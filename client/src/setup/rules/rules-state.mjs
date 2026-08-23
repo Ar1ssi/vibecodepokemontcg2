@@ -69,9 +69,12 @@
     };
     
     // ── turn/phase management ────────────────────────────────────────────
-    export function startGame() {
+    // firstPlayer: who goes first ('self' | 'opp'). Defaults to 'self' so
+    // existing callers/tests that invoke startGame() with no args keep
+    // their prior behavior; rules-bridge passes the coin-flip winner.
+    export function startGame(firstPlayer = 'self') {
       rulesState.turnNumber = 0;
-      rulesState.turnPlayer = 'self';
+      rulesState.turnPlayer = firstPlayer === 'opp' ? 'opp' : 'self';
       rulesState.phase = 'draw';
       resetTurnFlags('self');
       resetTurnFlags('opp');

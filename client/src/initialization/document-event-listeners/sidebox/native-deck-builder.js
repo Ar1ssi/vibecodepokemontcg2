@@ -31,6 +31,7 @@ import { initializeNativeDeckBuilderLibrary } from './native-deck-builder-librar
 import { initializeNativeDeckBuilderSetBrowser } from './native-deck-builder-set-browser.js';
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
 import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-picker.js';
+import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
     
     import {
@@ -168,6 +169,7 @@ export const initializeNativeDeckBuilder = () => {
           deckDirty = Object.keys(cards).length > 0;
           render();
           refreshSleeveSelection();
+          refreshCoinSelection();
         },
         onSaveCurrentDeck: () => {
           deckLibrary?.saveActiveDeck(deck);
@@ -278,7 +280,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             onChange: (coin) => {
               deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
               document.dispatchEvent(new CustomEvent('rules-coin-changed', {
-                detail: { coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
+                detail: { target: currentLoadTarget, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
               }));
             },
           });
@@ -364,6 +366,21 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const refreshSleeveSelection = () => {
         const sleeveId = deckLibrary?.getActiveSleeve(currentLoadTarget) || null;
         sleevePicker?.setSelected(sleeveId);
+      };
+
+      // Reflect the active deck's coin when decks switch, and let the
+      // rules engine know (for the match-start turn-order coin flip) even
+      // if the player never opens the coin picker this session.
+      const refreshCoinSelection = () => {
+        const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
+        const coin = coinId ? getCoinById(coinId) : null;
+        coinPicker?.setSelected(coinId);
+        document.dispatchEvent(new CustomEvent('rules-coin-changed', {
+          detail: {
+            target: currentLoadTarget,
+            coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null,
+          },
+        }));
       };
       if (tabBrowse) tabBrowse.addEventListener('click', () => switchMode('browse'));
   if (tabCustomize) tabCustomize.addEventListener('click', () => switchMode('customize'));

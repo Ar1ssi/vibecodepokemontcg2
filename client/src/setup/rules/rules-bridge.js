@@ -23,8 +23,25 @@ import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { evaluateMulligans } from './mulligan.mjs';
+import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     
     let initialized = false;
+    
+    // ── turn-order coin flip state ─────────────────────────────────────
+    // Coins each player has actively selected this session (from the deck
+    // builder's Customize > Coin tab, or the coin baked into whichever
+    // saved deck they opened). Populated by the 'rules-coin-changed' event
+    // dispatched from native-deck-builder.js.
+    const selectedCoins = { self: null, opp: null };
+    document.addEventListener('rules-coin-changed', (event) => {
+      const { target, coin } = event.detail || {};
+      if (target === 'self' || target === 'opp') selectedCoins[target] = coin || null;
+    });
+    
+    // When the opponent's client resolves the coin flip first (multiplayer),
+    // their result is mirrored here so our own Set Up click uses the same
+    // outcome instead of flipping independently.
+    let syncedTurnOrder = null;
     
     export const initializeRulesEngine = () => {
       if (initialized) return;
@@ -183,24 +200,125 @@ import { evaluateMulligans } from './mulligan.mjs';
       if (!btn) return;
       btn.addEventListener('click', () => {
         if (!rulesState.enabled) return;
-        startGame();
-        resetPrizes();
-        resetStatuses();
-        appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
     
-        // mulligan check: opening hands must contain a Basic Pokémon
-        setTimeout(async () => {
-          try {
-            const selfHand = getZone('self', 'hand').array;
-            const oppHand = systemState.isTwoPlayer ? getZone('opp', 'hand').array : [];
-            const steps = await evaluateMulligans({ selfHand, oppHand });
-            for (const step of steps) {
-              appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
-            }
-          } catch {}
-        }, 2500);
-        updateTurnBanner();
+        const proceedWithSetup = (firstPlayer) => {
+          startGame(firstPlayer);
+          resetPrizes();
+          resetStatuses();
+          appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
+    
+          // mulligan check: opening hands must contain a Basic Pokémon
+          setTimeout(async () => {
+            try {
+              const selfHand = getZone('self', 'hand').array;
+              const oppHand = systemState.isTwoPlayer ? getZone('opp', 'hand').array : [];
+              const steps = await evaluateMulligans({ selfHand, oppHand });
+              for (const step of steps) {
+                appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
+              }
+            } catch {}
+          }, 2500);
+          updateTurnBanner();
+        };
+    
+        // If the opponent's client already resolved (and broadcast) the
+        // coin flip, mirror their result instead of flipping again —
+        // avoids the two sides disagreeing on who goes first.
+        if (syncedTurnOrder) {
+          const firstPlayer = syncedTurnOrder;
+          syncedTurnOrder = null;
+          proceedWithSetup(firstPlayer);
+          return;
+        }
+    
+        runTurnOrderCoinFlip().then(({ turnPlayer }) => proceedWithSetup(turnPlayer));
       }, true);
+    };
+    
+    // ── turn-order coin flip: automatic at match start ───────────────────
+    // Randomly picks one player's selected coin (falling back to a random
+    // coin from the catalog if neither player has picked one), plays the
+    // existing 3D coin-toss animation full-screen, and uses the result to
+    // decide who goes first. Broadcasts the outcome to the opponent in
+    // multiplayer so both sides see the same flip and agree on turn order.
+    const runTurnOrderCoinFlip = () => {
+      return new Promise((resolve) => {
+        const coinOwner = Math.random() < 0.5 ? 'self' : 'opp';
+        const coin = selectedCoins[coinOwner] || pickRandomCoin();
+        const result = Math.random() < 0.5 ? 'heads' : 'tails';
+        // heads → self goes first, tails → opp goes first
+        const turnPlayer = result === 'heads' ? 'self' : 'opp';
+    
+        playTurnOrderCoinAnimation({ coin, result, coinOwner, turnPlayer, isRemote: false });
+    
+        if (systemState.isTwoPlayer && rulesSocket) {
+          rulesSocket.emit('rulesEvent', {
+            type: 'turnOrderCoinFlip',
+            data: { coinOwner, coinId: coin?.id || null, result, turnPlayer },
+          });
+        }
+    
+        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner }), 2700);
+      });
+    };
+    
+    const pickRandomCoin = () => {
+      const coins = getCoins();
+      if (coins.length === 0) return null;
+      return coins[Math.floor(Math.random() * coins.length)];
+    };
+    
+    // Renders the full-screen coin-toss overlay, reusing the existing
+    // .coin-3d / .coin-toss-wrap CSS from the deck builder's coin picker.
+    const playTurnOrderCoinAnimation = ({ coin, result, coinOwner, turnPlayer, isRemote }) => {
+      document.getElementById('turnOrderCoinFlipOverlay')?.remove();
+    
+      const material = coin?.material || 'enamel';
+      const thumb = coin?.thumb || 'https://ptcgsim.online/src/assets/coins/coin-back.png';
+      const name = coin?.name || 'Coin';
+      const ownerLabel = coinOwner === 'self' ? (isRemote ? "Opponent's" : 'Your') : (isRemote ? 'Your' : "Opponent's");
+      const winnerLabel = turnPlayer === 'self' ? (isRemote ? 'Opponent goes' : 'You go') : (isRemote ? 'You go' : 'Opponent goes');
+    
+      const overlay = document.createElement('div');
+      overlay.id = 'turnOrderCoinFlipOverlay';
+      overlay.innerHTML = `
+        <div class="turn-order-coin-flip-label">${ownerLabel} coin — flipping for turn order…</div>
+        <span class="coin-toss-wrap" data-coin-toss>
+          <div class="coin-3d coin-mat-${escapeHtml(material)}" data-coin-flip-el>
+            <div class="coin-face coin-front"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(name)}" /></div>
+            <div class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="back" /></div>
+          </div>
+        </span>
+        <div class="turn-order-coin-flip-result"></div>`;
+      document.body.appendChild(overlay);
+    
+      const coinEl = overlay.querySelector('[data-coin-flip-el]');
+      const wrap = overlay.querySelector('[data-coin-toss]');
+      const resultEl = overlay.querySelector('.turn-order-coin-flip-result');
+    
+      // 4 full tumbles, landing on front for heads / back for tails —
+      // matches the tossing timing used by the deck builder's coin picker.
+      requestAnimationFrame(() => {
+        const finalDeg = 4 * 360 + (result === 'tails' ? 180 : 0);
+        coinEl.style.setProperty('--coin-flip', finalDeg + 'deg');
+        wrap.classList.add('tossing');
+      });
+    
+      setTimeout(() => {
+        resultEl.textContent = `${result === 'heads' ? 'Heads' : 'Tails'}! ${winnerLabel} first.`;
+        resultEl.classList.add('visible');
+        appendMessage(
+          '',
+          `🪙 ${ownerLabel === 'Your' ? 'Your' : "Opponent's"} coin flip: ${result} — ${winnerLabel.toLowerCase()} first!`,
+          'announcement',
+          false
+        );
+      }, 1500);
+    
+      setTimeout(() => {
+        overlay.classList.add('fading');
+        setTimeout(() => overlay.remove(), 400);
+      }, 2400);
     };
     
     // ── deck privacy ─────────────────────────────────────────────────────
@@ -574,6 +692,21 @@ import { evaluateMulligans } from './mulligan.mjs';
               if (data.status) appendMessage('', `Your Pokémon is now ${data.status}!`, 'announcement', false);
             } else if (type === 'ko') {
               appendMessage('', `Your ${data.cardName} was knocked out. Promote a new Active.`, 'announcement', false);
+            } else if (type === 'turnOrderCoinFlip') {
+              // sender's data is from their own self/opp perspective — invert
+              // it so it's correct from ours
+              const localCoinOwner = data.coinOwner === 'self' ? 'opp' : 'self';
+              const localTurnPlayer = data.turnPlayer === 'self' ? 'opp' : 'self';
+              const coin = data.coinId ? getCoinById(data.coinId) : null;
+              playTurnOrderCoinAnimation({
+                coin,
+                result: data.result,
+                coinOwner: localCoinOwner,
+                turnPlayer: localTurnPlayer,
+                isRemote: true,
+              });
+              // used when we click our own Set Up, so both sides agree
+              syncedTurnOrder = localTurnPlayer;
             }
           } catch {}
         });

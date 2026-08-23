@@ -235,6 +235,10 @@ import {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].sleeveId || null : null;
             },
+        getActiveCoin: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId] ? library.decks[activeId].coinId || null : null;
+            },
             saveActiveDeck: (cards) => {
           const activeId = activeDeckIds[currentTarget];
           if (!activeId || !library?.decks?.[activeId]) return false;
