@@ -43,8 +43,16 @@ async function main() {
     },
   });
   // Create a new SQLite database
-  const dbFilePath = 'database/db.sqlite';
+  const dbDir = path.join(__dirname, 'database');
+  const dbFilePath = path.join(dbDir, 'db.sqlite');
   const maxSizeGB = 15;
+
+  // ensure the database directory exists BEFORE opening the DB
+  // (ephemeral hosts like Render wipe this on every deploy/restart)
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
   const db = new sqlite3.Database(dbFilePath);
   let isDatabaseCapacityReached = false;
 
@@ -316,8 +324,6 @@ async function main() {
 
   const port = process.env.PORT || 4000;
 
-// ensure the database directory exists (ephemeral hosts wipe it)
-try { if (!existsSync('./database')) mkdirSync('./database', { recursive: true }); } catch {}
   server.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`Server is running at http://localhost:${port}`);
