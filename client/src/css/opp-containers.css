@@ -1,0 +1,663 @@
+
+* {
+  user-select: none;
+}
+body, input, textarea, button {
+  font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif
+}
+.dark-mode-1 {
+  background-color: rgb(8, 18, 18) !important;
+  color: white;
+}
+.dark-mode-2 {
+  background-color: rgb(0, 0, 0) !important;
+  color: white;
+}
+.dark-mode-3 {
+  color: rgb(149, 149, 149);
+}
+.dark-mode-4 {
+  background-color: #141414 !important;
+  color: white;
+}
+.dark-mode-5 {
+  background-color: rgb(59 59 59 / 87%) !important;
+}
+#boardCenterDesign {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+#boardCircle {
+  position: absolute;
+  width: 16vw;
+  height: 16vw;
+  bottom: calc(100% - 8vw);
+  left: calc(50% - 8vw);
+  border-radius: 50%;
+  background: rgba(213, 158, 158, 0.14);
+  z-index: -2;
+}
+#innerCircle {
+  position: absolute;
+  width: 4vw;
+  height: 4vw;
+  bottom: calc(100% - 2vw);
+  left: calc(50% - 2vw);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: -2;
+}
+.outline {
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 15px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.self-view {
+  transform: translate(-50%, -50%);
+  top: 50%;
+  left: 50%;
+}
+.opp-view {
+  transform: translateX(-50%) scaleX(-1) scaleY(-1);
+  top: 0%;
+  left: 50%;
+}
+.flip-image img {
+  transform: scaleX(-1) scaleY(-1) !important;
+}
+.highlight {
+  box-shadow: 0 0 0 4px rgb(182, 110, 110) !important;
+  background-color: rgba(188, 90, 113, 0.3) !important;
+  z-index: 1 !important;
+}
+.selectHighlight {
+  box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864) !important;
+}
+.highlightBox {
+  background-color: rgba(188, 90, 113, 0.3);
+}
+#hand {
+  border-top: 3px solid rgba(188, 90, 113, 0.864);  
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: calc(30% - 3px);
+  overflow-x: auto;
+  display: flex;
+  z-index: 0;
+  align-items: flex-end;
+}
+#hand img {
+  box-sizing: border-box;
+  width: auto;
+  max-height: calc(100% - 3vh);
+  margin-bottom: 2vh;
+  margin-left: .25vw;
+  margin-right: .25vw;
+}
+#handText {
+  position: fixed;
+  right: 2%;
+  bottom: 30%;
+  color: rgba(188, 90, 113, 0.864);  
+}
+#handLabel {
+  position: fixed;
+  left: 0%;
+  bottom: 29.5%;
+  color: rgba(188, 90, 113, 0.864);
+  font-size: 5vh;
+}
+#bench {
+  position: fixed;
+	bottom: 35%;
+	left: 10%;
+	width: 79%;
+	height: 25%;
+	display: flex;
+	justify-content: center;
+	align-items: flex-end;
+	z-index: 0;
+}
+#bench div {
+  height: 100%;
+	margin-right: 1%;
+}
+#active {
+  position: fixed;
+	bottom: 65%;
+	left: 34%;
+	width: 32%;
+	height: 28%;
+	display: flex;
+	justify-content: center;
+	align-items: flex-end;
+	z-index: 0;
+}
+#active div {
+  width: auto;
+	height: 100%;
+}
+#prizes {
+  position: fixed;
+  bottom: 36%;
+  left: 1%;
+  width: 6%;
+  height: 43%;
+  z-index: 0;
+  padding: 5px;
+}
+#prizes img {
+  margin-left: .1vw;
+  width: auto;
+  max-width: calc(50% - .1vw);
+}
+.prizes-normal-size {
+  max-height: 33%;
+}
+.prizes-small-size {
+  max-height: 23%;
+}
+#lostZoneCover {
+  position: fixed;
+  bottom: 84%;
+  left: 1%;
+  width: 7%;
+  height: 15%;
+  z-index: 0;
+  background-color: rgba(233, 198, 233, 0.111);
+  display: flex;
+  justify-content: center; 
+  align-items:flex-start;
+  border-radius: 1rem;
+}
+#lostZoneCover img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  left: 0;
+}
+#lostZoneText {
+	position: fixed;
+  left: 8.5%;
+  bottom: 90%;
+}
+#deckCover {
+  position: fixed;
+  bottom: 66%;
+  right: 1%;
+  width: 8%;
+  height: 25%;
+  display: flex;
+  justify-content: center; 
+  align-items:flex-start;
+  z-index: 0;
+}
+#deckCover img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  left: 0;
+} 
+#deckText {
+  position: fixed;
+  right: 2%;
+  bottom: 91%;
+}
+.self-text {
+  font-size: clamp(10px, 4vh, 20px);
+}
+.opp-text {
+  font-size: clamp(10px, 4vh, 20px);
+  transform: scaleX(-1) scaleY(-1);
+}
+#discardText {
+  position: fixed;
+  right: 2%;
+  bottom: 60%;
+}
+#discardCover {
+  position: fixed;
+  bottom: 36%;
+  right: 1%;
+  width: 8%;
+  height: 23%;
+  display: flex;
+  justify-content: center; 
+  align-items:flex-start;
+  z-index: 0;
+}
+#discardCover img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  left: 0;
+}
+#shuffleDiscardButton {
+  background: linear-gradient(to bottom, rgba(188, 90, 113, 0.864), rgba(158, 60, 83, 0.864));
+}
+#shuffleDiscardButton:hover {
+  background-color: rgba(189, 112, 130, 0.864);  
+}
+#board {
+  position: fixed;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  overflow-y: auto;
+  align-items: flex-end;
+  padding: 5px;
+  z-index: -1;
+}
+#board img {
+  width: auto;
+  height: 70%;
+  margin: .25vw;
+}
+.self-board {
+  bottom: 61%;
+  left: 66%;
+  width: 24%;
+  height: 30%;
+  border-radius: 20px;
+}
+.opp-board {
+  bottom: 61%;
+  right: 66%;
+  width: 22%;
+  height: 30%;
+  border-radius: 20px;
+}
+.self-special-move-button-container {
+  position: fixed;
+  height: 6%;
+  width: 10%;
+  right: 67%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.opp-special-move-button-container {
+  position: fixed;
+  height: 6%;
+  width: 10%;
+  left: 67%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+}
+#specialMoveButtonContainer button {
+  min-height: 10px;
+  max-height: 20px;
+  height: 6vh;
+  border-radius: 10px;
+  font-size: clamp(10px, 4vh, 15px);
+  cursor: pointer;
+  background: linear-gradient(to bottom, rgb(250, 250, 250), rgb(230, 230, 230));
+  color: rgb(60, 60, 60);
+  border: 1px solid rgb(200, 200, 200);
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+#specialMoveButtonContainer button.dark-mode-2 {
+  background: linear-gradient(to bottom, rgb(60, 60, 60), rgb(40, 40, 40));
+  color: rgb(250, 250, 250);
+  border-color: rgb(100, 100, 100);
+  box-shadow: 0px 2px 4px rgba(255, 255, 255, 0.1);
+}
+#specialMoveButtonContainer button:hover {
+  background: linear-gradient(to bottom, rgb(220, 220, 220), rgb(200, 200, 200));
+  color: rgb(40, 40, 40);
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+#specialMoveButtonContainer button.dark-mode-2:hover {
+  background: linear-gradient(to bottom, rgb(80, 80, 80), rgb(60, 60, 60));
+  color: rgb(220, 220, 220);
+  box-shadow: 0px 4px 8px rgba(255, 255, 255, 0.2);
+}
+.used-special-move {
+  background: linear-gradient(to bottom, rgba(188, 90, 113, 0.7), rgba(188, 90, 113, 0.3)) !important;
+  border-color: rgba(188, 90, 113, 0.864) !important;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+.used-special-move:not(.dark-mode-2) {
+  color: rgb(0, 0, 0) !important;
+}
+.play-container {
+  display: inline-block;
+  flex-wrap: nowrap;
+  height: 100%;
+  position: relative;
+}
+.play-container img {
+  width: auto;
+  height: 100%;
+}
+.full-view {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(169, 169, 169, 0.5);
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  margin-right: 1%;
+}
+.full-view img {
+  height: 24%;
+  margin: 0.5%;
+}
+.self-circle {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgb(255, 98, 0);
+  color: white;
+  text-align: center;
+}
+.opp-circle {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgb(255, 98, 0);
+  color: white;
+  text-align: center;
+  transform: scaleX(-1) scaleY(-1);
+}
+.opp-tab {
+  position: absolute;
+  border-radius: 10%;
+  background-color: rgba(255, 60, 0, 0.392);
+}
+#attachedCards {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(169, 169, 169, 0.5);
+  border: 1px solid #ccc;
+  border-radius: 0 0 15px 15px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  width: 69%;
+  height: 75%;
+}
+#attachedCards img {
+  height: 33%;
+  margin: 0.5%;
+}
+#attachedCards button, #viewCards button {
+  width: 17%;
+}
+.header {
+  position: absolute;
+  top: -3%;
+  left: 50%;
+  width: 100%;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  border-radius: 15px 15px 0 0;
+  color: white;
+  font-size: clamp(12px, 3vh, 20px);
+  background-color: rgb(196 112 131);
+  border: 2px solid #c47083;
+  box-sizing: border-box;
+}
+.self-header {
+  transform: translate(-50%, -50%);
+}
+.opp-header {
+  transform: translateX(-50%) scaleX(-1) scaleY(-1);
+}
+#viewCards {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(169, 169, 169, 0.5);
+  border: 1px solid #ccc;
+  border-radius: 0 0 15px 15px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  width: 69%;
+  height: 75%;
+}
+#viewCards img {
+  height: 33%;
+  margin: 0.5%;
+}
+.self-zone-button-container {
+  position: absolute;
+  bottom: 0%;
+  width: 96%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #dadada;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  padding: 10px;
+  border-radius: 15px;
+}
+.opp-zone-button-container {
+  display: none;
+  /* position: absolute;
+  bottom: 0%;
+  width: 96%;
+  left: 50%;
+  transform: translateX(-50%) scaleX(-1) scaleY(-1);
+  background-color: #dddddd;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  padding: 10px;
+  border-radius: 15px; */
+}
+.zone-button {
+  margin: 0 5px;
+  width: 20%;
+  padding: 5px;
+  border-radius: 5px;
+  border: none;
+  background: linear-gradient(to bottom, #6e6f71, #4c4d4f);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+}
+.zone-button:hover {
+  background: linear-gradient(to bottom, #898989, #7b7c7d);
+}
+.zone-button-container {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  left: 0;
+  background-color: #dadada;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  padding: 5px;
+  border-radius: 0 0 15px 15px;
+  margin-bottom: 1%;
+  z-index: 1;
+  box-sizing: border-box;
+}
+.zone {
+  display: none;
+  position: fixed;
+  background-color: rgba(169, 169, 169, 0.867);
+  border: 1px solid #ccc;
+  border-radius: 15px 15px 15px 15px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+  padding: 0px 20px 20px 20px;
+  width: 85%;
+  height: 75%;
+  overflow-y: auto;
+  z-index: 3;
+}
+#deck label, #discard label, #lostZone label {
+  position: relative;
+  cursor: pointer;
+}
+#deck img {
+  display: inline-block;
+  width: 8%;
+  height: auto;
+  margin: 1px;
+}
+#lostZone img {
+  display: inline-block;
+  width: 12%;
+  height: auto;
+  margin: 1px;
+}
+#discard img {
+  display: inline-block;
+  width: 10%;
+  height: auto;
+  margin: 1px;
+}
+
+#hand img,
+#bench div img,
+#lostZoneCover img,
+#deckCover img,
+#discardCover img,
+#board img,
+.play-container img,
+.full-view img,
+#attachedCards img,
+#viewCards img,
+#deck img,
+#lostZone img,
+#discard img,
+#prizes img {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .3);
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+#hand,
+#bench,
+#deckCover,
+#discardCover,
+#active,
+#prizes
+{
+  border-radius: .5rem;
+}
+.default-rotation {
+  transform: rotate(0deg) !important;
+}
+.high-zIndex {
+  z-index: 1 !important;
+}
+    
+    /* ═══ TCG LIVE-STYLE PLAYMAT THEME ═══════════════════════════════════
+       Applies inside the playmat iframes: a soft arena mat with distinct
+       zone plates (deck, prizes, discard, lost zone, active, bench), plus
+       card motion animations for draw/shuffle/play. */
+    
+    /* arena mat background */
+    body {
+      background:
+        radial-gradient(120% 90% at 50% 0%, rgba(120, 160, 230, 0.10), transparent 60%),
+        linear-gradient(180deg, #23324e 0%, #1b2740 55%, #161f36 100%) !important;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(60% 40% at 50% 55%, rgba(140, 190, 255, 0.06), transparent 70%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0 2px, transparent 2px 90px),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.014) 0 2px, transparent 2px 90px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    /* zone plates: rounded, softly lit, labeled */
+    .zone, .outline {
+      border-radius: 10px;
+    }
+    
+    /* deck/discard/lost-zone plates */
+    #deck, #discard, #lostZone {
+      background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+      border: 1px solid rgba(160, 190, 255, 0.22);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    /* active spot: spotlight plate */
+    #active {
+      background: radial-gradient(80% 80% at 50% 40%, rgba(255, 214, 120, 0.10), transparent 70%),
+                  linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255, 214, 120, 0.30);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+    }
+    /* bench + stadium */
+    #board .outline, #stadium {
+      background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+      border: 1px solid rgba(160, 190, 255, 0.18);
+    }
+    /* hand strip */
+    #hand {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+      border-top: 1px solid rgba(160, 190, 255, 0.18);
+    }
+    
+    /* hover affordance on plates */
+    #deck:hover, #discard:hover, #lostZone:hover {
+      border-color: rgba(190, 220, 255, 0.45);
+    }
+    
+    
+    
+    /* ═══ CARD MOTION — TCG Live style ═══════════════════════════════════
+       Subtle slide+fade from the origin direction; short, no bounce, no
+       board shake. Cards animate opacity/transform only and NEVER touch
+       layout properties, so zones never reflow away. */
+    @keyframes tcgl-from-deck {
+      from { transform: translateY(-34px) scale(0.92); opacity: 0; }
+      to   { transform: none; opacity: 1; }
+    }
+    @keyframes tcgl-from-hand {
+      from { transform: translateY(22px) scale(1.06); opacity: 0; }
+      to   { transform: none; opacity: 1; }
+    }
+    @keyframes tcgl-to-discard {
+      0%   { transform: none; opacity: 1; }
+      100% { transform: translateY(18px) rotate(5deg) scale(0.94); opacity: 0; }
+    }
+    @keyframes tcgl-knockout {
+      0%   { filter: brightness(1); }
+      30%  { filter: brightness(1.6) saturate(0.2); }
+      100% { filter: brightness(0.4); opacity: 0.85; }
+    }
+    .tcgl-anim { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1); animation-fill-mode: backwards; }
+    .tcgl-from-deck { animation-name: tcgl-from-deck; }
+    .tcgl-from-hand { animation-name: tcgl-from-hand; }
+    .tcgl-to-discard { animation-name: tcgl-to-discard; animation-fill-mode: forwards; }
+    .tcgl-knockout { animation-name: tcgl-knockout; animation-duration: 0.5s; animation-fill-mode: forwards; }
+    
+    /* shuffle: a restrained single wobble of the deck label plate only */
+    @keyframes tcgl-shuffle {
+      0%, 100% { transform: none; }
+      30% { transform: translateY(-2px) rotate(-0.6deg); }
+      65% { transform: translateY(1px) rotate(0.5deg); }
+    }
+    .tcgl-shuffle { animation: tcgl-shuffle 0.42s ease-in-out; }
+    
