@@ -1,12 +1,11 @@
 services:
-      - type: web
-        name: ptcg-sim
-        runtime: node
-        plan: free
-        buildCommand: corepack enable && pnpm install --frozen-lockfile
-        startCommand: node server/server.js
-        healthCheckPath: /
-        envVars:
-          - key: NODE_ENV
-            value: production
-    
+  - type: web
+    name: ptcg-sim
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: node server/server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
