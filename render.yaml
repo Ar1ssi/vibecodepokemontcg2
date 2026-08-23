@@ -3,7 +3,7 @@ services:
         name: ptcg-sim
         runtime: node
         plan: free
-        buildCommand: npm install
+        buildCommand: npm install --prefix server
         startCommand: node server/server.js
         healthCheckPath: /
         envVars:
