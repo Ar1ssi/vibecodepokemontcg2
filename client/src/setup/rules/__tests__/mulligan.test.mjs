@@ -50,4 +50,22 @@ import test from 'node:test';
       assert.equal(bonusDrawsOwed(0), 0);
       assert.equal(bonusDrawsOwed(2), 2);
     });
+
+    test('mulligansResolved starts false', () => {
+      assert.equal(rulesState.mulligansResolved, false);
+    });
+
+    test('markMulligansResolved sets flag to true', async () => {
+      const { markMulligansResolved } = await import('../rules-state.mjs');
+      markMulligansResolved();
+      assert.equal(rulesState.mulligansResolved, true);
+    });
+
+    test('startGame resets mulligansResolved to false', async () => {
+      const { markMulligansResolved, startGame } = await import('../rules-state.mjs');
+      markMulligansResolved();
+      assert.equal(rulesState.mulligansResolved, true);
+      startGame('self');
+      assert.equal(rulesState.mulligansResolved, false);
+    });
     

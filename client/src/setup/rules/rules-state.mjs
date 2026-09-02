@@ -5,14 +5,17 @@
     export const RULES_STORAGE_KEY = 'ptcg-sim.rules-enforced.v1';
     
     export const rulesState = {
-      enabled: false,          // master switch (Settings toggle)
+      enabled: true,           // master switch (Settings toggle) — default on; loadRulesEnabled() may override from storage
       turnPlayer: 'self',      // whose turn: 'self' | 'opp'
       turnNumber: 0,
       phase: 'setup',          // setup | draw | main | attack | ended
+      // Stadium currently on the field (both players share it): { user, card } | null
+      stadium: null,
+      mulligansResolved: false, // guard: mulligan execution runs at most once per game
       // per-player per-turn facts
       flags: {
-        self: { energyAttached: false, attackerAttacked: false, evolved: {} },
-        opp: { energyAttached: false, attackerAttacked: false, evolved: {} },
+        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
+        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
       },
     };
     
@@ -76,6 +79,8 @@
       rulesState.turnNumber = 0;
       rulesState.turnPlayer = firstPlayer === 'opp' ? 'opp' : 'self';
       rulesState.phase = 'draw';
+      rulesState.stadium = null; // new game: nothing on the stadium field
+      rulesState.mulligansResolved = false;
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -97,12 +102,106 @@
     }
     
     function resetTurnFlags(player) {
-      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {} };
+      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {}, stadiumUsed: false, drewThisTurn: false };
+    }
+
+    // Mark that the start-of-turn draw already happened for this player this
+    // turn, so a duplicate rules-turn-began dispatch (two live hook sites, or a
+    // re-render) cannot double-draw.
+    export function markTurnDrawn(player) {
+      if (rulesState.flags[player]) rulesState.flags[player].drewThisTurn = true;
+    }
+
+    // Mulligan execution gate: ensures the auto-reshuffle/redraw + bonus draw
+    // runs at most once per game. Set true after the mulligan block executes.
+    export function markMulligansResolved() {
+      rulesState.mulligansResolved = true;
     }
     
     export function markEnergyAttached(player) {
       if (rulesState.flags[player]) rulesState.flags[player].energyAttached = true;
     }
+    export function markSupporterPlayed(player) {
+      if (rulesState.flags[player]) rulesState.flags[player].supporterPlayed = true;
+    }
+    
+    // ── start-of-turn draw (taxonomy B: "Draw 1 at start of turn") ──────
+    // Pure, DOM-free gate: should the turn-start player auto-draw exactly one
+    // card? True only when rules are enabled, the draw hasn't happened yet this
+    // turn, and there is at least one card left in the deck. The UI layer
+    // (rules-bridge.js) calls the real draw() when this returns true.
+    export function shouldAutoDrawAtTurnStart({ enabled = true, drewThisTurn = false, deckCount = 0 } = {}) {
+      return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
+    }
+
+    // ── one Supporter per turn (taxonomy A2) ──────────────────────────
+    // Pure, DOM-free gate: playing a Supporter is limited to one per turn.
+    // Items are unlimited; Stadiums, Tools, and Special Supporters bypass
+    // the limit entirely (Special Supporters may be played as many times as
+    // their text allows).
+    // cardType: supertype string ('Supporter', 'Item', 'Special Supporter', ...)
+    // subtypes: optional TCGdex subtypes array as fallback discriminator.
+    export function supporterPlayGate({ cardType, subtypes = [], supporterPlayed = false }) {
+      const t = String(cardType || '').toLowerCase();
+      const subs = (subtypes || []).map((s) => String(s).toLowerCase());
+      const isSupporter =
+        (t.includes('supporter') && !t.includes('special')) ||
+        (subs.includes('supporter') && !subs.includes('special supporter'));
+      if (!isSupporter) return { allowed: true };
+      if (supporterPlayed) {
+        return { allowed: false, reason: 'You already played a Supporter this turn (one per turn).' };
+      }
+      return { allowed: true };
+    }
+    // ── Stadium on the field (taxonomy E) ──────────────────────────
+    // Both players share a single Stadium; playing a new one discards the
+    // old one (the DOM/UI side already does that in update-stadium-card.js —
+    // this is the *state* record so gates/effects can query it).
+    // Pure, DOM-free. markStadiumPlayed stores { user, card } and returns
+    // the previously-on-field object (or null) so the caller can announce
+    // the replacement. Call it BEFORE updateStadiumCard discards the old card.
+    export function markStadiumPlayed(user, card) {
+      const previous = rulesState.stadium;
+      rulesState.stadium = { user, card };
+      return previous;
+    }
+
+    export function getStadium() {
+      return rulesState.stadium;
+    }
+
+    // ── per-ability used-tracking (taxonomy C) ────────────────────
+    // Pure, DOM-free replacement for the old img.__rulesAbilityUsed flag.
+    // Abilities that may only be used once per turn record themselves here;
+    // resetTurnFlags() clears the whole map each turn (startGame/beginTurn/
+    // endTurn all call it), so no separate DOM-flag reset is required.
+    // Keyed by a stable card identity so the same card on bench vs active, or
+    // across client mirrors, maps to one slot.
+    export function abilityKey(card) {
+      if (!card) return 'unknown';
+      if (card.id != null && card.id !== '') return `id:${card.id}`;
+      const setNumber = card.number ?? card.set?.number ?? '';
+      return `name:${card.name ?? 'unknown'}#${setNumber}`;
+    }
+    export function markAbilityUsed(player, card) {
+      const f = rulesState.flags[player];
+      if (f) f.abilitiesUsed[abilityKey(card)] = true;
+    }
+    export function abilityUsed(player, card) {
+      return !!rulesState.flags[player]?.abilitiesUsed?.[abilityKey(card)];
+    }
+
+    // ── per-stadium used-tracking (taxonomy E, once-per-turn) ─────────
+    // A stadium's once-per-turn effect can only be used once per turn by
+    // each player. Reset in resetTurnFlags (startGame/beginTurn/endTurn).
+    export function markStadiumUsed(player) {
+      const f = rulesState.flags[player];
+      if (f) f.stadiumUsed = true;
+    }
+    export function stadiumUsed(player) {
+      return !!rulesState.flags[player]?.stadiumUsed;
+    }
+
     export function markAttacked(player) {
       if (rulesState.flags[player]) rulesState.flags[player].attackerAttacked = true;
       rulesState.phase = 'attack'; // attacking ends the turn (auto)
@@ -162,6 +261,13 @@
           }
           return { allowed: true };
     
+        case 'playSupporter':
+          if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
+          if (S.flags[user]?.supporterPlayed) {
+            return { allowed: false, reason: 'You already played a Supporter this turn (one per turn).' };
+          }
+          return { allowed: true };
+    
         case 'evolve':
           if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
           if (S.turnNumber <= 1) {
@@ -205,7 +311,9 @@
     }
     export function loadRulesEnabled() {
       try {
-        rulesState.enabled = localStorage.getItem(RULES_STORAGE_KEY) === '1';
+        const stored = localStorage.getItem(RULES_STORAGE_KEY);
+        // Rules mode is ON by default; only an explicitly stored '0' keeps it off.
+        rulesState.enabled = stored === null ? true : stored === '1';
       } catch {}
       return rulesState.enabled;
     }

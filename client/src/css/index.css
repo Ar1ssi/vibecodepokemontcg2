@@ -136,6 +136,69 @@ ul, li {
   height: 50%;
   transform: scaleX(-1) scaleY(-1);
 }
+/* ── Battle mat: hexagonal red/blue arena, PTCG Live style ─────────────
+   Sits fixed behind the self/opp iframes (which render transparent
+   card zones on top of it) and in front of the customizable body
+   background. Purely a visual layer — doesn't affect any game logic
+   or zone positioning, which is still driven by the iframes' own CSS. */
+#battleMat {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 75.5%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, #14161c 0%, #05060a 70%, #000 100%);
+  z-index: 0;
+  overflow: hidden;
+}
+#battleMatTrim {
+  position: absolute;
+  inset: 3.4% 3%;
+  background: linear-gradient(160deg, #f6dd85 0%, #d9ab3d 28%, #8a6416 52%, #d9ab3d 76%, #f6dd85 100%);
+  clip-path: polygon(9% 0%, 91% 0%, 100% 9%, 100% 91%, 91% 100%, 9% 100%, 0% 91%, 0% 9%);
+  box-shadow: 0 0 3vh rgba(0, 0, 0, 0.55) inset, 0 0.4vh 1.2vh rgba(0, 0, 0, 0.6);
+}
+#battleMatSurface {
+  position: absolute;
+  inset: 1vh;
+  clip-path: polygon(9% 0%, 91% 0%, 100% 9%, 100% 91%, 91% 100%, 9% 100%, 0% 91%, 0% 9%);
+  background: linear-gradient(to bottom,
+    #8a1f22 0%, #a3282b 24%, #8f2124 48.5%,
+    #1b2646 51.5%, #1e3a72 76%, #22458a 100%);
+  overflow: hidden;
+}
+#battleMatSeam {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: linear-gradient(to right, transparent 0%, rgba(255, 220, 140, 0.55) 15%, rgba(255, 220, 140, 0.55) 85%, transparent 100%);
+}
+#battleMatFloor {
+  position: absolute;
+  top: 22%;
+  left: 22%;
+  width: 56%;
+  height: 56%;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, rgba(0, 0, 0, 0.16) 0, rgba(0, 0, 0, 0.16) 1px, transparent 1px, transparent 5%),
+    radial-gradient(circle, rgba(20, 22, 30, 0.55) 0%, rgba(10, 11, 16, 0.75) 65%, rgba(5, 6, 9, 0.85) 100%);
+  box-shadow: 0 0 4vh rgba(0, 0, 0, 0.5) inset;
+}
+#battleMatGlow {
+  position: absolute;
+  top: 32%;
+  left: 30%;
+  width: 40%;
+  height: 36%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.32) 0%, rgba(190, 210, 255, 0.14) 45%, transparent 72%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
 #stadium {
   position: fixed;
   bottom: 42%;
@@ -703,6 +766,59 @@ ul, li {
       opacity: 0.75;
       margin: 0.4vh 0 0.6vh;
     }
+    /* ── Horizontal set tab strip ─────────────────────────────────────────
+       Sets scroll horizontally in a wrapping row instead of stacking as
+       full-width rows — frees up vertical space for the card grid below. */
+    .native-deck-builder-set-browser-tabs {
+      flex: 0 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4vh 0.4vw;
+      padding-bottom: 0.6vh;
+      margin-bottom: 0.4vh;
+      border-bottom: 1px solid rgba(40, 57, 124, 0.14);
+    }
+    .native-deck-builder-set-browser-tab {
+      display: flex;
+      align-items: center;
+      gap: 0.35vw;
+      padding: 0.4vh 0.55vw;
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(40, 57, 124, 0.16);
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 1.4vh;
+      font-family: inherit;
+      color: #1a2560;
+      white-space: nowrap;
+    }
+    .native-deck-builder-set-browser-tab:hover {
+      background: rgba(65, 91, 168, 0.1);
+    }
+    .native-deck-builder-set-browser-tab.expanded {
+      background: rgba(65, 91, 168, 0.16);
+      border-color: rgba(65, 91, 168, 0.55);
+      font-weight: 600;
+    }
+    .native-deck-builder-set-browser-tab-logo {
+      height: 2.4vh;
+      width: auto;
+      max-width: 6.5vw;
+      object-fit: contain;
+    }
+    .native-deck-builder-set-browser-tab-name {
+      max-width: 10vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .native-deck-builder-set-browser-tab-count {
+      font-size: 1.15vh;
+      opacity: 0.65;
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 999px;
+      padding: 0.05vh 0.4vw;
+    }
+    /* ── Drop-down card area below the tab strip ─────────────────────────── */
     .native-deck-builder-set-browser-results {
       flex: 1;
       min-height: 0;
@@ -716,72 +832,29 @@ ul, li {
       background: rgba(0, 0, 0, 0.2);
       border-radius: 3px;
     }
-    .native-deck-builder-set-browser-group {
-      margin-bottom: 0.8vh;
-      background: rgba(255, 255, 255, 0.35);
-      border: 1px solid rgba(40, 57, 124, 0.12);
-      border-radius: 0.4vw;
-      overflow: hidden;
-    }
-    .native-deck-builder-set-browser-group.expanded {
-      border-color: rgba(65, 91, 168, 0.4);
-    }
-    .native-deck-builder-set-browser-group-header {
-      display: flex;
-      align-items: center;
-      gap: 0.6vw;
-      width: 100%;
-      padding: 0.6vh 0.7vw;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-size: 1.7vh;
-      font-family: inherit;
-      color: inherit;
-      text-align: left;
-    }
-    .native-deck-builder-set-browser-group-header:hover {
-      background: rgba(65, 91, 168, 0.07);
-    }
-    .native-deck-builder-set-browser-group.expanded .native-deck-builder-set-browser-group-header {
-      border-bottom: 1px solid rgba(40, 57, 124, 0.14);
-    }
-    .native-deck-builder-set-browser-group-logo {
-      height: 5.5vh;
-      width: auto;
-      max-width: 100%;
-      object-fit: contain;
-      flex: 0 0 auto;
-      opacity: 0.95;
-    }
-    .native-deck-builder-set-browser-group-header strong {
-      color: #1a2560;
-    }
-    .native-deck-builder-set-browser-group-count {
-      font-size: 1.3vh;
-      opacity: 0.7;
-    }
-    .native-deck-builder-set-browser-group-date {
-      font-size: 1.2vh;
-      opacity: 0.55;
-      margin-left: 0;
-    }
-    .native-deck-builder-set-browser-chevron {
-      margin-left: auto;
-      font-size: 1.6vh;
+    .native-deck-builder-set-browser-dropdown-empty {
+      font-size: 1.5vh;
       opacity: 0.6;
-      transition: transform 160ms ease;
-      flex: 0 0 auto;
+      font-style: italic;
+      padding: 1.2vh 0.2vw;
     }
-    .native-deck-builder-set-browser-group.expanded .native-deck-builder-set-browser-chevron {
-      transform: rotate(180deg);
+    .native-deck-builder-set-browser-dropdown-section {
+      margin-bottom: 1vh;
+    }
+    .native-deck-builder-set-browser-dropdown-label {
+      font-size: 1.4vh;
+      font-weight: 600;
+      color: #1a2560;
+      margin: 0.3vh 0 0.4vh;
+      padding-bottom: 0.2vh;
+      border-bottom: 1px solid rgba(40, 57, 124, 0.1);
     }
     .native-deck-builder-set-browser-group-cards {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 0.5vw;
       align-content: start;
-      padding: 0.6vh 0.5vw;
+      padding: 0.6vh 0.2vw;
     }
     .native-deck-builder-set-browser-empty {
       flex: 1;
@@ -811,15 +884,21 @@ ul, li {
       border-color: rgba(120, 144, 214, 0.25);
       color: #eef3ff;
     }
-    body.dark-mode-1 .native-deck-builder-set-browser-group {
+    body.dark-mode-1 .native-deck-builder-set-browser-tabs {
+      border-color: rgba(120, 144, 214, 0.2);
+    }
+    body.dark-mode-1 .native-deck-builder-set-browser-tab {
       background: rgba(40, 50, 80, 0.35);
       border-color: rgba(120, 144, 214, 0.2);
-    }
-    body.dark-mode-1 .native-deck-builder-set-browser-group-header {
-      border-color: rgba(120, 144, 214, 0.2);
-    }
-    body.dark-mode-1 .native-deck-builder-set-browser-group-header strong {
       color: #c5d0ff;
+    }
+    body.dark-mode-1 .native-deck-builder-set-browser-tab.expanded {
+      background: rgba(120, 144, 214, 0.22);
+      border-color: rgba(120, 144, 214, 0.5);
+    }
+    body.dark-mode-1 .native-deck-builder-set-browser-dropdown-label {
+      color: #c5d0ff;
+      border-color: rgba(120, 144, 214, 0.16);
     }
     
     /* ── Saved deck library ("My Decks") bar ─────────────────────────────── */
@@ -3397,7 +3476,28 @@ a:hover {
     }
     body:not(.dark-mode-1) .choice-picker-card { background: rgba(247,248,250,0.98); color: #1a2560; }
     body:not(.dark-mode-1) .choice-picker-item { background: rgba(65,91,168,0.1); }
-    
+    .choice-picker-item.selected {
+      background: rgba(65, 91, 168, 0.55);
+      border-color: rgba(160, 190, 255, 0.9);
+    }
+    .choice-picker-confirm {
+      margin-top: 1.6vh;
+      align-self: center;
+      background: rgba(80, 160, 100, 0.3);
+      border: 1px solid rgba(120, 200, 140, 0.5);
+      color: inherit;
+      border-radius: 7px;
+      padding: 0.8vh 2vw;
+      cursor: pointer;
+      font-size: 1.5vh;
+    }
+    .choice-picker-confirm:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    body:not(.dark-mode-1) .choice-picker-item.selected { background: rgba(65,91,168,0.3); border-color: rgba(65,91,168,0.8); }
+    body:not(.dark-mode-1) .choice-picker-confirm { background: rgba(80,160,100,0.2); }
+
     /* ═══ COIN PICKER (TCG Live style) ════════════════════════════════════
        Circular metal discs with mouse-tracked specular highlights.
        Materials: gold/silver = hard anisotropic sweep (metalness), colored
@@ -3696,4 +3796,55 @@ a:hover {
     .native-deck-builder-coin-picker .native-deck-builder-coin-filter { display: none; }
     .native-deck-builder-coin-picker .native-deck-builder-section-title,
     .native-deck-builder-coin-picker .native-deck-builder-set-browser-series-tag { display: none; }
+
+    /* ── Attack Window ── */
+    #rulesAttackWindow {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      z-index: 9999;
+      background: rgba(20, 24, 32, 0.95);
+      border: 1px solid rgba(100, 140, 220, 0.4);
+      border-radius: 8px;
+      padding: 10px 14px;
+      max-width: 380px;
+      max-height: 45vh;
+      overflow-y: auto;
+      font-size: 0.82rem;
+      color: #dde;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    .rules-aw-title {
+      margin: 0 0 6px;
+      font-size: 0.95rem;
+      color: #aaccff;
+      border-bottom: 1px solid rgba(100,140,220,0.25);
+      padding-bottom: 4px;
+    }
+    .rules-aw-section {
+      font-weight: 600;
+      margin: 8px 0 3px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8899bb;
+    }
+    .rules-aw-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      margin: 2px 0;
+      cursor: default;
+    }
+    .rules-aw-clickable { cursor: pointer; }
+    .rules-aw-clickable:hover { background: rgba(80,120,200,0.2); }
+    .rules-aw-name { flex: 1; }
+    .rules-aw-cost { font-size: 0.9rem; letter-spacing: -1px; }
+    .rules-aw-dmg { color: #ff9966; font-size: 0.78rem; margin-left: 4px; }
+    .rules-aw-badge { font-size: 0.85rem; margin-left: auto; }
+    .rules-aw-usable { color: #55dd77; }
+    .rules-aw-unusable { color: #ff5555; }
+    .rules-aw-reason { font-size: 0.72rem; color: #999; margin-left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     

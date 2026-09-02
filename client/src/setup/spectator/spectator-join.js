@@ -4,6 +4,7 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { acceptAction } from '../general/accept-action.js';
 import { cleanActionData } from '../general/clean-action-data.js';
 import { handleSpectatorButtons } from './handle-spectator-buttons.js';
+import { forceRulesEnabledForMultiplayer } from '../rules/rules-bridge.js';
 
 let socketId = '';
 let spectatorTimerId;
@@ -21,6 +22,7 @@ export const spectatorJoin = () => {
   lobby.style.display = 'none';
   p2ExplanationBox.style.display = 'none';
   systemState.isTwoPlayer = true;
+  forceRulesEnabledForMultiplayer();
   cleanActionData('self');
   cleanActionData('opp');
   reset('self', true, false, false, false);

@@ -3,6 +3,7 @@
     // (3) twice in one turn. Rare Candy skips stage 1.
     
     import { rulesState, ensureCardData } from './rules-state.mjs';
+    import { getStadiumEvolutionSpeed } from './stadium-effects.mjs';
     
     export async function canEvolve(player, baseCardInPlay, evolutionCardInHand, wasPlayedThisTurn) {
       if (!rulesState.enabled) return { allowed: true };
@@ -11,7 +12,11 @@
         return { allowed: false, reason: "Can't evolve on the first turn." };
       }
     
-      if (wasPlayedThisTurn) {
+      // Stadium evolution-speed modifier ("as if it had been in play for 1
+      // more turn") relaxes the just-played gate; "costs N less Energy" is
+      // surfaced as `costReduce` for the cost layer (no live charge site yet).
+      const evoSpeed = getStadiumEvolutionSpeed(player);
+      if (wasPlayedThisTurn && !evoSpeed.relaxTurnGate) {
         return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
       }
     
@@ -32,7 +37,10 @@
       const order = ['Basic', 'Stage 1', 'Stage 2'];
       const baseIdx = order.indexOf(baseStage);
       const evoIdx = order.indexOf(evoStage);
-      if (evoIdx !== baseIdx + 1) {
+      // Basic -> Stage 2 is only legal with a Rare Candy (item) — the item's
+      // own play rules are trainer guidance; here we permit the stage skip.
+      const rareCandyJump = isRareCandyJump(baseCardInPlay, evolutionCardInHand);
+      if (evoIdx !== baseIdx + 1 && !rareCandyJump) {
         return { allowed: false, reason: `${evoStage} can't evolve from ${baseStage} directly (needs Rare Candy for a skip).` };
       }
     
@@ -42,7 +50,7 @@
         return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
       }
     
-      return { allowed: true };
+      return { allowed: true, costReduce: evoSpeed.costReduce };
     }
     
     // Rare Candy: Basic -> Stage 2 directly (item, so it also needs the item

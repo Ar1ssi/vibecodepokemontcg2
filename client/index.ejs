@@ -31,6 +31,15 @@
 <body>
     <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
+    <div id="battleMat">
+        <div id="battleMatTrim">
+            <div id="battleMatSurface">
+                <div id="battleMatSeam"></div>
+                <div id="battleMatFloor"></div>
+                <div id="battleMatGlow"></div>
+            </div>
+        </div>
+    </div>
     <iframe id="selfContainer" class="self" src="./self-containers.html"></iframe>
     <iframe id="oppContainer" class="opp" src="./opp-containers.html"></iframe>
     <div id="stadium" class="outline"></div>
@@ -87,6 +96,13 @@
         </div>
         <div id="chatboxButtonContainer" class="chat-button-container">
             <button id="attackButton" class="self-color">Attack</button>
+            <button id="retreatButton" class="self-color">Retreat</button>
+            <button id="healButton" class="self-color">Heal</button>
+            <button id="switchButton" class="self-color">Switch</button>
+            <button id="attachButton" class="self-color">Attach</button>
+            <button id="searchButton" class="self-color">Search</button>
+            <button id="stadiumButton" class="self-color">Stadium</button>
+            <button id="energyRedirectButton" class="self-color">🔀 Redirect</button>
             <button id="passButton" class="self-color">Pass</button>
             <button id="undoButton" class="self-color">Undo</button>
             <button id="FREEBUTTON" class="self-color">🌺</button>
@@ -135,6 +151,13 @@
             <div id="p2Chatbox"></div>
             <div id="p2ChatboxButtonContainer" class="chat-button-container">
                 <button id="p2AttackButton" class="self-color">Attack</button>
+                <button id="p2RetreatButton" class="self-color">Retreat</button>
+                <button id="p2HealButton" class="self-color">Heal</button>
+                <button id="p2SwitchButton" class="self-color">Switch</button>
+                <button id="p2AttachButton" class="self-color">Attach</button>
+                <button id="p2SearchButton" class="self-color">Search</button>
+                <button id="p2StadiumButton" class="self-color">Stadium</button>
+                <button id="p2EnergyRedirectButton" class="self-color">🔀 Redirect</button>
                 <button id="p2PassButton" class="self-color">Pass</button>
                 <!-- <button id="p2UndoButton" class="self-color">Undo</button> -->
                 <button id="p2FREEBUTTON" class="self-color">🌺</button>

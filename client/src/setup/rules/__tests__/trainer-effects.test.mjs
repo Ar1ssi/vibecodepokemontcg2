@@ -38,6 +38,14 @@ import test from 'node:test';
       assert.equal(r.steps[0].count, 2);
       assert.equal(r.steps[1].type, 'searchDeck');
     });
+
+    test('Generalized discard cost: any N other cards', () => {
+      const r = parseTrainerEffect("You can use this card only if you discard 3 other cards from your hand.\n\nSearch your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.");
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps[0].type, 'discardCost');
+      assert.equal(r.steps[0].count, 3);
+      assert.equal(r.steps[1].type, 'searchDeck');
+    });
     
     test("Boss's Orders: switch opponent", () => {
       const r = parseTrainerEffect("Switch in 1 of your opponent's Benched Pokémon to the Active Spot.");
@@ -93,5 +101,52 @@ import test from 'node:test';
     test('describeStep gives human guidance', () => {
       const s = describeStep({ type: 'discardHandThenDraw', count: 7 });
       assert.ok(s.includes('7'));
+    });
+
+    test('Bare draw: standalone "Draw 2 cards."', () => {
+      const r = parseTrainerEffect('Draw 2 cards.');
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'draw');
+      assert.equal(r.steps[0].count, 2);
+    });
+
+    test('Bare draw: singular "Draw 1 card."', () => {
+      const r = parseTrainerEffect('Draw 1 card.');
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps[0].type, 'draw');
+      assert.equal(r.steps[0].count, 1);
+    });
+
+    test('Bare draw: "Then, draw 3 cards."', () => {
+      const r = parseTrainerEffect('Then, draw 3 cards.');
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps[0].type, 'draw');
+      assert.equal(r.steps[0].count, 3);
+    });
+
+    test('Regression: "search… then draw" keeps the search step (not bare draw)', () => {
+      const r = parseTrainerEffect('Search your deck for a Pokémon, reveal it, and put it into your hand. Then, draw 1 card.');
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps[0].type, 'searchDeck');
+      assert.equal(r.steps[0].destination, 'hand');
+    });
+
+    test('Regression: discard-hand-then-draw is not shadowed by bare draw', () => {
+      const r = parseTrainerEffect('Discard your hand and draw 5 cards.');
+      assert.equal(r.steps[0].type, 'discardHandThenDraw');
+      assert.equal(r.steps[0].count, 5);
+      assert.equal(r.steps.length, 1);
+    });
+
+    test('Regression: shuffle-hand-then-draw is not shadowed by bare draw', () => {
+      const r = parseTrainerEffect('Shuffle your hand into your deck. Then, draw 6 cards. If you have exactly 6 Prize cards remaining, draw 8 cards instead.');
+      assert.equal(r.steps[0].type, 'shuffleHandThenDraw');
+      assert.equal(r.steps[0].count, 6);
+    });
+
+    test('describeStep draw: plural and singular', () => {
+      assert.ok(describeStep({ type: 'draw', count: 2 }).includes('2 cards'));
+      assert.ok(describeStep({ type: 'draw', count: 1 }).includes('1 card'));
     });
     

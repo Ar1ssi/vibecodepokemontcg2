@@ -51,12 +51,22 @@
         else if (lower.includes('mega evolution pokémon ex')) what = 'Mega Evolution Pokémon ex';
         else if (lower.includes('pokémon')) what = 'Pokémon';
         steps.push({ type: 'searchDeck', what, count, destination });
-        if (lower.includes('discard 2 other cards')) {
-          steps.unshift({ type: 'discardCost', count: 2 });
+        const costMatch = lower.match(/discard (\d+) other cards/);
+        if (costMatch) {
+          steps.unshift({ type: 'discardCost', count: Number(costMatch[1]) });
         }
         return { steps, recognizable: true };
       }
     
+      // bare draw (standalone, e.g. "Draw 2 cards." / "Then, draw 3 cards.")
+      // placed after the search branch so "search… then draw" cards keep
+      // their search step (the picker is the interactive part)
+      if (/draw (\d+) cards?/.test(lower)) {
+        const m = lower.match(/draw (\d+) cards?/);
+        steps.push({ type: 'draw', count: Number(m[1]) });
+        return { steps, recognizable: true };
+      }
+
       // look at top N (Pokégear, Grimsley's Move)
       if (lower.includes('look at the top')) {
         const m = lower.match(/top (\d+) cards?/);
@@ -119,6 +129,7 @@
     // Human-readable guidance for each step — this is what gets announced.
     export function describeStep(step) {
       switch (step.type) {
+        case 'draw': return `Draw ${step.count} card${step.count > 1 ? 's' : ''}.`;
         case 'discardHandThenDraw': return `Discard your hand, then draw ${step.count} cards.`;
         case 'shuffleHandThenDraw': return `Shuffle your hand into the deck, then draw ${step.count} cards${step.bonusCount ? ` (${step.bonusCount} if 6 prizes left)` : ''}.`;
         case 'searchDeck': return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what} → ${step.destination === 'bench' ? 'put on Bench' : 'add to hand'}, then shuffle.`;

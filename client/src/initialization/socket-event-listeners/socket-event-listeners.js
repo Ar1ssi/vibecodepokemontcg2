@@ -19,6 +19,7 @@ import { cleanActionData } from '../../setup/general/clean-action-data.js';
 import { resyncActions } from '../../setup/general/resync-actions.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
+import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -45,6 +46,7 @@ export const initializeSocketEventListeners = () => {
       flipBoard();
     }
     systemState.isTwoPlayer = true;
+    forceRulesEnabledForMultiplayer();
     cleanActionData('self');
     cleanActionData('opp');
     reset('opp', true, false, false, false);

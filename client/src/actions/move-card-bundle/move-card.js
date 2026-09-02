@@ -15,8 +15,14 @@ import { updateAttachedCardsPosition } from './update-attached-cards-position.js
 import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { updateStadiumCard } from './update-stadium-card.js';
+import { appendMessage } from '../../setup/chatbox/append-message.js';
+import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed } from '../../setup/rules/rules-state.mjs';
+import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
+import { clearStatuses } from '../../setup/rules/status.mjs';
+import { describeStadiumEffect } from '../../setup/rules/stadium-effects.mjs';
+import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
 
-export const moveCard = (
+export const moveCard = async (
   user,
   initiator,
   oZoneId,
@@ -40,6 +46,93 @@ export const moveCard = (
   }
   // define the card that's being moved
   const movingCard = oZone.array[index];
+
+  // ── rules: one Supporter per turn (taxonomy A2) ──────────────────
+  // Playing a Trainer = hand → board. Supporters are limited to one per
+  // turn; Items/Stadiums/Tools/Special Supporters bypass the limit. The
+  // gate runs before the zone splice so blocked moves never mutate state.
+  if (
+    rulesState.enabled &&
+    rulesState.turnPlayer === user &&
+    oZoneId === 'hand' &&
+    dZoneId === 'board'
+  ) {
+    const gate = supporterPlayGate({
+      cardType: movingCard.type,
+      subtypes: movingCard.subtypes || [],
+      supporterPlayed: rulesState.flags[user]?.supporterPlayed,
+    });
+    if (!gate.allowed) {
+      appendMessage(user, `⛔ ${movingCard.name}: ${gate.reason}`, 'announcement', false);
+      return;
+    }
+    markSupporterPlayed(user);
+  }
+
+  // ── rules: record a Stadium placed on the field (taxonomy E) ─────────
+  // hand → board is the play path; updateStadiumCard() (below) handles the
+  // UI-side discard of any existing Stadium. Recording state here — before
+  // the splice and before updateStadiumCard's recursive moveCard call —
+  // avoids that recursion clobbering the record with the discarded card.
+  if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'board') {
+    const isStadiumCard =
+      movingCard.type === 'Stadium' ||
+      (movingCard.subtypes || []).some((s) => String(s).toLowerCase() === 'stadium');
+    if (isStadiumCard) {
+      const displaced = markStadiumPlayed(user, movingCard);
+      if (displaced?.card) {
+        appendMessage(
+          user,
+          `${movingCard.name} is placed on the field; ${displaced.card.name} goes to discard.`,
+          'announcement',
+          false
+        );
+      }
+      appendMessage(user, describeStadiumEffect(movingCard), 'announcement', false);
+    }
+  }
+
+  // ── rules: evolution legality gate (taxonomy B) ──────────────────────
+  // Must run BEFORE the splice so blocked moves never mutate zone arrays.
+  const activeOrBenchZones = ['active', 'bench'];
+  if (
+    rulesState.enabled &&
+    movingCard.type === 'Pokémon' &&
+    !activeOrBenchZones.includes(oZoneId) &&
+    activeOrBenchZones.includes(dZoneId) &&
+    targetCard
+  ) {
+    const evoCheck = await canEvolve(user, targetCard, movingCard, false);
+    if (!evoCheck.allowed) {
+      appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
+      return;
+    }
+  }
+
+  // ── rules: Lock Energy (taxonomy §F, family 2) ──────────────────────
+  // Energy attached to a Pokémon that also has a Lock Energy attached
+  // cannot be removed by card effects. Only moves *into removal zones*
+  // (discard/lostZone/hand/deck) are blocked — zone-to-zone reattachment
+  // (active↔bench, →attachedCards via relocateAttachedCards) is allowed.
+  // `movingCard.image.relative` is the Pokémon's image element; the shim
+  // lets the pure helper compare against each energy's image.relative.
+  if (
+    rulesState.enabled &&
+    movingCard.type === 'Energy' &&
+    ['active', 'bench', 'attachedCards'].includes(oZoneId) &&
+    ['discard', 'lostZone', 'hand', 'deck'].includes(dZoneId) &&
+    movingCard.image?.relative &&
+    pokemonHasLockedEnergy({ image: movingCard.image.relative }, oZone.array)
+  ) {
+    appendMessage(
+      user,
+      `⛔ ${movingCard.name}: cannot be removed — a Lock Energy is attached to ${movingCard.image.relative.name || 'this Pokémon'}.`,
+      'announcement',
+      false
+    );
+    return;
+  }
+
   // move card from origin array to destination array
   dZone.array.push(...oZone.array.splice(index, 1));
 
@@ -101,6 +194,9 @@ export const moveCard = (
   if (isTargetCardValid && isAttachAllowed) {
     if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
       evolveCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
+      markEvolvedThisTurn(user, targetCard.name);
+      clearStatuses(user, targetCard.image?.dataset?.cardId || targetCard.name);
+      appendMessage(user, `${movingCard.name} evolved onto ${targetCard.name}!`, 'announcement', false);
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
     }

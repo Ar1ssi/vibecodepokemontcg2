@@ -3,6 +3,7 @@
     // the turn after attacking (TCG Live behavior).
     
     import { rulesState, markAttacked } from './rules-state.mjs';
+import { effectiveHp } from './stadium-effects.mjs';
     
     // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
     // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -37,19 +38,48 @@
       return { total, base, multiplier, flat, resistance };
     }
     
+    // Expand attached-energy entries into a flat pool of provided types.
+    // Entries may be plain type strings (legacy) or `{ type, family }`
+    // objects (taxonomy §F): a `double` family energy provides 2 of its
+    // printed type; `double-colorless` provides 2 Colorless (any 2 symbols).
+    export function expandEnergyEntries(attachedEnergies = []) {
+      const pool = [];
+      for (const entry of attachedEnergies) {
+        const type = typeof entry === 'string' ? entry : entry?.type;
+        const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
+        if (!type) continue;
+        if (family === 'double-colorless') {
+          pool.push('Colorless', 'Colorless');
+        } else if (family === 'double') {
+          pool.push(type, type);
+        } else {
+          pool.push(type);
+        }
+      }
+      return pool;
+    }
+
     // Energy check: does the attacker have enough attached energy for the cost?
+    // `attachedEnergies` entries may be plain type strings or `{ type, family }`
+    // objects (see `expandEnergyEntries`). A Colorless entry satisfies any
+    // symbol; a Colorless cost symbol can be paid by any attached energy.
     export function canPayAttackCost(attachedEnergies = [], cost = []) {
-      // attachedEnergies: array of energy types; cost: array of type symbols
-      const pool = [...attachedEnergies];
+      const pool = expandEnergyEntries(attachedEnergies);
       for (const symbol of cost) {
         if (symbol === 'Colorless') {
-          // any single energy
-          if (pool.length === 0) return false;
-          pool.pop();
+          const ci = pool.indexOf('Colorless');
+          if (ci !== -1) pool.splice(ci, 1);
+          else if (pool.length === 0) return false;
+          else pool.pop(); // any single energy pays a Colorless symbol
         } else {
           const idx = pool.indexOf(symbol);
-          if (idx === -1) return false;
-          pool.splice(idx, 1);
+          if (idx !== -1) {
+            pool.splice(idx, 1);
+          } else {
+            const ci = pool.indexOf('Colorless'); // Colorless is a wildcard
+            if (ci === -1) return false;
+            pool.splice(ci, 1);
+          }
         }
       }
       return true;
@@ -72,12 +102,15 @@
     
       markAttacked(rulesState.turnPlayer);
     
-      const ko = defender.hp != null && newTotal >= defender.hp;
+      // KO threshold uses effective HP (stadium +/−HP modifiers apply).
+      const koHp = defender.hp != null ? effectiveHp(defender.hp, defender?.user) : 0;
+      const ko = koHp > 0 && newTotal >= koHp;
       return {
         ok: true,
         damage: dmg.total,
         breakdown: dmg,
         ko,
+        koHp,
       };
     }
     

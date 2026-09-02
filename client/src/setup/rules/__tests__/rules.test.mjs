@@ -1,8 +1,9 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, canPerformAction, startGame, beginTurn, endTurn } = await import('../rules-state.mjs');
-    const { computeAttackDamage, canPayAttackCost } = await import('../attack-engine.mjs');
+    const { rulesState, canPerformAction, startGame, beginTurn, endTurn, markAttacked } = await import('../rules-state.mjs');
+    const { computeAttackDamage, canPayAttackCost, expandEnergyEntries } = await import('../attack-engine.mjs');
+const { classifyEnergyEffect } = await import('../energy-effects.mjs');
     
     test('weakness doubles damage', () => {
       const result = computeAttackDamage({ types: ['Water'] }, { weakness: { type: 'Water', value: 2 } }, { damage: 60 });
@@ -94,5 +95,121 @@ import test from 'node:test';
       rulesState.turnNumber = 2;
       const check2 = canPerformAction({ user: 'self', action: 'attack' });
       assert.equal(check2.allowed, true);
+    });
+
+    test('loadRulesEnabled: ON by default when no preference is stored', async () => {
+      const { loadRulesEnabled, RULES_STORAGE_KEY } = await import('../rules-state.mjs');
+      const storage = {};
+      const previous = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: (k) => (k in storage ? storage[k] : null),
+        setItem: (k, v) => {
+          storage[k] = String(v);
+        },
+        removeItem: (k) => {
+          delete storage[k];
+        },
+      };
+      try {
+        // missing key (first run) → rules mode ON by default
+        assert.equal(loadRulesEnabled(), true);
+        // explicit solo "off" preference is respected
+        storage[RULES_STORAGE_KEY] = '0';
+        assert.equal(loadRulesEnabled(), false);
+        // explicit "on" stays on
+        storage[RULES_STORAGE_KEY] = '1';
+        assert.equal(loadRulesEnabled(), true);
+      } finally {
+        if (previous === undefined) delete globalThis.localStorage;
+        else globalThis.localStorage = previous;
+      }
+    });
+
+    test('attacking ends the turn: markAttacked sets phase to attack', () => {
+      rulesState.enabled = true;
+      rulesState.phase = 'main';
+      rulesState.turnPlayer = 'self';
+      rulesState.flags.self.attackerAttacked = false;
+      markAttacked('self');
+      assert.equal(rulesState.phase, 'attack');
+      assert.equal(rulesState.flags.self.attackerAttacked, true);
+    });
+
+    test('endTurn advances turn, resets next player flags, phase back to main', () => {
+      rulesState.enabled = true;
+      rulesState.phase = 'attack';
+      rulesState.turnPlayer = 'self';
+      rulesState.turnNumber = 3;
+      rulesState.flags.self.attackerAttacked = true;
+      rulesState.flags.opp.attackerAttacked = true;
+      const next = endTurn('self');
+      assert.equal(next, 'opp');
+      assert.equal(rulesState.turnPlayer, 'opp');
+      assert.equal(rulesState.turnNumber, 4);
+      assert.equal(rulesState.phase, 'main');
+      assert.equal(rulesState.flags.opp.attackerAttacked, false);
+    });
+
+    test('gating: cannot attack twice in one turn', () => {
+      rulesState.enabled = true;
+      rulesState.phase = 'main';
+      rulesState.turnPlayer = 'self';
+      rulesState.turnNumber = 2;
+      rulesState.flags.self.attackerAttacked = false;
+      assert.equal(canPerformAction({ user: 'self', action: 'attack' }).allowed, true);
+      markAttacked('self');
+      const check = canPerformAction({ user: 'self', action: 'attack' });
+      assert.equal(check.allowed, false);
+      assert.ok(check.reason.toLowerCase().includes('attacked'));
+    });
+
+    // --- Taxonomy §F: Double / Double Colorless energy cost counting ---
+
+    test('expandEnergyEntries: legacy strings expand 1:1', () => {
+      assert.deepEqual(expandEnergyEntries(['Fire']), ['Fire']);
+      assert.deepEqual(expandEnergyEntries(['Fire', 'Water', 'Colorless']), ['Fire', 'Water', 'Colorless']);
+      assert.deepEqual(expandEnergyEntries([]), []);
+    });
+
+    test('expandEnergyEntries: double energy expands to 2 of its type', () => {
+      assert.deepEqual(expandEnergyEntries([{ type: 'Fire', family: 'double' }]), ['Fire', 'Fire']);
+      assert.deepEqual(expandEnergyEntries([{ type: 'Colorless', family: 'double-colorless' }]), ['Colorless', 'Colorless']);
+    });
+
+    test('expandEnergyEntries: mixed arrays', () => {
+      const out = expandEnergyEntries(['Water', { type: 'Lightning', family: 'double' }]);
+      assert.deepEqual(out, ['Water', 'Lightning', 'Lightning']);
+    });
+
+    test('double energy pays 2 of its type', () => {
+      assert.equal(canPayAttackCost([{ type: 'Fire', family: 'double' }], ['Fire', 'Fire']), true);
+      assert.equal(canPayAttackCost([{ type: 'Fire', family: 'basic' }], ['Fire', 'Fire']), false);
+    });
+
+    test('double energy can also cover a Colorless symbol', () => {
+      assert.equal(canPayAttackCost([{ type: 'Fire', family: 'double' }], ['Fire', 'Colorless']), true);
+    });
+
+    test('double energy cannot pay a different type', () => {
+      assert.equal(canPayAttackCost([{ type: 'Fire', family: 'double' }], ['Fire', 'Water']), false);
+    });
+
+    test('double-colorless energy pays any two symbols', () => {
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Fire', 'Water']), true);
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Fire', 'Fire', 'Water']), false);
+    });
+
+    test('Colorless cost symbol is a wildcard (legacy strings)', () => {
+      assert.equal(canPayAttackCost(['Colorless', 'Colorless'], ['Fire', 'Water']), true);
+      assert.equal(canPayAttackCost(['Colorless'], ['Fire']), true);
+    });
+
+    test('classifyEnergyEffect feeds the correct family into cost payment', () => {
+      const family = classifyEnergyEffect({ name: 'Double Colorless Energy', subtypes: ['Energy', 'Special'] });
+      assert.equal(family, 'double-colorless');
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family }], ['Grass', 'Metal']), true);
+      const dfamily = classifyEnergyEffect({ name: 'Double Fire Energy', subtypes: ['Energy', 'Special'] });
+      assert.equal(dfamily, 'double');
+      assert.equal(canPayAttackCost([{ type: 'Fire', family: dfamily }], ['Fire', 'Fire']), true);
     });
     

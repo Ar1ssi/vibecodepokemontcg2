@@ -12,8 +12,14 @@
       beginTurn,
       endTurn,
       markEnergyAttached,
+      markAbilityUsed,
+      abilityUsed,
       loadRulesEnabled,
       persistRulesEnabled,
+      getStadium,
+      shouldAutoDrawAtTurnStart,
+      markTurnDrawn,
+      markMulligansResolved,
     } from './rules-state.mjs';
     import { executeAttack, canPayAttackCost } from './attack-engine.mjs';
     import { handleKO, checkWinConditions, resetPrizes } from './ko-flow.mjs';
@@ -22,7 +28,15 @@ import { statusState } from './status.mjs';
 import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
-import { evaluateMulligans } from './mulligan.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
+import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
+import { classifyAbility } from './ability-effects.mjs';
+import { listUsableActions } from './attack-window.mjs';
+import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, searchAbility } from '../../actions/chat-buttons/chat-buttons.js';
+import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
+import { draw } from '../../actions/zones/deck-actions.js';
+import { shuffleAndDraw } from '../../actions/zones/hand-actions.js';
 import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     
     let initialized = false;
@@ -42,14 +56,19 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // their result is mirrored here so our own Set Up click uses the same
     // outcome instead of flipping independently.
     let syncedTurnOrder = null;
+    // True while a coin flip animation is in flight, so a second Set Up
+    // click (on a different button) can't start a second flip/game start.
+    let coinFlipPending = false;
+    // Set when a turn was auto-ended by an attack, so the next +Turn click
+    // is swallowed instead of double-advancing the turn.
+    let turnEndedByAttack = false;
     
     export const initializeRulesEngine = () => {
       if (initialized) return;
       initialized = true;
       loadRulesEnabled();
   document.body.classList.toggle('rules-mode', rulesState.enabled);
-      buildAttackPanel();
-  buildTurnHUD();
+      buildTurnHUD();
       hookTurnButton();
       hookSetupButton();
       hookDeckView();
@@ -59,10 +78,11 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
   renderStatusBadges();
   hookMultiplayerSync();
   buildEndScreen();
-  buildBattleLog();
       hookMoveCard();
       hookEnergyAttach();
       syncRulesToggleUI();
+      buildAttackWindow();
+      hookTurnStartDraw();
     };
     
     // ── turn HUD: persistent whose-turn/phase banner ─────────────────────
@@ -103,7 +123,140 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       document.addEventListener('rules-mode-changed', refresh);
       window.setInterval(refresh, 1500);
     };
-    
+
+    // ── attack window: list attacks + abilities, let the player choose ──
+    const buildAttackWindow = () => {
+      if (document.getElementById('rulesAttackWindow')) return;
+      const win = document.createElement('div');
+      win.id = 'rulesAttackWindow';
+      win.hidden = true;
+      win.innerHTML = `<h4 class="rules-aw-title">⚔️ Attack Window</h4><div class="rules-aw-body"></div>`;
+      document.body.appendChild(win);
+
+      const energySymbols = {
+        Colorless: '⚪', Fire: '🔥', Water: '💧', Grass: '🌿',
+        Lightning: '⚡', Psychic: '🔮', Fighting: '🥊', Metal: '⚙️',
+        Dark: '🌑', Dragon: '🐉',
+      };
+      const costStr = (arr) => (arr || []).map(s => energySymbols[s] || s).join('');
+
+      // Map ability family → executor function
+      const abilityFns = {
+        'heal': healAbility,
+        'switch': switchAbility,
+        'attach': attachAbility,
+        'energy-redirect': energyRedirectAbility,
+        'search': searchAbility,
+      };
+
+      const refresh = async () => {
+        if (!rulesState.enabled || rulesState.turnPlayer !== 'self' || rulesState.phase === 'ended') {
+          win.hidden = true;
+          return;
+        }
+        win.hidden = false;
+        const body = win.querySelector('.rules-aw-body');
+        const active = getZone('self', 'active').array[0];
+        if (!active) { body.innerHTML = '<em>No active Pokémon.</em>'; return; }
+
+        try { await ensureCardData(active); } catch { /* card data may not be ready yet */ }
+
+        // Gather energy types (same logic as chat-buttons.attack())
+        const attachedEnergies = getZone('self', 'active').array.filter(
+          (c) => c.type === 'Energy' && c.image?.relative === active.image
+        );
+        const energyTypes = [];
+        for (const e of attachedEnergies) {
+          try { await ensureCardData(e); } catch { /* skip */ }
+          const type = e.types?.[0] ||
+            (/fire/i.test(e.name || '') ? 'Fire'
+            : /water/i.test(e.name || '') ? 'Water'
+            : /grass/i.test(e.name || '') ? 'Grass'
+            : /lightning/i.test(e.name || '') ? 'Lightning'
+            : /psychic/i.test(e.name || '') ? 'Psychic'
+            : /fighting/i.test(e.name || '') ? 'Fighting'
+            : /metal/i.test(e.name || '') ? 'Metal'
+            : /dark/i.test(e.name || '') ? 'Dark'
+            : /dragon/i.test(e.name || '') ? 'Dragon'
+            : 'Colorless');
+          const family = classifyEnergyEffect(e);
+          const override = effectiveEnergyType(e);
+          energyTypes.push({ type: override || type, family });
+        }
+
+        const stadiumCard = getStadium()?.card;
+        const stadiumCostModifier = stadiumCard ? parseStadiumCostModifier(stadiumCard) : 0;
+        const abilityUsedFlag = abilityUsed('self', active);
+
+        const { attacks: atkList, abilities: abList } = listUsableActions(active, {
+          energyTypes,
+          stadiumCostModifier,
+          abilityUsed: abilityUsedFlag,
+          rulesEnabled: true,
+        });
+
+        let html = '';
+
+        // ── Attacks ──
+        if (atkList.length) {
+          html += '<div class="rules-aw-section">Attacks</div>';
+          for (const a of atkList) {
+            const badge = a.usable
+              ? '<span class="rules-aw-badge rules-aw-usable">✓</span>'
+              : `<span class="rules-aw-badge rules-aw-unusable">✗</span>`;
+            const dmg = a.damage != null ? `<span class="rules-aw-dmg">${a.damage} dmg</span>` : '';
+            html += `<div class="rules-aw-row ${a.usable ? 'rules-aw-clickable' : ''}" data-attack-idx="${a.index}">`+
+              `<span class="rules-aw-name">${a.name}</span>`+
+              `<span class="rules-aw-cost">${costStr(a.effectiveCost)}</span>`+
+              dmg + badge +
+              (a.reason ? `<span class="rules-aw-reason">${a.reason}</span>` : '')+
+              `</div>`;
+          }
+        } else {
+          html += '<div class="rules-aw-section">No attacks defined.</div>';
+        }
+
+        // ── Abilities ──
+        if (abList.length) {
+          html += '<div class="rules-aw-section">Abilities</div>';
+          const family = classifyAbility(active);
+          for (const ab of abList) {
+            const badge = ab.usable
+              ? '<span class="rules-aw-badge rules-aw-usable">✓</span>'
+              : '<span class="rules-aw-badge rules-aw-unusable">✗</span>';
+            html += `<div class="rules-aw-row ${ab.usable ? 'rules-aw-clickable' : ''}" data-ability="${family}">`+
+              `<span class="rules-aw-name">${ab.name}</span>`+
+              badge +
+              (ab.reason ? `<span class="rules-aw-reason">${ab.reason}</span>` : '')+
+              `</div>`;
+          }
+        }
+
+        body.innerHTML = html;
+
+        // Wire clicks
+        body.querySelectorAll('[data-attack-idx]').forEach((row) => {
+          if (!row.classList.contains('rules-aw-clickable')) return;
+          row.addEventListener('click', () => {
+            const idx = parseInt(row.dataset.attackIdx, 10);
+            attack('self', true, idx);
+          });
+        });
+        body.querySelectorAll('[data-ability]').forEach((row) => {
+          if (!row.classList.contains('rules-aw-clickable')) return;
+          row.addEventListener('click', () => {
+            const family = row.dataset.ability;
+            const fn = abilityFns[family];
+            if (fn) fn('self', true);
+          });
+        });
+      };
+
+      document.addEventListener('rules-turn-began', refresh);
+      document.addEventListener('rules-mode-changed', refresh);
+      window.setInterval(refresh, 1500);
+    };
+
     // ── settings toggle ──────────────────────────────────────────────────
     const buildRulesToggle = () => {
       const settings = document.getElementById('settings');
@@ -119,6 +272,13 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       settings.appendChild(row);
     
       document.getElementById('rulesEnforcedCheckbox').addEventListener('change', (e) => {
+        if (systemState.isTwoPlayer && !e.target.checked) {
+          // Multiplayer games always run with rules enforced: snap the
+          // checkbox back instead of letting it be unticked.
+          e.target.checked = true;
+          appendMessage('', 'Rules enforcement is always on in multiplayer.', 'announcement', false);
+          return;
+        }
         rulesState.enabled = e.target.checked;
         persistRulesEnabled();
         appendMessage('', `Rules enforcement ${rulesState.enabled ? 'enabled' : 'disabled'}`, 'announcement', false);
@@ -132,12 +292,32 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       if (cb) cb.checked = rulesState.enabled;
     };
     
+    // Multiplayer games always run with rules enforced. Called when
+    // systemState.isTwoPlayer becomes true (joinGame / spectatorJoin) so a
+    // solo "off" preference can't carry into a shared game.
+    export const forceRulesEnabledForMultiplayer = () => {
+      if (rulesState.enabled) {
+        syncRulesToggleUI();
+        return;
+      }
+      rulesState.enabled = true;
+      persistRulesEnabled();
+      appendMessage('', 'Rules enforcement is always on in multiplayer.', 'announcement', false);
+      document.dispatchEvent(new CustomEvent('rules-mode-changed', { detail: { enabled: true } }));
+      document.body.classList.toggle('rules-mode', true);
+      syncRulesToggleUI();
+    };
+    
     // ── turn flow: attack ends turn; +Turn advances ──────────────────────
     const hookTurnButton = () => {
       const btn = document.getElementById('turnButton');
       if (!btn) return;
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         if (!rulesState.enabled) return;
+        if (turnEndedByAttack) {
+          turnEndedByAttack = false;
+          return; // turn already ended by an attack
+        }
     
         // end-of-turn: resolve the turn player's statuses before passing
         const endingPlayer = rulesState.turnPlayer;
@@ -155,6 +335,44 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
             }
           }
         } catch {}
+    
+        // end-of-turn ability effects (ability family: end-of-turn):
+        // resolve for the ending player's Active + bench, once per turn
+        if (rulesState.enabled) {
+          for (const zoneId of ['active', 'bench']) {
+            for (const card of getZone(endingPlayer, zoneId).array) {
+              if (abilityUsed(endingPlayer, card)) continue;
+              try {
+                await ensureCardData(card);
+              } catch {}
+              const effect = parseEndOfTurnEffect(card);
+              if (!effect) continue;
+              markAbilityUsed(endingPlayer, card);
+              if (effect.kind === 'draw') {
+                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                  for (let k = 0; k < effect.n; k++) {
+                    if (getZone(endingPlayer, 'deck').getCount() > 0) {
+                      moveCardBundle(endingPlayer, endingPlayer, 'deck', 'hand', 0, false, 'move');
+                    }
+                  }
+                });
+                appendMessage(
+                  '',
+                  `⏰ End of turn: ${card.name || 'your Pokémon'} draws ${effect.n} card(s).`,
+                  'announcement',
+                  false
+                );
+              } else if (effect.kind === 'search') {
+                appendMessage(
+                  '',
+                  `⏰ End of turn: ${card.name || 'your Pokémon'} searches for a card (see Search ability).`,
+                  'announcement',
+                  false
+                );
+              }
+            }
+          }
+        }
     
         // win-condition sweep before passing — only once the game is truly
         // underway (turn 2+), never during setup/mulligan
@@ -196,10 +414,36 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     };
     
     const hookSetupButton = () => {
-      const btn = document.getElementById('setupButton');
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        if (!rulesState.enabled) return;
+      // One shared capture-phase handler for every Set Up trigger (P1 box,
+      // P2 box, Set Up Both). Whichever is clicked first flips the coin;
+      // the rest no-op via the phase/pending guards in handleSetupClick.
+      ['setupButton', 'p2SetupButton', 'setupBothButton'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', handleSetupClick, true);
+      });
+      hookResetButtons();
+    };
+    
+    // Non-rules Reset handlers don't touch rulesState, so without this the
+    // phase would stay 'draw' and a later Set Up would skip the coin flip.
+    const hookResetButtons = () => {
+      ['resetButton', 'p2ResetButton', 'resetBothButton'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          if (!rulesState.enabled) return;
+          rulesState.phase = 'setup';
+          rulesState.turnNumber = 0;
+          syncedTurnOrder = null;
+          turnEndedByAttack = false;
+        }, true);
+      });
+    };
+    
+    const handleSetupClick = () => {
+      if (!rulesState.enabled) return;
+      if (systemState.isReplay) return;
+      if (coinFlipPending) return; // a flip already in flight will start the game
     
         const proceedWithSetup = (firstPlayer) => {
           startGame(firstPlayer);
@@ -210,16 +454,69 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           // mulligan check: opening hands must contain a Basic Pokémon
           setTimeout(async () => {
             try {
+              if (rulesState.mulligansResolved) return;
+
               const selfHand = getZone('self', 'hand').array;
-              const oppHand = systemState.isTwoPlayer ? getZone('opp', 'hand').array : [];
+              const oppHand = getZone('opp', 'hand').array;
               const steps = await evaluateMulligans({ selfHand, oppHand });
-              for (const step of steps) {
-                appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
+
+              // No mulligans needed
+              if (steps.length === 1 && steps[0].mulligan === false) {
+                markMulligansResolved();
+                return;
               }
-            } catch {}
+
+              for (const step of steps) {
+                if (step.mulligan) {
+                  appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
+                }
+              }
+
+              markMulligansResolved();
+
+              const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
+              const oppMulliganned = steps.some(s => s.player === 'opp' && s.mulligan);
+
+              // Execute self mulligan
+              if (selfMulliganned) {
+                appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
+                shuffleAndDraw('self', 'self', 7, null, true);
+              }
+
+              // In 1P, also execute opponent mulligan locally
+              if (!systemState.isTwoPlayer && oppMulliganned) {
+                appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
+                shuffleAndDraw('opp', 'opp', 7, null, true);
+              }
+              // In 2P, the opponent's client handles their own mulligan independently.
+
+              // Bonus draws (1 per mulligan)
+              if (selfMulliganned) {
+                // Opponent draws 1 bonus card
+                if (systemState.isTwoPlayer && rulesSocket) {
+                  rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
+                } else {
+                  appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
+                  draw('opp', 'opp', 1, true);
+                }
+              }
+
+              if (oppMulliganned && !systemState.isTwoPlayer) {
+                // 1P: self draws bonus (opponent mulliganned)
+                appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
+                draw('self', 'self', 1, true);
+              }
+              // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
+            } catch (e) {
+              console.error('Mulligan execution error:', e);
+            }
           }, 2500);
           updateTurnBanner();
         };
+    
+        // A previous Set Up click already flipped and started the game —
+        // turn order is decided; let the original handler finish setup.
+        if (rulesState.phase !== 'setup') return;
     
         // If the opponent's client already resolved (and broadcast) the
         // coin flip, mirror their result instead of flipping again —
@@ -231,8 +528,12 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           return;
         }
     
-        runTurnOrderCoinFlip().then(({ turnPlayer }) => proceedWithSetup(turnPlayer));
-      }, true);
+        coinFlipPending = true;
+        runTurnOrderCoinFlip()
+          .then(({ turnPlayer }) => proceedWithSetup(turnPlayer))
+          .finally(() => {
+            coinFlipPending = false;
+          });
     };
     
     // ── turn-order coin flip: automatic at match start ───────────────────
@@ -342,13 +643,17 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     };
     
     const hookDeckView = () => {
-      // The deck zone's click/context handlers show deck contents. Gate them.
+      // The deck cover (click to open) and the deck zone's own click/context
+      // handlers both show deck contents. Gate both — the cover is the real
+      // entry point (opens the face-up card list), so without gating it too
+      // a player could always peek their deck regardless of the rule below.
       document.addEventListener('click', (event) => {
         if (!rulesState.enabled) return;
-        const deckEl = event.target.closest?.('[id="deck"]');
-        if (!deckEl) return;
+        const target = event.target.closest?.('[id="deck"], [id="deckCover"]');
+        if (!target) return;
         if (deckAccess.open) return; // a card effect unlocked it
-        const check = canPerformAction({ user: rulesState.turnPlayer, action: 'viewDeck' });
+        const owner = target.id === 'deckCover' ? (target.user || 'self') : rulesState.turnPlayer;
+        const check = canPerformAction({ user: owner, action: 'viewDeck' });
         if (!check.allowed) {
           event.stopImmediatePropagation();
           event.preventDefault();
@@ -389,6 +694,11 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
             } else {
               markEnergyAttached('self');
               appendMessage('', 'Energy attached (1/1 this turn)', 'announcement', false);
+              // Surface the special-energy effect (announce-only, Gap #4).
+              const family = classifyEnergyEffect({ name: card.name, type: card.type, subtypes: card.subtypes });
+              if (family && family !== 'basic' && family !== 'unknown') {
+                appendMessage('', describeEnergyEffect({ name: card.name, type: card.type, subtypes: card.subtypes }), 'announcement', false);
+              }
             }
           }
         } catch {}
@@ -407,9 +717,9 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           const deck = getZone(player, 'deck');
           const hand = getZone(player, 'hand');
           if (deck.getCount() > 0) {
-            // moveCard(user, initiator, fromZone, toZone, index)
-            import('../../actions/move-card-bundle/move-card.js').then(({ moveCard }) => {
-              moveCard(player, player, 'deck', 'hand', 0);
+            // moveCardBundle(user, initiator, fromZone, toZone, index, targetIndex, action)
+            import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+              moveCardBundle(player, player, 'deck', 'hand', 0, false, 'move');
             });
             return true;
           }
@@ -461,22 +771,10 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     
     // continuous KO detection: watch all in-play Pokémon for damage >= HP
     const koWatcher = () => {
-      let lastAbilityResetTurn = -1;
-    
+      // per-turn ability flags now live in rulesState.flags[player].abilitiesUsed
+      // and are cleared by resetTurnFlags() each turn — no DOM-flag reset here.
       window.setInterval(async () => {
         if (!rulesState.enabled || rulesState.phase === 'ended') return;
-    
-        // reset per-turn ability flags at each new turn
-        if (lastAbilityResetTurn !== rulesState.turnNumber) {
-          lastAbilityResetTurn = rulesState.turnNumber;
-          try {
-            for (const zoneId of ['active', 'bench']) {
-              for (const c of getZone('self', zoneId).array) {
-                if (c.image) c.image.__rulesAbilityUsed = false;
-              }
-            }
-          } catch {}
-        }
     
         try {
           for (const player of ['self', 'opp']) {
@@ -489,29 +787,38 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
                 const damage = parseInt(dmgText, 10) || 0;
                 if (damage <= 0 || !card.hp) continue;
                 await ensureCardData(card);
-                if (damage >= (card.hp || 0)) {
+                const effHp = effectiveHp(card.hp, player);
+                if (effHp > 0 && damage >= effHp) {
                   card.__rulesKODetected = true;
                   const who = player === 'self' ? 'Your' : "Opponent's";
-                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${card.hp} damage — KO! Move it to discard${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
+                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to discard${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
     
                   playAttackFeedback(true);
-
-              // auto-discard the KO'd Pokémon (with its attachments)
-                  import('../../actions/move-card-bundle/move-card.js').then(({ moveCard }) => {
-                    try {
-                      const idx = zone.array.indexOf(card);
-                      if (idx >= 0) {
-                        moveCard(player, 'self', zoneId, 'discard', idx);
-                        appendMessage('', "auto: KO'd Pokémon moved to discard", 'announcement', false);
-                      }
-                    } catch {}
-                  });
     
-                  // sync KO to opponent in multiplayer
-                  if (systemState.isTwoPlayer && rulesSocket) {
-                    rulesSocket.emit('rulesEvent', {
-                      type: 'ko',
-                      data: { cardName: card.name || 'Pokémon' },
+                  // Auto-discard the KO'd Pokémon — but ONLY on the side that
+                  // actually owns this zone. This loop runs on BOTH clients,
+                  // watching BOTH 'self' and 'opp' (their mirrored view of
+                  // the other player's board), purely for local detection —
+                  // it isn't authoritative for a zone it doesn't own.
+                  // Calling the raw moveCard() primitive here for 'opp' too
+                  // (as this used to) mutated each client's local copy of
+                  // the other player's zone WITHOUT ever broadcasting the
+                  // change — the two clients' boards, discard piles, and
+                  // battle logs would silently drift apart over the game.
+                  // Only the owning client (player === 'self' from its own
+                  // perspective) performs the move, and it does so through
+                  // moveCardBundle — the same synced wrapper used by manual
+                  // drag/discard — so the peer receives and replays the
+                  // identical action instead of guessing at it locally.
+                  if (player === 'self') {
+                    import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                      try {
+                        const idx = zone.array.indexOf(card);
+                        if (idx >= 0) {
+                          moveCardBundle('self', 'self', zoneId, 'discard', idx, false, 'move');
+                          appendMessage('', "auto: KO'd Pokémon moved to discard", 'announcement', false);
+                        }
+                      } catch {}
                     });
                   }
                 }
@@ -564,9 +871,14 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
 // ── choice picker for search effects ─────────────────────────────────
     // Opens a modal with candidate cards (from deck/discard); clicking one
     // executes the pending move (to hand or bench) automatically.
-    const openChoicePicker = ({ title, candidates, zoneFrom, destination, onPick }) => {
+    const openChoicePicker = ({ title, candidates, zoneFrom, destination, multiSelect = false, requiredCount = 1, onPick, onConfirm, onCancel }) => {
       // remove any existing picker
       document.getElementById('rulesChoicePicker')?.remove();
+      
+      if (multiSelect && requiredCount > candidates.length) {
+        appendMessage('', `  not enough cards to select ${requiredCount} — play it manually`, 'announcement', false);
+        return;
+      }
     
       const overlay = document.createElement('div');
       overlay.id = 'rulesChoicePicker';
@@ -574,26 +886,42 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         <div class="choice-picker-card">
           <div class="choice-picker-title"></div>
           <div class="choice-picker-grid"></div>
+          ${multiSelect ? '<button class="choice-picker-confirm" disabled>Confirm</button>' : ''}
           <button class="choice-picker-cancel">Cancel</button>
         </div>`;
       document.body.appendChild(overlay);
       overlay.querySelector('.choice-picker-title').textContent = title;
     
+      const selected = new Set();
       const grid = overlay.querySelector('.choice-picker-grid');
-      import('../../actions/move-card-bundle/move-card.js').then(({ moveCard }) => {
+      const confirmBtn = overlay.querySelector('.choice-picker-confirm');
+      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
         for (const cand of candidates) {
           const btn = document.createElement('button');
           btn.className = 'choice-picker-item';
-          const thumb = cand.images?.small || cand.image || '';
+          // zone cards carry a DOM <img> in `image`, not a URL string
+          const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
           btn.innerHTML = thumb
             ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
             : `<span>${cand.name || 'Card'}</span>`;
           btn.addEventListener('click', () => {
+            if (multiSelect) {
+              // toggle selection; the cards only move when Confirm is clicked
+              if (selected.has(cand)) {
+                selected.delete(cand);
+                btn.classList.remove('selected');
+              } else {
+                selected.add(cand);
+                btn.classList.add('selected');
+              }
+              if (confirmBtn) confirmBtn.disabled = selected.size !== requiredCount;
+              return;
+            }
             try {
               const zone = getZone('self', zoneFrom);
               const idx = zone.array.indexOf(cand);
               if (idx >= 0) {
-                moveCard('self', 'self', zoneFrom, destination, idx);
+                moveCardBundle('self', 'self', zoneFrom, destination, idx, false, 'move');
                 appendMessage('', `auto: ${cand.name} → ${destination === 'bench' ? 'Bench' : 'hand'}`, 'announcement', false);
               }
             } catch {}
@@ -603,10 +931,22 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           grid.appendChild(btn);
         }
       });
-    
-      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => overlay.remove());
+      
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          onConfirm?.(Array.from(selected));
+          overlay.remove();
+        });
+      }
+      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
+        onCancel?.();
+        overlay.remove();
+      });
       overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
+        if (e.target === overlay) {
+          onCancel?.();
+          overlay.remove();
+        }
       });
     };
     
@@ -614,17 +954,17 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // Fully deterministic effects execute automatically; anything requiring
     // a choice (search/switch) stays guided-only.
     const autoExecuteTrainer = (card, steps) => {
-      import('../../actions/move-card-bundle/move-card.js').then(({ moveCard }) => {
+      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
         for (const step of steps) {
           try {
             if (step.type === 'discardHandThenDraw') {
               // discard entire hand then draw N
               const hand = getZone('self', 'hand');
               while (hand.getCount() > 0) {
-                moveCard('self', 'self', 'hand', 'discard', 0);
+                moveCardBundle('self', 'self', 'hand', 'discard', 0, false, 'move');
               }
               for (let i = 0; i < step.count; i++) {
-                if (getZone('self', 'deck').getCount() > 0) moveCard('self', 'self', 'deck', 'hand', 0);
+                if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
               }
               appendMessage('', `  auto: discarded hand, drew ${step.count}`, 'announcement', false);
             } else if (step.type === 'shuffleHandThenDraw') {
@@ -632,17 +972,23 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               // move hand back to deck (the sim's shuffle happens via its own
               // deck action; we move + note)
               for (let i = 0; i < handCount0; i++) {
-                moveCard('self', 'self', 'hand', 'deck', 0);
+                moveCardBundle('self', 'self', 'hand', 'deck', 0, false, 'move');
               }
               const drawCount = step.count; // bonus handling needs prize count — guided
               for (let i = 0; i < drawCount; i++) {
-                if (getZone('self', 'deck').getCount() > 0) moveCard('self', 'self', 'deck', 'hand', 0);
+                if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
               }
               appendMessage('', `  auto: shuffled hand in, drew ${drawCount} (shuffle your deck)`, 'announcement', false);
+            } else if (step.type === 'draw') {
+              // standalone "draw N" — fully deterministic, no choice involved
+              for (let i = 0; i < step.count; i++) {
+                if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+              }
+              appendMessage('', `  auto: drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
             } else if (step.type === 'searchDeck' && step.destination === 'bench' && step.what === 'Basic Pokémon') {
               // Nest Ball / Buddy-Buddy Poffin automation: if the deck holds
               // exactly one Basic (unambiguous), auto-bench it
-              import('../../actions/move-card-bundle/move-card.js').then(async ({ moveCard }) => {
+              import('../../actions/move-card-bundle/move-card-bundle.js').then(async ({ moveCardBundle }) => {
                 const deck = getZone('self', 'deck');
                 const basics = [];
                 for (const c of deck.array) {
@@ -651,7 +997,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
                 }
                 if (basics.length === 1) {
                   const idx = deck.array.indexOf(basics[0]);
-                  moveCard('self', 'self', 'deck', 'bench', idx);
+                  moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
                   appendMessage('', `  auto: benched ${basics[0].name}`, 'announcement', false);
                 } else if (basics.length > 1) {
                   openChoicePicker({
@@ -687,11 +1033,17 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
             const { type, data } = payload || {};
             if (type === 'turnPassed') {
               appendMessage('', `Opponent ended their turn.`, 'announcement', false);
+              // the attacking client already advanced its own rulesState;
+              // mirror the advance here. The turnPlayer guard prevents a
+              // double-advance if the event arrives more than once.
+              if (rulesState.enabled && rulesState.turnPlayer === 'opp') {
+                const next = endTurn('opp');
+                appendMessage('', `Turn passes to ${next === 'self' ? 'you' : 'opponent'}`, 'announcement', false);
+                updateTurnBanner();
+              }
             } else if (type === 'attacked') {
               appendMessage('', `Opponent used ${data.attackName} — ${data.damage} damage`, 'announcement', false);
               if (data.status) appendMessage('', `Your Pokémon is now ${data.status}!`, 'announcement', false);
-            } else if (type === 'ko') {
-              appendMessage('', `Your ${data.cardName} was knocked out. Promote a new Active.`, 'announcement', false);
             } else if (type === 'turnOrderCoinFlip') {
               // sender's data is from their own self/opp perspective — invert
               // it so it's correct from ours
@@ -707,6 +1059,12 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               });
               // used when we click our own Set Up, so both sides agree
               syncedTurnOrder = localTurnPlayer;
+            } else if (type === 'mulliganBonus') {
+              // Opponent mulliganed — we draw 1 bonus card for ourselves
+              if (rulesState.enabled) {
+                draw('self', 'self', 1, true);
+                appendMessage('', 'Bonus draw: you drew 1 card (opponent mulliganed).', 'announcement', false);
+              }
             }
           } catch {}
         });
@@ -719,74 +1077,6 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       }, 500);
     };
     
-    // ── battle log panel ─────────────────────────────────────────────────
-    const BATTLE_LOG_KEY = 'ptcg-sim.rules-battle-log.v1';
-    
-    const buildBattleLog = () => {
-      if (document.getElementById('rulesBattleLog')) return;
-      const wrap = document.createElement('div');
-      wrap.id = 'rulesBattleLog';
-      wrap.innerHTML = `
-        <div class="battle-log-header">
-          <span>Battle Log</span>
-          <button class="battle-log-clear" title="Clear log">✕</button>
-        </div>
-        <div class="battle-log-entries"></div>`;
-      document.body.appendChild(wrap);
-    
-      const entriesEl = wrap.querySelector('.battle-log-entries');
-      wrap.querySelector('.battle-log-clear').addEventListener('click', () => {
-        entriesEl.innerHTML = '';
-        try { localStorage.removeItem(BATTLE_LOG_KEY); } catch {}
-      });
-    
-      const addEntry = (text, kind = 'info') => {
-        if (!text) return;
-        const row = document.createElement('div');
-        row.className = `battle-log-entry battle-log-${kind}`;
-        row.textContent = text;
-        entriesEl.appendChild(row);
-        // cap at 200 entries
-        while (entriesEl.children.length > 200) {
-          entriesEl.removeChild(entriesEl.firstChild);
-        }
-        entriesEl.scrollTop = entriesEl.scrollHeight;
-        try {
-          localStorage.setItem(BATTLE_LOG_KEY, entriesEl.innerHTML);
-        } catch {}
-      };
-    
-      // restore persisted log
-      try {
-        const saved = localStorage.getItem(BATTLE_LOG_KEY);
-        if (saved) entriesEl.innerHTML = saved;
-      } catch {}
-    
-      // intercept rules announcements: monkey-patch appendMessage's caller by
-      // listening to DOM changes in the chatbox
-      const chatbox = document.getElementById('chatbox');
-      if (chatbox) {
-        const observer = new MutationObserver((mutations) => {
-          if (!rulesState.enabled) return;
-          for (const m of mutations) {
-            for (const node of m.addedNodes) {
-              if (node.nodeType === 1) {
-                const text = node.textContent?.trim() || '';
-                if (!text) continue;
-                const kind = text.includes('💀') || text.includes('KO') ? 'ko'
-                  : text.includes('Attack:') ? 'attack'
-                  : text.includes('Turn passes') || text.includes('Turn ') ? 'turn'
-                  : text.includes('⚠️') ? 'warn'
-                  : text.includes('🏆') ? 'win'
-                  : 'info';
-                addEntry(text, kind);
-              }
-            }
-          }
-        });
-        observer.observe(chatbox, { childList: true, subtree: true });
-      }
-    };
     
     // ── attack/KO visual feedback ────────────────────────────────────────
     const playAttackFeedback = () => {
@@ -865,21 +1155,109 @@ if (!isTrainer) {
                         const name = card.ability?.name || 'Ability';
                         appendMessage('', `✦ ${card.name} — ${name}:`, 'announcement', false);
                         for (const s of steps) appendMessage('', '  ' + s.guidance, 'announcement', false);
+                        // family-level guidance (announce-only; skip draw — handled below, and unknown)
+                        if (classifyAbility(card) !== 'draw' && classifyAbility(card) !== 'unknown') {
+                          appendMessage('', describeAbilityFamily(card), 'announcement', false);
+                        }
     
-                        // auto-apply draw abilities once per turn (flag on image)
+                        // auto-apply draw abilities once per turn (tracked in rulesState)
                         const drawStep = steps.find((s) => s.type === 'drawAbility');
-                        if (drawStep && !img.__rulesAbilityUsed) {
-                          import('../../actions/move-card-bundle/move-card.js').then(({ moveCard }) => {
+                        if (drawStep && !abilityUsed('self', card)) {
+                          import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
                             for (let k = 0; k < drawStep.count; k++) {
                               try {
                                 if (getZone('self', 'deck').getCount() > 0) {
-                                  moveCard('self', 'self', 'deck', 'hand', 0);
+                                  moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
                                 }
                               } catch {}
                             }
-                            img.__rulesAbilityUsed = true;
+                            markAbilityUsed('self', card);
                             appendMessage('', `  auto: drew ${drawStep.count} (ability used this turn)`, 'announcement', false);
                           });
+                        }
+
+                        // "When you play this Pokémon" — one-shot, fires once ever
+                        // (poller re-visits cards, so gate on a per-card DOM flag)
+                        if (!img.__rulesWhenPlayedFired) {
+                          const effect = parseWhenPlayedEffect(card);
+                          if (effect) {
+                            img.__rulesWhenPlayedFired = true;
+                            if (effect.kind === 'draw') {
+                              import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                                for (let k = 0; k < effect.n; k++) {
+                                  try {
+                                    if (getZone('self', 'deck').getCount() > 0) {
+                                      moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+                                    }
+                                  } catch {}
+                                }
+                                appendMessage('', `  auto: when played — drew ${effect.n} card(s)`, 'announcement', false);
+                              });
+                            } else if (effect.kind === 'damage') {
+                              const oppActive = getZone('opp', 'active').array[0];
+                              const existing = parseInt(oppActive?.image?.damageCounter?.textContent || '0', 10) || 0;
+                              if (oppActive?.image) {
+                                if (existing) {
+                                  import('../../actions/counters/damage-counter.js').then(({ updateDamageCounter }) => updateDamageCounter('opp', 'active', 0, existing + effect.n));
+                                } else {
+                                  import('../../actions/counters/damage-counter.js').then(({ addDamageCounter }) => addDamageCounter('opp', 'active', 0, effect.n));
+                                }
+                              }
+                              appendMessage('', `  auto: when played — placed ${effect.n} damage counter(s) on opponent's Active`, 'announcement', false);
+                            }
+                          }
+                        }
+
+                        // opponent-disrupt: "Discard N cards from your opponent's
+                        // hand" — one-shot (per-card DOM flag), blocked when any
+                        // opponent Pokémon protects its hand (isHandProtected).
+                        const oppDiscardN = parseOpponentDiscard(card);
+                        if (oppDiscardN > 0 && !img.__rulesOppDiscardFired) {
+                          img.__rulesOppDiscardFired = true;
+                          const oppPokemons = [
+                            ...getZone('opp', 'active').array,
+                            ...getZone('opp', 'bench').array,
+                          ];
+                          const protector = oppPokemons.find((c) => c.image && isHandProtected(c));
+                          // Stadium hand protection: a Stadium owned by the
+                          // discarding target can shield their hand as well
+                          // (e.g. "Cards in your hand can't be discarded").
+                          const stadium = getStadium();
+                          const stadiumProtect = stadium && stadium.user === 'opp' && isStadiumHandProtect(stadium.card);
+                          if (protector || stadiumProtect) {
+                            const by = protector ? protector.name : (stadium.card.name || 'Stadium');
+                            appendMessage('', `  \u{1f6e1}\ufe0f ${by} protects the hand — discard blocked.`, 'announcement', false);
+                          } else {
+                            const handCards = getZone('opp', 'hand').array;
+                            if (handCards.length === 0) {
+                              appendMessage('', `  opponent's hand is empty — nothing to discard.`, 'announcement', false);
+                            } else if (handCards.length < oppDiscardN) {
+                              appendMessage('', `  only ${handCards.length} card(s) in hand — discard manually.`, 'announcement', false);
+                            } else {
+                              appendMessage('', `  \u{1f0b4} Discard ${oppDiscardN} card(s) from the opponent's hand:`, 'announcement', false);
+                              openChoicePicker({
+                                title: `Discard ${oppDiscardN} from opponent's hand`,
+                                candidates: handCards,
+                                zoneFrom: 'hand',
+                                destination: 'discard',
+                                multiSelect: true,
+                                requiredCount: oppDiscardN,
+                                onConfirm: (picks) => {
+                                  import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                                    const zone = getZone('opp', 'hand');
+                                    for (const pick of picks) {
+                                      const idx = zone.array.indexOf(pick);
+                                      if (idx >= 0) {
+                                        try { moveCardBundle('opp', 'opp', 'hand', 'discard', idx, false, 'move'); } catch {}
+                                      }
+                                    }
+                                    appendMessage('', `  auto: opponent discarded ${picks.length} card(s).`, 'announcement', false);
+                                  });
+                                },
+                                onCancel: () => appendMessage('', '  cancelled — discard manually.', 'announcement', false),
+                              });
+                            }
+                          }
                         }
                       });
                       continue;
@@ -891,20 +1269,21 @@ if (!isTrainer) {
                 appendMessage('', `${card.name}: effect not auto-parsed — play it manually.`, 'announcement', false);
                 return;
               }
-              appendMessage('', `▶ ${card.name}:`, 'announcement', false);
-              for (const step of parsed.steps) {
-                appendMessage('', '  ' + describeStep(step), 'announcement', false);
-                if (step.type === 'searchDeck' || step.type === 'lookAtTop') {
-                  openDeckSearchWindow(`${card.name} lets you search your deck`);
-                  appendMessage('', '  (deck unlocked — click your deck to look)', 'announcement', false);
-                }
-              }
-              // auto-execute the fully-deterministic draw effects
-              autoExecuteTrainer(card, parsed.steps);
-    
-              // choice-based searches: open the picker with filtered candidates
-              const searchStep = parsed.steps.find((s) => s.type === 'searchDeck' && s.destination === 'hand');
-              if (searchStep) {
+              const costStep = parsed.steps.find((s) => s.type === 'discardCost');
+              // guided picker for search steps (hand or bench). The
+              // Nest-Ball / single-Basic bench case stays auto-handled in
+              // autoExecuteTrainer, so exclude it here to avoid two pickers.
+              const searchStep = parsed.steps.find(
+                (s) => s.type === 'searchDeck' && !(s.destination === 'bench' && s.what === 'Basic Pokémon'),
+              );
+
+              // choice-based searches: unlock the deck window, then open the
+              // filtered picker. Runs immediately — or only after the discard
+              // cost below is confirmed and paid.
+              const runSearchPicker = () => {
+                if (!searchStep) return;
+                openDeckSearchWindow(`${card.name} lets you search your deck`);
+                appendMessage('', '  (deck unlocked — click your deck to look)', 'announcement', false);
                 import('./rules-state.mjs').then(async ({ ensureCardData }) => {
                   const deck = getZone('self', 'deck');
                   const matches = [];
@@ -914,16 +1293,86 @@ if (!isTrainer) {
                   }
                   if (matches.length === 0) {
                     appendMessage('', '  no matching cards in deck', 'announcement', false);
-                  } else {
+                  } else if ((searchStep.count || 1) > 1) {
+                    // multi-card search (e.g. Buddy-Buddy: 2 basics to bench)
+                    const toBench = searchStep.destination === 'bench';
                     openChoicePicker({
-                      title: `${card.name} — take a card to hand`,
+                      title: `${card.name} — choose ${searchStep.count} cards to ${toBench ? 'Bench' : 'your hand'}`,
                       candidates: matches,
                       zoneFrom: 'deck',
-                      destination: 'hand',
+                      destination: searchStep.destination,
+                      multiSelect: true,
+                      requiredCount: searchStep.count,
+                      onConfirm: (selected) => {
+                        import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                          for (const s of selected) {
+                            const idx = getZone('self', 'deck').array.indexOf(s);
+                            if (idx >= 0) moveCardBundle('self', 'self', 'deck', searchStep.destination, idx, false, 'move');
+                          }
+                          appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
+                        });
+                      },
+                      onCancel: () => {
+                        appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
+                      },
+                    });
+                  } else {
+                    const toBench = searchStep.destination === 'bench';
+                    openChoicePicker({
+                      title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}`,
+                      candidates: matches,
+                      zoneFrom: 'deck',
+                      destination: searchStep.destination,
                     });
                   }
                 });
+              };
+
+              appendMessage('', `▶ ${card.name}:`, 'announcement', false);
+              for (const step of parsed.steps) {
+                appendMessage('', '  ' + describeStep(step), 'announcement', false);
+                // with a discard cost the deck window opens only after the
+                // cost is paid (inside runSearchPicker)
+                if ((step.type === 'searchDeck' || step.type === 'lookAtTop') && !costStep) {
+                  openDeckSearchWindow(`${card.name} lets you search your deck`);
+                  appendMessage('', '  (deck unlocked — click your deck to look)', 'announcement', false);
+                }
               }
+              // auto-execute the fully-deterministic draw effects
+              autoExecuteTrainer(card, parsed.steps);
+
+              // discard cost (e.g. Ultra Ball): multi-select picker first —
+              // the search picker opens only on confirm (cost paid)
+              if (costStep) {
+                const candidates = getZone('self', 'hand').array.filter((c) => c !== card);
+                import('./rules-state.mjs').then(async ({ ensureCardData }) => {
+                  for (const c of candidates) await ensureCardData(c);
+                  openChoicePicker({
+                    title: `${card.name} — discard ${costStep.count} cards to pay the cost`,
+                    candidates,
+                    zoneFrom: 'hand',
+                    destination: 'discard',
+                    multiSelect: true,
+                    requiredCount: costStep.count,
+                    onConfirm: (selected) => {
+                      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                        for (const s of selected) {
+                          const idx = getZone('self', 'hand').array.indexOf(s);
+                          if (idx >= 0) moveCardBundle('self', 'self', 'hand', 'discard', idx, false, 'move');
+                        }
+                        appendMessage('', `  cost paid: discarded ${selected.map((s) => s.name).join(', ')}`, 'announcement', false);
+                      });
+                      runSearchPicker();
+                    },
+                    onCancel: () => {
+                      appendMessage('', '  cost not paid — effect canceled', 'announcement', false);
+                    },
+                  });
+                });
+                return;
+              }
+
+              if (searchStep) runSearchPicker();
     
               // recursion (Night Stretcher): picker from discard
               const recurStep = parsed.steps.find((s) => s.type === 'recursion');
@@ -962,267 +1411,41 @@ if (!isTrainer) {
       });
     };
     
-    // ── attack panel UI ──────────────────────────────────────────────────
-    const buildAttackPanel = () => {
-      if (document.getElementById('attackPanel')) return;
-      const selfDoc = self.document;
-    
-      const panel = document.createElement('div');
-      panel.id = 'attackPanel';
-      panel.hidden = true;
-      panel.innerHTML = `
-        <div class="attack-panel-card">
-          <div class="attack-panel-title">Attacks</div>
-          <div class="attack-panel-list"></div>
-          <div class="attack-panel-footer">
-            <span class="attack-panel-hint">Attacking ends your turn</span>
-          </div>
-        </div>`;
-      selfDoc.body.appendChild(panel);
-    
-      const attacker = () => getZone('self', 'active').array[0];
-      const list = panel.querySelector('.attack-panel-list');
-    
-      const refresh = async () => {
-        const active = attacker();
-        list.innerHTML = '';
-        if (!active) {
-          list.innerHTML = '<div class="attack-panel-empty">No active Pokémon.</div>';
-          return;
-        }
-        await ensureCardData(active);
-        const attacks = active.attacks || [];
-        if (attacks.length === 0) {
-          list.innerHTML = '<div class="attack-panel-empty">This Pokémon has no attacks.</div>';
-          return;
-        }
-        attacks.forEach((attack, index) => {
-          const cost = (attack.cost || []).join(' ');
-          const btn = document.createElement('button');
-          btn.className = 'attack-panel-button';
-          btn.innerHTML = `<span class="attack-panel-cost">${escapeHtml(cost)}</span>
-            <span class="attack-panel-name">${escapeHtml(attack.name)}</span>
-            <span class="attack-panel-damage">${attack.damage != null ? attack.damage : ''}</span>`;
-          btn.addEventListener('click', () => runAttack(index));
-          list.appendChild(btn);
-        });
-      };
-    
-      const runAttack = async (index) => {
-        // modern rule: the player going first can't attack on turn 1
-        if (rulesState.turnNumber === 1) {
-          toastRulesBlocked("Can't attack on the first turn (going first).");
-          return;
-        }
-        // status check: paralyzed/asleep act as attack blocks
-        const { canActThroughStatuses } = await import('./status.mjs');
-        const me0 = attacker();
-        if (me0) {
-          const myKey = me0.image?.dataset?.cardId || me0.name;
-          const statusCheck = canActThroughStatuses('self', myKey);
-          if (!statusCheck.can) {
-            toastRulesBlocked(statusCheck.reason);
-            return;
-          }
-        }
-    
-        const me = attacker();
-        const oppActive = getZone('opp', 'active').array[0];
-        if (!me || !oppActive) {
-          toastRulesBlocked('Both players need an active Pokémon.');
-          return;
-        }
-        await ensureCardData(me);
-        await ensureCardData(oppActive);
-    
-        const attack = (me.attacks || [])[index];
-        if (!attack) return;
-    
-        // gather attached energy types (the sim tracks attachments by image
-        // adjacency; we read the counters the attach flow maintains)
-        const energies = getAttachedEnergyTypes(me);
-    
-        const result = await executeAttack({
-          attacker: { ...me, attachedEnergies: energies },
-          defender: oppActive,
-          attack,
-          attackIndex: index,
-          damageApplier: (total) => applyDamageToOpponent(total),
-          prizeTaker: () => {},
-        });
-    
-        if (!result.ok) {
-          toastRulesBlocked(result.reason);
-          return;
-        }
-    
-        playAttackFeedback(result.ko);
-
-    const parts = [`Attack: ${attack.name}`];
-        if (result.breakdown.multiplier > 1) parts.push(`weakness ×${result.breakdown.multiplier}`);
-        if (result.breakdown.resistance > 0) parts.push(`resistance −${result.breakdown.resistance}`);
-        parts.push(`${result.damage} damage`);
-        appendMessage('', parts.join(' · '), 'announcement', false);
-    
-        // sync to opponent in multiplayer
-        if (systemState.isTwoPlayer && rulesSocket) {
-          rulesSocket.emit('rulesEvent', {
-            type: 'attacked',
-            data: {
-              attackName: attack.name,
-              damage: result.damage,
-              status: (parseStatusFromAttackText(attack.text || ''))[0] || null,
-            },
-          });
-        }
-    
-        if (result.ko) {
-          appendMessage('', `${oppActive.name || 'Defending Pokémon'} is knocked out!`, 'announcement', false);
-          const ko = handleKO({ attackerPlayer: 'self', defender: oppActive });
-          appendMessage('', `Take ${ko.prizeCount} prize${ko.prizeCount > 1 ? 's' : ''} (${ko.prizesRemaining} remaining)`, 'announcement', false);
-              // auto-take the prize cards (TCG Live moves them to hand directly)
-              import('../../actions/move-card-bundle/move-card.js').then(({ moveCard }) => {
-                for (let i = 0; i < ko.prizeCount; i++) {
-                  try {
-                    if (getZone('self', 'prizes').getCount() > 0) {
-                      moveCard('self', 'self', 'prizes', 'hand', 0);
-                    }
-                  } catch {}
-                }
-                appendMessage('', 'Prize card(s) added to hand', 'announcement', false);
-              });
-          const { promotionGuidance } = await import('./ko-flow.mjs');
-          const oppBench = getZone('opp', 'bench').array.length;
-          const guidance = promotionGuidance('opp', oppBench);
-          if (guidance) appendMessage('', guidance, 'announcement', false);
-          if (ko.won) {
-            appendMessage('', '🏆 All prizes taken — you win!', 'announcement', false);
-            rulesState.phase = 'ended';
-            panel.hidden = true;
-            return;
-          }
-        }
-    
-        // apply statuses printed on the attack (TCG Live parses these)
-        const statuses = parseStatusFromAttackText(attack.text || '');
-        for (const status of statuses) {
-          applyStatus('opp', oppActive.image?.dataset?.cardId || oppActive.name, status);
-          appendMessage('', `${oppActive.name || 'Defender'} is now ${status}!`, 'announcement', false);
-        }
-    
-        // turn-boundary status damage on our own active (poison/burn)
-        const myId = me.image?.dataset?.cardId || me.name;
-        const boundary = resolveTurnBoundary('self', myId);
-        if (boundary.damage > 0 && me.image?.damageCounter) {
-          const current = parseInt(me.image.damageCounter.textContent || '0', 10) || 0;
-          me.image.damageCounter.textContent = current + boundary.damage;
-        }
-        for (const note of boundary.notes) {
-          appendMessage('', note, 'announcement', false);
-        }
-    
-        // attack ends the turn automatically
-        const next = endTurn(rulesState.turnPlayer);
-        appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
-        updateTurnBanner();
-        panel.hidden = true;
-      };
-    
-      const getAttachedEnergyTypes = (card) => {
-            // type each attached energy from its name (basic energies) or
-            // enriched API data (special energies)
-            const attachedZone = getZone('self', 'attachedCards');
-            const NAME_TO_TYPE = {
-              'grass energy': 'Grass', 'fire energy': 'Fire', 'water energy': 'Water',
-              'lightning energy': 'Lightning', 'psychic energy': 'Psychic',
-              'fighting energy': 'Fighting', 'darkness energy': 'Darkness',
-              'metal energy': 'Metal', 'dragon energy': 'Dragon', 'fairy energy': 'Fairy',
-            };
-            const energies = [];
-            for (const attached of attachedZone.array) {
-              if (attached.image?.relative === card.image) {
-                const name = String(attached.name || '').toLowerCase().trim();
-                const mapped = NAME_TO_TYPE[name];
-                if (mapped) {
-                  energies.push(mapped);
-                  continue;
-                }
-                const types = attached.types;
-                if (Array.isArray(types) && types.length > 0 && String(attached.supertype || attached.type || '').toLowerCase().includes('energy')) {
-                  energies.push(types[0]);
-                  continue;
-                }
-                const t = attached.type || attached.image.dataset?.energyType;
-                if (t) energies.push(String(t));
-              }
-            }
-            return energies;
-          };
-    
-      const applyDamageToOpponent = (total) => {
-        const oppActive = getZone('opp', 'active').array[0];
-        if (!oppActive?.image?.damageCounter) return;
-        oppActive.currentDamage = total;
-        oppActive.image.damageCounter.textContent = total;
-        // sync to opponent in multiplayer
-        if (systemState.isTwoPlayer) {
-          import('../../setup/general/process-action.js').then(({ processAction }) => {
-            processAction('opp', true, 'updateDamageCounter', ['active', 0, total]);
-          });
-        }
-      };
-    
-      // retreat button lives in the panel footer
-      const footer = panel.querySelector('.attack-panel-footer');
-      const retreatBtn = document.createElement('button');
-      retreatBtn.className = 'attack-panel-retreat';
-      retreatBtn.textContent = 'Retreat Active Pokémon';
-      footer.appendChild(retreatBtn);
-    
-      retreatBtn.addEventListener('click', async () => {
-        const { canRetreat, markRetreated } = await import('./retreat.mjs');
-        const me = attacker();
-        if (!me) {
-          toastRulesBlocked('No active Pokémon.');
-          return;
-        }
-        await ensureCardData(me);
-        const energies = getAttachedEnergyTypes(me);
-        const check = canRetreat('self', me, energies);
-        if (!check.allowed) {
-          toastRulesBlocked(check.reason);
-          return;
-        }
-        // retreat = discard cost energies + prompt bench selection
-        const bench = getZone('self', 'bench').array;
-        if (bench.length === 0) {
-          toastRulesBlocked('No benched Pokémon to retreat into.');
-          return;
-        }
-        markRetreated('self');
-        const cost = me.retreatCost || 0;
-        appendMessage('', `Retreat: discard ${cost} energy, then drag a benched Pokémon to Active.`, 'announcement', false);
-        toastRulesBlocked(`Retreating ${me.name || 'active'} — move a bench Pokémon to Active.`);
-      });
-    
-      // show panel when the local player's turn begins in rules mode;
-      // hide (with a dimmed 'waiting' state) on the opponent's turn
-      document.addEventListener('rules-mode-changed', refresh);
-      document.addEventListener('rules-turn-began', refresh);
-      window.setInterval(() => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') {
-          panel.hidden = true;
-          return;
-        }
-        const myTurn = rulesState.turnPlayer === 'self';
-        panel.hidden = false;
-        panel.classList.toggle('waiting-for-opponent', !myTurn);
-        if (myTurn) refresh();
-      }, 2000);
-    };
     
     const updateTurnBanner = () => {
       document.dispatchEvent(new CustomEvent('rules-turn-began', { detail: { player: rulesState.turnPlayer } }));
+    };
+
+    // ── start-of-turn draw (taxonomy B) ──────────────────────────────
+    // Every live turn transition dispatches `rules-turn-began` (solo attack/
+    // pass via chat-buttons.js, the +Turn button via hookTurnButton, and the
+    // multiplayer mirror via hookMultiplayerSync). A single listener here
+    // covers all three: it auto-draws one card for the incoming turn player,
+    // once per turn (guarded by `drewThisTurn`), and announces deck-out when
+    // the deck is empty.
+    const hookTurnStartDraw = () => {
+      if (document.getElementById('rulesTurnStartDrawHooked')) return;
+      const marker = document.createElement('span');
+      marker.id = 'rulesTurnStartDrawHooked';
+      document.body.appendChild(marker);
+
+      document.addEventListener('rules-turn-began', (event) => {
+        const player = event?.detail?.player || rulesState.turnPlayer;
+        if (!rulesState.enabled) return;
+        let deckCount = 0;
+        try {
+          deckCount = getZone(player, 'deck').getCount();
+        } catch {
+          return;
+        }
+        if (shouldAutoDrawAtTurnStart({ enabled: rulesState.enabled, drewThisTurn: rulesState.flags[player]?.drewThisTurn, deckCount })) {
+          draw(player, player, 1, true);
+          markTurnDrawn(player);
+          appendMessage('', `${player === 'self' ? 'P1' : 'P2'} draws a card (start of turn).`, 'announcement', false);
+        } else if (Number(deckCount) <= 0) {
+          appendMessage('', `${player === 'self' ? 'P1' : 'P2'}'s deck is empty — cannot draw.`, 'announcement', false);
+        }
+      });
     };
     
     const escapeHtml = (v = '') => String(v)

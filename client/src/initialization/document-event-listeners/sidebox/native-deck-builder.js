@@ -9,7 +9,10 @@ import {
   validateDeck,
 } from '../../../setup/deck-builder/core/deck-validation.mjs';
 import { systemState } from '../../../front-end.js';
-import { loadDeckData } from '../../../setup/deck-constructor/import.js';
+import {
+  changeCardBack,
+  loadDeckData,
+} from '../../../setup/deck-constructor/import.js';
 import { show } from '../../../setup/home-header/header-toggle.js';
 import {
   renderDeckCards,
@@ -265,10 +268,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         onChange: (sleeve) => {
           deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
           if (sleeve?.image) {
-                systemState.cardBackSrc = sleeve.image;
-                document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { image: sleeve.image } }));
+                // Route through the syncable changeCardBack action: sets the
+                // correct self/opp state var, re-points the target container's
+                // back images, and (in multiplayer) broadcasts to the opponent.
+                changeCardBack(currentLoadTarget, sleeve.image, true);
+                document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: sleeve.image } }));
               } else {
-                document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { image: null } }));
+                document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: null } }));
               }
             },
       });
@@ -287,25 +293,48 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
       // Customize switcher: Card Sleeve <-> Coin toggle + shared filter
           // ── playmat sleeve application ─────────────────────────────────
-          // On sleeve change: update every currently face-down card on both
-          // playmats (they read systemState.cardBackSrc on next flip), and
-          // re-point existing back images so the change is immediately visible.
-          const applySleeveToPlaymat = (image) => {
+          // Card backs are tracked per-player (systemState.cardBackSrc for
+          // self; p1OppCardBackSrc/p2OppCardBackSrc for the opponent) —
+          // writing/applying a sleeve must only ever touch the target it
+          // was actually picked for, or picking (or even just opening) one
+          // player's sleeve/deck silently overwrites the other player's
+          // custom sleeve back to the default the next time either of
+          // their card backs happens to be redrawn (e.g. on shuffle).
+          const setCardBackForTarget = (target, image) => {
+            if (target === 'opp') {
+              if (systemState.isTwoPlayer) systemState.p2OppCardBackSrc = image;
+              else systemState.p1OppCardBackSrc = image;
+            } else {
+              systemState.cardBackSrc = image;
+            }
+          };
+          const getCardBackForTarget = (target) => (
+            target === 'opp'
+              ? (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc)
+              : systemState.cardBackSrc
+          );
+          // On sleeve change: update every currently face-down card on the
+          // relevant player's playmat only (they read the card-back state
+          // on next flip), and re-point existing back images so the change
+          // is immediately visible.
+          const applySleeveToPlaymat = (image, target = 'self') => {
             try {
               const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
-              const target = image || fallback;
-              for (const containerId of ['selfContainer', 'oppContainer']) {
-                const doc = document.getElementById(containerId)?.contentWindow?.document;
-                if (!doc) continue;
-                // any img currently showing a card back gets the new sleeve
-                doc.querySelectorAll('img').forEach((img) => {
-                  const isBack = img.src.includes('cardback') || img.src.includes('pokemon-sleeve-database');
-                  if (isBack) img.src = target;
-                });
-              }
+              // when no sleeve is set for this deck, fall back to whatever
+              // this player's own card back already is — never borrow the
+              // default and never touch the other player's playmat
+              const resolvedTarget = image || getCardBackForTarget(target) || fallback;
+              const knownBacks = [systemState.cardBackSrc, systemState.p1OppCardBackSrc, systemState.p2OppCardBackSrc, fallback];
+              const containerId = target === 'opp' ? 'oppContainer' : 'selfContainer';
+              const doc = document.getElementById(containerId)?.contentWindow?.document;
+              if (!doc) return;
+              // any img currently showing a card back gets the new sleeve
+              doc.querySelectorAll('img').forEach((img) => {
+                if (knownBacks.includes(img.src)) img.src = resolvedTarget;
+              });
             } catch {}
           };
-          document.addEventListener('deck-sleeve-changed', (e) => applySleeveToPlaymat(e.detail?.image));
+          document.addEventListener('deck-sleeve-changed', (e) => applySleeveToPlaymat(e.detail?.image, e.detail?.target || 'self'));
     
           // ── per-deck customization restore ─────────────────────────────
           const syncCustomizationToDeck = () => {
@@ -317,8 +346,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               const sleeves = typeof getSleeves === 'function' ? getSleeves() : [];
               const sleeve = sleeves.find((s) => s.id === sleeveId) || null;
               const backImage = sleeve?.image || null;
-              if (backImage) systemState.cardBackSrc = backImage;
-              document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { image: backImage } }));
+              // only write/apply for the target actually being viewed — an
+              // unset sleeve on this deck must never clobber the OTHER
+              // player's already-chosen card back
+              // emit=false: runs locally on init/switch; do not broadcast on load.
+              if (backImage) changeCardBack(currentLoadTarget, backImage, false);
+              document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
             } catch {}
           };
       syncCustomizationToDeck();

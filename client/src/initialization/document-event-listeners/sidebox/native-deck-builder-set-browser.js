@@ -53,10 +53,12 @@ import {
         '    placeholder="Filter by card name..." aria-label="Filter cards by name" />',
         '</div>',
         '<div class="native-deck-builder-set-browser-status" aria-live="polite"></div>',
+        '<div class="native-deck-builder-set-browser-tabs"></div>',
         '<div class="native-deck-builder-set-browser-results"></div>',
       ].join('');
     
       const statusEl = panelEl.querySelector('.native-deck-builder-set-browser-status');
+      const tabsEl = panelEl.querySelector('.native-deck-builder-set-browser-tabs');
       const resultsEl = panelEl.querySelector('.native-deck-builder-set-browser-results');
       const filterInput = panelEl.querySelector('.native-deck-builder-set-browser-filter');
     
@@ -104,45 +106,38 @@ import {
           .join('');
       };
     
-      const renderGroup = (set, { expanded, cardsHtml = '', loadingCards = false }) => {
+      const renderSetTab = (set, { expanded }) => {
         const safeSetName = escapeHtml(set.name);
-        const safeDate = escapeHtml(set.releaseDate || '');
-    
-        const header = [
-          `<button class="native-deck-builder-set-browser-group-header" data-toggle-set="${escapeHtml(set.setId)}" aria-expanded="${expanded ? 'true' : 'false'}">`,
-          set.logo ? `<img class="native-deck-builder-set-browser-group-logo" src="${escapeHtml(set.logo)}" alt="" loading="lazy" />` : '',
-          `  <strong>${safeSetName}</strong>`,
-          `  <span class="native-deck-builder-set-browser-group-count">${set.cardCount} card${set.cardCount === 1 ? '' : 's'}</span>`,
-          safeDate ? `<span class="native-deck-builder-set-browser-group-date">${safeDate}</span>` : '',
-          `  <span class="native-deck-builder-set-browser-chevron" aria-hidden="true">&#9662;</span>`,
+        return [
+          `<button class="native-deck-builder-set-browser-tab${expanded ? ' expanded' : ''}" data-toggle-set="${escapeHtml(set.setId)}" aria-expanded="${expanded ? 'true' : 'false'}" title="${safeSetName}">`,
+          set.logo ? `<img class="native-deck-builder-set-browser-tab-logo" src="${escapeHtml(set.logo)}" alt="" loading="lazy" />` : `<span class="native-deck-builder-set-browser-tab-name">${safeSetName}</span>`,
+          `  <span class="native-deck-builder-set-browser-tab-count">${set.cardCount}</span>`,
           '</button>',
         ].join('');
+      };
     
-        let body = '';
-        if (expanded && loadingCards) {
-          body = '<div class="native-deck-builder-set-browser-empty">Loading cards...</div>';
-        } else if (expanded) {
-          body = `<div class="native-deck-builder-set-browser-group-cards">${cardsHtml}</div>`;
-        }
-    
-        return `<div class="native-deck-builder-set-browser-group${expanded ? ' expanded' : ''}" data-set-id="${escapeHtml(set.setId)}">${header}${body}</div>`;
+      const renderDropdownSection = (set, { cardsHtml = '', loadingCards = false, showLabel = false }) => {
+        const safeSetName = escapeHtml(set.name);
+        const label = showLabel ? `<div class="native-deck-builder-set-browser-dropdown-label">${safeSetName}</div>` : '';
+        const body = loadingCards
+          ? '<div class="native-deck-builder-set-browser-empty">Loading cards...</div>'
+          : `<div class="native-deck-builder-set-browser-group-cards">${cardsHtml}</div>`;
+        return `<div class="native-deck-builder-set-browser-dropdown-section" data-set-id="${escapeHtml(set.setId)}">${label}${body}</div>`;
       };
     
       const render = () => {
         if (!loaded) {
+          tabsEl.innerHTML = '';
           resultsEl.innerHTML = '';
           return;
         }
     
         const isFiltering = String(filterTerm || '').trim() !== '';
-        const groupsHtml = [];
+        const tabsHtml = [];
+        const dropdownSections = [];
     
         for (const set of sets) {
-          // While filtering, every set that has loaded cards matching the term
-          // auto-expands (unloaded sets stay collapsed until clicked). Otherwise
-          // only the manually expanded set is open.
           let expanded = set.setId === expandedSetId;
-          let cardsHtml = '';
     
           if (expanded || isFiltering) {
             const cards = cardsBySet.get(set.setId);
@@ -152,31 +147,37 @@ import {
                 expanded = filtered.length > 0;
               }
               if (expanded) {
-                cardsHtml = filtered.length
+                const cardsHtml = filtered.length
                   ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), getQuantities ? getQuantities() : {})
                   : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
+                dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
               }
-            } else if (!isFiltering) {
-              cardsHtml = '';
-            } else {
+            } else if (expanded && !isFiltering) {
+              // clicked but not loaded yet — show a loading placeholder
+              dropdownSections.push(renderDropdownSection(set, { loadingCards: true }));
+            } else if (isFiltering) {
               expanded = false;
             }
           }
     
-          groupsHtml.push(renderGroup(set, { expanded, cardsHtml }));
+          tabsHtml.push(renderSetTab(set, { expanded }));
         }
     
-        if (groupsHtml.length === 0) {
+        if (tabsHtml.length === 0) {
+          tabsEl.innerHTML = '';
           resultsEl.innerHTML = '<div class="native-deck-builder-set-browser-empty">No sets available.</div>';
           return;
         }
     
-        resultsEl.innerHTML = groupsHtml.join('');
+        tabsEl.innerHTML = tabsHtml.join('');
+        resultsEl.innerHTML = dropdownSections.length
+          ? dropdownSections.join('')
+          : '<div class="native-deck-builder-set-browser-dropdown-empty">Select a set above to browse its cards.</div>';
         wireEvents();
       };
     
       const wireEvents = () => {
-        resultsEl.querySelectorAll('[data-toggle-set]').forEach((button) => {
+        tabsEl.querySelectorAll('[data-toggle-set]').forEach((button) => {
           button.addEventListener('click', async () => {
             const setId = button.dataset.toggleSet;
             if (expandedSetId === setId) {
@@ -225,6 +226,7 @@ import {
           render();
         } catch (error) {
           showStatus(`Could not load sets: ${error.message}`);
+          tabsEl.innerHTML = '';
           resultsEl.innerHTML = '';
         } finally {
           loading = false;
