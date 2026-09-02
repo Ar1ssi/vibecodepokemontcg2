@@ -1266,7 +1266,7 @@ if (!isTrainer) {
               const text = [card.effect || card.text || []].flat().join(' ');
               const parsed = parseTrainerEffect(text);
               if (!parsed.recognizable) {
-                appendMessage('', `${card.name}: effect not auto-parsed — play it manually.`, 'announcement', false);
+                appendMessage('', `${card.name}: effect not auto-parsed — play it manually. (parser got: "${text.slice(0, 60)}")`, 'announcement', false);
                 return;
               }
               const costStep = parsed.steps.find((s) => s.type === 'discardCost');

@@ -51,6 +51,8 @@
           ability: detail.ability || null,
           subtypes: detail.subtypes || [],
           rarity: detail.rarity || card.rarity || '',
+          effect: detail.effect || null,
+          text: detail.text || null,
         };
         cardDataCache.set(card.id, data);
         Object.assign(card, data);
