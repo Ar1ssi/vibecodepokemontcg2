@@ -6,6 +6,7 @@ import { rearrangeArray, shuffleIndices } from '../../setup/general/shuffle.js';
 import { removeImages } from '../../setup/image-logic/remove-images.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { sort } from './general.js';
+import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const shuffleZone = (
   user,
@@ -32,7 +33,11 @@ export const shuffleZone = (
 
   rearrangeArray(zone.array, indices);
   for (let i = 0; i < zone.getCount(); i++) {
+    unhydrateHolo(zone.array[i]);
     zone.element.appendChild(zone.array[i].image);
+  }
+  if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
+    zone.array.forEach((card) => hydrateHolo(card));
   }
   if (zoneId === 'deck') {
     sort(user, zoneId);

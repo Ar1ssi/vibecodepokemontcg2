@@ -14,6 +14,7 @@
     //   { type: 'recursion', what: 'Pokemon|Energy', from: 'discard' }
     //   { type: 'heal', target: 'Mega Evolution ex' }
     //   { type: 'attachFromDiscard', energyType: 'Psychic', target: 'Bench Psychic' }
+    //   { type: 'ionoShuffle' }
     
     export function parseTrainerEffect(text = '') {
       const lower = text.toLowerCase();
@@ -112,8 +113,10 @@
         return { steps, recognizable: true };
       }
     
-      // both players shuffle hands to bottom (Iono)
-      if (lower.includes('each player shuffles their hand')) {
+      // both players shuffle hands (Iono — matches both the SV wording
+      // "each player shuffles their hand" and PAL 185
+      // "each player shuffles the cards in their hand into their deck")
+      if (lower.includes('each player shuffles') && lower.includes('hand')) {
         steps.push({ type: 'ionoShuffle' });
         return { steps, recognizable: true };
       }
@@ -140,7 +143,7 @@
         case 'recursion': return `Put a ${step.what} from your discard pile into your hand.`;
         case 'heal': return `Heal all damage from your ${step.target}.`;
         case 'attachFromDiscard': return `Attach a basic ${step.energyType} Energy from your discard pile to 1 of your benched ${step.energyType} Pokémon.`;
-        case 'ionoShuffle': return 'Both players shuffle hands to the bottom of their decks and draw fresh hands.';
+        case 'ionoShuffle': return 'Both players shuffle the cards in their hands into their decks.';
         case 'passive': return 'Passive effect — stays in play.';
         default: return '';
       }

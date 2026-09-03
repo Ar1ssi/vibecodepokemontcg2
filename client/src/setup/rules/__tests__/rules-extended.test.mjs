@@ -9,7 +9,7 @@ import test from 'node:test';
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
@@ -1865,6 +1865,111 @@ import test from 'node:test';
       assert.equal(promotionGuidance('self', 0), null);
       assert.match(promotionGuidance('self', 2), /You must promote/);
       assert.match(promotionGuidance('opp', 2), /Opponent must promote/);
+    });
+    
+    // ── name → id resolution (attack-window data plumbing) ──
+    const { resolveCardId, normalizeCardName } = await import('../rules-state.mjs');
+    
+    test('normalizeCardName: lowercases, trims, collapses whitespace', () => {
+      assert.equal(normalizeCardName('  Charizard  EX '), 'charizard ex');
+      assert.equal(normalizeCardName(''), '');
+    });
+    
+    test('resolveCardId: exact name match wins over partial', () => {
+      const summaries = [
+        { id: 1, name: 'Pikachu', category: 'pokemon' },
+        { id: 2, name: 'Pikachu EX', category: 'pokemon' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Pikachu'), 1);
+    });
+    
+    test('resolveCardId: prefers Pokémon when type is Pokémon', () => {
+      const summaries = [
+        { id: 10, name: 'Pikachu', category: 'trainer' },
+        { id: 20, name: 'Pikachu', category: 'pokemon' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Pikachu', 'Pokémon'), 20);
+    });
+    
+    test('resolveCardId: prefers Trainer when type is Trainer', () => {
+      const summaries = [
+        { id: 10, name: 'Poké Ball', category: 'pokemon' },
+        { id: 20, name: 'Poké Ball', category: 'trainer' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Poké Ball', 'Trainer'), 20);
+    });
+    
+    test('resolveCardId: EX variant matches " EX" form', () => {
+      const summaries = [{ id: 42, name: 'Charizard EX', category: 'pokemon' }];
+      assert.equal(resolveCardId(summaries, 'Charizard EX', 'Pokémon'), 42);
+    });
+    
+    test('resolveCardId: no match returns null', () => {
+      const summaries = [{ id: 1, name: 'Totally Different', category: 'pokemon' }];
+      assert.equal(resolveCardId(summaries, 'Nonexistent Card'), null);
+    });
+    
+    test('resolveCardId: empty/invalid input returns null', () => {
+      assert.equal(resolveCardId([], 'Pikachu'), null);
+      assert.equal(resolveCardId(null, 'Pikachu'), null);
+      assert.equal(resolveCardId([{ id: 1, name: 'Pikachu' }], ''), null);
+      assert.equal(resolveCardId([{ name: 'Pikachu' }], 'Pikachu'), null); // no id
+    });
+
+    // ── Garland Ray: discard-to-scale damage (Mega Diancie ex) ──
+    const GARLAND_RAY =
+      'Discard up to 2 Energy cards from this Pokémon, and this attack does 120 damage for each card you discarded in this way.';
+
+    test('discardEnergyScaling: Garland Ray → { max: 2 }', () => {
+      assert.deepEqual(discardEnergyScaling(GARLAND_RAY), { max: 2 });
+    });
+
+    test('discardEnergyScaling: no “for each card you discarded” → null', () => {
+      assert.equal(discardEnergyScaling('Discard 2 Energy cards from this Pokémon.'), null);
+      assert.equal(discardEnergyScaling('Does 120 damage.'), null);
+      assert.equal(discardEnergyScaling(''), null);
+      assert.equal(discardEnergyScaling(null), null);
+    });
+
+    test('discardEnergyScaling: unnumbered discard clause defaults to 1', () => {
+      // Only matches when both the “for each card you discarded” scaling
+      // phrase and a “discard … Energy cards from this Pokémon” clause are
+      // present; the number is optional in the regex but Garland Ray-style
+      // text always carries one. Guard the default path explicitly.
+      const t = 'Discard Energy cards from this Pokémon, and this attack does 120 damage for each card you discarded in this way.';
+      assert.deepEqual(discardEnergyScaling(t), { max: 1 });
+    });
+
+    test('parseAttackDamage: Garland Ray scales by energyDiscarded', () => {
+      const atk = { name: 'Garland Ray', damage: 120, text: GARLAND_RAY };
+      for (const [discarded, expected] of [[0, 0], [1, 120], [2, 240]]) {
+        const parsed = parseAttackDamage(atk, {}, {}, { energyDiscarded: discarded });
+        assert.equal(parsed.total, expected, `discarded=${discarded}`);
+        assert.ok(
+          parsed.components.includes('per-energy-discarded'),
+          `component present at discarded=${discarded}`
+        );
+      }
+    });
+
+    test('parseAttackDamage: discard-scale branch wins over attached-energy branch', () => {
+      // Even with attached Energy present, the discarded-count branch (printed
+      // as “for each card you discarded”) takes precedence.
+      const atk = { name: 'Garland Ray', damage: 120, text: GARLAND_RAY };
+      const parsed = parseAttackDamage(atk, {}, {}, { energyDiscarded: 1, energyCount: 3 });
+      assert.equal(parsed.total, 120); // 120 × 1, not 120 × 3
+      assert.ok(parsed.components.includes('per-energy-discarded'));
+    });
+
+    test('parseAttackDamage: regression — “× the number of Energy” still uses attached count', () => {
+      const atk = {
+        name: 'Psychic Beam',
+        damage: 30,
+        text: 'This attack does 30 damage times the number of Energy cards attached to this Pokémon.',
+      };
+      const parsed = parseAttackDamage(atk, {}, {}, { energyCount: 3, energyDiscarded: 0 });
+      assert.equal(parsed.total, 90); // 30 × 3 attached
+      assert.ok(parsed.components.includes('per-energy'));
     });
 
     

@@ -4,6 +4,7 @@ import test from 'node:test';
     const { rulesState, canPerformAction, startGame, beginTurn, endTurn, markAttacked } = await import('../rules-state.mjs');
     const { computeAttackDamage, canPayAttackCost, expandEnergyEntries } = await import('../attack-engine.mjs');
 const { classifyEnergyEffect } = await import('../energy-effects.mjs');
+const { decideTurnOrder } = await import('../rules-turnorder.mjs');
     
     test('weakness doubles damage', () => {
       const result = computeAttackDamage({ types: ['Water'] }, { weakness: { type: 'Water', value: 2 } }, { damage: 60 });
@@ -211,5 +212,36 @@ const { classifyEnergyEffect } = await import('../energy-effects.mjs');
       const dfamily = classifyEnergyEffect({ name: 'Double Fire Energy', subtypes: ['Energy', 'Special'] });
       assert.equal(dfamily, 'double');
       assert.equal(canPayAttackCost([{ type: 'Fire', family: dfamily }], ['Fire', 'Fire']), true);
+    });
+
+    // ── turn-order coin flip: caller wins if the coin lands on their call ──
+    test('decideTurnOrder: caller self calls heads, heads → self first', () => {
+      assert.equal(decideTurnOrder({ caller: 'self', call: 'heads', result: 'heads' }), 'self');
+    });
+
+    test('decideTurnOrder: caller self calls heads, tails → opp first', () => {
+      assert.equal(decideTurnOrder({ caller: 'self', call: 'heads', result: 'tails' }), 'opp');
+    });
+
+    test('decideTurnOrder: caller opp calls tails, tails → opp first', () => {
+      assert.equal(decideTurnOrder({ caller: 'opp', call: 'tails', result: 'tails' }), 'opp');
+    });
+
+    test('decideTurnOrder: caller opp calls tails, heads → self first', () => {
+      assert.equal(decideTurnOrder({ caller: 'opp', call: 'tails', result: 'heads' }), 'self');
+    });
+
+    test('decideTurnOrder: caller self calls tails, tails → self first', () => {
+      assert.equal(decideTurnOrder({ caller: 'self', call: 'tails', result: 'tails' }), 'self');
+    });
+
+    test('decideTurnOrder: caller self calls tails, heads → opp first', () => {
+      assert.equal(decideTurnOrder({ caller: 'self', call: 'tails', result: 'heads' }), 'opp');
+    });
+
+    test('decideTurnOrder: invalid input falls back sanely', () => {
+      assert.equal(decideTurnOrder({ caller: 'nonsense', call: 'heads', result: 'heads' }), 'self');
+      assert.equal(decideTurnOrder({ caller: 'self', call: 'bogus', result: 'heads' }), 'opp');
+      assert.equal(decideTurnOrder({}), 'self');
     });
     

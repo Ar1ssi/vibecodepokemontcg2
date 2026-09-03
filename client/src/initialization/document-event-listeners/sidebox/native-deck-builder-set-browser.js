@@ -4,7 +4,6 @@ import {
       filterCardsByName,
       sortCardsWithinGroup,
     } from '../../../setup/deck-builder/core/set-browser.mjs';
-    import { resolveHoloEffect } from '../../../setup/deck-builder/core/holo.mjs';
     
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')

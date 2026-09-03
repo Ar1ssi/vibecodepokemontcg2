@@ -9,6 +9,8 @@ import {
 } from '../../front-end.js';
 import { getZone } from '../zones/get-zone.js';
 import { identifyCard } from './click-events.js';
+import { manualDeckActionAllowed } from '../rules/rules-state.mjs';
+import { appendMessage } from '../chatbox/append-message.js';
 
 const popupContainers = [
   'lostZone',
@@ -17,6 +19,10 @@ const popupContainers = [
   'attachedCards',
   'viewCards',
 ];
+
+const ZONE_SELECTOR =
+  '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone';
+const zoneOf = (el) => el?.closest?.(ZONE_SELECTOR);
 
 export const dragStart = (event) => {
   if (systemState.isReplay && !systemState.isTwoPlayer) {
@@ -76,23 +82,20 @@ export const dragOver = (event) => {
     selfContainerDocument.querySelector('.dragging') ||
     oppContainerDocument.querySelector('.dragging');
 
-  const targetIsNotOwnContainer =
-    event.target !== draggedImage.parentElement &&
-    event.target !== draggedImage.parentElement.parentElement;
+  const targetIsNotOwnContainer = event.target !== zoneOf(draggedImage);
   const targetIsContainer = event.target.tagName === 'DIV';
   const cardIsAttached = draggedImage.attached;
   const targetIsActiveOrBench = ['active', 'bench'].includes(event.target.id);
   const targetParentIsActiveOrBench = ['active', 'bench'].includes(
-    event.target.parentElement.parentElement.id
+    zoneOf(event.target)?.id
   );
   const targetNotItself = event.target !== draggedImage;
   const targetIsAttached = event.target.attached;
   const cardIsFromActiveOrBench = ['active', 'bench'].includes(
-    draggedImage.parentElement.parentElement.id
+    zoneOf(draggedImage)?.id
   );
   const targetParentParentIsNotOwnContainer =
-    event.target.parentElement.parentElement !==
-    draggedImage.parentElement.parentElement;
+    zoneOf(event.target) !== zoneOf(draggedImage);
 
   const movingValidCardToContainer =
     targetIsContainer &&
@@ -119,8 +122,8 @@ export const dragOver = (event) => {
   }
 
   const targetParentIsNotOwnContainer =
-    event.target.parentElement !== draggedImage.parentElement;
-  const targetParentIsContainer = event.target.parentElement.tagName === 'DIV';
+    zoneOf(event.target) !== zoneOf(draggedImage);
+  const targetParentIsContainer = zoneOf(event.target) !== null;
 
   if (
     targetIsNotPlayContainer &&
@@ -133,12 +136,13 @@ export const dragOver = (event) => {
       cardIsFromActiveOrBench &&
       targetParentParentIsNotOwnContainer
     ) {
-      event.target.parentElement.parentElement.classList.add('highlightBox');
+      zoneOf(event.target)?.classList.add('highlightBox');
     } else if (!targetParentIsActiveOrBench && targetParentIsNotOwnContainer) {
-      if (event.target.parentElement.id === 'board') {
-        event.target.parentElement.classList.add('highlightBox');
-      } else {
-        event.target.parentElement.classList.add('highlight');
+      const zone = zoneOf(event.target);
+      if (zone?.parentElement?.id === 'board') {
+        zone.classList.add('highlightBox');
+      } else if (zone) {
+        zone.classList.add('highlight');
       }
     }
   }
@@ -146,11 +150,8 @@ export const dragOver = (event) => {
 
 export const dragLeave = (event) => {
   event.target.classList.remove('highlight', 'highlightBox');
-  event.target.parentElement.classList.remove('highlight', 'highlightBox');
-  event.target.parentElement.parentElement.classList.remove(
-    'highlight',
-    'highlightBox'
-  );
+  zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
+  event.target.parentElement?.classList.remove('highlight', 'highlightBox');
 };
 
 export const dragEnd = (event) => {
@@ -166,13 +167,8 @@ export const dragEnd = (event) => {
   enablePointerEvents(oppContainerDocument, classList);
 
   event.target.classList.remove('dragging');
-  if (event.target.parentElement) {
-    event.target.parentElement.classList.remove('highlight', 'highlightBox');
-    event.target.parentElement.parentElement.classList.remove(
-      'highlight',
-      'highlightBox'
-    );
-  }
+  zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
+  event.target.parentElement?.classList.remove('highlight', 'highlightBox');
 
   event.target.classList.remove('high-zIndex');
   event.target.style.opacity = '1';
@@ -218,11 +214,8 @@ export const drop = (event) => {
   }
 
   event.target.classList.remove('highlight', 'highlightBox');
-  event.target.parentElement.classList.remove('highlight', 'highlightBox');
-  event.target.parentElement.parentElement.classList.remove(
-    'highlight',
-    'highlightBox'
-  );
+  zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
+  event.target.parentElement?.classList.remove('highlight', 'highlightBox');
 
   let draggedImage =
     document.querySelector('.dragging') ||
@@ -256,14 +249,14 @@ export const drop = (event) => {
     if (
       event.target.tagName === 'IMG' &&
       event.target !== draggedImage[0] &&
-      ['active', 'bench'].includes(event.target.parentElement.parentElement.id)
+      ['active', 'bench'].includes(zoneOf(event.target)?.id)
     ) {
-      dZoneId = event.target.parentElement.parentElement.id;
+      dZoneId = zoneOf(event.target)?.id;
       targetIndex = getZone(event.target.user, dZoneId).array.findIndex(
         (card) => card.image === event.target
       );
     } else if (event.target.tagName === 'IMG') {
-      dZoneId = event.target.parentElement.id;
+      dZoneId = zoneOf(event.target)?.id;
     } else {
       dZoneId = event.target.id;
     }
@@ -275,12 +268,23 @@ export const drop = (event) => {
         targetIndex !== undefined)
     ) {
       if (dZoneId === 'deckCover') {
+        // Gate the manual deck drop through the rules layer.
+        const deckCheck = manualDeckActionAllowed('moveToDeck');
+        if (!deckCheck.allowed) {
+          appendMessage(
+            systemState.initiator,
+            '⛔ ' + deckCheck.reason,
+            'announcement',
+            false
+          );
+        } else {
         moveToDeckTop(
           mouseClick.cardUser,
           systemState.initiator,
           mouseClick.zoneId,
           mouseClick.cardIndex
         );
+        }
       } else {
         moveCardBundle(
           mouseClick.cardUser,

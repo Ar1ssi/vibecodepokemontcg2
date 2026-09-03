@@ -1,12 +1,7 @@
-import { VSTARGXFunction } from '../../../actions/general/VSTAR-GX.js';
 import { flipBoard } from '../../../actions/general/flip-board.js';
 import { flipCoin } from '../../../actions/general/flip-coin.js';
 import { takeTurn } from '../../../actions/general/take-turn.js';
-import {
-  oppContainerDocument,
-  selfContainerDocument,
-  systemState,
-} from '../../../front-end.js';
+import { systemState } from '../../../front-end.js';
 import { refreshBoardImages } from '../../../setup/sizing/refresh-board.js';
 
 export const initializeBoardButtons = () => {
@@ -68,55 +63,4 @@ export const initializeBoardButtons = () => {
     }
   });
 
-  const selfVSTARButton = selfContainerDocument.getElementById('VSTARButton');
-  selfVSTARButton.addEventListener('click', () => {
-    if (
-      !(
-        systemState.isTwoPlayer &&
-        document.getElementById('spectatorModeCheckbox').checked
-      ) &&
-      !systemState.isReplay
-    ) {
-      VSTARGXFunction('self', 'VSTAR');
-    }
-  });
-
-  const selfGXButton = selfContainerDocument.getElementById('GXButton');
-  selfGXButton.addEventListener('click', () => {
-    if (
-      !(
-        systemState.isTwoPlayer &&
-        document.getElementById('spectatorModeCheckbox').checked
-      ) &&
-      !systemState.isReplay
-    ) {
-      VSTARGXFunction('self', 'GX');
-    }
-  });
-
-  const oppVSTARButton = oppContainerDocument.getElementById('VSTARButton');
-  oppVSTARButton.addEventListener('click', () => {
-    if (
-      !(
-        systemState.isTwoPlayer &&
-        document.getElementById('spectatorModeCheckbox').checked
-      ) &&
-      !systemState.isReplay
-    ) {
-      VSTARGXFunction('opp', 'VSTAR');
-    }
-  });
-
-  const oppGXButton = oppContainerDocument.getElementById('GXButton');
-  oppGXButton.addEventListener('click', () => {
-    if (
-      !(
-        systemState.isTwoPlayer &&
-        document.getElementById('spectatorModeCheckbox').checked
-      ) &&
-      !systemState.isReplay
-    ) {
-      VSTARGXFunction('opp', 'GX');
-    }
-  });
 };

@@ -1,5 +1,16 @@
 import { mouseClick, systemState } from '../../front-end.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
+import { manualDeckActionAllowed } from '../../setup/rules/rules-state.mjs';
+
+// Gate a manual (keybind-triggered) deck action through the rules layer.
+function gate(actionKey, initiator) {
+  const check = manualDeckActionAllowed(actionKey);
+  if (!check.allowed) {
+    appendMessage(initiator, '⛔ ' + check.reason, 'announcement', false);
+    return false;
+  }
+  return true;
+}
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import { doubleClick } from '../../setup/image-logic/click-events.js';
@@ -31,7 +42,6 @@ import {
 } from '../general/reveal-and-hide.js';
 import { rotateCard } from '../general/rotate-card.js';
 import { setup } from '../general/setup.js';
-import { takeTurn } from '../general/take-turn.js';
 import { undo } from '../general/undo.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import {
@@ -191,6 +201,7 @@ export const keyDown = (event) => {
       const dZoneId = bind;
       deselectCard();
       if (event.key === 'ArrowUp' || event.code === 'ArrowUp') {
+        if (!gate('moveToDeck', systemState.initiator)) return;
         moveToDeckTop(
           mouseClick.cardUser,
           systemState.initiator,
@@ -198,6 +209,7 @@ export const keyDown = (event) => {
           mouseClick.cardIndex
         );
       } else if (event.key === 'ArrowDown' || event.code === 'ArrowDown') {
+        if (!gate('moveToDeck', systemState.initiator)) return;
         moveToDeckBottom(
           mouseClick.cardUser,
           systemState.initiator,
@@ -205,6 +217,7 @@ export const keyDown = (event) => {
           mouseClick.cardIndex
         );
       } else if (event.key === 'ArrowRight' || event.code === 'ArrowRight') {
+        if (!gate('switchWithDeck', systemState.initiator)) return;
         switchWithDeckTop(
           mouseClick.cardUser,
           systemState.initiator,
@@ -212,6 +225,7 @@ export const keyDown = (event) => {
           mouseClick.cardIndex
         );
       } else if (event.key === 's' || event.code === 'KeyS') {
+        if (!gate('moveToDeck', systemState.initiator)) return;
         shuffleIntoDeck(
           mouseClick.cardUser,
           systemState.initiator,
@@ -506,9 +520,11 @@ export const keyDown = (event) => {
       (event.key === 's' || event.code === 'KeyS') &&
       !isAltKeyPressed(event)
     ) {
+      if (!gate('shuffleDeck', systemState.initiator)) return;
       shuffleAll(systemState.initiator, systemState.initiator, 'deck');
     }
     if (isNonZeroDigitKeyPressed(event) && isAltKeyPressed(event)) {
+      if (!gate('viewDeck', systemState.initiator)) return;
       const selectedDeckCount = getZone(
         systemState.initiator,
         'deck'
@@ -527,6 +543,7 @@ export const keyDown = (event) => {
       );
     }
     if (isNonZeroDigitKeyPressed(event) && event.ctrlKey) {
+      if (!gate('viewDeck', systemState.initiator)) return;
       const selectedDeckCount = getZone(
         systemState.initiator,
         'deck'
@@ -560,7 +577,13 @@ export const keyDown = (event) => {
       (event.key === 't' || event.code === 'KeyT') &&
       isAltKeyPressed(event)
     ) {
-      takeTurn(systemState.initiator, systemState.initiator);
+      // "End turn": route through the button click so the rules-mode
+      // capture hook (hookTurnButton in rules-bridge.js) ends the current
+      // turn and suppresses the legacy takeTurn bubble handler. In
+      // non-rules mode the capture hook no-ops and the button's bubble
+      // handler runs takeTurn as before.
+      const turnButton = document.getElementById('turnButton');
+      if (turnButton) turnButton.click();
     }
     if (event.key === 'm' || event.code === 'KeyM') {
       appendMessage(
@@ -574,18 +597,21 @@ export const keyDown = (event) => {
       isAltKeyPressed(event)
     ) {
       event.preventDefault();
+      if (!gate('discardAndDraw', systemState.initiator)) return;
       discardAndDraw(systemState.initiator, systemState.initiator);
     }
     if (
       (event.key === 's' || event.code === 'KeyS') &&
       isAltKeyPressed(event)
     ) {
+      if (!gate('shuffleAndDraw', systemState.initiator)) return;
       shuffleAndDraw(systemState.initiator, systemState.initiator);
     }
     if (
       (event.key === 'ArrowDown' || event.code === 'ArrowDown') &&
       isAltKeyPressed(event)
     ) {
+      if (!gate('shuffleBottomAndDraw', systemState.initiator)) return;
       shuffleBottomAndDraw(systemState.initiator, systemState.initiator);
     }
     if (event.key === 'u' || event.code === 'KeyU') {

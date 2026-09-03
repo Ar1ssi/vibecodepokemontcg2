@@ -133,7 +133,6 @@ export const flipBoard = () => {
     'attachedCardsButtonContainer',
   ];
   const headerIds = ['attachedCardsHeader', 'viewCardsHeader'];
-  const specialMoveButtonContainers = ['specialMoveButtonContainer'];
 
   for (const user of users) {
     const document =
@@ -163,11 +162,6 @@ export const flipBoard = () => {
       } else if (header.textContent === 'Opponent moving cards...') {
         header.textContent = 'Move attached cards';
       }
-    }
-    for (const containerId of specialMoveButtonContainers) {
-      const container = document.getElementById(containerId);
-      container.classList.toggle('self-special-move-button-container');
-      container.classList.toggle('opp-special-move-button-container');
     }
   }
 

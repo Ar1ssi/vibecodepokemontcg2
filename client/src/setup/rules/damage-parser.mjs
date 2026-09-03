@@ -121,7 +121,17 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   let total = base;
 
   // ── Scaling damage ──
-  if (text && /number of energy|× the number|\* the number/.test(text)) {
+  // Discard-to-scale (taxonomy §D damage-scaling family): "Discard up to N
+  // Energy cards from this Pokémon… does X damage for each card you
+  // discarded in this way" (Mega Diancie ex / Garland Ray). The multiplier is
+  // the number of Energy the player chose to discard (ctx.energyDiscarded),
+  // NOT the attached count. 0 discarded → 0 damage, per the printed text.
+  if (text && /for each card you discard(ed)?/.test(text)) {
+    const discarded = ctx.energyDiscarded ?? 0;
+    total = base * discarded;
+    components.push('per-energy-discarded');
+    notes.push(`× ${discarded} Energy discarded in this way`);
+  } else if (text && /number of energy|× the number|\* the number/.test(text)) {
     total = base * energyCount;
     components.push('per-energy');
     notes.push(`× ${energyCount} attached Energy`);
@@ -322,6 +332,22 @@ export function allBenchDamage(attackText) {
   if (!/to (?:each|every|all)\b[^.;]*benched pok[ée]mon/i.test(text)) return 0;
   const m = /(\d+)\s*damage\s+to\s+(?:each|every|all)\b/i.exec(text);
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+// Parse a printed "discard Energy to scale damage" clause
+// (taxonomy §D damage-scaling family, distinct from the fixed discard-cost
+// family): the discard amount is a *choice* ("up to N") and the damage
+// scales with what was actually discarded. Returns { max: N } or null.
+// e.g. Mega Diancie ex / Garland Ray: "Discard up to 2 Energy cards from
+// this Pokémon, and this attack does 120 damage for each card you
+// discarded in this way." Pure.
+export function discardEnergyScaling(attackText) {
+  const text = String(attackText || '');
+  const each = /for each card you discard(ed)?/i.test(text);
+  const discard = /discard\s+(?:up\s+to\s+)?(\d+\s+)?Energy\s+cards?\s+from\s+this\s+Pok[ée]mon/i.exec(text);
+  if (!each || !discard) return null;
+  const max = discard[1] ? Math.max(0, parseInt(discard[1], 10)) : 1;
+  return { max };
 }
 
 // Parse a printed discard-cost clause (taxonomy §D discard-cost family).

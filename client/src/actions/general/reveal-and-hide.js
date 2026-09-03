@@ -9,6 +9,7 @@ import { convertZoneName } from '../move-card-bundle/move-card-message.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { sort } from '../zones/general.js';
 import { deselectCard } from './close-popups.js';
+import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 
 const toggleCard = (card, targetCardBackSrc) => {
   if (card.image.src !== targetCardBackSrc) {
@@ -57,6 +58,7 @@ export const lookAtCards = (
 ) => {
   if (emit) {
     const zone = getZone(user, zoneId);
+    zone.array.forEach((card) => unhydrateHolo(card));
     removeImages(zone.element);
     zone.array.forEach((card) => {
       revealCard(user, card);
@@ -64,6 +66,9 @@ export const lookAtCards = (
     });
     if (zoneId === 'hand') {
       sort(user, zoneId);
+    }
+    if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
+      zone.array.forEach((card) => hydrateHolo(card));
     }
   }
   if (message) {
@@ -104,6 +109,7 @@ export const stopLookingAtCards = (
 ) => {
   if (emit) {
     const zone = getZone(user, zoneId);
+    zone.array.forEach((card) => unhydrateHolo(card));
     removeImages(zone.element);
     zone.array.forEach((card) => {
       hideCard(user, card);
@@ -111,6 +117,9 @@ export const stopLookingAtCards = (
     });
     if (zoneId === 'hand') {
       sort(user, zoneId);
+    }
+    if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
+      zone.array.forEach((card) => hydrateHolo(card));
     }
   }
   if (message) {
