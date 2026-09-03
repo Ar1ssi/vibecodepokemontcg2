@@ -6,6 +6,7 @@ import { updateCount } from '../general/count.js';
 import { hideCard, revealCard } from '../general/reveal-and-hide.js';
 import { sort } from '../zones/general.js';
 import { attachCard } from './attach-card.js';
+import { hydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { autoMoveActiveBenchCard } from './auto-move-active-bench-card.js';
 import { decreaseCardLayer } from './decrease-card-layer.js';
 import { evolveCard } from './evolve-card.js';
@@ -209,6 +210,7 @@ export const moveCard = async (
       initializeActiveBenchCard(user, movingCard, dZoneId, dZone);
     } else {
       dZone.element.appendChild(movingCard.image);
+      if (['hand', 'prizes', 'discard', 'lostZone'].includes(dZoneId)) hydrateHolo(movingCard);
     }
     //update the cover of the deck/lostzone/discard if applicable
     updateDestinationCover(user, movingCard, dZoneId);

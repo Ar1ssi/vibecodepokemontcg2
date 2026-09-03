@@ -9,8 +9,9 @@ import { classifyAbility, searchTargetType } from '../../setup/rules/ability-eff
 import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
 import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
 import { parseDamagePrevention, applyDamagePrevention, passiveCostDiscount, applyCostDiscount } from '../../setup/rules/ability-executors.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
+import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion } from '../../setup/rules/ko-flow.mjs';
 import { markRetreated } from '../../setup/rules/retreat.mjs';
@@ -272,6 +273,60 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
 
+        // Discard-to-scale (taxonomy §D damage-scaling family): "Discard up
+        // to N Energy cards from this Pokémon… does X damage for each card
+        // you discarded in this way" (Mega Diancie ex / Garland Ray). The
+        // player CHOOSES how many to discard (0..N, capped by what's
+        // attached); the damage multiplies by the chosen amount, so 0
+        // discarded → 0 damage (printed behavior). Cancel bails the attack
+        // (turn does not end), like the other cost gates.
+        let energyDiscarded = 0;
+        if (rulesState.enabled) {
+          const scaling = discardEnergyScaling(atk.text);
+          if (scaling) {
+            const cap = Math.min(scaling.max, attachedEnergies.length);
+            let chosen = 0;
+            if (cap > 0) {
+              const options = [];
+              for (let k = 0; k <= cap; k++) {
+                options.push({
+                  label: `Discard ${k} Energy → ${(atk.damage || 0) * k} damage`,
+                  idx: k,
+                });
+              }
+              const pick = await _pickFromList(
+                `${atk.name}: how many Energy to discard?`,
+                options
+              );
+              if (pick === null) {
+                appendMessage(user, 'Attack cancelled.', 'announcement', false);
+                return;
+              }
+              chosen = pick;
+              for (let k = 0; k < chosen; k++) {
+                const z = getZone(user, 'active');
+                const idx = z.array.findIndex((c) => c.type === 'Energy');
+                if (idx === -1) break;
+                moveCard(user, user, 'active', 'discard', idx);
+              }
+              appendMessage(
+                user,
+                `🗑 Discarded ${chosen} Energy; ${atk.name} does ${(atk.damage || 0) * chosen} damage.`,
+                'announcement',
+                false
+              );
+            } else {
+              appendMessage(
+                user,
+                `⚠️ ${atk.name}: no Energy to discard — it deals 0 damage.`,
+                'announcement',
+                false
+              );
+            }
+            energyDiscarded = chosen;
+          }
+        }
+
         // Damage calculation
         await ensureCardData(oppActive);
         await ensureCardData(active);
@@ -299,6 +354,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           const defenderDmgEl = oppActive?.image?.damageCounter;
           const parsed = parseAttackDamage(atk, active, oppActive, {
             energyCount: attachedEnergies.length,
+            energyDiscarded,
             opponentPrizes: getZone(oppPlayer, 'prizes').getCount(),
             turnCount: Math.max(1, rulesState.turnNumber),
             attackerHp: active?.hp ?? 0,
@@ -418,6 +474,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               'announcement',
               false
             );
+            await _takePrizesWithPicker(user, koResult.prizeCount);
             // P4: real promotion — move KO'd active to discard, promote first bench.
             const benchCount = getZone(oppPlayer, 'bench').getCount();
             const plan = planPromotion(true, benchCount);
@@ -578,6 +635,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                   'announcement',
                   false
                 );
+                await _takePrizesWithPicker(user, benchKO.prizeCount);
               }
             } else {
               appendMessage(
@@ -639,6 +697,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                     'announcement',
                     false
                   );
+                  await _takePrizesWithPicker(user, benchKO.prizeCount);
                 }
               } else {
                 appendMessage(
@@ -1222,6 +1281,91 @@ function _pickFromList(title, items) {
     host.style.borderRadius = '10px';
     host.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)';
   });
+}
+
+// Multi-select prize picker. Lets the player choose WHICH of their own prize
+// cards to take (up to `count`), instead of the automatic "take the top N".
+// Resolves to the array of chosen 0-based indices, or null (fallback to
+// automatic top-N). Reuses the same positioning/styling as `_pickFromList`.
+function _pickPrizeCards(count, cards) {
+  return new Promise((resolve) => {
+    const needed = Math.min(count, cards.length);
+    const host = document.createElement('div');
+    host.className = 'choice-picker-card';
+    const titleEl = document.createElement('div');
+    titleEl.className = 'choice-picker-title';
+    titleEl.textContent = `Choose ${needed} prize card${needed !== 1 ? 's' : ''} to take:`;
+    host.appendChild(titleEl);
+
+    const selected = new Set();
+    const grid = document.createElement('div');
+    grid.className = 'choice-picker-grid';
+    cards.forEach((card, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-picker-item';
+      btn.textContent = card.name || `Prize ${idx + 1}`;
+      btn.addEventListener('click', () => {
+        if (selected.has(idx)) {
+          selected.delete(idx);
+          btn.classList.remove('selected');
+        } else if (selected.size < needed) {
+          selected.add(idx);
+          btn.classList.add('selected');
+        }
+        confirmBtn.disabled = selected.size !== needed;
+      });
+      grid.appendChild(btn);
+    });
+    host.appendChild(grid);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'choice-picker-confirm';
+    confirmBtn.textContent = `Take ${needed} prize card${needed !== 1 ? 's' : ''}`;
+    confirmBtn.disabled = true; // enabled once exactly `needed` are selected
+    confirmBtn.addEventListener('click', () => {
+      host.remove();
+      resolve([...selected]);
+    });
+    host.appendChild(confirmBtn);
+
+    const cancel = document.createElement('button');
+    cancel.className = 'choice-picker-cancel';
+    cancel.textContent = 'Take the top ones (automatic)';
+    cancel.addEventListener('click', () => {
+      host.remove();
+      resolve(null);
+    });
+    host.appendChild(cancel);
+
+    const chatArea = document.querySelector('.chat-messages') || document.body;
+    chatArea.prepend(host);
+    host.style.position = 'fixed';
+    host.style.top = '10%';
+    host.style.left = '50%';
+    host.style.transform = 'translateX(-50%)';
+    host.style.zIndex = 9999;
+    host.style.minWidth = '220px';
+    host.style.padding = '12px';
+    host.style.borderRadius = '10px';
+    host.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)';
+  });
+}
+
+// Show the prize picker and take the chosen cards; fall back to the automatic
+// top-N behavior if the player cancels. Falls back to `takePrizes` when there
+// are no prize cards to choose from.
+async function _takePrizesWithPicker(user, count) {
+  const prizeCards = getZone(user, 'prizes').array.slice(0, count);
+  if (prizeCards.length === 0) {
+    takePrizes(user, user, count);
+    return;
+  }
+  const chosen = await _pickPrizeCards(count, prizeCards);
+  if (chosen === null || chosen.length === 0) {
+    takePrizes(user, user, count);
+    return;
+  }
+  takePrizesByIndex(user, user, chosen);
 }
 
 // Search ability (taxonomy C, once-per-turn): reveal the top card of your

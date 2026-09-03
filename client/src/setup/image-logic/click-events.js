@@ -19,11 +19,10 @@ import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
-  mouseClick.zoneId = event.target.parentElement.id;
-  if (!mouseClick.zoneId) {
-    //this will be the case for cards on the active/bench, since they are wrapped in a container
-    mouseClick.zoneId = event.target.parentElement.parentElement.id;
-  }
+  //closest() handles plain cards, play-container cards, and holo-wrapper cards
+  mouseClick.zoneId = event.target.closest(
+    '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone, #attachedCards, #viewCards, #stadium, #board, #deckCover, #discardCover, #lostZoneCover'
+  )?.id;
   if (mouseClick.zoneId === 'deckCover') {
     mouseClick.cardIndex = 0;
   } else if (['lostZoneCover', 'discardCover'].includes(mouseClick.zoneId)) {

@@ -38,7 +38,7 @@ import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
     
     import {
-      buildHoloStage,
+      buildHoloCard,
       resolveHoloEffect,
       startHoloAnimation,
       stopHoloAnimation,
@@ -520,10 +520,9 @@ let activeHoloStop = null;
     
         const holder = previewHolder;
         if (effect) {
-          const stage = buildHoloStage(imageUrl, effect);
-          stage.classList.add('holo-preview-image');
-          holder.replaceChildren(stage);
-          activeHoloStop = startHoloAnimation(stage);
+          const cardEl = buildHoloCard(imageUrl, effect);
+          holder.replaceChildren(cardEl);
+          activeHoloStop = startHoloAnimation(cardEl);
         } else {
           previewImage.src = imageUrl;
           holder.replaceChildren(previewImage);

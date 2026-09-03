@@ -83,7 +83,16 @@ import test from 'node:test';
     
     test('Iono: both shuffle', () => {
       const r = parseTrainerEffect("Each player shuffles their hand and puts it on the bottom of their deck.");
+      assert.equal(r.recognizable, true);
       assert.equal(r.steps[0].type, 'ionoShuffle');
+    });
+    
+    test('Iono PAL 185: "Each player shuffles the cards in their hand into their deck"', () => {
+      const r = parseTrainerEffect('Each player shuffles the cards in their hand into their deck.');
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'ionoShuffle');
+      assert.ok(describeStep(r.steps[0]).toLowerCase().includes('shuffle'));
     });
     
     test('Buddy-Buddy Poffin: 2 basics ≤70HP', () => {

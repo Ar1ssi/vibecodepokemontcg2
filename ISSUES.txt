@@ -1,0 +1,20 @@
+ 
+Issues:
+Both players draw a card when a turn is started
+Rename +Turn to end turn and rework the button so that it ends the users turn instead of starting theirs and interrupting the other user.
+Iono: effect not auto-parsed — play it manually. (parser got: "Each player shuffles the cards in their hand into their deck") ✅ FIXED (PAL 185 wording now parses to ionoShuffle and auto-executes)
+⛔ Stage1 can't evolve from Basic directly (needs Rare Candy for a skip). This is incorrect, stage 1 should evolve from basic, stage 2 cannot evolve from basics ✅ FIXED (stage strings like TCGdex's 'Stage1' now normalized; Stage 1 evolves from Basic, Stage 2 still requires the Rare Candy path)
+Garland ray doesn't let you discard when you attack. This means there is a parsing problem for discard energy when the attack does damage times the amount of energy cards you discard (not sure)
+Cant pick prize cards on KO
+Lillie drew 6 instead of 8
+Can still look through deck at any point in the game even with rules mode on (very bad, needs fix)
+Hand has 8 cards bug
+No Stadium in Play (even though a stadium is in play)
+Chat buttons need to be scaled properly or moved onto the mat 
+GX and Vstar buttons need to go
+
+Todo:
+CARD FILTERS LIKE PTCGLIVE
+Add shiny/holographic stuff onto the actual mat as well as the preview
+Make coins visible on the mat.
+RESCALE MAT SO BENCH AND POKEMON ARE BIGGER

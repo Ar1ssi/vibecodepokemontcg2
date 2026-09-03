@@ -3,7 +3,7 @@ services:
     name: ptcg-sim
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    buildCommand: pnpm install --frozen-lockfile
     startCommand: node server/server.js
     healthCheckPath: /
     envVars:

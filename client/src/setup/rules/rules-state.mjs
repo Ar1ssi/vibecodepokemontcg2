@@ -23,11 +23,97 @@
     // Weakness/resistance: TCGdex exposes { type, value } on card details.
     const cardDataCache = new Map();
     
+    // ── name → id resolution for zone cards (built without a TCGdex id) ──
+    // Zone `Card` objects carry only name/type/user/image. We resolve a TCGdex
+    // id by name so the detail fetch below can enrich attacks/weakness/etc.
+    export function normalizeCardName(name) {
+      return String(name || '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
+    // Pure, testable picker: choose the best TCGdex id for a card name. No network.
+    export function resolveCardId(summaries, name, type = '') {
+      if (!Array.isArray(summaries) || summaries.length === 0) return null;
+      const target = normalizeCardName(name);
+      if (!target) return null;
+      const t = String(type || '').toLowerCase();
+      const wantsPokemon = t.includes('pok');
+      const wantsTrainer = t.includes('trainer');
+    
+      const scored = summaries
+        .filter((s) => s && s.id)
+        .map((s) => {
+          const sn = normalizeCardName(s.name);
+          let score = 0;
+          if (sn === target) score += 100;
+          else if (sn.includes(target) || target.includes(sn)) score += 20;
+          if (wantsPokemon && s.category === 'pokemon') score += 10;
+          if (wantsTrainer && s.category === 'trainer') score += 10;
+          if (wantsPokemon && s.category === 'trainer') score -= 50;
+          if (wantsTrainer && s.category === 'pokemon') score -= 50;
+          return { s, score };
+        });
+      if (scored.length === 0) return null;
+      scored.sort((a, b) => b.score - a.score);
+      // Only exact normalized-name matches (score 100) may resolve an id —
+      // partial matches risk resolving to the wrong card (e.g. "Pikachu EX").
+      if (scored[0].score < 100) return null;
+      return scored[0].s.id;
+    }
+    
+    // Network: fetch TCGdex summary objects for a name (with EX/GX variant forms).
+    async function fetchSummariesByName(name) {
+      const queries = [name];
+      if (/-EX$/i.test(name)) queries.push(name.replace(/-EX$/i, ' EX'));
+      else if (/ EX$/i.test(name)) queries.push(name.replace(/ EX$/i, '-EX'));
+      if (/-GX$/i.test(name)) queries.push(name.replace(/-GX$/i, ' GX'));
+      else if (/ GX$/i.test(name)) queries.push(name.replace(/ GX$/i, '-GX'));
+      const seen = new Set();
+      const out = [];
+      for (const q of queries) {
+        try {
+          const url = `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q)}`;
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const arr = await res.json();
+          if (Array.isArray(arr)) {
+            for (const s of arr) {
+              if (s && s.id && !seen.has(s.id)) {
+                seen.add(s.id);
+                out.push(s);
+              }
+            }
+          }
+        } catch {
+          /* ignore a failed variant query; others may still resolve */
+        }
+      }
+      return out;
+    }
+    
     export async function ensureCardData(card) {
-      if (!card?.id) return card;
+      if (!card) return card;
       if (card.hp && card.weaknesses !== undefined) return card; // enriched
+      if (!card.id && card.name) {
+        // Zone cards arrive without an id — resolve one by name before the detail fetch.
+        try {
+          const summaries = await fetchSummariesByName(card.name);
+          const id = resolveCardId(summaries, card.name, card.type);
+          if (id != null) card.id = id;
+        } catch {
+          /* fall through: card.id stays unset and we return unenriched */
+        }
+      }
+      if (!card?.id) return card;
       if (cardDataCache.has(card.id)) {
-        Object.assign(card, cardDataCache.get(card.id));
+        // Same fill-only merge as the fresh-fetch path: the card's own values
+        // (e.g. local `stage: 'Stage 1'`) must not be clobbered by TCGdex's
+        // formatting (e.g. `stage: 'Stage1'`) on a cache hit.
+        for (const [k, v] of Object.entries(cardDataCache.get(card.id))) {
+          if (card[k] == null || card[k] === '') card[k] = v;
+        }
         return card;
       }
       try {
@@ -51,11 +137,19 @@
           ability: detail.ability || null,
           subtypes: detail.subtypes || [],
           rarity: detail.rarity || card.rarity || '',
+          effect: detail.effect || null,
+          text: detail.text || null,
         };
         cardDataCache.set(card.id, data);
-        Object.assign(card, data);
+        // Fill in only fields the card doesn't already carry — a card's own
+        // values (e.g. local `stage`/`evolvesFrom`) are the source of truth and
+        // must not be clobbered by TCGdex's formatting.
+        for (const [k, v] of Object.entries(data)) {
+          if (card[k] == null || card[k] === '') card[k] = v;
+        }
       } catch {
-        cardDataCache.set(card.id, {});
+        // Do NOT cache an empty object on failure — leave it out so a later
+        // call can retry the fetch (avoids permanently poisoned cache entries).
       }
       return card;
     }
@@ -298,6 +392,34 @@
     }
     
     function flow() { return false; }
+    
+    // Gate for MANUAL (button/keybind/drag) deck & hand<->deck actions.
+    // Parsed card-effect flows (setup draws, Iono, stadium effects, etc.) call
+    // the shared action functions directly and never pass through here.
+    // Returns { allowed } or { allowed: false, reason }.
+    export function manualDeckActionAllowed(action) {
+      if (!rulesState.enabled) return { allowed: true };
+      switch (action) {
+        case 'viewDeck':
+          return canPerformAction({ user: null, action: 'viewDeck' });
+        case 'draw':
+          return { allowed: false, reason: 'Drawing is locked — only card effects may draw for you.' };
+        case 'shuffleDeck':
+          return { allowed: false, reason: 'The deck is locked — only card effects may shuffle it.' };
+        case 'moveToDeck':
+          return { allowed: false, reason: 'The deck is locked — only card effects may place cards into it.' };
+        case 'switchWithDeck':
+          return { allowed: false, reason: 'The deck is locked — only card effects may swap cards with it.' };
+        case 'discardAndDraw':
+          return { allowed: false, reason: 'The deck is locked — discarding to draw is only via card effects.' };
+        case 'shuffleAndDraw':
+          return { allowed: false, reason: 'The deck is locked — shuffling your hand in is only via card effects.' };
+        case 'shuffleBottomAndDraw':
+          return { allowed: false, reason: 'The deck is locked — shuffling your hand in is only via card effects.' };
+        default:
+          return { allowed: true };
+      }
+    }
     
     export function isRulesEnabled() {
       return rulesState.enabled;

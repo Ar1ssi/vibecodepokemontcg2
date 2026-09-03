@@ -56,7 +56,7 @@ import {
   shuffleAndDraw,
   shuffleBottomAndDraw,
 } from '../../actions/zones/hand-actions.js';
-import { shufflePrizesToDeckBottom } from '../../actions/zones/prizes-actions.js';
+import { shufflePrizesToDeckBottom, takePrizes, takePrizesByIndex } from '../../actions/zones/prizes-actions.js';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
@@ -85,6 +85,8 @@ const functions = {
   shuffleAndDraw: shuffleAndDraw,
   shuffleBottomAndDraw: shuffleBottomAndDraw,
   shufflePrizesToDeckBottom: shufflePrizesToDeckBottom,
+  takePrizes: takePrizes,
+  takePrizesByIndex: takePrizesByIndex,
   shuffleZone: shuffleZone,
   useAbility: useAbility,
   removeAbilityCounter: removeAbilityCounter,

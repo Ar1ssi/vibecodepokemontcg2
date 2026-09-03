@@ -1,3 +1,30 @@
+/* Holofoil (simey) — @import must precede all other rules in this stylesheet. */
+@import url('./holo/base.css');
+@import url('./holo/regular-holo.css');
+@import url('./holo/ex-regular.css');
+@import url('./holo/ex-full-art.css');
+@import url('./holo/ex-special-illustration-rare.css');
+@import url('./holo/hyper-rare.css');
+@import url('./holo/illustration-rare.css');
+@import url('./holo/radiant-holo.css');
+@import url('./holo/rainbow-alt.css');
+@import url('./holo/reverse-holo.css');
+
+/* Sizing for the deck-builder preview card (replaces the old .holo-stage rules). */
+.native-deck-builder-card-preview-scrim .card {
+  width: min(78vw, 600px);
+  max-height: 88vh;
+}
+.native-deck-builder-card-preview-scrim .card__rotator img {
+  width: 100%;
+  height: auto;
+}
+@media (max-height: 860px) {
+  .native-deck-builder-card-preview-scrim .card {
+    width: min(66vw, 580px);
+  }
+}
+
 * {
   user-select: none;
 }
@@ -482,20 +509,26 @@ ul, li {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  overflow: hidden;
-  gap: .5vw;
+  flex-wrap: nowrap;
+  overflow: visible;
+  gap: .3vw;
   box-sizing: border-box;
   margin-top: .5vh;
   margin-bottom: .5vh;
 }
 .chat-button-container button {
-  flex: 1;
-  padding: 7px;
-  font-size: 2vh;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 5px;
+  font-size: clamp(9px, 1.3vh, 14px);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   color: white;
   border: none;
-  border-radius: .5vw;
+  border-radius: .4vw;
 }
 .chat-button-container button.self-color:hover {
   background-color: rgba(116, 129, 183, 0.864);
@@ -2682,462 +2715,6 @@ a:hover {
       background: #7890d6;
     }
     
-    /* ═══ HOLOFOIL EFFECTS — faithful port of poke-holo.simey.me ══════════
-       Uses simey's exact gradient stacks, blend modes and filter chains.
-       The animation drives his variables: --pointer-x/y (light), --background-x/y
-       (gradient pan), --pointer-from-center/left/top (derived). */
-    .holo-stage {
-      /* CRITICAL: isolates the stacking context so mix-blend-mode layers
-         composite against the card image only (simey's card__front context),
-         not the dark scrim behind it */
-      isolation: isolate;
-      --pointer-x: 50%;
-      --pointer-y: 50%;
-      --background-x: 50%;
-      --background-y: 50%;
-      --pointer-from-center: 0.5;
-      --pointer-from-left: 0.5;
-      --pointer-from-top: 0.5;
-      --card-opacity: 1;
-    
-      /* simey's palette + assets (cards.css) */
-      --grain: url('../assets/holo/grain.webp');
-      --glitter: url('../assets/holo/glitter.png');
-      --glittersize: 25%;
-      --space: 5%;
-      --angle: 133deg;
-      --imgsize: cover;
-      --red: #f80e35;
-      --yellow: #eedf10;
-      --green: #21e985;
-      --blue: #0dbde9;
-      --violet: #c929f1;
-      --sunpillar-1: hsl(2, 100%, 73%);
-      --sunpillar-2: hsl(53, 100%, 69%);
-      --sunpillar-3: hsl(93, 100%, 69%);
-      --sunpillar-4: hsl(176, 100%, 76%);
-      --sunpillar-5: hsl(228, 100%, 74%);
-      --sunpillar-6: hsl(283, 100%, 73%);
-      --sunpillar-clr-1: var(--sunpillar-1);
-      --sunpillar-clr-2: var(--sunpillar-2);
-      --sunpillar-clr-3: var(--sunpillar-3);
-      --sunpillar-clr-4: var(--sunpillar-4);
-      --sunpillar-clr-5: var(--sunpillar-5);
-      --sunpillar-clr-6: var(--sunpillar-6);
-    
-      position: relative;
-      overflow: hidden;
-      border-radius: 4.55% / 3.5%;
-      will-change: transform;
-    
-      /* 3D tilt (simey's signature): the card rotates with the light.
-         --rotate-x/y are set by the JS animation loop. */
-      transform: perspective(900px) rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
-      transform-style: preserve-3d;
-    }
-    .holo-stage img {
-      display: block;
-      width: 100%;
-      height: auto;
-      position: relative;
-      z-index: 1;
-      -webkit-transform: translate3d(0px, 0px, 0.01px);
-      transform: translate3d(0px, 0px, 0.01px);
-    }
-    .holo-shine,
-    .holo-glare {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      border-radius: inherit;
-      overflow: hidden;
-      will-change: background-position, filter, opacity;
-      transform: translateZ(1px);
-    }
-    .holo-shine { z-index: 2; }
-    .holo-glare { z-index: 3; }
-    /* each shine layer may carry :before/:after pseudo-layers (simey's trick) */
-    .holo-shine:before,
-    .holo-shine:after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-    
-    /* ══ HOLO RARE (regular-holo.css) ════════════════════════════════════ */
-    .holo-stage[data-holo="holo"] .holo-shine {
-      --scanlines-space: 1px;
-      --scanlines-light: #666;
-      --scanlines-dark: black;
-      --bars: 3%;
-      --bar-color: hsla(0, 0%, 70%, 1);
-      --bar-bg: hsla(0, 0%, 0%, 1);
-    
-      background-image:
-        repeating-linear-gradient(110deg,
-          var(--violet), var(--blue), var(--green), var(--yellow), var(--red),
-          var(--violet), var(--blue), var(--green), var(--yellow), var(--red),
-          var(--violet), var(--blue), var(--green), var(--yellow), var(--red)),
-        repeating-linear-gradient(90deg,
-          var(--scanlines-dark) calc(var(--scanlines-space) * 0),
-          var(--scanlines-dark) calc(var(--scanlines-space) * 2),
-          var(--scanlines-light) calc(var(--scanlines-space) * 2),
-          var(--scanlines-light) calc(var(--scanlines-space) * 4));
-      background-position:
-        calc(((50% - var(--background-x)) * 2.6) + 50%) calc(((50% - var(--background-y)) * 3.5) + 50%),
-        center center;
-      background-size: 400% 400%, cover;
-      background-blend-mode: overlay;
-      filter: brightness(1.1) contrast(1.1) saturate(1.2);
-      mix-blend-mode: color-dodge;
-      opacity: var(--card-opacity);
-    }
-    .holo-stage[data-holo="holo"] .holo-shine:before {
-      background-image:
-        repeating-linear-gradient(90deg,
-          var(--bar-bg) calc(var(--bars)*2),
-          var(--bar-color) calc(var(--bars)*3),
-          var(--bar-bg) calc(var(--bars)*3.5),
-          var(--bar-color) calc(var(--bars)*4),
-          var(--bar-bg) calc(var(--bars)*5),
-          var(--bar-bg) calc(var(--bars)*14)),
-        repeating-linear-gradient(90deg,
-          var(--bar-bg) calc(var(--bars)*2),
-          var(--bar-color) calc(var(--bars)*3),
-          var(--bar-bg) calc(var(--bars)*3.5),
-          var(--bar-color) calc(var(--bars)*4),
-          var(--bar-bg) calc(var(--bars)*5),
-          var(--bar-bg) calc(var(--bars)*10));
-      background-position:
-        calc((((50% - var(--background-x)) * 1.65) + 50%) + (var(--background-y) * 0.5)) var(--background-x),
-        calc((((50% - var(--background-x)) * -0.9) + 50%) - (var(--background-y) * 0.75)) var(--background-y);
-      background-size: 200% 200%, 200% 200%;
-      background-blend-mode: screen;
-      filter: brightness(1.15) contrast(1.1);
-      mix-blend-mode: hard-light;
-    }
-    .holo-stage[data-holo="holo"] .holo-shine:after {
-      background-image: radial-gradient(
-        farthest-corner circle at var(--pointer-x) var(--pointer-y),
-        hsla(0, 0%, 90%, 0.8) 0%,
-        hsla(0, 0%, 78%, 0.1) 25%,
-        hsl(0, 0%, 0%) 90%);
-      background-position: center center;
-      background-size: cover;
-      mix-blend-mode: luminosity;
-      filter: brightness(0.6) contrast(4);
-    }
-    
-    /* ══ DOUBLE RARE / EX (v-regular.css) ═══════════════════════════════ */
-    .holo-stage[data-holo="sheen"] .holo-shine {
-      --space: 5%;
-      --angle: 133deg;
-      --imgsize: 500px;
-      background-image:
-        var(--grain),
-        repeating-linear-gradient(0deg,
-          var(--sunpillar-clr-1) calc(var(--space)*1),
-          var(--sunpillar-clr-2) calc(var(--space)*2),
-          var(--sunpillar-clr-3) calc(var(--space)*3),
-          var(--sunpillar-clr-4) calc(var(--space)*4),
-          var(--sunpillar-clr-5) calc(var(--space)*5),
-          var(--sunpillar-clr-6) calc(var(--space)*6),
-          var(--sunpillar-clr-1) calc(var(--space)*7)),
-        repeating-linear-gradient(var(--angle),
-          #0e152e 0%,
-          hsl(180, 10%, 60%) 3.8%,
-          hsl(180, 29%, 66%) 4.5%,
-          hsl(180, 10%, 60%) 5.2%,
-          #0e152e 10%,
-          #0e152e 12%),
-        radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
-          hsla(0, 0%, 0%, 0.1) 12%,
-          hsla(0, 0%, 0%, 0.15) 20%,
-          hsla(0, 0%, 0%, 0.25) 120%);
-      background-blend-mode: screen, hue, hard-light;
-      background-size: var(--imgsize) 100%, 200% 700%, 300% 100%, 200% 100%;
-      background-position: center,
-        0% var(--background-y),
-        var(--background-x) var(--background-y),
-        var(--background-x) var(--background-y);
-      filter: brightness(0.8) contrast(2.95) saturate(0.65);
-      mix-blend-mode: color-dodge;
-      opacity: var(--card-opacity);
-    }
-    .holo-stage[data-holo="sheen"] .holo-shine:after {
-      background-image:
-        var(--grain),
-        repeating-linear-gradient(0deg,
-          var(--sunpillar-clr-1) calc(var(--space)*1),
-          var(--sunpillar-clr-2) calc(var(--space)*2),
-          var(--sunpillar-clr-3) calc(var(--space)*3),
-          var(--sunpillar-clr-4) calc(var(--space)*4),
-          var(--sunpillar-clr-5) calc(var(--space)*5),
-          var(--sunpillar-clr-6) calc(var(--space)*6),
-          var(--sunpillar-clr-1) calc(var(--space)*7)),
-        repeating-linear-gradient(var(--angle),
-          #0e152e 0%,
-          hsl(180, 10%, 60%) 3.8%,
-          hsl(180, 29%, 66%) 4.5%,
-          hsl(180, 10%, 60%) 5.2%,
-          #0e152e 10%,
-          #0e152e 12%),
-        radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
-          hsla(0, 0%, 0%, 0.1) 12%,
-          hsla(0, 0%, 0%, 0.15) 20%,
-          hsla(0, 0%, 0%, 0.25) 120%);
-      background-position: center,
-        0% var(--background-y),
-        calc(var(--background-x) * -1) calc(var(--background-y) * -1),
-        var(--background-x) var(--background-y);
-      background-size: var(--imgsize) 100%, 200% 400%, 195% 100%, 200% 100%;
-      filter: brightness(1) contrast(2.5) saturate(1.75);
-      mix-blend-mode: soft-light;
-    }
-    
-    /* ══ GALAXY / COSMOS (cosmos-holo.css) ══════════════════════════════ */
-    .holo-stage[data-holo="galaxy"] .holo-shine {
-      --space: 4%;
-      background-image:
-        url('../assets/holo/cosmos-bottom-trans.png'),
-        repeating-linear-gradient(82deg,
-          hsl(53, 65%, 60%) calc(var(--space)*1),
-          hsl(93, 56%, 50%) calc(var(--space)*2),
-          hsl(176, 54%, 49%) calc(var(--space)*3),
-          hsl(228, 59%, 55%) calc(var(--space)*4),
-          hsl(283, 60%, 55%) calc(var(--space)*5),
-          hsl(326, 59%, 51%) calc(var(--space)*6),
-          hsl(326, 59%, 51%) calc(var(--space)*7),
-          hsl(283, 60%, 55%) calc(var(--space)*8),
-          hsl(228, 59%, 55%) calc(var(--space)*9),
-          hsl(176, 54%, 49%) calc(var(--space)*10),
-          hsl(93, 56%, 50%) calc(var(--space)*11),
-          hsl(53, 65%, 60%) calc(var(--space)*12)),
-        radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
-          hsla(180, 100%, 89%, 0.5) 5%,
-          hsla(180, 14%, 57%, 0.3) 40%,
-          hsl(0, 0%, 0%) 130%);
-      background-blend-mode: color-burn, multiply;
-      background-position:
-        center center,
-        calc(10% + (var(--pointer-from-left) * 80%)) calc(10% + (var(--pointer-from-top) * 80%)),
-        center center;
-      background-size: cover, 400% 900%, cover;
-      filter: brightness(1) contrast(1) saturate(0.8);
-      mix-blend-mode: color-dodge;
-      opacity: var(--card-opacity);
-    }
-    .holo-stage[data-holo="galaxy"] .holo-shine:before {
-      background-image:
-        url('../assets/holo/cosmos-middle-trans.png'),
-        repeating-linear-gradient(82deg,
-          hsl(53, 65%, 60%) calc(var(--space)*1),
-          hsl(93, 56%, 50%) calc(var(--space)*2),
-          hsl(176, 54%, 49%) calc(var(--space)*3),
-          hsl(228, 59%, 55%) calc(var(--space)*4),
-          hsl(283, 60%, 55%) calc(var(--space)*5),
-          hsl(326, 59%, 51%) calc(var(--space)*6),
-          hsl(326, 59%, 51%) calc(var(--space)*7),
-          hsl(283, 60%, 55%) calc(var(--space)*8),
-          hsl(228, 59%, 55%) calc(var(--space)*9),
-          hsl(176, 54%, 49%) calc(var(--space)*10),
-          hsl(93, 56%, 50%) calc(var(--space)*11),
-          hsl(53, 65%, 60%) calc(var(--space)*12));
-      background-blend-mode: lighten, multiply;
-      background-position:
-        center center,
-        calc(15% + (var(--pointer-from-left) * 70%)) calc(15% + (var(--pointer-from-top) * 70%)),
-        center center;
-      background-size: cover, 400% 900%, cover;
-      filter: brightness(1.25) contrast(1.75) saturate(0.8);
-      mix-blend-mode: overlay;
-    }
-    .holo-stage[data-holo="galaxy"] .holo-shine:after {
-      background-image:
-        url('../assets/holo/cosmos-top-trans.png'),
-        repeating-linear-gradient(82deg,
-          hsl(53, 65%, 60%) calc(var(--space)*1),
-          hsl(93, 56%, 50%) calc(var(--space)*2),
-          hsl(176, 54%, 49%) calc(var(--space)*3),
-          hsl(228, 59%, 55%) calc(var(--space)*4),
-          hsl(283, 60%, 55%) calc(var(--space)*5),
-          hsl(326, 59%, 51%) calc(var(--space)*6),
-          hsl(326, 59%, 51%) calc(var(--space)*7),
-          hsl(283, 60%, 55%) calc(var(--space)*8),
-          hsl(228, 59%, 55%) calc(var(--space)*9),
-          hsl(176, 54%, 49%) calc(var(--space)*10),
-          hsl(93, 56%, 50%) calc(var(--space)*11),
-          hsl(53, 65%, 60%) calc(var(--space)*12));
-      background-blend-mode: multiply, multiply;
-      background-position:
-        center center,
-        calc(20% + (var(--pointer-from-left) * 60%)) calc(20% + (var(--pointer-from-top) * 60%)),
-        center center;
-      background-size: cover, 400% 900%, cover;
-      filter: brightness(1.25) contrast(1.75) saturate(0.8);
-      mix-blend-mode: multiply;
-    }
-    
-    /* ══ RAINBOW / SPARKLE (rainbow-holo.css) ═══════════════════════════ */
-    .holo-stage[data-holo="sparkle"] .holo-shine {
-      --r-clr-1: hsl(0, 57%, 37%);
-      --r-clr-2: hsl(40, 53%, 39%);
-      --r-clr-3: hsl(90, 60%, 35%);
-      --r-clr-4: hsl(180, 60%, 35%);
-      --r-clr-5: hsl(180, 60%, 35%);
-      --r-clr-6: hsl(210, 57%, 39%);
-      --r-clr-7: hsl(280, 55%, 31%);
-      background-image:
-        linear-gradient(-45deg, var(--r-clr-1), var(--r-clr-5)),
-        var(--glitter),
-        linear-gradient(-30deg,
-          var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
-          var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
-          var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
-          var(--r-clr-1));
-      background-blend-mode: luminosity, soft-light;
-      background-size: 200% 200%, var(--glittersize) var(--glittersize), 400% 400%;
-      background-position:
-        calc(25% + (50% * var(--pointer-from-left))) calc(25% + (50% * var(--pointer-from-top))),
-        center center,
-        calc(25% + (var(--pointer-x) / 2)) calc(25% + (var(--pointer-y) / 2));
-      filter: brightness(calc((var(--pointer-from-center)*0.25) + 0.6)) contrast(2.2) saturate(0.75);
-      mix-blend-mode: color-dodge;
-      opacity: var(--card-opacity);
-    }
-    .holo-stage[data-holo="sparkle"] .holo-shine:after {
-      background-image:
-        var(--glitter),
-        linear-gradient(-60deg,
-          var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
-          var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
-          var(--r-clr-1), var(--r-clr-2), var(--r-clr-3), var(--r-clr-4), var(--r-clr-5), var(--r-clr-6), var(--r-clr-7),
-          var(--r-clr-1));
-      background-blend-mode: soft-light;
-      background-size: var(--glittersize) var(--glittersize), 400% 400%;
-      background-position: center center, var(--pointer-x) var(--pointer-y);
-      filter: brightness(calc((var(--pointer-from-center)*0.3) + 0.55)) contrast(2) saturate(1);
-      mix-blend-mode: color-dodge;
-    }
-    
-    /* ══ GOLD / SECRET (secret-rare.css) ════════════════════════════════ */
-    .holo-stage[data-holo="gold"] .holo-shine {
-      --shift: 1px;
-      --imgsize: cover;
-      background-image:
-        var(--glitter),
-        var(--glitter),
-        conic-gradient(
-          var(--sunpillar-clr-4),
-          var(--sunpillar-clr-5),
-          var(--sunpillar-clr-6),
-          var(--sunpillar-clr-1),
-          var(--sunpillar-clr-4)),
-        radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
-          hsla(150, 0%, 0%, 0.98) 10%,
-          hsla(0, 0%, 95%, 0.15) 90%);
-      background-size: var(--glittersize) var(--glittersize), var(--glittersize) var(--glittersize), cover, cover;
-      background-position: 45% 45%, 55% 55%, center center, center center;
-      background-blend-mode: soft-light, hard-light, overlay;
-      mix-blend-mode: color-dodge;
-      filter: brightness(calc(0.4 + (var(--pointer-from-center) * 0.2))) contrast(1) saturate(2.7);
-      opacity: var(--card-opacity);
-    }
-    .holo-stage[data-holo="gold"] .holo-shine:before {
-      background-image:
-        url('../assets/holo/metal.png'),
-        linear-gradient(45deg, hsl(46, 95%, 50%), hsl(52, 100%, 69%)),
-        radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y),
-          hsla(10, 20%, 90%, 0.95) 10%,
-          hsl(0, 0%, 0%) 70%);
-      background-size: var(--imgsize), cover, cover;
-      background-position: center center, center center, center center;
-      background-blend-mode: hard-light, multiply;
-      mix-blend-mode: lighten;
-      filter: brightness(1.25) contrast(1.25) saturate(0.35);
-      opacity: 0.8;
-    }
-    .holo-stage[data-holo="gold"] .holo-shine:after {
-      background-image: var(--glitter);
-      background-size: var(--glittersize) var(--glittersize);
-      background-position:
-        calc(50% - ((var(--shift)*2) * var(--pointer-from-left)) + var(--shift))
-        calc(50% - ((var(--shift)*2) * var(--pointer-from-top)) + var(--shift));
-      filter: brightness(calc((var(--pointer-from-center)*0.6) + 0.6)) contrast(1.5);
-      mix-blend-mode: overlay;
-    }
-    
-    /* ══ GLARE (base.css, adapted per effect) ═══════════════════════════ */
-    .holo-stage .holo-glare {
-      background-image: radial-gradient(
-        farthest-corner circle at var(--pointer-x) var(--pointer-y),
-        hsla(0, 0%, 100%, 0.8) 10%,
-        hsla(0, 0%, 100%, 0.65) 20%,
-        hsla(0, 0%, 0%, 0.5) 90%);
-      opacity: calc(var(--card-opacity) * 0.8);
-      mix-blend-mode: overlay;
-      filter: brightness(0.8) contrast(1.5);
-    }
-    .holo-stage[data-holo="sheen"] .holo-glare {
-      background-image: radial-gradient(
-        farthest-corner circle at var(--pointer-x) var(--pointer-y),
-        hsl(0, 0%, 100%) 0%,
-        hsla(210, 3%, 54%, 0.33) 45%,
-        hsla(0, 0%, 20%, 0.9) 130%);
-      opacity: calc(var(--card-opacity) * 0.5);
-      mix-blend-mode: hard-light;
-      filter: brightness(0.9) contrast(1.75);
-    }
-    .holo-stage[data-holo="galaxy"] .holo-glare {
-      background-image: radial-gradient(
-        farthest-corner circle at var(--pointer-x) var(--pointer-y),
-        hsla(204, 100%, 95%, 0.8) 5%,
-        hsla(250, 15%, 20%, 1) 150%);
-      filter: brightness(0.75) contrast(2) saturate(2);
-      mix-blend-mode: overlay;
-      opacity: calc(var(--card-opacity) * (0.25 + var(--pointer-from-center)));
-    }
-    .holo-stage[data-holo="sparkle"] .holo-glare {
-      background-image: radial-gradient(
-        farthest-corner circle at var(--pointer-x) var(--pointer-y),
-        hsl(0, 0%, 80%),
-        hsla(187, 10%, 85%, 0.25) 30%,
-        hsl(197, 6%, 25%) 120%);
-      filter: brightness(0.9) contrast(1.75);
-      opacity: calc(var(--pointer-from-center) * 0.9);
-      mix-blend-mode: hard-light;
-    }
-    .holo-stage[data-holo="gold"] .holo-glare {
-      background-image: radial-gradient(
-        farthest-corner circle at var(--pointer-x) var(--pointer-y),
-        hsla(45, 8%, 80%, 0.3) 0%,
-        hsl(22, 15%, 12%) 180%);
-      filter: brightness(1.3) contrast(1.5);
-      mix-blend-mode: hard-light;
-    }
-    
-    /* holo stage inside the preview scrim: size like the raw preview image */
-    .native-deck-builder-card-preview-scrim .holo-stage {
-      /* display at the source's native width (600px) so pixels map 1:1 —
-         zero scaling artifacts. Only shrink on small screens (downscaling
-         is always clean). */
-      width: min(78vw, 600px);
-      max-height: 88vh;
-    }
-    .native-deck-builder-card-preview-scrim .holo-stage img {
-      width: 100%;
-      height: auto;
-      /* no image-rendering hint: browsers use smooth (bicubic) scaling,
-         which is correct for photographic card art. Nearest-neighbor would
-         look blocky on a non-integer scale. */
-    }
-    @media (max-height: 860px) {
-      .native-deck-builder-card-preview-scrim .holo-stage {
-        width: min(66vw, 580px);
-      }
-    }
-    
     /* ═══ RULES ENGINE UI ═════════════════════════════════════════════════ */
     #attackPanel {
       position: fixed;
@@ -3847,4 +3424,34 @@ a:hover {
     .rules-aw-usable { color: #55dd77; }
     .rules-aw-unusable { color: #ff5555; }
     .rules-aw-reason { font-size: 0.72rem; color: #999; margin-left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    
+
+    /* ═══ MAT COIN SLOTS ═════════════════════════════════════════════
+       Persistent coin tokens on the battle mat: each player's chosen
+       coin stays visible all game (self on the blue side, opp on the
+       red side), so both coins are always visible. Reuses the .coin-3d
+       / .coin-face / .coin-mat-* coin-picker CSS; sized down and static.
+       Rendered as a top-level body child (not inside #battleMat) so it
+       isn't clipped by the mat's overflow/clip-path; pointer-events none
+       so it never blocks zone interaction. */
+    .mat-coin-slot {
+      /* Rendered at the right-side reference spots (top + bottom circles),
+         fixed to the viewport so they sit beside the button cluster. */
+      position: fixed;
+      left: auto;
+      right: 2.5%;
+      width: 6vh;
+      height: 6vh;
+      display: none;
+      pointer-events: none;
+      filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.6));
+    }
+    .mat-coin-slot.has-coin { display: block; }
+    .mat-coin-slot .coin-3d {
+      width: 100%;
+      height: 100%;
+      transform: none;
+      transition: none;
+      cursor: default;
+    }
+    #matCoinSlotSelf { top: 36%; transform: translate(0, -50%); }
+    #matCoinSlotOpp { top: 64%; transform: translate(0, -50%); }
