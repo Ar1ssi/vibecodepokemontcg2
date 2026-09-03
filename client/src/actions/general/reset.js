@@ -5,6 +5,7 @@ import {
 } from '../../front-end.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { buildDeck } from '../../setup/deck-constructor/build-deck.js';
+import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { determineDeckData } from '../../setup/general/determine-deckdata.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
@@ -78,6 +79,7 @@ export const reset = (
   ];
   zoneIds.forEach((zoneId) => {
     const zone = getZone(user, zoneId);
+    zone.array.forEach((card) => unhydrateHolo(card));
     zone.array.length = 0;
     removeImages(zone.element);
     if (zone.elementCover) {

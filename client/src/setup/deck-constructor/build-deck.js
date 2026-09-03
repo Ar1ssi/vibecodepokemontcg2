@@ -3,7 +3,7 @@ import { determineDeckData } from '../general/determine-deckdata.js';
 import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
-import { hydrateHolo } from './hydrate-holo.js';
+
 
 export const buildDeck = (user) => {
   const deckData = determineDeckData(user);
@@ -13,7 +13,6 @@ export const buildDeck = (user) => {
       const card = new Card(user, name, type, imageURL);
       deck.array.push(card);
       deck.element.appendChild(card.image);
-      hydrateHolo(card); // async, fire-and-forget; plain card until resolved
     }
   }
   const targetCardBackSrc =

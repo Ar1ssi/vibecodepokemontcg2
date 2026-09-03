@@ -1,4 +1,5 @@
 import { resetImage } from '../../setup/image-logic/reset-image.js';
+import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { syncRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
 
@@ -41,6 +42,7 @@ export const attachCard = (
   }
   movingCard.image.style.zIndex -= layer;
 
+  unhydrateHolo(movingCard);
   targetCard.image.after(movingCard.image);
   //rotate tool/energy to the same orientation of card
   syncRotation(movingCard, targetCard.image);

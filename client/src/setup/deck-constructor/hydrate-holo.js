@@ -8,11 +8,15 @@ import { ensureCardData } from '../rules/rules-state.mjs';
 
 const hydrated = new WeakSet();
 
+// Kill-switch: set to false to re-enable mat holofoil rendering.
+const HOLO_DISABLED = true;
+
 // The node that should be moved around the DOM for a card:
 // its holo wrapper if present, otherwise the bare <img>.
 export const cardNode = (card) => card?.wrapper ?? card?.image;
 
 export function hydrateHolo(card) {
+  if (HOLO_DISABLED) return;
   if (!card?.image || hydrated.has(card)) return;
   hydrated.add(card);
   ensureCardData({ name: card.name, type: card.type })
@@ -20,7 +24,10 @@ export function hydrateHolo(card) {
       if (!card.image.isConnected) return; // card was removed meanwhile
       const effect = resolveHoloEffect(data);
       if (!effect) return; // common / non-holo → stays plain
-      const width = card.image.clientWidth || 0;
+      const width =
+        card.image.clientWidth ||
+        card.image.getBoundingClientRect().width ||
+        0;
       const wrapper = buildHoloCard(card.image.src, effect);
       wrapper.classList.add('mat-holo');
       if (width) wrapper.style.width = `${width}px`;

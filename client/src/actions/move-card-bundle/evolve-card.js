@@ -2,6 +2,7 @@ import { resetImage } from '../../setup/image-logic/reset-image.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { resetRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
+import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const evolveCard = (
   user,
@@ -12,6 +13,7 @@ export const evolveCard = (
   dZone
 ) => {
   resetImage(movingCard.image);
+  unhydrateHolo(movingCard);
   targetCard.image.after(movingCard.image);
   targetCard.image.relative = movingCard.image;
   //if counters exists, link the textcontent with the new Pokémon card

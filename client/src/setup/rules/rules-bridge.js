@@ -97,6 +97,9 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // Set when a turn was auto-ended by an attack, so the next +Turn click
     // is swallowed instead of double-advancing the turn.
     let turnEndedByAttack = false;
+    // Set when the authoritative remote turnOrderCoinFlip event arrives so
+    // a stale local flip (still in flight) does NOT double-start the game.
+    let flipSuperseded = false;
     // "Call the coin": the caller's heads/tails pick, remembered when it
     // arrives via the opponent's turnOrderCoinCall event (they clicked
     // Set Up first), so a late click on our side mirrors their call.
@@ -502,6 +505,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           rulesState.turnNumber = 0;
           syncedTurnOrder = null;
           turnEndedByAttack = false;
+          flipSuperseded = false;
           coinCallChoice = null;
           coinCallCaller = 'self';
           coinCallPending = false;
@@ -602,19 +606,24 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       const beginFlip = (call, caller = 'self') => {
         coinFlipPending = true;
         runTurnOrderCoinFlip({ call, caller })
-          .then(({ turnPlayer }) => beginSetupWithTurnOrder(turnPlayer))
+          .then(({ turnPlayer }) => {
+            if (flipSuperseded) return; // authoritative remote flip took over
+            beginSetupWithTurnOrder(turnPlayer);
+          })
           .finally(() => {
             coinFlipPending = false;
           });
       };
     
       // Opponent called the coin first (they clicked Set Up before us) —
-      // mirror their call instead of picking our own, so both sides agree.
+      // do NOT flip our own coin: the caller's flip is the single
+      // authoritative one and arrives via the turnOrderCoinFlip event,
+      // whose handler mirrors it and auto-starts the game on our side.
+      // (Flipping locally here was the desync bug: each side rolled its
+      // own random result and both saw themselves as the coin owner.)
       if (coinCallChoice) {
-        const call = coinCallChoice;
-        const caller = coinCallCaller;
         coinCallChoice = null;
-        beginFlip(call, caller);
+        appendMessage('', "Waiting for opponent's coin flip…", 'announcement', false);
         return;
       }
     
@@ -1198,15 +1207,13 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               syncedTurnOrder = localTurnPlayer;
 
               // Auto-start: the caller already resolved and broadcast the
-              // flip — if we're still in setup and not mid-flip, begin the
-              // game now so the mirror never has to click Set Up itself.
-              // startGame flips phase to 'draw', which guards against a
-              // double-start via our own Set Up click or a duplicate event.
-              if (
-                rulesState.enabled &&
-                rulesState.phase === 'setup' &&
-                !coinFlipPending
-              ) {
+              // flip — if we're still in setup, the authoritative result
+              // ALWAYS wins (even over a stale local flip in flight, which
+              // flipSuperseded cancels). startGame flips phase to 'draw',
+              // which guards against a double-start via our own Set Up
+              // click or a duplicate event.
+              if (rulesState.enabled && rulesState.phase === 'setup') {
+                flipSuperseded = true;
                 syncedTurnOrder = null;
                 beginSetupWithTurnOrder(localTurnPlayer);
               }

@@ -14,6 +14,7 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { addAbilityCounter } from '../counters/ability-counter.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
+import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
@@ -283,6 +284,7 @@ export const sort = (user, zoneId) => {
   const zone = getZone(user, zoneId);
 
   removeImages(zone.element);
+  zone.array.forEach((card) => unhydrateHolo(card));
 
   if (checkbox.checked && deckData) {
     deckData.forEach((entry) => {
@@ -313,5 +315,8 @@ export const sort = (user, zoneId) => {
         addAbilityCounter(user, zoneId, index);
       }
     });
+  }
+  if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
+    zone.array.forEach((card) => hydrateHolo(card));
   }
 };
