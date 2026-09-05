@@ -160,4 +160,14 @@ import test from 'node:test';
       assert.equal(saveLibraryToStorage(undefined, createEmptyLibrary()), false);
       assert.equal(saveLibraryToStorage({ setItem: () => { throw new Error('full'); } }, createEmptyLibrary()), false);
     });
+
+    test('last-session save/load round-trips active deck id', async () => {
+      const { saveLastSession, loadLastSession, LAST_SESSION_STORAGE_KEY } = await import('../core/last-session.mjs');
+      const storage = makeStorage();
+      saveLastSession(storage, { deckId: 'deck1234', target: 'self' });
+      const loaded = loadLastSession(storage);
+      assert.equal(loaded.deckId, 'deck1234');
+      assert.equal(loaded.target, 'self');
+      assert.ok(storage.getItem(LAST_SESSION_STORAGE_KEY));
+    });
     

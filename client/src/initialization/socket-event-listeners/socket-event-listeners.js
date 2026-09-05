@@ -21,6 +21,7 @@ import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
+import { restoreLastUsedDeckToPlaymat } from '../document-event-listeners/sidebox/native-deck-builder.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -51,6 +52,7 @@ export const initializeSocketEventListeners = () => {
     cleanActionData('self');
     cleanActionData('opp');
     reset('opp', true, false, false, false);
+    restoreLastUsedDeckToPlaymat();
     exchangeData(
       'self',
       systemState.p2SelfUsername,

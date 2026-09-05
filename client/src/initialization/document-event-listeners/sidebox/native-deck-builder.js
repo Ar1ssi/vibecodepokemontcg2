@@ -37,8 +37,11 @@ import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-pick
 import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
 import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
 import { getMatById } from '../../../setup/deck-builder/core/mats.mjs';
+import { getDeckFromLibrary } from '../../../setup/deck-builder/core/deck-library.mjs';
+import { loadLastSession, saveLastSession } from '../../../setup/deck-builder/core/last-session.mjs';
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
+import { updateReadyButtons } from '../../../actions/general/ready.js';
     
     import {
       buildHoloCard,
@@ -71,6 +74,11 @@ const deckToSimRows = (deck = {}) => {
 
   return rows;
 };
+
+let restoreLastUsedDeckImpl = null;
+
+/** Restore the last played deck (and its customization) onto the self playmat. */
+export const restoreLastUsedDeckToPlaymat = () => Boolean(restoreLastUsedDeckImpl?.());
 
 export const initializeNativeDeckBuilder = () => {
   const targetMainButton = document.getElementById(
@@ -189,6 +197,11 @@ export const initializeNativeDeckBuilder = () => {
           deckLibrary?.saveActiveDeck(deck);
         },
       });
+
+      const persistLastUsedSession = () => {
+        const deckId = deckLibrary?.getActiveDeckId?.('self');
+        if (deckId) saveLastSession(window.localStorage, { deckId, target: 'self' });
+      };
     
       // ── Set browser (Mega Evolution / TCGdex) ─────────────────────────────
       const tabSearch = document.getElementById('nativeDeckBuilderTabSearch');
@@ -912,6 +925,7 @@ let activeHoloStop = null;
     const deckRows = deckToSimRows(deck);
     if (deckRows.length > 0) {
       loadDeckData(currentLoadTarget, deckRows);
+      if (currentLoadTarget === 'self') persistLastUsedSession();
     }
     render();
   };
@@ -1048,4 +1062,31 @@ let activeHoloStop = null;
   // Restore each player's saved mat so both halves of the board pick up their
   // own layout on load, even if the player never opens the mat picker.
   announceAllMats();
+
+  restoreLastUsedDeckImpl = () => {
+    try {
+      const session = loadLastSession(window.localStorage);
+      if (!session?.deckId) return false;
+      const lib = deckLibrary?.getLibrary?.();
+      const cards = getDeckFromLibrary(lib, session.deckId);
+      if (!cards || Object.keys(cards).length === 0) return false;
+
+      if (currentLoadTarget !== 'self') {
+        switchTarget('self');
+      }
+      deckLibrary?.setActiveDeck('self', session.deckId);
+      deck = cards;
+      syncedDecks.self = cards;
+      deckDirty = true;
+      loadCurrentDeck();
+      refreshSleeveSelection();
+      refreshCoinSelection();
+      refreshMatSelection();
+      syncCustomizationToDeck();
+      updateReadyButtons();
+      return true;
+    } catch {
+      return false;
+    }
+  };
 };
