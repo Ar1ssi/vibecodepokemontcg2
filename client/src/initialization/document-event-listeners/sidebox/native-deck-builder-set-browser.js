@@ -38,6 +38,7 @@ import {
       let loading = false;
       let filterTerm = '';
       let expandedSetId = null;
+      let activeCategory = 'standard';
       const cardsBySet = new Map(); // setId -> Card[] (loaded lazily)
       const pendingBySet = new Map(); // setId -> Promise<Card[]>
     
@@ -46,7 +47,8 @@ import {
         '<div class="native-deck-builder-section-title-row">',
         '  <div class="native-deck-builder-section-title-wrap">',
         '    <div class="native-deck-builder-section-title">Browse Sets</div>',
-        '    <span class="native-deck-builder-set-browser-series-tag">Standard 2026-27</span>',
+        '    <button class="native-deck-builder-set-browser-series-tag active" data-category="standard" type="button">Standard 2026-27</button>',
+        '    <button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--other" data-category="other" type="button">other</button>',
         '  </div>',
         '  <input class="native-deck-builder-set-browser-filter" type="text"',
         '    placeholder="Filter by card name..." aria-label="Filter cards by name" />',
@@ -132,43 +134,66 @@ import {
         }
     
         const isFiltering = String(filterTerm || '').trim() !== '';
-        const tabsHtml = [];
         const dropdownSections = [];
     
-        for (const set of sets) {
-          let expanded = set.setId === expandedSetId;
+        const buildTabsFor = (groupSets) => {
+          const tabsHtml = [];
+          for (const set of groupSets) {
+            let expanded = set.setId === expandedSetId;
     
-          if (expanded || isFiltering) {
-            const cards = cardsBySet.get(set.setId);
-            if (cards) {
-              const filtered = filterCardsByName(cards, filterTerm);
-              if (isFiltering) {
-                expanded = filtered.length > 0;
+            if (expanded || isFiltering) {
+              const cards = cardsBySet.get(set.setId);
+              if (cards) {
+                const filtered = filterCardsByName(cards, filterTerm);
+                if (isFiltering) {
+                  expanded = filtered.length > 0;
+                }
+                if (expanded) {
+                  const cardsHtml = filtered.length
+                    ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), getQuantities ? getQuantities() : {})
+                    : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
+                  dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
+                }
+              } else if (expanded && !isFiltering) {
+                // clicked but not loaded yet — show a loading placeholder
+                dropdownSections.push(renderDropdownSection(set, { loadingCards: true }));
+              } else if (isFiltering) {
+                expanded = false;
               }
-              if (expanded) {
-                const cardsHtml = filtered.length
-                  ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), getQuantities ? getQuantities() : {})
-                  : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
-                dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
-              }
-            } else if (expanded && !isFiltering) {
-              // clicked but not loaded yet — show a loading placeholder
-              dropdownSections.push(renderDropdownSection(set, { loadingCards: true }));
-            } else if (isFiltering) {
-              expanded = false;
             }
+    
+            tabsHtml.push(renderSetTab(set, { expanded }));
           }
+          return tabsHtml;
+        };
     
-          tabsHtml.push(renderSetTab(set, { expanded }));
-        }
+        const renderGroup = (label, groupSets) => {
+          if (groupSets.length === 0) return '';
+          const tabsHtml = buildTabsFor(groupSets);
+          const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          return [
+            `<div class="native-deck-builder-set-browser-group" data-category="${escapeHtml(key)}">`,
+            `  <div class="native-deck-builder-set-browser-group-label">${escapeHtml(label)}</div>`,
+            `  <div class="native-deck-builder-set-browser-group-tabs">${tabsHtml.join('')}</div>`,
+            '</div>',
+          ].join('');
+        };
     
-        if (tabsHtml.length === 0) {
+        const standardSets = sets.filter((set) => (set.category || 'standard') !== 'other');
+        const otherSets = sets.filter((set) => (set.category || 'standard') === 'other');
+    
+        const groupSets = activeCategory === 'other' ? otherSets : standardSets;
+    
+        if (groupSets.length === 0) {
           tabsEl.innerHTML = '';
           resultsEl.innerHTML = '<div class="native-deck-builder-set-browser-empty">No sets available.</div>';
           return;
         }
     
-        tabsEl.innerHTML = tabsHtml.join('');
+        tabsEl.innerHTML = renderGroup(
+          activeCategory === 'other' ? 'other' : 'Standard 2026-27',
+          groupSets,
+        );
         resultsEl.innerHTML = dropdownSections.length
           ? dropdownSections.join('')
           : '<div class="native-deck-builder-set-browser-dropdown-empty">Select a set above to browse its cards.</div>';
@@ -221,7 +246,7 @@ import {
           sets = await fetchLegalStandardSets();
           loaded = true;
           const total = sets.reduce((sum, s) => sum + s.cardCount, 0);
-          showStatus(`Standard 2026-27: ${sets.length} legal sets, ${total} cards. Click a set to expand it.`);
+          showStatus(`${sets.length} legal sets, ${total} cards. Use the pills to switch between Standard 2026-27 and other sets, then click a set to expand it.`);
           render();
         } catch (error) {
           showStatus(`Could not load sets: ${error.message}`);
@@ -236,6 +261,21 @@ import {
       filterInput.addEventListener('input', () => {
         filterTerm = filterInput.value;
         render();
+      });
+    
+      const categoryPills = panelEl.querySelectorAll('.native-deck-builder-set-browser-series-tag[data-category]');
+      const setCategory = (category) => {
+        activeCategory = category;
+        expandedSetId = null;
+        categoryPills.forEach((pill) => {
+          pill.classList.toggle('active', pill.dataset.category === category);
+        });
+        render();
+      };
+      categoryPills.forEach((pill) => {
+        pill.addEventListener('click', () => {
+          if (pill.dataset.category !== activeCategory) setCategory(pill.dataset.category);
+        });
       });
     
       const findCardById = (cardId) => {

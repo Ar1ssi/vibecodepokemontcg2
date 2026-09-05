@@ -110,6 +110,24 @@ body, input, textarea, button {
   margin-left: .25vw;
   margin-right: .25vw;
 }
+/* Holo cards: size the wrapper the same way a bare hand <img> sizes itself
+   (see #hand img above) so it rescales live with #hand, instead of a
+   one-time JS pixel snapshot. The nested real <img> just fills that box. */
+#hand .mat-holo {
+  box-sizing: border-box;
+  width: auto;
+  max-height: calc(100% - 3vh);
+  margin-bottom: 2vh;
+  margin-left: .25vw;
+  margin-right: .25vw;
+}
+#hand .mat-holo img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+}
 #handText {
   position: fixed;
   right: 2%;
@@ -166,6 +184,21 @@ body, input, textarea, button {
   margin-left: .1vw;
   width: auto;
   max-width: calc(50% - .1vw);
+}
+/* Holo cards in prizes: same wrapper-sizes-live-instead-of-frozen-px
+   approach as #hand .mat-holo above. */
+#prizes .mat-holo {
+  margin-left: .1vw;
+  width: auto;
+  max-width: calc(50% - .1vw);
+  max-height: 33%;
+}
+#prizes .mat-holo img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
 }
 .prizes-normal-size {
   max-height: 33%;
@@ -490,6 +523,25 @@ body, input, textarea, button {
   width: 10%;
   height: auto;
   margin: 1px;
+}
+/* Holo cards: same wrapper-sizes-live approach as #hand .mat-holo above. */
+#lostZone .mat-holo {
+  display: inline-block;
+  width: 12%;
+  height: auto;
+  margin: 1px;
+}
+#discard .mat-holo {
+  display: inline-block;
+  width: 10%;
+  height: auto;
+  margin: 1px;
+}
+#lostZone .mat-holo img,
+#discard .mat-holo img {
+  width: 100%;
+  height: 100%;
+  margin: 0;
 }
 
 #hand img,

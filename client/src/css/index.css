@@ -786,6 +786,29 @@ ul, li {
       border-radius: 999px;
       white-space: nowrap;
     }
+    .native-deck-builder-set-browser-series-tag--other {
+      background: rgba(60, 130, 90, 0.16);
+      color: #1f5c3a;
+    }
+    button.native-deck-builder-set-browser-series-tag {
+      display: inline-flex;
+      align-items: center;
+      border: none;
+      font-family: inherit;
+      font-size: 1.25vh;
+      line-height: 1.2;
+      cursor: pointer;
+    }
+    button.native-deck-builder-set-browser-series-tag:not(.active) {
+      opacity: 0.55;
+    }
+    button.native-deck-builder-set-browser-series-tag.active {
+      background: rgba(65, 91, 168, 0.32);
+      font-weight: 600;
+    }
+    button.native-deck-builder-set-browser-series-tag--other.active {
+      background: rgba(60, 130, 90, 0.38);
+    }
     .native-deck-builder-set-browser-filter {
       flex: 0 0 auto;
       width: 14vw;
@@ -805,11 +828,27 @@ ul, li {
     .native-deck-builder-set-browser-tabs {
       flex: 0 0 auto;
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.4vh 0.4vw;
+      flex-direction: column;
+      gap: 0.55vh;
       padding-bottom: 0.6vh;
       margin-bottom: 0.4vh;
       border-bottom: 1px solid rgba(40, 57, 124, 0.14);
+    }
+    .native-deck-builder-set-browser-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3vh;
+    }
+    .native-deck-builder-set-browser-group-label {
+      font-size: 1.3vh;
+      font-weight: 600;
+      color: #1a2560;
+      opacity: 0.85;
+    }
+    .native-deck-builder-set-browser-group-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4vh 0.4vw;
     }
     .native-deck-builder-set-browser-tab {
       display: flex;
@@ -2234,6 +2273,65 @@ a:hover {
 }
 .popup-button:hover {
   background-color: #555;
+}
+
+/* Ability Picker Popup */
+.ability-picker-popup {
+  min-width: 320px;
+  max-width: 420px;
+  text-align: left;
+}
+.ability-picker-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.ability-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.ability-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+.ability-picker-row:hover {
+  background-color: #e8e8e8;
+}
+.ability-picker-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+.ability-picker-family {
+  font-size: 13px;
+  color: #555;
+  margin: 0 10px;
+  white-space: nowrap;
+}
+.ability-picker-use-btn {
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.15s;
+}
+.ability-picker-use-btn:hover {
+  background-color: #555;
+}
+.ability-picker-cancel {
+  width: 100%;
 }
 #loadingCircle {
   width: 1vh; /* Adjust size as needed */

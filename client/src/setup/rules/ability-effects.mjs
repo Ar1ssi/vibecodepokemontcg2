@@ -11,6 +11,7 @@
 // "announce-only / guidance" convention:
 //   - `classifyAbility` buckets a card into a single ability family (from the
 //     ability text + name; works before async card data loads).
+//   - `classifyAbilityFamilies` returns a LIST of all matching families.
 //   - `describeAbilityFamily` builds a human-readable announcement line.
 //   - `applyAbilityEffect` is an announce-only stub: it returns a result
 //     object and does NOT mutate any game state. Full per-family execution is
@@ -32,8 +33,28 @@ export const ABILITY_FAMILIES = [
   'when-played',      // one-shot effect when the Pokémon is played
   'end-of-turn',      // effect at the end of your turn
   'damage-prevent',   // prevent or reduce damage
+  'damage-reduce',    // take less damage (passive reduction)
+  'damage-bonus',     // deal more damage (passive bonus)
   'hand-protect',     // shield cards in hand from effects
   'opponent-disrupt', // disrupt / limit the opponent
+  'energy-redirect',  // move energy between Pokémon
+  'move-energy',      // move energy (active)
+  'move-damage',      // move/place damage counters
+  'recursion',        // KO-trigger: return/search
+  'evolve',           // evolve this Pokémon
+  'look-at-top',      // look at top N of deck
+  'status',           // apply/remove Special Conditions
+  'ko-prevention',    // prevent KO (coin flip)
+  'retreat-cost',     // modify Retreat Cost
+  'cost-discount',    // reduce attack cost
+  'hp-bonus',         // increase HP
+  'weakness',         // modify Weakness
+  'setup',            // face-down placement
+  'tool-cap',         // extra Tool slot
+  'prize-modify',     // modify prize count on KO
+  'effect-prevent',   // negate effects/abilities
+  'energy-multiplier',// energy ×N
+  'thorns',           // damage-on-attacker
   'unknown',          // ability we can't place
 ];
 
@@ -57,8 +78,179 @@ const isAbilityCard = (card) => {
 
 export { isAbilityCard };
 
-// Bucket a card into a single ability family. Non-ability / unrecognizable
-// cards return 'unknown'. Precedence: the most distinctive keyword wins.
+// ─── Family detection predicates ───────────────────────────────────────────
+// Each predicate returns true if the text matches that family.
+// Order matters for the single-family `classifyAbility` (most specific first).
+
+const isSearch = (t) =>
+  t.includes('search') ||
+  t.includes('look through') ||
+  (t.includes('up to') && t.includes('from your deck') && t.includes('into your hand')) ||
+  (t.includes('find') && t.includes('from your deck'));
+
+const isDraw = (t) =>
+  t.includes('draw') && (t.includes('card') || t.includes('until you have'));
+
+const isSwitch = (t) =>
+  t.includes('bring in') || (t.includes('switch') && !t.includes('retreat'));
+
+const isHeal = (t) =>
+  (t.includes('remove') && t.includes('damage counter')) || t.includes('heal');
+
+// FIXED: require "attach" as a verb (word boundary), not "attached" describing state.
+// Also catches the common "Put an Energy card ... onto a Pokémon" attach wording.
+const isAttach = (t) =>
+  t.includes('energy') &&
+  ((t.includes('attach') && !t.includes('attached')) || (t.includes('put') && t.includes('onto')));
+
+// True if `w` appears as a whole word (not a substring of a longer word).
+// Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
+const hasWord = (t, w) => t.split(/[^a-z]/).includes(w);
+
+const isMoveEnergy = (t) =>
+  hasWord(t, 'move') && t.includes('energy') && (t.includes('to 1 of your') || t.includes('to another') || t.includes('to a different'));
+
+const isMoveDamage = (t) =>
+  (hasWord(t, 'move') || t.includes('place')) && t.includes('damage counter') && (t.includes('to') || t.includes('onto'));
+
+const isOpponentDisrupt = (t) =>
+  t.includes('opponent') && (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
+
+const isRecursion = (t) =>
+  t.includes('knocked out') && (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'));
+
+const isEvolve = (t) =>
+  t.includes('evolve') && (t.includes('this pokémon') || t.includes('onto this pokémon'));
+
+const isLookAtTop = (t) => t.includes('look at the top');
+
+const isWhenPlayed = (t) => t.includes('when you play');
+
+const isEndOfTurn = (t) => t.includes('end of your turn') || t.includes('at the end of your turn');
+
+const isDamagePrevent = (t) =>
+  (t.includes('prevent') && t.includes('damage')) || t.includes("can't be damaged") || t.includes('immune to damage');
+
+const isDamageReduce = (t) =>
+  t.includes('less damage') || (t.includes('reduce') && t.includes('damage'));
+
+const isDamageBonus = (t) =>
+  t.includes('more damage') && (t.includes('attack') || t.includes('this pokémon'));
+
+const isHandProtect = (t) =>
+  (t.includes('in hand') || t.includes('your hand')) && (t.includes("can't") || t.includes('cannot') || t.includes('immune'));
+
+const isStatus = (t) =>
+  t.includes('confused') || t.includes('burned') || t.includes('poisoned') ||
+  (t.includes('special condition') && !t.includes('recover'));
+
+const isKoPrevention = (t) =>
+  t.includes('knocked out') && (t.includes('prevent') || t.includes("can't") || t.includes('coin') || t.includes('flip'));
+
+const isRetreatCost = (t) => t.includes('retreat cost');
+
+// Narrow passive-qualified check: "While this Pokémon is in play, …" or
+// "As long as this Pokémon is in play, …" is the canonical passive signal.
+// Placed before the passive-style modifier families (retreat-cost,
+// cost-discount, hp-bonus, weakness, damage-reduce, damage-bonus) so that
+// explicitly-qualified passives classify as 'passive' rather than leaking
+// into a modifier family.
+const isPassiveQualified = (t) =>
+  t.includes('while this pokémon') || t.includes('as long as this pokémon');
+
+const isCostDiscount = (t) =>
+  (t.includes('cost') || t.includes('energy')) && (t.includes('less') || t.includes('ignore') || t.includes('reduce')) && t.includes('attack');
+
+const isHpBonus = (t) =>
+  t.includes('hp') && (t.includes('more') || t.includes('increase') || t.includes('treated as'));
+
+const isWeakness = (t) => t.includes('weakness');
+
+const isSetup = (t) => t.includes('face-down') || t.includes('face down');
+
+const isToolCap = (t) =>
+  t.includes('tool') && (t.includes('attach') || t.includes('slot') || t.includes('more'));
+
+const isPrizeModify = (t) =>
+  t.includes('prize card') && (t.includes('less') || t.includes('fewer') || t.includes('more') || t.includes('extra'));
+
+const isEffectPrevent = (t) =>
+  (t.includes('prevent') || t.includes("can't") || t.includes('have no effect') || t.includes('have no abilities')) &&
+  (t.includes('effect') || t.includes('ability') || t.includes('attack'));
+
+const isEnergyMultiplier = (t) =>
+  t.includes('energy') && (t.includes('×') || t.includes('x2') || t.includes('counts as') || t.includes('treated as'));
+
+const isThorns = (t) =>
+  t.includes('damage counter') && (t.includes('put') || t.includes('place')) && (t.includes('attacker') || t.includes('attacking pokémon'));
+
+// Broadened passive detection: catches all the common passive phrasings.
+// This is the LAST check in FAMILY_ORDER, so it only fires when no more
+// specific family matched. Being broad here is intentional (catch-all).
+const isPassive = (t) =>
+  t.includes('while this pokémon') ||
+  t.includes('as long as this pokémon') ||
+  t.includes('while it is') ||
+  t.includes('in play') ||
+  t.includes('if this pokémon is in the active spot') ||
+  t.includes('if this pokémon is active') ||
+  t.includes('when your opponent') ||
+  t.includes("your opponent's active pokémon") ||
+  (t.includes('takes') && t.includes('less damage')) ||
+  (t.includes('deals') && t.includes('more damage')) ||
+  t.includes("can't be") ||
+  t.includes('immune to') ||
+  t.includes('retreat cost') ||
+  t.includes('hp') ||
+  t.includes('weakness') ||
+  t.includes('tool') ||
+  t.includes('this pokémon');
+
+// ─── Single-family classifier (dominant / most specific) ───────────────────
+// Precedence: most distinctive / specific keyword wins.
+// Returns the FIRST matching family from the ordered list below.
+
+const FAMILY_ORDER = [
+  // Most specific first (compound / multi-keyword matches)
+  ['energy-redirect', isMoveEnergy],
+  ['move-damage', isMoveDamage],
+  ['recursion', isRecursion],
+  ['ko-prevention', isKoPrevention],
+  ['damage-prevent', isDamagePrevent],
+  ['hand-protect', isHandProtect],
+  ['opponent-disrupt', isOpponentDisrupt],
+  ['end-of-turn', isEndOfTurn],
+  ['look-at-top', isLookAtTop],
+  ['evolve', isEvolve],
+  ['setup', isSetup],
+  ['tool-cap', isToolCap],
+  ['prize-modify', isPrizeModify],
+  ['effect-prevent', isEffectPrevent],
+  ['energy-multiplier', isEnergyMultiplier],
+  ['thorns', isThorns],
+  ['status', isStatus],
+  // Passive-qualified: "While this Pokémon is in play, X" → passive.
+  // Must come before the passive-style modifier families below.
+  ['passive', isPassiveQualified],
+  ['retreat-cost', isRetreatCost],
+  ['cost-discount', isCostDiscount],
+  ['hp-bonus', isHpBonus],
+  ['weakness', isWeakness],
+  ['damage-reduce', isDamageReduce],
+  ['damage-bonus', isDamageBonus],
+  // Active actions (single keyword + context)
+  ['search', isSearch],
+  ['draw', isDraw],
+  ['switch', isSwitch],
+  ['heal', isHeal],
+  ['attach', isAttach],
+  // 'when-played' is a trigger, not an effect: it loses to any more
+  // specific action (draw/search/…) and only wins when no action matched.
+  ['when-played', isWhenPlayed],
+  // Passive (broad catch-all — last)
+  ['passive', isPassive],
+];
+
 export function classifyAbility(card) {
   if (!isAbilityCard(card)) return 'unknown';
 
@@ -66,60 +258,25 @@ export function classifyAbility(card) {
   const name = nameOf(card);
   const t = text || name;
 
-  if (t.includes('prevent') || t.includes('immune') || t.includes('can\'t be damaged')) {
-    return 'damage-prevent';
-  }
-  if ((t.includes('in hand') || t.includes('your hand')) && t.includes('can\'t')) {
-    return 'hand-protect';
-  }
-  if (
-    t.includes('opponent') &&
-    (t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || t.includes('shuffle'))
-  ) {
-    return 'opponent-disrupt';
-  }
-  if (t.includes('at the end of your turn') || t.includes('end of your turn')) {
-    return 'end-of-turn';
-  }
-  if (
-    t.includes('energy') &&
-    (t.includes('redirect') || (t.includes('move') && t.includes('other pokémon')))
-  ) {
-    return 'energy-redirect';
-  }
-  if (t.includes('energy') && (t.includes('attach') || t.includes('put') || t.includes('add'))) {
-    return 'attach';
-  }
-  if ((t.includes('remove') && t.includes('damage counter')) || t.includes('heal')) {
-    return 'heal';
-  }
-  if (t.includes('bring in') || t.includes('switch')) {
-    return 'switch';
-  }
-  if (
-    t.includes('search') ||
-    t.includes('look through') ||
-    (t.includes('up to') && t.includes('from your deck') && t.includes('into your hand')) ||
-    (t.includes('find') && t.includes('from your deck'))
-  ) {
-    return 'search';
-  }
-  if (t.includes('draw') && t.includes('card')) {
-    return 'draw';
-  }
-  if (t.includes('when you play')) {
-    return 'when-played';
-  }
-  // Passive: "while this Pokémon is in play" / "as long as" style text.
-  if (
-    t.includes('while this pokémon') ||
-    t.includes('as long as this pokémon') ||
-    t.includes('while it is') ||
-    t.includes('in play')
-  ) {
-    return 'passive';
+  for (const [family, predicate] of FAMILY_ORDER) {
+    if (predicate(t)) return family;
   }
   return 'unknown';
+}
+
+// Returns a LIST of all matching families (for compound effects).
+export function classifyAbilityFamilies(card) {
+  if (!isAbilityCard(card)) return ['unknown'];
+
+  const text = textOf(card);
+  const name = nameOf(card);
+  const t = text || name;
+
+  const matched = [];
+  for (const [family, predicate] of FAMILY_ORDER) {
+    if (predicate(t)) matched.push(family);
+  }
+  return matched.length > 0 ? matched : ['unknown'];
 }
 
 // Determine the card type a search ability is looking for based on the
@@ -161,10 +318,49 @@ export function describeAbilityFamily(card) {
       return `${name}: end-of-turn ability — an effect that triggers at the end of your turn.`;
     case 'damage-prevent':
       return `${name}: prevention ability — prevent or reduce damage/effects (see card text).`;
+    case 'damage-reduce':
+      return `${name}: damage reduction — takes less damage from attacks (see card text).`;
+    case 'damage-bonus':
+      return `${name}: damage bonus — deals more damage with attacks (see card text).`;
     case 'hand-protect':
       return `${name}: protection ability — shields cards in your hand (see card text).`;
     case 'opponent-disrupt':
       return `${name}: disruption ability — limits or disrupts the opponent (see card text).`;
+    case 'energy-redirect':
+    case 'move-energy':
+      return `${name}: energy movement — move Energy between your Pokémon (see card text).`;
+    case 'move-damage':
+      return `${name}: damage counter movement — move/place damage counters (see card text).`;
+    case 'recursion':
+      return `${name}: recursion — when Knocked Out, return/search a card (see card text).`;
+    case 'evolve':
+      return `${name}: evolution — evolve this Pokémon using a card from hand (see card text).`;
+    case 'look-at-top':
+      return `${name}: look at top — inspect the top of your deck (see card text).`;
+    case 'status':
+      return `${name}: status condition — apply or remove Special Conditions (see card text).`;
+    case 'ko-prevention':
+      return `${name}: KO prevention — avoid being Knocked Out (see card text).`;
+    case 'retreat-cost':
+      return `${name}: retreat cost modifier — changes Retreat Cost (see card text).`;
+    case 'cost-discount':
+      return `${name}: cost discount — reduce the cost of attacks (see card text).`;
+    case 'hp-bonus':
+      return `${name}: HP bonus — this Pokémon has more HP (see card text).`;
+    case 'weakness':
+      return `${name}: weakness modifier — changes this Pokémon's Weakness (see card text).`;
+    case 'setup':
+      return `${name}: setup — face-down placement (see card text).`;
+    case 'tool-cap':
+      return `${name}: tool capacity — extra Pokémon Tool slot (see card text).`;
+    case 'prize-modify':
+      return `${name}: prize modifier — changes prizes taken on KO (see card text).`;
+    case 'effect-prevent':
+      return `${name}: effect prevention — negate effects/abilities (see card text).`;
+    case 'energy-multiplier':
+      return `${name}: energy multiplier — Energy counts as more (see card text).`;
+    case 'thorns':
+      return `${name}: thorns — damage counters on the attacker (see card text).`;
     case 'unknown':
     default:
       return `${name}: ability present (no specific family recognized — read the card text).`;

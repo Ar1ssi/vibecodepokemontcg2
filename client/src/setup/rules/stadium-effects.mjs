@@ -48,6 +48,12 @@ const isStadiumCard = (card) => {
 
 export { isStadiumCard };
 
+// Matches both the literal "once per turn" and the "once during {each/your/
+// either} player's turn" phrasing (e.g. Grand Tree), which is semantically
+// the same repeatable-once-per-turn trigger but doesn't contain the literal
+// substring "once per turn".
+const ONCE_PER_TURN_RE = /once per turn|once during (?:each|your|either) player'?s turn/;
+
 // Bucket a card into a stadium-effect family. Non-stadium / unrecognizable
 // cards return 'unknown'. Precedence: the most restrictive trigger wins.
 export function classifyStadiumEffect(card) {
@@ -57,7 +63,7 @@ export function classifyStadiumEffect(card) {
   if (t.includes('when you play this card') || t.includes('when you play it')) {
     return 'setup-once';
   }
-  if (t.includes('once per turn')) {
+  if (ONCE_PER_TURN_RE.test(t)) {
     return 'once-per-turn';
   }
   if (
@@ -108,12 +114,13 @@ export function parseStadiumSetupDraw(card) {
 }
 
 /**
- * Once-per-turn: "Once per turn, you may …"
- * Returns { kind: 'draw'|'search'|'heal'|'energy', n } or null.
+ * Once-per-turn: "Once per turn, you may …" (also matches "Once during
+ * each player's turn" wording — see ONCE_PER_TURN_RE above).
+ * Returns { kind: 'draw'|'search'|'search-evolve'|'heal'|'energy', n } or null.
  */
 export function parseStadiumOncePerTurn(card) {
   const t = textOf(card);
-  if (!t.includes('once per turn')) return null;
+  if (!ONCE_PER_TURN_RE.test(t)) return null;
   if (/draw/.test(t)) {
     const m = t.match(/draw (?:up to )?(\d+)/);
     return { kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
@@ -123,6 +130,14 @@ export function parseStadiumOncePerTurn(card) {
   if (/attach/.test(t) && /energy/.test(t)) {
     const m = t.match(/up to (\d+)/);
     return { kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
+  }
+  // Search-and-evolve (e.g. Grand Tree: search for an evolution and put it
+  // onto a Pokémon already in play to evolve it) is a distinct mechanic
+  // from a plain search-to-hand — evolving a Pokémon, not fetching a card
+  // to hand — so it needs its own kind rather than falling into 'search'
+  // and being misrouted as a hand pickup.
+  if (/search/.test(t) && /evolv/.test(t)) {
+    return { kind: 'search-evolve', n: 1 };
   }
   if (/search|look through|find/.test(t)) {
     return { kind: 'search', n: 1 };

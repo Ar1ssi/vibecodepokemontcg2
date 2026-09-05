@@ -209,3 +209,47 @@
   will-change: transform, opacity, background-image, background-size,
     background-position, background-blend-mode, filter;
 }
+
+/* ── Mat holo overrides (scoped to .mat-holo) ─────────────────────────
+   Mat zones size their <img> by height (e.g. `#board img { height: 70% }`,
+   `#attachedCards img { height: 33% }`). The holo wrapper replaces the <img>
+   in the zone and gets explicit px width AND height from hydrateHolo. These
+   rules force the simey rotator stack to fill that exact box by height (not
+   the base.css width-driven sizing), keep the card image visible under the
+   glare layer, and make the underlying <img> the sole interactive target so
+   click/drag/evolve/energy-attach keep working. */
+.mat-holo {
+  /* Real sizing lives in per-zone rules in self/opp-containers.css (e.g.
+     #hand .mat-holo, #prizes .mat-holo), each mirroring that zone's plain
+     `img` rule. Keeping the card's true aspect ratio here (rather than
+     `auto`) lets the wrapper derive its unconstrained dimension from
+     whichever one the zone actually sets — exactly like a bare <img> does —
+     so it stays correctly sized on every resize instead of relying on a
+     one-time JS pixel snapshot. */
+  aspect-ratio: var(--card-aspect);
+  overflow: visible;
+}
+.mat-holo .card__translater,
+.mat-holo .card__rotator,
+.mat-holo .card__rotator > * {
+  width: 100%;
+  height: 100%;
+}
+.mat-holo img {
+  display: block;
+  object-fit: cover;
+}
+/* Pointer-events passthrough: decorative holo layers and the 3D-transformed
+   rotator must NOT intercept pointer events over the real card image. The
+   <img> (card.image) stays the hit target for click/drag/evolve/attach. */
+.mat-holo,
+.mat-holo .card__translater,
+.mat-holo .card__rotator,
+.mat-holo .card__shine,
+.mat-holo .card__glitter,
+.mat-holo .card__glare {
+  pointer-events: none;
+}
+.mat-holo img {
+  pointer-events: auto;
+}

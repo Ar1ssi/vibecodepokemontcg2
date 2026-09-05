@@ -1,4 +1,5 @@
 import { attack, attachAbility, healAbility, pass, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
+import { abilityPicker } from '../../../../actions/ability-picker.js';
 import { undo } from '../../../../actions/general/undo.js';
 import { systemState } from '../../../../front-end.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
@@ -22,6 +23,9 @@ export const initializeP1ChatButtons = () => {
 
   const searchButton = document.getElementById('searchButton');
   searchButton.addEventListener('click', () => searchAbility(systemState.initiator));
+
+  const abilityButton = document.getElementById('abilityButton');
+  abilityButton.addEventListener('click', () => abilityPicker(systemState.initiator));
 
   const stadiumButton = document.getElementById('stadiumButton');
   stadiumButton.addEventListener('click', () => stadiumEffect(systemState.initiator));

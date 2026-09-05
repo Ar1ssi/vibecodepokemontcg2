@@ -8,13 +8,13 @@ import test from 'node:test';
       sortCardsWithinGroup,
     } from '../core/set-browser.mjs';
     
-    test('legal registry contains the 20 Standard 2026-27 sets', () => {
+    test('legal registry contains the 21 Standard 2026-27 sets', () => {
       const registry = getLegalSetRegistry();
-      assert.equal(registry.length, 20);
+      assert.equal(registry.length, 21);
     
       const ids = registry.map((entry) => entry.setId);
       // Scarlet & Violet sets
-      for (const id of ['sv05', 'sv06', 'sv06.5', 'sv07', 'sv08', 'sv08.5', 'sv09', 'sv10', 'sv10.5b', 'sv10.5w', 'svp']) {
+      for (const id of ['sv03.5', 'sv05', 'sv06', 'sv06.5', 'sv07', 'sv08', 'sv08.5', 'sv09', 'sv10', 'sv10.5b', 'sv10.5w', 'svp']) {
         assert.ok(ids.includes(id), `missing ${id}`);
       }
       // Mega Evolution series — all sets post September 2025 are legal

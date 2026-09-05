@@ -120,8 +120,13 @@ import test from 'node:test';
       assert.equal(steps[0].count, 2);
     });
     
-    test('ability parser: unknown -> passive', () => {
+    test('ability parser: effect prevention', () => {
       const steps = parseAbility("Prevent all effects of your opponent's abilities.");
+      assert.equal(steps[0].type, 'effectPreventAbility');
+    });
+
+    test('ability parser: unknown -> passive', () => {
+      const steps = parseAbility('A completely novel mechanic.');
       assert.equal(steps[0].type, 'passiveAbility');
     });
     

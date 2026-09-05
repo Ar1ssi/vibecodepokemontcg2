@@ -130,7 +130,15 @@
             name: a.name,
             cost: a.cost || [],
             damage: parseDamage(a.damage),
-            text: a.text || '',
+            // TCGdex's attack objects carry the effect text under `effect`,
+            // not `text` (see https://tcgdex.dev/reference/card — Pokémon
+            // Card > attacks[].effect). `a.text` doesn't exist on the raw
+            // API response, so keeping it only as a fallback (in case a
+            // future API revision renames the field back) — without it,
+            // every attack-text parser in damage-parser.mjs (discard cost,
+            // discard-to-scale, once-per-turn, heal, switch, bench damage,
+            // etc.) silently no-ops because atk.text is always ''.
+            text: a.effect || a.text || '',
           })),
           stage: detail.stage || null,
           evolvesFrom: detail.evolvesFrom || null,

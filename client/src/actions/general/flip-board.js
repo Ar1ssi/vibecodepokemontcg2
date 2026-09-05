@@ -24,6 +24,7 @@ export const flipBoard = () => {
   const switchButton = document.getElementById('switchButton');
   const attachButton = document.getElementById('attachButton');
   const searchButton = document.getElementById('searchButton');
+  const abilityButton = document.getElementById('abilityButton');
   const energyRedirectButton = document.getElementById('energyRedirectButton');
   const passButton = document.getElementById('passButton');
   const undoButton = document.getElementById('undoButton');
@@ -36,6 +37,7 @@ export const flipBoard = () => {
   const p2SwitchButton = document.getElementById('p2SwitchButton');
   const p2AttachButton = document.getElementById('p2AttachButton');
   const p2SearchButton = document.getElementById('p2SearchButton');
+  const p2AbilityButton = document.getElementById('p2AbilityButton');
   const p2EnergyRedirectButton = document.getElementById('p2EnergyRedirectButton');
   const p2PassButton = document.getElementById('p2PassButton');
   // const p2UndoButton = document.getElementById('p2UndoButton');
@@ -97,6 +99,7 @@ export const flipBoard = () => {
   toggleClasses(switchButton, 'self-color', 'opp-color');
   toggleClasses(attachButton, 'self-color', 'opp-color');
   toggleClasses(searchButton, 'self-color', 'opp-color');
+  toggleClasses(abilityButton, 'self-color', 'opp-color');
   toggleClasses(energyRedirectButton, 'self-color', 'opp-color');
   toggleClasses(passButton, 'self-color', 'opp-color');
   toggleClasses(undoButton, 'self-color', 'opp-color');
@@ -107,6 +110,7 @@ export const flipBoard = () => {
   toggleClasses(p2SwitchButton, 'self-color', 'opp-color');
   toggleClasses(p2AttachButton, 'self-color', 'opp-color');
   toggleClasses(p2SearchButton, 'self-color', 'opp-color');
+  toggleClasses(p2AbilityButton, 'self-color', 'opp-color');
   toggleClasses(p2EnergyRedirectButton, 'self-color', 'opp-color');
   toggleClasses(p2PassButton, 'self-color', 'opp-color');
   // toggleClasses(p2UndoButton, 'self-color', 'opp-color');

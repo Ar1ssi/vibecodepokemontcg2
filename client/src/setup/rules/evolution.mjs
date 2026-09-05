@@ -26,7 +26,16 @@
       // stage chain check: evolution must be exactly the next stage (or a
       // legal Rare Candy jump from Basic to Stage 2)
       const baseStage = normalizeStage(baseCardInPlay.stage) || 'Basic';
-      const evoStage = normalizeStage(evolutionCardInHand.stage) || 'Stage 1';
+      const evoStage = normalizeStage(evolutionCardInHand.stage);
+      // A card in hand that has no valid stage (e.g. a misclassified Energy
+      // card) is not a Pokémon evolution — reject it instead of silently
+      // defaulting to 'Stage 1' and mis-evaluating the stage chain.
+      if (!evoStage) {
+        return {
+          allowed: false,
+          reason: `${evolutionCardInHand.name} is not a Pokémon evolution card (no valid stage).`,
+        };
+      }
       const evolvesFrom = String(evolutionCardInHand.evolvesFrom || '').toLowerCase();
       const baseName = String(baseCardInPlay.name || '').toLowerCase();
     

@@ -1273,6 +1273,21 @@ import test from 'node:test';
       assert.match(r2.reason, /Rare Candy|can't evolve/i);
     });
 
+    test('evolution: a card in hand with no valid stage (e.g. Energy) is rejected', async () => {
+      const { canEvolve } = await import('../evolution.mjs');
+      startGame();
+      beginTurn('self');
+      beginTurn('opp');
+      beginTurn('self'); // turn 3, evolution allowed
+      const base = { name: 'Charmander', stage: 'Basic', id: 'ne1' };
+      // An Energy card has no `stage` — previously it silently defaulted to
+      // 'Stage 1' and slipped through the stage-chain check.
+      const energy = { name: 'Rainbow Energy', type: 'Energy', id: 'ne2' };
+      const r = await canEvolve('self', base, energy, false);
+      assert.equal(r.allowed, false);
+      assert.match(r.reason, /not a Pokémon evolution/i);
+    });
+
     test('evolution: clearStatuses clears base card statuses after evolve', () => {
       resetStatuses();
       applyStatus('self', 'base1', 'confused');
@@ -1837,6 +1852,18 @@ import test from 'node:test';
       assert.equal(rulesState.flags.opp.drewThisTurn, false);
     });
 
+    test('startGame twice resets flags (bridge guard must prevent the 2nd call)', () => {
+      startGame('self');
+      assert.equal(rulesState.phase, 'draw'); // guard condition: 2nd call would return early
+      markTurnDrawn('self');
+      assert.equal(rulesState.flags.self.drewThisTurn, true);
+      // A 2nd startGame (which the bridge now blocks) WOULD reset this:
+      startGame('self');
+      assert.equal(rulesState.flags.self.drewThisTurn, false); // documents why the guard is needed
+      // Reset for subsequent tests
+      startGame('self');
+    });
+
     // ── P4: promotion bench → active after KO (taxonomy B) ──
     test('planPromotion: bench KO never promotes', () => {
       const plan = planPromotion(false, 3);
@@ -1972,4 +1999,210 @@ import test from 'node:test';
       assert.ok(parsed.components.includes('per-energy'));
     });
 
-    
+    // ── A-scaler tests (Mega Evolution audit A) ──
+
+    test('parseAttackDamage: per-each Energy on all your Pokémon (with ctx)', () => {
+      const atk = {
+        name: 'Mega Symphonia', damage: 50,
+        text: 'This attack does 50 damage for each Psychic Energy attached to all of your Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { ownEnergyCount: 4 });
+      assert.equal(p.total, 200); // 50 × 4
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, true);
+    });
+
+    test('parseAttackDamage: per-each Energy on all your Pokémon (no ctx → unresolved)', () => {
+      const atk = {
+        name: 'Mega Symphonia', damage: 50,
+        text: 'This attack does 50 damage for each Psychic Energy attached to all of your Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p.total, 50); // base only
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, false);
+      assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    test('parseAttackDamage: per-each opponent\'s Active Energy (with ctx)', () => {
+      const atk = {
+        name: 'Ear Force', damage: 80,
+        text: 'This attack does 80 more damage for each Energy card attached to your opponent\u2019s Active Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { opponentEnergyCount: 3 });
+      assert.equal(p.total, 320); // 80 + 80×3
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, true);
+    });
+
+    test('parseAttackDamage: per-each opponent\'s Active Energy (no ctx → unresolved)', () => {
+      const atk = {
+        name: 'Ear Force', damage: 80,
+        text: 'This attack does 80 more damage for each Energy card attached to your opponent\u2019s Active Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p.resolved, false);
+      assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    test('parseAttackDamage: per-each species count (Beedrill)', () => {
+      const atk = {
+        name: 'Rumbling Bees', damage: 110,
+        text: 'This attack does 110 damage for each of your Beedrill and Beedrill ex in play.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { speciesCount: 2 });
+      assert.equal(p.total, 220); // 110 × 2
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, true);
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each opponent hand count (Froslass)', () => {
+      const atk = {
+        name: 'Resentful Refrain', damage: 50,
+        text: 'This attack does 50 damage for each card in your opponent\u2019s hand.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { opponentHandCount: 6 });
+      assert.equal(p.total, 300); // 50 × 6
+      assert.ok(p.components.includes('per-each'));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each retreat cost (Chandelure)', () => {
+      const atk = {
+        name: 'Phantom Maze', damage: 130,
+        text: 'This attack does 50 more damage for each Colorless in your opponent\u2019s Active Pok\u00e9mon\u2019s Retreat Cost.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { retreatCostColorless: 3 });
+      assert.equal(p.total, 280); // 130 + 50×3
+      assert.ok(p.components.includes('per-each'));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each bench both sides (Clefairy)', () => {
+      const atk = {
+        name: 'Full Moon Rondo', damage: 20,
+        text: 'This attack does 20 more damage for each Benched Pok\u00e9mon (both yours and your opponent\u2019s).',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { ownBenchCount: 3, opponentBenchCount: 2 });
+      assert.equal(p.total, 120); // 20 + 20×5
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, true);
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+      assert.ok(p2.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    test('parseAttackDamage: per-each own bench (Terapagos)', () => {
+      const atk = {
+        name: 'Unified Beatdown', damage: 30,
+        text: 'This attack does 30 damage for each of your Benched Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { ownBenchCount: 4 });
+      assert.equal(p.total, 120); // 30 × 4
+      assert.ok(p.components.includes('per-each'));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each damaged bench (Gourgeist)', () => {
+      const atk = {
+        name: 'Horrifying Rondo', damage: 30,
+        text: 'This attack does 50 more damage for each of your Benched Pok\u00e9mon that has any damage counters on it.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { damagedBenchCount: 2 });
+      assert.equal(p.total, 130); // 30 + 50×2
+      assert.ok(p.components.includes('per-each'));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each attached Energy (Meganium)', () => {
+      const atk = {
+        name: 'Giant Bouquet', damage: 70,
+        text: 'This attack does 50 more damage for each Grass Energy attached to this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { energyCount: 2 });
+      assert.equal(p.total, 170); // 70 + 50×2
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, true);
+    });
+
+    test('parseAttackDamage: per-each attached Energy (Azumarill)', () => {
+      const atk = {
+        name: 'Energized Balloon', damage: 60,
+        text: 'This attack does 40 more damage for each Psychic Energy attached to this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { energyCount: 3 });
+      assert.equal(p.total, 180); // 60 + 40×3
+      assert.ok(p.components.includes('per-each'));
+    });
+
+    test('parseAttackDamage: per-each attached Energy (Cinccino, no more)', () => {
+      const atk = {
+        name: 'Energized Slap', damage: 40,
+        text: 'This attack does 40 damage for each Energy attached to this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { energyCount: 2 });
+      assert.equal(p.total, 80); // 40 × 2 (not 40 + 40×2)
+      assert.ok(p.components.includes('per-each'));
+    });
+
+    // ── B heal tests (Mega Evolution audit B) ──
+
+    test('parseAttackDamage: heal \u201cHeal 30 damage from this Pok\u00e9mon\u201d', () => {
+      const atk = {
+        name: 'Jungle Dump', damage: 240,
+        text: 'Heal 30 damage from this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p.heal, 30);
+      assert.ok(p.components.includes('heal'));
+      assert.equal(p.total, 240); // heal does not add to total
+    });
+
+    test('parseAttackDamage: heal \u201cremove up to 50 damage counters\u201d', () => {
+      const atk = {
+        name: 'Soothing Wave', damage: 100,
+        text: 'Remove up to 50 damage counters from this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p.heal, 50);
+      assert.ok(p.components.includes('heal'));
+    });
+
+    test('healTarget: \u201ceach of your Pok\u00e9mon\u201d → all', () => {
+      const target = healTarget('Heal 30 damage from each of your Pok\u00e9mon.');
+      assert.equal(target, 'all');
+    });
+
+    test('healTarget: \u201cthis Pok\u00e9mon\u201d → attacker', () => {
+      const target = healTarget('Heal 30 damage from this Pok\u00e9mon.');
+      assert.equal(target, 'attacker');
+    });
+
+    // ── I per-heads tests (Mega Evolution audit I) ──
+
+    test('parseAttackDamage: per-heads coin (Kangaskhan, with ctx)', () => {
+      const atk = {
+        name: 'Rapid-Fire Combo', damage: 200,
+        text: 'Flip a coin until you get tails. This attack does 50 more damage for each heads.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { headsCount: 2 });
+      assert.equal(p.total, 300); // 200 + 50×2
+      assert.ok(p.components.includes('per-each'));
+      assert.equal(p.resolved, true);
+    });
+
+    test('parseAttackDamage: per-heads coin (Kangaskhan, no ctx → unresolved)', () => {
+      const atk = {
+        name: 'Rapid-Fire Combo', damage: 200,
+        text: 'Flip a coin until you get tails. This attack does 50 more damage for each heads.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p.resolved, false);
+      assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });

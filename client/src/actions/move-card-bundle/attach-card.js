@@ -1,5 +1,8 @@
 import { resetImage } from '../../setup/image-logic/reset-image.js';
-import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import {
+  unhydrateHolo,
+  imageAnchor,
+} from '../../setup/deck-constructor/hydrate-holo.js';
 import { syncRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
 
@@ -25,15 +28,20 @@ export const attachCard = (
 
   let layer;
   if (movingCard.type !== 'Pokémon') {
+    // hostParent is the element that owns the target card in the zone DOM
+    // (`.play-container`) — the `.mat-holo` wrapper if the Pokémon is
+    // holo-hydrated, otherwise the bare <img>. Sizing siblings against this
+    // keeps the target card's holofoil intact (it is NOT de-wrapped).
+    const hostParent = imageAnchor(targetCard.image).parentElement;
     const adjustment = targetCard.image.clientWidth / 6;
     targetCard.image.energyLayer += 1;
     layer = targetCard.image.energyLayer;
     movingCard.image.style.left = `${layer * adjustment}px`;
 
     //adjust width of container
-    const currentWidth = parseFloat(targetCard.image.parentElement.clientWidth);
+    const currentWidth = parseFloat(hostParent.clientWidth);
     const newWidth = currentWidth + adjustment;
-    targetCard.image.parentElement.style.width = newWidth + 'px';
+    hostParent.style.width = newWidth + 'px';
   } else {
     const adjustment = targetCard.image.clientWidth / 15;
     targetCard.image.layer += 1;
@@ -43,7 +51,10 @@ export const attachCard = (
   movingCard.image.style.zIndex -= layer;
 
   unhydrateHolo(movingCard);
-  targetCard.image.after(movingCard.image);
+  // insert as a sibling of the target's anchor (the wrapper if holo-hydrated)
+  // so the energy lands inside `.play-container`, not inside the overflow-hidden
+  // `.card__rotator`. `movingCard.image.relative` stays the target's <img>.
+  imageAnchor(targetCard.image).after(movingCard.image);
   //rotate tool/energy to the same orientation of card
   syncRotation(movingCard, targetCard.image);
 

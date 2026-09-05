@@ -17,10 +17,10 @@ import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed } from '../../setup/rules/rules-state.mjs';
+import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData } from '../../setup/rules/rules-state.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
 import { clearStatuses } from '../../setup/rules/status.mjs';
-import { describeStadiumEffect } from '../../setup/rules/stadium-effects.mjs';
+import { describeStadiumEffect, isStadiumCard } from '../../setup/rules/stadium-effects.mjs';
 import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
 
 export const moveCard = async (
@@ -75,11 +75,18 @@ export const moveCard = async (
   // UI-side discard of any existing Stadium. Recording state here — before
   // the splice and before updateStadiumCard's recursive moveCard call —
   // avoids that recursion clobbering the record with the discarded card.
+  //
+  // movingCard.type is always the coarse 'Trainer' bucket assigned at deck
+  // import (Stadiums/Supporters/Items/Tools are indistinguishable there),
+  // and movingCard.subtypes is only ever populated by ensureCardData()'s
+  // async TCGdex fetch — nothing awaited it before this check used to run,
+  // so subtypes was always still undefined and no Stadium was ever
+  // recorded. Awaiting it here (moveCard is already async) enriches the
+  // card first, then the shared isStadiumCard() detector (also used by
+  // stadium-effects.mjs, so the two no longer disagree) can see it.
   if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'board') {
-    const isStadiumCard =
-      movingCard.type === 'Stadium' ||
-      (movingCard.subtypes || []).some((s) => String(s).toLowerCase() === 'stadium');
-    if (isStadiumCard) {
+    await ensureCardData(movingCard);
+    if (isStadiumCard(movingCard)) {
       const displaced = markStadiumPlayed(user, movingCard);
       if (displaced?.card) {
         appendMessage(
@@ -208,6 +215,10 @@ export const moveCard = async (
     //special initialization is needed for cards in the active and bench since pokemon has its own container with its attached cards
     if (activeOrBenchZone.includes(dZoneId)) {
       initializeActiveBenchCard(user, movingCard, dZoneId, dZone);
+      // give the card its holofoil wrapper now that initializeActiveBenchCard
+      // has settled the <img> into its .play-container (clientWidth/Height are
+      // valid). No-op for common/non-holo cards.
+      hydrateHolo(movingCard);
     } else {
       dZone.element.appendChild(movingCard.image);
       if (['hand', 'prizes', 'discard', 'lostZone'].includes(dZoneId)) hydrateHolo(movingCard);
@@ -262,5 +273,17 @@ export const moveCard = async (
   //sort the array, if applicable
   if (['deck', 'lostZone', 'discard', 'hand'].includes(dZoneId)) {
     sort(user, dZoneId);
+  }
+
+  // ── rules: notify the rules-bridge a card just landed on the board ───
+  // moveCard() is the single choke point every zone transition passes
+  // through (drag/drop, bundle actions, multiplayer sync all funnel
+  // here), so this is the one place that can announce "board" arrivals
+  // instantly. rules-bridge.js listens for this to react the same turn
+  // it fires, instead of waiting on its polling fallback to notice.
+  if (dZoneId === 'board') {
+    document.dispatchEvent(
+      new CustomEvent('rules-card-on-board', { detail: { user, card: movingCard } })
+    );
   }
 };

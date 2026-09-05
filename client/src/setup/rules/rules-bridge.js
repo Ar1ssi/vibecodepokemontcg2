@@ -22,8 +22,8 @@
       markMulligansResolved,
     } from './rules-state.mjs';
     import { executeAttack, canPayAttackCost } from './attack-engine.mjs';
-    import { handleKO, checkWinConditions, resetPrizes } from './ko-flow.mjs';
-    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses } from './status.mjs';
+    import { handleKO, checkWinConditions, resetPrizes, prizeState } from './ko-flow.mjs';
+    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from './status.mjs';
 import { statusState } from './status.mjs';
 import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
@@ -515,10 +515,21 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     
     // Shared setup sequence once turn order is decided — used both by the
     // local Set Up click and by the mirror side's auto-start (so the mirror
-    // no longer needs a second Set Up click). startGame flips phase to
-    // 'draw', which also guards against double-starting the game.
+    // no longer needs a second Set Up click).
     const beginSetupWithTurnOrder = (firstPlayer) => {
+      // Guard: if the game has already started (phase left 'setup'), a second
+      // invocation (double Set Up click, duplicate turnOrderCoinFlip event,
+      // or local flip + mirror both landing) would re-run startGame() and
+      // reset drewThisTurn, causing a double auto-draw on turn 1.
+      if (rulesState.phase !== 'setup') return;
       startGame(firstPlayer);
+          // startGame() only resets to turnNumber 0 / phase 'draw' — it never
+          // advances into the first player's actual turn 1. beginTurn() is
+          // what increments turnNumber and flips phase to 'main'; without
+          // calling it here, the first player's opening turn silently runs
+          // at turnNumber 0, which shifts the "turn 1" attack restriction
+          // onto the second player's first turn instead.
+          beginTurn(firstPlayer === 'opp' ? 'opp' : 'self');
           resetPrizes();
           resetStatuses();
           appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
@@ -1079,6 +1090,69 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       });
     };
     
+    // ── heal a specific card (shared by the direct heal + the heal picker) ─
+    // Finds the card's zone/index, removes up to `amount` damage counters,
+    // optionally cures its Special Condition, and announces the result.
+    const applyHealToCard = (cand, amount, cure) => {
+      import('../../actions/counters/damage-counter.js').then(({ updateDamageCounter, removeDamageCounter }) => {
+        let zoneId = null, idx = -1;
+        for (const z of ['active', 'bench']) {
+          const zone = getZone('self', z);
+          const i = zone.array.indexOf(cand);
+          if (i >= 0) { zoneId = z; idx = i; break; }
+        }
+        const current = parseInt(cand.image?.damageCounter?.textContent || '0', 10) || 0;
+        if (!zoneId || current === 0) {
+          appendMessage('', `  ${cand.name} has no damage to heal`, 'announcement', false);
+          return;
+        }
+        const healed = Math.min(amount, current);
+        if (current - amount <= 0) removeDamageCounter('self', zoneId, idx);
+        else updateDamageCounter('self', zoneId, idx, current - amount);
+        if (cure) {
+          const key = cand.image?.dataset?.cardId || cand.name;
+          clearStatuses('self', key);
+        }
+        appendMessage('', `  healed ${healed} damage counter${healed === 1 ? '' : 's'}${cure ? ' + cured Special Condition' : ''} from ${cand.name}`, 'announcement', false);
+      });
+    };
+
+    // ── guided heal picker: choose which of your Pokémon to heal ──────────
+    const openHealPicker = ({ title, candidates, amount, cure }) => {
+      document.getElementById('rulesChoicePicker')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rulesChoicePicker';
+      overlay.innerHTML = `
+        <div class="choice-picker-card">
+          <div class="choice-picker-title"></div>
+          <div class="choice-picker-grid"></div>
+          <button class="choice-picker-cancel">Cancel</button>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('.choice-picker-title').textContent = title;
+      const grid = overlay.querySelector('.choice-picker-grid');
+      for (const cand of candidates) {
+        const btn = document.createElement('button');
+        btn.className = 'choice-picker-item';
+        const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
+        btn.innerHTML = thumb
+          ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
+          : `<span>${cand.name || 'Card'}</span>`;
+        btn.addEventListener('click', () => {
+          applyHealToCard(cand, amount, cure);
+          overlay.remove();
+        });
+        grid.appendChild(btn);
+      }
+      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
+        appendMessage('', '  heal canceled', 'announcement', false);
+        overlay.remove();
+      });
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+      });
+    };
+
     // ── trainer auto-execution (deterministic effects) ───────────────────
     // Fully deterministic effects execute automatically; anything requiring
     // a choice (search/switch) stays guided-only.
@@ -1103,11 +1177,18 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               for (let i = 0; i < handCount0; i++) {
                 moveCardBundle('self', 'self', 'hand', 'deck', 0, false, 'move');
               }
-              const drawCount = step.count; // bonus handling needs prize count — guided
+              // Lillie's Determination: draw `count` (6) normally, but when you
+              // still have exactly 6 Prize cards remaining (0 taken) draw
+              // `bonusCount` (8) instead.
+              let drawCount = step.count;
+              const prizesRemaining = Math.max(0, 6 - (prizeState?.self?.taken || 0));
+              if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
+                drawCount = step.bonusCount;
+              }
               for (let i = 0; i < drawCount; i++) {
                 if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
               }
-              appendMessage('', `  auto: shuffled hand in, drew ${drawCount} (shuffle your deck)`, 'announcement', false);
+              appendMessage('', `  auto: shuffled hand in, drew ${drawCount} (shuffle your deck)${drawCount !== step.count ? ` — bonus draw (6 prizes left)` : ''}`, 'announcement', false);
             } else if (step.type === 'ionoShuffle') {
               // both players shuffle their hands into their decks —
               // fully deterministic, no choice involved
@@ -1125,6 +1206,50 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
                 if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
               }
               appendMessage('', `  auto: drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
+            } else if (step.type === 'drawUntil') {
+              // "draw cards until you have N" — deterministic: draw until the
+              // hand reaches `target` (deck-exhaustion guarded).
+              const target = Number(step.target);
+              if (!Number.isFinite(target) || target <= 0) {
+                appendMessage('', '  auto: draw-until target missing — skipped', 'announcement', false);
+              } else {
+                let drew = 0;
+                while (getZone('self', 'hand').getCount() < target && getZone('self', 'deck').getCount() > 0) {
+                  moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+                  drew++;
+                }
+                appendMessage('', `  auto: drew ${drew} card${drew === 1 ? '' : 's'} until you had ${target} in hand`, 'announcement', false);
+              }
+            } else if (step.type === 'opponentDraw') {
+              // "your opponent draws N" — deterministic, no choice involved
+              for (let i = 0; i < step.count; i++) {
+                if (getZone('opp', 'deck').getCount() > 0) moveCardBundle('opp', 'opp', 'deck', 'hand', 0, false, 'move');
+              }
+              appendMessage('', `  auto: your opponent drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
+            } else if (step.type === 'healAmount') {
+              // heal N damage counters.
+              //  - "Active Pokémon" target → unambiguous, heal the Active.
+              //  - "1 of your Pokémon" → a choice (Active + benched). Heal it
+              //    directly if there's only one; otherwise open a guided picker.
+              const isActiveOnly = step.target === 'Active Pokémon';
+              const candidates = isActiveOnly
+                ? getZone('self', 'active').array.filter((c) => c && c.hp)
+                : [
+                    ...getZone('self', 'active').array,
+                    ...getZone('self', 'bench').array,
+                  ].filter((c) => c && c.hp);
+              if (candidates.length === 0) {
+                appendMessage('', '  auto: no Pokémon to heal', 'announcement', false);
+              } else if (isActiveOnly || candidates.length === 1) {
+                applyHealToCard(candidates[0], step.amount, step.cure);
+              } else {
+                openHealPicker({
+                  title: `${card.name} — choose a Pokémon to heal`,
+                  candidates,
+                  amount: step.amount,
+                  cure: step.cure,
+                });
+              }
             } else if (step.type === 'searchDeck' && step.destination === 'bench' && step.what === 'Basic Pokémon') {
               // Nest Ball / Buddy-Buddy Poffin automation: if the deck holds
               // exactly one Basic (unambiguous), auto-bench it
@@ -1295,12 +1420,32 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // match a card against a search-step's target description
     const matchesSearch = (card, what = '') => {
       const w = what.toLowerCase();
+      // Or-clause (e.g. Fighting Gong: "Basic {F} Energy card or a Basic {F}
+      // Pokémon") — a card matches if it satisfies either side.
+      if (w.includes(' or ')) {
+        return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg));
+      }
       const isPokemon = !!card.hp;
       const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
       if (w.includes('item') && w.includes('tool')) return isTrainer;
+      if (w.includes('energy')) {
+        // e.g. 'Basic Energy' (Firebreather: up to 7 Basic Energy cards)
+        return String(card.type || '').toLowerCase().includes('energy') ||
+          String(card.name || '').toLowerCase().includes('energy');
+      }
       if (w.includes('mega evolution')) return isPokemon && String(card.name || '').toLowerCase().includes('mega');
       if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) return isPokemon;
-      if (w.includes('basic')) return isPokemon && (card.stage || 'Basic') === 'Basic';
+      if (w.includes('basic')) {
+        if (!isPokemon || (card.stage || 'Basic') !== 'Basic') return false;
+        // e.g. 'Basic Pokémon ≤70 HP' (Buddy-Buddy Poffin) — enforce the HP cap
+        const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
+        if (hpCap) {
+          const maxHp = Number(hpCap[1]);
+          const cardHp = Number(card.hp);
+          return Number.isFinite(cardHp) && cardHp <= maxHp;
+        }
+        return true;
+      }
       if (w.includes('pokémon')) return isPokemon;
       return true; // generic search: everything matches
     };
@@ -1309,16 +1454,17 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // Watching the hand → play zones for Trainer-class cards. When one lands
     // in play, announce its effect steps; searchDeck/lookAtTop effects open
     // the private deck window so the player can legally look.
-    const hookTrainerPlay = () => {
-      window.setInterval(() => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
-        try {
-          const board = getZone('self', 'board');
-          if (!board?.array) return;
-          for (const card of board.array) {
+    //
+    // Primary trigger: the 'rules-card-on-board' event, dispatched by
+    // move-card.js the instant a card lands on 'board' — this is what makes
+    // the picker open immediately instead of on the next poll tick. The
+    // window.setInterval below stays only as a slow backstop (in case some
+    // future code path pushes into the board zone array without going
+    // through moveCard) and no longer determines how fast the popup opens.
+    const processBoardCard = (card) => {
+      try {
             const img = card.image;
-            if (!img || img.__rulesTrainerAnnounced) continue;
+            if (!img || img.__rulesTrainerAnnounced) return;
             img.__rulesTrainerAnnounced = true;
             const isTrainer = String(card.type || '').toLowerCase().includes('trainer') ||
               String(card.supertype || '').toLowerCase().includes('trainer');
@@ -1436,7 +1582,7 @@ if (!isTrainer) {
                           }
                         }
                       });
-                      continue;
+                      return;
                     }
             ensureCardData(card).then(() => {
               const text = [card.effect || card.text || []].flat().join(' ');
@@ -1573,9 +1719,30 @@ if (!isTrainer) {
                 });
               }
             });
-          }
+      } catch {}
+    };
+
+    const hookTrainerPlay = () => {
+      // Instant path: react the same tick a card lands on 'board'.
+      document.addEventListener('rules-card-on-board', (event) => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        if (rulesState.turnPlayer !== 'self') return;
+        const { user, card } = event.detail || {};
+        if (user !== 'self' || !card) return;
+        processBoardCard(card);
+      });
+      // Backstop: catches anything that (for whatever reason) didn't fire
+      // the event above — same logic, just on a slow poll so it's never
+      // the thing the player is waiting on.
+      window.setInterval(() => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        if (rulesState.turnPlayer !== 'self') return;
+        try {
+          const board = getZone('self', 'board');
+          if (!board?.array) return;
+          for (const card of board.array) processBoardCard(card);
         } catch {}
-      }, 1000);
+      }, 2000);
     };
     
     // ── move gating ──────────────────────────────────────────────────────

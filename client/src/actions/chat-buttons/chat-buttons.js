@@ -932,33 +932,38 @@ const parseHealAmount = (abilityText) => {
 // active Pokémon using the active's own heal-family ability. Does NOT end the
 // turn (like retreat). Damage-counter updates relay in multiplayer via the
 // existing updateDamageCounter/removeDamageCounter actions.
-export const healAbility = async (user, emit = true) => {
+export const healAbility = async (user, emit = true, targetCard = null) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
   }
 
-  const active = getZone(user, 'active').array[0];
-  if (!active) {
-    appendMessage(user, '⛔ No active Pokémon to heal.', 'announcement', false);
+  const _activeCard = getZone(user, 'active').array[0];
+  const target = targetCard || _activeCard;
+  if (!target) {
+    appendMessage(user, '⛔ No Pokémon to heal.', 'announcement', false);
     return;
   }
 
-  await ensureCardData(active);
-  if (classifyAbility(active) !== 'heal') {
+  const zoneId = targetCard && targetCard !== _activeCard ? 'bench' : 'active';
+  const zoneIdx = targetCard && targetCard !== _activeCard
+    ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
+
+  await ensureCardData(target);
+  if (classifyAbility(target) !== 'heal') {
     appendMessage(
       user,
-      `⛔ ${active.name || 'This Pokémon'} has no heal ability.`,
+      `⛔ ${target.name || 'This Pokémon'} has no heal ability.`,
       'announcement',
       false
     );
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, active)) {
+  if (rulesState.enabled && abilityUsed(user, target)) {
     appendMessage(
       user,
-      `⛔ ${active.name}'s heal ability was already used this turn.`,
+      `⛔ ${target.name}'s heal ability was already used this turn.`,
       'announcement',
       false
     );
@@ -966,17 +971,17 @@ export const healAbility = async (user, emit = true) => {
   }
 
   const abilityText =
-    active.ability?.text ?? active.abilityText ?? active.text ?? '';
+    target.ability?.text ?? target.abilityText ?? target.text ?? '';
   const amount = parseHealAmount(abilityText);
   let current = 0;
-  if (active.image?.damageCounter) {
+  if (target.image?.damageCounter) {
     current =
-      parseInt(active.image.damageCounter.textContent || '0', 10) || 0;
+      parseInt(target.image.damageCounter.textContent || '0', 10) || 0;
   }
   if (current === 0) {
     appendMessage(
       user,
-      `⛔ ${active.name} has no damage counters to remove.`,
+      `⛔ ${target.name} has no damage counters to remove.`,
       'announcement',
       false
     );
@@ -985,15 +990,15 @@ export const healAbility = async (user, emit = true) => {
 
   const healed = amount === 'all' ? current : Math.min(amount, current);
   if (amount === 'all' || current - amount <= 0) {
-    removeDamageCounter(user, 'active', 0, emit);
+    removeDamageCounter(user, zoneId, zoneIdx, emit);
   } else {
-    updateDamageCounter(user, 'active', 0, current - amount, emit);
+    updateDamageCounter(user, zoneId, zoneIdx, current - amount, emit);
   }
 
-  if (rulesState.enabled) markAbilityUsed(user, active);
+  if (rulesState.enabled) markAbilityUsed(user, target);
   appendMessage(
     user,
-    `💖 ${active.name} heals ${healed} damage counter${healed !== 1 ? 's' : ''}.`,
+    `💖 ${target.name} heals ${healed} damage counter${healed !== 1 ? 's' : ''}.`,
     'announcement',
     false
   );
@@ -1002,33 +1007,39 @@ export const healAbility = async (user, emit = true) => {
 // Switch ability (taxonomy C, once-per-turn): free active↔bench swap using the
 // active's own switch-family ability. No energy cost (unlike retreat) and does
 // NOT end the turn. Card movement relays in multiplayer via moveCard.
-export const switchAbility = async (user, emit = true) => {
+export const switchAbility = async (user, emit = true, targetCard = null) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
   }
 
-  const active = getZone(user, 'active').array[0];
-  if (!active) {
-    appendMessage(user, '⛔ No active Pokémon to switch.', 'announcement', false);
+  const _activeCard = getZone(user, 'active').array[0];
+  const target = targetCard || _activeCard;
+  if (!target) {
+    appendMessage(user, '⛔ No Pokémon to switch.', 'announcement', false);
     return;
   }
 
-  await ensureCardData(active);
-  if (classifyAbility(active) !== 'switch') {
+  const targetIsBench = targetCard && targetCard !== _activeCard;
+  const targetZone = targetIsBench ? 'bench' : 'active';
+  const targetIdx = targetIsBench
+    ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
+
+  await ensureCardData(target);
+  if (classifyAbility(target) !== 'switch') {
     appendMessage(
       user,
-      `⛔ ${active.name || 'This Pokémon'} has no switch ability.`,
+      `⛔ ${target.name || 'This Pokémon'} has no switch ability.`,
       'announcement',
       false
     );
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, active)) {
+  if (rulesState.enabled && abilityUsed(user, target)) {
     appendMessage(
       user,
-      `⛔ ${active.name}'s switch ability was already used this turn.`,
+      `⛔ ${target.name}'s switch ability was already used this turn.`,
       'announcement',
       false
     );
@@ -1046,16 +1057,22 @@ export const switchAbility = async (user, emit = true) => {
     return;
   }
 
-  const switcherName = active.name || 'This Pokémon';
-  // Free swap: active → bench, first bench → active (no energy discarded).
-  moveCard(user, user, 'active', 'bench', 0);
-  moveCard(user, user, 'bench', 'active', 0);
+  const switcherName = target.name || 'This Pokémon';
+  // Free swap: move the target to active; autoMoveActiveBenchCard handles
+  // pushing the old active to bench. For active source, move active→bench first
+  // then bench→active (two-step since active can't hold two cards).
+  if (targetIsBench) {
+    moveCard(user, user, 'bench', 'active', targetIdx);
+  } else {
+    moveCard(user, user, 'active', 'bench', 0);
+    moveCard(user, user, 'bench', 'active', 0);
+  }
 
-  if (rulesState.enabled) markAbilityUsed(user, active);
+  if (rulesState.enabled) markAbilityUsed(user, target);
   const newActive = getZone(user, 'active').array[0];
   appendMessage(
     user,
-    `🔁 ${switcherName} switches with ${newActive?.name || 'the benched Pokémon'}.`,
+    `🔁 ${switcherName} switches with ${newActive?.name || 'the other Pokémon'}.`,
     'announcement',
     false
   );
@@ -1064,33 +1081,38 @@ export const switchAbility = async (user, emit = true) => {
 // Attach-energy ability (taxonomy C, once-per-turn): attach an Energy card
 // from hand to the active Pokémon using its own attach-family ability.
 // Does NOT end the turn.
-export const attachAbility = async (user, emit = true) => {
+export const attachAbility = async (user, emit = true, targetCard = null) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
   }
 
-  const active = getZone(user, 'active').array[0];
-  if (!active) {
-    appendMessage(user, '⛔ No active Pokémon.', 'announcement', false);
+  const _activeCard = getZone(user, 'active').array[0];
+  const target = targetCard || _activeCard;
+  if (!target) {
+    appendMessage(user, '⛔ No Pokémon.', 'announcement', false);
     return;
   }
 
-  await ensureCardData(active);
-  if (classifyAbility(active) !== 'attach') {
+  const targetZone = targetCard && targetCard !== _activeCard ? 'bench' : 'active';
+  const targetIdx = targetCard && targetCard !== _activeCard
+    ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
+
+  await ensureCardData(target);
+  if (classifyAbility(target) !== 'attach') {
     appendMessage(
       user,
-      `⛔ ${active.name || 'This Pokémon'} has no attach ability.`,
+      `⛔ ${target.name || 'This Pokémon'} has no attach ability.`,
       'announcement',
       false
     );
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, active)) {
+  if (rulesState.enabled && abilityUsed(user, target)) {
     appendMessage(
       user,
-      `⛔ ${active.name}'s attach ability was already used this turn.`,
+      `⛔ ${target.name}'s attach ability was already used this turn.`,
       'announcement',
       false
     );
@@ -1112,13 +1134,13 @@ export const attachAbility = async (user, emit = true) => {
 
   const energy = hand.array[energyIndex];
 
-  // Attach: hand → active. targetIndex=0 triggers attachCard path.
-  moveCard(user, user, 'hand', 'active', energyIndex, 0);
+  // Attach: hand → target. targetIndex triggers attachCard path.
+  moveCard(user, user, 'hand', targetZone, energyIndex, targetIdx);
 
-  if (rulesState.enabled) markAbilityUsed(user, active);
+  if (rulesState.enabled) markAbilityUsed(user, target);
   appendMessage(
     user,
-    `⚡ ${active.name} attaches ${energy.name || 'an Energy card'} via its ability.`,
+    `⚡ ${target.name} attaches ${energy.name || 'an Energy card'} via its ability.`,
     'announcement',
     false
   );
@@ -1128,58 +1150,71 @@ export const attachAbility = async (user, emit = true) => {
 // from the active Pokémon to another friendly Pokémon.
 // Auto-fast-path: if exactly 1 energy + 1 target → immediate move.
 // General path: two-step picker (pick energy → pick target).
-export const energyRedirectAbility = async (user) => {
+export const energyRedirectAbility = async (user, emit = true, targetCard = null) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
   }
 
-  const active = getZone(user, 'active').array[0];
-  if (!active) {
-    appendMessage(user, '⛔ No active Pokémon.', 'announcement', false);
+  const _activeCard = getZone(user, 'active').array[0];
+  const source = targetCard || _activeCard;
+  if (!source) {
+    appendMessage(user, '⛔ No Pokémon.', 'announcement', false);
     return;
   }
 
-  await ensureCardData(active);
-  const family = classifyAbility(active);
+  const sourceIsBench = targetCard && targetCard !== _activeCard;
+  const sourceZone = sourceIsBench ? 'bench' : 'active';
+  const sourceIdx = sourceIsBench
+    ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
+
+  await ensureCardData(source);
+  const family = classifyAbility(source);
   if (family !== 'energy-redirect') {
     appendMessage(
       user,
-      `⛔ ${active.name || 'This Pokémon'} has no energy-redirect ability.`,
+      `⛔ ${source.name || 'This Pokémon'} has no energy-redirect ability.`,
       'announcement',
       false
     );
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, active)) {
+  if (rulesState.enabled && abilityUsed(user, source)) {
     appendMessage(
       user,
-      `⛔ ${active.name}'s redirect ability was already used this turn.`,
+      `⛔ ${source.name}'s redirect ability was already used this turn.`,
       'announcement',
       false
     );
     return;
   }
 
-  // Find attached energies on the active (energy cards whose image.relative === active.image)
-  const activeZone = getZone(user, 'active');
-  const energies = activeZone.array
+  // Find attached energies on the source Pokémon
+  const sourceZoneObj = getZone(user, sourceZone);
+  const energies = sourceZoneObj.array
     .map((c, i) => ({ card: c, idx: i }))
     .filter(
-      ({ card }) => card.type === 'Energy' && card.image?.relative === active.image
+      ({ card }) => card.type === 'Energy' && card.image?.relative === source.image
     );
 
   if (energies.length === 0) {
-    appendMessage(user, `⛔ No Energy attached to ${active.name || 'active'}.`, 'announcement', false);
+    appendMessage(user, `⛔ No Energy attached to ${source.name || 'source'}.`, 'announcement', false);
     return;
   }
 
-  // Find other friendly Pokémon (bench, non-energy)
-  const benchZone = getZone(user, 'bench');
-  const targets = benchZone.array
-    .map((c, i) => ({ card: c, idx: i }))
-    .filter(({ card }) => card.type === 'Pokémon');
+  // Find other friendly Pokémon (excluding the source).
+  // If source is on bench, the active is also a valid target.
+  const allBench = getZone(user, 'bench');
+  const targets = allBench.array
+    .map((c, i) => ({ card: c, idx: i, zone: 'bench' }))
+    .filter(({ card }) => card.type === 'Pokémon' && card !== source);
+  if (sourceIsBench) {
+    const activeCard = getZone(user, 'active').array[0];
+    if (activeCard && activeCard.type === 'Pokémon' && activeCard !== source) {
+      targets.push({ card: activeCard, idx: 0, zone: 'active' });
+    }
+  }
 
   if (targets.length === 0) {
     appendMessage(user, '⛔ No other friendly Pokémon to redirect to.', 'announcement', false);
@@ -1189,12 +1224,12 @@ export const energyRedirectAbility = async (user) => {
   // Auto-fast-path (B): exactly 1 energy + 1 target → immediate move
   if (energies.length === 1 && targets.length === 1) {
     const { card: energy, idx: energyIdx } = energies[0];
-    const { card: target, idx: targetIdx } = targets[0];
-    moveCard(user, user, 'active', 'bench', energyIdx, targetIdx);
-    if (rulesState.enabled) markAbilityUsed(user, active);
+    const { card: destTarget, idx: targetIdx, zone: targetZone } = targets[0];
+    moveCard(user, user, sourceZone, targetZone, energyIdx, targetIdx);
+    if (rulesState.enabled) markAbilityUsed(user, source);
     appendMessage(
       user,
-      `🔀 ${active.name} redirects ${energy.name || 'Energy'} to ${target.name}.`,
+      `🔀 ${source.name} redirects ${energy.name || 'Energy'} to ${destTarget.name}.`,
       'announcement',
       false
     );
@@ -1211,7 +1246,7 @@ export const energyRedirectAbility = async (user) => {
     appendMessage(user, 'Redirect cancelled.', 'announcement', false);
     return;
   }
-  const energyCard = activeZone.array[energyPick];
+  const energyCard = sourceZoneObj.array[energyPick];
 
   // Step 2: pick target Pokémon
   const targetPick = await _pickFromList(
@@ -1222,13 +1257,13 @@ export const energyRedirectAbility = async (user) => {
     appendMessage(user, 'Redirect cancelled.', 'announcement', false);
     return;
   }
-  const targetCard = benchZone.array[targetPick];
+  const destTarget = targets[targetPick];
 
-  moveCard(user, user, 'active', 'bench', energyPick, targetPick);
-  if (rulesState.enabled) markAbilityUsed(user, active);
+  moveCard(user, user, sourceZone, destTarget.zone, energyPick, destTarget.idx);
+  if (rulesState.enabled) markAbilityUsed(user, source);
   appendMessage(
     user,
-    `🔀 ${active.name} redirects ${energyCard.name || 'Energy'} to ${targetCard.name}.`,
+    `🔀 ${source.name} redirects ${energyCard.name || 'Energy'} to ${destTarget.card.name}.`,
     'announcement',
     false
   );
@@ -1371,33 +1406,34 @@ async function _takePrizesWithPicker(user, count) {
 // Search ability (taxonomy C, once-per-turn): reveal the top card of your
 // deck; if it is a Pokémon, put it into your hand. Otherwise the deck is
 // unchanged. Does NOT end the turn.
-export const searchAbility = async (user, emit = true) => {
+export const searchAbility = async (user, emit = true, targetCard = null) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
   }
 
-  const active = getZone(user, 'active').array[0];
-  if (!active) {
-    appendMessage(user, '⛔ No active Pokémon.', 'announcement', false);
+  const _activeCard = getZone(user, 'active').array[0];
+  const target = targetCard || _activeCard;
+  if (!target) {
+    appendMessage(user, '⛔ No Pokémon.', 'announcement', false);
     return;
   }
 
-  await ensureCardData(active);
-  if (classifyAbility(active) !== 'search') {
+  await ensureCardData(target);
+  if (classifyAbility(target) !== 'search') {
     appendMessage(
       user,
-      `⛔ ${active.name || 'This Pokémon'} has no search ability.`,
+      `⛔ ${target.name || 'This Pokémon'} has no search ability.`,
       'announcement',
       false
     );
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, active)) {
+  if (rulesState.enabled && abilityUsed(user, target)) {
     appendMessage(
       user,
-      `⛔ ${active.name}'s search ability was already used this turn.`,
+      `⛔ ${target.name}'s search ability was already used this turn.`,
       'announcement',
       false
     );
@@ -1410,26 +1446,26 @@ export const searchAbility = async (user, emit = true) => {
     return;
   }
 
-  const targetType = searchTargetType(active);
+  const targetType = searchTargetType(target);
   const topCard = deck.array[0];
   if (topCard.type === targetType) {
     moveCard(user, user, 'deck', 'hand', 0, 0);
     appendMessage(
       user,
-      `🔍 ${active.name} searches: found ${topCard.name || `a ${targetType} card`} and put it into your hand.`,
+      `🔍 ${target.name} searches: found ${topCard.name || `a ${targetType} card`} and put it into your hand.`,
       'announcement',
       false
     );
   } else {
     appendMessage(
       user,
-      `🔍 ${active.name} searches: top card was ${topCard.name || 'a card'} (not a ${targetType}). Deck unchanged.`,
+      `🔍 ${target.name} searches: top card was ${topCard.name || 'a card'} (not a ${targetType}). Deck unchanged.`,
       'announcement',
       false
     );
   }
 
-  if (rulesState.enabled) markAbilityUsed(user, active);
+  if (rulesState.enabled) markAbilityUsed(user, target);
 };
 
 export const pass = (user, emit = true) => {
@@ -1460,7 +1496,7 @@ export const pass = (user, emit = true) => {
 
 // ── Stadium effect (taxonomy E, once-per-turn / setup-once) ──────────
 // Uses the active stadium's once-per-turn or setup-once effect.
-// For once-per-turn: draw N / search / heal based on the parsed effect.
+// For once-per-turn: draw N / search / search-evolve / heal based on the parsed effect.
 // For setup-once: draw N (one-shot, applied immediately).
 export const stadiumEffect = async (user, emit = true) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
@@ -1518,6 +1554,23 @@ export const stadiumEffect = async (user, emit = true) => {
       }
       if (rulesState.enabled) markStadiumUsed(user);
       processAction(user, emit, 'stadium-effect', [{ action: 'search' }]);
+      break;
+    }
+    case 'search-evolve': {
+      // Search-and-evolve (e.g. Grand Tree) evolves a Pokémon already in
+      // play rather than fetching a card to hand, and its exact target
+      // (which of your Pokémon in play, chained Stage 1 → Stage 2 search)
+      // is a player choice this rules engine doesn't drive a picker for —
+      // so this is guided, not auto-executed, same as other multi-choice
+      // Trainer searches elsewhere in the engine.
+      appendMessage(
+        user,
+        `🔍 ${card.name}: search your deck for a Pokémon that evolves from one of your Pokémon in play, then evolve it onto that Pokémon manually (see card text for any chained follow-up search). Shuffle your deck afterward.`,
+        'announcement',
+        false
+      );
+      if (rulesState.enabled) markStadiumUsed(user);
+      processAction(user, emit, 'stadium-effect', [{ action: 'search-evolve' }]);
       break;
     }
     case 'heal': {

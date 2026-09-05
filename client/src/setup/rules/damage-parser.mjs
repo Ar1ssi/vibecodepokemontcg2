@@ -33,12 +33,14 @@
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
+  'per-each',
   'per-prize',
   'per-turn',
   'per-hp',
   'extra-by-type',
   'conditional',
   'coin',
+  'per-heads',
   'bench',
   'heal',
 ];
@@ -117,6 +119,18 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const turnCount = ctx.turnCount ?? 1;
   const attackerHp = ctx.attackerHp ?? attacker?.hp ?? 0;
   const defenderHp = ctx.defenderHp ?? defender?.hp ?? 0;
+  // Live game-state counts for "for each …" scaling (Mega Evolution audit A).
+  // Each is OPTIONAL: when the caller has not supplied the relevant field we
+  // keep an honest unresolved note instead of silently computing 0.
+  const ownEnergyCount = ctx.ownEnergyCount; // Energy on ALL of your Pokémon
+  const opponentEnergyCount = ctx.opponentEnergyCount; // Energy on opponent's Active
+  const speciesCount = ctx.speciesCount; // e.g. Beedrill + Beedrill ex in play
+  const opponentHandCount = ctx.opponentHandCount; // cards in opponent's hand
+  const retreatCostColorless = ctx.retreatCostColorless; // Colorless in opponent's Active's Retreat Cost
+  const ownBenchCount = ctx.ownBenchCount; // your Benched Pokémon
+  const opponentBenchCount = ctx.opponentBenchCount; // opponent's Benched Pokémon
+  const damagedBenchCount = ctx.damagedBenchCount; // your Benched Pokémon with damage counters
+  const headsCount = ctx.headsCount; // heads from a "flip … for each heads" coin
 
   let total = base;
 
@@ -135,6 +149,67 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     total = base * energyCount;
     components.push('per-energy');
     notes.push(`× ${energyCount} attached Energy`);
+  } else if (text && /damage for each/.test(text) && !/damage for each \d+ hp/.test(text)) {
+    // "for each …" scaling (Mega Evolution audit A). "does N damage for each X"
+    // → total = N × count (N is the per-unit value, so the printed base = N).
+    // "does N more damage for each X" → total = base + N × count (N is a
+    // per-unit bonus on top of the printed base). The live count comes from ctx
+    // (caller supplies the game value); when the needed ctx field is absent we
+    // keep an honest unresolved note instead of silently computing 0.
+    const isMore = /more damage for each/.test(text);
+    const per = amount(text, /does (\d+)(?: more)? damage for each/);
+    // Anchor on the DAMAGE clause ("…damage for each X") so a coin-count
+    // clause like "flip a coin for each Energy attached" is not mistaken for
+    // the damage unit (Work Rush: damage scales per HEADS, not per Energy).
+    const unit = (text.match(/damage for each (.+)/) || [])[1] || '';
+    let count;
+    let label;
+    if (/energy attached to all of your pok[ée]mon/.test(unit)) {
+      count = ownEnergyCount;
+      label = 'Energy on all your Pokémon';
+    } else if (/energy (card )?attached to your opponent's active pok[ée]mon/.test(unit)) {
+      count = opponentEnergyCount;
+      label = "Energy on opponent's Active Pokémon";
+    } else if (/energy attached/.test(unit)) {
+      count = energyCount;
+      label = 'Energy attached';
+    } else if (/beedrill/.test(unit)) {
+      count = speciesCount;
+      label = 'Beedrill/Beedrill ex in play';
+    } else if (/card in your opponent's hand/.test(unit)) {
+      count = opponentHandCount;
+      label = "cards in opponent's hand";
+    } else if (/retreat cost/.test(unit)) {
+      count = retreatCostColorless;
+      label = "Colorless in opponent's Active's Retreat Cost";
+    } else if (/(both yours and (your )?opponent's)|each benched pok[ée]mon/.test(unit)) {
+      count = (ownBenchCount === undefined && opponentBenchCount === undefined)
+        ? undefined
+        : (ownBenchCount ?? 0) + (opponentBenchCount ?? 0);
+      label = 'Benched Pokémon (both sides)';
+    } else if (/damage counter|damaged/.test(unit)) {
+      count = damagedBenchCount;
+      label = 'your damaged Benched Pokémon';
+    } else if (/benched pok[ée]mon/.test(unit)) {
+      count = ownBenchCount;
+      label = 'your Benched Pokémon';
+    } else if (/heads/.test(unit)) {
+      // Per-heads coin scaling (audit I): "flip … for each heads". The heads
+      // count is supplied by the caller after the flip (ctx.headsCount).
+      count = headsCount;
+      label = 'heads';
+    } else {
+      count = undefined;
+      label = unit || 'the printed count';
+    }
+    if (per > 0 && typeof count === 'number' && count >= 0) {
+      total = isMore ? base + per * count : per * count;
+      components.push('per-each');
+      notes.push(`${isMore ? `+ ${per} × ${count}` : `${per} × ${count}`} (${label})`);
+    } else {
+      components.push('per-each');
+      notes.push(`per-${label} scaling — resolve the printed count`);
+    }
   } else if (text && /prize card/.test(text)) {
     const per = amount(text, /(\d+) more damage|does (\d+) damage/);
     total = base + per * opponentPrizes;
@@ -231,14 +306,18 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     if (bench > 0) components.push('bench');
   }
   let heal = 0;
-  if (text && /remove (?:up to )?(\d+) damage counter/.test(text)) {
-    heal = amount(text, /remove (?:up to )?(\d+) damage counter/);
+  // Heal family (audit B): "Heal N damage from …" and "remove N damage
+  // counter(s)" both remove N damage counters. The target (attacker /
+  // defender / all) is resolved separately by healTarget().
+  const healRe = /(?:heal|remove) (?:up to )?(\d+) damage/;
+  if (text && healRe.test(text)) {
+    heal = amount(text, healRe);
     if (heal > 0) components.push('heal');
   }
 
   const resolved =
     !/(coin flip pending)/.test(notes.join(' ')) &&
-    !/resolve the printed (condition|amount)/.test(notes.join(' '));
+    !/resolve the printed (condition|amount|count)/.test(notes.join(' '));
 
   return {
     base,
@@ -258,6 +337,9 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
 export function healTarget(attackText) {
   const t = String(attackText || '').toLowerCase();
   if (/(heal|remove)[^.]*defending pok[ée]mon/.test(t)) return 'defender';
+  // "Heal N damage from each/all of your Pokémon" (audit B) → heals every one
+  // of your Pokémon, not just the Active (Ethan's Ho-Oh / Shining Feathers).
+  if (/(heal|remove)[^.]*(?:each|all) of your pok[ée]mon/.test(t)) return 'all';
   return 'attacker';
 }
 

@@ -1,4 +1,5 @@
 import { attack, attachAbility, healAbility, pass, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
+import { abilityPicker } from '../../../../actions/ability-picker.js';
 import { systemState } from '../../../../front-end.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
@@ -21,6 +22,9 @@ export const initializeP2ChatButtons = () => {
 
   const p2SearchButton = document.getElementById('p2SearchButton');
   p2SearchButton.addEventListener('click', () => searchAbility(systemState.initiator));
+
+  const p2AbilityButton = document.getElementById('p2AbilityButton');
+  p2AbilityButton.addEventListener('click', () => abilityPicker(systemState.initiator));
 
   const p2StadiumButton = document.getElementById('p2StadiumButton');
   p2StadiumButton.addEventListener('click', () => stadiumEffect(systemState.initiator));

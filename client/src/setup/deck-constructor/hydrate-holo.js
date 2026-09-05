@@ -9,11 +9,20 @@ import { ensureCardData } from '../rules/rules-state.mjs';
 const hydrated = new WeakSet();
 
 // Kill-switch: set to false to re-enable mat holofoil rendering.
-const HOLO_DISABLED = true;
+const HOLO_DISABLED = false;
 
 // The node that should be moved around the DOM for a card:
 // its holo wrapper if present, otherwise the bare <img>.
 export const cardNode = (card) => card?.wrapper ?? card?.image;
+
+// The node that owns a card's <img> in the zone DOM: the `.mat-holo` wrapper
+// if the <img> is nested inside one, otherwise the bare <img> itself. The
+// parent of this node is the element to insert sibling cards into (e.g.
+// `.play-container`), which keeps attached energies/tools OUTSIDE the
+// overflow-hidden `.card__rotator`. Degrades to the bare <img> when the card
+// isn't hydrated yet (hydration is async), so this is always safe to call.
+export const imageAnchor = (image) =>
+  image?.parentElement?.closest?.('.mat-holo') ?? image;
 
 export function hydrateHolo(card) {
   if (HOLO_DISABLED) return;
@@ -24,13 +33,21 @@ export function hydrateHolo(card) {
       if (!card.image.isConnected) return; // card was removed meanwhile
       const effect = resolveHoloEffect(data);
       if (!effect) return; // common / non-holo → stays plain
-      const width =
-        card.image.clientWidth ||
-        card.image.getBoundingClientRect().width ||
-        0;
+      // NOTE: we deliberately do NOT snapshot card.image's current pixel
+      // size here. That used to be captured once (via getBoundingClientRect/
+      // clientWidth/clientHeight) and baked in as inline wrapper.style.width/
+      // height — a frozen px box that never updated again. Plain <img> cards
+      // are sized live by each zone's CSS (e.g. #hand img's max-height), so
+      // they rescale automatically on window resize or when the hand/board
+      // divider is dragged; the old snapshot approach didn't, so a holo card
+      // would stay stuck at its hydration-time size and end up comically
+      // oversized (or undersized) relative to its now-rescaled neighbors.
+      // Sizing .mat-holo is now handled entirely by per-zone CSS rules (see
+      // #hand .mat-holo, #prizes .mat-holo, etc. in self/opp-containers.css),
+      // mirroring the same rule each zone already uses for a bare <img>, so
+      // the wrapper tracks its zone's live size exactly like a plain card.
       const wrapper = buildHoloCard(card.image.src, effect);
       wrapper.classList.add('mat-holo');
-      if (width) wrapper.style.width = `${width}px`;
       const rotator = wrapper.querySelector('.card__rotator');
       // Where the <img> currently sits in its zone (captured BEFORE moving it).
       const { parentElement, nextSibling } = card.image;
