@@ -3527,11 +3527,13 @@ a:hover {
 
     /* ═══ MAT COIN SLOTS ═════════════════════════════════════════════
        Persistent coin tokens beside each player's Active Pokémon.
-       Position is computed from the Active zone's screen rect; flips
-       reuse the deck-builder's .coin-toss-wrap animation in-place. */
+       Fixed to the reference spots: bottom player right, top player left.
+       Rendered above playmat iframes (z-index 3) so both stay visible. */
     .mat-coin-slot {
       position: fixed;
       z-index: 3;
+      width: 6vh;
+      height: 6vh;
       display: none;
       pointer-events: none;
       filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.6));
@@ -3557,10 +3559,15 @@ a:hover {
     .mat-coin-slot .mat-coin-toss-wrap.tossing {
       animation: coin-toss-arc 1.35s cubic-bezier(0.3, 0.0, 0.35, 1);
     }
-    #matCoinSlotSelf,
-    #matCoinSlotOpp {
+    #matCoinSlotSelf {
+      top: 64%;
+      right: 2.5%;
       left: auto;
+      transform: translate(0, -50%);
+    }
+    #matCoinSlotOpp {
+      top: 36%;
+      left: 2.5%;
       right: auto;
-      top: auto;
-      transform: translateY(-50%);
+      transform: translate(0, -50%);
     }
