@@ -96,6 +96,9 @@ import {
     let coinCallCaller = 'self';
     // True while the heads/tails call picker is open.
     let coinCallPending = false;
+    // Bumped on reset/restart so stale coin-flip / mulligan callbacks cannot
+    // re-enter beginSetupWithTurnOrder after the session was cleared.
+    let rulesSessionGeneration = 0;
     
     export const initializeRulesEngine = () => {
       if (initialized) return;
@@ -156,6 +159,7 @@ import {
     
       document.addEventListener('rules-turn-began', refresh);
       document.addEventListener('rules-mode-changed', refresh);
+      document.addEventListener('rules-session-reset', refresh);
       window.setInterval(refresh, 1500);
     };
 
@@ -176,7 +180,12 @@ import {
       const costStr = (arr) => (arr || []).map(s => energySymbols[s] || s).join('');
 
       const refresh = async () => {
-        if (!rulesState.enabled || rulesState.turnPlayer !== 'self' || rulesState.phase === 'ended') {
+        if (
+          !rulesState.enabled ||
+          rulesState.phase === 'setup' ||
+          rulesState.turnPlayer !== 'self' ||
+          rulesState.phase === 'ended'
+        ) {
           win.hidden = true;
           return;
         }
@@ -290,6 +299,7 @@ import {
 
       document.addEventListener('rules-turn-began', refresh);
       document.addEventListener('rules-mode-changed', refresh);
+      document.addEventListener('rules-session-reset', refresh);
       window.setInterval(refresh, 1500);
     };
 
@@ -525,12 +535,35 @@ import {
     // Non-rules Reset handlers don't touch rulesState, so without this the
     // phase would stay 'draw' and a later Set Up would skip the coin flip.
     const resetRulesSession = () => {
+      rulesSessionGeneration += 1;
       rulesState.phase = 'setup';
       rulesState.turnNumber = 0;
       rulesState.turnPlayer = 'self';
       rulesState.stadium = null;
       rulesState.mulligansResolved = false;
       rulesState.attackExecuting = false;
+      rulesState.flags = {
+        self: {
+          energyAttached: false,
+          attackerAttacked: false,
+          evolved: {},
+          supporterPlayed: false,
+          lastSupporterName: '',
+          abilitiesUsed: {},
+          stadiumUsed: false,
+          drewThisTurn: false,
+        },
+        opp: {
+          energyAttached: false,
+          attackerAttacked: false,
+          evolved: {},
+          supporterPlayed: false,
+          lastSupporterName: '',
+          abilitiesUsed: {},
+          stadiumUsed: false,
+          drewThisTurn: false,
+        },
+      };
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;
@@ -543,10 +576,11 @@ import {
       closeDeckSearchWindow();
       document.getElementById('rulesCoinCallOverlay')?.remove();
       document.getElementById('rulesChoicePicker')?.remove();
+      document.dispatchEvent(new CustomEvent('rules-session-reset'));
     };
 
     const hookResetButtons = () => {
-      ['resetButton', 'p2ResetButton', 'resetBothButton'].forEach((id) => {
+      ['resetButton', 'p2ResetButton', 'resetBothButton', 'restartButton'].forEach((id) => {
         const btn = document.getElementById(id);
         if (!btn) return;
         btn.addEventListener('click', () => {
@@ -569,6 +603,7 @@ import {
       // or local flip + mirror both landing) would re-run startGame() and
       // reset drewThisTurn, causing a double auto-draw on turn 1.
       if (rulesState.phase !== 'setup') return;
+      const session = rulesSessionGeneration;
       startGame(firstPlayer);
           // startGame() only resets to turnNumber 0 / phase 'draw' — it never
           // advances into the first player's actual turn 1. beginTurn() is
@@ -584,6 +619,7 @@ import {
           // mulligan check: opening hands must contain a Basic Pokémon
           setTimeout(async () => {
             try {
+              if (session !== rulesSessionGeneration) return;
               if (rulesState.mulligansResolved) return;
 
               const selfHand = getZone('self', 'hand').array;
@@ -666,10 +702,12 @@ import {
       }
     
       const beginFlip = (call, caller = 'self') => {
+        const session = rulesSessionGeneration;
         coinFlipPending = true;
         runTurnOrderCoinFlip({ call, caller })
           .then(({ turnPlayer }) => {
             if (flipSuperseded) return; // authoritative remote flip took over
+            if (session !== rulesSessionGeneration) return;
             beginSetupWithTurnOrder(turnPlayer);
           })
           .finally(() => {
