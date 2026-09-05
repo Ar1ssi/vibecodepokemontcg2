@@ -551,6 +551,8 @@ import {
       closeDeckSearchWindow();
       document.getElementById('rulesCoinCallOverlay')?.remove();
       document.getElementById('rulesChoicePicker')?.remove();
+      const hud = document.getElementById('rulesTurnHUD');
+      if (hud) hud.hidden = true;
       document.dispatchEvent(new CustomEvent('rules-session-reset'));
     };
 
