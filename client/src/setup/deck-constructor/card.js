@@ -29,9 +29,11 @@ export class Card {
     // disambiguate cards that share an identical name across many different
     // printings/sets (see resolveCardId and ensureCardData in
     // rules-state.mjs) instead of guessing from a name-only search.
-    this.number = number || null;
-    this.set = set || null;
-    this.id = id || null;
+  this.number = number || null;
+  this.set = set || null;
+  this.id = id || null;
+  /** Stable deck-build index for multiplayer sync (same on both clients). */
+  this.syncInstance = null;
     this.imageAttributes = {
       user: user,
       type: type,

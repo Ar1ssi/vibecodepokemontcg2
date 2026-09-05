@@ -1,8 +1,9 @@
-import { systemState } from '../../state.js';
+import { socket, systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import {
   buildCardHint,
+  hintMatchesAtIndex,
   resolveCardIndex,
 } from '../../setup/zones/resolve-card-index.mjs';
 import { moveCardMessage } from './move-card-message.js';
@@ -85,6 +86,20 @@ export const moveCardBundle = (
         targetIndex,
         cardHints
       ));
+    const oZone = getZone(user, oZoneId);
+    if (
+      cardHints.moving &&
+      !hintMatchesAtIndex(oZone, resolvedIndex, cardHints.moving)
+    ) {
+      console.warn('moveCardBundle: hint mismatch after resolve — requesting resync', {
+        oZoneId,
+        relayIndex: index,
+        resolvedIndex,
+        hint: cardHints.moving,
+      });
+      socket.emit('resyncActions', { roomId: systemState.roomId });
+      return;
+    }
     syncOptions = { syncReplay: true };
     if (cardHints.isEvolution) {
       syncOptions.forceEvolution = true;
