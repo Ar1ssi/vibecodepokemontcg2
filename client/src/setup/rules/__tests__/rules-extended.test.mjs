@@ -7,6 +7,7 @@ import test from 'node:test';
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
+    const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
@@ -629,6 +630,35 @@ import test from 'node:test';
       assert.equal(classifyAbility({ ability: { text: 'When you play this Pokémon, search your deck.' } }), 'search');
       assert.equal(classifyAbility({ ability: { text: 'While this Pokémon is in play, attacks cost less.' } }), 'passive');
       assert.equal(classifyAbility({ name: 'Pikachu' }), 'unknown');
+    });
+
+    test('parseAbility: Mega Greninja ex Mortal Shuriken (discard Water Energy → place damage on opponent)', () => {
+      const text =
+        "Once during your turn, if this Pokémon is in the Active Spot, you may discard a Basic Water Energy card from your hand in order to use this Ability. Place 6 damage counters on 1 of your opponent's Pokémon.";
+      const steps = parseAbility(text);
+      assert.equal(steps.some((s) => s.type === 'discardCostAbility'), true);
+      assert.equal(steps.some((s) => s.type === 'moveDamageAbility'), true);
+      assert.equal(steps.some((s) => s.type === 'opponentDisruptAbility'), false);
+
+      const cost = steps.find((s) => s.type === 'discardCostAbility');
+      assert.equal(cost.count, 1);
+      assert.equal(cost.basic, true);
+      assert.equal(cost.energyType, 'water');
+
+      const dmg = steps.find((s) => s.type === 'moveDamageAbility');
+      assert.equal(dmg.count, 6);
+      assert.equal(dmg.onOpponent, true);
+
+      assert.equal(classifyAbility({ name: 'Mega Greninja ex', ability: { text } }), 'move-damage');
+    });
+
+    test('parseAbility: place damage on opponent without incidental "to" in cost clause', () => {
+      const text =
+        "Once during your turn, you may discard a Basic Water Energy card from your hand. Place 6 damage counters on 1 of your opponent's Pokémon.";
+      const steps = parseAbility(text);
+      assert.equal(steps.some((s) => s.type === 'moveDamageAbility'), true);
+      assert.equal(steps.some((s) => s.type === 'opponentDisruptAbility'), false);
+      assert.equal(classifyAbility({ ability: { text } }), 'move-damage');
     });
 
     test('searchTargetType: determines card type from ability text', () => {
@@ -1390,6 +1420,14 @@ import test from 'node:test';
       assert.equal(parseOpponentDiscard({ ability: { text: 'Discard up to 2 cards from your opponent’s hand.' } }), 2);
       assert.equal(parseOpponentDiscard({ ability: { text: 'Discard a card from your opponent’s hand.' } }), 1);
       assert.equal(parseOpponentDiscard({ ability: { text: 'Draw a card.' } }), 0);
+      assert.equal(
+        parseOpponentDiscard({
+          ability: {
+            text: "Once during your turn, you may discard a Basic Water Energy card from your hand. Place 6 damage counters on 1 of your opponent's Pokémon.",
+          },
+        }),
+        0,
+      );
     });
 
     test('parseEnergyRedirect', () => {
@@ -2546,9 +2584,6 @@ import test from 'node:test';
       assert.equal(p.resolved, false);
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
     });
-
-<<<<<<< HEAD
-    // ── Standard 2026-27 ability parser gaps ──
 
     test('parseAbility: recursionFromDiscardAbility (Snorlax Voraciousness)', () => {
       const steps = parseAbility(

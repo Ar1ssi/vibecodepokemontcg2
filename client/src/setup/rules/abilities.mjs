@@ -32,6 +32,38 @@ const hasVerbAttach = (t) =>
 // Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
 const hasWord = (t, w) => t.split(/[^a-z]/).includes(w);
 
+// "Place 6 damage counters on …" uses "on", not only "to/onto". Do not rely on
+// incidental "to" elsewhere (e.g. "in order to use this Ability").
+const hasDamageCounterPlacement = (t) =>
+  /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
+  /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
+
+// Discard-from-your-hand costs that affect the opponent are NOT opponent-disrupt.
+const isSelfHandDiscardCost = (t) =>
+  t.includes('discard') &&
+  t.includes('from your hand') &&
+  !t.includes("opponent's hand") &&
+  !t.includes('from your opponent');
+
+const parseEnergyTypeHint = (t) => {
+  const types = [
+    'water', 'fire', 'grass', 'lightning', 'psychic', 'fighting',
+    'darkness', 'metal', 'dragon', 'fairy', 'colorless',
+  ];
+  for (const type of types) {
+    if (t.includes(type)) return type;
+  }
+  const sym = t.match(/\{([a-z])\}/);
+  if (sym) {
+    const map = {
+      w: 'water', r: 'fire', g: 'grass', l: 'lightning', p: 'psychic',
+      f: 'fighting', d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy', c: 'colorless',
+    };
+    return map[sym[1]] || null;
+  }
+  return null;
+};
+
 export function parseAbility(text = '') {
   const lower = normalizeText(text);
   const steps = [];
@@ -180,27 +212,54 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 7. Move / place damage counters ─────────────────────────────────────
+  // ── 7. Discard cost (Energy from hand to use ability) ───────────────────
+  if (
+    lower.includes('discard') &&
+    lower.includes('from your hand') &&
+    lower.includes('energy')
+  ) {
+    const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
+    const count = countMatch ? Number(countMatch[1]) : 1;
+    const basic = lower.includes('basic');
+    const energyType = parseEnergyTypeHint(lower);
+    const typeLabel = energyType
+      ? `${basic ? 'Basic ' : ''}${energyType.charAt(0).toUpperCase()}${energyType.slice(1)} `
+      : basic ? 'Basic ' : '';
+    steps.push({
+      type: 'discardCostAbility',
+      count,
+      basic,
+      energyType,
+      guidance: `Once during your turn: discard ${count > 1 ? `${count} ` : ''}${typeLabel}Energy from your hand (cost).`,
+    });
+  }
+
+  // ── 8. Move / place damage counters ─────────────────────────────────────
   if (
     (hasWord(lower, 'move') || lower.includes('place')) &&
     lower.includes('damage counter') &&
-    (lower.includes('to') || lower.includes('onto'))
+    hasDamageCounterPlacement(lower)
   ) {
-    const upTo = lower.match(/(?:move|place)\s+(?:up to\s+)?(\d+)\s+damage/)?.[1] || null;
+    const upToMatch = lower.match(/(?:move|place)\s+up to\s+(\d+)\s+damage/);
+    const exactMatch = lower.match(/(?:move|place)\s+(\d+)\s+damage/);
+    const count = upToMatch ? Number(upToMatch[1]) : exactMatch ? Number(exactMatch[1]) : null;
     const onOpponent = lower.includes('opponent');
+    const verb = hasWord(lower, 'move') && !lower.includes('place') ? 'move' : 'place';
     steps.push({
       type: 'moveDamageAbility',
-      upTo: upTo ? Number(upTo) : null,
+      count,
+      upTo: upToMatch ? count : null,
       onOpponent,
-      guidance: upTo
-        ? `Once during your turn: ${hasWord(lower, 'move') ? 'move' : 'place'} up to ${upTo} damage counters ${onOpponent ? 'on your opponent\'s Pokémon' : 'as described'}.`
+      guidance: count
+        ? `Once during your turn: ${verb} ${upToMatch ? 'up to ' : ''}${count} damage counter${count !== 1 ? 's' : ''} ${onOpponent ? 'on your opponent\'s Pokémon' : 'as described'}.`
         : 'Once during your turn: move/place damage counters as described.',
     });
   }
 
-  // ── 8. Opponent disruption (discard / shuffle / return to opp hand) ─────
+  // ── 9. Opponent disruption (discard / shuffle / return to opp hand) ─────
   if (
     lower.includes('opponent') &&
+    !isSelfHandDiscardCost(lower) &&
     (lower.includes('discard') || lower.includes('shuffle') ||
      (lower.includes('put') && lower.includes('into their hand')))
   ) {
@@ -218,7 +277,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 9. Recursion (KO-trigger: search/return from discard) ───────────────
+  // ── 10. Recursion (KO-trigger: search/return from discard) ───────────────
   if (
     lower.includes('knocked out') &&
     (lower.includes('search') || lower.includes('put') || lower.includes('return') || lower.includes('add'))
@@ -229,7 +288,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 10. Evolve (put an evolution card onto this Pokémon) ────────────────
+  // ── 11. Evolve (put an evolution card onto this Pokémon) ────────────────
   if (
     lower.includes('evolve') &&
     (lower.includes('this pokémon') || lower.includes('onto this pokémon'))
@@ -240,7 +299,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 11. Look at top of deck ─────────────────────────────────────────────
+  // ── 12. Look at top of deck ─────────────────────────────────────────────
   if (lower.includes('look at the top')) {
     const n = lower.match(/top\s+(\d+)\s+cards?/)?.[1] || null;
     steps.push({
@@ -252,7 +311,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 12. When-played (one-shot on play) ──────────────────────────────────
+  // ── 13. When-played (one-shot on play) ──────────────────────────────────
   if (lower.includes('when you play')) {
     steps.push({
       type: 'whenPlayedAbility',
@@ -260,7 +319,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 13. End-of-turn trigger ─────────────────────────────────────────────
+  // ── 14. End-of-turn trigger ─────────────────────────────────────────────
   if (lower.includes('end of your turn') || lower.includes('at the end of your turn')) {
     steps.push({
       type: 'endOfTurnAbility',
@@ -306,7 +365,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 16. Retreat cost modifier ───────────────────────────────────────────
+  // ── 17. Retreat cost modifier ───────────────────────────────────────────
   if (lower.includes('retreat cost')) {
     const increased = lower.includes('more') || lower.includes('increase');
     steps.push({
@@ -318,7 +377,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 17. Cost discount (ignore energy in cost) ───────────────────────────
+  // ── 18. Cost discount (ignore energy in cost) ───────────────────────────
   if (
     (lower.includes('cost') || lower.includes('energy')) &&
     (lower.includes('less') || lower.includes('ignore') || lower.includes('reduce')) &&
@@ -354,7 +413,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 19. Weakness change ─────────────────────────────────────────────────
+  // ── 20. Weakness change ─────────────────────────────────────────────────
   if (lower.includes('weakness')) {
     steps.push({
       type: 'weaknessAbility',
@@ -362,7 +421,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 20. Damage reduction ────────────────────────────────────────────────
+  // ── 21. Damage reduction ────────────────────────────────────────────────
   if (
     (lower.includes('less damage') || lower.includes('reduce damage') || lower.includes('damage dealt to')) &&
     lower.includes('this pokémon')
@@ -377,7 +436,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 21. Damage bonus ────────────────────────────────────────────────────
+  // ── 22. Damage bonus ────────────────────────────────────────────────────
   if (lower.includes('more damage') && (lower.includes('attack') || lower.includes('this pokémon'))) {
     const amount = lower.match(/(\d+)\s+more\s+damage/)?.[1] || null;
     steps.push({
@@ -389,7 +448,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 22. Damage prevention ───────────────────────────────────────────────
+  // ── 23. Damage prevention ───────────────────────────────────────────────
   if (
     (lower.includes('prevent') && lower.includes('damage')) ||
     lower.includes("can't be damaged") ||
@@ -401,7 +460,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 23. Setup / face-down placement ─────────────────────────────────────
+  // ── 24. Setup / face-down placement ─────────────────────────────────────
   if (lower.includes('face-down') || lower.includes('face down')) {
     steps.push({
       type: 'setupAbility',
@@ -409,7 +468,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 24. Tool cap / extra Tool slot ──────────────────────────────────────
+  // ── 25. Tool cap / extra Tool slot ──────────────────────────────────────
   if (lower.includes('tool') && (lower.includes('attach') || lower.includes('slot') || lower.includes('more'))) {
     steps.push({
       type: 'toolCapAbility',
@@ -417,7 +476,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 25. Prize modification ──────────────────────────────────────────────
+  // ── 26. Prize modification ──────────────────────────────────────────────
   if (lower.includes('prize card') && (lower.includes('less') || lower.includes('fewer') || lower.includes('more') || lower.includes('extra'))) {
     steps.push({
       type: 'prizeModifyAbility',
@@ -425,7 +484,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 26. Effect prevention / negation ────────────────────────────────────
+  // ── 27. Effect prevention / negation ────────────────────────────────────
   if (
     ((lower.includes('prevent') ||
       lower.includes("can't") ||
@@ -457,7 +516,7 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 28. Thorns / damage-on-attacker ─────────────────────────────────────
+  // ── 29. Thorns / damage-on-attacker ─────────────────────────────────────
   if (
     lower.includes('damage counter') &&
     (lower.includes('put') || lower.includes('place')) &&

@@ -114,6 +114,16 @@ const hasPromotionTrigger = (t) =>
   t.includes('moves from your bench to the active spot') ||
   t.includes('move from your bench to the active spot');
 
+const hasDamageCounterPlacement = (t) =>
+  /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
+  /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
+
+const isSelfHandDiscardCost = (t) =>
+  t.includes('discard') &&
+  t.includes('from your hand') &&
+  !t.includes("opponent's hand") &&
+  !t.includes('from your opponent');
+
 const isMoveEnergy = (t) => {
   const movesEnergy =
     hasWord(t, 'move') &&
@@ -131,10 +141,14 @@ const isMoveEnergy = (t) => {
 };
 
 const isMoveDamage = (t) =>
-  (hasWord(t, 'move') || t.includes('place')) && t.includes('damage counter') && (t.includes('to') || t.includes('onto'));
+  (hasWord(t, 'move') || t.includes('place')) &&
+  t.includes('damage counter') &&
+  hasDamageCounterPlacement(t);
 
 const isOpponentDisrupt = (t) =>
-  t.includes('opponent') && (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
+  t.includes('opponent') &&
+  !isSelfHandDiscardCost(t) &&
+  (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
 
 const isRecursion = (t) =>
   (t.includes('knocked out') &&
