@@ -117,10 +117,10 @@ const syncIframeLayouts = () => {
 };
 
 /**
- * Point a half's background at the mat artwork, preferring the local file.
+ * Point a half's background at the mat artwork.
  *
- * `png/` is gitignored and absent from deploys; probe and fall back to the
- * scraped CDN original when the local path 404s.
+ * Production uses the scraped CDN original (`imageUrl`); local PNGs are
+ * gitignored. When those files exist in dev, we upgrade after load.
  */
 const paintMatImageForTarget = (target, mat) => {
   const key = normalizeTarget(target);
@@ -134,18 +134,26 @@ const paintMatImageForTarget = (target, mat) => {
 
   const local = mat.image ? new URL(mat.image, document.baseURI).href : null;
   const remote = mat.imageUrl || null;
+  const primary = remote || local;
   const setImage = (url) =>
     document.documentElement.style.setProperty(varName, `url("${url}")`);
 
-  setImage(local || remote);
+  if (!primary) {
+    document.documentElement.style.removeProperty(varName);
+    return;
+  }
 
-  if (!local || !remote) return;
+  // Prefer the CDN original on deploys — local PNGs are gitignored and 404.
+  setImage(primary);
 
-  const probe = new Image();
-  probe.onerror = () => {
-    if (token === matPaintToken[key]) setImage(remote);
-  };
-  probe.src = local;
+  // When local assets exist (dev), upgrade to the higher-res file.
+  if (local && remote && local !== remote) {
+    const probe = new Image();
+    probe.onload = () => {
+      if (token === matPaintToken[key]) setImage(local);
+    };
+    probe.src = local;
+  }
 };
 
 const syncMatArt = () => {

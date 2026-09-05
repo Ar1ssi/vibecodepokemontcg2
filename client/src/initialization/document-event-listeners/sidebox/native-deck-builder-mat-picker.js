@@ -49,6 +49,13 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   const galleryEl = panelEl.querySelector('.native-deck-builder-mat-gallery');
   const filterInput = panelEl.querySelector('.native-deck-builder-mat-filter');
 
+  const matImageSrc = (mat) => mat.imageUrl || mat.thumb || mat.image || '';
+  const matImageFallback = (mat) => {
+    if (mat.imageUrl && mat.thumb && mat.imageUrl !== mat.thumb) return mat.thumb;
+    if (mat.image && mat.imageUrl !== mat.image) return mat.image;
+    return '';
+  };
+
   const layoutLabel = (mat) =>
     mat.layout === 'two-player' ? 'Full size · both players' : 'One-player mat';
 
@@ -75,8 +82,11 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
       return;
     }
     previewEl.innerHTML = [
-      `<img class="native-deck-builder-mat-preview-image" src="${escapeHtml(mat.thumb)}"`,
-      `  data-fallback="${escapeHtml(mat.imageUrl || '')}" alt="${escapeHtml(mat.title)}" />`,
+      `<img class="native-deck-builder-mat-preview-image" src="${escapeHtml(matImageSrc(mat))}"`,
+      matImageFallback(mat)
+        ? `  data-fallback="${escapeHtml(matImageFallback(mat))}"`
+        : '',
+      ` alt="${escapeHtml(mat.title)}" />`,
       '<div class="native-deck-builder-mat-preview-text">',
       `  <strong>${escapeHtml(mat.title)}</strong>`,
       `  <span>${escapeHtml(layoutLabel(mat))}</span>`,
@@ -107,7 +117,11 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
           const isSelected = mat.id === selectedId;
           return [
             `<button class="native-deck-builder-mat-cell${isSelected ? ' selected' : ''}" data-mat-id="${escapeHtml(mat.id)}" title="${escapeHtml(mat.title)}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
-            `  <img src="${escapeHtml(mat.thumb)}" data-fallback="${escapeHtml(mat.imageUrl || '')}" alt="${escapeHtml(mat.title)}" loading="lazy" />`,
+            `  <img src="${escapeHtml(matImageSrc(mat))}"${
+              matImageFallback(mat)
+                ? ` data-fallback="${escapeHtml(matImageFallback(mat))}"`
+                : ''
+            } alt="${escapeHtml(mat.title)}" loading="lazy" />`,
             `  <span class="native-deck-builder-mat-cell-name">${escapeHtml(mat.title)}</span>`,
             mat.layout === 'two-player'
               ? '  <span class="native-deck-builder-mat-cell-badge">Full size</span>'

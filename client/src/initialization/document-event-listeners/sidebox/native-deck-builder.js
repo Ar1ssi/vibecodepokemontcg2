@@ -248,25 +248,23 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           sidePane.style.display = isCustomize ? 'none' : '';
         }
     
-        // Sleeve panel only in customize mode. sleevePanel is declared below the
-        // picker init block; safe because switchMode only runs on tab clicks.
+        // Customize sub-panels: only one visible at a time (setView handles
+        // sleeve/coin/mat toggling). While not in customize, hide all three.
         if (typeof sleevePanel !== 'undefined' && sleevePanel) {
-          sleevePanel.hidden = !isCustomize;
-    if (typeof coinPanel !== 'undefined' && coinPanel) {
-      coinPanel.hidden = !isCustomize;
-    }
-    if (typeof matPanel !== 'undefined' && matPanel) {
-      matPanel.hidden = !isCustomize;
-    }
-        const customizeSwitcherEl = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
-        if (customizeSwitcherEl) {
-          customizeSwitcherEl.hidden = !isCustomize;
-          // entering customize resets to the sleeve view; leaving hides both
-          if (isCustomize) {
-            const sleeveBtn = customizeSwitcherEl.querySelector('[data-view="sleeve"]');
-            sleeveBtn?.click();
+          if (!isCustomize) {
+            sleevePanel.hidden = true;
+            if (coinPanel) coinPanel.hidden = true;
+            if (matPanel) matPanel.hidden = true;
           }
-        }
+          const customizeSwitcherEl = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
+          if (customizeSwitcherEl) {
+            customizeSwitcherEl.hidden = !isCustomize;
+            // entering customize resets to the sleeve view
+            if (isCustomize) {
+              const sleeveBtn = customizeSwitcherEl.querySelector('[data-view="sleeve"]');
+              sleeveBtn?.click();
+            }
+          }
         }
       };
     

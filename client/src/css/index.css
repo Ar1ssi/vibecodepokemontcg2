@@ -3531,6 +3531,9 @@ a:hover {
     .native-deck-builder-coin-picker .native-deck-builder-coin-filter { display: none; }
     .native-deck-builder-coin-picker .native-deck-builder-section-title,
     .native-deck-builder-coin-picker .native-deck-builder-set-browser-series-tag { display: none; }
+    .native-deck-builder-mat-picker .native-deck-builder-mat-filter { display: none; }
+    .native-deck-builder-mat-picker .native-deck-builder-section-title,
+    .native-deck-builder-mat-picker .native-deck-builder-set-browser-series-tag { display: none; }
 
     /* ── Attack Window ── */
     #rulesAttackWindow {
@@ -3629,6 +3632,9 @@ a:hover {
       flex-direction: column;
       padding: 0.8vh 0.75vw;
       overflow: hidden;
+    }
+    .native-deck-builder-mat-picker[hidden] {
+      display: none;
     }
     .native-deck-builder-mat-filter {
       font-size: 1.3vh;
