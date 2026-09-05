@@ -49,11 +49,22 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   const galleryEl = panelEl.querySelector('.native-deck-builder-mat-gallery');
   const filterInput = panelEl.querySelector('.native-deck-builder-mat-filter');
 
-  const matImageSrc = (mat) => mat.imageUrl || mat.thumb || mat.image || '';
+  const matImageSrc = (mat) => mat.thumb || mat.imageUrl || mat.image || '';
   const matImageFallback = (mat) => {
-    if (mat.imageUrl && mat.thumb && mat.imageUrl !== mat.thumb) return mat.thumb;
-    if (mat.image && mat.imageUrl !== mat.image) return mat.image;
+    if (mat.thumb && mat.imageUrl) return mat.imageUrl;
+    if (mat.imageUrl && mat.image) return mat.image;
     return '';
+  };
+
+  const imgTag = (mat, className = '') => {
+    const src = matImageSrc(mat);
+    const fallback = matImageFallback(mat);
+    return [
+      `<img class="${className}" src="${escapeHtml(src)}"`,
+      ' referrerpolicy="no-referrer"',
+      fallback ? ` data-fallback="${escapeHtml(fallback)}"` : '',
+      ` alt="${escapeHtml(mat.title)}" />`,
+    ].join('');
   };
 
   const layoutLabel = (mat) =>
@@ -82,11 +93,7 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
       return;
     }
     previewEl.innerHTML = [
-      `<img class="native-deck-builder-mat-preview-image" src="${escapeHtml(matImageSrc(mat))}"`,
-      matImageFallback(mat)
-        ? `  data-fallback="${escapeHtml(matImageFallback(mat))}"`
-        : '',
-      ` alt="${escapeHtml(mat.title)}" />`,
+      imgTag(mat, 'native-deck-builder-mat-preview-image'),
       '<div class="native-deck-builder-mat-preview-text">',
       `  <strong>${escapeHtml(mat.title)}</strong>`,
       `  <span>${escapeHtml(layoutLabel(mat))}</span>`,
@@ -117,7 +124,7 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
           const isSelected = mat.id === selectedId;
           return [
             `<button class="native-deck-builder-mat-cell${isSelected ? ' selected' : ''}" data-mat-id="${escapeHtml(mat.id)}" title="${escapeHtml(mat.title)}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
-            `  <img src="${escapeHtml(matImageSrc(mat))}"${
+            `  <img src="${escapeHtml(matImageSrc(mat))}" referrerpolicy="no-referrer"${
               matImageFallback(mat)
                 ? ` data-fallback="${escapeHtml(matImageFallback(mat))}"`
                 : ''

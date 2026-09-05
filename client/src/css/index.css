@@ -216,18 +216,20 @@ ul, li {
   left: 0;
   width: 100%;
   height: 50%;
-  background-size: var(--mat-fit, 100% 100%);
-  background-position: center;
-  background-repeat: no-repeat;
+  overflow: hidden;
+}
+#battleMatArt .mat-half img.mat-art-image {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
 }
 #battleMatArt .mat-half-self {
   bottom: 0;
-  background-image: var(--mat-image-self, none);
 }
 #battleMatArt .mat-half-opp {
   top: 0;
   transform: rotate(180deg);
-  background-image: var(--mat-image-opp, none);
 }
 /* A full-size mat is one sheet spanning both players. */
 #battleMat.mat-two-player #battleMatArt .mat-half-opp {

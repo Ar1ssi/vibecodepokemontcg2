@@ -116,41 +116,63 @@ const syncIframeLayouts = () => {
   applyMatLayoutToDoc(parentLayout.id, document);
 };
 
+/** Ensure each mat half has an <img> we can point at CDN art without hotlink watermarks. */
+const matHalfImage = (target) => {
+  const selector =
+    target === 'opp' ? '#battleMatArt .mat-half-opp' : '#battleMatArt .mat-half-self';
+  const half = document.querySelector(selector);
+  if (!half) return null;
+  let img = half.querySelector('img.mat-art-image');
+  if (!img) {
+    img = document.createElement('img');
+    img.className = 'mat-art-image';
+    img.referrerPolicy = 'no-referrer';
+    img.alt = '';
+    half.appendChild(img);
+  }
+  return img;
+};
+
 /**
- * Point a half's background at the mat artwork.
+ * Point a half's artwork at the mat image.
  *
- * Production uses the scraped CDN original (`imageUrl`); local PNGs are
- * gitignored. When those files exist in dev, we upgrade after load.
+ * cdn.artofpkm.com returns a generic watermark when a Referer is sent; use
+ * `<img referrerpolicy="no-referrer">` so the browser loads the real art.
  */
 const paintMatImageForTarget = (target, mat) => {
   const key = normalizeTarget(target);
-  const varName = key === 'opp' ? '--mat-image-opp' : '--mat-image-self';
   const token = ++matPaintToken[key];
+  const img = matHalfImage(key);
+
+  if (!img) return;
 
   if (!mat?.image && !mat?.imageUrl) {
-    document.documentElement.style.removeProperty(varName);
+    img.removeAttribute('src');
+    img.hidden = true;
     return;
   }
+
+  img.hidden = false;
+  img.referrerPolicy = 'no-referrer';
 
   const local = mat.image ? new URL(mat.image, document.baseURI).href : null;
   const remote = mat.imageUrl || null;
   const primary = remote || local;
-  const setImage = (url) =>
-    document.documentElement.style.setProperty(varName, `url("${url}")`);
 
   if (!primary) {
-    document.documentElement.style.removeProperty(varName);
+    img.removeAttribute('src');
+    img.hidden = true;
     return;
   }
 
-  // Prefer the CDN original on deploys — local PNGs are gitignored and 404.
-  setImage(primary);
+  img.src = primary;
 
-  // When local assets exist (dev), upgrade to the higher-res file.
+  // When local PNGs exist (dev), upgrade after load.
   if (local && remote && local !== remote) {
     const probe = new Image();
+    probe.referrerPolicy = 'no-referrer';
     probe.onload = () => {
-      if (token === matPaintToken[key]) setImage(local);
+      if (token === matPaintToken[key]) img.src = local;
     };
     probe.src = local;
   }
@@ -182,10 +204,10 @@ const syncMatArt = () => {
   }
 
   if (art) {
-    document.documentElement.style.removeProperty('--mat-image-self');
-    document.documentElement.style.removeProperty('--mat-image-opp');
     if (shared) {
       paintMatImageForTarget(shared.owner, shared.mat);
+      const other = shared.owner === 'self' ? 'opp' : 'self';
+      paintMatImageForTarget(other, null);
     } else {
       paintMatImageForTarget('self', currentMats.self);
       paintMatImageForTarget('opp', currentMats.opp);
