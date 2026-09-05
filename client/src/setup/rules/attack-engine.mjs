@@ -103,7 +103,7 @@ import { effectiveHp } from './stadium-effects.mjs';
       markAttacked(rulesState.turnPlayer);
     
       // KO threshold uses effective HP (stadium +/−HP modifiers apply).
-      const koHp = defender.hp != null ? effectiveHp(defender.hp, defender?.user) : 0;
+      const koHp = defender.hp != null ? effectiveHp(defender.hp, defender?.user, defender) : 0;
       const ko = koHp > 0 && newTotal >= koHp;
       return {
         ok: true,
