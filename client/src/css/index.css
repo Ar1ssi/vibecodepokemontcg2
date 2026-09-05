@@ -154,6 +154,7 @@ ul, li {
   bottom: 0;
   width: 75.5%;
   height: 50%;
+  z-index: 2;
 }
 .opp {
   position: fixed;
@@ -162,6 +163,7 @@ ul, li {
   width: 75.5%;
   height: 50%;
   transform: scaleX(-1) scaleY(-1);
+  z-index: 2;
 }
 /* ── Battle mat: hexagonal red/blue arena, PTCG Live style ─────────────
    Sits fixed behind the self/opp iframes (which render transparent
@@ -3529,7 +3531,7 @@ a:hover {
        reuse the deck-builder's .coin-toss-wrap animation in-place. */
     .mat-coin-slot {
       position: fixed;
-      z-index: 4;
+      z-index: 3;
       display: none;
       pointer-events: none;
       filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.6));
