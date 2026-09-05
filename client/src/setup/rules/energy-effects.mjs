@@ -33,6 +33,58 @@ const lower = (v) => String(v ?? '').toLowerCase();
 const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
+// Single-word basic names TCGdex sometimes omits subtypes for.
+const BASIC_ENERGY_NAME = /^(colorless|grass|fire|water|lightning|psychic|fighting|metal|darkness|dragon|fairy) energy$/;
+
+const isBasicNamedEnergy = (name) => BASIC_ENERGY_NAME.test(lower(name).trim());
+
+// "Rocky Fighting Energy", "Growing Grass Energy", …
+const TYPED_ENERGY_NAME =
+  /\b(colorless|grass|fire|water|lightning|psychic|fighting|metal|darkness|dragon|fairy)\s+energy\b/i;
+
+const ENERGY_SYMBOL_TYPES = {
+  c: 'Colorless',
+  g: 'Grass',
+  r: 'Fire',
+  w: 'Water',
+  l: 'Lightning',
+  p: 'Psychic',
+  f: 'Fighting',
+  m: 'Metal',
+  d: 'Darkness',
+  n: 'Dragon',
+  y: 'Fairy',
+};
+
+const normalizeEnergyType = (raw) => {
+  const t = String(raw ?? '').trim();
+  if (!t) return null;
+  const key = t.toLowerCase();
+  if (key === 'dark') return 'Dark';
+  if (key === 'darkness') return 'Darkness';
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+};
+
+const typeHintFromEnergyName = (name) => {
+  const m = TYPED_ENERGY_NAME.exec(String(name ?? ''));
+  return m ? normalizeEnergyType(m[1]) : null;
+};
+
+const typeHintFromEffect = (card) => {
+  const text = String(card?.effect ?? card?.text ?? '');
+  const sym = text.match(/\{([a-z])\}/i);
+  if (!sym) return null;
+  return ENERGY_SYMBOL_TYPES[sym[1].toLowerCase()] || null;
+};
+
+const providesTypedEnergy = (card) => {
+  const name = lower(card?.name);
+  const text = lower(card?.effect ?? card?.text ?? '');
+  return typeHintFromEnergyName(name) != null
+    || /\bprovides?\b/.test(text)
+    || /\{[a-z]\}\s+energy/.test(text);
+};
+
 const isEnergyCard = (card) => {
   if (!card) return false;
   const subs = subtypesOf(card);
@@ -82,11 +134,22 @@ export function classifyEnergyEffect(card) {
     return 'protect';
   }
 
-  if (isBasic) return 'basic';
+  if (isBasic || isBasicNamedEnergy(card?.name)) return 'basic';
 
   // A special energy we don't have a named rule for is treated as an
   // "attach-type" modifier (letter / named specials that change the type).
   if (isSpecial) return 'attach-type';
+
+  // TCGdex often omits subtypes on modern special energies (e.g. Rocky
+  // Fighting Energy). Infer attach-type from the name/effect when it is not
+  // a basic- or double-named card.
+  if (
+    !name.includes('double') &&
+    !isBasicNamedEnergy(card?.name) &&
+    (providesTypedEnergy(card) || (name.includes(' energy') && name !== 'energy'))
+  ) {
+    return 'attach-type';
+  }
 
   return 'unknown';
 }
@@ -149,7 +212,13 @@ export function effectiveEnergyType(card) {
   if (!isEnergyCard(card)) return null;
   if (classifyEnergyEffect(card) === 'attach-type') {
     const fromData = String(card?.types?.[0] ?? '').trim();
-    if (VALID_TYPES.has(fromData.toLowerCase())) return fromData;
+    if (VALID_TYPES.has(fromData.toLowerCase())) return normalizeEnergyType(fromData);
+
+    const fromEffect = typeHintFromEffect(card);
+    if (fromEffect) return fromEffect;
+
+    const fromName = typeHintFromEnergyName(card?.name);
+    if (fromName) return fromName;
   }
   const name = lower(card?.name);
   const letter = name.match(/^([a-z]) energy/);
@@ -158,6 +227,18 @@ export function effectiveEnergyType(card) {
     if (re.test(name)) return type;
   }
   return null;
+}
+
+// Single entry point for attack-cost / retreat-cost energy typing.
+export function resolveAttachedEnergyType(card) {
+  if (!isEnergyCard(card)) return 'Colorless';
+  return (
+    effectiveEnergyType(card)
+    || normalizeEnergyType(card?.types?.[0])
+    || typeHintFromEnergyName(card?.name)
+    || typeHintFromEffect(card)
+    || 'Colorless'
+  );
 }
 
 // ── lock execution (taxonomy §F, family 2) ──────────────────────────────

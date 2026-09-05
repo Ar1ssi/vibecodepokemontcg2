@@ -7,7 +7,7 @@ import { discardBoard } from '../general/board-actions.js';
 import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium } from '../../setup/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '../../setup/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
-import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
+import { classifyEnergyEffect, resolveAttachedEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
 import { parseDamagePrevention, applyDamagePrevention, passiveCostDiscount, applyCostDiscount } from '../../setup/rules/ability-executors.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
@@ -158,24 +158,11 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         const energyTypes = [];
         for (const e of attachedEnergies) {
           await ensureCardData(e);
-          const type = e.types?.[0] ||
-            (/fire/i.test(e.name || '') ? 'Fire'
-            : /water/i.test(e.name || '') ? 'Water'
-            : /grass/i.test(e.name || '') ? 'Grass'
-            : /lightning/i.test(e.name || '') ? 'Lightning'
-            : /psychic/i.test(e.name || '') ? 'Psychic'
-            : /fighting/i.test(e.name || '') ? 'Fighting'
-            : /metal/i.test(e.name || '') ? 'Metal'
-            : /dark/i.test(e.name || '') ? 'Dark'
-            : /dragon/i.test(e.name || '') ? 'Dragon'
-            : 'Colorless');
-          // taxonomy §F: pass the effect family so Double / Double Colorless
-          // energy count as 2 toward the cost (`canPayAttackCost` expands it).
           const family = classifyEnergyEffect(e);
-          // attach-type family (letter / named specials): use the effective
-          // attached type (e.g. U Energy → Fighting) for cost payment.
-          const override = effectiveEnergyType(e);
-          energyTypes.push({ type: override || type, family });
+          // attach-type family (letter / named / typed specials): use the
+          // effective attached type (e.g. U Energy → Fighting, Rocky
+          // Fighting Energy → Fighting) for cost payment.
+          energyTypes.push({ type: resolveAttachedEnergyType(e), family });
         }
         // Passive cost discount (ability family: passive) — reduce the
         // attacker's energy cost per the active card's printed ability.
