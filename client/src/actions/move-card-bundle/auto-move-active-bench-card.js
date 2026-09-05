@@ -16,7 +16,8 @@ export const autoMoveActiveBenchCard = (
   oZone,
   dZoneId,
   dZone,
-  targetIndex
+  targetIndex,
+  syncOptions = {}
 ) => {
   // Case 1: playing a Pokémon to Active when another non-attached Pokémon
   // is already there — bench the previous Active. Attached Energy at array[1]
@@ -34,7 +35,7 @@ export const autoMoveActiveBenchCard = (
       );
       if (oldIdx >= 0) {
         moveCardMessage(user, initiator, 'active', 'bench', oldIdx, false, 'move');
-        moveCard(user, initiator, 'active', 'bench', oldIdx, false);
+        moveCard(user, initiator, 'active', 'bench', oldIdx, false, syncOptions);
         return;
       }
     }
@@ -49,7 +50,7 @@ export const autoMoveActiveBenchCard = (
     !dZone.array[0]?.image.attached
   ) {
     moveCardMessage(user, initiator, 'bench', 'active', 0, false, 'move');
-    moveCard(user, initiator, 'bench', 'active', 0, false);
+    moveCard(user, initiator, 'bench', 'active', 0, false, syncOptions);
     return;
   }
 
@@ -69,6 +70,6 @@ export const autoMoveActiveBenchCard = (
       false,
       'move'
     );
-    moveCard(user, initiator, dZoneId, oZoneId, targetIndex, false);
+    moveCard(user, initiator, dZoneId, oZoneId, targetIndex, false, syncOptions);
   }
 };
