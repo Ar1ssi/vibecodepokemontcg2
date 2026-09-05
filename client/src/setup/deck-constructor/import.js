@@ -383,8 +383,8 @@ const LimitlessDecklistArray = async (decklist) => {
     decklistArray.push([
       card['count'],
       card['name'],
-      null,
-      null,
+      card['set'] || null,
+      card['number'] || null,
       null,
       cardDataToImageURL({
         name: card['name'],
@@ -650,16 +650,17 @@ export const importDecklist = async (user) => {
 
       let tableBody = decklistTable.getElementsByTagName('tbody')[0];
       decklistTable.style.display = 'block';
-      decklistArray.forEach(([quantity, name, set, number, , url, type]) => {
+      decklistArray.forEach(([quantity, name, set, number, tcgId, url, type]) => {
         let newRow = tableBody.insertRow();
-        // Stash the printed set code and collector number (neither is shown as
-        // its own visible column) so the rules engine can later disambiguate
-        // cards that share an identical name across many different
-        // sets/printings — see resolveCardId()/ensureCardData() in
+        // Stash the printed set code, collector number, and pre-resolved TCGdex
+        // id (neither is shown as its own visible column) so the rules engine
+        // can later disambiguate cards that share an identical name across many
+        // different sets/printings — see resolveCardId()/ensureCardData() in
         // rules-state.mjs. cloneNode(true) below preserves these data-*
         // attributes when the row is copied into currentDecklistTable.
         newRow.dataset.cardNumber = number || '';
         newRow.dataset.cardSet = set || '';
+        newRow.dataset.cardTcgId = tcgId || '';
 
         let qtyCell = newRow.insertCell(0);
         let nameCell = newRow.insertCell(1);
@@ -800,8 +801,9 @@ confirmButton.addEventListener('click', () => {
     let url = cells[3].innerText;
     let number = rows[i].dataset.cardNumber || null;
     let set = rows[i].dataset.cardSet || null;
+    let tcgId = rows[i].dataset.cardTcgId || null;
 
-    let cardData = [quantity, name, type, url, number, set];
+    let cardData = [quantity, name, type, url, number, set, tcgId];
     deckData.push(cardData);
   }
 

@@ -2488,25 +2488,36 @@ import test from 'node:test';
     test('resolveCardId: same-name reprints disambiguated by collector number', () => {
       const summaries = [
         { id: 'ex7-13', localId: '13', name: 'Piloswine', category: 'pokemon' }, // EX Team Rocket Returns
-        { id: 'sv10-32', localId: '32', name: 'Piloswine', category: 'pokemon' }, // Phantasmal Flames
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' }, // Phantasmal Flames
         { id: 'neo2-16', localId: '16', name: 'Piloswine', category: 'pokemon' }, // Neo Genesis
       ];
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'sv10-32');
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '13'), 'ex7-13');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '13', 'TRR'), 'ex7-13');
+    });
+
+    test('resolveCardId: collector number alone is ambiguous across sets (PFL #24 vs Skyridge #24)', () => {
+      const summaries = [
+        { id: 'ecard3-24', localId: '24', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
+      ];
+      // Without a set code both tie on number — first wins (legacy behaviour).
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24'), 'ecard3-24');
+      // With the printed set code the Phantasmal Flames printing wins decisively.
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
     });
 
     test('resolveCardId: collector number normalizes leading zeros', () => {
       const summaries = [
-        { id: 'sv10-32', localId: '032', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
       ];
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'sv10-32');
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '032'), 'sv10-32');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '024', 'PFL'), 'me02-024');
     });
 
     test('resolveCardId: no number given falls back to prior (order-based) behavior', () => {
       const summaries = [
         { id: 'ex7-13', localId: '13', name: 'Piloswine', category: 'pokemon' },
-        { id: 'sv10-32', localId: '32', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
       ];
       assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon'), 'ex7-13');
     });
@@ -2993,12 +3004,36 @@ import test from 'node:test';
       });
     });
 
-    test('ensureCardData: a modern (untabled) set code goes straight to the name search', async () => {
+    test('ensureCardData: modern set code (PFL) resolves via padded id without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/me02-024')) {
+          return detailResponse({
+            id: 'me02-024',
+            name: 'Piloswine',
+            hp: '120',
+            attacks: [
+              { name: 'Rising Lunge', damage: '30+', effect: 'Flip a coin.' },
+              { name: 'Frost Smash', damage: '70', effect: '' },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'PFL', number: '24' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'me02-024');
+        assert.equal(card.hp, 120);
+        assert.deepEqual(card.attacks.map((a) => a.name), ['Rising Lunge', 'Frost Smash']);
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: a truly unknown set code uses name search only', async () => {
       const handler = (url) => {
         if (url.includes('/cards?name=')) {
           return detailResponse([
             { id: 'sv1-903', name: 'Piloswine', category: 'pokemon', localId: '903' },
-            { id: 'neo1-38', name: 'Piloswine', category: 'pokemon', localId: '38' },
           ]);
         }
         if (url.includes('/cards/sv1-903')) {
@@ -3007,10 +3042,9 @@ import test from 'node:test';
         return { ok: false, json: async () => ({}) };
       };
       await withStubbedFetch(handler, async (calls) => {
-        const card = { name: 'Piloswine', type: 'Pokémon', set: 'PAF', number: '903' };
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'ZZZ', number: '903' };
         await ensureCardData(card);
-        // No legacy candidate exists for 'PAF', so nothing is fetched by id first.
-        assert.ok(!calls.some((u) => u.includes('/cards/PAF')));
+        assert.ok(!calls.some((u) => u.match(/\/cards\/zzz-/i)));
         assert.equal(card.id, 'sv1-903');
         assert.equal(card.hp, 110);
       });

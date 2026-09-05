@@ -2,7 +2,11 @@
     // Tracks whose turn it is, what phase they're in, and what actions are
     // currently legal. All gating flows through canPerformAction().
     
-    import { buildLegacyCardId } from '../shared/legacy-set-ids.mjs';
+    import {
+      buildSetCardIdCandidates,
+      extractTcgdexIdFromImageUrl,
+      resolveTcgdexSetId,
+    } from '../shared/legacy-set-ids.mjs';
     
     export const RULES_STORAGE_KEY = 'ptcg-sim.rules-enforced.v1';
     
@@ -55,7 +59,7 @@
     // directly against TCGdex's own `localId` for each candidate. When it
     // is available and matches exactly one candidate, that candidate wins
     // regardless of result order.
-    export function resolveCardId(summaries, name, type = '', number = null) {
+    export function resolveCardId(summaries, name, type = '', number = null, setCode = null) {
       if (!Array.isArray(summaries) || summaries.length === 0) return null;
       const target = normalizeCardName(name);
       if (!target) return null;
@@ -64,6 +68,7 @@
       const wantsTrainer = t.includes('trainer');
       // Normalize away leading zeros / stray whitespace so "032" == "32".
       const wantNumber = number != null ? String(number).trim().replace(/^0+(?=\d)/, '') : null;
+      const wantSetId = resolveTcgdexSetId(setCode);
     
       const scored = summaries
         .filter((s) => s && s.id)
@@ -76,10 +81,16 @@
           if (wantsTrainer && s.category === 'trainer') score += 10;
           if (wantsPokemon && s.category === 'trainer') score -= 50;
           if (wantsTrainer && s.category === 'pokemon') score -= 50;
+          // Printed set code → TCGdex set-id prefix. Collector numbers repeat
+          // across sets (PFL #24 vs Skyridge #24), so set+number together are
+          // required for a decisive match on modern decks.
+          if (score >= 100 && wantSetId && String(s.id).startsWith(`${wantSetId}-`)) {
+            score += 10000;
+          }
           // The collector number breaks ties *between otherwise acceptable
-          // candidates* — it never promotes one that would have been rejected
-          // on its own. Gating on `score >= 100` (exact name, no category
-          // conflict) stops a coincidental number match on "Piloswine ex"
+          // candidates in the same set* — it never promotes one that would have
+          // been rejected on its own. Gating on `score >= 100` (exact name, no
+          // category conflict) stops a coincidental number match on "Piloswine ex"
           // (partial name, 20) or on a same-named Trainer (50) from beating
           // the real exact-name Pokémon.
           if (score >= 100 && wantNumber != null && s.localId != null) {
@@ -164,13 +175,14 @@
     // id it produces is only a *candidate* — the fetched card's name has to
     // match the board card's before we trust it. Returns the id, or null to
     // tell the caller to fall back to the by-name search.
-    async function resolveLegacyCardId(card) {
-      const candidate = buildLegacyCardId(card.set, card.number);
-      if (!candidate) return null;
-      const detail = await fetchCardDetail(candidate);
-      if (!detail) return null;
-      if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) return null;
-      return candidate;
+    async function resolveSetCardId(card) {
+      for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
+        const detail = await fetchCardDetail(candidate);
+        if (!detail) continue;
+        if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
+        return candidate;
+      }
+      return null;
     }
 
     
@@ -180,13 +192,17 @@
       // it here, not the never-set `weaknesses`, so an already-enriched card
       // is actually recognized and doesn't re-run resolution/fetch on every call.
       if (card.hp && card.weakness !== undefined) return card; // enriched
+      if (!card.id && card.image?.src) {
+        const fromUrl = extractTcgdexIdFromImageUrl(card.image.src);
+        if (fromUrl) card.id = fromUrl;
+      }
       if (!card.id && card.name) {
         // Zone cards arrive without an id. Prefer the deterministic
         // (set code, collector number) → id mapping; only guess by name if
         // that isn't available or doesn't check out.
         try {
-          const legacyId = await resolveLegacyCardId(card);
-          if (legacyId != null) card.id = legacyId;
+          const setId = await resolveSetCardId(card);
+          if (setId != null) card.id = setId;
         } catch {
           /* fall through to the by-name search */
         }
@@ -194,7 +210,13 @@
       if (!card.id && card.name) {
         try {
           const summaries = await fetchSummariesByName(card.name);
-          const id = resolveCardId(summaries, card.name, card.type, card.number);
+          const id = resolveCardId(
+            summaries,
+            card.name,
+            card.type,
+            card.number,
+            card.set
+          );
           if (id != null) card.id = id;
         } catch {
           /* fall through: card.id stays unset and we return unenriched */

@@ -62,8 +62,9 @@ export const initializeHeaderButtons = () => {
           let url = cells[3].innerText;
           let number = rows[i].dataset.cardNumber || null;
           let set = rows[i].dataset.cardSet || null;
+          let tcgId = rows[i].dataset.cardTcgId || null;
 
-          let cardData = [quantity, name, type, url, number, set];
+          let cardData = [quantity, name, type, url, number, set, tcgId];
           deckData.push(cardData);
         }
         if (deckData.length > 0) {
