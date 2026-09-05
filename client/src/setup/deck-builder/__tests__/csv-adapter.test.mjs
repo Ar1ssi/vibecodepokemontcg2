@@ -18,6 +18,27 @@ test('formatImageUrl uses images.large for database cards', () => {
   assert.equal(formatImageUrl(card), 'https://example.com/card.png');
 });
 
+test('formatImageUrl falls back to images.small when large is missing', () => {
+  const card = {
+    id: 'sv1-2',
+    images: { small: 'https://example.com/small.png' },
+    supertype: 'Pokémon',
+  };
+
+  assert.equal(formatImageUrl(card), 'https://example.com/small.png');
+});
+
+test('formatImageUrl falls back to image when database card has no images object urls', () => {
+  const card = {
+    id: 'sv1-3',
+    images: {},
+    image: 'https://example.com/legacy.png',
+    supertype: 'Trainer',
+  };
+
+  assert.equal(formatImageUrl(card), 'https://example.com/legacy.png');
+});
+
 test('formatImageUrl preserves direct image for formatted deck cards', () => {
   const card = {
     image: 'https://example.com/direct.png',
