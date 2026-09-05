@@ -34,7 +34,9 @@ import { initializeNativeDeckBuilderLibrary } from './native-deck-builder-librar
 import { initializeNativeDeckBuilderSetBrowser } from './native-deck-builder-set-browser.js';
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
 import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-picker.js';
+import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
 import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
+import { getMatById } from '../../../setup/deck-builder/core/mats.mjs';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
     
     import {
@@ -173,6 +175,7 @@ export const initializeNativeDeckBuilder = () => {
           render();
           refreshSleeveSelection();
           refreshCoinSelection();
+          refreshMatSelection();
         },
         onSaveCurrentDeck: () => {
           deckLibrary?.saveActiveDeck(deck);
@@ -246,6 +249,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     if (typeof coinPanel !== 'undefined' && coinPanel) {
       coinPanel.hidden = !isCustomize;
     }
+    if (typeof matPanel !== 'undefined' && matPanel) {
+      matPanel.hidden = !isCustomize;
+    }
         const customizeSwitcherEl = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
         if (customizeSwitcherEl) {
           customizeSwitcherEl.hidden = !isCustomize;
@@ -263,6 +269,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       // ── Card sleeve picker ────────────────────────────────────────────────
       const sleevePanel = document.getElementById('nativeDeckBuilderSleevePanel');
       const coinPanel = document.getElementById('nativeDeckBuilderCoinPanel');
+      const matPanel = document.getElementById('nativeDeckBuilderMatPanel');
       const sleevePicker = initializeDeckBuilderSleevePicker({
         panelEl: sleevePanel,
         onChange: (sleeve) => {
@@ -291,7 +298,47 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             },
           });
 
-      // Customize switcher: Card Sleeve <-> Coin toggle + shared filter
+          // Playmat picker (Customize tab). The pick is persisted with the
+          // active deck; the board-side module (setup/sizing/apply-mat-layout.js)
+          // owns the ptcg-sim.playmat.v1 localStorage record, so this only
+          // reads that key — as the fallback selection when no saved deck is
+          // active — and never writes it, keeping a single writer.
+          const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
+          const getStoredMatId = () => {
+            try {
+              const raw = localStorage.getItem(MAT_STORAGE_KEY);
+              return (raw ? JSON.parse(raw) : null)?.id || null;
+            } catch {
+              return null;
+            }
+          };
+          // apply-mat-layout.js listens for this to render the mat and re-fit
+          // the board zones; nothing here touches the board.
+          const announceMat = (target, mat) => {
+            document.dispatchEvent(new CustomEvent('playmat-changed', {
+              detail: {
+                target,
+                mat: mat
+                  ? {
+                      id: mat.id,
+                      title: mat.title,
+                      image: mat.image,
+                      thumb: mat.thumb,
+                      layout: mat.layout,
+                    }
+                  : null,
+              },
+            }));
+          };
+          const matPicker = initializeDeckBuilderMatPicker({
+            panelEl: matPanel,
+            onChange: (mat) => {
+              deckLibrary?.setActiveMat?.(currentLoadTarget, mat ? mat.id : null);
+              announceMat(currentLoadTarget, mat);
+            },
+          });
+
+      // Customize switcher: Card Sleeve <-> Coin <-> Mat toggle + shared filter
           // ── playmat sleeve application ─────────────────────────────────
           // Card backs are tracked per-player (systemState.cardBackSrc for
           // self; p1OppCardBackSrc/p2OppCardBackSrc for the opponent) —
@@ -361,16 +408,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           if (customizeSwitcher && coinPicker) {
             const sleeveBtn = customizeSwitcher.querySelector('[data-view="sleeve"]');
             const coinBtn = customizeSwitcher.querySelector('[data-view="coin"]');
+            const matBtn = customizeSwitcher.querySelector('[data-view="mat"]');
+            const placeholders = {
+              sleeve: 'Filter sleeves...',
+              coin: 'Filter coins...',
+              mat: 'Filter mats...',
+            };
             const setView = (view) => {
               sleeveBtn.classList.toggle('active', view === 'sleeve');
               coinBtn.classList.toggle('active', view === 'coin');
+              matBtn?.classList.toggle('active', view === 'mat');
               sleevePanel.hidden = view !== 'sleeve';
               coinPanel.hidden = view !== 'coin';
-              customizeFilter.placeholder = view === 'sleeve'
-                ? 'Filter sleeves...' : 'Filter coins...';
+              if (matPanel) matPanel.hidden = view !== 'mat';
+              customizeFilter.placeholder = placeholders[view] || placeholders.sleeve;
             };
             sleeveBtn.addEventListener('click', () => setView('sleeve'));
             coinBtn.addEventListener('click', () => setView('coin'));
+            matBtn?.addEventListener('click', () => setView('mat'));
     
             // the pickers expose controllers? sleeve picker returns one too —
             // drive their internal filters via the shared input
@@ -389,6 +444,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                   coinInput.value = term;
                   coinInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
+                // mat picker: exposes its filter directly on the controller
+                matPicker?.filter(term);
               });
             }
             setView('sleeve'); // default view
@@ -414,6 +471,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null,
           },
         }));
+      };
+
+      // Reflect the active deck's mat when decks switch, and re-announce it
+      // so the board picks the mat up even if the player never opens the mat
+      // picker this session.
+      const refreshMatSelection = () => {
+        const matId = deckLibrary?.getActiveMat?.(currentLoadTarget)
+          || getStoredMatId();
+        const mat = matId ? getMatById(matId) : null;
+        matPicker?.setSelected(mat ? mat.id : null);
+        announceMat(currentLoadTarget, mat || null);
       };
       if (tabBrowse) tabBrowse.addEventListener('click', () => switchMode('browse'));
   if (tabCustomize) tabCustomize.addEventListener('click', () => switchMode('customize'));
@@ -927,4 +995,7 @@ let activeHoloStop = null;
   });
 
   render();
+  // Last, once currentLoadTarget exists: restore the saved mat and announce it
+  // so the board renders it on load without opening the picker.
+  refreshMatSelection();
 };

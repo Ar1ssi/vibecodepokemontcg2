@@ -75,7 +75,9 @@ test('searchMats is case-insensitive and empty for no match', () => {
 
 test('layout classification: full-size mats cover both players', () => {
   assert.equal(
-    classifyMatLayoutFromTitle('Rubber Playmat Full size Showdown! Mega Rayquaza'),
+    classifyMatLayoutFromTitle(
+      'Rubber Playmat Full size Showdown! Mega Rayquaza'
+    ),
     'two-player'
   );
   assert.equal(
