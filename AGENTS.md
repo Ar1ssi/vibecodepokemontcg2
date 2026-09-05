@@ -354,3 +354,70 @@ auto-draw flow is DOM-heavy and was **not** visually verified in a browser.
 - Card text is external-API-driven — there is no in-repo card DB, so "bare
   draw N" branches shadow no existing card text; add a real-card regression
   test when such text appears.
+
+## Card identity resolution (why the "wrong Piloswine" happened)
+
+**This was never a text/regex parsing bug.** `attack-effects.mjs` /
+`damage-parser.mjs` were parsing correctly — they were handed a *different
+card's* `attacks[]`. Board `Card` objects carry no TCGdex id, so
+`ensureCardData()` (`setup/rules/rules-state.mjs`) resolved one by **name
+alone**; Pokémon names are reprinted verbatim across dozens of sets, every
+reprint scored identically in `resolveCardId()`, and the winner was whatever
+order `/cards?name=` happened to return. Fix this at the *identity* layer, not
+in the parsers.
+
+- **The card identity pipeline (all five files must stay in sync):** the
+  decklist row's `dataset.cardNumber` / `dataset.cardSet` (set in `import.js`,
+  survives `cloneNode(true)` into `currentDecklistTable`) → the `deckData`
+  tuple `[quantity, name, type, url, number, set]`, rebuilt in **three**
+  places (`import.js` confirm handler, `sidebox/header-buttons.js`,
+  `sidebox/p2/room-buttons.js`) → `build-deck.js` → `new Card(user, name,
+  type, imageURL, number, set)`. Adding a field means touching all of them.
+  `native-deck-builder.js`'s `deckToSimRows()` is a **fourth** producer of that
+  tuple (it fills `number` from `variant.data.number`, i.e. TCGdex `localId`,
+  and leaves `set` null — it has no legacy short code).
+- **`Card.set` is a short *set code* string ("TRR"), not TCGdex's `set`
+  object.** `abilityKey()` reads `card.set?.number`, which is simply undefined
+  for a string — fine, but don't assume the object shape.
+- **`resolveCardId(summaries, name, type, number)`** gives a `+1000` bonus to a
+  candidate whose `localId` matches (leading zeros normalized). The bonus is
+  gated on `score >= 100` so it only breaks ties **between already-acceptable
+  candidates** — a coincidental number match must never promote a partial-name
+  hit ("Piloswine ex", 20) or a same-named Trainer (50) over the real card.
+- **`ensureCardData()` order:** enriched-check → `resolveLegacyCardId()` →
+  by-name search → detail fetch. `resolveLegacyCardId` builds a candidate id
+  from `(card.set, card.number)` via `buildLegacyCardId()` and **validates the
+  fetched card's name matches** before trusting it — the legacy table was
+  hand-built for limitlesstcg's URL scheme and is not verified card-by-card
+  against TCGdex.
+- **`setup/shared/legacy-set-ids.mjs`** is the single source of truth for the
+  short-code → TCGdex-set-id table (`LEGACY_SET_CODE_TO_TCGDEX_ID`). It used to
+  live inline in `import.js`; that file now imports it. Don't re-copy it.
+  `buildLegacyCardId()` uses `Object.hasOwn` — codes come from user-pasted
+  decklists, so a plain lookup would resolve `"constructor"`.
+- **`fetchCardDetail(id)`** memoizes raw TCGdex detail responses so validating
+  a legacy candidate doesn't cost a second round trip. It must **not** require
+  `detail.id` — `mulligan.test.mjs` stubs `fetch` with bare `{ hp, stage }`
+  objects and will fail if you tighten that check.
+- **Bonus fix (already in):** the "already enriched, skip re-fetch" guard tested
+  `card.weaknesses` (plural), but enrichment sets `card.weakness` (singular), so
+  the fast path never fired. It checks the singular field now.
+
+**Remaining gap:** modern sets aren't in the legacy table, so a modern-set
+decklist that *also* omits the collector number still falls back to name-order
+guessing. Narrow (nearly every decklist format prints a number). The natural
+next step is resolving the set id via TCGdex's `/sets` endpoint and constraining
+the by-name search to that set.
+
+**Verification status:** full suite **413/413** pass (396 prior + 7 in the new
+`setup/shared/__tests__/legacy-set-ids.test.mjs` + 10 appended to
+`rules-extended.test.mjs`). The new test file **is** registered in the root
+`package.json` test list. `node --check` clean on every edited file. ESLint was
+run: the new files are clean and no touched file gained an error beyond the
+file-wide `prettier/prettier` noise that `rules-state.mjs` and
+`rules-extended.test.mjs` already have (both are indented 4 spaces throughout —
+pre-existing; new lines match the surrounding style rather than reformatting the
+files). **Not** live-verified in a browser against the real TCGdex API.
+
+**Baseline correction:** the 163/416 figures in earlier sections are stale. The
+suite was **396/396** before this pass and is **413/413** after.
