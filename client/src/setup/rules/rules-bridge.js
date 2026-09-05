@@ -48,7 +48,7 @@ import {
   actionableAbilityPlan,
   markAbilityUseAfterSearchStep,
 } from './ability-step-plan.mjs';
-import { decideTurnOrder } from './rules-turnorder.mjs';
+import { decideTurnOrder, resolveTurnOrderCaller } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
 import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
@@ -706,6 +706,22 @@ import {
         coinCallChoice = null;
         appendMessage('', "Waiting for opponent's coin flip…", 'announcement', false);
         return;
+      }
+
+      // Multiplayer: one randomly designated caller picks heads/tails; the
+      // other waits for the broadcast flip. Both clients derive the same
+      // caller from roomId + session so only one side opens the picker.
+      if (systemState.isTwoPlayer && rulesSocket) {
+        const designatedCaller = resolveTurnOrderCaller({
+          roomId: systemState.roomId,
+          socketId: rulesSocket.id,
+          sessionKey: String(rulesSessionGeneration),
+          isMultiplayer: true,
+        });
+        if (designatedCaller !== 'self') {
+          appendMessage('', 'Waiting for opponent to call the coin…', 'announcement', false);
+          return;
+        }
       }
     
       // "Call the coin": this player (the caller) picks heads or tails;
