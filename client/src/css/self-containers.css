@@ -10,6 +10,7 @@
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
 @import url('./damage-counter.css');
+@import url('./status-marker.css');
 
 * {
   user-select: none;

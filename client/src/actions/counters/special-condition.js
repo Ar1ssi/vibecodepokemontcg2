@@ -3,6 +3,7 @@ import {
   selfContainerDocument,
   systemState,
 } from '../../front-end.js';
+import { applySpecialConditionStyle } from '../../setup/counters/special-condition-style-apply.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 
@@ -25,33 +26,7 @@ export const updateSpecialCondition = (
   const specialCondition = getZone(user, zoneId).array[index].image
     .specialCondition;
   specialCondition.textContent = textContent;
-  let text = specialCondition.textContent.toUpperCase();
-  switch (text) {
-    case 'P':
-      specialCondition.style.backgroundColor = 'green';
-      specialCondition.style.color = 'white';
-      break;
-    case 'B':
-      specialCondition.style.backgroundColor = 'red';
-      specialCondition.style.color = 'white';
-      break;
-    case 'A':
-      specialCondition.style.backgroundColor = 'blue';
-      specialCondition.style.color = 'white';
-      break;
-    case 'PA':
-      specialCondition.style.backgroundColor = 'yellow';
-      specialCondition.style.color = 'black';
-      break;
-    case 'C':
-      specialCondition.style.backgroundColor = 'purple';
-      specialCondition.style.color = 'white';
-      break;
-    default:
-      specialCondition.style.backgroundColor = 'white';
-      specialCondition.style.color = 'black';
-      break;
-  }
+  applySpecialConditionStyle(specialCondition, textContent);
 
   processAction(user, emit, 'updateSpecialCondition', [
     zoneId,
@@ -124,9 +99,10 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
     }
     specialCondition.contentEditable = 'true';
     specialCondition.textContent = 'P';
-    specialCondition.style.backgroundColor = 'green';
-    specialCondition.style.color = 'white';
+    applySpecialConditionStyle(specialCondition, 'P');
   }
+
+  applySpecialConditionStyle(specialCondition, specialCondition.textContent);
 
   specialCondition.style.display = 'inline-block';
   specialCondition.style.left = `${targetRect.left - zoneElementRect.left}px`;
