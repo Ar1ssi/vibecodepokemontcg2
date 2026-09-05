@@ -10,6 +10,10 @@ import {
   playDeselectPop,
   makePopFrame,
 } from '../../setup/image-logic/card-pop.mjs';
+import {
+  closeCardPreview,
+  isCardPreviewOpen,
+} from '../../setup/image-logic/full-view.js';
 
 export const hideZoneElements = () => {
   const zonesToHide = [
@@ -154,6 +158,7 @@ export const closeFullView = (event) => {
 
 export const closePopups = (event) => {
   deselectCard();
+  closeCardPreview(event);
   closeFullView(event);
   hideZoneElementsIfEmpty(event);
   document.getElementById('cardContextMenu').style.display = 'none';

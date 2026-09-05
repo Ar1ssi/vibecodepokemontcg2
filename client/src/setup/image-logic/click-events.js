@@ -16,12 +16,13 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
-import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
   fullViewHost,
-  imageAnchor,
 } from '../deck-constructor/hydrate-holo.js';
-import { playSelectPop, makePopFrame } from './card-pop.mjs';
+import {
+  closeCardPreview,
+  openCardPreview,
+} from './full-view.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -69,6 +70,7 @@ export const openCardContextMenu = (event) => {
   const cardContextMenu = document.getElementById('cardContextMenu');
 
   closeFullView(event);
+  closeCardPreview(event);
   deselectCard();
   cardContextMenu.style.cssText = '';
 
@@ -122,6 +124,10 @@ export const openCardContextMenu = (event) => {
     shuffleBoardButton: [[true, 'board']],
     lostZoneBoardButton: [[true, 'board']],
     changeButton: [
+      [true, 'active'],
+      [true, 'bench'],
+    ],
+    viewAttachedCardsButton: [
       [true, 'active'],
       [true, 'bench'],
     ],
@@ -246,60 +252,12 @@ export const doubleClick = (event) => {
   }
   const targetImage = mouseClick.card.image;
   targetImage.classList.remove('highlight');
-  // `.play-container` for both plain and holo cards; the holo <img> sits one
-  // level deeper (inside `.card__rotator`), so its parentElement is not the host.
-  const host = fullViewHost(targetImage);
-  const anchor = imageAnchor(targetImage);
-  if (
-    ['active', 'bench'].includes(mouseClick.zoneId) &&
-    host &&
-    !host.classList.contains('full-view')
-  ) {
-    const images = host.querySelectorAll('img');
-    images.forEach((image) => {
-      if (image.damageCounter) {
-        image.damageCounter.style.display = 'none';
-      }
-      if (image.specialCondition) {
-        image.specialCondition.style.display = 'none';
-      }
-      if (image.abilityCounter) {
-        image.abilityCounter.style.display = 'none';
-      }
-      if (image.attached) {
-        image.style.position = 'static';
-      }
-      image.classList.add('default-rotation');
-    });
-    // classList.add (not a className overwrite) so the container keeps its
-    // `.play-container` class — `drag.js` and the resizer both key off it.
-    host.classList.add('full-view');
-    // Marks the double-clicked card (or its holo wrapper) as the one that
-    // fills the panel; the attached energies/tools stay small around it.
-    anchor.classList.add('full-view-card');
-    if (document.querySelector('.dark-mode-1')) {
-      host.classList.add('dark-mode-5'); //dynamically add dark-mode
+  if (['active', 'bench'].includes(mouseClick.zoneId)) {
+    closeCardPreview(null, true);
+    const host = fullViewHost(targetImage);
+    if (!host?.classList.contains('full-view')) {
+      openCardPreview(targetImage, mouseClick.card);
     }
-    host.style.zIndex = '2';
-    host.style.height = '70%';
-    // `auto` (not a percentage) so the fixed-position panel shrink-wraps the
-    // enlarged card and its attachments. The container carries an inline px
-    // width from attach-card, which has to be cleared for that to happen.
-    host.style.width = 'auto';
-
-    host.parentElement.style.zIndex = '2';
-    document.getElementById('stadium').style.zIndex = '-1';
-
-    // Enlarged holo cards get the deck-builder-preview treatment: the
-    // shine follows the real cursor instead of auto-sweeping.
-    if (mouseClick.card.wrapper) {
-      startHoloAnimation(mouseClick.card.wrapper);
-    }
-
-    // Pop the enlarged view into place. `.full-view` sizing above is applied
-    // synchronously, so the preview is already visible (immediate) — the spring
-    // just adds the grow-and-settle on top.
-    playSelectPop(host, makePopFrame(host));
   } else {
     let overlay = document.createElement('div');
     overlay.id = 'fullImage';
