@@ -22,7 +22,7 @@ import {
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
@@ -64,6 +64,7 @@ const abilityBlockedByStadium = (user, target) => {
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
 const placeSelfDamage = (user, zoneId, index, damage) => {
+  if (!(damage > 0)) return;
   const target = getZone(user, zoneId).array[index];
   if (!target) return;
   if (target.image?.damageCounter) {
@@ -162,8 +163,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
     const oppActive = getActivePokemonCard(getZone(oppPlayer, 'active'));
     if (active && oppActive) {
       await ensureCardData(active);
-      const atk = active.attacks?.[attackIndex] || active.attacks?.[0];
+      let atk = active.attacks?.[attackIndex] || active.attacks?.[0];
       if (atk) {
+        const atkText = resolveAttackText(active, atk);
+        if (atkText) atk = { ...atk, text: atkText };
         // Once-per-turn (taxonomy §D once-per-turn family): if this attack
         // carries an "Once during your turn" clause and it was already used
         // this turn, fizzle before any cost/damage is applied. Consistent
@@ -525,12 +528,16 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
 
         // Place damage counters
         placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
-        appendMessage(
-          user,
-          `💥 ${atk.name} deals ${dmg.total} damage!`,
-          'announcement',
-          false
-        );
+        const willSearch =
+          rulesState.enabled && parseAttackSearchClause(atk.text);
+        if (dmg.total > 0 || !willSearch) {
+          appendMessage(
+            user,
+            `💥 ${atk.name} deals ${dmg.total} damage!`,
+            'announcement',
+            false
+          );
+        }
 
         // KO check → prizes (effective HP includes stadium +/−HP modifiers)
         const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
@@ -871,6 +878,17 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             );
           }
         }
+
+        // Deck search (taxonomy §D search-deck family): Call for Family, Flock,
+        // Lucky Find, etc. Opens the filtered deck picker, moves to Bench/hand,
+        // then shuffles — awaited so the turn does not end before the pick.
+        if (rulesState.enabled) {
+          const searchStep = parseAttackSearchClause(atk.text);
+          if (searchStep) {
+            await _runAttackDeckSearch(user, atk, searchStep, emit);
+          }
+        }
+
         // Record the once-per-turn attack as used this turn (only reached on
         // a successful attack — the fizzle path returns early above). Reuses
         // the shared abilitiesUsed flag map, cleared by resetTurnFlags().
@@ -1543,6 +1561,10 @@ const matchesSearch = (card, what = '') => {
     .toLowerCase()
     .includes('trainer');
   if (w.includes('item') && w.includes('tool')) return isTrainer;
+  if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {
+    const tt = String(card.trainerType || card.type || '').toLowerCase();
+    return tt.includes('item') || (isTrainer && tt.includes('item'));
+  }
   if (w.includes('energy')) {
     return (
       String(card.type || '').toLowerCase().includes('energy') ||
@@ -1566,6 +1588,13 @@ const matchesSearch = (card, what = '') => {
     return true;
   }
   if (w.includes('pokémon') || w.includes('pokemon')) return isPokemon;
+  // Named species (attack search: "up to 2 Grubbin", not a generic keyword)
+  const generic =
+    /\b(card|pokémon|pokemon|energy|item|tool|trainer|basic|supporter|stadium|mega|stage|evolution)\b/i;
+  if (what.trim() && !generic.test(what)) {
+    const needle = what.trim().toLowerCase();
+    return String(card.name || '').toLowerCase().includes(needle);
+  }
   return true;
 };
 
@@ -1578,13 +1607,20 @@ const openAbilityChoicePicker = ({
   destination,
   multiSelect = false,
   requiredCount = 1,
+  minCount,
+  maxCount,
+  upTo = false,
   onPick,
   onConfirm,
   onCancel,
 }) => {
   document.getElementById('rulesChoicePicker')?.remove();
 
-  if (multiSelect && requiredCount > candidates.length) {
+  const maxSel = maxCount ?? requiredCount;
+  const minSel = minCount ?? (upTo ? 0 : requiredCount);
+  const cappedMax = Math.min(maxSel, candidates.length);
+
+  if (multiSelect && !upTo && minSel > candidates.length) {
     appendMessage(
       user,
       `⛔ Not enough cards to select ${requiredCount}.`,
@@ -1609,6 +1645,9 @@ const openAbilityChoicePicker = ({
   const selected = new Set();
   const grid = overlay.querySelector('.choice-picker-grid');
   const confirmBtn = overlay.querySelector('.choice-picker-confirm');
+  if (confirmBtn && upTo && minSel === 0) {
+    confirmBtn.disabled = false;
+  }
 
   for (const cand of candidates) {
     const btn = document.createElement('button');
@@ -1625,11 +1664,13 @@ const openAbilityChoicePicker = ({
         if (selected.has(cand)) {
           selected.delete(cand);
           btn.classList.remove('selected');
-        } else {
+        } else if (selected.size < cappedMax) {
           selected.add(cand);
           btn.classList.add('selected');
         }
-        if (confirmBtn) confirmBtn.disabled = selected.size !== requiredCount;
+        if (confirmBtn) {
+          confirmBtn.disabled = selected.size < minSel || selected.size > cappedMax;
+        }
         return;
       }
       try {
@@ -1662,6 +1703,138 @@ const openAbilityChoicePicker = ({
     }
   });
 };
+
+// Attack deck-search (Call for Family, Flock, …): filtered picker, then shuffle.
+async function _runAttackDeckSearch(user, atk, searchStep, emit) {
+  const deck = getZone(user, 'deck');
+  if (deck.array.length === 0) {
+    appendMessage(
+      user,
+      `🔍 ${atk.name} fizzles — your deck is empty.`,
+      'announcement',
+      false
+    );
+    shuffleZone(user, user, 'deck');
+    return;
+  }
+
+  let destZone = 'hand';
+  if (searchStep.destination === 'bench') destZone = 'bench';
+  else if (searchStep.destination === 'attach') destZone = 'hand';
+  const destLabel = destZone === 'bench' ? 'Bench' : 'hand';
+  const maxCount = searchStep.count || 1;
+  const upTo = searchStep.upTo === true;
+  let effectiveMax = maxCount;
+
+  if (destZone === 'bench') {
+    const openSlots = 5 - getZone(user, 'bench').getCount();
+    if (openSlots <= 0) {
+      appendMessage(
+        user,
+        `🔍 ${atk.name} fizzles — your Bench is full.`,
+        'announcement',
+        false
+      );
+      shuffleZone(user, user, 'deck');
+      return;
+    }
+    effectiveMax = Math.min(maxCount, openSlots);
+  }
+
+  const matches = [];
+  for (const c of deck.array) {
+    await ensureCardData(c);
+    if (matchesSearch(c, searchStep.what)) matches.push(c);
+  }
+  const usingFallback = matches.length === 0 && deck.array.length > 0;
+  const pool = usingFallback ? deck.array : matches;
+  if (pool.length === 0) {
+    appendMessage(
+      user,
+      `🔍 ${atk.name} — no matching cards in your deck.`,
+      'announcement',
+      false
+    );
+    shuffleZone(user, user, 'deck');
+    return;
+  }
+
+  const finishSearch = () => shuffleZone(user, user, 'deck');
+
+  const useMulti = upTo ? effectiveMax >= 1 : effectiveMax > 1;
+  const minPick = upTo ? 0 : effectiveMax;
+  const pickLabel = upTo
+    ? `up to ${effectiveMax}`
+    : String(effectiveMax);
+
+  if (useMulti) {
+    await new Promise((resolve) => {
+      openAbilityChoicePicker({
+        user,
+        title: `${atk.name} — choose ${pickLabel} for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+        candidates: pool,
+        zoneFrom: 'deck',
+        destination: destZone,
+        multiSelect: true,
+        requiredCount: effectiveMax,
+        minCount: minPick,
+        maxCount: effectiveMax,
+        upTo,
+        onConfirm: (selected) => {
+          for (const s of selected) {
+            const idx = getZone(user, 'deck').array.indexOf(s);
+            if (idx >= 0) {
+              moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
+            }
+          }
+          if (selected.length === 0) {
+            appendMessage(user, `🔍 ${atk.name}: no cards taken — deck shuffled.`, 'announcement', false);
+          } else {
+            appendMessage(
+              user,
+              `🔍 ${atk.name}: ${selected.map((s) => s.name).join(', ')} → ${destLabel}.`,
+              'announcement',
+              false
+            );
+          }
+          finishSearch();
+          resolve();
+        },
+        onCancel: () => {
+          appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
+          finishSearch();
+          resolve();
+        },
+      });
+    });
+    return;
+  }
+
+  await new Promise((resolve) => {
+    openAbilityChoicePicker({
+      user,
+      title: `${atk.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+      candidates: pool,
+      zoneFrom: 'deck',
+      destination: destZone,
+      onPick: (picked) => {
+        appendMessage(
+          user,
+          `🔍 ${atk.name}: ${picked.name || 'a card'} → ${destLabel}.`,
+          'announcement',
+          false
+        );
+        finishSearch();
+        resolve();
+      },
+      onCancel: () => {
+        appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
+        finishSearch();
+        resolve();
+      },
+    });
+  });
+}
 
 // Search ability (taxonomy C, once-per-turn): full-deck filtered search via
 // choice picker (Trainer-style). Does NOT end the turn.
@@ -1705,7 +1878,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  const finishSearch = () => {
+  const completeSearch = () => {
     shuffleZone(user, user, 'deck');
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
@@ -1732,11 +1905,15 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
           'announcement',
           false
         );
-        finishSearch();
+        completeSearch();
       },
       onCancel: () => {
-        appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-        finishSearch();
+        appendMessage(
+          user,
+          '🔍 Search canceled — ability not used (you may decline).',
+          'announcement',
+          false
+        );
       },
     });
     return;
@@ -1755,11 +1932,15 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
         'announcement',
         false
       );
-      finishSearch();
+      completeSearch();
     },
     onCancel: () => {
-      appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-      finishSearch();
+      appendMessage(
+        user,
+        '🔍 Search canceled — ability not used (you may decline).',
+        'announcement',
+        false
+      );
     },
   });
 };

@@ -15,6 +15,13 @@ import {
   layoutToCssVars,
   resolveMatLayout,
 } from './mat-layouts.mjs';
+import {
+  matImageProxyUrl,
+  resolveMatBoardUrl,
+  toAbsoluteClientPath,
+} from '../deck-builder/core/mat-image-urls.mjs';
+import { getMatById } from '../deck-builder/core/mats.mjs';
+import { processAction } from '../general/process-action.js';
 
 const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
 const MAT_TARGETS = ['self', 'opp'];
@@ -116,36 +123,66 @@ const syncIframeLayouts = () => {
   applyMatLayoutToDoc(parentLayout.id, document);
 };
 
+/** Ensure each mat half has an <img> we can point at CDN art without hotlink watermarks. */
+const matHalfImage = (target) => {
+  const selector =
+    target === 'opp' ? '#battleMatArt .mat-half-opp' : '#battleMatArt .mat-half-self';
+  const half = document.querySelector(selector);
+  if (!half) return null;
+  let img = half.querySelector('img.mat-art-image');
+  if (!img) {
+    img = document.createElement('img');
+    img.className = 'mat-art-image';
+    img.referrerPolicy = 'no-referrer';
+    img.alt = '';
+    half.appendChild(img);
+  }
+  return img;
+};
+
 /**
- * Point a half's background at the mat artwork, preferring the local file.
+ * Point a half's artwork at the mat image.
  *
- * `png/` is gitignored and absent from deploys; probe and fall back to the
- * scraped CDN original when the local path 404s.
+ * cdn.artofpkm.com returns a generic watermark when a Referer is sent. Load
+ * remote art through `/api/mat-image` (same-origin proxy) instead.
  */
 const paintMatImageForTarget = (target, mat) => {
   const key = normalizeTarget(target);
-  const varName = key === 'opp' ? '--mat-image-opp' : '--mat-image-self';
   const token = ++matPaintToken[key];
+  const img = matHalfImage(key);
 
-  if (!mat?.image && !mat?.imageUrl) {
-    document.documentElement.style.removeProperty(varName);
+  if (!img) return;
+
+  if (!mat?.image && !mat?.imageUrl && !mat?.board) {
+    img.removeAttribute('src');
+    img.hidden = true;
     return;
   }
 
-  const local = mat.image ? new URL(mat.image, document.baseURI).href : null;
-  const remote = mat.imageUrl || null;
-  const setImage = (url) =>
-    document.documentElement.style.setProperty(varName, `url("${url}")`);
+  img.hidden = false;
+  img.referrerPolicy = 'no-referrer';
 
-  setImage(local || remote);
+  const primary = resolveMatBoardUrl(mat);
+  const local = mat.image ? toAbsoluteClientPath(mat.image) : null;
+  const remote = mat.imageUrl ? matImageProxyUrl(mat.imageUrl) : null;
 
-  if (!local || !remote) return;
+  if (!primary) {
+    img.removeAttribute('src');
+    img.hidden = true;
+    return;
+  }
 
-  const probe = new Image();
-  probe.onerror = () => {
-    if (token === matPaintToken[key]) setImage(remote);
-  };
-  probe.src = local;
+  img.src = primary;
+
+  // When local PNGs exist (dev), upgrade after load.
+  if (local && remote && local !== remote) {
+    const probe = new Image();
+    probe.referrerPolicy = 'no-referrer';
+    probe.onload = () => {
+      if (token === matPaintToken[key]) img.src = local;
+    };
+    probe.src = local;
+  }
 };
 
 const syncMatArt = () => {
@@ -174,10 +211,10 @@ const syncMatArt = () => {
   }
 
   if (art) {
-    document.documentElement.style.removeProperty('--mat-image-self');
-    document.documentElement.style.removeProperty('--mat-image-opp');
     if (shared) {
       paintMatImageForTarget(shared.owner, shared.mat);
+      const other = shared.owner === 'self' ? 'opp' : 'self';
+      paintMatImageForTarget(other, null);
     } else {
       paintMatImageForTarget('self', currentMats.self);
       paintMatImageForTarget('opp', currentMats.opp);
@@ -243,6 +280,24 @@ export const getCurrentMat = (target) => {
 };
 
 export const getCurrentMats = () => ({ ...currentMats });
+
+/** @param {'self'|'opp'} target */
+export const getStoredMatId = (target) => {
+  const mat = readStoredMats()[normalizeTarget(target)];
+  return mat?.id || null;
+};
+
+/**
+ * Syncable playmat change (multiplayer + undo log). Mirrors `changeCardBack`.
+ * @param {'self'|'opp'} user
+ * @param {string|null} matId
+ * @param {boolean} [emit]
+ */
+export const changePlaymat = (user, matId, emit = true) => {
+  const mat = matId ? getMatById(matId) : null;
+  applyMatForTarget(normalizeTarget(user), mat || null);
+  processAction(user, emit, 'changePlaymat', [matId]);
+};
 
 /**
  * Re-apply active choices. Iframes reload on board flips and wipe inline

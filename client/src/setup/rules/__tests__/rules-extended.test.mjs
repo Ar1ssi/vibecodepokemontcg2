@@ -10,7 +10,7 @@ import test from 'node:test';
     const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
@@ -997,6 +997,87 @@ import test from 'node:test';
       assert.equal(classifyAttackEffect({ name: 'Mystery' }), 'unknown');
       assert.equal(classifyAttackEffect(null), 'unknown');
       assert.equal(classifyAttackEffect({ damage: 50 }), 'flat');
+    });
+
+    test('classifyAttackEffect: search-deck before trailing shuffle (Call for Family)', () => {
+      const callForFamily =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      assert.equal(
+        classifyAttackEffect({ name: 'Call for Family', damage: 0, text: callForFamily }),
+        'search-deck',
+      );
+      assert.notEqual(
+        classifyAttackEffect({ name: 'Call for Family', damage: 0, text: callForFamily }),
+        'shuffle-cost',
+      );
+    });
+
+    test('parseAttackSearchClause: Call for Family and rotation search attacks', () => {
+      const callForFamilyOne =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callForFamilyOne), {
+        what: 'Basic Pokémon',
+        count: 1,
+        destination: 'bench',
+        upTo: false,
+      });
+
+      const callForFamilyTwo =
+        'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callForFamilyTwo), {
+        what: 'Basic Pokémon',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const nestBallStyle =
+        'Search your deck for up to 2 Basic Pokémon with 70 HP or less and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(nestBallStyle), {
+        what: 'Basic Pokémon ≤70 HP',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const flock =
+        'Search your deck for up to 2 Grubbin and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(flock), {
+        what: 'grubbin',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const luckyFind =
+        'Search your deck for an Item card, reveal it, and put it into your hand. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(luckyFind), {
+        what: 'Item',
+        count: 1,
+        destination: 'hand',
+      });
+
+      assert.equal(parseAttackSearchClause('Flip a coin. If heads, this attack does 30 more damage.'), null);
+    });
+
+    test('resolveAttackText: reads effect text from sibling attack on card', () => {
+      const card = {
+        attacks: [
+          {
+            name: 'Call for Family',
+            cost: ['Colorless'],
+            damage: 0,
+            text: 'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.',
+          },
+        ],
+      };
+      const stub = { name: 'Call for Family', cost: ['Colorless'], damage: 0 };
+      assert.match(resolveAttackText(card, stub), /search your deck for/i);
+      assert.ok(parseAttackSearchClause(resolveAttackText(card, stub)));
+    });
+
+    test('ATTACK_FAMILIES: includes search-deck', () => {
+      assert.ok(ATTACK_FAMILIES.includes('search-deck'));
     });
 
     test('describeAttackEffect: one guidance line naming the attack', () => {
@@ -2374,10 +2455,14 @@ import test from 'node:test';
 
     // ── start-of-turn draw (taxonomy B) ──
     test('shouldAutoDrawAtTurnStart: true when enabled, not drawn, deck non-empty', () => {
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3 }), true);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: true, deckCount: 3 }), false);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 0 }), false);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), true);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: true, deckCount: 3, turnNumber: 2 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 0, turnNumber: 2 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), false);
+    });
+
+    test('shouldAutoDrawAtTurnStart: turn 1 skipped (first player does not draw)', () => {
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), false);
     });
 
     test('markTurnDrawn: sets the per-turn dedupe guard, survives flag reset', () => {
@@ -2488,25 +2573,36 @@ import test from 'node:test';
     test('resolveCardId: same-name reprints disambiguated by collector number', () => {
       const summaries = [
         { id: 'ex7-13', localId: '13', name: 'Piloswine', category: 'pokemon' }, // EX Team Rocket Returns
-        { id: 'sv10-32', localId: '32', name: 'Piloswine', category: 'pokemon' }, // Phantasmal Flames
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' }, // Phantasmal Flames
         { id: 'neo2-16', localId: '16', name: 'Piloswine', category: 'pokemon' }, // Neo Genesis
       ];
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'sv10-32');
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '13'), 'ex7-13');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '13', 'TRR'), 'ex7-13');
+    });
+
+    test('resolveCardId: collector number alone is ambiguous across sets (PFL #24 vs Skyridge #24)', () => {
+      const summaries = [
+        { id: 'ecard3-24', localId: '24', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
+      ];
+      // Without a set code both tie on number — first wins (legacy behaviour).
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24'), 'ecard3-24');
+      // With the printed set code the Phantasmal Flames printing wins decisively.
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
     });
 
     test('resolveCardId: collector number normalizes leading zeros', () => {
       const summaries = [
-        { id: 'sv10-32', localId: '032', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
       ];
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'sv10-32');
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '032'), 'sv10-32');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '024', 'PFL'), 'me02-024');
     });
 
     test('resolveCardId: no number given falls back to prior (order-based) behavior', () => {
       const summaries = [
         { id: 'ex7-13', localId: '13', name: 'Piloswine', category: 'pokemon' },
-        { id: 'sv10-32', localId: '32', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
       ];
       assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon'), 'ex7-13');
     });
@@ -2866,6 +2962,26 @@ import test from 'node:test';
       assert.equal(plan[1].reason, 'passive');
     });
 
+    test('markAbilityUseAfterSearchStep: cancel does not consume optional search (Mammoth Hauler)', async () => {
+      const { markAbilityUseAfterSearchStep } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const { classifyAbility } = await import('../ability-effects.mjs');
+
+      const card = {
+        name: 'Mamoswine ex',
+        ability: {
+          name: 'Mammoth Hauler',
+          text: 'Once during your turn, you may search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.',
+        },
+      };
+      assert.equal(classifyAbility(card), 'search');
+      const steps = parseAbility(card.ability.text);
+      assert.equal(steps[0].type, 'searchAbility');
+
+      assert.equal(markAbilityUseAfterSearchStep(false), false, 'cancel must not mark ability used');
+      assert.equal(markAbilityUseAfterSearchStep(true), true, 'confirmed pick marks ability used');
+    });
+
     // ── card identity resolution (name collisions across sets) ──
     //
     // Regression coverage for the "wrong Piloswine" incident: board cards carry
@@ -2993,12 +3109,36 @@ import test from 'node:test';
       });
     });
 
-    test('ensureCardData: a modern (untabled) set code goes straight to the name search', async () => {
+    test('ensureCardData: modern set code (PFL) resolves via padded id without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/me02-024')) {
+          return detailResponse({
+            id: 'me02-024',
+            name: 'Piloswine',
+            hp: '120',
+            attacks: [
+              { name: 'Rising Lunge', damage: '30+', effect: 'Flip a coin.' },
+              { name: 'Frost Smash', damage: '70', effect: '' },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'PFL', number: '24' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'me02-024');
+        assert.equal(card.hp, 120);
+        assert.deepEqual(card.attacks.map((a) => a.name), ['Rising Lunge', 'Frost Smash']);
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: a truly unknown set code uses name search only', async () => {
       const handler = (url) => {
         if (url.includes('/cards?name=')) {
           return detailResponse([
             { id: 'sv1-903', name: 'Piloswine', category: 'pokemon', localId: '903' },
-            { id: 'neo1-38', name: 'Piloswine', category: 'pokemon', localId: '38' },
           ]);
         }
         if (url.includes('/cards/sv1-903')) {
@@ -3007,10 +3147,9 @@ import test from 'node:test';
         return { ok: false, json: async () => ({}) };
       };
       await withStubbedFetch(handler, async (calls) => {
-        const card = { name: 'Piloswine', type: 'Pokémon', set: 'PAF', number: '903' };
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'ZZZ', number: '903' };
         await ensureCardData(card);
-        // No legacy candidate exists for 'PAF', so nothing is fetched by id first.
-        assert.ok(!calls.some((u) => u.includes('/cards/PAF')));
+        assert.ok(!calls.some((u) => u.match(/\/cards\/zzz-/i)));
         assert.equal(card.id, 'sv1-903');
         assert.equal(card.hp, 110);
       });
@@ -3027,3 +3166,38 @@ import test from 'node:test';
       });
     });
 
+    test('ensureCardData: merges attack effect text onto stub attacks[]', async () => {
+      const callForFamilyText =
+        'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv03.5-016')) {
+          return detailResponse({
+            id: 'sv03.5-016',
+            name: 'Pidgey',
+            hp: '50',
+            attacks: [
+              {
+                name: 'Call for Family',
+                cost: ['Colorless'],
+                damage: '0',
+                effect: callForFamilyText,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv03.5-016',
+          name: 'Pidgey',
+          hp: 50,
+          weakness: null,
+          attacks: [{ name: 'Call for Family', cost: ['Colorless'], damage: 0 }],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, callForFamilyText);
+      });
+    });
+
+    // ── card identity resolution (name collisions across sets) ──

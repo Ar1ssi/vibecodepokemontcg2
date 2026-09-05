@@ -2,7 +2,11 @@
     // Tracks whose turn it is, what phase they're in, and what actions are
     // currently legal. All gating flows through canPerformAction().
     
-    import { buildLegacyCardId } from '../shared/legacy-set-ids.mjs';
+    import {
+      buildSetCardIdCandidates,
+      extractTcgdexIdFromImageUrl,
+      resolveTcgdexSetId,
+    } from '../shared/legacy-set-ids.mjs';
     
     export const RULES_STORAGE_KEY = 'ptcg-sim.rules-enforced.v1';
     
@@ -55,7 +59,7 @@
     // directly against TCGdex's own `localId` for each candidate. When it
     // is available and matches exactly one candidate, that candidate wins
     // regardless of result order.
-    export function resolveCardId(summaries, name, type = '', number = null) {
+    export function resolveCardId(summaries, name, type = '', number = null, setCode = null) {
       if (!Array.isArray(summaries) || summaries.length === 0) return null;
       const target = normalizeCardName(name);
       if (!target) return null;
@@ -64,6 +68,7 @@
       const wantsTrainer = t.includes('trainer');
       // Normalize away leading zeros / stray whitespace so "032" == "32".
       const wantNumber = number != null ? String(number).trim().replace(/^0+(?=\d)/, '') : null;
+      const wantSetId = resolveTcgdexSetId(setCode);
     
       const scored = summaries
         .filter((s) => s && s.id)
@@ -76,10 +81,16 @@
           if (wantsTrainer && s.category === 'trainer') score += 10;
           if (wantsPokemon && s.category === 'trainer') score -= 50;
           if (wantsTrainer && s.category === 'pokemon') score -= 50;
+          // Printed set code → TCGdex set-id prefix. Collector numbers repeat
+          // across sets (PFL #24 vs Skyridge #24), so set+number together are
+          // required for a decisive match on modern decks.
+          if (score >= 100 && wantSetId && String(s.id).startsWith(`${wantSetId}-`)) {
+            score += 10000;
+          }
           // The collector number breaks ties *between otherwise acceptable
-          // candidates* — it never promotes one that would have been rejected
-          // on its own. Gating on `score >= 100` (exact name, no category
-          // conflict) stops a coincidental number match on "Piloswine ex"
+          // candidates in the same set* — it never promotes one that would have
+          // been rejected on its own. Gating on `score >= 100` (exact name, no
+          // category conflict) stops a coincidental number match on "Piloswine ex"
           // (partial name, 20) or on a same-named Trainer (50) from beating
           // the real exact-name Pokémon.
           if (score >= 100 && wantNumber != null && s.localId != null) {
@@ -164,13 +175,64 @@
     // id it produces is only a *candidate* — the fetched card's name has to
     // match the board card's before we trust it. Returns the id, or null to
     // tell the caller to fall back to the by-name search.
-    async function resolveLegacyCardId(card) {
-      const candidate = buildLegacyCardId(card.set, card.number);
-      if (!candidate) return null;
-      const detail = await fetchCardDetail(candidate);
-      if (!detail) return null;
-      if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) return null;
-      return candidate;
+    async function resolveSetCardId(card) {
+      for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
+        const detail = await fetchCardDetail(candidate);
+        if (!detail) continue;
+        if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
+        return candidate;
+      }
+      return null;
+    }
+
+    function mapDetailAttacks(detailAttacks) {
+      return (detailAttacks || []).map((a) => ({
+        name: a.name,
+        cost: a.cost || [],
+        damage: parseDamage(a.damage),
+        text: a.effect || a.text || '',
+      }));
+    }
+
+    // Merge TCGdex attack data onto board cards. Stub arrays (name/cost/damage
+    // only) must not block effect text from loading — that silences search,
+    // heal, status, and other text-driven attack effects (Call for Family).
+    function mergeAttacks(existing, incoming) {
+      if (!Array.isArray(incoming) || incoming.length === 0) return existing;
+      if (!Array.isArray(existing) || existing.length === 0) {
+        return incoming.map((a) => ({ ...a }));
+      }
+      const merged = existing.map((e) => ({ ...e }));
+      for (const inc of incoming) {
+        const idx = merged.findIndex((e) => e.name === inc.name);
+        if (idx >= 0) {
+          const ex = merged[idx];
+          merged[idx] = {
+            ...ex,
+            cost: inc.cost?.length ? inc.cost : ex.cost,
+            damage: inc.damage ?? ex.damage,
+            text: inc.text || ex.text || '',
+          };
+        } else {
+          merged.push({ ...inc });
+        }
+      }
+      return merged;
+    }
+
+    function attacksNeedText(card) {
+      if (!Array.isArray(card?.attacks) || card.attacks.length === 0) return false;
+      return card.attacks.some((a) => a?.name && !(a.text || a.effect));
+    }
+
+    function applyEnrichedData(card, data) {
+      for (const [k, v] of Object.entries(data)) {
+        if (k === 'attacks') {
+          card.attacks = mergeAttacks(card.attacks, v);
+        } else if (card[k] == null || card[k] === '') {
+          card[k] = v;
+        }
+      }
     }
 
     
@@ -179,14 +241,18 @@
       // NOTE: enrichment below sets `card.weakness` (singular) — matching on
       // it here, not the never-set `weaknesses`, so an already-enriched card
       // is actually recognized and doesn't re-run resolution/fetch on every call.
-      if (card.hp && card.weakness !== undefined) return card; // enriched
+      if (card.hp && card.weakness !== undefined && !attacksNeedText(card)) return card;
+      if (!card.id && card.image?.src) {
+        const fromUrl = extractTcgdexIdFromImageUrl(card.image.src);
+        if (fromUrl) card.id = fromUrl;
+      }
       if (!card.id && card.name) {
         // Zone cards arrive without an id. Prefer the deterministic
         // (set code, collector number) → id mapping; only guess by name if
         // that isn't available or doesn't check out.
         try {
-          const legacyId = await resolveLegacyCardId(card);
-          if (legacyId != null) card.id = legacyId;
+          const setId = await resolveSetCardId(card);
+          if (setId != null) card.id = setId;
         } catch {
           /* fall through to the by-name search */
         }
@@ -194,7 +260,13 @@
       if (!card.id && card.name) {
         try {
           const summaries = await fetchSummariesByName(card.name);
-          const id = resolveCardId(summaries, card.name, card.type, card.number);
+          const id = resolveCardId(
+            summaries,
+            card.name,
+            card.type,
+            card.number,
+            card.set
+          );
           if (id != null) card.id = id;
         } catch {
           /* fall through: card.id stays unset and we return unenriched */
@@ -202,12 +274,7 @@
       }
       if (!card?.id) return card;
       if (cardDataCache.has(card.id)) {
-        // Same fill-only merge as the fresh-fetch path: the card's own values
-        // (e.g. local `stage: 'Stage 1'`) must not be clobbered by TCGdex's
-        // formatting (e.g. `stage: 'Stage1'`) on a cache hit.
-        for (const [k, v] of Object.entries(cardDataCache.get(card.id))) {
-          if (card[k] == null || card[k] === '') card[k] = v;
-        }
+        applyEnrichedData(card, cardDataCache.get(card.id));
         return card;
       }
       try {
@@ -219,20 +286,7 @@
           weakness: parseTypeValue(detail.weaknesses?.[0]),
           resistance: parseTypeValue(detail.resistances?.[0]),
           retreatCost: detail.retreat ? detail.retreat.length : 0,
-          attacks: (detail.attacks || []).map((a) => ({
-            name: a.name,
-            cost: a.cost || [],
-            damage: parseDamage(a.damage),
-            // TCGdex's attack objects carry the effect text under `effect`,
-            // not `text` (see https://tcgdex.dev/reference/card — Pokémon
-            // Card > attacks[].effect). `a.text` doesn't exist on the raw
-            // API response, so keeping it only as a fallback (in case a
-            // future API revision renames the field back) — without it,
-            // every attack-text parser in damage-parser.mjs (discard cost,
-            // discard-to-scale, once-per-turn, heal, switch, bench damage,
-            // etc.) silently no-ops because atk.text is always ''.
-            text: a.effect || a.text || '',
-          })),
+          attacks: mapDetailAttacks(detail.attacks),
           stage: detail.stage || null,
           evolvesFrom: detail.evolvesFrom || null,
           ability: tcgAbilityFromDetail(detail),
@@ -242,12 +296,7 @@
           text: detail.text || null,
         };
         cardDataCache.set(card.id, data);
-        // Fill in only fields the card doesn't already carry — a card's own
-        // values (e.g. local `stage`/`evolvesFrom`) are the source of truth and
-        // must not be clobbered by TCGdex's formatting.
-        for (const [k, v] of Object.entries(data)) {
-          if (card[k] == null || card[k] === '') card[k] = v;
-        }
+        applyEnrichedData(card, data);
       } catch {
         // Do NOT cache an empty object on failure — leave it out so a later
         // call can retry the fetch (avoids permanently poisoned cache entries).
@@ -267,6 +316,19 @@
     };
     
     // ── turn/phase management ────────────────────────────────────────────
+    // Return rules state to pre-game setup so the next Set Up run can coin
+    // flip and evaluate mulligans again. Used by reset/restart in rules-bridge.
+    export function resetRulesSessionState() {
+      rulesState.phase = 'setup';
+      rulesState.turnNumber = 0;
+      rulesState.turnPlayer = 'self';
+      rulesState.stadium = null;
+      rulesState.mulligansResolved = false;
+      rulesState.attackExecuting = false;
+      resetTurnFlags('self');
+      resetTurnFlags('opp');
+    }
+
     // firstPlayer: who goes first ('self' | 'opp'). Defaults to 'self' so
     // existing callers/tests that invoke startGame() with no args keep
     // their prior behavior; rules-bridge passes the coin-flip winner.
@@ -328,7 +390,10 @@
     // card? True only when rules are enabled, the draw hasn't happened yet this
     // turn, and there is at least one card left in the deck. The UI layer
     // (rules-bridge.js) calls the real draw() when this returns true.
-    export function shouldAutoDrawAtTurnStart({ enabled = true, drewThisTurn = false, deckCount = 0 } = {}) {
+    // Turn 1 is skipped: the player who goes first does not draw at the start
+    // of their opening turn (bonus mulligan draws are handled separately).
+    export function shouldAutoDrawAtTurnStart({ enabled = true, drewThisTurn = false, deckCount = 0, turnNumber = 0 } = {}) {
+      if (Number(turnNumber) === 1) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }
 

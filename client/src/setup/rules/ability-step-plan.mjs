@@ -131,3 +131,11 @@ export function hasWhenPlayedSearchChain(steps = []) {
   const hasSearch = steps.some((s) => s.type === 'searchAbility');
   return hasWhen && hasSearch;
 }
+
+/**
+ * Optional "you may" deck searches (e.g. Mammoth Hauler): only consume the
+ * once-per-turn ability flag when the player confirmed a pick — not on cancel.
+ */
+export function markAbilityUseAfterSearchStep(pickerCompleted) {
+  return pickerCompleted === true;
+}

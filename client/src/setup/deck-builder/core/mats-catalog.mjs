@@ -1,8 +1,8 @@
 // GENERATED FILE — run `node scripts/generate-mat-thumbs.mjs` to rebuild.
 // Playmat catalog scraped from artofpkm.com. `image` is the local 1500px
-// PNG, `thumb` the ~320px WebP the picker grid loads, and `imageUrl` the
-// remote original used as an onerror fallback when the (gitignored) local
-// files are absent. `layout` is the zone profile family from
+// PNG, `thumb` the ~320px WebP the picker grid loads, `board` the trimmed
+// ~1500px WebP painted on the battle mat, and `imageUrl` the remote
+// original used only as a last-resort proxy fallback. `layout` is the
 // `setup/sizing/mat-layouts.mjs`.
 
 export const MATS_CATALOG = [
@@ -13,6 +13,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3234-rubber-playmat-full-size-showdown-mega-rayquaza-1.png',
     thumb:
       'src/assets/playmats/thumbs/3234-rubber-playmat-full-size-showdown-mega-rayquaza-1.webp',
+    board:
+      'src/assets/playmats/board/3234-rubber-playmat-full-size-showdown-mega-rayquaza-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/3234',
     imageUrl: 'https://cdn.artofpkm.com/8ptzdf2ctjqqm35rvio95ocjy7kb',
@@ -23,6 +25,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/3235-rubber-playmat-mega-rayquaza-1.png',
     thumb:
       'src/assets/playmats/thumbs/3235-rubber-playmat-mega-rayquaza-1.webp',
+    board: 'src/assets/playmats/board/3235-rubber-playmat-mega-rayquaza-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3235',
     imageUrl: 'https://cdn.artofpkm.com/txd5zymcjyykg1eywu251cl6pk4k',
@@ -32,6 +35,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat PJCS2026',
     image: 'src/assets/playmats/png/3183-rubber-playmat-pjcs2026-1.png',
     thumb: 'src/assets/playmats/thumbs/3183-rubber-playmat-pjcs2026-1.webp',
+    board: 'src/assets/playmats/board/3183-rubber-playmat-pjcs2026-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3183',
     imageUrl: 'https://cdn.artofpkm.com/1dypyd51bud15nx819jpwyu0azkm',
@@ -43,6 +47,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3164-rubber-playmat-gwynn-amp-mega-chandelure-1.png',
     thumb:
       'src/assets/playmats/thumbs/3164-rubber-playmat-gwynn-amp-mega-chandelure-1.webp',
+    board:
+      'src/assets/playmats/board/3164-rubber-playmat-gwynn-amp-mega-chandelure-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3164',
     imageUrl: 'https://cdn.artofpkm.com/4q1k465cm5lt3zpif3k0tc8nlari',
@@ -53,6 +59,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/3146-rubber-playmat-mega-greninja-1.png',
     thumb:
       'src/assets/playmats/thumbs/3146-rubber-playmat-mega-greninja-1.webp',
+    board: 'src/assets/playmats/board/3146-rubber-playmat-mega-greninja-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3146',
     imageUrl: 'https://cdn.artofpkm.com/h5znqauilj1y49pj8kpuw9c93grl',
@@ -64,6 +71,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3119-rubber-playmat-canari-amp-mega-eelektross-1.png',
     thumb:
       'src/assets/playmats/thumbs/3119-rubber-playmat-canari-amp-mega-eelektross-1.webp',
+    board:
+      'src/assets/playmats/board/3119-rubber-playmat-canari-amp-mega-eelektross-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3119',
     imageUrl: 'https://cdn.artofpkm.com/kfcu9i7dcs774fh1lp3hhrvuz48u',
@@ -75,6 +84,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3092-rubber-playmat-n-amp-reshiram-amp-zekrom-1.png',
     thumb:
       'src/assets/playmats/thumbs/3092-rubber-playmat-n-amp-reshiram-amp-zekrom-1.webp',
+    board:
+      'src/assets/playmats/board/3092-rubber-playmat-n-amp-reshiram-amp-zekrom-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3092',
     imageUrl: 'https://cdn.artofpkm.com/elux7ug0y6osw0ws3153yturyrfs',
@@ -86,6 +97,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3093-rubber-playmat-pikachu-amp-thunder-1.png',
     thumb:
       'src/assets/playmats/thumbs/3093-rubber-playmat-pikachu-amp-thunder-1.webp',
+    board:
+      'src/assets/playmats/board/3093-rubber-playmat-pikachu-amp-thunder-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3093',
     imageUrl: 'https://cdn.artofpkm.com/jae7auqnzekol9e271426toim2bl',
@@ -97,6 +110,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3052-rubber-playmat-pok-mon-center-kagawa-1.png',
     thumb:
       'src/assets/playmats/thumbs/3052-rubber-playmat-pok-mon-center-kagawa-1.webp',
+    board:
+      'src/assets/playmats/board/3052-rubber-playmat-pok-mon-center-kagawa-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3052',
     imageUrl: 'https://cdn.artofpkm.com/hr4imwakn28i5swvp8h617ropwj7',
@@ -108,6 +123,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/3024-rubber-playmat-mega-evolution-ex-1.png',
     thumb:
       'src/assets/playmats/thumbs/3024-rubber-playmat-mega-evolution-ex-1.webp',
+    board:
+      'src/assets/playmats/board/3024-rubber-playmat-mega-evolution-ex-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3024',
     imageUrl: 'https://cdn.artofpkm.com/l9knfxf68oqnpfvpl0hbhib845y2',
@@ -117,6 +134,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat OTENKI TEAM',
     image: 'src/assets/playmats/png/3003-rubber-playmat-otenki-team-1.png',
     thumb: 'src/assets/playmats/thumbs/3003-rubber-playmat-otenki-team-1.webp',
+    board: 'src/assets/playmats/board/3003-rubber-playmat-otenki-team-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/3003',
     imageUrl: 'https://cdn.artofpkm.com/j0swjjz01xz0m9qe4edkrzi5f9h6',
@@ -126,6 +144,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat PJCS2025',
     image: 'src/assets/playmats/png/2900-rubber-playmat-pjcs2025-1.png',
     thumb: 'src/assets/playmats/thumbs/2900-rubber-playmat-pjcs2025-1.webp',
+    board: 'src/assets/playmats/board/2900-rubber-playmat-pjcs2025-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2900',
     imageUrl: 'https://cdn.artofpkm.com/7raob8mfno8kuxg3m2nu0ysmdguk',
@@ -135,6 +154,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Hilda',
     image: 'src/assets/playmats/png/2958-rubber-playmat-hilda-1.png',
     thumb: 'src/assets/playmats/thumbs/2958-rubber-playmat-hilda-1.webp',
+    board: 'src/assets/playmats/board/2958-rubber-playmat-hilda-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2958',
     imageUrl: 'https://cdn.artofpkm.com/f16mh1vb2220opkqptrlcx0lectm',
@@ -144,6 +164,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Team Rocket (#2863)',
     image: 'src/assets/playmats/png/2863-rubber-playmat-team-rocket-1.png',
     thumb: 'src/assets/playmats/thumbs/2863-rubber-playmat-team-rocket-1.webp',
+    board: 'src/assets/playmats/board/2863-rubber-playmat-team-rocket-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2863',
     imageUrl: 'https://cdn.artofpkm.com/046oad8saiugle2ib4ont6xfa11e',
@@ -155,6 +176,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/2849-rubber-playmat-cynthia-amp-garchomp-1.png',
     thumb:
       'src/assets/playmats/thumbs/2849-rubber-playmat-cynthia-amp-garchomp-1.webp',
+    board:
+      'src/assets/playmats/board/2849-rubber-playmat-cynthia-amp-garchomp-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2849',
     imageUrl: 'https://cdn.artofpkm.com/hw9arun99ctb79rhwpnvb4iaa8hx',
@@ -165,6 +188,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/2828-rubber-playmat-snowy-gathering-1.png',
     thumb:
       'src/assets/playmats/thumbs/2828-rubber-playmat-snowy-gathering-1.webp',
+    board:
+      'src/assets/playmats/board/2828-rubber-playmat-snowy-gathering-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2828',
     imageUrl: 'https://cdn.artofpkm.com/c0gm3akukgztbb7imrvdtex9mcoq',
@@ -174,6 +199,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Iono',
     image: 'src/assets/playmats/png/2811-rubber-playmat-iono-1.png',
     thumb: 'src/assets/playmats/thumbs/2811-rubber-playmat-iono-1.webp',
+    board: 'src/assets/playmats/board/2811-rubber-playmat-iono-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2811',
     imageUrl: 'https://cdn.artofpkm.com/nil74qvehr166w23ibuz7cd2t228',
@@ -185,6 +211,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/2786-rubber-playmat-ancient-and-future-1.png',
     thumb:
       'src/assets/playmats/thumbs/2786-rubber-playmat-ancient-and-future-1.webp',
+    board:
+      'src/assets/playmats/board/2786-rubber-playmat-ancient-and-future-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2786',
     imageUrl: 'https://cdn.artofpkm.com/8y3g6kemrkak26gj6h4k7pry2bai',
@@ -195,6 +223,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/2784-rubber-playmat-eevee-evolutions-1.png',
     thumb:
       'src/assets/playmats/thumbs/2784-rubber-playmat-eevee-evolutions-1.webp',
+    board:
+      'src/assets/playmats/board/2784-rubber-playmat-eevee-evolutions-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2784',
     imageUrl: 'https://cdn.artofpkm.com/p4t6jpp98uh9xry2yhurbpoesxun',
@@ -206,6 +236,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/2785-rubber-playmat-pokemon-trainers-blueberry-academy-1.png',
     thumb:
       'src/assets/playmats/thumbs/2785-rubber-playmat-pokemon-trainers-blueberry-academy-1.webp',
+    board:
+      'src/assets/playmats/board/2785-rubber-playmat-pokemon-trainers-blueberry-academy-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2785',
     imageUrl: 'https://cdn.artofpkm.com/bnrethnjo78isl9tea8jwz2rb4md',
@@ -215,6 +247,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Giratina',
     image: 'src/assets/playmats/png/2739-rubber-playmat-giratina.png',
     thumb: 'src/assets/playmats/thumbs/2739-rubber-playmat-giratina.webp',
+    board: 'src/assets/playmats/board/2739-rubber-playmat-giratina.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2739',
     imageUrl: 'https://cdn.artofpkm.com/a7pfs989rx4dhad3511ufbkrkm0c',
@@ -226,6 +259,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/2723-rubber-playmat-altaria-amp-lisia-1.png',
     thumb:
       'src/assets/playmats/thumbs/2723-rubber-playmat-altaria-amp-lisia-1.webp',
+    board:
+      'src/assets/playmats/board/2723-rubber-playmat-altaria-amp-lisia-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2723',
     imageUrl: 'https://cdn.artofpkm.com/too6kx0asw9lfi1itahvikd6t7ql',
@@ -235,6 +270,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Cassiopeia',
     image: 'src/assets/playmats/png/21-rubber-playmat-cassiopeia-1.png',
     thumb: 'src/assets/playmats/thumbs/21-rubber-playmat-cassiopeia-1.webp',
+    board: 'src/assets/playmats/board/21-rubber-playmat-cassiopeia-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/21',
     imageUrl: 'https://cdn.artofpkm.com/mb2uva8lxprea2x5z2pbqu9greud',
@@ -244,6 +280,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat PJCS2024',
     image: 'src/assets/playmats/png/24-rubber-playmat-pjcs2024-1.png',
     thumb: 'src/assets/playmats/thumbs/24-rubber-playmat-pjcs2024-1.webp',
+    board: 'src/assets/playmats/board/24-rubber-playmat-pjcs2024-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/24',
     imageUrl: 'https://cdn.artofpkm.com/8zlupo805zjqulnqxokp55c1n6mj',
@@ -254,6 +291,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/48-rubber-playmat-carmine-amp-kieran-1.png',
     thumb:
       'src/assets/playmats/thumbs/48-rubber-playmat-carmine-amp-kieran-1.webp',
+    board:
+      'src/assets/playmats/board/48-rubber-playmat-carmine-amp-kieran-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/48',
     imageUrl: 'https://cdn.artofpkm.com/10lwgmbea9bctywkmx4xv5pthvv8',
@@ -263,6 +302,7 @@ export const MATS_CATALOG = [
     title: 'Playmat / Charizard',
     image: 'src/assets/playmats/png/68-playmat-charizard-1.png',
     thumb: 'src/assets/playmats/thumbs/68-playmat-charizard-1.webp',
+    board: 'src/assets/playmats/board/68-playmat-charizard-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/68',
     imageUrl: 'https://cdn.artofpkm.com/u1v96dz6r0hjz0jrsxvofnz5rw7s',
@@ -274,6 +314,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/72-playmat-dragonite-amp-rayquaza-collide-1.png',
     thumb:
       'src/assets/playmats/thumbs/72-playmat-dragonite-amp-rayquaza-collide-1.webp',
+    board:
+      'src/assets/playmats/board/72-playmat-dragonite-amp-rayquaza-collide-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/72',
     imageUrl: 'https://cdn.artofpkm.com/psbq6kn30at7tq0jqtcbkyqyq6em',
@@ -283,6 +325,7 @@ export const MATS_CATALOG = [
     title: 'Playmat / Eevee Breakaway',
     image: 'src/assets/playmats/png/73-playmat-eevee-breakaway-1.png',
     thumb: 'src/assets/playmats/thumbs/73-playmat-eevee-breakaway-1.webp',
+    board: 'src/assets/playmats/board/73-playmat-eevee-breakaway-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/73',
     imageUrl: 'https://cdn.artofpkm.com/fegf0kv6bw4azw258k8sowbvjzwp',
@@ -294,6 +337,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/77-playmat-espeon-amp-umbreon-timeless-friends-1.png',
     thumb:
       'src/assets/playmats/thumbs/77-playmat-espeon-amp-umbreon-timeless-friends-1.webp',
+    board:
+      'src/assets/playmats/board/77-playmat-espeon-amp-umbreon-timeless-friends-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/77',
     imageUrl: 'https://cdn.artofpkm.com/uva7tg4otdr4sbculofczt1wnizm',
@@ -303,6 +348,7 @@ export const MATS_CATALOG = [
     title: 'Playmat / Legends of Hoenn',
     image: 'src/assets/playmats/png/71-playmat-legends-of-hoenn-1.png',
     thumb: 'src/assets/playmats/thumbs/71-playmat-legends-of-hoenn-1.webp',
+    board: 'src/assets/playmats/board/71-playmat-legends-of-hoenn-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/71',
     imageUrl: 'https://cdn.artofpkm.com/d8en3au8xx87mgayh933s6yayto2',
@@ -314,6 +360,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/76-playmat-luxray-limitless-lightning-1.png',
     thumb:
       'src/assets/playmats/thumbs/76-playmat-luxray-limitless-lightning-1.webp',
+    board:
+      'src/assets/playmats/board/76-playmat-luxray-limitless-lightning-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/76',
     imageUrl: 'https://cdn.artofpkm.com/1snbr0t6dq1f5f3aqp0saiwpckct',
@@ -323,6 +371,7 @@ export const MATS_CATALOG = [
     title: 'Playmat / Mew Celestial Circles',
     image: 'src/assets/playmats/png/70-playmat-mew-celestial-circles-1.png',
     thumb: 'src/assets/playmats/thumbs/70-playmat-mew-celestial-circles-1.webp',
+    board: 'src/assets/playmats/board/70-playmat-mew-celestial-circles-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/70',
     imageUrl: 'https://cdn.artofpkm.com/blyztlw62km74r3yve5aq6lsjp0s',
@@ -332,6 +381,7 @@ export const MATS_CATALOG = [
     title: 'Playmat / Pikachu Power Grid',
     image: 'src/assets/playmats/png/79-playmat-pikachu-power-grid-1.png',
     thumb: 'src/assets/playmats/thumbs/79-playmat-pikachu-power-grid-1.webp',
+    board: 'src/assets/playmats/board/79-playmat-pikachu-power-grid-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/79',
     imageUrl: 'https://cdn.artofpkm.com/8ojn9884s5ylzhxantg06hmoctp0',
@@ -343,6 +393,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/75-playmat-rapidash-flames-amp-fairies-1.png',
     thumb:
       'src/assets/playmats/thumbs/75-playmat-rapidash-flames-amp-fairies-1.webp',
+    board:
+      'src/assets/playmats/board/75-playmat-rapidash-flames-amp-fairies-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/75',
     imageUrl: 'https://cdn.artofpkm.com/87j5c8t8q5rodbzqp2wxgci40m79',
@@ -353,6 +405,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/74-playmat-rayquaza-among-the-stars-1.png',
     thumb:
       'src/assets/playmats/thumbs/74-playmat-rayquaza-among-the-stars-1.webp',
+    board:
+      'src/assets/playmats/board/74-playmat-rayquaza-among-the-stars-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/74',
     imageUrl: 'https://cdn.artofpkm.com/y9bw8mj71a834qsj7694umoszorz',
@@ -364,6 +418,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/78-playmat-volcarona-amp-frosmoth-freezer-burn-1.png',
     thumb:
       'src/assets/playmats/thumbs/78-playmat-volcarona-amp-frosmoth-freezer-burn-1.webp',
+    board:
+      'src/assets/playmats/board/78-playmat-volcarona-amp-frosmoth-freezer-burn-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/78',
     imageUrl: 'https://cdn.artofpkm.com/hk5r8i9pkqgwse5e8uupyjwnxbai',
@@ -375,6 +431,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/69-pok-mon-tcg-espeon-amp-umbreon-starry-constellations-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/69-pok-mon-tcg-espeon-amp-umbreon-starry-constellations-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/69-pok-mon-tcg-espeon-amp-umbreon-starry-constellations-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/69',
     imageUrl: 'https://cdn.artofpkm.com/2h3r3t67r628me2yqzv4j5mjwxvz',
@@ -386,6 +444,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/67-pok-mon-tcg-look-upon-the-stars-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/67-pok-mon-tcg-look-upon-the-stars-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/67-pok-mon-tcg-look-upon-the-stars-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/67',
     imageUrl: 'https://cdn.artofpkm.com/a9i2o11naqikmk5ifig7hqvpa9li',
@@ -395,6 +455,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Bianca',
     image: 'src/assets/playmats/png/88-rubber-playmat-bianca-1.png',
     thumb: 'src/assets/playmats/thumbs/88-rubber-playmat-bianca-1.webp',
+    board: 'src/assets/playmats/board/88-rubber-playmat-bianca-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/88',
     imageUrl: 'https://cdn.artofpkm.com/899yfhjciq9xcb5m5e9bmgh0a7jl',
@@ -405,6 +466,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/124-rubber-playmat-full-size-ver-2-1.png',
     thumb:
       'src/assets/playmats/thumbs/124-rubber-playmat-full-size-ver-2-1.webp',
+    board:
+      'src/assets/playmats/board/124-rubber-playmat-full-size-ver-2-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/124',
     imageUrl: 'https://cdn.artofpkm.com/klu9xst2mgcinx5jjd05p7rwxlwy',
@@ -414,6 +477,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Order Up',
     image: 'src/assets/playmats/png/125-rubber-playmat-order-up-1.png',
     thumb: 'src/assets/playmats/thumbs/125-rubber-playmat-order-up-1.webp',
+    board: 'src/assets/playmats/board/125-rubber-playmat-order-up-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/125',
     imageUrl: 'https://cdn.artofpkm.com/x8ztpnhvsyzdkocuwxd1c69rnjfo',
@@ -423,6 +487,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Maushold',
     image: 'src/assets/playmats/png/158-rubber-playmat-maushold-1.png',
     thumb: 'src/assets/playmats/thumbs/158-rubber-playmat-maushold-1.webp',
+    board: 'src/assets/playmats/board/158-rubber-playmat-maushold-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/158',
     imageUrl: 'https://cdn.artofpkm.com/c4q31vphn3tfcb8462pysvjf855p',
@@ -434,6 +499,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/174-rubber-playmat-water-type-terastal-garchomp-1.png',
     thumb:
       'src/assets/playmats/thumbs/174-rubber-playmat-water-type-terastal-garchomp-1.webp',
+    board:
+      'src/assets/playmats/board/174-rubber-playmat-water-type-terastal-garchomp-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/174',
     imageUrl: 'https://cdn.artofpkm.com/u1m4lp4acq02jlzynuzzkl9cqs02',
@@ -445,6 +512,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/188-rubber-playmat-terra-dark-charizard-1.png',
     thumb:
       'src/assets/playmats/thumbs/188-rubber-playmat-terra-dark-charizard-1.webp',
+    board:
+      'src/assets/playmats/board/188-rubber-playmat-terra-dark-charizard-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/188',
     imageUrl: 'https://cdn.artofpkm.com/0l475r6lp6rihf16br8lgjp6aiqn',
@@ -456,6 +525,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/207-rubber-playmat-pikachu-large-collection-1.png',
     thumb:
       'src/assets/playmats/thumbs/207-rubber-playmat-pikachu-large-collection-1.webp',
+    board:
+      'src/assets/playmats/board/207-rubber-playmat-pikachu-large-collection-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/207',
     imageUrl: 'https://cdn.artofpkm.com/355jwp0o4kaf6wff891oh07kdxvc',
@@ -465,6 +536,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Full Size Mew',
     image: 'src/assets/playmats/png/227-rubber-playmat-full-size-mew-1.png',
     thumb: 'src/assets/playmats/thumbs/227-rubber-playmat-full-size-mew-1.webp',
+    board: 'src/assets/playmats/board/227-rubber-playmat-full-size-mew-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/227',
     imageUrl: 'https://cdn.artofpkm.com/2aaiqv2q01yorzghyaprrlm1lt6h',
@@ -476,6 +548,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/239-rubber-playmat-midnight-agent-the-cinema-1.png',
     thumb:
       'src/assets/playmats/thumbs/239-rubber-playmat-midnight-agent-the-cinema-1.webp',
+    board:
+      'src/assets/playmats/board/239-rubber-playmat-midnight-agent-the-cinema-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/239',
     imageUrl: 'https://cdn.artofpkm.com/jeyd8arjw8v685uyhg1ziitjnbeu',
@@ -485,6 +559,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Grafaiai',
     image: 'src/assets/playmats/png/275-rubber-playmat-grafaiai-1.png',
     thumb: 'src/assets/playmats/thumbs/275-rubber-playmat-grafaiai-1.webp',
+    board: 'src/assets/playmats/board/275-rubber-playmat-grafaiai-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/275',
     imageUrl: 'https://cdn.artofpkm.com/13akp02zm31lg125r10s51tx4dex',
@@ -495,6 +570,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/308-rubber-playmat-koraidon-miraidon.png',
     thumb:
       'src/assets/playmats/thumbs/308-rubber-playmat-koraidon-miraidon.webp',
+    board:
+      'src/assets/playmats/board/308-rubber-playmat-koraidon-miraidon.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/308',
     imageUrl: 'https://cdn.artofpkm.com/nm29gd6cm5z0ngqivr3jqaaxhwr4',
@@ -506,6 +583,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/367-rubber-playmat-hisuian-zorua-amp-hisuian-zoroark-1.png',
     thumb:
       'src/assets/playmats/thumbs/367-rubber-playmat-hisuian-zorua-amp-hisuian-zoroark-1.webp',
+    board:
+      'src/assets/playmats/board/367-rubber-playmat-hisuian-zorua-amp-hisuian-zoroark-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/367',
     imageUrl: 'https://cdn.artofpkm.com/lh28793tqk0m3wk64468ogl35rea',
@@ -517,6 +596,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/359-rubber-playmat-rayquaza-vs-charizard-1.png',
     thumb:
       'src/assets/playmats/thumbs/359-rubber-playmat-rayquaza-vs-charizard-1.webp',
+    board:
+      'src/assets/playmats/board/359-rubber-playmat-rayquaza-vs-charizard-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/359',
     imageUrl: 'https://cdn.artofpkm.com/0b4mp9ltdn4kkrymn4p4gda50etd',
@@ -528,6 +609,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/374-rubber-playmat-pikachu-amp-morpeko-1.png',
     thumb:
       'src/assets/playmats/thumbs/374-rubber-playmat-pikachu-amp-morpeko-1.webp',
+    board:
+      'src/assets/playmats/board/374-rubber-playmat-pikachu-amp-morpeko-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/374',
     imageUrl: 'https://cdn.artofpkm.com/gwkfsim74rbxbohe6fh7ml5ypz8m',
@@ -537,6 +620,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat HISUI DAYS',
     image: 'src/assets/playmats/png/391-rubber-playmat-hisui-days-1.png',
     thumb: 'src/assets/playmats/thumbs/391-rubber-playmat-hisui-days-1.webp',
+    board: 'src/assets/playmats/board/391-rubber-playmat-hisui-days-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/391',
     imageUrl: 'https://cdn.artofpkm.com/eeemrbwi2exijvcolh74c3bs3iid',
@@ -547,6 +631,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/414-rubber-playmat-latias-amp-latios-1.png',
     thumb:
       'src/assets/playmats/thumbs/414-rubber-playmat-latias-amp-latios-1.webp',
+    board:
+      'src/assets/playmats/board/414-rubber-playmat-latias-amp-latios-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/414',
     imageUrl: 'https://cdn.artofpkm.com/5lw77avq1bx5m3yjtq2duva80gyw',
@@ -556,6 +642,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Serena',
     image: 'src/assets/playmats/png/400-rubber-playmat-serena-1.png',
     thumb: 'src/assets/playmats/thumbs/400-rubber-playmat-serena-1.webp',
+    board: 'src/assets/playmats/board/400-rubber-playmat-serena-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/400',
     imageUrl: 'https://cdn.artofpkm.com/nj7rg0nyekn8qkwd2rqor8fuxr5r',
@@ -566,6 +653,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/411-rubber-playmat-trainers-salon-1.png',
     thumb:
       'src/assets/playmats/thumbs/411-rubber-playmat-trainers-salon-1.webp',
+    board: 'src/assets/playmats/board/411-rubber-playmat-trainers-salon-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/411',
     imageUrl: 'https://cdn.artofpkm.com/09z6ia3uq8flyra27s3k5drjsf66',
@@ -577,6 +665,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/425-rubber-playmat-pok-mon-center-okinawa-1.png',
     thumb:
       'src/assets/playmats/thumbs/425-rubber-playmat-pok-mon-center-okinawa-1.webp',
+    board:
+      'src/assets/playmats/board/425-rubber-playmat-pok-mon-center-okinawa-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/425',
     imageUrl: 'https://cdn.artofpkm.com/n0krq4an026osr3wnq4r5ervb8y6',
@@ -587,6 +677,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/442-rubber-playmat-poke-ball-design-1.png',
     thumb:
       'src/assets/playmats/thumbs/442-rubber-playmat-poke-ball-design-1.webp',
+    board:
+      'src/assets/playmats/board/442-rubber-playmat-poke-ball-design-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/442',
     imageUrl: 'https://cdn.artofpkm.com/5n5l38wsu8h5hk6irf0lhv6lwdmo',
@@ -596,6 +688,7 @@ export const MATS_CATALOG = [
     title: 'Rubber playmat Blastoise',
     image: 'src/assets/playmats/png/469-rubber-playmat-blastoise-1.png',
     thumb: 'src/assets/playmats/thumbs/469-rubber-playmat-blastoise-1.webp',
+    board: 'src/assets/playmats/board/469-rubber-playmat-blastoise-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/469',
     imageUrl: 'https://cdn.artofpkm.com/6n4jvtn7c2ieep7znhmlnw1eu5i2',
@@ -605,6 +698,7 @@ export const MATS_CATALOG = [
     title: 'Rubber playmat Charizard',
     image: 'src/assets/playmats/png/470-rubber-playmat-charizard-1.png',
     thumb: 'src/assets/playmats/thumbs/470-rubber-playmat-charizard-1.webp',
+    board: 'src/assets/playmats/board/470-rubber-playmat-charizard-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/470',
     imageUrl: 'https://cdn.artofpkm.com/pklwnggerq9pf2va7wz6qnb4cicl',
@@ -614,6 +708,7 @@ export const MATS_CATALOG = [
     title: 'Rubber playmat Venusaur',
     image: 'src/assets/playmats/png/468-rubber-playmat-venusaur-1.png',
     thumb: 'src/assets/playmats/thumbs/468-rubber-playmat-venusaur-1.webp',
+    board: 'src/assets/playmats/board/468-rubber-playmat-venusaur-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/468',
     imageUrl: 'https://cdn.artofpkm.com/dj4sd9hy76imzq670i3shfedtp4v',
@@ -623,6 +718,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat COOL×METAL',
     image: 'src/assets/playmats/png/477-rubber-playmat-cool-metal-1.png',
     thumb: 'src/assets/playmats/thumbs/477-rubber-playmat-cool-metal-1.webp',
+    board: 'src/assets/playmats/board/477-rubber-playmat-cool-metal-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/477',
     imageUrl: 'https://cdn.artofpkm.com/956emax3utr3ehauwufy8500vkdu',
@@ -633,6 +729,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/507-rubber-playmat-pok-mon-yurutto-1.png',
     thumb:
       'src/assets/playmats/thumbs/507-rubber-playmat-pok-mon-yurutto-1.webp',
+    board:
+      'src/assets/playmats/board/507-rubber-playmat-pok-mon-yurutto-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/507',
     imageUrl: 'https://cdn.artofpkm.com/vgyr68lx7e5ag0j3gw7eylur5i5b',
@@ -644,6 +742,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/498-rubber-playmat-thank-you-for-your-hard-work-everyone-1.png',
     thumb:
       'src/assets/playmats/thumbs/498-rubber-playmat-thank-you-for-your-hard-work-everyone-1.webp',
+    board:
+      'src/assets/playmats/board/498-rubber-playmat-thank-you-for-your-hard-work-everyone-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/498',
     imageUrl: 'https://cdn.artofpkm.com/vsz4bpq1lpie4aec7hgo7ac7o2rp',
@@ -655,6 +755,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/521-rubber-playmat-sparkling-greninja-1.png',
     thumb:
       'src/assets/playmats/thumbs/521-rubber-playmat-sparkling-greninja-1.webp',
+    board:
+      'src/assets/playmats/board/521-rubber-playmat-sparkling-greninja-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/521',
     imageUrl: 'https://cdn.artofpkm.com/2ucakth6i1ewdf60zl84w0s9pu17',
@@ -664,6 +766,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Arceus',
     image: 'src/assets/playmats/png/544-rubber-playmat-arceus-1.png',
     thumb: 'src/assets/playmats/thumbs/544-rubber-playmat-arceus-1.webp',
+    board: 'src/assets/playmats/board/544-rubber-playmat-arceus-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/544',
     imageUrl: 'https://cdn.artofpkm.com/w81x4oxvt7q8215fslyja2ickk1t',
@@ -675,6 +778,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/575-rubber-playmat-pok-mon-trainers-off-shot.png',
     thumb:
       'src/assets/playmats/thumbs/575-rubber-playmat-pok-mon-trainers-off-shot.webp',
+    board:
+      'src/assets/playmats/board/575-rubber-playmat-pok-mon-trainers-off-shot.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/575',
     imageUrl: 'https://cdn.artofpkm.com/9fmgbu00a2511nyofggdkwm6c38y',
@@ -686,6 +791,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/602-rubber-playmat-flying-pikachu-amp-surfing-pikachu-1.png',
     thumb:
       'src/assets/playmats/thumbs/602-rubber-playmat-flying-pikachu-amp-surfing-pikachu-1.webp',
+    board:
+      'src/assets/playmats/board/602-rubber-playmat-flying-pikachu-amp-surfing-pikachu-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/602',
     imageUrl: 'https://cdn.artofpkm.com/hpo6jtaody0u98kq7gljjo61p4z2',
@@ -697,6 +804,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/604-rubber-playmat-full-size-25th-anniversary-1.png',
     thumb:
       'src/assets/playmats/thumbs/604-rubber-playmat-full-size-25th-anniversary-1.webp',
+    board:
+      'src/assets/playmats/board/604-rubber-playmat-full-size-25th-anniversary-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/604',
     imageUrl: 'https://cdn.artofpkm.com/jemtcprdr8ubvdzmxx8c05gcfshb',
@@ -707,6 +816,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/677-rubber-playmat-eievui-collection-1.png',
     thumb:
       'src/assets/playmats/thumbs/677-rubber-playmat-eievui-collection-1.webp',
+    board:
+      'src/assets/playmats/board/677-rubber-playmat-eievui-collection-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/677',
     imageUrl: 'https://cdn.artofpkm.com/xd6011t23dicdcvmqpmpjqp1ub2c',
@@ -718,6 +829,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/697-rubber-playmat-ice-rider-calyrex-shadow-rider-calyrex-1.png',
     thumb:
       'src/assets/playmats/thumbs/697-rubber-playmat-ice-rider-calyrex-shadow-rider-calyrex-1.webp',
+    board:
+      'src/assets/playmats/board/697-rubber-playmat-ice-rider-calyrex-shadow-rider-calyrex-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/697',
     imageUrl: 'https://cdn.artofpkm.com/dbi69bdlwnc0mymyc3mfv9ugshsb',
@@ -730,6 +843,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/744-pokemon-card-game-rubber-playmat-gigantamax-urshifu-rapid-strike-master-1.png',
     thumb:
       'src/assets/playmats/thumbs/744-pokemon-card-game-rubber-playmat-gigantamax-urshifu-rapid-strike-master-1.webp',
+    board:
+      'src/assets/playmats/board/744-pokemon-card-game-rubber-playmat-gigantamax-urshifu-rapid-strike-master-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/744',
     imageUrl: 'https://cdn.artofpkm.com/i7kfzniz87oak5hqlt5sl5jjpngj',
@@ -742,6 +857,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/756-pokemon-card-game-rubber-playmat-gigantamax-urshifu-single-strike-master-1.png',
     thumb:
       'src/assets/playmats/thumbs/756-pokemon-card-game-rubber-playmat-gigantamax-urshifu-single-strike-master-1.webp',
+    board:
+      'src/assets/playmats/board/756-pokemon-card-game-rubber-playmat-gigantamax-urshifu-single-strike-master-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/756',
     imageUrl: 'https://cdn.artofpkm.com/pey3b24bum33x3xm1imuzf7sm2vw',
@@ -753,6 +870,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/775-rubber-playmat-zacian-zamazenta-eternatus.png',
     thumb:
       'src/assets/playmats/thumbs/775-rubber-playmat-zacian-zamazenta-eternatus.webp',
+    board:
+      'src/assets/playmats/board/775-rubber-playmat-zacian-zamazenta-eternatus.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/775',
     imageUrl: 'https://cdn.artofpkm.com/b7uafugqaa1nwq9nzhnqjoyi1p82',
@@ -764,6 +883,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/788-rubber-playmat-farfetch-39-d-three-green-onions-corps-story.png',
     thumb:
       'src/assets/playmats/thumbs/788-rubber-playmat-farfetch-39-d-three-green-onions-corps-story.webp',
+    board:
+      'src/assets/playmats/board/788-rubber-playmat-farfetch-39-d-three-green-onions-corps-story.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/788',
     imageUrl: 'https://cdn.artofpkm.com/gprn7s2t8d4usgrk2epk8szbhai2',
@@ -774,6 +895,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/800-rubber-playmat-eevee-and-evolution.png',
     thumb:
       'src/assets/playmats/thumbs/800-rubber-playmat-eevee-and-evolution.webp',
+    board:
+      'src/assets/playmats/board/800-rubber-playmat-eevee-and-evolution.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/800',
     imageUrl: 'https://cdn.artofpkm.com/kw1ji7ldm6g303h08rhezmk7l79d',
@@ -784,6 +907,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/795-rubber-playmat-eternamax-eternatus.png',
     thumb:
       'src/assets/playmats/thumbs/795-rubber-playmat-eternamax-eternatus.webp',
+    board:
+      'src/assets/playmats/board/795-rubber-playmat-eternamax-eternatus.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/795',
     imageUrl: 'https://cdn.artofpkm.com/zu7v75o32rirj5yrfclm3ar4iec7',
@@ -795,6 +920,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/805-rubber-playmat-full-size-gigantamax-pikachu.png',
     thumb:
       'src/assets/playmats/thumbs/805-rubber-playmat-full-size-gigantamax-pikachu.webp',
+    board:
+      'src/assets/playmats/board/805-rubber-playmat-full-size-gigantamax-pikachu.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/805',
     imageUrl: 'https://cdn.artofpkm.com/ub0oyrtd02ld5lfa6nr3ogae67co',
@@ -804,6 +931,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Pikachu Forest',
     image: 'src/assets/playmats/png/810-rubber-playmat-pikachu-forest.png',
     thumb: 'src/assets/playmats/thumbs/810-rubber-playmat-pikachu-forest.webp',
+    board: 'src/assets/playmats/board/810-rubber-playmat-pikachu-forest.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/810',
     imageUrl: 'https://cdn.artofpkm.com/nxn9cy3suoz0xhmvfmi39qcej9xx',
@@ -814,6 +942,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/815-it-s-not-pok-mon-rubber-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/815-it-s-not-pok-mon-rubber-playmat.webp',
+    board: 'src/assets/playmats/board/815-it-s-not-pok-mon-rubber-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/815',
     imageUrl: 'https://cdn.artofpkm.com/knojcuww4u2gjxzq9n1oy2hplh1u',
@@ -824,6 +953,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/823-rubber-playmat-pok-mon-galartabi.png',
     thumb:
       'src/assets/playmats/thumbs/823-rubber-playmat-pok-mon-galartabi.webp',
+    board:
+      'src/assets/playmats/board/823-rubber-playmat-pok-mon-galartabi.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/823',
     imageUrl: 'https://cdn.artofpkm.com/ybitmga3d991flyilcqrciw8hgx7',
@@ -835,6 +966,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/826-rubber-playmat-pok-mon-relaxing-life.png',
     thumb:
       'src/assets/playmats/thumbs/826-rubber-playmat-pok-mon-relaxing-life.webp',
+    board:
+      'src/assets/playmats/board/826-rubber-playmat-pok-mon-relaxing-life.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/826',
     imageUrl: 'https://cdn.artofpkm.com/g1x50ykbdwu9pb25f5v5kmrxp0h5',
@@ -846,6 +979,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/862-rubber-playmat-gigantamax-charizard.png',
     thumb:
       'src/assets/playmats/thumbs/862-rubber-playmat-gigantamax-charizard.webp',
+    board:
+      'src/assets/playmats/board/862-rubber-playmat-gigantamax-charizard.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/862',
     imageUrl: 'https://cdn.artofpkm.com/6rexx1kd4tzpbvu5zqnixc6ri3is',
@@ -857,6 +992,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/878-rubber-playmat-flowers-in-full-bloom-1.png',
     thumb:
       'src/assets/playmats/thumbs/878-rubber-playmat-flowers-in-full-bloom-1.webp',
+    board:
+      'src/assets/playmats/board/878-rubber-playmat-flowers-in-full-bloom-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/878',
     imageUrl: 'https://cdn.artofpkm.com/hyalf7mxbm26sqmmu4j6cwfrfp6z',
@@ -866,6 +1003,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Snorlax Yawn',
     image: 'src/assets/playmats/png/879-rubber-playmat-snorlax-yawn-1.png',
     thumb: 'src/assets/playmats/thumbs/879-rubber-playmat-snorlax-yawn-1.webp',
+    board: 'src/assets/playmats/board/879-rubber-playmat-snorlax-yawn-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/879',
     imageUrl: 'https://cdn.artofpkm.com/mgxm2tm06va1hxlqvoht23j87krt',
@@ -875,6 +1013,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat TAIKI-BANSEI',
     image: 'src/assets/playmats/png/877-rubber-playmat-taiki-bansei-1.png',
     thumb: 'src/assets/playmats/thumbs/877-rubber-playmat-taiki-bansei-1.webp',
+    board: 'src/assets/playmats/board/877-rubber-playmat-taiki-bansei-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/877',
     imageUrl: 'https://cdn.artofpkm.com/hwqlxacbq0ucrrj50g8zdwleu5ok',
@@ -885,6 +1024,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/887-rubber-playmat-hoppe-daish-go-1.png',
     thumb:
       'src/assets/playmats/thumbs/887-rubber-playmat-hoppe-daish-go-1.webp',
+    board: 'src/assets/playmats/board/887-rubber-playmat-hoppe-daish-go-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/887',
     imageUrl: 'https://cdn.artofpkm.com/55afhgoq34t9ld7nfdk4xux03njg',
@@ -896,6 +1036,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/921-rubber-playmat-24-hour-pokemon-ch-1.png',
     thumb:
       'src/assets/playmats/thumbs/921-rubber-playmat-24-hour-pokemon-ch-1.webp',
+    board:
+      'src/assets/playmats/board/921-rubber-playmat-24-hour-pokemon-ch-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/921',
     imageUrl: 'https://cdn.artofpkm.com/cx8nbr6h1gdkn1600adeu9k82z6p',
@@ -905,6 +1047,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Mewtwo ver.3',
     image: 'src/assets/playmats/png/920-rubber-playmat-mewtwo-ver-3.png',
     thumb: 'src/assets/playmats/thumbs/920-rubber-playmat-mewtwo-ver-3.webp',
+    board: 'src/assets/playmats/board/920-rubber-playmat-mewtwo-ver-3.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/920',
     imageUrl: 'https://cdn.artofpkm.com/ar0mt5fa5jgcjbua3tbmprd6iz7o',
@@ -914,6 +1057,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Pikachu Face',
     image: 'src/assets/playmats/png/919-rubber-playmat-pikachu-face.png',
     thumb: 'src/assets/playmats/thumbs/919-rubber-playmat-pikachu-face.webp',
+    board: 'src/assets/playmats/board/919-rubber-playmat-pikachu-face.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/919',
     imageUrl: 'https://cdn.artofpkm.com/w3rili812ih74n5u38qjdyiswr1u',
@@ -923,6 +1067,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat PIKAPIKACHU BK',
     image: 'src/assets/playmats/png/914-rubber-playmat-pikapikachu-bk.png',
     thumb: 'src/assets/playmats/thumbs/914-rubber-playmat-pikapikachu-bk.webp',
+    board: 'src/assets/playmats/board/914-rubber-playmat-pikapikachu-bk.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/914',
     imageUrl: 'https://cdn.artofpkm.com/fvi3m4u096ajgbvbcce3x35vn8u3',
@@ -934,6 +1079,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/947-sumi-e-series-rubber-playmat-entei-suicune-and-raikou.png',
     thumb:
       'src/assets/playmats/thumbs/947-sumi-e-series-rubber-playmat-entei-suicune-and-raikou.webp',
+    board:
+      'src/assets/playmats/board/947-sumi-e-series-rubber-playmat-entei-suicune-and-raikou.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/947',
     imageUrl: 'https://cdn.artofpkm.com/zif9e927ff4r95lv4jywywy68mky',
@@ -945,6 +1092,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/946-sumi-e-series-rubber-playmat-pikachu-amp-rayquaza.png',
     thumb:
       'src/assets/playmats/thumbs/946-sumi-e-series-rubber-playmat-pikachu-amp-rayquaza.webp',
+    board:
+      'src/assets/playmats/board/946-sumi-e-series-rubber-playmat-pikachu-amp-rayquaza.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/946',
     imageUrl: 'https://cdn.artofpkm.com/m98y1odr9quimb78135oe2bl5fbz',
@@ -955,6 +1104,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/958-rubber-playmat-berry-39-s-forest-1.png',
     thumb:
       'src/assets/playmats/thumbs/958-rubber-playmat-berry-39-s-forest-1.webp',
+    board:
+      'src/assets/playmats/board/958-rubber-playmat-berry-39-s-forest-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/958',
     imageUrl: 'https://cdn.artofpkm.com/t9z2jnq0lgrzwdjrxhfuqvk4doax',
@@ -965,6 +1116,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/959-rubber-playmat-ghost-39-s-castle.png',
     thumb:
       'src/assets/playmats/thumbs/959-rubber-playmat-ghost-39-s-castle.webp',
+    board:
+      'src/assets/playmats/board/959-rubber-playmat-ghost-39-s-castle.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/959',
     imageUrl: 'https://cdn.artofpkm.com/u62m5zvj2v2drfuvlesp5qrsdwp9',
@@ -976,6 +1129,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/970-full-size-playmat-zacian-amp-zamazenta-1.png',
     thumb:
       'src/assets/playmats/thumbs/970-full-size-playmat-zacian-amp-zamazenta-1.webp',
+    board:
+      'src/assets/playmats/board/970-full-size-playmat-zacian-amp-zamazenta-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/970',
     imageUrl: 'https://cdn.artofpkm.com/u4enbanb3bmov0so5569ifoc7x1z',
@@ -987,6 +1142,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/978-sword-amp-shield-family-mart-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/978-sword-amp-shield-family-mart-playmat.webp',
+    board:
+      'src/assets/playmats/board/978-sword-amp-shield-family-mart-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/978',
     imageUrl: 'https://cdn.artofpkm.com/097q001uebq5cwslwkaurxjr70qd',
@@ -997,6 +1154,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/979-sword-amp-shield-lawson-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/979-sword-amp-shield-lawson-playmat.webp',
+    board: 'src/assets/playmats/board/979-sword-amp-shield-lawson-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/979',
     imageUrl: 'https://cdn.artofpkm.com/fr143q35b6qq2vb9myw2juxo098i',
@@ -1008,6 +1166,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1003-rubber-playmat-box-pok-mon-caricature-1.png',
     thumb:
       'src/assets/playmats/thumbs/1003-rubber-playmat-box-pok-mon-caricature-1.webp',
+    board:
+      'src/assets/playmats/board/1003-rubber-playmat-box-pok-mon-caricature-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1003',
     imageUrl: 'https://cdn.artofpkm.com/zr5sjdyaff1m9hm0nwmvnykm6mbh',
@@ -1019,6 +1179,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1011-rubber-playmat-gengar-de-chilling-1.png',
     thumb:
       'src/assets/playmats/thumbs/1011-rubber-playmat-gengar-de-chilling-1.webp',
+    board:
+      'src/assets/playmats/board/1011-rubber-playmat-gengar-de-chilling-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1011',
     imageUrl: 'https://cdn.artofpkm.com/detdrips3sw1ls1r9a24636k9ycx',
@@ -1030,6 +1192,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1004-rubber-playmat-pok-mon-world-market-1.png',
     thumb:
       'src/assets/playmats/thumbs/1004-rubber-playmat-pok-mon-world-market-1.webp',
+    board:
+      'src/assets/playmats/board/1004-rubber-playmat-pok-mon-world-market-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1004',
     imageUrl: 'https://cdn.artofpkm.com/fpks84iqzyhdwwy49ckhontbcemh',
@@ -1039,6 +1203,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Dash! Eevee',
     image: 'src/assets/playmats/png/1022-rubber-playmat-dash-eevee-1.png',
     thumb: 'src/assets/playmats/thumbs/1022-rubber-playmat-dash-eevee-1.webp',
+    board: 'src/assets/playmats/board/1022-rubber-playmat-dash-eevee-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1022',
     imageUrl: 'https://cdn.artofpkm.com/ttr4hug0cudomin7geb07dncsgcn',
@@ -1050,6 +1215,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1038-ruber-playmat-arceus-dialga-amp-palkia-tag-team-gx.png',
     thumb:
       'src/assets/playmats/thumbs/1038-ruber-playmat-arceus-dialga-amp-palkia-tag-team-gx.webp',
+    board:
+      'src/assets/playmats/board/1038-ruber-playmat-arceus-dialga-amp-palkia-tag-team-gx.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1038',
     imageUrl: 'https://cdn.artofpkm.com/pckwve89ze3ecflnwyddkqggbvss',
@@ -1059,6 +1226,7 @@ export const MATS_CATALOG = [
     title: 'Umbreon & Darkrai Playmat',
     image: 'src/assets/playmats/png/1041-umbreon-amp-darkrai-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1041-umbreon-amp-darkrai-playmat.webp',
+    board: 'src/assets/playmats/board/1041-umbreon-amp-darkrai-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1041',
     imageUrl: 'https://cdn.artofpkm.com/lgbilv1gvh6hnoj102t9zh4a887d',
@@ -1068,6 +1236,7 @@ export const MATS_CATALOG = [
     title: 'Half Playmat BEAMS',
     image: 'src/assets/playmats/png/1043-half-playmat-beams.png',
     thumb: 'src/assets/playmats/thumbs/1043-half-playmat-beams.webp',
+    board: 'src/assets/playmats/board/1043-half-playmat-beams.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1043',
     imageUrl: 'https://cdn.artofpkm.com/t7cfz8qdinmnu34ewh39u1h4kxip',
@@ -1077,6 +1246,7 @@ export const MATS_CATALOG = [
     title: 'Playmat BEAMS',
     image: 'src/assets/playmats/png/1042-playmat-beams.png',
     thumb: 'src/assets/playmats/thumbs/1042-playmat-beams.webp',
+    board: 'src/assets/playmats/board/1042-playmat-beams.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1042',
     imageUrl: 'https://cdn.artofpkm.com/3j503505cytsish8ruwlm1x0iq5y',
@@ -1086,6 +1256,7 @@ export const MATS_CATALOG = [
     title: 'Playmat Oceanic Operetta',
     image: 'src/assets/playmats/png/1052-playmat-oceanic-operetta-1.png',
     thumb: 'src/assets/playmats/thumbs/1052-playmat-oceanic-operetta-1.webp',
+    board: 'src/assets/playmats/board/1052-playmat-oceanic-operetta-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1052',
     imageUrl: 'https://cdn.artofpkm.com/e65c5ufe7mg2iotckl2vmlr0d63f',
@@ -1097,6 +1268,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1070-rubber-playmat-mewtwo-amp-mew-tag-team-gx.png',
     thumb:
       'src/assets/playmats/thumbs/1070-rubber-playmat-mewtwo-amp-mew-tag-team-gx.webp',
+    board:
+      'src/assets/playmats/board/1070-rubber-playmat-mewtwo-amp-mew-tag-team-gx.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1070',
     imageUrl: 'https://cdn.artofpkm.com/05lyiop5uvrtxhb60c1ph51p0cpr',
@@ -1108,6 +1281,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1087-rubber-playmat-yusuke-murata-comic-pattern-1.png',
     thumb:
       'src/assets/playmats/thumbs/1087-rubber-playmat-yusuke-murata-comic-pattern-1.webp',
+    board:
+      'src/assets/playmats/board/1087-rubber-playmat-yusuke-murata-comic-pattern-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1087',
     imageUrl: 'https://cdn.artofpkm.com/8ehch7zyokptx6e4ld6277poo9l2',
@@ -1119,6 +1294,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1084-rubber-playmat-yusuke-murata-ultra-necrozma-battle-1.png',
     thumb:
       'src/assets/playmats/thumbs/1084-rubber-playmat-yusuke-murata-ultra-necrozma-battle-1.webp',
+    board:
+      'src/assets/playmats/board/1084-rubber-playmat-yusuke-murata-ultra-necrozma-battle-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1084',
     imageUrl: 'https://cdn.artofpkm.com/m6wxrn1qgt7raluvp4tiulax0wl6',
@@ -1130,6 +1307,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1112-rubber-playmat-fan-of-pikachu-amp-eevee.png',
     thumb:
       'src/assets/playmats/thumbs/1112-rubber-playmat-fan-of-pikachu-amp-eevee.webp',
+    board:
+      'src/assets/playmats/board/1112-rubber-playmat-fan-of-pikachu-amp-eevee.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1112',
     imageUrl: 'https://cdn.artofpkm.com/tak90yzdjewh01nelzq0yee6xll8',
@@ -1141,6 +1320,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1123-rubber-playmat-riding-latias-latios-1.png',
     thumb:
       'src/assets/playmats/thumbs/1123-rubber-playmat-riding-latias-latios-1.webp',
+    board:
+      'src/assets/playmats/board/1123-rubber-playmat-riding-latias-latios-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1123',
     imageUrl: 'https://cdn.artofpkm.com/67hbxn13pole7rbpv1s2ud4fjunh',
@@ -1152,6 +1333,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1111-rubber-playmat-rr-pikachu-amp-eevee-1.png',
     thumb:
       'src/assets/playmats/thumbs/1111-rubber-playmat-rr-pikachu-amp-eevee-1.webp',
+    board:
+      'src/assets/playmats/board/1111-rubber-playmat-rr-pikachu-amp-eevee-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1111',
     imageUrl: 'https://cdn.artofpkm.com/vvi3tq8z7f91ghmd3j5dkn6f9vh8',
@@ -1161,6 +1344,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Team Rocket (#1117)',
     image: 'src/assets/playmats/png/1117-rubber-playmat-team-rocket-1.png',
     thumb: 'src/assets/playmats/thumbs/1117-rubber-playmat-team-rocket-1.webp',
+    board: 'src/assets/playmats/board/1117-rubber-playmat-team-rocket-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1117',
     imageUrl: 'https://cdn.artofpkm.com/kwpygil1ub6znf1jhlmb9pppwu9o',
@@ -1172,6 +1356,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1136-rubber-playmat-hannari-pretend-tea-party.png',
     thumb:
       'src/assets/playmats/thumbs/1136-rubber-playmat-hannari-pretend-tea-party.webp',
+    board:
+      'src/assets/playmats/board/1136-rubber-playmat-hannari-pretend-tea-party.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1136',
     imageUrl: 'https://cdn.artofpkm.com/qztbjy45ljdeab79a86myvg4s3iz',
@@ -1183,6 +1369,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1147-rubber-playmat-reshiram-amp-charizard-tag-team-gx.png',
     thumb:
       'src/assets/playmats/thumbs/1147-rubber-playmat-reshiram-amp-charizard-tag-team-gx.webp',
+    board:
+      'src/assets/playmats/board/1147-rubber-playmat-reshiram-amp-charizard-tag-team-gx.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1147',
     imageUrl: 'https://cdn.artofpkm.com/gtgbpk12yvuadn4jl7vahyon3wdu',
@@ -1194,6 +1382,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1157-deck-sleeves-ub-ultra-graphix-main-art.png',
     thumb:
       'src/assets/playmats/thumbs/1157-deck-sleeves-ub-ultra-graphix-main-art.webp',
+    board:
+      'src/assets/playmats/board/1157-deck-sleeves-ub-ultra-graphix-main-art.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1157',
     imageUrl: 'https://cdn.artofpkm.com/2qm2dmuubiqtclqo02wpn5m2n6fu',
@@ -1205,6 +1395,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1155-deck-sleeves-ub-ultra-graphix-nihilego.png',
     thumb:
       'src/assets/playmats/thumbs/1155-deck-sleeves-ub-ultra-graphix-nihilego.webp',
+    board:
+      'src/assets/playmats/board/1155-deck-sleeves-ub-ultra-graphix-nihilego.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1155',
     imageUrl: 'https://cdn.artofpkm.com/gqu3mfchb1c8636sxpyvm0rjgkcu',
@@ -1216,6 +1408,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1156-deck-sleeves-ub-ultra-graphix-shard.png',
     thumb:
       'src/assets/playmats/thumbs/1156-deck-sleeves-ub-ultra-graphix-shard.webp',
+    board:
+      'src/assets/playmats/board/1156-deck-sleeves-ub-ultra-graphix-shard.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1156',
     imageUrl: 'https://cdn.artofpkm.com/oisooydhl27540x8h8t6cl58oqpy',
@@ -1225,6 +1419,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Jirachi CL2019',
     image: 'src/assets/playmats/png/1160-rubber-playmat-jirachi-cl2019.png',
     thumb: 'src/assets/playmats/thumbs/1160-rubber-playmat-jirachi-cl2019.webp',
+    board: 'src/assets/playmats/board/1160-rubber-playmat-jirachi-cl2019.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1160',
     imageUrl: 'https://cdn.artofpkm.com/6lbqn91qy32eyct6ct890h4mlen7',
@@ -1236,6 +1431,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1162-rubber-playmat-lucario-amp-melmetal-tag-team-gx.png',
     thumb:
       'src/assets/playmats/thumbs/1162-rubber-playmat-lucario-amp-melmetal-tag-team-gx.webp',
+    board:
+      'src/assets/playmats/board/1162-rubber-playmat-lucario-amp-melmetal-tag-team-gx.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1162',
     imageUrl: 'https://cdn.artofpkm.com/e5796sx8du8l5uhdoc23ncbc1pzz',
@@ -1246,6 +1443,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1161-rubber-playmat-rayquaza-cl2019.png',
     thumb:
       'src/assets/playmats/thumbs/1161-rubber-playmat-rayquaza-cl2019.webp',
+    board: 'src/assets/playmats/board/1161-rubber-playmat-rayquaza-cl2019.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1161',
     imageUrl: 'https://cdn.artofpkm.com/gw6eur9jmmcfkly6w7evnki1gndh',
@@ -1256,6 +1454,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1176-rubber-playmat-bl-pok-mon-black.png',
     thumb:
       'src/assets/playmats/thumbs/1176-rubber-playmat-bl-pok-mon-black.webp',
+    board:
+      'src/assets/playmats/board/1176-rubber-playmat-bl-pok-mon-black.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1176',
     imageUrl: 'https://cdn.artofpkm.com/8xo2q6sxrttt797gtoun0pk15eds',
@@ -1266,6 +1466,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1174-rubber-playmat-bl-pok-mon-white.png',
     thumb:
       'src/assets/playmats/thumbs/1174-rubber-playmat-bl-pok-mon-white.webp',
+    board:
+      'src/assets/playmats/board/1174-rubber-playmat-bl-pok-mon-white.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1174',
     imageUrl: 'https://cdn.artofpkm.com/vesrjwcinnw61e9v4bs0pmovwiw7',
@@ -1275,6 +1477,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Eevee Jewel',
     image: 'src/assets/playmats/png/1171-rubber-playmat-eevee-jewel.png',
     thumb: 'src/assets/playmats/thumbs/1171-rubber-playmat-eevee-jewel.webp',
+    board: 'src/assets/playmats/board/1171-rubber-playmat-eevee-jewel.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1171',
     imageUrl: 'https://cdn.artofpkm.com/yododgc6ti8mwrzuxq4zm8mjtdex',
@@ -1284,6 +1487,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Pikachu Jewel',
     image: 'src/assets/playmats/png/1170-rubber-playmat-pikachu-jewel.png',
     thumb: 'src/assets/playmats/thumbs/1170-rubber-playmat-pikachu-jewel.webp',
+    board: 'src/assets/playmats/board/1170-rubber-playmat-pikachu-jewel.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1170',
     imageUrl: 'https://cdn.artofpkm.com/pg3aq971qhn8qqc61ql3j9d7v1my',
@@ -1295,6 +1499,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1179-full-size-rubber-playmat-brock-vs-misty.png',
     thumb:
       'src/assets/playmats/thumbs/1179-full-size-rubber-playmat-brock-vs-misty.webp',
+    board:
+      'src/assets/playmats/board/1179-full-size-rubber-playmat-brock-vs-misty.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/1179',
     imageUrl: 'https://cdn.artofpkm.com/flz8v9bt6pr9d7ogfybs9n2asfap',
@@ -1304,6 +1510,7 @@ export const MATS_CATALOG = [
     title: 'Full Size Rubber Playmat',
     image: 'src/assets/playmats/png/1197-full-size-rubber-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1197-full-size-rubber-playmat.webp',
+    board: 'src/assets/playmats/board/1197-full-size-rubber-playmat.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/1197',
     imageUrl: 'https://cdn.artofpkm.com/v76v74ah6wn6gxj281b9dov8b7hs',
@@ -1315,6 +1522,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1207-rubber-playmat-pikachu-amp-zekrom-tag-team-gx.png',
     thumb:
       'src/assets/playmats/thumbs/1207-rubber-playmat-pikachu-amp-zekrom-tag-team-gx.webp',
+    board:
+      'src/assets/playmats/board/1207-rubber-playmat-pikachu-amp-zekrom-tag-team-gx.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1207',
     imageUrl: 'https://cdn.artofpkm.com/zk3e6vh0bhq6xdsudnwygjs3nkn7',
@@ -1325,6 +1534,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1263-rubber-playmat-red-amp-pikachu.png',
     thumb:
       'src/assets/playmats/thumbs/1263-rubber-playmat-red-amp-pikachu.webp',
+    board: 'src/assets/playmats/board/1263-rubber-playmat-red-amp-pikachu.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1263',
     imageUrl: 'https://cdn.artofpkm.com/yt78nuabo4rw0u5o2t4n99viis84',
@@ -1336,6 +1546,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1282-rubber-playmat-night-parade-of-100-pok-mon.png',
     thumb:
       'src/assets/playmats/thumbs/1282-rubber-playmat-night-parade-of-100-pok-mon.webp',
+    board:
+      'src/assets/playmats/board/1282-rubber-playmat-night-parade-of-100-pok-mon.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1282',
     imageUrl: 'https://cdn.artofpkm.com/vgbudji9n4bzm3z6s0hcsu4rqdxs',
@@ -1347,6 +1559,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1295-rubber-playmat-follow-in-the-ultra-beat.png',
     thumb:
       'src/assets/playmats/thumbs/1295-rubber-playmat-follow-in-the-ultra-beat.webp',
+    board:
+      'src/assets/playmats/board/1295-rubber-playmat-follow-in-the-ultra-beat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1295',
     imageUrl: 'https://cdn.artofpkm.com/3qfikqzmzda4fdjodc41mqoymmvc',
@@ -1358,6 +1572,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1334-rubber-playmat-cynthia-39-s-full-power.png',
     thumb:
       'src/assets/playmats/thumbs/1334-rubber-playmat-cynthia-39-s-full-power.webp',
+    board:
+      'src/assets/playmats/board/1334-rubber-playmat-cynthia-39-s-full-power.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1334',
     imageUrl: 'https://cdn.artofpkm.com/clx9xc41ods0pxrkfcw81rlhp3z8',
@@ -1367,6 +1583,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Lillie',
     image: 'src/assets/playmats/png/1355-rubber-playmat-lillie.png',
     thumb: 'src/assets/playmats/thumbs/1355-rubber-playmat-lillie.webp',
+    board: 'src/assets/playmats/board/1355-rubber-playmat-lillie.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1355',
     imageUrl: 'https://cdn.artofpkm.com/pk4jzzc9evu2w1y0chfxihmxfhd6',
@@ -1377,6 +1594,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1353-rubber-playmat-mt-silver-ukiyo-e.png',
     thumb:
       'src/assets/playmats/thumbs/1353-rubber-playmat-mt-silver-ukiyo-e.webp',
+    board:
+      'src/assets/playmats/board/1353-rubber-playmat-mt-silver-ukiyo-e.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1353',
     imageUrl: 'https://cdn.artofpkm.com/92ppaehodrz18jhz1y0y7e0sg3cd',
@@ -1386,6 +1605,7 @@ export const MATS_CATALOG = [
     title: 'Rubber Playmat Pokéball',
     image: 'src/assets/playmats/png/1381-rubber-playmat-pok-ball.png',
     thumb: 'src/assets/playmats/thumbs/1381-rubber-playmat-pok-ball.webp',
+    board: 'src/assets/playmats/board/1381-rubber-playmat-pok-ball.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1381',
     imageUrl: 'https://cdn.artofpkm.com/u6z8wkdb760shnkpxilfvuthi2jd',
@@ -1395,6 +1615,7 @@ export const MATS_CATALOG = [
     title: 'Playmat Summer Festa 2017',
     image: 'src/assets/playmats/png/1396-playmat-summer-festa-2017.png',
     thumb: 'src/assets/playmats/thumbs/1396-playmat-summer-festa-2017.webp',
+    board: 'src/assets/playmats/board/1396-playmat-summer-festa-2017.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1396',
     imageUrl: 'https://cdn.artofpkm.com/eh4eis03ja7pl45yn3btfviatodk',
@@ -1405,6 +1626,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1416-edion-limited-rubber-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1416-edion-limited-rubber-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1416-edion-limited-rubber-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1416',
     imageUrl: 'https://cdn.artofpkm.com/lo4ex9aue6mv56yun7mveiit7y42',
@@ -1414,6 +1637,7 @@ export const MATS_CATALOG = [
     title: 'Welcome Battle Half Playmat',
     image: 'src/assets/playmats/png/1462-welcome-battle-half-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1462-welcome-battle-half-playmat.webp',
+    board: 'src/assets/playmats/board/1462-welcome-battle-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1462',
     imageUrl: 'https://cdn.artofpkm.com/p9baezsa2vyaiphnuz13tplyz8s6',
@@ -1424,6 +1648,7 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1473-lycanroc-original-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1473-lycanroc-original-half-playmat.webp',
+    board: 'src/assets/playmats/board/1473-lycanroc-original-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1473',
     imageUrl: 'https://cdn.artofpkm.com/ult8i97akrft2gyhkt2xxv01hitf',
@@ -1435,6 +1660,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1468-pretend-team-aqua-grunt-pikachu-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1468-pretend-team-aqua-grunt-pikachu-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1468-pretend-team-aqua-grunt-pikachu-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1468',
     imageUrl: 'https://cdn.artofpkm.com/ld8zlhs0vhw6ba65kajmkao1zyi8',
@@ -1446,6 +1673,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1470-pretend-team-galactic-grunt-pikachu-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1470-pretend-team-galactic-grunt-pikachu-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1470-pretend-team-galactic-grunt-pikachu-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1470',
     imageUrl: 'https://cdn.artofpkm.com/uh0kp0l8he17szzisn5ciril2vw4',
@@ -1457,6 +1686,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1469-pretend-team-magma-grunt-pikachu-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1469-pretend-team-magma-grunt-pikachu-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1469-pretend-team-magma-grunt-pikachu-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1469',
     imageUrl: 'https://cdn.artofpkm.com/mmwvd1omq23thv3idhld7ninopb8',
@@ -1468,6 +1699,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1471-pretend-team-plasma-grunt-pikachu-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1471-pretend-team-plasma-grunt-pikachu-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1471-pretend-team-plasma-grunt-pikachu-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1471',
     imageUrl: 'https://cdn.artofpkm.com/pl1yoe7lcbntnqp0knscacrrjnit',
@@ -1479,6 +1712,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1467-pretend-team-rocket-grunt-pikachu-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1467-pretend-team-rocket-grunt-pikachu-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1467-pretend-team-rocket-grunt-pikachu-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1467',
     imageUrl: 'https://cdn.artofpkm.com/s2f1cs6z81tpw8uu2z4od98auj69',
@@ -1490,6 +1725,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1472-pretend-team-skull-grunt-pikachu-half-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/1472-pretend-team-skull-grunt-pikachu-half-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/1472-pretend-team-skull-grunt-pikachu-half-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1472',
     imageUrl: 'https://cdn.artofpkm.com/w401f08wrx28v2795qo6m3gt4c4p',
@@ -1501,6 +1738,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1486-solgaleo-amp-lunala-durable-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/1486-solgaleo-amp-lunala-durable-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/1486-solgaleo-amp-lunala-durable-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1486',
     imageUrl: 'https://cdn.artofpkm.com/058sxnajfxvznxysj645cm1uvgay',
@@ -1512,6 +1751,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1500-yamada-denki-original-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1500-yamada-denki-original-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1500-yamada-denki-original-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1500',
     imageUrl: 'https://cdn.artofpkm.com/olxk7p8ezwgpo3fs8ivambahth4c',
@@ -1522,6 +1763,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1515-team-rocket-design-half-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/1515-team-rocket-design-half-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/1515-team-rocket-design-half-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1515',
     imageUrl: 'https://cdn.artofpkm.com/jskv4pzc52y3e9afkxtas5lrqwoe',
@@ -1532,6 +1775,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1541-black-mega-gardevoir-half-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1541-black-mega-gardevoir-half-playmat.webp',
+    board:
+      'src/assets/playmats/board/1541-black-mega-gardevoir-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1541',
     imageUrl: 'https://cdn.artofpkm.com/foyw4hwogx8ikzn76h2el4546a69',
@@ -1543,6 +1788,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1562-20th-anniversary-full-size-rubber-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/1562-20th-anniversary-full-size-rubber-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/1562-20th-anniversary-full-size-rubber-playmat-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/1562',
     imageUrl: 'https://cdn.artofpkm.com/qon3ricp5y9vepskfmbisu0hxkgq',
@@ -1552,6 +1799,7 @@ export const MATS_CATALOG = [
     title: 'Darkrai Half Playmat',
     image: 'src/assets/playmats/png/1604-darkrai-half-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1604-darkrai-half-playmat.webp',
+    board: 'src/assets/playmats/board/1604-darkrai-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1604',
     imageUrl: 'https://cdn.artofpkm.com/vtxstx3af0a6u7fppcwh8qgzy84c',
@@ -1561,6 +1809,7 @@ export const MATS_CATALOG = [
     title: 'Espeon Half Playmat',
     image: 'src/assets/playmats/png/1603-espeon-half-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1603-espeon-half-playmat.webp',
+    board: 'src/assets/playmats/board/1603-espeon-half-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1603',
     imageUrl: 'https://cdn.artofpkm.com/bnhoeb4g3n11bvtv14ais8r1aqwb',
@@ -1571,6 +1820,8 @@ export const MATS_CATALOG = [
     image: 'src/assets/playmats/png/1613-forest-birthday-rubber-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/1613-forest-birthday-rubber-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/1613-forest-birthday-rubber-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1613',
     imageUrl: 'https://cdn.artofpkm.com/9y9thejodqzn6pjgurgxxqb0qt2j',
@@ -1582,6 +1833,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1614-mega-mewtwo-x-amp-mega-mewtwo-y-rubber-playmat-1.png',
     thumb:
       'src/assets/playmats/thumbs/1614-mega-mewtwo-x-amp-mega-mewtwo-y-rubber-playmat-1.webp',
+    board:
+      'src/assets/playmats/board/1614-mega-mewtwo-x-amp-mega-mewtwo-y-rubber-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1614',
     imageUrl: 'https://cdn.artofpkm.com/q5p7fh41x0xyjq43v1b1ta6qhxjv',
@@ -1591,6 +1844,7 @@ export const MATS_CATALOG = [
     title: 'Mega Rayquaza Rubber Playmat',
     image: 'src/assets/playmats/png/1642-mega-rayquaza-rubber-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1642-mega-rayquaza-rubber-playmat.webp',
+    board: 'src/assets/playmats/board/1642-mega-rayquaza-rubber-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1642',
     imageUrl: 'https://cdn.artofpkm.com/uz7cg8q6asyaievzeuxbr604wg5q',
@@ -1600,6 +1854,7 @@ export const MATS_CATALOG = [
     title: 'Primal Groudon Playmat',
     image: 'src/assets/playmats/png/1679-primal-groudon-playmat-1.png',
     thumb: 'src/assets/playmats/thumbs/1679-primal-groudon-playmat-1.webp',
+    board: 'src/assets/playmats/board/1679-primal-groudon-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1679',
     imageUrl: 'https://cdn.artofpkm.com/pk2nhawds580apzxrf0a4txfgekw',
@@ -1609,6 +1864,7 @@ export const MATS_CATALOG = [
     title: 'Primal Kyogre Playmat',
     image: 'src/assets/playmats/png/1680-primal-kyogre-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1680-primal-kyogre-playmat.webp',
+    board: 'src/assets/playmats/board/1680-primal-kyogre-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1680',
     imageUrl: 'https://cdn.artofpkm.com/0zt1h8xrfmmmasotmfc7q7dudzi7',
@@ -1618,6 +1874,7 @@ export const MATS_CATALOG = [
     title: 'Limited Paper Playmat',
     image: 'src/assets/playmats/png/1705-limited-paper-playmat.png',
     thumb: 'src/assets/playmats/thumbs/1705-limited-paper-playmat.webp',
+    board: 'src/assets/playmats/board/1705-limited-paper-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1705',
     imageUrl: 'https://cdn.artofpkm.com/5hsng2hvlmeq6xu9sekbja9h4axd',
@@ -1629,6 +1886,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1718-rubber-playmat-mega-charizard-battle.png',
     thumb:
       'src/assets/playmats/thumbs/1718-rubber-playmat-mega-charizard-battle.webp',
+    board:
+      'src/assets/playmats/board/1718-rubber-playmat-mega-charizard-battle.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1718',
     imageUrl: 'https://cdn.artofpkm.com/jz9zupulixcvr1lna8d3g346n527',
@@ -1640,6 +1899,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1734-xerneas-amp-yveltal-durable-playmat.png',
     thumb:
       'src/assets/playmats/thumbs/1734-xerneas-amp-yveltal-durable-playmat.webp',
+    board:
+      'src/assets/playmats/board/1734-xerneas-amp-yveltal-durable-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1734',
     imageUrl: 'https://cdn.artofpkm.com/dt5oybj3hipla51opwh1jq4uybf3',
@@ -1649,6 +1910,7 @@ export const MATS_CATALOG = [
     title: 'Half Playmat Cynthia',
     image: 'src/assets/playmats/png/1830-half-playmat-cynthia.png',
     thumb: 'src/assets/playmats/thumbs/1830-half-playmat-cynthia.webp',
+    board: 'src/assets/playmats/board/1830-half-playmat-cynthia.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1830',
     imageUrl: 'https://cdn.artofpkm.com/rdz3a9j0yf99lals0tte8ms0f0cc',
@@ -1658,6 +1920,7 @@ export const MATS_CATALOG = [
     title: 'Half Playmat Ingo & Emmet',
     image: 'src/assets/playmats/png/1831-half-playmat-ingo-amp-emmet.png',
     thumb: 'src/assets/playmats/thumbs/1831-half-playmat-ingo-amp-emmet.webp',
+    board: 'src/assets/playmats/board/1831-half-playmat-ingo-amp-emmet.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1831',
     imageUrl: 'https://cdn.artofpkm.com/3657gmtmyx8anj78fh271k1xrkq3',
@@ -1667,6 +1930,7 @@ export const MATS_CATALOG = [
     title: 'Half Playmat Skyla',
     image: 'src/assets/playmats/png/1827-half-playmat-skyla-1.png',
     thumb: 'src/assets/playmats/thumbs/1827-half-playmat-skyla-1.webp',
+    board: 'src/assets/playmats/board/1827-half-playmat-skyla-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1827',
     imageUrl: 'https://cdn.artofpkm.com/eda6ad18g6zuzj4sdy3pfxq65hdv',
@@ -1678,6 +1942,8 @@ export const MATS_CATALOG = [
       'src/assets/playmats/png/1837-durable-playmat-black-kyurem-amp-white-kyurem-1.png',
     thumb:
       'src/assets/playmats/thumbs/1837-durable-playmat-black-kyurem-amp-white-kyurem-1.webp',
+    board:
+      'src/assets/playmats/board/1837-durable-playmat-black-kyurem-amp-white-kyurem-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1837',
     imageUrl: 'https://cdn.artofpkm.com/1e0x21jbxv3ekican4j910cddxgd',
@@ -1687,6 +1953,7 @@ export const MATS_CATALOG = [
     title: 'BW Durable Playmat',
     image: 'src/assets/playmats/png/1956-bw-durable-playmat-1.png',
     thumb: 'src/assets/playmats/thumbs/1956-bw-durable-playmat-1.webp',
+    board: 'src/assets/playmats/board/1956-bw-durable-playmat-1.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/1956',
     imageUrl: 'https://cdn.artofpkm.com/jhkihr8czdgrhb0g25ak4htvlcjj',
@@ -1696,6 +1963,7 @@ export const MATS_CATALOG = [
     title: 'Official Playmat Blue',
     image: 'src/assets/playmats/png/2154-official-playmat-blue-1.png',
     thumb: 'src/assets/playmats/thumbs/2154-official-playmat-blue-1.webp',
+    board: 'src/assets/playmats/board/2154-official-playmat-blue-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/2154',
     imageUrl: 'https://cdn.artofpkm.com/7omgxn8fqirjr0r9f2mwwgh69rah',
@@ -1705,6 +1973,7 @@ export const MATS_CATALOG = [
     title: 'Official Playmat Green',
     image: 'src/assets/playmats/png/2143-official-playmat-green-1.png',
     thumb: 'src/assets/playmats/thumbs/2143-official-playmat-green-1.webp',
+    board: 'src/assets/playmats/board/2143-official-playmat-green-1.webp',
     layout: 'two-player',
     sourceUrl: 'https://www.artofpkm.com/products/2143',
     imageUrl: 'https://cdn.artofpkm.com/89s2shr0kdjozt8neraab22bne6m',
@@ -1714,6 +1983,7 @@ export const MATS_CATALOG = [
     title: 'Playmat',
     image: 'src/assets/playmats/png/2404-playmat.png',
     thumb: 'src/assets/playmats/thumbs/2404-playmat.webp',
+    board: 'src/assets/playmats/board/2404-playmat.webp',
     layout: 'one-player',
     sourceUrl: 'https://www.artofpkm.com/products/2404',
     imageUrl: 'https://cdn.artofpkm.com/eux6y8w75w1zba7pyp5rr33eitgx',

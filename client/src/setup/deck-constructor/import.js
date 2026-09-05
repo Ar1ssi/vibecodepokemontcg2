@@ -383,8 +383,8 @@ const LimitlessDecklistArray = async (decklist) => {
     decklistArray.push([
       card['count'],
       card['name'],
-      null,
-      null,
+      card['set'] || null,
+      card['number'] || null,
       null,
       cardDataToImageURL({
         name: card['name'],
@@ -650,16 +650,17 @@ export const importDecklist = async (user) => {
 
       let tableBody = decklistTable.getElementsByTagName('tbody')[0];
       decklistTable.style.display = 'block';
-      decklistArray.forEach(([quantity, name, set, number, , url, type]) => {
+      decklistArray.forEach(([quantity, name, set, number, tcgId, url, type]) => {
         let newRow = tableBody.insertRow();
-        // Stash the printed set code and collector number (neither is shown as
-        // its own visible column) so the rules engine can later disambiguate
-        // cards that share an identical name across many different
-        // sets/printings — see resolveCardId()/ensureCardData() in
+        // Stash the printed set code, collector number, and pre-resolved TCGdex
+        // id (neither is shown as its own visible column) so the rules engine
+        // can later disambiguate cards that share an identical name across many
+        // different sets/printings — see resolveCardId()/ensureCardData() in
         // rules-state.mjs. cloneNode(true) below preserves these data-*
         // attributes when the row is copied into currentDecklistTable.
         newRow.dataset.cardNumber = number || '';
         newRow.dataset.cardSet = set || '';
+        newRow.dataset.cardTcgId = tcgId || '';
 
         let qtyCell = newRow.insertCell(0);
         let nameCell = newRow.insertCell(1);
@@ -800,8 +801,9 @@ confirmButton.addEventListener('click', () => {
     let url = cells[3].innerText;
     let number = rows[i].dataset.cardNumber || null;
     let set = rows[i].dataset.cardSet || null;
+    let tcgId = rows[i].dataset.cardTcgId || null;
 
-    let cardData = [quantity, name, type, url, number, set];
+    let cardData = [quantity, name, type, url, number, set, tcgId];
     deckData.push(cardData);
   }
 
@@ -854,23 +856,37 @@ const downloadCSV = (csv, filename) => {
 };
 
 const exportTableToCSV = (filename, table) => {
-  let csv = [];
-  let rows = document.querySelectorAll(table);
+  const csv = [];
+  const rows = document.querySelectorAll(table);
 
   for (let i = 0; i < rows.length; i++) {
-    let row = [],
-      cols = rows[i].querySelectorAll('td, th');
+    const rowEl = rows[i];
+    const cols = rowEl.querySelectorAll('td, th');
+    if (cols.length === 0) continue;
 
+    const cells = [];
     for (let j = 0; j < cols.length; j++) {
-      let cell = cols[j];
-      let select = cell.querySelector('select');
-      if (select) {
-        row.push(select.value);
-      } else {
-        row.push(cell.innerText);
-      }
+      const cell = cols[j];
+      const select = cell.querySelector('select');
+      cells.push(select ? select.value : cell.innerText);
     }
-    csv.push(row.join(','));
+
+    // Identity fields live on the row dataset, not in visible columns.
+    if (rowEl.tagName === 'TR' && cols[0]?.tagName === 'TD') {
+      cells.push(rowEl.dataset.cardNumber || '');
+      cells.push(rowEl.dataset.cardSet || '');
+      cells.push(rowEl.dataset.cardTcgId || '');
+    }
+
+    csv.push(cells.join(','));
+  }
+
+  const headerRow = csv.find((line) => /^QTY,/i.test(line));
+  if (headerRow && !/Number,Set,TcgId/i.test(headerRow)) {
+    const headerIndex = csv.indexOf(headerRow);
+    csv[headerIndex] = `${headerRow},Number,Set,TcgId`;
+  } else if (!headerRow && csv.length > 0) {
+    csv.unshift('QTY,Name,Type,URL,Number,Set,TcgId');
   }
 
   downloadCSV(csv.join('\n'), filename);

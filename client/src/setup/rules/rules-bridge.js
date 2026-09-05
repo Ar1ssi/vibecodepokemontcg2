@@ -20,6 +20,8 @@
       shouldAutoDrawAtTurnStart,
       markTurnDrawn,
       markMulligansResolved,
+      markAttacked,
+      resetRulesSessionState,
     } from './rules-state.mjs';
     import { executeAttack, canPayAttackCost } from './attack-engine.mjs';
     import { handleKO, checkWinConditions, resetPrizes, prizeState } from './ko-flow.mjs';
@@ -44,6 +46,7 @@ import { classifyAbility, describeAbilityFamily } from './ability-effects.mjs';
 import {
   planAbilitySteps,
   actionableAbilityPlan,
+  markAbilityUseAfterSearchStep,
 } from './ability-step-plan.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
@@ -96,6 +99,9 @@ import {
     let coinCallCaller = 'self';
     // True while the heads/tails call picker is open.
     let coinCallPending = false;
+    // Bumped on reset/restart so stale coin-flip / mulligan callbacks cannot
+    // re-enter beginSetupWithTurnOrder after the session was cleared.
+    let rulesSessionGeneration = 0;
     
     export const initializeRulesEngine = () => {
       if (initialized) return;
@@ -156,6 +162,7 @@ import {
     
       document.addEventListener('rules-turn-began', refresh);
       document.addEventListener('rules-mode-changed', refresh);
+      document.addEventListener('rules-session-reset', refresh);
       window.setInterval(refresh, 1500);
     };
 
@@ -176,7 +183,12 @@ import {
       const costStr = (arr) => (arr || []).map(s => energySymbols[s] || s).join('');
 
       const refresh = async () => {
-        if (!rulesState.enabled || rulesState.turnPlayer !== 'self' || rulesState.phase === 'ended') {
+        if (
+          !rulesState.enabled ||
+          rulesState.phase === 'setup' ||
+          rulesState.turnPlayer !== 'self' ||
+          rulesState.phase === 'ended'
+        ) {
           win.hidden = true;
           return;
         }
@@ -290,6 +302,7 @@ import {
 
       document.addEventListener('rules-turn-began', refresh);
       document.addEventListener('rules-mode-changed', refresh);
+      document.addEventListener('rules-session-reset', refresh);
       window.setInterval(refresh, 1500);
     };
 
@@ -350,6 +363,11 @@ import {
       if (!btn) return;
       btn.addEventListener('click', async (event) => {
         if (!rulesState.enabled) return;
+        // Suppress pass() and legacy takeTurn before any await — otherwise
+        // the bubble handler runs while this async listener is suspended and
+        // the turn advances twice (double start-of-turn draw for the opponent).
+        event.preventDefault();
+        event.stopImmediatePropagation();
         if (turnEndedByAttack) {
           turnEndedByAttack = false;
           return; // turn already ended by an attack
@@ -503,8 +521,6 @@ import {
         // "interrupt" the opponent right after we passed the turn. Deliberate,
         // rules-mode-only exception to the "capture hooks don't suppress"
         // invariant (which protects the Set Up / Reset hooks).
-        event.preventDefault();
-        event.stopImmediatePropagation();
         const next = endTurn(rulesState.turnPlayer);
         appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
         updateTurnBanner();
@@ -524,21 +540,38 @@ import {
     
     // Non-rules Reset handlers don't touch rulesState, so without this the
     // phase would stay 'draw' and a later Set Up would skip the coin flip.
+    const resetRulesSession = () => {
+      rulesSessionGeneration += 1;
+      resetRulesSessionState();
+      resetPrizes();
+      resetStatuses();
+      syncedTurnOrder = null;
+      turnEndedByAttack = false;
+      flipSuperseded = false;
+      coinCallChoice = null;
+      coinCallCaller = 'self';
+      coinCallPending = false;
+      coinFlipPending = false;
+      closeDeckSearchWindow();
+      document.getElementById('rulesCoinCallOverlay')?.remove();
+      document.getElementById('rulesChoicePicker')?.remove();
+      const hud = document.getElementById('rulesTurnHUD');
+      if (hud) hud.hidden = true;
+      document.dispatchEvent(new CustomEvent('rules-session-reset'));
+    };
+
     const hookResetButtons = () => {
-      ['resetButton', 'p2ResetButton', 'resetBothButton'].forEach((id) => {
+      ['resetButton', 'p2ResetButton', 'resetBothButton', 'restartButton'].forEach((id) => {
         const btn = document.getElementById(id);
         if (!btn) return;
         btn.addEventListener('click', () => {
           if (!rulesState.enabled) return;
-          rulesState.phase = 'setup';
-          rulesState.turnNumber = 0;
-          syncedTurnOrder = null;
-          turnEndedByAttack = false;
-          flipSuperseded = false;
-          coinCallChoice = null;
-          coinCallCaller = 'self';
-          coinCallPending = false;
+          resetRulesSession();
         }, true);
+      });
+      document.addEventListener('game-restarted', () => {
+        if (!rulesState.enabled) return;
+        resetRulesSession();
       });
     };
     
@@ -551,6 +584,7 @@ import {
       // or local flip + mirror both landing) would re-run startGame() and
       // reset drewThisTurn, causing a double auto-draw on turn 1.
       if (rulesState.phase !== 'setup') return;
+      const session = rulesSessionGeneration;
       startGame(firstPlayer);
           // startGame() only resets to turnNumber 0 / phase 'draw' — it never
           // advances into the first player's actual turn 1. beginTurn() is
@@ -566,6 +600,7 @@ import {
           // mulligan check: opening hands must contain a Basic Pokémon
           setTimeout(async () => {
             try {
+              if (session !== rulesSessionGeneration) return;
               if (rulesState.mulligansResolved) return;
 
               const selfHand = getZone('self', 'hand').array;
@@ -648,10 +683,12 @@ import {
       }
     
       const beginFlip = (call, caller = 'self') => {
+        const session = rulesSessionGeneration;
         coinFlipPending = true;
         runTurnOrderCoinFlip({ call, caller })
           .then(({ turnPlayer }) => {
             if (flipSuperseded) return; // authoritative remote flip took over
+            if (session !== rulesSessionGeneration) return;
             beginSetupWithTurnOrder(turnPlayer);
           })
           .finally(() => {
@@ -1508,8 +1545,7 @@ import {
             });
           },
           onCancel: () => {
-            appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
-            shuffleAfter();
+            appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
           },
         });
         return result.ok;
@@ -1521,7 +1557,9 @@ import {
         zoneFrom: 'deck',
         destination: dest,
         onPick: shuffleAfter,
-        onCancel: shuffleAfter,
+        onCancel: () => {
+          appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
+        },
       });
       return result.ok;
     };
@@ -1626,8 +1664,10 @@ import {
           await executeAbilityDraw(user, item.step);
           executed = true;
         } else if (item.action === 'search') {
-          await runAbilitySearchPicker(user, card, item.step);
-          executed = true;
+          const completed = await runAbilitySearchPicker(user, card, item.step);
+          if (markAbilityUseAfterSearchStep(completed)) {
+            executed = true;
+          }
         } else if (item.action === 'when-played') {
           if (await runWhenPlayedStep(user, card, steps, item.stepIndex)) executed = true;
         } else if (item.action === 'executor' && item.executor) {
@@ -1952,9 +1992,14 @@ if (!isTrainer) {
         } catch {
           return;
         }
-        if (shouldAutoDrawAtTurnStart({ enabled: rulesState.enabled, drewThisTurn: rulesState.flags[player]?.drewThisTurn, deckCount })) {
-          draw(player, player, 1, true);
+        if (shouldAutoDrawAtTurnStart({
+          enabled: rulesState.enabled,
+          drewThisTurn: rulesState.flags[player]?.drewThisTurn,
+          deckCount,
+          turnNumber: rulesState.turnNumber,
+        })) {
           markTurnDrawn(player);
+          draw(player, player, 1, true);
           appendMessage('', `${player === 'self' ? 'P1' : 'P2'} draws a card (start of turn).`, 'announcement', false);
         } else if (Number(deckCount) <= 0) {
           appendMessage('', `${player === 'self' ? 'P1' : 'P2'}'s deck is empty — cannot draw.`, 'announcement', false);

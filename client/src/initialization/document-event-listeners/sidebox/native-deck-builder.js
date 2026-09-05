@@ -37,6 +37,7 @@ import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-pick
 import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
 import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
 import { getMatById } from '../../../setup/deck-builder/core/mats.mjs';
+import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
     
     import {
@@ -61,8 +62,9 @@ const deckToSimRows = (deck = {}) => {
         // which printing was picked; carrying the number keeps the rules
         // engine from re-guessing it by name later — see resolveCardId() in
         // setup/rules/rules-state.mjs.
-        variant?.data?.number || null,
-        null,
+        variant?.data?.number || variant?.data?.localId || null,
+        variant?.data?.set?.id || null,
+        variant?.data?.id || null,
       ]);
     }
   }
@@ -151,7 +153,7 @@ export const initializeNativeDeckBuilder = () => {
           const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
           const image = sleeve?.image || fallback;
           import('../../../setup/deck-constructor/import.js').then(({ changeCardBack }) => {
-            changeCardBack('self', image, false);
+            changeCardBack(currentLoadTarget, image, false);
           });
         } catch {}
   });
@@ -248,25 +250,23 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           sidePane.style.display = isCustomize ? 'none' : '';
         }
     
-        // Sleeve panel only in customize mode. sleevePanel is declared below the
-        // picker init block; safe because switchMode only runs on tab clicks.
+        // Customize sub-panels: only one visible at a time (setView handles
+        // sleeve/coin/mat toggling). While not in customize, hide all three.
         if (typeof sleevePanel !== 'undefined' && sleevePanel) {
-          sleevePanel.hidden = !isCustomize;
-    if (typeof coinPanel !== 'undefined' && coinPanel) {
-      coinPanel.hidden = !isCustomize;
-    }
-    if (typeof matPanel !== 'undefined' && matPanel) {
-      matPanel.hidden = !isCustomize;
-    }
-        const customizeSwitcherEl = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
-        if (customizeSwitcherEl) {
-          customizeSwitcherEl.hidden = !isCustomize;
-          // entering customize resets to the sleeve view; leaving hides both
-          if (isCustomize) {
-            const sleeveBtn = customizeSwitcherEl.querySelector('[data-view="sleeve"]');
-            sleeveBtn?.click();
+          if (!isCustomize) {
+            sleevePanel.hidden = true;
+            if (coinPanel) coinPanel.hidden = true;
+            if (matPanel) matPanel.hidden = true;
           }
-        }
+          const customizeSwitcherEl = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
+          if (customizeSwitcherEl) {
+            customizeSwitcherEl.hidden = !isCustomize;
+            // entering customize resets to the sleeve view
+            if (isCustomize) {
+              const sleeveBtn = customizeSwitcherEl.querySelector('[data-view="sleeve"]');
+              sleeveBtn?.click();
+            }
+          }
         }
       };
     
@@ -326,24 +326,29 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           };
           // apply-mat-layout.js listens for this to render the mat and re-fit
           // the board zones; nothing here touches the board.
-          const announceMat = (target, mat) => {
-            document.dispatchEvent(new CustomEvent('playmat-changed', {
-              detail: {
-                target,
-                mat: mat
-                  ? {
-                      id: mat.id,
-                      title: mat.title,
-                      image: mat.image,
-                      // The local `image` is absent from a deploy, so the
-                      // board needs the scraped original to fall back on.
-                      imageUrl: mat.imageUrl,
-                      thumb: mat.thumb,
-                      layout: mat.layout,
-                    }
-                  : null,
-              },
-            }));
+          const matPayload = (mat) =>
+            mat
+              ? {
+                  id: mat.id,
+                  title: mat.title,
+                  image: mat.image,
+                  imageUrl: mat.imageUrl,
+                  thumb: mat.thumb,
+                  board: mat.board,
+                  layout: mat.layout,
+                }
+              : null;
+
+          const announceMat = (target, mat, emit = false) => {
+            if (emit) {
+              changePlaymat(target, mat?.id ?? null, true);
+              return;
+            }
+            document.dispatchEvent(
+              new CustomEvent('playmat-changed', {
+                detail: { target, mat: matPayload(mat) },
+              })
+            );
           };
           const matPicker = initializeDeckBuilderMatPicker({
             panelEl: matPanel,
@@ -354,7 +359,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                 const other = currentLoadTarget === 'opp' ? 'self' : 'opp';
                 deckLibrary?.setActiveMat?.(other, null);
               }
-              announceMat(currentLoadTarget, mat);
+              announceMat(currentLoadTarget, mat, true);
             },
           });
 
@@ -590,6 +595,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deck = syncedDecks[target];
         deckLibrary?.setTarget(target);
         render();
+        refreshSleeveSelection();
+        refreshCoinSelection();
         refreshMatSelection();
       };
 
