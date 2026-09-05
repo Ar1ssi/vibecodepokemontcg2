@@ -60,6 +60,7 @@ const abilityBlockedByStadium = (user, target) => {
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
 const placeSelfDamage = (user, zoneId, index, damage) => {
+  if (!(damage > 0)) return;
   const target = getZone(user, zoneId).array[index];
   if (!target) return;
   if (target.image?.damageCounter) {
