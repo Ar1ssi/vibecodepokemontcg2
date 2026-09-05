@@ -1,8 +1,11 @@
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
 
+const isBoardPokemon = (card) =>
+  (card.type2 || card.type) === 'Pokémon' && !card.image.attached;
+
 const nonAttachedPokemon = (zone) =>
-  zone.array.filter((card) => card.type === 'Pokémon' && !card.image.attached);
+  zone.array.filter((card) => isBoardPokemon(card));
 
 export const autoMoveActiveBenchCard = (
   user,
@@ -22,13 +25,12 @@ export const autoMoveActiveBenchCard = (
     ['active'].includes(dZoneId) &&
     !movingCard.image.attached &&
     !targetCard &&
-    movingCard.type === 'Pokémon'
+    isBoardPokemon(movingCard)
   ) {
     const pokemon = nonAttachedPokemon(dZone);
     if (pokemon.length > 1) {
       const oldIdx = dZone.array.findIndex(
-        (c) =>
-          c !== movingCard && c.type === 'Pokémon' && !c.image.attached
+        (c) => c !== movingCard && isBoardPokemon(c)
       );
       if (oldIdx >= 0) {
         moveCardMessage(user, initiator, 'active', 'bench', oldIdx, false, 'move');

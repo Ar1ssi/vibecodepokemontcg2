@@ -20,16 +20,20 @@ function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
     hints.target = buildCardHint(dZone.array[targetIndex]);
   }
 
+  const cardType = movingCard.type2 || movingCard.type;
   const fromHandOrDeck = !['active', 'bench'].includes(oZoneId);
   const toActiveOrBench = ['active', 'bench'].includes(dZoneId);
   hints.isEvolution =
     !!hints.target &&
-    movingCard.type === 'Pokémon' &&
+    cardType === 'Pokémon' &&
     fromHandOrDeck &&
     toActiveOrBench;
 
   return hints;
 }
+
+/** @internal exported for unit tests */
+export { buildMoveCardHints };
 
 function resolveMoveCardIndices(user, oZoneId, dZoneId, index, targetIndex, hints) {
   if (!hints) {
@@ -106,6 +110,19 @@ export const moveCardBundle = (
     }
   }
 
+  // Capture sync hints BEFORE moveCard splices the origin zone — building
+  // hints after the move reads the wrong card at the relayed index.
+  const hintsToSend =
+    emit && systemState.isTwoPlayer
+      ? buildMoveCardHints(
+          user,
+          oZoneId,
+          dZoneId,
+          resolvedIndex,
+          resolvedTargetIndex
+        )
+      : cardHints;
+
   moveCardMessage(
     user,
     initiator,
@@ -141,11 +158,6 @@ export const moveCardBundle = (
     return;
   }
 
-  const hints =
-    emit && systemState.isTwoPlayer
-      ? buildMoveCardHints(user, oZoneId, dZoneId, resolvedIndex, resolvedTargetIndex)
-      : cardHints;
-
   processAction(user, emit, 'moveCardBundle', [
     oInitiator,
     oZoneId,
@@ -153,6 +165,6 @@ export const moveCardBundle = (
     resolvedIndex,
     resolvedTargetIndex,
     action,
-    hints,
+    hintsToSend,
   ]);
 };
