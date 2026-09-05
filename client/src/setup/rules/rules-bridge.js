@@ -1418,6 +1418,280 @@ import {
       return true; // generic search: everything matches
     };
 
+    const executeAbilityDraw = async (user, step) => {
+      const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+      let drew = 0;
+      if (step.until) {
+        const target = Number(step.count);
+        while (Number.isFinite(target) && getZone(user, 'hand').getCount() < target && getZone(user, 'deck').getCount() > 0) {
+          moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move');
+          drew++;
+        }
+        appendMessage('', `  auto: drew ${drew} card${drew === 1 ? '' : 's'} until you had ${target} in hand`, 'announcement', false);
+      } else if (step.eachPlayer) {
+        for (const who of ['self', 'opp']) {
+          for (let i = 0; i < step.count; i++) {
+            if (getZone(who, 'deck').getCount() > 0) {
+              moveCardBundle(who, who, 'deck', 'hand', 0, false, 'move');
+              drew++;
+            }
+          }
+        }
+        appendMessage('', `  auto: each player drew ${step.count} card${step.count === 1 ? '' : 's'}`, 'announcement', false);
+      } else {
+        for (let i = 0; i < step.count; i++) {
+          if (getZone(user, 'deck').getCount() > 0) {
+            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move');
+            drew++;
+          }
+        }
+        appendMessage('', `  auto: drew ${drew} card${drew === 1 ? '' : 's'}`, 'announcement', false);
+      }
+      return drew > 0 || step.eachPlayer;
+    };
+
+    const awaitChoicePicker = (opts) =>
+      new Promise((resolve) => {
+        openChoicePicker({
+          ...opts,
+          onPick: (cand) => {
+            opts.onPick?.(cand);
+            resolve({ ok: true, picks: [cand] });
+          },
+          onConfirm: (selected) => {
+            opts.onConfirm?.(selected);
+            resolve({ ok: true, picks: selected });
+          },
+          onCancel: () => {
+            opts.onCancel?.();
+            resolve({ ok: false, picks: [] });
+          },
+        });
+      });
+
+    const runAbilitySearchPicker = async (user, card, step) => {
+      openDeckSearchWindow(`${card.name} ability — search your deck`);
+      appendMessage('', `  ${card.name} — opening card select…`, 'announcement', false);
+      const deck = getZone(user, 'deck');
+      const matches = [];
+      for (const c of deck.array) {
+        await ensureCardData(c);
+        if (matchesSearch(c, step.what)) matches.push(c);
+      }
+      const usingFallback = matches.length === 0 && deck.array.length > 0;
+      const pool = usingFallback ? deck.array : matches;
+      if (pool.length === 0) {
+        appendMessage('', '  no cards left in deck', 'announcement', false);
+        return false;
+      }
+      const dest = step.destination === 'Bench' ? 'bench' : 'hand';
+      const toBench = dest === 'bench';
+      const shuffleAfter = () => shuffleZone(user, user, 'deck');
+      const count = step.count || 1;
+
+      if (count > 1) {
+        const result = await awaitChoicePicker({
+          title: `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+          candidates: pool,
+          zoneFrom: 'deck',
+          destination: dest,
+          multiSelect: true,
+          requiredCount: count,
+          onConfirm: (selected) => {
+            import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+              for (const s of selected) {
+                const idx = getZone(user, 'deck').array.indexOf(s);
+                if (idx >= 0) moveCardBundle(user, user, 'deck', dest, idx, false, 'move');
+              }
+              appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
+              shuffleAfter();
+            });
+          },
+          onCancel: () => {
+            appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
+            shuffleAfter();
+          },
+        });
+        return result.ok;
+      }
+
+      const result = await awaitChoicePicker({
+        title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+        candidates: pool,
+        zoneFrom: 'deck',
+        destination: dest,
+        onPick: shuffleAfter,
+        onCancel: shuffleAfter,
+      });
+      return result.ok;
+    };
+
+    const runWhenPlayedStep = async (user, card, steps, stepIndex) => {
+      const img = card.image;
+      if (img?.__rulesWhenPlayedFired) return false;
+      img.__rulesWhenPlayedFired = true;
+
+      const effect = parseWhenPlayedEffect(card);
+      let ran = false;
+      if (effect?.kind === 'draw') {
+        await executeAbilityDraw(user, { count: effect.n, until: false, eachPlayer: false });
+        ran = true;
+      } else if (effect?.kind === 'damage') {
+        const oppActive = getZone('opp', 'active').array[0];
+        const existing = parseInt(oppActive?.image?.damageCounter?.textContent || '0', 10) || 0;
+        if (oppActive?.image) {
+          if (existing) {
+            const { updateDamageCounter } = await import('../../actions/counters/damage-counter.js');
+            updateDamageCounter('opp', 'active', 0, existing + effect.n);
+          } else {
+            const { addDamageCounter } = await import('../../actions/counters/damage-counter.js');
+            addDamageCounter('opp', 'active', 0, effect.n);
+          }
+        }
+        appendMessage('', `  auto: when played — placed ${effect.n} damage counter(s) on opponent's Active`, 'announcement', false);
+        ran = true;
+      }
+
+      const searchStep = steps.slice(stepIndex + 1).find((s) => s.type === 'searchAbility');
+      if (searchStep || effect?.kind === 'search') {
+        const step = searchStep || { what: 'a card', count: effect?.n || 1, destination: 'hand' };
+        await runAbilitySearchPicker(user, card, step);
+        ran = true;
+      }
+      return ran;
+    };
+
+    const ABILITY_EXECUTOR_FNS = {
+      heal: healAbility,
+      switch: switchAbility,
+      attach: attachAbility,
+      'energy-redirect': energyRedirectAbility,
+    };
+
+    const autoExecuteAbilitySteps = (user, card, steps) => {
+      const plan = planAbilitySteps(steps, { mode: 'auto' });
+      for (const item of plan) {
+        try {
+          if (item.action === 'draw' && !abilityUsed(user, card)) {
+            executeAbilityDraw(user, item.step).then((ran) => {
+              if (ran) {
+                markAbilityUsed(user, card);
+                appendMessage('', '  auto: ability used this turn (draw)', 'announcement', false);
+              }
+            });
+          } else if (item.action === 'when-played') {
+            runWhenPlayedStep(user, card, steps, item.stepIndex);
+          } else if (item.action === 'announce' && item.step.type === 'opponentDraw') {
+            appendMessage(
+              '',
+              `  ${item.step.guidance} (announce-only — opponent must consent to draw)`,
+              'announcement',
+              false
+            );
+          }
+        } catch {}
+      }
+    };
+
+    export async function runAbilitySteps(user, card) {
+      if (rulesState.enabled && rulesState.turnPlayer !== user) {
+        appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
+        return;
+      }
+      if (rulesState.enabled && abilityUsed(user, card)) {
+        appendMessage(user, `⛔ ${card.name}'s ability was already used this turn.`, 'announcement', false);
+        return;
+      }
+
+      await ensureCardData(card);
+      const abilityText = card.ability?.text || card.abilityText || '';
+      const steps = parseAbility(abilityText);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      const actionable = actionableAbilityPlan(plan, { mode: 'interactive' });
+      if (actionable.length === 0) {
+        appendMessage(user, `⛔ No actionable steps for ${card.name}'s ability.`, 'announcement', false);
+        return;
+      }
+
+      const name = card.ability?.name || 'Ability';
+      appendMessage('', `✦ ${card.name} — ${name}:`, 'announcement', false);
+
+      let executed = false;
+      const orchestrated = { orchestrated: true };
+
+      for (const item of plan) {
+        if (item.action === 'skip') continue;
+
+        if (item.action === 'draw') {
+          await executeAbilityDraw(user, item.step);
+          executed = true;
+        } else if (item.action === 'search') {
+          await runAbilitySearchPicker(user, card, item.step);
+          executed = true;
+        } else if (item.action === 'when-played') {
+          if (await runWhenPlayedStep(user, card, steps, item.stepIndex)) executed = true;
+        } else if (item.action === 'executor' && item.executor) {
+          const fn = ABILITY_EXECUTOR_FNS[item.executor];
+          if (fn) {
+            await fn(user, true, card, orchestrated);
+            executed = true;
+          }
+        } else if (item.action === 'recursion-discard') {
+          const discard = getZone(user, 'discard');
+          const matches = [];
+          for (const c of discard.array) {
+            await ensureCardData(c);
+            if (isPokemonCard(c) || String(c.name || '').toLowerCase().includes('energy')) {
+              matches.push(c);
+            }
+          }
+          if (matches.length > 0) {
+            const upTo = item.step.upTo || 1;
+            if (upTo > 1) {
+              const result = await awaitChoicePicker({
+                title: `${card.name} — choose up to ${upTo} cards from discard`,
+                candidates: matches,
+                zoneFrom: 'discard',
+                destination: 'hand',
+                multiSelect: true,
+                requiredCount: Math.min(upTo, matches.length),
+                onConfirm: (selected) => {
+                  import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                    for (const s of selected) {
+                      const idx = getZone(user, 'discard').array.indexOf(s);
+                      if (idx >= 0) moveCardBundle(user, user, 'discard', 'hand', idx, false, 'move');
+                    }
+                  });
+                },
+              });
+              if (result.ok) executed = true;
+            } else {
+              const result = await awaitChoicePicker({
+                title: `${card.name} — take a card from discard`,
+                candidates: matches,
+                zoneFrom: 'discard',
+                destination: 'hand',
+              });
+              if (result.ok) executed = true;
+            }
+          }
+        } else if (item.action === 'look-at-top') {
+          openDeckSearchWindow(`${card.name} — look at the top of your deck`);
+          appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
+          executed = true;
+        } else if (item.action === 'opponent-draw') {
+          appendMessage('', `  ${item.step.guidance} (opponent must consent)`, 'announcement', false);
+        } else if (item.action === 'announce') {
+          appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
+        }
+      }
+
+      if (executed && rulesState.enabled) {
+        markAbilityUsed(user, card);
+      }
+    }
+    
+
     initTrainerExecution({
       getZone,
       appendMessage,
