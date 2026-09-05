@@ -856,23 +856,37 @@ const downloadCSV = (csv, filename) => {
 };
 
 const exportTableToCSV = (filename, table) => {
-  let csv = [];
-  let rows = document.querySelectorAll(table);
+  const csv = [];
+  const rows = document.querySelectorAll(table);
 
   for (let i = 0; i < rows.length; i++) {
-    let row = [],
-      cols = rows[i].querySelectorAll('td, th');
+    const rowEl = rows[i];
+    const cols = rowEl.querySelectorAll('td, th');
+    if (cols.length === 0) continue;
 
+    const cells = [];
     for (let j = 0; j < cols.length; j++) {
-      let cell = cols[j];
-      let select = cell.querySelector('select');
-      if (select) {
-        row.push(select.value);
-      } else {
-        row.push(cell.innerText);
-      }
+      const cell = cols[j];
+      const select = cell.querySelector('select');
+      cells.push(select ? select.value : cell.innerText);
     }
-    csv.push(row.join(','));
+
+    // Identity fields live on the row dataset, not in visible columns.
+    if (rowEl.tagName === 'TR' && cols[0]?.tagName === 'TD') {
+      cells.push(rowEl.dataset.cardNumber || '');
+      cells.push(rowEl.dataset.cardSet || '');
+      cells.push(rowEl.dataset.cardTcgId || '');
+    }
+
+    csv.push(cells.join(','));
+  }
+
+  const headerRow = csv.find((line) => /^QTY,/i.test(line));
+  if (headerRow && !/Number,Set,TcgId/i.test(headerRow)) {
+    const headerIndex = csv.indexOf(headerRow);
+    csv[headerIndex] = `${headerRow},Number,Set,TcgId`;
+  } else if (!headerRow && csv.length > 0) {
+    csv.unshift('QTY,Name,Type,URL,Number,Set,TcgId');
   }
 
   downloadCSV(csv.join('\n'), filename);
