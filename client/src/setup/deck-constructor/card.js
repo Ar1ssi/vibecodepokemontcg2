@@ -18,18 +18,20 @@ export class Card {
   image;
   number;
   set;
+  id;
 
-  constructor(user, name, type, imageURL, number = null, set = null) {
+  constructor(user, name, type, imageURL, number = null, set = null, id = null) {
     this.user = user;
     this.name = name;
     this.type = type;
-    // Printed collector number and set code from the decklist (e.g. "32" /
-    // "TRR"), when known. Kept alongside `name` so the rules engine can
+    // Printed collector number, set code, and TCGdex id from the decklist /
+    // deck-builder when known. Kept alongside `name` so the rules engine can
     // disambiguate cards that share an identical name across many different
     // printings/sets (see resolveCardId and ensureCardData in
     // rules-state.mjs) instead of guessing from a name-only search.
     this.number = number || null;
     this.set = set || null;
+    this.id = id || null;
     this.imageAttributes = {
       user: user,
       type: type,

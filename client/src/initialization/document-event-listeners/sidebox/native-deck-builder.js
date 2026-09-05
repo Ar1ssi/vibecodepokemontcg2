@@ -62,7 +62,8 @@ const deckToSimRows = (deck = {}) => {
         // engine from re-guessing it by name later — see resolveCardId() in
         // setup/rules/rules-state.mjs.
         variant?.data?.number || null,
-        null,
+        variant?.data?.set?.id || null,
+        variant?.data?.id || null,
       ]);
     }
   }
