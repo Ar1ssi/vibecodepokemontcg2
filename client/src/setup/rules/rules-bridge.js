@@ -29,8 +29,8 @@ import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
-import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
-import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, combinedHandProtected } from './ability-executors.mjs';
+import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
 import { classifyAbility } from './ability-effects.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
@@ -384,7 +384,9 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           const active = getZone(endingPlayer, 'active').array[0];
           if (active) {
             const key = active.image?.dataset?.cardId || active.name;
-            const boundary = resolveTurnBoundary(endingPlayer, key);
+            const boundary = resolveTurnBoundary(endingPlayer, key, Math.random, {
+              checkupPoisonBonus: getStadiumCheckupPoisonBonus(active, endingPlayer),
+            });
             if (boundary.damage > 0 && active.image?.damageCounter) {
               const current = parseInt(active.image.damageCounter.textContent || '0', 10) || 0;
               active.image.damageCounter.textContent = current + boundary.damage;
@@ -1570,7 +1572,12 @@ if (!isTrainer) {
                             ...getZone('opp', 'active').array,
                             ...getZone('opp', 'bench').array,
                           ];
-                          const protector = oppPokemons.find((c) => c.image && isHandProtected(c));
+                          const blockTools = stadiumBlocksToolEffects();
+                          const protector = oppPokemons.find((c) => {
+                            if (!c.image) return false;
+                            const zoneId = getZone('opp', 'active').array.includes(c) ? 'active' : 'bench';
+                            return combinedHandProtected(c, getZone('opp', zoneId).array, { blockTools });
+                          });
                           // Stadium hand protection: a Stadium owned by the
                           // discarding target can shield their hand as well
                           // (e.g. "Cards in your hand can't be discarded").

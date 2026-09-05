@@ -7,11 +7,11 @@ import test from 'node:test';
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed } = await import('../stadium-effects.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
     
     // ── KO / prizes ──
@@ -639,7 +639,7 @@ import test from 'node:test';
       );
       assert.equal(
         classifyStadiumEffect({ type: 'Stadium', name: 'Lillie’s Rooftop', text: 'Prevent all damage that would be dealt to your Active Pokémon by attacks.' }),
-        'unknown', // prevention effect: no trigger keyword → unknown (guidance says read text)
+        'continuous-both',
       );
       assert.equal(
         classifyStadiumEffect({ type: 'Stadium', name: 'Misty’s Cove', text: 'Your opponent’s Water Pokémon are harder to evolve.' }),
@@ -684,6 +684,65 @@ import test from 'node:test';
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, attach an Energy.' }).kind, 'energy');
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, heal 20 damage.' }).kind, 'heal');
       assert.equal(parseStadiumOncePerTurn({ text: 'Prevent all damage.' }), null);
+    });
+
+    test('parseStadiumOncePerTurn: complex TCG Live once-per-turn stadiums', () => {
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may discard an Energy card from their hand in order to draw a card." }).kind,
+        'discard-draw',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may put a card from their hand on top of their deck." }).kind,
+        'hand-to-deck-top',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may switch their Active {W} Pokémon with 1 of their Benched {W} Pokémon." }).kind,
+        'switch-type',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may heal 10 damage from each of their Pokémon." }).kind,
+        'heal-all',
+      );
+      const factory = parseStadiumOncePerTurn({ text: 'Once during each player\'s turn, if they played a Supporter card that has "Team Rocket" in its name from their hand, they may draw 2 cards.' });
+      assert.equal(factory.kind, 'draw');
+      assert.equal(factory.n, 2);
+      assert.equal(factory.condition.type, 'named-supporter');
+    });
+
+    test('Jamming Tower: tool effects blocked via combinedDamagePrevention', async () => {
+      const { combinedDamagePrevention } = await import('../ability-executors.mjs');
+      const { markStadiumPlayed, getStadium } = await import('../rules-state.mjs');
+      const { stadiumBlocksToolEffects } = await import('../stadium-effects.mjs');
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        const mon = { name: 'Pikachu', ability: { text: 'Prevent all damage done to this Pokémon by attacks.' } };
+        const tool = { name: 'Bravery Charm', type: 'Trainer', subtypes: ['Tool'], ability: { text: 'Prevent all damage done to this Pokémon by attacks from Pokémon ex.' } };
+        markStadiumPlayed('self', { name: 'Jamming Tower', subtypes: ['Stadium'], text: 'Pokémon Tools attached to each Pokémon (both yours and your opponent\'s) have no effect.' });
+        assert.equal(stadiumBlocksToolEffects(), true);
+        const blocked = combinedDamagePrevention(mon, [tool], { blockTools: true });
+        assert.equal(blocked.preventAll, true);
+        const withTool = combinedDamagePrevention(mon, [tool], { blockTools: false });
+        assert.equal(withTool.preventAll, true);
+      } finally {
+        rulesState.stadium = prev;
+      }
+    });
+
+    test('Area Zero Underdepths: bench limit 8 with Tera, else 5', () => {
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        markStadiumPlayed('self', {
+          name: 'Area Zero Underdepths',
+          subtypes: ['Stadium'],
+          text: 'Each player who has any Tera Pokémon in play can have up to 8 Pokémon on their Bench.',
+        });
+        assert.equal(getEffectiveBenchLimit(false), 5);
+        assert.equal(getEffectiveBenchLimit(true), 8);
+      } finally {
+        rulesState.stadium = prev;
+      }
     });
 
     test('parseStadiumDamagePrevention: numbers, all, and null', () => {
@@ -1627,6 +1686,42 @@ import test from 'node:test';
 
       assert.equal(parseStadiumHpModifier(null), 0);
       assert.equal(parseStadiumHpModifier({ name: 'X' }), 0);
+
+      const gravity = { name: 'Gravity Mountain', subtypes: ['Stadium'], text: 'Each Stage 2 Pokémon in play (both yours and your opponent\'s) gets -30 HP.' };
+      assert.equal(parseStadiumHpModifier(gravity), -30);
+    });
+
+    test('TCG Live Standard stadiums: key passive/active parsers recognize real card text', () => {
+      const cards = [
+        { name: 'Full Metal Lab', text: '{M} Pokémon (both yours and your opponent\'s) take 30 less damage from attacks from the opponent\'s Pokémon (after applying Weakness and Resistance).' },
+        { name: 'Forest of Vitality', text: 'Each player\'s {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.' },
+        { name: 'Risky Ruins', text: 'Whenever any player puts a Basic non-{D} Pokémon onto their Bench during their turn, place 2 damage counters on that Pokémon.' },
+        { name: 'Postwick', text: 'Attacks used by Hop\'s Pokémon (both yours and your opponent\'s) do 30 more damage to the opponent\'s Active Pokémon (before applying Weakness and Resistance).' },
+        { name: 'Perilous Jungle', text: 'During Pokémon Checkup, put 2 more damage counters on each Poisoned non-{D} Pokémon (both yours and your opponent\'s).' },
+        { name: 'N\'s Castle', text: 'N\'s Pokémon in play (both yours and your opponent\'s) have no Retreat Cost.' },
+      ].map((c) => ({ ...c, subtypes: ['Stadium'], type: 'Stadium' }));
+
+      for (const c of cards) {
+        assert.notEqual(classifyStadiumEffect(c), 'unknown', c.name);
+        assert.equal(hasRecognizedPassiveStadiumEffect(c), true, c.name);
+        assert.ok(applyStadiumEffect(c).results.length > 0, c.name);
+      }
+
+      assert.equal(parseStadiumDamageReduction(cards[0]), 30);
+      assert.equal(parseStadiumEvolutionSpeed(cards[1]).relaxTurnGate, true);
+      assert.equal(parseStadiumEvolutionSpeed(cards[1]).typeFilter, 'grass');
+      assert.equal(stadiumBenchDamageApplies({ name: 'Pikachu', stage: 'Basic', types: ['Lightning'] }, cards[2]), 2);
+      assert.equal(stadiumBenchDamageApplies({ name: 'Umbreon', stage: 'Basic', types: ['Darkness'] }, cards[2]), null);
+      assert.equal(parseStadiumAttackDamageBonus(cards[3]), 30);
+      assert.equal(parseStadiumCheckupPoisonBonus(cards[4]), 2);
+      assert.equal(parseStadiumRetreatModifier(cards[5]), -Infinity);
+    });
+
+    test('resolveTurnBoundary: Perilous Jungle adds extra poison damage', () => {
+      applyStatus('self', 'c1', 'poisoned');
+      const r = resolveTurnBoundary('self', 'c1', Math.random, { checkupPoisonBonus: 2 });
+      assert.equal(r.damage, 30);
+      assert.match(r.notes.join(' '), /Stadium \+2 counter/);
     });
 
     test('getStadiumHpBonus: targeting follows the stadium pronouns', () => {
@@ -1683,7 +1778,7 @@ import test from 'node:test';
 
     test('parseStadiumEvolutionSpeed: turn-gate relax / cost reduce / none', () => {
       const relax = { name: 'Fast Evolve', subtypes: ['Stadium'], text: 'Your Pokémon in play may evolve as if it had been in play for 1 more turn.' };
-      assert.deepEqual(parseStadiumEvolutionSpeed(relax), { relaxTurnGate: true, costReduce: 0 });
+      assert.deepEqual(parseStadiumEvolutionSpeed(relax), { relaxTurnGate: true, costReduce: 0, typeFilter: null });
 
       // plural "they" phrasing (real-card style)
       const relaxThey = { name: 'Fast Evolve 2', subtypes: ['Stadium'], text: 'Your Benched Pokémon may evolve as if they had been in play for one more turn.' };
@@ -1694,10 +1789,10 @@ import test from 'node:test';
       assert.equal(parseStadiumEvolutionSpeed(cost).relaxTurnGate, false);
 
       const none = { name: 'Heal Center', subtypes: ['Stadium'], text: 'Heal 30 damage from your Active Pokémon.' };
-      assert.deepEqual(parseStadiumEvolutionSpeed(none), { relaxTurnGate: false, costReduce: 0 });
+      assert.deepEqual(parseStadiumEvolutionSpeed(none), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
 
-      assert.deepEqual(parseStadiumEvolutionSpeed(null), { relaxTurnGate: false, costReduce: 0 });
-      assert.deepEqual(parseStadiumEvolutionSpeed({ name: 'X' }), { relaxTurnGate: false, costReduce: 0 });
+      assert.deepEqual(parseStadiumEvolutionSpeed(null), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
+      assert.deepEqual(parseStadiumEvolutionSpeed({ name: 'X' }), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
     });
 
     test('getStadiumEvolutionSpeed: targeting follows the stadium pronouns', () => {
@@ -1707,13 +1802,13 @@ import test from 'node:test';
       try {
         // "your Pokémon" → owner only
         markStadiumPlayed('self', { name: 'A', subtypes: ['Stadium'], text: 'Your Pokémon in play may evolve as if it had been in play for 1 more turn.' });
-        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: true, costReduce: 0 });
-        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: false, costReduce: 0 });
+        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: true, costReduce: 0, typeFilter: null });
+        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
 
         // "your opponent" → non-owner only
         markStadiumPlayed('self', { name: 'B', subtypes: ['Stadium'], text: 'Your opponent\'s Pokémon may evolve as if it had been in play for 1 more turn.' });
-        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: false, costReduce: 0 });
-        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: true, costReduce: 0 });
+        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
+        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: true, costReduce: 0, typeFilter: null });
 
         // General (no pronoun) → both
         markStadiumPlayed('self', { name: 'C', subtypes: ['Stadium'], text: 'Pokémon in play may evolve as if it had been in play for 1 more turn.' });
