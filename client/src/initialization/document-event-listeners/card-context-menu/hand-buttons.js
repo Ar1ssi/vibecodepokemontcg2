@@ -8,7 +8,7 @@ import {
   shuffleAndDraw,
   shuffleBottomAndDraw,
 } from '../../../actions/zones/hand-actions.js';
-import { mouseClick, systemState } from '../../../front-end.js';
+import { mouseClick, systemState } from '../../../state.js';
 import { manualDeckActionAllowed } from '../../../setup/rules/rules-state.mjs';
 import { appendMessage } from '../../../setup/chatbox/append-message.js';
 

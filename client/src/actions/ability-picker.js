@@ -9,7 +9,7 @@ import { getZone } from '../setup/zones/get-zone.js';
 import { classifyAbility, isAbilityCard } from '../setup/rules/ability-effects.mjs';
 import { rulesState, abilityUsed, ensureCardData } from '../setup/rules/rules-state.mjs';
 import { appendMessage } from '../setup/chatbox/append-message.js';
-import { selfContainer, oppContainer } from '../front-end.js';
+import { selfContainer, oppContainer } from '../state.js';
 import {
   healAbility,
   switchAbility,

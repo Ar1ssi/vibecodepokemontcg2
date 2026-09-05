@@ -3376,7 +3376,7 @@ a:hover {
       border-radius: 12px;
       flex: 0 0 auto;
       overflow: visible;
-    }}
+    }
     .native-deck-builder-coin-preview .coin-3d { width: 120px; height: 120px; flex: 0 0 auto; }
     .native-deck-builder-coin-preview-text { display: flex; flex-direction: column; gap: 0.4vh; }
     .native-deck-builder-coin-preview-text strong { font-size: 1.7vh; }

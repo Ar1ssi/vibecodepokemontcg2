@@ -4,7 +4,7 @@ import {
   lostZoneBoard,
   shuffleBoard,
 } from '../../../actions/general/board-actions.js';
-import { mouseClick, systemState } from '../../../front-end.js';
+import { mouseClick, systemState } from '../../../state.js';
 
 export const initializeBoardButtons = () => {
   const discardBoardButton = document.getElementById('discardBoardButton');

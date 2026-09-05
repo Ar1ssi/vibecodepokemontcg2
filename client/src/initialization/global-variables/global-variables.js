@@ -1,6 +1,12 @@
 /* eslint-disable no-undef */
 import { preloadImage } from '../../setup/general/preload-image.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+export {
+  selfContainer,
+  oppContainer,
+  selfContainerDocument,
+  oppContainerDocument,
+} from './containers.js';
 
 export const version = '1.5.1';
 
@@ -11,11 +17,6 @@ const socketUrl = window.location.hostname === 'ptcgsim.online'
 export const socket = io(socketUrl);
 // export const socket = io('http://localhost:4000/');
 
-// export references to HTML elements 'selfContainer' and 'oppContainer', and their respective content window documents for ease of access to the iframes
-export const selfContainer = document.getElementById('selfContainer');
-export const selfContainerDocument = selfContainer.contentWindow.document;
-export const oppContainer = document.getElementById('oppContainer');
-export const oppContainerDocument = oppContainer.contentWindow.document;
 // create globally accessible variable systemState, which holds information relevant to the state of the user's game
 export const systemState = {
   coachingMode: false,

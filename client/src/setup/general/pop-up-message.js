@@ -1,4 +1,4 @@
-import { oppContainer, selfContainer } from '../../front-end.js';
+import { oppContainer, selfContainer } from '../../state.js';
 
 export const showPopup = (message, callback) => {
   const popup = document.createElement('div');

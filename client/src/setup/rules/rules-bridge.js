@@ -1,7 +1,7 @@
 // Bridge between the free-form sim and the rules engine. Installs gates
     // on existing handlers (deck view, moves) and provides the attack flow UI.
     
-    import { systemState, socket as rulesSocket } from '../../front-end.js';
+    import { systemState, socket as rulesSocket } from '../../initialization/global-variables/global-variables.js';
     import { appendMessage } from '../chatbox/append-message.js';
     import { getZone } from '../zones/get-zone.js';
     import {

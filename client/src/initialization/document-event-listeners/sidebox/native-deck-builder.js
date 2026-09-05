@@ -8,7 +8,7 @@ import {
   detectDeckFormat,
   validateDeck,
 } from '../../../setup/deck-builder/core/deck-validation.mjs';
-import { systemState } from '../../../front-end.js';
+import { systemState } from '../../../state.js';
 import {
   changeCardBack,
   loadDeckData,

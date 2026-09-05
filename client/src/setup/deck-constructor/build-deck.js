@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { determineDeckData } from '../general/determine-deckdata.js';
 import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';

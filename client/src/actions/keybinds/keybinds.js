@@ -1,4 +1,4 @@
-import { mouseClick, systemState } from '../../front-end.js';
+import { mouseClick, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { manualDeckActionAllowed } from '../../setup/rules/rules-state.mjs';
 

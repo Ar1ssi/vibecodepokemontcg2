@@ -6,8 +6,8 @@ import {
   oppContainer,
   selfContainerDocument,
   oppContainerDocument,
-  systemState,
-} from '../../front-end.js';
+} from '../../initialization/global-variables/containers.js';
+import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { getCoins } from '../deck-builder/core/coins.mjs';
 
 const MAT_COIN_BACK_URL = '/src/assets/coins/coin-back.png';

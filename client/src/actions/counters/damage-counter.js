@@ -2,7 +2,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import {
   DAMAGE_COUNTER_TIERS,
   getDamageCounterTier,

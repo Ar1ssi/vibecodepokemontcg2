@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { resetImage } from '../../setup/image-logic/reset-image.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { closePopups, deselectCard } from '../general/close-popups.js';
@@ -479,6 +479,7 @@ export const moveCard = async (
         detail: { user, card: movingCard, zoneId: dZoneId, fromZone: oZoneId },
       })
     );
+  }
 
   // Festival Grounds: attaching Energy clears Special Conditions.
   if (

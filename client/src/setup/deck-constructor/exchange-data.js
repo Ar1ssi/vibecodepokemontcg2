@@ -1,5 +1,5 @@
 import { reset } from '../../actions/general/reset.js';
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { processAction } from '../general/process-action.js';
 

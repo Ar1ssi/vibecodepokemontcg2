@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { moveCard } from './move-card.js';
 
 export const updateStadiumCard = (user, initiator, dZoneId, dZone) => {

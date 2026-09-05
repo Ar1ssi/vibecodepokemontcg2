@@ -6,7 +6,7 @@ import {
   version,
   oppContainerDocument,
   selfContainerDocument,
-} from '../../../../front-end.js';
+} from '../../../../state.js';
 import {
   clearChatboxContent,
   exportChatboxContent,

@@ -4,8 +4,8 @@ import {
   oppContainerDocument,
   selfContainer,
   selfContainerDocument,
-  systemState,
-} from '../../front-end.js';
+} from '../../initialization/global-variables/containers.js';
+import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { processAction } from '../general/process-action.js';

@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import { moveCardMessage } from './move-card-message.js';

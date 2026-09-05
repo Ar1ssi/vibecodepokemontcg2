@@ -2,7 +2,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { applySpecialConditionStyle } from '../../setup/counters/special-condition-style-apply.js';
 import {
   getSpecialConditionCode,
