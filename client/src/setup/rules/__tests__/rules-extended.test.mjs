@@ -13,6 +13,7 @@ import test from 'node:test';
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
+    const { parseAbility } = await import('../abilities.mjs');
     
     // ── KO / prizes ──
     test('prizesForKO: standard = 1, ex = 3 (2 extra), VMAX = 3', () => {
@@ -2287,4 +2288,35 @@ import test from 'node:test';
       const p = parseAttackDamage(atk, {}, {}, {});
       assert.equal(p.resolved, false);
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    // ── Standard 2026-27 ability parser gaps ──
+
+    test('parseAbility: recursionFromDiscardAbility (Snorlax Voraciousness)', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.'
+      );
+      assert.equal(steps[0].type, 'recursionFromDiscardAbility');
+    });
+
+    test('parseAbility: checkupAbility (Froslass Freezing Shroud)', () => {
+      const steps = parseAbility(
+        'During Pokémon Checkup, put 1 damage counter on each Pokémon that has an Ability (both yours and your opponent\'s), except any Froslass.'
+      );
+      assert.equal(steps[0].type, 'checkupAbility');
+    });
+
+    test('parseAbility: onPromotionAbility damage (Iron Valiant Tachyon Bits)', () => {
+      const steps = parseAbility(
+        'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent\'s Pokémon.'
+      );
+      assert.equal(steps[0].type, 'onPromotionAbility');
+      assert.equal(steps[0].effect, 'damage');
+    });
+
+    test('parseAbility: effectPreventAbility active-spot aura (Midnight Fluttering)', () => {
+      const steps = parseAbility(
+        'As long as this Pokémon is in the Active Spot, your opponent\'s Active Pokémon has no Abilities, except for Midnight Fluttering.'
+      );
+      assert.equal(steps[0].type, 'effectPreventAbility');
     });

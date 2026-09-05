@@ -151,19 +151,32 @@ export function parseAbility(text = '') {
     });
   }
 
+  // Bench → Active promotion trigger (Lustrous Assist, Tachyon Bits, …)
+  const hasPromotionTrigger =
+    lower.includes('moves from your bench to the active spot') ||
+    lower.includes('move from your bench to the active spot');
+
   // ── 6. Move energy between Pokémon ──────────────────────────────────────
   if (
+    !hasPromotionTrigger &&
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
-    (lower.includes('to 1 of your') || lower.includes('to another') || lower.includes('to a different'))
+    (lower.includes('to 1 of your') ||
+      lower.includes('to another') ||
+      lower.includes('to a different') ||
+      lower.includes('to your active'))
   ) {
     const upTo = lower.match(/move\s+(?:up to\s+)?(\d+)\s+energy/)?.[1] || null;
+    const unlimited = lower.includes('as often as you like');
     steps.push({
       type: 'moveEnergyAbility',
       upTo: upTo ? Number(upTo) : null,
-      guidance: upTo
-        ? `Once during your turn: move up to ${upTo} Energy from this Pokémon to another of your Pokémon.`
-        : 'Once during your turn: move Energy from this Pokémon to another of your Pokémon.',
+      unlimited,
+      guidance: unlimited
+        ? 'During your turn (as often as you like): move Energy between your Pokémon as described.'
+        : upTo
+          ? `Once during your turn: move up to ${upTo} Energy from this Pokémon to another of your Pokémon.`
+          : 'Once during your turn: move Energy from this Pokémon to another of your Pokémon.',
     });
   }
 
@@ -255,11 +268,13 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 14. Status conditions (Confuse / Burn / Poison) ─────────────────────
+  // ── 14. Status conditions (Confuse / Burn / Poison / Asleep) ────────────
   if (
     lower.includes('confused') ||
     lower.includes('burned') ||
     lower.includes('poisoned') ||
+    lower.includes('asleep') ||
+    (lower.includes('make') && lower.includes('opponent')) ||
     (lower.includes('special condition') && !lower.includes('recover'))
   ) {
     const target = lower.includes('opponent') ? 'opponent' : 'attacker';
@@ -270,14 +285,24 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 15. KO-prevention (coin flip to avoid KO) ───────────────────────────
+  // ── 15. KO-prevention (coin flip or full-HP survive) ─────────────────────
   if (
-    lower.includes('knocked out') &&
-    (lower.includes('prevent') || lower.includes("can't") || lower.includes('coin') || lower.includes('flip'))
+    (lower.includes('knocked out') &&
+      (lower.includes('prevent') ||
+        lower.includes("can't") ||
+        lower.includes('coin') ||
+        lower.includes('flip'))) ||
+    (lower.includes('full hp') &&
+      lower.includes('would be knocked out') &&
+      lower.includes('not knocked out'))
   ) {
+    const fullHp = lower.includes('full hp');
     steps.push({
       type: 'koPreventionAbility',
-      guidance: 'When this Pokémon would be Knocked Out: flip a coin — if heads, it is not Knocked Out (as described).',
+      fullHp,
+      guidance: fullHp
+        ? 'When this Pokémon has full HP and would be Knocked Out by an attack: it is not Knocked Out and its remaining HP becomes 10 (as described).'
+        : 'When this Pokémon would be Knocked Out: flip a coin — if heads, it is not Knocked Out (as described).',
     });
   }
 
@@ -306,13 +331,25 @@ export function parseAbility(text = '') {
   }
 
   // ── 18. HP bonus ────────────────────────────────────────────────────────
-  if (lower.includes('hp') && (lower.includes('more') || lower.includes('increase') || lower.includes('treated as'))) {
-    const bonus = lower.match(/(\d+)\s+more\s+hp/)?.[1] || lower.match(/(\d+)\s+hp\s+more/)?.[1] || null;
+  if (
+    lower.includes('hp') &&
+    (lower.includes('more') ||
+      lower.includes('increase') ||
+      lower.includes('treated as') ||
+      lower.includes('gets +') ||
+      /\+\d+\s+hp/.test(lower))
+  ) {
+    const bonus =
+      lower.match(/(\d+)\s+more\s+hp/)?.[1] ||
+      lower.match(/(\d+)\s+hp\s+more/)?.[1] ||
+      lower.match(/gets\s+\+(\d+)\s+hp/)?.[1] ||
+      lower.match(/\+(\d+)\s+hp/)?.[1] ||
+      null;
     steps.push({
       type: 'hpBonusAbility',
       bonus: bonus ? Number(bonus) : null,
       guidance: bonus
-        ? `Passive: this Pokémon is treated as having ${bonus} more HP.`
+        ? `Passive: this Pokémon gets +${bonus} HP (as described).`
         : 'Passive: modifies this Pokémon\'s HP as described.',
     });
   }
@@ -390,8 +427,13 @@ export function parseAbility(text = '') {
 
   // ── 26. Effect prevention / negation ────────────────────────────────────
   if (
-    (lower.includes('prevent') || lower.includes("can't") || lower.includes('have no effect') || lower.includes('have no abilities')) &&
-    (lower.includes('effect') || lower.includes('ability') || lower.includes('attack'))
+    ((lower.includes('prevent') ||
+      lower.includes("can't") ||
+      lower.includes('have no effect') ||
+      lower.includes('have no abilities') ||
+      lower.includes('has no abilities')) &&
+      (lower.includes('effect') || lower.includes('ability') || lower.includes('attack'))) ||
+    (lower.includes('active spot') && lower.includes('no abilities'))
   ) {
     steps.push({
       type: 'effectPreventAbility',
@@ -400,7 +442,15 @@ export function parseAbility(text = '') {
   }
 
   // ── 27. Energy ×N / double energy ───────────────────────────────────────
-  if (lower.includes('energy') && (lower.includes('×') || lower.includes('x2') || lower.includes('counts as') || lower.includes('treated as'))) {
+  if (
+    lower.includes('energy') &&
+    (lower.includes('×') ||
+      lower.includes('x2') ||
+      lower.includes('counts as') ||
+      lower.includes('treated as') ||
+      (lower.includes('provides') &&
+        (/\{[a-z]\}\{[a-z]\}/.test(lower) || lower.includes('basic'))))
+  ) {
     steps.push({
       type: 'energyMultiplierAbility',
       guidance: 'Passive: Energy attached to this Pokémon counts as more (as described).',
@@ -420,6 +470,91 @@ export function parseAbility(text = '') {
       guidance: n
         ? `Passive: when this Pokémon is damaged by an attack, put ${n} damage counter${n !== '1' ? 's' : ''} on the Attacking Pokémon.`
         : 'Passive: put damage counters on the Attacking Pokémon when this Pokémon is damaged.',
+    });
+  }
+
+  // ── 29. Discard pile → hand ─────────────────────────────────────────────
+  if (
+    lower.includes('discard pile') &&
+    lower.includes('into your hand') &&
+    (lower.includes('put') || lower.includes('return') || lower.includes('add'))
+  ) {
+    const upTo = lower.match(/up to\s+(\d+)/)?.[1] || null;
+    steps.push({
+      type: 'recursionFromDiscardAbility',
+      upTo: upTo ? Number(upTo) : null,
+      guidance: upTo
+        ? `Once during your turn: put up to ${upTo} cards from your discard pile into your hand.`
+        : 'Once during your turn: put cards from your discard pile into your hand.',
+    });
+  }
+
+  // ── 30. Pokémon Checkup damage ──────────────────────────────────────────
+  if (lower.includes('checkup') && lower.includes('damage counter')) {
+    const n = lower.match(/put\s+(\d+)\s+damage/)?.[1] || null;
+    steps.push({
+      type: 'checkupAbility',
+      count: n ? Number(n) : null,
+      guidance: n
+        ? `During Pokémon Checkup: put ${n} damage counter${n !== '1' ? 's' : ''} as described.`
+        : 'During Pokémon Checkup: put damage counters as described.',
+    });
+  }
+
+  // ── 31. Attack inheritance from previous Evolutions ─────────────────────
+  if (
+    (lower.includes('previous evolution') || lower.includes('previous evolutions')) &&
+    (lower.includes('attack') || lower.includes('attacks'))
+  ) {
+    steps.push({
+      type: 'attackInheritanceAbility',
+      guidance: 'Passive: this Pokémon (or your evolved Pokémon) can use attacks from its previous Evolutions (as described).',
+    });
+  }
+
+  // ── 32. Opponent evolution trigger ──────────────────────────────────────
+  if (
+    lower.includes('opponent') &&
+    lower.includes('evolve') &&
+    lower.includes('damage counter')
+  ) {
+    const n = lower.match(/put\s+(\d+)\s+damage/)?.[1] || null;
+    steps.push({
+      type: 'onOpponentEvolveAbility',
+      count: n ? Number(n) : null,
+      guidance: n
+        ? `Whenever your opponent evolves: put ${n} damage counter${n !== '1' ? 's' : ''} on that Pokémon.`
+        : 'Whenever your opponent evolves: put damage counters as described.',
+    });
+  }
+
+  // ── 33. Bench → Active promotion trigger ────────────────────────────────
+  if (hasPromotionTrigger) {
+    let effect = 'other';
+    if (hasWord(lower, 'move') && lower.includes('energy')) effect = 'moveEnergy';
+    else if (lower.includes('damage counter')) effect = 'damage';
+    const n = lower.match(/put\s+(\d+)\s+damage/)?.[1] || null;
+    steps.push({
+      type: 'onPromotionAbility',
+      effect,
+      count: n ? Number(n) : null,
+      guidance:
+        effect === 'moveEnergy'
+          ? 'When this Pokémon moves from your Bench to the Active Spot: move Energy as described.'
+          : effect === 'damage'
+            ? `When this Pokémon moves from your Bench to the Active Spot: put ${n || ''} damage counter${n && n !== '1' ? 's' : ''} as described.`
+            : 'When this Pokémon moves from your Bench to the Active Spot: resolve the effect as described.',
+    });
+  }
+
+  // ── 34. First-turn attack permission ────────────────────────────────────
+  if (
+    (lower.includes('first turn') && (lower.includes('attack') || lower.includes('attacks'))) ||
+    (lower.includes('go first') && (lower.includes('attack') || lower.includes('attacks')))
+  ) {
+    steps.push({
+      type: 'firstTurnAttackAbility',
+      guidance: 'Passive: this Pokémon can use attacks during your first turn (as described).',
     });
   }
 
