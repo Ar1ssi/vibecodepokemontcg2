@@ -2241,3 +2241,164 @@ import test from 'node:test';
       assert.equal(p.resolved, false);
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
     });
+
+    // ── card identity resolution (name collisions across sets) ──
+    //
+    // Regression coverage for the "wrong Piloswine" incident: board cards carry
+    // no TCGdex id, so the engine used to resolve one by name alone. Pokémon
+    // names are reprinted verbatim across dozens of sets, every reprint scored
+    // identically, and the winner was whatever order the API happened to
+    // return — which could hand the attack parser a completely different
+    // card's attacks[].
+    const { ensureCardData } = await import('../rules-state.mjs');
+
+    const piloswinePrintings = [
+      { id: 'neo1-38', name: 'Piloswine', category: 'pokemon', localId: '38' },
+      { id: 'ex7-32', name: 'Piloswine', category: 'pokemon', localId: '32' },
+      { id: 'dp6-71', name: 'Piloswine', category: 'pokemon', localId: '71' },
+    ];
+
+    test('resolveCardId: collector number picks the printing regardless of API order', () => {
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '71'), 'dp6-71');
+      assert.equal(
+        resolveCardId([...piloswinePrintings].reverse(), 'Piloswine', 'Pokémon', '71'),
+        'dp6-71'
+      );
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '32'), 'ex7-32');
+    });
+
+    test('resolveCardId: collector number ignores leading zeros and whitespace', () => {
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '032'), 'ex7-32');
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', ' 32 '), 'ex7-32');
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', 32), 'ex7-32');
+    });
+
+    test('resolveCardId: without a number it still resolves (first exact match wins)', () => {
+      // Documents the remaining gap: no number means no tiebreaker, so the
+      // result is only as good as the API's ordering.
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon'), 'neo1-38');
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', null), 'neo1-38');
+    });
+
+    test('resolveCardId: a number match never promotes a partial-name candidate', () => {
+      const summaries = [
+        { id: 'sv1-32', name: 'Piloswine ex', category: 'pokemon', localId: '32' },
+        { id: 'dp6-71', name: 'Piloswine', category: 'pokemon', localId: '71' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'dp6-71');
+    });
+
+    test('resolveCardId: a number match never promotes a wrong-category candidate', () => {
+      const summaries = [
+        { id: 'trn-32', name: 'Cyrus', category: 'trainer', localId: '32' },
+        { id: 'pkm-71', name: 'Cyrus', category: 'pokemon', localId: '71' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Cyrus', 'Pokémon', '32'), 'pkm-71');
+    });
+
+    test('resolveCardId: an unmatched number leaves the existing scoring intact', () => {
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '999'), 'neo1-38');
+    });
+
+    // ── ensureCardData: deterministic id from (set code, collector number) ──
+
+    const withStubbedFetch = async (handler, fn) => {
+      const previous = globalThis.fetch;
+      const calls = [];
+      globalThis.fetch = async (url) => {
+        calls.push(url);
+        return handler(url);
+      };
+      try {
+        return await fn(calls);
+      } finally {
+        globalThis.fetch = previous;
+      }
+    };
+
+    const detailResponse = (body) => ({ ok: true, json: async () => body });
+
+    test('ensureCardData: legacy set code + number resolves without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/ex7-901')) {
+          return detailResponse({
+            id: 'ex7-901',
+            name: 'Piloswine',
+            hp: '80',
+            attacks: [{ name: 'Rock Throw', damage: '30', effect: '' }],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'TRR', number: '901' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'ex7-901');
+        assert.equal(card.hp, 80);
+        assert.deepEqual(
+          card.attacks.map((a) => a.name),
+          ['Rock Throw']
+        );
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: legacy id whose name disagrees falls back to the name search', async () => {
+      const handler = (url) => {
+        // The legacy table is hand-built for limitlesstcg's URL scheme, so a
+        // candidate id can land on an unrelated card — that must not be trusted.
+        if (url.includes('/cards/ex7-902')) {
+          return detailResponse({ id: 'ex7-902', name: 'Team Rocket Base', hp: null });
+        }
+        if (url.includes('/cards?name=')) {
+          return detailResponse([
+            { id: 'dp6-902', name: 'Piloswine', category: 'pokemon', localId: '902' },
+          ]);
+        }
+        if (url.includes('/cards/dp6-902')) {
+          return detailResponse({ id: 'dp6-902', name: 'Piloswine', hp: '90', attacks: [] });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'TRR', number: '902' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'dp6-902');
+        assert.equal(card.hp, 90);
+        assert.ok(calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: a modern (untabled) set code goes straight to the name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards?name=')) {
+          return detailResponse([
+            { id: 'sv1-903', name: 'Piloswine', category: 'pokemon', localId: '903' },
+            { id: 'neo1-38', name: 'Piloswine', category: 'pokemon', localId: '38' },
+          ]);
+        }
+        if (url.includes('/cards/sv1-903')) {
+          return detailResponse({ id: 'sv1-903', name: 'Piloswine', hp: '110', attacks: [] });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'PAF', number: '903' };
+        await ensureCardData(card);
+        // No legacy candidate exists for 'PAF', so nothing is fetched by id first.
+        assert.ok(!calls.some((u) => u.includes('/cards/PAF')));
+        assert.equal(card.id, 'sv1-903');
+        assert.equal(card.hp, 110);
+      });
+    });
+
+    test('ensureCardData: an already-enriched card short-circuits (weakness, not weaknesses)', async () => {
+      const handler = () => {
+        throw new Error('ensureCardData must not re-fetch an enriched card');
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', id: 'ex7-904', hp: 80, weakness: null };
+        await ensureCardData(card);
+        assert.equal(calls.length, 0);
+      });
+    });
