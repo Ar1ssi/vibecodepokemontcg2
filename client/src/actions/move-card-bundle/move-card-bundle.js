@@ -50,7 +50,7 @@ function resolveMoveCardIndices(user, oZoneId, dZoneId, index, targetIndex, hint
   };
 }
 
-export const moveCardBundle = (
+export const moveCardBundle = async (
   user,
   initiator,
   oZoneId,
@@ -104,6 +104,14 @@ export const moveCardBundle = (
       socket.emit('resyncActions', { roomId: systemState.roomId });
       return;
     }
+    if (!oZone.array[resolvedIndex]) {
+      console.warn('moveCardBundle: no card at resolved index on mirror — requesting resync', {
+        oZoneId,
+        resolvedIndex,
+      });
+      socket.emit('resyncActions', { roomId: systemState.roomId });
+      return;
+    }
     syncOptions = { syncReplay: true };
     if (cardHints.isEvolution) {
       syncOptions.forceEvolution = true;
@@ -133,7 +141,7 @@ export const moveCardBundle = (
     action
   );
   try {
-    moveCard(
+    await moveCard(
       user,
       initiator,
       oZoneId,

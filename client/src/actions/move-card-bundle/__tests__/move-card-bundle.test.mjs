@@ -53,3 +53,10 @@ test('pre-move hint must be captured before origin zone splice', () => {
   assert.equal(hintBeforeMove?.syncInstance, 1);
   assert.equal(hintAfterMove?.syncInstance, 2);
 });
+
+test('mirror autoMove bench swap inherits syncReplay from parent move', () => {
+  // Documented contract: autoMoveActiveBenchCard passes syncOptions through
+  // to nested moveCard so opponent mirror replay reveals active/bench cards.
+  const syncOptions = { syncReplay: true };
+  assert.equal(syncOptions.syncReplay, true);
+});

@@ -425,7 +425,8 @@ export const moveCard = async (
       oZone,
       dZoneId,
       dZone,
-      targetIndex
+      targetIndex,
+      { syncReplay }
     );
     //automatically bump any existing stadiums and make sure it's facing right-side-up for the user
     updateStadiumCard(user, initiator, dZoneId, dZone);
