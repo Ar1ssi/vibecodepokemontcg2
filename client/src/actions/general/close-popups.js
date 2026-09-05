@@ -8,7 +8,6 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { startHoloAnimation } from '../../setup/deck-builder/core/holo.mjs';
 import {
   playDeselectPop,
-  popHostFor,
   makePopFrame,
 } from '../../setup/image-logic/card-pop.mjs';
 
@@ -94,22 +93,26 @@ export const closeFullView = (event) => {
 
   if (fullViewElement && (!event || !fullViewElement.contains(event.target))) {
     //use the !event as a guard for closeFullView to trigger when using the escape keybind
-    // Primary (non-attached) image, used both for the width revert and to pick
-    // the deselect-pop transform host (holo wrapper vs. the .full-view container).
+    // Primary (non-attached) image, used for the container width revert.
     const targetImage = Array.from(
       fullViewElement.querySelectorAll('img')
     )
       .filter((image) => !image.attached)[0];
 
     const revert = () => {
-      // If this was a holo card, hand the shine back to the auto-sweep before
-      // the container's classes/inline sizing revert.
-      const matHoloWrapper = fullViewElement.closest('.mat-holo');
-      if (matHoloWrapper) {
-        startHoloAnimation(matHoloWrapper, { auto: true });
-      }
-      // Revert the styles
+      // Hand any holo shine in the container back to the auto-sweep before the
+      // classes/inline sizing revert. There can be more than one wrapper here —
+      // an evolution stack keeps the base card hydrated under the evolved one.
+      fullViewElement
+        .querySelectorAll('.mat-holo')
+        .forEach((wrapper) => startHoloAnimation(wrapper, { auto: true }));
+      // Revert the styles. The inline transform is the pop's, not the layout's —
+      // leaving it behind would keep the container translated off its mat slot.
       fullViewElement.classList.remove('full-view', 'dark-mode-5');
+      fullViewElement
+        .querySelector('.full-view-card')
+        ?.classList.remove('full-view-card');
+      fullViewElement.style.transform = '';
       fullViewElement.style.zIndex = '';
       fullViewElement.style.height = '';
 
@@ -141,11 +144,11 @@ export const closeFullView = (event) => {
 
     // Shrink the enlarged view back down, then revert the layout once the
     // spring settles so the deselect reads as a pop rather than a snap.
-    if (targetImage) {
-      playDeselectPop(popHostFor(targetImage), makePopFrame(targetImage), revert);
-    } else {
-      revert();
-    }
+    playDeselectPop(
+      fullViewElement,
+      makePopFrame(fullViewElement),
+      revert
+    );
   }
 };
 

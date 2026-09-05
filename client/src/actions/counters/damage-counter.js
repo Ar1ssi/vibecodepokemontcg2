@@ -5,6 +5,7 @@ import {
 } from '../../front-end.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const updateDamageCounter = (
   user,
@@ -115,7 +116,7 @@ export const addDamageCounter = (
   damageCounter.style.top = `${targetRect.top - zoneElementRect.top + targetRect.height / 4}px`;
   zone.element.appendChild(damageCounter);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     damageCounter.style.display = 'none';
   }
   //adjust size of the circle based on card size

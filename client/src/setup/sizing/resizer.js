@@ -9,6 +9,7 @@ import {
   selfContainerDocument,
 } from '../../front-end.js';
 import { getZone } from '../zones/get-zone.js';
+import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
 import { adjustAlignment } from './adjust-alignment.js';
 
 // Create the overlay div
@@ -214,7 +215,10 @@ export const adjustCards = (user, zoneId, ratio) => {
       const adjustment = parseFloat(card.image.clientWidth / 6);
       const newWidth =
         (baseWidth + card.image.energyLayer * adjustment) * ratio;
-      card.image.parentElement.style.width = `${newWidth}px`;
+      // Size the `.play-container`, resolved through the holo wrapper when the
+      // card is hydrated — the <img>'s own parent is then `.card__rotator`, and
+      // writing a px width there squashes the card inside its wrapper.
+      imageAnchor(card.image).parentElement.style.width = `${newWidth}px`;
     }
     if (card.image.damageCounter) {
       const index = zone.array.findIndex((loopCard) => loopCard === card);

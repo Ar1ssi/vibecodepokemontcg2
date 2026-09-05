@@ -5,6 +5,7 @@ import {
 } from '../../front-end.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const removeAbilityCounter = (user, zoneId, index, emit = true) => {
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
@@ -78,7 +79,7 @@ export const addAbilityCounter = (user, zoneId, index) => {
   }
   zone.element.appendChild(abilityCounter);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     abilityCounter.style.display = 'none';
   }
 

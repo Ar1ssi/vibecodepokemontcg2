@@ -352,10 +352,31 @@ body, input, textarea, button {
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
   padding: 20px;
   margin-right: 1%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .full-view img {
   height: 24%;
   margin: 0.5%;
+}
+/* The double-clicked card fills the panel so the preview is an enlargement;
+   `.full-view img { height: 24% }` above only sizes the attached energies and
+   tools around it. Holo wrappers carry a pixel size frozen at hydration time,
+   so it has to be overridden here (hence `!important`) and the aspect ratio
+   restated — the wrapper has no intrinsic width of its own. */
+.full-view > img.full-view-card {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+}
+.full-view > .mat-holo.full-view-card {
+  width: auto !important;
+  height: 100% !important;
+  aspect-ratio: var(--card-aspect);
+  margin: 0;
 }
 .self-circle {
   position: absolute;

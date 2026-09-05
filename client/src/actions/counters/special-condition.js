@@ -5,6 +5,7 @@ import {
 } from '../../front-end.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const updateSpecialCondition = (
   user,
@@ -133,7 +134,7 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
   specialCondition.style.top = `${targetRect.top - zoneElementRect.top + targetRect.height / 4}px`;
   zone.element.appendChild(specialCondition);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     specialCondition.style.display = 'none';
   }
 
