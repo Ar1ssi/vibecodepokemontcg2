@@ -55,6 +55,9 @@ export const ABILITY_FAMILIES = [
   'effect-prevent',   // negate effects/abilities
   'energy-multiplier',// energy ×N
   'thorns',           // damage-on-attacker
+  'checkup',          // During Pokémon Checkup triggers
+  'attack-inheritance', // use attacks from previous Evolutions
+  'on-opponent-evolve', // damage when opponent evolves
   'unknown',          // ability we can't place
 ];
 
@@ -107,8 +110,25 @@ const isAttach = (t) =>
 // Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
 const hasWord = (t, w) => t.split(/[^a-z]/).includes(w);
 
-const isMoveEnergy = (t) =>
-  hasWord(t, 'move') && t.includes('energy') && (t.includes('to 1 of your') || t.includes('to another') || t.includes('to a different'));
+const hasPromotionTrigger = (t) =>
+  t.includes('moves from your bench to the active spot') ||
+  t.includes('move from your bench to the active spot');
+
+const isMoveEnergy = (t) => {
+  const movesEnergy =
+    hasWord(t, 'move') &&
+    t.includes('energy') &&
+    (t.includes('to 1 of your') ||
+      t.includes('to another') ||
+      t.includes('to a different') ||
+      t.includes('to your active') ||
+      (t.includes('benched') && t.includes('active')));
+  const unlimited =
+    t.includes('as often as you like') && hasWord(t, 'move') && t.includes('energy');
+  const onPromotion =
+    hasPromotionTrigger(t) && hasWord(t, 'move') && t.includes('energy');
+  return movesEnergy || unlimited || onPromotion;
+};
 
 const isMoveDamage = (t) =>
   (hasWord(t, 'move') || t.includes('place')) && t.includes('damage counter') && (t.includes('to') || t.includes('onto'));
@@ -117,7 +137,11 @@ const isOpponentDisrupt = (t) =>
   t.includes('opponent') && (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
 
 const isRecursion = (t) =>
-  t.includes('knocked out') && (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'));
+  (t.includes('knocked out') &&
+    (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'))) ||
+  (t.includes('discard pile') &&
+    t.includes('into your hand') &&
+    (t.includes('put') || t.includes('return') || t.includes('add')));
 
 const isEvolve = (t) =>
   t.includes('evolve') && (t.includes('this pokémon') || t.includes('onto this pokémon'));
@@ -138,10 +162,25 @@ const isDamageBonus = (t) =>
   t.includes('more damage') && (t.includes('attack') || t.includes('this pokémon'));
 
 const isHandProtect = (t) =>
-  (t.includes('in hand') || t.includes('your hand')) && (t.includes("can't") || t.includes('cannot') || t.includes('immune'));
+  t.includes("hand can't be reduced") ||
+  t.includes('hand cannot be reduced') ||
+  t.includes("cards in your hand can't") ||
+  t.includes('cards in your hand cannot') ||
+  t.includes("can't be discarded from your hand") ||
+  t.includes('cannot be discarded from your hand') ||
+  t.includes("cards in hand can't") ||
+  t.includes('cards in hand cannot') ||
+  (t.includes('your hand') &&
+    (t.includes("can't be affected") || t.includes('cannot be affected'))) ||
+  (t.includes('in hand') && t.includes('immune'));
 
 const isStatus = (t) =>
-  t.includes('confused') || t.includes('burned') || t.includes('poisoned') ||
+  t.includes('confused') ||
+  t.includes('burned') ||
+  t.includes('poisoned') ||
+  t.includes('asleep') ||
+  t.includes('now poisoned') ||
+  (t.includes('make') && t.includes('opponent')) ||
   (t.includes('special condition') && !t.includes('recover'));
 
 const isKoPrevention = (t) =>
@@ -179,7 +218,22 @@ const isEffectPrevent = (t) =>
   (t.includes('effect') || t.includes('ability') || t.includes('attack'));
 
 const isEnergyMultiplier = (t) =>
-  t.includes('energy') && (t.includes('×') || t.includes('x2') || t.includes('counts as') || t.includes('treated as'));
+  t.includes('energy') &&
+  (t.includes('×') ||
+    t.includes('x2') ||
+    t.includes('counts as') ||
+    t.includes('treated as') ||
+    (t.includes('provides') &&
+      (/\{[a-z]\}\{[a-z]\}/.test(t) || t.includes('basic'))));
+
+const isCheckup = (t) => t.includes('checkup') && t.includes('damage counter');
+
+const isAttackInheritance = (t) =>
+  (t.includes('previous evolution') || t.includes('previous evolutions')) &&
+  (t.includes('attack') || t.includes('attacks'));
+
+const isOnOpponentEvolve = (t) =>
+  t.includes('opponent') && t.includes('evolve') && t.includes('damage counter');
 
 const isThorns = (t) =>
   t.includes('damage counter') && (t.includes('put') || t.includes('place')) && (t.includes('attacker') || t.includes('attacking pokémon'));
@@ -212,14 +266,22 @@ const isPassive = (t) =>
 
 const FAMILY_ORDER = [
   // Most specific first (compound / multi-keyword matches)
+  ['on-opponent-evolve', isOnOpponentEvolve],
+  ['attack-inheritance', isAttackInheritance],
+  ['checkup', isCheckup],
   ['energy-redirect', isMoveEnergy],
   ['move-damage', isMoveDamage],
   ['recursion', isRecursion],
   ['ko-prevention', isKoPrevention],
   ['damage-prevent', isDamagePrevent],
+  // Active actions before hand-protect (avoids "your hand" + "can't use" false positives)
+  ['search', isSearch],
+  ['status', isStatus],
+  ['heal', isHeal],
   ['hand-protect', isHandProtect],
   ['opponent-disrupt', isOpponentDisrupt],
   ['end-of-turn', isEndOfTurn],
+  ['draw', isDraw],
   ['look-at-top', isLookAtTop],
   ['evolve', isEvolve],
   ['setup', isSetup],
@@ -228,7 +290,6 @@ const FAMILY_ORDER = [
   ['effect-prevent', isEffectPrevent],
   ['energy-multiplier', isEnergyMultiplier],
   ['thorns', isThorns],
-  ['status', isStatus],
   // Passive-qualified: "While this Pokémon is in play, X" → passive.
   // Must come before the passive-style modifier families below.
   ['passive', isPassiveQualified],
@@ -238,11 +299,7 @@ const FAMILY_ORDER = [
   ['weakness', isWeakness],
   ['damage-reduce', isDamageReduce],
   ['damage-bonus', isDamageBonus],
-  // Active actions (single keyword + context)
-  ['search', isSearch],
-  ['draw', isDraw],
   ['switch', isSwitch],
-  ['heal', isHeal],
   ['attach', isAttach],
   // 'when-played' is a trigger, not an effect: it loses to any more
   // specific action (draw/search/…) and only wins when no action matched.
@@ -361,6 +418,12 @@ export function describeAbilityFamily(card) {
       return `${name}: energy multiplier — Energy counts as more (see card text).`;
     case 'thorns':
       return `${name}: thorns — damage counters on the attacker (see card text).`;
+    case 'checkup':
+      return `${name}: checkup ability — an effect during Pokémon Checkup (see card text).`;
+    case 'attack-inheritance':
+      return `${name}: attack inheritance — can use attacks from previous Evolutions (see card text).`;
+    case 'on-opponent-evolve':
+      return `${name}: on-opponent-evolve — puts damage counters when the opponent evolves (see card text).`;
     case 'unknown':
     default:
       return `${name}: ability present (no specific family recognized — read the card text).`;

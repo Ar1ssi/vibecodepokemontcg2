@@ -1419,6 +1419,48 @@ import test from 'node:test';
       assert.equal(classifyAbility(attach), 'attach');
     });
 
+    test('classifyAbility: Standard 2026-27 audit fixes', () => {
+      const fanRotom = {
+        name: 'Fan Rotom',
+        ability: {
+          text: "Once during your first turn, you may search your deck for up to 3 {C} Pokémon with 100 HP or less, reveal them, and put them into your hand. Then, shuffle your deck. You can't use more than 1 Fan Call Ability during your turn.",
+        },
+      };
+      assert.equal(classifyAbility(fanRotom), 'search');
+
+      const wildGrowth = {
+        name: 'Meganium',
+        ability: {
+          text: "Each Basic {G} Energy attached to all of your Pokémon provides {G}{G} Energy. The effect of Wild Growth doesn't stack.",
+        },
+      };
+      assert.equal(classifyAbility(wildGrowth), 'energy-multiplier');
+
+      const calmingLight = {
+        name: 'Shiinotic',
+        ability: {
+          text: "Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent's Active Pokémon Asleep.",
+        },
+      };
+      assert.equal(classifyAbility(calmingLight), 'status');
+
+      const washOut = {
+        name: 'Dewgong',
+        ability: {
+          text: 'As often as you like during your turn, you may use this Ability. Move a {W} Energy from 1 of your Benched Pokémon to your Active Pokémon.',
+        },
+      };
+      assert.equal(classifyAbility(washOut), 'energy-redirect');
+
+      const voraciousness = {
+        name: 'Snorlax',
+        ability: {
+          text: 'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.',
+        },
+      };
+      assert.equal(classifyAbility(voraciousness), 'recursion');
+    });
+
     // ── §D heal family (execute: remove up to N counters) ──
     test('healTarget: printed target selection', () => {
       assert.equal(healTarget('Remove up to 2 damage counters from the Defending Pokémon.'), 'defender');
