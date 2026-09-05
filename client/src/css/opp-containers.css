@@ -1,5 +1,6 @@
 
 /* Holofoil (simey) — @import must precede all other rules in this stylesheet. */
+@import url('./mat-coin.css');
 @import url('./holo/base.css');
 @import url('./holo/regular-holo.css');
 @import url('./holo/ex-regular.css');

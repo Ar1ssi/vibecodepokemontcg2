@@ -12,17 +12,12 @@ import { getCoins } from '../deck-builder/core/coins.mjs';
 
 const MAT_COIN_BACK_URL = '/src/assets/coins/coin-back.png';
 const MAT_COIN_SLOTS = {
-  self: () => document.getElementById('matCoinSlotSelf'),
-  opp: () => document.getElementById('matCoinSlotOpp'),
-};
-const CONTAINER_DOCS = {
-  self: () => selfContainerDocument,
-  opp: () => oppContainerDocument,
+  self: () => selfContainerDocument.getElementById('matCoinSlot'),
+  opp: () => oppContainerDocument.getElementById('matCoinSlot'),
 };
 
 const selectedCoins = { self: null, opp: null };
 const tossRevolutions = { self: 0, opp: 0 };
-let layoutObserver = null;
 let layoutHooked = false;
 
 const escapeHtml = (value = '') =>
@@ -32,6 +27,12 @@ const escapeHtml = (value = '') =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+
+const coinUrl = (path) => {
+  if (!path) return MAT_COIN_BACK_URL;
+  if (/^https?:\/\//.test(path) || path.startsWith('/')) return path;
+  return `/${path.replace(/^\//, '')}`;
+};
 
 export const getSelectedCoin = (target) => selectedCoins[target] || null;
 
@@ -47,52 +48,8 @@ export const pickRandomCoin = () => {
   return coins[Math.floor(Math.random() * coins.length)];
 };
 
-const CONTAINER_ELS = {
-  self: () => selfContainer,
-  opp: () => oppContainer,
-};
-
-/** Each player's coin sits to *their* right at the table. */
-const coinScreenSide = (target) => {
-  const container = CONTAINER_ELS[target]?.();
-  // Top-half iframes use the .opp class and are mirrored — "player right"
-  // maps to screen-left of the Active zone; bottom-half maps to screen-right.
-  return container?.classList.contains('opp') ? 'left' : 'right';
-};
-
-export const positionMatCoinSlots = () => {
-  for (const target of ['self', 'opp']) {
-    const slot = MAT_COIN_SLOTS[target]();
-    const active = CONTAINER_DOCS[target]()?.getElementById('active');
-    if (!slot || !active) continue;
-
-    const rect = active.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) continue;
-
-    const size = Math.max(
-      32,
-      Math.min(rect.height * 0.38, rect.width * 0.18, window.innerHeight * 0.065)
-    );
-    const gap = size * 0.2;
-    const side = coinScreenSide(target);
-    const playmatRight = window.innerWidth * 0.755;
-
-    slot.style.width = `${size}px`;
-    slot.style.height = `${size}px`;
-    slot.style.top = `${rect.top + rect.height / 2}px`;
-    slot.style.transform = 'translateY(-50%)';
-    slot.style.right = 'auto';
-
-    let left =
-      side === 'left'
-        ? rect.left - size - gap
-        : rect.right + gap;
-
-    // Keep tokens inside the playmat column.
-    left = Math.max(gap, Math.min(left, playmatRight - size - gap));
-    slot.style.left = `${left}px`;
-  }
-};
+/** Position is CSS-driven inside each playmat iframe (#matCoinSlot). */
+export const positionMatCoinSlots = () => {};
 
 export const renderMatCoinSlot = (target) => {
   const slot = MAT_COIN_SLOTS[target]?.();
@@ -109,13 +66,11 @@ export const renderMatCoinSlot = (target) => {
   slot.innerHTML = [
     `<span class="coin-toss-wrap mat-coin-toss-wrap" data-mat-coin-toss="${target}">`,
     `<div class="coin-3d coin-mat-${escapeHtml(coin.material || 'silver')} mat-coin-token" data-mat-coin-el="${target}">`,
-    `<div class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name || 'coin')}"></div>`,
+    `<div class="coin-face coin-front"><img src="${escapeHtml(coinUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}"></div>`,
     `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt=""></div>`,
     `</div>`,
     `</span>`,
   ].join('');
-
-  positionMatCoinSlots();
 };
 
 export const renderMatCoins = () => {
@@ -140,8 +95,6 @@ export const flipMatCoin = ({
       selectedCoins[target] = coin;
       renderMatCoinSlot(target);
     }
-
-    positionMatCoinSlots();
 
     const slot = MAT_COIN_SLOTS[target]();
     const wrap = slot?.querySelector(`[data-mat-coin-toss="${target}"]`);
@@ -194,16 +147,6 @@ const hookLayoutRefresh = () => {
   if (layoutHooked) return;
   layoutHooked = true;
 
-  window.addEventListener('resize', positionMatCoinSlots);
-
-  if (typeof ResizeObserver !== 'undefined') {
-    layoutObserver = new ResizeObserver(() => positionMatCoinSlots());
-    for (const target of ['self', 'opp']) {
-      const active = CONTAINER_DOCS[target]()?.getElementById('active');
-      if (active) layoutObserver.observe(active);
-    }
-  }
-
   document.addEventListener('rules-coin-changed', (event) => {
     const { target, coin } = event.detail || {};
     if (target !== 'self' && target !== 'opp') return;
@@ -214,5 +157,7 @@ const hookLayoutRefresh = () => {
 export const initMatCoins = () => {
   hookLayoutRefresh();
   renderMatCoins();
-  requestAnimationFrame(positionMatCoinSlots);
+  for (const container of [selfContainer, oppContainer]) {
+    container?.addEventListener('load', renderMatCoins, { once: true });
+  }
 };
