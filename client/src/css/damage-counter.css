@@ -1,0 +1,141 @@
+/* TCG Live-style 3D damage counter tokens (tier colors by total damage). */
+
+.self-circle.damage-counter,
+.opp-circle.damage-counter {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: transparent;
+  color: #fff4d6;
+  font-family: 'Arial Rounded MT Bold', 'Nunito', 'Segoe UI', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  -webkit-text-stroke: 0.08em #3d2200;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0.06em 0 #3d2200,
+    0 0.12em 0.18em rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 0 0.12em 0.22em rgba(255, 255, 255, 0.42),
+    inset 0 -0.18em 0.28em rgba(0, 0, 0, 0.28),
+    0 0.14em 0.28em rgba(0, 0, 0, 0.38);
+  overflow: visible;
+}
+
+.self-circle.damage-counter::before,
+.opp-circle.damage-counter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transform: translateY(11%) scale(0.9);
+  z-index: -1;
+  filter: brightness(0.62) saturate(1.05);
+  box-shadow: 0 0.22em 0.34em rgba(0, 0, 0, 0.35);
+}
+
+.self-circle.damage-counter::after,
+.opp-circle.damage-counter::after {
+  content: '';
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 28%,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0) 42%
+  );
+  pointer-events: none;
+}
+
+/* 10 — yellow/gold */
+.self-circle.damage-counter.dmg-tier-10,
+.opp-circle.damage-counter.dmg-tier-10 {
+  background: radial-gradient(
+    circle at 34% 28%,
+    #ffe566 0%,
+    #f4c430 52%,
+    #d4a017 100%
+  );
+}
+.self-circle.damage-counter.dmg-tier-10::before,
+.opp-circle.damage-counter.dmg-tier-10::before {
+  background: radial-gradient(circle at 50% 35%, #c99212 0%, #9a720d 100%);
+}
+
+/* 20 — amber */
+.self-circle.damage-counter.dmg-tier-20,
+.opp-circle.damage-counter.dmg-tier-20 {
+  background: radial-gradient(
+    circle at 34% 28%,
+    #ffc95a 0%,
+    #f5a623 52%,
+    #d98512 100%
+  );
+}
+.self-circle.damage-counter.dmg-tier-20::before,
+.opp-circle.damage-counter.dmg-tier-20::before {
+  background: radial-gradient(circle at 50% 35%, #c97f0f 0%, #9a6109 100%);
+}
+
+/* 30 — orange (TCG Live reference tier) */
+.self-circle.damage-counter.dmg-tier-30,
+.opp-circle.damage-counter.dmg-tier-30 {
+  background: radial-gradient(
+    circle at 34% 28%,
+    #ffae52 0%,
+    #ff7a00 52%,
+    #e05f00 100%
+  );
+}
+.self-circle.damage-counter.dmg-tier-30::before,
+.opp-circle.damage-counter.dmg-tier-30::before {
+  background: radial-gradient(circle at 50% 35%, #c44f00 0%, #943b00 100%);
+}
+
+/* 40 — red-orange */
+.self-circle.damage-counter.dmg-tier-40,
+.opp-circle.damage-counter.dmg-tier-40 {
+  background: radial-gradient(
+    circle at 34% 28%,
+    #ff8f45 0%,
+    #ff5500 52%,
+    #db4200 100%
+  );
+}
+.self-circle.damage-counter.dmg-tier-40::before,
+.opp-circle.damage-counter.dmg-tier-40::before {
+  background: radial-gradient(circle at 50% 35%, #b83800 0%, #8c2a00 100%);
+}
+
+/* 50–90 — red */
+.self-circle.damage-counter.dmg-tier-50,
+.opp-circle.damage-counter.dmg-tier-50 {
+  background: radial-gradient(
+    circle at 34% 28%,
+    #ff6b6b 0%,
+    #e52525 52%,
+    #b81212 100%
+  );
+}
+.self-circle.damage-counter.dmg-tier-50::before,
+.opp-circle.damage-counter.dmg-tier-50::before {
+  background: radial-gradient(circle at 50% 35%, #991010 0%, #720c0c 100%);
+}
+
+/* 100+ — purple/magenta */
+.self-circle.damage-counter.dmg-tier-100,
+.opp-circle.damage-counter.dmg-tier-100 {
+  background: radial-gradient(
+    circle at 34% 28%,
+    #e878d8 0%,
+    #b030a8 52%,
+    #8a2288 100%
+  );
+}
+.self-circle.damage-counter.dmg-tier-100::before,
+.opp-circle.damage-counter.dmg-tier-100::before {
+  background: radial-gradient(circle at 50% 35%, #701a70 0%, #541454 100%);
+}

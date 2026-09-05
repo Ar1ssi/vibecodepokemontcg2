@@ -1,0 +1,151 @@
+/* Official-style poison & burn status markers (cardboard token replicas). */
+
+.self-circle.status-marker,
+.opp-circle.status-marker {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 0.14em rgba(0, 0, 0, 0.35),
+    0 0.12em 0.24em rgba(0, 0, 0, 0.35);
+}
+
+.self-circle.status-marker::before,
+.opp-circle.status-marker::before {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.self-circle.status-marker::after,
+.opp-circle.status-marker::after {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  pointer-events: none;
+}
+
+/* Hide editable letter codes; icons carry the meaning. */
+.self-circle.status-marker.status-poison,
+.opp-circle.status-marker.status-poison,
+.self-circle.status-marker.status-burn,
+.opp-circle.status-marker.status-burn {
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+}
+
+/* Poison — green vortex + skull */
+.self-circle.status-marker.status-poison,
+.opp-circle.status-marker.status-poison {
+  background: radial-gradient(
+    circle at 50% 50%,
+    #8ef067 0%,
+    #3fc928 38%,
+    #1a9618 72%,
+    #0d6b0c 100%
+  );
+}
+.self-circle.status-marker.status-poison::before,
+.opp-circle.status-marker.status-poison::before {
+  background: conic-gradient(
+    from 20deg,
+    #b8ff8a 0deg,
+    #2db82a 72deg,
+    #157812 144deg,
+    #5fd838 216deg,
+    #1a9618 288deg,
+    #b8ff8a 360deg
+  );
+  opacity: 0.72;
+}
+.self-circle.status-marker.status-poison::after,
+.opp-circle.status-marker.status-poison::after {
+  background-image: url('../assets/status-markers/poison-icon.svg');
+}
+
+/* Burn — red vortex + crossed bandages */
+.self-circle.status-marker.status-burn,
+.opp-circle.status-marker.status-burn {
+  background: radial-gradient(
+    circle at 50% 50%,
+    #ff8a45 0%,
+    #e52525 40%,
+    #b81212 72%,
+    #7a0a0a 100%
+  );
+}
+.self-circle.status-marker.status-burn::before,
+.opp-circle.status-marker.status-burn::before {
+  background: conic-gradient(
+    from 35deg,
+    #ffd080 0deg,
+    #ff5520 70deg,
+    #c41212 140deg,
+    #ff7840 210deg,
+    #a01010 280deg,
+    #ffd080 360deg
+  );
+  opacity: 0.78;
+}
+.self-circle.status-marker.status-burn::after,
+.opp-circle.status-marker.status-burn::after {
+  background-image: url('../assets/status-markers/burn-icon.svg');
+}
+
+/* Other conditions — simple colored discs (unchanged behavior). */
+.self-circle.status-marker.status-asleep,
+.opp-circle.status-marker.status-asleep {
+  background-color: #3b8dad;
+  color: #fff;
+  font-size: inherit;
+  line-height: inherit;
+}
+.self-circle.status-marker.status-paralyzed,
+.opp-circle.status-marker.status-paralyzed {
+  background-color: #f4d03f;
+  color: #111;
+  font-size: inherit;
+  line-height: inherit;
+}
+.self-circle.status-marker.status-confused,
+.opp-circle.status-marker.status-confused {
+  background-color: #8e44ad;
+  color: #fff;
+  font-size: inherit;
+  line-height: inherit;
+}
+.self-circle.status-marker.status-default,
+.opp-circle.status-marker.status-default {
+  background-color: #fff;
+  color: #111;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.self-circle.status-marker.status-asleep::before,
+.opp-circle.status-marker.status-asleep::before,
+.self-circle.status-marker.status-paralyzed::before,
+.opp-circle.status-marker.status-paralyzed::before,
+.self-circle.status-marker.status-confused::before,
+.opp-circle.status-marker.status-confused::before,
+.self-circle.status-marker.status-default::before,
+.opp-circle.status-marker.status-default::before,
+.self-circle.status-marker.status-asleep::after,
+.opp-circle.status-marker.status-asleep::after,
+.self-circle.status-marker.status-paralyzed::after,
+.opp-circle.status-marker.status-paralyzed::after,
+.self-circle.status-marker.status-confused::after,
+.opp-circle.status-marker.status-confused::after,
+.self-circle.status-marker.status-default::after,
+.opp-circle.status-marker.status-default::after {
+  display: none;
+}
