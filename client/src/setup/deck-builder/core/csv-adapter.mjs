@@ -2,7 +2,12 @@ import { isDatabaseCard, isFormattedDeckCard } from './card-compare.mjs';
 
 export function formatImageUrl(cardObj = {}) {
   if (isDatabaseCard(cardObj)) {
-    return cardObj.images?.large || '';
+    return (
+      cardObj.images?.large ||
+      cardObj.images?.small ||
+      cardObj.image ||
+      ''
+    );
   }
 
   if (isFormattedDeckCard(cardObj)) {
