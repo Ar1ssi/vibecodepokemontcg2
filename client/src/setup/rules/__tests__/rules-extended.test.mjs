@@ -5,7 +5,7 @@ import test from 'node:test';
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
-    const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
+    const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed } = await import('../stadium-effects.mjs');
@@ -1890,6 +1890,48 @@ import test from 'node:test';
       assert.equal(effectiveEnergyType({ name: 'Double Water Energy', subtypes: ['Energy', 'Double'] }), null);
       assert.equal(effectiveEnergyType({ name: 'Pikachu' }), null);
       assert.equal(effectiveEnergyType(null), null);
+    });
+
+    test('typed special energies: TCGdex cards without subtypes/types resolve correctly', () => {
+      const rocky = {
+        name: 'Rocky Fighting Energy',
+        type: 'Energy',
+        types: [],
+        subtypes: [],
+        effect: 'As long as this card is attached to a Pokémon, it provides {F} Energy.',
+      };
+      assert.equal(classifyEnergyEffect(rocky), 'attach-type');
+      assert.equal(effectiveEnergyType(rocky), 'Fighting');
+      assert.equal(resolveAttachedEnergyType(rocky), 'Fighting');
+
+      const growing = {
+        name: 'Growing Grass Energy',
+        type: 'Energy',
+        effect: 'As long as this card is attached to a Pokémon, it provides {G} Energy.',
+      };
+      assert.equal(classifyEnergyEffect(growing), 'attach-type');
+      assert.equal(resolveAttachedEnergyType(growing), 'Grass');
+
+      const telepathic = {
+        name: 'Telepathic Psychic Energy',
+        type: 'Energy',
+        effect: 'As long as this card is attached to a Pokémon, it provides {P} Energy.',
+      };
+      assert.equal(resolveAttachedEnergyType(telepathic), 'Psychic');
+    });
+
+    test('cost payment: typed specials pay as their effective type', () => {
+      const rocky = {
+        name: 'Rocky Fighting Energy',
+        type: 'Energy',
+        effect: 'provides {F} Energy.',
+      };
+      const entry = {
+        type: resolveAttachedEnergyType(rocky),
+        family: classifyEnergyEffect(rocky),
+      };
+      assert.equal(canPayAttackCost([entry], ['Fighting']), true);
+      assert.equal(canPayAttackCost([entry], ['Water']), false);
     });
 
     test('applyEnergyEffect: attach-type reports executed with effective type', () => {

@@ -31,7 +31,7 @@ import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay } from './ability-executors.mjs';
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, resolveAttachedEnergyType } from './energy-effects.mjs';
 import { classifyAbility, describeAbilityFamily } from './ability-effects.mjs';
 import {
   planAbilitySteps,
@@ -213,20 +213,8 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         const energyTypes = [];
         for (const e of attachedEnergies) {
           try { await ensureCardData(e); } catch { /* skip */ }
-          const type = e.types?.[0] ||
-            (/fire/i.test(e.name || '') ? 'Fire'
-            : /water/i.test(e.name || '') ? 'Water'
-            : /grass/i.test(e.name || '') ? 'Grass'
-            : /lightning/i.test(e.name || '') ? 'Lightning'
-            : /psychic/i.test(e.name || '') ? 'Psychic'
-            : /fighting/i.test(e.name || '') ? 'Fighting'
-            : /metal/i.test(e.name || '') ? 'Metal'
-            : /dark/i.test(e.name || '') ? 'Dark'
-            : /dragon/i.test(e.name || '') ? 'Dragon'
-            : 'Colorless');
           const family = classifyEnergyEffect(e);
-          const override = effectiveEnergyType(e);
-          energyTypes.push({ type: override || type, family });
+          energyTypes.push({ type: resolveAttachedEnergyType(e), family });
         }
 
         const stadiumCard = getStadium()?.card;
