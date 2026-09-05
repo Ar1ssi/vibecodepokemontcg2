@@ -59,7 +59,7 @@ export const initializeSocketEventListeners = () => {
       systemState.selfDeckData,
       systemState.cardBackSrc,
       document.getElementById('coachingModeCheckbox').checked,
-      true,
+      false,
       true,
       getStoredMatId('self')
     );
@@ -209,9 +209,6 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (notSpectator) {
-      if (data.action === 'exchangeData') {
-        cleanActionData('opp');
-      }
       if (data.counter === parseInt(systemState.oppCounter) + 1) {
         systemState.oppCounter++;
         // systemState.spectatorActionData.push({user: 'opp', emit: true, action: data.action, parameters: data.parameters});

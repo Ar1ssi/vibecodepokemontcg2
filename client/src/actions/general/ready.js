@@ -10,8 +10,12 @@ const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
 // Reflects the current readiness state on the Set Up button(s) so a player
 // can see whether they've readied up and are waiting on their opponent.
 export const updateReadyButtons = () => {
-  const mySideKey =
-    systemState.initiator === 'self' ? 'selfReady' : 'oppReady';
+  // In 2P each client owns the self zones; initiator only reflects mat flip.
+  const mySideKey = systemState.isTwoPlayer
+    ? 'selfReady'
+    : systemState.initiator === 'self'
+      ? 'selfReady'
+      : 'oppReady';
   const iAmReady = systemState[mySideKey];
   const initiator = systemState.initiator;
   const deckLoaded = hasDeckLoaded(initiator);
@@ -63,9 +67,9 @@ export const clearReady = (user) => {
 // automatically sets 6 prizes and draws an opening hand of 7 for both
 // players.
 export const readyUp = (user, emit = true) => {
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'readyUp', []);
-    return;
+  // Local Set Up passes initiator; in 2P the local player always sits in self zones.
+  if (emit && systemState.isTwoPlayer && user === systemState.initiator) {
+    user = 'self';
   }
 
   const readyKey = user === 'self' ? 'selfReady' : 'oppReady';
@@ -88,7 +92,10 @@ export const readyUp = (user, emit = true) => {
   systemState[readyKey] = true;
   appendMessage(user, determineUsername(user) + ' is ready', 'player', false);
   updateReadyButtons();
-  processAction(user, emit, 'readyUp', []);
+  if (emit) {
+    const syncUser = systemState.isTwoPlayer ? 'self' : user;
+    processAction(syncUser, emit, 'readyUp', []);
+  }
 
   if (systemState.selfReady && systemState.oppReady) {
     systemState.selfReady = false;

@@ -15,6 +15,7 @@ import { addAbilityCounter } from '../counters/ability-counter.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { sortCardsByDeckList } from '../../setup/zones/hand-sort.mjs';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
@@ -295,21 +296,19 @@ export const sort = (user, zoneId) => {
       deckData);
 
   if (sortByDeckList) {
-    deckData.forEach((entry) => {
-      const name = entry[1];
-      zone.array.forEach((card) => {
-        if (card.name === name) {
-          // eslint-disable-next-line no-self-assign
-          card.image.src = card.image.src; // redraw trick as insurance
-          zone.element.appendChild(card.image);
-          if (card.image.abilityCounter) {
-            const index = zone.array.findIndex(
-              (selectedCard) => selectedCard === card
-            );
-            addAbilityCounter(user, zoneId, index);
-          }
-        }
-      });
+    const sorted = sortCardsByDeckList(zone.array, deckData);
+    zone.array.length = 0;
+    zone.array.push(...sorted);
+    zone.array.forEach((card) => {
+      // eslint-disable-next-line no-self-assign
+      card.image.src = card.image.src; // redraw trick as insurance
+      zone.element.appendChild(card.image);
+      if (card.image.abilityCounter) {
+        const index = zone.array.findIndex(
+          (selectedCard) => selectedCard === card
+        );
+        addAbilityCounter(user, zoneId, index);
+      }
     });
   } else {
     zone.array.forEach((card) => {

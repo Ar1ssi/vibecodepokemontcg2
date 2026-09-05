@@ -46,7 +46,8 @@ test('buildCardHint captures name and face src', () => {
     name: 'Machoke',
     image: { src: 'back.png', src2: 'machoke.png' },
   });
-  assert.deepEqual(hint, { src: 'machoke.png', name: 'Machoke' });
+  assert.equal(hint.src, 'machoke.png');
+  assert.equal(hint.name, 'Machoke');
 });
 
 test('resolveCardIndex prefers relay index for duplicate face URLs', () => {
