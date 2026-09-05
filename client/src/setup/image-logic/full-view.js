@@ -1,15 +1,19 @@
 import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
+  cardNode,
   fullViewHost,
+  hydrateHolo,
   imageAnchor,
+  isInCardPreview,
 } from '../deck-constructor/hydrate-holo.js';
 import {
   playSelectPop,
   playDeselectPop,
   makePopFrame,
+  stopPop,
 } from './card-pop.mjs';
 
-/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, wrapper?: HTMLElement } | null} */
+/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, host: HTMLElement | null, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
@@ -73,7 +77,8 @@ export const openCardPreview = (targetImage, card) => {
   }
 
   const doc = targetImage.ownerDocument;
-  const anchor = imageAnchor(targetImage);
+  const host = fullViewHost(targetImage);
+  const anchor = cardNode(card) ?? imageAnchor(targetImage);
   const rect = anchor.getBoundingClientRect();
 
   const placeholder = doc.createElement('span');
@@ -103,7 +108,15 @@ export const openCardPreview = (targetImage, card) => {
 
   playSelectPop(popHost, makePopFrame(popHost));
 
-  cardPreviewState = { overlay, popHost, placeholder, anchor, wrapper };
+  cardPreviewState = {
+    overlay,
+    popHost,
+    placeholder,
+    anchor,
+    host,
+    card,
+    wrapper,
+  };
 
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) {
@@ -118,27 +131,45 @@ export const closeCardPreview = (event, immediate = false) => {
     if (event.target !== cardPreviewState.overlay) return;
   }
 
-  const { overlay, popHost, placeholder, anchor, wrapper } = cardPreviewState;
+  const state = cardPreviewState;
+  cardPreviewState = null;
+  stopPop(state.popHost);
 
   const revert = () => {
+    const anchor =
+      (state.card ? cardNode(state.card) : null) ?? state.anchor;
+    const wrapper =
+      state.card?.wrapper ?? state.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
+
     if (wrapper) {
       startHoloAnimation(wrapper, { auto: true });
     }
     anchor.classList.remove('card-preview-card');
-    const primaryImg = anchor.matches('img') ? anchor : anchor.querySelector('img');
+    const primaryImg = anchor.matches('img')
+      ? anchor
+      : anchor.querySelector('img');
     if (primaryImg) {
       showCardCounters(primaryImg);
     }
-    placeholder.before(anchor);
-    placeholder.remove();
-    overlay.remove();
-    cardPreviewState = null;
+
+    if (state.placeholder.isConnected) {
+      state.placeholder.before(anchor);
+      state.placeholder.remove();
+    } else if (state.host?.isConnected) {
+      state.host.appendChild(anchor);
+    }
+
+    state.overlay.remove();
+
+    if (state.card && !isInCardPreview(state.card)) {
+      hydrateHolo(state.card);
+    }
   };
 
   if (immediate) {
     revert();
   } else {
-    playDeselectPop(popHost, makePopFrame(popHost), revert);
+    playDeselectPop(state.popHost, makePopFrame(state.popHost), revert);
   }
 };
 

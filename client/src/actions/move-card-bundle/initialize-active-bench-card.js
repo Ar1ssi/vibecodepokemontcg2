@@ -31,15 +31,19 @@ export const initializeActiveBenchCard = (user, movingCard, dZoneId, dZone) => {
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.removedNodes.length > 0) {
-        const removedNode = mutation.removedNodes[0];
-        if (
-          removedNode.nodeName === 'IMG' &&
-          container.getElementsByTagName('img').length === 0
-        ) {
-          if (container.parentElement) {
-            container.parentElement.style.zIndex = '0';
+        for (const removedNode of mutation.removedNodes) {
+          // Reparented nodes (double-click preview, holo wrapper) stay in the
+          // document — only discard an empty slot when the Pokémon was removed.
+          if (removedNode.isConnected) continue;
+          if (
+            removedNode.nodeName === 'IMG' &&
+            container.getElementsByTagName('img').length === 0
+          ) {
+            if (container.parentElement) {
+              container.parentElement.style.zIndex = '0';
+            }
+            container.remove();
           }
-          container.remove();
         }
         if (['bench'].includes(dZoneId)) {
           const selectedBenchZone = getZone(user, 'bench');

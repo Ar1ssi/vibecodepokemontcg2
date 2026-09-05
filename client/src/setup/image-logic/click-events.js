@@ -248,8 +248,10 @@ export const imageClick = (event) => {
 
 export const doubleClick = (event) => {
   if (event) {
+    event.stopPropagation();
     identifyCard(event);
   }
+  if (!mouseClick.card?.image) return;
   const targetImage = mouseClick.card.image;
   targetImage.classList.remove('highlight');
   if (['active', 'bench'].includes(mouseClick.zoneId)) {

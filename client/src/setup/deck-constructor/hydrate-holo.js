@@ -47,16 +47,31 @@ export const imageAnchor = (image) =>
 // the enlarged view shrinks the card instead of growing it.
 export const fullViewHost = (image) => imageAnchor(image)?.parentElement ?? null;
 
+export function isInCardPreview(card) {
+  if (!card?.image) return false;
+  return (
+    card.image.closest('.card-preview-overlay') != null ||
+    card.wrapper?.closest('.card-preview-overlay') != null
+  );
+}
+
 export const isInFullView = (image) =>
   !!fullViewHost(image)?.classList.contains('full-view');
 
 export function hydrateHolo(card) {
   if (HOLO_DISABLED) return;
-  if (!card?.image || hydrated.has(card) || isCardHidden(card)) return;
+  if (!card?.image || hydrated.has(card) || isCardHidden(card) || isInCardPreview(card)) {
+    return;
+  }
   hydrated.add(card);
   ensureCardData({ name: card.name, type: card.type })
     .then((data) => {
-      if (!card.image.isConnected || isCardHidden(card)) return;
+      if (!card.image.isConnected || isCardHidden(card) || isInCardPreview(card)) {
+        if (isInCardPreview(card)) {
+          hydrated.delete(card);
+        }
+        return;
+      }
       const effect = resolveHoloEffect(data);
       if (!effect) return; // common / non-holo → stays plain
       const rect = card.image.getBoundingClientRect();
