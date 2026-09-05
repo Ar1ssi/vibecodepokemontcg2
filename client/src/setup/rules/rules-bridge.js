@@ -524,21 +524,39 @@ import {
     
     // Non-rules Reset handlers don't touch rulesState, so without this the
     // phase would stay 'draw' and a later Set Up would skip the coin flip.
+    const resetRulesSession = () => {
+      rulesState.phase = 'setup';
+      rulesState.turnNumber = 0;
+      rulesState.turnPlayer = 'self';
+      rulesState.stadium = null;
+      rulesState.mulligansResolved = false;
+      rulesState.attackExecuting = false;
+      resetPrizes();
+      resetStatuses();
+      syncedTurnOrder = null;
+      turnEndedByAttack = false;
+      flipSuperseded = false;
+      coinCallChoice = null;
+      coinCallCaller = 'self';
+      coinCallPending = false;
+      coinFlipPending = false;
+      closeDeckSearchWindow();
+      document.getElementById('rulesCoinCallOverlay')?.remove();
+      document.getElementById('rulesChoicePicker')?.remove();
+    };
+
     const hookResetButtons = () => {
       ['resetButton', 'p2ResetButton', 'resetBothButton'].forEach((id) => {
         const btn = document.getElementById(id);
         if (!btn) return;
         btn.addEventListener('click', () => {
           if (!rulesState.enabled) return;
-          rulesState.phase = 'setup';
-          rulesState.turnNumber = 0;
-          syncedTurnOrder = null;
-          turnEndedByAttack = false;
-          flipSuperseded = false;
-          coinCallChoice = null;
-          coinCallCaller = 'self';
-          coinCallPending = false;
+          resetRulesSession();
         }, true);
+      });
+      document.addEventListener('game-restarted', () => {
+        if (!rulesState.enabled) return;
+        resetRulesSession();
       });
     };
     
