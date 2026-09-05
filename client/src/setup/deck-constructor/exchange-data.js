@@ -25,7 +25,6 @@ export const exchangeData = (
       );
     }
     systemState.selfDeckData = deckData;
-    systemState.p2OppCardBackSrc = cardBack;
     reset('self', true, true, false, false);
   } else if (user === 'opp') {
     systemState.p2OppUsername = username;

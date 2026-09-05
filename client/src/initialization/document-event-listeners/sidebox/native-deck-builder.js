@@ -152,7 +152,7 @@ export const initializeNativeDeckBuilder = () => {
           const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
           const image = sleeve?.image || fallback;
           import('../../../setup/deck-constructor/import.js').then(({ changeCardBack }) => {
-            changeCardBack('self', image, false);
+            changeCardBack(currentLoadTarget, image, false);
           });
         } catch {}
   });
@@ -590,6 +590,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deck = syncedDecks[target];
         deckLibrary?.setTarget(target);
         render();
+        refreshSleeveSelection();
+        refreshCoinSelection();
         refreshMatSelection();
       };
 
