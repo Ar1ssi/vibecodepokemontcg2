@@ -141,8 +141,9 @@ export const initializeRoomButtons = () => {
           let type = cells[2].querySelector('select').value;
           let url = cells[3].innerText;
           let number = rows[i].dataset.cardNumber || null;
+          let set = rows[i].dataset.cardSet || null;
 
-          let cardData = [quantity, name, type, url, number];
+          let cardData = [quantity, name, type, url, number, set];
           deckData.push(cardData);
         }
         if (deckData.length > 0) {
