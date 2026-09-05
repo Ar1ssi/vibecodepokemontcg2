@@ -48,3 +48,16 @@ test('buildCardHint captures name and face src', () => {
   });
   assert.deepEqual(hint, { src: 'machoke.png', name: 'Machoke' });
 });
+
+test('resolveCardIndex prefers relay index for duplicate face URLs', () => {
+  const zone = {
+    array: [
+      { name: 'Dark Energy', image: { src: 'dark.png' } },
+      { name: 'Dark Energy', image: { src: 'dark.png' } },
+      { name: 'Dark Energy', image: { src: 'dark.png' } },
+    ],
+  };
+  const hint = { src: 'dark.png', name: 'Dark Energy' };
+  assert.equal(resolveCardIndex(zone, hint, 2), 2);
+  assert.equal(resolveCardIndex(zone, hint, 1), 1);
+});

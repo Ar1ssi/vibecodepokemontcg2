@@ -26,9 +26,31 @@ export function resolveCardIndex(zone, hint, fallbackIndex) {
   const arr = zone?.array;
   if (!arr?.length) return typeof fallbackIndex === 'number' ? fallbackIndex : -1;
 
+  // Trust the relay index when it still identifies the intended card (handles
+  // duplicate printings that share the same image URL).
+  if (
+    typeof fallbackIndex === 'number' &&
+    fallbackIndex >= 0 &&
+    fallbackIndex < arr.length &&
+    (!hint || cardMatchesHint(arr[fallbackIndex], hint))
+  ) {
+    return fallbackIndex;
+  }
+
   if (hint) {
-    const byHint = arr.findIndex((c) => cardMatchesHint(c, hint));
-    if (byHint >= 0) return byHint;
+    const matches = arr
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => cardMatchesHint(c, hint));
+    if (matches.length === 1) return matches[0].i;
+    if (matches.length > 1 && typeof fallbackIndex === 'number') {
+      const nearest = matches.reduce((best, cur) =>
+        Math.abs(cur.i - fallbackIndex) < Math.abs(best.i - fallbackIndex)
+          ? cur
+          : best
+      );
+      return nearest.i;
+    }
+    if (matches.length > 0) return matches[0].i;
   }
 
   if (

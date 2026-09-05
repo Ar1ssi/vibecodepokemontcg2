@@ -79,7 +79,7 @@ export const moveCard = async (
   targetIndex,
   options = {}
 ) => {
-  const { forceEvolution = false } = options;
+  const { forceEvolution = false, syncReplay = false } = options;
   oZoneId = oZoneId.replace('Cover', '');
   dZoneId = dZoneId.replace('Cover', '');
 
@@ -98,8 +98,10 @@ export const moveCard = async (
   // define the card that's being moved
   const movingCard = oZone.array[index];
 
+  if (!movingCard) return;
+
   // ── rules: Item play blocked by opponent Active (effect-prevent family) ─
-  if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'board') {
+  if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
     await ensureCardData(movingCard);
     const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
     const isItem =
@@ -129,6 +131,7 @@ export const moveCard = async (
   // gate runs before the zone splice so blocked moves never mutate state.
   if (
     rulesState.enabled &&
+    !syncReplay &&
     rulesState.turnPlayer === user &&
     oZoneId === 'hand' &&
     dZoneId === 'board'
@@ -159,7 +162,7 @@ export const moveCard = async (
   // recorded. Awaiting it here (moveCard is already async) enriches the
   // card first, then the shared isStadiumCard() detector (also used by
   // stadium-effects.mjs, so the two no longer disagree) can see it.
-  if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'board') {
+  if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
     await ensureCardData(movingCard);
     if (isStadiumCard(movingCard)) {
       const displaced = markStadiumPlayed(user, movingCard);
@@ -192,6 +195,7 @@ export const moveCard = async (
   // ── rules: bench limit (Area Zero Underdepths + default 5) ───────────
   if (
     rulesState.enabled &&
+    !syncReplay &&
     movingCard.type === 'Pokémon' &&
     dZoneId === 'bench' &&
     oZoneId !== 'bench' &&
@@ -212,6 +216,7 @@ export const moveCard = async (
   const activeOrBenchZones = ['active', 'bench'];
   if (
     rulesState.enabled &&
+    !syncReplay &&
     !forceEvolution &&
     movingCard.type === 'Pokémon' &&
     oZoneId === 'hand' &&
@@ -229,6 +234,8 @@ export const moveCard = async (
   // Must run BEFORE the splice so blocked moves never mutate zone arrays.
   if (
     rulesState.enabled &&
+    !syncReplay &&
+    !forceEvolution &&
     movingCard.type === 'Pokémon' &&
     !activeOrBenchZones.includes(oZoneId) &&
     activeOrBenchZones.includes(dZoneId) &&
@@ -250,6 +257,7 @@ export const moveCard = async (
   // lets the pure helper compare against each energy's image.relative.
   if (
     rulesState.enabled &&
+    !syncReplay &&
     movingCard.type === 'Energy' &&
     ['active', 'bench', 'attachedCards'].includes(oZoneId) &&
     ['discard', 'lostZone', 'hand', 'deck'].includes(dZoneId) &&
@@ -323,8 +331,13 @@ export const moveCard = async (
     systemState.initiator !== user;
   const isFaceDownCard =
     movingCard.image.faceDown && ['active', 'bench', 'board'].includes(dZoneId);
+  const mirrorPlayVisible =
+    syncReplay && ['active', 'bench', 'board'].includes(dZoneId);
 
-  if (isP1HideZone || isP2HideZone || isFaceDownCard) {
+  if (mirrorPlayVisible) {
+    revealCard(user, movingCard);
+    movingCard.image.faceDown = false;
+  } else if (isP1HideZone || isP2HideZone || isFaceDownCard) {
     hideCard(user, movingCard);
     if (isP1HideZone || isP2HideZone) {
       movingCard.image.faceDown = false;
@@ -350,26 +363,28 @@ export const moveCard = async (
   if (isTargetCardValid && isAttachAllowed) {
     if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
       evolveCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
-      markEvolvedThisTurn(user, targetCard.name);
-      const evoKey = targetCard.image?.dataset?.cardId || targetCard.name;
-      const wasConfused = getStatus(user, evoKey)?.confused;
-      clearStatuses(user, evoKey);
-      if (
-        wasConfused &&
-        getStadium()?.card &&
-        isStadiumConfusedPersist(getStadium().card)
-      ) {
-        applyStatus(user, evoKey, 'confused');
+      if (!syncReplay) {
+        markEvolvedThisTurn(user, targetCard.name);
+        const evoKey = targetCard.image?.dataset?.cardId || targetCard.name;
+        const wasConfused = getStatus(user, evoKey)?.confused;
+        clearStatuses(user, evoKey);
+        if (
+          wasConfused &&
+          getStadium()?.card &&
+          isStadiumConfusedPersist(getStadium().card)
+        ) {
+          applyStatus(user, evoKey, 'confused');
+        }
+        appendMessage(user, `${movingCard.name} evolved onto ${targetCard.name}!`, 'announcement', false);
+        document.dispatchEvent(
+          new CustomEvent('rules-opponent-evolved', {
+            detail: { user, evolvedCard: movingCard, zoneId: dZoneId },
+          })
+        );
       }
-      appendMessage(user, `${movingCard.name} evolved onto ${targetCard.name}!`, 'announcement', false);
-      document.dispatchEvent(
-        new CustomEvent('rules-opponent-evolved', {
-          detail: { user, evolvedCard: movingCard, zoneId: dZoneId },
-        })
-      );
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
-      if (rulesState.enabled && movingCard.type === 'Energy') {
+      if (rulesState.enabled && !syncReplay && movingCard.type === 'Energy') {
         document.dispatchEvent(
           new CustomEvent('rules-energy-attached', {
             detail: {
@@ -483,26 +498,29 @@ export const moveCard = async (
   // here), so this is the one place that can announce "board" arrivals
   // instantly. rules-bridge.js listens for this to react the same turn
   // it fires, instead of waiting on its polling fallback to notice.
-  if (dZoneId === 'board') {
-    document.dispatchEvent(
-      new CustomEvent('rules-card-on-board', { detail: { user, card: movingCard } })
-    );
-  }
-  if (
-    (dZoneId === 'active' || dZoneId === 'bench') &&
-    movingCard.type === 'Pokémon' &&
-    !movingCard.image.attached
-  ) {
-    document.dispatchEvent(
-      new CustomEvent('rules-pokemon-in-play', {
-        detail: { user, card: movingCard, zoneId: dZoneId, fromZone: oZoneId },
-      })
-    );
+  if (!syncReplay) {
+    if (dZoneId === 'board') {
+      document.dispatchEvent(
+        new CustomEvent('rules-card-on-board', { detail: { user, card: movingCard } })
+      );
+    }
+    if (
+      (dZoneId === 'active' || dZoneId === 'bench') &&
+      movingCard.type === 'Pokémon' &&
+      !movingCard.image.attached
+    ) {
+      document.dispatchEvent(
+        new CustomEvent('rules-pokemon-in-play', {
+          detail: { user, card: movingCard, zoneId: dZoneId, fromZone: oZoneId },
+        })
+      );
+    }
   }
 
   // Festival Grounds: attaching Energy clears Special Conditions.
   if (
     rulesState.enabled &&
+    !syncReplay &&
     movingCard.type === 'Energy' &&
     ['active', 'bench'].includes(dZoneId) &&
     targetCard?.type === 'Pokémon'
@@ -520,7 +538,7 @@ export const moveCard = async (
     }
   }
 
-  if (rulesState.enabled && parseStadiumBenchLimit(getStadium()?.card)) {
+  if (!syncReplay && rulesState.enabled && parseStadiumBenchLimit(getStadium()?.card)) {
     await enforceBenchLimit(user);
     await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
   }
