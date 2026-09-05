@@ -83,8 +83,9 @@ The parser's first job is to bucket a card by `supertype` (`'Pokémon' | 'Traine
 | **Double / Double Colorless** | `double` / `double colorless` |
 
 Energy **types** (for paying attack costs) are handled, including Double /
-Double Colorless counting as 2 symbols; energy **card effects**
-(special-energy powers) are still classified + announced only. See **F**.
+Double Colorless counting as 2 symbols. Special-energy **card effects**
+(`attach-type`, `lock`, `redirect`, `protect`) are **executed** in the live
+path — see **F** (protect is a simplified damage-cap model).
 
 ---
 
@@ -100,7 +101,7 @@ exactly these. A full parser needs all of them:
 | Weakness | `weakness {type, value}` | ✅ parsed + applied by `computeAttackDamage()` (`attack-engine.mjs:11`): modern ×2, legacy flat +N; tested in `rules.test.mjs`; wired into live `attack()` (`chat-buttons.js`) |
 | Resistance | `resistance {type, value}` | ✅ parsed + applied by `computeAttackDamage()`; tested; wired into live `attack()` (`chat-buttons.js`) |
 | Retreat cost | `retreatCost` | ✅ live retreat flow: gate (`canPerformAction` + `statusAllowsRetreat` — only Paralyzed blocks) → pay cost (discard N energy, `energiesToDiscardForRetreat()`) → swap active/bench → `markRetreated` → clears Confused (`clearStatuses`); wired via `retreat()` action (`chat-buttons.js`) + P1/P2 buttons + flip-board; tested in `rules-extended.test.mjs` |
-| Attacks | `attacks[]` (`name`, `cost[]`, `damage`, `text`) | ✅ live attack flow: `ensureCardData()` enriches both actives → energy-cost gate (`canPayAttackCost`, ⛔ announce + bail without ending turn) → `computeAttackDamage()` (weakness ×2 / legacy +N, resistance, clamped ≥0) → damage counters placed on opponent's active → KO check (`totalDamage ≥ hp`) → prizes (`handleKO`: GX = match win, else `prizesForKO` + `promotionGuidance`); wired via `attack()` (`chat-buttons.js`); pure functions tested in `rules.test.mjs` / `rules-extended.test.mjs`. Attack `text` (effect text) still not parsed — see D |
+| Attacks | `attacks[]` (`name`, `cost[]`, `damage`, `text`) | ✅ live attack flow: `ensureCardData()` enriches both actives → energy-cost gate (`canPayAttackCost`, ⛔ announce + bail without ending turn) → `computeAttackDamage()` (weakness ×2 / legacy +N, resistance, clamped ≥0) → damage counters placed on opponent's active → KO check (`totalDamage ≥ hp`) → prizes (`handleKO`: GX = match win, else `prizesForKO` + `promotionGuidance`); wired via `attack()` (`chat-buttons.js`); pure functions tested in `rules.test.mjs` / `rules-extended.test.mjs`. Attack `text` effect families are parsed + **executed in solo** via `damage-parser.mjs` helpers inside `attack()` — see D. `attack-effects.mjs` remains an announce-only classifier (`applyAttackEffect` always `executed: false`) and is not the live execution path. |
 | Stage | `stage` | ✅ gates `evolve` in `canPerformAction` |
 | Evolves-from | `evolvesFrom` | ✅ live evolution gate in `moveCard()` (`move-card.js`): `canEvolve()` blocks illegal evolutions (turn-1 ban, same-turn ban, stage chain, once-per-turn) before the zone splice; on success `markEvolvedThisTurn()` + `clearStatuses()` + announce; tested in `rules-extended.test.mjs` |
 | Ability | `ability {name, text}` | ✅ all core families executed — see C (live wiring in `chat-buttons.js` / `rules-bridge.js`; `parseAbility()` still emits guidance lines) |
@@ -171,28 +172,23 @@ announce pass. Per-ability used-tracking: `abilityKey()` / `markAbilityUsed()` /
 
 ## D. Attack-effect families
 
-**Current state:** `attack()` (`chat-buttons.js`) is the live entry. It gates via
-`canPerformAction({action:'attack'})`, calls `markAttacked()`, then does
-announce + discard + `processAction` + `endTurn`. **No damage is computed.**
-`computeAttackDamage()` / `executeAttack()` in `attack-engine.mjs` are **dead code**
-(never called). Only `attack.damage` is read, and only as a single number.
+**Current state (solo, rules on):** `attack()` in `chat-buttons.js` is the live
+entry. It gates via status / `canPerformAction({action:'attack'})` / energy cost,
+calls `markAttacked()`, computes damage with `computeAttackDamage()`
+(`attack-engine.mjs` — weakness/resistance applied), executes D-family effect
+text via **`damage-parser.mjs` helpers** (scaling damage, coin, bench, heal, draw,
+attach energy, switch, discard cost, shuffle-draw, once-per-turn, status
+application, etc.), runs KO/prizes, then `endTurnWithBanner`. Multiplayer status
+application on the opponent is still a known gap (see Gap 6 / §G).
 
-**Gap #1, Piece A — done (announce-only):** new `attack-effects.mjs` classifies any
-attack into one of the 20 families below (`ATTACK_FAMILIES` + `unknown`), describes
-it in one line, and exposes an announce-only `applyAttackEffect()` (`executed: false`,
-no state mutation). It is a pure, DOM-free classifier (same shape as
-`ability-effects.mjs`) — not yet wired into the live attack announcement, and no
-family is executed. 7 tests in `rules-extended.test.mjs`.
+**Classifier vs executor:** `attack-effects.mjs` (`ATTACK_FAMILIES`,
+`classifyAttackEffect`, `describeAttackEffect`, announce-only
+`applyAttackEffect()` with `executed: false`) remains a pure classifier and is
+**not** the live execution path. Live D-family execution goes through
+`damage-parser.mjs` + `attack()`. `executeAttack()` in `attack-engine.mjs` is
+still **dead** (unused); do not confuse it with the live `attack()` path.
 
-**Phase 1 (core damage execution) is now live:** the five scaling/bonus
-families (flat, per-energy, per-prize, per-turn, extra-by-type, and the
-Basic-Pokémon conditional) are **executed in `attack()`** when rules are on —
-`parseAttackDamage()` (`damage-parser.mjs`) feeds the effective base number into
-`computeAttackDamage()` (`chat-buttons.js`), with weakness/resistance and the
-defender's damage prevention still applied. Verified by the "Phase 1 wiring"
-tests in `rules-extended.test.mjs` (full repo suite 204/204 green across the root
-`pnpm test` file list). Every family below is now ✅ executed in the live path —
-see the per-row status.
+**Suite baseline:** full listed `package.json` test list is **396/396**.
 
 | Family | Canonical real-card example | Printed shape | Status |
 |---|---|---|---|
@@ -217,34 +213,13 @@ see the per-row status.
 | **Switch (as part of attack)** | **Clefairy** / switch attacks | "then switch your Active" | ✅ **executed (live solo path)** — `switchClause()` detects the clause; `attack()` auto-swaps active with the first benched Pokémon via the shared `moveCard` pair (no energy cost, same as the switch ability); fizzles when the bench is empty or the active was KO'd; tests in `rules-extended.test.mjs` |
 | **"Once during your turn" attack-side effect** | **Cursola** / turn-locked attacks | "Once during your turn: …" inside an attack | ✅ **executed (live solo path)** — `oncePerTurnClause()` detects the clause; `attack()` gates it on `abilityUsed(user, active)` (shared `abilitiesUsed` flag map, cleared by `resetTurnFlags()`): if already used this turn the attack **fizzles before any cost/damage** (⛔ announcement, early return — the turn does NOT end, so the player can retry another attack or pass, consistent with the other invalid-attack bails); on success `markAbilityUsed(user, active)` records it before `markAttacked`. Test in `rules-extended.test.mjs` |
 
-> **Parser needs:** a full effect grammar over `attacks[].text` — cost sub-clauses
-> (discard/shuffle/coin), damage modifiers (per-energy/HP/prize/turn/type), target
-> selection (active/bench/all), status application (all five), coin-flip branching,
-> and follow-up actions (draw/attach/switch). Today a flat `damage` number **plus
-> weakness/resistance** is consumed (`computeAttackDamage()` in
-> `attack-engine.mjs`); the broader effect grammar above is still ❌.
->
-> **Done so far:**
-> - **Pieces A + B:** classification of every family (`attack-effects.mjs`) and
->   damage-expression parsing (`damage-parser.mjs`: `parseAttackDamage()` /
->   `describeParsedDamage()`, components `per-energy, per-prize, per-turn,
->   per-hp, extra-by-type, conditional, coin, bench, heal`) as **pure, tested** modules.
-> - **Phase 1 (core damage execution):** the five scaling/bonus families above are
->   **wired into the live `attack()` flow** (`chat-buttons.js`: parse → substitute
->   effective base → `computeAttackDamage` → damage prevention), active only when
->   rules are on; flat attacks are byte-for-byte unchanged. The parser stays pure —
->   coin outcomes, bench and heal amounts are **reported, not executed**.
-> - **Remaining (Phases 2–6):** none — **all Section-D attack-effect families are
->   now functional** (per-HP scaling landed alongside per-prize/per-turn;
->   coin-flip, bench, self-heal, draw/attach/switch follow-ups, multi-target,
->   discard-cost, and shuffle-cost are ✅ — see rows above).
->   **Status application (Phase 2) is now executed in the live solo path** —
->   `applyStatus` on the surviving defender in `attack()`, plus the turn-boundary
->   resolve (poison/burn damage, asleep/paralyzed clear, confused persists) in
->   `endTurnWithBanner` (`chat-buttons.js`). Multiplayer status-on-opponent
->   resolution is a separate pre-existing gap (flagged, not built).
+> **Live path note:** D-family effect text is executed in solo via
+> `damage-parser.mjs` helpers inside `attack()` (`chat-buttons.js`), on top of
+> `computeAttackDamage()` (weakness/resistance). `attack-effects.mjs` remains an
+> announce-only classifier. `executeAttack()` in `attack-engine.mjs` is still
+> unused. Multiplayer status-on-opponent sync is the remaining related gap
+> (Gap 6 / §G) — not missing D-family parsing.
 
----
 
 ## E. Stadiums
 
@@ -332,11 +307,11 @@ passes `{ type, family }` objects. **Special-energy card *effects* are classifie
 
 | Condition | Applied | Enforced | Resolved | Status |
 |---|---|---|---|---|
-| **Asleep** | ✅ `applyStatus` | ✅ `canAct` (pure query) → `resolveWake` (heads clears, tails stays) | ✅ clears at turn end (`resolveTurnBoundary`) | ✅ (wiring to live path = Phase 2) |
-| **Paralyzed** | ✅ `applyStatus` | ✅ `canAct` blocks attack/retreat, no coin flip | ✅ clears at turn end | ✅ (wiring to live path = Phase 2) |
-| **Poisoned** | ✅ `applyStatus` | n/a | ✅ −10 at turn end (`resolveTurnBoundary`) | ✅ |
-| **Burned** | ✅ `applyStatus` | n/a | ✅ coin-then-−20, heals on heads (`resolveTurnBoundary`) | ✅ |
-| **Confused** | ✅ `applyStatus` + in `parseStatusFromAttackText` | ✅ `canAct` blocks → `resolveConfusedAttack` (heads proceeds, tails = 3 DC self-damage) | ✅ **intentionally not cleared** at turn end; cleared via `clearStatuses` on retreat/evolve/Trainer effect | ✅ (wiring to live path = Phase 2) |
+| **Asleep** | ✅ `applyStatus` | ✅ `canAct` (pure query) → `resolveWake` (heads clears, tails stays) | ✅ clears at turn end (`resolveTurnBoundary`) | ✅ solo live path |
+| **Paralyzed** | ✅ `applyStatus` | ✅ `canAct` blocks attack/retreat, no coin flip | ✅ clears at turn end | ✅ solo live path |
+| **Poisoned** | ✅ `applyStatus` | n/a | ✅ −10 at turn end (`resolveTurnBoundary`) | ✅ solo live path |
+| **Burned** | ✅ `applyStatus` | n/a | ✅ coin-then-−20, heals on heads (`resolveTurnBoundary`) | ✅ solo live path |
+| **Confused** | ✅ `applyStatus` + in `parseStatusFromAttackText` | ✅ `canAct` blocks → `resolveConfusedAttack` (heads proceeds, tails = 3 DC self-damage) | ✅ **intentionally not cleared** at turn end; cleared via `clearStatuses` on retreat/evolve/Trainer effect | ✅ solo live path |
 
 > **Fixed in Phase 1 (verified, 171/171 tests green):**
 > 1. **Confused now enforced** — pre-attack coin via `resolveConfusedAttack()`; tails
@@ -356,8 +331,10 @@ passes `{ type, family }` objects. **Special-energy card *effects* are classifie
 > resolves asleep via `resolveWake`, resolves confused via `resolveConfusedAttack`
 > (tails = 3 DC self-damage, attack fizzles); turn-boundary resolve runs in
 > `endTurnWithBanner`. `attack-engine.mjs` (`executeAttack`) remains dead code. The
-> only remaining status gap is **multiplayer status-on-opponent** (no emitter sets
-> `data.status` for the `attacked` receiver in `rules-bridge.js`) — flagged, not built.
+> only remaining status gap is **multiplayer status-on-opponent**. Stronger than
+> "no emitter sets `data.status`": `rulesEvent { type: 'attacked' }` is **never
+> emitted** anywhere in the repo, so the `attacked` listener's status apply in
+> `rules-bridge.js` is dead. Attack/pass sync uses action replay instead.
 
 ---
 
@@ -411,28 +388,23 @@ Enforced by `canPerformAction()` (`rules-state.mjs:120`) + the flags on
 
 Ranked roughly by "how much is missing to make a card actually work":
 
-1. **No attack-effect execution in the live path** — **partially done (announce-only).**
-   Piece A: `attack-effects.mjs` (`ATTACK_FAMILIES`, `classifyAttackEffect()`,
-   `describeAttackEffect()`, announce-only `applyAttackEffect()`) classifies every D
-   family; Piece B: `damage-parser.mjs` (`DAMAGE_COMPONENTS`, `parseAttackDamage()`,
-   `describeParsedDamage()`) parses damage expressions (per-energy / per-prize /
-   per-turn / extra-by-type / conditional / coin / bench / heal). Both are pure,
-   tested, announce-only, and **not wired into the live path**. The live entry
-   (`chat-buttons.js attack()`) now handles the **numeric damage path** (energy-cost
-   gate, `computeAttackDamage`, KO/prizes via `handleKO`) but executes **no D-family
-   effect text**, so every D family remains **❌ live**. The remaining gap is
-   **execution + live-path wiring (Pieces C/D)**, which requires **per-family user
-   confirmation** (do not silently build execution).
-2. **No ability execution** — **partially done (announce-only).**
-   Classification ✅: new `ability-effects.mjs` exports `ABILITY_FAMILIES`,
-   `isAbilityCard()`, `classifyAbility()`, `describeAbilityFamily()`, and
-   announce-only `applyAbilityEffect()` (no mutation); wired into
-   `hookTrainerPlay()` (`rules-bridge.js`) to emit a family-level guidance line
-   (skipping `draw` and `unknown`); 6 tests in `rules-extended.test.mjs`.
-   The **only** ability actually executed is still the bare `drawAbility` in
-   `hookTrainerPlay`. **Execution of every other family in C is still ❌** —
-   building per-family effects requires **user confirmation**
-   (do not silently build execution).
+1. **Attack-effect execution in the live path** — **✅ done (solo).**
+   Live `attack()` (`chat-buttons.js`) executes D-family effect text via
+   `damage-parser.mjs` helpers (scaling damage, coin, bench, heal, draw, attach
+   energy, switch, discard cost, shuffle-draw, once-per-turn, status, etc.) after
+   the energy-cost gate and `computeAttackDamage` (weakness/resistance), then
+   KO/prizes. The `attack-effects.mjs` classifier (`applyAttackEffect` always
+   `executed: false`) remains announce-only and is **not** the live path.
+   `executeAttack()` in `attack-engine.mjs` is still dead/unused. Remaining related
+   gap: multiplayer status-on-opponent sync (Gap 6) — not D-family parsing.
+2. **Ability execution** — **✅ core families done.**
+   Classification still exists in `ability-effects.mjs` (announce-only
+   `applyAbilityEffect`). Live execution: draw abilities auto-run from
+   `hookTrainerPlay` / when-played paths; heal / switch / attach / search /
+   energy-redirect via `chat-buttons.js` + attack-window / ability-picker;
+   passives, end-of-turn, hand-protect, opponent-discard, cost discount via
+   `ability-executors.mjs` + bridge hooks. Finer unparsed clauses remain out of
+   scope; do not treat this gap as "only drawAbility works."
 3. ~~**No stadium engine.**~~ — **state + replacement done**: `rulesState.stadium`
    slot + `markStadiumPlayed()`/`getStadium()` (`rules-state.mjs`, pure + tested),
    wired into `moveCard()` (hand→board) with a replacement announcement; UI discard
@@ -448,24 +420,26 @@ Ranked roughly by "how much is missing to make a card actually work":
    (see §E): HP → `effectiveHp()` at every KO site, evolution-speed → `canEvolve()`
    gate relax + `costReduce` surfaced, attack-cost → `parseStadiumCostModifier()`
    stacked on the live attack cost gate.
-4. ~~**No special-energy effect engine**~~ — **partially done (announce-only).**
-   Classification ✅: new `energy-effects.mjs` exports `ENERGY_EFFECT_FAMILIES`,
-   `isEnergyCard()`, `classifyEnergyEffect()` (`double | double-colorless | lock |
-   redirect | protect | attach-type | basic | unknown`), `describeEnergyEffect()`,
-   and announce-only `applyEnergyEffect()` (no mutation). Wired into
-   `rules-bridge.js:hookEnergyAttach()` to emit a human-readable line on first
-   energy attach; 7 tests in `rules-extended.test.mjs`. **4a — Double / Double Colorless cost counting ✅**: `expandEnergyEntries()` (`attack-engine.mjs`) expands family objects (`double` → 2× type, `double-colorless` → 2 Colorless wildcards); `chat-buttons.js` live gate passes `{ type, family }`; 9 new tests in `rules.test.mjs` (137/137 green). **Execution of each family**: `attach-type` ✅ (this session — effective attached type honored in the live cost gate; 6 new tests, 143/143 green); `lock` / `redirect` / `protect` still ❌ — user confirmed via "fix energy types"; proceeding family-by-family.
-5. ~~**Weakness/resistance multipliers never applied**~~ — **done (math)**: fields are
-   parsed (`ensureCardData`) and `computeAttackDamage()` (`attack-engine.mjs:11`) applies
-   modern ×2 / legacy flat weakness and resistance, with tests in `rules.test.mjs`.
-   Remaining work is the same as gap #1: wiring it into the live attack path.
+4. ~~**No special-energy effect engine**~~ — **✅ executed** (see §F).
+   Classification remains in `energy-effects.mjs`. Live execution: Double /
+   Double Colorless cost expansion (`expandEnergyEntries`); `attach-type`
+   effective type in the cost gate; `lock` blocks attached-energy removal
+   (`move-card.js`); `redirect` free-retreat path in `retreat()`; `protect`
+   damage cap in `attack()` (simplified model — damage cap only, not a full
+   non-damage shield). Align any leftover "announce-only" wording with §F.
+5. ~~**Weakness/resistance multipliers never applied**~~ — **✅ done (math + live
+   wiring).** Fields parsed via `ensureCardData`; `computeAttackDamage()` applies
+   modern ×2 / legacy flat weakness and resistance; live `attack()` calls it.
+   No remaining wiring work under this gap.
 6. **~~Confused status is inert~~ / ~~mutual-exclusion not enforced~~ / ~~side-effectful
    `canActThroughStatuses`~~** — all three `status.mjs` defects (G) are **fixed and
-   test-verified in Phase 1**; **wiring is now done (Phase 2)** — the
-   `canAct`/`resolveWake`/`resolveConfusedAttack` API is executed in the live solo
-   attack path (`chat-buttons.js attack()`), with turn-boundary resolve in
-   `endTurnWithBanner`. The only remaining status item is
-   **multiplayer status-on-opponent** (flagged, not built).
+   test-verified**; **solo live wiring is done** — `canAct` / `resolveWake` /
+   `resolveConfusedAttack` run in `chat-buttons.js attack()`, with turn-boundary
+   resolve in `endTurnWithBanner`. Remaining status gap: **multiplayer
+   status-on-opponent**. Stronger than "no `data.status` on emit":
+   `rulesEvent { type: 'attacked' }` itself is **never emitted** anywhere in the
+   repo, so the `attacked` listener's status apply path is dead. Attack/pass sync
+   uses `processAction` / `accept-action.js` replay instead.
 7. ~~**No per-ability / per-card used-tracking** beyond the single
    `img.__rulesAbilityUsed` flag.~~ — **done**: `abilityKey()`/`markAbilityUsed()`/
    `abilityUsed()` (`rules-state.mjs`, pure + tested) track used abilities in
@@ -518,11 +492,23 @@ Ranked roughly by "how much is missing to make a card actually work":
 | `trainer-effects.mjs` | `parseTrainerEffect`, `describeStep` | Trainer effect parser |
 | `rules-bridge.js` | `initializeRulesEngine`, `autoExecuteTrainer`, `hookTrainerPlay`, `openDeckSearchWindow`, … | DOM orchestration |
 
-`trainer-effects.mjs` branch order (load-bearing, do not reorder):
-`discardHandThenDraw → shuffleHandThenDraw → searchDeck → draw(bare) → lookAtTop →
-switchOpponent → switchOwn → recursion → heal → attachFromDiscard → ionoShuffle →
-passive → unrecognizable`. Executed today: bare `draw` (auto) + `searchDeck` (picker).
-All others are announce-only.
+`trainer-effects.mjs` branch order (load-bearing, do not reorder casually):
+`discardHandThenDraw → shuffleHandThenDraw → searchDeck (+ optional discardCost +
+trailing draw) → lookAtTop → switches → recursion → healAmount → heal →
+attachFromDiscard → ionoShuffle (+ optional opponentDraw) → drawUntil →
+evolveStage2 / moveEnergy / devolve / discardTools / … → trailing/bare draw
+(late) → passive → unrecognizable`.
+
+**Executed today**
+- **✅ Auto:** `discardHandThenDraw`, `shuffleHandThenDraw`, `ionoShuffle`,
+  `draw`, `drawUntil`, `opponentDraw`, Nest-Ball single-Basic `searchDeck`,
+  `healAmount` (direct or heal picker)
+- **✅ Guided:** generic `searchDeck`, `discardCost` → then search, `recursion`,
+  `lookAtTop` (opens deck search window)
+- **⚠️ Partial:** `switchOwn` (tip when bench size is 1)
+- **Announce-only:** `switchOpponent`, `switchOpponentOut`, legacy `heal`,
+  `attachFromDiscard`, `evolveStage2`, `moveEnergy`, `devolve`, `discardTools`,
+  `discardFromOpponent`, `passive`
 
 ## Appendix — Attack window UI (verified)
 
