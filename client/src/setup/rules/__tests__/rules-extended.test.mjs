@@ -10,7 +10,7 @@ import test from 'node:test';
     const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
@@ -997,6 +997,51 @@ import test from 'node:test';
       assert.equal(classifyAttackEffect({ name: 'Mystery' }), 'unknown');
       assert.equal(classifyAttackEffect(null), 'unknown');
       assert.equal(classifyAttackEffect({ damage: 50 }), 'flat');
+    });
+
+    test('classifyAttackEffect: search-deck before trailing shuffle (Call for Family)', () => {
+      const callForFamily =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      assert.equal(
+        classifyAttackEffect({ name: 'Call for Family', damage: 0, text: callForFamily }),
+        'search-deck',
+      );
+      assert.notEqual(
+        classifyAttackEffect({ name: 'Call for Family', damage: 0, text: callForFamily }),
+        'shuffle-cost',
+      );
+    });
+
+    test('parseAttackSearchClause: Call for Family and rotation search attacks', () => {
+      const callForFamily =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callForFamily), {
+        what: 'Basic Pokémon',
+        count: 1,
+        destination: 'bench',
+      });
+
+      const flock =
+        'Search your deck for up to 2 Grubbin and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(flock), {
+        what: 'grubbin',
+        count: 2,
+        destination: 'bench',
+      });
+
+      const luckyFind =
+        'Search your deck for an Item card, reveal it, and put it into your hand. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(luckyFind), {
+        what: 'Item',
+        count: 1,
+        destination: 'hand',
+      });
+
+      assert.equal(parseAttackSearchClause('Flip a coin. If heads, this attack does 30 more damage.'), null);
+    });
+
+    test('ATTACK_FAMILIES: includes search-deck', () => {
+      assert.ok(ATTACK_FAMILIES.includes('search-deck'));
     });
 
     test('describeAttackEffect: one guidance line naming the attack', () => {
