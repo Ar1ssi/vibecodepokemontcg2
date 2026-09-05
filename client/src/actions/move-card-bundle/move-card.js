@@ -17,7 +17,7 @@ import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData } from '../../setup/rules/rules-state.mjs';
+import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium } from '../../setup/rules/rules-state.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
 import { clearStatuses, getStatus, applyStatus } from '../../setup/rules/status.mjs';
 import {
@@ -27,7 +27,6 @@ import {
   parseStadiumSetupDraw,
   stadiumBenchDamageApplies,
   isStadiumConfusedPersist,
-  getStadium,
   getEffectiveBenchLimit,
   playerHasTeraInPlay,
   isTeraCard,
