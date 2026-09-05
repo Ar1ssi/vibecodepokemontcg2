@@ -6,6 +6,10 @@ export function isFormattedDeckCard(card = {}) {
   return ['image'].every((key) => Object.prototype.hasOwnProperty.call(card, key));
 }
 
+export function isShowingCardBack(imageSrc, cardBackSrc) {
+  return !!imageSrc && !!cardBackSrc && imageSrc === cardBackSrc;
+}
+
 export function determineCardType(card = {}) {
   if (isDatabaseCard(card)) {
     return 'DatabaseCard';
