@@ -10,7 +10,7 @@ import test from 'node:test';
     const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
@@ -1058,6 +1058,22 @@ import test from 'node:test';
       });
 
       assert.equal(parseAttackSearchClause('Flip a coin. If heads, this attack does 30 more damage.'), null);
+    });
+
+    test('resolveAttackText: reads effect text from sibling attack on card', () => {
+      const card = {
+        attacks: [
+          {
+            name: 'Call for Family',
+            cost: ['Colorless'],
+            damage: 0,
+            text: 'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.',
+          },
+        ],
+      };
+      const stub = { name: 'Call for Family', cost: ['Colorless'], damage: 0 };
+      assert.match(resolveAttackText(card, stub), /search your deck for/i);
+      assert.ok(parseAttackSearchClause(resolveAttackText(card, stub)));
     });
 
     test('ATTACK_FAMILIES: includes search-deck', () => {
@@ -3147,6 +3163,40 @@ import test from 'node:test';
         const card = { name: 'Piloswine', id: 'ex7-904', hp: 80, weakness: null };
         await ensureCardData(card);
         assert.equal(calls.length, 0);
+      });
+    });
+
+    test('ensureCardData: merges attack effect text onto stub attacks[]', async () => {
+      const callForFamilyText =
+        'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv03.5-016')) {
+          return detailResponse({
+            id: 'sv03.5-016',
+            name: 'Pidgey',
+            hp: '50',
+            attacks: [
+              {
+                name: 'Call for Family',
+                cost: ['Colorless'],
+                damage: '0',
+                effect: callForFamilyText,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv03.5-016',
+          name: 'Pidgey',
+          hp: 50,
+          weakness: null,
+          attacks: [{ name: 'Call for Family', cost: ['Colorless'], damage: 0 }],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, callForFamilyText);
       });
     });
 

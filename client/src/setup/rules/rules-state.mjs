@@ -185,13 +185,63 @@
       return null;
     }
 
+    function mapDetailAttacks(detailAttacks) {
+      return (detailAttacks || []).map((a) => ({
+        name: a.name,
+        cost: a.cost || [],
+        damage: parseDamage(a.damage),
+        text: a.effect || a.text || '',
+      }));
+    }
+
+    // Merge TCGdex attack data onto board cards. Stub arrays (name/cost/damage
+    // only) must not block effect text from loading — that silences search,
+    // heal, status, and other text-driven attack effects (Call for Family).
+    function mergeAttacks(existing, incoming) {
+      if (!Array.isArray(incoming) || incoming.length === 0) return existing;
+      if (!Array.isArray(existing) || existing.length === 0) {
+        return incoming.map((a) => ({ ...a }));
+      }
+      const merged = existing.map((e) => ({ ...e }));
+      for (const inc of incoming) {
+        const idx = merged.findIndex((e) => e.name === inc.name);
+        if (idx >= 0) {
+          const ex = merged[idx];
+          merged[idx] = {
+            ...ex,
+            cost: inc.cost?.length ? inc.cost : ex.cost,
+            damage: inc.damage ?? ex.damage,
+            text: inc.text || ex.text || '',
+          };
+        } else {
+          merged.push({ ...inc });
+        }
+      }
+      return merged;
+    }
+
+    function attacksNeedText(card) {
+      if (!Array.isArray(card?.attacks) || card.attacks.length === 0) return false;
+      return card.attacks.some((a) => a?.name && !(a.text || a.effect));
+    }
+
+    function applyEnrichedData(card, data) {
+      for (const [k, v] of Object.entries(data)) {
+        if (k === 'attacks') {
+          card.attacks = mergeAttacks(card.attacks, v);
+        } else if (card[k] == null || card[k] === '') {
+          card[k] = v;
+        }
+      }
+    }
+
     
     export async function ensureCardData(card) {
       if (!card) return card;
       // NOTE: enrichment below sets `card.weakness` (singular) — matching on
       // it here, not the never-set `weaknesses`, so an already-enriched card
       // is actually recognized and doesn't re-run resolution/fetch on every call.
-      if (card.hp && card.weakness !== undefined) return card; // enriched
+      if (card.hp && card.weakness !== undefined && !attacksNeedText(card)) return card;
       if (!card.id && card.image?.src) {
         const fromUrl = extractTcgdexIdFromImageUrl(card.image.src);
         if (fromUrl) card.id = fromUrl;
@@ -224,12 +274,7 @@
       }
       if (!card?.id) return card;
       if (cardDataCache.has(card.id)) {
-        // Same fill-only merge as the fresh-fetch path: the card's own values
-        // (e.g. local `stage: 'Stage 1'`) must not be clobbered by TCGdex's
-        // formatting (e.g. `stage: 'Stage1'`) on a cache hit.
-        for (const [k, v] of Object.entries(cardDataCache.get(card.id))) {
-          if (card[k] == null || card[k] === '') card[k] = v;
-        }
+        applyEnrichedData(card, cardDataCache.get(card.id));
         return card;
       }
       try {
@@ -241,20 +286,7 @@
           weakness: parseTypeValue(detail.weaknesses?.[0]),
           resistance: parseTypeValue(detail.resistances?.[0]),
           retreatCost: detail.retreat ? detail.retreat.length : 0,
-          attacks: (detail.attacks || []).map((a) => ({
-            name: a.name,
-            cost: a.cost || [],
-            damage: parseDamage(a.damage),
-            // TCGdex's attack objects carry the effect text under `effect`,
-            // not `text` (see https://tcgdex.dev/reference/card — Pokémon
-            // Card > attacks[].effect). `a.text` doesn't exist on the raw
-            // API response, so keeping it only as a fallback (in case a
-            // future API revision renames the field back) — without it,
-            // every attack-text parser in damage-parser.mjs (discard cost,
-            // discard-to-scale, once-per-turn, heal, switch, bench damage,
-            // etc.) silently no-ops because atk.text is always ''.
-            text: a.effect || a.text || '',
-          })),
+          attacks: mapDetailAttacks(detail.attacks),
           stage: detail.stage || null,
           evolvesFrom: detail.evolvesFrom || null,
           ability: tcgAbilityFromDetail(detail),
@@ -264,12 +296,7 @@
           text: detail.text || null,
         };
         cardDataCache.set(card.id, data);
-        // Fill in only fields the card doesn't already carry — a card's own
-        // values (e.g. local `stage`/`evolvesFrom`) are the source of truth and
-        // must not be clobbered by TCGdex's formatting.
-        for (const [k, v] of Object.entries(data)) {
-          if (card[k] == null || card[k] === '') card[k] = v;
-        }
+        applyEnrichedData(card, data);
       } catch {
         // Do NOT cache an empty object on failure — leave it out so a later
         // call can retry the fetch (avoids permanently poisoned cache entries).

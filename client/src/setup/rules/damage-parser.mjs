@@ -476,6 +476,17 @@ export function parseAttackSearchClause(attackText) {
   return parseSearchDeckParams(lower(text));
 }
 
+// Resolve printed attack effect text from the attack object or its parent card.
+// Board cards sometimes carry stub attacks (name/cost/damage) before enrichment
+// fills `text` — always read through this before text-driven attack logic.
+export function resolveAttackText(card, attack) {
+  if (!attack) return '';
+  const direct = attack.text || attack.effect || '';
+  if (direct) return direct;
+  const match = card?.attacks?.find((a) => a?.name && a.name === attack.name);
+  return match?.text || match?.effect || '';
+}
+
 // One-line human summary of the parsed damage (for announcements).
 export function describeParsedDamage(attack, attacker = {}, defender = {}, ctx = {}) {
   const parsed = parseAttackDamage(attack, attacker, defender, ctx);

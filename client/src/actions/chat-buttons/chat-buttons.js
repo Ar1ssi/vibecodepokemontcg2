@@ -22,7 +22,7 @@ import {
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
@@ -157,8 +157,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
     const oppActive = getZone(oppPlayer, 'active').array[0];
     if (active && oppActive) {
       await ensureCardData(active);
-      const atk = active.attacks?.[attackIndex] || active.attacks?.[0];
+      let atk = active.attacks?.[attackIndex] || active.attacks?.[0];
       if (atk) {
+        const atkText = resolveAttackText(active, atk);
+        if (atkText) atk = { ...atk, text: atkText };
         // Once-per-turn (taxonomy §D once-per-turn family): if this attack
         // carries an "Once during your turn" clause and it was already used
         // this turn, fizzle before any cost/damage is applied. Consistent
@@ -523,12 +525,16 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
 
         // Place damage counters
         placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
-        appendMessage(
-          user,
-          `💥 ${atk.name} deals ${dmg.total} damage!`,
-          'announcement',
-          false
-        );
+        const willSearch =
+          rulesState.enabled && parseAttackSearchClause(atk.text);
+        if (dmg.total > 0 || !willSearch) {
+          appendMessage(
+            user,
+            `💥 ${atk.name} deals ${dmg.total} damage!`,
+            'announcement',
+            false
+          );
+        }
 
         // KO check → prizes (effective HP includes stadium +/−HP modifiers)
         const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
