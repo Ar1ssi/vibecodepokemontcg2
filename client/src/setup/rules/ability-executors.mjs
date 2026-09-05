@@ -120,9 +120,17 @@ export function parseEnergyRedirect(card) {
 // --- opponent-disrupt --------------------------------------------------
 
 // "Discard N cards from your opponent's hand" → N; unparseable → 1.
+// Self-hand discard costs (e.g. Mortal Shuriken) → 0.
 export function parseOpponentDiscard(card) {
   const t = textOf(card);
   if (!/opponent/.test(t) || !/discard/.test(t)) return 0;
+  if (
+    t.includes('from your hand') &&
+    !t.includes("opponent's hand") &&
+    !t.includes('from your opponent')
+  ) {
+    return 0;
+  }
   const m = t.match(/discard (?:up to )?(\d+)?/);
   return m?.[1] ? parseInt(m[1], 10) : 1;
 }
