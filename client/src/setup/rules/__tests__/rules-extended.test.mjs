@@ -1,7 +1,7 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn } = await import('../rules-state.mjs');
+    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
@@ -11,8 +11,9 @@ import test from 'node:test';
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
+    const { parseAbility } = await import('../abilities.mjs');
     
     // ── KO / prizes ──
     test('prizesForKO: standard = 1, ex = 3 (2 extra), VMAX = 3', () => {
@@ -368,6 +369,53 @@ import test from 'node:test';
       assert.notEqual(getStadium(), null);
       startGame('opp');
       assert.equal(getStadium(), null);
+    });
+
+    // ── TCGdex ability mapping (ensureCardData enrichment) ──
+    test('tcgAbilityFromDetail: prefers legacy detail.ability', () => {
+      const legacy = { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage.' };
+      assert.deepEqual(
+        tcgAbilityFromDetail({ ability: legacy, abilities: [{ type: 'Ability', name: 'Other', effect: 'x' }] }),
+        legacy
+      );
+    });
+
+    test('tcgAbilityFromDetail: maps TCGdex v2 abilities[] with type Ability', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'Ability', name: 'Solid Shell', effect: 'This Pokémon takes 20 less damage from attacks.' },
+          ],
+        }),
+        { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage from attacks.' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: type match is case-insensitive; uses first Ability entry', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'ability', name: 'First', effect: 'First effect' },
+            { type: 'Ability', name: 'Second', effect: 'Second effect' },
+          ],
+        }),
+        { name: 'First', text: 'First effect' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: falls back to entry.text when effect is missing', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [{ type: 'Ability', name: 'Draw Power', text: 'Draw a card.' }],
+        }),
+        { name: 'Draw Power', text: 'Draw a card.' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: returns null when no ability present', () => {
+      assert.equal(tcgAbilityFromDetail(null), null);
+      assert.equal(tcgAbilityFromDetail({}), null);
+      assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Pokémon Power', name: 'X', effect: 'y' }] }), null);
     });
 
     // ── per-ability used-tracking (taxonomy C) ──
@@ -1362,6 +1410,221 @@ import test from 'node:test';
       assert.equal(parseEnergyRedirect({ name: 'Pikachu' }), null);
     });
 
+    // ── Announce-only ability family parsers (ability-executors.mjs) ──
+
+    test('parseDamageReduction: takes N less / reduce damage by N', () => {
+      assert.deepEqual(
+        parseDamageReduction({ ability: { text: 'This Pokémon takes 2 less damage from attacks.' } }),
+        { reduce: 2 }
+      );
+      assert.deepEqual(
+        parseDamageReduction({ ability: { text: 'Reduce damage by 3 done to this Pokémon.' } }),
+        { reduce: 3 }
+      );
+      assert.deepEqual(parseDamageReduction({ ability: { text: 'Draw a card.' } }), { reduce: 0 });
+    });
+
+    test('parseDamageBonus / applyDamageBonus', () => {
+      assert.deepEqual(
+        parseDamageBonus({ ability: { text: 'This Pokémon\'s attacks do 20 more damage.' } }),
+        { bonus: 20 }
+      );
+      assert.deepEqual(
+        parseDamageBonus({ ability: { text: 'This Pokémon deals 30 more damage to the Defending Pokémon.' } }),
+        { bonus: 30 }
+      );
+      assert.equal(applyDamageBonus(50, 20), 70);
+      assert.equal(applyDamageBonus(50, 0), 50);
+      assert.deepEqual(parseDamageBonus({ ability: { text: 'Draw a card.' } }), { bonus: 0 });
+    });
+
+    test('parseHpBonus / applyHpBonus', () => {
+      assert.deepEqual(
+        parseHpBonus({ ability: { text: 'If this Pokémon has any Special Energy attached, it gets +100 HP.' } }),
+        { bonus: 100 }
+      );
+      assert.deepEqual(
+        parseHpBonus({ ability: { text: 'This Pokémon gets +20 HP for each Energy attached to it.' } }),
+        { bonus: 20 }
+      );
+      assert.equal(applyHpBonus(120, 100), 220);
+      assert.equal(applyHpBonus(5, -10), 1); // clamped to ≥ 1
+      assert.equal(applyHpBonus(0, 20), 0);
+    });
+
+    test('parseRetreatCostModifier / applyRetreatCostModifier', () => {
+      assert.deepEqual(
+        parseRetreatCostModifier({ ability: { text: 'This Pokémon\'s Retreat Cost is 1 less.' } }),
+        { delta: -1 }
+      );
+      assert.deepEqual(
+        parseRetreatCostModifier({ ability: { text: 'It costs 2 more to retreat this Pokémon.' } }),
+        { delta: 2 }
+      );
+      assert.equal(applyRetreatCostModifier(3, -1), 2);
+      assert.equal(applyRetreatCostModifier(1, -5), 0);
+    });
+
+    test('parsePrizeModify / applyPrizeModify', () => {
+      assert.deepEqual(
+        parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 1 fewer Prize card.' } }),
+        { delta: -1 }
+      );
+      assert.deepEqual(
+        parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 2 more Prize cards.' } }),
+        { delta: 2 }
+      );
+      assert.equal(applyPrizeModify(3, -1), 2);
+      assert.equal(applyPrizeModify(1, -5), 0);
+    });
+
+    test('parseKoPrevention: Resolute Heart + coin-flip patterns', () => {
+      assert.deepEqual(
+        parseKoPrevention({
+          ability: {
+            text: 'If this Pokémon has full HP and would be Knocked Out by damage from an attack, it is not Knocked Out, and its remaining HP becomes 10.',
+          },
+        }),
+        { fullHpOnly: true, surviveHp: 10 }
+      );
+      assert.deepEqual(
+        parseKoPrevention({ ability: { text: 'When this Pokémon would be Knocked Out, flip a coin. If heads, it is not Knocked Out.' } }),
+        { fullHpOnly: false, surviveHp: null }
+      );
+      assert.deepEqual(parseKoPrevention({ ability: { text: 'Draw a card.' } }), { fullHpOnly: false, surviveHp: null });
+    });
+
+    test('parseThorns: damage counters on attacker', () => {
+      assert.deepEqual(
+        parseThorns({ ability: { text: 'When this Pokémon is damaged by an attack, put 2 damage counters on the Attacking Pokémon.' } }),
+        { count: 2 }
+      );
+      assert.deepEqual(parseThorns({ ability: { text: 'Draw a card.' } }), { count: 0 });
+    });
+
+    test('parseCheckupEffect: checkup damage + filter', () => {
+      assert.deepEqual(
+        parseCheckupEffect({ ability: { text: 'During Pokémon Checkup, put 1 damage counter on each Poisoned Pokémon.' } }),
+        { count: 1, filter: 'poisoned', exceptName: null, targetHasAbility: false, source: 'Ability' }
+      );
+      assert.deepEqual(
+        parseCheckupEffect({ ability: { text: 'During Pokémon Checkup, put 2 damage counters on your opponent\'s Pokémon.' } }),
+        { count: 2, filter: 'opponent', exceptName: null, targetHasAbility: false, source: 'Ability' }
+      );
+      assert.deepEqual(parseCheckupEffect({ ability: { text: 'Draw a card.' } }), { count: 0, filter: null, exceptName: null, targetHasAbility: false, source: 'Ability' });
+    });
+
+    test('parseEnergyMultiplier: Wild Growth pattern', () => {
+      assert.deepEqual(
+        parseEnergyMultiplier({
+          ability: {
+            text: "Each Basic {G} Energy attached to all of your Pokémon provides {G}{G} Energy. The effect of Wild Growth doesn't stack.",
+          },
+        }),
+        { multiplier: 2, energyType: 'Grass' }
+      );
+      assert.deepEqual(parseEnergyMultiplier({ ability: { text: 'Draw a card.' } }), { multiplier: 0, energyType: null });
+    });
+
+    test('parseToolCap: extra Tool slot', () => {
+      assert.deepEqual(
+        parseToolCap({ ability: { text: 'This Pokémon can have an extra Pokémon Tool attached to it.' } }),
+        { extra: 1 }
+      );
+      assert.deepEqual(
+        parseToolCap({ ability: { text: 'This Pokémon can have 2 more Pokémon Tools attached to it.' } }),
+        { extra: 2 }
+      );
+      assert.deepEqual(parseToolCap({ ability: { text: 'Draw a card.' } }), { extra: 0 });
+    });
+
+    test('parseAttackInheritance', () => {
+      assert.equal(
+        parseAttackInheritance({
+          ability: {
+            text: 'Each of your evolved Pokémon can use any attack from its previous Evolutions. (You still need the necessary Energy to use each attack.)',
+          },
+        }),
+        true
+      );
+      assert.equal(parseAttackInheritance({ ability: { text: 'Draw a card.' } }), false);
+    });
+
+    test('parseOnOpponentEvolve: Darkest Impulse pattern', () => {
+      assert.deepEqual(
+        parseOnOpponentEvolve({
+          ability: {
+            text: 'Whenever your opponent plays a Pokémon from their hand to evolve 1 of their Pokémon, put 4 damage counters on that Pokémon.',
+          },
+        }),
+        { count: 4 }
+      );
+      assert.deepEqual(parseOnOpponentEvolve({ ability: { text: 'Draw a card.' } }), { count: 0 });
+    });
+
+    test('parseStatusInflict: asleep on opponent active', () => {
+      assert.deepEqual(
+        parseStatusInflict({
+          ability: {
+            text: 'Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent\'s Active Pokémon Asleep.',
+          },
+        }),
+        { status: 'asleep', target: 'opponent-active' }
+      );
+      assert.deepEqual(parseStatusInflict({ ability: { text: 'Draw a card.' } }), { status: null, target: 'attacker' });
+    });
+
+    test('parseMoveDamage: move/place counters on opponent', () => {
+      assert.deepEqual(
+        parseMoveDamage({ ability: { text: 'Once during your turn, you may move up to 3 damage counters from 1 of your Pokémon to another.' } }),
+        { count: 3, onOpponent: false }
+      );
+      assert.deepEqual(
+        parseMoveDamage({ ability: { text: 'Put 2 damage counters on your opponent\'s Active Pokémon.' } }),
+        { count: 2, onOpponent: true }
+      );
+      assert.deepEqual(parseMoveDamage({ ability: { text: 'Draw a card.' } }), { count: null, onOpponent: false });
+    });
+
+    test('parseLookAtTop', () => {
+      assert.deepEqual(
+        parseLookAtTop({ ability: { text: 'Once during your turn, look at the top 3 cards of your deck.' } }),
+        { count: 3, takeToHand: false }
+      );
+      assert.deepEqual(parseLookAtTop({ ability: { text: 'Draw a card.' } }), { count: 0, takeToHand: false });
+    });
+
+    test('parseRecursionFromDiscard: Snorlax Voraciousness pattern', () => {
+      assert.deepEqual(
+        parseRecursionFromDiscard({
+          ability: { text: 'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.' },
+        }),
+        { count: 2, what: 'Leftovers' }
+      );
+      assert.deepEqual(
+        parseRecursionFromDiscard({ ability: { text: 'Put an Energy card from your discard pile into your hand.' } }),
+        { count: 0, what: 'Energy' }
+      );
+      assert.deepEqual(parseRecursionFromDiscard({ ability: { text: 'Draw a card.' } }), { count: 0, what: '' });
+    });
+
+    test('parseEffectPrevent: Initialization pattern', () => {
+      assert.deepEqual(
+        parseEffectPrevent({
+          ability: {
+            text: "As long as this Pokémon is in the Active Spot, Pokémon with a Rule Box in play (both yours and your opponent's) have no Abilities, except for Future Pokémon.",
+          },
+        }),
+        { scope: 'abilities' }
+      );
+      assert.deepEqual(parseEffectPrevent({ ability: { text: 'Draw a card.' } }), { scope: null });
+    });
+
+    test('parseSetupFaceDown', () => {
+      assert.equal(parseSetupFaceDown({ ability: { text: 'When you play this Pokémon, put it face-down in the Active Spot.' } }), true);
+      assert.equal(parseSetupFaceDown({ ability: { text: 'Draw a card.' } }), false);
+    });
+
     test('classifyAbility: energy-redirect family', () => {
       const ironTinker = { ability: { text: 'Once During Your Turn: You may move 1 Energy from this Pokémon to 1 of your other Pokémon.' } };
       assert.equal(classifyAbility(ironTinker), 'energy-redirect');
@@ -1369,6 +1632,48 @@ import test from 'node:test';
       // Attach-energy card still classifies as 'attach'
       const attach = { ability: { text: 'Once During Your Turn: You may attach an Energy card to this Pokémon.' } };
       assert.equal(classifyAbility(attach), 'attach');
+    });
+
+    test('classifyAbility: Standard 2026-27 audit fixes', () => {
+      const fanRotom = {
+        name: 'Fan Rotom',
+        ability: {
+          text: "Once during your first turn, you may search your deck for up to 3 {C} Pokémon with 100 HP or less, reveal them, and put them into your hand. Then, shuffle your deck. You can't use more than 1 Fan Call Ability during your turn.",
+        },
+      };
+      assert.equal(classifyAbility(fanRotom), 'search');
+
+      const wildGrowth = {
+        name: 'Meganium',
+        ability: {
+          text: "Each Basic {G} Energy attached to all of your Pokémon provides {G}{G} Energy. The effect of Wild Growth doesn't stack.",
+        },
+      };
+      assert.equal(classifyAbility(wildGrowth), 'energy-multiplier');
+
+      const calmingLight = {
+        name: 'Shiinotic',
+        ability: {
+          text: "Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent's Active Pokémon Asleep.",
+        },
+      };
+      assert.equal(classifyAbility(calmingLight), 'status');
+
+      const washOut = {
+        name: 'Dewgong',
+        ability: {
+          text: 'As often as you like during your turn, you may use this Ability. Move a {W} Energy from 1 of your Benched Pokémon to your Active Pokémon.',
+        },
+      };
+      assert.equal(classifyAbility(washOut), 'energy-redirect');
+
+      const voraciousness = {
+        name: 'Snorlax',
+        ability: {
+          text: 'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.',
+        },
+      };
+      assert.equal(classifyAbility(voraciousness), 'recursion');
     });
 
     // ── §D heal family (execute: remove up to N counters) ──
@@ -2240,4 +2545,92 @@ import test from 'node:test';
       const p = parseAttackDamage(atk, {}, {}, {});
       assert.equal(p.resolved, false);
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    // ── Standard 2026-27 ability parser gaps ──
+
+    test('parseAbility: recursionFromDiscardAbility (Snorlax Voraciousness)', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.'
+      );
+      assert.equal(steps[0].type, 'recursionFromDiscardAbility');
+    });
+
+    test('parseAbility: checkupAbility (Froslass Freezing Shroud)', () => {
+      const steps = parseAbility(
+        'During Pokémon Checkup, put 1 damage counter on each Pokémon that has an Ability (both yours and your opponent\'s), except any Froslass.'
+      );
+      assert.equal(steps[0].type, 'checkupAbility');
+    });
+
+    test('parseAbility: onPromotionAbility damage (Iron Valiant Tachyon Bits)', () => {
+      const steps = parseAbility(
+        'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent\'s Pokémon.'
+      );
+      assert.equal(steps[0].type, 'onPromotionAbility');
+      assert.equal(steps[0].effect, 'damage');
+    });
+
+    test('parseAbility: effectPreventAbility active-spot aura (Midnight Fluttering)', () => {
+      const steps = parseAbility(
+        'As long as this Pokémon is in the Active Spot, your opponent\'s Active Pokémon has no Abilities, except for Midnight Fluttering.'
+      );
+      assert.equal(steps[0].type, 'effectPreventAbility');
+    });
+
+    // ── compound ability step orchestration (planAbilitySteps) ──
+
+    test('planAbilitySteps: draw + search interactive order', async () => {
+      const { planAbilitySteps } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'Once during your turn, you may draw 2 cards. Once during your turn, you may search your deck for a Basic Pokémon and put it onto your Bench.';
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['search', 'draw']
+      );
+    });
+
+    test('planAbilitySteps: auto mode — self draw only; opponentDraw alone announces', async () => {
+      const { planAbilitySteps, actionableAbilityPlan } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const drawText = 'Once during your turn, you may draw 2 cards.';
+      const drawSteps = parseAbility(drawText);
+      const drawPlan = planAbilitySteps(drawSteps, { mode: 'auto' });
+      assert.deepEqual(drawPlan.map((p) => p.action), ['draw']);
+      assert.equal(actionableAbilityPlan(drawPlan, { mode: 'auto' }).length, 1);
+
+      const oppText = 'Once during your turn, your opponent draws 2 cards.';
+      const oppPlan = planAbilitySteps(parseAbility(oppText), { mode: 'auto' });
+      assert.deepEqual(oppPlan.map((p) => p.action), ['announce']);
+    });
+
+    test('planAbilitySteps: when-played + search compound detected', async () => {
+      const { planAbilitySteps, hasWhenPlayedSearchChain } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'When you play this Pokémon from your hand, search your deck for up to 2 Basic Pokémon and put them onto your Bench.';
+      const steps = parseAbility(text);
+      assert.ok(hasWhenPlayedSearchChain(steps));
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['search', 'when-played']
+      );
+    });
+
+    test('planAbilitySteps: passive steps skipped in compound plan', async () => {
+      const { planAbilitySteps } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'Once during your turn, you may draw a card. This Pokémon takes 30 less damage from attacks.';
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['draw', 'skip']
+      );
+      assert.equal(plan[1].reason, 'passive');
     });

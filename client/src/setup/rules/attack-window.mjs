@@ -5,8 +5,23 @@
 
 import { canPayAttackCost, expandEnergyEntries } from './attack-engine.mjs';
 import { oncePerTurnClause } from './damage-parser.mjs';
-import { passiveCostDiscount, applyCostDiscount } from './ability-executors.mjs';
+import { passiveCostDiscount, applyCostDiscount, parseAttackInheritance } from './ability-executors.mjs';
 import { parseStadiumCostModifier } from './stadium-effects.mjs';
+
+/**
+ * Merge prior-evolution attacks when the active has attack-inheritance.
+ */
+export function mergeInheritedAttacks(card, priorAttacks = []) {
+  const base = [...(card?.attacks || [])];
+  if (!parseAttackInheritance(card)) return base;
+  const seen = new Set(base.map((a) => a.name));
+  for (const atk of priorAttacks) {
+    if (!atk?.name || seen.has(atk.name)) continue;
+    base.push({ ...atk, inherited: true });
+    seen.add(atk.name);
+  }
+  return base;
+}
 
 /**
  * Build the list of usable attacks for a card.
@@ -27,9 +42,10 @@ export function listAttacks(card, opts = {}) {
     stadiumCostModifier = 0,
     abilityUsed = false,
     rulesEnabled = true,
+    priorAttacks = [],
   } = opts;
 
-  const attacks = card.attacks || [];
+  const attacks = mergeInheritedAttacks(card, priorAttacks);
   const discount = rulesEnabled
     ? passiveCostDiscount(card) + stadiumCostModifier
     : 0;
@@ -106,8 +122,6 @@ export function listUsableActions(card, opts = {}) {
     abilities: listAbilities(card, opts),
   };
 }
-
-// ── helpers ──────────────────────────────────────────────────────────
 
 const SYMBOL_LABELS = {
   Colorless: '⚪',

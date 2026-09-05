@@ -117,6 +117,18 @@
       return out;
     }
     
+    // Pure mapper: TCGdex v2 card detail → rules-engine ability shape.
+    // v2 exposes abilities[] ({ type, name, effect }); legacy detail.ability is kept for compat.
+    export function tcgAbilityFromDetail(detail) {
+      if (detail?.ability?.text || detail?.ability?.name) return detail.ability;
+      // Multiple Ability entries are rare; first match wins (TCGdex order is stable).
+      const entry = (detail?.abilities || []).find(
+        (a) => String(a?.type || '').toLowerCase() === 'ability'
+      );
+      if (!entry) return null;
+      return { name: entry.name || '', text: entry.effect || entry.text || '' };
+    }
+    
     export async function ensureCardData(card) {
       if (!card) return card;
       // NOTE: enrichment below sets `card.weakness` (singular) — matching on
@@ -169,7 +181,7 @@
           })),
           stage: detail.stage || null,
           evolvesFrom: detail.evolvesFrom || null,
-          ability: detail.ability || null,
+          ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || [],
           rarity: detail.rarity || card.rarity || '',
           effect: detail.effect || null,
