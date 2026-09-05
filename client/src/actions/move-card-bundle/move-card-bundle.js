@@ -1,6 +1,5 @@
 import { systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
-import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import {
   buildCardHint,
@@ -74,7 +73,9 @@ export const moveCardBundle = (
   let resolvedIndex = index;
   let resolvedTargetIndex = targetIndex;
   let syncOptions = {};
-  if (cardHints && systemState.isTwoPlayer && !emit && user === 'opp') {
+  const isMirrorReplay =
+    cardHints && systemState.isTwoPlayer && !emit && user === 'opp';
+  if (isMirrorReplay) {
     ({ index: resolvedIndex, targetIndex: resolvedTargetIndex } =
       resolveMoveCardIndices(
         user,
@@ -84,8 +85,9 @@ export const moveCardBundle = (
         targetIndex,
         cardHints
       ));
+    syncOptions = { syncReplay: true };
     if (cardHints.isEvolution) {
-      syncOptions = { forceEvolution: true };
+      syncOptions.forceEvolution = true;
     }
   }
 
@@ -108,8 +110,10 @@ export const moveCardBundle = (
       resolvedTargetIndex,
       syncOptions
     );
-    refreshBoard(); //refreshing the board rearranges the array of the cards on the active/bench. to prevent desyncs, refresh the board whenever a user moves a card to ensure that the array for both users is the same
-    // the issue arised when one player would refresh their board by flipping board/resizing window, changing their arrays, but the other player would still have the original arrays.
+    // Do not call refreshBoard here — it used to invoke moveCard on every
+    // active/bench Pokémon, recreating play-containers and re-firing rules
+    // hooks. Array sync is handled by the socket replay itself; refreshBoard
+    // remains available for resize / flip-board / manual image reload.
   } catch (e) {
     console.error('Error in moveCardBundle:', e, {
       user,
