@@ -2,6 +2,7 @@ import {
   listMats,
   searchMats,
 } from '../../../setup/deck-builder/core/mats.mjs';
+import { matThumbFallbackChain } from '../../../setup/deck-builder/core/mat-image-urls.mjs';
 
 const escapeHtml = (value = '') =>
   String(value)
@@ -49,12 +50,8 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   const galleryEl = panelEl.querySelector('.native-deck-builder-mat-gallery');
   const filterInput = panelEl.querySelector('.native-deck-builder-mat-filter');
 
-  const matImageSrc = (mat) => mat.thumb || mat.imageUrl || mat.image || '';
-  const matImageFallback = (mat) => {
-    if (mat.thumb && mat.imageUrl) return mat.imageUrl;
-    if (mat.imageUrl && mat.image) return mat.image;
-    return '';
-  };
+  const matImageSrc = (mat) => matThumbFallbackChain(mat).primary;
+  const matImageFallback = (mat) => matThumbFallbackChain(mat).fallback;
 
   const imgTag = (mat, className = '') => {
     const src = matImageSrc(mat);

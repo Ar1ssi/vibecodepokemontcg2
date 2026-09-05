@@ -15,6 +15,11 @@ import {
   layoutToCssVars,
   resolveMatLayout,
 } from './mat-layouts.mjs';
+import {
+  matImageProxyUrl,
+  resolveMatBoardUrl,
+  toAbsoluteClientPath,
+} from '../deck-builder/core/mat-image-urls.mjs';
 
 const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
 const MAT_TARGETS = ['self', 'opp'];
@@ -136,8 +141,8 @@ const matHalfImage = (target) => {
 /**
  * Point a half's artwork at the mat image.
  *
- * cdn.artofpkm.com returns a generic watermark when a Referer is sent; use
- * `<img referrerpolicy="no-referrer">` so the browser loads the real art.
+ * cdn.artofpkm.com returns a generic watermark when a Referer is sent. Load
+ * remote art through `/api/mat-image` (same-origin proxy) instead.
  */
 const paintMatImageForTarget = (target, mat) => {
   const key = normalizeTarget(target);
@@ -155,9 +160,9 @@ const paintMatImageForTarget = (target, mat) => {
   img.hidden = false;
   img.referrerPolicy = 'no-referrer';
 
-  const local = mat.image ? new URL(mat.image, document.baseURI).href : null;
-  const remote = mat.imageUrl || null;
-  const primary = remote || local;
+  const primary = resolveMatBoardUrl(mat);
+  const local = mat.image ? toAbsoluteClientPath(mat.image) : null;
+  const remote = mat.imageUrl ? matImageProxyUrl(mat.imageUrl) : null;
 
   if (!primary) {
     img.removeAttribute('src');
