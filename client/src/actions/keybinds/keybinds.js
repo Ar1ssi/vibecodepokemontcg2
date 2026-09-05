@@ -17,6 +17,7 @@ import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
+import { isCardPreviewOpen } from '../../setup/image-logic/full-view.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { addSpecialCondition } from '../counters/special-condition.js';
 import { useAbility } from '../counters/use-ability.js';
@@ -462,6 +463,7 @@ export const keyDown = (event) => {
       !(event.altKey || event.getModifierState('Alt')) &&
       ['stadium', 'active', 'bench'].includes(mouseClick.zoneId) &&
       !isInFullView(mouseClick.card.image) &&
+      !isCardPreviewOpen() &&
       !systemState.isReplay
     ) {
       rotateCard(mouseClick.cardUser, mouseClick.zoneId, mouseClick.cardIndex);
@@ -471,6 +473,7 @@ export const keyDown = (event) => {
       (event.altKey || event.getModifierState('Alt')) &&
       ['active', 'bench'].includes(mouseClick.zoneId) &&
       !isInFullView(mouseClick.card.image) &&
+      !isCardPreviewOpen() &&
       !systemState.isReplay
     ) {
       rotateCard(

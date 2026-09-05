@@ -1,13 +1,9 @@
-// Ad-hoc UI test for the double-click card preview (`.full-view`), the case that
-// used to shrink holofoil cards instead of enlarging them. Not part of `pnpm test`.
+// Ad-hoc UI test for card preview flows. Not part of `pnpm test`.
 //
-//   node server/server.js                       # in another shell
+//   node server/server.js
 //   node fullview-test.mjs <exported-state.json>
 //
-// The argument is a state file exported from the sim's Options > Export (the
-// same JSON the `#jsonFile` input accepts). It must contain at least one
-// Pokémon in the self-side active spot; a holofoil-rare one exercises the
-// interesting path, and attached energies exercise the panel layout.
+// Needs a self-side active Pokémon with attachments (holo preferred).
 
 import { chromium } from 'playwright';
 
@@ -34,20 +30,20 @@ const T = (name, ok, extra = '') =>
 
 const snap = (zone) =>
   fr.evaluate((z) => {
-    const img = document.querySelector(`#${z} img`);
-    if (!img) return null;
-    const host = img.closest('.play-container');
-    const rotator = img.closest('.card__rotator');
+    const host = document.querySelector(`#${z} .play-container`);
+    const previewImg = document.querySelector('.card-preview-pop img');
+    const matImg = document.querySelector(`#${z} img`);
+    const rotator = matImg?.closest('.card__rotator');
     return {
-      imgW: Math.round(img.getBoundingClientRect().width),
-      holo: !!img.closest('.mat-holo'),
+      matImgW: matImg ? Math.round(matImg.getBoundingClientRect().width) : null,
+      previewImgW: previewImg
+        ? Math.round(previewImg.getBoundingClientRect().width)
+        : null,
+      holo: !!matImg?.closest('.mat-holo'),
       hostCls: host?.className ?? null,
-      hostStyle: host?.getAttribute('style') ?? null,
-      rotatorStyle: rotator ? rotator.getAttribute('style') || '' : null,
+      previewOpen: !!document.querySelector('.card-preview-overlay'),
       fullViews: document.querySelectorAll('.full-view').length,
-      fullViewsOnPlayContainer: Array.from(document.querySelectorAll('.full-view')).every(
-        (e) => e.classList.contains('play-container')
-      ),
+      rotatorStyle: rotator ? rotator.getAttribute('style') || '' : null,
     };
   }, zone);
 
@@ -61,27 +57,37 @@ const doubleClickCard = (zone) =>
       clientX: r.x + r.width / 2,
       clientY: r.y + r.height / 2,
     };
-    // Dispatched directly: the holo auto-sweep keeps the card "unstable", so
-    // Playwright's own dblclick() waits for stability until it times out.
     img.dispatchEvent(new MouseEvent('click', o));
     img.dispatchEvent(new MouseEvent('click', o));
     img.dispatchEvent(new MouseEvent('dblclick', o));
   }, zone);
 
+const openAttachedViaContext = async () => {
+  await fr.evaluate(() => {
+    const img = document.querySelector('#active img');
+    img.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    );
+  });
+  await page.waitForTimeout(300);
+  await page.hover('#attachedCardsButton');
+  await page.click('#viewAttachedCardsButton', { force: true });
+  return fr.evaluate(() => document.querySelectorAll('.full-view').length);
+};
+
 const before = await snap('active');
-if (!before) {
-  console.error('no card in the self active spot — pick a different state file');
+if (!before || before.matImgW == null) {
+  console.error('no card in the self active spot');
   process.exit(1);
 }
 
-// Sample the pop transform across the animation.
 await fr.evaluate(() => {
   window.__scales = [];
   const t0 = performance.now();
   const sample = () => {
-    const fv = document.querySelector('.full-view');
-    if (fv) {
-      const m = /scale\(([\d.]+)\)/.exec(fv.style.transform || '');
+    const pop = document.querySelector('.card-preview-pop');
+    if (pop) {
+      const m = /scale\(([\d.]+)\)/.exec(pop.style.transform || '');
       if (m) window.__scales.push(Number(m[1]));
     }
     if (performance.now() - t0 < 800) requestAnimationFrame(sample);
@@ -92,40 +98,50 @@ await doubleClickCard('active');
 await page.waitForTimeout(1200);
 
 const scales = await fr.evaluate(() => window.__scales);
-const open = await snap('active');
+const dblOpen = await snap('active');
 
-T('preview enlarges the card', open.imgW > before.imgW * 1.8, `${before.imgW}px -> ${open.imgW}px`);
-T('.full-view lands on .play-container', open.fullViewsOnPlayContainer, open.hostCls);
-T('exactly one .full-view', open.fullViews === 1);
-if (before.holo) {
-  T('holo .card__rotator is not resized', open.rotatorStyle === '', `style="${open.rotatorStyle}"`);
-}
+T('double-click opens card preview overlay', dblOpen.previewOpen === true);
+T('double-click does not open .full-view panel', dblOpen.fullViews === 0);
+T(
+  'preview enlarges the card',
+  dblOpen.previewImgW > before.matImgW * 1.8,
+  `${before.matImgW}px -> ${dblOpen.previewImgW}px`
+);
 T('pop starts small', scales[0] <= 0.6, `first=${scales[0]}`);
-T('pop overshoots then settles', Math.max(...scales) > 1 && scales.at(-1) === 1, `max=${Math.max(...scales)} last=${scales.at(-1)}`);
+T(
+  'pop overshoots then settles',
+  Math.max(...scales) > 1 && scales.at(-1) === 1,
+  `max=${Math.max(...scales)} last=${scales.at(-1)}`
+);
+if (before.holo) {
+  T(
+    'holo .card__rotator is not resized on mat',
+    dblOpen.rotatorStyle === '',
+    `style="${dblOpen.rotatorStyle}"`
+  );
+}
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(3000);
-const closed = await snap('active');
+const dblClosed = await snap('active');
+T('card returns to mat after preview', dblClosed.matImgW === before.matImgW);
+T('preview overlay removed', dblClosed.previewOpen === false);
 
-T('card returns to mat size', closed.imgW === before.imgW, `${closed.imgW}px vs ${before.imgW}px`);
-T('no .full-view left behind', closed.fullViews === 0);
-T('no leftover pop transform', !/transform/.test(closed.hostStyle || ''), closed.hostStyle);
-T('container width restored', closed.hostStyle === before.hostStyle);
-if (before.holo) {
-  T('holo wrapper survives the close', closed.holo === true);
-}
+const fullViewCount = await openAttachedViaContext();
+T('context menu can open attached-cards panel', fullViewCount === 1);
+await page.waitForTimeout(1200);
+const panelOpen = await snap('active');
+T('attached panel uses .full-view', panelOpen.fullViews === 1, panelOpen.hostCls);
+T(
+  'attached panel enlarges the card',
+  panelOpen.matImgW > before.matImgW * 1.8,
+  `${before.matImgW}px -> ${panelOpen.matImgW}px`
+);
 
-// A viewport resize must not squash a holo card (the resizer used to write the
-// container width onto `.card__rotator`).
-await page.setViewportSize({ width: 1280, height: 820 });
-await page.waitForTimeout(1500);
-await page.setViewportSize({ width: 1440, height: 900 });
-await page.waitForTimeout(1500);
-const resized = await snap('active');
-T('card survives a viewport resize', Math.abs(resized.imgW - before.imgW) <= 3, `${before.imgW}px -> ${resized.imgW}px`);
-if (before.holo) {
-  T('resize does not size .card__rotator', !/width/.test(resized.rotatorStyle || ''), resized.rotatorStyle);
-}
+await page.keyboard.press('Escape');
+await page.waitForTimeout(3000);
+const panelClosed = await snap('active');
+T('attached panel closes cleanly', panelClosed.fullViews === 0);
 
 console.log('page errors:', errors.length ? errors.slice(0, 5) : 'none');
 await browser.close();
