@@ -1,7 +1,7 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn } = await import('../rules-state.mjs');
+    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
@@ -368,6 +368,53 @@ import test from 'node:test';
       assert.notEqual(getStadium(), null);
       startGame('opp');
       assert.equal(getStadium(), null);
+    });
+
+    // ── TCGdex ability mapping (ensureCardData enrichment) ──
+    test('tcgAbilityFromDetail: prefers legacy detail.ability', () => {
+      const legacy = { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage.' };
+      assert.deepEqual(
+        tcgAbilityFromDetail({ ability: legacy, abilities: [{ type: 'Ability', name: 'Other', effect: 'x' }] }),
+        legacy
+      );
+    });
+
+    test('tcgAbilityFromDetail: maps TCGdex v2 abilities[] with type Ability', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'Ability', name: 'Solid Shell', effect: 'This Pokémon takes 20 less damage from attacks.' },
+          ],
+        }),
+        { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage from attacks.' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: type match is case-insensitive; uses first Ability entry', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'ability', name: 'First', effect: 'First effect' },
+            { type: 'Ability', name: 'Second', effect: 'Second effect' },
+          ],
+        }),
+        { name: 'First', text: 'First effect' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: falls back to entry.text when effect is missing', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [{ type: 'Ability', name: 'Draw Power', text: 'Draw a card.' }],
+        }),
+        { name: 'Draw Power', text: 'Draw a card.' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: returns null when no ability present', () => {
+      assert.equal(tcgAbilityFromDetail(null), null);
+      assert.equal(tcgAbilityFromDetail({}), null);
+      assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Pokémon Power', name: 'X', effect: 'y' }] }), null);
     });
 
     // ── per-ability used-tracking (taxonomy C) ──
