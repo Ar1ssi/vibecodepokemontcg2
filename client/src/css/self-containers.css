@@ -9,6 +9,7 @@
 @import url('./holo/radiant-holo.css');
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
+@import url('./damage-counter.css');
 
 * {
   user-select: none;
@@ -415,15 +416,11 @@ body, input, textarea, button {
 .self-circle {
   position: absolute;
   border-radius: 50%;
-  background-color: rgb(255, 98, 0);
-  color: white;
   text-align: center;
 }
 .opp-circle {
   position: absolute;
   border-radius: 50%;
-  background-color: rgb(255, 98, 0);
-  color: white;
   text-align: center;
   transform: scaleX(-1) scaleY(-1);
 }
