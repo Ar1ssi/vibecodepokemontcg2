@@ -1704,7 +1704,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  const finishSearch = () => {
+  const completeSearch = () => {
     shuffleZone(user, user, 'deck');
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
@@ -1731,11 +1731,15 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
           'announcement',
           false
         );
-        finishSearch();
+        completeSearch();
       },
       onCancel: () => {
-        appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-        finishSearch();
+        appendMessage(
+          user,
+          '🔍 Search canceled — ability not used (you may decline).',
+          'announcement',
+          false
+        );
       },
     });
     return;
@@ -1754,11 +1758,15 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
         'announcement',
         false
       );
-      finishSearch();
+      completeSearch();
     },
     onCancel: () => {
-      appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-      finishSearch();
+      appendMessage(
+        user,
+        '🔍 Search canceled — ability not used (you may decline).',
+        'announcement',
+        false
+      );
     },
   });
 };
