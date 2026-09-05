@@ -1164,7 +1164,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
 // ── choice picker for search effects ─────────────────────────────────
     // Opens a modal with candidate cards (from deck/discard); clicking one
     // executes the pending move (to hand or bench) automatically.
-    const openChoicePicker = ({ title, candidates, zoneFrom, destination, multiSelect = false, requiredCount = 1, onPick, onConfirm, onCancel }) => {
+    const openChoicePicker = ({ title, candidates, zoneFrom, destination, user = 'self', pickOnly = false, multiSelect = false, requiredCount = 1, onPick, onConfirm, onCancel }) => {
       // remove any existing picker
       document.getElementById('rulesChoicePicker')?.remove();
       
@@ -1211,11 +1211,13 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               return;
             }
             try {
-              const zone = getZone('self', zoneFrom);
-              const idx = zone.array.indexOf(cand);
-              if (idx >= 0) {
-                moveCardBundle('self', 'self', zoneFrom, destination, idx, false, 'move');
-                appendMessage('', `auto: ${cand.name} → ${destination === 'bench' ? 'Bench' : 'hand'}`, 'announcement', false);
+              if (!pickOnly && zoneFrom && destination) {
+                const z = getZone(user, zoneFrom);
+                const idx = z.array.indexOf(cand);
+                if (idx >= 0) {
+                  moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
+                  appendMessage('', `auto: ${cand.name} → ${destination === 'bench' ? 'Bench' : destination}`, 'announcement', false);
+                }
               }
             } catch {}
             onPick?.(cand);
