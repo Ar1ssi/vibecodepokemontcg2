@@ -107,14 +107,28 @@ const isAttach = (t) =>
 // Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
 const hasWord = (t, w) => t.split(/[^a-z]/).includes(w);
 
+const hasDamageCounterPlacement = (t) =>
+  /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
+  /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
+
+const isSelfHandDiscardCost = (t) =>
+  t.includes('discard') &&
+  t.includes('from your hand') &&
+  !t.includes("opponent's hand") &&
+  !t.includes('from your opponent');
+
 const isMoveEnergy = (t) =>
   hasWord(t, 'move') && t.includes('energy') && (t.includes('to 1 of your') || t.includes('to another') || t.includes('to a different'));
 
 const isMoveDamage = (t) =>
-  (hasWord(t, 'move') || t.includes('place')) && t.includes('damage counter') && (t.includes('to') || t.includes('onto'));
+  (hasWord(t, 'move') || t.includes('place')) &&
+  t.includes('damage counter') &&
+  hasDamageCounterPlacement(t);
 
 const isOpponentDisrupt = (t) =>
-  t.includes('opponent') && (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
+  t.includes('opponent') &&
+  !isSelfHandDiscardCost(t) &&
+  (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
 
 const isRecursion = (t) =>
   t.includes('knocked out') && (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'));
