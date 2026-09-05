@@ -10,7 +10,7 @@ import {
 import { getZone } from '../zones/get-zone.js';
 import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { identifyCard } from './click-events.js';
-import { manualDeckActionAllowed } from '../rules/rules-state.mjs';
+import { findZoneCardIndex } from './zone-card-lookup.js';
 import { appendMessage } from '../chatbox/append-message.js';
 
 const popupContainers = [
@@ -254,8 +254,9 @@ export const drop = (event) => {
       ['active', 'bench'].includes(zoneOf(event.target)?.id)
     ) {
       dZoneId = zoneOf(event.target)?.id;
-      targetIndex = getZone(event.target.user, dZoneId).array.findIndex(
-        (card) => card.image === event.target
+      targetIndex = findZoneCardIndex(
+        getZone(event.target.user, dZoneId),
+        event.target
       );
     } else if (event.target.tagName === 'IMG') {
       dZoneId = zoneOf(event.target)?.id;

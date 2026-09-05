@@ -16,7 +16,7 @@ const refreshZone = (user, zoneId) => {
       img.src = image.src;
       document.body.appendChild(img);
       document.body.removeChild(img);
-      if (!image.attached) {
+      if (!image.attached && !image.relative) {
         // re-append the card to the end of the same zone
         let currentRotation;
         if (image.PokémonBreak) {

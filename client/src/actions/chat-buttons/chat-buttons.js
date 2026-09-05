@@ -31,6 +31,10 @@ import { markRetreated } from '../../setup/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import {
+  energiesAttachedToPokemon,
+  getActivePokemonCard,
+} from '../../setup/zones/active-pokemon.mjs';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import {
   canAct,
@@ -80,7 +84,7 @@ const endTurnWithBanner = (user) => {
   // attack() and pass(), so pass is covered too. Mirrors the +Turn button
   // path in rules-bridge.js; solo never goes through rules-bridge, so there is
   // no double-resolve.
-  const active = getZone(user, 'active').array[0];
+  const active = getActivePokemonCard(getZone(user, 'active'));
   if (active) {
     const key = active.image?.dataset?.cardId || active.name;
     const checkupBonus = getStadiumCheckupPoisonBonus(active, user);
@@ -110,7 +114,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
 
     // Statuses that gate attacking: asleep (wake coin), paralyzed (blocked),
     // confused (pre-attack coin; tails = 3 damage counters, attack fizzles).
-    const active = getZone(user, 'active').array[0];
+    const activeZone = getZone(user, 'active');
+    const active = getActivePokemonCard(activeZone);
     if (active) {
       const key = active.image?.dataset?.cardId || active.name;
       const gate = canAct(user, key);
@@ -155,7 +160,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
     }
     // ── Attack execution: energy cost, damage, KO ──
     const oppPlayer = user === 'self' ? 'opp' : 'self';
-    const oppActive = getZone(oppPlayer, 'active').array[0];
+    const oppActive = getActivePokemonCard(getZone(oppPlayer, 'active'));
     if (active && oppActive) {
       await ensureCardData(active);
       let atk = active.attacks?.[attackIndex] || active.attacks?.[0];
@@ -182,10 +187,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
 
         // Energy cost check
-        const activeZone = getZone(user, 'active');
-        const attachedEnergies = activeZone.array.filter(
-          (c) => c.type === 'Energy' && c.image?.relative === active.image
-        );
+        const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
         const energyTypes = [];
         for (const e of attachedEnergies) {
           await ensureCardData(e);
@@ -936,7 +938,8 @@ export const retreat = (user, emit = true) => {
     }
 
     // Only Paralyzed blocks retreating. Retreating also clears Confused.
-    const active = getZone(user, 'active').array[0];
+    const activeZone = getZone(user, 'active');
+    const active = getActivePokemonCard(activeZone);
     let activeKey = null;
     if (active) {
       activeKey = active.image?.dataset?.cardId || active.name;
@@ -974,10 +977,7 @@ export const retreat = (user, emit = true) => {
       ? getStadiumRetreatCost(baseRetreatCost, active, user)
       : baseRetreatCost;
     if (retreatCost > 0 && !hasRedirectEnergy) {
-      const activeZone = getZone(user, 'active');
-      const attachedEnergies = activeZone.array.filter(
-        (c) => c.type === 'Energy' && c.image?.relative === active.image
-      );
+      const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
       if (attachedEnergies.length < retreatCost) {
         appendMessage(
           user,
@@ -991,7 +991,8 @@ export const retreat = (user, emit = true) => {
       for (let i = 0; i < retreatCost; i++) {
         const z = getZone(user, 'active');
         const idx = z.array.findIndex(
-          (c) => c.type === 'Energy' && c.image?.relative === active.image
+          (c) =>
+            c.type === 'Energy' && c.image?.relative === active.image
         );
         if (idx === -1) break;
         moveCard(user, user, 'active', 'discard', idx);
@@ -2264,7 +2265,16 @@ export const evolveAbility = async (user, emit = true, targetCard = null) => {
   }
 
   const finishEvolve = async (entry) => {
-    moveCard(user, user, 'hand', targetZone, entry.idx, targetIdx);
+    moveCardBundle(
+      user,
+      user,
+      'hand',
+      targetZone,
+      entry.idx,
+      targetIdx,
+      'move',
+      emit
+    );
     markEvolvedThisTurn(user, target.name);
     if (rulesState.enabled) markAbilityUsed(user, target);
     appendMessage(

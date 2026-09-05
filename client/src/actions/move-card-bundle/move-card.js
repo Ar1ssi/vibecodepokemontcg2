@@ -76,8 +76,10 @@ export const moveCard = async (
   oZoneId,
   dZoneId,
   index,
-  targetIndex
+  targetIndex,
+  options = {}
 ) => {
+  const { forceEvolution = false } = options;
   oZoneId = oZoneId.replace('Cover', '');
   dZoneId = dZoneId.replace('Cover', '');
 
@@ -210,6 +212,7 @@ export const moveCard = async (
   const activeOrBenchZones = ['active', 'bench'];
   if (
     rulesState.enabled &&
+    !forceEvolution &&
     movingCard.type === 'Pokémon' &&
     oZoneId === 'hand' &&
     activeOrBenchZones.includes(dZoneId) &&

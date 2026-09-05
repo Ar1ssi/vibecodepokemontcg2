@@ -286,7 +286,15 @@ export const sort = (user, zoneId) => {
   removeImages(zone.element);
   zone.array.forEach((card) => unhydrateHolo(card));
 
-  if (checkbox.checked && deckData) {
+  // In multiplayer, hand order must match on both clients. Local "Sort"
+  // checkboxes differ per view (self vs opp iframe), so always use deck-list
+  // order for hands when online — otherwise relayed hand indices desync.
+  const sortByDeckList =
+    ((checkbox?.checked ||
+      (systemState.isTwoPlayer && zoneId === 'hand')) &&
+      deckData);
+
+  if (sortByDeckList) {
     deckData.forEach((entry) => {
       const name = entry[1];
       zone.array.forEach((card) => {
