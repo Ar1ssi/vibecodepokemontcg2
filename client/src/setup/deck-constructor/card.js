@@ -16,11 +16,18 @@ export class Card {
   type;
   user;
   image;
+  number;
 
-  constructor(user, name, type, imageURL) {
+  constructor(user, name, type, imageURL, number = null) {
     this.user = user;
     this.name = name;
     this.type = type;
+    // Printed collector number from the decklist (e.g. "32"), when known.
+    // Kept alongside `name` so the rules engine can disambiguate cards that
+    // share an identical name across many different printings/sets (see
+    // resolveCardId in rules-state.mjs) instead of guessing from a
+    // name-only search.
+    this.number = number || null;
     this.imageAttributes = {
       user: user,
       type: type,

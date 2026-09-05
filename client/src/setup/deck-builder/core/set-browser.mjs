@@ -5,6 +5,12 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
     const LEGAL_SET_REGISTRY = [
   {
     "series": "sv",
+    "setId": "sv03.5",
+    "name": "151",
+    "category": "other"
+  },
+  {
+    "series": "sv",
     "setId": "sv05",
     "name": "Temporal Forces"
   },
@@ -159,6 +165,7 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
               logo: normalizeAssetUrl(record.logo),
               symbol: normalizeAssetUrl(record.symbol),
               cardCount: (record.cards || []).filter((c) => c.image).length,
+              category: entry.category || 'standard',
             };
           } catch {
             return null;

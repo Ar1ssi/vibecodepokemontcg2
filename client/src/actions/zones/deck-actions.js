@@ -9,6 +9,7 @@ import { hideCard } from '../general/reveal-and-hide.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
+import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const shuffleIntoDeck = (
   user,
@@ -170,6 +171,7 @@ export const viewDeck = (
     const zone = getZone(user, 'viewCards');
     removeImages(zone.element);
     zone.array.forEach((card) => {
+      unhydrateHolo(card);
       hideCard(user, card);
       zone.element.appendChild(card.image);
     });

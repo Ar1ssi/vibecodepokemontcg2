@@ -2,6 +2,11 @@ import { resetImage } from '../../setup/image-logic/reset-image.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { resetRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
+import {
+  unhydrateHolo,
+  hydrateHolo,
+  imageAnchor,
+} from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const evolveCard = (
   user,
@@ -12,7 +17,13 @@ export const evolveCard = (
   dZone
 ) => {
   resetImage(movingCard.image);
-  targetCard.image.after(movingCard.image);
+  unhydrateHolo(movingCard);
+  // insert as a sibling of the base's anchor (the `.mat-holo` wrapper if the
+  // base Pokémon is holo-hydrated) so the evolved card lands in `.play-container`,
+  // not inside the overflow-hidden `.card__rotator`. The base card keeps its
+  // holofoil — only this incoming card is de-wrapped above, then re-hydrated
+  // at the end of this function.
+  imageAnchor(targetCard.image).after(movingCard.image);
   targetCard.image.relative = movingCard.image;
   //if counters exists, link the textcontent with the new Pokémon card
   if (targetCard.image.damageCounter) {
@@ -35,7 +46,7 @@ export const evolveCard = (
 
   //reset container width (since cards are being re-attached)
   const newWidth = parseFloat(movingCard.image.clientWidth);
-  targetCard.image.parentElement.style.width = newWidth + 'px';
+  imageAnchor(targetCard.image).parentElement.style.width = newWidth + 'px';
 
   // set relative of all of targetCard's attached cards to movingCard
   dZone.array.forEach((card) => {
@@ -58,4 +69,9 @@ export const evolveCard = (
       i--;
     }
   }
+
+  // the evolved card is settled into the container now — give it its holofoil
+  // wrapper (no-op for common/non-holo cards). Runs after the re-attach loop so
+  // the <img> is in its final position and clientWidth/Height are valid.
+  hydrateHolo(movingCard);
 };

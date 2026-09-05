@@ -2,6 +2,13 @@ import { addDamageCounter } from '../../../actions/counters/damage-counter.js';
 import { addSpecialCondition } from '../../../actions/counters/special-condition.js';
 import { useAbility } from '../../../actions/counters/use-ability.js';
 import { changeType } from '../../../actions/general/change-type.js';
+import {
+  discardAll,
+  shuffleAll,
+  lostZoneAll,
+  handAll,
+  leaveAll,
+} from '../../../actions/zones/general.js';
 import { mouseClick, systemState } from '../../../front-end.js';
 
 export const initializeActiveAndBenchButtons = () => {
@@ -71,4 +78,31 @@ export const initializeActiveAndBenchButtons = () => {
       'Pokémon'
     );
   });
+
+  // Attached-cards submenu: same zone-wide actions as the standalone
+  // #attachedCards panel, but scoped to whichever side's card was right-clicked.
+  const attachedDiscardButton = document.getElementById('attachedDiscardButton');
+  attachedDiscardButton.addEventListener('click', () =>
+    discardAll(mouseClick.cardUser, systemState.initiator, 'attachedCards')
+  );
+
+  const attachedShuffleButton = document.getElementById('attachedShuffleButton');
+  attachedShuffleButton.addEventListener('click', () =>
+    shuffleAll(mouseClick.cardUser, systemState.initiator, 'attachedCards')
+  );
+
+  const attachedLostZoneButton = document.getElementById('attachedLostZoneButton');
+  attachedLostZoneButton.addEventListener('click', () =>
+    lostZoneAll(mouseClick.cardUser, systemState.initiator, 'attachedCards')
+  );
+
+  const attachedHandButton = document.getElementById('attachedHandButton');
+  attachedHandButton.addEventListener('click', () =>
+    handAll(mouseClick.cardUser, systemState.initiator, 'attachedCards')
+  );
+
+  const attachedLeaveButton = document.getElementById('attachedLeaveButton');
+  attachedLeaveButton.addEventListener('click', () =>
+    leaveAll(mouseClick.cardUser, systemState.initiator, 'attachedCards')
+  );
 };

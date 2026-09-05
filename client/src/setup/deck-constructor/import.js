@@ -264,6 +264,16 @@ const getEnergies = (language) => {
   };
 };
 
+// True if a card name looks like an energy card (basic or special). Every
+// PTCG energy card's name ends in "Energy" (e.g. "Rainbow Energy",
+// "Double Colorless Energy", "Capture Energy"), and no Pokémon or Trainer
+// card does — so this safely classifies special energies that the
+// basic-energy-only dict above cannot name.
+const isEnergyName = (name) => {
+  if (!name) return false;
+  return String(name).trim().toLowerCase().endsWith('energy');
+};
+
 const cardDataToImageURL = (card, formatHint) => {
   /*
   card is expected to be as follows (things can be undefined):
@@ -604,7 +614,6 @@ const DecklistArray = async (decklist) => {
   // Each card will be stored as [quantity, name, set code, number, pokemontcg.io id, image url, type]
   let decklistArray = ptcgsimDecklistArray(decklist);
   const formatHint = detectDecklistFormat(decklistArray);
-  const energies = getEnergies();
   for (let i = 0; i < decklistArray.length; i++) {
     decklistArray[i][4] = cardDataToID(
       {
@@ -636,7 +645,7 @@ const DecklistArray = async (decklist) => {
       if (decklistArray[i][4]) {
         decklistArray[i][6] = getOldCardType(decklistArray[i][4]);
       }
-      if (energies[decklistArray[i][1]]) {
+      if (isEnergyName(decklistArray[i][1])) {
         decklistArray[i][6] = 'Energy';
       }
     }
@@ -730,8 +739,15 @@ export const importDecklist = async (user) => {
 
       let tableBody = decklistTable.getElementsByTagName('tbody')[0];
       decklistTable.style.display = 'block';
-      decklistArray.forEach(([quantity, name, , , , url, type]) => {
+      decklistArray.forEach(([quantity, name, , number, , url, type]) => {
         let newRow = tableBody.insertRow();
+        // Stash the printed collector number (not shown as its own visible
+        // column) so the rules engine can later disambiguate cards that
+        // share an identical name across many different sets/printings —
+        // see resolveCardId() in rules-state.mjs. cloneNode(true) below
+        // preserves this data-* attribute when the row is copied into
+        // currentDecklistTable.
+        newRow.dataset.cardNumber = number || '';
 
         let qtyCell = newRow.insertCell(0);
         let nameCell = newRow.insertCell(1);
@@ -870,8 +886,9 @@ confirmButton.addEventListener('click', () => {
     let name = cells[1].innerText;
     let type = cells[2].querySelector('select').value;
     let url = cells[3].innerText;
+    let number = rows[i].dataset.cardNumber || null;
 
-    let cardData = [quantity, name, type, url];
+    let cardData = [quantity, name, type, url, number];
     deckData.push(cardData);
   }
 

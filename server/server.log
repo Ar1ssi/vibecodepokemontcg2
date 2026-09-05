@@ -1,0 +1,24 @@
+node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: listen EADDRINUSE: address already in use :::4000
+    at Server.setupListenHandle [as _listen2] (node:net:2324:16)
+    at listenInCluster (node:net:2433:12)
+    at Server.listen (node:net:2558:7)
+    at main (file:///C:/Users/SMG26/Downloads/New%20folder%20(12)/vibecodepokemontcg2%20bionic%20mirror/server/server.js:327:10)
+    at file:///C:/Users/SMG26/Downloads/New%20folder%20(12)/vibecodepokemontcg2%20bionic%20mirror/server/server.js:332:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2412:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 4000
+}
+
+Node.js v24.20.0

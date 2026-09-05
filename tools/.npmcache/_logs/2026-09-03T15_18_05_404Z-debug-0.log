@@ -1,0 +1,41 @@
+0 verbose cli C:\Users\SMG26\.lmstudio\.internal\utils\node.exe C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\bin\npm-cli.js
+1 info using npm@10.9.2
+2 info using node@v25.5.0
+3 silly config load:file:C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\npmrc
+4 silly config load:file:C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\server\.npmrc
+5 silly config load:file:C:\Users\SMG26\.npmrc
+6 silly config load:file:C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\server\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--prefix" "server" "--no-audit" "--no-fund" "--cache" "C:/Users/SMG26/Downloads/New folder (12)/vibecodepokemontcg2 bionic mirror/tools/.npmcache"
+9 verbose logfile logs-max:10 dir:C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\.npmcache\_logs\2026-09-03T15_18_05_404Z-
+10 verbose logfile C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\.npmcache\_logs\2026-09-03T15_18_05_404Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 verbose stack Error: Could not read package.json: Error: ENOENT: no such file or directory, open 'C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\package.json'
+13 verbose stack     at async open (node:internal/fs/promises:636:25)
+13 verbose stack     at async readFile (node:internal/fs/promises:1269:14)
+13 verbose stack     at async read (C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\package-json\lib\read-package.js:9:18)
+13 verbose stack     at async PackageJson.load (C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\package-json\lib\index.js:131:31)
+13 verbose stack     at async PackageJson.normalize (C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\package-json\lib\index.js:117:5)
+13 verbose stack     at async C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:515:22
+13 verbose stack     at async Promise.all (index 0)
+13 verbose stack     at async #add (C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:504:5)
+13 verbose stack     at async #applyUserRequestsToNode (C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:473:7)
+13 verbose stack     at async #applyUserRequests (C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\package\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:408:7)
+14 error code ENOENT
+15 error syscall open
+16 error path C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\package.json
+17 error errno -4058
+18 error enoent Could not read package.json: Error: ENOENT: no such file or directory, open 'C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\package.json'
+19 error enoent This is related to npm not being able to find a file.
+19 error enoent
+20 silly unfinished npm timer reify 1788448693302
+21 silly unfinished npm timer reify:loadTrees 1788448693302
+22 silly unfinished npm timer idealTree:userRequests 1788448693311
+23 verbose cwd C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror
+24 verbose os Windows_NT 10.0.26200
+25 verbose node v25.5.0
+26 verbose npm  v10.9.2
+27 verbose exit -4058
+28 verbose code -4058
+29 error A complete log of this run can be found in: C:\Users\SMG26\Downloads\New folder (12)\vibecodepokemontcg2 bionic mirror\tools\.npmcache\_logs\2026-09-03T15_18_05_404Z-debug-0.log

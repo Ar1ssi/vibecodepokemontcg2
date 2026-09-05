@@ -16,14 +16,19 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
+import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
+import {
+  playSelectPop,
+  popHostFor,
+  makePopFrame,
+} from './card-pop.mjs';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
-  mouseClick.zoneId = event.target.parentElement.id;
-  if (!mouseClick.zoneId) {
-    //this will be the case for cards on the active/bench, since they are wrapped in a container
-    mouseClick.zoneId = event.target.parentElement.parentElement.id;
-  }
+  //closest() handles plain cards, play-container cards, and holo-wrapper cards
+  mouseClick.zoneId = event.target.closest(
+    '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone, #attachedCards, #viewCards, #stadium, #board, #deckCover, #discardCover, #lostZoneCover'
+  )?.id;
   if (mouseClick.zoneId === 'deckCover') {
     mouseClick.cardIndex = 0;
   } else if (['lostZoneCover', 'discardCover'].includes(mouseClick.zoneId)) {
@@ -117,6 +122,10 @@ export const openCardContextMenu = (event) => {
     shuffleBoardButton: [[true, 'board']],
     lostZoneBoardButton: [[true, 'board']],
     changeButton: [
+      [true, 'active'],
+      [true, 'bench'],
+    ],
+    attachedCardsButton: [
       [true, 'active'],
       [true, 'bench'],
     ],
@@ -257,7 +266,10 @@ export const doubleClick = (event) => {
       }
       image.classList.add('default-rotation');
     });
-    targetImage.parentElement.className = 'full-view';
+    // classList.add (not a className overwrite) so holo cards keep their
+    // .card__rotator class — losing it would break the shine/glare sizing
+    // rules that key off `.card__rotator`.
+    targetImage.parentElement.classList.add('full-view');
     if (document.querySelector('.dark-mode-1')) {
       targetImage.parentElement.classList.add('dark-mode-5'); //dynamically add dark-mode
     }
@@ -267,6 +279,17 @@ export const doubleClick = (event) => {
 
     targetImage.parentElement.parentElement.style.zIndex = '2';
     document.getElementById('stadium').style.zIndex = '-1';
+
+    // Enlarged holo cards get the deck-builder-preview treatment: the
+    // shine follows the real cursor instead of auto-sweeping.
+    if (mouseClick.card.wrapper) {
+      startHoloAnimation(mouseClick.card.wrapper);
+    }
+
+    // Pop the enlarged view into place. `.full-view` sizing above is applied
+    // synchronously, so the preview is already visible (immediate) — the spring
+    // just adds the grow-and-settle on top.
+    playSelectPop(popHostFor(targetImage), makePopFrame(targetImage));
   } else {
     let overlay = document.createElement('div');
     overlay.id = 'fullImage';

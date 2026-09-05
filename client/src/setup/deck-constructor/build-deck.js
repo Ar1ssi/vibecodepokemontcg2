@@ -4,12 +4,13 @@ import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
 
+
 export const buildDeck = (user) => {
   const deckData = determineDeckData(user);
   const deck = getZone(user, 'deck');
-  for (const [quantity, name, type, imageURL] of deckData) {
+  for (const [quantity, name, type, imageURL, number] of deckData) {
     for (let i = 0; i < quantity; i++) {
-      const card = new Card(user, name, type, imageURL);
+      const card = new Card(user, name, type, imageURL, number);
       deck.array.push(card);
       deck.element.appendChild(card.image);
     }

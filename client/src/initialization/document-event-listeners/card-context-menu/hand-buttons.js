@@ -9,6 +9,18 @@ import {
   shuffleBottomAndDraw,
 } from '../../../actions/zones/hand-actions.js';
 import { mouseClick, systemState } from '../../../front-end.js';
+import { manualDeckActionAllowed } from '../../../setup/rules/rules-state.mjs';
+import { appendMessage } from '../../../setup/chatbox/append-message.js';
+
+// Gate a manual (human-triggered) deck action through the rules layer.
+function gate(actionKey, initiator) {
+  const check = manualDeckActionAllowed(actionKey);
+  if (!check.allowed) {
+    appendMessage(initiator, '⛔ ' + check.reason, 'announcement', false);
+    return false;
+  }
+  return true;
+}
 
 export const initializeHandButtons = () => {
   const lookHandButton = document.getElementById('lookHandButton');
@@ -32,19 +44,22 @@ export const initializeHandButtons = () => {
   );
 
   const discardHandButton = document.getElementById('discardHandButton');
-  discardHandButton.addEventListener('click', () =>
-    discardAndDraw(mouseClick.cardUser, systemState.initiator)
-  );
+  discardHandButton.addEventListener('click', () => {
+    if (!gate('discardAndDraw', systemState.initiator)) return;
+    discardAndDraw(mouseClick.cardUser, systemState.initiator);
+  });
 
   const shuffleHandButton = document.getElementById('shuffleHandButton');
-  shuffleHandButton.addEventListener('click', () =>
-    shuffleAndDraw(mouseClick.cardUser, systemState.initiator)
-  );
+  shuffleHandButton.addEventListener('click', () => {
+    if (!gate('shuffleAndDraw', systemState.initiator)) return;
+    shuffleAndDraw(mouseClick.cardUser, systemState.initiator);
+  });
 
   const shuffleHandBottomButton = document.getElementById(
     'shuffleHandBottomButton'
   );
-  shuffleHandBottomButton.addEventListener('click', () =>
-    shuffleBottomAndDraw(mouseClick.cardUser, systemState.initiator)
-  );
+  shuffleHandBottomButton.addEventListener('click', () => {
+    if (!gate('shuffleBottomAndDraw', systemState.initiator)) return;
+    shuffleBottomAndDraw(mouseClick.cardUser, systemState.initiator);
+  });
 };

@@ -25,8 +25,17 @@
     
       // stage chain check: evolution must be exactly the next stage (or a
       // legal Rare Candy jump from Basic to Stage 2)
-      const baseStage = baseCardInPlay.stage || 'Basic';
-      const evoStage = evolutionCardInHand.stage || 'Stage 1';
+      const baseStage = normalizeStage(baseCardInPlay.stage) || 'Basic';
+      const evoStage = normalizeStage(evolutionCardInHand.stage);
+      // A card in hand that has no valid stage (e.g. a misclassified Energy
+      // card) is not a Pokémon evolution — reject it instead of silently
+      // defaulting to 'Stage 1' and mis-evaluating the stage chain.
+      if (!evoStage) {
+        return {
+          allowed: false,
+          reason: `${evolutionCardInHand.name} is not a Pokémon evolution card (no valid stage).`,
+        };
+      }
       const evolvesFrom = String(evolutionCardInHand.evolvesFrom || '').toLowerCase();
       const baseName = String(baseCardInPlay.name || '').toLowerCase();
     
@@ -53,11 +62,22 @@
       return { allowed: true, costReduce: evoSpeed.costReduce };
     }
     
+    // Stage strings vary by source: local card data uses 'Stage 1' while
+    // TCGdex can return 'Stage1' (and case can differ). Canonicalize to the
+    // 'Basic' | 'Stage 1' | 'Stage 2' forms used by the stage-order check.
+    export function normalizeStage(stage) {
+      const s = String(stage || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (s === 'basic') return 'Basic';
+      if (s === 'stage1') return 'Stage 1';
+      if (s === 'stage2') return 'Stage 2';
+      return null;
+    }
+    
     // Rare Candy: Basic -> Stage 2 directly (item, so it also needs the item
     // to be playable — the item rules are handled by trainer guidance)
     export function isRareCandyJump(baseCardInPlay, evolutionCardInHand) {
-      const baseStage = baseCardInPlay.stage || 'Basic';
-      const evoStage = evolutionCardInHand.stage || 'Stage 1';
+      const baseStage = normalizeStage(baseCardInPlay.stage) || 'Basic';
+      const evoStage = normalizeStage(evolutionCardInHand.stage) || 'Stage 1';
       return baseStage === 'Basic' && evoStage === 'Stage 2';
     }
     

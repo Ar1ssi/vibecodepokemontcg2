@@ -32,6 +32,7 @@ import {
   stopLookingShortcut,
 } from '../../actions/general/reveal-and-hide.js';
 import { rotateCard } from '../../actions/general/rotate-card.js';
+import { readyUp } from '../../actions/general/ready.js';
 import { setup } from '../../actions/general/setup.js';
 import { takeTurn } from '../../actions/general/take-turn.js';
 import { undo } from '../../actions/general/undo.js';
@@ -56,7 +57,7 @@ import {
   shuffleAndDraw,
   shuffleBottomAndDraw,
 } from '../../actions/zones/hand-actions.js';
-import { shufflePrizesToDeckBottom } from '../../actions/zones/prizes-actions.js';
+import { shufflePrizesToDeckBottom, takePrizes, takePrizesByIndex } from '../../actions/zones/prizes-actions.js';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
@@ -68,6 +69,7 @@ const functions = {
   changeCardBack: changeCardBack,
   reset: reset,
   setup: setup,
+  readyUp: readyUp,
   takeTurn: takeTurn,
   draw: draw,
   moveCardBundle: moveCardBundle,
@@ -85,6 +87,8 @@ const functions = {
   shuffleAndDraw: shuffleAndDraw,
   shuffleBottomAndDraw: shuffleBottomAndDraw,
   shufflePrizesToDeckBottom: shufflePrizesToDeckBottom,
+  takePrizes: takePrizes,
+  takePrizesByIndex: takePrizesByIndex,
   shuffleZone: shuffleZone,
   useAbility: useAbility,
   removeAbilityCounter: removeAbilityCounter,

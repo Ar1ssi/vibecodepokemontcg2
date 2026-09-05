@@ -22,16 +22,18 @@
       markMulligansResolved,
     } from './rules-state.mjs';
     import { executeAttack, canPayAttackCost } from './attack-engine.mjs';
-    import { handleKO, checkWinConditions, resetPrizes } from './ko-flow.mjs';
-    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses } from './status.mjs';
+    import { handleKO, checkWinConditions, resetPrizes, prizeState } from './ko-flow.mjs';
+    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from './status.mjs';
 import { statusState } from './status.mjs';
 import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
+import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
 import { classifyAbility } from './ability-effects.mjs';
+import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
 import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, searchAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
@@ -47,9 +49,43 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // saved deck they opened). Populated by the 'rules-coin-changed' event
     // dispatched from native-deck-builder.js.
     const selectedCoins = { self: null, opp: null };
+
+    // ── mat coin slots ─────────────────────────────────────────────────
+    // Persistent coin tokens on the battle mat so each player's chosen
+    // coin stays visible all game (self on their side, opp on theirs).
+    const MAT_COIN_SLOTS = {
+      self: () => document.getElementById('matCoinSlotSelf'),
+      opp: () => document.getElementById('matCoinSlotOpp'),
+    };
+    const MAT_COIN_BACK_URL = 'assets/coins/coin-back.png';
+    const renderMatCoinSlot = (target) => {
+      const slot = MAT_COIN_SLOTS[target]?.();
+      if (!slot) return;
+      const coin = selectedCoins[target];
+      slot.innerHTML = '';
+      if (!coin) {
+        slot.classList.remove('has-coin');
+        return;
+      }
+      slot.classList.add('has-coin');
+      slot.innerHTML =
+        `<div class="coin-3d coin-mat-${coin.material || 'silver'} mat-coin-token">` +
+        `<div class="coin-face"><img src="${coin.thumb}" alt="${coin.name || 'coin'}"></div>` +
+        `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt=""></div>` +
+        `</div>`;
+    };
+    const renderMatCoins = () => { renderMatCoinSlot('self'); renderMatCoinSlot('opp'); };
+
     document.addEventListener('rules-coin-changed', (event) => {
       const { target, coin } = event.detail || {};
-      if (target === 'self' || target === 'opp') selectedCoins[target] = coin || null;
+      if (target !== 'self' && target !== 'opp') return;
+      selectedCoins[target] = coin || null;
+      renderMatCoins();
+      // Online 2P: tell the opponent which coin we chose so their mat
+      // shows ours (rulesEvent is relayed by the server generically).
+      if (target === 'self' && systemState.isTwoPlayer && rulesSocket) {
+        rulesSocket.emit('rulesEvent', { type: 'coinChosen', data: { coin } });
+      }
     });
     
     // When the opponent's client resolves the coin flip first (multiplayer),
@@ -62,6 +98,18 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // Set when a turn was auto-ended by an attack, so the next +Turn click
     // is swallowed instead of double-advancing the turn.
     let turnEndedByAttack = false;
+    // Set when the authoritative remote turnOrderCoinFlip event arrives so
+    // a stale local flip (still in flight) does NOT double-start the game.
+    let flipSuperseded = false;
+    // "Call the coin": the caller's heads/tails pick, remembered when it
+    // arrives via the opponent's turnOrderCoinCall event (they clicked
+    // Set Up first), so a late click on our side mirrors their call.
+    let coinCallChoice = null;
+    // Who the caller is from our perspective ('self' unless the opponent
+    // clicked Set Up first and broadcast their call).
+    let coinCallCaller = 'self';
+    // True while the heads/tails call picker is open.
+    let coinCallPending = false;
     
     export const initializeRulesEngine = () => {
       if (initialized) return;
@@ -213,7 +261,18 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               `</div>`;
           }
         } else {
-          html += '<div class="rules-aw-section">No attacks defined.</div>';
+          // Self-diagnosing hint: surface why no attacks resolved so a data-plumbing
+          // issue (e.g. zone card never got a TCGdex id) is visible to the player.
+          if (typeof console !== 'undefined') {
+            console.warn('[rules] attack window: no attacks resolved', {
+              name: active.name,
+              hasId: !!active.id,
+              attacks: Array.isArray(active.attacks) ? active.attacks.length : typeof active.attacks,
+            });
+          }
+          const notLoaded = Array.isArray(active.attacks) ? '' : ' · data not loaded (check network / TCGdex)';
+          html += '<div class="rules-aw-section">No attacks defined.' +
+            ` <span class="rules-aw-reason">id=${active.id || '—'}${notLoaded}</span></div>`;
         }
 
         // ── Abilities ──
@@ -310,9 +369,9 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     
     // ── turn flow: attack ends turn; +Turn advances ──────────────────────
     const hookTurnButton = () => {
-      const btn = document.getElementById('turnButton');
+      const btn = document.getElementById('passButton');
       if (!btn) return;
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (event) => {
         if (!rulesState.enabled) return;
         if (turnEndedByAttack) {
           turnEndedByAttack = false;
@@ -407,6 +466,17 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         } catch {}
         }
     
+        // This is the only path that actually ends the turn (the three
+        // early-return paths above all bail before reaching it). The rules
+        // capture handler is registered before the board bubble handler
+        // (initializeSidebox() runs before initializeTable()), so suppressing
+        // the event here stops the legacy takeTurn(...) bubble handler from
+        // also firing — otherwise it would start the initiator's own turn and
+        // "interrupt" the opponent right after we passed the turn. Deliberate,
+        // rules-mode-only exception to the "capture hooks don't suppress"
+        // invariant (which protects the Set Up / Reset hooks).
+        event.preventDefault();
+        event.stopImmediatePropagation();
         const next = endTurn(rulesState.turnPlayer);
         appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
         updateTurnBanner();
@@ -414,13 +484,13 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     };
     
     const hookSetupButton = () => {
-      // One shared capture-phase handler for every Set Up trigger (P1 box,
-      // P2 box, Set Up Both). Whichever is clicked first flips the coin;
-      // the rest no-op via the phase/pending guards in handleSetupClick.
-      ['setupButton', 'p2SetupButton', 'setupBothButton'].forEach((id) => {
-        const btn = document.getElementById(id);
-        if (btn) btn.addEventListener('click', handleSetupClick, true);
-      });
+      // The coin flip used to fire the instant a Set Up button was
+      // clicked. Set Up is now a "ready check" (see ready.js) — the
+      // actual game/hand setup only happens once BOTH players have
+      // pressed their button, at which point ready.js dispatches
+      // 'both-players-ready' on document. Listen for that instead of the
+      // raw click so the coin flip happens after setup is complete.
+      document.addEventListener('both-players-ready', handleSetupClick);
       hookResetButtons();
     };
     
@@ -436,17 +506,31 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           rulesState.turnNumber = 0;
           syncedTurnOrder = null;
           turnEndedByAttack = false;
+          flipSuperseded = false;
+          coinCallChoice = null;
+          coinCallCaller = 'self';
+          coinCallPending = false;
         }, true);
       });
     };
     
-    const handleSetupClick = () => {
-      if (!rulesState.enabled) return;
-      if (systemState.isReplay) return;
-      if (coinFlipPending) return; // a flip already in flight will start the game
-    
-        const proceedWithSetup = (firstPlayer) => {
-          startGame(firstPlayer);
+    // Shared setup sequence once turn order is decided — used both by the
+    // local Set Up click and by the mirror side's auto-start (so the mirror
+    // no longer needs a second Set Up click).
+    const beginSetupWithTurnOrder = (firstPlayer) => {
+      // Guard: if the game has already started (phase left 'setup'), a second
+      // invocation (double Set Up click, duplicate turnOrderCoinFlip event,
+      // or local flip + mirror both landing) would re-run startGame() and
+      // reset drewThisTurn, causing a double auto-draw on turn 1.
+      if (rulesState.phase !== 'setup') return;
+      startGame(firstPlayer);
+          // startGame() only resets to turnNumber 0 / phase 'draw' — it never
+          // advances into the first player's actual turn 1. beginTurn() is
+          // what increments turnNumber and flips phase to 'main'; without
+          // calling it here, the first player's opening turn silently runs
+          // at turnNumber 0, which shifts the "turn 1" attack restriction
+          // onto the second player's first turn instead.
+          beginTurn(firstPlayer === 'opp' ? 'opp' : 'self');
           resetPrizes();
           resetStatuses();
           appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
@@ -512,28 +596,68 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
             }
           }, 2500);
           updateTurnBanner();
-        };
+    };
     
-        // A previous Set Up click already flipped and started the game —
-        // turn order is decided; let the original handler finish setup.
-        if (rulesState.phase !== 'setup') return;
+    // Fires once both players have pressed Set Up and their opening hands/
+    // prizes have been dealt (see the 'both-players-ready' event dispatched
+    // by ready.js). Decides turn order via a coin flip and kicks off the
+    // actual game/turn state.
+    const handleSetupClick = () => {
+      if (!rulesState.enabled) return;
+      if (systemState.isReplay) return;
+      if (coinFlipPending) return; // a flip already in flight will start the game
+      if (rulesState.phase !== 'setup') return; // already started (e.g. auto-start)
+      if (coinCallPending) return; // the heads/tails call picker is already open
     
-        // If the opponent's client already resolved (and broadcast) the
-        // coin flip, mirror their result instead of flipping again —
-        // avoids the two sides disagreeing on who goes first.
-        if (syncedTurnOrder) {
-          const firstPlayer = syncedTurnOrder;
-          syncedTurnOrder = null;
-          proceedWithSetup(firstPlayer);
-          return;
-        }
+      // If the opponent's client already resolved (and broadcast) the coin
+      // flip, mirror their result instead of flipping again — avoids the
+      // two sides disagreeing on who goes first.
+      if (syncedTurnOrder) {
+        const firstPlayer = syncedTurnOrder;
+        syncedTurnOrder = null;
+        beginSetupWithTurnOrder(firstPlayer);
+        return;
+      }
     
+      const beginFlip = (call, caller = 'self') => {
         coinFlipPending = true;
-        runTurnOrderCoinFlip()
-          .then(({ turnPlayer }) => proceedWithSetup(turnPlayer))
+        runTurnOrderCoinFlip({ call, caller })
+          .then(({ turnPlayer }) => {
+            if (flipSuperseded) return; // authoritative remote flip took over
+            beginSetupWithTurnOrder(turnPlayer);
+          })
           .finally(() => {
             coinFlipPending = false;
           });
+      };
+    
+      // Opponent called the coin first (they clicked Set Up before us) —
+      // do NOT flip our own coin: the caller's flip is the single
+      // authoritative one and arrives via the turnOrderCoinFlip event,
+      // whose handler mirrors it and auto-starts the game on our side.
+      // (Flipping locally here was the desync bug: each side rolled its
+      // own random result and both saw themselves as the coin owner.)
+      if (coinCallChoice) {
+        coinCallChoice = null;
+        appendMessage('', "Waiting for opponent's coin flip…", 'announcement', false);
+        return;
+      }
+    
+      // "Call the coin": this player (the caller) picks heads or tails;
+      // the flip then decides turn order from that call.
+      coinCallPending = true;
+      openCoinCallPicker({
+        onCall: (call) => {
+          coinCallPending = false;
+          if (systemState.isTwoPlayer && rulesSocket) {
+            rulesSocket.emit('rulesEvent', {
+              type: 'turnOrderCoinCall',
+              data: { caller: 'self', call },
+            });
+          }
+          beginFlip(call);
+        },
+      });
     };
     
     // ── turn-order coin flip: automatic at match start ───────────────────
@@ -542,24 +666,27 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // existing 3D coin-toss animation full-screen, and uses the result to
     // decide who goes first. Broadcasts the outcome to the opponent in
     // multiplayer so both sides see the same flip and agree on turn order.
-    const runTurnOrderCoinFlip = () => {
+    const runTurnOrderCoinFlip = ({ call, caller = 'self' } = {}) => {
       return new Promise((resolve) => {
         const coinOwner = Math.random() < 0.5 ? 'self' : 'opp';
         const coin = selectedCoins[coinOwner] || pickRandomCoin();
+        // "Call the coin": the caller (the player who clicked Set Up) picked
+        // a face via the call picker. Fall back to random if none supplied.
+        const chosenCall = call || (Math.random() < 0.5 ? 'heads' : 'tails');
         const result = Math.random() < 0.5 ? 'heads' : 'tails';
-        // heads → self goes first, tails → opp goes first
-        const turnPlayer = result === 'heads' ? 'self' : 'opp';
+        // Caller goes first iff the coin lands on the face they called.
+        const turnPlayer = decideTurnOrder({ caller, call: chosenCall, result });
     
-        playTurnOrderCoinAnimation({ coin, result, coinOwner, turnPlayer, isRemote: false });
+        playTurnOrderCoinAnimation({ coin, result, coinOwner, turnPlayer, caller, call: chosenCall, isRemote: false });
     
         if (systemState.isTwoPlayer && rulesSocket) {
           rulesSocket.emit('rulesEvent', {
             type: 'turnOrderCoinFlip',
-            data: { coinOwner, coinId: coin?.id || null, result, turnPlayer },
+            data: { coinOwner, coinId: coin?.id || null, caller, call: chosenCall, result, turnPlayer },
           });
         }
     
-        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner }), 2700);
+        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner, caller, call: chosenCall }), 2700);
       });
     };
     
@@ -567,6 +694,38 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       const coins = getCoins();
       if (coins.length === 0) return null;
       return coins[Math.floor(Math.random() * coins.length)];
+    };
+    
+    // 2-button "call the coin" picker: the caller picks heads or tails
+    // before the turn-order flip. Caller goes first if the coin lands on
+    // the face they called. Mirrors the #rulesChoicePicker overlay styling.
+    const openCoinCallPicker = ({ onCall }) => {
+      document.getElementById('rulesCoinCallOverlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rulesCoinCallOverlay';
+      overlay.style.cssText =
+        'position:fixed;inset:0;z-index:2400;display:flex;align-items:center;justify-content:center;background:rgba(8,10,14,.72);';
+      const box = document.createElement('div');
+      box.style.cssText =
+        'background:#1b1f27;border:1px solid #3a4150;border-radius:12px;padding:24px 28px;text-align:center;color:#e8ecf4;min-width:280px;';
+      box.innerHTML = `
+        <div style="font-size:16px;font-weight:600;margin-bottom:6px;">\u{1FA99} Call the coin</div>
+        <div style="font-size:13px;color:#9aa3b2;margin-bottom:16px;">Pick a face \u2014 if the coin lands on it, you go first.</div>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <button type="button" data-coin-call="heads" style="flex:1;padding:10px 18px;border-radius:8px;border:1px solid #4a5568;background:#2a3040;color:#e8ecf4;font-size:14px;font-weight:600;cursor:pointer;">Heads</button>
+          <button type="button" data-coin-call="tails" style="flex:1;padding:10px 18px;border-radius:8px;border:1px solid #4a5568;background:#2a3040;color:#e8ecf4;font-size:14px;font-weight:600;cursor:pointer;">Tails</button>
+        </div>`;
+      overlay.appendChild(box);
+      box.querySelectorAll('button[data-coin-call]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          overlay.remove();
+          onCall(btn.dataset.coinCall);
+        });
+      });
+      overlay.addEventListener('click', (e) => {
+        if (e.target !== overlay) return; // click outside does not pick a face
+      });
+      document.body.appendChild(overlay);
     };
     
     // Renders the full-screen coin-toss overlay, reusing the existing
@@ -577,8 +736,14 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       const material = coin?.material || 'enamel';
       const thumb = coin?.thumb || 'https://ptcgsim.online/src/assets/coins/coin-back.png';
       const name = coin?.name || 'Coin';
-      const ownerLabel = coinOwner === 'self' ? (isRemote ? "Opponent's" : 'Your') : (isRemote ? 'Your' : "Opponent's");
-      const winnerLabel = turnPlayer === 'self' ? (isRemote ? 'Opponent goes' : 'You go') : (isRemote ? 'You go' : 'Opponent goes');
+      // `coinOwner` and `turnPlayer` are already re-perspectived to the
+      // local viewer by the caller (see the `turnOrderCoinFlip` socket
+      // handler, which inverts caller/coinOwner before recomputing
+      // `turnPlayer` for the receiving client) — 'self' always means "this
+      // screen's player" here, whether the flip happened locally or was
+      // mirrored from the opponent. No further isRemote-based flip needed.
+      const ownerLabel = coinOwner === 'self' ? 'Your' : "Opponent's";
+      const winnerLabel = turnPlayer === 'self' ? 'You go' : 'Opponent goes';
     
       const overlay = document.createElement('div');
       overlay.id = 'turnOrderCoinFlipOverlay';
@@ -608,12 +773,16 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       setTimeout(() => {
         resultEl.textContent = `${result === 'heads' ? 'Heads' : 'Tails'}! ${winnerLabel} first.`;
         resultEl.classList.add('visible');
-        appendMessage(
-          '',
-          `🪙 ${ownerLabel === 'Your' ? 'Your' : "Opponent's"} coin flip: ${result} — ${winnerLabel.toLowerCase()} first!`,
-          'announcement',
-          false
-        );
+        // Announce only on the caller's/local side — the mirror already saw its
+        // own announcement, so firing here for isRemote would double-post.
+        if (!isRemote) {
+          appendMessage(
+            '',
+            `🪙 ${ownerLabel === 'Your' ? 'Your' : "Opponent's"} coin flip: ${result} — ${winnerLabel.toLowerCase()} first!`,
+            'announcement',
+            false
+          );
+        }
       }, 1500);
     
       setTimeout(() => {
@@ -705,10 +874,10 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       }, 1200);
     };
     
-    // ── turn automation: auto-draw, hand limit, KO watch ────────────────
-    // TCG Live draws automatically at turn start and enforces the 7-card
-    // hand limit at turn end. We hook the turn flow via the chatbox watcher
-    // (the sim announces turns) and drive the deck/hand zones directly.
+    // ── turn automation: auto-draw, KO watch ────────────────────────────
+    // TCG Live draws automatically at turn start. We hook the turn flow via
+    // the chatbox watcher (the sim announces turns) and drive the
+    // deck/hand zones directly.
     const turnAutomation = () => {
       let lastProcessedTurn = -1;
     
@@ -726,14 +895,6 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           return false;
         } catch {
           return false;
-        }
-      };
-    
-      const handCount = (player) => {
-        try {
-          return getZone(player, 'hand').getCount();
-        } catch {
-          return 0;
         }
       };
     
@@ -755,16 +916,6 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               rulesState.phase = 'ended';
             }
           }
-        }
-    
-        // hand limit: warn when over 7 at end of turn (we can't know the
-        // exact end-moment, so surface it whenever it's exceeded during play)
-        const hc = handCount(rulesState.turnPlayer);
-        if (hc > 7 && !rulesState.__handWarned) {
-          rulesState.__handWarned = true;
-          appendMessage('', `⚠️ Hand has ${hc} cards — discard down to 7 before ending your turn.`, 'announcement', false);
-        } else if (hc <= 7) {
-          rulesState.__handWarned = false;
         }
       }, 1500);
     };
@@ -950,6 +1101,69 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       });
     };
     
+    // ── heal a specific card (shared by the direct heal + the heal picker) ─
+    // Finds the card's zone/index, removes up to `amount` damage counters,
+    // optionally cures its Special Condition, and announces the result.
+    const applyHealToCard = (cand, amount, cure) => {
+      import('../../actions/counters/damage-counter.js').then(({ updateDamageCounter, removeDamageCounter }) => {
+        let zoneId = null, idx = -1;
+        for (const z of ['active', 'bench']) {
+          const zone = getZone('self', z);
+          const i = zone.array.indexOf(cand);
+          if (i >= 0) { zoneId = z; idx = i; break; }
+        }
+        const current = parseInt(cand.image?.damageCounter?.textContent || '0', 10) || 0;
+        if (!zoneId || current === 0) {
+          appendMessage('', `  ${cand.name} has no damage to heal`, 'announcement', false);
+          return;
+        }
+        const healed = Math.min(amount, current);
+        if (current - amount <= 0) removeDamageCounter('self', zoneId, idx);
+        else updateDamageCounter('self', zoneId, idx, current - amount);
+        if (cure) {
+          const key = cand.image?.dataset?.cardId || cand.name;
+          clearStatuses('self', key);
+        }
+        appendMessage('', `  healed ${healed} damage counter${healed === 1 ? '' : 's'}${cure ? ' + cured Special Condition' : ''} from ${cand.name}`, 'announcement', false);
+      });
+    };
+
+    // ── guided heal picker: choose which of your Pokémon to heal ──────────
+    const openHealPicker = ({ title, candidates, amount, cure }) => {
+      document.getElementById('rulesChoicePicker')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rulesChoicePicker';
+      overlay.innerHTML = `
+        <div class="choice-picker-card">
+          <div class="choice-picker-title"></div>
+          <div class="choice-picker-grid"></div>
+          <button class="choice-picker-cancel">Cancel</button>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('.choice-picker-title').textContent = title;
+      const grid = overlay.querySelector('.choice-picker-grid');
+      for (const cand of candidates) {
+        const btn = document.createElement('button');
+        btn.className = 'choice-picker-item';
+        const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
+        btn.innerHTML = thumb
+          ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
+          : `<span>${cand.name || 'Card'}</span>`;
+        btn.addEventListener('click', () => {
+          applyHealToCard(cand, amount, cure);
+          overlay.remove();
+        });
+        grid.appendChild(btn);
+      }
+      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
+        appendMessage('', '  heal canceled', 'announcement', false);
+        overlay.remove();
+      });
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+      });
+    };
+
     // ── trainer auto-execution (deterministic effects) ───────────────────
     // Fully deterministic effects execute automatically; anything requiring
     // a choice (search/switch) stays guided-only.
@@ -974,17 +1188,79 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               for (let i = 0; i < handCount0; i++) {
                 moveCardBundle('self', 'self', 'hand', 'deck', 0, false, 'move');
               }
-              const drawCount = step.count; // bonus handling needs prize count — guided
+              // Lillie's Determination: draw `count` (6) normally, but when you
+              // still have exactly 6 Prize cards remaining (0 taken) draw
+              // `bonusCount` (8) instead.
+              let drawCount = step.count;
+              const prizesRemaining = Math.max(0, 6 - (prizeState?.self?.taken || 0));
+              if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
+                drawCount = step.bonusCount;
+              }
               for (let i = 0; i < drawCount; i++) {
                 if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
               }
-              appendMessage('', `  auto: shuffled hand in, drew ${drawCount} (shuffle your deck)`, 'announcement', false);
+              appendMessage('', `  auto: shuffled hand in, drew ${drawCount} (shuffle your deck)${drawCount !== step.count ? ` — bonus draw (6 prizes left)` : ''}`, 'announcement', false);
+            } else if (step.type === 'ionoShuffle') {
+              // both players shuffle their hands into their decks —
+              // fully deterministic, no choice involved
+              for (const who of ['self', 'opp']) {
+                const hand = getZone(who, 'hand');
+                const n = hand.getCount();
+                for (let i = 0; i < n; i++) {
+                  moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
+                }
+                appendMessage('', `  auto: ${who === 'self' ? 'your' : "opponent's"} hand shuffled into ${who === 'self' ? 'your' : 'their'} deck (${n} card${n === 1 ? '' : 's'})`, 'announcement', false);
+              }
             } else if (step.type === 'draw') {
               // standalone "draw N" — fully deterministic, no choice involved
               for (let i = 0; i < step.count; i++) {
                 if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
               }
               appendMessage('', `  auto: drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
+            } else if (step.type === 'drawUntil') {
+              // "draw cards until you have N" — deterministic: draw until the
+              // hand reaches `target` (deck-exhaustion guarded).
+              const target = Number(step.target);
+              if (!Number.isFinite(target) || target <= 0) {
+                appendMessage('', '  auto: draw-until target missing — skipped', 'announcement', false);
+              } else {
+                let drew = 0;
+                while (getZone('self', 'hand').getCount() < target && getZone('self', 'deck').getCount() > 0) {
+                  moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+                  drew++;
+                }
+                appendMessage('', `  auto: drew ${drew} card${drew === 1 ? '' : 's'} until you had ${target} in hand`, 'announcement', false);
+              }
+            } else if (step.type === 'opponentDraw') {
+              // "your opponent draws N" — deterministic, no choice involved
+              for (let i = 0; i < step.count; i++) {
+                if (getZone('opp', 'deck').getCount() > 0) moveCardBundle('opp', 'opp', 'deck', 'hand', 0, false, 'move');
+              }
+              appendMessage('', `  auto: your opponent drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
+            } else if (step.type === 'healAmount') {
+              // heal N damage counters.
+              //  - "Active Pokémon" target → unambiguous, heal the Active.
+              //  - "1 of your Pokémon" → a choice (Active + benched). Heal it
+              //    directly if there's only one; otherwise open a guided picker.
+              const isActiveOnly = step.target === 'Active Pokémon';
+              const candidates = isActiveOnly
+                ? getZone('self', 'active').array.filter((c) => c && c.hp)
+                : [
+                    ...getZone('self', 'active').array,
+                    ...getZone('self', 'bench').array,
+                  ].filter((c) => c && c.hp);
+              if (candidates.length === 0) {
+                appendMessage('', '  auto: no Pokémon to heal', 'announcement', false);
+              } else if (isActiveOnly || candidates.length === 1) {
+                applyHealToCard(candidates[0], step.amount, step.cure);
+              } else {
+                openHealPicker({
+                  title: `${card.name} — choose a Pokémon to heal`,
+                  candidates,
+                  amount: step.amount,
+                  cure: step.cure,
+                });
+              }
             } else if (step.type === 'searchDeck' && step.destination === 'bench' && step.what === 'Basic Pokémon') {
               // Nest Ball / Buddy-Buddy Poffin automation: if the deck holds
               // exactly one Basic (unambiguous), auto-bench it
@@ -993,19 +1269,24 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
                 const basics = [];
                 for (const c of deck.array) {
                   await ensureCardData(c);
-                  if ((c.stage || 'Basic') === 'Basic' && c.hp) basics.push(c);
+                  if ((c.stage || 'Basic') === 'Basic' && isPokemonCard(c)) basics.push(c);
                 }
                 if (basics.length === 1) {
                   const idx = deck.array.indexOf(basics[0]);
                   moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
                   appendMessage('', `  auto: benched ${basics[0].name}`, 'announcement', false);
+                  shuffleZone('self', 'self', 'deck');
                 } else if (basics.length > 1) {
                   openChoicePicker({
                     title: `Nest Ball — choose a Basic Pokémon to bench (${basics.length} in deck)`,
                     candidates: basics,
                     zoneFrom: 'deck',
                     destination: 'bench',
+                    onPick: () => shuffleZone('self', 'self', 'deck'),
+                    onCancel: () => shuffleZone('self', 'self', 'deck'),
                   });
+                } else {
+                  appendMessage('', '  no Basic Pokémon in deck', 'announcement', false);
                 }
               });
             } else if (step.type === 'switchOwn') {
@@ -1046,9 +1327,15 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               if (data.status) appendMessage('', `Your Pokémon is now ${data.status}!`, 'announcement', false);
             } else if (type === 'turnOrderCoinFlip') {
               // sender's data is from their own self/opp perspective — invert
-              // it so it's correct from ours
+              // caller + coinOwner so it's correct from ours, then recompute
+              // turn order deterministically from the caller's call + result.
               const localCoinOwner = data.coinOwner === 'self' ? 'opp' : 'self';
-              const localTurnPlayer = data.turnPlayer === 'self' ? 'opp' : 'self';
+              const localCaller = data.caller === 'self' ? 'opp' : 'self';
+              const localTurnPlayer = decideTurnOrder({
+                caller: localCaller,
+                call: data.call,
+                result: data.result,
+              });
               const coin = data.coinId ? getCoinById(data.coinId) : null;
               playTurnOrderCoinAnimation({
                 coin,
@@ -1059,6 +1346,36 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               });
               // used when we click our own Set Up, so both sides agree
               syncedTurnOrder = localTurnPlayer;
+
+              // Auto-start: the caller already resolved and broadcast the
+              // flip — if we're still in setup, the authoritative result
+              // ALWAYS wins (even over a stale local flip in flight, which
+              // flipSuperseded cancels). startGame flips phase to 'draw',
+              // which guards against a double-start via our own Set Up
+              // click or a duplicate event.
+              if (rulesState.enabled && rulesState.phase === 'setup') {
+                flipSuperseded = true;
+                syncedTurnOrder = null;
+                beginSetupWithTurnOrder(localTurnPlayer);
+              }
+            } else if (type === 'turnOrderCoinCall') {
+              // Opponent clicked Set Up first and broadcast their heads/tails
+              // call — remember it so a late Set Up click on our side mirrors
+              // their call instead of picking its own.
+              coinCallChoice =
+                data.call === 'heads' || data.call === 'tails' ? data.call : null;
+              // sender's 'self' means THEY are the caller → 'opp' from ours
+              coinCallCaller = data.caller === 'self' ? 'opp' : 'self';
+              // If our call picker happens to be open (both clicked at once),
+              // close it — the caller's call is authoritative.
+              if (coinCallPending) {
+                coinCallPending = false;
+                document.getElementById('rulesCoinCallOverlay')?.remove();
+              }
+            } else if (type === 'coinChosen') {
+              // Opponent chose/changed their coin — show it on our mat
+              selectedCoins.opp = data?.coin || null;
+              renderMatCoins();
             } else if (type === 'mulliganBonus') {
               // Opponent mulliganed — we draw 1 bonus card for ourselves
               if (rulesState.enabled) {
@@ -1116,15 +1433,49 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       }, 1000);
     };
     
+    // Is this a Pokémon card? Prefer the locally-known `type`/`supertype`
+    // (set at deck-import time, always available) over the network-fetched
+    // `hp` field — `hp` only exists once ensureCardData's tcgdex lookup has
+    // resolved, which can be slow, rate-limited, or fail outright. Relying
+    // on `hp` alone silently starved every search picker (Ultra Ball,
+    // Buddy-Buddy Poffin, Nest Ball, …) of candidates whenever that lookup
+    // hadn't completed, which was the actual reason the menu seemed to
+    // require clicking the deck instead of just popping up.
+    const isPokemonCard = (card) => {
+      if (card.hp) return true;
+      const t = String(card.type || card.supertype || '').toLowerCase();
+      return t.includes('pokémon') || t.includes('pokemon');
+    };
+
     // match a card against a search-step's target description
     const matchesSearch = (card, what = '') => {
       const w = what.toLowerCase();
-      const isPokemon = !!card.hp;
+      // Or-clause (e.g. Fighting Gong: "Basic {F} Energy card or a Basic {F}
+      // Pokémon") — a card matches if it satisfies either side.
+      if (w.includes(' or ')) {
+        return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg));
+      }
+      const isPokemon = isPokemonCard(card);
       const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
       if (w.includes('item') && w.includes('tool')) return isTrainer;
+      if (w.includes('energy')) {
+        // e.g. 'Basic Energy' (Firebreather: up to 7 Basic Energy cards)
+        return String(card.type || '').toLowerCase().includes('energy') ||
+          String(card.name || '').toLowerCase().includes('energy');
+      }
       if (w.includes('mega evolution')) return isPokemon && String(card.name || '').toLowerCase().includes('mega');
       if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) return isPokemon;
-      if (w.includes('basic')) return isPokemon && (card.stage || 'Basic') === 'Basic';
+      if (w.includes('basic')) {
+        if (!isPokemon || (card.stage || 'Basic') !== 'Basic') return false;
+        // e.g. 'Basic Pokémon ≤70 HP' (Buddy-Buddy Poffin) — enforce the HP cap
+        const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
+        if (hpCap) {
+          const maxHp = Number(hpCap[1]);
+          const cardHp = Number(card.hp);
+          return Number.isFinite(cardHp) && cardHp <= maxHp;
+        }
+        return true;
+      }
       if (w.includes('pokémon')) return isPokemon;
       return true; // generic search: everything matches
     };
@@ -1133,16 +1484,17 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     // Watching the hand → play zones for Trainer-class cards. When one lands
     // in play, announce its effect steps; searchDeck/lookAtTop effects open
     // the private deck window so the player can legally look.
-    const hookTrainerPlay = () => {
-      window.setInterval(() => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
-        try {
-          const board = getZone('self', 'board');
-          if (!board?.array) return;
-          for (const card of board.array) {
+    //
+    // Primary trigger: the 'rules-card-on-board' event, dispatched by
+    // move-card.js the instant a card lands on 'board' — this is what makes
+    // the picker open immediately instead of on the next poll tick. The
+    // window.setInterval below stays only as a slow backstop (in case some
+    // future code path pushes into the board zone array without going
+    // through moveCard) and no longer determines how fast the popup opens.
+    const processBoardCard = (card) => {
+      try {
             const img = card.image;
-            if (!img || img.__rulesTrainerAnnounced) continue;
+            if (!img || img.__rulesTrainerAnnounced) return;
             img.__rulesTrainerAnnounced = true;
             const isTrainer = String(card.type || '').toLowerCase().includes('trainer') ||
               String(card.supertype || '').toLowerCase().includes('trainer');
@@ -1260,13 +1612,13 @@ if (!isTrainer) {
                           }
                         }
                       });
-                      continue;
+                      return;
                     }
             ensureCardData(card).then(() => {
               const text = [card.effect || card.text || []].flat().join(' ');
               const parsed = parseTrainerEffect(text);
               if (!parsed.recognizable) {
-                appendMessage('', `${card.name}: effect not auto-parsed — play it manually.`, 'announcement', false);
+                appendMessage('', `${card.name}: effect not auto-parsed — play it manually. (parser got: "${text.slice(0, 60)}")`, 'announcement', false);
                 return;
               }
               const costStep = parsed.steps.find((s) => s.type === 'discardCost');
@@ -1277,13 +1629,25 @@ if (!isTrainer) {
                 (s) => s.type === 'searchDeck' && !(s.destination === 'bench' && s.what === 'Basic Pokémon'),
               );
 
+              // "Search your deck for X, then shuffle" — the shuffle isn't a
+              // separate parsed step, so fire it ourselves once the search
+              // finishes, whether a card was found or the search was
+              // cancelled (you still looked through the whole deck either way).
+              const autoShuffleAfterSearch = () => {
+                shuffleZone('self', 'self', 'deck');
+              };
+
               // choice-based searches: unlock the deck window, then open the
               // filtered picker. Runs immediately — or only after the discard
               // cost below is confirmed and paid.
               const runSearchPicker = () => {
                 if (!searchStep) return;
+                // The deck window is still unlocked (legal to peek at the raw
+                // deck for reference / rules-privacy purposes), but the card
+                // select menu itself always pops up on its own below — the
+                // player never has to click the deck to get a picker.
                 openDeckSearchWindow(`${card.name} lets you search your deck`);
-                appendMessage('', '  (deck unlocked — click your deck to look)', 'announcement', false);
+                appendMessage('', `  ${card.name} — opening card select…`, 'announcement', false);
                 import('./rules-state.mjs').then(async ({ ensureCardData }) => {
                   const deck = getZone('self', 'deck');
                   const matches = [];
@@ -1291,14 +1655,23 @@ if (!isTrainer) {
                     await ensureCardData(c);
                     if (matchesSearch(c, searchStep.what)) matches.push(c);
                   }
-                  if (matches.length === 0) {
-                    appendMessage('', '  no matching cards in deck', 'announcement', false);
-                  } else if ((searchStep.count || 1) > 1) {
+                  // If nothing matched the parsed target — most often because
+                  // card-data enrichment for a card hasn't resolved yet rather
+                  // than a genuine "no such card in deck" — fall back to the
+                  // full deck so the select menu still pops up automatically
+                  // instead of leaving the player with no picker at all.
+                  const usingFallback = matches.length === 0 && deck.array.length > 0;
+                  const pool = usingFallback ? deck.array : matches;
+                  if (pool.length === 0) {
+                    appendMessage('', '  no cards left in deck', 'announcement', false);
+                    return;
+                  }
+                  const toBench = searchStep.destination === 'bench';
+                  if ((searchStep.count || 1) > 1) {
                     // multi-card search (e.g. Buddy-Buddy: 2 basics to bench)
-                    const toBench = searchStep.destination === 'bench';
                     openChoicePicker({
-                      title: `${card.name} — choose ${searchStep.count} cards to ${toBench ? 'Bench' : 'your hand'}`,
-                      candidates: matches,
+                      title: `${card.name} — choose ${searchStep.count} cards to ${toBench ? 'Bench' : 'your hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+                      candidates: pool,
                       zoneFrom: 'deck',
                       destination: searchStep.destination,
                       multiSelect: true,
@@ -1310,19 +1683,22 @@ if (!isTrainer) {
                             if (idx >= 0) moveCardBundle('self', 'self', 'deck', searchStep.destination, idx, false, 'move');
                           }
                           appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
+                          autoShuffleAfterSearch();
                         });
                       },
                       onCancel: () => {
                         appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
+                        autoShuffleAfterSearch();
                       },
                     });
                   } else {
-                    const toBench = searchStep.destination === 'bench';
                     openChoicePicker({
-                      title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}`,
-                      candidates: matches,
+                      title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+                      candidates: pool,
                       zoneFrom: 'deck',
                       destination: searchStep.destination,
+                      onPick: autoShuffleAfterSearch,
+                      onCancel: autoShuffleAfterSearch,
                     });
                   }
                 });
@@ -1335,7 +1711,6 @@ if (!isTrainer) {
                 // cost is paid (inside runSearchPicker)
                 if ((step.type === 'searchDeck' || step.type === 'lookAtTop') && !costStep) {
                   openDeckSearchWindow(`${card.name} lets you search your deck`);
-                  appendMessage('', '  (deck unlocked — click your deck to look)', 'announcement', false);
                 }
               }
               // auto-execute the fully-deterministic draw effects
@@ -1382,7 +1757,7 @@ if (!isTrainer) {
                   const matches = [];
                   for (const c of discard.array) {
                     await ensureCardData(c);
-                    const isPokemon = !!c.hp;
+                    const isPokemon = isPokemonCard(c);
                     const isBasicEnergy = String(c.name || '').toLowerCase().includes('energy');
                     if (isPokemon || isBasicEnergy) matches.push(c);
                   }
@@ -1397,9 +1772,30 @@ if (!isTrainer) {
                 });
               }
             });
-          }
+      } catch {}
+    };
+
+    const hookTrainerPlay = () => {
+      // Instant path: react the same tick a card lands on 'board'.
+      document.addEventListener('rules-card-on-board', (event) => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        if (rulesState.turnPlayer !== 'self') return;
+        const { user, card } = event.detail || {};
+        if (user !== 'self' || !card) return;
+        processBoardCard(card);
+      });
+      // Backstop: catches anything that (for whatever reason) didn't fire
+      // the event above — same logic, just on a slow poll so it's never
+      // the thing the player is waiting on.
+      window.setInterval(() => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        if (rulesState.turnPlayer !== 'self') return;
+        try {
+          const board = getZone('self', 'board');
+          if (!board?.array) return;
+          for (const card of board.array) processBoardCard(card);
         } catch {}
-      }, 1000);
+      }, 2000);
     };
     
     // ── move gating ──────────────────────────────────────────────────────

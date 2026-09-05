@@ -31,6 +31,8 @@
 <body>
     <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
+    <div id="matCoinSlotSelf" class="mat-coin-slot"></div>
+    <div id="matCoinSlotOpp" class="mat-coin-slot"></div>
     <div id="battleMat">
         <div id="battleMatTrim">
             <div id="battleMatSurface">
@@ -48,9 +50,9 @@
     <div id="oppResizer" class="opp-color"></div>
 
     <div id="boardButtonContainer">
-        <div class="tooltip" id="turnButton">
-            <button>+Turn</button>
-            <span class="tooltiptext">Start turn</span>
+        <div class="tooltip" id="passBoardButton">
+            <button id="passButton" class="self-color">Pass</button>
+            <span class="tooltiptext">Pass</span>
         </div>
         <div class="tooltip" id="flipCoinButton">
             <button>Coin</button>
@@ -101,9 +103,9 @@
             <button id="switchButton" class="self-color">Switch</button>
             <button id="attachButton" class="self-color">Attach</button>
             <button id="searchButton" class="self-color">Search</button>
+            <button id="abilityButton" class="self-color">✦ Ability</button>
             <button id="stadiumButton" class="self-color">Stadium</button>
             <button id="energyRedirectButton" class="self-color">🔀 Redirect</button>
-            <button id="passButton" class="self-color">Pass</button>
             <button id="undoButton" class="self-color">Undo</button>
             <button id="FREEBUTTON" class="self-color">🌺</button>
         </div>
@@ -156,6 +158,7 @@
                 <button id="p2SwitchButton" class="self-color">Switch</button>
                 <button id="p2AttachButton" class="self-color">Attach</button>
                 <button id="p2SearchButton" class="self-color">Search</button>
+                <button id="p2AbilityButton" class="self-color">✦ Ability</button>
                 <button id="p2StadiumButton" class="self-color">Stadium</button>
                 <button id="p2EnergyRedirectButton" class="self-color">🔀 Redirect</button>
                 <button id="p2PassButton" class="self-color">Pass</button>
@@ -441,6 +444,15 @@
                     <li id="changeToPokémonButton">to Pokémon</li>
                 </ul>
             </li>
+            <li id="attachedCardsButton">Attached cards...
+                <ul class="card-sub-menu">
+                    <li id="attachedDiscardButton">Discard all</li>
+                    <li id="attachedShuffleButton">Shuffle all to deck</li>
+                    <li id="attachedLostZoneButton">Lost Zone all</li>
+                    <li id="attachedHandButton">Move all to hand</li>
+                    <li id="attachedLeaveButton">Leave in play</li>
+                </ul>
+            </li>
         </ul>
     </div>
 
@@ -543,7 +555,7 @@
                     <ul>
                         <li>Set up <code>[alt + n]</code></li>
                         <li>Reset <code>[alt + r]</code></li>
-                        <li>Start turn <code>[alt + t]</code></li>
+                        <li>End turn <code>[alt + t]</code></li>
                         <li>Flip coin <code>[f]</code></li>
                         <li>Flip board <code>[alt + f]</code></li>
                         <li>Announce mulligan <code>[m]</code></li>

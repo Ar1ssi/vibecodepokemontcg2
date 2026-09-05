@@ -1,5 +1,5 @@
 import { reset } from '../../../../actions/general/reset.js';
-import { setup } from '../../../../actions/general/setup.js';
+import { readyUp } from '../../../../actions/general/ready.js';
 import {
   socket,
   systemState,
@@ -18,13 +18,13 @@ import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
 
 export const initializeP1BottomButtons = () => {
   const setupButton = document.getElementById('setupButton');
-  const setupFunction = () => setup(systemState.initiator);
+  const setupFunction = () => readyUp(systemState.initiator);
   setupButton.addEventListener('click', setupFunction);
 
   const setupBothButton = document.getElementById('setupBothButton');
   const setupBothFunction = () => {
-    setup('self');
-    setup('opp');
+    readyUp('self');
+    readyUp('opp');
   };
   setupBothButton.addEventListener('click', setupBothFunction);
 
@@ -174,7 +174,7 @@ export const initializeP1BottomButtons = () => {
     exportState.style.display = 'block';
     exportLog.style.display = 'block';
     clearLog.style.display = 'none';
-    document.getElementById('turnButton').style.display = 'none';
+    document.getElementById('passBoardButton').style.display = 'none';
     document.getElementById('flipCoinButton').style.display = 'none';
 
     [oppContainerDocument, selfContainerDocument].forEach((doc) => {
@@ -229,7 +229,7 @@ export const initializeP1BottomButtons = () => {
     exportState.style.display = 'block';
     exportLog.style.display = 'block';
     clearLog.style.display = 'block';
-    document.getElementById('turnButton').style.display = 'block';
+    document.getElementById('passBoardButton').style.display = 'block';
     document.getElementById('flipCoinButton').style.display = 'block';
 
     [oppContainerDocument, selfContainerDocument].forEach((doc) => {

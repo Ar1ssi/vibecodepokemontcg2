@@ -1,0 +1,249 @@
+/*
+  Holo structural base — ported from poke-holo / poke-151 (simeydotme).
+  Scoped to .card / .card__translater / .card__rotator / __shine / __glitter / __glare.
+  Skipped vs. simey original:
+    - :not(.interactive) hover fallback block (we drive the vars from JS)
+    - .card.active / :focus glow states (we're not a button card)
+    - .card.offscreen, .card__back / .card__front / .loading (flip machinery)
+    - .card.water / .fire / ... type glow vars (unused)
+    - .card.masked masking blocks (we render unmasked)
+    - .card__glare2 (unused; kept display:none for selector compatibility)
+  Framework-specific pointer-events and outline trick dropped.
+*/
+
+.card {
+  /* Asset variables (rewritten to bundled textures under src/assets/holo) */
+  --grain: url('../../assets/holo/grain.webp');
+  --glitter: url('../../assets/holo/glitter.png');
+  --noise: url('../../assets/holo/noise-base.webp');
+  --noise-over: url('../../assets/holo/noise-top.webp');
+  --iri1: url('../../assets/holo/iri-1.webp');
+  --iri2: url('../../assets/holo/iri-2.webp');
+  --iri3: url('../../assets/holo/iri-3.webp');
+  --iri4: url('../../assets/holo/iri-4.webp');
+  --iri5: url('../../assets/holo/iri-5.webp');
+  --iri6: url('../../assets/holo/iri-6.webp');
+  --iri7: url('../../assets/holo/iri-7.webp');
+  --iri8: url('../../assets/holo/iri-8.webp');
+  --iri9: url('../../assets/holo/iri-9.webp');
+  --birthday: url('../../assets/holo/birthday-holo.webp');
+  --birthday-dank: url('../../assets/holo/birthday-holo-dank.webp');
+  --birthday-dank2: url('../../assets/holo/birthday-holo-dank-2.webp');
+  /* We render unmasked: variants that still reference these resolve to nothing. */
+  --foil: none;
+  --mask: none;
+
+  --glittersize: 25%;
+  --space: 5%;
+  --angle: 133deg;
+  --imgsize: cover;
+
+  --red: #f80e35;
+  --yellow: #eedf10;
+  --green: #21e985;
+  --blue: #0dbde9;
+  --violet: #c929f1;
+
+  --clip: inset(9.85% 8% 52.85% 8%);
+  --clip-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0 47.15%, 91.5% 47.15%, 91.5% 9.85%, 8% 9.85%, 8% 47.15%, 0 50%);
+  --clip-stage: polygon(91.5% 9.85%, 57% 9.85%, 54% 12%, 17% 12%, 16% 14%, 12% 16%, 8% 16%, 8% 47.15%, 92% 47.15%);
+  --clip-stage-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0 47.15%, 91.5% 47.15%, 91.5% 9.85%, 57% 9.85%, 54% 12%, 17% 12%, 16% 14%, 12% 16%, 8% 16%, 8% 47.15%, 0 50%);
+  --clip-trainer: inset(14.5% 8.5% 48.2% 8.5%);
+  --clip-borders: inset(2.8% 4% round 2.55% / 1.5%);
+  --clip-borders-invert: polygon(94.8% 2.8%, 95.7% 3.2%, 96.2% 3.8%, 96.2% 96%, 95.9% 96.8%, 94.8% 97.3%, 5% 97.3%, 4.2% 96.9%, 3.8% 96.2%, 3.8% 6.1%, 15% 6.1%, 16% 5%, 17.9% 4%, 19% 2.8%);
+  --clip-ex-borders: polygon(0% 0%, 0% 100%, 4% 100%, 4% 18%, 1% 16%, 1% 13%, 3% 10%, 4% 9%, 4% 6%, 9% 6%, 16% 6%, 16% 5%, 18% 4%, 19% 3%, 95% 3%, 97% 4%, 96% 90%, 97% 92%, 97% 94%, 96% 95%, 96% 97%, 95% 97%, 4% 97%, 4% 100%, 100% 100%, 100% 0%);
+
+  /* Sunpillar palette (shared by all variants via --holo) */
+  --sunpillar-1: hsl(2, 100%, 73%);
+  --sunpillar-2: hsl(53, 100%, 69%);
+  --sunpillar-3: hsl(93, 100%, 69%);
+  --sunpillar-4: hsl(176, 100%, 76%);
+  --sunpillar-5: hsl(228, 100%, 74%);
+  --sunpillar-6: hsl(283, 100%, 73%);
+  --sunpillar-clr-1: var(--sunpillar-1);
+  --sunpillar-clr-2: var(--sunpillar-2);
+  --sunpillar-clr-3: var(--sunpillar-3);
+  --sunpillar-clr-4: var(--sunpillar-4);
+  --sunpillar-clr-5: var(--sunpillar-5);
+  --sunpillar-clr-6: var(--sunpillar-6);
+  --sunpillar: var(--sunpillar-1) 25%, var(--sunpillar-2), var(--sunpillar-3), var(--sunpillar-4), var(--sunpillar-5), var(--sunpillar-6) 75%;
+  --holo: var(--sunpillar-1), var(--sunpillar-2), var(--sunpillar-3), var(--sunpillar-4), var(--sunpillar-5), var(--sunpillar-6), var(--sunpillar-1);
+
+  --card-aspect: 0.718;
+  --card-radius: 4.55% / 3.5%;
+  --card-edge: hsl(47, 100%, 78%);
+  --card-back: hsl(205, 100%, 25%);
+  --card-glow: hsl(175, 100%, 90%);
+}
+
+.card {
+  -webkit-transform: translate3d(0px, 0px, 0.01px);
+  transform: translate3d(0px, 0px, 0.01px);
+  will-change: transform, visibility, z-index;
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
+}
+
+.card,
+.card__rotator {
+  aspect-ratio: var(--card-aspect);
+  border-radius: var(--card-radius);
+}
+
+.card__translater,
+.card__rotator {
+  display: grid;
+  perspective: 600px;
+  will-change: transform, box-shadow;
+  transform-origin: center;
+  -webkit-transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.card__translater {
+  width: auto;
+  position: relative;
+  -webkit-transform: translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0.1px) scale(var(--card-scale, 1));
+  transform: translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0.1px) scale(var(--card-scale, 1));
+}
+
+.card__rotator {
+  -webkit-transform: rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
+  -webkit-transform-style: preserve-3d;
+  transform: rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
+}
+
+.card__rotator * {
+  width: 100%;
+  display: grid;
+  grid-area: 1/1;
+  aspect-ratio: var(--card-aspect);
+  border-radius: var(--card-radius);
+  image-rendering: optimizeQuality;
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
+  overflow: hidden;
+}
+
+.card__rotator img {
+  height: auto;
+  -webkit-transform: translate3d(0px, 0px, 0.01px);
+  transform: translate3d(0px, 0px, 0.01px);
+}
+
+/* ── Shine & Glitter ───────────────────────────────────────────────── */
+
+.card__shine,
+.card__glitter {
+  display: grid;
+  transform: translateZ(1px);
+  overflow: hidden;
+  z-index: 3;
+
+  background: transparent;
+  background-size: cover;
+  background-position: center;
+
+  border-radius: var(--card-radius);
+  filter: brightness(.45) contrast(1.5) saturate(1.2);
+  mix-blend-mode: color-dodge;
+
+  opacity: var(--card-opacity, 1);
+}
+
+.card__glitter {
+  display: none;
+  z-index: 2;
+}
+
+.card__shine:before,
+.card__shine:after,
+.card__glitter:before,
+.card__glitter:after {
+  --sunpillar-clr-1: var(--sunpillar-5);
+  --sunpillar-clr-2: var(--sunpillar-6);
+  --sunpillar-clr-3: var(--sunpillar-1);
+  --sunpillar-clr-4: var(--sunpillar-2);
+  --sunpillar-clr-5: var(--sunpillar-3);
+  --sunpillar-clr-6: var(--sunpillar-4);
+
+  grid-area: 1/1;
+  transform: translateZ(1px);
+  border-radius: var(--card-radius);
+}
+
+.card__shine:after {
+  --sunpillar-clr-1: var(--sunpillar-6);
+  --sunpillar-clr-2: var(--sunpillar-1);
+  --sunpillar-clr-3: var(--sunpillar-2);
+  --sunpillar-clr-4: var(--sunpillar-3);
+  --sunpillar-clr-5: var(--sunpillar-4);
+  --sunpillar-clr-6: var(--sunpillar-5);
+
+  transform: translateZ(1.2px);
+}
+
+/* ── Glare ─────────────────────────────────────────────────────────── */
+
+.card__glare {
+  transform: translateZ(1.41px);
+  overflow: hidden;
+
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    hsla(0, 0%, 100%, 0.8) 10%,
+    hsla(0, 0%, 100%, 0.65) 20%,
+    hsla(0, 0%, 0%, 0.5) 90%
+  );
+
+  opacity: var(--card-opacity, 1);
+  mix-blend-mode: overlay;
+}
+
+.card__glare2 {
+  display: none;
+}
+
+.card__shine,
+.card__glare {
+  will-change: transform, opacity, background-image, background-size,
+    background-position, background-blend-mode, filter;
+}
+
+/* ── Mat holo overrides (scoped to .mat-holo) ─────────────────────────
+   Mat zones size their <img> by height (e.g. `#board img { height: 70% }`,
+   `#attachedCards img { height: 33% }`). The holo wrapper replaces the <img>
+   in the zone and gets explicit px width AND height from hydrateHolo. These
+   rules force the simey rotator stack to fill that exact box by height (not
+   the base.css width-driven sizing), keep the card image visible under the
+   glare layer, and make the underlying <img> the sole interactive target so
+   click/drag/evolve/energy-attach keep working. */
+.mat-holo {
+  aspect-ratio: auto;
+  overflow: visible;
+}
+.mat-holo .card__translater,
+.mat-holo .card__rotator,
+.mat-holo .card__rotator > * {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+.mat-holo img {
+  display: block;
+  object-fit: cover;
+}
+/* Pointer-events passthrough: decorative holo layers and the 3D-transformed
+   rotator must NOT intercept pointer events over the real card image. The
+   <img> (card.image) stays the hit target for click/drag/evolve/attach. */
+.mat-holo,
+.mat-holo .card__translater,
+.mat-holo .card__rotator,
+.mat-holo .card__shine,
+.mat-holo .card__glitter,
+.mat-holo .card__glare {
+  pointer-events: none;
+}
+.mat-holo img {
+  pointer-events: auto;
+}

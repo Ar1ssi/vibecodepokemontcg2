@@ -6,6 +6,7 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { addAbilityCounter } from '../counters/ability-counter.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { addSpecialCondition } from '../counters/special-condition.js';
+import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const initializeActiveBenchCard = (user, movingCard, dZoneId, dZone) => {
   if (!movingCard.type2) {
@@ -23,6 +24,7 @@ export const initializeActiveBenchCard = (user, movingCard, dZoneId, dZone) => {
   container.className = 'play-container';
   container.style.zIndex = '0';
   dZone.element.appendChild(container);
+  unhydrateHolo(movingCard);
   container.appendChild(movingCard.image);
 
   // delete the container if it's empty

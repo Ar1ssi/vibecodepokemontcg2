@@ -131,12 +131,16 @@ check. Never claim lint passed without actually running it.
 
 ## Turn-order coin flip (on "Set Up")
 
-- **Goal:** once a player clicks Set Up (rules on), a coin from either player's
-  selection is flipped (full-screen animation) to decide who goes first. Runs in
-  solo (shared-browser P1+P2) and online multiplayer. All logic lives in
-  `rules-bridge.js`; state in `rules-state.mjs` (`rulesState`); overlay CSS in
-  `client/src/css/index.css` (`.coin-toss-wrap`, `#turnOrderCoinFlipOverlay`,
-  `@keyframes coin-toss-arc`).
+- **Goal:** once a player clicks Set Up (rules on), **the caller picks a face
+  (heads/tails)** via a 2-button picker, then a coin from either player's
+  selection is flipped (full-screen animation): **the caller goes first iff the
+  coin lands on the face they called**. Runs in solo (shared-browser P1+P2) and
+  online multiplayer, where the mirror side **auto-starts** from the broadcast
+  (no second Set Up click) and the flip is announced once. All logic lives in
+  `rules-bridge.js`; the pure, unit-tested resolution is `decideTurnOrder()` in
+  `rules-turnorder.mjs` (caller + call + result → who goes first); state in
+  `rules-state.mjs` (`rulesState`); overlay CSS in `client/src/css/index.css`
+  (`.coin-toss-wrap`, `#turnOrderCoinFlipOverlay`, `@keyframes coin-toss-arc`).
 - **Wiring (capture-phase hooks, added this pass):**
   - `hookSetupButton()` attaches one shared `handleSetupClick` to **all three**
     Set Up triggers: `#setupButton` (p1 box), `#p2SetupButton` (p2 box),
@@ -151,11 +155,15 @@ check. Never claim lint passed without actually running it.
     Up would silently skip the flip.
 - **Guards in `handleSetupClick` (in order):** `rulesState.enabled`; 
 `systemState.isReplay` (replay repurposes `#setupButton` for `rewindToStartReplay`
-— must not flip); `coinFlipPending` (module-level flag, set around
-`runTurnOrderCoinFlip()` so a double click on two different buttons can't start
-a second flip/game); `rulesState.phase !== 'setup'` (a prior flip already decided
-turn order — let the original handler finish setup). If `syncedTurnOrder` is set
-(multiplayer mirror) use it and skip the local flip.
+— must not flip); `rulesState.phase !== 'setup'`; `coinCallPending` (the call
+picker is already open); `syncedTurnOrder` (multiplayer mirror — start the game
+from the opponent's broadcast outcome, no local flip); `coinCallChoice` (the
+opponent clicked Set Up first and broadcast their call — mirror it, don't pick
+again). Otherwise open `openCoinCallPicker()` (overlay `#rulesCoinCallOverlay`,
+z-index 2400, click-outside does NOT pick a face) and flip via
+`runTurnOrderCoinFlip({ call, caller })` → `beginSetupWithTurnOrder(firstPlayer)`
+(module-scope, shared by the local and mirror auto-start paths; `startGame`
+flips phase to `'draw'`, guarding double-starts).
 - **Invariants:** capture-phase listeners (`addEventListener(..., true)`) fire
   before the original bubble handlers, which still run (no
   `stopPropagation`/`preventDefault`) — the original `setup()` deals hands etc.
@@ -165,21 +173,32 @@ turn order — let the original handler finish setup). If `syncedTurnOrder` is s
   (animation ~2.4s + fade 0.4s); `proceedWithSetup` runs after that. The 2500 ms
   mulligan `setTimeout` inside `proceedWithSetup` can overlap the overlay fade —
   pre-existing, acceptable.
-- **Multiplayer mirror:** `hookMultiplayerSync()` (`rules-bridge.js`, ~line 700)
-  relays the flip via `rulesSocket.emit('rulesEvent', { type: 'turnOrderCoinFlip', data })`;
-  the opponent's client sets `syncedTurnOrder` and reuses that outcome instead of
-  flipping independently. Server relays `rulesEvent` (`server/server.js` ~181–187).
+- **Multiplayer mirror:** `hookMultiplayerSync()` (`rules-bridge.js`) relays two
+  events over `rulesSocket.emit('rulesEvent', …)` (server relays `rulesEvent`,
+  `server/server.js` ~181–187):
+  - `turnOrderCoinCall` — emitted the moment the caller picks a face (2P only);
+    the mirror stores it (`coinCallChoice`, `coinCallCaller` inverted) and closes
+    its own open picker if one is up, so both sides agree on the call.
+  - `turnOrderCoinFlip` — `{ caller, call, result, turnPlayer, coinId, coinOwner }`
+    (all sender-perspective; mirror inverts `caller`/`coinOwner` and recomputes
+    who goes first via the pure `decideTurnOrder()` — deterministic, no
+    re-randomization). The mirror then **auto-starts** the game
+    (`beginSetupWithTurnOrder`) when `phase === 'setup' && !coinFlipPending`.
+  - **Single announcement:** the remote animation path passes `isRemote: true`;
+    only the local (non-remote) flip appends its chat message, so exactly one
+    side announces the result.
 - **`selectedCoins`** (`rules-bridge.js`, module-level `{ self, opp }`) is
   populated by the `rules-coin-changed` event (dispatched from
   `native-deck-builder.js`); the flip picks a coin from `selectedCoins[owner]`
   (random owner) or falls back to `pickRandomCoin()` from the catalog.
-- **Verification status:** `node --check` passes; full suite **152/152** green. No
-  browser/jsdom in the sandbox — the flip flow is DOM-heavy and was **not**
-  visually verified. To trigger manually: rules on by default, pick a coin in
-  Customize > Coin, click any Set Up button. A new unit test is optional
-  (would need `document`/`systemState`/`rulesSocket` stubs); if added, append to
-  an already-listed test file (e.g. `rules.test.mjs`) so it runs under `pnpm test`. 
-  `evolution.test.mjs` remains pre-existing but NOT in the root test list (skip it).
+- **Verification status:** `node --check` passes on `rules-bridge.js` +
+  `rules-turnorder.mjs`; `decideTurnOrder` is unit-tested in `rules.test.mjs` and
+  the full suite is **333/333 green, 0 fail**. No browser/socket pair in the
+  sandbox — the interactive picker, mirror auto-start, and single-announcement
+  gate are DOM/socket-heavy and were **not** live-verified; verify with a manual
+  2P run. To trigger: rules on by default, pick a coin in Customize > Coin,
+  click any Set Up button, pick a face. `evolution.test.mjs` remains pre-existing
+  but NOT in the root test list (run it explicitly if desired).
 
 ## Turn flow: attacking (or passing) ends the turn
 

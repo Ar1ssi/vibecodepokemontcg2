@@ -5,6 +5,12 @@ import {
 } from '../../front-end.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { startHoloAnimation } from '../../setup/deck-builder/core/holo.mjs';
+import {
+  playDeselectPop,
+  popHostFor,
+  makePopFrame,
+} from '../../setup/image-logic/card-pop.mjs';
 
 export const hideZoneElements = () => {
   const zonesToHide = [
@@ -88,41 +94,58 @@ export const closeFullView = (event) => {
 
   if (fullViewElement && (!event || !fullViewElement.contains(event.target))) {
     //use the !event as a guard for closeFullView to trigger when using the escape keybind
-    // Revert the styles
-    fullViewElement.className = 'play-container';
-    fullViewElement.style.zIndex = '';
-    fullViewElement.style.height = '';
-
+    // Primary (non-attached) image, used both for the width revert and to pick
+    // the deselect-pop transform host (holo wrapper vs. the .full-view container).
     const targetImage = Array.from(
       fullViewElement.querySelectorAll('img')
-    ).filter((image) => {
-      return !image.attached;
-    });
+    )
+      .filter((image) => !image.attached)[0];
 
-    // Revert the position of the images
-    const images = fullViewElement.querySelectorAll('img');
-    images.forEach((image) => {
-      image.classList.remove('default-rotation');
-      if (image.attached) {
-        image.style.position = 'absolute';
+    const revert = () => {
+      // If this was a holo card, hand the shine back to the auto-sweep before
+      // the container's classes/inline sizing revert.
+      const matHoloWrapper = fullViewElement.closest('.mat-holo');
+      if (matHoloWrapper) {
+        startHoloAnimation(matHoloWrapper, { auto: true });
       }
-    });
+      // Revert the styles
+      fullViewElement.classList.remove('full-view', 'dark-mode-5');
+      fullViewElement.style.zIndex = '';
+      fullViewElement.style.height = '';
 
-    if (targetImage.length > 0) {
-      const currentWidth = parseFloat(targetImage[0].clientWidth);
-      const newWidth =
-        currentWidth +
-        (targetImage[0].clientWidth / 6) * targetImage[0].energyLayer;
-      fullViewElement.style.width = newWidth + 'px';
-    }
-    fullViewElement.style.zIndex = '0';
+      // Revert the position of the images
+      const images = fullViewElement.querySelectorAll('img');
+      images.forEach((image) => {
+        image.classList.remove('default-rotation');
+        if (image.attached) {
+          image.style.position = 'absolute';
+        }
+      });
 
-    // Revert the z-indexes
-    if (fullViewElement.parentElement) {
-      fullViewElement.parentElement.style.zIndex = '0';
+      if (targetImage) {
+        const currentWidth = parseFloat(targetImage.clientWidth);
+        const newWidth =
+          currentWidth +
+          (targetImage.clientWidth / 6) * targetImage.energyLayer;
+        fullViewElement.style.width = newWidth + 'px';
+      }
+      fullViewElement.style.zIndex = '0';
+
+      // Revert the z-indexes
+      if (fullViewElement.parentElement) {
+        fullViewElement.parentElement.style.zIndex = '0';
+      }
+      document.getElementById('stadium').style.zIndex = '0';
+      refreshBoard();
+    };
+
+    // Shrink the enlarged view back down, then revert the layout once the
+    // spring settles so the deselect reads as a pop rather than a snap.
+    if (targetImage) {
+      playDeselectPop(popHostFor(targetImage), makePopFrame(targetImage), revert);
+    } else {
+      revert();
     }
-    document.getElementById('stadium').style.zIndex = '0';
-    refreshBoard();
   }
 };
 

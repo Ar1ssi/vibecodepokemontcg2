@@ -5,6 +5,7 @@ import {
 } from '../../front-end.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { buildDeck } from '../../setup/deck-constructor/build-deck.js';
+import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { determineDeckData } from '../../setup/general/determine-deckdata.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
@@ -12,6 +13,7 @@ import { removeImages } from '../../setup/image-logic/remove-images.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { hideZoneElements } from './close-popups.js';
 import { updateCount } from './count.js';
+import { clearReady } from './ready.js';
 
 export const reset = (
   user,
@@ -27,6 +29,7 @@ export const reset = (
 
   const stadium = getZone('neutral', 'stadium');
   systemState.turn = 0;
+  clearReady(user);
   if (
     stadium.array[0] &&
     ((stadium.array[0].image.user === 'self' && user === 'self') ||
@@ -78,6 +81,7 @@ export const reset = (
   ];
   zoneIds.forEach((zoneId) => {
     const zone = getZone(user, zoneId);
+    zone.array.forEach((card) => unhydrateHolo(card));
     zone.array.length = 0;
     removeImages(zone.element);
     if (zone.elementCover) {

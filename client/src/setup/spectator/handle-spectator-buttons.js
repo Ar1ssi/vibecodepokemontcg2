@@ -31,7 +31,7 @@ export const handleSpectatorButtons = () => {
     'p2PassButton',
     'p2SetupButton',
     'p2ResetButton',
-    'turnButton',
+    'passBoardButton',
     'flipCoinButton',
   ];
   toggleElementsVisibility(
