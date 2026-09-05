@@ -38,6 +38,8 @@ test('serializeDeckToSimCsv emits the simulator header and rows', () => {
             id: 'sv1-25',
             name: 'Pikachu',
             supertype: 'Pokémon',
+            number: '25',
+            set: { id: 'sv01' },
             images: { large: 'https://example.com/pikachu.png' },
           },
         },
@@ -49,7 +51,7 @@ test('serializeDeckToSimCsv emits the simulator header and rows', () => {
 
   assert.equal(
     csv,
-    'QTY,Name,Type,URL\n2,Pikachu,Pokémon,https://example.com/pikachu.png'
+    'QTY,Name,Type,URL,Number,Set,TcgId\n2,Pikachu,Pokémon,https://example.com/pikachu.png,25,sv01,sv1-25'
   );
 });
 
@@ -64,6 +66,8 @@ test('serializeDeckToSimCsv emits one row per card variation', () => {
             id: 'sv1-25',
             name: 'Pikachu',
             supertype: 'Pokémon',
+            number: '25',
+            set: { id: 'sv01' },
             images: { large: 'https://example.com/pikachu-a.png' },
           },
         },
@@ -81,9 +85,12 @@ test('serializeDeckToSimCsv emits one row per card variation', () => {
   const csv = serializeDeckToSimCsv(deck);
   const lines = csv.split('\n');
 
-  assert.equal(lines[0], 'QTY,Name,Type,URL');
-  assert.equal(lines[1], '2,Pikachu,Pokémon,https://example.com/pikachu-a.png');
-  assert.equal(lines[2], '1,Pikachu,Pokémon,https://example.com/pikachu-b.png');
+  assert.equal(lines[0], 'QTY,Name,Type,URL,Number,Set,TcgId');
+  assert.equal(
+    lines[1],
+    '2,Pikachu,Pokémon,https://example.com/pikachu-a.png,25,sv01,sv1-25'
+  );
+  assert.equal(lines[2], '1,Pikachu,Pokémon,https://example.com/pikachu-b.png,,,');
 });
 
 test('parseSimCsv parses simulator CSV into grouped deck structure', () => {
@@ -100,6 +107,56 @@ test('parseSimCsv parses simulator CSV into grouped deck structure', () => {
   assert.equal(deck.Pikachu.cards[0].data.name, 'Pikachu');
   assert.equal(deck.Switch.totalCount, 1);
   assert.equal(deck.Switch.cards[0].data.supertype, 'Trainer');
+});
+
+test('parseSimCsv reads extended identity columns', () => {
+  const csv = [
+    'QTY,Name,Type,URL,Number,Set,TcgId',
+    '4,Piloswine,Pokémon,https://example.com/piloswine.png,24,PFL,me02-024',
+  ].join('\n');
+
+  const deck = parseSimCsv(csv);
+  const data = deck.Piloswine.cards[0].data;
+
+  assert.equal(data.number, '24');
+  assert.equal(data.localId, '24');
+  assert.equal(data.id, 'me02-024');
+  assert.equal(data.set.id, 'PFL');
+});
+
+test('parseSimCsv still accepts legacy 4-column CSV', () => {
+  const csv = 'QTY,Name,Type,URL\n1,Pikachu,Pokémon,https://example.com/p.png';
+  const deck = parseSimCsv(csv);
+  assert.equal(deck.Pikachu.cards[0].data.number, null);
+});
+
+test('parseDeckDataRows preserves deckData identity tuple fields', async () => {
+  const { parseDeckDataRows } = await import('../core/csv-adapter.mjs');
+  const deck = parseDeckDataRows([
+    ['4', 'Piloswine', 'Pokémon', 'https://example.com/p.png', '24', 'PFL', 'me02-024'],
+  ]);
+  const data = deck.Piloswine.cards[0].data;
+  assert.equal(data.number, '24');
+  assert.equal(data.id, 'me02-024');
+  assert.equal(data.set.id, 'PFL');
+});
+
+test('parseDeckDataRows accepts starter-deck localId cards via deckToSimRows shape', async () => {
+  const { parseDeckDataRows } = await import('../core/csv-adapter.mjs');
+  const deck = parseDeckDataRows([
+    [
+      '2',
+      'Mega Lucario ex',
+      'Pokémon',
+      'https://assets.tcgdex.net/en/me/me01/077/high.webp',
+      '077',
+      'me01',
+      'me01-077',
+    ],
+  ]);
+  const data = deck['Mega Lucario ex'].cards[0].data;
+  assert.equal(data.number, '077');
+  assert.equal(data.id, 'me01-077');
 });
 
 test('formatCardType returns supertype', () => {
