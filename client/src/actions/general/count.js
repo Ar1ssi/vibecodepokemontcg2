@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 
 export const updateCount = () => {

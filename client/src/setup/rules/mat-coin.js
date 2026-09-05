@@ -1,7 +1,7 @@
 // Persistent battle-mat coin tokens: render each player's chosen coin beside
 // their Active Pokémon and play flip animations on the mat (not full-screen).
 
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { getCoins } from '../deck-builder/core/coins.mjs';
 
 const MAT_COIN_BACK_URL = '/src/assets/coins/coin-back.png';

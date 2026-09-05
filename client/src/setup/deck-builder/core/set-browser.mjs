@@ -1,3 +1,5 @@
+import { GENERATED_STARTER_DECKS } from './starter-decks.generated.mjs';
+
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
     
     // Sets legal in the 2026-27 Standard format (H regulation mark onward).
@@ -224,9 +226,10 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       });
     }
     
-    // ── Starter decks (Mega Gengar ex / Mega Diancie ex Mega Battle Decks) ──
-    // Card lists per Bulbapedia; quantities exact. Cards are resolved at runtime
-    // against TCGdex so images always come from the live database.
+    // ── Starter decks (Mega Battle Decks + Pokémon TCG Live starter decks) ──
+    // Gengar/Diancie: Bulbapedia Mega Battle Deck lists. TCG Live decks: official
+    // lists from pokemon.com (March 2026 starter strategies + Pitch Black battle pass).
+    // Resolved card data is baked in; GENERATED decks built via scripts/generate-starter-decks.mjs.
     const STARTER_DECKS = {
   "gengar": [
     {
@@ -1100,8 +1103,21 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
     }
   ]
 };
-    
-    export function getStarterDecks() {
-      return STARTER_DECKS;
-    }
+
+export const STARTER_DECK_CATALOG = [
+  { key: 'gengar', name: 'Mega Gengar ex Battle Deck' },
+  { key: 'diancie', name: 'Mega Diancie ex Battle Deck' },
+  { key: 'lucario', name: 'Mega Lucario ex Starter Deck' },
+  { key: 'charizard', name: 'Mega Charizard X ex Starter Deck' },
+  { key: 'darkrai', name: 'Mega Darkrai ex Starter Deck' },
+  { key: 'dragonite', name: 'Mega Dragonite ex Starter Deck' },
+  { key: 'greninja', name: 'Mega Greninja ex Starter Deck' },
+];
+
+export function getStarterDecks() {
+  return {
+    ...STARTER_DECKS,
+    ...GENERATED_STARTER_DECKS,
+  };
+}
     

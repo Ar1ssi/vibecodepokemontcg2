@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { Cover } from '../../setup/deck-constructor/cover.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 

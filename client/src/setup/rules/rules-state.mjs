@@ -2,6 +2,12 @@
     // Tracks whose turn it is, what phase they're in, and what actions are
     // currently legal. All gating flows through canPerformAction().
     
+    import {
+      buildSetCardIdCandidates,
+      extractTcgdexIdFromImageUrl,
+      resolveTcgdexSetId,
+    } from '../shared/legacy-set-ids.mjs';
+    
     export const RULES_STORAGE_KEY = 'ptcg-sim.rules-enforced.v1';
     
     export const rulesState = {
@@ -12,10 +18,11 @@
       // Stadium currently on the field (both players share it): { user, card } | null
       stadium: null,
       mulligansResolved: false, // guard: mulligan execution runs at most once per game
+      attackExecuting: false, // true while an attack's damage/effects are resolving (Nitro recycle)
       // per-player per-turn facts
       flags: {
-        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
-        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
+        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
+        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
       },
     };
     
@@ -52,7 +59,7 @@
     // directly against TCGdex's own `localId` for each candidate. When it
     // is available and matches exactly one candidate, that candidate wins
     // regardless of result order.
-    export function resolveCardId(summaries, name, type = '', number = null) {
+    export function resolveCardId(summaries, name, type = '', number = null, setCode = null) {
       if (!Array.isArray(summaries) || summaries.length === 0) return null;
       const target = normalizeCardName(name);
       if (!target) return null;
@@ -61,6 +68,7 @@
       const wantsTrainer = t.includes('trainer');
       // Normalize away leading zeros / stray whitespace so "032" == "32".
       const wantNumber = number != null ? String(number).trim().replace(/^0+(?=\d)/, '') : null;
+      const wantSetId = resolveTcgdexSetId(setCode);
     
       const scored = summaries
         .filter((s) => s && s.id)
@@ -73,7 +81,19 @@
           if (wantsTrainer && s.category === 'trainer') score += 10;
           if (wantsPokemon && s.category === 'trainer') score -= 50;
           if (wantsTrainer && s.category === 'pokemon') score -= 50;
-          if (wantNumber != null && s.localId != null) {
+          // Printed set code → TCGdex set-id prefix. Collector numbers repeat
+          // across sets (PFL #24 vs Skyridge #24), so set+number together are
+          // required for a decisive match on modern decks.
+          if (score >= 100 && wantSetId && String(s.id).startsWith(`${wantSetId}-`)) {
+            score += 10000;
+          }
+          // The collector number breaks ties *between otherwise acceptable
+          // candidates in the same set* — it never promotes one that would have
+          // been rejected on its own. Gating on `score >= 100` (exact name, no
+          // category conflict) stops a coincidental number match on "Piloswine ex"
+          // (partial name, 20) or on a same-named Trainer (50) from beating
+          // the real exact-name Pokémon.
+          if (score >= 100 && wantNumber != null && s.localId != null) {
             const sNumber = String(s.localId).trim().replace(/^0+(?=\d)/, '');
             if (sNumber === wantNumber) score += 1000; // decisive disambiguator
           }
@@ -117,17 +137,86 @@
       return out;
     }
     
+    // Pure mapper: TCGdex v2 card detail → rules-engine ability shape.
+    // v2 exposes abilities[] ({ type, name, effect }); legacy detail.ability is kept for compat.
+    export function tcgAbilityFromDetail(detail) {
+      if (detail?.ability?.text || detail?.ability?.name) return detail.ability;
+      // Multiple Ability entries are rare; first match wins (TCGdex order is stable).
+      const entry = (detail?.abilities || []).find(
+        (a) => String(a?.type || '').toLowerCase() === 'ability'
+      );
+      if (!entry) return null;
+      return { name: entry.name || '', text: entry.effect || entry.text || '' };
+    }
+
+    // Network: fetch (and memoize) one raw TCGdex card detail by id. Shared by
+    // the legacy-id validation below and the enrichment fetch, so validating a
+    // candidate id doesn't cost a second round trip. `null` = fetch failed or
+    // the id doesn't exist; failures are not memoized so a later call retries.
+    const cardDetailCache = new Map();
+    async function fetchCardDetail(id) {
+      if (cardDetailCache.has(id)) return cardDetailCache.get(id);
+      try {
+        const res = await fetch(`https://api.tcgdex.net/v2/en/cards/${id}`);
+        if (!res.ok) return null;
+        const detail = await res.json();
+        if (!detail) return null;
+        cardDetailCache.set(id, detail);
+        return detail;
+      } catch {
+        return null;
+      }
+    }
+
+    // Deterministic id resolution for the legacy sets we have a code→set-id
+    // table for: "TRR 32" is unambiguously ex7-32, no name search and no
+    // tiebreaking required. The table was hand-built for limitlesstcg's URL
+    // scheme and has never been verified card-by-card against TCGdex, so the
+    // id it produces is only a *candidate* — the fetched card's name has to
+    // match the board card's before we trust it. Returns the id, or null to
+    // tell the caller to fall back to the by-name search.
+    async function resolveSetCardId(card) {
+      for (const candidate of buildSetCardIdCandidates(card.set, card.number)) {
+        const detail = await fetchCardDetail(candidate);
+        if (!detail) continue;
+        if (normalizeCardName(detail.name) !== normalizeCardName(card.name)) continue;
+        return candidate;
+      }
+      return null;
+    }
+
+    
     export async function ensureCardData(card) {
       if (!card) return card;
       // NOTE: enrichment below sets `card.weakness` (singular) — matching on
       // it here, not the never-set `weaknesses`, so an already-enriched card
       // is actually recognized and doesn't re-run resolution/fetch on every call.
       if (card.hp && card.weakness !== undefined) return card; // enriched
+      if (!card.id && card.image?.src) {
+        const fromUrl = extractTcgdexIdFromImageUrl(card.image.src);
+        if (fromUrl) card.id = fromUrl;
+      }
       if (!card.id && card.name) {
-        // Zone cards arrive without an id — resolve one by name before the detail fetch.
+        // Zone cards arrive without an id. Prefer the deterministic
+        // (set code, collector number) → id mapping; only guess by name if
+        // that isn't available or doesn't check out.
+        try {
+          const setId = await resolveSetCardId(card);
+          if (setId != null) card.id = setId;
+        } catch {
+          /* fall through to the by-name search */
+        }
+      }
+      if (!card.id && card.name) {
         try {
           const summaries = await fetchSummariesByName(card.name);
-          const id = resolveCardId(summaries, card.name, card.type, card.number);
+          const id = resolveCardId(
+            summaries,
+            card.name,
+            card.type,
+            card.number,
+            card.set
+          );
           if (id != null) card.id = id;
         } catch {
           /* fall through: card.id stays unset and we return unenriched */
@@ -144,9 +233,8 @@
         return card;
       }
       try {
-        const res = await fetch(`https://api.tcgdex.net/v2/en/cards/${card.id}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const detail = await res.json();
+        const detail = await fetchCardDetail(card.id);
+        if (!detail) throw new Error(`no detail for ${card.id}`);
         const data = {
           hp: detail.hp ? Number(detail.hp) : null,
           types: detail.types || [],
@@ -169,7 +257,7 @@
           })),
           stage: detail.stage || null,
           evolvesFrom: detail.evolvesFrom || null,
-          ability: detail.ability || null,
+          ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || [],
           rarity: detail.rarity || card.rarity || '',
           effect: detail.effect || null,
@@ -201,6 +289,19 @@
     };
     
     // ── turn/phase management ────────────────────────────────────────────
+    // Return rules state to pre-game setup so the next Set Up run can coin
+    // flip and evaluate mulligans again. Used by reset/restart in rules-bridge.
+    export function resetRulesSessionState() {
+      rulesState.phase = 'setup';
+      rulesState.turnNumber = 0;
+      rulesState.turnPlayer = 'self';
+      rulesState.stadium = null;
+      rulesState.mulligansResolved = false;
+      rulesState.attackExecuting = false;
+      resetTurnFlags('self');
+      resetTurnFlags('opp');
+    }
+
     // firstPlayer: who goes first ('self' | 'opp'). Defaults to 'self' so
     // existing callers/tests that invoke startGame() with no args keep
     // their prior behavior; rules-bridge passes the coin-flip winner.
@@ -231,7 +332,7 @@
     }
     
     function resetTurnFlags(player) {
-      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {}, stadiumUsed: false, drewThisTurn: false };
+      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, stadiumUsed: false, drewThisTurn: false };
     }
 
     // Mark that the start-of-turn draw already happened for this player this
@@ -250,8 +351,11 @@
     export function markEnergyAttached(player) {
       if (rulesState.flags[player]) rulesState.flags[player].energyAttached = true;
     }
-    export function markSupporterPlayed(player) {
-      if (rulesState.flags[player]) rulesState.flags[player].supporterPlayed = true;
+    export function markSupporterPlayed(player, cardName = '') {
+      if (rulesState.flags[player]) {
+        rulesState.flags[player].supporterPlayed = true;
+        if (cardName) rulesState.flags[player].lastSupporterName = cardName;
+      }
     }
     
     // ── start-of-turn draw (taxonomy B: "Draw 1 at start of turn") ──────
@@ -259,7 +363,10 @@
     // card? True only when rules are enabled, the draw hasn't happened yet this
     // turn, and there is at least one card left in the deck. The UI layer
     // (rules-bridge.js) calls the real draw() when this returns true.
-    export function shouldAutoDrawAtTurnStart({ enabled = true, drewThisTurn = false, deckCount = 0 } = {}) {
+    // Turn 1 is skipped: the player who goes first does not draw at the start
+    // of their opening turn (bonus mulligan draws are handled separately).
+    export function shouldAutoDrawAtTurnStart({ enabled = true, drewThisTurn = false, deckCount = 0, turnNumber = 0 } = {}) {
+      if (Number(turnNumber) === 1) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }
 

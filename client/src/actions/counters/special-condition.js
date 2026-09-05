@@ -2,9 +2,15 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
+import { applySpecialConditionStyle } from '../../setup/counters/special-condition-style-apply.js';
+import {
+  getSpecialConditionCode,
+  setSpecialConditionCode,
+} from '../../setup/counters/special-condition-code.mjs';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 
 export const updateSpecialCondition = (
   user,
@@ -24,34 +30,8 @@ export const updateSpecialCondition = (
 
   const specialCondition = getZone(user, zoneId).array[index].image
     .specialCondition;
-  specialCondition.textContent = textContent;
-  let text = specialCondition.textContent.toUpperCase();
-  switch (text) {
-    case 'P':
-      specialCondition.style.backgroundColor = 'green';
-      specialCondition.style.color = 'white';
-      break;
-    case 'B':
-      specialCondition.style.backgroundColor = 'red';
-      specialCondition.style.color = 'white';
-      break;
-    case 'A':
-      specialCondition.style.backgroundColor = 'blue';
-      specialCondition.style.color = 'white';
-      break;
-    case 'PA':
-      specialCondition.style.backgroundColor = 'yellow';
-      specialCondition.style.color = 'black';
-      break;
-    case 'C':
-      specialCondition.style.backgroundColor = 'purple';
-      specialCondition.style.color = 'white';
-      break;
-    default:
-      specialCondition.style.backgroundColor = 'white';
-      specialCondition.style.color = 'black';
-      break;
-  }
+  setSpecialConditionCode(specialCondition, textContent);
+  applySpecialConditionStyle(specialCondition, textContent);
 
   processAction(user, emit, 'updateSpecialCondition', [
     zoneId,
@@ -123,17 +103,21 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
         systemState.initiator === 'self' ? 'opp-circle' : 'self-circle';
     }
     specialCondition.contentEditable = 'true';
-    specialCondition.textContent = 'P';
-    specialCondition.style.backgroundColor = 'green';
-    specialCondition.style.color = 'white';
+    setSpecialConditionCode(specialCondition, 'P');
+    applySpecialConditionStyle(specialCondition, 'P');
   }
+
+  applySpecialConditionStyle(
+    specialCondition,
+    getSpecialConditionCode(specialCondition)
+  );
 
   specialCondition.style.display = 'inline-block';
   specialCondition.style.left = `${targetRect.left - zoneElementRect.left}px`;
   specialCondition.style.top = `${targetRect.top - zoneElementRect.top + targetRect.height / 4}px`;
   zone.element.appendChild(specialCondition);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     specialCondition.style.display = 'none';
   }
 
@@ -144,7 +128,12 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
   specialCondition.style.zIndex = '1';
 
   const handleColor = () => {
-    updateSpecialCondition(user, zoneId, index, specialCondition.textContent);
+    updateSpecialCondition(
+      user,
+      zoneId,
+      index,
+      getSpecialConditionCode(specialCondition)
+    );
   };
 
   const handleResize = () => {
@@ -153,8 +142,8 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
 
   const handleRemove = (fromBlurEvent = false) => {
     if (
-      specialCondition.textContent.trim() === '' ||
-      specialCondition.textContent === '0'
+      getSpecialConditionCode(specialCondition) === '' ||
+      getSpecialConditionCode(specialCondition) === '0'
     ) {
       targetCard.image.specialCondition.removeEventListener(
         'input',

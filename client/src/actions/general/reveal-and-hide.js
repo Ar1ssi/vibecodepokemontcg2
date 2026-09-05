@@ -1,4 +1,4 @@
-import { socket, systemState } from '../../front-end.js';
+import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { showPopup } from '../../setup/general/pop-up-message.js';
@@ -31,6 +31,7 @@ export const hideCard = (user, card) => {
         ? systemState.p2OppCardBackSrc
         : systemState.p1OppCardBackSrc;
 
+  unhydrateHolo(card);
   if (card.image.src !== targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
   }
@@ -46,6 +47,7 @@ export const revealCard = (user, card) => {
 
   if (card.image.src === targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
+    hydrateHolo(card);
   }
 };
 
@@ -117,9 +119,6 @@ export const stopLookingAtCards = (
     });
     if (zoneId === 'hand') {
       sort(user, zoneId);
-    }
-    if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
-      zone.array.forEach((card) => hydrateHolo(card));
     }
   }
   if (message) {
@@ -234,6 +233,7 @@ export const revealShortcut = (
         : systemState.p1OppCardBackSrc;
   if (card.image.src === targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
+    hydrateHolo(card);
   }
   if (message) {
     appendMessage(
@@ -306,6 +306,7 @@ export const hideShortcut = (
       : systemState.isTwoPlayer
         ? systemState.p2OppCardBackSrc
         : systemState.p1OppCardBackSrc;
+  unhydrateHolo(card);
   if (card.image.src !== targetCardBackSrc) {
     toggleCard(card, targetCardBackSrc);
   }
@@ -357,7 +358,10 @@ export const lookShortcut = (user, initiator, zoneId, index, emit = true) => {
     //only apply for initiator
     const zone = getZone(user, zoneId);
     const card = zone.array[index];
-    toggleCard(card, targetCardBackSrc);
+    if (card.image.src === targetCardBackSrc) {
+      toggleCard(card, targetCardBackSrc);
+      hydrateHolo(card);
+    }
   }
   appendMessage(
     initiator,
@@ -404,7 +408,10 @@ export const stopLookingShortcut = (
     //only apply for initiator
     const zone = getZone(user, zoneId);
     const card = zone.array[index];
-    toggleCard(card, targetCardBackSrc);
+    unhydrateHolo(card);
+    if (card.image.src !== targetCardBackSrc) {
+      toggleCard(card, targetCardBackSrc);
+    }
   }
   appendMessage(
     initiator,

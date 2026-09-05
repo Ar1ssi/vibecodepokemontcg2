@@ -6,8 +6,9 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { getZone } from '../zones/get-zone.js';
+import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { identifyCard } from './click-events.js';
 import { manualDeckActionAllowed } from '../rules/rules-state.mjs';
 import { appendMessage } from '../chatbox/append-message.js';
@@ -50,9 +51,10 @@ export const dragStart = (event) => {
   if (popupContainers.includes(mouseClick.zoneId)) {
     getZone(mouseClick.cardUser, mouseClick.zoneId).element.style.opacity = '0';
   }
-  if (event.target.parentElement.classList.contains('full-view')) {
-    mouseClick.playContainer = event.target.parentElement;
-    mouseClick.playContainerParent = event.target.parentElement.parentElement;
+  const dragHost = fullViewHost(event.target);
+  if (dragHost?.classList.contains('full-view')) {
+    mouseClick.playContainer = dragHost;
+    mouseClick.playContainerParent = dragHost.parentElement;
     mouseClick.playContainer.style.opacity = '0';
   }
 };

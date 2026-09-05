@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { acceptAction } from './accept-action.js';
 
 export const catchUpActions = (actionData) => {

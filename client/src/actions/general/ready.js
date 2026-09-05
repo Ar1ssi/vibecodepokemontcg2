@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';

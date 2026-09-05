@@ -1,4 +1,5 @@
 import { reset } from '../../../../actions/general/reset.js';
+import { restartGame } from '../../../../actions/general/restart.js';
 import { readyUp } from '../../../../actions/general/ready.js';
 import {
   socket,
@@ -6,7 +7,7 @@ import {
   version,
   oppContainerDocument,
   selfContainerDocument,
-} from '../../../../front-end.js';
+} from '../../../../state.js';
 import {
   clearChatboxContent,
   exportChatboxContent,
@@ -38,6 +39,10 @@ export const initializeP1BottomButtons = () => {
     reset('opp');
   };
   resetBothButton.addEventListener('click', resetBothFunction);
+
+  const restartButton = document.getElementById('restartButton');
+  const restartFunction = () => restartGame();
+  restartButton.addEventListener('click', restartFunction);
 
   const optionsContextMenu = document.getElementById('optionsContextMenu');
 
@@ -142,6 +147,7 @@ export const initializeP1BottomButtons = () => {
     setupBothButton.addEventListener('click', setupBothFunction);
     resetButton.addEventListener('click', resetFunction);
     resetBothButton.addEventListener('click', resetBothFunction);
+    restartButton.addEventListener('click', restartFunction);
   }
 
   function removeReplayListeners() {
@@ -156,6 +162,7 @@ export const initializeP1BottomButtons = () => {
     setupBothButton.removeEventListener('click', setupBothFunction);
     resetButton.removeEventListener('click', resetFunction);
     resetBothButton.removeEventListener('click', resetBothFunction);
+    restartButton.removeEventListener('click', restartFunction);
   }
 
   function enterReplayMode() {
@@ -176,6 +183,7 @@ export const initializeP1BottomButtons = () => {
     clearLog.style.display = 'none';
     document.getElementById('passBoardButton').style.display = 'none';
     document.getElementById('flipCoinButton').style.display = 'none';
+    restartButton.style.display = 'none';
 
     [oppContainerDocument, selfContainerDocument].forEach((doc) => {
       [
@@ -231,6 +239,7 @@ export const initializeP1BottomButtons = () => {
     clearLog.style.display = 'block';
     document.getElementById('passBoardButton').style.display = 'block';
     document.getElementById('flipCoinButton').style.display = 'block';
+    restartButton.style.display = '';
 
     [oppContainerDocument, selfContainerDocument].forEach((doc) => {
       [

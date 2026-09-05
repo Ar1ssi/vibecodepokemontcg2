@@ -1,5 +1,5 @@
 import { reset } from '../../../../actions/general/reset.js';
-import { socket, systemState } from '../../../../front-end.js';
+import { socket, systemState } from '../../../../state.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { processAction } from '../../../../setup/general/process-action.js';
 import { handleSpectatorButtons } from '../../../../setup/spectator/handle-spectator-buttons.js';
@@ -141,8 +141,10 @@ export const initializeRoomButtons = () => {
           let type = cells[2].querySelector('select').value;
           let url = cells[3].innerText;
           let number = rows[i].dataset.cardNumber || null;
+          let set = rows[i].dataset.cardSet || null;
+          let tcgId = rows[i].dataset.cardTcgId || null;
 
-          let cardData = [quantity, name, type, url, number];
+          let cardData = [quantity, name, type, url, number, set, tcgId];
           deckData.push(cardData);
         }
         if (deckData.length > 0) {

@@ -34,6 +34,15 @@
     <div id="battleMat">
         <div id="battleMatTrim">
             <div id="battleMatSurface">
+                <!-- Chosen playmat artwork. Hidden until a mat is picked, at
+                     which point apply-mat-layout.js sets --mat-image and the
+                     mat-one-player / mat-two-player mode class: a one-player
+                     mat is drawn once per half (the far half rotated to face
+                     that player), a full-size mat is drawn once across both. -->
+                <div id="battleMatArt" hidden>
+                    <div class="mat-half mat-half-opp"></div>
+                    <div class="mat-half mat-half-self"></div>
+                </div>
                 <div id="battleMatSeam"></div>
                 <div id="battleMatFloor"></div>
                 <div id="battleMatGlow"></div>
@@ -115,6 +124,7 @@
             <button id="resetButton" class="self-color">Reset</button>
             <button id="setupBothButton" class="neutral-color">Set Up Both</button>
             <button id="resetBothButton" class="neutral-color">Reset Both</button>
+            <button id="restartButton" class="neutral-color">Restart</button>
             <button id="optionsButton" class="neutral-color">Options</button>
         </div>
     </div>
@@ -299,14 +309,16 @@
                       <div class="customize-switcher-toggle" role="tablist">
                         <button type="button" data-view="sleeve" class="active">Card Sleeve</button>
                         <button type="button" data-view="coin">Coin</button>
+                        <button type="button" data-view="mat">Mat</button>
                       </div>
                       <input id="nativeDeckBuilderCustomizeFilter" type="text"
-                        placeholder="Filter sleeves or coins..." aria-label="Filter customize items" />
+                        placeholder="Filter sleeves, coins or mats..." aria-label="Filter customize items" />
                     </div>
                     <div id="nativeDeckBuilderSleevePanel" class="native-deck-builder-sleeve-panel" hidden>
                     </div>
     
-                    <div id="nativeDeckBuilderCoinPanel" class="native-deck-builder-coin-picker" hidden></div>         </div>
+                    <div id="nativeDeckBuilderCoinPanel" class="native-deck-builder-coin-picker" hidden></div>
+                    <div id="nativeDeckBuilderMatPanel" class="native-deck-builder-mat-picker" hidden></div>         </div>
                 
                 <div class="native-deck-builder-pane native-deck-builder-pane-side">
                         <div class="native-deck-builder-deck-header">
@@ -446,6 +458,7 @@
             </li>
             <li id="attachedCardsButton">Attached cards...
                 <ul class="card-sub-menu">
+                    <li id="viewAttachedCardsButton">View attached cards</li>
                     <li id="attachedDiscardButton">Discard all</li>
                     <li id="attachedShuffleButton">Shuffle all to deck</li>
                     <li id="attachedLostZoneButton">Lost Zone all</li>

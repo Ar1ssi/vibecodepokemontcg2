@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../../front-end.js';
+} from '../../../state.js';
 import { adjustAlignment } from '../../../setup/sizing/adjust-alignment.js';
 import { refreshBoard } from '../../../setup/sizing/refresh-board.js';
 

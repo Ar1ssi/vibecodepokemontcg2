@@ -2,7 +2,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 
 const toggleElementsVisibility = (elementIds, isVisible) => {
   elementIds.forEach((id) => {

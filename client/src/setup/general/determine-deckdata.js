@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 
 export const determineDeckData = (user) => {
   let deckData;

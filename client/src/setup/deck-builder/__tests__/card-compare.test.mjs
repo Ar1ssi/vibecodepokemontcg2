@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   isDatabaseCard,
   isFormattedDeckCard,
+  isShowingCardBack,
   determineCardType,
   areCardsEqual,
 } from '../core/card-compare.mjs';
@@ -18,6 +19,12 @@ test('isFormattedDeckCard identifies cards with image', () => {
   const card = { image: 'https://example.com/card.png' };
   assert.equal(isFormattedDeckCard(card), true);
   assert.equal(determineCardType(card), 'FormattedDeckCard');
+});
+
+test('isShowingCardBack matches only when src equals the card back', () => {
+  const back = 'https://example.com/back.png';
+  assert.equal(isShowingCardBack(back, back), true);
+  assert.equal(isShowingCardBack('https://example.com/face.png', back), false);
 });
 
 test('determineCardType returns Unknown for unsupported shapes', () => {

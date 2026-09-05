@@ -15,7 +15,7 @@
       // Stadium evolution-speed modifier ("as if it had been in play for 1
       // more turn") relaxes the just-played gate; "costs N less Energy" is
       // surfaced as `costReduce` for the cost layer (no live charge site yet).
-      const evoSpeed = getStadiumEvolutionSpeed(player);
+      const evoSpeed = getStadiumEvolutionSpeed(player, baseCardInPlay);
       if (wasPlayedThisTurn && !evoSpeed.relaxTurnGate) {
         return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
       }

@@ -1,6 +1,6 @@
 import { flipBoard } from '../../../actions/general/flip-board.js';
 import { flipCoin } from '../../../actions/general/flip-coin.js';
-import { systemState } from '../../../front-end.js';
+import { systemState } from '../../../state.js';
 import { refreshBoardImages } from '../../../setup/sizing/refresh-board.js';
 
 export const initializeBoardButtons = () => {
