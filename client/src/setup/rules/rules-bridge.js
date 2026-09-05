@@ -25,6 +25,7 @@
     import { handleKO, checkWinConditions, resetPrizes, prizeState } from './ko-flow.mjs';
     import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from './status.mjs';
 import { statusState } from './status.mjs';
+import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
@@ -1164,143 +1165,6 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       });
     };
 
-    // ── trainer auto-execution (deterministic effects) ───────────────────
-    // Fully deterministic effects execute automatically; anything requiring
-    // a choice (search/switch) stays guided-only.
-    const autoExecuteTrainer = (card, steps) => {
-      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-        for (const step of steps) {
-          try {
-            if (step.type === 'discardHandThenDraw') {
-              // discard entire hand then draw N
-              const hand = getZone('self', 'hand');
-              while (hand.getCount() > 0) {
-                moveCardBundle('self', 'self', 'hand', 'discard', 0, false, 'move');
-              }
-              for (let i = 0; i < step.count; i++) {
-                if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
-              }
-              appendMessage('', `  auto: discarded hand, drew ${step.count}`, 'announcement', false);
-            } else if (step.type === 'shuffleHandThenDraw') {
-              const handCount0 = getZone('self', 'hand').getCount();
-              // move hand back to deck (the sim's shuffle happens via its own
-              // deck action; we move + note)
-              for (let i = 0; i < handCount0; i++) {
-                moveCardBundle('self', 'self', 'hand', 'deck', 0, false, 'move');
-              }
-              // Lillie's Determination: draw `count` (6) normally, but when you
-              // still have exactly 6 Prize cards remaining (0 taken) draw
-              // `bonusCount` (8) instead.
-              let drawCount = step.count;
-              const prizesRemaining = Math.max(0, 6 - (prizeState?.self?.taken || 0));
-              if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
-                drawCount = step.bonusCount;
-              }
-              for (let i = 0; i < drawCount; i++) {
-                if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
-              }
-              appendMessage('', `  auto: shuffled hand in, drew ${drawCount} (shuffle your deck)${drawCount !== step.count ? ` — bonus draw (6 prizes left)` : ''}`, 'announcement', false);
-            } else if (step.type === 'ionoShuffle') {
-              // both players shuffle their hands into their decks —
-              // fully deterministic, no choice involved
-              for (const who of ['self', 'opp']) {
-                const hand = getZone(who, 'hand');
-                const n = hand.getCount();
-                for (let i = 0; i < n; i++) {
-                  moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
-                }
-                appendMessage('', `  auto: ${who === 'self' ? 'your' : "opponent's"} hand shuffled into ${who === 'self' ? 'your' : 'their'} deck (${n} card${n === 1 ? '' : 's'})`, 'announcement', false);
-              }
-            } else if (step.type === 'draw') {
-              // standalone "draw N" — fully deterministic, no choice involved
-              for (let i = 0; i < step.count; i++) {
-                if (getZone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
-              }
-              appendMessage('', `  auto: drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
-            } else if (step.type === 'drawUntil') {
-              // "draw cards until you have N" — deterministic: draw until the
-              // hand reaches `target` (deck-exhaustion guarded).
-              const target = Number(step.target);
-              if (!Number.isFinite(target) || target <= 0) {
-                appendMessage('', '  auto: draw-until target missing — skipped', 'announcement', false);
-              } else {
-                let drew = 0;
-                while (getZone('self', 'hand').getCount() < target && getZone('self', 'deck').getCount() > 0) {
-                  moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
-                  drew++;
-                }
-                appendMessage('', `  auto: drew ${drew} card${drew === 1 ? '' : 's'} until you had ${target} in hand`, 'announcement', false);
-              }
-            } else if (step.type === 'opponentDraw') {
-              // "your opponent draws N" — deterministic, no choice involved
-              for (let i = 0; i < step.count; i++) {
-                if (getZone('opp', 'deck').getCount() > 0) moveCardBundle('opp', 'opp', 'deck', 'hand', 0, false, 'move');
-              }
-              appendMessage('', `  auto: your opponent drew ${step.count} card${step.count > 1 ? 's' : ''}`, 'announcement', false);
-            } else if (step.type === 'healAmount') {
-              // heal N damage counters.
-              //  - "Active Pokémon" target → unambiguous, heal the Active.
-              //  - "1 of your Pokémon" → a choice (Active + benched). Heal it
-              //    directly if there's only one; otherwise open a guided picker.
-              const isActiveOnly = step.target === 'Active Pokémon';
-              const candidates = isActiveOnly
-                ? getZone('self', 'active').array.filter((c) => c && c.hp)
-                : [
-                    ...getZone('self', 'active').array,
-                    ...getZone('self', 'bench').array,
-                  ].filter((c) => c && c.hp);
-              if (candidates.length === 0) {
-                appendMessage('', '  auto: no Pokémon to heal', 'announcement', false);
-              } else if (isActiveOnly || candidates.length === 1) {
-                applyHealToCard(candidates[0], step.amount, step.cure);
-              } else {
-                openHealPicker({
-                  title: `${card.name} — choose a Pokémon to heal`,
-                  candidates,
-                  amount: step.amount,
-                  cure: step.cure,
-                });
-              }
-            } else if (step.type === 'searchDeck' && step.destination === 'bench' && step.what === 'Basic Pokémon') {
-              // Nest Ball / Buddy-Buddy Poffin automation: if the deck holds
-              // exactly one Basic (unambiguous), auto-bench it
-              import('../../actions/move-card-bundle/move-card-bundle.js').then(async ({ moveCardBundle }) => {
-                const deck = getZone('self', 'deck');
-                const basics = [];
-                for (const c of deck.array) {
-                  await ensureCardData(c);
-                  if ((c.stage || 'Basic') === 'Basic' && isPokemonCard(c)) basics.push(c);
-                }
-                if (basics.length === 1) {
-                  const idx = deck.array.indexOf(basics[0]);
-                  moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
-                  appendMessage('', `  auto: benched ${basics[0].name}`, 'announcement', false);
-                  shuffleZone('self', 'self', 'deck');
-                } else if (basics.length > 1) {
-                  openChoicePicker({
-                    title: `Nest Ball — choose a Basic Pokémon to bench (${basics.length} in deck)`,
-                    candidates: basics,
-                    zoneFrom: 'deck',
-                    destination: 'bench',
-                    onPick: () => shuffleZone('self', 'self', 'deck'),
-                    onCancel: () => shuffleZone('self', 'self', 'deck'),
-                  });
-                } else {
-                  appendMessage('', '  no Basic Pokémon in deck', 'announcement', false);
-                }
-              });
-            } else if (step.type === 'switchOwn') {
-              // Switch automation: exactly one benched Pokémon = unambiguous
-              const bench = getZone('self', 'bench');
-              if (bench.getCount() === 1) {
-                appendMessage('', '  auto: switching with your only benched Pokémon — drag to confirm positions', 'announcement', false);
-              }
-            }
-          } catch {}
-        }
-      });
-    };
-    
     // ── multiplayer rules sync ────────────────────────────────────────────
     // Listen for socket events carrying rules actions so both clients stay
     // in step (turn passes, attacks, statuses).
@@ -1458,6 +1322,15 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       const isPokemon = isPokemonCard(card);
       const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
       if (w.includes('item') && w.includes('tool')) return isTrainer;
+      if (w.includes('stadium') && w.includes('energy')) {
+        const isEnergy = String(card.type || '').toLowerCase().includes('energy') ||
+          String(card.name || '').toLowerCase().includes('energy');
+        const isStadium = (
+          String(card.type || card.supertype || '').toLowerCase().includes('trainer') &&
+          String(card.name || '').toLowerCase().includes('stadium')
+        ) || String(card.trainerType || '').toLowerCase() === 'stadium';
+        return isEnergy || isStadium;
+      }
       if (w.includes('energy')) {
         // e.g. 'Basic Energy' (Firebreather: up to 7 Basic Energy cards)
         return String(card.type || '').toLowerCase().includes('energy') ||
@@ -1479,6 +1352,19 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       if (w.includes('pokémon')) return isPokemon;
       return true; // generic search: everything matches
     };
+
+    initTrainerExecution({
+      getZone,
+      appendMessage,
+      openChoicePicker,
+      openHealPicker,
+      applyHealToCard,
+      openDeckSearchWindow,
+      shuffleZone,
+      matchesSearch,
+      isPokemonCard,
+      prizeState,
+    });
     
     // ── trainer play guidance ────────────────────────────────────────────
     // Watching the hand → play zones for Trainer-class cards. When one lands
@@ -1621,156 +1507,11 @@ if (!isTrainer) {
                 appendMessage('', `${card.name}: effect not auto-parsed — play it manually. (parser got: "${text.slice(0, 60)}")`, 'announcement', false);
                 return;
               }
-              const costStep = parsed.steps.find((s) => s.type === 'discardCost');
-              // guided picker for search steps (hand or bench). The
-              // Nest-Ball / single-Basic bench case stays auto-handled in
-              // autoExecuteTrainer, so exclude it here to avoid two pickers.
-              const searchStep = parsed.steps.find(
-                (s) => s.type === 'searchDeck' && !(s.destination === 'bench' && s.what === 'Basic Pokémon'),
-              );
-
-              // "Search your deck for X, then shuffle" — the shuffle isn't a
-              // separate parsed step, so fire it ourselves once the search
-              // finishes, whether a card was found or the search was
-              // cancelled (you still looked through the whole deck either way).
-              const autoShuffleAfterSearch = () => {
-                shuffleZone('self', 'self', 'deck');
-              };
-
-              // choice-based searches: unlock the deck window, then open the
-              // filtered picker. Runs immediately — or only after the discard
-              // cost below is confirmed and paid.
-              const runSearchPicker = () => {
-                if (!searchStep) return;
-                // The deck window is still unlocked (legal to peek at the raw
-                // deck for reference / rules-privacy purposes), but the card
-                // select menu itself always pops up on its own below — the
-                // player never has to click the deck to get a picker.
-                openDeckSearchWindow(`${card.name} lets you search your deck`);
-                appendMessage('', `  ${card.name} — opening card select…`, 'announcement', false);
-                import('./rules-state.mjs').then(async ({ ensureCardData }) => {
-                  const deck = getZone('self', 'deck');
-                  const matches = [];
-                  for (const c of deck.array) {
-                    await ensureCardData(c);
-                    if (matchesSearch(c, searchStep.what)) matches.push(c);
-                  }
-                  // If nothing matched the parsed target — most often because
-                  // card-data enrichment for a card hasn't resolved yet rather
-                  // than a genuine "no such card in deck" — fall back to the
-                  // full deck so the select menu still pops up automatically
-                  // instead of leaving the player with no picker at all.
-                  const usingFallback = matches.length === 0 && deck.array.length > 0;
-                  const pool = usingFallback ? deck.array : matches;
-                  if (pool.length === 0) {
-                    appendMessage('', '  no cards left in deck', 'announcement', false);
-                    return;
-                  }
-                  const toBench = searchStep.destination === 'bench';
-                  if ((searchStep.count || 1) > 1) {
-                    // multi-card search (e.g. Buddy-Buddy: 2 basics to bench)
-                    openChoicePicker({
-                      title: `${card.name} — choose ${searchStep.count} cards to ${toBench ? 'Bench' : 'your hand'}${usingFallback ? ' (showing full deck)' : ''}`,
-                      candidates: pool,
-                      zoneFrom: 'deck',
-                      destination: searchStep.destination,
-                      multiSelect: true,
-                      requiredCount: searchStep.count,
-                      onConfirm: (selected) => {
-                        import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                          for (const s of selected) {
-                            const idx = getZone('self', 'deck').array.indexOf(s);
-                            if (idx >= 0) moveCardBundle('self', 'self', 'deck', searchStep.destination, idx, false, 'move');
-                          }
-                          appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
-                          autoShuffleAfterSearch();
-                        });
-                      },
-                      onCancel: () => {
-                        appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
-                        autoShuffleAfterSearch();
-                      },
-                    });
-                  } else {
-                    openChoicePicker({
-                      title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}${usingFallback ? ' (showing full deck)' : ''}`,
-                      candidates: pool,
-                      zoneFrom: 'deck',
-                      destination: searchStep.destination,
-                      onPick: autoShuffleAfterSearch,
-                      onCancel: autoShuffleAfterSearch,
-                    });
-                  }
-                });
-              };
-
               appendMessage('', `▶ ${card.name}:`, 'announcement', false);
               for (const step of parsed.steps) {
                 appendMessage('', '  ' + describeStep(step), 'announcement', false);
-                // with a discard cost the deck window opens only after the
-                // cost is paid (inside runSearchPicker)
-                if ((step.type === 'searchDeck' || step.type === 'lookAtTop') && !costStep) {
-                  openDeckSearchWindow(`${card.name} lets you search your deck`);
-                }
               }
-              // auto-execute the fully-deterministic draw effects
-              autoExecuteTrainer(card, parsed.steps);
-
-              // discard cost (e.g. Ultra Ball): multi-select picker first —
-              // the search picker opens only on confirm (cost paid)
-              if (costStep) {
-                const candidates = getZone('self', 'hand').array.filter((c) => c !== card);
-                import('./rules-state.mjs').then(async ({ ensureCardData }) => {
-                  for (const c of candidates) await ensureCardData(c);
-                  openChoicePicker({
-                    title: `${card.name} — discard ${costStep.count} cards to pay the cost`,
-                    candidates,
-                    zoneFrom: 'hand',
-                    destination: 'discard',
-                    multiSelect: true,
-                    requiredCount: costStep.count,
-                    onConfirm: (selected) => {
-                      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                        for (const s of selected) {
-                          const idx = getZone('self', 'hand').array.indexOf(s);
-                          if (idx >= 0) moveCardBundle('self', 'self', 'hand', 'discard', idx, false, 'move');
-                        }
-                        appendMessage('', `  cost paid: discarded ${selected.map((s) => s.name).join(', ')}`, 'announcement', false);
-                      });
-                      runSearchPicker();
-                    },
-                    onCancel: () => {
-                      appendMessage('', '  cost not paid — effect canceled', 'announcement', false);
-                    },
-                  });
-                });
-                return;
-              }
-
-              if (searchStep) runSearchPicker();
-    
-              // recursion (Night Stretcher): picker from discard
-              const recurStep = parsed.steps.find((s) => s.type === 'recursion');
-              if (recurStep) {
-                import('./rules-state.mjs').then(async ({ ensureCardData }) => {
-                  const discard = getZone('self', 'discard');
-                  const matches = [];
-                  for (const c of discard.array) {
-                    await ensureCardData(c);
-                    const isPokemon = isPokemonCard(c);
-                    const isBasicEnergy = String(c.name || '').toLowerCase().includes('energy');
-                    if (isPokemon || isBasicEnergy) matches.push(c);
-                  }
-                  if (matches.length > 0) {
-                    openChoicePicker({
-                      title: `${card.name} — take a card from discard`,
-                      candidates: matches,
-                      zoneFrom: 'discard',
-                      destination: 'hand',
-                    });
-                  }
-                });
-              }
+              runTrainerSteps(card, parsed.steps);
             });
       } catch {}
     };
