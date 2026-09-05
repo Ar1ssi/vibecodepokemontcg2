@@ -4,9 +4,9 @@ import { processAction } from '../../setup/general/process-action.js';
 import { reset } from './reset.js';
 
 // Full match restart: clear both boards, rebuild decks, and reset rules state.
-export const restartGame = (_user, emit = true) => {
-  if (emit && systemState.isTwoPlayer) {
-    processAction('self', emit, 'restartGame', []);
+export const restartGame = (user = 'self', emit = true) => {
+  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+    processAction(user, emit, 'restartGame', []);
     return;
   }
 
