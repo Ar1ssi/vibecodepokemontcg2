@@ -355,6 +355,7 @@ auto-draw flow is DOM-heavy and was **not** visually verified in a browser.
   draw N" branches shadow no existing card text; add a real-card regression
   test when such text appears.
 
+<<<<<<< HEAD
 ## Card identity resolution (why the "wrong Piloswine" happened)
 
 **This was never a text/regex parsing bug.** `attack-effects.mjs` /
@@ -421,3 +422,46 @@ files). **Not** live-verified in a browser against the real TCGdex API.
 
 **Baseline correction:** the 163/416 figures in earlier sections are stale. The
 suite was **396/396** before this pass and is **413/413** after.
+=======
+## Double-click card preview (`.full-view`) — the holo shrink bug
+
+**Symptom:** double-clicking a holofoil Pokémon on the mat shrank it (92px → 63px)
+instead of showing an enlarged preview. Plain cards shrank too (92px → 55px).
+
+- **Never use `image.parentElement` to find a card's slot in a zone.** For a
+  holo-hydrated card the <img> lives inside `.card__rotator`, so its parent is
+  the rotator, not the `.play-container`. Always go through
+  `imageAnchor(image).parentElement`, exposed as `fullViewHost(image)` /
+  `isInFullView(image)` in `setup/deck-constructor/hydrate-holo.js`. `doubleClick`
+  set `height: 70%; width: 69%` on the rotator, which resolved against the
+  wrapper's frozen 92px snapshot — hence the shrink. Same bug was in
+  `adjustCards()` (`setup/sizing/resizer.js`), which wrote the container width
+  onto `.card__rotator` on every board resize.
+- **`.full-view img { height: 24% }` (self/opp-containers.css, from the original
+  upstream import) is for the ATTACHED cards only.** 24% of the panel is smaller
+  than a mat card, so it shrank the primary card as well. The double-clicked card
+  (or its `.mat-holo` wrapper) now gets a `full-view-card` class and fills the
+  panel; the holo rules need `!important` because the wrapper's px size is inline.
+- The panel width is `auto` (not `69%`) so the fixed-position container
+  shrink-wraps the card + attachments. `doubleClick` must clear the inline px
+  width that `attach-card` leaves on `.play-container` for that to work.
+- **`card-pop.mjs` scales the `.full-view` container for both card kinds** (it no
+  longer touches the holo `--card-scale`), so `makePopFrame(fullViewElement)`
+  composes `scale()` with the centering `translate(-50%, -50%)`. `closeFullView`
+  MUST clear `style.transform` on revert or the container stays translated off
+  its mat slot. The select spring is deliberately underdamped
+  (`stiffness 0.14 / damping 0.71`, ~8% overshoot, settles ~450ms) and writes its
+  first frame synchronously — without that the preview paints once at full size
+  before the spring starts.
+- **Verification:** `fullview-test.mjs <exported-state.json>` (root, ad-hoc
+  Playwright like `browser-test.mjs`; needs a running server + a state export
+  with a self-side active Pokémon). 13/13 pass: enlarges 92px → 226px, pop
+  overshoots to 1.08 and settles, rotator never resized, reverts to 92px with the
+  holo auto-sweep resumed, survives a viewport resize. Verified for holo AND
+  plain (via the `HOLO_DISABLED` kill-switch) on the self side; the opp side was
+  not covered (no opp active card in the fixture) but the CSS is symmetric and
+  the JS is shared.
+- **Baseline correction:** this file previously said 163/163. `pnpm test` on the
+  current tree is **396/396 pass, 0 fail** — use 396. `integration-test.mjs`
+  cannot run as-is: `jsdom` is not in any `package.json`.
+>>>>>>> 9b63f32 (Document the .full-view holo shrink fix and correct the test baseline)
