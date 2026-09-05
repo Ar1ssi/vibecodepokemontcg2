@@ -20,6 +20,7 @@ import {
 } from '../../actions/general/board-actions.js';
 import { changeType } from '../../actions/general/change-type.js';
 import { reset } from '../../actions/general/reset.js';
+import { restartGame } from '../../actions/general/restart.js';
 import {
   hideCards,
   hideShortcut,
@@ -68,6 +69,7 @@ const functions = {
   loadDeckData: loadDeckData,
   changeCardBack: changeCardBack,
   reset: reset,
+  restartGame: restartGame,
   setup: setup,
   readyUp: readyUp,
   takeTurn: takeTurn,
