@@ -13,6 +13,10 @@ import {
   exportChatboxContent,
 } from '../../../../setup/chatbox/export-chat.js';
 import { hideOptionsContextMenu } from '../../../../setup/chatbox/hide-options-context-menu.js';
+import {
+  copySyncCompareLog,
+  exportSyncLog,
+} from '../../../../setup/general/sync-logger-bridge.js';
 import { acceptAction } from '../../../../setup/general/accept-action.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
@@ -66,6 +70,22 @@ export const initializeP1BottomButtons = () => {
   const exportLog = document.getElementById('exportLog');
   exportLog.addEventListener('click', () => {
     exportChatboxContent();
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const exportSyncLogButton = document.getElementById('exportSyncLog');
+  exportSyncLogButton.addEventListener('click', () => {
+    exportSyncLog();
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const copySyncCompareLogButton = document.getElementById('copySyncCompareLog');
+  copySyncCompareLogButton.addEventListener('click', async () => {
+    try {
+      await copySyncCompareLog();
+    } catch (err) {
+      console.error('Copy sync compare failed:', err);
+    }
     optionsContextMenu.style.display = 'none';
   });
 

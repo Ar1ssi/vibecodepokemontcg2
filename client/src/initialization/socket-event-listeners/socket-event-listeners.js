@@ -22,6 +22,12 @@ import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
 import { restoreLastUsedDeckToPlaymat } from '../document-event-listeners/sidebox/native-deck-builder.js';
+import {
+  enableSyncLogForMultiplayer,
+  exportSyncLog,
+  copySyncCompareLog,
+  logSync,
+} from '../../setup/general/sync-logger-bridge.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -49,6 +55,7 @@ export const initializeSocketEventListeners = () => {
     }
     systemState.isTwoPlayer = true;
     forceRulesEnabledForMultiplayer();
+    enableSyncLogForMultiplayer();
     cleanActionData('self');
     cleanActionData('opp');
     reset('opp', true, false, false, false);
@@ -149,6 +156,7 @@ export const initializeSocketEventListeners = () => {
       }
       // Trigger immediate resync to recover any actions missed during disconnect
       if (notSpectator) {
+        logSync('resync.request.emit', { reason: 'connect' }, 'out');
         socket.emit('resyncActions', {
           roomId: systemState.roomId,
         });
@@ -227,11 +235,22 @@ export const initializeSocketEventListeners = () => {
         startKeybindsSleep();
         acceptAction('opp', data.action, data.parameters);
       } else if (data.counter > parseInt(systemState.oppCounter) + 1) {
+        logSync('pushAction.gap', {
+          expected: systemState.oppCounter + 1,
+          received: data.counter,
+          action: data.action,
+        }, 'in');
         const data = {
           roomId: systemState.roomId,
           counter: systemState.oppCounter,
         };
         socket.emit('resyncActions', data);
+      } else if (data.counter <= parseInt(systemState.oppCounter)) {
+        logSync('pushAction.stale', {
+          oppCounter: systemState.oppCounter,
+          received: data.counter,
+          action: data.action,
+        }, 'in');
       }
     }
   });
@@ -241,6 +260,7 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (notSpectator) {
+      logSync('resync.request.recv', {}, 'in');
       resyncActions();
     }
   });
@@ -250,6 +270,7 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (notSpectator) {
+      logSync('catchUp.recv', { count: data.actionData?.length ?? 0 }, 'in');
       catchUpActions(data.actionData);
     }
   });
@@ -259,6 +280,10 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (notSpectator && data.counter >= parseInt(systemState.oppCounter) + 1) {
+      logSync('syncCheck.gap', {
+        peerSelfCounter: data.counter,
+        localOppCounter: systemState.oppCounter,
+      }, 'in');
       const data = {
         roomId: systemState.roomId,
         counter: systemState.oppCounter,

@@ -8,6 +8,7 @@ import {
 } from '../../setup/zones/resolve-card-index.mjs';
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
+import { logSync } from '../../setup/general/sync-logger-bridge.js';
 
 function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
   const oZone = getZone(user, oZoneId);
@@ -101,11 +102,23 @@ export const moveCardBundle = async (
         resolvedIndex,
         hint: cardHints.moving,
       });
+      logSync('moveCardBundle.mirror.abort', {
+        reason: 'hint_mismatch',
+        oZoneId,
+        relayIndex: index,
+        resolvedIndex,
+        moving: cardHints.moving,
+      });
       socket.emit('resyncActions', { roomId: systemState.roomId });
       return;
     }
     if (!oZone.array[resolvedIndex]) {
       console.warn('moveCardBundle: no card at resolved index on mirror — requesting resync', {
+        oZoneId,
+        resolvedIndex,
+      });
+      logSync('moveCardBundle.mirror.abort', {
+        reason: 'missing_card',
         oZoneId,
         resolvedIndex,
       });
@@ -116,6 +129,14 @@ export const moveCardBundle = async (
     if (cardHints.isEvolution) {
       syncOptions.forceEvolution = true;
     }
+    logSync('moveCardBundle.mirror.resolve', {
+      oZoneId,
+      dZoneId,
+      relayIndex: index,
+      resolvedIndex,
+      resolvedTargetIndex,
+      moving: cardHints.moving,
+    });
   }
 
   // Capture sync hints BEFORE moveCard splices the origin zone — building
