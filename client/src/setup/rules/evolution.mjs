@@ -85,4 +85,20 @@
       const f = rulesState.flags[player];
       if (f) f.evolved[baseCardName.toLowerCase()] = true;
     }
+
+    // Playing a Pokémon from hand onto Active/Bench (not evolving onto one
+    // already in play) is limited to Basic stage.
+    export async function canPlayPokemonFromHand(pokemonCard) {
+      if (!rulesState.enabled) return { allowed: true };
+
+      await ensureCardData(pokemonCard);
+      const stage = normalizeStage(pokemonCard.stage);
+      if (stage === 'Stage 1' || stage === 'Stage 2') {
+        return {
+          allowed: false,
+          reason: `${pokemonCard.name} is a ${stage} Pokémon — only Basic Pokémon can be played from your hand.`,
+        };
+      }
+      return { allowed: true };
+    }
     

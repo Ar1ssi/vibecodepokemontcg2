@@ -288,6 +288,23 @@ export const drop = (event) => {
         );
         }
       } else {
+        const fromZone = mouseClick.zoneId;
+        if (
+          dZoneId === 'hand' &&
+          (fromZone === 'deck' || fromZone === 'viewCards')
+        ) {
+          const drawCheck = manualDeckActionAllowed('draw');
+          if (!drawCheck.allowed) {
+            appendMessage(
+              systemState.initiator,
+              '⛔ ' + drawCheck.reason,
+              'announcement',
+              false
+            );
+            event.stopPropagation();
+            return;
+          }
+        }
         moveCardBundle(
           mouseClick.cardUser,
           systemState.initiator,

@@ -2,7 +2,7 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn } = await import('../rules-state.mjs');
-    const { canEvolve, isRareCandyJump, markEvolvedThisTurn, normalizeStage } = await import('../evolution.mjs');
+    const { canEvolve, canPlayPokemonFromHand, isRareCandyJump, markEvolvedThisTurn, normalizeStage } = await import('../evolution.mjs');
     const { parseAbility } = await import('../abilities.mjs');
     
     test('no evolving on turn 1', async () => {
@@ -105,6 +105,29 @@ import test from 'node:test';
     test('rules disabled allows all evolution', async () => {
       rulesState.enabled = false;
       const r = await canEvolve('self', { stage: 'Basic', name: 'Gastly' }, { stage: 'Stage 1', name: 'Haunter', evolvesFrom: 'Gastly' }, true);
+      assert.equal(r.allowed, true);
+    });
+
+    test('canPlayPokemonFromHand blocks Stage 1 and Stage 2', async () => {
+      rulesState.enabled = true;
+      const s1 = await canPlayPokemonFromHand({ name: 'Haunter', stage: 'Stage 1' });
+      assert.equal(s1.allowed, false);
+      assert.ok(s1.reason.includes('Stage 1'));
+
+      const s2 = await canPlayPokemonFromHand({ name: 'Gengar', stage: 'Stage2' });
+      assert.equal(s2.allowed, false);
+      assert.ok(s2.reason.includes('Stage 2'));
+    });
+
+    test('canPlayPokemonFromHand allows Basic Pokémon', async () => {
+      rulesState.enabled = true;
+      const basic = await canPlayPokemonFromHand({ name: 'Gastly', stage: 'Basic' });
+      assert.equal(basic.allowed, true);
+    });
+
+    test('canPlayPokemonFromHand skipped when rules off', async () => {
+      rulesState.enabled = false;
+      const r = await canPlayPokemonFromHand({ name: 'Haunter', stage: 'Stage 1' });
       assert.equal(r.allowed, true);
     });
     
