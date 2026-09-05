@@ -32,27 +32,34 @@ import test from 'node:test';
       assert.notEqual(fresh[0].setId, 'tampered');
     });
     
-    test('starter decks: two 60-card decks with resolved TCGdex cards', () => {
+    test('starter decks: six 60-card decks with resolved TCGdex cards', () => {
       const decks = getStarterDecks();
-      assert.equal(Object.keys(decks).length, 2);
-    
-      const gengar = decks.gengar;
-      const diancie = decks.diancie;
-      assert.equal(gengar.reduce((n, r) => n + r.qty, 0), 60);
-      assert.equal(diancie.reduce((n, r) => n + r.qty, 0), 60);
-    
-      // signature cards present
-      const gengarNames = gengar.map((r) => r.name);
+      assert.equal(Object.keys(decks).length, 6);
+
+      for (const key of ['gengar', 'diancie', 'lucario', 'charizard', 'darkrai', 'dragonite']) {
+        assert.ok(decks[key], `missing deck: ${key}`);
+        assert.equal(
+          decks[key].reduce((n, r) => n + r.qty, 0),
+          60,
+          `${key} should be 60 cards`
+        );
+      }
+
+      const gengarNames = decks.gengar.map((r) => r.name);
       assert.ok(gengarNames.includes('Mega Gengar ex'));
       assert.ok(gengarNames.includes('Gastly'));
-      const diancieNames = diancie.map((r) => r.name);
+      const diancieNames = decks.diancie.map((r) => r.name);
       assert.ok(diancieNames.includes('Mega Diancie ex'));
       assert.ok(diancieNames.includes('Mimikyu'));
+      assert.ok(decks.lucario.some((c) => c.name === 'Mega Lucario ex'));
+      assert.ok(decks.charizard.some((c) => c.name === 'Mega Charizard X ex'));
+      assert.ok(decks.darkrai.some((c) => c.name === 'Mega Darkrai ex'));
+      assert.ok(decks.dragonite.some((c) => c.name === 'Mega Dragonite ex'));
     });
-    
+
     test('starter deck cards are fully resolved (id, image, qty)', () => {
       const decks = getStarterDecks();
-      for (const card of [...decks.gengar, ...decks.diancie]) {
+      for (const card of Object.values(decks).flat()) {
         assert.ok(card.id, `missing id for ${card.name}`);
         assert.ok(card.name, 'missing name');
         assert.ok(card.image && card.image.includes('https://'), `missing image for ${card.name}`);
