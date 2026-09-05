@@ -30,7 +30,7 @@ import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
-import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
+import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
 import { classifyAbility } from './ability-effects.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
@@ -384,7 +384,9 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           const active = getZone(endingPlayer, 'active').array[0];
           if (active) {
             const key = active.image?.dataset?.cardId || active.name;
-            const boundary = resolveTurnBoundary(endingPlayer, key);
+            const boundary = resolveTurnBoundary(endingPlayer, key, Math.random, {
+              checkupPoisonBonus: getStadiumCheckupPoisonBonus(active, endingPlayer),
+            });
             if (boundary.damage > 0 && active.image?.damageCounter) {
               const current = parseInt(active.image.damageCounter.textContent || '0', 10) || 0;
               active.image.damageCounter.textContent = current + boundary.damage;

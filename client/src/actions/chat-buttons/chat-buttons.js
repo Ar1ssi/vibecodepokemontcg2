@@ -30,7 +30,18 @@ import {
   resolveTurnBoundary,
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp } from '../../setup/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication } from '../../setup/rules/stadium-effects.mjs';
+
+const abilityBlockedByStadium = (user, target) => {
+  if (!stadiumAbilityBlocked(target)) return false;
+  appendMessage(
+    user,
+    `🏟️ ${getStadium()?.card?.name || 'The Stadium'} — ${target.name || 'This Pokémon'}'s Abilities are suppressed.`,
+    'announcement',
+    false
+  );
+  return true;
+};
 
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
@@ -57,7 +68,10 @@ const endTurnWithBanner = (user) => {
   const active = getZone(user, 'active').array[0];
   if (active) {
     const key = active.image?.dataset?.cardId || active.name;
-    const boundary = resolveTurnBoundary(user, key);
+    const checkupBonus = getStadiumCheckupPoisonBonus(active, user);
+    const boundary = resolveTurnBoundary(user, key, Math.random, {
+      checkupPoisonBonus: checkupBonus,
+    });
     if (boundary.damage > 0) placeSelfDamage(user, 'active', 0, boundary.damage);
     for (const note of boundary.notes) appendMessage('', note, 'announcement', false);
   }
@@ -199,6 +213,19 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                   : '';
               appendMessage(user, `✨ ${atk.name}'s cost is reduced by ${discount}${note}!`, 'announcement', false);
             }
+          }
+          const costIncrease = getStadiumAttackCostIncrease(active, user);
+          if (costIncrease > 0) {
+            effectiveCost = [
+              ...effectiveCost,
+              ...Array(costIncrease).fill('Colorless'),
+            ];
+            appendMessage(
+              user,
+              `🏟️ Stadium — ${active?.name || 'Your Active'}'s attack costs ${costIncrease} more Energy.`,
+              'announcement',
+              false
+            );
           }
         }
         if (!canPayAttackCost(energyTypes, effectiveCost)) {
@@ -388,6 +415,19 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
         let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
 
+        if (rulesState.enabled) {
+          const stadiumBonus = getStadiumAttackDamageBonus(active, user);
+          if (stadiumBonus > 0) {
+            dmg = { ...dmg, total: dmg.total + stadiumBonus };
+            appendMessage(
+              user,
+              `🏟️ Stadium — +${stadiumBonus} damage from ${active?.name || 'your Active'}!`,
+              'announcement',
+              false,
+            );
+          }
+        }
+
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
           const prevention = parseDamagePrevention(oppActive);
@@ -403,8 +443,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
           // Continuous stadium damage prevention (taxonomy E)
           const st = getStadium()?.card;
-          if (st) {
-            const stPrevention = parseStadiumDamagePrevention(st);
+          if (st && stadiumPreventionApplies(st, { zoneId: 'active', defender: oppActive })) {
+            const detail = parseStadiumDamagePreventionDetail(st);
+            const stPrevention = detail?.amount ?? null;
             if (stPrevention !== null) {
               const stPrevented =
                 stPrevention === Infinity
@@ -419,6 +460,19 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                 );
                 dmg = { ...dmg, total: stPrevented };
               }
+            }
+          }
+          const stReduction = getStadiumDamageReduction(oppActive, oppPlayer, 'active');
+          if (stReduction > 0 && dmg.total > 0) {
+            const reduced = Math.max(0, dmg.total - stReduction);
+            if (reduced !== dmg.total) {
+              appendMessage(
+                user,
+                `🏟️ ${getStadium()?.card?.name || 'The Stadium'} reduces damage by ${stReduction}!`,
+                'announcement',
+                false
+              );
+              dmg = { ...dmg, total: reduced };
             }
           }
           // Buddy-Buddy Energy damage cap (taxonomy §F, family 4): if the
@@ -459,7 +513,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         );
 
         // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer);
+        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
         if (oppHp > 0 && totalDmg >= oppHp) {
           const koResult = handleKO({
             attackerPlayer: user,
@@ -501,8 +555,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         if (oppHp > 0 && totalDmg < oppHp) {
           const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
           const found = parseStatusFromAttackText(atk.text);
+          const oppZoneCards = getZone(oppPlayer, 'active').array;
+          const statusBlocked = stadiumBlocksStatusApplication(oppActive, oppZoneCards);
           for (const st of found) {
-            if (applyStatus(oppPlayer, oppKey, st)) {
+            if (applyStatus(oppPlayer, oppKey, st, { blocked: statusBlocked })) {
               appendMessage(
                 user,
                 `💫 ${oppActive?.name || 'The defender'} is now ${st}!`,
@@ -614,7 +670,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               );
             }
             placeSelfDamage(oppPlayer, 'bench', benchIdx, parsed.bench);
-            const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer);
+            const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer, benchTarget);
             const benchDmgEl =
               getZone(oppPlayer, 'bench').array[benchIdx]?.image
                 ?.damageCounter;
@@ -682,7 +738,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               const benchDmg = benchDmgEl
                 ? parseInt(benchDmgEl.textContent || '0', 10) || 0
                 : 0;
-              const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer);
+              const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer, benchTarget);
               if (benchHp > 0 && benchDmg >= benchHp) {
                 const benchKO = handleKO({
                   attackerPlayer: user,
@@ -877,7 +933,10 @@ export const retreat = (user, emit = true) => {
     }
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
-    const retreatCost = active?.retreatCost ?? 0;
+    const baseRetreatCost = active?.retreatCost ?? 0;
+    const retreatCost = rulesState.enabled
+      ? getStadiumRetreatCost(baseRetreatCost, active, user)
+      : baseRetreatCost;
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const activeZone = getZone(user, 'active');
       const attachedEnergies = activeZone.array.filter(
@@ -951,6 +1010,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'heal') {
     appendMessage(
       user,
@@ -1027,6 +1087,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'switch') {
     appendMessage(
       user,
@@ -1100,6 +1161,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'attach') {
     appendMessage(
       user,
@@ -1170,6 +1232,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(source);
+  if (abilityBlockedByStadium(user, source)) return;
   const family = classifyAbility(source);
   if (family !== 'energy-redirect') {
     appendMessage(
@@ -1421,6 +1484,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
   }
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'search') {
     appendMessage(
       user,
