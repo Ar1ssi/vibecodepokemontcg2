@@ -17,8 +17,8 @@
       attackExecuting: false, // true while an attack's damage/effects are resolving (Nitro recycle)
       // per-player per-turn facts
       flags: {
-        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
-        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
+        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
+        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
       },
     };
     
@@ -297,7 +297,7 @@
     }
     
     function resetTurnFlags(player) {
-      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {}, stadiumUsed: false, drewThisTurn: false };
+      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, stadiumUsed: false, drewThisTurn: false };
     }
 
     // Mark that the start-of-turn draw already happened for this player this
@@ -316,8 +316,11 @@
     export function markEnergyAttached(player) {
       if (rulesState.flags[player]) rulesState.flags[player].energyAttached = true;
     }
-    export function markSupporterPlayed(player) {
-      if (rulesState.flags[player]) rulesState.flags[player].supporterPlayed = true;
+    export function markSupporterPlayed(player, cardName = '') {
+      if (rulesState.flags[player]) {
+        rulesState.flags[player].supporterPlayed = true;
+        if (cardName) rulesState.flags[player].lastSupporterName = cardName;
+      }
     }
     
     // ── start-of-turn draw (taxonomy B: "Draw 1 at start of turn") ──────

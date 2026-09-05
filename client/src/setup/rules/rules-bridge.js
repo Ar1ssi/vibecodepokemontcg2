@@ -45,6 +45,10 @@ import {
   planAbilitySteps,
   actionableAbilityPlan,
 } from './ability-step-plan.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, combinedHandProtected } from './ability-executors.mjs';
+import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
+import { classifyAbility } from './ability-effects.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
 import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
@@ -1565,7 +1569,12 @@ if (!isTrainer) {
                             ...getZone('opp', 'active').array,
                             ...getZone('opp', 'bench').array,
                           ];
-                          const protector = oppPokemons.find((c) => c.image && isHandProtected(c));
+                          const blockTools = stadiumBlocksToolEffects();
+                          const protector = oppPokemons.find((c) => {
+                            if (!c.image) return false;
+                            const zoneId = getZone('opp', 'active').array.includes(c) ? 'active' : 'bench';
+                            return combinedHandProtected(c, getZone('opp', zoneId).array, { blockTools });
+                          });
                           // Stadium hand protection: a Stadium owned by the
                           // discarding target can shield their hand as well
                           // (e.g. "Cards in your hand can't be discarded").

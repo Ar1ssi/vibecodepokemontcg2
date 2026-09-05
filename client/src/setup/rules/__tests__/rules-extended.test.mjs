@@ -13,6 +13,11 @@ import test from 'node:test';
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown } = await import('../ability-executors.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
+    const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { computeAttackDamage } = await import('../attack-engine.mjs');
+    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
     
     // ── KO / prizes ──
@@ -761,6 +766,65 @@ import test from 'node:test';
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, attach an Energy.' }).kind, 'energy');
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, heal 20 damage.' }).kind, 'heal');
       assert.equal(parseStadiumOncePerTurn({ text: 'Prevent all damage.' }), null);
+    });
+
+    test('parseStadiumOncePerTurn: complex TCG Live once-per-turn stadiums', () => {
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may discard an Energy card from their hand in order to draw a card." }).kind,
+        'discard-draw',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may put a card from their hand on top of their deck." }).kind,
+        'hand-to-deck-top',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may switch their Active {W} Pokémon with 1 of their Benched {W} Pokémon." }).kind,
+        'switch-type',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may heal 10 damage from each of their Pokémon." }).kind,
+        'heal-all',
+      );
+      const factory = parseStadiumOncePerTurn({ text: 'Once during each player\'s turn, if they played a Supporter card that has "Team Rocket" in its name from their hand, they may draw 2 cards.' });
+      assert.equal(factory.kind, 'draw');
+      assert.equal(factory.n, 2);
+      assert.equal(factory.condition.type, 'named-supporter');
+    });
+
+    test('Jamming Tower: tool effects blocked via combinedDamagePrevention', async () => {
+      const { combinedDamagePrevention } = await import('../ability-executors.mjs');
+      const { markStadiumPlayed, getStadium } = await import('../rules-state.mjs');
+      const { stadiumBlocksToolEffects } = await import('../stadium-effects.mjs');
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        const mon = { name: 'Pikachu', ability: { text: 'Prevent all damage done to this Pokémon by attacks.' } };
+        const tool = { name: 'Bravery Charm', type: 'Trainer', subtypes: ['Tool'], ability: { text: 'Prevent all damage done to this Pokémon by attacks from Pokémon ex.' } };
+        markStadiumPlayed('self', { name: 'Jamming Tower', subtypes: ['Stadium'], text: 'Pokémon Tools attached to each Pokémon (both yours and your opponent\'s) have no effect.' });
+        assert.equal(stadiumBlocksToolEffects(), true);
+        const blocked = combinedDamagePrevention(mon, [tool], { blockTools: true });
+        assert.equal(blocked.preventAll, true);
+        const withTool = combinedDamagePrevention(mon, [tool], { blockTools: false });
+        assert.equal(withTool.preventAll, true);
+      } finally {
+        rulesState.stadium = prev;
+      }
+    });
+
+    test('Area Zero Underdepths: bench limit 8 with Tera, else 5', () => {
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        markStadiumPlayed('self', {
+          name: 'Area Zero Underdepths',
+          subtypes: ['Stadium'],
+          text: 'Each player who has any Tera Pokémon in play can have up to 8 Pokémon on their Bench.',
+        });
+        assert.equal(getEffectiveBenchLimit(false), 5);
+        assert.equal(getEffectiveBenchLimit(true), 8);
+      } finally {
+        rulesState.stadium = prev;
+      }
     });
 
     test('parseStadiumDamagePrevention: numbers, all, and null', () => {

@@ -28,12 +28,48 @@ import {
   stadiumBenchDamageApplies,
   isStadiumConfusedPersist,
   getStadium,
+  getEffectiveBenchLimit,
+  playerHasTeraInPlay,
+  isTeraCard,
+  parseStadiumBenchLimit,
+  stadiumBlocksStatusApplication,
 } from '../../setup/rules/stadium-effects.mjs';
+import { canAddToBench } from '../../setup/rules/ko-flow.mjs';
 import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
 import { blocksItemPlay } from '../../setup/rules/ability-executors.mjs';
 import { shouldNitroReturnToHand } from '../../setup/rules/special-energy-effects.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
+
+const pokemonInPlay = (user) =>
+  [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
+    (c) => c.type === 'Pokémon'
+  );
+
+const benchLimitFor = (user, extraPokemon = null) => {
+  let inPlay = pokemonInPlay(user);
+  if (extraPokemon && extraPokemon.type === 'Pokémon' && !inPlay.includes(extraPokemon)) {
+    inPlay = [...inPlay, extraPokemon];
+  }
+  return getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));
+};
+
+const enforceBenchLimit = async (user) => {
+  if (!rulesState.enabled) return;
+  const bench = getZone(user, 'bench');
+  const limit = benchLimitFor(user);
+  while (bench.getCount() > limit) {
+    const idx = bench.getCount() - 1;
+    const name = bench.array[idx]?.name || 'a Pokémon';
+    await moveCard(user, user, 'bench', 'discard', idx);
+    appendMessage(
+      user,
+      `🏟️ Bench trimmed to ${limit} — ${name} discarded.`,
+      'announcement',
+      false
+    );
+  }
+};
 
 export const moveCard = async (
   user,
@@ -105,7 +141,7 @@ export const moveCard = async (
       appendMessage(user, `⛔ ${movingCard.name}: ${gate.reason}`, 'announcement', false);
       return;
     }
-    markSupporterPlayed(user);
+    markSupporterPlayed(user, movingCard.name);
   }
 
   // ── rules: record a Stadium placed on the field (taxonomy E) ─────────
@@ -133,6 +169,10 @@ export const moveCard = async (
           'announcement',
           false
         );
+        if (parseStadiumBenchLimit(displaced.card)) {
+          await enforceBenchLimit(user);
+          await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
+        }
       }
       appendMessage(user, describeStadiumEffect(movingCard), 'announcement', false);
       const drawN = parseStadiumSetupDraw(movingCard);
@@ -145,6 +185,23 @@ export const moveCard = async (
           false
         );
       }
+    }
+  }
+
+  // ── rules: bench limit (Area Zero Underdepths + default 5) ───────────
+  if (
+    rulesState.enabled &&
+    movingCard.type === 'Pokémon' &&
+    dZoneId === 'bench' &&
+    oZoneId !== 'bench' &&
+    !targetCard
+  ) {
+    const bench = getZone(user, 'bench');
+    const limit = benchLimitFor(user, movingCard);
+    const gate = canAddToBench(bench.getCount(), limit);
+    if (!gate.allowed) {
+      appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
+      return;
     }
   }
 
@@ -422,5 +479,29 @@ export const moveCard = async (
         detail: { user, card: movingCard, zoneId: dZoneId, fromZone: oZoneId },
       })
     );
+
+  // Festival Grounds: attaching Energy clears Special Conditions.
+  if (
+    rulesState.enabled &&
+    movingCard.type === 'Energy' &&
+    ['active', 'bench'].includes(dZoneId) &&
+    targetCard?.type === 'Pokémon'
+  ) {
+    const hostZone = getZone(user, dZoneId);
+    if (stadiumBlocksStatusApplication(targetCard, hostZone.array)) {
+      const key = targetCard.image?.dataset?.cardId || targetCard.name;
+      clearStatuses(user, key);
+      appendMessage(
+        user,
+        `🏟️ ${getStadium()?.card?.name || 'Stadium'} — ${targetCard.name} recovered from Special Conditions.`,
+        'announcement',
+        false
+      );
+    }
+  }
+
+  if (rulesState.enabled && parseStadiumBenchLimit(getStadium()?.card)) {
+    await enforceBenchLimit(user);
+    await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
   }
 };
