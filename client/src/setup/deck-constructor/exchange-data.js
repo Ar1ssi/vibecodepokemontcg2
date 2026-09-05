@@ -18,17 +18,14 @@ export const exchangeData = (
   const coachingModeCheckbox = document.getElementById('coachingModeCheckbox');
 
   if (user === 'self') {
-    if (callback) {
-      appendMessage(
-        '',
-        systemState.p2SelfUsername + ' joined',
-        'announcement',
-        false
-      );
-    }
     systemState.selfDeckData = deckData;
-    reset('self', true, true, false, false);
+    if (emit) {
+      reset('self', true, true, false, false);
+    }
   } else if (user === 'opp') {
+    const opponentChanged =
+      systemState.p2OppUsername !== username ||
+      systemState.p2OppDeckData !== deckData;
     systemState.p2OppUsername = username;
     systemState.p2OppDeckData = deckData;
     systemState.p2OppCardBackSrc = cardBack;
@@ -37,15 +34,19 @@ export const exchangeData = (
       systemState.coachingMode = true;
       flipBoardButton.style.display = 'inline-block';
     }
-    appendMessage(
-      '',
-      systemState.p2OppUsername + ' joined',
-      'announcement',
-      false
-    );
-    reset('opp', true, true, false, false);
+    if (opponentChanged) {
+      appendMessage(
+        '',
+        systemState.p2OppUsername + ' joined',
+        'announcement',
+        false
+      );
+      reset('opp', true, true, false, false);
+    }
 
-    if (callback) {
+    // Only the originating client should chain a response; mirror/resync replays
+    // arrive with emit=false and must not send a second exchange or reset ready state.
+    if (callback && emit) {
       exchangeData(
         'self',
         systemState.p2SelfUsername,
