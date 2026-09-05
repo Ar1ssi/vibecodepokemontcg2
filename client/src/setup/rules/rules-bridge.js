@@ -53,48 +53,20 @@ import { addDamageCounter, updateDamageCounter } from '../../actions/counters/da
 import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw } from '../../actions/zones/hand-actions.js';
-import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
+import { getCoinById } from '../deck-builder/core/coins.mjs';
+import {
+  flipMatCoin,
+  getSelectedCoin,
+  initMatCoins,
+  pickRandomCoin,
+  setSelectedCoin,
+} from './mat-coin.js';
     
     let initialized = false;
-    
-    // ── turn-order coin flip state ─────────────────────────────────────
-    // Coins each player has actively selected this session (from the deck
-    // builder's Customize > Coin tab, or the coin baked into whichever
-    // saved deck they opened). Populated by the 'rules-coin-changed' event
-    // dispatched from native-deck-builder.js.
-    const selectedCoins = { self: null, opp: null };
-
-    // ── mat coin slots ─────────────────────────────────────────────────
-    // Persistent coin tokens on the battle mat so each player's chosen
-    // coin stays visible all game (self on their side, opp on theirs).
-    const MAT_COIN_SLOTS = {
-      self: () => document.getElementById('matCoinSlotSelf'),
-      opp: () => document.getElementById('matCoinSlotOpp'),
-    };
-    const MAT_COIN_BACK_URL = 'assets/coins/coin-back.png';
-    const renderMatCoinSlot = (target) => {
-      const slot = MAT_COIN_SLOTS[target]?.();
-      if (!slot) return;
-      const coin = selectedCoins[target];
-      slot.innerHTML = '';
-      if (!coin) {
-        slot.classList.remove('has-coin');
-        return;
-      }
-      slot.classList.add('has-coin');
-      slot.innerHTML =
-        `<div class="coin-3d coin-mat-${coin.material || 'silver'} mat-coin-token">` +
-        `<div class="coin-face"><img src="${coin.thumb}" alt="${coin.name || 'coin'}"></div>` +
-        `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt=""></div>` +
-        `</div>`;
-    };
-    const renderMatCoins = () => { renderMatCoinSlot('self'); renderMatCoinSlot('opp'); };
 
     document.addEventListener('rules-coin-changed', (event) => {
       const { target, coin } = event.detail || {};
       if (target !== 'self' && target !== 'opp') return;
-      selectedCoins[target] = coin || null;
-      renderMatCoins();
       // Online 2P: tell the opponent which coin we chose so their mat
       // shows ours (rulesEvent is relayed by the server generically).
       if (target === 'self' && systemState.isTwoPlayer && rulesSocket) {
@@ -130,6 +102,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       initialized = true;
       loadRulesEnabled();
   document.body.classList.toggle('rules-mode', rulesState.enabled);
+      initMatCoins();
       buildTurnHUD();
       hookTurnButton();
       hookSetupButton();
@@ -724,7 +697,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     const runTurnOrderCoinFlip = ({ call, caller = 'self' } = {}) => {
       return new Promise((resolve) => {
         const coinOwner = Math.random() < 0.5 ? 'self' : 'opp';
-        const coin = selectedCoins[coinOwner] || pickRandomCoin();
+        const coin = getSelectedCoin(coinOwner) || pickRandomCoin();
         // "Call the coin": the caller (the player who clicked Set Up) picked
         // a face via the call picker. Fall back to random if none supplied.
         const chosenCall = call || (Math.random() < 0.5 ? 'heads' : 'tails');
@@ -732,7 +705,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         // Caller goes first iff the coin lands on the face they called.
         const turnPlayer = decideTurnOrder({ caller, call: chosenCall, result });
     
-        playTurnOrderCoinAnimation({ coin, result, coinOwner, turnPlayer, caller, call: chosenCall, isRemote: false });
+        playTurnOrderCoinAnimation({ coin, result, coinOwner, turnPlayer, isRemote: false });
     
         if (systemState.isTwoPlayer && rulesSocket) {
           rulesSocket.emit('rulesEvent', {
@@ -743,12 +716,6 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
     
         setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner, caller, call: chosenCall }), 2700);
       });
-    };
-    
-    const pickRandomCoin = () => {
-      const coins = getCoins();
-      if (coins.length === 0) return null;
-      return coins[Math.floor(Math.random() * coins.length)];
     };
     
     // 2-button "call the coin" picker: the caller picks heads or tails
@@ -783,67 +750,23 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       document.body.appendChild(overlay);
     };
     
-    // Renders the full-screen coin-toss overlay, reusing the existing
-    // .coin-3d / .coin-toss-wrap CSS from the deck builder's coin picker.
+    // Flip the chosen coin on the battle mat (beside Active), not full-screen.
     const playTurnOrderCoinAnimation = ({ coin, result, coinOwner, turnPlayer, isRemote }) => {
-      document.getElementById('turnOrderCoinFlipOverlay')?.remove();
-    
-      const material = coin?.material || 'enamel';
-      const thumb = coin?.thumb || 'https://ptcgsim.online/src/assets/coins/coin-back.png';
-      const name = coin?.name || 'Coin';
-      // `coinOwner` and `turnPlayer` are already re-perspectived to the
-      // local viewer by the caller (see the `turnOrderCoinFlip` socket
-      // handler, which inverts caller/coinOwner before recomputing
-      // `turnPlayer` for the receiving client) — 'self' always means "this
-      // screen's player" here, whether the flip happened locally or was
-      // mirrored from the opponent. No further isRemote-based flip needed.
       const ownerLabel = coinOwner === 'self' ? 'Your' : "Opponent's";
       const winnerLabel = turnPlayer === 'self' ? 'You go' : 'Opponent goes';
-    
-      const overlay = document.createElement('div');
-      overlay.id = 'turnOrderCoinFlipOverlay';
-      overlay.innerHTML = `
-        <div class="turn-order-coin-flip-label">${ownerLabel} coin — flipping for turn order…</div>
-        <span class="coin-toss-wrap" data-coin-toss>
-          <div class="coin-3d coin-mat-${escapeHtml(material)}" data-coin-flip-el>
-            <div class="coin-face coin-front"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(name)}" /></div>
-            <div class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="back" /></div>
-          </div>
-        </span>
-        <div class="turn-order-coin-flip-result"></div>`;
-      document.body.appendChild(overlay);
-    
-      const coinEl = overlay.querySelector('[data-coin-flip-el]');
-      const wrap = overlay.querySelector('[data-coin-toss]');
-      const resultEl = overlay.querySelector('.turn-order-coin-flip-result');
-    
-      // 4 full tumbles, landing on front for heads / back for tails —
-      // matches the tossing timing used by the deck builder's coin picker.
-      requestAnimationFrame(() => {
-        const finalDeg = 4 * 360 + (result === 'tails' ? 180 : 0);
-        coinEl.style.setProperty('--coin-flip', finalDeg + 'deg');
-        wrap.classList.add('tossing');
-      });
-    
+
+      flipMatCoin({ target: coinOwner, result, coin });
+
       setTimeout(() => {
-        resultEl.textContent = `${result === 'heads' ? 'Heads' : 'Tails'}! ${winnerLabel} first.`;
-        resultEl.classList.add('visible');
-        // Announce only on the caller's/local side — the mirror already saw its
-        // own announcement, so firing here for isRemote would double-post.
         if (!isRemote) {
           appendMessage(
             '',
-            `🪙 ${ownerLabel === 'Your' ? 'Your' : "Opponent's"} coin flip: ${result} — ${winnerLabel.toLowerCase()} first!`,
+            `🪙 ${ownerLabel} coin flip: ${result} — ${winnerLabel.toLowerCase()} first!`,
             'announcement',
             false
           );
         }
       }, 1500);
-    
-      setTimeout(() => {
-        overlay.classList.add('fading');
-        setTimeout(() => overlay.remove(), 400);
-      }, 2400);
     };
     
     // ── deck privacy ─────────────────────────────────────────────────────
@@ -1381,8 +1304,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
               }
             } else if (type === 'coinChosen') {
               // Opponent chose/changed their coin — show it on our mat
-              selectedCoins.opp = data?.coin || null;
-              renderMatCoins();
+              setSelectedCoin('opp', data?.coin || null);
             } else if (type === 'mulliganBonus') {
               // Opponent mulliganed — we draw 1 bonus card for ourselves
               if (rulesState.enabled) {
