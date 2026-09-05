@@ -120,9 +120,17 @@ export const applyMat = (mat) => {
   applyMatLayout(layout.id);
 
   if (battleMat) {
+    // The mode classes describe how the artwork is laid out, so they only
+    // mean anything while a mat is on the board.
     battleMat.classList.toggle('mat-active', Boolean(mat));
-    battleMat.classList.toggle('mat-one-player', layout.matMode === 'one-player');
-    battleMat.classList.toggle('mat-two-player', layout.matMode === 'two-player');
+    battleMat.classList.toggle(
+      'mat-one-player',
+      Boolean(mat) && layout.matMode === 'one-player'
+    );
+    battleMat.classList.toggle(
+      'mat-two-player',
+      Boolean(mat) && layout.matMode === 'two-player'
+    );
   }
 
   // Each iframe paints its own opaque arena background, which would sit on
