@@ -194,6 +194,55 @@ ul, li {
     #1b2646 51.5%, #1e3a72 76%, #22458a 100%);
   overflow: hidden;
 }
+/* Chosen playmat artwork, layered over the synthetic mat surface but under
+   the seam/floor/glow highlights. A one-player mat is a single player's
+   sheet, so it is painted into each half with the far half rotated to face
+   the opponent; a full-size mat already covers both players, so it is
+   painted once across the whole surface. `--mat-fit` comes from the layout
+   profile (background-size), letting a mat stretch to the board or sit
+   letterboxed inside it. */
+#battleMatArt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#battleMatArt[hidden] {
+  display: none;
+}
+#battleMatArt .mat-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background-image: var(--mat-image, none);
+  background-size: var(--mat-fit, 100% 100%);
+  background-position: center;
+  background-repeat: no-repeat;
+}
+#battleMatArt .mat-half-self {
+  bottom: 0;
+}
+#battleMatArt .mat-half-opp {
+  top: 0;
+  transform: rotate(180deg);
+}
+/* A full-size mat is one sheet spanning both players. */
+#battleMat.mat-two-player #battleMatArt .mat-half-opp {
+  display: none;
+}
+#battleMat.mat-two-player #battleMatArt .mat-half-self {
+  height: 100%;
+}
+/* With real mat art behind the board, the synthetic arena decoration would
+   read as grime on top of the artwork. */
+#battleMat.mat-active #battleMatFloor,
+#battleMat.mat-active #battleMatGlow {
+  display: none;
+}
+#battleMat.mat-active #battleMatSeam {
+  opacity: 0.35;
+}
+
 #battleMatSeam {
   position: absolute;
   top: 50%;
@@ -228,10 +277,10 @@ ul, li {
 }
 #stadium {
   position: fixed;
-  bottom: 42%;
-  left: 11%;
-  width: 6%;
-  height: 16%;
+  bottom: var(--stadium-bottom, 42%);
+  left: var(--stadium-left, 11%);
+  width: var(--stadium-width, 6%);
+  height: var(--stadium-height, 16%);
   display: flex;
 	justify-content: center;
   border-radius: 15px;

@@ -36,6 +36,15 @@
     <div id="battleMat">
         <div id="battleMatTrim">
             <div id="battleMatSurface">
+                <!-- Chosen playmat artwork. Hidden until a mat is picked, at
+                     which point apply-mat-layout.js sets --mat-image and the
+                     mat-one-player / mat-two-player mode class: a one-player
+                     mat is drawn once per half (the far half rotated to face
+                     that player), a full-size mat is drawn once across both. -->
+                <div id="battleMatArt" hidden>
+                    <div class="mat-half mat-half-opp"></div>
+                    <div class="mat-half mat-half-self"></div>
+                </div>
                 <div id="battleMatSeam"></div>
                 <div id="battleMatFloor"></div>
                 <div id="battleMatGlow"></div>

@@ -11,6 +11,46 @@
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
 
+/* ── Modular zone geometry ────────────────────────────────────────────
+   Mirror of the block in `self-containers.css`; see the comment there.
+   Both playmat iframes read the same variable names so a picked mat can
+   re-fit either side's zones with one set of values. */
+:root {
+  --hand-height: 32%;
+
+  --bench-bottom: 34%;
+  --bench-left: 20%;
+  --bench-width: 60%;
+  --bench-height: 28%;
+  --bench-gap: 0.35vw;
+
+  --active-bottom: 63%;
+  --active-left: 32.5%;
+  --active-width: 35%;
+  --active-height: 32%;
+
+  --prizes-bottom: 35%;
+  --prizes-left: 1%;
+  --prizes-width: 7%;
+  --prizes-height: 46%;
+  --prizes-card-max-width: calc(50% - .1vw);
+
+  --deck-bottom: 64%;
+  --deck-right: 1%;
+  --deck-width: 9%;
+  --deck-height: 28%;
+
+  --discard-bottom: 35%;
+  --discard-right: 1%;
+  --discard-width: 9%;
+  --discard-height: 26%;
+
+  --lost-zone-bottom: 84%;
+  --lost-zone-left: 1%;
+  --lost-zone-width: 7%;
+  --lost-zone-height: 15%;
+}
+
 * {
   user-select: none;
 }
@@ -98,7 +138,7 @@ body, input, textarea, button {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: calc(32% - 3px);
+  height: calc(var(--hand-height) - 3px);
   overflow-x: auto;
   display: flex;
   z-index: 0;
@@ -133,26 +173,26 @@ body, input, textarea, button {
 #handText {
   position: fixed;
   right: 2%;
-  bottom: 32%;
+  bottom: var(--hand-height);
   color: rgba(188, 90, 113, 0.864);  
 }
 #handLabel {
   position: fixed;
   left: 0%;
-  bottom: 31.5%;
+  bottom: calc(var(--hand-height) - 0.5%);
   color: rgba(188, 90, 113, 0.864);
   font-size: 5vh;
 }
 #bench {
   position: fixed;
-	bottom: 34%;
-	left: 20%;
-	width: 60%;
-	height: 28%;
+	bottom: var(--bench-bottom);
+	left: var(--bench-left);
+	width: var(--bench-width);
+	height: var(--bench-height);
 	display: flex;
 	justify-content: center;
 	align-items: flex-end;
-	gap: 0.35vw;
+	gap: var(--bench-gap);
 	z-index: 0;
 }
 #bench div {
@@ -161,10 +201,10 @@ body, input, textarea, button {
 }
 #active {
   position: fixed;
-	bottom: 63%;
-	left: 32.5%;
-	width: 35%;
-	height: 32%;
+	bottom: var(--active-bottom);
+	left: var(--active-left);
+	width: var(--active-width);
+	height: var(--active-height);
 	display: flex;
 	justify-content: center;
 	align-items: flex-end;
@@ -176,24 +216,24 @@ body, input, textarea, button {
 }
 #prizes {
   position: fixed;
-  bottom: 35%;
-  left: 1%;
-  width: 7%;
-  height: 46%;
+  bottom: var(--prizes-bottom);
+  left: var(--prizes-left);
+  width: var(--prizes-width);
+  height: var(--prizes-height);
   z-index: 0;
   padding: 5px;
 }
 #prizes img {
   margin-left: .1vw;
   width: auto;
-  max-width: calc(50% - .1vw);
+  max-width: var(--prizes-card-max-width);
 }
 /* Holo cards in prizes: same wrapper-sizes-live-instead-of-frozen-px
    approach as #hand .mat-holo above. */
 #prizes .mat-holo {
   margin-left: .1vw;
   width: auto;
-  max-width: calc(50% - .1vw);
+  max-width: var(--prizes-card-max-width);
   max-height: 33%;
 }
 #prizes .mat-holo img {
@@ -211,10 +251,10 @@ body, input, textarea, button {
 }
 #lostZoneCover {
   position: fixed;
-  bottom: 84%;
-  left: 1%;
-  width: 7%;
-  height: 15%;
+  bottom: var(--lost-zone-bottom);
+  left: var(--lost-zone-left);
+  width: var(--lost-zone-width);
+  height: var(--lost-zone-height);
   z-index: 0;
   background-color: rgba(233, 198, 233, 0.111);
   display: flex;
@@ -237,10 +277,10 @@ body, input, textarea, button {
 }
 #deckCover {
   position: fixed;
-  bottom: 64%;
-  right: 1%;
-  width: 9%;
-  height: 28%;
+  bottom: var(--deck-bottom);
+  right: var(--deck-right);
+  width: var(--deck-width);
+  height: var(--deck-height);
   display: flex;
   justify-content: center; 
   align-items:flex-start;
@@ -273,10 +313,10 @@ body, input, textarea, button {
 }
 #discardCover {
   position: fixed;
-  bottom: 35%;
-  right: 1%;
-  width: 9%;
-  height: 26%;
+  bottom: var(--discard-bottom);
+  right: var(--discard-right);
+  width: var(--discard-width);
+  height: var(--discard-height);
   display: flex;
   justify-content: center; 
   align-items:flex-start;
@@ -674,3 +714,22 @@ body, input, textarea, button {
     }
     .tcgl-shuffle { animation: tcgl-shuffle 0.42s ease-in-out; }
     
+/* ── Chosen playmat: let the parent page's mat art show through ────────
+   Mirror of the block in `self-containers.css`; see the comment there. */
+body.mat-active {
+  background: transparent !important;
+}
+body.mat-active::before {
+  display: none;
+}
+body.mat-active #deck,
+body.mat-active #discard,
+body.mat-active #lostZone,
+body.mat-active #active,
+body.mat-active #hand {
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: none !important;
+}
+body.mat-active .outline {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}

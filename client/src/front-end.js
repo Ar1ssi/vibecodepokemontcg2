@@ -4,8 +4,10 @@ import { initializeDOMEventListeners } from './initialization/document-event-lis
 import { loadImportData } from './initialization/load-import-data/load-import-data.js';
 import { initializeMutationObservers } from './initialization/mutation-observers/initialize-mutation-observers.js';
 import { initializeSocketEventListeners } from './initialization/socket-event-listeners/socket-event-listeners.js';
+import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
 
 initializeSocketEventListeners(); // Initializes all event listeners for socket events
 initializeDOMEventListeners(); // Initializes all event listeners for user's actions on html elements and the window
 initializeMutationObservers(); // Initializes all mutation observers for user's actions on html elements
+initializeMatLayout(); // Restores the saved playmat and fits the board zones to it
 loadImportData(); // get the importData (if there is any), and load the content.
