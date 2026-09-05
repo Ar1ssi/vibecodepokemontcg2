@@ -1,3 +1,5 @@
+import { systemState } from '../../front-end.js';
+import { isShowingCardBack } from '../deck-builder/core/card-compare.mjs';
 import {
   resolveHoloEffect,
   buildHoloCard,
@@ -7,6 +9,20 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 
 const hydrated = new WeakSet();
+
+export function cardBackSrcForUser(user) {
+  return user === 'self'
+    ? systemState.cardBackSrc
+    : systemState.isTwoPlayer
+      ? systemState.p2OppCardBackSrc
+      : systemState.p1OppCardBackSrc;
+}
+
+export function isCardHidden(card) {
+  if (!card?.image?.src) return false;
+  const user = card.user ?? card.image.user;
+  return isShowingCardBack(card.image.src, cardBackSrcForUser(user));
+}
 
 // Kill-switch: set to false to re-enable mat holofoil rendering.
 const HOLO_DISABLED = false;
@@ -36,11 +52,11 @@ export const isInFullView = (image) =>
 
 export function hydrateHolo(card) {
   if (HOLO_DISABLED) return;
-  if (!card?.image || hydrated.has(card)) return;
+  if (!card?.image || hydrated.has(card) || isCardHidden(card)) return;
   hydrated.add(card);
   ensureCardData({ name: card.name, type: card.type })
     .then((data) => {
-      if (!card.image.isConnected) return; // card was removed meanwhile
+      if (!card.image.isConnected || isCardHidden(card)) return;
       const effect = resolveHoloEffect(data);
       if (!effect) return; // common / non-holo → stays plain
       const rect = card.image.getBoundingClientRect();
