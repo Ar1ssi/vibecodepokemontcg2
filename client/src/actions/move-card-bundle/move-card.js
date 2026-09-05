@@ -22,6 +22,7 @@ import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs'
 import { clearStatuses } from '../../setup/rules/status.mjs';
 import { describeStadiumEffect, isStadiumCard } from '../../setup/rules/stadium-effects.mjs';
 import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
+import { blocksItemPlay } from '../../setup/rules/ability-executors.mjs';
 
 export const moveCard = async (
   user,
@@ -47,6 +48,31 @@ export const moveCard = async (
   }
   // define the card that's being moved
   const movingCard = oZone.array[index];
+
+  // ── rules: Item play blocked by opponent Active (effect-prevent family) ─
+  if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'board') {
+    await ensureCardData(movingCard);
+    const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
+    const isItem =
+      String(movingCard.type || '').toLowerCase() === 'item' ||
+      subtypes.includes('item');
+    if (isItem) {
+      const oppPlayer = user === 'self' ? 'opp' : 'self';
+      const oppActive = getZone(oppPlayer, 'active').array[0];
+      if (oppActive) {
+        await ensureCardData(oppActive);
+        if (blocksItemPlay(oppActive)) {
+          appendMessage(
+            user,
+            `🚫 ${oppActive.name}: Items can't be played while this Pokémon is Active!`,
+            'announcement',
+            false
+          );
+          return;
+        }
+      }
+    }
+  }
 
   // ── rules: one Supporter per turn (taxonomy A2) ──────────────────
   // Playing a Trainer = hand → board. Supporters are limited to one per
@@ -205,6 +231,11 @@ export const moveCard = async (
       markEvolvedThisTurn(user, targetCard.name);
       clearStatuses(user, targetCard.image?.dataset?.cardId || targetCard.name);
       appendMessage(user, `${movingCard.name} evolved onto ${targetCard.name}!`, 'announcement', false);
+      document.dispatchEvent(
+        new CustomEvent('rules-opponent-evolved', {
+          detail: { user, evolvedCard: movingCard, zoneId: dZoneId },
+        })
+      );
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
     }
@@ -284,6 +315,17 @@ export const moveCard = async (
   if (dZoneId === 'board') {
     document.dispatchEvent(
       new CustomEvent('rules-card-on-board', { detail: { user, card: movingCard } })
+    );
+  }
+  if (
+    (dZoneId === 'active' || dZoneId === 'bench') &&
+    movingCard.type === 'Pokémon' &&
+    !movingCard.image.attached
+  ) {
+    document.dispatchEvent(
+      new CustomEvent('rules-pokemon-in-play', {
+        detail: { user, card: movingCard, zoneId: dZoneId, fromZone: oZoneId },
+      })
     );
   }
 };

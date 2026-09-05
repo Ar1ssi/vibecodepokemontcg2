@@ -127,301 +127,6 @@ export function parseOpponentDiscard(card) {
   return m?.[1] ? parseInt(m[1], 10) : 1;
 }
 
-// --- passive damage-reduce / weakness ----------------------------------
-
-// Passive "takes N less damage" on a Pokémon (damage-reduce / weakness families).
-export function parseDamageReduction(card) {
-  const t = textOf(card);
-  if (!t) return null;
-  const reduces =
-    t.includes('less damage') ||
-    (t.includes('reduce') && t.includes('damage')) ||
-    t.includes('damage dealt to');
-  const weaknessReduce = t.includes('weakness') && reduces;
-  if (!reduces && !weaknessReduce) return null;
-  if (
-    !t.includes('this pokémon') &&
-    !t.includes('your pokémon') &&
-    !t.includes('benched') &&
-    !weaknessReduce
-  ) {
-    return null;
-  }
-  const m =
-    t.match(/(\d+)\s+less\s+damage/) ||
-    t.match(/reduc(?:e|ed).*?(\d+)/) ||
-    t.match(/(\d+)\s+damage/);
-  return { reduce: m ? parseInt(m[1], 10) : 1, source: card?.name || 'Ability' };
-}
-
-export function applyDamageReduction(incoming, reduction) {
-  if (!reduction?.reduce) return incoming;
-  const reduced = incoming - reduction.reduce;
-  return reduced > 0 ? reduced : 0;
-}
-
-// Stack reductions from multiple in-play sources (defender active + bench).
-export function stackDamageReductions(incoming, cards = []) {
-  let total = incoming;
-  const applied = [];
-  for (const card of cards) {
-    const r = parseDamageReduction(card);
-    if (!r) continue;
-    const next = applyDamageReduction(total, r);
-    if (next !== total) {
-      applied.push({ ...r, card });
-      total = next;
-    }
-  }
-  return { total, applied };
-}
-
-// --- passive damage-bonus ----------------------------------------------
-
-export function parseDamageBonus(card) {
-  const t = textOf(card);
-  if (!t.includes('more damage')) return null;
-  if (
-    !t.includes('attack') &&
-    !t.includes('this pokémon') &&
-    !t.includes('your pokémon') &&
-    !t.includes('your benched')
-  ) {
-    return null;
-  }
-  const m = t.match(/(\d+)\s+more\s+damage/);
-  return { bonus: m ? parseInt(m[1], 10) : 1, source: card?.name || 'Ability' };
-}
-
-export function applyDamageBonus(incoming, bonus) {
-  return incoming + (bonus?.bonus || 0);
-}
-
-export function stackDamageBonuses(incoming, cards = []) {
-  let total = incoming;
-  const applied = [];
-  for (const card of cards) {
-    const b = parseDamageBonus(card);
-    if (!b) continue;
-    total = applyDamageBonus(total, b);
-    applied.push({ ...b, card });
-  }
-  return { total, applied };
-}
-
-// --- thorns ------------------------------------------------------------
-
-export function parseThorns(card) {
-  const t = textOf(card);
-  if (
-    !t.includes('damage counter') ||
-    !(t.includes('put') || t.includes('place')) ||
-    !(t.includes('attacker') || t.includes('attacking pokémon'))
-  ) {
-    return null;
-  }
-  const m = t.match(/(\d+)\s+damage/);
-  return { count: m ? parseInt(m[1], 10) : 1, source: card?.name || 'Ability' };
-}
-
-// --- ko-prevention / hp-bonus / prize-modify ---------------------------
-
-export function parseKoPrevention(card) {
-  const t = textOf(card);
-  if (!t) return null;
-  const fullHp =
-    t.includes('full hp') &&
-    t.includes('would be knocked out') &&
-    t.includes('not knocked out');
-  if (fullHp) {
-    const survive = t.match(/remaining hp becomes (\d+)/)?.[1];
-    return { fullHp: true, surviveHp: survive ? parseInt(survive, 10) : 10 };
-  }
-  if (
-    t.includes('knocked out') &&
-    (t.includes('prevent') ||
-      t.includes("can't") ||
-      t.includes('coin') ||
-      t.includes('flip'))
-  ) {
-    return { fullHp: false, coinFlip: true };
-  }
-  return null;
-}
-
-export function parseHpBonus(card) {
-  const t = textOf(card);
-  if (
-    !t.includes('hp') ||
-    !(
-      t.includes('more') ||
-      t.includes('increase') ||
-      t.includes('treated as') ||
-      t.includes('gets +') ||
-      /\+\d+\s+hp/.test(t)
-    )
-  ) {
-    return null;
-  }
-  const m =
-    t.match(/(\d+)\s+more\s+hp/) ||
-    t.match(/(\d+)\s+hp\s+more/) ||
-    t.match(/gets\s+\+(\d+)\s+hp/) ||
-    t.match(/\+(\d+)\s+hp/);
-  return { bonus: m ? parseInt(m[1], 10) : 0 };
-}
-
-export function pokemonHpThreshold(baseHp, card, stadiumBonus = 0) {
-  const base = baseHp || 0;
-  if (!base) return 0;
-  const abilityBonus = parseHpBonus(card)?.bonus || 0;
-  return Math.max(1, base + stadiumBonus + abilityBonus);
-}
-
-export function parsePrizeModify(card) {
-  const t = textOf(card);
-  if (!t.includes('prize card')) return null;
-  if (t.includes('less') || t.includes('fewer')) {
-    const m = t.match(/(\d+)\s+fewer/) || t.match(/(\d+)\s+less/);
-    return { delta: -(m ? parseInt(m[1], 10) : 1) };
-  }
-  if (t.includes('more') || t.includes('extra')) {
-    const m = t.match(/(\d+)\s+more/) || t.match(/(\d+)\s+extra/);
-    return { delta: m ? parseInt(m[1], 10) : 1 };
-  }
-  return null;
-}
-
-// --- retreat-cost ------------------------------------------------------
-
-export function parseRetreatCostModifier(card) {
-  const t = textOf(card);
-  if (!t.includes('retreat cost')) return null;
-  if (t.includes('free') || t.includes('no cost') || t.includes("don't have")) {
-    return { delta: -999 };
-  }
-  const less = t.match(/(\d+)\s+less/);
-  const more = t.match(/(\d+)\s+more/);
-  if (less) return { delta: -parseInt(less[1], 10) };
-  if (more) return { delta: parseInt(more[1], 10) };
-  if (t.includes('more') || t.includes('increase')) return { delta: 1 };
-  if (t.includes('less') || t.includes('reduce')) return { delta: -1 };
-  return { delta: 0 };
-}
-
-export function applyRetreatCostModifier(baseCost, modifiers = []) {
-  let cost = baseCost;
-  for (const m of modifiers) {
-    if (m?.delta === -999) return 0;
-    if (m?.delta) cost += m.delta;
-  }
-  return Math.max(0, cost);
-}
-
-// --- energy-multiplier -------------------------------------------------
-
-export function parseEnergyMultiplier(card) {
-  const t = textOf(card);
-  if (!t.includes('energy')) return null;
-  const matches =
-    t.includes('×') ||
-    t.includes('x2') ||
-    t.includes('counts as') ||
-    t.includes('treated as') ||
-    (t.includes('provides') &&
-      (/\{[a-z]\}\{[a-z]\}/.test(t) || t.includes('basic')));
-  if (!matches) return null;
-  const m = t.match(/x(\d+)/) || t.match(/×(\d+)/);
-  return { multiplier: m ? parseInt(m[1], 10) : 2 };
-}
-
-// Expand basic energy entries when any in-play Pokémon grants ×N energy.
-export function expandEnergyForMultiplier(energyTypes = [], multiplier = 2) {
-  if (!multiplier || multiplier <= 1) return energyTypes;
-  const expanded = [];
-  for (const entry of energyTypes) {
-    const type = typeof entry === 'string' ? entry : entry?.type;
-    const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
-    if (!type) continue;
-    if (family === 'double-colorless' || family === 'double') {
-      expanded.push(entry);
-      continue;
-    }
-    for (let i = 0; i < multiplier; i++) {
-      expanded.push(typeof entry === 'string' ? type : { type, family: 'basic' });
-    }
-  }
-  return expanded;
-}
-
-export function hasEnergyMultiplierInPlay(cards = []) {
-  return cards.some((c) => parseEnergyMultiplier(c));
-}
-
-// --- checkup -----------------------------------------------------------
-
-export function parseCheckupEffect(card) {
-  const t = textOf(card);
-  if (!t.includes('checkup') || !t.includes('damage counter')) return null;
-  const m = t.match(/put\s+(\d+)\s+damage/);
-  const exceptName = t.match(/except any ([^.]+)/)?.[1]?.trim().toLowerCase() || null;
-  const targetHasAbility =
-    t.includes('has an ability') || t.includes('with an ability');
-  return {
-    count: m ? parseInt(m[1], 10) : 1,
-    exceptName,
-    targetHasAbility,
-    source: card?.name || 'Ability',
-  };
-}
-
-// --- setup / on-opponent-evolve / attack-inheritance / effect-prevent ----
-
-export function parseSetupFaceDown(card) {
-  const t = textOf(card);
-  return t.includes('face-down') || t.includes('face down');
-}
-
-export function parseOnOpponentEvolve(card) {
-  const t = textOf(card);
-  if (
-    !t.includes('opponent') ||
-    !t.includes('evolve') ||
-    !t.includes('damage counter')
-  ) {
-    return null;
-  }
-  const m = t.match(/put\s+(\d+)\s+damage/);
-  return { count: m ? parseInt(m[1], 10) : 1, source: card?.name || 'Ability' };
-}
-
-export function parseAttackInheritance(card) {
-  const t = textOf(card);
-  if (
-    !(t.includes('previous evolution') || t.includes('previous evolutions')) ||
-    !(t.includes('attack') || t.includes('attacks'))
-  ) {
-    return null;
-  }
-  return { enabled: true };
-}
-
-export function parseEffectPrevent(card) {
-  const t = textOf(card);
-  if (!t) return null;
-  const blockItems =
-    (t.includes("can't play") || t.includes('cannot play')) && t.includes('item');
-  const blockAbilities =
-    t.includes('no abilities') || t.includes('have no abilities');
-  const blockEffects = t.includes('prevent') && t.includes('effect');
-  if (!blockItems && !blockAbilities && !blockEffects) return null;
-  return { blockItems, blockAbilities, blockEffects };
-}
-
-export function blocksItemPlay(card) {
-  return !!parseEffectPrevent(card)?.blockItems;
-}
-
 // --- announce-only families (Section C parsers) ------------------------
 // Pure extractors for ability families that are recognized but not yet
 // executed. Mirrors the step shapes from abilities.mjs.
@@ -579,7 +284,13 @@ export function parseThorns(card) {
 export function parseCheckupEffect(card) {
   const t = textOf(card);
   if (!t || !t.includes('checkup') || !t.includes('damage counter')) {
-    return { count: 0, filter: null };
+    return {
+      count: 0,
+      filter: null,
+      exceptName: null,
+      targetHasAbility: false,
+      source: card?.name || 'Ability',
+    };
   }
   const m = t.match(/put\s+(\d+)\s+damage/);
   let filter = null;
@@ -593,7 +304,17 @@ export function parseCheckupEffect(card) {
     if (energy) filter = `{${energy[1]}}`;
     else if (/opponent/.test(t)) filter = 'opponent';
   }
-  return { count: parseNumber(m), filter };
+  const exceptName =
+    t.match(/except any ([^.]+)/)?.[1]?.trim().toLowerCase() || null;
+  const targetHasAbility =
+    t.includes('has an ability') || t.includes('with an ability');
+  return {
+    count: parseNumber(m),
+    filter,
+    exceptName,
+    targetHasAbility,
+    source: card?.name || 'Ability',
+  };
 }
 
 // Wild Growth: Basic {G} provides {G}{G}
@@ -767,4 +488,76 @@ export function parseEffectPrevent(card) {
 export function parseSetupFaceDown(card) {
   const t = textOf(card);
   return t.includes('face-down') || t.includes('face down');
+}
+
+// --- live-hook helpers (stack / expand) --------------------------------
+
+export function stackDamageReductions(incoming, cards = []) {
+  let total = incoming;
+  const applied = [];
+  for (const card of cards) {
+    const r = parseDamageReduction(card);
+    if (!r?.reduce) continue;
+    const next = Math.max(0, total - r.reduce);
+    if (next !== total) {
+      applied.push({ ...r, source: card?.name || 'Ability' });
+      total = next;
+    }
+  }
+  return { total, applied };
+}
+
+export function stackDamageBonuses(incoming, cards = []) {
+  let total = incoming;
+  const applied = [];
+  for (const card of cards) {
+    const b = parseDamageBonus(card);
+    if (!b?.bonus) continue;
+    total += b.bonus;
+    applied.push({ ...b, source: card?.name || 'Ability' });
+  }
+  return { total, applied };
+}
+
+export function expandEnergyForMultiplier(
+  energyTypes = [],
+  multiplier = 2,
+  energyType = null
+) {
+  if (!multiplier || multiplier <= 1) return energyTypes;
+  const expanded = [];
+  for (const entry of energyTypes) {
+    const type = typeof entry === 'string' ? entry : entry?.type;
+    const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
+    if (!type) continue;
+    if (energyType && type !== energyType) {
+      expanded.push(entry);
+      continue;
+    }
+    if (family === 'double-colorless' || family === 'double') {
+      expanded.push(entry);
+      continue;
+    }
+    for (let i = 0; i < multiplier; i++) {
+      expanded.push(typeof entry === 'string' ? type : { type, family: 'basic' });
+    }
+  }
+  return expanded;
+}
+
+export function findEnergyMultiplier(cards = []) {
+  for (const card of cards) {
+    const m = parseEnergyMultiplier(card);
+    if (m?.multiplier > 1) return { ...m, source: card?.name || 'Ability' };
+  }
+  return null;
+}
+
+export function pokemonHpThreshold(baseHp, card, stadiumBonus = 0) {
+  const hpBonus = parseHpBonus(card)?.bonus || 0;
+  return applyHpBonus((baseHp || 0) + (stadiumBonus || 0), hpBonus);
+}
+
+export function blocksItemPlay(card) {
+  return parseEffectPrevent(card)?.scope === 'items';
 }
