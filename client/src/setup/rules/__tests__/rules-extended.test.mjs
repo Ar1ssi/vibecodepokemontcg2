@@ -5,7 +5,7 @@ import test from 'node:test';
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
-    const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
+    const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
@@ -1547,6 +1547,107 @@ import test from 'node:test';
       assert.equal(effectiveEnergyType({ name: 'Double Water Energy', subtypes: ['Energy', 'Double'] }), null);
       assert.equal(effectiveEnergyType({ name: 'Pikachu' }), null);
       assert.equal(effectiveEnergyType(null), null);
+    });
+
+    test('typed special energies: TCGdex cards without subtypes/types resolve correctly', () => {
+      const rocky = {
+        name: 'Rocky Fighting Energy',
+        type: 'Energy',
+        types: [],
+        subtypes: [],
+        effect: 'As long as this card is attached to a Pokémon, it provides {F} Energy.',
+      };
+      assert.equal(classifyEnergyEffect(rocky), 'attach-type');
+      assert.equal(effectiveEnergyType(rocky), 'Fighting');
+      assert.equal(resolveAttachedEnergyType(rocky), 'Fighting');
+
+      const growing = {
+        name: 'Growing Grass Energy',
+        type: 'Energy',
+        effect: 'As long as this card is attached to a Pokémon, it provides {G} Energy.',
+      };
+      assert.equal(classifyEnergyEffect(growing), 'attach-type');
+      assert.equal(resolveAttachedEnergyType(growing), 'Grass');
+
+      const telepathic = {
+        name: 'Telepathic Psychic Energy',
+        type: 'Energy',
+        effect: 'As long as this card is attached to a Pokémon, it provides {P} Energy.',
+      };
+      assert.equal(resolveAttachedEnergyType(telepathic), 'Psychic');
+    });
+
+    test('cost payment: typed specials pay as their effective type', () => {
+      const rocky = {
+        name: 'Rocky Fighting Energy',
+        type: 'Energy',
+        effect: 'provides {F} Energy.',
+      };
+      const entry = {
+        type: resolveAttachedEnergyType(rocky),
+        family: classifyEnergyEffect(rocky),
+      };
+      assert.equal(canPayAttackCost([entry], ['Fighting']), true);
+      assert.equal(canPayAttackCost([entry], ['Water']), false);
+    });
+
+    test('typed special energy catalog: all eight ME03–ME05 cards parse and describe', async () => {
+      const {
+        parseTypedSpecialEnergy,
+        describeTypedSpecialEnergy,
+        getEnergyHpBonus,
+        hasRockyEffectShield,
+        hasBubblyStatusImmunity,
+        hasMagneticFreeRetreat,
+        getVoltaicDamageBonus,
+        blocksBenchAttackDamage,
+        shouldNitroReturnToHand,
+        getTelepathicOnAttachSearch,
+      } = await import('../special-energy-effects.mjs');
+
+      const cards = [
+        ['Growing Grass Energy', 'Grass', { hpBonus: 20 }],
+        ['Rocky Fighting Energy', 'Fighting', { rocky: true }],
+        ['Telepathic Psychic Energy', 'Psychic', { telepathic: true }],
+        ['Bubbly Water Energy', 'Water', { bubbly: true }],
+        ['Magnetic Metal Energy', 'Metal', { magnetic: true }],
+        ['Nitro Fire Energy', 'Fire', { nitro: true }],
+        ['Shadowy Darkness Energy', 'Darkness', { shadowy: true }],
+        ['Voltaic Lightning Energy', 'Lightning', { voltaic: 20 }],
+      ];
+
+      for (const [name, type, flags] of cards) {
+        const card = { name, type: 'Energy' };
+        const def = parseTypedSpecialEnergy(card);
+        assert.ok(def, `${name} should parse`);
+        assert.ok(describeTypedSpecialEnergy(card), `${name} should describe`);
+
+        const hostImg = {};
+        const host = { types: [type], type: 'Pokémon', stage: 'Basic', image: hostImg };
+        const attached = { name, type: 'Energy', image: { relative: hostImg } };
+        const zone = [host, attached];
+
+        if (flags.hpBonus) {
+          assert.equal(getEnergyHpBonus(host, zone), flags.hpBonus);
+        }
+        if (flags.rocky) assert.equal(hasRockyEffectShield(host, zone), true);
+        if (flags.bubbly) assert.equal(hasBubblyStatusImmunity(host, zone), true);
+        if (flags.magnetic) assert.equal(hasMagneticFreeRetreat(host, zone), true);
+        if (flags.voltaic) assert.equal(getVoltaicDamageBonus(host, zone), flags.voltaic);
+        if (flags.shadowy) {
+          assert.equal(blocksBenchAttackDamage(host, 'bench', zone), true);
+          assert.equal(blocksBenchAttackDamage(host, 'active', zone), false);
+        }
+        if (flags.nitro) {
+          assert.equal(shouldNitroReturnToHand(card, host, true), true);
+          assert.equal(shouldNitroReturnToHand(card, host, false), false);
+        }
+        if (flags.telepathic) {
+          const search = getTelepathicOnAttachSearch(card);
+          assert.equal(search.count, 2);
+          assert.equal(search.destination, 'bench');
+        }
+      }
     });
 
     test('applyEnergyEffect: attach-type reports executed with effective type', () => {

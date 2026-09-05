@@ -22,6 +22,7 @@ import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs'
 import { clearStatuses } from '../../setup/rules/status.mjs';
 import { describeStadiumEffect, isStadiumCard } from '../../setup/rules/stadium-effects.mjs';
 import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
+import { shouldNitroReturnToHand } from '../../setup/rules/special-energy-effects.mjs';
 
 export const moveCard = async (
   user,
@@ -38,7 +39,8 @@ export const moveCard = async (
 
   // convert the string into the actual arrays/html elements
   const oZone = getZone(user, oZoneId);
-  const dZone = getZone(user, dZoneId);
+  let destZoneId = dZoneId;
+  let dZone = getZone(user, destZoneId);
 
   // define the card that's being targeted, i.e., the pokemon that is being attached to, if a target index is defined
   let targetCard;
@@ -141,6 +143,30 @@ export const moveCard = async (
     return;
   }
 
+  // ── rules: Nitro Fire Energy — return to hand when discarded by own attack ─
+  if (
+    rulesState.enabled &&
+    rulesState.attackExecuting &&
+    movingCard.type === 'Energy' &&
+    destZoneId === 'discard' &&
+    ['active', 'bench'].includes(oZoneId) &&
+    movingCard.image?.relative
+  ) {
+    const hostPokemon = oZone.array.find(
+      (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative,
+    );
+    if (shouldNitroReturnToHand(movingCard, hostPokemon, true)) {
+      destZoneId = 'hand';
+      dZone = getZone(user, destZoneId);
+      appendMessage(
+        user,
+        `🔥 ${movingCard.name} returns to your hand (Nitro Fire Energy).`,
+        'announcement',
+        false,
+      );
+    }
+  }
+
   // move card from origin array to destination array
   dZone.array.push(...oZone.array.splice(index, 1));
 
@@ -207,6 +233,19 @@ export const moveCard = async (
       appendMessage(user, `${movingCard.name} evolved onto ${targetCard.name}!`, 'announcement', false);
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
+      if (rulesState.enabled && movingCard.type === 'Energy') {
+        document.dispatchEvent(
+          new CustomEvent('rules-energy-attached', {
+            detail: {
+              user,
+              energy: movingCard,
+              pokemon: targetCard,
+              fromZone: oZoneId,
+              toZone: dZoneId,
+            },
+          }),
+        );
+      }
     }
     // if image is not being attached to another card, proceed with normal card move
   } else {

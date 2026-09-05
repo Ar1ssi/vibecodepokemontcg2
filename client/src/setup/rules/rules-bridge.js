@@ -31,7 +31,14 @@ import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType } from './energy-effects.mjs';
+import {
+  describeTypedSpecialEnergy,
+  getTelepathicOnAttachSearch,
+  matchesBasicPokemonType,
+  parseTypedSpecialEnergy,
+  pokemonMatchesEnergyType,
+} from './special-energy-effects.mjs';
 import { classifyAbility } from './ability-effects.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
@@ -216,20 +223,8 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         const energyTypes = [];
         for (const e of attachedEnergies) {
           try { await ensureCardData(e); } catch { /* skip */ }
-          const type = e.types?.[0] ||
-            (/fire/i.test(e.name || '') ? 'Fire'
-            : /water/i.test(e.name || '') ? 'Water'
-            : /grass/i.test(e.name || '') ? 'Grass'
-            : /lightning/i.test(e.name || '') ? 'Lightning'
-            : /psychic/i.test(e.name || '') ? 'Psychic'
-            : /fighting/i.test(e.name || '') ? 'Fighting'
-            : /metal/i.test(e.name || '') ? 'Metal'
-            : /dark/i.test(e.name || '') ? 'Dark'
-            : /dragon/i.test(e.name || '') ? 'Dragon'
-            : 'Colorless');
           const family = classifyEnergyEffect(e);
-          const override = effectiveEnergyType(e);
-          energyTypes.push({ type: override || type, family });
+          energyTypes.push({ type: resolveAttachedEnergyType(e), family });
         }
 
         const stadiumCard = getStadium()?.card;
@@ -863,15 +858,102 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
             } else {
               markEnergyAttached('self');
               appendMessage('', 'Energy attached (1/1 this turn)', 'announcement', false);
-              // Surface the special-energy effect (announce-only, Gap #4).
-              const family = classifyEnergyEffect({ name: card.name, type: card.type, subtypes: card.subtypes });
-              if (family && family !== 'basic' && family !== 'unknown') {
-                appendMessage('', describeEnergyEffect({ name: card.name, type: card.type, subtypes: card.subtypes }), 'announcement', false);
+              const energyCard = { name: card.name, type: card.type, subtypes: card.subtypes, effect: card.effect, text: card.text };
+              const applied = applyEnergyEffect(energyCard);
+              if (applied.message) {
+                appendMessage('', applied.message.replace(/^⚡ /, ''), 'announcement', false);
+              } else {
+                const family = classifyEnergyEffect(energyCard);
+                if (family && family !== 'basic' && family !== 'unknown') {
+                  appendMessage('', describeEnergyEffect(energyCard), 'announcement', false);
+                }
               }
             }
           }
         } catch {}
       }, 1200);
+
+      document.addEventListener('rules-energy-attached', async (event) => {
+        if (!rulesState.enabled) return;
+        const { user, energy, pokemon, fromZone } = event.detail || {};
+        if (!energy || !pokemon) return;
+        try {
+          await ensureCardData(energy);
+          await ensureCardData(pokemon);
+          const def = parseTypedSpecialEnergy(energy);
+          if (!def) return;
+
+          const desc = describeTypedSpecialEnergy(energy) || describeEnergyEffect(energy);
+          appendMessage('', `⚡ ${desc}`, 'announcement', false);
+
+          if (
+            def.recoverStatusOnAttach &&
+            pokemonMatchesEnergyType(pokemon, def.requiredPokemonType)
+          ) {
+            const key = pokemon.image?.dataset?.cardId || pokemon.name;
+            clearStatuses(user, key);
+            appendMessage(
+              '',
+              `  💧 ${pokemon.name}: recovered from all Special Conditions.`,
+              'announcement',
+              false,
+            );
+          }
+
+          const search = getTelepathicOnAttachSearch(energy);
+          if (
+            fromZone === 'hand' &&
+            search &&
+            pokemonMatchesEnergyType(pokemon, def.requiredPokemonType)
+          ) {
+            openDeckSearchWindow(`${energy.name} — search your deck`);
+            const deck = getZone(user, 'deck');
+            const matches = [];
+            for (const c of deck.array) {
+              await ensureCardData(c);
+              if (matchesBasicPokemonType(c, def.requiredPokemonType)) {
+                matches.push(c);
+              }
+            }
+            const pool = matches.length > 0 ? matches : deck.array;
+            if (pool.length === 0) {
+              appendMessage('', '  no cards left in deck', 'announcement', false);
+              return;
+            }
+            openChoicePicker({
+              title: `${energy.name} — choose up to ${search.count} Basic ${def.requiredPokemonType} Pokémon for your Bench`,
+              candidates: pool,
+              zoneFrom: 'deck',
+              destination: 'bench',
+              multiSelect: true,
+              requiredCount: Math.min(search.count, pool.length),
+              onConfirm: (selected) => {
+                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                  for (const s of selected) {
+                    const idx = getZone(user, 'deck').array.indexOf(s);
+                    if (idx >= 0) {
+                      moveCardBundle(user, user, 'deck', 'bench', idx, false, 'move');
+                    }
+                  }
+                  appendMessage(
+                    '',
+                    `  ${selected.map((s) => s.name).join(', ')} → Bench`,
+                    'announcement',
+                    false,
+                  );
+                  shuffleZone(user, user, 'deck');
+                });
+              },
+              onCancel: () => {
+                appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
+                shuffleZone(user, user, 'deck');
+              },
+            });
+          }
+        } catch {
+          /* card data may not be ready */
+        }
+      });
     };
     
     // ── turn automation: auto-draw, KO watch ────────────────────────────

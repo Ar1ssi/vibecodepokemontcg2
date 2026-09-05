@@ -12,6 +12,7 @@
       // Stadium currently on the field (both players share it): { user, card } | null
       stadium: null,
       mulligansResolved: false, // guard: mulligan execution runs at most once per game
+      attackExecuting: false, // true while an attack's damage/effects are resolving (Nitro recycle)
       // per-player per-turn facts
       flags: {
         self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, abilitiesUsed: {} },
