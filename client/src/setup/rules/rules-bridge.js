@@ -29,8 +29,8 @@ import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
-import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
-import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus } from './stadium-effects.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, combinedHandProtected } from './ability-executors.mjs';
+import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
 import { classifyAbility } from './ability-effects.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
@@ -1572,7 +1572,12 @@ if (!isTrainer) {
                             ...getZone('opp', 'active').array,
                             ...getZone('opp', 'bench').array,
                           ];
-                          const protector = oppPokemons.find((c) => c.image && isHandProtected(c));
+                          const blockTools = stadiumBlocksToolEffects();
+                          const protector = oppPokemons.find((c) => {
+                            if (!c.image) return false;
+                            const zoneId = getZone('opp', 'active').array.includes(c) ? 'active' : 'bench';
+                            return combinedHandProtected(c, getZone('opp', zoneId).array, { blockTools });
+                          });
                           // Stadium hand protection: a Stadium owned by the
                           // discarding target can shield their hand as well
                           // (e.g. "Cards in your hand can't be discarded").

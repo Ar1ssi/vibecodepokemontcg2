@@ -105,9 +105,9 @@
     // ── bench limits & promotion ──────────────────────────────────────────
     export const BENCH_LIMIT = 5;
     
-    export function canAddToBench(currentBenchCount) {
-      if (currentBenchCount >= BENCH_LIMIT) {
-        return { allowed: false, reason: `Bench is full (${BENCH_LIMIT}).` };
+    export function canAddToBench(currentBenchCount, limit = BENCH_LIMIT) {
+      if (currentBenchCount >= limit) {
+        return { allowed: false, reason: `Bench is full (${limit}).` };
       }
       return { allowed: true };
     }

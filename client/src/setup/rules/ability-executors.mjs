@@ -92,6 +92,66 @@ export function applyDamagePrevention(incoming, prevention) {
   return reduced > 0 ? reduced : 0;
 }
 
+/** Merge two prevention structs (stack reductions; any preventAll wins). */
+export function mergeDamagePrevention(a, b) {
+  const out = { preventAll: false, reduce: 0 };
+  if (a?.preventAll || b?.preventAll) {
+    out.preventAll = true;
+    return out;
+  }
+  out.reduce = (a?.reduce || 0) + (b?.reduce || 0);
+  return out;
+}
+
+/** Pokémon Tool attached to a host (not Energy / Pokémon). */
+export function isPokemonToolCard(card) {
+  if (!card) return false;
+  const type = String(card.type || '').toLowerCase();
+  if (type === 'pokémon' || type === 'pokemon' || type === 'energy') return false;
+  const sub = (Array.isArray(card.subtypes) ? card.subtypes : []).map((s) =>
+    String(s).toLowerCase()
+  );
+  if (sub.includes('tool') || sub.includes('pokémon tool')) return true;
+  if (type === 'tool') return true;
+  if (String(card.trainerType || '').toLowerCase() === 'tool') return true;
+  return false;
+}
+
+/** Tools attached to a Pokémon in a zone array. */
+export function attachedTools(pokemon, zoneCards = []) {
+  if (!pokemon?.image) return [];
+  return (zoneCards || []).filter(
+    (c) => c.image?.relative === pokemon.image && isPokemonToolCard(c)
+  );
+}
+
+/** Damage prevention from Pokémon + attached Tools (optional tool block). */
+export function combinedDamagePrevention(pokemon, zoneCards = [], { blockTools = false } = {}) {
+  let out = parseDamagePrevention(pokemon);
+  if (blockTools) return out;
+  for (const tool of attachedTools(pokemon, zoneCards)) {
+    out = mergeDamagePrevention(out, parseDamagePrevention(tool));
+  }
+  return out;
+}
+
+/** Passive attack-cost discount from Pokémon + attached Tools. */
+export function combinedPassiveCostDiscount(pokemon, zoneCards = [], { blockTools = false } = {}) {
+  let discount = passiveCostDiscount(pokemon);
+  if (blockTools) return discount;
+  for (const tool of attachedTools(pokemon, zoneCards)) {
+    discount += passiveCostDiscount(tool);
+  }
+  return discount;
+}
+
+/** Hand protection from Pokémon abilities or attached Tools. */
+export function combinedHandProtected(pokemon, zoneCards = [], { blockTools = false } = {}) {
+  if (isHandProtected(pokemon)) return true;
+  if (blockTools) return false;
+  return attachedTools(pokemon, zoneCards).some((t) => isHandProtected(t));
+}
+
 // --- hand-protect ------------------------------------------------------
 
 // "Your hand can't be reduced / cards in hand can't be affected"

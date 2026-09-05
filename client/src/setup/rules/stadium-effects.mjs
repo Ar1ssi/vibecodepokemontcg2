@@ -147,39 +147,137 @@ export function parseStadiumSetupDraw(card) {
 }
 
 /**
- * Once-per-turn: "Once per turn, you may …" (also matches "Once during
- * each player's turn" wording — see ONCE_PER_TURN_RE above).
- * Returns { kind: 'draw'|'search'|'search-evolve'|'heal'|'energy', n } or null.
+ * Once-per-turn stadium effect descriptor.
+ * Returns { kind, n, cost?, condition?, typeFilter?, searchFilter?, destination? } or null.
  */
 export function parseStadiumOncePerTurn(card) {
   const t = textOf(card);
   if (!ONCE_PER_TURN_RE.test(t)) return null;
-  if (/draw/.test(t)) {
-    const m = t.match(/draw (?:up to )?(\d+)/);
-    return { kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
+
+  const base = { n: 1 };
+  if (/played a supporter card from their hand this turn/.test(t)) {
+    base.condition = { type: 'supporter-played' };
   }
-  // Energy attach is checked before search: attach text may also mention
-  // searching, but attaching is the primary action.
+  if (/supporter card that has "team rocket" in its name/.test(t)) {
+    base.condition = { type: 'named-supporter', contains: 'team rocket' };
+  }
+  if (/discard an energy card from their hand/.test(t)) {
+    base.cost = { type: 'discard-energy', n: 1 };
+  }
+  const discardHand = t.match(/discard (\d+) cards? from their hand/);
+  if (discardHand) {
+    base.cost = { type: 'discard-hand', n: parseInt(discardHand[1], 10) || 2 };
+  }
+
+  if (/put a card from their hand on top of their deck/.test(t)) {
+    return { ...base, kind: 'hand-to-deck-top', n: 1 };
+  }
+  if (/switch their active \{w\}/.test(t) || /switch their active.*\{w\}/.test(t)) {
+    return { ...base, kind: 'switch-type', typeFilter: 'water' };
+  }
+  if (/put up to (\d+) basic \{l\} energy/.test(t) && /discard.*bench/.test(t)) {
+    const m = t.match(/put up to (\d+)/);
+    return {
+      ...base,
+      kind: 'discard-to-bench',
+      n: m ? parseInt(m[1], 10) : 2,
+      typeFilter: 'lightning',
+    };
+  }
+  if (/heal 10 damage from each of their pokémon/.test(t) || /heal 10 damage from each/.test(t)) {
+    return { ...base, kind: 'heal-all', n: 10 };
+  }
+  if (/search/.test(t) && /evolv/.test(t)) {
+    return { ...base, kind: 'search-evolve', n: 1 };
+  }
+  if (/search.*basic pokémon.*bench/.test(t)) {
+    return { ...base, kind: 'search-bench', n: 1, searchWhat: 'basic pokemon' };
+  }
+  const fusion = t.match(/search.*up to (\d+) item cards that have "([^"]+)"/);
+  if (fusion) {
+    return {
+      ...base,
+      kind: 'search-hand',
+      n: parseInt(fusion[1], 10) || 2,
+      searchFilter: fusion[2],
+      searchWhat: 'item',
+    };
+  }
+  if (/search.*marnie's pokémon/.test(t)) {
+    return { ...base, kind: 'search-hand', n: 1, searchFilter: "marnie's", searchWhat: 'pokemon' };
+  }
   if (/attach/.test(t) && /energy/.test(t)) {
     const m = t.match(/up to (\d+)/);
-    return { kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
+    return { ...base, kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
   }
-  // Search-and-evolve (e.g. Grand Tree: search for an evolution and put it
-  // onto a Pokémon already in play to evolve it) is a distinct mechanic
-  // from a plain search-to-hand — evolving a Pokémon, not fetching a card
-  // to hand — so it needs its own kind rather than falling into 'search'
-  // and being misrouted as a hand pickup.
-  if (/search/.test(t) && /evolv/.test(t)) {
-    return { kind: 'search-evolve', n: 1 };
+  if (/discard/.test(t) && /draw/.test(t)) {
+    const dm = t.match(/draw (?:up to )?(\d+|a card)/);
+    const n = !dm || dm[1] === 'a card' ? 1 : parseInt(dm[1], 10) || 1;
+    return {
+      ...base,
+      kind: 'discard-draw',
+      n,
+      cost: base.cost || { type: 'discard-hand', n: 2 },
+    };
+  }
+  if (/draw/.test(t)) {
+    const m = t.match(/draw (?:up to )?(\d+)/);
+    return { ...base, kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
   }
   if (/search|look through|find/.test(t)) {
-    return { kind: 'search', n: 1 };
+    return { ...base, kind: 'search', n: 1 };
   }
   if (/heal/.test(t)) {
     const m = t.match(/heal\s*(\d+)?/);
-    return { kind: 'heal', n: m?.[1] ? parseInt(m[1], 10) : 1 };
+    return { ...base, kind: 'heal', n: m?.[1] ? parseInt(m[1], 10) : 10 };
   }
-  return { kind: 'search', n: 1 };
+  return { ...base, kind: 'search', n: 1 };
+}
+
+/** Whether a once-per-turn stadium condition is met for this player. */
+export function stadiumOnceConditionMet(condition, playerFlags = {}) {
+  if (!condition) return true;
+  if (condition.type === 'supporter-played') return !!playerFlags.supporterPlayed;
+  if (condition.type === 'named-supporter') {
+    const name = String(playerFlags.lastSupporterName || '').toLowerCase();
+    return !!name && name.includes(String(condition.contains || '').toLowerCase());
+  }
+  return true;
+}
+
+/** Deck/hand search filter for stadium once-per-turn effects. */
+export function matchesStadiumSearch(card, { searchWhat, searchFilter } = {}) {
+  if (!card) return false;
+  const name = lower(card.name || '');
+  if (searchFilter && !name.includes(String(searchFilter).toLowerCase())) return false;
+  const type = lower(card.type || '');
+  const sub = (card.subtypes || []).map(lower);
+  if (searchWhat === 'basic pokemon') {
+    return type.includes('pok') && (sub.includes('basic') || lower(card.stage) === 'basic' || !card.stage);
+  }
+  if (searchWhat === 'item') {
+    return type.includes('trainer') && (sub.includes('item') || lower(card.trainerType) === 'item');
+  }
+  if (searchWhat === 'pokemon') return type.includes('pok');
+  return true;
+}
+
+export function isTeraCard(card) {
+  if (!card) return false;
+  return (card.subtypes || []).map(lower).includes('tera');
+}
+
+/** Bench limit for a player (5 default; 8 when Area Zero + any Tera in play). */
+export function getEffectiveBenchLimit(hasTeraInPlay) {
+  if (!rulesState.enabled) return 5;
+  const stadium = getStadium()?.card;
+  const raised = parseStadiumBenchLimit(stadium);
+  if (!raised) return 5;
+  return hasTeraInPlay ? raised : 5;
+}
+
+export function playerHasTeraInPlay(pokemonInPlay = []) {
+  return pokemonInPlay.some(isTeraCard);
 }
 
 /**
@@ -576,6 +674,12 @@ export function getStadiumDamageReduction(defender, targetPlayer, zoneId = 'acti
   return amount;
 }
 
+export function stadiumBlocksToolEffects() {
+  if (!rulesState.enabled) return false;
+  const stadium = getStadium()?.card;
+  return stadium ? isStadiumToolNegation(stadium) : false;
+}
+
 /** Jamming Tower: Pokémon Tools have no effect. */
 export function isStadiumToolNegation(card) {
   const t = textOf(card);
@@ -707,7 +811,7 @@ export function applyStadiumEffect(card) {
     }
     case 'once-per-turn': {
       const parsed = parseStadiumOncePerTurn(card);
-      if (parsed) results.push({ action: parsed.kind, n: parsed.n });
+      if (parsed) results.push({ action: parsed.kind, ...parsed });
       return {
         family,
         executed: true,
