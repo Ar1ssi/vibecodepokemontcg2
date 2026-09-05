@@ -1,4 +1,5 @@
 import { socket, systemState } from '../../state.js';
+import { logSyncAction } from './sync-logger-bridge.js';
 
 export const processAction = (user, emit, action, parameters) => {
   const notSpectator = !(
@@ -32,6 +33,10 @@ export const processAction = (user, emit, action, parameters) => {
         parameters: parameters,
       };
       socket.emit('pushAction', data);
+      logSyncAction(action, parameters, 'out', {
+        counter: systemState.selfCounter,
+        transport: 'pushAction',
+      });
     } else if (systemState.isTwoPlayer) {
       //if it's two player and you're moving an opponent's card, request the action before implementing
       const data = {

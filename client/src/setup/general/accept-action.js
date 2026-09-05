@@ -64,6 +64,8 @@ import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
 import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
+import { logSyncAction } from './sync-logger-bridge.js';
+import { systemState } from '../../state.js';
 
 const functions = {
   exchangeData: exchangeData,
@@ -144,6 +146,9 @@ export const acceptAction = (
     return;
   }
   const emit = user === 'self' || isStateImport ? true : false;
+  if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
+    logSyncAction(action, parameters, 'in');
+  }
   if (parameters) {
     actionToFunction(action)(user, ...parameters, emit);
   } else {
