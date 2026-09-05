@@ -265,7 +265,9 @@ import {
           });
           return true;
         },
-        getActiveDeckId: () => activeDeckIds[currentTarget],
+        getActiveDeckId: (target) =>
+          activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??
+          activeDeckIds[currentTarget],
         getLibrary: () => library,
       };
     };
