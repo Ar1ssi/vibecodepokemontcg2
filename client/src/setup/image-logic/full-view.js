@@ -1,3 +1,4 @@
+import { systemState } from '../../front-end.js';
 import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
   cardNode,
@@ -17,6 +18,13 @@ import {
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
+
+// Opponent cards live in the flipped iframe (`.opp { scaleX(-1) scaleY(-1) }` on
+// the parent). Counter-flip the enlarged preview so the art reads upright.
+const needsPreviewUpright = (card, targetImage) => {
+  const cardUser = card?.user ?? targetImage?.user;
+  return cardUser !== systemState.initiator;
+};
 
 const hideCardCounters = (image) => {
   if (image.damageCounter) image.damageCounter.style.display = 'none';
@@ -99,6 +107,9 @@ export const openCardPreview = (targetImage, card) => {
   doc.body.appendChild(overlay);
 
   anchor.classList.add('card-preview-card');
+  if (needsPreviewUpright(card, targetImage)) {
+    anchor.classList.add('card-preview-upright');
+  }
   hideCardCounters(targetImage);
 
   const wrapper = card?.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
@@ -144,7 +155,7 @@ export const closeCardPreview = (event, immediate = false) => {
     if (wrapper) {
       startHoloAnimation(wrapper, { auto: true });
     }
-    anchor.classList.remove('card-preview-card');
+    anchor.classList.remove('card-preview-card', 'card-preview-upright');
     const primaryImg = anchor.matches('img')
       ? anchor
       : anchor.querySelector('img');

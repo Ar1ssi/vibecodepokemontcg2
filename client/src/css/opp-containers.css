@@ -402,6 +402,9 @@ body, input, textarea, button {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   border-radius: 0.3rem;
 }
+.card-preview-pop > .card-preview-card.card-preview-upright {
+  transform: scaleX(-1) scaleY(-1) !important;
+}
 .card-preview-pop > .mat-holo.card-preview-card {
   width: auto !important;
   height: 70vh !important;
