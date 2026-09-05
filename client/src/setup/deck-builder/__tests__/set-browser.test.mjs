@@ -32,11 +32,11 @@ import test from 'node:test';
       assert.notEqual(fresh[0].setId, 'tampered');
     });
     
-    test('starter decks: six 60-card decks with resolved TCGdex cards', () => {
+    test('starter decks: seven 60-card decks with resolved TCGdex cards', () => {
       const decks = getStarterDecks();
-      assert.equal(Object.keys(decks).length, 6);
+      assert.equal(Object.keys(decks).length, 7);
 
-      for (const key of ['gengar', 'diancie', 'lucario', 'charizard', 'darkrai', 'dragonite']) {
+      for (const key of ['gengar', 'diancie', 'lucario', 'charizard', 'darkrai', 'dragonite', 'greninja']) {
         assert.ok(decks[key], `missing deck: ${key}`);
         assert.equal(
           decks[key].reduce((n, r) => n + r.qty, 0),
@@ -55,6 +55,7 @@ import test from 'node:test';
       assert.ok(decks.charizard.some((c) => c.name === 'Mega Charizard X ex'));
       assert.ok(decks.darkrai.some((c) => c.name === 'Mega Darkrai ex'));
       assert.ok(decks.dragonite.some((c) => c.name === 'Mega Dragonite ex'));
+      assert.ok(decks.greninja.some((c) => c.name === 'Mega Greninja ex'));
     });
 
     test('starter deck cards are fully resolved (id, image, qty)', () => {

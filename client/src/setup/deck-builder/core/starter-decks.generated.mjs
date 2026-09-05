@@ -1826,5 +1826,483 @@ export const GENERATED_STARTER_DECKS = {
       },
       "qty": 3
     }
+  ],
+  "greninja": [
+    {
+      "id": "me04-022",
+      "name": "Mega Greninja ex",
+      "supertype": "Pokémon",
+      "localId": "022",
+      "image": "https://assets.tcgdex.net/en/me/me04/022/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me04/022/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me04/022/high.webp"
+      },
+      "set": {
+        "id": "me04",
+        "name": "Chaos Rising",
+        "releaseDate": ""
+      },
+      "qty": 3
+    },
+    {
+      "id": "me04-021",
+      "name": "Frogadier",
+      "supertype": "Pokémon",
+      "localId": "021",
+      "image": "https://assets.tcgdex.net/en/me/me04/021/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me04/021/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me04/021/high.webp"
+      },
+      "set": {
+        "id": "me04",
+        "name": "Chaos Rising",
+        "releaseDate": ""
+      },
+      "qty": 2
+    },
+    {
+      "id": "me04-020",
+      "name": "Froakie",
+      "supertype": "Pokémon",
+      "localId": "020",
+      "image": "https://assets.tcgdex.net/en/me/me04/020/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me04/020/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me04/020/high.webp"
+      },
+      "set": {
+        "id": "me04",
+        "name": "Chaos Rising",
+        "releaseDate": ""
+      },
+      "qty": 3
+    },
+    {
+      "id": "me03-021",
+      "name": "Mega Starmie ex",
+      "supertype": "Pokémon",
+      "localId": "021",
+      "image": "https://assets.tcgdex.net/en/me/me03/021/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/021/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/021/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 3
+    },
+    {
+      "id": "me03-020",
+      "name": "Staryu",
+      "supertype": "Pokémon",
+      "localId": "020",
+      "image": "https://assets.tcgdex.net/en/me/me03/020/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/020/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/020/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 3
+    },
+    {
+      "id": "sv06.5-038",
+      "name": "Fezandipiti ex",
+      "supertype": "Pokémon",
+      "localId": "038",
+      "image": "https://assets.tcgdex.net/en/sv/sv06.5/038/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv06.5/038/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv06.5/038/high.webp"
+      },
+      "set": {
+        "id": "sv06.5",
+        "name": "Shrouded Fable",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "me03-062",
+      "name": "Meowth ex",
+      "supertype": "Pokémon",
+      "localId": "062",
+      "image": "https://assets.tcgdex.net/en/me/me03/062/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/062/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/062/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "sv08.5-004",
+      "name": "Budew",
+      "supertype": "Pokémon",
+      "localId": "004",
+      "image": "https://assets.tcgdex.net/en/sv/sv08.5/004/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv08.5/004/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv08.5/004/high.webp"
+      },
+      "set": {
+        "id": "sv08.5",
+        "name": "Prismatic Evolutions",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "me01-119",
+      "name": "Lillie's Determination",
+      "supertype": "Trainer",
+      "localId": "119",
+      "image": "https://assets.tcgdex.net/en/me/me01/119/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me01/119/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me01/119/high.webp"
+      },
+      "set": {
+        "id": "me01",
+        "name": "Mega Evolution",
+        "releaseDate": ""
+      },
+      "qty": 4
+    },
+    {
+      "id": "me01-114",
+      "name": "Boss's Orders",
+      "supertype": "Trainer",
+      "localId": "114",
+      "image": "https://assets.tcgdex.net/en/me/me01/114/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me01/114/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me01/114/high.webp"
+      },
+      "set": {
+        "id": "me01",
+        "name": "Mega Evolution",
+        "releaseDate": ""
+      },
+      "qty": 3
+    },
+    {
+      "id": "me02-087",
+      "name": "Dawn",
+      "supertype": "Trainer",
+      "localId": "087",
+      "image": "https://assets.tcgdex.net/en/me/me02/087/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me02/087/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me02/087/high.webp"
+      },
+      "set": {
+        "id": "me02",
+        "name": "Phantasmal Flames",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "sv10.5b-084",
+      "name": "Pokégear 3.0",
+      "supertype": "Trainer",
+      "localId": "084",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/084/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp"
+      },
+      "set": {
+        "id": "sv10.5b",
+        "name": "Black Bolt",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "me03-076",
+      "name": "Judge",
+      "supertype": "Trainer",
+      "localId": "076",
+      "image": "https://assets.tcgdex.net/en/me/me03/076/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/076/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/076/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "me03-084",
+      "name": "Rosa's Encouragement",
+      "supertype": "Trainer",
+      "localId": "084",
+      "image": "https://assets.tcgdex.net/en/me/me03/084/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/084/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/084/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "sv05-160",
+      "name": "Salvatore",
+      "supertype": "Trainer",
+      "localId": "160",
+      "image": "https://assets.tcgdex.net/en/sv/sv05/160/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv05/160/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv05/160/high.webp"
+      },
+      "set": {
+        "id": "sv05",
+        "name": "Temporal Forces",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "sv10-176",
+      "name": "Team Rocket's Petrel",
+      "supertype": "Trainer",
+      "localId": "176",
+      "image": "https://assets.tcgdex.net/en/sv/sv10/176/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv10/176/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10/176/high.webp"
+      },
+      "set": {
+        "id": "sv10",
+        "name": "Destined Rivals",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "me01-129",
+      "name": "Surfing Beach",
+      "supertype": "Trainer",
+      "localId": "129",
+      "image": "https://assets.tcgdex.net/en/me/me01/129/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me01/129/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me01/129/high.webp"
+      },
+      "set": {
+        "id": "me01",
+        "name": "Mega Evolution",
+        "releaseDate": ""
+      },
+      "qty": 2
+    },
+    {
+      "id": "sv05-144",
+      "name": "Buddy-Buddy Poffin",
+      "supertype": "Trainer",
+      "localId": "144",
+      "image": "https://assets.tcgdex.net/en/sv/sv05/144/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv05/144/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv05/144/high.webp"
+      },
+      "set": {
+        "id": "sv05",
+        "name": "Temporal Forces",
+        "releaseDate": ""
+      },
+      "qty": 4
+    },
+    {
+      "id": "me01-131",
+      "name": "Ultra Ball",
+      "supertype": "Trainer",
+      "localId": "131",
+      "image": "https://assets.tcgdex.net/en/me/me01/131/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me01/131/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me01/131/high.webp"
+      },
+      "set": {
+        "id": "me01",
+        "name": "Mega Evolution",
+        "releaseDate": ""
+      },
+      "qty": 3
+    },
+    {
+      "id": "me03-081",
+      "name": "Poké Pad",
+      "supertype": "Trainer",
+      "localId": "081",
+      "image": "https://assets.tcgdex.net/en/me/me03/081/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/081/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/081/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 2
+    },
+    {
+      "id": "me01-125",
+      "name": "Rare Candy",
+      "supertype": "Trainer",
+      "localId": "125",
+      "image": "https://assets.tcgdex.net/en/me/me01/125/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me01/125/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me01/125/high.webp"
+      },
+      "set": {
+        "id": "me01",
+        "name": "Mega Evolution",
+        "releaseDate": ""
+      },
+      "qty": 2
+    },
+    {
+      "id": "me04-082",
+      "name": "Special Red Card",
+      "supertype": "Trainer",
+      "localId": "082",
+      "image": "https://assets.tcgdex.net/en/me/me04/082/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me04/082/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me04/082/high.webp"
+      },
+      "set": {
+        "id": "me04",
+        "name": "Chaos Rising",
+        "releaseDate": ""
+      },
+      "qty": 2
+    },
+    {
+      "id": "sv10.5b-082",
+      "name": "Fennel",
+      "supertype": "Trainer",
+      "localId": "082",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/082/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/082/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/082/high.webp"
+      },
+      "set": {
+        "id": "sv10.5b",
+        "name": "Black Bolt",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "me03-072",
+      "name": "Energy Search",
+      "supertype": "Trainer",
+      "localId": "072",
+      "image": "https://assets.tcgdex.net/en/me/me03/072/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/me/me03/072/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me03/072/high.webp"
+      },
+      "set": {
+        "id": "me03",
+        "name": "Perfect Order",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "sv06.5-061",
+      "name": "Night Stretcher",
+      "supertype": "Trainer",
+      "localId": "061",
+      "image": "https://assets.tcgdex.net/en/sv/sv06.5/061/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv06.5/061/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv06.5/061/high.webp"
+      },
+      "set": {
+        "id": "sv06.5",
+        "name": "Shrouded Fable",
+        "releaseDate": ""
+      },
+      "qty": 1
+    },
+    {
+      "id": "sv10.5b-079",
+      "name": "Air Balloon",
+      "supertype": "Trainer",
+      "localId": "079",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/079/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/079/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/079/high.webp"
+      },
+      "set": {
+        "id": "sv10.5b",
+        "name": "Black Bolt",
+        "releaseDate": ""
+      },
+      "qty": 2
+    },
+    {
+      "id": "g1-77",
+      "name": "Water Energy",
+      "supertype": "Energy",
+      "localId": "77",
+      "image": "https://assets.tcgdex.net/en/xy/g1/77/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/xy/g1/77/low.webp",
+        "large": "https://assets.tcgdex.net/en/xy/g1/77/high.webp"
+      },
+      "set": {
+        "id": "g1",
+        "name": "Generations",
+        "releaseDate": ""
+      },
+      "qty": 9
+    },
+    {
+      "id": "sv05-162",
+      "name": "Neo Upper Energy",
+      "supertype": "Energy",
+      "localId": "162",
+      "image": "https://assets.tcgdex.net/en/sv/sv05/162/high.webp",
+      "images": {
+        "small": "https://assets.tcgdex.net/en/sv/sv05/162/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv05/162/high.webp"
+      },
+      "set": {
+        "id": "sv05",
+        "name": "Temporal Forces",
+        "releaseDate": ""
+      },
+      "qty": 1
+    }
   ]
 };

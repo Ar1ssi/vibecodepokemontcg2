@@ -69,6 +69,9 @@ const TRAINER_IDS = {
   "Professor's Research (Professor Sada)": 'sv04.5-087',
   Iono: 'sv04.5-080',
   'Earthen Vessel': 'sv08.5-106',
+  "Rosa's Encouragement": 'me03-084',
+  'Surfing Beach': 'me01-129',
+  'Energy Search': 'me03-072',
 };
 
 const ENERGY_IDS = {
@@ -78,6 +81,7 @@ const ENERGY_IDS = {
   'Basic Fighting Energy': 'g1-80',
   'Basic Lightning Energy': 'g1-78',
   'Basic Water Energy': 'g1-77',
+  'Neo Upper Energy': 'sv05-162',
 };
 
 function normalizeName(name) {
@@ -245,6 +249,36 @@ const DECK_SOURCES = {
     '1 Maximum Belt',
     '5 Basic Lightning Energy',
     '3 Basic Water Energy',
+  ],
+  greninja: [
+    '3 Mega Greninja ex CRI 22',
+    '2 Frogadier CRI 21',
+    '3 Froakie CRI 20',
+    '3 Mega Starmie ex POR 21',
+    '3 Staryu POR 20',
+    '1 Fezandipiti ex SFA 38',
+    '1 Meowth ex POR 62',
+    '1 Budew PRE 4',
+    "4 Lillie's Determination",
+    "3 Boss's Orders (Ghetsis)",
+    '1 Dawn',
+    '1 Hilda',
+    '1 Judge',
+    "1 Rosa's Encouragement",
+    '1 Salvatore',
+    "1 Team Rocket's Petrel",
+    '2 Surfing Beach',
+    '4 Buddy-Buddy Poffin',
+    '3 Ultra Ball',
+    '2 Poké Pad',
+    '2 Rare Candy',
+    '2 Special Red Card',
+    '1 Energy Retrieval',
+    '1 Energy Search',
+    '1 Night Stretcher',
+    '2 Air Balloon',
+    '9 Basic Water Energy',
+    '1 Neo Upper Energy',
   ],
 };
 

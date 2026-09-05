@@ -1111,6 +1111,7 @@ export const STARTER_DECK_CATALOG = [
   { key: 'charizard', name: 'Mega Charizard X ex Starter Deck' },
   { key: 'darkrai', name: 'Mega Darkrai ex Starter Deck' },
   { key: 'dragonite', name: 'Mega Dragonite ex Starter Deck' },
+  { key: 'greninja', name: 'Mega Greninja ex Starter Deck' },
 ];
 
 export function getStarterDecks() {
