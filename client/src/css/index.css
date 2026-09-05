@@ -3007,6 +3007,9 @@ a:hover {
       box-shadow: 0 6px 24px rgba(0,0,0,0.4);
       pointer-events: none;
     }
+    #rulesTurnHUD[hidden] {
+      display: none !important;
+    }
     #rulesTurnHUD.my-turn {
       border-color: rgba(120, 220, 140, 0.6);
       background: rgba(20, 42, 28, 0.92);
