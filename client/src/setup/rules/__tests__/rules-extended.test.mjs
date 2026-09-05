@@ -1591,6 +1591,65 @@ import test from 'node:test';
       assert.equal(canPayAttackCost([entry], ['Water']), false);
     });
 
+    test('typed special energy catalog: all eight ME03–ME05 cards parse and describe', async () => {
+      const {
+        parseTypedSpecialEnergy,
+        describeTypedSpecialEnergy,
+        getEnergyHpBonus,
+        hasRockyEffectShield,
+        hasBubblyStatusImmunity,
+        hasMagneticFreeRetreat,
+        getVoltaicDamageBonus,
+        blocksBenchAttackDamage,
+        shouldNitroReturnToHand,
+        getTelepathicOnAttachSearch,
+      } = await import('../special-energy-effects.mjs');
+
+      const cards = [
+        ['Growing Grass Energy', 'Grass', { hpBonus: 20 }],
+        ['Rocky Fighting Energy', 'Fighting', { rocky: true }],
+        ['Telepathic Psychic Energy', 'Psychic', { telepathic: true }],
+        ['Bubbly Water Energy', 'Water', { bubbly: true }],
+        ['Magnetic Metal Energy', 'Metal', { magnetic: true }],
+        ['Nitro Fire Energy', 'Fire', { nitro: true }],
+        ['Shadowy Darkness Energy', 'Darkness', { shadowy: true }],
+        ['Voltaic Lightning Energy', 'Lightning', { voltaic: 20 }],
+      ];
+
+      for (const [name, type, flags] of cards) {
+        const card = { name, type: 'Energy' };
+        const def = parseTypedSpecialEnergy(card);
+        assert.ok(def, `${name} should parse`);
+        assert.ok(describeTypedSpecialEnergy(card), `${name} should describe`);
+
+        const hostImg = {};
+        const host = { types: [type], type: 'Pokémon', stage: 'Basic', image: hostImg };
+        const attached = { name, type: 'Energy', image: { relative: hostImg } };
+        const zone = [host, attached];
+
+        if (flags.hpBonus) {
+          assert.equal(getEnergyHpBonus(host, zone), flags.hpBonus);
+        }
+        if (flags.rocky) assert.equal(hasRockyEffectShield(host, zone), true);
+        if (flags.bubbly) assert.equal(hasBubblyStatusImmunity(host, zone), true);
+        if (flags.magnetic) assert.equal(hasMagneticFreeRetreat(host, zone), true);
+        if (flags.voltaic) assert.equal(getVoltaicDamageBonus(host, zone), flags.voltaic);
+        if (flags.shadowy) {
+          assert.equal(blocksBenchAttackDamage(host, 'bench', zone), true);
+          assert.equal(blocksBenchAttackDamage(host, 'active', zone), false);
+        }
+        if (flags.nitro) {
+          assert.equal(shouldNitroReturnToHand(card, host, true), true);
+          assert.equal(shouldNitroReturnToHand(card, host, false), false);
+        }
+        if (flags.telepathic) {
+          const search = getTelepathicOnAttachSearch(card);
+          assert.equal(search.count, 2);
+          assert.equal(search.destination, 'bench');
+        }
+      }
+    });
+
     test('applyEnergyEffect: attach-type reports executed with effective type', () => {
       const griseous = applyEnergyEffect({ name: 'Griseous Energy', subtypes: ['Energy', 'Special'] });
       assert.equal(griseous.family, 'attach-type');

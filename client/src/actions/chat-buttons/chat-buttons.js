@@ -8,6 +8,14 @@ import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, ma
 import { classifyAbility, searchTargetType } from '../../setup/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
 import { classifyEnergyEffect, resolveAttachedEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
+import {
+  getEnergyHpBonus,
+  getVoltaicDamageBonus,
+  hasRockyEffectShield,
+  hasBubblyStatusImmunity,
+  hasMagneticFreeRetreat,
+  blocksBenchAttackDamage,
+} from '../../setup/rules/special-energy-effects.mjs';
 import { parseDamagePrevention, applyDamagePrevention, passiveCostDiscount, applyCostDiscount } from '../../setup/rules/ability-executors.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
@@ -193,6 +201,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           return; // turn does NOT end
         }
 
+        rulesState.attackExecuting = true;
+        try {
         // Discard-cost (taxonomy §D discard-cost family): the attack's
         // printed discard cost is paid from the attacker's own zones BEFORE
         // damage is applied. Insufficient energy/hand → ⛔ fizzle (early
@@ -375,6 +385,19 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
         let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
 
+        if (rulesState.enabled) {
+          const voltaicBonus = getVoltaicDamageBonus(active, activeZone.array);
+          if (voltaicBonus > 0) {
+            dmg = { ...dmg, total: dmg.total + voltaicBonus };
+            appendMessage(
+              user,
+              `⚡ Voltaic Lightning Energy — +${voltaicBonus} damage to the opponent's Active!`,
+              'announcement',
+              false,
+            );
+          }
+        }
+
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
           const prevention = parseDamagePrevention(oppActive);
@@ -445,8 +468,11 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           false
         );
 
-        // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer);
+        // KO check → prizes (effective HP includes stadium + energy bonuses)
+        const oppActiveZoneForHp = getZone(oppPlayer, 'active');
+        const oppHp =
+          effectiveHp(oppActive.hp ?? 0, oppPlayer) +
+          getEnergyHpBonus(oppActive, oppActiveZoneForHp.array);
         if (oppHp > 0 && totalDmg >= oppHp) {
           const koResult = handleKO({
             attackerPlayer: user,
@@ -487,8 +513,29 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // pre-existing gap (flagged, not built here).
         if (oppHp > 0 && totalDmg < oppHp) {
           const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
+          const oppZoneForShield = getZone(oppPlayer, 'active');
+          const rockyShield =
+            hasRockyEffectShield(oppActive, oppZoneForShield.array);
           const found = parseStatusFromAttackText(atk.text);
           for (const st of found) {
+            if (rockyShield) {
+              appendMessage(
+                user,
+                `🪨 Rocky Fighting Energy blocks ${st} — attack effects do not apply (damage is not an effect).`,
+                'announcement',
+                false,
+              );
+              continue;
+            }
+            if (hasBubblyStatusImmunity(oppActive, oppZoneForShield.array)) {
+              appendMessage(
+                user,
+                `💧 Bubbly Water Energy — ${oppActive?.name || 'The defender'} cannot be affected by Special Conditions.`,
+                'announcement',
+                false,
+              );
+              continue;
+            }
             if (applyStatus(oppPlayer, oppKey, st)) {
               appendMessage(
                 user,
@@ -592,6 +639,17 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           } else {
             const { card: benchTarget, idx: benchIdx } = oppBench[0];
             const hitName = benchTarget?.name || 'a benched Pokémon';
+            const oppBenchZone = getZone(oppPlayer, 'bench');
+            if (
+              blocksBenchAttackDamage(benchTarget, 'bench', oppBenchZone.array)
+            ) {
+              appendMessage(
+                user,
+                `🌑 Shadowy Darkness Energy — attack damage to ${hitName} on the Bench is prevented.`,
+                'announcement',
+                false,
+              );
+            } else {
             if (plan === -1) {
               appendMessage(
                 user,
@@ -601,7 +659,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               );
             }
             placeSelfDamage(oppPlayer, 'bench', benchIdx, parsed.bench);
-            const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer);
+            const benchHp =
+              effectiveHp(benchTarget.hp ?? 0, oppPlayer) +
+              getEnergyHpBonus(benchTarget, oppBenchZone.array);
             const benchDmgEl =
               getZone(oppPlayer, 'bench').array[benchIdx]?.image
                 ?.damageCounter;
@@ -633,6 +693,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                 false
               );
             }
+            }
           }
         }
 
@@ -662,6 +723,18 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             );
             for (const { card: benchTarget, idx: benchIdx } of oppBench) {
               const hitName = benchTarget?.name || 'a benched Pokémon';
+              const oppBenchZone = getZone(oppPlayer, 'bench');
+              if (
+                blocksBenchAttackDamage(benchTarget, 'bench', oppBenchZone.array)
+              ) {
+                appendMessage(
+                  user,
+                  `🌑 Shadowy Darkness Energy — attack damage to ${hitName} on the Bench is prevented.`,
+                  'announcement',
+                  false,
+                );
+                continue;
+              }
               placeSelfDamage(oppPlayer, 'bench', benchIdx, allBench);
               const benchDmgEl =
                 getZone(oppPlayer, 'bench').array[benchIdx]?.image
@@ -669,7 +742,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               const benchDmg = benchDmgEl
                 ? parseInt(benchDmgEl.textContent || '0', 10) || 0
                 : 0;
-              const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer);
+              const benchHp =
+                effectiveHp(benchTarget.hp ?? 0, oppPlayer) +
+                getEnergyHpBonus(benchTarget, oppBenchZone.array);
               if (benchHp > 0 && benchDmg >= benchHp) {
                 const benchKO = handleKO({
                   attackerPlayer: user,
@@ -788,6 +863,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         if (rulesState.enabled && oncePerTurnClause(atk.text)) {
           markAbilityUsed(user, active);
         }
+        } finally {
+          rulesState.attackExecuting = false;
+        }
       }
     }
     markAttacked(user);
@@ -854,6 +932,8 @@ export const retreat = (user, emit = true) => {
     const activeZoneForCheck = getZone(user, 'active');
     const hasRedirectEnergy =
       active && pokemonHasRedirectEnergy(active, activeZoneForCheck.array);
+    const hasMagneticRetreat =
+      active && hasMagneticFreeRetreat(active, activeZoneForCheck.array);
     if (hasRedirectEnergy) {
       appendMessage(
         user,
@@ -864,7 +944,16 @@ export const retreat = (user, emit = true) => {
     }
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
-    const retreatCost = active?.retreatCost ?? 0;
+    let retreatCost = active?.retreatCost ?? 0;
+    if (hasMagneticRetreat) {
+      retreatCost = 0;
+      appendMessage(
+        user,
+        `🧲 ${active?.name || 'This Pokémon'} has Magnetic Metal Energy — no Retreat Cost.`,
+        'announcement',
+        false,
+      );
+    }
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const activeZone = getZone(user, 'active');
       const attachedEnergies = activeZone.array.filter(
