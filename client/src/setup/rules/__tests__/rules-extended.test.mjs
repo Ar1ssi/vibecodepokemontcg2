@@ -2634,3 +2634,23 @@ import test from 'node:test';
       );
       assert.equal(plan[1].reason, 'passive');
     });
+
+    test('markAbilityUseAfterSearchStep: cancel does not consume optional search (Mammoth Hauler)', async () => {
+      const { markAbilityUseAfterSearchStep } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const { classifyAbility } = await import('../ability-effects.mjs');
+
+      const card = {
+        name: 'Mamoswine ex',
+        ability: {
+          name: 'Mammoth Hauler',
+          text: 'Once during your turn, you may search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.',
+        },
+      };
+      assert.equal(classifyAbility(card), 'search');
+      const steps = parseAbility(card.ability.text);
+      assert.equal(steps[0].type, 'searchAbility');
+
+      assert.equal(markAbilityUseAfterSearchStep(false), false, 'cancel must not mark ability used');
+      assert.equal(markAbilityUseAfterSearchStep(true), true, 'confirmed pick marks ability used');
+    });

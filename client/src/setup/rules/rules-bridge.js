@@ -36,6 +36,7 @@ import { classifyAbility, describeAbilityFamily } from './ability-effects.mjs';
 import {
   planAbilitySteps,
   actionableAbilityPlan,
+  markAbilityUseAfterSearchStep,
 } from './ability-step-plan.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
@@ -1449,8 +1450,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
             });
           },
           onCancel: () => {
-            appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
-            shuffleAfter();
+            appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
           },
         });
         return result.ok;
@@ -1462,7 +1462,9 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         zoneFrom: 'deck',
         destination: dest,
         onPick: shuffleAfter,
-        onCancel: shuffleAfter,
+        onCancel: () => {
+          appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
+        },
       });
       return result.ok;
     };
@@ -1572,8 +1574,10 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           await executeAbilityDraw(user, item.step);
           executed = true;
         } else if (item.action === 'search') {
-          await runAbilitySearchPicker(user, card, item.step);
-          executed = true;
+          const completed = await runAbilitySearchPicker(user, card, item.step);
+          if (markAbilityUseAfterSearchStep(completed)) {
+            executed = true;
+          }
         } else if (item.action === 'when-played') {
           if (await runWhenPlayedStep(user, card, steps, item.stepIndex)) executed = true;
         } else if (item.action === 'executor' && item.executor) {
