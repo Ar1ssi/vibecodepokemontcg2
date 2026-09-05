@@ -338,6 +338,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                       // board needs the scraped original to fall back on.
                       imageUrl: mat.imageUrl,
                       thumb: mat.thumb,
+                      board: mat.board,
                       layout: mat.layout,
                     }
                   : null,

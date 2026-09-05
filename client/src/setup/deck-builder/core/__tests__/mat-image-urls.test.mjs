@@ -61,7 +61,16 @@ describe('mat-image-urls', () => {
     assert.notEqual(chain.fallback, mat.imageUrl);
   });
 
-  it('resolveMatBoardUrl uses proxy for remote board art', () => {
+  it('resolveMatBoardUrl uses committed board art before proxy', () => {
+    const mat = {
+      board: 'src/assets/playmats/board/a.webp',
+      image: 'src/assets/playmats/png/a.png',
+      imageUrl: 'https://cdn.artofpkm.com/abc',
+    };
+    assert.equal(resolveMatBoardUrl(mat), '/src/assets/playmats/board/a.webp');
+  });
+
+  it('resolveMatBoardUrl falls back to proxy when board missing', () => {
     const mat = {
       image: 'src/assets/playmats/png/a.png',
       imageUrl: 'https://cdn.artofpkm.com/abc',

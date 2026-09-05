@@ -45,6 +45,8 @@ export function resolveMatThumbUrl(mat, base = '') {
  */
 export function resolveMatBoardUrl(mat, base = '') {
   if (!mat) return '';
+  const board = mat.board ? toAbsoluteClientPath(mat.board) : '';
+  if (board) return board;
   const proxy = mat.imageUrl ? matImageProxyUrl(mat.imageUrl, base) : '';
   const local = mat.image ? toAbsoluteClientPath(mat.image) : '';
   return proxy || local;

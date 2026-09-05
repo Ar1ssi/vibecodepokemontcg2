@@ -151,7 +151,7 @@ const paintMatImageForTarget = (target, mat) => {
 
   if (!img) return;
 
-  if (!mat?.image && !mat?.imageUrl) {
+  if (!mat?.image && !mat?.imageUrl && !mat?.board) {
     img.removeAttribute('src');
     img.hidden = true;
     return;
