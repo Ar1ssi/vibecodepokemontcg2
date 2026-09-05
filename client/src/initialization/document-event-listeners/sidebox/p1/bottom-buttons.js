@@ -1,6 +1,6 @@
 import { reset } from '../../../../actions/general/reset.js';
 import { restartGame } from '../../../../actions/general/restart.js';
-import { readyUp } from '../../../../actions/general/ready.js';
+import { readyUp, updateReadyButtons } from '../../../../actions/general/ready.js';
 import {
   socket,
   systemState,
@@ -28,6 +28,8 @@ export const initializeP1BottomButtons = () => {
     readyUp('opp');
   };
   setupBothButton.addEventListener('click', setupBothFunction);
+
+  updateReadyButtons();
 
   const resetButton = document.getElementById('resetButton');
   const resetFunction = () => reset(systemState.initiator);

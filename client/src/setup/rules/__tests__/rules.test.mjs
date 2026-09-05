@@ -4,7 +4,7 @@ import test from 'node:test';
     const { rulesState, canPerformAction, startGame, beginTurn, endTurn, markAttacked, resetRulesSessionState } = await import('../rules-state.mjs');
     const { computeAttackDamage, canPayAttackCost, expandEnergyEntries } = await import('../attack-engine.mjs');
 const { classifyEnergyEffect } = await import('../energy-effects.mjs');
-const { decideTurnOrder } = await import('../rules-turnorder.mjs');
+const { decideTurnOrder, resolveTurnOrderCaller } = await import('../rules-turnorder.mjs');
     
     test('weakness doubles damage', () => {
       const result = computeAttackDamage({ types: ['Water'] }, { weakness: { type: 'Water', value: 2 } }, { damage: 60 });
@@ -243,6 +243,48 @@ const { decideTurnOrder } = await import('../rules-turnorder.mjs');
       assert.equal(decideTurnOrder({ caller: 'nonsense', call: 'heads', result: 'heads' }), 'self');
       assert.equal(decideTurnOrder({ caller: 'self', call: 'bogus', result: 'heads' }), 'opp');
       assert.equal(decideTurnOrder({}), 'self');
+    });
+
+    test('resolveTurnOrderCaller: host and joiner get opposite designations', () => {
+      const roomId = 'abc1230';
+      const host = resolveTurnOrderCaller({
+        roomId,
+        socketId: 'abc123',
+        sessionKey: '0',
+        isMultiplayer: true,
+      });
+      const joiner = resolveTurnOrderCaller({
+        roomId,
+        socketId: 'xyz789',
+        sessionKey: '0',
+        isMultiplayer: true,
+      });
+      assert.notEqual(host, joiner);
+      assert(['self', 'opp'].includes(host));
+      assert(['self', 'opp'].includes(joiner));
+    });
+
+    test('resolveTurnOrderCaller: deterministic for same inputs', () => {
+      const first = resolveTurnOrderCaller({
+        roomId: 'room42',
+        socketId: 'hostid',
+        sessionKey: '1',
+        isMultiplayer: true,
+      });
+      const second = resolveTurnOrderCaller({
+        roomId: 'room42',
+        socketId: 'hostid',
+        sessionKey: '1',
+        isMultiplayer: true,
+      });
+      assert.equal(first, second);
+    });
+
+    test('resolveTurnOrderCaller: solo always returns self', () => {
+      assert.equal(
+        resolveTurnOrderCaller({ roomId: '', socketId: '', isMultiplayer: false }),
+        'self'
+      );
     });
 
     test('resetRulesSessionState returns phase to setup for a fresh coin flip', async () => {

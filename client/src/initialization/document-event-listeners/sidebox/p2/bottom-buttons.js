@@ -1,5 +1,5 @@
 import { reset } from '../../../../actions/general/reset.js';
-import { readyUp } from '../../../../actions/general/ready.js';
+import { readyUp, updateReadyButtons } from '../../../../actions/general/ready.js';
 import { systemState } from '../../../../state.js';
 import { hideOptionsContextMenu } from '../../../../setup/chatbox/hide-options-context-menu.js';
 
@@ -11,6 +11,8 @@ export const initializeP2BottomButtons = () => {
   p2SetupButton.addEventListener('click', () =>
     readyUp(systemState.initiator)
   );
+
+  updateReadyButtons();
 
   const p2ResetButton = document.getElementById('p2ResetButton');
   p2ResetButton.addEventListener('click', () => reset(systemState.initiator));
