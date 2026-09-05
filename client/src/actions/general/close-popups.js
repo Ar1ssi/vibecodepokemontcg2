@@ -2,7 +2,7 @@ import {
   mouseClick,
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { startHoloAnimation } from '../../setup/deck-builder/core/holo.mjs';

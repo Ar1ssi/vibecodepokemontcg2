@@ -1,6 +1,6 @@
 import { reset } from '../../../../actions/general/reset.js';
 import { readyUp } from '../../../../actions/general/ready.js';
-import { systemState } from '../../../../front-end.js';
+import { systemState } from '../../../../state.js';
 import { hideOptionsContextMenu } from '../../../../setup/chatbox/hide-options-context-menu.js';
 
 export const initializeP2BottomButtons = () => {

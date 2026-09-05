@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 
 export const resetAbilityCounters = () => {
   selfContainerDocument

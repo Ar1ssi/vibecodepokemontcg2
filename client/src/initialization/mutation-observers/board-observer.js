@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 
 const scrollToBottom = (element) => {
   element.scrollTop = element.scrollHeight;

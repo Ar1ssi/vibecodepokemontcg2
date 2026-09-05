@@ -49,6 +49,7 @@ export const ATTACK_FAMILIES = [
   'heal',             // "remove N damage counters" / "Heal N damage"
   'draw-attach',      // "draw N / attach an Energy"
   'draw-until',       // "draw cards until you have N cards"
+  'search-deck',      // "search your deck for … put onto Bench / into hand"
   'switch',           // "then switch your Active"
   'once-per-turn',    // "Once during your turn: …"
   'damage-prevention', // "takes N less damage" / "prevent all damage"
@@ -239,6 +240,12 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     return 'discard-opponent';
   }
   if (/discard/.test(t)) return 'discard-cost';
+  // Deck search (Call for Family, Flock, Lucky Find, …) — before shuffle so
+  // trailing "then, shuffle your deck" is not misfiled as shuffle-cost.
+  if (/search your deck for/i.test(t)) return 'search-deck';
+  if (/shuffle\s+(?:your\s+)?hand\s+into\s+(?:your\s+|the\s+)?deck/i.test(t)) {
+    return 'shuffle-cost';
+  }
   if (/shuffle/.test(t)) return 'shuffle-cost';
 
   // Turn-locked one-shot.
@@ -303,6 +310,8 @@ export function describeAttackEffect(attack, attackerCard = {}) {
       return `${name}: "${attackName}" draws cards and/or attaches Energy as part of its effect.`;
     case 'draw-until':
       return `${name}: "${attackName}" draws until you reach a hand-size target — count your hand before drawing.`;
+    case 'search-deck':
+      return `${name}: "${attackName}" searches your deck — pick the matching card(s), put them on your Bench or into your hand, then shuffle.`;
     case 'switch':
       return `${name}: "${attackName}" includes a switch — bring in or swap a Pokémon after resolving damage.`;
     case 'once-per-turn':

@@ -11,7 +11,7 @@ import {
   selfContainer,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';

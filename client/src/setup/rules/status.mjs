@@ -33,7 +33,8 @@ export function getStatus(player, cardId) {
   return statusState[player][cardId] || null;
 }
 
-export function applyStatus(player, cardId, status) {
+export function applyStatus(player, cardId, status, opts = {}) {
+  if (opts.blocked) return false;
   if (!ALL.includes(status)) return false;
   if (!statusState[player][cardId]) statusState[player][cardId] = {};
   const s = statusState[player][cardId];
@@ -105,14 +106,19 @@ export function resolveConfusedAttack(player, cardId, rng = Math.random) {
 // Burn:   coin flip — heads heals, tails 20 damage (persists either way).
 // Asleep / Paralyzed: cleared at end of the player's turn.
 // Confused: NOT cleared (permanent until retreat / evolve / Trainer).
-export function resolveTurnBoundary(player, cardId, rng = Math.random) {
+export function resolveTurnBoundary(player, cardId, rng = Math.random, opts = {}) {
   const s = statusState[player][cardId];
   if (!s) return { damage: 0, notes: [] };
   const notes = [];
   let damage = 0;
   if (s.poisoned) {
-    damage += 10;
-    notes.push('Poison: 10 damage');
+    const extraCounters = opts.checkupPoisonBonus || 0;
+    damage += 10 + extraCounters * 10;
+    notes.push(
+      extraCounters > 0
+        ? `Poison: ${10 + extraCounters * 10} damage (Stadium +${extraCounters} counter(s))`
+        : 'Poison: 10 damage'
+    );
   }
   if (s.burned) {
     if (rng() < 0.5) {

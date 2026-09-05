@@ -7,7 +7,7 @@ import {
   oppContainerDocument,
   selfContainer,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 import { getZone } from '../zones/get-zone.js';
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
 import { adjustAlignment } from './adjust-alignment.js';

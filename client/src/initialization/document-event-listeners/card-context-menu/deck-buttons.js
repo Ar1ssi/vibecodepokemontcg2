@@ -3,7 +3,7 @@ import {
   handleViewButtonClick,
 } from '../../../actions/zones/deck-actions.js';
 import { shuffleAll } from '../../../actions/zones/general.js';
-import { mouseClick, systemState } from '../../../front-end.js';
+import { mouseClick, systemState } from '../../../state.js';
 import { manualDeckActionAllowed } from '../../../setup/rules/rules-state.mjs';
 import { appendMessage } from '../../../setup/chatbox/append-message.js';
 

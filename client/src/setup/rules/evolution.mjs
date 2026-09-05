@@ -15,7 +15,7 @@
       // Stadium evolution-speed modifier ("as if it had been in play for 1
       // more turn") relaxes the just-played gate; "costs N less Energy" is
       // surfaced as `costReduce` for the cost layer (no live charge site yet).
-      const evoSpeed = getStadiumEvolutionSpeed(player);
+      const evoSpeed = getStadiumEvolutionSpeed(player, baseCardInPlay);
       if (wasPlayedThisTurn && !evoSpeed.relaxTurnGate) {
         return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
       }
@@ -84,5 +84,21 @@
     export function markEvolvedThisTurn(player, baseCardName) {
       const f = rulesState.flags[player];
       if (f) f.evolved[baseCardName.toLowerCase()] = true;
+    }
+
+    // Playing a Pokémon from hand onto Active/Bench (not evolving onto one
+    // already in play) is limited to Basic stage.
+    export async function canPlayPokemonFromHand(pokemonCard) {
+      if (!rulesState.enabled) return { allowed: true };
+
+      await ensureCardData(pokemonCard);
+      const stage = normalizeStage(pokemonCard.stage);
+      if (stage === 'Stage 1' || stage === 'Stage 2') {
+        return {
+          allowed: false,
+          reason: `${pokemonCard.name} is a ${stage} Pokémon — only Basic Pokémon can be played from your hand.`,
+        };
+      }
+      return { allowed: true };
     }
     

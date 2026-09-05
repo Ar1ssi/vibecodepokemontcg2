@@ -6,7 +6,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { getZone } from '../zones/get-zone.js';
 import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { identifyCard } from './click-events.js';
@@ -288,6 +288,23 @@ export const drop = (event) => {
         );
         }
       } else {
+        const fromZone = mouseClick.zoneId;
+        if (
+          dZoneId === 'hand' &&
+          (fromZone === 'deck' || fromZone === 'viewCards')
+        ) {
+          const drawCheck = manualDeckActionAllowed('draw');
+          if (!drawCheck.allowed) {
+            appendMessage(
+              systemState.initiator,
+              '⛔ ' + drawCheck.reason,
+              'announcement',
+              false
+            );
+            event.stopPropagation();
+            return;
+          }
+        }
         moveCardBundle(
           mouseClick.cardUser,
           systemState.initiator,

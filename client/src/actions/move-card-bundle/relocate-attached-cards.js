@@ -1,4 +1,4 @@
-import { mouseClick } from '../../front-end.js';
+import { mouseClick } from '../../state.js';
 import { resetImage } from '../../setup/image-logic/reset-image.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addDamageCounter } from '../counters/damage-counter.js';

@@ -3,7 +3,7 @@ import {
   darkMode,
   showOutlines,
 } from '../../../setup/settings/settings.js';
-import { systemState } from '../../../front-end.js';
+import { systemState } from '../../../state.js';
 import {
   lookAtCards,
   stopLookingAtCards,

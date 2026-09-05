@@ -31,6 +31,8 @@
 //     defenderDamage /* number of damage counters on the defender; leave
 //                         undefined when unknown — enables "is damaged" */ }
 
+import { parseSearchDeckParams } from './trainer-effects.mjs';
+
 export const DAMAGE_COMPONENTS = [
   'per-energy',
   'per-each',
@@ -464,6 +466,14 @@ export function shuffleDrawClause(attackText) {
   }
   const m = /draw\s+(?:up\s+to\s+)?(\d+)?\s+cards?/i.exec(text);
   return { draw: m && m[1] ? Math.max(0, parseInt(m[1], 10)) : 1 };
+}
+
+// Parse a deck-search clause from attack text (Call for Family, Flock, …).
+// Returns { what, count, destination } or null when absent. Pure.
+export function parseAttackSearchClause(attackText) {
+  const text = String(attackText || '');
+  if (!/search your deck for/i.test(text)) return null;
+  return parseSearchDeckParams(lower(text));
 }
 
 // One-line human summary of the parsed damage (for announcements).

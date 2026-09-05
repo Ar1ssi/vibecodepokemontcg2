@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 
 const zoneIds = ['lostZone', 'deck', 'discard', 'attachedCards', 'viewCards'];
 const selfElements = zoneIds.map((zoneId) =>

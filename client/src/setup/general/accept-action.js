@@ -20,6 +20,7 @@ import {
 } from '../../actions/general/board-actions.js';
 import { changeType } from '../../actions/general/change-type.js';
 import { reset } from '../../actions/general/reset.js';
+import { restartGame } from '../../actions/general/restart.js';
 import {
   hideCards,
   hideShortcut,
@@ -61,13 +62,16 @@ import { shufflePrizesToDeckBottom, takePrizes, takePrizesByIndex } from '../../
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
+import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
 
 const functions = {
   exchangeData: exchangeData,
   loadDeckData: loadDeckData,
   changeCardBack: changeCardBack,
+  changePlaymat: changePlaymat,
   reset: reset,
+  restartGame: restartGame,
   setup: setup,
   readyUp: readyUp,
   takeTurn: takeTurn,

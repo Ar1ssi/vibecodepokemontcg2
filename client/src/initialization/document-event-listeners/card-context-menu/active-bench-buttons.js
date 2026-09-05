@@ -10,7 +10,7 @@ import {
   leaveAll,
 } from '../../../actions/zones/general.js';
 import { openAttachedCardsPanel } from '../../../setup/image-logic/full-view.js';
-import { mouseClick, systemState } from '../../../front-end.js';
+import { mouseClick, systemState } from '../../../state.js';
 
 export const initializeActiveAndBenchButtons = () => {
   const damageCounterButton = document.getElementById('damageCounterButton');
