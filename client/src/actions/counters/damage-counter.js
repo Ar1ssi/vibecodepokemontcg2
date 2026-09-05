@@ -3,8 +3,18 @@ import {
   selfContainerDocument,
   systemState,
 } from '../../front-end.js';
+import {
+  DAMAGE_COUNTER_TIERS,
+  getDamageCounterTier,
+} from '../../setup/counters/damage-counter-style.mjs';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+
+const applyDamageCounterStyle = (damageCounter, damageAmount) => {
+  damageCounter.classList.add('damage-counter');
+  damageCounter.classList.remove(...DAMAGE_COUNTER_TIERS);
+  damageCounter.classList.add(getDamageCounterTier(damageAmount));
+};
 
 export const updateDamageCounter = (
   user,
@@ -26,6 +36,7 @@ export const updateDamageCounter = (
   if (damageCounter.textContent != damageAmount) {
     damageCounter.textContent = damageAmount;
   }
+  applyDamageCounterStyle(damageCounter, damageAmount);
 
   processAction(user, emit, 'updateDamageCounter', [
     zoneId,
@@ -108,7 +119,13 @@ export const addDamageCounter = (
     }
     damageCounter.contentEditable = 'true';
     damageCounter.textContent = damageAmount ? damageAmount : '10';
+    applyDamageCounterStyle(
+      damageCounter,
+      damageAmount ? damageAmount : '10'
+    );
   }
+
+  applyDamageCounterStyle(damageCounter, damageCounter.textContent);
 
   damageCounter.style.display = 'inline-block';
   damageCounter.style.left = `${targetRect.left - zoneElementRect.left + targetRect.width / 1.5}px`;
