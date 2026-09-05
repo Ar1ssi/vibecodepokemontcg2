@@ -2374,10 +2374,14 @@ import test from 'node:test';
 
     // ── start-of-turn draw (taxonomy B) ──
     test('shouldAutoDrawAtTurnStart: true when enabled, not drawn, deck non-empty', () => {
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3 }), true);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: true, deckCount: 3 }), false);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 0 }), false);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), true);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: true, deckCount: 3, turnNumber: 2 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 0, turnNumber: 2 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), false);
+    });
+
+    test('shouldAutoDrawAtTurnStart: turn 1 skipped (first player does not draw)', () => {
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), false);
     });
 
     test('markTurnDrawn: sets the per-turn dedupe guard, survives flag reset', () => {
