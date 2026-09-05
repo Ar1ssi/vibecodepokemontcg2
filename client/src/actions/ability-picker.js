@@ -4,9 +4,6 @@
 // Triggers ONLY when more than one actionable ability is usable.
 // If exactly 1 is usable, it executes directly (no popup).
 // If 0 are usable, it shows a "no usable abilities" message.
-//
-// The 5 actionable families (the only ones with executors):
-//   heal, switch, attach, search, energy-redirect
 
 import { getZone } from '../setup/zones/get-zone.js';
 import { classifyAbility, isAbilityCard } from '../setup/rules/ability-effects.mjs';
@@ -19,6 +16,12 @@ import {
   attachAbility,
   searchAbility,
   energyRedirectAbility,
+  drawAbility,
+  statusAbility,
+  moveDamageAbility,
+  lookAtTopAbility,
+  recursionAbility,
+  evolveAbility,
 } from './chat-buttons/chat-buttons.js';
 
 // Map family → executor function
@@ -28,6 +31,12 @@ const FAMILY_EXECUTORS = {
   attach: attachAbility,
   search: searchAbility,
   'energy-redirect': energyRedirectAbility,
+  draw: drawAbility,
+  status: statusAbility,
+  'move-damage': moveDamageAbility,
+  'look-at-top': lookAtTopAbility,
+  recursion: recursionAbility,
+  evolve: evolveAbility,
 };
 
 // Human-readable labels for each family
@@ -37,6 +46,12 @@ const FAMILY_LABELS = {
   attach: '⚡ Attach',
   search: '🔍 Search',
   'energy-redirect': '🔀 Redirect',
+  draw: '🃏 Draw',
+  status: '💫 Status',
+  'move-damage': '💥 Damage',
+  'look-at-top': '👁️ Look',
+  recursion: '♻️ Recursion',
+  evolve: '🧬 Evolve',
 };
 
 /**
@@ -91,7 +106,7 @@ export async function abilityPicker(user) {
   if (usable.length === 0) {
     appendMessage(
       user,
-      `⚠️ No usable abilities found. Make sure your Pokémon have actionable abilities (heal, switch, attach, search, or redirect).`,
+      `⚠️ No usable abilities found. Make sure your Pokémon have actionable abilities (heal, switch, attach, search, redirect, draw, status, damage, look, recursion, or evolve).`,
       'announcement',
       false
     );
