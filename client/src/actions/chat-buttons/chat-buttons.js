@@ -8,7 +8,7 @@ import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, ma
 import { classifyAbility, searchTargetType } from '../../setup/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
 import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
-import { parseDamagePrevention, applyDamagePrevention, passiveCostDiscount, applyCostDiscount } from '../../setup/rules/ability-executors.mjs';
+import { parseDamagePrevention, applyDamagePrevention, passiveCostDiscount, applyCostDiscount, combinedDamagePrevention, combinedPassiveCostDiscount } from '../../setup/rules/ability-executors.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
@@ -30,7 +30,18 @@ import {
   resolveTurnBoundary,
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp } from '../../setup/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
+
+const abilityBlockedByStadium = (user, target) => {
+  if (!stadiumAbilityBlocked(target)) return false;
+  appendMessage(
+    user,
+    `🏟️ ${getStadium()?.card?.name || 'The Stadium'} — ${target.name || 'This Pokémon'}'s Abilities are suppressed.`,
+    'announcement',
+    false
+  );
+  return true;
+};
 
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
@@ -57,7 +68,10 @@ const endTurnWithBanner = (user) => {
   const active = getZone(user, 'active').array[0];
   if (active) {
     const key = active.image?.dataset?.cardId || active.name;
-    const boundary = resolveTurnBoundary(user, key);
+    const checkupBonus = getStadiumCheckupPoisonBonus(active, user);
+    const boundary = resolveTurnBoundary(user, key, Math.random, {
+      checkupPoisonBonus: checkupBonus,
+    });
     if (boundary.damage > 0) placeSelfDamage(user, 'active', 0, boundary.damage);
     for (const note of boundary.notes) appendMessage('', note, 'announcement', false);
   }
@@ -182,7 +196,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         const rawCost = atk.cost || [];
         let effectiveCost = rawCost;
         if (rulesState.enabled) {
-          let discount = passiveCostDiscount(active);
+          let discount = combinedPassiveCostDiscount(active, activeZone.array, {
+            blockTools: stadiumBlocksToolEffects(),
+          });
           // Stadium cost modifier (taxonomy §E): same hook as the passive
           // discount, stacked on top of it (both applied sequentially).
           const stadiumCard = getStadium()?.card;
@@ -199,6 +215,19 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                   : '';
               appendMessage(user, `✨ ${atk.name}'s cost is reduced by ${discount}${note}!`, 'announcement', false);
             }
+          }
+          const costIncrease = getStadiumAttackCostIncrease(active, user);
+          if (costIncrease > 0) {
+            effectiveCost = [
+              ...effectiveCost,
+              ...Array(costIncrease).fill('Colorless'),
+            ];
+            appendMessage(
+              user,
+              `🏟️ Stadium — ${active?.name || 'Your Active'}'s attack costs ${costIncrease} more Energy.`,
+              'announcement',
+              false
+            );
           }
         }
         if (!canPayAttackCost(energyTypes, effectiveCost)) {
@@ -388,9 +417,25 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
         let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
 
+        if (rulesState.enabled) {
+          const stadiumBonus = getStadiumAttackDamageBonus(active, user);
+          if (stadiumBonus > 0) {
+            dmg = { ...dmg, total: dmg.total + stadiumBonus };
+            appendMessage(
+              user,
+              `🏟️ Stadium — +${stadiumBonus} damage from ${active?.name || 'your Active'}!`,
+              'announcement',
+              false,
+            );
+          }
+        }
+
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
-          const prevention = parseDamagePrevention(oppActive);
+          const oppActiveZone = getZone(oppPlayer, 'active');
+          const prevention = combinedDamagePrevention(oppActive, oppActiveZone.array, {
+            blockTools: stadiumBlocksToolEffects(),
+          });
           const prevented = applyDamagePrevention(dmg.total, prevention);
           if (prevented !== dmg.total) {
             appendMessage(
@@ -403,8 +448,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
           // Continuous stadium damage prevention (taxonomy E)
           const st = getStadium()?.card;
-          if (st) {
-            const stPrevention = parseStadiumDamagePrevention(st);
+          if (st && stadiumPreventionApplies(st, { zoneId: 'active', defender: oppActive })) {
+            const detail = parseStadiumDamagePreventionDetail(st);
+            const stPrevention = detail?.amount ?? null;
             if (stPrevention !== null) {
               const stPrevented =
                 stPrevention === Infinity
@@ -421,10 +467,22 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               }
             }
           }
+          const stReduction = getStadiumDamageReduction(oppActive, oppPlayer, 'active');
+          if (stReduction > 0 && dmg.total > 0) {
+            const reduced = Math.max(0, dmg.total - stReduction);
+            if (reduced !== dmg.total) {
+              appendMessage(
+                user,
+                `🏟️ ${getStadium()?.card?.name || 'The Stadium'} reduces damage by ${stReduction}!`,
+                'announcement',
+                false
+              );
+              dmg = { ...dmg, total: reduced };
+            }
+          }
           // Buddy-Buddy Energy damage cap (taxonomy §F, family 4): if the
           // defender carries a Buddy-Buddy Energy, an opponent's attack deals
           // at most 1 damage to it.
-          const oppActiveZone = getZone(oppPlayer, 'active');
           const hasProtect =
             oppActive && pokemonHasProtectEnergy(oppActive, oppActiveZone.array);
           if (hasProtect) {
@@ -459,7 +517,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         );
 
         // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer);
+        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
         if (oppHp > 0 && totalDmg >= oppHp) {
           const koResult = handleKO({
             attackerPlayer: user,
@@ -501,8 +559,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         if (oppHp > 0 && totalDmg < oppHp) {
           const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
           const found = parseStatusFromAttackText(atk.text);
+          const oppZoneCards = getZone(oppPlayer, 'active').array;
+          const statusBlocked = stadiumBlocksStatusApplication(oppActive, oppZoneCards);
           for (const st of found) {
-            if (applyStatus(oppPlayer, oppKey, st)) {
+            if (applyStatus(oppPlayer, oppKey, st, { blocked: statusBlocked })) {
               appendMessage(
                 user,
                 `💫 ${oppActive?.name || 'The defender'} is now ${st}!`,
@@ -614,7 +674,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               );
             }
             placeSelfDamage(oppPlayer, 'bench', benchIdx, parsed.bench);
-            const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer);
+            const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer, benchTarget);
             const benchDmgEl =
               getZone(oppPlayer, 'bench').array[benchIdx]?.image
                 ?.damageCounter;
@@ -682,7 +742,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               const benchDmg = benchDmgEl
                 ? parseInt(benchDmgEl.textContent || '0', 10) || 0
                 : 0;
-              const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer);
+              const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer, benchTarget);
               if (benchHp > 0 && benchDmg >= benchHp) {
                 const benchKO = handleKO({
                   attackerPlayer: user,
@@ -877,7 +937,10 @@ export const retreat = (user, emit = true) => {
     }
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
-    const retreatCost = active?.retreatCost ?? 0;
+    const baseRetreatCost = active?.retreatCost ?? 0;
+    const retreatCost = rulesState.enabled
+      ? getStadiumRetreatCost(baseRetreatCost, active, user)
+      : baseRetreatCost;
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const activeZone = getZone(user, 'active');
       const attachedEnergies = activeZone.array.filter(
@@ -951,6 +1014,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'heal') {
     appendMessage(
       user,
@@ -1027,6 +1091,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'switch') {
     appendMessage(
       user,
@@ -1100,6 +1165,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'attach') {
     appendMessage(
       user,
@@ -1170,6 +1236,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(source);
+  if (abilityBlockedByStadium(user, source)) return;
   const family = classifyAbility(source);
   if (family !== 'energy-redirect') {
     appendMessage(
@@ -1421,6 +1488,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
   }
 
   await ensureCardData(target);
+  if (abilityBlockedByStadium(user, target)) return;
   if (classifyAbility(target) !== 'search') {
     appendMessage(
       user,
@@ -1495,6 +1563,39 @@ export const pass = (user, emit = true) => {
   }
 };
 
+const pokemonMatchesType = (card, typeFilter) => {
+  if (!typeFilter || !card) return true;
+  return (card.types || []).map((t) => String(t).toLowerCase()).includes(typeFilter);
+};
+
+const payStadiumCost = (user, cost) => {
+  if (!cost) return true;
+  const hand = getZone(user, 'hand');
+  if (cost.type === 'discard-energy') {
+    const idx = hand.array.findIndex((c) => c.type === 'Energy');
+    if (idx < 0) {
+      appendMessage(user, '⛔ No Energy in hand to discard.', 'announcement', false);
+      return false;
+    }
+    moveCard(user, user, 'hand', 'discard', idx);
+    return true;
+  }
+  if (cost.type === 'discard-hand') {
+    if (hand.array.length < cost.n) {
+      appendMessage(user, `⛔ Need ${cost.n} card(s) in hand to discard.`, 'announcement', false);
+      return false;
+    }
+    for (let i = 0; i < cost.n; i++) moveCard(user, user, 'hand', 'discard', 0);
+    return true;
+  }
+  return true;
+};
+
+const finishStadiumAction = (user, card, emit, payload) => {
+  if (rulesState.enabled) markStadiumUsed(user);
+  processAction(user, emit, 'stadium-effect', [payload]);
+};
+
 // ── Stadium effect (taxonomy E, once-per-turn / setup-once) ──────────
 // Uses the active stadium's once-per-turn or setup-once effect.
 // For once-per-turn: draw N / search / search-evolve / heal based on the parsed effect.
@@ -1526,16 +1627,156 @@ export const stadiumEffect = async (user, emit = true) => {
     return;
   }
 
-  // Execute the first action in results
   const action = result.results[0];
+  const flags = rulesState.flags[user] || {};
+  if (action.condition && !stadiumOnceConditionMet(action.condition, flags)) {
+    const msg =
+      action.condition.type === 'named-supporter'
+        ? `⛔ Play a Supporter with "${action.condition.contains}" in its name first this turn.`
+        : '⛔ Play a Supporter from your hand this turn first.';
+    appendMessage(user, msg, 'announcement', false);
+    return;
+  }
+
+  if (action.cost && !payStadiumCost(user, action.cost)) return;
 
   switch (action.action) {
+    case 'hand-to-deck-top': {
+      const hand = getZone(user, 'hand');
+      if (hand.array.length === 0) {
+        appendMessage(user, '⛔ Your hand is empty.', 'announcement', false);
+        return;
+      }
+      moveCard(user, user, 'hand', 'deck', 0, 0);
+      appendMessage(user, `◈ ${card.name}: Put a card from your hand on top of your deck.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'hand-to-deck-top' });
+      break;
+    }
+    case 'switch-type': {
+      const active = getZone(user, 'active').array[0];
+      const bench = getZone(user, 'bench');
+      if (!active || !pokemonMatchesType(active, action.typeFilter)) {
+        appendMessage(user, `⛔ Your Active Pokémon must be ${action.typeFilter || 'matching'}.`, 'announcement', false);
+        return;
+      }
+      const benchIdx = bench.array.findIndex((c) => pokemonMatchesType(c, action.typeFilter));
+      if (benchIdx < 0) {
+        appendMessage(user, `⛔ No benched ${action.typeFilter || ''} Pokémon to switch with.`, 'announcement', false);
+        return;
+      }
+      const benchCard = bench.array[benchIdx];
+      moveCard(user, user, 'active', 'bench', 0);
+      const newIdx = getZone(user, 'bench').array.indexOf(benchCard);
+      if (newIdx >= 0) moveCard(user, user, 'bench', 'active', newIdx);
+      appendMessage(user, `🔁 ${card.name}: Switched Active with a benched ${action.typeFilter} Pokémon.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'switch-type' });
+      break;
+    }
+    case 'discard-to-bench': {
+      const discard = getZone(user, 'discard');
+      const bench = getZone(user, 'bench');
+      const { canAddToBench } = await import('../../setup/rules/ko-flow.mjs');
+      const { getEffectiveBenchLimit, playerHasTeraInPlay } = await import('../../setup/rules/stadium-effects.mjs');
+      const inPlay = [...getZone(user, 'active').array, ...bench.array].filter((c) => c.type === 'Pokémon');
+      const limit = getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));
+      let moved = 0;
+      for (let i = 0; i < discard.array.length && moved < (action.n || 1); i++) {
+        const c = discard.array[i];
+        if (c.type !== 'Energy') continue;
+        if (action.typeFilter && !pokemonMatchesType({ types: c.types || [c.name] }, action.typeFilter)) {
+          const name = String(c.name || '').toLowerCase();
+          if (action.typeFilter === 'lightning' && !name.includes('lightning')) continue;
+        }
+        if (!canAddToBench(bench.getCount(), limit).allowed) break;
+        moveCard(user, user, 'discard', 'bench', i - moved);
+        moved++;
+      }
+      if (moved === 0) {
+        appendMessage(user, '⛔ No matching Energy in discard (or bench full).', 'announcement', false);
+        return;
+      }
+      appendMessage(user, `◈ ${card.name}: Put ${moved} Basic ${action.typeFilter || ''} Energy onto your Bench.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'discard-to-bench', n: moved });
+      break;
+    }
+    case 'heal-all': {
+      const n = action.n || 10;
+      let healed = 0;
+      for (const zoneId of ['active', 'bench']) {
+        const zone = getZone(user, zoneId);
+        for (let i = 0; i < zone.array.length; i++) {
+          if (zone.array[i]?.type !== 'Pokémon') continue;
+          removeDamageCounter(user, zoneId, i, n, emit);
+          healed++;
+        }
+      }
+      appendMessage(user, `💚 ${card.name}: Healed ${n} damage from each of your Pokémon (${healed} total).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'heal-all', n });
+      break;
+    }
+    case 'search-bench': {
+      const deck = getZone(user, 'deck');
+      const { canAddToBench } = await import('../../setup/rules/ko-flow.mjs');
+      const { getEffectiveBenchLimit, playerHasTeraInPlay } = await import('../../setup/rules/stadium-effects.mjs');
+      const bench = getZone(user, 'bench');
+      const inPlay = [...getZone(user, 'active').array, ...bench.array].filter((c) => c.type === 'Pokémon');
+      const limit = getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));
+      if (!canAddToBench(bench.getCount(), limit).allowed) {
+        appendMessage(user, '⛔ Bench is full.', 'announcement', false);
+        return;
+      }
+      let found = -1;
+      for (let i = 0; i < deck.array.length; i++) {
+        await ensureCardData(deck.array[i]);
+        if (matchesStadiumSearch(deck.array[i], action)) {
+          found = i;
+          break;
+        }
+      }
+      if (found < 0) {
+        appendMessage(user, `🔍 ${card.name}: no matching Pokémon found in deck.`, 'announcement', false);
+        shuffleZone(user, user, 'deck');
+        finishStadiumAction(user, card, emit, { action: 'search-bench', found: false });
+        return;
+      }
+      const foundName = deck.array[found]?.name || 'Basic Pokémon';
+      moveCard(user, user, 'deck', 'bench', found);
+      appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
+      shuffleZone(user, user, 'deck');
+      finishStadiumAction(user, card, emit, { action: 'search-bench' });
+      break;
+    }
+    case 'search-hand': {
+      const deck = getZone(user, 'deck');
+      let moved = 0;
+      const want = action.n || 1;
+      for (let i = 0; i < deck.array.length && moved < want; ) {
+        await ensureCardData(deck.array[i]);
+        if (matchesStadiumSearch(deck.array[i], action)) {
+          moveCard(user, user, 'deck', 'hand', i);
+          moved++;
+        } else {
+          i++;
+        }
+      }
+      appendMessage(
+        user,
+        moved
+          ? `🔍 ${card.name}: found ${moved} card(s) → hand.`
+          : `🔍 ${card.name}: no matching cards in deck.`,
+        'announcement',
+        false
+      );
+      shuffleZone(user, user, 'deck');
+      finishStadiumAction(user, card, emit, { action: 'search-hand', n: moved });
+      break;
+    }
+    case 'discard-draw':
     case 'draw': {
       const n = action.n || 1;
       draw(user, n, emit);
       appendMessage(user, `◈ ${card.name}: Drew ${n} card(s).`, 'announcement', false);
-      if (rulesState.enabled) markStadiumUsed(user);
-      processAction(user, emit, 'stadium-effect', [{ action: 'draw', n }]);
+      finishStadiumAction(user, card, emit, { action: action.action, n });
       break;
     }
     case 'search': {
@@ -1553,8 +1794,7 @@ export const stadiumEffect = async (user, emit = true) => {
       } else {
         appendMessage(user, `🔍 ${card.name} searches: top card was ${topCard.name || 'a card'} (not a Pokémon). Deck unchanged.`, 'announcement', false);
       }
-      if (rulesState.enabled) markStadiumUsed(user);
-      processAction(user, emit, 'stadium-effect', [{ action: 'search' }]);
+      finishStadiumAction(user, card, emit, { action: 'search' });
       break;
     }
     case 'search-evolve': {
@@ -1571,8 +1811,17 @@ export const stadiumEffect = async (user, emit = true) => {
         false
       );
       shuffleZone(user, user, 'deck');
-      if (rulesState.enabled) markStadiumUsed(user);
-      processAction(user, emit, 'stadium-effect', [{ action: 'search-evolve' }]);
+      finishStadiumAction(user, card, emit, { action: 'search-evolve' });
+      break;
+    }
+    case 'energy': {
+      appendMessage(
+        user,
+        `◈ ${card.name}: attach up to ${action.n || 1} Energy from your hand to your Pokémon manually (see card text).`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'energy', n: action.n });
       break;
     }
     case 'heal': {
@@ -1585,8 +1834,7 @@ export const stadiumEffect = async (user, emit = true) => {
       // Remove up to n damage counters from the active Pokémon
       removeDamageCounter(user, 'active', 0, n, emit);
       appendMessage(user, `💚 ${card.name}: Healed ${n} damage counter(s) from ${active.name || 'active'}.`, 'announcement', false);
-      if (rulesState.enabled) markStadiumUsed(user);
-      processAction(user, emit, 'stadium-effect', [{ action: 'heal', n }]);
+      finishStadiumAction(user, card, emit, { action: 'heal', n });
       break;
     }
     case 'damage-prevention': {

@@ -24,6 +24,16 @@ export const cardNode = (card) => card?.wrapper ?? card?.image;
 export const imageAnchor = (image) =>
   image?.parentElement?.closest?.('.mat-holo') ?? image;
 
+// The element that becomes `.full-view` when a mat card is double-clicked: the
+// card's slot in the zone (`.play-container`), which holds the Pokémon plus its
+// attached energies/tools. Always go through `imageAnchor` — for a holo card the
+// <img>'s own parent is the overflow-hidden `.card__rotator`, and sizing THAT as
+// the enlarged view shrinks the card instead of growing it.
+export const fullViewHost = (image) => imageAnchor(image)?.parentElement ?? null;
+
+export const isInFullView = (image) =>
+  !!fullViewHost(image)?.classList.contains('full-view');
+
 export function hydrateHolo(card) {
   if (HOLO_DISABLED) return;
   if (!card?.image || hydrated.has(card)) return;

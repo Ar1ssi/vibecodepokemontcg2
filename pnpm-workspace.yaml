@@ -1,5 +1,7 @@
 packages:
   - "client"
   - "server"
+onlyBuiltDependencies:
+  - sqlite3
 allowBuilds:
   sqlite3: true

@@ -16,8 +16,14 @@ import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
+import { isCardPreviewOpen } from '../../setup/image-logic/full-view.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { addSpecialCondition } from '../counters/special-condition.js';
+import {
+  getSpecialConditionCode,
+  setSpecialConditionCode,
+} from '../../setup/counters/special-condition-code.mjs';
 import { useAbility } from '../counters/use-ability.js';
 import {
   discardBoard,
@@ -335,32 +341,31 @@ export const keyDown = (event) => {
         );
       } else {
         if (!isAltKeyPressed(event)) {
-          switch (
-            mouseClick.card.image.specialCondition.textContent.toUpperCase()
-          ) {
+          const sc = mouseClick.card.image.specialCondition;
+          switch (getSpecialConditionCode(sc).toUpperCase()) {
             case 'P':
-              mouseClick.card.image.specialCondition.textContent = 'B';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'B');
+              sc.handleColor();
               break;
             case 'B':
-              mouseClick.card.image.specialCondition.textContent = 'Pa';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'Pa');
+              sc.handleColor();
               break;
             case 'PA':
-              mouseClick.card.image.specialCondition.textContent = 'C';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'C');
+              sc.handleColor();
               break;
             case 'C':
-              mouseClick.card.image.specialCondition.textContent = 'A';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'A');
+              sc.handleColor();
               break;
             case 'A':
-              mouseClick.card.image.specialCondition.textContent = 'P';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'P');
+              sc.handleColor();
               break;
           }
         } else {
-          mouseClick.card.image.specialCondition.textContent = '';
+          setSpecialConditionCode(mouseClick.card.image.specialCondition, '');
           mouseClick.card.image.specialCondition.handleRemove(true);
           deselectCard();
         }
@@ -460,7 +465,8 @@ export const keyDown = (event) => {
       (event.key === 'r' || event.code === 'KeyR') &&
       !(event.altKey || event.getModifierState('Alt')) &&
       ['stadium', 'active', 'bench'].includes(mouseClick.zoneId) &&
-      !mouseClick.card.image.parentElement.classList.contains('full-view') &&
+      !isInFullView(mouseClick.card.image) &&
+      !isCardPreviewOpen() &&
       !systemState.isReplay
     ) {
       rotateCard(mouseClick.cardUser, mouseClick.zoneId, mouseClick.cardIndex);
@@ -469,7 +475,8 @@ export const keyDown = (event) => {
       (event.key === 'r' || event.code === 'KeyR') &&
       (event.altKey || event.getModifierState('Alt')) &&
       ['active', 'bench'].includes(mouseClick.zoneId) &&
-      !mouseClick.card.image.parentElement.classList.contains('full-view') &&
+      !isInFullView(mouseClick.card.image) &&
+      !isCardPreviewOpen() &&
       !systemState.isReplay
     ) {
       rotateCard(

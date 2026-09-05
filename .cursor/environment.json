@@ -1,0 +1,17 @@
+{
+  "name": "PTCG-sim",
+  "user": "ubuntu",
+  "install": "pnpm install --frozen-lockfile",
+  "terminals": [
+    {
+      "name": "server",
+      "command": "node server/server.js"
+    }
+  ],
+  "ports": [
+    {
+      "name": "server",
+      "port": 4000
+    }
+  ]
+}

@@ -9,6 +9,8 @@
 @import url('./holo/radiant-holo.css');
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
+@import url('./damage-counter.css');
+@import url('./status-marker.css');
 
 /* ── Modular zone geometry ────────────────────────────────────────────
    Every board zone below is positioned from these custom properties
@@ -400,23 +402,74 @@ body, input, textarea, button {
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
   padding: 20px;
   margin-right: 1%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .full-view img {
   height: 24%;
   margin: 0.5%;
 }
+/* The double-clicked card fills the panel so the preview is an enlargement;
+   `.full-view img { height: 24% }` above only sizes the attached energies and
+   tools around it. Holo wrappers carry a pixel size frozen at hydration time,
+   so it has to be overridden here (hence `!important`) and the aspect ratio
+   restated — the wrapper has no intrinsic width of its own. */
+.full-view > img.full-view-card {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+}
+.full-view > .mat-holo.full-view-card {
+  width: auto !important;
+  height: 100% !important;
+  aspect-ratio: var(--card-aspect);
+  margin: 0;
+}
+/* Double-click preview: spring-pop enlargement of the Pokémon only (no panel). */
+.card-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  background-color: rgba(0, 0, 0, 0.45);
+}
+.card-preview-pop {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  max-height: 70%;
+  max-width: 90%;
+}
+.card-preview-pop > img.card-preview-card {
+  height: 70vh;
+  width: auto;
+  max-height: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border-radius: 0.275rem;
+}
+.card-preview-pop > .mat-holo.card-preview-card {
+  width: auto !important;
+  height: 70vh !important;
+  max-height: 100%;
+  aspect-ratio: var(--card-aspect);
+  margin: 0;
+}
+.card-preview-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
 .self-circle {
   position: absolute;
   border-radius: 50%;
-  background-color: rgb(255, 98, 0);
-  color: white;
   text-align: center;
 }
 .opp-circle {
   position: absolute;
   border-radius: 50%;
-  background-color: rgb(255, 98, 0);
-  color: white;
   text-align: center;
   transform: scaleX(-1) scaleY(-1);
 }

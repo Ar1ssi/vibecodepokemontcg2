@@ -57,6 +57,12 @@ const deckToSimRows = (deck = {}) => {
         cardName,
         variant?.data?.supertype || '',
         formatImageUrl(variant?.data || {}),
+        // Collector number (TCGdex localId). Decks built here know exactly
+        // which printing was picked; carrying the number keeps the rules
+        // engine from re-guessing it by name later — see resolveCardId() in
+        // setup/rules/rules-state.mjs.
+        variant?.data?.number || null,
+        null,
       ]);
     }
   }
