@@ -20,6 +20,8 @@ import {
   resolveMatBoardUrl,
   toAbsoluteClientPath,
 } from '../deck-builder/core/mat-image-urls.mjs';
+import { getMatById } from '../deck-builder/core/mats.mjs';
+import { processAction } from '../general/process-action.js';
 
 const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
 const MAT_TARGETS = ['self', 'opp'];
@@ -278,6 +280,24 @@ export const getCurrentMat = (target) => {
 };
 
 export const getCurrentMats = () => ({ ...currentMats });
+
+/** @param {'self'|'opp'} target */
+export const getStoredMatId = (target) => {
+  const mat = readStoredMats()[normalizeTarget(target)];
+  return mat?.id || null;
+};
+
+/**
+ * Syncable playmat change (multiplayer + undo log). Mirrors `changeCardBack`.
+ * @param {'self'|'opp'} user
+ * @param {string|null} matId
+ * @param {boolean} [emit]
+ */
+export const changePlaymat = (user, matId, emit = true) => {
+  const mat = matId ? getMatById(matId) : null;
+  applyMatForTarget(normalizeTarget(user), mat || null);
+  processAction(user, emit, 'changePlaymat', [matId]);
+};
 
 /**
  * Re-apply active choices. Iframes reload on board flips and wipe inline

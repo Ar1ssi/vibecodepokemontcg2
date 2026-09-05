@@ -20,6 +20,7 @@ import { resyncActions } from '../../setup/general/resync-actions.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
+import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -55,7 +56,10 @@ export const initializeSocketEventListeners = () => {
       systemState.p2SelfUsername,
       systemState.selfDeckData,
       systemState.cardBackSrc,
-      document.getElementById('coachingModeCheckbox').checked
+      document.getElementById('coachingModeCheckbox').checked,
+      true,
+      true,
+      getStoredMatId('self')
     );
 
     //initialize sync checker, which will routinely make sure game are synced

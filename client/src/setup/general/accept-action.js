@@ -62,12 +62,14 @@ import { shufflePrizesToDeckBottom, takePrizes, takePrizesByIndex } from '../../
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
+import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
 
 const functions = {
   exchangeData: exchangeData,
   loadDeckData: loadDeckData,
   changeCardBack: changeCardBack,
+  changePlaymat: changePlaymat,
   reset: reset,
   restartGame: restartGame,
   setup: setup,
