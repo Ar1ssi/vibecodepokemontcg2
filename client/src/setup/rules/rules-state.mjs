@@ -289,6 +289,19 @@
     };
     
     // ── turn/phase management ────────────────────────────────────────────
+    // Return rules state to pre-game setup so the next Set Up run can coin
+    // flip and evaluate mulligans again. Used by reset/restart in rules-bridge.
+    export function resetRulesSessionState() {
+      rulesState.phase = 'setup';
+      rulesState.turnNumber = 0;
+      rulesState.turnPlayer = 'self';
+      rulesState.stadium = null;
+      rulesState.mulligansResolved = false;
+      rulesState.attackExecuting = false;
+      resetTurnFlags('self');
+      resetTurnFlags('opp');
+    }
+
     // firstPlayer: who goes first ('self' | 'opp'). Defaults to 'self' so
     // existing callers/tests that invoke startGame() with no args keep
     // their prior behavior; rules-bridge passes the coin-flip winner.

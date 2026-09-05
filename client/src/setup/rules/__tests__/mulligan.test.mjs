@@ -68,4 +68,12 @@ import test from 'node:test';
       startGame('self');
       assert.equal(rulesState.mulligansResolved, false);
     });
+
+    test('resetRulesSessionState clears mulligansResolved after a resolved mulligan', async () => {
+      const { markMulligansResolved, resetRulesSessionState } = await import('../rules-state.mjs');
+      markMulligansResolved();
+      assert.equal(rulesState.mulligansResolved, true);
+      resetRulesSessionState();
+      assert.equal(rulesState.mulligansResolved, false);
+    });
     
