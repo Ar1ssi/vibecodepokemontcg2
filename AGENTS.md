@@ -355,7 +355,6 @@ auto-draw flow is DOM-heavy and was **not** visually verified in a browser.
   draw N" branches shadow no existing card text; add a real-card regression
   test when such text appears.
 
-<<<<<<< HEAD
 ## Card identity resolution (why the "wrong Piloswine" happened)
 
 **This was never a text/regex parsing bug.** `attack-effects.mjs` /
@@ -410,19 +409,6 @@ guessing. Narrow (nearly every decklist format prints a number). The natural
 next step is resolving the set id via TCGdex's `/sets` endpoint and constraining
 the by-name search to that set.
 
-**Verification status:** full suite **413/413** pass (396 prior + 7 in the new
-`setup/shared/__tests__/legacy-set-ids.test.mjs` + 10 appended to
-`rules-extended.test.mjs`). The new test file **is** registered in the root
-`package.json` test list. `node --check` clean on every edited file. ESLint was
-run: the new files are clean and no touched file gained an error beyond the
-file-wide `prettier/prettier` noise that `rules-state.mjs` and
-`rules-extended.test.mjs` already have (both are indented 4 spaces throughout —
-pre-existing; new lines match the surrounding style rather than reformatting the
-files). **Not** live-verified in a browser against the real TCGdex API.
-
-**Baseline correction:** the 163/416 figures in earlier sections are stale. The
-suite was **396/396** before this pass and is **413/413** after.
-=======
 ## Double-click card preview (`.full-view`) — the holo shrink bug
 
 **Symptom:** double-clicking a holofoil Pokémon on the mat shrank it (92px → 63px)
@@ -461,7 +447,3 @@ instead of showing an enlarged preview. Plain cards shrank too (92px → 55px).
   plain (via the `HOLO_DISABLED` kill-switch) on the self side; the opp side was
   not covered (no opp active card in the fixture) but the CSS is symmetric and
   the JS is shared.
-- **Baseline correction:** this file previously said 163/163. `pnpm test` on the
-  current tree is **396/396 pass, 0 fail** — use 396. `integration-test.mjs`
-  cannot run as-is: `jsdom` is not in any `package.json`.
->>>>>>> 9b63f32 (Document the .full-view holo shrink fix and correct the test baseline)
