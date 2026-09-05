@@ -3591,53 +3591,6 @@ a:hover {
     .rules-aw-unusable { color: #ff5555; }
     .rules-aw-reason { font-size: 0.72rem; color: #999; margin-left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ═══ MAT COIN SLOTS ═════════════════════════════════════════════
-       Persistent coin tokens beside each player's Active Pokémon.
-       Fixed to the reference spots: bottom player right, top player left.
-       Rendered above playmat iframes (z-index 3) so both stay visible. */
-    .mat-coin-slot {
-      position: fixed;
-      z-index: 3;
-      width: 6vh;
-      height: 6vh;
-      display: none;
-      pointer-events: none;
-      filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.6));
-    }
-    .mat-coin-slot.has-coin { display: block; }
-    .mat-coin-slot.flipping {
-      z-index: 12;
-      filter: drop-shadow(0 0.6vh 1.2vh rgba(0, 0, 0, 0.75));
-    }
-    .mat-coin-slot .coin-3d {
-      width: 100%;
-      height: 100%;
-      cursor: default;
-    }
-    .mat-coin-slot .mat-coin-toss-wrap {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-    .mat-coin-slot .mat-coin-toss-wrap.tossing .coin-3d {
-      transition: transform 1.35s cubic-bezier(0.22, 0.08, 0.24, 1);
-    }
-    .mat-coin-slot .mat-coin-toss-wrap.tossing {
-      animation: coin-toss-arc 1.35s cubic-bezier(0.3, 0.0, 0.35, 1);
-    }
-    #matCoinSlotSelf {
-      top: 64%;
-      right: 2.5%;
-      left: auto;
-      transform: translate(0, -50%);
-    }
-    #matCoinSlotOpp {
-      top: 36%;
-      left: 2.5%;
-      right: auto;
-      transform: translate(0, -50%);
-    }
-
     /* ── Mat picker (Customize > Mat) ─────────────────────────────────────
        Same panel/grid look as the coin and sleeve pickers, with wide tiles:
        one-player mats are roughly 2:1 and full-size mats roughly 1:1, so

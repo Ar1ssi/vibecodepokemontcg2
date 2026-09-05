@@ -1,13 +1,19 @@
 // Persistent battle-mat coin tokens: render each player's chosen coin beside
 // their Active Pokémon and play flip animations on the mat (not full-screen).
 
+import {
+  selfContainer,
+  oppContainer,
+  selfContainerDocument,
+  oppContainerDocument,
+} from '../../initialization/global-variables/containers.js';
 import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { getCoins } from '../deck-builder/core/coins.mjs';
 
 const MAT_COIN_BACK_URL = '/src/assets/coins/coin-back.png';
 const MAT_COIN_SLOTS = {
-  self: () => document.getElementById('matCoinSlotSelf'),
-  opp: () => document.getElementById('matCoinSlotOpp'),
+  self: () => selfContainerDocument.getElementById('matCoinSlot'),
+  opp: () => oppContainerDocument.getElementById('matCoinSlot'),
 };
 
 const selectedCoins = { self: null, opp: null };
@@ -21,6 +27,12 @@ const escapeHtml = (value = '') =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+
+const coinUrl = (path) => {
+  if (!path) return MAT_COIN_BACK_URL;
+  if (/^https?:\/\//.test(path) || path.startsWith('/')) return path;
+  return `/${path.replace(/^\//, '')}`;
+};
 
 export const getSelectedCoin = (target) => selectedCoins[target] || null;
 
@@ -36,7 +48,7 @@ export const pickRandomCoin = () => {
   return coins[Math.floor(Math.random() * coins.length)];
 };
 
-/** Slots use fixed CSS beside each Active zone — no runtime repositioning. */
+/** Position is CSS-driven inside each playmat iframe (#matCoinSlot). */
 export const positionMatCoinSlots = () => {};
 
 export const renderMatCoinSlot = (target) => {
@@ -54,7 +66,7 @@ export const renderMatCoinSlot = (target) => {
   slot.innerHTML = [
     `<span class="coin-toss-wrap mat-coin-toss-wrap" data-mat-coin-toss="${target}">`,
     `<div class="coin-3d coin-mat-${escapeHtml(coin.material || 'silver')} mat-coin-token" data-mat-coin-el="${target}">`,
-    `<div class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name || 'coin')}"></div>`,
+    `<div class="coin-face coin-front"><img src="${escapeHtml(coinUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}"></div>`,
     `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt=""></div>`,
     `</div>`,
     `</span>`,

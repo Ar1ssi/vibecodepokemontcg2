@@ -14,7 +14,6 @@ import {
 } from '../../setup/sizing/resizer.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { lookAtCards, stopLookingAtCards } from './reveal-and-hide.js';
-import { positionMatCoinSlots } from '../../setup/rules/mat-coin.js';
 
 export const flipBoard = () => {
   const selfResizer = document.getElementById('selfResizer');
@@ -206,5 +205,4 @@ export const flipBoard = () => {
     }
   }
   refreshBoard();
-  requestAnimationFrame(positionMatCoinSlots);
 };
