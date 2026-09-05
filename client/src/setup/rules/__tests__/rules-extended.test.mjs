@@ -1505,13 +1505,13 @@ import test from 'node:test';
     test('parseCheckupEffect: checkup damage + filter', () => {
       assert.deepEqual(
         parseCheckupEffect({ ability: { text: 'During Pokémon Checkup, put 1 damage counter on each Poisoned Pokémon.' } }),
-        { count: 1, filter: 'poisoned' }
+        { count: 1, filter: 'poisoned', exceptName: null, targetHasAbility: false, source: 'Ability' }
       );
       assert.deepEqual(
         parseCheckupEffect({ ability: { text: 'During Pokémon Checkup, put 2 damage counters on your opponent\'s Pokémon.' } }),
-        { count: 2, filter: 'opponent' }
+        { count: 2, filter: 'opponent', exceptName: null, targetHasAbility: false, source: 'Ability' }
       );
-      assert.deepEqual(parseCheckupEffect({ ability: { text: 'Draw a card.' } }), { count: 0, filter: null });
+      assert.deepEqual(parseCheckupEffect({ ability: { text: 'Draw a card.' } }), { count: 0, filter: null, exceptName: null, targetHasAbility: false, source: 'Ability' });
     });
 
     test('parseEnergyMultiplier: Wild Growth pattern', () => {
@@ -2576,4 +2576,61 @@ import test from 'node:test';
         'As long as this Pokémon is in the Active Spot, your opponent\'s Active Pokémon has no Abilities, except for Midnight Fluttering.'
       );
       assert.equal(steps[0].type, 'effectPreventAbility');
+    });
+
+    // ── compound ability step orchestration (planAbilitySteps) ──
+
+    test('planAbilitySteps: draw + search interactive order', async () => {
+      const { planAbilitySteps } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'Once during your turn, you may draw 2 cards. Once during your turn, you may search your deck for a Basic Pokémon and put it onto your Bench.';
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['search', 'draw']
+      );
+    });
+
+    test('planAbilitySteps: auto mode — self draw only; opponentDraw alone announces', async () => {
+      const { planAbilitySteps, actionableAbilityPlan } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const drawText = 'Once during your turn, you may draw 2 cards.';
+      const drawSteps = parseAbility(drawText);
+      const drawPlan = planAbilitySteps(drawSteps, { mode: 'auto' });
+      assert.deepEqual(drawPlan.map((p) => p.action), ['draw']);
+      assert.equal(actionableAbilityPlan(drawPlan, { mode: 'auto' }).length, 1);
+
+      const oppText = 'Once during your turn, your opponent draws 2 cards.';
+      const oppPlan = planAbilitySteps(parseAbility(oppText), { mode: 'auto' });
+      assert.deepEqual(oppPlan.map((p) => p.action), ['announce']);
+    });
+
+    test('planAbilitySteps: when-played + search compound detected', async () => {
+      const { planAbilitySteps, hasWhenPlayedSearchChain } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'When you play this Pokémon from your hand, search your deck for up to 2 Basic Pokémon and put them onto your Bench.';
+      const steps = parseAbility(text);
+      assert.ok(hasWhenPlayedSearchChain(steps));
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['search', 'when-played']
+      );
+    });
+
+    test('planAbilitySteps: passive steps skipped in compound plan', async () => {
+      const { planAbilitySteps } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'Once during your turn, you may draw a card. This Pokémon takes 30 less damage from attacks.';
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['draw', 'skip']
+      );
+      assert.equal(plan[1].reason, 'passive');
     });

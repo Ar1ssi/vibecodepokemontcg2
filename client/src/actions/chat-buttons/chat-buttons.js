@@ -17,6 +17,20 @@ import {
   parseMoveDamage,
   parseLookAtTop,
   parseRecursionFromDiscard,
+  stackDamageReductions,
+  stackDamageBonuses,
+  parseThorns,
+  parseKoPrevention,
+  parseHpBonus,
+  pokemonHpThreshold,
+  parsePrizeModify,
+  applyPrizeModify,
+  parseRetreatCostModifier,
+  applyRetreatCostModifier,
+  parseEnergyMultiplier,
+  expandEnergyForMultiplier,
+  findEnergyMultiplier,
+  parseCheckupEffect,
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
@@ -42,7 +56,7 @@ import {
   resolveTurnBoundary,
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp } from '../../setup/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumHpBonus } from '../../setup/rules/stadium-effects.mjs';
 
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
@@ -60,12 +74,52 @@ const placeSelfDamage = (user, zoneId, index, damage) => {
 
 // Rules mode: an attack (or pass) ends the turn — advance rulesState and
 // refresh the HUD/panel via the same event updateTurnBanner() uses.
+const applyCheckupPassives = (endingPlayer) => {
+  for (const player of ['self', 'opp']) {
+    for (const zoneId of ['active', 'bench']) {
+      const zone = getZone(player, zoneId);
+      for (let idx = 0; idx < zone.array.length; idx++) {
+        const source = zone.array[idx];
+        if (source.type !== 'Pokémon') continue;
+        const checkup = parseCheckupEffect(source);
+        if (!checkup?.count) continue;
+        appendMessage(
+          '',
+          `🩺 ${checkup.source}: Pokémon Checkup — ${checkup.count} damage counter${checkup.count !== 1 ? 's' : ''} (see card text).`,
+          'announcement',
+          false
+        );
+        for (const targetPlayer of ['self', 'opp']) {
+          for (const targetZone of ['active', 'bench']) {
+            const tZone = getZone(targetPlayer, targetZone);
+            for (let tIdx = 0; tIdx < tZone.array.length; tIdx++) {
+              const target = tZone.array[tIdx];
+              if (target.type !== 'Pokémon') continue;
+              if (
+                checkup.exceptName &&
+                String(target.name || '').toLowerCase().includes(checkup.exceptName)
+              ) {
+                continue;
+              }
+              if (checkup.targetHasAbility && !(target.ability?.text || target.abilityText)) {
+                continue;
+              }
+              placeSelfDamage(targetPlayer, targetZone, tIdx, checkup.count);
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
 const endTurnWithBanner = (user) => {
   // SOLO turn-boundary: resolve this player's active status (poison/burn
   // damage, asleep/paralyzed clear) BEFORE the turn advances. Shared by both
   // attack() and pass(), so pass is covered too. Mirrors the +Turn button
   // path in rules-bridge.js; solo never goes through rules-bridge, so there is
   // no double-resolve.
+  applyCheckupPassives(user);
   const active = getZone(user, 'active').array[0];
   if (active) {
     const key = active.image?.dataset?.cardId || active.name;
@@ -213,7 +267,28 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             }
           }
         }
-        if (!canPayAttackCost(energyTypes, effectiveCost)) {
+        let payableEnergies = energyTypes;
+        if (rulesState.enabled) {
+          const inPlay = [
+            ...getZone(user, 'active').array,
+            ...getZone(user, 'bench').array,
+          ].filter((c) => c.type === 'Pokémon');
+          const mult = findEnergyMultiplier(inPlay);
+          if (mult) {
+            payableEnergies = expandEnergyForMultiplier(
+              energyTypes,
+              mult.multiplier,
+              mult.energyType
+            );
+            appendMessage(
+              user,
+              `⚡ ${mult.source}: Energy counts as ×${mult.multiplier}!`,
+              'announcement',
+              false
+            );
+          }
+        }
+        if (!canPayAttackCost(payableEnergies, effectiveCost)) {
           appendMessage(user, `⛔ Not enough energy for ${atk.name}.`, 'announcement', false);
           return; // turn does NOT end
         }
@@ -400,6 +475,43 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
         let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
 
+        // Attacker-side damage bonus + defender-side passive reduction
+        if (rulesState.enabled) {
+          const bonusSources = [
+            active,
+            ...getZone(user, 'bench').array.filter((c) => c.type === 'Pokémon'),
+          ];
+          const bonusResult = stackDamageBonuses(dmg.total, bonusSources);
+          if (bonusResult.total !== dmg.total) {
+            for (const b of bonusResult.applied) {
+              appendMessage(
+                user,
+                `💪 ${b.source}: +${b.bonus} damage!`,
+                'announcement',
+                false
+              );
+            }
+            dmg = { ...dmg, total: bonusResult.total };
+          }
+
+          const reduceSources = [
+            oppActive,
+            ...getZone(oppPlayer, 'bench').array.filter((c) => c.type === 'Pokémon'),
+          ];
+          const reduceResult = stackDamageReductions(dmg.total, reduceSources);
+          if (reduceResult.total !== dmg.total) {
+            for (const r of reduceResult.applied) {
+              appendMessage(
+                user,
+                `🛡️ ${r.source}: −${r.reduce} damage!`,
+                'announcement',
+                false
+              );
+            }
+            dmg = { ...dmg, total: reduceResult.total };
+          }
+        }
+
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
           const prevention = parseDamagePrevention(oppActive);
@@ -459,20 +571,62 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           currentDmg =
             parseInt(oppActive.image.damageCounter.textContent || '0', 10) || 0;
         }
-        const totalDmg = currentDmg + dmg.total;
+        const stadiumBonus = getStadiumHpBonus(oppPlayer);
+        const oppHpThreshold = pokemonHpThreshold(
+          oppActive.hp ?? 0,
+          oppActive,
+          stadiumBonus
+        );
+
+        // KO-prevention: full-HP survive (e.g. Resolute Heart)
+        let damageToPlace = dmg.total;
+        const koPrev = parseKoPrevention(oppActive);
+        if (
+          rulesState.enabled &&
+          koPrev.fullHpOnly &&
+          currentDmg === 0 &&
+          currentDmg + damageToPlace >= oppHpThreshold
+        ) {
+          const surviveHp = koPrev.surviveHp ?? 10;
+          const maxAllowed = Math.max(0, oppHpThreshold - surviveHp);
+          if (currentDmg + damageToPlace > maxAllowed) {
+            damageToPlace = Math.max(0, maxAllowed - currentDmg);
+            appendMessage(
+              user,
+              `💚 ${oppActive.name}: not Knocked Out (${surviveHp} HP remaining)!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        const totalDmg = currentDmg + damageToPlace;
 
         // Place damage counters
-        placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
+        placeSelfDamage(oppPlayer, 'active', 0, damageToPlace);
         appendMessage(
           user,
-          `💥 ${atk.name} deals ${dmg.total} damage!`,
+          `💥 ${atk.name} deals ${damageToPlace} damage!`,
           'announcement',
           false
         );
 
-        // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer);
-        if (oppHp > 0 && totalDmg >= oppHp) {
+        // Thorns: damage back to attacker after defender is hit
+        if (rulesState.enabled && damageToPlace > 0) {
+          const thorns = parseThorns(oppActive);
+          if (thorns?.count > 0) {
+            placeSelfDamage(user, 'active', 0, thorns.count);
+            appendMessage(
+              user,
+              `🌵 ${oppActive.name}: ${thorns.count} damage counter(s) on the attacker!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // KO check → prizes (effective HP includes stadium + ability bonuses)
+        if (oppHpThreshold > 0 && totalDmg >= oppHpThreshold) {
           const koResult = handleKO({
             attackerPlayer: user,
             defender: oppActive,
@@ -481,13 +635,24 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           if (koResult.won) {
             appendMessage(user, '🏆 Victory!', 'announcement', false);
           } else {
+            let prizeCount = koResult.prizeCount;
+            const prizeMod = parsePrizeModify(oppActive);
+            if (prizeMod?.delta) {
+              prizeCount = applyPrizeModify(prizeCount, prizeMod.delta);
+              appendMessage(
+                user,
+                `🎁 ${oppActive.name}: prize count ${prizeMod.delta > 0 ? '+' : ''}${prizeMod.delta}!`,
+                'announcement',
+                false
+              );
+            }
             appendMessage(
               user,
-              `🎯 KO! ${koResult.prizeCount} prize${koResult.prizeCount !== 1 ? 's' : ''} taken.`,
+              `🎯 KO! ${prizeCount} prize${prizeCount !== 1 ? 's' : ''} taken.`,
               'announcement',
               false
             );
-            await _takePrizesWithPicker(user, koResult.prizeCount);
+            await _takePrizesWithPicker(user, prizeCount);
             // P4: real promotion — move KO'd active to discard, promote first bench.
             const benchCount = getZone(oppPlayer, 'bench').getCount();
             const plan = planPromotion(true, benchCount);
@@ -889,7 +1054,20 @@ export const retreat = (user, emit = true) => {
     }
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
-    const retreatCost = active?.retreatCost ?? 0;
+    let retreatCost = active?.retreatCost ?? 0;
+    const retreatMod = parseRetreatCostModifier(active);
+    if (retreatMod?.delta) {
+      const modified = applyRetreatCostModifier(retreatCost, retreatMod.delta);
+      if (modified !== retreatCost) {
+        appendMessage(
+          user,
+          `🏃 ${active?.name || 'This Pokémon'}: retreat cost ${retreatMod.delta > 0 ? '+' : ''}${retreatMod.delta}!`,
+          'announcement',
+          false
+        );
+      }
+      retreatCost = modified;
+    }
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const activeZone = getZone(user, 'active');
       const attachedEnergies = activeZone.array.filter(
@@ -945,7 +1123,7 @@ const parseHealAmount = (abilityText) => {
 // active Pokémon using the active's own heal-family ability. Does NOT end the
 // turn (like retreat). Damage-counter updates relay in multiplayer via the
 // existing updateDamageCounter/removeDamageCounter actions.
-export const healAbility = async (user, emit = true, targetCard = null) => {
+export const healAbility = async (user, emit = true, targetCard = null, options = {}) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
@@ -963,7 +1141,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
-  if (classifyAbility(target) !== 'heal') {
+  if (!options.orchestrated && classifyAbility(target) !== 'heal') {
     appendMessage(
       user,
       `⛔ ${target.name || 'This Pokémon'} has no heal ability.`,
@@ -973,7 +1151,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, target)) {
+  if (rulesState.enabled && !options.orchestrated && abilityUsed(user, target)) {
     appendMessage(
       user,
       `⛔ ${target.name}'s heal ability was already used this turn.`,
@@ -1008,7 +1186,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     updateDamageCounter(user, zoneId, zoneIdx, current - amount, emit);
   }
 
-  if (rulesState.enabled) markAbilityUsed(user, target);
+  if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   appendMessage(
     user,
     `💖 ${target.name} heals ${healed} damage counter${healed !== 1 ? 's' : ''}.`,
@@ -1020,7 +1198,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
 // Switch ability (taxonomy C, once-per-turn): free active↔bench swap using the
 // active's own switch-family ability. No energy cost (unlike retreat) and does
 // NOT end the turn. Card movement relays in multiplayer via moveCard.
-export const switchAbility = async (user, emit = true, targetCard = null) => {
+export const switchAbility = async (user, emit = true, targetCard = null, options = {}) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
@@ -1039,7 +1217,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
-  if (classifyAbility(target) !== 'switch') {
+  if (!options.orchestrated && classifyAbility(target) !== 'switch') {
     appendMessage(
       user,
       `⛔ ${target.name || 'This Pokémon'} has no switch ability.`,
@@ -1049,7 +1227,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, target)) {
+  if (rulesState.enabled && !options.orchestrated && abilityUsed(user, target)) {
     appendMessage(
       user,
       `⛔ ${target.name}'s switch ability was already used this turn.`,
@@ -1081,7 +1259,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     moveCard(user, user, 'bench', 'active', 0);
   }
 
-  if (rulesState.enabled) markAbilityUsed(user, target);
+  if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   const newActive = getZone(user, 'active').array[0];
   appendMessage(
     user,
@@ -1094,7 +1272,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
 // Attach-energy ability (taxonomy C, once-per-turn): attach an Energy card
 // from hand to the active Pokémon using its own attach-family ability.
 // Does NOT end the turn.
-export const attachAbility = async (user, emit = true, targetCard = null) => {
+export const attachAbility = async (user, emit = true, targetCard = null, options = {}) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
@@ -1112,7 +1290,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
     ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
 
   await ensureCardData(target);
-  if (classifyAbility(target) !== 'attach') {
+  if (!options.orchestrated && classifyAbility(target) !== 'attach') {
     appendMessage(
       user,
       `⛔ ${target.name || 'This Pokémon'} has no attach ability.`,
@@ -1122,7 +1300,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, target)) {
+  if (rulesState.enabled && !options.orchestrated && abilityUsed(user, target)) {
     appendMessage(
       user,
       `⛔ ${target.name}'s attach ability was already used this turn.`,
@@ -1150,7 +1328,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
   // Attach: hand → target. targetIndex triggers attachCard path.
   moveCard(user, user, 'hand', targetZone, energyIndex, targetIdx);
 
-  if (rulesState.enabled) markAbilityUsed(user, target);
+  if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   appendMessage(
     user,
     `⚡ ${target.name} attaches ${energy.name || 'an Energy card'} via its ability.`,
@@ -1163,7 +1341,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
 // from the active Pokémon to another friendly Pokémon.
 // Auto-fast-path: if exactly 1 energy + 1 target → immediate move.
 // General path: two-step picker (pick energy → pick target).
-export const energyRedirectAbility = async (user, emit = true, targetCard = null) => {
+export const energyRedirectAbility = async (user, emit = true, targetCard = null, options = {}) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
@@ -1183,7 +1361,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
 
   await ensureCardData(source);
   const family = classifyAbility(source);
-  if (family !== 'energy-redirect') {
+  if (!options.orchestrated && family !== 'energy-redirect') {
     appendMessage(
       user,
       `⛔ ${source.name || 'This Pokémon'} has no energy-redirect ability.`,
@@ -1193,7 +1371,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, source)) {
+  if (rulesState.enabled && !options.orchestrated && abilityUsed(user, source)) {
     appendMessage(
       user,
       `⛔ ${source.name}'s redirect ability was already used this turn.`,
@@ -1239,7 +1417,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
     const { card: energy, idx: energyIdx } = energies[0];
     const { card: destTarget, idx: targetIdx, zone: targetZone } = targets[0];
     moveCard(user, user, sourceZone, targetZone, energyIdx, targetIdx);
-    if (rulesState.enabled) markAbilityUsed(user, source);
+    if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, source);
     appendMessage(
       user,
       `🔀 ${source.name} redirects ${energy.name || 'Energy'} to ${destTarget.name}.`,
@@ -1273,7 +1451,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
   const destTarget = targets[targetPick];
 
   moveCard(user, user, sourceZone, destTarget.zone, energyPick, destTarget.idx);
-  if (rulesState.enabled) markAbilityUsed(user, source);
+  if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, source);
   appendMessage(
     user,
     `🔀 ${source.name} redirects ${energyCard.name || 'Energy'} to ${destTarget.card.name}.`,
@@ -1417,7 +1595,7 @@ async function _takePrizesWithPicker(user, count) {
 }
 
 // Shared guards for once-per-turn ability executors.
-const abilityTurnAndUsageGuard = (user, target, family) => {
+const abilityTurnAndUsageGuard = (user, target, family, options = {}) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return false;
@@ -1426,7 +1604,7 @@ const abilityTurnAndUsageGuard = (user, target, family) => {
     appendMessage(user, '⛔ No Pokémon.', 'announcement', false);
     return false;
   }
-  if (family && classifyAbility(target) !== family) {
+  if (family && !options.orchestrated && classifyAbility(target) !== family) {
     appendMessage(
       user,
       `⛔ ${target.name || 'This Pokémon'} has no ${family} ability.`,
@@ -1435,7 +1613,7 @@ const abilityTurnAndUsageGuard = (user, target, family) => {
     );
     return false;
   }
-  if (rulesState.enabled && abilityUsed(user, target)) {
+  if (rulesState.enabled && !options.orchestrated && abilityUsed(user, target)) {
     appendMessage(
       user,
       `⛔ ${target.name}'s ability was already used this turn.`,
@@ -1596,10 +1774,10 @@ const openAbilityChoicePicker = ({
 
 // Search ability (taxonomy C, once-per-turn): full-deck filtered search via
 // choice picker (Trainer-style). Does NOT end the turn.
-export const searchAbility = async (user, emit = true, targetCard = null) => {
+export const searchAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
-  if (!abilityTurnAndUsageGuard(user, target, 'search')) return;
+  if (!abilityTurnAndUsageGuard(user, target, 'search', options)) return;
 
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
@@ -1638,7 +1816,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
 
   const finishSearch = () => {
     shuffleZone(user, user, 'deck');
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   };
 
   if (count > 1) {
@@ -1696,7 +1874,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
 };
 
 // Draw ability (taxonomy C, once-per-turn): draw N from deck. Does NOT end turn.
-export const drawAbility = async (user, emit = true, targetCard = null) => {
+export const drawAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
 
@@ -1713,7 +1891,7 @@ export const drawAbility = async (user, emit = true, targetCard = null) => {
     );
     return;
   }
-  if (!abilityTurnAndUsageGuard(user, target)) return;
+  if (!abilityTurnAndUsageGuard(user, target, null, options)) return;
 
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
@@ -1747,7 +1925,7 @@ export const drawAbility = async (user, emit = true, targetCard = null) => {
     }
   }
 
-  if (rulesState.enabled) markAbilityUsed(user, target);
+  if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   appendMessage(
     user,
     `🃏 ${target.name} draws ${drew} card${drew !== 1 ? 's' : ''}.`,
@@ -1757,10 +1935,10 @@ export const drawAbility = async (user, emit = true, targetCard = null) => {
 };
 
 // Status ability: apply a Special Condition to the opponent's Active Pokémon.
-export const statusAbility = async (user, emit = true, targetCard = null) => {
+export const statusAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
-  if (!abilityTurnAndUsageGuard(user, target, 'status')) return;
+  if (!abilityTurnAndUsageGuard(user, target, 'status', options)) return;
 
   const parsed = parseStatusInflict(target);
   if (!parsed?.status) {
@@ -1785,7 +1963,7 @@ export const statusAbility = async (user, emit = true, targetCard = null) => {
 
   const key = statusTarget.image?.dataset?.cardId || statusTarget.name;
   applyStatus(statusPlayer, key, parsed.status);
-  if (rulesState.enabled) markAbilityUsed(user, target);
+  if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   appendMessage(
     user,
     `💫 ${target.name} makes ${statusTarget.name} ${parsed.status}.`,
@@ -1795,10 +1973,10 @@ export const statusAbility = async (user, emit = true, targetCard = null) => {
 };
 
 // Move-damage ability: place damage counters on opponent Pokémon.
-export const moveDamageAbility = async (user, emit = true, targetCard = null) => {
+export const moveDamageAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
-  if (!abilityTurnAndUsageGuard(user, target, 'move-damage')) return;
+  if (!abilityTurnAndUsageGuard(user, target, 'move-damage', options)) return;
 
   const parsed = parseMoveDamage(target);
   if (!parsed || parsed.count === null) {
@@ -1840,7 +2018,7 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null) =>
     } else {
       addDamageCounter(damagePlayer, zone, idx, amount, emit);
     }
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
     appendMessage(
       user,
       `💥 ${target.name} places ${amount} damage counter${amount !== 1 ? 's' : ''} on ${card.name}.`,
@@ -1866,10 +2044,10 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null) =>
 };
 
 // Look-at-top ability: reveal top N cards; optionally take one to hand.
-export const lookAtTopAbility = async (user, emit = true, targetCard = null) => {
+export const lookAtTopAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
-  if (!abilityTurnAndUsageGuard(user, target, 'look-at-top')) return;
+  if (!abilityTurnAndUsageGuard(user, target, 'look-at-top', options)) return;
 
   const parsed = parseLookAtTop(target);
   if (!parsed?.count) {
@@ -1890,7 +2068,7 @@ export const lookAtTopAbility = async (user, emit = true, targetCard = null) => 
 
   const topCards = deck.array.slice(0, parsed.count);
   const finish = () => {
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   };
 
   if (parsed.takeToHand) {
@@ -1940,10 +2118,10 @@ export const lookAtTopAbility = async (user, emit = true, targetCard = null) => 
 };
 
 // Recursion ability: put a card from discard into hand.
-export const recursionAbility = async (user, emit = true, targetCard = null) => {
+export const recursionAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
-  if (!abilityTurnAndUsageGuard(user, target, 'recursion')) return;
+  if (!abilityTurnAndUsageGuard(user, target, 'recursion', options)) return;
 
   const parsed = parseRecursionFromDiscard(target);
   if (!parsed?.count) {
@@ -1963,7 +2141,7 @@ export const recursionAbility = async (user, emit = true, targetCard = null) => 
   }
 
   const finish = () => {
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
   };
 
   openAbilityChoicePicker({
@@ -1988,10 +2166,10 @@ export const recursionAbility = async (user, emit = true, targetCard = null) => 
 };
 
 // Evolve ability: evolve this Pokémon using a card from hand.
-export const evolveAbility = async (user, emit = true, targetCard = null) => {
+export const evolveAbility = async (user, emit = true, targetCard = null, options = {}) => {
   const { target, targetZone, targetIdx } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
-  if (!abilityTurnAndUsageGuard(user, target, 'evolve')) return;
+  if (!abilityTurnAndUsageGuard(user, target, 'evolve', options)) return;
 
   const hand = getZone(user, 'hand');
   const valid = [];
@@ -2016,7 +2194,7 @@ export const evolveAbility = async (user, emit = true, targetCard = null) => {
   const finishEvolve = async (entry) => {
     moveCard(user, user, 'hand', targetZone, entry.idx, targetIdx);
     markEvolvedThisTurn(user, target.name);
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled && !options.orchestrated) markAbilityUsed(user, target);
     appendMessage(
       user,
       `🧬 ${target.name} evolves into ${entry.card.name}!`,

@@ -29,18 +29,19 @@ import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
-import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay } from './ability-executors.mjs';
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
 import { classifyAbility, describeAbilityFamily } from './ability-effects.mjs';
 import {
   planAbilitySteps,
   actionableAbilityPlan,
-  hasWhenPlayedSearchChain,
 } from './ability-step-plan.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
-import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, searchAbility, drawAbility, statusAbility, moveDamageAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
+import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
+import { hideCard } from '../../actions/general/reveal-and-hide.js';
+import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw } from '../../actions/zones/hand-actions.js';
@@ -193,21 +194,6 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       };
       const costStr = (arr) => (arr || []).map(s => energySymbols[s] || s).join('');
 
-      // Map ability family → executor function
-      const abilityFns = {
-        'heal': healAbility,
-        'switch': switchAbility,
-        'attach': attachAbility,
-        'energy-redirect': energyRedirectAbility,
-        'search': searchAbility,
-        'draw': drawAbility,
-        'status': statusAbility,
-        'move-damage': moveDamageAbility,
-        'look-at-top': lookAtTopAbility,
-        'recursion': recursionAbility,
-        'evolve': evolveAbility,
-      };
-
       const refresh = async () => {
         if (!rulesState.enabled || rulesState.turnPlayer !== 'self' || rulesState.phase === 'ended') {
           win.hidden = true;
@@ -246,12 +232,25 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         const stadiumCard = getStadium()?.card;
         const stadiumCostModifier = stadiumCard ? parseStadiumCostModifier(stadiumCard) : 0;
         const abilityUsedFlag = abilityUsed('self', active);
+        let priorAttacks = [];
+        if (parseAttackInheritance(active)) {
+          appendMessage(
+            '',
+            `🧬 ${active.name}: can use attacks from previous Evolutions (see card text).`,
+            'announcement',
+            false
+          );
+          if (active.evolvesFrom) {
+            priorAttacks = [];
+          }
+        }
 
         const { attacks: atkList, abilities: abList } = listUsableActions(active, {
           energyTypes,
           stadiumCostModifier,
           abilityUsed: abilityUsedFlag,
           rulesEnabled: true,
+          priorAttacks,
         });
 
         let html = '';
@@ -387,6 +386,55 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           return; // turn already ended by an attack
         }
     
+        // Pokémon Checkup passive abilities (Froslass pattern) before status boundary
+        if (rulesState.enabled) {
+          for (const player of ['self', 'opp']) {
+            for (const zoneId of ['active', 'bench']) {
+              for (const source of getZone(player, zoneId).array) {
+                if (source.type !== 'Pokémon') continue;
+                const checkup = parseCheckupEffect(source);
+                if (!checkup?.count) continue;
+                appendMessage(
+                  '',
+                  `🩺 ${checkup.source}: Pokémon Checkup — ${checkup.count} damage counter${checkup.count !== 1 ? 's' : ''}.`,
+                  'announcement',
+                  false
+                );
+                for (const targetPlayer of ['self', 'opp']) {
+                  for (const targetZone of ['active', 'bench']) {
+                    const tZone = getZone(targetPlayer, targetZone);
+                    for (let tIdx = 0; tIdx < tZone.array.length; tIdx++) {
+                      const target = tZone.array[tIdx];
+                      if (target.type !== 'Pokémon') continue;
+                      if (
+                        checkup.exceptName &&
+                        String(target.name || '').toLowerCase().includes(checkup.exceptName)
+                      ) {
+                        continue;
+                      }
+                      if (
+                        checkup.targetHasAbility &&
+                        !(target.ability?.text || target.abilityText)
+                      ) {
+                        continue;
+                      }
+                      const existing = parseInt(
+                        target.image?.damageCounter?.textContent || '0',
+                        10
+                      ) || 0;
+                      if (target.image?.damageCounter) {
+                        target.image.damageCounter.textContent = existing + checkup.count;
+                      } else {
+                        addDamageCounter(targetPlayer, targetZone, tIdx, checkup.count);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // end-of-turn: resolve the turn player's statuses before passing
         const endingPlayer = rulesState.turnPlayer;
         try {
@@ -1459,6 +1507,11 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       switch: switchAbility,
       attach: attachAbility,
       'energy-redirect': energyRedirectAbility,
+      status: statusAbility,
+      'move-damage': moveDamageAbility,
+      'look-at-top': lookAtTopAbility,
+      recursion: recursionAbility,
+      evolve: evolveAbility,
     };
 
     const autoExecuteAbilitySteps = (user, card, steps) => {
@@ -1528,44 +1581,44 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
           if (fn) {
             await fn(user, true, card, orchestrated);
             executed = true;
-          }
-        } else if (item.action === 'recursion-discard') {
-          const discard = getZone(user, 'discard');
-          const matches = [];
-          for (const c of discard.array) {
-            await ensureCardData(c);
-            if (isPokemonCard(c) || String(c.name || '').toLowerCase().includes('energy')) {
-              matches.push(c);
+          } else if (item.executor === 'recursion-discard') {
+            const discard = getZone(user, 'discard');
+            const matches = [];
+            for (const c of discard.array) {
+              await ensureCardData(c);
+              if (isPokemonCard(c) || String(c.name || '').toLowerCase().includes('energy')) {
+                matches.push(c);
+              }
             }
-          }
-          if (matches.length > 0) {
-            const upTo = item.step.upTo || 1;
-            if (upTo > 1) {
-              const result = await awaitChoicePicker({
-                title: `${card.name} — choose up to ${upTo} cards from discard`,
-                candidates: matches,
-                zoneFrom: 'discard',
-                destination: 'hand',
-                multiSelect: true,
-                requiredCount: Math.min(upTo, matches.length),
-                onConfirm: (selected) => {
-                  import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                    for (const s of selected) {
-                      const idx = getZone(user, 'discard').array.indexOf(s);
-                      if (idx >= 0) moveCardBundle(user, user, 'discard', 'hand', idx, false, 'move');
-                    }
-                  });
-                },
-              });
-              if (result.ok) executed = true;
-            } else {
-              const result = await awaitChoicePicker({
-                title: `${card.name} — take a card from discard`,
-                candidates: matches,
-                zoneFrom: 'discard',
-                destination: 'hand',
-              });
-              if (result.ok) executed = true;
+            if (matches.length > 0) {
+              const upTo = item.step.upTo || 1;
+              if (upTo > 1) {
+                const result = await awaitChoicePicker({
+                  title: `${card.name} — choose up to ${upTo} cards from discard`,
+                  candidates: matches,
+                  zoneFrom: 'discard',
+                  destination: 'hand',
+                  multiSelect: true,
+                  requiredCount: Math.min(upTo, matches.length),
+                  onConfirm: (selected) => {
+                    import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                      for (const s of selected) {
+                        const idx = getZone(user, 'discard').array.indexOf(s);
+                        if (idx >= 0) moveCardBundle(user, user, 'discard', 'hand', idx, false, 'move');
+                      }
+                    });
+                  },
+                });
+                if (result.ok) executed = true;
+              } else {
+                const result = await awaitChoicePicker({
+                  title: `${card.name} — take a card from discard`,
+                  candidates: matches,
+                  zoneFrom: 'discard',
+                  destination: 'hand',
+                });
+                if (result.ok) executed = true;
+              }
             }
           }
         } else if (item.action === 'look-at-top') {
@@ -1795,52 +1848,18 @@ if (!isTrainer) {
                           appendMessage('', describeAbilityFamily(card), 'announcement', false);
                         }
     
-                        // auto-apply draw abilities once per turn (tracked in rulesState)
-                        const drawStep = steps.find((s) => s.type === 'drawAbility');
-                        if (drawStep && !abilityUsed('self', card)) {
-                          import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                            for (let k = 0; k < drawStep.count; k++) {
-                              try {
-                                if (getZone('self', 'deck').getCount() > 0) {
-                                  moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
-                                }
-                              } catch {}
-                            }
-                            markAbilityUsed('self', card);
-                            appendMessage('', `  auto: drew ${drawStep.count} (ability used this turn)`, 'announcement', false);
-                          });
-                        }
+                        // compound ability orchestration (auto: draw + when-played chains)
+                        autoExecuteAbilitySteps('self', card, steps);
 
-                        // "When you play this Pokémon" — one-shot, fires once ever
-                        // (poller re-visits cards, so gate on a per-card DOM flag)
-                        if (!img.__rulesWhenPlayedFired) {
-                          const effect = parseWhenPlayedEffect(card);
-                          if (effect) {
-                            img.__rulesWhenPlayedFired = true;
-                            if (effect.kind === 'draw') {
-                              import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                                for (let k = 0; k < effect.n; k++) {
-                                  try {
-                                    if (getZone('self', 'deck').getCount() > 0) {
-                                      moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
-                                    }
-                                  } catch {}
-                                }
-                                appendMessage('', `  auto: when played — drew ${effect.n} card(s)`, 'announcement', false);
-                              });
-                            } else if (effect.kind === 'damage') {
-                              const oppActive = getZone('opp', 'active').array[0];
-                              const existing = parseInt(oppActive?.image?.damageCounter?.textContent || '0', 10) || 0;
-                              if (oppActive?.image) {
-                                if (existing) {
-                                  import('../../actions/counters/damage-counter.js').then(({ updateDamageCounter }) => updateDamageCounter('opp', 'active', 0, existing + effect.n));
-                                } else {
-                                  import('../../actions/counters/damage-counter.js').then(({ addDamageCounter }) => addDamageCounter('opp', 'active', 0, effect.n));
-                                }
-                              }
-                              appendMessage('', `  auto: when played — placed ${effect.n} damage counter(s) on opponent's Active`, 'announcement', false);
-                            }
-                          }
+                        if (parseSetupFaceDown(card) && !img.__rulesSetupFaceDown) {
+                          img.__rulesSetupFaceDown = true;
+                          hideCard('self', card);
+                          appendMessage(
+                            '',
+                            `🎭 ${card.name}: placed face-down (setup ability).`,
+                            'announcement',
+                            false
+                          );
                         }
 
                         // opponent-disrupt: "Discard N cards from your opponent's
@@ -2067,6 +2086,73 @@ if (!isTrainer) {
         if (user !== 'self' || !card) return;
         processBoardCard(card);
       });
+
+      document.addEventListener('rules-pokemon-in-play', (event) => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        const { user, card, zoneId, fromZone } = event.detail || {};
+        if (!card?.image || card.image.__rulesPokemonInPlay) return;
+        card.image.__rulesPokemonInPlay = true;
+        ensureCardData(card).then(() => {
+          if (parseSetupFaceDown(card) && !card.image.__rulesSetupFaceDown) {
+            card.image.__rulesSetupFaceDown = true;
+            hideCard(user, card);
+            appendMessage(
+              '',
+              `🎭 ${card.name}: placed face-down (setup ability).`,
+              'announcement',
+              false
+            );
+          }
+          if (fromZone === 'bench' && zoneId === 'active') {
+            const steps = parseAbility(card.ability?.text || card.abilityText || '');
+            const promo = steps.find((s) => s.type === 'onPromotionAbility');
+            if (promo) {
+              appendMessage(
+                '',
+                `⬆️ ${card.name}: ${promo.guidance}`,
+                'announcement',
+                false
+              );
+            }
+          }
+        });
+      });
+
+      document.addEventListener('rules-opponent-evolved', (event) => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        const { user: evolvingPlayer, evolvedCard, zoneId } = event.detail || {};
+        const reactivePlayer = evolvingPlayer === 'self' ? 'opp' : 'self';
+        const sources = [
+          ...getZone(reactivePlayer, 'active').array,
+          ...getZone(reactivePlayer, 'bench').array,
+        ].filter((c) => c.type === 'Pokémon');
+        for (const source of sources) {
+          ensureCardData(source).then(() => {
+            const trigger = parseOnOpponentEvolve(source);
+            if (!trigger?.count) return;
+            const tZone = getZone(evolvingPlayer, zoneId);
+            const tIdx = tZone.array.findIndex((c) => c.image === evolvedCard.image);
+            if (tIdx < 0) return;
+            const existing =
+              parseInt(
+                evolvedCard.image?.damageCounter?.textContent || '0',
+                10
+              ) || 0;
+            if (evolvedCard.image?.damageCounter) {
+              evolvedCard.image.damageCounter.textContent = existing + trigger.count;
+            } else {
+              addDamageCounter(evolvingPlayer, zoneId, tIdx, trigger.count);
+            }
+            appendMessage(
+              '',
+              `⚡ ${source.name}: ${trigger.count} damage counter(s) on evolved ${evolvedCard.name}!`,
+              'announcement',
+              false
+            );
+          });
+        }
+      });
+
       // Backstop: catches anything that (for whatever reason) didn't fire
       // the event above — same logic, just on a slow poll so it's never
       // the thing the player is waiting on.

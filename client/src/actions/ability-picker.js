@@ -23,6 +23,7 @@ import {
   recursionAbility,
   evolveAbility,
 } from './chat-buttons/chat-buttons.js';
+import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
 
 // Map family → executor function
 const FAMILY_EXECUTORS = {
@@ -113,11 +114,10 @@ export async function abilityPicker(user) {
     return;
   }
 
-  // Exactly 1 usable → execute directly
+  // Exactly 1 usable → execute via compound step orchestrator
   if (usable.length === 1) {
-    const { card, family } = usable[0];
-    const executor = FAMILY_EXECUTORS[family];
-    await executor(user, true, card);
+    const { card } = usable[0];
+    await runAbilitySteps(user, card);
     return;
   }
 
@@ -164,8 +164,7 @@ function showAbilityPopup(user, usable) {
     useBtn.textContent = 'Use';
     useBtn.addEventListener('click', async () => {
       closePopup(popup);
-      const executor = FAMILY_EXECUTORS[family];
-      await executor(user, true, card);
+      await runAbilitySteps(user, card);
     });
     row.appendChild(useBtn);
 
