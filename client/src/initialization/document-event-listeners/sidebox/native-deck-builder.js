@@ -323,6 +323,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                       id: mat.id,
                       title: mat.title,
                       image: mat.image,
+                      // The local `image` is absent from a deploy, so the
+                      // board needs the scraped original to fall back on.
+                      imageUrl: mat.imageUrl,
                       thumb: mat.thumb,
                       layout: mat.layout,
                     }

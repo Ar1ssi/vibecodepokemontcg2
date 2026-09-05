@@ -53,6 +53,39 @@ const frameDocuments = () => {
 
 const boardDocuments = () => [document, ...frameDocuments()];
 
+/** Identifies the newest paint so a slow probe cannot overwrite a later pick. */
+let matPaintToken = 0;
+
+/**
+ * Point `--mat-image` at the mat's artwork, preferring the local file.
+ *
+ * `png/` is gitignored and so is absent from a deploy, where the local path
+ * 404s but the scraped CDN original still resolves. A CSS background reports
+ * no load failure, so the local file is probed and the variable re-pointed at
+ * the remote copy if it is missing.
+ */
+const paintMatImage = (mat) => {
+  const token = ++matPaintToken;
+  // A relative url() inside a custom property is resolved against the
+  // stylesheet that consumes it, not the document, so a catalog path like
+  // `src/assets/...` would be looked up under `src/css/`. Resolve it against
+  // the page first so the variable carries an absolute URL.
+  const local = mat.image ? new URL(mat.image, document.baseURI).href : null;
+  const remote = mat.imageUrl || null;
+  const setImage = (url) =>
+    document.documentElement.style.setProperty('--mat-image', `url("${url}")`);
+
+  setImage(local || remote);
+
+  if (!local || !remote) return;
+
+  const probe = new Image();
+  probe.onerror = () => {
+    if (token === matPaintToken) setImage(remote);
+  };
+  probe.src = local;
+};
+
 /**
  * Push a layout profile's variables onto the parent page and both iframes.
  * Zone variables are only meaningful inside the iframes and the stadium ones
@@ -80,7 +113,9 @@ export const applyMatLayout = (layoutId) => {
 export const applyMat = (mat) => {
   const battleMat = document.getElementById('battleMat');
   const art = document.getElementById('battleMatArt');
-  const layout = mat ? resolveMatLayout(mat) : getMatLayout(DEFAULT_MAT_LAYOUT_ID);
+  const layout = mat
+    ? resolveMatLayout(mat)
+    : getMatLayout(DEFAULT_MAT_LAYOUT_ID);
 
   applyMatLayout(layout.id);
 
@@ -98,16 +133,11 @@ export const applyMat = (mat) => {
   }
 
   if (art) {
-    if (mat?.image) {
-      // A relative url() inside a custom property is resolved against the
-      // stylesheet that consumes it, not the document, so a catalog path like
-      // `src/assets/...` would be looked up under `src/css/`. Resolve it
-      // against the page first so the variable carries an absolute URL.
-      const href = new URL(mat.image, document.baseURI).href;
-      // The mat art lives on the parent document, so the variable goes there.
-      document.documentElement.style.setProperty('--mat-image', `url("${href}")`);
+    if (mat?.image || mat?.imageUrl) {
+      paintMatImage(mat);
       art.hidden = false;
     } else {
+      matPaintToken++;
       document.documentElement.style.removeProperty('--mat-image');
       art.hidden = true;
     }
