@@ -16,6 +16,8 @@
 //     and does NOT mutate any game state. Full per-family execution is deferred
 //     pending user confirmation (taxonomy: do not silently build execution).
 
+import { describeTypedSpecialEnergy } from './special-energy-effects.mjs';
+
 // Effect families a special energy can be classified into.
 export const ENERGY_EFFECT_FAMILIES = [
   'double',           // provides 2 energy of the printed type
@@ -170,8 +172,11 @@ export function describeEnergyEffect(card) {
       return `${name}: Switching Energy — may be used to switch your Active Pokémon.`;
     case 'protect':
       return `${name}: Buddy-Buddy Energy — shields this Pokémon from certain opponent effects.`;
-    case 'attach-type':
+    case 'attach-type': {
+      const typed = describeTypedSpecialEnergy(card);
+      if (typed) return typed;
       return `${name}: Special Energy — attached as a modified energy type (see the card text for the exact type).`;
+    }
     case 'basic':
       return `${name}: Basic Energy — provides 1 energy of its printed type.`;
     case 'unknown':
@@ -309,9 +314,8 @@ export function applyProtectCap(damage, hasProtect) {
   return d > 1 ? 1 : d;
 }
 
-// Per-family execution entry point. `attach-type` is fully executed: it
-// reports the effective attached type used for cost payment. Other families
-// remain announce-only until their execution is built.
+// Per-family execution entry point. Typed specials + attach-type report their
+// effective energy type; passive continuous effects are enforced elsewhere.
 export function applyEnergyEffect(card) {
   const family = classifyEnergyEffect(card);
   const description = describeEnergyEffect(card);
