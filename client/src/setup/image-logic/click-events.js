@@ -19,6 +19,7 @@ import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import {
   fullViewHost,
 } from '../deck-constructor/hydrate-holo.js';
+import { findZoneCardIndex } from './zone-card-lookup.js';
 import {
   closeCardPreview,
   openCardPreview,
@@ -36,10 +37,10 @@ export const identifyCard = (event) => {
     mouseClick.cardIndex =
       getZone(mouseClick.cardUser, mouseClick.zoneId).getCount() - 1;
   } else {
-    mouseClick.cardIndex = getZone(
-      mouseClick.cardUser,
-      mouseClick.zoneId
-    ).array.findIndex((card) => card.image === event.target);
+    mouseClick.cardIndex = findZoneCardIndex(
+      getZone(mouseClick.cardUser, mouseClick.zoneId),
+      event.target
+    );
   }
 };
 
@@ -226,8 +227,9 @@ export const imageClick = (event) => {
   if (event.target.classList.contains('selectHighlight')) {
     closePopups(event);
     const dZoneId = event.target.parentElement.parentElement.id;
-    const targetIndex = getZone(event.target.user, dZoneId).array.findIndex(
-      (card) => card.image === event.target
+    const targetIndex = findZoneCardIndex(
+      getZone(event.target.user, dZoneId),
+      event.target
     );
     moveCardBundle(
       mouseClick.cardUser,
