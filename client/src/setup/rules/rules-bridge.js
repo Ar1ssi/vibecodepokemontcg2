@@ -362,6 +362,11 @@ import {
       if (!btn) return;
       btn.addEventListener('click', async (event) => {
         if (!rulesState.enabled) return;
+        // Suppress pass() and legacy takeTurn before any await — otherwise
+        // the bubble handler runs while this async listener is suspended and
+        // the turn advances twice (double start-of-turn draw for the opponent).
+        event.preventDefault();
+        event.stopImmediatePropagation();
         if (turnEndedByAttack) {
           turnEndedByAttack = false;
           return; // turn already ended by an attack
@@ -515,8 +520,6 @@ import {
         // "interrupt" the opponent right after we passed the turn. Deliberate,
         // rules-mode-only exception to the "capture hooks don't suppress"
         // invariant (which protects the Set Up / Reset hooks).
-        event.preventDefault();
-        event.stopImmediatePropagation();
         const next = endTurn(rulesState.turnPlayer);
         appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
         updateTurnBanner();
@@ -1985,9 +1988,14 @@ if (!isTrainer) {
         } catch {
           return;
         }
-        if (shouldAutoDrawAtTurnStart({ enabled: rulesState.enabled, drewThisTurn: rulesState.flags[player]?.drewThisTurn, deckCount })) {
-          draw(player, player, 1, true);
+        if (shouldAutoDrawAtTurnStart({
+          enabled: rulesState.enabled,
+          drewThisTurn: rulesState.flags[player]?.drewThisTurn,
+          deckCount,
+          turnNumber: rulesState.turnNumber,
+        })) {
           markTurnDrawn(player);
+          draw(player, player, 1, true);
           appendMessage('', `${player === 'self' ? 'P1' : 'P2'} draws a card (start of turn).`, 'announcement', false);
         } else if (Number(deckCount) <= 0) {
           appendMessage('', `${player === 'self' ? 'P1' : 'P2'}'s deck is empty — cannot draw.`, 'announcement', false);
