@@ -75,6 +75,7 @@ export const positionMatCoinSlots = () => {
     );
     const gap = size * 0.2;
     const side = coinScreenSide(target);
+    const playmatRight = window.innerWidth * 0.755;
 
     slot.style.width = `${size}px`;
     slot.style.height = `${size}px`;
@@ -82,11 +83,14 @@ export const positionMatCoinSlots = () => {
     slot.style.transform = 'translateY(-50%)';
     slot.style.right = 'auto';
 
-    if (side === 'left') {
-      slot.style.left = `${rect.left - size - gap}px`;
-    } else {
-      slot.style.left = `${rect.right + gap}px`;
-    }
+    let left =
+      side === 'left'
+        ? rect.left - size - gap
+        : rect.right + gap;
+
+    // Keep tokens inside the playmat column.
+    left = Math.max(gap, Math.min(left, playmatRight - size - gap));
+    slot.style.left = `${left}px`;
   }
 };
 
