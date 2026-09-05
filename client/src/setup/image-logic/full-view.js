@@ -1,4 +1,3 @@
-import { systemState } from '../../front-end.js';
 import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
   cardNode,
@@ -14,16 +13,14 @@ import {
   stopPop,
 } from './card-pop.mjs';
 
-/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, host: HTMLElement | null, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement } | null} */
+/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
 
-// Opponent cards live in the flipped iframe (`.opp { scaleX(-1) scaleY(-1) }` on
-// the parent). Counter-flip the enlarged preview so the art reads upright.
-const needsPreviewUpright = (card, targetImage) => {
-  const cardUser = card?.user ?? targetImage?.user;
-  return cardUser !== systemState.initiator;
+const adoptNode = (node, doc) => {
+  if (!node || node.ownerDocument === doc) return node;
+  return doc.adoptNode(node);
 };
 
 const hideCardCounters = (image) => {
@@ -84,12 +81,12 @@ export const openCardPreview = (targetImage, card) => {
     closeCardPreview(null, true);
   }
 
-  const doc = targetImage.ownerDocument;
+  const zoneDoc = targetImage.ownerDocument;
   const host = fullViewHost(targetImage);
   const anchor = cardNode(card) ?? imageAnchor(targetImage);
   const rect = anchor.getBoundingClientRect();
 
-  const placeholder = doc.createElement('span');
+  const placeholder = zoneDoc.createElement('span');
   placeholder.className = 'card-preview-placeholder';
   placeholder.style.display = 'inline-block';
   placeholder.style.width = `${rect.width}px`;
@@ -97,19 +94,16 @@ export const openCardPreview = (targetImage, card) => {
   placeholder.style.verticalAlign = 'bottom';
   anchor.before(placeholder);
 
-  const overlay = doc.createElement('div');
+  const overlay = document.createElement('div');
   overlay.className = 'card-preview-overlay';
 
-  const popHost = doc.createElement('div');
+  const popHost = document.createElement('div');
   popHost.className = 'card-preview-pop';
-  popHost.appendChild(anchor);
+  popHost.appendChild(adoptNode(anchor, document));
   overlay.appendChild(popHost);
-  doc.body.appendChild(overlay);
+  document.body.appendChild(overlay);
 
   anchor.classList.add('card-preview-card');
-  if (needsPreviewUpright(card, targetImage)) {
-    anchor.classList.add('card-preview-upright');
-  }
   hideCardCounters(targetImage);
 
   const wrapper = card?.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
@@ -125,6 +119,7 @@ export const openCardPreview = (targetImage, card) => {
     placeholder,
     anchor,
     host,
+    zoneDoc,
     card,
     wrapper,
   };
@@ -155,7 +150,7 @@ export const closeCardPreview = (event, immediate = false) => {
     if (wrapper) {
       startHoloAnimation(wrapper, { auto: true });
     }
-    anchor.classList.remove('card-preview-card', 'card-preview-upright');
+    anchor.classList.remove('card-preview-card');
     const primaryImg = anchor.matches('img')
       ? anchor
       : anchor.querySelector('img');
@@ -163,11 +158,12 @@ export const closeCardPreview = (event, immediate = false) => {
       showCardCounters(primaryImg);
     }
 
+    const homeAnchor = adoptNode(anchor, state.zoneDoc);
     if (state.placeholder.isConnected) {
-      state.placeholder.before(anchor);
+      state.placeholder.before(homeAnchor);
       state.placeholder.remove();
     } else if (state.host?.isConnected) {
-      state.host.appendChild(anchor);
+      state.host.appendChild(homeAnchor);
     }
 
     state.overlay.remove();

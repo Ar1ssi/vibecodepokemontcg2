@@ -1608,6 +1608,48 @@ ul, li {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
+/* Double-click bench/active preview — rendered on the main page so the scrim
+   covers the full viewport (both playmat iframes + chrome). */
+.card-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  background-color: rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+}
+.card-preview-pop {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 92vh;
+  max-width: min(94vw, 780px);
+  pointer-events: none;
+}
+.card-preview-pop > img.card-preview-card {
+  display: block;
+  height: min(88vh, calc(min(94vw, 780px) * 1.397));
+  width: auto;
+  max-height: 88vh;
+  max-width: min(94vw, 780px);
+  margin: 0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  border-radius: 0.3rem;
+  pointer-events: auto;
+}
+.card-preview-pop > .mat-holo.card-preview-card {
+  width: auto !important;
+  height: min(88vh, calc(min(94vw, 780px) * 1.397)) !important;
+  max-height: 88vh;
+  max-width: min(94vw, 780px);
+  aspect-ratio: var(--card-aspect);
+  margin: 0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
 /* Custom card modal */
 .native-deck-builder-modal {
   position: absolute;

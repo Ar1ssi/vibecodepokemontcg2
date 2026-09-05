@@ -379,39 +379,7 @@ body, input, textarea, button {
   aspect-ratio: var(--card-aspect);
   margin: 0;
 }
-/* Double-click preview: spring-pop enlargement of the Pokémon only (no panel). */
-.card-preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 3;
-  background-color: rgba(0, 0, 0, 0.45);
-}
-.card-preview-pop {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  max-height: 70%;
-  max-width: 90%;
-}
-.card-preview-pop > img.card-preview-card {
-  height: 70vh;
-  width: auto;
-  max-height: 100%;
-  max-width: 100%;
-  margin: 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  border-radius: 0.3rem;
-}
-.card-preview-pop > .card-preview-card.card-preview-upright {
-  transform: scaleX(-1) scaleY(-1) !important;
-}
-.card-preview-pop > .mat-holo.card-preview-card {
-  width: auto !important;
-  height: 70vh !important;
-  max-height: 100%;
-  aspect-ratio: var(--card-aspect);
-  margin: 0;
-}
+/* Double-click preview styles live in index.css (overlay is on the main page). */
 .card-preview-placeholder {
   visibility: hidden;
   pointer-events: none;

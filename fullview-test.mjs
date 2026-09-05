@@ -28,24 +28,30 @@ const fr = page.frames().find((f) => /self-containers/.test(f.url()));
 const T = (name, ok, extra = '') =>
   console.log(`${ok ? 'PASS' : 'FAIL'} — ${name}${extra ? '  [' + extra + ']' : ''}`);
 
-const snap = (zone) =>
-  fr.evaluate((z) => {
+const snap = async (zone) => {
+  const mat = await fr.evaluate((z) => {
     const host = document.querySelector(`#${z} .play-container`);
-    const previewImg = document.querySelector('.card-preview-pop img');
     const matImg = document.querySelector(`#${z} img`);
     const rotator = matImg?.closest('.card__rotator');
     return {
       matImgW: matImg ? Math.round(matImg.getBoundingClientRect().width) : null,
-      previewImgW: previewImg
-        ? Math.round(previewImg.getBoundingClientRect().width)
-        : null,
       holo: !!matImg?.closest('.mat-holo'),
       hostCls: host?.className ?? null,
-      previewOpen: !!document.querySelector('.card-preview-overlay'),
       fullViews: document.querySelectorAll('.full-view').length,
       rotatorStyle: rotator ? rotator.getAttribute('style') || '' : null,
     };
   }, zone);
+  const preview = await page.evaluate(() => {
+    const previewImg = document.querySelector('.card-preview-pop img');
+    return {
+      previewImgW: previewImg
+        ? Math.round(previewImg.getBoundingClientRect().width)
+        : null,
+      previewOpen: !!document.querySelector('.card-preview-overlay'),
+    };
+  });
+  return { ...mat, ...preview };
+};
 
 const doubleClickCard = (zone) =>
   fr.evaluate((z) => {
@@ -81,7 +87,7 @@ if (!before || before.matImgW == null) {
   process.exit(1);
 }
 
-await fr.evaluate(() => {
+await page.evaluate(() => {
   window.__scales = [];
   const t0 = performance.now();
   const sample = () => {
@@ -97,7 +103,7 @@ await fr.evaluate(() => {
 await doubleClickCard('active');
 await page.waitForTimeout(1200);
 
-const scales = await fr.evaluate(() => window.__scales);
+const scales = await page.evaluate(() => window.__scales);
 const dblOpen = await snap('active');
 
 T('double-click opens card preview overlay', dblOpen.previewOpen === true);
