@@ -20,6 +20,8 @@
       shouldAutoDrawAtTurnStart,
       markTurnDrawn,
       markMulligansResolved,
+      markAttacked,
+      resetRulesSessionState,
     } from './rules-state.mjs';
     import { executeAttack, canPayAttackCost } from './attack-engine.mjs';
     import { handleKO, checkWinConditions, resetPrizes, prizeState } from './ko-flow.mjs';
@@ -536,34 +538,7 @@ import {
     // phase would stay 'draw' and a later Set Up would skip the coin flip.
     const resetRulesSession = () => {
       rulesSessionGeneration += 1;
-      rulesState.phase = 'setup';
-      rulesState.turnNumber = 0;
-      rulesState.turnPlayer = 'self';
-      rulesState.stadium = null;
-      rulesState.mulligansResolved = false;
-      rulesState.attackExecuting = false;
-      rulesState.flags = {
-        self: {
-          energyAttached: false,
-          attackerAttacked: false,
-          evolved: {},
-          supporterPlayed: false,
-          lastSupporterName: '',
-          abilitiesUsed: {},
-          stadiumUsed: false,
-          drewThisTurn: false,
-        },
-        opp: {
-          energyAttached: false,
-          attackerAttacked: false,
-          evolved: {},
-          supporterPlayed: false,
-          lastSupporterName: '',
-          abilitiesUsed: {},
-          stadiumUsed: false,
-          drewThisTurn: false,
-        },
-      };
+      resetRulesSessionState();
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;
