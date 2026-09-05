@@ -214,17 +214,18 @@ ul, li {
   left: 0;
   width: 100%;
   height: 50%;
-  background-image: var(--mat-image, none);
   background-size: var(--mat-fit, 100% 100%);
   background-position: center;
   background-repeat: no-repeat;
 }
 #battleMatArt .mat-half-self {
   bottom: 0;
+  background-image: var(--mat-image-self, none);
 }
 #battleMatArt .mat-half-opp {
   top: 0;
   transform: rotate(180deg);
+  background-image: var(--mat-image-opp, none);
 }
 /* A full-size mat is one sheet spanning both players. */
 #battleMat.mat-two-player #battleMatArt .mat-half-opp {
@@ -232,6 +233,14 @@ ul, li {
 }
 #battleMat.mat-two-player #battleMatArt .mat-half-self {
   height: 100%;
+}
+/* Opp-only full-size mat: the artwork lives in the top half element. */
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-self {
+  display: none;
+}
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-opp {
+  height: 100%;
+  top: 0;
 }
 /* With real mat art behind the board, the synthetic arena decoration would
    read as grime on top of the artwork. */

@@ -1,12 +1,12 @@
 /**
- * Applies a playmat and its zone layout to the board.
+ * Applies playmats and zone layouts to the board.
  *
- * The board is three separate documents: the parent page (which owns the mat
- * artwork and the stadium) plus the two playmat iframes (which own every card
- * zone). CSS custom properties do not cross an iframe boundary, so the layout
- * variables have to be written onto each document's own `documentElement`.
- * That is the whole job here — `mat-layouts.mjs` decides the geometry, this
- * module delivers it and paints the mat.
+ * The board is three separate documents: the parent page (mat artwork +
+ * stadium) plus the two playmat iframes (card zones). CSS custom properties
+ * do not cross an iframe boundary, so each iframe gets the layout profile for
+ * *its* player's mat. In solo mode P1 and P2 can pick different mats with
+ * different zone geometry; the coin/sleeve picker already tracks a target,
+ * and this module mirrors that split.
  */
 
 import {
@@ -17,63 +17,101 @@ import {
 } from './mat-layouts.mjs';
 
 const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
+const MAT_TARGETS = ['self', 'opp'];
 
-let currentMat = null;
+/** @type {{ self: object|null, opp: object|null }} */
+let currentMats = { self: null, opp: null };
 
-/** localStorage is unavailable in some embeddings; a mat choice is not worth throwing over. */
-const readStoredMat = () => {
+/** Per-half paint tokens so a slow probe cannot overwrite a later pick. */
+const matPaintToken = { self: 0, opp: 0 };
+
+const normalizeTarget = (target) => (target === 'opp' ? 'opp' : 'self');
+
+/** @returns {{ self: object|null, opp: object|null }} */
+const readStoredMats = () => {
   try {
     const raw = localStorage.getItem(MAT_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return { self: null, opp: null };
+    const parsed = JSON.parse(raw);
+    if (parsed && ('self' in parsed || 'opp' in parsed)) {
+      return { self: parsed.self || null, opp: parsed.opp || null };
+    }
+    // Older builds stored a single mat record for the whole board.
+    return { self: parsed || null, opp: null };
   } catch {
-    return null;
+    return { self: null, opp: null };
   }
 };
 
-const writeStoredMat = (mat) => {
+/** @param {{ self: object|null, opp: object|null }} mats */
+const writeStoredMats = (mats) => {
   try {
-    if (mat) localStorage.setItem(MAT_STORAGE_KEY, JSON.stringify(mat));
-    else localStorage.removeItem(MAT_STORAGE_KEY);
+    if (mats.self || mats.opp) {
+      localStorage.setItem(MAT_STORAGE_KEY, JSON.stringify(mats));
+    } else {
+      localStorage.removeItem(MAT_STORAGE_KEY);
+    }
   } catch {
     /* choice simply will not persist */
   }
 };
 
-/** The two playmat iframes, skipping any that has not parsed yet. */
-const frameDocuments = () => {
-  const docs = [];
-  for (const id of ['selfContainer', 'oppContainer']) {
-    const frame = document.getElementById(id);
-    // Same-origin, but the iframe may not have parsed yet on first paint.
-    const doc = frame?.contentDocument;
-    if (doc?.documentElement) docs.push(doc);
-  }
-  return docs;
+/** @param {'self'|'opp'} target */
+const frameDocument = (target) => {
+  const id = target === 'opp' ? 'oppContainer' : 'selfContainer';
+  const frame = document.getElementById(id);
+  const doc = frame?.contentDocument;
+  return doc?.documentElement ? doc : null;
 };
 
-const boardDocuments = () => [document, ...frameDocuments()];
+const applyMatLayoutToDoc = (layoutId, doc) => {
+  if (!doc?.documentElement) return;
+  const vars = layoutToCssVars(getMatLayout(layoutId));
+  const root = doc.documentElement;
+  for (const [name, value] of Object.entries(vars)) {
+    root.style.setProperty(name, value);
+  }
+};
 
-/** Identifies the newest paint so a slow probe cannot overwrite a later pick. */
-let matPaintToken = 0;
+/** @param {'self'|'opp'} target */
+const layoutForTarget = (target) => {
+  const mat = currentMats[target];
+  return mat ? resolveMatLayout(mat) : getMatLayout(DEFAULT_MAT_LAYOUT_ID);
+};
+
+const syncIframeLayouts = () => {
+  for (const target of MAT_TARGETS) {
+    applyMatLayoutToDoc(layoutForTarget(target).id, frameDocument(target));
+  }
+
+  // Stadium sits on the parent page; follow the bottom player's mat, then opp.
+  const parentLayout =
+    currentMats.self && layoutForTarget('self').id !== DEFAULT_MAT_LAYOUT_ID
+      ? layoutForTarget('self')
+      : layoutForTarget('opp');
+  applyMatLayoutToDoc(parentLayout.id, document);
+};
 
 /**
- * Point `--mat-image` at the mat's artwork, preferring the local file.
+ * Point a half's background at the mat artwork, preferring the local file.
  *
- * `png/` is gitignored and so is absent from a deploy, where the local path
- * 404s but the scraped CDN original still resolves. A CSS background reports
- * no load failure, so the local file is probed and the variable re-pointed at
- * the remote copy if it is missing.
+ * `png/` is gitignored and absent from deploys; probe and fall back to the
+ * scraped CDN original when the local path 404s.
  */
-const paintMatImage = (mat) => {
-  const token = ++matPaintToken;
-  // A relative url() inside a custom property is resolved against the
-  // stylesheet that consumes it, not the document, so a catalog path like
-  // `src/assets/...` would be looked up under `src/css/`. Resolve it against
-  // the page first so the variable carries an absolute URL.
+const paintMatImageForTarget = (target, mat) => {
+  const key = normalizeTarget(target);
+  const varName = key === 'opp' ? '--mat-image-opp' : '--mat-image-self';
+  const token = ++matPaintToken[key];
+
+  if (!mat?.image && !mat?.imageUrl) {
+    document.documentElement.style.removeProperty(varName);
+    return;
+  }
+
   const local = mat.image ? new URL(mat.image, document.baseURI).href : null;
   const remote = mat.imageUrl || null;
   const setImage = (url) =>
-    document.documentElement.style.setProperty('--mat-image', `url("${url}")`);
+    document.documentElement.style.setProperty(varName, `url("${url}")`);
 
   setImage(local || remote);
 
@@ -81,109 +119,109 @@ const paintMatImage = (mat) => {
 
   const probe = new Image();
   probe.onerror = () => {
-    if (token === matPaintToken) setImage(remote);
+    if (token === matPaintToken[key]) setImage(remote);
   };
   probe.src = local;
 };
 
-/**
- * Push a layout profile's variables onto the parent page and both iframes.
- * Zone variables are only meaningful inside the iframes and the stadium ones
- * only in the parent, but writing the whole set everywhere keeps this from
- * having to know which document owns which zone.
- */
-export const applyMatLayout = (layoutId) => {
-  const layout = getMatLayout(layoutId);
-  const vars = layoutToCssVars(layout);
-
-  for (const doc of boardDocuments()) {
-    const root = doc.documentElement;
-    for (const [name, value] of Object.entries(vars)) {
-      root.style.setProperty(name, value);
-    }
-  }
-
-  return layout;
-};
-
-/**
- * Paint the mat artwork. `mat` is a catalog record (`{ id, title, image,
- * layout }`) or null to fall back to the simulator's own board.
- */
-export const applyMat = (mat) => {
+const syncMatArt = () => {
   const battleMat = document.getElementById('battleMat');
   const art = document.getElementById('battleMatArt');
-  const layout = mat
-    ? resolveMatLayout(mat)
-    : getMatLayout(DEFAULT_MAT_LAYOUT_ID);
+  const hasAny = Boolean(currentMats.self || currentMats.opp);
 
-  applyMatLayout(layout.id);
+  const selfTwo =
+    Boolean(currentMats.self) &&
+    layoutForTarget('self').matMode === 'two-player';
+  const oppTwo =
+    Boolean(currentMats.opp) && layoutForTarget('opp').matMode === 'two-player';
 
   if (battleMat) {
-    // The mode classes describe how the artwork is laid out, so they only
-    // mean anything while a mat is on the board.
-    battleMat.classList.toggle('mat-active', Boolean(mat));
-    battleMat.classList.toggle(
-      'mat-one-player',
-      Boolean(mat) && layout.matMode === 'one-player'
-    );
-    battleMat.classList.toggle(
-      'mat-two-player',
-      Boolean(mat) && layout.matMode === 'two-player'
-    );
+    battleMat.classList.toggle('mat-active', hasAny);
+    battleMat.classList.toggle('mat-two-player', selfTwo);
+    battleMat.classList.toggle('mat-two-player-opp', !selfTwo && oppTwo);
   }
 
-  // Each iframe paints its own opaque arena background, which would sit on
-  // top of the parent's mat art; `mat-active` makes it transparent so the
-  // artwork underneath is visible.
-  for (const doc of frameDocuments()) {
-    doc.body?.classList.toggle('mat-active', Boolean(mat));
+  for (const target of MAT_TARGETS) {
+    frameDocument(target)?.body?.classList.toggle(
+      'mat-active',
+      Boolean(currentMats[target])
+    );
   }
 
   if (art) {
-    if (mat?.image || mat?.imageUrl) {
-      paintMatImage(mat);
-      art.hidden = false;
-    } else {
-      matPaintToken++;
-      document.documentElement.style.removeProperty('--mat-image');
-      art.hidden = true;
-    }
+    paintMatImageForTarget('self', currentMats.self);
+    paintMatImageForTarget('opp', currentMats.opp);
+    art.hidden = !hasAny;
   }
+};
 
-  currentMat = mat || null;
-  writeStoredMat(currentMat);
+/**
+ * Push a layout profile's variables onto every board document.
+ * Prefer `applyMatForTarget` when zones should differ per player.
+ */
+export const applyMatLayout = (layoutId) => {
+  for (const target of MAT_TARGETS) {
+    applyMatLayoutToDoc(layoutId, frameDocument(target));
+  }
+  applyMatLayoutToDoc(layoutId, document);
+  return getMatLayout(layoutId);
+};
+
+/** Apply one player's mat and zone layout without touching the other half. */
+export const applyMatForTarget = (target, mat) => {
+  const key = normalizeTarget(target);
+  currentMats[key] = mat || null;
+  writeStoredMats(currentMats);
+  syncIframeLayouts();
+  syncMatArt();
 
   document.dispatchEvent(
     new CustomEvent('mat-layout-applied', {
-      detail: { mat: currentMat, layout: layout.id },
+      detail: { target: key, mat: currentMats[key], mats: { ...currentMats } },
     })
   );
 
-  return layout;
+  return layoutForTarget(key);
 };
 
-export const getCurrentMat = () => currentMat;
+/** @deprecated Use applyMatForTarget; kept so a single mat clears both sides. */
+export const applyMat = (mat) => {
+  currentMats = { self: mat || null, opp: mat || null };
+  writeStoredMats(currentMats);
+  syncIframeLayouts();
+  syncMatArt();
+  return layoutForTarget('self');
+};
+
+/** @param {'self'|'opp'} [target] */
+export const getCurrentMat = (target) => {
+  if (target) return currentMats[normalizeTarget(target)];
+  return currentMats.self || currentMats.opp || null;
+};
+
+export const getCurrentMats = () => ({ ...currentMats });
 
 /**
- * Re-apply the active choice. The iframes are reloaded on board flips and
- * resets, which wipes the inline variables written onto their roots, so the
- * layout has to be replayed whenever a frame comes back.
+ * Re-apply active choices. Iframes reload on board flips and wipe inline
+ * variables, so replay whenever a frame comes back.
  */
-export const refreshMatLayout = () => applyMat(currentMat);
+export const refreshMatLayout = () => {
+  syncIframeLayouts();
+  syncMatArt();
+};
 
 export const initializeMatLayout = () => {
-  currentMat = readStoredMat();
-  applyMat(currentMat);
+  currentMats = readStoredMats();
+  refreshMatLayout();
 
-  // Replay onto each iframe once it has a document to write to.
   for (const id of ['selfContainer', 'oppContainer']) {
-    const frame = document.getElementById(id);
-    if (frame) frame.addEventListener('load', refreshMatLayout);
+    document.getElementById(id)?.addEventListener('load', refreshMatLayout);
   }
 
-  // Dispatched by the deck builder's mat picker.
   document.addEventListener('playmat-changed', (event) => {
-    applyMat(event.detail?.mat || null);
+    applyMatForTarget(
+      event.detail?.target || 'self',
+      event.detail?.mat || null
+    );
   });
 };

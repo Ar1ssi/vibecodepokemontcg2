@@ -304,10 +304,16 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // reads that key — as the fallback selection when no saved deck is
           // active — and never writes it, keeping a single writer.
           const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
-          const getStoredMatId = () => {
+          const getStoredMatId = (target = 'self') => {
             try {
               const raw = localStorage.getItem(MAT_STORAGE_KEY);
-              return (raw ? JSON.parse(raw) : null)?.id || null;
+              if (!raw) return null;
+              const parsed = JSON.parse(raw);
+              if (parsed && ('self' in parsed || 'opp' in parsed)) {
+                const side = target === 'opp' ? 'opp' : 'self';
+                return parsed[side]?.id || null;
+              }
+              return target === 'self' ? parsed?.id || null : null;
             } catch {
               return null;
             }
@@ -481,10 +487,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       // picker this session.
       const refreshMatSelection = () => {
         const matId = deckLibrary?.getActiveMat?.(currentLoadTarget)
-          || getStoredMatId();
+          || getStoredMatId(currentLoadTarget);
         const mat = matId ? getMatById(matId) : null;
         matPicker?.setSelected(mat ? mat.id : null);
         announceMat(currentLoadTarget, mat || null);
+      };
+      const announceAllMats = () => {
+        for (const target of ['self', 'opp']) {
+          const matId = deckLibrary?.getActiveMat?.(target) || getStoredMatId(target);
+          const mat = matId ? getMatById(matId) : null;
+          announceMat(target, mat || null);
+        }
       };
       if (tabBrowse) tabBrowse.addEventListener('click', () => switchMode('browse'));
   if (tabCustomize) tabCustomize.addEventListener('click', () => switchMode('customize'));
@@ -998,7 +1011,7 @@ let activeHoloStop = null;
   });
 
   render();
-  // Last, once currentLoadTarget exists: restore the saved mat and announce it
-  // so the board renders it on load without opening the picker.
-  refreshMatSelection();
+  // Restore each player's saved mat so both halves of the board pick up their
+  // own layout on load, even if the player never opens the mat picker.
+  announceAllMats();
 };
