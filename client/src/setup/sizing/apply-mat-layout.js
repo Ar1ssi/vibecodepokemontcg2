@@ -79,7 +79,31 @@ const layoutForTarget = (target) => {
   return mat ? resolveMatLayout(mat) : getMatLayout(DEFAULT_MAT_LAYOUT_ID);
 };
 
+const isTwoPlayerMat = (mat) =>
+  Boolean(mat && resolveMatLayout(mat).matMode === 'two-player');
+
+/** When a full-size mat is active, both halves share its layout and artwork. */
+const activeTwoPlayerMat = () => {
+  if (isTwoPlayerMat(currentMats.self)) {
+    return { mat: currentMats.self, owner: 'self' };
+  }
+  if (isTwoPlayerMat(currentMats.opp)) {
+    return { mat: currentMats.opp, owner: 'opp' };
+  }
+  return null;
+};
+
 const syncIframeLayouts = () => {
+  const shared = activeTwoPlayerMat();
+  if (shared) {
+    const layoutId = resolveMatLayout(shared.mat).id;
+    for (const target of MAT_TARGETS) {
+      applyMatLayoutToDoc(layoutId, frameDocument(target));
+    }
+    applyMatLayoutToDoc(layoutId, document);
+    return;
+  }
+
   for (const target of MAT_TARGETS) {
     applyMatLayoutToDoc(layoutForTarget(target).id, frameDocument(target));
   }
@@ -127,30 +151,37 @@ const paintMatImageForTarget = (target, mat) => {
 const syncMatArt = () => {
   const battleMat = document.getElementById('battleMat');
   const art = document.getElementById('battleMatArt');
-  const hasAny = Boolean(currentMats.self || currentMats.opp);
-
-  const selfTwo =
-    Boolean(currentMats.self) &&
-    layoutForTarget('self').matMode === 'two-player';
-  const oppTwo =
-    Boolean(currentMats.opp) && layoutForTarget('opp').matMode === 'two-player';
+  const shared = activeTwoPlayerMat();
+  const hasAny = Boolean(shared || currentMats.self || currentMats.opp);
 
   if (battleMat) {
     battleMat.classList.toggle('mat-active', hasAny);
-    battleMat.classList.toggle('mat-two-player', selfTwo);
-    battleMat.classList.toggle('mat-two-player-opp', !selfTwo && oppTwo);
+    battleMat.classList.toggle(
+      'mat-two-player',
+      Boolean(shared && shared.owner === 'self')
+    );
+    battleMat.classList.toggle(
+      'mat-two-player-opp',
+      Boolean(shared && shared.owner === 'opp')
+    );
   }
 
   for (const target of MAT_TARGETS) {
     frameDocument(target)?.body?.classList.toggle(
       'mat-active',
-      Boolean(currentMats[target])
+      Boolean(shared || currentMats[target])
     );
   }
 
   if (art) {
-    paintMatImageForTarget('self', currentMats.self);
-    paintMatImageForTarget('opp', currentMats.opp);
+    document.documentElement.style.removeProperty('--mat-image-self');
+    document.documentElement.style.removeProperty('--mat-image-opp');
+    if (shared) {
+      paintMatImageForTarget(shared.owner, shared.mat);
+    } else {
+      paintMatImageForTarget('self', currentMats.self);
+      paintMatImageForTarget('opp', currentMats.opp);
+    }
     art.hidden = !hasAny;
   }
 };
@@ -170,14 +201,26 @@ export const applyMatLayout = (layoutId) => {
 /** Apply one player's mat and zone layout without touching the other half. */
 export const applyMatForTarget = (target, mat) => {
   const key = normalizeTarget(target);
+  const other = key === 'opp' ? 'self' : 'opp';
   currentMats[key] = mat || null;
+
+  // A full-size mat covers both players — drop whatever the other side had.
+  if (mat && isTwoPlayerMat(mat)) {
+    currentMats[other] = null;
+  }
+
   writeStoredMats(currentMats);
   syncIframeLayouts();
   syncMatArt();
 
   document.dispatchEvent(
     new CustomEvent('mat-layout-applied', {
-      detail: { target: key, mat: currentMats[key], mats: { ...currentMats } },
+      detail: {
+        target: key,
+        mat: currentMats[key],
+        mats: { ...currentMats },
+        clearedTarget: mat && isTwoPlayerMat(mat) ? other : null,
+      },
     })
   );
 

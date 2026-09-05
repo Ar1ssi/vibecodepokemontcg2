@@ -343,6 +343,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             panelEl: matPanel,
             onChange: (mat) => {
               deckLibrary?.setActiveMat?.(currentLoadTarget, mat ? mat.id : null);
+              // Full-size mats span the whole board and replace the other side.
+              if (mat?.layout === 'two-player') {
+                const other = currentLoadTarget === 'opp' ? 'self' : 'opp';
+                deckLibrary?.setActiveMat?.(other, null);
+              }
               announceMat(currentLoadTarget, mat);
             },
           });
@@ -493,10 +498,25 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         announceMat(currentLoadTarget, mat || null);
       };
       const announceAllMats = () => {
+        const mats = {};
         for (const target of ['self', 'opp']) {
-          const matId = deckLibrary?.getActiveMat?.(target) || getStoredMatId(target);
-          const mat = matId ? getMatById(matId) : null;
-          announceMat(target, mat || null);
+          const matId =
+            deckLibrary?.getActiveMat?.(target) || getStoredMatId(target);
+          mats[target] = matId ? getMatById(matId) : null;
+        }
+        // A saved full-size mat wins over any per-side one-player choice.
+        if (mats.self?.layout === 'two-player') {
+          deckLibrary?.setActiveMat?.('opp', null);
+          announceMat('self', mats.self);
+          return;
+        }
+        if (mats.opp?.layout === 'two-player') {
+          deckLibrary?.setActiveMat?.('self', null);
+          announceMat('opp', mats.opp);
+          return;
+        }
+        for (const target of ['self', 'opp']) {
+          announceMat(target, mats[target] || null);
         }
       };
       if (tabBrowse) tabBrowse.addEventListener('click', () => switchMode('browse'));
@@ -564,6 +584,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deck = syncedDecks[target];
         deckLibrary?.setTarget(target);
         render();
+        refreshMatSelection();
       };
 
 let activeHoloStop = null;
