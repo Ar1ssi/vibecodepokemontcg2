@@ -1,2 +1,8 @@
 node_modules/
 server/database/db.sqlite
+
+# Playmat scrape outputs (run scripts/scrape-playmats.mjs to regenerate)
+client/src/assets/playmats/original/
+client/src/assets/playmats/png/
+client/src/assets/playmats/upscaled/
+client/src/assets/playmats/thumbs/
