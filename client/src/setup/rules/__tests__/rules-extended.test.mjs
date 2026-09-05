@@ -1013,12 +1013,31 @@ import test from 'node:test';
     });
 
     test('parseAttackSearchClause: Call for Family and rotation search attacks', () => {
-      const callForFamily =
+      const callForFamilyOne =
         'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
-      assert.deepEqual(parseAttackSearchClause(callForFamily), {
+      assert.deepEqual(parseAttackSearchClause(callForFamilyOne), {
         what: 'Basic Pokémon',
         count: 1,
         destination: 'bench',
+        upTo: false,
+      });
+
+      const callForFamilyTwo =
+        'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callForFamilyTwo), {
+        what: 'Basic Pokémon',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const nestBallStyle =
+        'Search your deck for up to 2 Basic Pokémon with 70 HP or less and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(nestBallStyle), {
+        what: 'Basic Pokémon ≤70 HP',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
       });
 
       const flock =
@@ -1027,6 +1046,7 @@ import test from 'node:test';
         what: 'grubbin',
         count: 2,
         destination: 'bench',
+        upTo: true,
       });
 
       const luckyFind =

@@ -162,6 +162,7 @@ export function parseSearchDeckParams(lower) {
       what: namedBenchMulti[2].trim(),
       count: Number(namedBenchMulti[1]),
       destination: 'bench',
+      upTo: true,
     };
   }
   if (
@@ -176,17 +177,36 @@ export function parseSearchDeckParams(lower) {
   }
   const basicEnergyHand = lower.match(/search your deck for up to\s+(\d+)\s+basic energy cards/);
   if (basicEnergyHand && lower.includes('into your hand')) {
-    return { what: 'Basic Energy', count: Number(basicEnergyHand[1]), destination: 'hand' };
+    return { what: 'Basic Energy', count: Number(basicEnergyHand[1]), destination: 'hand', upTo: true };
   }
 
-  if (lower.includes('up to 2 basic pokémon')) {
-    what = 'Basic Pokémon ≤70 HP';
-    count = 2;
-    destination = 'bench';
-  } else if (lower.includes('basic pokémon') && lower.includes('onto your bench')) {
-    what = 'Basic Pokémon';
-    destination = 'bench';
-  } else if (lower.includes('evolution team rocket')) what = "Evolution Team Rocket's Pokémon";
+  // up to N Basic Pokémon → bench WITH an HP cap (trainers e.g. Nest Ball-style)
+  if (
+    lower.includes('up to 2 basic pokémon') &&
+    (lower.includes('70 hp or less') || lower.includes('hp or less'))
+  ) {
+    return { what: 'Basic Pokémon ≤70 HP', count: 2, destination: 'bench', upTo: true };
+  }
+
+  // up to N Basic Pokémon → bench, no HP cap (Call for Family on Pidgey, etc.)
+  const basicBenchUpTo = lower.match(
+    /search your deck for up to\s+(\d+)\s+basic pok[ée]mon\b/
+  );
+  if (basicBenchUpTo && lower.includes('onto your bench')) {
+    return {
+      what: 'Basic Pokémon',
+      count: Number(basicBenchUpTo[1]),
+      destination: 'bench',
+      upTo: true,
+    };
+  }
+
+  // exactly one Basic Pokémon → bench (Call for Family on many Basics)
+  if (/search your deck for a basic pok[ée]mon\b/.test(lower) && lower.includes('onto your bench')) {
+    return { what: 'Basic Pokémon', count: 1, destination: 'bench', upTo: false };
+  }
+
+  if (lower.includes('evolution team rocket')) what = "Evolution Team Rocket's Pokémon";
   else if (lower.includes('basic team rocket')) {
     what = "Basic Team Rocket's Pokémon";
     const m = lower.match(/up to\s+(\d+)/);

@@ -1599,13 +1599,20 @@ const openAbilityChoicePicker = ({
   destination,
   multiSelect = false,
   requiredCount = 1,
+  minCount,
+  maxCount,
+  upTo = false,
   onPick,
   onConfirm,
   onCancel,
 }) => {
   document.getElementById('rulesChoicePicker')?.remove();
 
-  if (multiSelect && requiredCount > candidates.length) {
+  const maxSel = maxCount ?? requiredCount;
+  const minSel = minCount ?? (upTo ? 0 : requiredCount);
+  const cappedMax = Math.min(maxSel, candidates.length);
+
+  if (multiSelect && !upTo && minSel > candidates.length) {
     appendMessage(
       user,
       `⛔ Not enough cards to select ${requiredCount}.`,
@@ -1630,6 +1637,9 @@ const openAbilityChoicePicker = ({
   const selected = new Set();
   const grid = overlay.querySelector('.choice-picker-grid');
   const confirmBtn = overlay.querySelector('.choice-picker-confirm');
+  if (confirmBtn && upTo && minSel === 0) {
+    confirmBtn.disabled = false;
+  }
 
   for (const cand of candidates) {
     const btn = document.createElement('button');
@@ -1646,11 +1656,13 @@ const openAbilityChoicePicker = ({
         if (selected.has(cand)) {
           selected.delete(cand);
           btn.classList.remove('selected');
-        } else {
+        } else if (selected.size < cappedMax) {
           selected.add(cand);
           btn.classList.add('selected');
         }
-        if (confirmBtn) confirmBtn.disabled = selected.size !== requiredCount;
+        if (confirmBtn) {
+          confirmBtn.disabled = selected.size < minSel || selected.size > cappedMax;
+        }
         return;
       }
       try {
@@ -1702,7 +1714,9 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   if (searchStep.destination === 'bench') destZone = 'bench';
   else if (searchStep.destination === 'attach') destZone = 'hand';
   const destLabel = destZone === 'bench' ? 'Bench' : 'hand';
-  let count = searchStep.count || 1;
+  const maxCount = searchStep.count || 1;
+  const upTo = searchStep.upTo === true;
+  let effectiveMax = maxCount;
 
   if (destZone === 'bench') {
     const openSlots = 5 - getZone(user, 'bench').getCount();
@@ -1716,7 +1730,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       shuffleZone(user, user, 'deck');
       return;
     }
-    count = Math.min(count, openSlots);
+    effectiveMax = Math.min(maxCount, openSlots);
   }
 
   const matches = [];
@@ -1739,16 +1753,25 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
 
   const finishSearch = () => shuffleZone(user, user, 'deck');
 
-  if (count > 1) {
+  const useMulti = upTo ? effectiveMax >= 1 : effectiveMax > 1;
+  const minPick = upTo ? 0 : effectiveMax;
+  const pickLabel = upTo
+    ? `up to ${effectiveMax}`
+    : String(effectiveMax);
+
+  if (useMulti) {
     await new Promise((resolve) => {
       openAbilityChoicePicker({
         user,
-        title: `${atk.name} — choose ${count} for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+        title: `${atk.name} — choose ${pickLabel} for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
         candidates: pool,
         zoneFrom: 'deck',
         destination: destZone,
         multiSelect: true,
-        requiredCount: Math.min(count, pool.length),
+        requiredCount: effectiveMax,
+        minCount: minPick,
+        maxCount: effectiveMax,
+        upTo,
         onConfirm: (selected) => {
           for (const s of selected) {
             const idx = getZone(user, 'deck').array.indexOf(s);
@@ -1756,12 +1779,16 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
               moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
             }
           }
-          appendMessage(
-            user,
-            `🔍 ${atk.name}: ${selected.map((s) => s.name).join(', ')} → ${destLabel}.`,
-            'announcement',
-            false
-          );
+          if (selected.length === 0) {
+            appendMessage(user, `🔍 ${atk.name}: no cards taken — deck shuffled.`, 'announcement', false);
+          } else {
+            appendMessage(
+              user,
+              `🔍 ${atk.name}: ${selected.map((s) => s.name).join(', ')} → ${destLabel}.`,
+              'announcement',
+              false
+            );
+          }
           finishSearch();
           resolve();
         },
