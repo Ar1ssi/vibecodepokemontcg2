@@ -18,7 +18,7 @@ import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium } from '../../setup/rules/rules-state.mjs';
-import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
+import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
 import { clearStatuses, getStatus, applyStatus } from '../../setup/rules/status.mjs';
 import {
   describeStadiumEffect,
@@ -204,9 +204,26 @@ export const moveCard = async (
     }
   }
 
-  // ── rules: evolution legality gate (taxonomy B) ──────────────────────
+  // ── rules: only Basic Pokémon may be played from hand ──────────────
+  // Stage 1/2 must evolve onto a Pokémon already in play (gate below).
   // Must run BEFORE the splice so blocked moves never mutate zone arrays.
   const activeOrBenchZones = ['active', 'bench'];
+  if (
+    rulesState.enabled &&
+    movingCard.type === 'Pokémon' &&
+    oZoneId === 'hand' &&
+    activeOrBenchZones.includes(dZoneId) &&
+    !targetCard
+  ) {
+    const playCheck = await canPlayPokemonFromHand(movingCard);
+    if (!playCheck.allowed) {
+      appendMessage(user, `⛔ ${playCheck.reason}`, 'announcement', false);
+      return;
+    }
+  }
+
+  // ── rules: evolution legality gate (taxonomy B) ──────────────────────
+  // Must run BEFORE the splice so blocked moves never mutate zone arrays.
   if (
     rulesState.enabled &&
     movingCard.type === 'Pokémon' &&
