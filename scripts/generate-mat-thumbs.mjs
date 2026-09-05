@@ -91,19 +91,28 @@ function makeThumb(sourcePath, targetPath) {
   );
 }
 
+/** Prettier's string style: single quotes unless the value has one in it. */
+function quote(value) {
+  const text = String(value ?? '');
+  return text.includes("'")
+    ? JSON.stringify(text)
+    : `'${text.replaceAll('\\', '\\\\')}'`;
+}
+
 function renderCatalog(mats) {
   const entries = mats
-    .map(
-      (mat) =>
-        `  ${JSON.stringify({
-          id: mat.id,
-          title: mat.title,
-          image: mat.image,
-          thumb: mat.thumb,
-          layout: mat.layout,
-          sourceUrl: mat.sourceUrl,
-          imageUrl: mat.imageUrl,
-        })},`
+    .map((mat) =>
+      [
+        '  {',
+        `    id: ${quote(mat.id)},`,
+        `    title: ${quote(mat.title)},`,
+        `    image: ${quote(mat.image)},`,
+        `    thumb: ${quote(mat.thumb)},`,
+        `    layout: ${quote(mat.layout)},`,
+        `    sourceUrl: ${quote(mat.sourceUrl)},`,
+        `    imageUrl: ${quote(mat.imageUrl)},`,
+        '  },',
+      ].join('\n')
     )
     .join('\n');
 
@@ -120,6 +129,24 @@ function renderCatalog(mats) {
     '];',
     '',
   ].join('\n');
+}
+
+/**
+ * Long asset paths need prettier's own line wrapping to keep the generated
+ * file lint-clean; hand-rolling that is not worth it, so defer to the local
+ * prettier when the workspace has one installed.
+ */
+function formatCatalog() {
+  const prettier = fileURLToPath(
+    new URL('../node_modules/.bin/prettier', import.meta.url)
+  );
+  if (!existsSync(prettier)) {
+    console.warn(
+      '! prettier not installed — generated catalog left unformatted'
+    );
+    return;
+  }
+  execFileSync(prettier, ['--write', CATALOG_PATH], { stdio: 'ignore' });
 }
 
 function main() {
@@ -186,6 +213,7 @@ function main() {
 
   writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   writeFileSync(CATALOG_PATH, renderCatalog(mats));
+  formatCatalog();
 
   const twoPlayer = mats.filter((m) => m.layout === 'two-player').length;
   console.log(
