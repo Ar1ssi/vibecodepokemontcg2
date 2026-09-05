@@ -194,6 +194,17 @@
       }));
     }
 
+    // Damage-only labels ("0", "30+") are not effect text — treat as missing so
+    // TCGdex enrichment is not skipped (Call for Family and other text effects).
+    function isPlaceholderAttackText(text, damage) {
+      if (text == null || text === '') return true;
+      const t = String(text).trim();
+      if (!t) return true;
+      if (/^\d+\+?$/.test(t)) return true;
+      if (damage != null && String(damage) === t) return true;
+      return false;
+    }
+
     // Merge TCGdex attack data onto board cards. Stub arrays (name/cost/damage
     // only) must not block effect text from loading — that silences search,
     // heal, status, and other text-driven attack effects (Call for Family).
@@ -207,11 +218,16 @@
         const idx = merged.findIndex((e) => e.name === inc.name);
         if (idx >= 0) {
           const ex = merged[idx];
+          const exText = ex.text || ex.effect || '';
+          const incText = inc.text || inc.effect || '';
+          const text = !isPlaceholderAttackText(exText, ex.damage)
+            ? exText
+            : incText || exText || '';
           merged[idx] = {
             ...ex,
             cost: inc.cost?.length ? inc.cost : ex.cost,
             damage: inc.damage ?? ex.damage,
-            text: inc.text || ex.text || '',
+            text,
           };
         } else {
           merged.push({ ...inc });
@@ -221,8 +237,10 @@
     }
 
     function attacksNeedText(card) {
-      if (!Array.isArray(card?.attacks) || card.attacks.length === 0) return false;
-      return card.attacks.some((a) => a?.name && !(a.text || a.effect));
+      if (!Array.isArray(card?.attacks) || card.attacks.length === 0) return true;
+      return card.attacks.some((a) =>
+        a?.name && isPlaceholderAttackText(a.text || a.effect || '', a.damage)
+      );
     }
 
     function applyEnrichedData(card, data) {

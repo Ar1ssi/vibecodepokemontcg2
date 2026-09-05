@@ -3160,9 +3160,58 @@ import test from 'node:test';
         throw new Error('ensureCardData must not re-fetch an enriched card');
       };
       await withStubbedFetch(handler, async (calls) => {
-        const card = { name: 'Piloswine', id: 'ex7-904', hp: 80, weakness: null };
+        const card = {
+          name: 'Piloswine',
+          id: 'ex7-904',
+          hp: 80,
+          weakness: null,
+          attacks: [
+            {
+              name: 'Stampede',
+              cost: ['Fighting', 'Colorless'],
+              damage: 20,
+              text: 'Flip a coin. If heads, this attack does 10 more damage.',
+            },
+          ],
+        };
         await ensureCardData(card);
         assert.equal(calls.length, 0);
+      });
+    });
+
+    test('ensureCardData: replaces placeholder attack text with TCGdex effect', async () => {
+      const callForFamilyText =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv03.5-016')) {
+          return detailResponse({
+            id: 'sv03.5-016',
+            name: 'Pidgey',
+            hp: '50',
+            attacks: [
+              {
+                name: 'Call for Family',
+                cost: ['Colorless'],
+                damage: '0',
+                effect: callForFamilyText,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv03.5-016',
+          name: 'Pidgey',
+          hp: 50,
+          weakness: null,
+          attacks: [
+            { name: 'Call for Family', cost: ['Colorless'], damage: 0, text: '0' },
+          ],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, callForFamilyText);
       });
     });
 

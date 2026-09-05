@@ -76,6 +76,17 @@ const placeSelfDamage = (user, zoneId, index, damage) => {
   }
 };
 
+// Re-read attack effect text after ensureCardData may have merged TCGdex data.
+const syncAttackFromCard = (card, attackIndex, prev) => {
+  const latest =
+    card.attacks?.[attackIndex] ??
+    (prev?.name && card.attacks?.find((a) => a.name === prev.name)) ??
+    card.attacks?.[0];
+  if (!latest) return prev;
+  const text = resolveAttackText(card, latest);
+  return text ? { ...latest, text } : latest;
+};
+
 // Rules mode: an attack (or pass) ends the turn — advance rulesState and
 // refresh the HUD/panel via the same event updateTurnBanner() uses.
 const endTurnWithBanner = (user) => {
@@ -161,12 +172,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
     // ── Attack execution: energy cost, damage, KO ──
     const oppPlayer = user === 'self' ? 'opp' : 'self';
     const oppActive = getActivePokemonCard(getZone(oppPlayer, 'active'));
-    if (active && oppActive) {
+    if (active) {
       await ensureCardData(active);
-      let atk = active.attacks?.[attackIndex] || active.attacks?.[0];
+      let atk = syncAttackFromCard(active, attackIndex, null);
       if (atk) {
-        const atkText = resolveAttackText(active, atk);
-        if (atkText) atk = { ...atk, text: atkText };
         // Once-per-turn (taxonomy §D once-per-turn family): if this attack
         // carries an "Once during your turn" clause and it was already used
         // this turn, fizzle before any cost/damage is applied. Consistent
@@ -376,9 +385,13 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
 
-        // Damage calculation
+        // Damage calculation (requires a defending Active — skipped for
+        // effect-only attacks like Call for Family when none is in play).
+        let parsed = null;
+        if (oppActive) {
         await ensureCardData(oppActive);
         await ensureCardData(active);
+        atk = syncAttackFromCard(active, attackIndex, atk);
         // Text-based damage scaling (taxonomy §D damage families): when rules
         // are on, parse the printed attack text for per-energy / per-prize /
         // per-turn / extra-by-type / conditional bonuses and substitute the
@@ -401,7 +414,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           // pass the defender's current damage-counter count when it is in the
           // DOM; leave undefined otherwise so the parser keeps it honestly unresolved.
           const defenderDmgEl = oppActive?.image?.damageCounter;
-          const parsed = parseAttackDamage(atk, active, oppActive, {
+          parsed = parseAttackDamage(atk, active, oppActive, {
             energyCount: attachedEnergies.length,
             energyDiscarded,
             opponentPrizes: getZone(oppPlayer, 'prizes').getCount(),
@@ -594,6 +607,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               );
             }
           }
+        }
         }
 
         // Coin tails self-damage (taxonomy §D coin-flip family): the parser
@@ -883,6 +897,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // Lucky Find, etc. Opens the filtered deck picker, moves to Bench/hand,
         // then shuffles — awaited so the turn does not end before the pick.
         if (rulesState.enabled) {
+          await ensureCardData(active);
+          atk = syncAttackFromCard(active, attackIndex, atk);
           const searchStep = parseAttackSearchClause(atk.text);
           if (searchStep) {
             await _runAttackDeckSearch(user, atk, searchStep, emit);
