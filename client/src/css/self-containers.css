@@ -96,7 +96,7 @@ body, input, textarea, button {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: calc(30% - 3px);
+  height: calc(32% - 3px);
   overflow-x: auto;
   display: flex;
   z-index: 0;
@@ -105,8 +105,8 @@ body, input, textarea, button {
 #hand img {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 3vh);
-  margin-bottom: 2vh;
+  max-height: calc(100% - 1.5vh);
+  margin-bottom: 1.5vh;
   margin-left: .25vw;
   margin-right: .25vw;
 }
@@ -116,8 +116,8 @@ body, input, textarea, button {
 #hand .mat-holo {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 3vh);
-  margin-bottom: 2vh;
+  max-height: calc(100% - 1.5vh);
+  margin-bottom: 1.5vh;
   margin-left: .25vw;
   margin-right: .25vw;
 }
@@ -131,37 +131,38 @@ body, input, textarea, button {
 #handText {
   position: fixed;
   right: 2%;
-  bottom: 30%;
+  bottom: 32%;
   color:rgba(90, 110, 188, 0.864);
 }
 #handLabel {
   position: fixed;
   left: 0%;
-  bottom: 29.5%;
+  bottom: 31.5%;
   color:rgba(90, 110, 188, 0.864);
   font-size: 5vh;
 }
 #bench {
   position: fixed;
-  bottom: 35%;
-  left: 10%;
-  width: 79%;
-  height: 25%;
+  bottom: 34%;
+  left: 20%;
+  width: 60%;
+  height: 28%;
   display: flex;
   justify-content: center;
   align-items: flex-end;
+  gap: 0.35vw;
   z-index: 0;
 }
 #bench div {
   height: 100%;
-  margin-right: 1%;
+  flex: 0 0 auto;
 }
 #active {
   position: fixed;
-  bottom: 65%;
-  left: 34%;
-  width: 32%;
-  height: 28%;
+  bottom: 63%;
+  left: 32.5%;
+  width: 35%;
+  height: 32%;
   display: flex;
   justify-content: center;
   align-items: flex-end;
@@ -173,10 +174,10 @@ body, input, textarea, button {
 }
 #prizes {
   position: fixed;
-  bottom: 36%;
+  bottom: 35%;
   left: 1%;
-  width: 6%;
-  height: 43%;
+  width: 7%;
+  height: 46%;
   z-index: 0;
   padding: 5px;
 }
@@ -234,10 +235,10 @@ body, input, textarea, button {
 }
 #deckCover {
   position: fixed;
-  bottom: 66%;
+  bottom: 64%;
   right: 1%;
-  width: 8%;
-  height: 25%;
+  width: 9%;
+  height: 28%;
   z-index: 0;
   display: flex;
   justify-content: center; 
@@ -271,10 +272,10 @@ body, input, textarea, button {
 }
 #discardCover {
   position: fixed;
-  bottom: 36%;
+  bottom: 35%;
   right: 1%;
-  width: 8%;
-  height: 23%;
+  width: 9%;
+  height: 26%;
   display: flex;
   justify-content: center; 
   align-items:flex-start;
