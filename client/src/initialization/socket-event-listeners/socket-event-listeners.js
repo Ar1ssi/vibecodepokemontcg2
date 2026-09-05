@@ -63,6 +63,10 @@ export const initializeSocketEventListeners = () => {
       true,
       getStoredMatId('self')
     );
+    socket.emit('rulesEvent', {
+      type: 'peerSocketId',
+      data: { socketId: socket.id },
+    });
 
     //initialize sync checker, which will routinely make sure game are synced
     syncCheckInterval = setInterval(() => {

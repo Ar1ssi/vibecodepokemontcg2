@@ -245,39 +245,55 @@ const { decideTurnOrder, resolveTurnOrderCaller } = await import('../rules-turno
       assert.equal(decideTurnOrder({}), 'self');
     });
 
-    test('resolveTurnOrderCaller: host and joiner get opposite designations', () => {
-      const roomId = 'abc1230';
-      const host = resolveTurnOrderCaller({
+    test('resolveTurnOrderCaller: paired socket ids give opposite designations', () => {
+      const roomId = 'room-abc';
+      const alpha = resolveTurnOrderCaller({
         roomId,
-        socketId: 'abc123',
+        socketId: 'alpha',
+        opponentSocketId: 'omega',
         sessionKey: '0',
         isMultiplayer: true,
       });
-      const joiner = resolveTurnOrderCaller({
+      const omega = resolveTurnOrderCaller({
         roomId,
-        socketId: 'xyz789',
+        socketId: 'omega',
+        opponentSocketId: 'alpha',
         sessionKey: '0',
         isMultiplayer: true,
       });
-      assert.notEqual(host, joiner);
-      assert(['self', 'opp'].includes(host));
-      assert(['self', 'opp'].includes(joiner));
+      assert.notEqual(alpha, omega);
+      assert(['self', 'opp'].includes(alpha));
+      assert(['self', 'opp'].includes(omega));
     });
 
     test('resolveTurnOrderCaller: deterministic for same inputs', () => {
       const first = resolveTurnOrderCaller({
         roomId: 'room42',
-        socketId: 'hostid',
+        socketId: 'aaa',
+        opponentSocketId: 'zzz',
         sessionKey: '1',
         isMultiplayer: true,
       });
       const second = resolveTurnOrderCaller({
         roomId: 'room42',
-        socketId: 'hostid',
+        socketId: 'aaa',
+        opponentSocketId: 'zzz',
         sessionKey: '1',
         isMultiplayer: true,
       });
       assert.equal(first, second);
+    });
+
+    test('resolveTurnOrderCaller: returns null until peer socket id is known', () => {
+      assert.equal(
+        resolveTurnOrderCaller({
+          roomId: 'room',
+          socketId: 'aaa',
+          opponentSocketId: null,
+          isMultiplayer: true,
+        }),
+        null
+      );
     });
 
     test('resolveTurnOrderCaller: solo always returns self', () => {

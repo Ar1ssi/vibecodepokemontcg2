@@ -123,6 +123,7 @@ export const initializeRoomButtons = () => {
       connectedRoom.style.display = 'none';
       systemState.isTwoPlayer = false;
       systemState.roomId = '';
+      systemState.opponentSocketId = '';
       cleanActionData('self');
       cleanActionData('opp');
       reset('opp', true, true, false, true);

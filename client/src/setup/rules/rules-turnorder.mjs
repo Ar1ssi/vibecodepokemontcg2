@@ -22,23 +22,26 @@ const hashSeedToBool = (seed = '') => {
 };
 
 /**
- * Pick who calls the turn-order coin in multiplayer without a network round-trip.
- * Both clients derive the same host/joiner choice from roomId + sessionKey; each
- * maps that to 'self' or 'opp' from its own perspective. Solo callers always get
+ * Pick who calls the turn-order coin in multiplayer. Both clients must know
+ * each other's socket.id; the designated caller is chosen randomly but
+ * deterministically from roomId + sessionKey by picking one of the two ids.
+ * Returns null when the peer id is not known yet. Solo callers always get
  * 'self'.
  */
 export const resolveTurnOrderCaller = ({
   roomId,
   socketId,
+  opponentSocketId = null,
   sessionKey = '0',
   isMultiplayer = true,
 } = {}) => {
   if (!isMultiplayer || !roomId || !socketId) return 'self';
-  const hostSocketId = roomId.endsWith('0') ? roomId.slice(0, -1) : roomId;
-  const isHost = socketId === hostSocketId;
-  const hostCalls = hashSeedToBool(`${roomId}:${sessionKey}`);
-  if (hostCalls) return isHost ? 'self' : 'opp';
-  return isHost ? 'opp' : 'self';
+  if (!opponentSocketId || opponentSocketId === socketId) return null;
+
+  const [lowId, highId] = [socketId, opponentSocketId].sort();
+  const lowCalls = hashSeedToBool(`${roomId}:${sessionKey}`);
+  const callerSocketId = lowCalls ? lowId : highId;
+  return socketId === callerSocketId ? 'self' : 'opp';
 };
 
 export const decideTurnOrder = ({ caller, call, result } = {}) => {

@@ -710,14 +710,24 @@ import {
 
       // Multiplayer: one randomly designated caller picks heads/tails; the
       // other waits for the broadcast flip. Both clients derive the same
-      // caller from roomId + session so only one side opens the picker.
+      // caller from the pair of socket ids + session so only one side opens
+      // the picker.
       if (systemState.isTwoPlayer && rulesSocket) {
+        if (!systemState.opponentSocketId) {
+          rulesSocket.emit('rulesEvent', {
+            type: 'peerSocketId',
+            data: { socketId: rulesSocket.id },
+          });
+          return;
+        }
         const designatedCaller = resolveTurnOrderCaller({
           roomId: systemState.roomId,
           socketId: rulesSocket.id,
+          opponentSocketId: systemState.opponentSocketId,
           sessionKey: String(rulesSessionGeneration),
           isMultiplayer: true,
         });
+        if (designatedCaller === null) return;
         if (designatedCaller !== 'self') {
           appendMessage('', 'Waiting for opponent to call the coin…', 'announcement', false);
           return;
@@ -1354,6 +1364,26 @@ import {
               if (coinCallPending) {
                 coinCallPending = false;
                 document.getElementById('rulesCoinCallOverlay')?.remove();
+              }
+            } else if (type === 'peerSocketId') {
+              const peerId = data?.socketId;
+              if (peerId && peerId !== rulesSocket?.id) {
+                systemState.opponentSocketId = peerId;
+                if (
+                  rulesState.enabled &&
+                  rulesState.phase === 'setup' &&
+                  !coinFlipPending &&
+                  !coinCallPending &&
+                  !syncedTurnOrder
+                ) {
+                  handleSetupClick();
+                }
+              }
+              if (peerId && peerId !== rulesSocket?.id) {
+                rulesSocket.emit('rulesEvent', {
+                  type: 'peerSocketId',
+                  data: { socketId: rulesSocket.id },
+                });
               }
             } else if (type === 'coinChosen') {
               // Opponent chose/changed their coin — show it on our mat

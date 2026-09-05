@@ -39,6 +39,7 @@ export const systemState = {
     //refers to the user on the bottom half of the screen, e.g., initiator === 'self' means that the bottom half is the 'self' user
   },
   roomId: '',
+  opponentSocketId: '', // multiplayer peer socket.id for synced turn-order coin caller
   p1Username: (user) => {
     return user === 'self' ? 'Blue' : 'Red';
   },
