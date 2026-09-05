@@ -18,6 +18,10 @@ import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { addSpecialCondition } from '../counters/special-condition.js';
+import {
+  getSpecialConditionCode,
+  setSpecialConditionCode,
+} from '../../setup/counters/special-condition-code.mjs';
 import { useAbility } from '../counters/use-ability.js';
 import {
   discardBoard,
@@ -335,32 +339,31 @@ export const keyDown = (event) => {
         );
       } else {
         if (!isAltKeyPressed(event)) {
-          switch (
-            mouseClick.card.image.specialCondition.textContent.toUpperCase()
-          ) {
+          const sc = mouseClick.card.image.specialCondition;
+          switch (getSpecialConditionCode(sc).toUpperCase()) {
             case 'P':
-              mouseClick.card.image.specialCondition.textContent = 'B';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'B');
+              sc.handleColor();
               break;
             case 'B':
-              mouseClick.card.image.specialCondition.textContent = 'Pa';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'Pa');
+              sc.handleColor();
               break;
             case 'PA':
-              mouseClick.card.image.specialCondition.textContent = 'C';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'C');
+              sc.handleColor();
               break;
             case 'C':
-              mouseClick.card.image.specialCondition.textContent = 'A';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'A');
+              sc.handleColor();
               break;
             case 'A':
-              mouseClick.card.image.specialCondition.textContent = 'P';
-              mouseClick.card.image.specialCondition.handleColor();
+              setSpecialConditionCode(sc, 'P');
+              sc.handleColor();
               break;
           }
         } else {
-          mouseClick.card.image.specialCondition.textContent = '';
+          setSpecialConditionCode(mouseClick.card.image.specialCondition, '');
           mouseClick.card.image.specialCondition.handleRemove(true);
           deselectCard();
         }

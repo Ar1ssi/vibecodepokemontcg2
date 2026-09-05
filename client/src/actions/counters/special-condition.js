@@ -4,6 +4,10 @@ import {
   systemState,
 } from '../../front-end.js';
 import { applySpecialConditionStyle } from '../../setup/counters/special-condition-style-apply.js';
+import {
+  getSpecialConditionCode,
+  setSpecialConditionCode,
+} from '../../setup/counters/special-condition-code.mjs';
 import { processAction } from '../../setup/general/process-action.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 
@@ -25,7 +29,7 @@ export const updateSpecialCondition = (
 
   const specialCondition = getZone(user, zoneId).array[index].image
     .specialCondition;
-  specialCondition.textContent = textContent;
+  setSpecialConditionCode(specialCondition, textContent);
   applySpecialConditionStyle(specialCondition, textContent);
 
   processAction(user, emit, 'updateSpecialCondition', [
@@ -98,11 +102,14 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
         systemState.initiator === 'self' ? 'opp-circle' : 'self-circle';
     }
     specialCondition.contentEditable = 'true';
-    specialCondition.textContent = 'P';
+    setSpecialConditionCode(specialCondition, 'P');
     applySpecialConditionStyle(specialCondition, 'P');
   }
 
-  applySpecialConditionStyle(specialCondition, specialCondition.textContent);
+  applySpecialConditionStyle(
+    specialCondition,
+    getSpecialConditionCode(specialCondition)
+  );
 
   specialCondition.style.display = 'inline-block';
   specialCondition.style.left = `${targetRect.left - zoneElementRect.left}px`;
@@ -120,7 +127,12 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
   specialCondition.style.zIndex = '1';
 
   const handleColor = () => {
-    updateSpecialCondition(user, zoneId, index, specialCondition.textContent);
+    updateSpecialCondition(
+      user,
+      zoneId,
+      index,
+      getSpecialConditionCode(specialCondition)
+    );
   };
 
   const handleResize = () => {
@@ -129,8 +141,8 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
 
   const handleRemove = (fromBlurEvent = false) => {
     if (
-      specialCondition.textContent.trim() === '' ||
-      specialCondition.textContent === '0'
+      getSpecialConditionCode(specialCondition) === '' ||
+      getSpecialConditionCode(specialCondition) === '0'
     ) {
       targetCard.image.specialCondition.removeEventListener(
         'input',
