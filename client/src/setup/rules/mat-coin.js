@@ -157,4 +157,7 @@ const hookLayoutRefresh = () => {
 export const initMatCoins = () => {
   hookLayoutRefresh();
   renderMatCoins();
+  for (const container of [selfContainer, oppContainer]) {
+    container?.addEventListener('load', renderMatCoins, { once: true });
+  }
 };
