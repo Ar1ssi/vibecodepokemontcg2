@@ -1647,6 +1647,16 @@ import test from 'node:test';
       assert.ok(heal.components.includes('heal'));
     });
 
+    test('parseAttackDamage: "also does N damage" bench clause (Jetting Blow)', () => {
+      const jetting = parseAttackDamage({
+        damage: 120,
+        text: "This attack also does 50 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+      });
+      assert.equal(jetting.total, 120);
+      assert.equal(jetting.bench, 50);
+      assert.ok(jetting.components.includes('bench'));
+    });
+
     test('parseAttackDamage: feeds computeAttackDamage (weakness ×2 on parsed total)', () => {
       const parsed = parseAttackDamage(
         { name: 'Type Surge', damage: 30, text: 'If the Defending Pokémon is a Water Pokémon, this attack does 20 more damage.' },

@@ -8,7 +8,7 @@ import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus } from './status.mjs';
 import { ensureCardData, getStadium } from './rules-state.mjs';
-import { normalizeStage, isRareCandyJump, markEvolvedThisTurn } from './evolution.mjs';
+import { normalizeStage, isRareCandyJump } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
 
 const STATUS_KEY = {
@@ -1102,12 +1102,11 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               openPickOnly({
                 title: `${card.name} — choose Stage 2`,
                 candidates: options,
-                onPick: (evo) => {
+                onPick: async (evo) => {
                   const loc = pokemonZoneEntry('self', base);
                   const handIdx = hand.array.indexOf(evo);
                   if (!loc || handIdx < 0) return;
-                  moveCard('self', 'self', 'hand', loc.zoneId, handIdx, loc.index);
-                  markEvolvedThisTurn('self', base.name);
+                  await moveCard('self', 'self', 'hand', loc.zoneId, handIdx, loc.index);
                   msg(`  auto: Rare Candy — ${base.name} → ${evo.name}`);
                 },
               });

@@ -357,8 +357,8 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
 
   // ── Side effects (reported, never executed) ──
   let bench = 0;
-  if (text && /benched pokémon|your bench/.test(text) && /damage|do \d/.test(text)) {
-    bench = amount(text, /(?:also )?do (\d+) damage/);
+  if (text && /benched pok[ée]mon|your bench/.test(text) && /damage|do(?:es)? \d/.test(text)) {
+    bench = amount(text, /(?:also )?do(?:es)? (\d+) damage/);
     if (bench > 0) components.push('bench');
   }
   let heal = 0;
