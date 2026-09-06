@@ -88,6 +88,18 @@ export const moveCardBundle = async (
   const { emit, tail: cardHints } = splitEmitAndTail(emitOrHints, maybeHintsOrEmit);
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
+    // This client is acting on its (possibly stale) mirror of the
+    // opponent's zone and asking the real owner to apply the move via
+    // 'requestAction'. Attach the same identity hints the self→opp mirror
+    // path already sends, so the owner (who applies this to their real,
+    // authoritative zone) can verify `index` still points at the intended
+    // card instead of trusting a relay index that may have drifted — e.g.
+    // a Judge/Boss's-Orders-style effect racing the owner's own concurrent
+    // action on that zone. Without this, a stale index silently moves the
+    // wrong card on the owner's authoritative board with no verification
+    // and no resync trigger (see the isMirrorReplay/needsHintVerification
+    // block below, previously unreachable for this direction).
+    const requestHints = buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex);
     processAction(user, emit, 'moveCardBundle', [
       oInitiator,
       oZoneId,
@@ -95,7 +107,7 @@ export const moveCardBundle = async (
       index,
       targetIndex,
       action,
-      cardHints,
+      requestHints,
     ]);
     return;
   }
@@ -103,8 +115,15 @@ export const moveCardBundle = async (
   let resolvedIndex = index;
   let resolvedTargetIndex = targetIndex;
   let syncOptions = {};
-  const isMirrorReplay =
-    cardHints && systemState.isTwoPlayer && !emit && user === 'opp';
+  // Hints only ever accompany a relayed call (mirror-apply of the
+  // opponent's own move, or here, this owner applying a move the opponent
+  // requested against our real zone) — never a fresh local UI action — so
+  // gating on their presence is safe and covers both relay directions.
+  const needsHintVerification =
+    !!cardHints &&
+    systemState.isTwoPlayer &&
+    ((user === 'opp' && !emit) || (user === 'self' && emit));
+  const isMirrorReplay = needsHintVerification;
   if (isMirrorReplay) {
     ({ index: resolvedIndex, targetIndex: resolvedTargetIndex } =
       resolveMoveCardIndices(

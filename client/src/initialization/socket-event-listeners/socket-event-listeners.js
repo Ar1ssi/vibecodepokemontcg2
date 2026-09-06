@@ -205,15 +205,41 @@ export const initializeSocketEventListeners = () => {
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
-    if (
-      (notSpectator && data.counter === systemState.selfCounter) ||
-      isImporting
-    ) {
-      startKeybindsSleep();
-      pushActionQueue = pushActionQueue.then(() =>
-        acceptAction('self', data.action, data.parameters)
+    if (!notSpectator) return;
+    const counterMatches = data.counter === systemState.selfCounter;
+    // The counter check guards against applying a request built against a
+    // stale view of our board (e.g. the opponent's effect raced one of our
+    // own actions). On a mismatch this used to drop the request with zero
+    // feedback — no log, no resync — silently losing the action forever
+    // (both sides end up "in sync" since neither ever applied it, so the
+    // periodic board-hash check can't catch it either). moveCardBundle now
+    // carries identity hints (see move-card-bundle.js) that let it verify
+    // the relayed index and safely abort + request a resync instead of
+    // corrupting our board, so it's safe to still attempt it even when
+    // stale. Other action types have no such verification yet, so a
+    // mismatch there is still dropped rather than risk applying it against
+    // the wrong card — but now it's logged instead of silent.
+    const canAttempt =
+      isImporting || counterMatches || data.action === 'moveCardBundle';
+    if (!canAttempt) {
+      logSync(
+        'requestAction.drop',
+        { action: data.action, expected: systemState.selfCounter, received: data.counter },
+        'in'
+      );
+      return;
+    }
+    if (!counterMatches && !isImporting) {
+      logSync(
+        'requestAction.stale_counter',
+        { action: data.action, expected: systemState.selfCounter, received: data.counter },
+        'in'
       );
     }
+    startKeybindsSleep();
+    pushActionQueue = pushActionQueue.then(() =>
+      acceptAction('self', data.action, data.parameters)
+    );
   });
   // reset counter when importing game state
   socket.on('initiateImport', () => {
