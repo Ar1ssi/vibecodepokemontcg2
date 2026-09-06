@@ -7,16 +7,26 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 
-// Draw starting hand of 7 and prize 6
-export const drawHand = (user, initiator) => {
-  const drawAmount = Math.min(7, getZone(user, 'deck').getCount());
-  for (let i = 0; i < drawAmount; i++) {
-    moveCard(user, initiator, 'deck', 'hand', 0);
-  }
+// Place 6 prize cards from the top of the deck.
+export const setOpeningPrizes = (user, initiator) => {
   const prizeAmount = Math.min(6, getZone(user, 'deck').getCount());
   for (let i = 0; i < prizeAmount; i++) {
     moveCard(user, initiator, 'deck', 'prizes', 0);
   }
+};
+
+// Draw opening hand of 7 from the top of the deck.
+export const drawOpeningHand = (user, initiator) => {
+  const drawAmount = Math.min(7, getZone(user, 'deck').getCount());
+  for (let i = 0; i < drawAmount; i++) {
+    moveCard(user, initiator, 'deck', 'hand', 0);
+  }
+};
+
+// Draw starting hand of 7 and prize 6 (non-rules / legacy setup path).
+export const drawHand = (user, initiator) => {
+  drawOpeningHand(user, initiator);
+  setOpeningPrizes(user, initiator);
 };
 
 export const discardAndDraw = (user, initiator, drawAmount, emit = true) => {

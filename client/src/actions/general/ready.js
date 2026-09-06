@@ -3,7 +3,8 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { hasDeckLoaded } from '../../setup/general/has-deck-loaded.js';
 import { processAction } from '../../setup/general/process-action.js';
-import { setup } from './setup.js';
+import { rulesState } from '../../setup/rules/rules-state.mjs';
+import { setup, setupPrizes } from './setup.js';
 
 const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
 
@@ -100,17 +101,30 @@ export const readyUp = (user, emit = true) => {
   if (systemState.selfReady && systemState.oppReady) {
     systemState.selfReady = false;
     systemState.oppReady = false;
-    appendMessage(
-      '',
-      'Both players are ready -- setting prizes and drawing opening hands!',
-      'announcement',
-      false
-    );
-    setup('self');
-    if (!systemState.isTwoPlayer) {
-      // In solo/one-player mode there's no separate opponent client to
-      // trigger the mirrored setup, so do it locally for both sides.
-      setup('opp');
+    if (rulesState.enabled) {
+      appendMessage(
+        '',
+        'Both players are ready — setting prizes!',
+        'announcement',
+        false
+      );
+      setupPrizes('self');
+      if (!systemState.isTwoPlayer) {
+        setupPrizes('opp');
+      }
+    } else {
+      appendMessage(
+        '',
+        'Both players are ready — setting prizes and drawing opening hands!',
+        'announcement',
+        false
+      );
+      setup('self');
+      if (!systemState.isTwoPlayer) {
+        // In solo/one-player mode there's no separate opponent client to
+        // trigger the mirrored setup, so do it locally for both sides.
+        setup('opp');
+      }
     }
     updateReadyButtons();
     // Let other systems (e.g. the rules engine's turn-order coin flip)

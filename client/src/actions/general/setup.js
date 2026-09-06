@@ -5,7 +5,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { shuffleIndices } from '../../setup/general/shuffle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
-import { drawHand } from '../zones/hand-actions.js';
+import { drawHand, setOpeningPrizes } from '../zones/hand-actions.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { reset } from './reset.js';
 
@@ -28,4 +28,27 @@ export const setup = (user, indices, emit = true) => {
     );
   }
   processAction(user, emit, 'setup', [indices]);
+};
+
+// Rules-mode setup step 1: shuffle deck and set prize cards only.
+// Opening hands are drawn after the turn-order coin flip (rules-bridge).
+export const setupPrizes = (user, indices, emit = true) => {
+  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+    processAction(user, emit, 'setupPrizes', [indices]);
+    return;
+  }
+  reset(user, true, true, true, false);
+  const deck = getZone(user, 'deck');
+  indices = indices ? indices : shuffleIndices(deck.getCount());
+  if (determineDeckData(user)) {
+    shuffleZone(user, user, 'deck', indices, false, false);
+    setOpeningPrizes(user, user);
+    appendMessage(
+      user,
+      determineUsername(user) + ' set prizes',
+      'player',
+      false
+    );
+  }
+  processAction(user, emit, 'setupPrizes', [indices]);
 };

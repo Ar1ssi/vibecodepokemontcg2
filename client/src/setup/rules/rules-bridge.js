@@ -58,7 +58,7 @@ import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
-import { shuffleAndDraw } from '../../actions/zones/hand-actions.js';
+import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
 import { getCoinById } from '../deck-builder/core/coins.mjs';
 import {
   flipMatCoin,
@@ -102,6 +102,10 @@ import {
     let coinCallCaller = 'self';
     // True while the heads/tails call picker is open.
     let coinCallPending = false;
+    // True once both players have readied up and prizes are on the mat —
+    // gates the turn-order coin flip so a peerSocketId exchange on room
+    // join cannot start the game early.
+    let openingSetupReadyForCoinFlip = false;
     // Bumped on reset/restart so stale coin-flip / mulligan callbacks cannot
     // re-enter beginSetupWithTurnOrder after the session was cleared.
     let rulesSessionGeneration = 0;
@@ -537,7 +541,10 @@ import {
       // pressed their button, at which point ready.js dispatches
       // 'both-players-ready' on document. Listen for that instead of the
       // raw click so the coin flip happens after setup is complete.
-      document.addEventListener('both-players-ready', handleSetupClick);
+      document.addEventListener('both-players-ready', () => {
+        openingSetupReadyForCoinFlip = true;
+        handleSetupClick();
+      });
       hookResetButtons();
     };
     
@@ -555,6 +562,7 @@ import {
       coinCallCaller = 'self';
       coinCallPending = false;
       coinFlipPending = false;
+      openingSetupReadyForCoinFlip = false;
       closeDeckSearchWindow();
       document.getElementById('rulesCoinCallOverlay')?.remove();
       document.getElementById('rulesChoicePicker')?.remove();
@@ -598,6 +606,11 @@ import {
           beginTurn(firstPlayer === 'opp' ? 'opp' : 'self');
           resetPrizes();
           resetStatuses();
+          drawOpeningHand('self', 'self');
+          if (!systemState.isTwoPlayer) {
+            drawOpeningHand('opp', 'opp');
+          }
+          appendMessage('', 'Opening hands drawn!', 'announcement', false);
           appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
     
           // mulligan check: opening hands must contain a Basic Pokémon
@@ -664,12 +677,13 @@ import {
           updateTurnBanner();
     };
     
-    // Fires once both players have pressed Set Up and their opening hands/
-    // prizes have been dealt (see the 'both-players-ready' event dispatched
-    // by ready.js). Decides turn order via a coin flip and kicks off the
-    // actual game/turn state.
+    // Fires once both players have pressed Set Up and their prize cards
+    // are on the mat (see the 'both-players-ready' event dispatched by
+    // ready.js). Decides turn order via a coin flip, draws opening hands,
+    // and kicks off the actual game/turn state.
     const handleSetupClick = () => {
       if (!rulesState.enabled) return;
+      if (!openingSetupReadyForCoinFlip) return;
       if (systemState.isReplay) return;
       if (coinFlipPending) return; // a flip already in flight will start the game
       if (rulesState.phase !== 'setup') return; // already started (e.g. auto-start)
@@ -1290,7 +1304,11 @@ import {
               // flipSuperseded cancels). startGame flips phase to 'draw',
               // which guards against a double-start via our own Set Up
               // click or a duplicate event.
-              if (rulesState.enabled && rulesState.phase === 'setup') {
+              if (
+                rulesState.enabled &&
+                rulesState.phase === 'setup' &&
+                openingSetupReadyForCoinFlip
+              ) {
                 flipSuperseded = true;
                 syncedTurnOrder = null;
                 beginSetupWithTurnOrder(localTurnPlayer);
@@ -1316,6 +1334,7 @@ import {
                 systemState.opponentSocketId = peerId;
                 if (
                   !alreadyKnown &&
+                  openingSetupReadyForCoinFlip &&
                   rulesState.enabled &&
                   rulesState.phase === 'setup' &&
                   !coinFlipPending &&
