@@ -8,13 +8,22 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 
-/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, dragPx: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
+/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, targetDragPx: number, renderDragPx: number, animFrameId: number | null, tracking: boolean, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
 let viewerState = null;
 
 const PEEK_PERCENT = 24;
 const SWIPE_THRESHOLD = 40;
 const SWIPE_LOCK_PX = 10;
 const SCREEN_EDGE_MARGIN = 32;
+/** Drag farther than one peek width to fully advance one card — lowers jitter sensitivity. */
+const DRAG_CARD_SCALE = 1.45;
+/** How quickly rendered drag catches up to the pointer (lower = smoother). */
+const DRAG_LERP = 0.16;
+
+const smoothstep = (t) => {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+};
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
 
@@ -67,7 +76,8 @@ const buildSlideContent = async (card) => {
 
 /** Fractional focus index: drag shifts the whole stack in peek-sized steps. */
 const computeVirtualIndex = (index, dragPx, peekPx, slideCount) => {
-  const progress = dragPx / peekPx;
+  const cardStepPx = peekPx * DRAG_CARD_SCALE;
+  const progress = dragPx / cardStepPx;
   return Math.max(0, Math.min(slideCount - 1, index + progress));
 };
 
@@ -91,7 +101,7 @@ const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
 
   if (dragPx !== 0) {
     const progress = virtualIndex - index;
-    const handoff = Math.min(1, Math.abs(progress)) * 6;
+    const handoff = smoothstep(Math.abs(progress)) * 5;
     const incoming = dragPx > 0 ? index + 1 : index - 1;
 
     if (slideIndex === index) {
@@ -102,6 +112,40 @@ const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
   }
 
   return Math.round(z);
+};
+
+const stopDragLoop = (state) => {
+  if (state.animFrameId != null) {
+    cancelAnimationFrame(state.animFrameId);
+    state.animFrameId = null;
+  }
+};
+
+const startDragLoop = (state) => {
+  if (state.animFrameId != null) return;
+
+  const tick = () => {
+    if (!viewerState || viewerState !== state) {
+      stopDragLoop(state);
+      return;
+    }
+
+    const delta = state.targetDragPx - state.renderDragPx;
+    if (!state.tracking && Math.abs(delta) < 0.35) {
+      state.renderDragPx = state.targetDragPx;
+      layoutStack(state);
+      state.stack.classList.remove('is-dragging');
+      state.stage.classList.remove('is-dragging');
+      stopDragLoop(state);
+      return;
+    }
+
+    state.renderDragPx += delta * DRAG_LERP;
+    layoutStack(state);
+    state.animFrameId = requestAnimationFrame(tick);
+  };
+
+  state.animFrameId = requestAnimationFrame(tick);
 };
 
 const isSlideOnScreen = (stackRect, stackWidth, peekOffset) => {
@@ -141,13 +185,13 @@ const syncHoloAnimations = (state) => {
 };
 
 const layoutStack = (state) => {
-  const { slides, stack, index, dragPx } = state;
+  const { slides, stack, index, renderDragPx } = state;
   const stackWidth = stack.clientWidth || 380;
   const stackRect = stack.getBoundingClientRect();
   const peekPx = (PEEK_PERCENT / 100) * stackWidth;
   const virtualIndex = computeVirtualIndex(
     index,
-    dragPx,
+    renderDragPx,
     peekPx,
     slides.length
   );
@@ -159,7 +203,7 @@ const layoutStack = (state) => {
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
     slide.classList.add(`is-${layout.role}`);
     slide.style.zIndex = String(
-      computeSlideZIndex(i, virtualIndex, index, dragPx)
+      computeSlideZIndex(i, virtualIndex, index, renderDragPx)
     );
 
     const scale = 1 - absPeek * 0.035;
@@ -183,7 +227,9 @@ const updateFooter = (state) => {
 
 const goToIndex = (state, index) => {
   state.index = clampIndex(index, state.slides.length - 1);
-  state.dragPx = 0;
+  state.targetDragPx = 0;
+  state.renderDragPx = 0;
+  stopDragLoop(state);
   updateFooter(state);
 };
 
@@ -198,6 +244,7 @@ export const closeDiscardPileViewer = (event) => {
 
   const { overlay, onKeyDown, slides } = viewerState;
   document.removeEventListener('keydown', onKeyDown);
+  stopDragLoop(viewerState);
   slides.forEach((slide) => {
     const wrapper = slideWrapper(slide);
     if (wrapper) stopHoloAnimation(wrapper);
@@ -223,12 +270,15 @@ const attachSwipe = (state) => {
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
     if (isSwipeBlockedTarget(event.target)) return;
+    stopDragLoop(state);
     tracking = true;
+    state.tracking = true;
     dragging = false;
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
-    state.dragPx = 0;
+    state.targetDragPx = 0;
+    state.renderDragPx = 0;
     stage.setPointerCapture(event.pointerId);
   };
 
@@ -249,8 +299,8 @@ const attachSwipe = (state) => {
 
     if (dragging) {
       event.preventDefault();
-      state.dragPx = dx;
-      layoutStack(state);
+      state.targetDragPx = dx;
+      startDragLoop(state);
     }
   };
 
@@ -258,6 +308,7 @@ const attachSwipe = (state) => {
     if (!tracking || state.pointerId !== event.pointerId) return;
     const wasDragging = dragging;
     tracking = false;
+    state.tracking = false;
     dragging = false;
     stage.classList.remove('is-dragging');
     stack.classList.remove('is-dragging');
@@ -272,8 +323,10 @@ const attachSwipe = (state) => {
     if (horizontal) {
       goToIndex(state, state.index + (dx > 0 ? 1 : -1));
     } else {
-      state.dragPx = 0;
-      layoutStack(state);
+      state.targetDragPx = 0;
+      stack.classList.add('is-dragging');
+      stage.classList.add('is-dragging');
+      startDragLoop(state);
     }
 
     state.pointerId = null;
@@ -375,7 +428,10 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
     slides,
     cards,
     index: initialIndex,
-    dragPx: 0,
+    targetDragPx: 0,
+    renderDragPx: 0,
+    animFrameId: null,
+    tracking: false,
     countEl,
     nameEl,
     pointerId: null,
