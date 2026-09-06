@@ -196,6 +196,7 @@ export const closeCardPreview = (event, immediate = false) => {
 
   const state = cardPreviewState;
   cardPreviewState = null;
+  state.overlay.classList.add('is-closing');
 
   const revert = () => {
     const anchor =

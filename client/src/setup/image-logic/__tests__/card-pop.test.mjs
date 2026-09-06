@@ -63,11 +63,12 @@ test('popover always targets a 360° spin, including a second open', () => {
   motion.stop();
 });
 
-test('retreat targets rotateY 0 so the card lands face-up on the mat', () => {
-  const { host } = fakeHost();
+test('retreat snaps rotateY to 0 immediately so close is not blocked', () => {
+  const { host, flip } = fakeHost();
   const motion = createPopoverMotion(host);
   motion.popover({ left: 0, top: 0, width: 100, height: 140 });
   motion.retreat();
   assert.equal(motion.rotateTarget, 0);
+  assert.match(flip.style.transform, /rotateY\(0deg\)/);
   motion.stop();
 });

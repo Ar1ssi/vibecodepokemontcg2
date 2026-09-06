@@ -211,10 +211,12 @@ export const createPopoverMotion = (host) => {
       ]);
     },
     retreat() {
+      // 360° and 0° look the same; don't unwind a full reverse spin or the
+      // overlay waits ~2s after the card is already home.
+      rotateDelta.set(0, { hard: true });
       return Promise.all([
         scale.set(1, { soft: true }),
         translate.set({ x: 0, y: 0 }, { soft: true }),
-        rotateDelta.set(0, { soft: true }),
       ]);
     },
     reset() {
