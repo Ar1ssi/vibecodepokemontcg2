@@ -1773,20 +1773,26 @@ ul, li {
   justify-content: center;
   min-height: 0;
   width: 100%;
-  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
 }
-.discard-pile-stage > * {
-  pointer-events: auto;
+.discard-pile-stage.is-dragging {
+  cursor: grabbing;
+}
+.discard-pile-nav,
+.discard-pile-close {
+  cursor: pointer;
 }
 .discard-pile-stack {
   position: relative;
   width: min(72vw, 380px);
   height: min(68vh, calc(min(72vw, 380px) * 1.397));
   touch-action: none;
-  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .discard-pile-stack img,
 .discard-pile-stack .mat-holo.discard-pile-holo {
@@ -1811,10 +1817,9 @@ ul, li {
   pointer-events: none;
   opacity: 1;
 }
-.discard-pile-slide.is-active {
-  pointer-events: auto;
-}
-.discard-pile-slide.is-ahead {
+.discard-pile-slide.is-active,
+.discard-pile-slide.is-ahead,
+.discard-pile-slide.is-behind {
   pointer-events: none;
 }
 .discard-pile-slide.is-hidden {
@@ -1871,7 +1876,7 @@ ul, li {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 300;
+  z-index: 400;
   width: 2.75rem;
   height: 2.75rem;
   border: none;

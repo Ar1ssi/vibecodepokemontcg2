@@ -8,12 +8,12 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 
-/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
+/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, dragPx: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
 let viewerState = null;
 
 const PEEK_PERCENT = 24;
 const SWIPE_THRESHOLD = 40;
-const SWIPE_START_PX = 16;
+const SWIPE_LOCK_PX = 10;
 const SCREEN_EDGE_MARGIN = 32;
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
@@ -65,22 +65,70 @@ const buildSlideContent = async (card) => {
   return { node: img, holoWrapper: null };
 };
 
-const isSlideOnScreen = (stackRect, stackWidth, offset, dragPx = 0) => {
+/** Clamp drag at pile ends so cards rubber-band instead of sliding off-screen. */
+const clampDragPx = (index, dragPx, slideCount) => {
+  if (dragPx > 0 && index >= slideCount - 1) return 0;
+  if (dragPx < 0 && index <= 0) return 0;
+  return dragPx;
+};
+
+/**
+ * PTCG Live-style stack layout.
+ * At rest each slide sits at (index - slideIndex) peek steps from center.
+ * During a horizontal drag only the active card and its immediate neighbor
+ * interpolate; deeper peeks stay anchored.
+ *
+ * Drag right  → older card (index + 1). Drag left → newer (index - 1).
+ */
+const computeSlideLayout = (slideIndex, index, dragPx, peekPx) => {
+  const basePeek = index - slideIndex;
+
+  if (dragPx === 0) {
+    return {
+      peekOffset: basePeek,
+      px: 0,
+      role:
+        basePeek === 0 ? 'active' : basePeek < 0 ? 'ahead' : 'behind',
+    };
+  }
+
+  if (dragPx > 0) {
+    if (slideIndex === index) {
+      return { peekOffset: 0, px: dragPx, role: 'active' };
+    }
+    if (slideIndex === index + 1) {
+      return { peekOffset: -1, px: dragPx, role: 'ahead' };
+    }
+    return {
+      peekOffset: basePeek,
+      px: 0,
+      role: basePeek < 0 ? 'ahead' : 'behind',
+    };
+  }
+
+  if (slideIndex === index) {
+    return { peekOffset: 0, px: dragPx, role: 'active' };
+  }
+  if (slideIndex === index - 1) {
+    return { peekOffset: 1, px: dragPx, role: 'behind' };
+  }
+  return {
+    peekOffset: basePeek,
+    px: 0,
+    role: basePeek < 0 ? 'ahead' : 'behind',
+  };
+};
+
+const isSlideOnScreen = (stackRect, stackWidth, peekOffset, px) => {
   const peekPx = (PEEK_PERCENT / 100) * stackWidth;
   const centerX = stackRect.left + stackRect.width / 2;
-  const scale = 1 - Math.abs(offset) * 0.035;
+  const scale = 1 - Math.abs(peekOffset) * 0.035;
   const cardWidth = stackWidth * scale;
-  const cardCenterX = centerX + offset * peekPx + dragPx;
+  const cardCenterX = centerX + peekOffset * peekPx + px;
   return (
     cardCenterX + cardWidth / 2 >= -SCREEN_EDGE_MARGIN &&
     cardCenterX - cardWidth / 2 <= window.innerWidth + SCREEN_EDGE_MARGIN
   );
-};
-
-const clampDragOffset = (state, dragOffsetX) => {
-  if (dragOffsetX > 0 && state.index >= state.slides.length - 1) return 0;
-  if (dragOffsetX < 0 && state.index <= 0) return 0;
-  return dragOffsetX;
 };
 
 const syncHoloAnimations = (state) => {
@@ -107,33 +155,26 @@ const syncHoloAnimations = (state) => {
   });
 };
 
-const layoutStack = (state, dragOffsetX = 0) => {
-  const { slides, stack, index } = state;
+const layoutStack = (state) => {
+  const { slides, stack, index, dragPx: rawDragPx } = state;
   const stackWidth = stack.clientWidth || 380;
   const stackRect = stack.getBoundingClientRect();
-  const activeDragPx =
-    dragOffsetX !== 0 ? clampDragOffset(state, dragOffsetX) : 0;
+  const peekPx = (PEEK_PERCENT / 100) * stackWidth;
+  const dragPx = clampDragPx(index, rawDragPx, slides.length);
 
   slides.forEach((slide, i) => {
-    const offset = index - i;
-    const absOffset = Math.abs(offset);
-    const dragPx = i === index ? activeDragPx : 0;
+    const layout = computeSlideLayout(i, index, dragPx, peekPx);
+    const absPeek = Math.abs(layout.peekOffset);
+
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
+    slide.classList.add(`is-${layout.role}`);
+    slide.style.zIndex = String(300 - Math.round(absPeek * 10));
 
-    slide.style.zIndex = String(300 - Math.round(absOffset * 10));
-
-    if (absOffset === 0) {
-      slide.classList.add('is-active');
-    } else if (offset < 0) {
-      slide.classList.add('is-ahead');
-    } else {
-      slide.classList.add('is-behind');
-    }
-
-    slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}% + ${dragPx}px)) scale(${1 - absOffset * 0.035})`;
+    const scale = 1 - absPeek * 0.035;
+    slide.style.transform = `translateX(calc(${layout.peekOffset * PEEK_PERCENT}% + ${layout.px}px)) scale(${scale})`;
     slide.style.opacity = '1';
 
-    if (!isSlideOnScreen(stackRect, stackWidth, offset, dragPx)) {
+    if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset, layout.px)) {
       slide.classList.add('is-hidden');
     }
   });
@@ -150,6 +191,7 @@ const updateFooter = (state) => {
 
 const goToIndex = (state, index) => {
   state.index = clampIndex(index, state.slides.length - 1);
+  state.dragPx = 0;
   updateFooter(state);
 };
 
@@ -172,8 +214,11 @@ export const closeDiscardPileViewer = (event) => {
   viewerState = null;
 };
 
+const isSwipeBlockedTarget = (target) =>
+  target.closest('.discard-pile-nav, .discard-pile-close, button, a');
+
 const attachSwipe = (state) => {
-  const { stack, overlay } = state;
+  const { stage, stack } = state;
   let startX = 0;
   let startY = 0;
   let tracking = false;
@@ -185,30 +230,35 @@ const attachSwipe = (state) => {
 
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
-    if (!stack.contains(event.target)) return;
+    if (isSwipeBlockedTarget(event.target)) return;
     tracking = true;
     dragging = false;
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
-    overlay.setPointerCapture(event.pointerId);
+    state.dragPx = 0;
+    stage.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event) => {
     if (!tracking || state.pointerId !== event.pointerId) return;
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
+
     if (
       !dragging &&
-      Math.abs(dx) >= SWIPE_START_PX &&
-      Math.abs(dx) > Math.abs(dy) * 1.2
+      Math.abs(dx) >= SWIPE_LOCK_PX &&
+      Math.abs(dx) > Math.abs(dy) * 1.1
     ) {
       dragging = true;
+      stage.classList.add('is-dragging');
       stack.classList.add('is-dragging');
     }
+
     if (dragging) {
       event.preventDefault();
-      layoutStack(state, dx);
+      state.dragPx = dx;
+      layoutStack(state);
     }
   };
 
@@ -217,39 +267,38 @@ const attachSwipe = (state) => {
     const wasDragging = dragging;
     tracking = false;
     dragging = false;
+    stage.classList.remove('is-dragging');
     stack.classList.remove('is-dragging');
+
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
     const horizontal =
       wasDragging &&
       Math.abs(dx) >= SWIPE_THRESHOLD &&
       Math.abs(dx) > Math.abs(dy);
+
     if (horizontal) {
-      if (dx > 0) {
-        goToIndex(state, state.index + 1);
-      } else {
-        goToIndex(state, state.index - 1);
-      }
+      goToIndex(state, state.index + (dx > 0 ? 1 : -1));
     } else {
+      state.dragPx = 0;
       layoutStack(state);
     }
+
     state.pointerId = null;
-    if (wasDragging) {
-      event.preventDefault();
-    }
+    if (wasDragging) event.preventDefault();
     event.stopPropagation();
     try {
-      overlay.releasePointerCapture(event.pointerId);
+      stage.releasePointerCapture(event.pointerId);
     } catch {
       // capture may already be released
     }
   };
 
-  overlay.addEventListener('pointerdown', onPointerDown);
-  overlay.addEventListener('pointermove', onPointerMove);
-  overlay.addEventListener('pointerup', endSwipe);
-  overlay.addEventListener('pointercancel', endSwipe);
-  overlay.addEventListener('dragstart', blockNativeDrag, true);
+  stage.addEventListener('pointerdown', onPointerDown);
+  stage.addEventListener('pointermove', onPointerMove);
+  stage.addEventListener('pointerup', endSwipe);
+  stage.addEventListener('pointercancel', endSwipe);
+  stage.addEventListener('dragstart', blockNativeDrag, true);
   stack.addEventListener('dragstart', blockNativeDrag, true);
 };
 
@@ -334,6 +383,7 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
     slides,
     cards,
     index: initialIndex,
+    dragPx: 0,
     countEl,
     nameEl,
     pointerId: null,
