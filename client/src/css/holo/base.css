@@ -211,7 +211,7 @@
 }
 
 /* ── Mat holo overrides (scoped to .mat-holo) ─────────────────────────
-   Mat zones size their <img> by height (e.g. `#board img { height: 70% }`,
+   Mat zones size their <img> by height (e.g. `#board img` fills the slot,
    `#attachedCards img { height: 33% }`). The holo wrapper replaces the <img>
    in the zone and gets explicit px width AND height from hydrateHolo. These
    rules force the simey rotator stack to fill that exact box by height (not
