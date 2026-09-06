@@ -10,17 +10,23 @@ import {
 import { toHighResCardImageUrl } from './card-image-url.mjs';
 import { playDrawFlight, viewportRectOf } from './card-pop.mjs';
 
+const pendingHandOrigins = new WeakMap();
+
+export const setHandFlightOrigin = (card, rect) => {
+  if (card && rect) pendingHandOrigins.set(card, rect);
+};
+
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 const STAGGER_MS = 180;
 
 let nextStartAt = 0;
 
-const hideForFlight = (card) => {
+export const hideForFlight = (card) => {
   card?.image?.classList.add('draw-flight-source');
   card?.wrapper?.classList.add('draw-flight-source');
 };
 
-const showAfterFlight = (card) => {
+export const showAfterFlight = (card) => {
   card?.image?.classList.remove('draw-flight-source');
   card?.wrapper?.classList.remove('draw-flight-source');
 };
@@ -58,6 +64,11 @@ const buildDrawFlip = (faceSrc, sleeveSrc) => {
 };
 
 export const originRectForHandFlight = (user, oZoneId, card) => {
+  const override = pendingHandOrigins.get(card);
+  if (override) {
+    pendingHandOrigins.delete(card);
+    return override;
+  }
   const el =
     oZoneId === 'deck'
       ? deckOriginEl(user)

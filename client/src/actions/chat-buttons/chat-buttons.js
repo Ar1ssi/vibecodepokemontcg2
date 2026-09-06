@@ -1468,9 +1468,8 @@ function _pickFromList(title, items) {
   });
 }
 
-// Highlight the prize zone (blue frame + orbiting glow, no reveal, no
-// menu) and take each face-down card the player clicks. Each click uses
-// the existing prizes→hand flight.
+// TCG Live prize pick: remaining prizes fly up sleeve-forward. The
+// player clicks as many as they earned; those fly into the hand.
 async function _takePrizesWithPicker(user, count) {
   if (getZone(user, 'prizes').getCount() === 0) {
     takePrizes(user, user, count);

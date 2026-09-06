@@ -11,6 +11,8 @@ import {
   popoverScaleFor,
   previewSizeForSource,
   previewTargetSize,
+  prizeFanCardSize,
+  prizeFanSlots,
 } from '../card-pop.mjs';
 
 const viewport = { width: 1200, height: 800 };
@@ -119,4 +121,27 @@ test('drawFlightPose lifts and enlarges at mid-flight, then settles in the hand'
   assert.ok(Math.abs(end.y) < 1e-10);
   assert.ok(Math.abs(end.scale - 1) < 1e-10);
   assert.equal(end.rotateY, 0);
+});
+
+test('prizeFanSlots lays out a centered sleeve-forward row', () => {
+  const size = prizeFanCardSize(6, viewport);
+  const slots = prizeFanSlots(6, viewport, size);
+  assert.equal(slots.length, 6);
+  assert.ok(size.width < 168);
+  assert.ok(Math.abs(size.height / size.width - 1.397) < 0.001);
+  const first = slots[0];
+  const last = slots[5];
+  assert.ok(first.left > 0);
+  assert.ok(last.left + last.width < viewport.width);
+  const mid = (first.left + last.left + last.width) / 2;
+  assert.ok(Math.abs(mid - viewport.width / 2) < 1);
+  assert.equal(first.top, viewport.height * 0.28);
+});
+
+test('prizeFanCardSize shrinks so six prizes fit the viewport', () => {
+  const wide = prizeFanCardSize(2, viewport);
+  const packed = prizeFanCardSize(6, viewport);
+  assert.ok(packed.width <= wide.width);
+  const row = packed.width * 6 + packed.gap * 5;
+  assert.ok(row <= viewport.width * 0.86 + 0.01);
 });

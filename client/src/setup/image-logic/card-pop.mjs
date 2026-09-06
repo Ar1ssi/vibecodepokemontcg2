@@ -21,6 +21,10 @@ export const POPOVER_SPIN_DEGREES = 360;
 export const DRAW_FLIP_DEGREES = 180;
 export const DRAW_ARC_PX = 96;
 export const DRAW_PEAK_SCALE = 0.45;
+export const PRIZE_FAN_WIDTH_FIT = 0.86;
+export const PRIZE_FAN_MAX_WIDTH = 168;
+export const PRIZE_FAN_GAP = 16;
+export const PRIZE_FAN_TOP = 0.28;
 
 const tickSpring = (ctx, lastValue, currentValue, targetValue) => {
   if (typeof currentValue === 'number') {
@@ -206,6 +210,46 @@ export const centerDeltaFor = (
   y: Math.round(viewport.height / 2 - rect.top - rect.height / 2),
 });
 
+const defaultViewport = () => ({
+  width: globalThis.innerWidth || 0,
+  height: globalThis.innerHeight || 0,
+});
+
+/** Card size for the TCG Live prize-pick fan that flies up to the screen. */
+export const prizeFanCardSize = (
+  count,
+  viewport = defaultViewport()
+) => {
+  const n = Math.max(1, count);
+  const gap = PRIZE_FAN_GAP;
+  const maxWidth = Math.min(PRIZE_FAN_MAX_WIDTH, viewport.width * 0.16);
+  const available = viewport.width * PRIZE_FAN_WIDTH_FIT;
+  const width = Math.min(
+    maxWidth,
+    (available - gap * Math.max(0, n - 1)) / n
+  );
+  return { width, height: width * CARD_ASPECT, gap };
+};
+
+/** Centered row of slots for `count` sleeve-forward prize cards. */
+export const prizeFanSlots = (
+  count,
+  viewport = defaultViewport(),
+  size = prizeFanCardSize(count, viewport)
+) => {
+  const { width, height, gap } = size;
+  const n = Math.max(0, count);
+  const total = n * width + Math.max(0, n - 1) * gap;
+  const left0 = (viewport.width - total) / 2;
+  const top = viewport.height * PRIZE_FAN_TOP;
+  return Array.from({ length: n }, (_, i) => ({
+    left: left0 + i * (width + gap),
+    top,
+    width,
+    height,
+  }));
+};
+
 const applyHostTransform = (host, translate, scale, rotateY) => {
   if (!host) return;
   host.style.transform = `translate3d(${translate.x}px, ${translate.y}px, 0.1px) scale(${scale})`;
@@ -376,6 +420,47 @@ export const playDrawFlight = (
     translate.set({ x: 0, y: 0 }),
     scale.set(1),
     rotateDelta.set(0),
+  ]).then(() => {
+    motion.stop();
+    activePops.delete(host);
+    onDone?.();
+  });
+  return motion;
+};
+
+/**
+ * Spring a settled overlay card back to its prize-zone seat (no flip).
+ */
+export const playReturnFlight = (
+  host,
+  { endTranslate, endScale = 1, onDone } = {}
+) => {
+  stopPop(host);
+  const scale = createSpring(1, DRAW_SPRING);
+  const translate = createSpring({ x: 0, y: 0 }, DRAW_SPRING);
+  const paint = () => {
+    applyHostTransform(host, translate.value, scale.value, 0);
+  };
+  const unsubs = [scale.subscribe(paint), translate.subscribe(paint)];
+  const motion = {
+    get rotateTarget() {
+      return 0;
+    },
+    retreat() {},
+    reset() {},
+    stop() {
+      unsubs.forEach((off) => off());
+      scale.stop();
+      translate.stop();
+    },
+  };
+  activePops.set(host, motion);
+  Promise.all([
+    translate.set({
+      x: endTranslate?.x ?? 0,
+      y: endTranslate?.y ?? 0,
+    }),
+    scale.set(endScale),
   ]).then(() => {
     motion.stop();
     activePops.delete(host);
