@@ -209,7 +209,7 @@ const syncHoloAnimations = (state) => {
   });
 };
 
-const CHOOSE_PEEK_PERCENT = PEEK_PERCENT;
+const CHOOSE_PEEK_PERCENT = 44;
 
 const getPeekPercent = (state) =>
   state.mode === 'browse' ? PEEK_PERCENT : CHOOSE_PEEK_PERCENT;
@@ -329,8 +329,8 @@ const syncChooseLayout = (state) => {
   const cardH = cardW * CARD_ASPECT;
 
   const peeks = getChoosePeekCounts(state);
-  const leftPeek = cardW * (PEEK_PERCENT / 100) * peeks.ahead;
-  const rightPeek = cardW * (PEEK_PERCENT / 100) * peeks.behind;
+  const leftPeek = cardW * (CHOOSE_PEEK_PERCENT / 100) * peeks.ahead;
+  const rightPeek = cardW * (CHOOSE_PEEK_PERCENT / 100) * peeks.behind;
   const carouselW = cardW + leftPeek + rightPeek;
   const triggerNudge = hasTrigger ? TRIGGER_NUDGE_PX : 0;
   const topRowW =
