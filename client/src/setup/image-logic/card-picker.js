@@ -209,7 +209,7 @@ const syncHoloAnimations = (state) => {
   });
 };
 
-const CHOOSE_PEEK_PERCENT = 38;
+const CHOOSE_PEEK_PERCENT = 44;
 
 const getPeekPercent = (state) =>
   state.mode === 'browse' ? PEEK_PERCENT : CHOOSE_PEEK_PERCENT;
