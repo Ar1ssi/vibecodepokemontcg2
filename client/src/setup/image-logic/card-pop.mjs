@@ -11,6 +11,8 @@
 // Rotate lives on `.card-preview-flip` (not the host) so the 3D sleeve back
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
+import { mapIframeLocalToViewport, readFrameTransform } from './iframe-rect.mjs';
+
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
 const DRAW_SPRING = { stiffness: 0.09, damping: 0.68, precision: 0.02 };
 const PREVIEW_MAX_WIDTH = 780;
@@ -158,13 +160,8 @@ export const viewportRectOf = (el) => {
       height: local.height,
     };
   }
-  const frameRect = frame.getBoundingClientRect();
-  return {
-    left: local.left + frameRect.left,
-    top: local.top + frameRect.top,
-    width: local.width,
-    height: local.height,
-  };
+  const { frameRect, matrix, origin } = readFrameTransform(frame);
+  return mapIframeLocalToViewport(local, frameRect, matrix, origin);
 };
 
 export const previewTargetSize = (

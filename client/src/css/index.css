@@ -1781,6 +1781,25 @@ ul, li {
   border-radius: 0.3rem;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
 }
+.card-shuffle-flight {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 2300;
+  will-change: transform;
+}
+.card-shuffle-flight img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0.3rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.48);
+}
 .card-preview-overlay.is-closing .card-preview-pop,
 .card-preview-overlay.is-closing .card-preview-face--front,
 .card-preview-overlay.is-closing .card-preview-face--front > img.card-preview-card,

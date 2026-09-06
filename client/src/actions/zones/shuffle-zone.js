@@ -7,6 +7,7 @@ import { removeImages } from '../../setup/image-logic/remove-images.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { sort } from './general.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { playShuffleFlight } from '../../setup/image-logic/shuffle-flight.js';
 
 export const shuffleZone = (
   user,
@@ -28,6 +29,7 @@ export const shuffleZone = (
   }
 
   const zone = getZone(user, zoneId);
+  playShuffleFlight(user, zoneId, zone.getCount());
   removeImages(zone.element);
   indices = indices ? indices : shuffleIndices(zone.getCount());
 
