@@ -325,7 +325,7 @@ const syncChooseLayout = (state) => {
   const reservedY = 320;
   const maxCardH = Math.max(180, vh - reservedY);
   const cardWFromH = maxCardH / CARD_ASPECT;
-  const cardW = Math.min(playmat.width * 0.38, 300, cardWFromH);
+  const cardW = Math.min(playmat.width * 0.28, 220, cardWFromH);
   const cardH = cardW * CARD_ASPECT;
 
   const peeks = getChoosePeekCounts(state);
