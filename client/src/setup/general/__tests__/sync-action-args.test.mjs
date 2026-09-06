@@ -15,6 +15,7 @@ import {
   resetBoardResyncDedupe,
   shouldAnimateDrawFlight,
   shouldEmitBoardResync,
+  shouldRequestBoardSnapshot,
   shouldRequestHashResync,
 } from '../sync-replay.mjs';
 
@@ -149,6 +150,52 @@ test('shouldEmitBoardResync: hint_mismatch and apply_failed share one slot', () 
   const later = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 19 });
   assert.equal(later.request, true);
   resetBoardResyncDedupe();
+});
+
+test('shouldRequestBoardSnapshot: one snapshot per pair, after replay may still fire', () => {
+  resetBoardResyncDedupe();
+  const replay = shouldEmitBoardResync({ selfCounter: 8, oppCounter: 4 });
+  assert.equal(replay.request, true);
+  assert.equal(
+    shouldEmitBoardResync({ selfCounter: 8, oppCounter: 4 }).request,
+    false
+  );
+  const snap = shouldRequestBoardSnapshot({ selfCounter: 8, oppCounter: 4 });
+  assert.equal(snap.request, true);
+  assert.equal(
+    shouldRequestBoardSnapshot({ selfCounter: 8, oppCounter: 4 }).request,
+    false
+  );
+  assert.equal(
+    shouldRequestBoardSnapshot({
+      selfCounter: 8,
+      oppCounter: 4,
+      isCatchingUp: true,
+    }).skipped,
+    'replaying'
+  );
+  resetBoardResyncDedupe();
+});
+
+test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => {
+  const handPath = fileURLToPath(
+    new URL('../../../actions/zones/hand-actions.js', import.meta.url)
+  );
+  const handSrc = readFileSync(handPath, 'utf8');
+  const start = handSrc.indexOf('export const drawOpeningHand');
+  const next = handSrc.indexOf('\nexport const ', start + 1);
+  const body = handSrc.slice(start, next === -1 ? undefined : next);
+  assert.match(body, /processAction\(user, emit, 'drawOpeningHand'/);
+  assert.match(body, /emit = false/);
+
+  const bridgePath = fileURLToPath(
+    new URL('../../rules/rules-bridge.js', import.meta.url)
+  );
+  const bridgeSrc = readFileSync(bridgePath, 'utf8');
+  assert.match(
+    bridgeSrc,
+    /drawOpeningHand\('self', 'self', true\)/
+  );
 });
 
 test('switchAbility relays active/bench swaps via moveCardBundle', () => {
