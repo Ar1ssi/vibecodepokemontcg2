@@ -64,9 +64,8 @@ export const clearReady = (user) => {
 
 // Called when a player presses their Set Up button. Rather than drawing a
 // hand and setting prizes immediately, this marks that player as "ready".
-// Once both players have pressed their Set Up button, the game
-// automatically sets 6 prizes and draws an opening hand of 7 for both
-// players.
+// Once both players have pressed their Set Up button, prizes are placed
+// (rules mode: hands wait until after the turn-order coin flip).
 export const readyUp = (user, emit = true) => {
   // Local Set Up passes initiator; in 2P the local player always sits in self zones.
   if (emit && systemState.isTwoPlayer && user === systemState.initiator) {
