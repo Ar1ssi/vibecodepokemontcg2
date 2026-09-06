@@ -167,7 +167,7 @@ export const closeFullView = (event) => {
 export const closePopups = (event) => {
   deselectCard();
   closeCardPreview(event);
-  closeDiscardPileViewer();
+  closeDiscardPileViewer(event);
   closeFullView(event);
   hideZoneElementsIfEmpty(event);
   document.getElementById('cardContextMenu').style.display = 'none';

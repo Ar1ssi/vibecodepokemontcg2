@@ -8,7 +8,7 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 
-/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null, blockOverlayClose: boolean, pointerTracking: boolean } | null} */
+/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
 let viewerState = null;
 
 const PEEK_PERCENT = 24;
@@ -60,12 +60,12 @@ const getVirtualIndex = (state, dragOffsetX = 0) => {
   return Math.max(0, Math.min(state.slides.length - 1, raw));
 };
 
-const isSlideOnScreen = (stackRect, stackWidth, offset) => {
+const isSlideOnScreen = (stackRect, stackWidth, offset, dragOffsetX = 0) => {
   const peekPx = (PEEK_PERCENT / 100) * stackWidth;
   const centerX = stackRect.left + stackRect.width / 2;
   const scale = 1 - Math.abs(offset) * 0.035;
   const cardWidth = stackWidth * scale;
-  const cardCenterX = centerX + offset * peekPx;
+  const cardCenterX = centerX + offset * peekPx + dragOffsetX;
   return (
     cardCenterX + cardWidth / 2 >= -SCREEN_EDGE_MARGIN &&
     cardCenterX - cardWidth / 2 <= window.innerWidth + SCREEN_EDGE_MARGIN
@@ -103,13 +103,13 @@ const layoutStack = (state, dragOffsetX = 0) => {
   const stackRect = stack.getBoundingClientRect();
 
   slides.forEach((slide, i) => {
-    const offset = i - virtualIndex;
+    const offset = virtualIndex - i;
     const absOffset = Math.abs(offset);
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
 
     slide.style.zIndex = String(300 - Math.round(absOffset * 10));
 
-    if (Math.abs(offset) < 0.05) {
+    if (absOffset < 0.05) {
       slide.classList.add('is-active');
     } else if (offset < 0) {
       slide.classList.add('is-ahead');
@@ -117,10 +117,10 @@ const layoutStack = (state, dragOffsetX = 0) => {
       slide.classList.add('is-behind');
     }
 
-    slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}%)) scale(${1 - absOffset * 0.035})`;
-    slide.style.opacity = String(Math.max(0.5, 1 - absOffset * 0.18));
+    slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}% + ${dragOffsetX}px)) scale(${1 - absOffset * 0.035})`;
+    slide.style.opacity = '1';
 
-    if (!isSlideOnScreen(stackRect, stackWidth, offset)) {
+    if (!isSlideOnScreen(stackRect, stackWidth, offset, dragOffsetX)) {
       slide.classList.add('is-hidden');
     }
   });
@@ -140,8 +140,14 @@ const goToIndex = (state, index) => {
   updateFooter(state);
 };
 
-export const closeDiscardPileViewer = () => {
+export const closeDiscardPileViewer = (event) => {
   if (!viewerState) return;
+  if (event?.target) {
+    const { overlay } = viewerState;
+    if (overlay.contains(event.target) && event.target !== overlay) {
+      return;
+    }
+  }
 
   const { overlay, onKeyDown, slides } = viewerState;
   document.removeEventListener('keydown', onKeyDown);
@@ -165,7 +171,6 @@ const attachSwipe = (state) => {
     if (!stack.contains(event.target)) return;
     tracking = true;
     dragging = false;
-    state.pointerTracking = true;
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
@@ -192,7 +197,6 @@ const attachSwipe = (state) => {
   const endSwipe = (event) => {
     if (!tracking || state.pointerId !== event.pointerId) return;
     tracking = false;
-    state.pointerTracking = false;
     stack.classList.remove('is-dragging');
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
@@ -209,7 +213,6 @@ const attachSwipe = (state) => {
     }
     dragging = false;
     state.pointerId = null;
-    state.blockOverlayClose = true;
     event.preventDefault();
     event.stopPropagation();
     try {
@@ -309,8 +312,6 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
     countEl,
     nameEl,
     pointerId: null,
-    blockOverlayClose: false,
-    pointerTracking: false,
     onKeyDown: null,
   };
 
@@ -330,11 +331,7 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
     closeDiscardPileViewer();
   });
   overlay.addEventListener('click', (event) => {
-    if (state.blockOverlayClose) {
-      state.blockOverlayClose = false;
-      return;
-    }
-    if (state.pointerTracking) return;
+    event.stopPropagation();
     if (event.target === overlay) closeDiscardPileViewer();
   });
   prevBtn.addEventListener('click', (event) => {

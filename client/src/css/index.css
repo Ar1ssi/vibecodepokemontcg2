@@ -1796,23 +1796,29 @@ ul, li {
   justify-content: center;
   isolation: isolate;
   overflow: visible;
-  transition:
-    transform 0.22s ease,
-    opacity 0.22s ease;
+  transition: transform 0.22s ease;
   transform-origin: center center;
-  will-change: transform, opacity;
+  will-change: transform;
   pointer-events: none;
+  opacity: 1;
 }
 .discard-pile-slide.is-active {
   pointer-events: auto;
 }
-.discard-pile-slide.is-ahead,
-.discard-pile-slide.is-behind {
+.discard-pile-slide.is-ahead {
   pointer-events: none;
 }
 .discard-pile-slide.is-hidden {
   opacity: 0 !important;
   pointer-events: none;
+  visibility: hidden;
+}
+.discard-pile-slide.is-behind {
+  pointer-events: none;
+}
+.discard-pile-slide.is-behind .mat-holo.discard-pile-holo,
+.discard-pile-slide.is-behind .discard-pile-card {
+  opacity: 1;
 }
 .discard-pile-slide .mat-holo.discard-pile-holo {
   width: 100%;
