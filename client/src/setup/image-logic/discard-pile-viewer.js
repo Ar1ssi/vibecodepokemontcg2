@@ -12,13 +12,13 @@ import { closeCardPreview } from './full-view.js';
 let viewerState = null;
 
 const PEEK_PERCENT = 24;
-const SWIPE_THRESHOLD = 40;
+const SWIPE_THRESHOLD = 44;
 const SWIPE_LOCK_PX = 10;
 const SCREEN_EDGE_MARGIN = 32;
 /** Drag farther than one peek width to fully advance one card — lowers jitter sensitivity. */
-const DRAG_CARD_SCALE = 1.45;
+const DRAG_CARD_SCALE = 1.65;
 /** How quickly rendered drag catches up to the pointer (lower = smoother). */
-const DRAG_LERP = 0.16;
+const DRAG_LERP = 0.12;
 
 const smoothstep = (t) => {
   const x = Math.max(0, Math.min(1, t));
