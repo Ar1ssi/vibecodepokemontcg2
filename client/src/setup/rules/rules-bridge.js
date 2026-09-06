@@ -32,7 +32,7 @@ import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected } from './ability-executors.mjs';
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier } from './stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType } from './energy-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, effectiveEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
 import { classifyAbility } from './ability-effects.mjs';
 import { decideTurnOrder } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
@@ -1334,9 +1334,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         return isEnergy || isStadium;
       }
       if (w.includes('energy')) {
-        // e.g. 'Basic Energy' (Firebreather: up to 7 Basic Energy cards)
-        return String(card.type || '').toLowerCase().includes('energy') ||
-          String(card.name || '').toLowerCase().includes('energy');
+        return energyMatchesSearchWhat(card, what);
       }
       if (w.includes('mega evolution')) return isPokemon && String(card.name || '').toLowerCase().includes('mega');
       if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) return isPokemon;

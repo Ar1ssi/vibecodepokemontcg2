@@ -170,15 +170,14 @@ function parseSearchDeckParams(lower) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+(\{[a-z]\})\s+energy/);
     what = `Basic ${m[2].toUpperCase()} Energy`;
     count = Number(m[1]);
-  } else if (lower.includes('up to 7') && lower.includes('energy')) {
-    what = 'Basic Energy';
-    count = 7;
   } else if (/up to\s+(\d+)\s+basic\s+energy/.test(lower)) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+energy/);
     what = 'Basic Energy';
     count = Number(m[1]);
   } else if (lower.includes('basic') && lower.includes('energy') && !lower.includes('or')) {
     const typed = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
+    const countMatch = lower.match(/up to\s+(\d+)/);
+    if (countMatch) count = Number(countMatch[1]);
     what = typed ? `Basic ${typed[1].toUpperCase()} Energy` : 'Basic Energy';
   } else if (lower.includes('up to 4') && lower.includes('pokémon')) {
     what = 'Pokémon';

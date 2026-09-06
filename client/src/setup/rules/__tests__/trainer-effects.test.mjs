@@ -2,6 +2,7 @@ import test, { describe } from 'node:test';
     import assert from 'node:assert/strict';
     
     const { parseTrainerEffect, describeStep } = await import('../trainer-effects.mjs');
+    const { energyMatchesSearchWhat } = await import('../energy-effects.mjs');
     
     test("Professor's Research: discard hand, draw 7", () => {
       const r = parseTrainerEffect("Discard your hand and draw 7 cards.");
@@ -378,6 +379,16 @@ import test, { describe } from 'node:test';
       const r = parseTrainerEffect("Search your deck for up to 7 Basic { R } Energy cards, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
       assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic {R} Energy' && s.count === 7));
+      assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
+    });
+
+    test('Firebreather search filter: typed {R} matches Fire only', () => {
+      const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
+      assert.equal(energyMatchesSearchWhat(fire, 'Basic {R} Energy'), true);
+      assert.equal(energyMatchesSearchWhat(water, 'Basic {R} Energy'), false);
+      assert.equal(energyMatchesSearchWhat(fire, 'Basic Energy'), true);
+      assert.equal(energyMatchesSearchWhat(water, 'Basic Energy'), true);
     });
 
     test('Fighting Gong: or-clause "Basic Energy or Basic Pokémon" (not plain Pokémon)', () => {

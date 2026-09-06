@@ -160,6 +160,51 @@ export function effectiveEnergyType(card) {
   return null;
 }
 
+// Printed {R}/{W}/… symbols → TCG type names (trainer search filters).
+const ENERGY_SYMBOL_TO_TYPE = {
+  c: 'colorless',
+  g: 'grass',
+  r: 'fire',
+  w: 'water',
+  l: 'lightning',
+  p: 'psychic',
+  f: 'fighting',
+  d: 'dark',
+  m: 'metal',
+};
+
+function primaryEnergyTypeName(card) {
+  const fromEffective = effectiveEnergyType(card);
+  if (fromEffective) return lower(fromEffective);
+  const fromData = lower(card?.types?.[0] ?? '');
+  if (fromData && VALID_TYPES.has(fromData)) return fromData;
+  const name = lower(card?.name ?? '');
+  for (const type of VALID_TYPES) {
+    if (name.includes(type) && name.includes('energy')) return type;
+  }
+  return '';
+}
+
+/** Match deck-search / discard-shuffle filters like "Basic {R} Energy". */
+export function energyMatchesSearchWhat(card, what = '') {
+  if (!isEnergyCard(card)) return false;
+  const w = lower(what);
+  const sym = w.match(/\{([a-z])\}/);
+  if (sym) {
+    const expected = ENERGY_SYMBOL_TO_TYPE[sym[1]];
+    if (!expected) return false;
+    if (w.includes('basic') && classifyEnergyEffect(card) !== 'basic') return false;
+    const cardType = primaryEnergyTypeName(card);
+    if (cardType === expected) return true;
+    const name = lower(card.name);
+    return name.includes(expected) && name.includes('energy');
+  }
+  if (w.includes('basic')) {
+    return classifyEnergyEffect(card) === 'basic' || lower(card.name).includes('basic');
+  }
+  return true;
+}
+
 // ── lock execution (taxonomy §F, family 2) ──────────────────────────────
 // Lock Energy: the energy attached to a Pokémon that has a Lock Energy
 // attached cannot be removed by card effects. Pure helpers for the
