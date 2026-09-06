@@ -98,26 +98,77 @@ export function getSyncLogEntries() {
 
 function compareLinesFor(meta, list) {
   const who = meta.username || meta.clientTag || '?';
-  return list.map((e) => {
-    const ctr = `s${e.selfCounter ?? '?'}/o${e.oppCounter ?? '?'}`;
-    const detail =
-      e.detail?.summary ||
-      (e.detail?.action && e.detail?.counter != null
-        ? `${e.detail.action}@${e.detail.counter}`
-        : JSON.stringify(e.detail));
-    return `${who}\t${e.seq}\t${e.dir}\t${ctr}\t${e.event}\t${detail}`;
-  });
+  return list.map((e) => formatCompareLine(who, e));
+}
+
+export function formatCompareLine(who, entry) {
+  const ctr = `s${entry.selfCounter ?? '?'}/o${entry.oppCounter ?? '?'}`;
+  const detail =
+    entry.detail?.summary ||
+    (entry.detail?.action && entry.detail?.counter != null
+      ? `${entry.detail.action}@${entry.detail.counter}`
+      : JSON.stringify(entry.detail));
+  return `${who}\t${entry.seq}\t${entry.dir}\t${ctr}\t${entry.event}\t${detail}`;
 }
 
 /**
  * @param {{ username?: string, roomId?: string, socketId?: string, initiator?: string, selfCounter?: number, oppCounter?: number }} meta
  */
-export function buildSyncLogExport(meta = {}) {
-  const list = getSyncLogEntries();
-  const snapshot = { meta: { exportedAt: new Date().toISOString(), ...meta }, entries: list };
+export function buildSyncLogExport(meta = {}, entryList = getSyncLogEntries()) {
+  const snapshot = {
+    meta: { exportedAt: new Date().toISOString(), ...meta },
+    entries: [...entryList],
+  };
   return {
     ...snapshot,
     compareHeader: 'client\tseq\tdir\tcounters\tevent\tdetail',
-    compareLines: compareLinesFor(meta, list),
+    compareLines: compareLinesFor(meta, snapshot.entries),
+  };
+}
+
+/**
+ * Merge local + remote client exports into one file with a unified timeline.
+ * @param {ReturnType<typeof buildSyncLogExport>} localExport
+ * @param {ReturnType<typeof buildSyncLogExport>[]} remoteExports
+ */
+export function buildCombinedSyncLogExport(localExport, remoteExports = []) {
+  const clients = [localExport, ...remoteExports.filter(Boolean)];
+  const timeline = [];
+
+  for (const client of clients) {
+    const who = client.meta?.username || client.meta?.socketId || '?';
+    for (const entry of client.entries || []) {
+      timeline.push({
+        t: entry.t,
+        who,
+        entry,
+        compareLine: formatCompareLine(who, entry),
+      });
+    }
+  }
+
+  timeline.sort((a, b) => a.t - b.t || String(a.who).localeCompare(String(b.who)));
+
+  return {
+    meta: {
+      exportedAt: new Date().toISOString(),
+      combined: true,
+      roomId: localExport.meta?.roomId || remoteExports[0]?.meta?.roomId || '',
+      requester: localExport.meta?.username,
+      clients: clients.map((c) => c.meta),
+    },
+    clients,
+    compareHeader: 'client\tseq\tdir\tcounters\tevent\tdetail',
+    compareLines: timeline.map((row) => row.compareLine),
+    timeline: timeline.map(({ t, who, entry }) => ({
+      t,
+      who,
+      seq: entry.seq,
+      dir: entry.dir,
+      selfCounter: entry.selfCounter,
+      oppCounter: entry.oppCounter,
+      event: entry.event,
+      detail: entry.detail,
+    })),
   };
 }
