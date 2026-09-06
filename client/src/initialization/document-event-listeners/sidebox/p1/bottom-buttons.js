@@ -75,7 +75,7 @@ export const initializeP1BottomButtons = () => {
 
   const exportSyncLogButton = document.getElementById('exportSyncLog');
   exportSyncLogButton.addEventListener('click', () => {
-    exportSyncLog();
+    exportSyncLog().catch((err) => console.error('Export sync log failed:', err));
     optionsContextMenu.style.display = 'none';
   });
 

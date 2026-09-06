@@ -24,8 +24,6 @@ import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
 import { restoreLastUsedDeckToPlaymat } from '../document-event-listeners/sidebox/native-deck-builder.js';
 import {
   enableSyncLogForMultiplayer,
-  exportSyncLog,
-  copySyncCompareLog,
   logSync,
 } from '../../setup/general/sync-logger-bridge.js';
 
