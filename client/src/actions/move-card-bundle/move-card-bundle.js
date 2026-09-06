@@ -1,6 +1,7 @@
 import { socket, systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { shouldEmitBoardResync } from '../../setup/general/sync-replay.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import {
   buildCardHint,
@@ -10,6 +11,25 @@ import {
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
 import { logSync } from '../../setup/general/sync-logger-bridge.js';
+
+function requestHintResync(reason, extra = {}) {
+  const { request, skipped } = shouldEmitBoardResync({
+    selfCounter: systemState.selfCounter,
+    oppCounter: systemState.oppCounter,
+    syncReplaying: systemState.syncReplaying,
+    isCatchingUp: systemState.isCatchingUp,
+  });
+  if (!request) {
+    logSync('moveCardBundle.resync.skip', { reason, skipped, ...extra });
+    return;
+  }
+  socket.emit('resyncActions', {
+    roomId: systemState.roomId,
+    reason: 'hint_mismatch',
+    selfCounter: systemState.selfCounter,
+    oppCounter: systemState.oppCounter,
+  });
+}
 
 function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
   const oZone = getZone(user, oZoneId);
@@ -111,9 +131,10 @@ export const moveCardBundle = async (
         resolvedIndex,
         moving: cardHints.moving,
       });
-      socket.emit('resyncActions', {
-        roomId: systemState.roomId,
-        reason: 'hint_mismatch',
+      requestHintResync('hint_mismatch', {
+        oZoneId,
+        relayIndex: index,
+        resolvedIndex,
       });
       return false;
     }
@@ -127,10 +148,7 @@ export const moveCardBundle = async (
         oZoneId,
         resolvedIndex,
       });
-      socket.emit('resyncActions', {
-        roomId: systemState.roomId,
-        reason: 'hint_mismatch',
-      });
+      requestHintResync('missing_card', { oZoneId, resolvedIndex });
       return false;
     }
     syncOptions = { syncReplay: true };

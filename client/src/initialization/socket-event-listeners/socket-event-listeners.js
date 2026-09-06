@@ -27,13 +27,12 @@ import {
   logSync,
 } from '../../setup/general/sync-logger-bridge.js';
 import { hashUserBoard } from '../../setup/zones/board-hash.js';
-import { shouldRequestHashResync } from '../../setup/general/sync-replay.mjs';
+import { shouldEmitBoardResync } from '../../setup/general/sync-replay.mjs';
 
 let isImporting = false;
 let syncCheckInterval;
 let spectatorActionInterval;
 let pushActionQueue = Promise.resolve();
-let lastHashResyncKey = null;
 export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
   clearInterval(spectatorActionInterval);
@@ -237,9 +236,29 @@ export const initializeSocketEventListeners = () => {
             { counter: data.counter, action: data.action },
             'in'
           );
+          const { request, skipped } = shouldEmitBoardResync({
+            selfCounter: systemState.selfCounter,
+            oppCounter: systemState.oppCounter,
+            syncReplaying: systemState.syncReplaying,
+            isCatchingUp: systemState.isCatchingUp,
+          });
+          if (!request) {
+            logSync(
+              'pushAction.apply_failed.repeat',
+              {
+                counter: data.counter,
+                action: data.action,
+                skipped,
+              },
+              'in'
+            );
+            return;
+          }
           socket.emit('resyncActions', {
             roomId: systemState.roomId,
             reason: 'apply_failed',
+            selfCounter: systemState.selfCounter,
+            oppCounter: systemState.oppCounter,
           });
           return;
         }
@@ -283,6 +302,22 @@ export const initializeSocketEventListeners = () => {
         data?.reason === 'hint_mismatch' ||
         data?.reason === 'apply_failed' ||
         data?.reason === 'reconnect';
+      if (fullReplay && data?.reason !== 'reconnect') {
+        const { request, skipped } = shouldEmitBoardResync({
+          selfCounter: systemState.selfCounter,
+          oppCounter: systemState.oppCounter,
+          syncReplaying: systemState.syncReplaying,
+          isCatchingUp: systemState.isCatchingUp,
+        });
+        if (!request) {
+          logSync(
+            'resync.request.recv.repeat',
+            { reason: data?.reason, skipped },
+            'in'
+          );
+          return;
+        }
+      }
       logSync('resync.request.recv', { reason: data?.reason, fullReplay }, 'in');
       resyncActions({ fullReplay });
     }
@@ -325,23 +360,24 @@ export const initializeSocketEventListeners = () => {
         return;
       }
       if (data.boardHash && data.boardHash !== hashUserBoard('opp')) {
-        const { request, key } = shouldRequestHashResync(
-          lastHashResyncKey,
-          data.counter,
-          systemState.oppCounter
-        );
+        const { request, skipped } = shouldEmitBoardResync({
+          selfCounter: data.counter,
+          oppCounter: systemState.oppCounter,
+          syncReplaying: systemState.syncReplaying,
+          isCatchingUp: systemState.isCatchingUp,
+        });
         if (!request) {
           logSync(
             'syncCheck.hash.repeat',
             {
               peerSelfCounter: data.counter,
               localOppCounter: systemState.oppCounter,
+              skipped,
             },
             'in'
           );
           return;
         }
-        lastHashResyncKey = key;
         logSync('syncCheck.hash', {
           peerSelfCounter: data.counter,
           localOppCounter: systemState.oppCounter,

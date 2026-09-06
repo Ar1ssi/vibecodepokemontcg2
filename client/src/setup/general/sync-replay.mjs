@@ -6,7 +6,13 @@
  * re-ran deck→hand `moveCard` without a replay flag, so the draw-to-hand
  * flight replayed on a loop. These helpers:
  *   - suppress that flight during catch-up
- *   - allow only one hash-based fullReplay per (peer, local) counter pair
+ *   - allow only one fullReplay per (peer, local) counter pair
+ *
+ * `hint_mismatch` / `apply_failed` used to emit `resyncActions` on every
+ * failed mirror move. When the action log cannot converge (e.g. a local-only
+ * ability swap), catch-up rebuilds the board, the same move fails again, and
+ * the board flickers. Share one last-key across hash, hint, and apply-failed
+ * so a single pair only full-replays once.
  */
 
 /** Live pushAction should still animate; only catch-up / explicit replay skip. */
@@ -36,4 +42,38 @@ export function shouldRequestHashResync(
     return { request: false, key };
   }
   return { request: true, key };
+}
+
+let lastBoardResyncKey = null;
+
+/** @internal reset between unit tests */
+export function resetBoardResyncDedupe() {
+  lastBoardResyncKey = null;
+}
+
+/**
+ * One fullReplay request per counter pair, and never while catch-up is
+ * already rebuilding the board. Shared by hash, hint_mismatch, and
+ * apply_failed so a failed replay does not immediately request another.
+ */
+export function shouldEmitBoardResync({
+  selfCounter,
+  oppCounter,
+  syncReplaying = false,
+  isCatchingUp = false,
+} = {}) {
+  if (syncReplaying || isCatchingUp) {
+    return {
+      request: false,
+      skipped: 'replaying',
+      key: lastBoardResyncKey,
+    };
+  }
+  const { request, key } = shouldRequestHashResync(
+    lastBoardResyncKey,
+    selfCounter,
+    oppCounter
+  );
+  if (request) lastBoardResyncKey = key;
+  return { request, key };
 }
