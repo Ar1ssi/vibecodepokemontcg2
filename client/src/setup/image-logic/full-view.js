@@ -1,5 +1,6 @@
 import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
+  cardBackSrcForUser,
   cardNode,
   fullViewHost,
   hydrateHolo,
@@ -11,12 +12,20 @@ import {
   playDeselectPop,
   makePopFrame,
   stopPop,
+  viewportRectOf,
 } from './card-pop.mjs';
+
+const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 
 /** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
+
+export const resolvePreviewSleeveSrc = (card, image) => {
+  const user = card?.user ?? card?.image?.user ?? image?.user ?? 'self';
+  return cardBackSrcForUser(user) || DEFAULT_SLEEVE;
+};
 
 const adoptNode = (node, doc) => {
   if (!node || node.ownerDocument === doc) return node;
@@ -40,6 +49,27 @@ const showCardCounters = (image) => {
   if (image.damageCounter) image.damageCounter.style.display = '';
   if (image.specialCondition) image.specialCondition.style.display = '';
   if (image.abilityCounter) image.abilityCounter.style.display = '';
+};
+
+const buildPreviewFlip = (frontNode, sleeveSrc) => {
+  const flip = document.createElement('div');
+  flip.className = 'card-preview-flip';
+
+  const front = document.createElement('div');
+  front.className = 'card-preview-face card-preview-face--front';
+  front.appendChild(frontNode);
+
+  const back = document.createElement('div');
+  back.className = 'card-preview-face card-preview-face--back';
+  const sleeve = document.createElement('img');
+  sleeve.className = 'card-preview-sleeve';
+  sleeve.src = sleeveSrc;
+  sleeve.alt = '';
+  sleeve.draggable = false;
+  back.appendChild(sleeve);
+
+  flip.append(front, back);
+  return flip;
 };
 
 // Right-click → "View attached cards": the grey panel with the Pokémon plus its
@@ -91,7 +121,7 @@ export const openCardPreview = (targetImage, card) => {
   const zoneDoc = targetImage.ownerDocument;
   const host = fullViewHost(targetImage);
   const anchor = cardNode(card) ?? imageAnchor(targetImage);
-  const rect = anchor.getBoundingClientRect();
+  const rect = viewportRectOf(anchor);
 
   const placeholder = zoneDoc.createElement('span');
   placeholder.className = 'card-preview-placeholder';
@@ -106,11 +136,17 @@ export const openCardPreview = (targetImage, card) => {
 
   const popHost = document.createElement('div');
   popHost.className = 'card-preview-pop';
-  popHost.appendChild(adoptNode(anchor, document));
+  popHost.style.left = `${rect.left}px`;
+  popHost.style.top = `${rect.top}px`;
+  popHost.style.width = `${rect.width}px`;
+  popHost.style.height = `${rect.height}px`;
+
+  const frontNode = adoptNode(anchor, document);
+  frontNode.classList.add('card-preview-card');
+  popHost.appendChild(buildPreviewFlip(frontNode, resolvePreviewSleeveSrc(card, targetImage)));
   overlay.appendChild(popHost);
   document.body.appendChild(overlay);
 
-  anchor.classList.add('card-preview-card');
   hideCardCounters(targetImage);
 
   const wrapper = card?.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
@@ -122,13 +158,17 @@ export const openCardPreview = (targetImage, card) => {
         return;
       }
       hydratedWrapper.classList.add('card-preview-card');
+      const front = cardPreviewState.popHost.querySelector('.card-preview-face--front');
+      if (front && hydratedWrapper.parentElement !== front) {
+        front.appendChild(hydratedWrapper);
+      }
       cardPreviewState.wrapper = hydratedWrapper;
       cardPreviewState.anchor = hydratedWrapper;
       startPreviewHolo(hydratedWrapper);
     });
   }
 
-  playSelectPop(popHost, makePopFrame(popHost));
+  playSelectPop(popHost, null, null, rect);
 
   cardPreviewState = {
     overlay,
@@ -156,7 +196,6 @@ export const closeCardPreview = (event, immediate = false) => {
 
   const state = cardPreviewState;
   cardPreviewState = null;
-  stopPop(state.popHost);
 
   const revert = () => {
     const anchor =
@@ -191,9 +230,10 @@ export const closeCardPreview = (event, immediate = false) => {
   };
 
   if (immediate) {
+    stopPop(state.popHost);
     revert();
   } else {
-    playDeselectPop(state.popHost, makePopFrame(state.popHost), revert);
+    playDeselectPop(state.popHost, null, revert);
   }
 };
 
