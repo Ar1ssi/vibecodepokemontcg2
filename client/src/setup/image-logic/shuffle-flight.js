@@ -111,13 +111,13 @@ export const playShuffleFlight = (user, zoneId, zoneCount) => {
     return host;
   });
 
-  const started = performance.now();
-  const run = { hosts, rafId: null };
+  const run = { hosts, rafId: null, started: null };
   activeByUser[user] = run;
 
   const tick = (now) => {
     if (activeByUser[user] !== run) return;
-    const t = Math.min(1, (now - started) / SHUFFLE_DURATION_MS);
+    if (run.started == null) run.started = now;
+    const t = Math.min(1, (now - run.started) / SHUFFLE_DURATION_MS);
     const plan = shuffleFlightPlan({
       deckRect,
       boardRect,
