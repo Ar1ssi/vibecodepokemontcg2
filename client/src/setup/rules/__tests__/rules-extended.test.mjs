@@ -14,6 +14,11 @@ import test from 'node:test';
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
+    const {
+      isUsableAbilityCard,
+      collectUsableAbilityCandidates,
+      filterUsableAbilities,
+    } = await import('../collect-usable-abilities.mjs');
     
     // ── KO / prizes ──
     test('prizesForKO: standard = 1, ex = 2, mega = 3, VMAX = 3', () => {
@@ -2876,6 +2881,62 @@ import test from 'node:test';
       const energyTypes = [{ type: 'Colorless', family: 'double-colorless' }];
       const res = listAttacks(card, { energyTypes });
       assert.equal(res[0].payable, true);
+    });
+
+    // ── collect-usable-abilities (active + bench picker gate) ──
+    test('isUsableAbilityCard: actionable draw ability is usable', () => {
+      const card = {
+        name: 'Bidoof',
+        ability: { name: 'Carefree Countenance', text: 'Once during your turn, you may draw a card.' },
+      };
+      assert.equal(isUsableAbilityCard(card), true);
+      assert.equal(isUsableAbilityCard(card, { used: true }), false);
+    });
+
+    test('isUsableAbilityCard: passive ability is not usable interactively', () => {
+      const card = {
+        name: 'T',
+        ability: { name: 'Thick Fat', text: 'While this Pokémon is in play, it takes 30 less damage from attacks.' },
+      };
+      assert.equal(isUsableAbilityCard(card), false);
+    });
+
+    test('filterUsableAbilities: active + bench with two actionable abilities', () => {
+      const active = {
+        name: 'ActiveMon',
+        type: 'Pokémon',
+        ability: { name: 'Draw', text: 'Once during your turn, you may draw a card.' },
+      };
+      const bench = {
+        name: 'BenchMon',
+        type: 'Pokémon',
+        ability: {
+          name: 'Search',
+          text: 'Once during your turn, you may search your deck for a Basic Pokémon and put it onto your Bench.',
+        },
+      };
+      const candidates = collectUsableAbilityCandidates(active, [bench]);
+      const usable = filterUsableAbilities(candidates);
+      assert.equal(usable.length, 2);
+      assert.equal(usable[0].zone, 'active');
+      assert.equal(usable[1].zone, 'bench');
+      assert.equal(usable[1].card.name, 'BenchMon');
+    });
+
+    test('filterUsableAbilities: skips bench Pokémon without actionable ability', () => {
+      const active = {
+        name: 'ActiveMon',
+        ability: { name: 'Draw', text: 'Once during your turn, you may draw a card.' },
+      };
+      const passiveBench = {
+        name: 'PassiveBench',
+        type: 'Pokémon',
+        ability: { name: 'Thick Fat', text: 'While this Pokémon is in play, it takes 30 less damage from attacks.' },
+      };
+      const candidates = collectUsableAbilityCandidates(active, [passiveBench]);
+      const usable = filterUsableAbilities(candidates);
+      assert.equal(usable.length, 1);
+      assert.equal(usable[0].zone, 'active');
     });
 
     // ── start-of-turn draw (taxonomy B) ──

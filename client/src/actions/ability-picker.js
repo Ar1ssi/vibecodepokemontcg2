@@ -6,39 +6,14 @@
 // If 0 are usable, it shows a "no usable abilities" message.
 
 import { getZone } from '../setup/zones/get-zone.js';
-import { classifyAbility, isAbilityCard } from '../setup/rules/ability-effects.mjs';
 import { rulesState, abilityUsed, ensureCardData } from '../setup/rules/rules-state.mjs';
 import { appendMessage } from '../setup/chatbox/append-message.js';
 import { selfContainer, oppContainer } from '../state.js';
-import {
-  healAbility,
-  switchAbility,
-  attachAbility,
-  searchAbility,
-  energyRedirectAbility,
-  drawAbility,
-  statusAbility,
-  moveDamageAbility,
-  lookAtTopAbility,
-  recursionAbility,
-  evolveAbility,
-} from './chat-buttons/chat-buttons.js';
 import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
-
-// Map family → executor function
-const FAMILY_EXECUTORS = {
-  heal: healAbility,
-  switch: switchAbility,
-  attach: attachAbility,
-  search: searchAbility,
-  'energy-redirect': energyRedirectAbility,
-  draw: drawAbility,
-  status: statusAbility,
-  'move-damage': moveDamageAbility,
-  'look-at-top': lookAtTopAbility,
-  recursion: recursionAbility,
-  evolve: evolveAbility,
-};
+import {
+  collectUsableAbilityCandidates,
+  filterUsableAbilities,
+} from '../setup/rules/collect-usable-abilities.mjs';
 
 // Human-readable labels for each family
 const FAMILY_LABELS = {
@@ -53,41 +28,31 @@ const FAMILY_LABELS = {
   'look-at-top': '👁️ Look',
   recursion: '♻️ Recursion',
   evolve: '🧬 Evolve',
+  'when-played': '🎭 When played',
+  'opponent-disrupt': '🚫 Disrupt',
 };
 
 /**
  * Scan active + bench for usable abilities.
- * Returns an array of { card, family, zone, index } for each usable ability.
+ * Returns an array of { card, family, zone, index, abilityName }.
  */
-async function collectUsableAbilities(user) {
-  const usable = [];
+export async function collectUsableAbilities(user) {
   const activeCard = getZone(user, 'active').array[0];
   const benchCards = getZone(user, 'bench').array;
+  const candidates = collectUsableAbilityCandidates(activeCard, benchCards);
 
-  const candidates = [];
-  if (activeCard) candidates.push({ card: activeCard, zone: 'active', index: 0 });
-  benchCards.forEach((card, index) => {
-    if (card.type === 'Pokémon') {
-      candidates.push({ card, zone: 'bench', index });
+  for (const { card } of candidates) {
+    try {
+      await ensureCardData(card);
+    } catch {
+      /* card data may not be ready yet */
     }
-  });
-
-  for (const { card, zone, index } of candidates) {
-    if (!isAbilityCard(card)) continue;
-
-    // Ensure card data is loaded before classifying
-    await ensureCardData(card);
-
-    const family = classifyAbility(card);
-    if (!FAMILY_EXECUTORS[family]) continue;
-
-    // Check once-per-turn usage
-    if (rulesState.enabled && abilityUsed(user, card)) continue;
-
-    usable.push({ card, family, zone, index });
   }
 
-  return usable;
+  return filterUsableAbilities(candidates, {
+    rulesEnabled: rulesState.enabled,
+    isUsed: (card) => abilityUsed(user, card),
+  });
 }
 
 /**
@@ -144,14 +109,14 @@ function showAbilityPopup(user, usable) {
   const list = document.createElement('div');
   list.className = 'ability-picker-list';
 
-  for (const { card, family, zone, index } of usable) {
+  for (const { card, family, zone, index, abilityName } of usable) {
     const row = document.createElement('div');
     row.className = 'ability-picker-row';
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'ability-picker-name';
     const zoneLabel = zone === 'active' ? ' (Active)' : ` (Bench ${index + 1})`;
-    nameSpan.textContent = `${card.name || 'Pokémon'}${zoneLabel}`;
+    nameSpan.textContent = `${card.name || 'Pokémon'}${zoneLabel} — ${abilityName}`;
     row.appendChild(nameSpan);
 
     const familySpan = document.createElement('span');

@@ -54,6 +54,10 @@ import {
 } from './ability-step-plan.mjs';
 import { decideTurnOrder, resolveTurnOrderCaller } from './rules-turnorder.mjs';
 import { listUsableActions } from './attack-window.mjs';
+import {
+  collectUsableAbilityCandidates,
+  filterUsableAbilities,
+} from './collect-usable-abilities.mjs';
 import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
@@ -230,12 +234,26 @@ import {
           }
         }
 
-        const { attacks: atkList, abilities: abList } = listUsableActions(active, {
+        const { attacks: atkList } = listUsableActions(active, {
           energyTypes,
           stadiumCostModifier,
           abilityUsed: abilityUsedFlag,
           rulesEnabled: true,
           priorAttacks,
+        });
+
+        const benchCards = getZone('self', 'bench').array;
+        const abilityCandidates = collectUsableAbilityCandidates(active, benchCards);
+        for (const { card } of abilityCandidates) {
+          try {
+            await ensureCardData(card);
+          } catch {
+            /* card data may not be ready yet */
+          }
+        }
+        const usableAbilities = filterUsableAbilities(abilityCandidates, {
+          rulesEnabled: true,
+          isUsed: (card) => abilityUsed('self', card),
         });
 
         let html = '';
@@ -270,18 +288,16 @@ import {
             ` <span class="rules-aw-reason">id=${active.id || '—'}${notLoaded}</span></div>`;
         }
 
-        // ── Abilities ──
-        if (abList.length) {
+        // ── Abilities (active + bench) ──
+        if (usableAbilities.length) {
           html += '<div class="rules-aw-section">Abilities</div>';
-          const family = classifyAbility(active);
-          for (const ab of abList) {
-            const badge = ab.usable
-              ? '<span class="rules-aw-badge rules-aw-usable">✓</span>'
-              : '<span class="rules-aw-badge rules-aw-unusable">✗</span>';
-            html += `<div class="rules-aw-row ${ab.usable ? 'rules-aw-clickable' : ''}" data-ability="${family}">`+
-              `<span class="rules-aw-name">${ab.name}</span>`+
-              badge +
-              (ab.reason ? `<span class="rules-aw-reason">${ab.reason}</span>` : '')+
+          for (const ab of usableAbilities) {
+            const zoneLabel =
+              ab.zone === 'active' ? 'Active' : `Bench ${ab.index + 1}`;
+            html +=
+              `<div class="rules-aw-row rules-aw-clickable" data-ability-key="${ab.zone}-${ab.index}">` +
+              `<span class="rules-aw-name">${ab.card.name || 'Pokémon'} (${zoneLabel}) — ${ab.abilityName}</span>` +
+              `<span class="rules-aw-badge rules-aw-usable">✓</span>` +
               `</div>`;
           }
         }
@@ -296,10 +312,15 @@ import {
             attack('self', true, idx);
           });
         });
-        body.querySelectorAll('[data-ability]').forEach((row) => {
-          if (!row.classList.contains('rules-aw-clickable')) return;
+        body.querySelectorAll('[data-ability-key]').forEach((row) => {
           row.addEventListener('click', () => {
-            runAbilitySteps('self', active);
+            const key = row.dataset.abilityKey;
+            const match = usableAbilities.find(
+              (entry) => `${entry.zone}-${entry.index}` === key
+            );
+            if (match) {
+              runAbilitySteps('self', match.card);
+            }
           });
         });
       };
