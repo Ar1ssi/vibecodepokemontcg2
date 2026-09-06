@@ -410,3 +410,6 @@ instead of showing an enlarged preview. Plain cards shrank too (92px → 55px).
   plain (via the `HOLO_DISABLED` kill-switch) on the self side; the opp side was
   not covered (no opp active card in the fixture) but the CSS is symmetric and
   the JS is shared.
+- **Baseline correction:** this file previously said 163/163. `pnpm test` on the
+  current tree is **396/396 pass, 0 fail** — use 396. `integration-test.mjs`
+  cannot run as-is: `jsdom` is not in any `package.json`.

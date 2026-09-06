@@ -35,7 +35,8 @@ import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
-import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
+import { takePrizes } from '../zones/prizes-actions.js';
+import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion } from '../../setup/rules/ko-flow.mjs';
 import { markRetreated } from '../../setup/rules/retreat.mjs';
@@ -46,6 +47,7 @@ import {
   energiesAttachedToPokemon,
   getActivePokemonCard,
 } from '../../setup/zones/active-pokemon.mjs';
+import { openCardPicker } from '../../setup/image-logic/card-picker.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import {
   canAct,
@@ -61,6 +63,9 @@ import {
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
+import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -328,7 +333,7 @@ const syncAttackFromCard = (card, attackIndex, prev) => {
 
 // Rules mode: an attack (or pass) ends the turn — advance rulesState and
 // refresh the HUD/panel via the same event updateTurnBanner() uses.
-const endTurnWithBanner = (user) => {
+const endTurnWithBanner = (user, rngBundle = {}) => {
   // SOLO turn-boundary: resolve this player's active status (poison/burn
   // damage, asleep/paralyzed clear) BEFORE the turn advances. Shared by both
   // attack() and pass(), so pass is covered too. Mirrors the +Turn button
@@ -338,7 +343,8 @@ const endTurnWithBanner = (user) => {
   if (active) {
     const key = active.image?.dataset?.cardId || active.name;
     const checkupBonus = getStadiumCheckupPoisonBonus(active, user);
-    const boundary = resolveTurnBoundary(user, key, Math.random, {
+    const burnCoin = flipCoin(rngBundle, 'burn');
+    const boundary = resolveTurnBoundary(user, key, rngFromCoin(burnCoin), {
       checkupPoisonBonus: checkupBonus,
     });
     if (boundary.damage > 0) placeSelfDamage(user, 'active', 0, boundary.damage);
@@ -349,9 +355,14 @@ const endTurnWithBanner = (user) => {
   document.dispatchEvent(new CustomEvent('rules-turn-began', { detail: { player: rulesState.turnPlayer } }));
 };
 
-export const attack = async (user, emit = true, attackIndex = 0) => {
+export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, maybeEmit) => {
+  const { attackIndex, rngBundle, emit } = parseAttackArgs(
+    emitOrIndex,
+    attackIndexOrRng,
+    maybeEmit
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'attack', []);
+    processAction(user, emit, 'attack', [attackIndex, rngBundle]);
     return;
   }
 
@@ -371,7 +382,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
       const gate = canAct(user, key);
       if (!gate.can) {
         if (getStatus(user, key)?.asleep) {
-          const wake = resolveWake(user, key);
+          const wakeCoin = flipCoin(rngBundle, 'wake');
+          const wake = resolveWake(user, key, rngFromCoin(wakeCoin));
           if (!wake.woke) {
             appendMessage(
               user,
@@ -388,7 +400,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
       }
       if (getStatus(user, key)?.confused) {
-        const result = resolveConfusedAttack(user, key);
+        const confusedCoin = flipCoin(rngBundle, 'confused');
+        const result = resolveConfusedAttack(user, key, rngFromCoin(confusedCoin));
         if (!result.proceeds) {
           placeSelfDamage(user, 'active', 0, result.damage);
           appendMessage(
@@ -397,7 +410,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             'announcement',
             false
           );
-          // A failed attack is still an attack: the turn ends (below).
+          rngBundle.confusedFizzle = true;
         } else {
           appendMessage(
             user,
@@ -411,7 +424,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
     // ── Attack execution: energy cost, damage, KO ──
     const oppPlayer = user === 'self' ? 'opp' : 'self';
     const oppActive = getActivePokemonCard(getZone(oppPlayer, 'active'));
-    if (active) {
+    if (active && !rngBundle.confusedFizzle) {
       await ensureCardData(active);
       let atk = syncAttackFromCard(active, attackIndex, null);
       if (atk) {
@@ -660,9 +673,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           // the effective damage total by the parser; tails self-damage is
           // executed after the KO check (below).
           const coin = /flip a coin/.test(atkLower)
-            ? Math.random() < 0.5
-              ? 'heads'
-              : 'tails'
+            ? flipCoin(rngBundle, 'attack')
             : null;
           let headsCount;
           const multiFlip = atkLower.match(/flip (\d+) coins?/);
@@ -1945,10 +1956,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
   appendMessage(user, message, 'player', false);
   discardBoard(user, user, false, false);
 
-  processAction(user, emit, 'attack', []);
+  processAction(user, emit, 'attack', [attackIndex, rngBundle]);
 
   if (rulesState.enabled) {
-    endTurnWithBanner(user);
+    endTurnWithBanner(user, rngBundle);
   }
 };
 
@@ -2262,13 +2273,20 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  // Find the first Energy-type card in hand.
+  // Find a matching Energy card in hand (typed/basic when parsed).
+  const abilityText =
+    target.ability?.text ?? target.abilityText ?? target.text ?? '';
+  const attachStep = parseAbility(abilityText).find((s) => s.type === 'attachAbility');
+  const whatFilter = energySearchWhat({
+    basic: attachStep?.basic ?? abilityText.toLowerCase().includes('basic'),
+    energyType: attachStep?.energyType ?? null,
+  });
   const hand = getZone(user, 'hand');
-  const energyIndex = hand.array.findIndex((c) => c.type === 'Energy');
+  const energyIndex = hand.array.findIndex((c) => matchesSearch(c, whatFilter));
   if (energyIndex === -1) {
     appendMessage(
       user,
-      '⛔ No Energy in hand to attach.',
+      `⛔ No ${whatFilter} in hand to attach.`,
       'announcement',
       false
     );
@@ -2334,16 +2352,31 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
     return;
   }
 
-  // Find attached energies on the source Pokémon
+  // Find attached energies on the source Pokémon (typed/basic when parsed).
+  const abilityText =
+    source.ability?.text ?? source.abilityText ?? source.text ?? '';
+  const moveStep = parseAbility(abilityText).find((s) => s.type === 'moveEnergyAbility');
+  const whatFilter = energySearchWhat({
+    basic: moveStep?.basic ?? false,
+    energyType: moveStep?.energyType ?? null,
+  });
   const sourceZoneObj = getZone(user, sourceZone);
   const energies = sourceZoneObj.array
     .map((c, i) => ({ card: c, idx: i }))
     .filter(
-      ({ card }) => card.type === 'Energy' && card.image?.relative === source.image
+      ({ card }) =>
+        card.type === 'Energy' &&
+        card.image?.relative === source.image &&
+        matchesSearch(card, whatFilter)
     );
 
   if (energies.length === 0) {
-    appendMessage(user, `⛔ No Energy attached to ${source.name || 'source'}.`, 'announcement', false);
+    appendMessage(
+      user,
+      `⛔ No ${whatFilter || 'Energy'} attached to ${source.name || 'source'}.`,
+      'announcement',
+      false
+    );
     return;
   }
 
@@ -2462,89 +2495,14 @@ function _pickFromList(title, items) {
   });
 }
 
-// Multi-select prize picker. Lets the player choose WHICH of their own prize
-// cards to take (up to `count`), instead of the automatic "take the top N".
-// Resolves to the array of chosen 0-based indices, or null (fallback to
-// automatic top-N). Reuses the same positioning/styling as `_pickFromList`.
-function _pickPrizeCards(count, cards) {
-  return new Promise((resolve) => {
-    const needed = Math.min(count, cards.length);
-    const host = document.createElement('div');
-    host.className = 'choice-picker-card';
-    const titleEl = document.createElement('div');
-    titleEl.className = 'choice-picker-title';
-    titleEl.textContent = `Choose ${needed} prize card${needed !== 1 ? 's' : ''} to take:`;
-    host.appendChild(titleEl);
-
-    const selected = new Set();
-    const grid = document.createElement('div');
-    grid.className = 'choice-picker-grid';
-    cards.forEach((card, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'choice-picker-item';
-      btn.textContent = card.name || `Prize ${idx + 1}`;
-      btn.addEventListener('click', () => {
-        if (selected.has(idx)) {
-          selected.delete(idx);
-          btn.classList.remove('selected');
-        } else if (selected.size < needed) {
-          selected.add(idx);
-          btn.classList.add('selected');
-        }
-        confirmBtn.disabled = selected.size !== needed;
-      });
-      grid.appendChild(btn);
-    });
-    host.appendChild(grid);
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'choice-picker-confirm';
-    confirmBtn.textContent = `Take ${needed} prize card${needed !== 1 ? 's' : ''}`;
-    confirmBtn.disabled = true; // enabled once exactly `needed` are selected
-    confirmBtn.addEventListener('click', () => {
-      host.remove();
-      resolve([...selected]);
-    });
-    host.appendChild(confirmBtn);
-
-    const cancel = document.createElement('button');
-    cancel.className = 'choice-picker-cancel';
-    cancel.textContent = 'Take the top ones (automatic)';
-    cancel.addEventListener('click', () => {
-      host.remove();
-      resolve(null);
-    });
-    host.appendChild(cancel);
-
-    const chatArea = document.querySelector('.chat-messages') || document.body;
-    chatArea.prepend(host);
-    host.style.position = 'fixed';
-    host.style.top = '10%';
-    host.style.left = '50%';
-    host.style.transform = 'translateX(-50%)';
-    host.style.zIndex = 9999;
-    host.style.minWidth = '220px';
-    host.style.padding = '12px';
-    host.style.borderRadius = '10px';
-    host.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)';
-  });
-}
-
-// Show the prize picker and take the chosen cards; fall back to the automatic
-// top-N behavior if the player cancels. Falls back to `takePrizes` when there
-// are no prize cards to choose from.
+// TCG Live prize pick: remaining prizes fly up sleeve-forward. The
+// player clicks as many as they earned; those fly into the hand.
 async function _takePrizesWithPicker(user, count) {
-  const prizeCards = getZone(user, 'prizes').array.slice(0, count);
-  if (prizeCards.length === 0) {
+  if (getZone(user, 'prizes').getCount() === 0) {
     takePrizes(user, user, count);
     return;
   }
-  const chosen = await _pickPrizeCards(count, prizeCards);
-  if (chosen === null || chosen.length === 0) {
-    takePrizes(user, user, count);
-    return;
-  }
-  takePrizesByIndex(user, user, chosen);
+  await promptPrizeTake(user, count);
 }
 
 const abilityTurnAndUsageGuard = (user, target, family) => {
@@ -2588,59 +2546,6 @@ const resolveAbilityTarget = (user, targetCard) => {
   return { target, targetZone, targetIdx, activeCard };
 };
 
-const isPokemonCard = (card) => {
-  if (card?.hp) return true;
-  const t = String(card?.type || card?.supertype || '').toLowerCase();
-  return t.includes('pokémon') || t.includes('pokemon');
-};
-
-const matchesSearch = (card, what = '') => {
-  const w = what.toLowerCase();
-  if (w.includes(' or ')) {
-    return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg));
-  }
-  const isPokemon = isPokemonCard(card);
-  const isTrainer = String(card.supertype || card.type || '')
-    .toLowerCase()
-    .includes('trainer');
-  if (w.includes('item') && w.includes('tool')) return isTrainer;
-  if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {
-    const tt = String(card.trainerType || card.type || '').toLowerCase();
-    return tt.includes('item') || (isTrainer && tt.includes('item'));
-  }
-  if (w.includes('energy')) {
-    return (
-      String(card.type || '').toLowerCase().includes('energy') ||
-      String(card.name || '').toLowerCase().includes('energy')
-    );
-  }
-  if (w.includes('mega evolution')) {
-    return isPokemon && String(card.name || '').toLowerCase().includes('mega');
-  }
-  if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) {
-    return isPokemon;
-  }
-  if (w.includes('basic')) {
-    if (!isPokemon || (card.stage || 'Basic') !== 'Basic') return false;
-    const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
-    if (hpCap) {
-      const maxHp = Number(hpCap[1]);
-      const cardHp = Number(card.hp);
-      return Number.isFinite(cardHp) && cardHp <= maxHp;
-    }
-    return true;
-  }
-  if (w.includes('pokémon') || w.includes('pokemon')) return isPokemon;
-  // Named species (attack search: "up to 2 Grubbin", not a generic keyword)
-  const generic =
-    /\b(card|pokémon|pokemon|energy|item|tool|trainer|basic|supporter|stadium|mega|stage|evolution)\b/i;
-  if (what.trim() && !generic.test(what)) {
-    const needle = what.trim().toLowerCase();
-    return String(card.name || '').toLowerCase().includes(needle);
-  }
-  return true;
-};
-
 // Modal card picker (mirrors rules-bridge openChoicePicker for ability buttons).
 const openAbilityChoicePicker = ({
   user,
@@ -2653,12 +2558,12 @@ const openAbilityChoicePicker = ({
   minCount,
   maxCount,
   upTo = false,
+  triggerCard = null,
+  allCandidates = null,
   onPick,
   onConfirm,
   onCancel,
 }) => {
-  document.getElementById('rulesChoicePicker')?.remove();
-
   const maxSel = maxCount ?? requiredCount;
   const minSel = minCount ?? (upTo ? 0 : requiredCount);
   const cappedMax = Math.min(maxSel, candidates.length);
@@ -2673,82 +2578,30 @@ const openAbilityChoicePicker = ({
     return;
   }
 
-  const overlay = document.createElement('div');
-  overlay.id = 'rulesChoicePicker';
-  overlay.innerHTML = `
-    <div class="choice-picker-card">
-      <div class="choice-picker-title"></div>
-      <div class="choice-picker-grid"></div>
-      ${multiSelect ? '<button class="choice-picker-confirm" disabled>Confirm</button>' : ''}
-      <button class="choice-picker-cancel">Cancel</button>
-    </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('.choice-picker-title').textContent = title;
-
-  const selected = new Set();
-  const grid = overlay.querySelector('.choice-picker-grid');
-  const confirmBtn = overlay.querySelector('.choice-picker-confirm');
-  if (confirmBtn && upTo && minSel === 0) {
-    confirmBtn.disabled = false;
-  }
-
-  for (const cand of candidates) {
-    const btn = document.createElement('button');
-    btn.className = 'choice-picker-item';
-    const thumb =
-      cand.images?.small ||
-      (typeof cand.image === 'string' ? cand.image : cand.image?.src) ||
-      '';
-    btn.innerHTML = thumb
-      ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
-      : `<span>${cand.name || 'Card'}</span>`;
-    btn.addEventListener('click', () => {
-      if (multiSelect) {
-        if (selected.has(cand)) {
-          selected.delete(cand);
-          btn.classList.remove('selected');
-        } else if (selected.size < cappedMax) {
-          selected.add(cand);
-          btn.classList.add('selected');
-        }
-        if (confirmBtn) {
-          confirmBtn.disabled = selected.size < minSel || selected.size > cappedMax;
-        }
-        return;
-      }
-      try {
-        const zone = getZone(user, zoneFrom);
-        const idx = zone.array.indexOf(cand);
-        if (idx >= 0 && destination) {
-          moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move', true);
-        }
-      } catch {}
-      onPick?.(cand);
-      overlay.remove();
-    });
-    grid.appendChild(btn);
-  }
-
-  if (confirmBtn) {
-    confirmBtn.addEventListener('click', () => {
-      onConfirm?.(Array.from(selected));
-      overlay.remove();
-    });
-  }
-  overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
-    onCancel?.();
-    overlay.remove();
-  });
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      onCancel?.();
-      overlay.remove();
-    }
+  openCardPicker({
+    title,
+    candidates,
+    allCandidates,
+    triggerCard,
+    multiSelect,
+    requiredCount,
+    minCount: minSel,
+    maxCount: cappedMax,
+    upTo,
+    zoneFrom,
+    destination,
+    user,
+    onPick,
+    onConfirm,
+    onCancel,
   });
 };
 
 // Attack deck-search (Call for Family, Flock, …): filtered picker, then shuffle.
 async function _runAttackDeckSearch(user, atk, searchStep, emit) {
+  // Mirror replay: the originator's moveCardBundle + shuffleZone actions
+  // arrive separately. Opening a picker here would desync both boards.
+  if (!emit) return;
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
     appendMessage(
@@ -2787,10 +2640,16 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   const matches = [];
   for (const c of deck.array) {
     await ensureCardData(c);
-    if (matchesSearch(c, searchStep.what)) matches.push(c);
   }
-  const usingFallback = matches.length === 0 && deck.array.length > 0;
-  const pool = usingFallback ? deck.array : matches;
+  const pool = filterSearchMatches(deck.array, searchStep.what, {
+    onNoMatches: () =>
+      appendMessage(
+        user,
+        `🔍 ${atk.name} — no cards in deck match "${searchStep.what}".`,
+        'announcement',
+        false
+      ),
+  });
   if (pool.length === 0) {
     appendMessage(
       user,
@@ -2803,6 +2662,13 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   }
 
   const finishSearch = () => shuffleZone(user, user, 'deck');
+  const attackText = atk.text || '';
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal(user, atk.name, picked, appendMessage, {
+      step: searchStep,
+      sourceText: attackText,
+    });
+  const triggerCard = getZone(user, 'active').array[0] || null;
 
   const useMulti = upTo ? effectiveMax >= 1 : effectiveMax > 1;
   const minPick = upTo ? 0 : effectiveMax;
@@ -2814,8 +2680,10 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
     await new Promise((resolve) => {
       openAbilityChoicePicker({
         user,
-        title: `${atk.name} — choose ${pickLabel} for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+        title: `${atk.name} — choose ${pickLabel} for ${destLabel}`,
         candidates: pool,
+        allCandidates: usingFallback ? null : deck.array,
+        triggerCard,
         zoneFrom: 'deck',
         destination: destZone,
         multiSelect: true,
@@ -2824,6 +2692,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         maxCount: effectiveMax,
         upTo,
         onConfirm: (selected) => {
+          revealPicked(selected);
           for (const s of selected) {
             const idx = getZone(user, 'deck').array.indexOf(s);
             if (idx >= 0) {
@@ -2856,11 +2725,14 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   await new Promise((resolve) => {
     openAbilityChoicePicker({
       user,
-      title: `${atk.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+      title: `${atk.name} — take a card to ${destLabel}`,
       candidates: pool,
+      allCandidates: usingFallback ? null : deck.array,
+      triggerCard,
       zoneFrom: 'deck',
       destination: destZone,
       onPick: (picked) => {
+        revealPicked(picked);
         appendMessage(
           user,
           `🔍 ${atk.name}: ${picked.name || 'a card'} → ${destLabel}.`,
@@ -2905,17 +2777,23 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
         ? 'Trainer'
         : 'a Pokémon');
   const count = searchStep?.count || 1;
+  const upTo = searchStep?.upTo === true;
   const destZone =
     searchStep?.destination === 'Bench' ? 'bench' : 'hand';
   const destLabel = destZone === 'bench' ? 'Bench' : 'hand';
 
-  const matches = [];
   for (const c of deck.array) {
     await ensureCardData(c);
-    if (matchesSearch(c, what)) matches.push(c);
   }
-  const usingFallback = matches.length === 0 && deck.array.length > 0;
-  const pool = usingFallback ? deck.array : matches;
+  const pool = filterSearchMatches(deck.array, what, {
+    onNoMatches: () =>
+      appendMessage(
+        user,
+        `⛔ ${target.name} — no cards in deck match "${what}".`,
+        'announcement',
+        false
+      ),
+  });
   if (pool.length === 0) {
     appendMessage(user, '⛔ No matching cards in your deck.', 'announcement', false);
     return;
@@ -2925,17 +2803,29 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     shuffleZone(user, user, 'deck');
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal(user, target.name, picked, appendMessage, {
+      step: searchStep,
+      sourceText: abilityText,
+    });
 
-  if (count > 1) {
+  if (count > 1 || upTo) {
+    const effectiveMax = upTo ? count : count;
     openAbilityChoicePicker({
       user,
-      title: `${target.name} — choose ${count} cards for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+      title: `${target.name} — choose ${upTo ? `up to ${effectiveMax}` : count} cards for ${destLabel}`,
       candidates: pool,
+      allCandidates: usingFallback ? null : deck.array,
+      triggerCard: target,
       zoneFrom: 'deck',
       destination: destZone,
       multiSelect: true,
-      requiredCount: count,
+      requiredCount: effectiveMax,
+      minCount: upTo ? 0 : count,
+      maxCount: effectiveMax,
+      upTo,
       onConfirm: (selected) => {
+        revealPicked(selected);
         for (const s of selected) {
           const idx = getZone(user, 'deck').array.indexOf(s);
           if (idx >= 0) {
@@ -2964,11 +2854,14 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
 
   openAbilityChoicePicker({
     user,
-    title: `${target.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+    title: `${target.name} — take a card to ${destLabel}`,
     candidates: pool,
+    allCandidates: usingFallback ? null : deck.array,
+    triggerCard: target,
     zoneFrom: 'deck',
     destination: destZone,
     onPick: (picked) => {
+      revealPicked(picked);
       appendMessage(
         user,
         `🔍 ${target.name} searches: ${picked.name || 'a card'} → ${destLabel}.`,
@@ -3094,6 +2987,44 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null) =>
   await ensureCardData(target);
   if (!abilityTurnAndUsageGuard(user, target, 'move-damage')) return;
 
+  const abilityText =
+    target.ability?.text ?? target.abilityText ?? target.text ?? '';
+  const steps = parseAbility(abilityText);
+  const costStep = steps.find((s) => s.type === 'discardCostAbility');
+
+  if (costStep) {
+    const whatFilter = energySearchWhat({
+      basic: costStep.basic,
+      energyType: costStep.energyType,
+    });
+    const hand = getZone(user, 'hand');
+    const candidates = hand.array.filter((c) => matchesSearch(c, whatFilter));
+    if (candidates.length === 0) {
+      appendMessage(
+        user,
+        `⛔ Discard ${whatFilter} from your hand to use ${target.name}'s ability.`,
+        'announcement',
+        false
+      );
+      return;
+    }
+    if (candidates.length === 1) {
+      const idx = hand.array.indexOf(candidates[0]);
+      moveCard(user, user, 'hand', 'discard', idx);
+    } else {
+      const pick = await _pickFromList(
+        `${target.name} — discard ${whatFilter} (cost)`,
+        candidates.map((c, i) => ({ label: c.name || 'Energy', idx: i }))
+      );
+      if (pick === null) {
+        appendMessage(user, 'Ability canceled — cost not paid.', 'announcement', false);
+        return;
+      }
+      const idx = hand.array.indexOf(candidates[pick]);
+      if (idx >= 0) moveCard(user, user, 'hand', 'discard', idx);
+    }
+  }
+
   const parsed = parseMoveDamage(target);
   if (!parsed || parsed.count === null) {
     appendMessage(
@@ -3192,6 +3123,7 @@ export const lookAtTopAbility = async (user, emit = true, targetCard = null) => 
       user,
       title: `${target.name} — take a top card to hand`,
       candidates: topCards,
+      triggerCard: target,
       zoneFrom: 'deck',
       destination: 'hand',
       onPick: (picked) => {
@@ -3215,6 +3147,7 @@ export const lookAtTopAbility = async (user, emit = true, targetCard = null) => 
     user,
     title: `${target.name} — top ${topCards.length} card${topCards.length !== 1 ? 's' : ''} (view only)`,
     candidates: topCards,
+    triggerCard: target,
     zoneFrom: 'deck',
     destination: null,
     onPick: () => {
@@ -3264,9 +3197,11 @@ export const recursionAbility = async (user, emit = true, targetCard = null) => 
     user,
     title: `${target.name} — take a card from discard`,
     candidates: discard.array,
+    triggerCard: target,
     zoneFrom: 'discard',
     destination: 'hand',
     onPick: (picked) => {
+      announceDiscardPick(user, target.name, picked, appendMessage);
       appendMessage(
         user,
         `♻️ ${target.name} returns ${picked.name || 'a card'} to hand.`,
@@ -3345,9 +3280,11 @@ export const evolveAbility = async (user, emit = true, targetCard = null) => {
 };
 
 
-export const pass = (user, emit = true) => {
+export const pass = (user, rngOrEmit = true, maybeEmit) => {
+  const { emit, tail: rngIn } = splitEmitAndTail(rngOrEmit, maybeEmit);
+  const rngBundle = rngIn || {};
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'pass', []);
+    processAction(user, emit, 'pass', [rngBundle]);
     return;
   }
 
@@ -3364,10 +3301,10 @@ export const pass = (user, emit = true) => {
   appendMessage(user, message, 'player', false);
   discardBoard(user, user, false, false);
 
-  processAction(user, emit, 'pass', []);
+  processAction(user, emit, 'pass', [rngBundle]);
 
   if (rulesState.enabled) {
-    endTurnWithBanner(user);
+    endTurnWithBanner(user, rngBundle);
   }
 };
 
@@ -3385,7 +3322,7 @@ const payStadiumCost = (user, cost) => {
       appendMessage(user, '⛔ No Energy in hand to discard.', 'announcement', false);
       return false;
     }
-    moveCard(user, user, 'hand', 'discard', idx);
+    moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
     return true;
   }
   if (cost.type === 'discard-hand') {
@@ -3393,7 +3330,9 @@ const payStadiumCost = (user, cost) => {
       appendMessage(user, `⛔ Need ${cost.n} card(s) in hand to discard.`, 'announcement', false);
       return false;
     }
-    for (let i = 0; i < cost.n; i++) moveCard(user, user, 'hand', 'discard', 0);
+    for (let i = 0; i < cost.n; i++) {
+      moveCardBundle(user, user, 'hand', 'discard', 0, false, 'move');
+    }
     return true;
   }
   return true;
@@ -3408,7 +3347,17 @@ const finishStadiumAction = (user, card, emit, payload) => {
 // Uses the active stadium's once-per-turn or setup-once effect.
 // For once-per-turn: draw N / search / search-evolve / heal based on the parsed effect.
 // For setup-once: draw N (one-shot, applied immediately).
-export const stadiumEffect = async (user, emit = true) => {
+export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
+  const { emit, tail: payload } = splitEmitAndTail(payloadOrEmit, maybeEmit);
+  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+    processAction(user, emit, 'stadium-effect', [payload]);
+    return;
+  }
+  // Mirror: card moves already arrived via moveCardBundle. Only mark used.
+  if (!emit) {
+    if (rulesState.enabled) markStadiumUsed(user);
+    return;
+  }
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
@@ -3455,7 +3404,7 @@ export const stadiumEffect = async (user, emit = true) => {
         appendMessage(user, '⛔ Your hand is empty.', 'announcement', false);
         return;
       }
-      moveCard(user, user, 'hand', 'deck', 0, 0);
+      moveCardBundle(user, user, 'hand', 'deck', 0, 0, 'move');
       appendMessage(user, `◈ ${card.name}: Put a card from your hand on top of your deck.`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: 'hand-to-deck-top' });
       break;
@@ -3473,9 +3422,9 @@ export const stadiumEffect = async (user, emit = true) => {
         return;
       }
       const benchCard = bench.array[benchIdx];
-      moveCard(user, user, 'active', 'bench', 0);
+      moveCardBundle(user, user, 'active', 'bench', 0, false, 'move');
       const newIdx = getZone(user, 'bench').array.indexOf(benchCard);
-      if (newIdx >= 0) moveCard(user, user, 'bench', 'active', newIdx);
+      if (newIdx >= 0) moveCardBundle(user, user, 'bench', 'active', newIdx, false, 'move');
       appendMessage(user, `🔁 ${card.name}: Switched Active with a benched ${action.typeFilter} Pokémon.`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: 'switch-type' });
       break;
@@ -3496,7 +3445,7 @@ export const stadiumEffect = async (user, emit = true) => {
           if (action.typeFilter === 'lightning' && !name.includes('lightning')) continue;
         }
         if (!canAddToBench(bench.getCount(), limit).allowed) break;
-        moveCard(user, user, 'discard', 'bench', i - moved);
+        moveCardBundle(user, user, 'discard', 'bench', i - moved, false, 'move');
         moved++;
       }
       if (moved === 0) {
@@ -3548,7 +3497,7 @@ export const stadiumEffect = async (user, emit = true) => {
         return;
       }
       const foundName = deck.array[found]?.name || 'Basic Pokémon';
-      moveCard(user, user, 'deck', 'bench', found);
+      moveCardBundle(user, user, 'deck', 'bench', found, false, 'move');
       appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search-bench' });
@@ -3561,7 +3510,7 @@ export const stadiumEffect = async (user, emit = true) => {
       for (let i = 0; i < deck.array.length && moved < want; ) {
         await ensureCardData(deck.array[i]);
         if (matchesStadiumSearch(deck.array[i], action)) {
-          moveCard(user, user, 'deck', 'hand', i);
+          moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
           moved++;
         } else {
           i++;
@@ -3582,7 +3531,7 @@ export const stadiumEffect = async (user, emit = true) => {
     case 'discard-draw':
     case 'draw': {
       const n = action.n || 1;
-      draw(user, n, emit);
+      draw(user, user, n, emit);
       appendMessage(user, `◈ ${card.name}: Drew ${n} card(s).`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: action.action, n });
       break;
@@ -3597,7 +3546,7 @@ export const stadiumEffect = async (user, emit = true) => {
       // If it's a Pokémon, put it in hand; otherwise deck unchanged
       const isPokemon = (topCard.type || '').toLowerCase().includes('pokemon') || (topCard.subtypes || []).some(s => s.toLowerCase() === 'pokemon');
       if (isPokemon) {
-        moveCard(user, user, 'deck', 'hand', 0, 0);
+        moveCardBundle(user, user, 'deck', 'hand', 0, 0, 'move');
         appendMessage(user, `🔍 ${card.name} searches: found ${topCard.name || 'a Pokémon'} → hand.`, 'announcement', false);
       } else {
         appendMessage(user, `🔍 ${card.name} searches: top card was ${topCard.name || 'a card'} (not a Pokémon). Deck unchanged.`, 'announcement', false);

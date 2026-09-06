@@ -2,7 +2,7 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
-    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
+    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
@@ -16,13 +16,23 @@ import test from 'node:test';
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
     
     // ── KO / prizes ──
-    test('prizesForKO: standard = 1, ex = 3 (2 extra), VMAX = 3', () => {
+    test('prizesForKO: standard = 1, ex = 2, mega = 3, VMAX = 3', () => {
       assert.equal(prizesForKO({ rarity: 'Common' }), 1);
-      assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 3);
-      assert.equal(prizesForKO({ name: 'Cetitan ex' }), 3);
+      assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 2);
+      assert.equal(prizesForKO({ name: 'Cetitan ex' }), 2);
       assert.equal(prizesForKO({ subtypes: ['VMAX'] }), 3);
       assert.equal(prizesForKO({ subtypes: ['VSTAR'] }), 2);
-      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 2);
+      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 3);
+      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 3);
+      assert.equal(prizesForKO({ name: 'Yanmega' }), 1);
+    });
+
+    test('isMegaCard: rarity, subtype, or Mega name — not Yanmega', () => {
+      assert.equal(isMegaCard({ rarity: 'Mega Hyper Rare' }), true);
+      assert.equal(isMegaCard({ subtypes: ['Mega Evolution'] }), true);
+      assert.equal(isMegaCard({ name: 'Mega Lucario ex' }), true);
+      assert.equal(isMegaCard({ name: 'Yanmega' }), false);
+      assert.equal(isMegaCard({ name: 'Cetitan ex' }), false);
     });
 
     test('isExCard / isGxCard: subtypes first, name suffix fallback', () => {
@@ -38,7 +48,8 @@ import test from 'node:test';
 
     test('koOutcome: GX = match loss, otherwise prize counts', () => {
       assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'matchLoss' });
-      assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 3 });
+      assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 2 });
+      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 3 });
       assert.deepEqual(koOutcome({ rarity: 'Common' }), { type: 'prizes', count: 1 });
     });
 
@@ -52,12 +63,12 @@ import test from 'node:test';
       assert.match(r.reason, /GX/);
     });
 
-    test('handleKO: ex awards 3 prizes', () => {
+    test('handleKO: ex awards 2 prizes', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { name: 'Cetitan ex' } });
-      assert.equal(r.prizeCount, 3);
-      assert.equal(r.prizesTaken, 3);
-      assert.equal(r.prizesRemaining, 3);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 2);
+      assert.equal(r.prizesRemaining, 4);
       assert.equal(r.won, false);
     });
     
@@ -76,9 +87,9 @@ import test from 'node:test';
     test('handleKO packages prize info', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { rarity: 'Double rare', subtypes: ['ex'] } });
-      assert.equal(r.prizeCount, 3);
-      assert.equal(r.prizesTaken, 3);
-      assert.equal(r.prizesRemaining, 3);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 2);
+      assert.equal(r.prizesRemaining, 4);
     });
     
     test('checkWinConditions: deck-out loses', () => {
@@ -660,6 +671,36 @@ import test from 'node:test';
       assert.equal(classifyAbility({ ability: { text } }), 'move-damage');
     });
 
+    test('parseAbility: Fan Rotom Fan Call — typed {C} Pokémon with HP cap (ability parser, not trainer)', () => {
+      const text =
+        "Once during your first turn, you may search your deck for up to 3 {C} Pokémon with 100 HP or less, reveal them, and put them into your hand. Then, shuffle your deck.";
+      const steps = parseAbility(text);
+      const search = steps.find((s) => s.type === 'searchAbility');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {C} Pokémon ≤100 HP');
+      assert.equal(search.count, 3);
+      assert.equal(search.upTo, true);
+      assert.equal(search.destination, 'hand');
+    });
+
+    test('parseAbilitySearchParams: typed Basic {R} Energy preserved', async () => {
+      const { parseAbilitySearchParams } = await import('../abilities.mjs');
+      const lower =
+        'search your deck for up to 2 basic {r} energy cards and put them into your hand';
+      const parsed = parseAbilitySearchParams(lower);
+      assert.equal(parsed.what, 'Basic {R} Energy');
+      assert.equal(parsed.count, 2);
+      assert.equal(parsed.upTo, true);
+    });
+
+    test('ability search filter: typed {R} Energy via search-match.mjs', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
+      assert.equal(matchesSearch(fire, 'Basic {R} Energy'), true);
+      assert.equal(matchesSearch(water, 'Basic {R} Energy'), false);
+    });
+
     test('searchTargetType: determines card type from ability text', () => {
       assert.equal(searchTargetType({ ability: { text: 'Look through your deck and find a Basic Pokémon, put it into your hand.' } }), 'Pokémon');
       assert.equal(searchTargetType({ ability: { text: 'Search your deck for an Energy card and put it into your hand.' } }), 'Energy');
@@ -748,11 +789,18 @@ import test from 'node:test';
       assert.equal(r.results[0].n, 2);
     });
 
-    test('parseStadiumSetupDraw: parses draw N or falls back to 1', () => {
+    test('parseStadiumSetupDraw: only the when-you-play sentence, never a default 1', () => {
       assert.equal(parseStadiumSetupDraw({ name: 'Victory Road', text: 'When you play this card, draw 2 cards.' }), 2);
-      assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'When you play this card, do something.' }), 1);
+      assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'When you play this card, do something.' }), null);
       assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'Once per turn, draw 1 card.' }), null);
       assert.equal(parseStadiumSetupDraw(null), null);
+      const boilerplate =
+        'This Stadium stays in play when you play it. Discard it if another Stadium comes into play. Once during each player\'s turn, that player may draw 2 cards.';
+      assert.equal(parseStadiumSetupDraw({ type: 'Stadium', name: 'Mesagoza', text: boilerplate }), null);
+      assert.equal(
+        classifyStadiumEffect({ type: 'Stadium', name: 'Mesagoza', text: boilerplate }),
+        'once-per-turn',
+      );
     });
 
     test('parseStadiumOncePerTurn: buckets draw/search/energy/heal', () => {

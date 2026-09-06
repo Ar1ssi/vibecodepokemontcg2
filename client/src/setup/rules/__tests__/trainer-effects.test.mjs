@@ -2,6 +2,8 @@ import test, { describe } from 'node:test';
     import assert from 'node:assert/strict';
     
     const { parseTrainerEffect, describeStep } = await import('../trainer-effects.mjs');
+    const { energyMatchesSearchWhat } = await import('../energy-effects.mjs');
+    const { matchesSearch, filterSearchMatches, isPokemonCard } = await import('../search-match.mjs');
     
     test("Professor's Research: discard hand, draw 7", () => {
       const r = parseTrainerEffect("Discard your hand and draw 7 cards.");
@@ -359,6 +361,15 @@ import test, { describe } from 'node:test';
       assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target === 5));
     });
 
+    test('Mesagoza-style stadium draw-until is passive, not a one-shot drawUntil', () => {
+      const r = parseTrainerEffect(
+        "This Stadium stays in play when you play it. Once during each player's turn, that player may draw cards until they have 3 cards in their hand."
+      );
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'passive');
+    });
+
     test("Team Rocket's Factory: stadium 'once during each player's turn' is passive, NOT a bare draw", () => {
       const r = parseTrainerEffect("Once during each player’s turn, if they played a Supporter card that has “Team Rocket” in its name from their hand this turn, they may draw 2 cards.");
       assert.equal(r.recognizable, true);
@@ -377,7 +388,87 @@ import test, { describe } from 'node:test';
     test('Firebreather: search up to 7 Basic {R} Energy (not generic "card")', () => {
       const r = parseTrainerEffect("Search your deck for up to 7 Basic { R } Energy cards, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
-      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic {R} Energy' && s.count === 7));
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {R} Energy');
+      assert.equal(search.count, 7);
+      assert.equal(search.upTo, true);
+      assert.equal(search.reveal, true);
+      assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
+    });
+
+    test('announceDiscardPick: always broadcasts picked discard card', async () => {
+      const { announceDiscardPick } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      announceDiscardPick('self', 'Super Rod', [{ name: 'Pikachu' }], append);
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Super Rod\): Pikachu/);
+    });
+
+    test('maybeAnnounceSearchReveal: skips when effect has no reveal', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      let called = 0;
+      const append = () => { called++; };
+      maybeAnnounceSearchReveal('self', 'Ultra Ball', [{ name: 'Pikachu' }], append, {
+        sourceText: 'Search your deck for a Pokémon and put it into your hand.',
+      });
+      assert.equal(called, 0);
+    });
+
+    test('maybeAnnounceSearchReveal: announces when effect text includes reveal', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      maybeAnnounceSearchReveal('self', 'Firebreather', [{ name: 'Basic Fire Energy' }], append, {
+        sourceText: 'Search your deck for up to 7 Basic {R} Energy cards, reveal them, and put them into your hand.',
+      });
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
+    });
+
+    test('Firebreather search filter: typed {R} matches Fire only', () => {
+      const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
+      assert.equal(energyMatchesSearchWhat(fire, 'Basic {R} Energy'), true);
+      assert.equal(energyMatchesSearchWhat(water, 'Basic {R} Energy'), false);
+      assert.equal(energyMatchesSearchWhat(fire, 'Basic Energy'), true);
+      assert.equal(energyMatchesSearchWhat(water, 'Basic Energy'), true);
+    });
+
+    test('Buddy-Buddy Poffin filter: Basic ≤70 HP includes stubs without hp', () => {
+      const stub = { name: 'Pikachu', type: 'Pokémon', stage: 'Basic' };
+      const overCap = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', hp: 90 };
+      const underCap = { name: 'Clefairy', type: 'Pokémon', stage: 'Basic', hp: 60 };
+      const what = 'Basic Pokémon ≤70 HP';
+      assert.equal(matchesSearch(stub, what), true);
+      assert.equal(matchesSearch(underCap, what), true);
+      assert.equal(matchesSearch(overCap, what), false);
+      const pool = filterSearchMatches([stub, overCap, underCap], what);
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu', 'Clefairy']);
+    });
+
+    test('Ultra Ball filter: any Pokémon in deck (type on image fallback)', () => {
+      const fromImageType = { name: 'Pikachu', image: { type: 'Pokémon' } };
+      const energy = { name: 'Basic Fire Energy', type: 'Energy' };
+      assert.equal(isPokemonCard(fromImageType), true);
+      assert.equal(matchesSearch(fromImageType, 'Pokémon'), true);
+      assert.equal(matchesSearch(energy, 'Pokémon'), false);
+      const pool = filterSearchMatches([fromImageType, energy], 'Pokémon');
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu']);
+    });
+
+    test('typed bench search: up to 3 {C} Pokémon with 100 HP or less', () => {
+      const r = parseTrainerEffect(
+        'Search your deck for up to 3 { C } Pokémon with 100 HP or less and put them onto your Bench. Then, shuffle your deck.'
+      );
+      assert.equal(r.recognizable, true);
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {C} Pokémon ≤100 HP');
+      assert.equal(search.count, 3);
+      assert.equal(search.destination, 'bench');
+      assert.equal(search.upTo, true);
     });
 
     test('Fighting Gong: or-clause "Basic Energy or Basic Pokémon" (not plain Pokémon)', () => {

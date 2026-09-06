@@ -427,18 +427,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "g1-80",
-      "name": "Fighting Energy",
+      "id": "sve-006",
+      "name": "Basic Fighting Energy",
       "supertype": "Energy",
-      "localId": "80",
-      "image": "https://assets.tcgdex.net/en/xy/g1/80/high.webp",
+      "localId": "006",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_006_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/80/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/80/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_006_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_006_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 10
@@ -871,18 +871,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 2
     },
     {
-      "id": "g1-76",
-      "name": "Fire Energy",
+      "id": "sve-002",
+      "name": "Basic Fire Energy",
       "supertype": "Energy",
-      "localId": "76",
-      "image": "https://assets.tcgdex.net/en/xy/g1/76/high.webp",
+      "localId": "002",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_002_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/76/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/76/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_002_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_002_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 11
@@ -1383,18 +1383,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "g1-81",
-      "name": "Darkness Energy",
+      "id": "sve-007",
+      "name": "Basic Darkness Energy",
       "supertype": "Energy",
-      "localId": "81",
-      "image": "https://assets.tcgdex.net/en/xy/g1/81/high.webp",
+      "localId": "007",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/81/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/81/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 10
@@ -1793,35 +1793,35 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "g1-78",
-      "name": "Lightning Energy",
+      "id": "sve-004",
+      "name": "Basic Lightning Energy",
       "supertype": "Energy",
-      "localId": "78",
-      "image": "https://assets.tcgdex.net/en/xy/g1/78/high.webp",
+      "localId": "004",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_004_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/78/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/78/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_004_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_004_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 5
     },
     {
-      "id": "g1-77",
-      "name": "Water Energy",
+      "id": "sve-003",
+      "name": "Basic Water Energy",
       "supertype": "Energy",
-      "localId": "77",
-      "image": "https://assets.tcgdex.net/en/xy/g1/77/high.webp",
+      "localId": "003",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_003_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/77/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/77/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_003_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_003_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 3
@@ -2271,18 +2271,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 2
     },
     {
-      "id": "g1-77",
-      "name": "Water Energy",
+      "id": "sve-003",
+      "name": "Basic Water Energy",
       "supertype": "Energy",
-      "localId": "77",
-      "image": "https://assets.tcgdex.net/en/xy/g1/77/high.webp",
+      "localId": "003",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_003_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/77/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/77/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_003_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_003_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 9

@@ -302,6 +302,8 @@ async function main() {
       'resyncActions',
       'catchUpActions',
       'syncCheck',
+      'requestSyncLogBundle',
+      'syncLogBundle',
       'appendMessage',
       'spectatorActionData',
       'initiateImport',

@@ -14,6 +14,12 @@ import {
   closeCardPreview,
   isCardPreviewOpen,
 } from '../../setup/image-logic/full-view.js';
+import {
+  closeCardPicker,
+} from '../../setup/image-logic/card-picker.js';
+import {
+  closeDiscardPileViewer,
+} from '../../setup/image-logic/discard-pile-viewer.js';
 
 export const hideZoneElements = () => {
   const zonesToHide = [
@@ -38,6 +44,13 @@ const isOutsideZoneClick = (event, zone) => {
   } else if (zone.elementCover && zone.elementCover.contains(event.target)) {
     return false;
   } else if (event.target.id && event.target.id === 'fullImage') {
+    return false;
+  } else if (
+    event.target.id === 'discardPileViewer' ||
+    event.target.closest?.('#discardPileViewer') ||
+    event.target.id === 'cardPickerOverlay' ||
+    event.target.closest?.('#cardPickerOverlay')
+  ) {
     return false;
   } else if (
     event.target.parentElement &&
@@ -158,7 +171,19 @@ export const closeFullView = (event) => {
 
 export const closePopups = (event) => {
   deselectCard();
+  // Preview close must not run closeFullView → refreshBoard, which re-seats
+  // every Active/Bench card. Keep the overlay as the only closer while it
+  // is up so the return flight cannot reshuffle the mat.
+  if (
+    isCardPreviewOpen() ||
+    event?.target?.closest?.('.card-preview-overlay')
+  ) {
+    closeCardPreview(event);
+    document.getElementById('cardContextMenu').style.display = 'none';
+    return;
+  }
   closeCardPreview(event);
+  closeDiscardPileViewer(event);
   closeFullView(event);
   hideZoneElementsIfEmpty(event);
   document.getElementById('cardContextMenu').style.display = 'none';

@@ -4,6 +4,7 @@
     import { systemState, socket as rulesSocket } from '../../initialization/global-variables/global-variables.js';
     import { appendMessage } from '../chatbox/append-message.js';
     import { getZone } from '../zones/get-zone.js';
+    import { openCardPicker } from '../image-logic/card-picker.js';
     import {
       rulesState,
       canPerformAction,
@@ -33,8 +34,10 @@ import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay, combinedHandProtected } from './ability-executors.mjs';
-import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType } from './energy-effects.mjs';
+import { isStadiumCard, isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
+import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat } from './search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from './search-reveal.mjs';
 import {
   describeTypedSpecialEnergy,
   getTelepathicOnAttachSearch,
@@ -1150,84 +1153,47 @@ import {
 // ── choice picker for search effects ─────────────────────────────────
     // Opens a modal with candidate cards (from deck/discard); clicking one
     // executes the pending move (to hand or bench) automatically.
-    const openChoicePicker = ({ title, candidates, zoneFrom, destination, user = 'self', pickOnly = false, multiSelect = false, requiredCount = 1, onPick, onConfirm, onCancel }) => {
-      // remove any existing picker
-      document.getElementById('rulesChoicePicker')?.remove();
-      
-      if (multiSelect && requiredCount > candidates.length) {
+    const openChoicePicker = ({
+      title,
+      candidates,
+      zoneFrom,
+      destination,
+      user = 'self',
+      pickOnly = false,
+      multiSelect = false,
+      requiredCount = 1,
+      minCount,
+      maxCount,
+      upTo = false,
+      onPick,
+      onConfirm,
+      onCancel,
+      triggerCard = null,
+      allCandidates = null,
+    }) => {
+      const minSel = minCount ?? (upTo ? 0 : requiredCount);
+      if (multiSelect && !upTo && minSel > candidates.length) {
         appendMessage('', `  not enough cards to select ${requiredCount} — play it manually`, 'announcement', false);
         return;
       }
-    
-      const overlay = document.createElement('div');
-      overlay.id = 'rulesChoicePicker';
-      overlay.innerHTML = `
-        <div class="choice-picker-card">
-          <div class="choice-picker-title"></div>
-          <div class="choice-picker-grid"></div>
-          ${multiSelect ? '<button class="choice-picker-confirm" disabled>Confirm</button>' : ''}
-          <button class="choice-picker-cancel">Cancel</button>
-        </div>`;
-      document.body.appendChild(overlay);
-      overlay.querySelector('.choice-picker-title').textContent = title;
-    
-      const selected = new Set();
-      const grid = overlay.querySelector('.choice-picker-grid');
-      const confirmBtn = overlay.querySelector('.choice-picker-confirm');
-      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-        for (const cand of candidates) {
-          const btn = document.createElement('button');
-          btn.className = 'choice-picker-item';
-          // zone cards carry a DOM <img> in `image`, not a URL string
-          const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
-          btn.innerHTML = thumb
-            ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
-            : `<span>${cand.name || 'Card'}</span>`;
-          btn.addEventListener('click', () => {
-            if (multiSelect) {
-              // toggle selection; the cards only move when Confirm is clicked
-              if (selected.has(cand)) {
-                selected.delete(cand);
-                btn.classList.remove('selected');
-              } else {
-                selected.add(cand);
-                btn.classList.add('selected');
-              }
-              if (confirmBtn) confirmBtn.disabled = selected.size !== requiredCount;
-              return;
-            }
-            try {
-              if (!pickOnly && zoneFrom && destination) {
-                const z = getZone(user, zoneFrom);
-                const idx = z.array.indexOf(cand);
-                if (idx >= 0) {
-                  moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
-                  appendMessage('', `auto: ${cand.name} → ${destination === 'bench' ? 'Bench' : destination}`, 'announcement', false);
-                }
-              }
-            } catch {}
-            onPick?.(cand);
-            overlay.remove();
-          });
-          grid.appendChild(btn);
-        }
-      });
-      
-      if (confirmBtn) {
-        confirmBtn.addEventListener('click', () => {
-          onConfirm?.(Array.from(selected));
-          overlay.remove();
-        });
-      }
-      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
-        onCancel?.();
-        overlay.remove();
-      });
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          onCancel?.();
-          overlay.remove();
-        }
+
+      openCardPicker({
+        title,
+        candidates,
+        allCandidates,
+        triggerCard,
+        multiSelect,
+        requiredCount,
+        minCount: minSel,
+        maxCount: maxCount ?? requiredCount,
+        upTo,
+        pickOnly,
+        zoneFrom,
+        destination,
+        user,
+        onPick,
+        onConfirm,
+        onCancel,
       });
     };
     
@@ -1259,38 +1225,16 @@ import {
     };
 
     // ── guided heal picker: choose which of your Pokémon to heal ──────────
-    const openHealPicker = ({ title, candidates, amount, cure }) => {
-      document.getElementById('rulesChoicePicker')?.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'rulesChoicePicker';
-      overlay.innerHTML = `
-        <div class="choice-picker-card">
-          <div class="choice-picker-title"></div>
-          <div class="choice-picker-grid"></div>
-          <button class="choice-picker-cancel">Cancel</button>
-        </div>`;
-      document.body.appendChild(overlay);
-      overlay.querySelector('.choice-picker-title').textContent = title;
-      const grid = overlay.querySelector('.choice-picker-grid');
-      for (const cand of candidates) {
-        const btn = document.createElement('button');
-        btn.className = 'choice-picker-item';
-        const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
-        btn.innerHTML = thumb
-          ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
-          : `<span>${cand.name || 'Card'}</span>`;
-        btn.addEventListener('click', () => {
-          applyHealToCard(cand, amount, cure);
-          overlay.remove();
-        });
-        grid.appendChild(btn);
-      }
-      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
-        appendMessage('', '  heal canceled', 'announcement', false);
-        overlay.remove();
-      });
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
+    const openHealPicker = ({ title, candidates, amount, cure, triggerCard = null }) => {
+      openCardPicker({
+        title,
+        candidates,
+        triggerCard,
+        pickOnly: true,
+        onPick: (cand) => applyHealToCard(cand, amount, cure),
+        onCancel: () => {
+          appendMessage('', '  heal canceled', 'announcement', false);
+        },
       });
     };
 
@@ -1368,8 +1312,10 @@ import {
             } else if (type === 'peerSocketId') {
               const peerId = data?.socketId;
               if (peerId && peerId !== rulesSocket?.id) {
+                const alreadyKnown = systemState.opponentSocketId === peerId;
                 systemState.opponentSocketId = peerId;
                 if (
+                  !alreadyKnown &&
                   rulesState.enabled &&
                   rulesState.phase === 'setup' &&
                   !coinFlipPending &&
@@ -1378,12 +1324,12 @@ import {
                 ) {
                   handleSetupClick();
                 }
-              }
-              if (peerId && peerId !== rulesSocket?.id) {
-                rulesSocket.emit('rulesEvent', {
-                  type: 'peerSocketId',
-                  data: { socketId: rulesSocket.id },
-                });
+                if (!alreadyKnown) {
+                  rulesSocket.emit('rulesEvent', {
+                    type: 'peerSocketId',
+                    data: { socketId: rulesSocket.id },
+                  });
+                }
               }
             } else if (type === 'coinChosen') {
               // Opponent chose/changed their coin — show it on our mat
@@ -1445,61 +1391,8 @@ import {
       }, 1000);
     };
     
-    // Is this a Pokémon card? Prefer the locally-known `type`/`supertype`
-    // (set at deck-import time, always available) over the network-fetched
-    // `hp` field — `hp` only exists once ensureCardData's tcgdex lookup has
-    // resolved, which can be slow, rate-limited, or fail outright. Relying
-    // on `hp` alone silently starved every search picker (Ultra Ball,
-    // Buddy-Buddy Poffin, Nest Ball, …) of candidates whenever that lookup
-    // hadn't completed, which was the actual reason the menu seemed to
-    // require clicking the deck instead of just popping up.
-    const isPokemonCard = (card) => {
-      if (card.hp) return true;
-      const t = String(card.type || card.supertype || '').toLowerCase();
-      return t.includes('pokémon') || t.includes('pokemon');
-    };
-
-    // match a card against a search-step's target description
-    const matchesSearch = (card, what = '') => {
-      const w = what.toLowerCase();
-      // Or-clause (e.g. Fighting Gong: "Basic {F} Energy card or a Basic {F}
-      // Pokémon") — a card matches if it satisfies either side.
-      if (w.includes(' or ')) {
-        return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg));
-      }
-      const isPokemon = isPokemonCard(card);
-      const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
-      if (w.includes('item') && w.includes('tool')) return isTrainer;
-      if (w.includes('stadium') && w.includes('energy')) {
-        const isEnergy = String(card.type || '').toLowerCase().includes('energy') ||
-          String(card.name || '').toLowerCase().includes('energy');
-        const isStadium = (
-          String(card.type || card.supertype || '').toLowerCase().includes('trainer') &&
-          String(card.name || '').toLowerCase().includes('stadium')
-        ) || String(card.trainerType || '').toLowerCase() === 'stadium';
-        return isEnergy || isStadium;
-      }
-      if (w.includes('energy')) {
-        // e.g. 'Basic Energy' (Firebreather: up to 7 Basic Energy cards)
-        return String(card.type || '').toLowerCase().includes('energy') ||
-          String(card.name || '').toLowerCase().includes('energy');
-      }
-      if (w.includes('mega evolution')) return isPokemon && String(card.name || '').toLowerCase().includes('mega');
-      if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) return isPokemon;
-      if (w.includes('basic')) {
-        if (!isPokemon || (card.stage || 'Basic') !== 'Basic') return false;
-        // e.g. 'Basic Pokémon ≤70 HP' (Buddy-Buddy Poffin) — enforce the HP cap
-        const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
-        if (hpCap) {
-          const maxHp = Number(hpCap[1]);
-          const cardHp = Number(card.hp);
-          return Number.isFinite(cardHp) && cardHp <= maxHp;
-        }
-        return true;
-      }
-      if (w.includes('pokémon')) return isPokemon;
-      return true; // generic search: everything matches
-    };
+    // Is this a Pokémon card? Prefer locally-known type/supertype over async hp.
+    // Search matching lives in search-match.mjs (matchesSearch).
 
     const executeAbilityDraw = async (user, step) => {
       const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
@@ -1556,13 +1449,10 @@ import {
       openDeckSearchWindow(`${card.name} ability — search your deck`);
       appendMessage('', `  ${card.name} — opening card select…`, 'announcement', false);
       const deck = getZone(user, 'deck');
-      const matches = [];
-      for (const c of deck.array) {
-        await ensureCardData(c);
-        if (matchesSearch(c, step.what)) matches.push(c);
-      }
-      const usingFallback = matches.length === 0 && deck.array.length > 0;
-      const pool = usingFallback ? deck.array : matches;
+      const pool = filterSearchMatches(deck.array, step.what, {
+        onNoMatches: (what) =>
+          appendMessage('', `  no cards in deck match "${what}"`, 'announcement', false),
+      });
       if (pool.length === 0) {
         appendMessage('', '  no cards left in deck', 'announcement', false);
         return false;
@@ -1571,16 +1461,31 @@ import {
       const toBench = dest === 'bench';
       const shuffleAfter = () => shuffleZone(user, user, 'deck');
       const count = step.count || 1;
+      const upTo = step.upTo === true;
+      const abilityText = card.ability?.text ?? card.abilityText ?? card.text ?? '';
+      const revealPicked = (picked) =>
+        maybeAnnounceSearchReveal(user, card.name, picked, appendMessage, {
+          step,
+          sourceText: abilityText,
+        });
 
-      if (count > 1) {
+      if (count > 1 || upTo) {
         const result = await awaitChoicePicker({
-          title: `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+          title: upTo
+            ? `${card.name} — choose up to ${count} cards to ${toBench ? 'Bench' : 'your hand'}`
+            : `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}`,
           candidates: pool,
+          allCandidates: usingFallback ? null : deck.array,
+          triggerCard: card,
           zoneFrom: 'deck',
           destination: dest,
           multiSelect: true,
-          requiredCount: count,
+          requiredCount: Math.min(count, pool.length),
+          minCount: upTo ? 0 : count,
+          maxCount: count,
+          upTo,
           onConfirm: (selected) => {
+            revealPicked(selected);
             import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
               for (const s of selected) {
                 const idx = getZone(user, 'deck').array.indexOf(s);
@@ -1598,11 +1503,16 @@ import {
       }
 
       const result = await awaitChoicePicker({
-        title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+        title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}`,
         candidates: pool,
+        allCandidates: usingFallback ? null : deck.array,
+        triggerCard: card,
         zoneFrom: 'deck',
         destination: dest,
-        onPick: shuffleAfter,
+        onPick: (picked) => {
+          revealPicked(picked);
+          shuffleAfter();
+        },
         onCancel: () => {
           appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
         },
@@ -1722,14 +1632,45 @@ import {
             await fn(user, true, card, orchestrated);
             executed = true;
           }
+        } else if (item.action === 'discard-cost') {
+          const hand = getZone(user, 'hand');
+          const whatFilter = energySearchWhat({
+            basic: item.step.basic,
+            energyType: item.step.energyType,
+          });
+          const candidates = hand.array.filter((c) => matchesSearch(c, whatFilter));
+          if (!candidates.length) {
+            appendMessage('', '  no matching Energy in hand to pay the cost', 'announcement', false);
+          } else {
+            const result = await awaitChoicePicker({
+              title: `${card.name} — discard ${item.step.count} Energy (cost)`,
+              candidates,
+              zoneFrom: 'hand',
+              destination: 'discard',
+              multiSelect: item.step.count > 1,
+              requiredCount: Math.min(item.step.count, candidates.length),
+              onConfirm: (selected) => {
+                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                  for (const s of selected) {
+                    const idx = getZone(user, 'hand').array.indexOf(s);
+                    if (idx >= 0) moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
+                  }
+                });
+              },
+            });
+            if (result.ok) executed = true;
+          }
         } else if (item.action === 'recursion-discard') {
           const discard = getZone(user, 'discard');
+          const what = item.step.what || 'card';
+          const searchWhat = what === 'card' ? 'a card' : what === 'Pokémon' ? 'a Pokémon' : what;
           const matches = [];
           for (const c of discard.array) {
             await ensureCardData(c);
-            if (isPokemonCard(c) || String(c.name || '').toLowerCase().includes('energy')) {
-              matches.push(c);
-            }
+            if (matchesSearch(c, searchWhat)) matches.push(c);
+          }
+          if (matches.length === 0 && discard.array.length > 0) {
+            appendMessage('', `  no cards in discard match "${searchWhat}"`, 'announcement', false);
           }
           if (matches.length > 0) {
             const upTo = item.step.upTo || 1;
@@ -1742,6 +1683,7 @@ import {
                 multiSelect: true,
                 requiredCount: Math.min(upTo, matches.length),
                 onConfirm: (selected) => {
+                  announceDiscardPick(user, card.name, selected, appendMessage);
                   import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
                     for (const s of selected) {
                       const idx = getZone(user, 'discard').array.indexOf(s);
@@ -1757,6 +1699,9 @@ import {
                 candidates: matches,
                 zoneFrom: 'discard',
                 destination: 'hand',
+                onPick: (picked) => {
+                  announceDiscardPick(user, card.name, picked, appendMessage);
+                },
               });
               if (result.ok) executed = true;
             }
@@ -1897,6 +1842,9 @@ if (!isTrainer) {
                       return;
                     }
             ensureCardData(card).then(() => {
+              // Stadiums are not one-shot Trainers. Playing one onto the board
+              // must not run draw / drawUntil / search as if it were a Supporter.
+              if (isStadiumCard(card)) return;
               const text = [card.effect || card.text || []].flat().join(' ');
               const parsed = parseTrainerEffect(text);
               if (!parsed.recognizable) {
@@ -1913,12 +1861,14 @@ if (!isTrainer) {
     };
 
     const hookTrainerPlay = () => {
+      // Guided trainer/auto-execution runs even when rules enforcement is off
+      // (easier solo testing). Turn gating still applies when rules are on.
       // Instant path: react the same tick a card lands on 'board'.
       document.addEventListener('rules-card-on-board', (event) => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
+        if (rulesState.phase === 'ended') return;
         const { user, card } = event.detail || {};
         if (user !== 'self' || !card) return;
+        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         processBoardCard(card);
       });
 
@@ -1992,8 +1942,8 @@ if (!isTrainer) {
       // the event above — same logic, just on a slow poll so it's never
       // the thing the player is waiting on.
       window.setInterval(() => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
+        if (rulesState.phase === 'ended') return;
+        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         try {
           const board = getZone('self', 'board');
           if (!board?.array) return;

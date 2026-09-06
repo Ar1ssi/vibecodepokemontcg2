@@ -27,7 +27,13 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
       return trimmed || fallback;
     }
     
-    export function createDeckInLibrary(library = {}, name, cards = {}, now = Date.now()) {
+    export function createDeckInLibrary(
+      library = {},
+      name,
+      cards = {},
+      now = Date.now(),
+      options = {}
+    ) {
       const nextLibrary = structuredClone(library);
       const deckId = generateDeckId(nextLibrary.decks);
       nextLibrary.decks[deckId] = {
@@ -36,9 +42,9 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
         createdAt: now,
         updatedAt: now,
         cards: structuredClone(cards),
-        sleeveId: null,
-      coinId: null,
-      matId: null,
+        sleeveId: options.sleeveId ?? null,
+        coinId: options.coinId ?? null,
+        matId: options.matId ?? null,
       };
       nextLibrary.order = [...(nextLibrary.order || []), deckId];
       return { library: nextLibrary, deckId };

@@ -2,6 +2,7 @@ import { reset } from '../../actions/general/reset.js';
 import { systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { processAction } from '../general/process-action.js';
+import { deckDataEquals } from '../general/sync-action-args.mjs';
 import { changePlaymat, getStoredMatId } from '../sizing/apply-mat-layout.js';
 
 export const exchangeData = (
@@ -11,8 +12,8 @@ export const exchangeData = (
   cardBack,
   coachingMode,
   callback = true,
-  emit = true,
-  matId = null
+  matId = null,
+  emit = true
 ) => {
   const flipBoardButton = document.getElementById('flipBoardButton');
   const coachingModeCheckbox = document.getElementById('coachingModeCheckbox');
@@ -25,7 +26,7 @@ export const exchangeData = (
   } else if (user === 'opp') {
     const opponentChanged =
       systemState.p2OppUsername !== username ||
-      systemState.p2OppDeckData !== deckData;
+      !deckDataEquals(systemState.p2OppDeckData, deckData);
     systemState.p2OppUsername = username;
     systemState.p2OppDeckData = deckData;
     systemState.p2OppCardBackSrc = cardBack;
@@ -54,8 +55,8 @@ export const exchangeData = (
         systemState.cardBackSrc,
         coachingModeCheckbox.checked,
         false,
-        true,
-        getStoredMatId('self')
+        getStoredMatId('self'),
+        true
       );
     }
   }

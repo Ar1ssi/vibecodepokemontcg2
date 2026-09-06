@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */
+import { resolveDefaultCardBackSrc } from '../../setup/deck-constructor/default-card-back.mjs';
 import { preloadImage } from '../../setup/general/preload-image.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 export {
@@ -7,6 +8,8 @@ export {
   selfContainerDocument,
   oppContainerDocument,
 } from './containers.js';
+
+const defaultCardBackSrc = resolveDefaultCardBackSrc();
 
 export const version = '1.5.1';
 
@@ -49,13 +52,13 @@ export const systemState = {
   selfDeckData: '',
   p1OppDeckData: '', // refers to the opponent's data in 1 player mode, i.e., the "alt" deck data
   p2OppDeckData: '', // refers to the opponent's data in 2 player mode, i.e., the other player's deck data
-  cardBackSrc: 'https://ptcgsim.online/src/assets/cardback.png',
-  p1OppCardBackSrc: 'https://ptcgsim.online/src/assets/cardback.png',
-  p2OppCardBackSrc: 'https://ptcgsim.online/src/assets/cardback.png',
+  cardBackSrc: defaultCardBackSrc,
+  p1OppCardBackSrc: defaultCardBackSrc,
+  p2OppCardBackSrc: defaultCardBackSrc,
 };
 
 // preload image
-preloadImage('https://ptcgsim.online/src/assets/cardback.png');
+preloadImage(defaultCardBackSrc);
 
 document.body.style.backgroundImage = `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('https://wallpapercave.com/wp/wp10484598.jpg')`;
 document.body.style.backgroundPosition = '-200px 0';

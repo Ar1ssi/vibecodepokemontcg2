@@ -292,7 +292,7 @@ import {
         event.preventDefault();
         const cardId = target.closest('[data-card-id]')?.dataset.cardId;
         const card = cardId ? findCardById(cardId) : null;
-        onPreviewCard?.(target.dataset.previewImage, card);
+        onPreviewCard?.(target.dataset.previewImage, card, target);
       });
     
       return {

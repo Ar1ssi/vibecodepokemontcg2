@@ -57,8 +57,9 @@ const undoAsync = async (user, filteredActionData, emit = true) => {
             )
           : 0;
 
-      if (mostRecentResetAndAfterEntries) {
-        mostRecentResetAndAfterEntries.forEach((data) =>
+      const replay = mostRecentResetAndAfterEntries || filteredActionData;
+      Promise.all(
+        replay.map((data) =>
           acceptAction(
             user,
             data.action,
@@ -66,19 +67,8 @@ const undoAsync = async (user, filteredActionData, emit = true) => {
             false,
             systemState.isReplay
           )
-        );
-      } else {
-        filteredActionData.forEach((data) =>
-          acceptAction(
-            user,
-            data.action,
-            data.parameters,
-            false,
-            systemState.isReplay
-          )
-        );
-      }
-      resolve();
+        )
+      ).then(() => resolve());
     }
     reject('No action data to undo');
   });

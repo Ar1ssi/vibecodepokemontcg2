@@ -42,13 +42,16 @@ import { loadLastSession, saveLastSession } from '../../../setup/deck-builder/co
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
 import { updateReadyButtons } from '../../../actions/general/ready.js';
+import {
+  LEGACY_DEFAULT_CARD_BACK_SRC,
+  resolveDefaultCardBackSrc,
+} from '../../../setup/deck-constructor/default-card-back.mjs';
     
     import {
-      buildHoloCard,
-      resolveHoloEffect,
-      startHoloAnimation,
-      stopHoloAnimation,
-    } from '../../../setup/deck-builder/core/holo.mjs';
+  closeCardPreview,
+  openFloatingCardPreview,
+} from '../../../setup/image-logic/full-view.js';
+import { toHighResCardImageUrl } from '../../../setup/image-logic/card-image-url.mjs';
 
 const deckToSimRows = (deck = {}) => {
   const rows = [];
@@ -158,7 +161,7 @@ export const initializeNativeDeckBuilder = () => {
           const deck = activeId && lib?.decks?.[activeId];
           const sleeveId = deck?.sleeveId;
           const sleeve = sleeveId ? getSleeves().find((s) => s.id === sleeveId) : null;
-          const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
+          const fallback = resolveDefaultCardBackSrc();
           const image = sleeve?.image || fallback;
           import('../../../setup/deck-constructor/import.js').then(({ changeCardBack }) => {
             changeCardBack(currentLoadTarget, image, false);
@@ -234,7 +237,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         },
         // Deferred so this object can be built before showCardPreview is
         // declared below (it is referenced lazily, at call time).
-        onPreviewCard: (imageUrl, card) => showCardPreview(imageUrl, card),
+        onPreviewCard: (imageUrl, card, sourceEl) =>
+          showCardPreview(imageUrl, card, sourceEl),
       });
     
       const switchMode = (mode) => {
@@ -404,12 +408,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // is immediately visible.
           const applySleeveToPlaymat = (image, target = 'self') => {
             try {
-              const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
+              const fallback = resolveDefaultCardBackSrc();
               // when no sleeve is set for this deck, fall back to whatever
               // this player's own card back already is — never borrow the
               // default and never touch the other player's playmat
               const resolvedTarget = image || getCardBackForTarget(target) || fallback;
-              const knownBacks = [systemState.cardBackSrc, systemState.p1OppCardBackSrc, systemState.p2OppCardBackSrc, fallback];
+              const knownBacks = [
+                systemState.cardBackSrc,
+                systemState.p1OppCardBackSrc,
+                systemState.p2OppCardBackSrc,
+                fallback,
+                LEGACY_DEFAULT_CARD_BACK_SRC,
+              ];
               const containerId = target === 'opp' ? 'oppContainer' : 'selfContainer';
               const doc = document.getElementById(containerId)?.contentWindow?.document;
               if (!doc) return;
@@ -613,7 +623,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         refreshMatSelection();
       };
 
-let activeHoloStop = null;
       // cache the preview holder while the image is still in the DOM — after
       // replaceChildren the image's parentElement becomes null
       const previewHolder = previewImage?.parentElement || null;
@@ -635,36 +644,37 @@ let activeHoloStop = null;
         }
       };
     
-      const showCardPreview = async (imageUrl, card = null) => {
-        if (!previewScrim || !previewImage || !imageUrl) return;
-        if (activeHoloStop) {
-          activeHoloStop();
-          activeHoloStop = null;
+      const deckBuilderSleeveSrc = () => {
+        const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
+        const sleeve = sleeveId
+          ? getSleeves().find((entry) => entry.id === sleeveId)
+          : null;
+        return (
+          sleeve?.image ||
+          systemState.cardBackSrc ||
+          'https://ptcgsim.online/src/assets/cardback.png'
+        );
+      };
+
+      const showCardPreview = async (imageUrl, card = null, sourceEl = null) => {
+        if (!imageUrl) return;
+        if (card?.id && !card.rarity) {
+          card = { ...card, rarity: await fetchRarity(card.id) };
         }
-        previewScrim.removeAttribute('hidden');
-    
-        let effect = null;
-        if (card?.id) {
-          const rarity = card.rarity || (await fetchRarity(card.id));
-          effect = resolveHoloEffect({ rarity });
-        }
-    
-        const holder = previewHolder;
-        if (effect) {
-          const cardEl = buildHoloCard(imageUrl, effect);
-          holder.replaceChildren(cardEl);
-          activeHoloStop = startHoloAnimation(cardEl);
-        } else {
-          previewImage.src = imageUrl;
-          holder.replaceChildren(previewImage);
-        }
+        const origin =
+          sourceEl?.querySelector?.('img.native-deck-builder-result-image') ||
+          sourceEl?.querySelector?.('img') ||
+          sourceEl;
+        openFloatingCardPreview({
+          sourceEl: origin || previewImage,
+          imageUrl: toHighResCardImageUrl(imageUrl),
+          card,
+          sleeveSrc: deckBuilderSleeveSrc(),
+        });
       };
     
       const hideCardPreview = () => {
-        if (activeHoloStop) {
-          activeHoloStop();
-          activeHoloStop = null;
-        }
+        closeCardPreview(null, false);
         if (!previewScrim) return;
         previewScrim.setAttribute('hidden', '');
         const holder = previewHolder;
@@ -686,7 +696,7 @@ let activeHoloStop = null;
         event.preventDefault();
         const index = target.dataset.resultIndex;
         const card = index !== undefined ? currentResults[Number(index)] : null;
-        showCardPreview(target.dataset.previewImage, card);
+        showCardPreview(target.dataset.previewImage, card, target);
       });
   }
 
@@ -703,7 +713,7 @@ let activeHoloStop = null;
           const index = row ? Number(row.dataset.deckRowIndex) : -1;
           const sortedCards = getSortedDeckCardArray(deck);
           const card = index >= 0 ? sortedCards[index] : null;
-          showCardPreview(target.dataset.previewImage, card);
+          showCardPreview(target.dataset.previewImage, card, target);
         });
   }
 

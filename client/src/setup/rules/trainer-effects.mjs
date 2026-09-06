@@ -139,6 +139,20 @@ export function parseSearchDeckParams(lower) {
   let what = 'card';
   let count = 1;
   let destination = 'hand';
+  const reveal = /\breveal\b/.test(lower);
+  if (
+    lower.includes('onto your bench') ||
+    lower.includes('put it onto your bench') ||
+    lower.includes('put them onto your bench')
+  ) {
+    destination = 'bench';
+  } else if (
+    lower.includes('attach them to') ||
+    lower.includes('attach them to 1') ||
+    (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
+  ) {
+    destination = 'attach';
+  }
 
   if (lower.includes('item card and a pokémon tool card')) {
     return { what: 'Item + Pokémon Tool', count: 1, destination: 'hand' };
@@ -178,6 +192,20 @@ export function parseSearchDeckParams(lower) {
   const basicEnergyHand = lower.match(/search your deck for up to\s+(\d+)\s+basic energy cards/);
   if (basicEnergyHand && lower.includes('into your hand')) {
     return { what: 'Basic Energy', count: Number(basicEnergyHand[1]), destination: 'hand', upTo: true };
+  }
+
+  const typedHpBench = lower.match(
+    /search your deck for up to\s+(\d+)\s+\{([a-z])\}\s+pok[ée]mon(?:\s+cards?)?(?:\s+with\s+(\d+)\s+hp\s+or\s+less)?/
+  );
+  if (typedHpBench && lower.includes('onto your bench')) {
+    const sym = typedHpBench[2].toUpperCase();
+    const hp = typedHpBench[3];
+    return {
+      what: hp ? `Basic {${sym}} Pokémon ≤${hp} HP` : `Basic {${sym}} Pokémon`,
+      count: Number(typedHpBench[1]),
+      destination: 'bench',
+      upTo: true,
+    };
   }
 
   // up to N Basic Pokémon → bench WITH an HP cap (trainers e.g. Nest Ball-style)
@@ -220,17 +248,26 @@ export function parseSearchDeckParams(lower) {
   // Energy before generic Pokémon fallback (Misty's Vitality, etc.)
   else if (/up to\s+(\d+)\s+basic\s+\{[a-z]\}\s+energy/.test(lower)) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+(\{[a-z]\})\s+energy/);
-    what = `Basic ${m[2].toUpperCase()} Energy`;
-    count = Number(m[1]);
-  } else if (lower.includes('up to 7') && lower.includes('energy')) {
-    what = 'Basic Energy';
-    count = 7;
+    return {
+      what: `Basic ${m[2].toUpperCase()} Energy`,
+      count: Number(m[1]),
+      destination,
+      upTo: true,
+      ...(reveal ? { reveal: true } : {}),
+    };
   } else if (/up to\s+(\d+)\s+basic\s+energy/.test(lower)) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+energy/);
-    what = 'Basic Energy';
-    count = Number(m[1]);
+    return {
+      what: 'Basic Energy',
+      count: Number(m[1]),
+      destination,
+      upTo: true,
+      ...(reveal ? { reveal: true } : {}),
+    };
   } else if (lower.includes('basic') && lower.includes('energy') && !lower.includes('or')) {
     const typed = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
+    const countMatch = lower.match(/up to\s+(\d+)/);
+    if (countMatch) count = Number(countMatch[1]);
     what = typed ? `Basic ${typed[1].toUpperCase()} Energy` : 'Basic Energy';
   } else if (lower.includes('up to 4') && lower.includes('pokémon')) {
     what = 'Pokémon';
@@ -239,15 +276,13 @@ export function parseSearchDeckParams(lower) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
-  if (
-    lower.includes('attach them to') ||
-    lower.includes('attach them to 1') ||
-    (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
-  ) {
-    destination = 'attach';
-  }
-
-  return { what, count, destination };
+  return {
+    what,
+    count,
+    destination,
+    ...(/search your deck for up to\s+\d+/.test(lower) ? { upTo: true } : {}),
+    ...(reveal ? { reveal: true } : {}),
+  };
 }
 
 function parseCoinFlipStep(lower) {
@@ -354,8 +389,8 @@ export function parseTrainerEffect(text = '') {
 
   // search deck → hand/bench/attach (with optional discard cost)
   if (lower.includes('search your deck for')) {
-    const { what, count, destination } = parseSearchDeckParams(lower);
-    steps.push({ type: 'searchDeck', what, count, destination });
+    const parsed = parseSearchDeckParams(lower);
+    steps.push({ type: 'searchDeck', ...parsed });
     appendDiscardCost(steps, lower);
     // Compound effects: search-then-draw is common; append the trailing draw
     appendTrailingDraw(steps, lower);
@@ -484,6 +519,15 @@ export function parseTrainerEffect(text = '') {
     const oppDraw = lower.match(/your opponent draws?\s+(\d+)\s+cards?/i);
     if (oppDraw) steps.push({ type: 'opponentDraw', count: Number(oppDraw[1]) });
     return { steps, recognizable: true };
+  }
+
+  // Stadium once-per-turn text is not a one-shot trainer. Must beat drawUntil
+  // (Mesagoza: "once during each player's turn … draw cards until you have 3").
+  if (
+    /once during (?:each|either) player/.test(lower) ||
+    (/once per turn/.test(lower) && /that player may/.test(lower))
+  ) {
+    return { steps: [{ type: 'passive', detail: passiveDetail(lower) }], recognizable: true };
   }
 
   // draw until you have N (standalone — Iris's Fighting Spirit, Ariana)
