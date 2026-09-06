@@ -211,6 +211,51 @@ const updateSelectionUI = (state) => {
     const count = selected.size;
     state.doneBtn.disabled = count < state.minCount || count > state.maxCount;
   }
+  renderSlotCards(state);
+};
+
+const renderSlotCards = (state) => {
+  if (!state.slotStack) return;
+  state.slotStack.replaceChildren();
+  const cardsInSlot = state.multiSelect
+    ? Array.from(state.selected)
+    : state.slotCard
+      ? [state.slotCard]
+      : [];
+  for (const card of cardsInSlot) {
+    const wrap = document.createElement('div');
+    wrap.className = 'card-picker-slot-card';
+    const img = document.createElement('img');
+    img.src =
+      card?.image?.src ||
+      (typeof card?.image === 'string' ? card.image : '') ||
+      '';
+    img.alt = card?.name ?? '';
+    img.draggable = false;
+    wrap.appendChild(img);
+    state.slotStack.appendChild(wrap);
+  }
+  state.dropSlot?.classList.toggle('has-cards', cardsInSlot.length > 0);
+};
+
+const isPointInDropSlot = (state, x, y) => {
+  if (!state.dropSlot) return false;
+  const rect = state.dropSlot.getBoundingClientRect();
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+};
+
+const addFocusedCardToSlot = (state) => {
+  const card = state.cards[state.index];
+  if (!card) return;
+  if (state.multiSelect) {
+    if (state.selected.has(card)) state.selected.delete(card);
+    else if (state.selected.size < state.maxCount) state.selected.add(card);
+    updateSelectionUI(state);
+    layoutStack(state);
+    return;
+  }
+  state.slotCard = card;
+  renderSlotCards(state);
 };
 
 const layoutStack = (state) => {
@@ -340,7 +385,7 @@ const confirmPicker = async (state) => {
     picks = Array.from(selected);
     if (picks.length < state.minCount || picks.length > state.maxCount) return;
   } else {
-    picks = [cards[index]];
+    picks = [state.slotCard ?? cards[index]];
   }
 
   if (!pickOnly && zoneFrom && destination) {
@@ -410,7 +455,7 @@ const setCandidateList = (state, candidates) => {
 
 const isSwipeBlockedTarget = (target) =>
   target.closest(
-    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, button, a'
+    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-top-bar, button, a'
   );
 
 const attachSwipe = (state) => {
@@ -419,8 +464,15 @@ const attachSwipe = (state) => {
   let startY = 0;
   let tracking = false;
   let dragging = false;
+  let gesture = 'pending';
+  let ghost = null;
 
   const blockNativeDrag = (event) => event.preventDefault();
+
+  const cleanupGhost = () => {
+    ghost?.remove();
+    ghost = null;
+  };
 
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
@@ -429,6 +481,7 @@ const attachSwipe = (state) => {
     tracking = true;
     state.tracking = true;
     dragging = false;
+    gesture = 'pending';
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
@@ -442,11 +495,42 @@ const attachSwipe = (state) => {
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
 
+    if (gesture === 'pending' && Math.hypot(dx, dy) >= SWIPE_LOCK_PX) {
+      if (
+        state.mode !== 'browse' &&
+        state.dropSlot &&
+        Math.abs(dy) >= Math.abs(dx) * 0.85
+      ) {
+        gesture = 'cardDrag';
+        const slide = state.slides[state.index];
+        const cardNode =
+          slide?.querySelector('.discard-pile-card, .mat-holo') ?? slide;
+        if (cardNode) {
+          ghost = cardNode.cloneNode(true);
+          ghost.classList.add('card-picker-drag-ghost');
+          document.body.appendChild(ghost);
+        }
+      } else if (Math.abs(dx) > Math.abs(dy) * 1.1) {
+        gesture = 'swipe';
+      }
+    }
+
+    if (gesture === 'cardDrag') {
+      event.preventDefault();
+      if (ghost) {
+        ghost.style.left = `${event.clientX}px`;
+        ghost.style.top = `${event.clientY}px`;
+      }
+      return;
+    }
+
     if (
+      gesture !== 'cardDrag' &&
       !dragging &&
       Math.abs(dx) >= SWIPE_LOCK_PX &&
       Math.abs(dx) > Math.abs(dy) * 1.1
     ) {
+      gesture = 'swipe';
       dragging = true;
       stage.classList.add('is-dragging');
       stack.classList.add('is-dragging');
@@ -462,34 +546,43 @@ const attachSwipe = (state) => {
   const endSwipe = (event) => {
     if (!tracking || state.pointerId !== event.pointerId) return;
     const wasDragging = dragging;
+    const wasCardDrag = gesture === 'cardDrag';
     tracking = false;
     state.tracking = false;
     dragging = false;
+    gesture = 'pending';
     stage.classList.remove('is-dragging');
     stack.classList.remove('is-dragging');
 
-    const dx = event.clientX - startX;
-    const dy = event.clientY - startY;
-    const horizontal =
-      wasDragging &&
-      Math.abs(dx) >= SWIPE_THRESHOLD &&
-      Math.abs(dx) > Math.abs(dy);
-
-    if (horizontal) {
-      goToIndex(state, state.index + (dx > 0 ? 1 : -1));
-    } else if (!wasDragging && state.multiSelect) {
-      toggleSelection(state);
-    } else if (!wasDragging && !state.multiSelect && state.mode !== 'browse') {
-      confirmPicker(state);
+    if (wasCardDrag) {
+      if (isPointInDropSlot(state, event.clientX, event.clientY)) {
+        addFocusedCardToSlot(state);
+      }
+      cleanupGhost();
     } else {
-      state.targetDragPx = 0;
-      stack.classList.add('is-dragging');
-      stage.classList.add('is-dragging');
-      startDragLoop(state);
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      const horizontal =
+        wasDragging &&
+        Math.abs(dx) >= SWIPE_THRESHOLD &&
+        Math.abs(dx) > Math.abs(dy);
+
+      if (horizontal) {
+        goToIndex(state, state.index + (dx > 0 ? 1 : -1));
+      } else if (!wasDragging && state.mode !== 'browse') {
+        if (isPointInDropSlot(state, event.clientX, event.clientY)) {
+          addFocusedCardToSlot(state);
+        }
+      } else {
+        state.targetDragPx = 0;
+        stack.classList.add('is-dragging');
+        stage.classList.add('is-dragging');
+        startDragLoop(state);
+      }
     }
 
     state.pointerId = null;
-    if (wasDragging) event.preventDefault();
+    if (wasDragging || wasCardDrag) event.preventDefault();
     event.stopPropagation();
     try {
       stage.releasePointerCapture(event.pointerId);
@@ -551,6 +644,8 @@ export const openCardPicker = async ({
   const overlay = document.createElement('div');
   overlay.className = 'card-picker-overlay discard-pile-overlay';
   overlay.id = 'cardPickerOverlay';
+  if (isBrowse) overlay.classList.add('card-picker-browse');
+  else overlay.classList.add('card-picker-choose');
 
   const filters = document.createElement('div');
   filters.className = 'card-picker-filters';
@@ -565,9 +660,6 @@ export const openCardPicker = async ({
     allBtn.textContent = `ALL ${allCandidates.length}`;
     filters.append(validBtn, allBtn);
   }
-
-  const main = document.createElement('div');
-  main.className = 'card-picker-main';
 
   const stage = document.createElement('div');
   stage.className = 'discard-pile-stage card-picker-stage';
@@ -587,23 +679,9 @@ export const openCardPicker = async ({
   nextBtn.setAttribute('aria-label', 'Next card');
   nextBtn.textContent = '›';
 
-  const triggerSlot = document.createElement('div');
-  triggerSlot.className = 'card-picker-trigger-slot';
-
   stage.append(stack, nextBtn);
   if (candidates.length > 1) stage.appendChild(prevBtn);
-  main.append(stage, triggerSlot);
 
-  const meta = document.createElement('div');
-  meta.className = 'discard-pile-footer card-picker-meta';
-  const countEl = document.createElement('span');
-  countEl.className = 'discard-pile-count';
-  const nameEl = document.createElement('span');
-  nameEl.className = 'discard-pile-name';
-  meta.append(countEl, nameEl);
-
-  const actionBar = document.createElement('div');
-  actionBar.className = 'card-picker-action-bar';
   const instructionEl = document.createElement('div');
   instructionEl.className = 'card-picker-instruction';
   instructionEl.textContent = title;
@@ -613,12 +691,66 @@ export const openCardPicker = async ({
   doneBtn.className = 'card-picker-done';
   doneBtn.textContent = isBrowse ? 'Close' : 'Done';
 
+  const countEl = document.createElement('span');
+  countEl.className = 'discard-pile-count';
+  const nameEl = document.createElement('span');
+  nameEl.className = 'discard-pile-name';
+
+  let main = null;
+  let triggerSlot = null;
+  let dropSlot = null;
+  let slotStack = null;
+  let topBar = null;
+  let actionBar = null;
+  let meta = null;
+
   if (isBrowse) {
+    main = document.createElement('div');
+    main.className = 'card-picker-main card-picker-main--browse';
+    main.appendChild(stage);
+
+    meta = document.createElement('div');
+    meta.className = 'discard-pile-footer card-picker-meta';
+    meta.append(countEl, nameEl);
+
+    actionBar = document.createElement('div');
+    actionBar.className = 'card-picker-action-bar';
     actionBar.append(instructionEl, doneBtn);
+
     overlay.append(filters, main, meta, actionBar);
   } else {
-    actionBar.append(instructionEl, doneBtn);
-    overlay.append(filters, main, actionBar, meta);
+    topBar = document.createElement('div');
+    topBar.className = 'card-picker-top-bar';
+    topBar.append(instructionEl, doneBtn);
+
+    main = document.createElement('div');
+    main.className = 'card-picker-workspace';
+
+    const row = document.createElement('div');
+    row.className = 'card-picker-row';
+
+    const carouselCol = document.createElement('div');
+    carouselCol.className = 'card-picker-carousel-col';
+    carouselCol.appendChild(stage);
+
+    triggerSlot = document.createElement('div');
+    triggerSlot.className = 'card-picker-trigger-slot';
+
+    row.append(carouselCol, triggerSlot);
+    main.appendChild(row);
+
+    dropSlot = document.createElement('div');
+    dropSlot.className = 'card-picker-drop-slot';
+    slotStack = document.createElement('div');
+    slotStack.className = 'card-picker-slot-stack';
+    dropSlot.appendChild(slotStack);
+    main.appendChild(dropSlot);
+
+    meta = document.createElement('div');
+    meta.className = 'card-picker-meta card-picker-meta--choose';
+    meta.append(countEl, nameEl);
+
+    overlay.append(filters, topBar, main, meta);
   }
 
   document.body.appendChild(overlay);
@@ -653,6 +785,10 @@ export const openCardPicker = async ({
     onConfirm,
     onCancel,
     triggerHoloWrapper: null,
+    triggerSlot,
+    dropSlot,
+    slotStack,
+    slotCard: null,
     onKeyDown: null,
     allCandidates,
     filteredCandidates: candidates,
