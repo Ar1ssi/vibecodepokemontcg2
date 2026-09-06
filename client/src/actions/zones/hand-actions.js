@@ -9,13 +9,14 @@ import { shuffleZone } from './shuffle-zone.js';
 
 // Draw starting hand of 7 and prize 6
 export const drawHand = (user, initiator) => {
+  const moveOpts = systemState.syncReplaying ? { syncReplay: true } : {};
   const drawAmount = Math.min(7, getZone(user, 'deck').getCount());
   for (let i = 0; i < drawAmount; i++) {
-    moveCard(user, initiator, 'deck', 'hand', 0);
+    moveCard(user, initiator, 'deck', 'hand', 0, false, moveOpts);
   }
   const prizeAmount = Math.min(6, getZone(user, 'deck').getCount());
   for (let i = 0; i < prizeAmount; i++) {
-    moveCard(user, initiator, 'deck', 'prizes', 0);
+    moveCard(user, initiator, 'deck', 'prizes', 0, false, moveOpts);
   }
 };
 

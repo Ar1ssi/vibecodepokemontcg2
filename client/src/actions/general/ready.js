@@ -98,6 +98,10 @@ export const readyUp = (user, emit = true) => {
   }
 
   if (systemState.selfReady && systemState.oppReady) {
+    if (systemState.syncReplaying) {
+      updateReadyButtons();
+      return;
+    }
     systemState.selfReady = false;
     systemState.oppReady = false;
     appendMessage(

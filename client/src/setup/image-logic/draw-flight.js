@@ -1,7 +1,9 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
+  systemState,
 } from '../../state.js';
+import { shouldAnimateDrawFlight } from '../general/sync-replay.mjs';
 import {
   cardBackSrcForUser,
   cardNode,
@@ -132,6 +134,13 @@ const startDrawToHand = (user, card, fromRect) => {
 // into the hand, and flips sleeve → face.
 export const playDrawToHand = (user, card, { fromRect } = {}) => {
   if (!card?.image || typeof document === 'undefined') return;
+  if (
+    !shouldAnimateDrawFlight({
+      syncReplaying: !!systemState.syncReplaying,
+    })
+  ) {
+    return;
+  }
   hideForFlight(card);
   const wait = Math.max(0, nextStartAt - performance.now());
   nextStartAt = performance.now() + wait + STAGGER_MS;

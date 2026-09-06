@@ -27,11 +27,13 @@ import {
   logSync,
 } from '../../setup/general/sync-logger-bridge.js';
 import { hashUserBoard } from '../../setup/zones/board-hash.js';
+import { shouldRequestHashResync } from '../../setup/general/sync-replay.mjs';
 
 let isImporting = false;
 let syncCheckInterval;
 let spectatorActionInterval;
 let pushActionQueue = Promise.resolve();
+let lastHashResyncKey = null;
 export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
   clearInterval(spectatorActionInterval);
@@ -306,29 +308,51 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (!notSpectator) return;
-    if (data.counter >= parseInt(systemState.oppCounter) + 1) {
-      logSync('syncCheck.gap', {
-        peerSelfCounter: data.counter,
-        localOppCounter: systemState.oppCounter,
-      }, 'in');
-      socket.emit('resyncActions', {
-        roomId: systemState.roomId,
-        counter: systemState.oppCounter,
-        reason: 'gap',
-      });
-      return;
-    }
-    if (data.boardHash && data.boardHash !== hashUserBoard('opp')) {
-      logSync('syncCheck.hash', {
-        peerSelfCounter: data.counter,
-        localOppCounter: systemState.oppCounter,
-      }, 'in');
-      socket.emit('resyncActions', {
-        roomId: systemState.roomId,
-        counter: systemState.oppCounter,
-        reason: 'hash',
-      });
-    }
+    // Wait for in-flight pushAction / catch-up applies so we don't hash a
+    // half-updated opp board (that race requested a looping fullReplay).
+    pushActionQueue = pushActionQueue.then(() => {
+      if (systemState.syncReplaying) return;
+      if (data.counter >= parseInt(systemState.oppCounter) + 1) {
+        logSync('syncCheck.gap', {
+          peerSelfCounter: data.counter,
+          localOppCounter: systemState.oppCounter,
+        }, 'in');
+        socket.emit('resyncActions', {
+          roomId: systemState.roomId,
+          counter: systemState.oppCounter,
+          reason: 'gap',
+        });
+        return;
+      }
+      if (data.boardHash && data.boardHash !== hashUserBoard('opp')) {
+        const { request, key } = shouldRequestHashResync(
+          lastHashResyncKey,
+          data.counter,
+          systemState.oppCounter
+        );
+        if (!request) {
+          logSync(
+            'syncCheck.hash.repeat',
+            {
+              peerSelfCounter: data.counter,
+              localOppCounter: systemState.oppCounter,
+            },
+            'in'
+          );
+          return;
+        }
+        lastHashResyncKey = key;
+        logSync('syncCheck.hash', {
+          peerSelfCounter: data.counter,
+          localOppCounter: systemState.oppCounter,
+        }, 'in');
+        socket.emit('resyncActions', {
+          roomId: systemState.roomId,
+          counter: systemState.oppCounter,
+          reason: 'hash',
+        });
+      }
+    });
   });
   // socket.on('exchangeData', (data) => {
   //     exchangeData(data.user, data.username, data.deckData, data.emit);

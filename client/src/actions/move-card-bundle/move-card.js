@@ -4,6 +4,7 @@ import {
   originRectForHandFlight,
   playDrawToHand,
 } from '../../setup/image-logic/draw-flight.js';
+import { shouldAnimateDrawFlight } from '../../setup/general/sync-replay.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { closePopups, deselectCard } from '../general/close-popups.js';
 import { updateCount } from '../general/count.js';
@@ -472,7 +473,13 @@ export const moveCard = async (
         : null;
       dZone.element.appendChild(movingCard.image);
       if (['hand', 'prizes', 'discard', 'lostZone'].includes(dZoneId)) hydrateHolo(movingCard);
-      if (handFlight) {
+      if (
+        handFlight &&
+        shouldAnimateDrawFlight({
+          syncReplay,
+          syncReplaying: !!systemState.syncReplaying,
+        })
+      ) {
         playDrawToHand(user, movingCard, { fromRect: flightOrigin });
       }
     }
