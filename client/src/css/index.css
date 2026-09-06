@@ -1683,7 +1683,6 @@ ul, li {
 }
 .card-preview-overlay.is-closing {
   background-color: transparent;
-  pointer-events: none;
   cursor: default;
 }
 .card-preview-pop {
@@ -1757,6 +1756,12 @@ ul, li {
 .card-preview-face--front > .mat-holo.card-preview-card img {
   display: block;
   object-fit: cover;
+}
+.card-preview-overlay.is-closing .card-preview-pop,
+.card-preview-overlay.is-closing .card-preview-face--front,
+.card-preview-overlay.is-closing .card-preview-face--front > img.card-preview-card,
+.card-preview-overlay.is-closing .card-preview-face--front > .mat-holo.card-preview-card {
+  pointer-events: none;
 }
 
 /* Custom card modal */

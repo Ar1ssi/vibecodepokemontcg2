@@ -227,10 +227,13 @@ export const openFloatingCardPreview = ({
     card: null,
     wrapper,
     mode: 'float',
+    closing: false,
     onClosed,
   };
 
   overlay.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     if (event.target === overlay) {
       closeCardPreview(event);
     }
@@ -239,20 +242,29 @@ export const openFloatingCardPreview = ({
 
 export const closeCardPreview = (event, immediate = false) => {
   if (!cardPreviewState) return;
-  if (event?.target && cardPreviewState.overlay.contains(event.target)) {
-    if (event.target !== cardPreviewState.overlay) return;
+  event?.stopPropagation?.();
+  if (
+    event?.target &&
+    cardPreviewState.overlay.contains(event.target) &&
+    event.target !== cardPreviewState.overlay &&
+    !cardPreviewState.closing
+  ) {
+    return;
   }
+  if (cardPreviewState.closing && !immediate) return;
 
   const state = cardPreviewState;
-  cardPreviewState = null;
+  state.closing = true;
   state.overlay.classList.add('is-closing');
 
   const revert = () => {
+    if (cardPreviewState === state) cardPreviewState = null;
     state.overlay.remove();
     state.onClosed?.();
   };
 
   if (immediate) {
+    cardPreviewState = null;
     stopPop(state.popHost);
     revert();
   } else {
