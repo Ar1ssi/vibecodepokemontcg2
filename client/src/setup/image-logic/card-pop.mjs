@@ -6,12 +6,13 @@
 //   translate    → viewport center − card center
 //   rotateY      → 360° on every open (horizontal spin)
 // Spring settings are springPopoverSettings: { stiffness: 0.033, damping: 0.45 }.
-// Retreat uses { soft: true } so the card eases back instead of slamming.
+// Retreat uses a snappier spring and spins rotateY 360° → 0.
 //
 // Rotate lives on `.card-preview-flip` (not the host) so the 3D sleeve back
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
+const RETREAT_SPRING = { stiffness: 0.18, damping: 0.72, precision: 0.01 };
 const PREVIEW_MAX_WIDTH = 780;
 const PREVIEW_WIDTH_FIT = 0.94;
 const PREVIEW_HEIGHT_FIT = 0.88;
@@ -49,6 +50,7 @@ const createSpring = (initial, opts) => {
   let invMass = 1;
   let invMassRecoveryRate = 0;
   let currentToken = 0;
+  let runOpts = options;
   const listeners = new Set();
   let pending = [];
 
@@ -66,7 +68,7 @@ const createSpring = (initial, opts) => {
     invMass = Math.min(invMass + invMassRecoveryRate, 1);
     const ctx = {
       inv_mass: invMass,
-      opts: options,
+      opts: runOpts,
       settled: true,
       dt: ((now - lastTime) * 60) / 1000,
     };
@@ -94,6 +96,12 @@ const createSpring = (initial, opts) => {
       targetValue = next;
       currentToken += 1;
       const token = currentToken;
+      runOpts = {
+        ...options,
+        stiffness: setOpts.stiffness ?? options.stiffness,
+        damping: setOpts.damping ?? options.damping,
+        precision: setOpts.precision ?? options.precision,
+      };
       if (setOpts.hard) {
         if (rafId != null) cancelAnimationFrame(rafId);
         rafId = null;
@@ -107,6 +115,9 @@ const createSpring = (initial, opts) => {
         const rate = setOpts.soft === true ? 0.5 : +setOpts.soft;
         invMassRecoveryRate = 1 / (rate * 60);
         invMass = 0;
+      } else {
+        invMass = 1;
+        invMassRecoveryRate = 0;
       }
       if (rafId == null) {
         lastTime = performance.now();
@@ -212,12 +223,10 @@ export const createPopoverMotion = (host, { homeScale = 1 } = {}) => {
       return Promise.all([translate.set(delta), scale.set(endScale)]);
     },
     retreat() {
-      // 360° and 0° look the same; don't unwind a full reverse spin or the
-      // overlay waits ~2s after the card is already home.
-      rotateDelta.set(0, { hard: true });
       return Promise.all([
-        scale.set(homeScale, { soft: true }),
-        translate.set({ x: 0, y: 0 }, { soft: true }),
+        scale.set(homeScale, RETREAT_SPRING),
+        translate.set({ x: 0, y: 0 }, RETREAT_SPRING),
+        rotateDelta.set(0, RETREAT_SPRING),
       ]);
     },
     reset() {
