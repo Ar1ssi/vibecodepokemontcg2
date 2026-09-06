@@ -521,6 +521,15 @@ export function parseTrainerEffect(text = '') {
     return { steps, recognizable: true };
   }
 
+  // Stadium once-per-turn text is not a one-shot trainer. Must beat drawUntil
+  // (Mesagoza: "once during each player's turn … draw cards until you have 3").
+  if (
+    /once during (?:each|either) player/.test(lower) ||
+    (/once per turn/.test(lower) && /that player may/.test(lower))
+  ) {
+    return { steps: [{ type: 'passive', detail: passiveDetail(lower) }], recognizable: true };
+  }
+
   // draw until you have N (standalone — Iris's Fighting Spirit, Ariana)
   if (lower.includes('draw cards until you have')) {
     const all = [...lower.matchAll(/until you have\s+(\d+)\s+cards?/g)].map((x) => Number(x[1]));

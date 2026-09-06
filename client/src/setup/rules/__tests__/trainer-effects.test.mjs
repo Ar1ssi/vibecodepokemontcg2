@@ -361,6 +361,15 @@ import test, { describe } from 'node:test';
       assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target === 5));
     });
 
+    test('Mesagoza-style stadium draw-until is passive, not a one-shot drawUntil', () => {
+      const r = parseTrainerEffect(
+        "This Stadium stays in play when you play it. Once during each player's turn, that player may draw cards until they have 3 cards in their hand."
+      );
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'passive');
+    });
+
     test("Team Rocket's Factory: stadium 'once during each player's turn' is passive, NOT a bare draw", () => {
       const r = parseTrainerEffect("Once during each player’s turn, if they played a Supporter card that has “Team Rocket” in its name from their hand this turn, they may draw 2 cards.");
       assert.equal(r.recognizable, true);

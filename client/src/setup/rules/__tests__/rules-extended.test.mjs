@@ -789,11 +789,18 @@ import test from 'node:test';
       assert.equal(r.results[0].n, 2);
     });
 
-    test('parseStadiumSetupDraw: parses draw N or falls back to 1', () => {
+    test('parseStadiumSetupDraw: only the when-you-play sentence, never a default 1', () => {
       assert.equal(parseStadiumSetupDraw({ name: 'Victory Road', text: 'When you play this card, draw 2 cards.' }), 2);
-      assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'When you play this card, do something.' }), 1);
+      assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'When you play this card, do something.' }), null);
       assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'Once per turn, draw 1 card.' }), null);
       assert.equal(parseStadiumSetupDraw(null), null);
+      const boilerplate =
+        'This Stadium stays in play when you play it. Discard it if another Stadium comes into play. Once during each player\'s turn, that player may draw 2 cards.';
+      assert.equal(parseStadiumSetupDraw({ type: 'Stadium', name: 'Mesagoza', text: boilerplate }), null);
+      assert.equal(
+        classifyStadiumEffect({ type: 'Stadium', name: 'Mesagoza', text: boilerplate }),
+        'once-per-turn',
+      );
     });
 
     test('parseStadiumOncePerTurn: buckets draw/search/energy/heal', () => {
