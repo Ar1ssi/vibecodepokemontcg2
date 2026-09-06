@@ -383,7 +383,29 @@ import test, { describe } from 'node:test';
       assert.equal(search.what, 'Basic {R} Energy');
       assert.equal(search.count, 7);
       assert.equal(search.upTo, true);
+      assert.equal(search.reveal, true);
       assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
+    });
+
+    test('maybeAnnounceSearchReveal: skips when effect has no reveal', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      let called = 0;
+      const append = () => { called++; };
+      maybeAnnounceSearchReveal('self', 'Ultra Ball', [{ name: 'Pikachu' }], append, {
+        sourceText: 'Search your deck for a Pokémon and put it into your hand.',
+      });
+      assert.equal(called, 0);
+    });
+
+    test('maybeAnnounceSearchReveal: announces when effect text includes reveal', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      maybeAnnounceSearchReveal('self', 'Firebreather', [{ name: 'Basic Fire Energy' }], append, {
+        sourceText: 'Search your deck for up to 7 Basic {R} Energy cards, reveal them, and put them into your hand.',
+      });
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
     });
 
     test('Firebreather search filter: typed {R} matches Fire only', () => {

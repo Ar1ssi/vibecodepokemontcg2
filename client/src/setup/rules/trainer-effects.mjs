@@ -139,6 +139,7 @@ export function parseSearchDeckParams(lower) {
   let what = 'card';
   let count = 1;
   let destination = 'hand';
+  const reveal = /\breveal\b/.test(lower);
   if (
     lower.includes('onto your bench') ||
     lower.includes('put it onto your bench') ||
@@ -252,6 +253,7 @@ export function parseSearchDeckParams(lower) {
       count: Number(m[1]),
       destination,
       upTo: true,
+      ...(reveal ? { reveal: true } : {}),
     };
   } else if (/up to\s+(\d+)\s+basic\s+energy/.test(lower)) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+energy/);
@@ -260,6 +262,7 @@ export function parseSearchDeckParams(lower) {
       count: Number(m[1]),
       destination,
       upTo: true,
+      ...(reveal ? { reveal: true } : {}),
     };
   } else if (lower.includes('basic') && lower.includes('energy') && !lower.includes('or')) {
     const typed = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
@@ -278,6 +281,7 @@ export function parseSearchDeckParams(lower) {
     count,
     destination,
     ...(/search your deck for up to\s+\d+/.test(lower) ? { upTo: true } : {}),
+    ...(reveal ? { reveal: true } : {}),
   };
 }
 
@@ -385,8 +389,8 @@ export function parseTrainerEffect(text = '') {
 
   // search deck → hand/bench/attach (with optional discard cost)
   if (lower.includes('search your deck for')) {
-    const { what, count, destination, upTo } = parseSearchDeckParams(lower);
-    steps.push({ type: 'searchDeck', what, count, destination, ...(upTo ? { upTo: true } : {}) });
+    const parsed = parseSearchDeckParams(lower);
+    steps.push({ type: 'searchDeck', ...parsed });
     appendDiscardCost(steps, lower);
     // Compound effects: search-then-draw is common; append the trailing draw
     appendTrailingDraw(steps, lower);

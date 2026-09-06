@@ -180,6 +180,7 @@ export function parseAbility(text = '') {
       count,
       destination: dest,
       upTo: parsed.upTo || false,
+      reveal: lower.includes('reveal'),
       guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${dest === 'Bench' ? 'put on Bench' : 'add to hand'}, then shuffle.`,
     });
   }

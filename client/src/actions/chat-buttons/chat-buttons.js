@@ -51,6 +51,7 @@ import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../c
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -1762,6 +1763,12 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   }
 
   const finishSearch = () => shuffleZone(user, user, 'deck');
+  const attackText = atk.text || '';
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal(user, atk.name, picked, appendMessage, {
+      step: searchStep,
+      sourceText: attackText,
+    });
 
   const useMulti = upTo ? effectiveMax >= 1 : effectiveMax > 1;
   const minPick = upTo ? 0 : effectiveMax;
@@ -1783,6 +1790,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         maxCount: effectiveMax,
         upTo,
         onConfirm: (selected) => {
+          revealPicked(selected);
           for (const s of selected) {
             const idx = getZone(user, 'deck').array.indexOf(s);
             if (idx >= 0) {
@@ -1820,6 +1828,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       zoneFrom: 'deck',
       destination: destZone,
       onPick: (picked) => {
+        revealPicked(picked);
         appendMessage(
           user,
           `🔍 ${atk.name}: ${picked.name || 'a card'} → ${destLabel}.`,
@@ -1890,6 +1899,11 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     shuffleZone(user, user, 'deck');
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal(user, target.name, picked, appendMessage, {
+      step: searchStep,
+      sourceText: abilityText,
+    });
 
   if (count > 1 || upTo) {
     const effectiveMax = upTo ? count : count;
@@ -1905,6 +1919,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
       maxCount: effectiveMax,
       upTo,
       onConfirm: (selected) => {
+        revealPicked(selected);
         for (const s of selected) {
           const idx = getZone(user, 'deck').array.indexOf(s);
           if (idx >= 0) {
@@ -1938,6 +1953,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     zoneFrom: 'deck',
     destination: destZone,
     onPick: (picked) => {
+      revealPicked(picked);
       appendMessage(
         user,
         `🔍 ${target.name} searches: ${picked.name || 'a card'} → ${destLabel}.`,

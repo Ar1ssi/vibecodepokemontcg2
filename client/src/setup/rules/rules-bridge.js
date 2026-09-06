@@ -36,6 +36,7 @@ import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHa
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat } from './search-match.mjs';
+import { maybeAnnounceSearchReveal } from './search-reveal.mjs';
 import {
   describeTypedSpecialEnergy,
   getTelepathicOnAttachSearch,
@@ -1528,6 +1529,12 @@ import {
       const shuffleAfter = () => shuffleZone(user, user, 'deck');
       const count = step.count || 1;
       const upTo = step.upTo === true;
+      const abilityText = card.ability?.text ?? card.abilityText ?? card.text ?? '';
+      const revealPicked = (picked) =>
+        maybeAnnounceSearchReveal(user, card.name, picked, appendMessage, {
+          step,
+          sourceText: abilityText,
+        });
 
       if (count > 1 || upTo) {
         const result = await awaitChoicePicker({
@@ -1543,6 +1550,7 @@ import {
           maxCount: count,
           upTo,
           onConfirm: (selected) => {
+            revealPicked(selected);
             import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
               for (const s of selected) {
                 const idx = getZone(user, 'deck').array.indexOf(s);
@@ -1564,7 +1572,10 @@ import {
         candidates: pool,
         zoneFrom: 'deck',
         destination: dest,
-        onPick: shuffleAfter,
+        onPick: (picked) => {
+          revealPicked(picked);
+          shuffleAfter();
+        },
         onCancel: () => {
           appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
         },

@@ -11,6 +11,7 @@ import { ensureCardData, getStadium } from './rules-state.mjs';
 import { normalizeStage, isRareCandyJump, markEvolvedThisTurn } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
 import { filterSearchMatches } from './search-match.mjs';
+import { maybeAnnounceSearchReveal } from './search-reveal.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -316,6 +317,12 @@ async function runSearchStep(card, searchStep, done) {
     done?.();
     return;
   }
+  const sourceText = card.text || card.effect || '';
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+      step: searchStep,
+      sourceText,
+    });
   // Nest Ball: single Basic → bench
   if (searchStep.destination === 'bench' && searchStep.what === 'Basic Pokémon' && (searchStep.count || 1) === 1) {
     const deck = zone('self', 'deck');
@@ -326,6 +333,7 @@ async function runSearchStep(card, searchStep, done) {
     }
     if (basics.length === 1) {
       const idx = deck.array.indexOf(basics[0]);
+      revealPicked(basics[0]);
       moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
       _shuffleZone('self', 'self', 'deck');
@@ -416,6 +424,7 @@ async function runSearchStep(card, searchStep, done) {
       maxCount: count,
       upTo,
       onConfirm: (selected) => {
+        revealPicked(selected);
         for (const s of selected) {
           const idx = zone('self', 'deck').array.indexOf(s);
           if (idx >= 0) {
@@ -445,6 +454,7 @@ async function runSearchStep(card, searchStep, done) {
     zoneFrom: 'deck',
     destination: toBench ? 'bench' : 'hand',
     onPick: (picked) => {
+      revealPicked(picked);
       if (toAttach) attachEnergyToPokemon(picked);
       else {
         shuffleAfter();
@@ -490,7 +500,11 @@ async function runLookStep(card, step, fromBottom, done) {
     candidates: pool,
     zoneFrom: 'deck',
     destination: step.destination === 'bench' ? 'bench' : 'hand',
-    onPick: () => {
+    onPick: (picked) => {
+      maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+        step,
+        sourceText: card.text || card.effect || '',
+      });
       _shuffleZone('self', 'self', 'deck');
       done?.();
     },
