@@ -66,7 +66,7 @@ export const clearReady = (user) => {
 // Once both players have pressed their Set Up button, the game
 // automatically sets 6 prizes and draws an opening hand of 7 for both
 // players.
-export const readyUp = (user, emit = true) => {
+export const readyUp = async (user, emit = true) => {
   // Local Set Up passes initiator; in 2P the local player always sits in self zones.
   if (emit && systemState.isTwoPlayer && user === systemState.initiator) {
     user = 'self';
@@ -106,11 +106,11 @@ export const readyUp = (user, emit = true) => {
       'announcement',
       false
     );
-    setup('self');
+    await setup('self');
     if (!systemState.isTwoPlayer) {
       // In solo/one-player mode there's no separate opponent client to
       // trigger the mirrored setup, so do it locally for both sides.
-      setup('opp');
+      await setup('opp');
     }
     updateReadyButtons();
     // Let other systems (e.g. the rules engine's turn-order coin flip)

@@ -9,17 +9,22 @@ import { drawHand } from '../zones/hand-actions.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { reset } from './reset.js';
 
-export const setup = (user, indices, emit = true) => {
+export const setup = async (user, indices, emit = true) => {
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'setup', [indices]);
     return;
   }
-  reset(user, true, true, true, false);
+  // Only wipe/rebuild when we have a serialized list. A 2P setup action can
+  // arrive before exchangeData; resetting then would empty the live deck and
+  // skip prizes. Deal from the cards already on the mat in that case.
+  if (determineDeckData(user)) {
+    reset(user, true, true, true, false);
+  }
   const deck = getZone(user, 'deck');
   indices = indices ? indices : shuffleIndices(deck.getCount());
-  if (determineDeckData(user)) {
+  if (deck.getCount() > 0) {
     shuffleZone(user, user, 'deck', indices, false, false);
-    drawHand(user, user);
+    await drawHand(user, user);
     appendMessage(
       user,
       determineUsername(user) + ' drew starting hand and set prizes',
