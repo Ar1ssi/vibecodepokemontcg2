@@ -188,8 +188,8 @@ const applyHostTransform = (host, translate, scale, rotateY) => {
   }
 };
 
-export const createPopoverMotion = (host) => {
-  const scale = createSpring(1, POPOVER_SPRING);
+export const createPopoverMotion = (host, { homeScale = 1 } = {}) => {
+  const scale = createSpring(homeScale, POPOVER_SPRING);
   const translate = createSpring({ x: 0, y: 0 }, POPOVER_SPRING);
   const rotateDelta = createSpring(0, POPOVER_SPRING);
   const paint = () => {
@@ -201,26 +201,27 @@ export const createPopoverMotion = (host) => {
     get rotateTarget() {
       return rotateDelta.target;
     },
-    popover(rect) {
+    get scaleTarget() {
+      return scale.target;
+    },
+    popover(rect, { startScale = homeScale, endScale = 1 } = {}) {
       const delta = centerDeltaFor(rect);
+      scale.set(startScale, { hard: true });
       rotateDelta.set(0, { hard: true });
       rotateDelta.set(POPOVER_SPIN_DEGREES);
-      return Promise.all([
-        translate.set(delta),
-        scale.set(popoverScaleFor(rect)),
-      ]);
+      return Promise.all([translate.set(delta), scale.set(endScale)]);
     },
     retreat() {
       // 360° and 0° look the same; don't unwind a full reverse spin or the
       // overlay waits ~2s after the card is already home.
       rotateDelta.set(0, { hard: true });
       return Promise.all([
-        scale.set(1, { soft: true }),
+        scale.set(homeScale, { soft: true }),
         translate.set({ x: 0, y: 0 }, { soft: true }),
       ]);
     },
     reset() {
-      scale.set(1, { hard: true });
+      scale.set(homeScale, { hard: true });
       translate.set({ x: 0, y: 0 }, { hard: true });
       rotateDelta.set(0, { hard: true });
     },
@@ -248,12 +249,14 @@ export const stopPop = (host) => {
  * with a 360° spin every time. Without `rect`, keep the attached-cards panel
  * on a scale-only spring.
  */
-export const playSelectPop = (host, onFrame, onDone, rect) => {
+export const playSelectPop = (host, onFrame, onDone, rect, motionOpts = {}) => {
   stopPop(host);
   if (rect) {
-    const motion = createPopoverMotion(host);
+    const motion = createPopoverMotion(host, {
+      homeScale: motionOpts.startScale ?? motionOpts.homeScale ?? 1,
+    });
     activePops.set(host, motion);
-    motion.popover(rect).then(() => onDone?.());
+    motion.popover(rect, motionOpts).then(() => onDone?.());
     return;
   }
   const scale = createSpring(0.55, POPOVER_SPRING);

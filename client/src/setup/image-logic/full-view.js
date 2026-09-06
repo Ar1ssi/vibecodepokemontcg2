@@ -1,23 +1,30 @@
-import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
+import {
+  buildHoloCard,
+  resolveHoloEffect,
+  startHoloAnimation,
+} from '../deck-builder/core/holo.mjs';
 import {
   cardBackSrcForUser,
   cardNode,
   fullViewHost,
   hydrateHolo,
   imageAnchor,
+  isCardHidden,
   isInCardPreview,
 } from '../deck-constructor/hydrate-holo.js';
+import { toHighResCardImageUrl } from './card-image-url.mjs';
 import {
   playSelectPop,
   playDeselectPop,
   makePopFrame,
+  previewTargetSize,
   stopPop,
   viewportRectOf,
 } from './card-pop.mjs';
 
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 
-/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement } | null} */
+/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement | null, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement, mode?: 'board' | 'float' } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
@@ -49,6 +56,32 @@ const showCardCounters = (image) => {
   if (image.damageCounter) image.damageCounter.style.display = '';
   if (image.specialCondition) image.specialCondition.style.display = '';
   if (image.abilityCounter) image.abilityCounter.style.display = '';
+};
+
+const applyHighResToImage = (image) => {
+  if (!image?.src) return;
+  const next = toHighResCardImageUrl(image.currentSrc || image.src);
+  if (next && next !== image.src) {
+    image.src = next;
+  }
+};
+
+const placePopHostOnSource = (popHost, sourceRect) => {
+  const target = previewTargetSize();
+  const startScale = Math.min(
+    sourceRect.width / target.width,
+    sourceRect.height / target.height
+  );
+  const left = sourceRect.left + sourceRect.width / 2 - target.width / 2;
+  const top = sourceRect.top + sourceRect.height / 2 - target.height / 2;
+  popHost.style.left = `${left}px`;
+  popHost.style.top = `${top}px`;
+  popHost.style.width = `${target.width}px`;
+  popHost.style.height = `${target.height}px`;
+  return {
+    startScale,
+    hostRect: { left, top, width: target.width, height: target.height },
+  };
 };
 
 const buildPreviewFlip = (frontNode, sleeveSrc) => {
@@ -136,10 +169,11 @@ export const openCardPreview = (targetImage, card) => {
 
   const popHost = document.createElement('div');
   popHost.className = 'card-preview-pop';
-  popHost.style.left = `${rect.left}px`;
-  popHost.style.top = `${rect.top}px`;
-  popHost.style.width = `${rect.width}px`;
-  popHost.style.height = `${rect.height}px`;
+  const { startScale, hostRect } = placePopHostOnSource(popHost, rect);
+
+  if (card && !isCardHidden(card)) {
+    applyHighResToImage(targetImage);
+  }
 
   const frontNode = adoptNode(anchor, document);
   frontNode.classList.add('card-preview-card');
@@ -168,7 +202,7 @@ export const openCardPreview = (targetImage, card) => {
     });
   }
 
-  playSelectPop(popHost, null, null, rect);
+  playSelectPop(popHost, null, null, hostRect, { startScale, endScale: 1 });
 
   cardPreviewState = {
     overlay,
@@ -179,6 +213,73 @@ export const openCardPreview = (targetImage, card) => {
     zoneDoc,
     card,
     wrapper: card?.wrapper ?? wrapper,
+    mode: 'board',
+  };
+
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) {
+      closeCardPreview(event);
+    }
+  });
+};
+
+// Deck-builder search / deck-list preview: clone a high-res card at the
+// thumbnail's seat and run the same 360° spring as the board preview.
+export const openFloatingCardPreview = ({
+  sourceEl,
+  imageUrl,
+  card = null,
+  sleeveSrc = DEFAULT_SLEEVE,
+} = {}) => {
+  if (cardPreviewState) {
+    closeCardPreview(null, true);
+  }
+  if (!sourceEl || !imageUrl) return;
+
+  const rect = viewportRectOf(sourceEl);
+  const overlay = document.createElement('div');
+  overlay.className = 'card-preview-overlay';
+
+  const popHost = document.createElement('div');
+  popHost.className = 'card-preview-pop';
+  const { startScale, hostRect } = placePopHostOnSource(popHost, rect);
+
+  const hiRes = toHighResCardImageUrl(imageUrl);
+  const effect = resolveHoloEffect(card || {});
+  let frontNode;
+  let wrapper;
+  if (effect) {
+    wrapper = buildHoloCard(hiRes, effect);
+    wrapper.classList.add('card-preview-card', 'mat-holo');
+    frontNode = wrapper;
+  } else {
+    frontNode = document.createElement('img');
+    frontNode.className = 'card-preview-card';
+    frontNode.src = hiRes;
+    frontNode.alt = card?.name || '';
+    frontNode.draggable = false;
+  }
+
+  popHost.appendChild(buildPreviewFlip(frontNode, sleeveSrc || DEFAULT_SLEEVE));
+  overlay.appendChild(popHost);
+  document.body.appendChild(overlay);
+
+  if (wrapper) {
+    startPreviewHolo(wrapper);
+  }
+
+  playSelectPop(popHost, null, null, hostRect, { startScale, endScale: 1 });
+
+  cardPreviewState = {
+    overlay,
+    popHost,
+    placeholder: null,
+    anchor: frontNode,
+    host: null,
+    zoneDoc: document,
+    card: null,
+    wrapper,
+    mode: 'float',
   };
 
   overlay.addEventListener('click', (event) => {
@@ -199,6 +300,11 @@ export const closeCardPreview = (event, immediate = false) => {
   state.overlay.classList.add('is-closing');
 
   const revert = () => {
+    if (state.mode === 'float' || !state.placeholder) {
+      state.overlay.remove();
+      return;
+    }
+
     const anchor =
       (state.card ? cardNode(state.card) : null) ?? state.anchor;
     const wrapper =

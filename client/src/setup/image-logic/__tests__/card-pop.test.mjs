@@ -48,6 +48,16 @@ const fakeHost = () => {
   };
 };
 
+test('popover can start from a board-sized scale and grow to 1', () => {
+  const { host } = fakeHost();
+  const motion = createPopoverMotion(host, { homeScale: 0.2 });
+  motion.popover({ left: 0, top: 0, width: 500, height: 700 }, { startScale: 0.2, endScale: 1 });
+  assert.equal(motion.scaleTarget, 1);
+  motion.retreat();
+  assert.equal(motion.scaleTarget, 0.2);
+  motion.stop();
+});
+
 test('popover always targets a 360° spin, including a second open', () => {
   const { host } = fakeHost();
   const motion = createPopoverMotion(host);
