@@ -243,6 +243,8 @@ const updateSelectionUI = (state) => {
 
 const CARD_ASPECT = 1.397;
 const CHOOSE_TOP_GAP = 16;
+const TRIGGER_NUDGE_PX = 10;
+const CHOOSE_PEEK_MAX = 8;
 
 const getPlaymatBounds = () => {
   if (document.body.classList.contains('side-menu-collapsed')) {
@@ -272,15 +274,18 @@ const syncChooseLayout = (state) => {
   const cardW = Math.min(playmat.width * 0.28, 220, cardWFromH);
   const cardH = cardW * CARD_ASPECT;
 
-  const peekSlots = Math.min(Math.max(cardCount - 1, 1), 3);
+  const peekSlots = Math.min(Math.max(cardCount - 1, 1), CHOOSE_PEEK_MAX);
   const leftPeek = cardW * (PEEK_PERCENT / 100) * peekSlots;
   const carouselW = cardW + leftPeek;
-  const topRowW = carouselW + (hasTrigger ? CHOOSE_TOP_GAP + cardW : 0);
+  const triggerNudge = hasTrigger ? TRIGGER_NUDGE_PX : 0;
+  const topRowW =
+    carouselW + (hasTrigger ? CHOOSE_TOP_GAP + triggerNudge + cardW : 0);
 
   const playmatPad = 16;
   let cardGroupLeft = playmatPad;
   if (hasTrigger) {
-    const desiredTriggerRight = playmat.left + playmat.width * 0.72;
+    const desiredTriggerRight =
+      playmat.left + playmat.width * 0.72 + TRIGGER_NUDGE_PX;
     cardGroupLeft = desiredTriggerRight - topRowW;
     const minLeft = playmatPad;
     const maxLeft = playmat.width - playmatPad - topRowW;
@@ -293,6 +298,10 @@ const syncChooseLayout = (state) => {
   state.overlay.style.setProperty('--card-picker-card-h', `${Math.round(cardH)}px`);
   state.overlay.style.setProperty('--card-picker-carousel-w', `${Math.round(carouselW)}px`);
   state.overlay.style.setProperty('--card-picker-top-gap', `${CHOOSE_TOP_GAP}px`);
+  state.overlay.style.setProperty(
+    '--card-picker-trigger-nudge',
+    `${triggerNudge}px`
+  );
   state.overlay.style.setProperty('--card-picker-playmat-w', `${Math.round(playmat.width)}px`);
   state.overlay.style.setProperty('--card-picker-playmat-right', `${Math.round(window.innerWidth - playmat.right)}px`);
 

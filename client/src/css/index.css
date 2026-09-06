@@ -1970,6 +1970,7 @@ ul, li {
   --card-picker-card-h: calc(var(--card-picker-card-w) * 1.397);
   --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.36);
   --card-picker-top-gap: 16px;
+  --card-picker-trigger-nudge: 10px;
   --card-picker-playmat-w: 76vw;
   --card-picker-playmat-right: 24vw;
   --card-picker-slot-gap: 6px;
@@ -2101,6 +2102,8 @@ ul, li {
   isolation: isolate;
   overflow: hidden;
   border-radius: 0.35rem;
+  margin-left: var(--card-picker-trigger-nudge, 10px);
+  animation: card-picker-float 3.2s ease-in-out infinite;
 }
 .card-picker-choose .card-picker-trigger-card,
 .card-picker-choose .card-picker-trigger-holo {
