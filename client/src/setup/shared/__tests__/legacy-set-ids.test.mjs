@@ -5,6 +5,7 @@ const {
   LEGACY_SET_CODE_TO_TCGDEX_ID,
   MODERN_SET_CODE_TO_TCGDEX_ID,
   buildLegacyCardId,
+  buildPreferredCardId,
   buildSetCardIdCandidates,
   resolveTcgdexSetId,
   extractTcgdexIdFromImageUrl,
@@ -19,6 +20,17 @@ test('legacy table maps the codes import.js used to own', () => {
 test('modern table maps Phantasmal Flames (PFL) to me02', () => {
   assert.equal(MODERN_SET_CODE_TO_TCGDEX_ID.PFL, 'me02');
   assert.equal(resolveTcgdexSetId('PFL'), 'me02');
+});
+
+test('modern table maps Pitch Black (PBL) to me05', () => {
+  assert.equal(MODERN_SET_CODE_TO_TCGDEX_ID.PBL, 'me05');
+  assert.equal(resolveTcgdexSetId('PBL'), 'me05');
+});
+
+test('buildPreferredCardId pads modern ME/SV collector numbers', () => {
+  assert.equal(buildPreferredCardId('PBL', '18'), 'me05-018');
+  assert.equal(buildPreferredCardId('PFL', '24'), 'me02-024');
+  assert.equal(buildLegacyCardId('TRR', '32'), 'ex7-32');
 });
 
 test('buildSetCardIdCandidates pads modern collector numbers', () => {
@@ -58,5 +70,11 @@ test('extractTcgdexIdFromImageUrl parses TCGdex CDN and limitlesstcg URLs', () =
       'https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/PFL/PFL_024_R_EN.png'
     ),
     'me02-024'
+  );
+  assert.equal(
+    extractTcgdexIdFromImageUrl(
+      'https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/PBL/PBL_018_R_EN.png'
+    ),
+    'me05-018'
   );
 });

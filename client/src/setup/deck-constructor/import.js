@@ -10,7 +10,7 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { processAction } from '../general/process-action.js';
 import { show } from '../home-header/header-toggle.js';
-import { LEGACY_SET_CODE_TO_TCGDEX_ID } from '../shared/legacy-set-ids.mjs';
+import { buildPreferredCardId } from '../shared/legacy-set-ids.mjs';
 import { getCardType } from './find-type.js';
 import { getOldCardType } from './find-old-type.js';
 
@@ -57,9 +57,9 @@ const cardDataToID = (card, formatHint) => {
 
   // Shared with the rules engine (see setup/shared/legacy-set-ids.mjs) — it
   // needs the same code→set-id mapping to pin a board card to one printing.
-  const oldSetCode_to_id = LEGACY_SET_CODE_TO_TCGDEX_ID;
-  if (oldSetCode_to_id[set] && !isPocketSet(set, formatHint)) {
-    return oldSetCode_to_id[set] + '-' + number;
+  if (!isPocketSet(set, formatHint)) {
+    const preferred = buildPreferredCardId(set, number);
+    if (preferred) return preferred;
   }
 
   // special case for PR-DPP
