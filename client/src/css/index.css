@@ -1966,13 +1966,15 @@ ul, li {
 
 /* Choose mode — carousel, meta, separate drop slots below */
 .card-picker-choose {
-  --card-picker-card-w: min(36vw, 210px);
+  --card-picker-card-w: min(56vw, 340px);
   --card-picker-card-h: calc(var(--card-picker-card-w) * 1.397);
-  --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.52);
+  --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.78);
+  --card-picker-top-gap: 16px;
+  --card-picker-center-shift: 0px;
   --card-picker-slot-gap: 6px;
   justify-content: center;
   gap: 0.85rem;
-  padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
+  padding: 0.75rem 0 max(1rem, env(safe-area-inset-bottom));
 }
 .card-picker-choose .card-picker-bottom-bar {
   position: relative;
@@ -2017,7 +2019,7 @@ ul, li {
   cursor: not-allowed;
 }
 .card-picker-choose .card-picker-workspace {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -2025,7 +2027,7 @@ ul, li {
   justify-content: center;
   gap: 0.65rem;
   min-height: 0;
-  padding: 0 0.5rem;
+  padding: 0 0.35rem;
   overflow: visible;
 }
 .card-picker-choose .card-picker-scene {
@@ -2034,14 +2036,16 @@ ul, li {
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  max-width: min(96vw, 860px);
+  max-width: min(98vw, 980px);
   overflow: visible;
+  transform: translateX(calc(0px - var(--card-picker-center-shift, 0px)));
+  transition: transform 0.18s ease;
 }
 .card-picker-choose .card-picker-top-row {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: clamp(12px, 2.5vw, 20px);
+  gap: var(--card-picker-top-gap, 16px);
   width: 100%;
   overflow: visible;
 }
@@ -2050,7 +2054,7 @@ ul, li {
   grid-template-columns: var(--card-picker-carousel-w) var(--card-picker-card-w);
   justify-content: center;
   align-items: flex-end;
-  gap: clamp(12px, 2.5vw, 20px);
+  gap: var(--card-picker-top-gap, 16px);
 }
 .card-picker-choose .card-picker-carousel-wrap {
   flex: 0 0 auto;
@@ -2064,7 +2068,7 @@ ul, li {
 }
 .card-picker-choose .card-picker-top-row.has-trigger .card-picker-carousel-wrap {
   grid-column: 1;
-  overflow: hidden;
+  overflow: visible;
   isolation: isolate;
   z-index: 1;
 }
@@ -2136,7 +2140,7 @@ ul, li {
   align-items: center;
   gap: var(--card-picker-slot-gap, 6px);
   width: 100%;
-  max-width: min(94vw, 860px);
+  max-width: min(98vw, 980px);
   margin-top: 0.1rem;
   overflow-x: auto;
   overflow-y: visible;

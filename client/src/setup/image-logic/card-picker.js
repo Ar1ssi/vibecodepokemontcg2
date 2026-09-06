@@ -241,15 +241,79 @@ const updateSelectionUI = (state) => {
   renderSlotCards(state);
 };
 
+const CARD_ASPECT = 1.397;
+const CHOOSE_TOP_GAP = 16;
+
+const syncChooseLayout = (state) => {
+  if (state.mode === 'browse' || !state.overlay) return;
+
+  const slotCount = state.slotElements?.length || 1;
+  const hasTrigger = Boolean(state.triggerSlot?.childElementCount);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const slotGap = 6;
+  const minSlotW = 84;
+
+  const slotRowReserve = Math.max(minSlotW * CARD_ASPECT, 110);
+  const reservedY = 230 + slotRowReserve;
+  const maxCardH = Math.max(240, vh - reservedY);
+  const cardWFromH = maxCardH / CARD_ASPECT;
+  const cardW = Math.min(vw * 0.56, 380, cardWFromH);
+  const cardH = cardW * CARD_ASPECT;
+  const peekFactor = hasTrigger ? 1.88 : 1.78;
+  const carouselW = cardW * peekFactor;
+
+  state.overlay.style.setProperty('--card-picker-card-w', `${Math.round(cardW)}px`);
+  state.overlay.style.setProperty('--card-picker-card-h', `${Math.round(cardH)}px`);
+  state.overlay.style.setProperty('--card-picker-carousel-w', `${Math.round(carouselW)}px`);
+  state.overlay.style.setProperty('--card-picker-top-gap', `${CHOOSE_TOP_GAP}px`);
+
+  const preferredSlotW = Math.max(
+    minSlotW,
+    Math.round(cardW * 0.94)
+  );
+  const maxRowW = vw * 0.96;
+  let slotW = preferredSlotW;
+  const totalNeeded = slotCount * slotW + (slotCount - 1) * slotGap;
+  if (totalNeeded > maxRowW) {
+    slotW = Math.max(
+      minSlotW,
+      Math.floor((maxRowW - (slotCount - 1) * slotGap) / slotCount)
+    );
+  }
+
+  let shift = 0;
+  if (hasTrigger) {
+    shift += (cardW + CHOOSE_TOP_GAP) / 2;
+  }
+
+  const slotRowW = slotCount * slotW + (slotCount - 1) * slotGap;
+  const topRowW = carouselW + (hasTrigger ? CHOOSE_TOP_GAP + cardW : 0);
+  const extraWidth = Math.max(slotRowW, topRowW) - carouselW;
+  if (extraWidth > 0) {
+    shift += extraWidth * 0.22;
+  }
+
+  state.overlay.style.setProperty('--card-picker-center-shift', `${Math.round(shift)}px`);
+  if (state.scene) {
+    state.scene.style.transform =
+      shift > 0 ? `translateX(-${Math.round(shift)}px)` : '';
+  }
+  state.scene?.classList.toggle('has-trigger', hasTrigger);
+  state.topRow?.classList.toggle('has-trigger', hasTrigger);
+  state.main?.classList.toggle('has-trigger', hasTrigger);
+};
+
 const syncDropSlotLayout = (state) => {
   if (!state.slotElements?.length || !state.stack) return;
+  syncChooseLayout(state);
   const slotCount = state.slotElements.length;
   const gap = 6;
   const minSlotW = 84;
-  const maxRowW = Math.min(window.innerWidth * 0.92, 860);
+  const maxRowW = Math.min(window.innerWidth * 0.96, 980);
   const preferredW = Math.max(
     minSlotW,
-    Math.round(state.stack.clientWidth * 0.92) || 160
+    Math.round(state.stack.clientWidth * 0.94) || 160
   );
   let slotW = preferredW;
   const totalNeeded = slotCount * slotW + (slotCount - 1) * gap;
@@ -430,6 +494,9 @@ const goToIndex = (state, nextIndex) => {
 
 const teardownPicker = (state) => {
   document.removeEventListener('keydown', state.onKeyDown);
+  if (state.onResize) {
+    window.removeEventListener('resize', state.onResize);
+  }
   stopDragLoop(state);
   state.slides.forEach((slide) => {
     const wrapper = slideWrapper(slide);
@@ -975,6 +1042,8 @@ export const openCardPicker = async ({
     slotCard: null,
     draggingToSlotIndex: null,
     topRow: topRow,
+    main,
+    onResize: null,
     onKeyDown: null,
     allCandidates,
     filteredCandidates: candidates,
@@ -988,13 +1057,17 @@ export const openCardPicker = async ({
     const { node, holoWrapper } = await buildSlideContent(triggerCard);
     node.classList.add('card-picker-trigger-card');
     triggerSlot.appendChild(node);
-    state.topRow?.classList.add('has-trigger');
-    main.classList.add('has-trigger');
     if (holoWrapper) {
       holoWrapper.classList.add('card-picker-trigger-holo');
       state.triggerHoloWrapper = holoWrapper;
       startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
     }
+  }
+
+  if (!isBrowse) {
+    syncChooseLayout(state);
+    state.onResize = () => syncChooseLayout(state);
+    window.addEventListener('resize', state.onResize);
   }
 
   state.onKeyDown = (event) => {
