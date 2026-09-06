@@ -137,6 +137,13 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const defenderDamage = ctx.defenderDamage; // damage counters on opponent's Active
   const headsCount = ctx.headsCount; // heads from a "flip … for each heads" coin
   const ownHandCount = ctx.ownHandCount; // cards in your hand
+  const ownPokemonInPlayCount = ctx.ownPokemonInPlayCount;
+  const roundAttackCount = ctx.roundAttackCount;
+  const teamRocketCount = ctx.teamRocketCount;
+  const ancientCount = ctx.ancientCount;
+  const grassPokemonCount = ctx.grassPokemonCount;
+  const specialEnergyOnSelfCount = ctx.specialEnergyOnSelfCount;
+  const opponentStatusCount = ctx.opponentStatusCount;
 
   let total = base;
 
@@ -188,6 +195,27 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     } else if (/card in your opponent's hand/.test(unit)) {
       count = opponentHandCount;
       label = "cards in opponent's hand";
+    } else if (/round attack/.test(unit)) {
+      count = roundAttackCount;
+      label = 'Pokémon in play with the Round attack';
+    } else if (/team rocket's pok[ée]mon/.test(unit)) {
+      count = teamRocketCount;
+      label = "Team Rocket's Pokémon in play";
+    } else if (/ancient pok[ée]mon/.test(unit)) {
+      count = ancientCount;
+      label = 'Ancient Pokémon in play';
+    } else if (/\{g\} pok[ée]mon in play/.test(unit)) {
+      count = grassPokemonCount;
+      label = '{G} Pokémon in play';
+    } else if (/pok[ée]mon in play/.test(unit)) {
+      count = ownPokemonInPlayCount;
+      label = 'Pokémon in play';
+    } else if (/special energy card attached to this pok[ée]mon/.test(unit)) {
+      count = specialEnergyOnSelfCount;
+      label = 'Special Energy attached to this Pokémon';
+    } else if (/special condition affecting your opponent's active/.test(unit)) {
+      count = opponentStatusCount;
+      label = "Special Conditions on opponent's Active";
     } else if (/retreat cost/.test(unit)) {
       count = retreatCostColorless;
       label = "Colorless in opponent's Active's Retreat Cost";
@@ -431,7 +459,8 @@ export function moveEnergyClause(attackText) {
   const text = String(attackText || '');
   return (
     /move an? energy from this pok[ée]mon/i.test(text) ||
-    (/move\b[^.;]*\benergy\b/i.test(text) && /benched pok[ée]mon|your bench/i.test(text))
+    (/move\b[^.;]*\benergy\b/i.test(text) && /benched pok[ée]mon|your bench/i.test(text)) ||
+    (/move\b[^.;]*\benergy\b/i.test(text) && /opponent's pok[ée]mon/i.test(text))
   );
 }
 
@@ -451,10 +480,19 @@ export function conditionalKoClause(attackText) {
   ) {
     return true;
   }
+  if (
+    /if your opponent's active pok[ée]mon is a basic pok[ée]mon/i.test(text) &&
+    /knocked out/i.test(text)
+  ) {
+    return true;
+  }
   if (/exactly \d+ damage counters?/.test(text) && /knocked out/i.test(text)) {
     return true;
   }
   if (/least hp remaining/.test(text) && /knocked out/i.test(text)) {
+    return true;
+  }
+  if (/knock out 1 of your opponent's pok[ée]mon that has exactly \d+ damage counters/i.test(text)) {
     return true;
   }
   return false;
@@ -504,11 +542,114 @@ export function immunityClause(attackText) {
   );
 }
 
-// Whether attack text carries a "Once during your turn" clause (taxonomy §D
-// once-per-turn family). Matches the common printed forms: "Once during your
-// turn: …", "Once during your turn, you may …". Only applied to attack text;
-// ability-side once-per-turn tracking is handled by the rules-state flag map.
-// Pure.
+/** Heal self for damage dealt this attack (mirror-heal family). */
+export function mirrorHealClause(attackText) {
+  return /heal from this pok[ée]mon the same amount of damage you did/i.test(
+    String(attackText || '')
+  );
+}
+
+/** Copy another Pokémon's attack (copy-attack family). Returns target scope or null. */
+export function copyAttackScope(attackText) {
+  const t = String(attackText || '').toLowerCase();
+  if (!/choose 1 of .* attacks and use it as this attack/.test(t)) return null;
+  if (/benched n's pok[ée]mon/.test(t)) return 'own-bench-ns';
+  if (/opponent's active tera/.test(t)) return 'opp-active-tera';
+  if (/opponent's active/.test(t)) return 'opp-active';
+  return 'unknown';
+}
+
+/** Retaliate/thorns: counters on Attacking Pokémon if damaged next turn. */
+export function retaliateCount(attackText) {
+  const t = String(attackText || '');
+  if (
+    !/if this pok[ée]mon is damaged by an attack/i.test(t) ||
+    !/put .* damage counters on the attacking pok[ée]mon/i.test(t)
+  ) {
+    return 0;
+  }
+  const m = /put (\d+) damage counters/i.exec(t);
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Put this Pokémon and attachments into your hand. */
+export function returnSelfClause(attackText) {
+  const t = String(attackText || '');
+  return (
+    /put this pok[ée]mon and all attached cards into your hand/i.test(t) ||
+    /put 1 of your benched pok[ée]mon and all attached cards into your hand/i.test(t)
+  );
+}
+
+/** Deferred damage at end of opponent's next turn. */
+export function deferredDamageCount(attackText) {
+  const m = /at the end of your opponent's next turn, put (\d+) damage counters/i.exec(
+    String(attackText || '')
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Look at top N of opponent's deck. */
+export function lookOpponentDeckCount(attackText) {
+  const m = /look at the top (\d+) cards of your opponent's deck/i.exec(
+    String(attackText || '')
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Next-turn named attack bonus (Echoed Voice, Meteor Mash, …). */
+export function nextTurnBonusClause(attackText) {
+  const m =
+    /during your next turn, this pok[ée]mon's ([^.]+?) attack does (\d+) more damage/i.exec(
+      String(attackText || '')
+    );
+  if (!m) return null;
+  return { attackName: m[1].trim(), bonus: parseInt(m[2], 10) || 0 };
+}
+
+/** Devolve each opponent evolved Pokémon. */
+export function devolveOpponentClause(attackText) {
+  return /devolve each of your opponent's evolved pok[ée]mon/i.test(String(attackText || ''));
+}
+
+/** Recovers from all Special Conditions. */
+export function recoverAllStatusClause(attackText) {
+  return /recovers from all special conditions/i.test(String(attackText || ''));
+}
+
+/** Remaining HP cap for damage placement. */
+export function hpCapRemaining(attackText) {
+  const m = /until its remaining hp is (\d+)/i.exec(String(attackText || ''));
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
+}
+
+/** Return opponent Active Energy to their hand. */
+export function returnOpponentEnergyClause(attackText) {
+  return /put .* energy attached to your opponent's active pok[ée]mon into their hand/i.test(
+    String(attackText || '')
+  );
+}
+
+export function returnOpponentEnergyCount(attackText) {
+  const m = /put (\d+) energy/i.exec(String(attackText || ''));
+  return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+}
+
+/** Bench exact-counter KO threshold. */
+export function benchExactKoThreshold(attackText) {
+  const m =
+    /knock out 1 of your opponent's pok[ée]mon that has exactly (\d+) damage counters/i.exec(
+      String(attackText || '')
+    );
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
+}
+
+/** Whether attack text carries a "Once during your turn" clause (taxonomy §D
+ * once-per-turn family). Matches the common printed forms: "Once during your
+ * turn: …", "Once during your turn, you may …". Only applied to attack text;
+ * ability-side once-per-turn tracking is handled by the rules-state flag map.
+ * Pure.
+ */
 export function oncePerTurnClause(attackText) {
   return /once during your turn/i.test(String(attackText || ''));
 }

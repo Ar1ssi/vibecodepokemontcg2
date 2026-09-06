@@ -42,6 +42,17 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
   'self-damage',
   'immunity',
   'redirect-damage',
+  'mirror-heal',
+  'copy-attack',
+  'retaliate',
+  'return-self',
+  'deferred-damage',
+  'look-opponent-deck',
+  'next-turn-bonus',
+  'devolve-opponent',
+  'recover-status',
+  'hp-cap-damage',
+  'return-opponent-energy',
 ]);
 
 /** Partial / heuristic execution — still flagged but lower priority. */

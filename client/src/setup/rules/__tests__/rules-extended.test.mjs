@@ -1126,6 +1126,103 @@ import test from 'node:test';
         }),
         'conditional-ko',
       );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Mirror Heal',
+          damage: 30,
+          text: "Heal from this Pokémon the same amount of damage you did to your opponent's Active Pokémon.",
+        }),
+        'mirror-heal',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Copy',
+          damage: 0,
+          text: "Choose 1 of your opponent's Active Pokémon's attacks and use it as this attack.",
+        }),
+        'copy-attack',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Round',
+          damage: 40,
+          text: 'This attack does 40 damage for each of your Pokémon in play that has the Round attack.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Item Lock',
+          damage: 0,
+          text: "During your opponent's next turn, they can't play any Item cards from their hand.",
+        }),
+        'next-turn-lock',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Return',
+          damage: 0,
+          text: 'Put this Pokémon and all attached cards into your hand.',
+        }),
+        'return-self',
+      );
+    });
+
+    test('backlog parser helpers: mirror heal, copy, deferred, hp cap', async () => {
+      const {
+        mirrorHealClause,
+        copyAttackScope,
+        deferredDamageCount,
+        lookOpponentDeckCount,
+        nextTurnBonusClause,
+        hpCapRemaining,
+        benchExactKoThreshold,
+        recoverAllStatusClause,
+        returnSelfClause,
+        retaliateCount,
+      } = await import('../damage-parser.mjs');
+      assert.equal(mirrorHealClause("Heal from this Pokémon the same amount of damage you did to your opponent's Active Pokémon."), true);
+      assert.equal(copyAttackScope("Choose 1 of your opponent's Active Pokémon's attacks and use it as this attack."), 'opp-active');
+      assert.equal(deferredDamageCount("At the end of your opponent's next turn, put 9 damage counters on the Defending Pokémon."), 9);
+      assert.equal(lookOpponentDeckCount("Look at the top 5 cards of your opponent's deck and put them back in any order."), 5);
+      assert.deepEqual(
+        nextTurnBonusClause("During your next turn, this Pokémon's Echoed Voice attack does 80 more damage (before applying Weakness and Resistance)."),
+        { attackName: 'Echoed Voice', bonus: 80 },
+      );
+      assert.equal(hpCapRemaining("Put damage counters on your opponent's Active Pokémon until its remaining HP is 50."), 50);
+      assert.equal(benchExactKoThreshold("Knock Out 1 of your opponent's Pokémon that has exactly 6 damage counters on it."), 6);
+      assert.equal(recoverAllStatusClause('This Pokémon recovers from all Special Conditions.'), true);
+      assert.equal(returnSelfClause('Put this Pokémon and all attached cards into your hand.'), true);
+      assert.equal(
+        retaliateCount("During your opponent's next turn, if this Pokémon is damaged by an attack (even if it is Knocked Out), put 8 damage counters on the Attacking Pokémon."),
+        8,
+      );
+    });
+
+    test('parseAttackDamage: in-play scaling counts', () => {
+      const roundAtk = {
+        name: 'Round',
+        damage: 40,
+        text: 'This attack does 40 damage for each of your Pokémon in play that has the Round attack.',
+      };
+      const p1 = parseAttackDamage(roundAtk, {}, {}, { roundAttackCount: 3 });
+      assert.equal(p1.total, 120);
+
+      const handAtk = {
+        name: 'Hand Crush',
+        damage: 50,
+        text: "This attack does 50 damage for each card in your opponent's hand.",
+      };
+      const p2 = parseAttackDamage(handAtk, {}, {}, { opponentHandCount: 4 });
+      assert.equal(p2.total, 200);
+
+      const rocketAtk = {
+        name: 'Rocket Strike',
+        damage: 30,
+        text: "This attack does 30 damage for each of your Team Rocket's Pokémon in play.",
+      };
+      const p3 = parseAttackDamage(rocketAtk, {}, {}, { teamRocketCount: 2 });
+      assert.equal(p3.total, 60);
     });
 
     test('parseSelfStatusFromAttackText', () => {

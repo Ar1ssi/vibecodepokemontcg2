@@ -22,7 +22,7 @@ import {
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
@@ -88,6 +88,52 @@ function countEnergyOnPlayerSide(player) {
     }
   }
   return total;
+}
+
+function countPokemonInPlay(player, filterFn = null) {
+  let total = 0;
+  for (const zoneId of ['active', 'bench']) {
+    for (const card of getZone(player, zoneId).array) {
+      if (card.type !== 'Pokémon') continue;
+      if (!filterFn || filterFn(card)) total++;
+    }
+  }
+  return total;
+}
+
+function isTeamRocketPokemon(card) {
+  return /team rocket/i.test(String(card?.name || ''));
+}
+
+function isAncientPokemon(card) {
+  const name = String(card?.name || '');
+  if (/\bancient\b/i.test(name)) return true;
+  return (card?.subtypes || []).some((s) => /ancient/i.test(String(s)));
+}
+
+function hasRoundAttack(card) {
+  return (card?.attacks || []).some((a) => /^round$/i.test(String(a?.name || '')));
+}
+
+function isGrassPokemon(card) {
+  const types = (card?.types || []).map((t) => String(t).toLowerCase());
+  return types.includes('grass');
+}
+
+function countSpecialEnergyOnPokemon(zone, pokemonImage) {
+  return energiesAttachedToPokemon(zone, pokemonImage).filter(
+    (e) => e.type === 'Energy' && classifyEnergyEffect(e) !== 'basic'
+  ).length;
+}
+
+function isBeedrillPokemon(card) {
+  return /beedrill/i.test(String(card?.name || ''));
+}
+
+function countOpponentStatuses(player, cardKey) {
+  const s = getStatus(player, cardKey);
+  if (!s) return 0;
+  return Object.values(s).filter(Boolean).length;
 }
 
 function remainingHp(player, card, zoneId, index) {
@@ -458,6 +504,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           // DOM; leave undefined otherwise so the parser keeps it honestly unresolved.
           const defenderDmgEl = oppActive?.image?.damageCounter;
           const attackerDmgEl = active?.image?.damageCounter;
+          const oppKeyForStatus = oppActive?.image?.dataset?.cardId || oppActive?.name;
           parsed = parseAttackDamage(atk, active, oppActive, {
             energyCount: attachedEnergies.length,
             energyDiscarded,
@@ -471,6 +518,16 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               oppActive.image
             ).length,
             ownHandCount: getZone(user, 'hand').getCount(),
+            opponentHandCount: getZone(oppPlayer, 'hand').getCount(),
+            ownPokemonInPlayCount: countPokemonInPlay(user),
+            roundAttackCount: countPokemonInPlay(user, hasRoundAttack),
+            teamRocketCount: countPokemonInPlay(user, isTeamRocketPokemon),
+            ancientCount: countPokemonInPlay(user, isAncientPokemon),
+            speciesCount: countPokemonInPlay(user, isBeedrillPokemon),
+            grassPokemonCount: countPokemonInPlay(user, isGrassPokemon),
+            specialEnergyOnSelfCount: countSpecialEnergyOnPokemon(activeZone, active.image),
+            opponentStatusCount: countOpponentStatuses(oppPlayer, oppKeyForStatus),
+            retreatCostColorless: oppActive?.retreatCost ?? 0,
             defenderDamage: defenderDmgEl
               ? parseInt(defenderDmgEl.textContent || '0', 10) || 0
               : undefined,
@@ -720,6 +777,26 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
                 false
               );
               await _takePrizesWithPicker(user, koResult.prizeCount);
+            }
+          } else if (
+            !alreadyKO &&
+            /if your opponent's active pok[ée]mon is a basic pok[ée]mon/i.test(String(atk.text || ''))
+          ) {
+            const stage = String(oppActive?.stage || 'Basic').toLowerCase();
+            const isBasic = stage === 'basic' || oppActive?.basic !== false;
+            if (isBasic) {
+              const koResult = handleKO({
+                attackerPlayer: user,
+                defender: oppActive,
+                defenderBoard: getZone(oppPlayer, 'active'),
+              });
+              appendMessage(
+                user,
+                `🎯 ${oppActive?.name || 'The active'} is Basic — KO!`,
+                'announcement',
+                false
+              );
+              if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
             }
           } else if (!alreadyKO && lowestHpKo) {
             const candidates = [];
@@ -1215,6 +1292,254 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               false
             );
           }
+        }
+
+        // Mirror heal: heal this Pokémon for damage dealt this attack.
+        if (mirrorHealClause(atk.text) && dmg.total > 0) {
+          const countersEl = active?.image?.damageCounter;
+          const current = countersEl
+            ? parseInt(countersEl.textContent || '0', 10) || 0
+            : 0;
+          const plan = planHeal(current, dmg.total);
+          if (plan.removed > 0) {
+            if (plan.zeroOut) {
+              removeDamageCounter(user, 'active', 0, true);
+            } else {
+              updateDamageCounter(user, 'active', 0, plan.remaining, true);
+            }
+            appendMessage(
+              user,
+              `💖 ${atk.name} heals ${plan.removed} damage (same as dealt)!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // HP-cap damage: place counters until remaining HP hits the cap.
+        const hpCap = hpCapRemaining(atk.text);
+        if (hpCap !== null && oppActive) {
+          const rem = remainingHp(oppPlayer, oppActive, 'active', 0);
+          const toPlace = Math.max(0, rem - hpCap);
+          if (toPlace > 0) {
+            placeSelfDamage(oppPlayer, 'active', 0, toPlace);
+            appendMessage(
+              user,
+              `💥 ${atk.name} places ${toPlace} damage until ${hpCap} HP remains.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Bench exact-counter KO.
+        const benchKoThreshold = benchExactKoThreshold(atk.text);
+        if (benchKoThreshold !== null) {
+          const oppBench = getZone(oppPlayer, 'bench').array
+            .map((card, idx) => ({ card, idx }))
+            .filter(({ card }) => card.type === 'Pokémon');
+          const match = oppBench.find(({ card, idx }) => {
+            const el = getZone(oppPlayer, 'bench').array[idx]?.image?.damageCounter;
+            const dmgN = el ? parseInt(el.textContent || '0', 10) || 0 : 0;
+            return dmgN === benchKoThreshold;
+          });
+          if (match) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: match.card,
+              defenderBoard: getZone(oppPlayer, 'bench'),
+            });
+            appendMessage(
+              user,
+              `🎯 ${match.card.name || 'A benched Pokémon'} had exactly ${benchKoThreshold} damage counters — KO!`,
+              'announcement',
+              false
+            );
+            if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+          } else {
+            appendMessage(
+              user,
+              `💤 ${atk.name}'s bench KO fizzles — no benched Pokémon with exactly ${benchKoThreshold} counters.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Return self to hand with attachments.
+        if (returnSelfClause(atk.text)) {
+          moveCardBundle(user, user, 'active', 'hand', 0, false, 'move', emit);
+          appendMessage(
+            user,
+            `🔁 ${active?.name || 'This Pokémon'} and attached cards return to your hand.`,
+            'announcement',
+            false
+          );
+        }
+
+        // Recover from all Special Conditions.
+        if (recoverAllStatusClause(atk.text) && active) {
+          const selfKey = active.image?.dataset?.cardId || active.name;
+          clearStatuses(user, selfKey);
+          appendMessage(
+            user,
+            `✨ ${active.name || 'Your Pokémon'} recovers from all Special Conditions!`,
+            'announcement',
+            false
+          );
+        }
+
+        // Return opponent Active Energy to their hand.
+        if (returnOpponentEnergyClause(atk.text)) {
+          const returnN = returnOpponentEnergyCount(atk.text);
+          const oppActiveZoneObj = getZone(oppPlayer, 'active');
+          let returned = 0;
+          for (let i = 0; i < returnN; i++) {
+            const energyIdx = oppActiveZoneObj.array.findIndex(
+              (c) =>
+                c.type === 'Energy' && c.image?.relative === oppActive?.image
+            );
+            if (energyIdx === -1) break;
+            moveCard(oppPlayer, oppPlayer, 'active', 'hand', energyIdx);
+            returned++;
+          }
+          if (returned === 0) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name}'s return fizzles — no Energy on opponent's Active.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} returns ${returned} Energy to opponent's hand.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Look at top of opponent's deck.
+        const lookOppN = lookOpponentDeckCount(atk.text);
+        if (lookOppN > 0) {
+          const oppDeck = getZone(oppPlayer, 'deck');
+          const topCards = oppDeck.array.slice(0, lookOppN);
+          if (topCards.length === 0) {
+            appendMessage(
+              user,
+              `👁️ ${atk.name} fizzles — opponent's deck is empty.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `👁️ ${atk.name} — top ${topCards.length} of opponent's deck: ${topCards.map((c) => c.name || 'Card').join(', ')} (put back in any order).`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Copy attack — list available attacks for manual resolution.
+        const copyScope = copyAttackScope(atk.text);
+        if (copyScope) {
+          let pool = [];
+          if (copyScope === 'opp-active' || copyScope === 'opp-active-tera') {
+            await ensureCardData(oppActive);
+            pool = (oppActive?.attacks || []).map((a) => a.name).filter(Boolean);
+          } else if (copyScope === 'own-bench-ns') {
+            for (const card of getZone(user, 'bench').array) {
+              if (card.type !== 'Pokémon' || !/n's/i.test(card.name || '')) continue;
+              await ensureCardData(card);
+              for (const a of card.attacks || []) {
+                if (a?.name) pool.push(`${card.name}: ${a.name}`);
+              }
+            }
+          }
+          appendMessage(
+            user,
+            pool.length
+              ? `📋 ${atk.name} — choose an attack to copy: ${pool.join('; ')}`
+              : `📋 ${atk.name} — no valid attacks to copy.`,
+            'announcement',
+            false
+          );
+        }
+
+        // Retaliate / deferred / next-turn bonus — track as announcements.
+        const thornsN = retaliateCount(atk.text);
+        if (thornsN > 0) {
+          appendMessage(
+            user,
+            `🌵 ${atk.name}: if damaged next turn, Attacking Pokémon takes ${thornsN} damage counters.`,
+            'announcement',
+            false
+          );
+        }
+        const deferredN = deferredDamageCount(atk.text);
+        if (deferredN > 0) {
+          appendMessage(
+            user,
+            `⏳ ${atk.name}: ${deferredN} damage counters at end of opponent's next turn on Defending Pokémon.`,
+            'announcement',
+            false
+          );
+        }
+        const nextBonus = nextTurnBonusClause(atk.text);
+        if (nextBonus) {
+          appendMessage(
+            user,
+            `📈 ${atk.name}: next turn ${nextBonus.attackName} does +${nextBonus.bonus} damage.`,
+            'announcement',
+            false
+          );
+        }
+        if (devolveOpponentClause(atk.text)) {
+          const evolved = [];
+          for (const zoneId of ['active', 'bench']) {
+            for (const card of getZone(oppPlayer, zoneId).array) {
+              if (card.type !== 'Pokémon') continue;
+              await ensureCardData(card);
+              const stage = String(card.stage || 'Basic').toLowerCase();
+              if (stage !== 'basic') evolved.push(card.name || 'Pokémon');
+            }
+          }
+          appendMessage(
+            user,
+            evolved.length
+              ? `🔄 ${atk.name} devolves: ${evolved.join(', ')} — shuffle highest Evolution into opponent's deck.`
+              : `🔄 ${atk.name} fizzles — no evolved opponent Pokémon.`,
+            'announcement',
+            false
+          );
+        }
+        if (/can't play any (item|supporter) cards?/i.test(String(atk.text || ''))) {
+          const lock = /item/i.test(atk.text) ? 'Item' : 'Supporter';
+          appendMessage(
+            user,
+            `🔒 ${atk.name}: opponent can't play ${lock} cards next turn.`,
+            'announcement',
+            false
+          );
+        }
+        if (/defending pok[ée]mon takes \d+ more damage from attacks/i.test(String(atk.text || ''))) {
+          const m = /takes (\d+) more damage/i.exec(atk.text);
+          appendMessage(
+            user,
+            `📈 ${atk.name}: Defending Pokémon takes +${m?.[1] || '?'} damage from attacks next turn.`,
+            'announcement',
+            false
+          );
+        }
+        if (/this pok[ée]mon has no weakness/i.test(String(atk.text || ''))) {
+          appendMessage(
+            user,
+            `🛡️ ${atk.name}: this Pokémon has no Weakness during opponent's next turn.`,
+            'announcement',
+            false
+          );
         }
 
         // Deck search (taxonomy §D search-deck family): Call for Family, Flock,
