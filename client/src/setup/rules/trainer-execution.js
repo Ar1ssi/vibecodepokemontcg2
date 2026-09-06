@@ -525,12 +525,12 @@ async function runLookStep(card, step, fromBottom, done) {
         step,
         sourceText: card.text || card.effect || '',
       });
-      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
     },
     onCancel: () => {
       msg('  kept all looked-at cards in deck order — shuffle your deck');
-      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
       done?.();
     },
   });
