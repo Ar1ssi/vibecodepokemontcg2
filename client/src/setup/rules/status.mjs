@@ -140,14 +140,37 @@ export function resolveTurnBoundary(player, cardId, rng = Math.random, opts = {}
 
 // Parse attack text for status keywords (TCG Live parses full effects;
 // we handle the common printed ones).
-export function parseStatusFromAttackText(text = '') {
+export function parseStatusFromAttackText(text = '', coin = null) {
   const lower = text.toLowerCase();
+  const hasCoin = /flip a coin|flip \d+ coins?|a coin/.test(lower);
+  if (!hasCoin || coin === null) {
+    const found = [];
+    if (lower.includes('asleep')) found.push('asleep');
+    if (lower.includes('paralyzed')) found.push('paralyzed');
+    if (lower.includes('poisoned')) found.push('poisoned');
+    if (lower.includes('burned')) found.push('burned');
+    if (lower.includes('confused')) found.push('confused');
+    return found;
+  }
+
   const found = [];
-  if (lower.includes('asleep')) found.push('asleep');
-  if (lower.includes('paralyzed')) found.push('paralyzed');
-  if (lower.includes('poisoned')) found.push('poisoned');
-  if (lower.includes('burned')) found.push('burned');
-  if (lower.includes('confused')) found.push('confused');
+  const headsPart = (lower.match(/if heads[,\s]+([^.]+)/) || [])[1] || '';
+  const tailsPart = (lower.match(/if tails[,\s]+([^.]+)/) || [])[1] || '';
+  const targetText = coin === 'heads' ? headsPart : coin === 'tails' ? tailsPart : '';
+
+  if (targetText.includes('asleep')) found.push('asleep');
+  if (targetText.includes('paralyzed')) found.push('paralyzed');
+  if (targetText.includes('poisoned')) found.push('poisoned');
+  if (targetText.includes('burned')) found.push('burned');
+  if (targetText.includes('confused')) found.push('confused');
+
+  const beforeCoin = lower.split(/flip a coin|flip \d+ coins?/)[0] || '';
+  if (beforeCoin.includes('is now asleep') && !found.includes('asleep')) found.push('asleep');
+  if (beforeCoin.includes('is now paralyzed') && !found.includes('paralyzed')) found.push('paralyzed');
+  if (beforeCoin.includes('is now poisoned') && !found.includes('poisoned')) found.push('poisoned');
+  if (beforeCoin.includes('is now burned') && !found.includes('burned')) found.push('burned');
+  if (beforeCoin.includes('is now confused') && !found.includes('confused')) found.push('confused');
+
   return found;
 }
 

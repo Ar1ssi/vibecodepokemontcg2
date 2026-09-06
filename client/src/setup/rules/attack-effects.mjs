@@ -218,6 +218,7 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     return 'multi-target';
   }
   if (
+    !/during pok[ée]mon checkup/i.test(t) &&
     /(?:place|put) \d+ damage counters? on/i.test(t) &&
     /your opponent's|opponent's active|1 of your opponent's pok[ée]mon/i.test(t)
   ) {

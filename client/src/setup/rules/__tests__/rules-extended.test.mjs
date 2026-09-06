@@ -4193,3 +4193,76 @@ import test from 'node:test';
       assert.equal(canPerformAction({ user: 'opp', action: 'evolve' }).allowed, false);
       assert.equal(canPerformAction({ user: 'opp', action: 'attachEnergy' }).allowed, false);
     });
+
+    test('classifyAttackEffect: checkup poison counter placement is status-poisoned, not bench-damage', async () => {
+      const { classifyAttackEffect } = await import('../attack-effects.mjs');
+      const crobat = {
+        name: 'Poison Fang',
+        text: "Your opponent's Active Pokémon is now Poisoned. During Pokémon Checkup, put 2 damage counters on that Pokémon instead of 1.",
+      };
+      const nidoking = {
+        name: 'Tainted Horn',
+        text: "Your opponent's Active Pokémon is now Poisoned. During Pokémon Checkup, put 8 damage counters on that Pokémon instead of 1.",
+      };
+      const dragalge = {
+        name: 'Pernicious Poison',
+        text: "Your opponent's Active Pokémon is now Poisoned. During Pokémon Checkup, place 16 damage counters on that Pokémon instead of 1.",
+      };
+      assert.equal(classifyAttackEffect(crobat), 'status-poisoned');
+      assert.equal(classifyAttackEffect(nidoking), 'status-poisoned');
+      assert.equal(classifyAttackEffect(dragalge), 'status-poisoned');
+    });
+
+    test('parseAttackDamage: parses unconditional and counter-scaling recoil self-damage', async () => {
+      const { parseAttackDamage } = await import('../damage-parser.mjs');
+      const zekrom = {
+        name: 'Voltage Burst',
+        damage: 130,
+        text: "This attack does 50 more damage for each Prize card your opponent has taken. This Pokémon also does 30 damage to itself.",
+      };
+      const pZekrom = parseAttackDamage(zekrom, {}, {}, { opponentPrizes: 2 });
+      assert.equal(pZekrom.total, 230);
+      assert.equal(pZekrom.selfDamage, 30);
+      assert.ok(pZekrom.components.includes('self-damage'));
+
+      const drapion = {
+        name: 'Hazardous Tail',
+        damage: 190,
+        text: "This Pokémon also does 70 damage to itself. Your opponent's Active Pokémon is now Paralyzed and Poisoned.",
+      };
+      const pDrapion = parseAttackDamage(drapion);
+      assert.equal(pDrapion.selfDamage, 70);
+      assert.ok(pDrapion.components.includes('self-damage'));
+
+      const raticate = {
+        name: 'Reckless Abandon',
+        damage: 120,
+        text: "Flip 2 coins. If both of them are tails, this Pokémon also does 90 damage to itself.",
+      };
+      const pRaticateTails = parseAttackDamage(raticate, {}, {}, { coin: 'tails' });
+      assert.equal(pRaticateTails.selfDamage, 90);
+      const pRaticateHeads = parseAttackDamage(raticate, {}, {}, { coin: 'heads' });
+      assert.equal(pRaticateHeads.selfDamage, 0);
+
+      const palafin = {
+        name: 'Vanguard Punch',
+        damage: 130,
+        text: "This Pokémon also does 10 damage to itself for each damage counter on it.",
+      };
+      const pPalafin = parseAttackDamage(palafin, {}, {}, { attackerDamage: 4 });
+      assert.equal(pPalafin.selfDamage, 40);
+      assert.ok(pPalafin.components.includes('self-damage'));
+    });
+
+    test('parseStatusFromAttackText: gates status on coin flip outcome', async () => {
+      const { parseStatusFromAttackText } = await import('../status.mjs');
+      const fakeOut = "Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed.";
+      assert.deepEqual(parseStatusFromAttackText(fakeOut, 'heads'), ['paralyzed']);
+      assert.deepEqual(parseStatusFromAttackText(fakeOut, 'tails'), []);
+
+      const lilligant =
+        "Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed and Poisoned. If tails, your opponent's Active Pokémon is now Confused.";
+      assert.deepEqual(parseStatusFromAttackText(lilligant, 'heads'), ['paralyzed', 'poisoned']);
+      assert.deepEqual(parseStatusFromAttackText(lilligant, 'tails'), ['confused']);
+    });
+
