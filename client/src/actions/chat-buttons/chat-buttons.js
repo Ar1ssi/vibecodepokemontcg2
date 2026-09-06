@@ -1067,7 +1067,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // pre-existing gap (flagged, not built here).
         if (oppHp > 0 && totalDmg < oppHp) {
           const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
-          const found = parseStatusFromAttackText(atk.text);
+          const found = parseStatusFromAttackText(atk.text, coin);
           const oppZoneCards = getZone(oppPlayer, 'active').array;
           const statusBlocked = stadiumBlocksStatusApplication(oppActive, oppZoneCards);
           for (const st of found) {

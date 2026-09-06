@@ -46,6 +46,7 @@ export const DAMAGE_COMPONENTS = [
   'per-heads',
   'bench',
   'heal',
+  'self-damage',
 ];
 
 // Normalize curly quotes so card text matches our patterns.
@@ -254,6 +255,9 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
       // count is supplied by the caller after the flip (ctx.headsCount).
       count = headsCount;
       label = 'heads';
+    } else if (/prize card/.test(unit)) {
+      count = opponentPrizes;
+      label = 'opponent Prize cards';
     } else {
       count = undefined;
       label = unit || 'the printed count';
@@ -337,22 +341,45 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const headsBonus = /if heads, this attack does (\d+) more|if heads, .*(\d+) more damage/.test(text)
     ? amount(text, /if heads, this attack does (\d+) more|if heads, .*(\d+) more damage/)
     : 0;
-  const tailsSelf = /if tails, do (\d+) damage to yourself/.test(text)
-    ? amount(text, /if tails, do (\d+) damage to yourself/)
-    : 0;
+  const tailsSelfMatch = text.match(/(?:if tails|if both (?:of them )?are tails)[^.]*(?:also )?do(?:es)? (\d+) damage to (?:itself|yourself)/);
+  const tailsSelf = tailsSelfMatch ? parseInt(tailsSelfMatch[1], 10) || 0 : 0;
   let selfDamage = 0;
-  if ((headsBonus > 0 || tailsSelf > 0) && /flip a coin/.test(text)) {
+  if ((headsBonus > 0 || tailsSelf > 0) && /flip a coin|flip \d+ coins?/.test(text)) {
+    if (tailsSelf > 0 && !components.includes('self-damage')) {
+      components.push('self-damage');
+    }
     if (ctx.coin === 'heads') {
       total += headsBonus;
       components.push('coin');
       notes.push(`coin: heads → +${headsBonus}`);
     } else if (ctx.coin === 'tails') {
-      selfDamage = tailsSelf || amount(text, /do (\d+) damage to yourself/);
+      selfDamage += tailsSelf || amount(text, /do (\d+) damage to yourself/);
       components.push('coin');
       notes.push(`coin: tails → ${selfDamage} to self`);
     } else {
       notes.push('coin flip pending — pass ctx.coin to resolve');
     }
+  } else if (/flip a coin|flip \d+ coins?|a coin/.test(text) && !components.includes('per-heads')) {
+    components.push('coin');
+    notes.push(`coin: ${ctx.coin || 'pending'} (attack effect)`);
+  }
+
+  // Recoil / self-damage (printed text specifies damage dealt to this Pokémon)
+  const perCounterSelf = amount(text, /(?:this pok[ée]mon|it) (?:also )?does (\d+) damage to itself for each damage counter on it/);
+  if (perCounterSelf > 0) {
+    const counters = ctx.attackerDamage || 0;
+    selfDamage += perCounterSelf * counters;
+    if (!components.includes('self-damage')) components.push('self-damage');
+    notes.push(`${perCounterSelf} damage to self per counter (${counters} counters = ${selfDamage})`);
+  } else {
+    const directSelfDamage = amount(text, /(?:this pok[ée]mon|it) (?:also )?does (\d+) damage to itself/);
+    if (directSelfDamage > 0 && !/if tails|if both of them are tails/.test(text)) {
+      selfDamage += directSelfDamage;
+    }
+  }
+  if (selfDamage > 0) {
+    if (!components.includes('self-damage')) components.push('self-damage');
+    notes.push(`${selfDamage} damage to self`);
   }
 
   // ── Side effects (reported, never executed) ──

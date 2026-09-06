@@ -5,3 +5,4 @@ server/database/db.sqlite
 client/src/assets/playmats/original/
 client/src/assets/playmats/png/
 client/src/assets/playmats/upscaled/
+.cache/
