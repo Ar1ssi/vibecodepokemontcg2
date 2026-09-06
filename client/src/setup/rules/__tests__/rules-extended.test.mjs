@@ -3524,6 +3524,37 @@ import test from 'node:test';
       });
     });
 
+    test('resolveCardId: Pitch Black Popplio disambiguated by PBL set code', () => {
+      const summaries = [
+        { id: 'smp-SM03', localId: 'SM03', name: 'Popplio', category: 'pokemon' },
+        { id: 'me05-018', localId: '018', name: 'Popplio', category: 'pokemon' },
+        { id: 'sm1-39', localId: '39', name: 'Popplio', category: 'pokemon' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Popplio', 'Pokémon', '18', 'PBL'), 'me05-018');
+      assert.equal(resolveCardId(summaries, 'Popplio', 'Pokémon', '18'), 'me05-018');
+    });
+
+    test('ensureCardData: Pitch Black (PBL) resolves via set code without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/me05-018')) {
+          return detailResponse({
+            id: 'me05-018',
+            name: 'Popplio',
+            hp: '70',
+            attacks: [{ name: 'Pound', damage: '10', effect: '' }],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Popplio', type: 'Pokémon', set: 'PBL', number: '18' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'me05-018');
+        assert.deepEqual(card.attacks.map((a) => a.name), ['Pound']);
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
     test('ensureCardData: modern set code (PFL) resolves via padded id without a name search', async () => {
       const handler = (url) => {
         if (url.includes('/cards/me02-024')) {

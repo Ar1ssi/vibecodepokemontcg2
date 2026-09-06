@@ -5,6 +5,14 @@ import assert from 'node:assert/strict';
 // incident: collector number "24" alone must not resolve to Skyridge (ecard3-24).
 const { ensureCardData, resolveCardId } = await import('../rules-state.mjs');
 
+test('live: PBL Popplio #18 resolves to Pitch Black (me05-018)', { skip: !globalThis.fetch }, async () => {
+  const card = { name: 'Popplio', type: 'Pokémon', set: 'PBL', number: '18' };
+  await ensureCardData(card);
+  assert.equal(card.id, 'me05-018');
+  assert.ok(card.attacks?.some((a) => a.name === 'Pound'), 'expected Pitch Black Pound attack');
+  assert.ok(!card.attacks?.some((a) => a.name === 'Sing'), 'must not be SM Black Star Promos');
+});
+
 test('live: PFL Piloswine #24 resolves to Phantasmal Flames (me02-024)', { skip: !globalThis.fetch }, async () => {
   const card = { name: 'Piloswine', type: 'Pokémon', set: 'PFL', number: '24' };
   await ensureCardData(card);

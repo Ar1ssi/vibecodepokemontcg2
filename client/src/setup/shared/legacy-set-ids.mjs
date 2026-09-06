@@ -105,9 +105,14 @@ export const LEGACY_SET_CODE_TO_TCGDEX_ID = {
 // distinguish Phantasmal Flames Piloswine (me02-024) from Skyridge Piloswine
 // (ecard3-24). Pair the short code with the number via buildSetCardId().
 export const MODERN_SET_CODE_TO_TCGDEX_ID = {
-  // Mega Evolution era (find-type.js MEGEra)
+  // Mega Evolution era (find-type.js MEGEra; keep in sync with
+  // scripts/generate-starter-decks.mjs SET_MAP)
   MEG: 'me01',
   PFL: 'me02',
+  ASC: 'me02.5',
+  POR: 'me03',
+  CRI: 'me04',
+  PBL: 'me05',
   MEP: 'mep',
   MEE: 'mee',
   // Scarlet & Violet (find-type.js SVEra)
@@ -211,6 +216,23 @@ export function buildLegacyCardId(setCode, number) {
   return candidates.length > 0 ? candidates[0] : null;
 }
 
+// Preferred id for sync callers (import, image-url extraction). Modern ME/SV
+// sets zero-pad to three digits on TCGdex (me05-018); the unpadded first
+// candidate (me05-18) 404s, so prefer the padded form when present.
+export function buildPreferredCardId(setCode, number) {
+  const candidates = buildSetCardIdCandidates(setCode, number);
+  if (!candidates.length) return null;
+  const setId = resolveTcgdexSetId(setCode);
+  if (setId && /^(me|sv)/.test(setId)) {
+    const padded = candidates.find((c) => {
+      const local = c.slice(String(setId).length + 1);
+      return /^\d{3}[a-zA-Z]?$/.test(local);
+    });
+    if (padded) return padded;
+  }
+  return candidates[0];
+}
+
 export function buildSetCardId(setCode, number) {
   return buildLegacyCardId(setCode, number);
 }
@@ -227,6 +249,6 @@ export function extractTcgdexIdFromImageUrl(src) {
   if (m) return `${m[1]}-${m[2]}`;
   // limitlesstcg: …/tpci/PFL/PFL_024_R_EN.png → build from short code
   m = s.match(/\/tpci\/([^/]+)\/\1_(\d+[a-zA-Z]?)_/);
-  if (m) return buildLegacyCardId(m[1], m[2]);
+  if (m) return buildPreferredCardId(m[1], m[2]);
   return null;
 }
