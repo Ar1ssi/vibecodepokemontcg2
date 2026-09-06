@@ -753,6 +753,11 @@ export const openCardPicker = async ({
     cardsRow.append(carouselCol, triggerSlot);
     scene.appendChild(cardsRow);
 
+    meta = document.createElement('div');
+    meta.className = 'card-picker-meta card-picker-meta--choose';
+    meta.append(countEl, nameEl);
+    scene.appendChild(meta);
+
     dropSlot = document.createElement('div');
     dropSlot.className = 'card-picker-drop-slot';
     dropSlot.style.setProperty('--card-picker-slot-count', String(maxSel));
@@ -762,11 +767,6 @@ export const openCardPicker = async ({
     scene.appendChild(dropSlot);
 
     main.appendChild(scene);
-
-    meta = document.createElement('div');
-    meta.className = 'card-picker-meta card-picker-meta--choose';
-    meta.append(countEl, nameEl);
-    main.appendChild(meta);
 
     bottomBar = document.createElement('div');
     bottomBar.className = 'card-picker-bottom-bar';
