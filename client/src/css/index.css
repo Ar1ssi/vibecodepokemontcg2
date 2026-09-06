@@ -1970,7 +1970,7 @@ ul, li {
   --card-picker-card-h: calc(var(--card-picker-card-w) * 1.397);
   --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.36);
   --card-picker-top-gap: 16px;
-  --card-picker-anchor-right: 0px;
+  --card-picker-anchor-right: calc(24vw + 15.2vw);
   --card-picker-slot-gap: 6px;
   justify-content: center;
   gap: 0.85rem;
@@ -2024,11 +2024,15 @@ ul, li {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.65rem;
   min-height: 0;
-  padding: 0 0.35rem;
+  padding: clamp(2.5rem, 8vh, 5rem) 0 0;
   overflow: visible;
+}
+.card-picker-choose .card-picker-workspace.has-trigger {
+  align-items: stretch;
+  padding-top: clamp(2rem, 7vh, 4.5rem);
 }
 .card-picker-choose .card-picker-scene {
   display: flex;

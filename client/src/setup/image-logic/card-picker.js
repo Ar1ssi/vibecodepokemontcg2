@@ -267,9 +267,15 @@ const syncChooseLayout = (state) => {
   state.overlay.style.setProperty('--card-picker-card-h', `${Math.round(cardH)}px`);
   state.overlay.style.setProperty('--card-picker-carousel-w', `${Math.round(carouselW)}px`);
   state.overlay.style.setProperty('--card-picker-top-gap', `${CHOOSE_TOP_GAP}px`);
+
+  const sideboxW = vw * 0.24;
+  const boardW = vw - sideboxW;
+  const anchorRightPx = hasTrigger
+    ? Math.round(sideboxW + boardW * 0.2)
+    : 0;
   state.overlay.style.setProperty(
     '--card-picker-anchor-right',
-    hasTrigger ? 'clamp(20px, 4.5vw, 52px)' : '0px'
+    anchorRightPx > 0 ? `${anchorRightPx}px` : '0px'
   );
 
   if (state.scene) {
