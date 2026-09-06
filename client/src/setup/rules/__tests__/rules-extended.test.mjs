@@ -2,7 +2,7 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
-    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
+    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
@@ -16,13 +16,23 @@ import test from 'node:test';
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
     
     // ── KO / prizes ──
-    test('prizesForKO: standard = 1, ex = 3 (2 extra), VMAX = 3', () => {
+    test('prizesForKO: standard = 1, ex = 2, mega = 3, VMAX = 3', () => {
       assert.equal(prizesForKO({ rarity: 'Common' }), 1);
-      assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 3);
-      assert.equal(prizesForKO({ name: 'Cetitan ex' }), 3);
+      assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 2);
+      assert.equal(prizesForKO({ name: 'Cetitan ex' }), 2);
       assert.equal(prizesForKO({ subtypes: ['VMAX'] }), 3);
       assert.equal(prizesForKO({ subtypes: ['VSTAR'] }), 2);
-      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 2);
+      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 3);
+      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 3);
+      assert.equal(prizesForKO({ name: 'Yanmega' }), 1);
+    });
+
+    test('isMegaCard: rarity, subtype, or Mega name — not Yanmega', () => {
+      assert.equal(isMegaCard({ rarity: 'Mega Hyper Rare' }), true);
+      assert.equal(isMegaCard({ subtypes: ['Mega Evolution'] }), true);
+      assert.equal(isMegaCard({ name: 'Mega Lucario ex' }), true);
+      assert.equal(isMegaCard({ name: 'Yanmega' }), false);
+      assert.equal(isMegaCard({ name: 'Cetitan ex' }), false);
     });
 
     test('isExCard / isGxCard: subtypes first, name suffix fallback', () => {
@@ -38,7 +48,8 @@ import test from 'node:test';
 
     test('koOutcome: GX = match loss, otherwise prize counts', () => {
       assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'matchLoss' });
-      assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 3 });
+      assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 2 });
+      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 3 });
       assert.deepEqual(koOutcome({ rarity: 'Common' }), { type: 'prizes', count: 1 });
     });
 
@@ -52,12 +63,12 @@ import test from 'node:test';
       assert.match(r.reason, /GX/);
     });
 
-    test('handleKO: ex awards 3 prizes', () => {
+    test('handleKO: ex awards 2 prizes', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { name: 'Cetitan ex' } });
-      assert.equal(r.prizeCount, 3);
-      assert.equal(r.prizesTaken, 3);
-      assert.equal(r.prizesRemaining, 3);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 2);
+      assert.equal(r.prizesRemaining, 4);
       assert.equal(r.won, false);
     });
     
@@ -76,9 +87,9 @@ import test from 'node:test';
     test('handleKO packages prize info', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { rarity: 'Double rare', subtypes: ['ex'] } });
-      assert.equal(r.prizeCount, 3);
-      assert.equal(r.prizesTaken, 3);
-      assert.equal(r.prizesRemaining, 3);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 2);
+      assert.equal(r.prizesRemaining, 4);
     });
     
     test('checkWinConditions: deck-out loses', () => {
