@@ -12,6 +12,7 @@ import { closeCardPreview } from './full-view.js';
 let viewerState = null;
 
 const MAX_BEHIND = 2;
+const MAX_AHEAD = 1;
 const PEEK_PERCENT = 24;
 const SWIPE_THRESHOLD = 40;
 const SWIPE_START_PX = 8;
@@ -53,43 +54,68 @@ const buildSlideContent = async (card) => {
   return { node: img, holoWrapper: null };
 };
 
+const getVirtualIndex = (state, dragOffsetX = 0) => {
+  const width = state.stack.clientWidth || 380;
+  const progress = dragOffsetX / width;
+  return clampIndex(state.index + progress, state.slides.length - 1);
+};
+
 const syncHoloAnimations = (state) => {
   state.slides.forEach((slide, i) => {
     const wrapper = slideWrapper(slide);
     if (!wrapper) return;
-    stopHoloAnimation(wrapper);
-    if (state.index - i === 0) {
-      startHoloAnimation(wrapper);
+
+    const visible = !slide.classList.contains('is-hidden');
+    if (!visible) {
+      if (slide.holoRunning) {
+        stopHoloAnimation(wrapper);
+        slide.holoRunning = false;
+      }
+      return;
+    }
+
+    if (!slide.holoRunning) {
+      startHoloAnimation(wrapper, {
+        auto: true,
+        phaseOffset: (i * 0.31) % 1,
+      });
+      slide.holoRunning = true;
     }
   });
 };
 
 const layoutStack = (state, dragOffsetX = 0) => {
-  const { slides, index } = state;
+  const virtualIndex = getVirtualIndex(state, dragOffsetX);
+  const { slides } = state;
+
   slides.forEach((slide, i) => {
-    const behind = index - i;
-    slide.classList.remove('is-active', 'is-behind', 'is-hidden');
-    if (behind < 0 || behind > MAX_BEHIND) {
+    const offset = i - virtualIndex;
+    slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
+
+    if (offset < -MAX_AHEAD || offset > MAX_BEHIND) {
       slide.classList.add('is-hidden');
       slide.style.zIndex = '0';
       slide.style.transform = '';
       slide.style.opacity = '';
       return;
     }
-    slide.style.zIndex = String(300 - behind);
-    if (behind === 0) {
+
+    const absOffset = Math.abs(offset);
+    slide.style.zIndex = String(300 - Math.round(absOffset * 10));
+
+    if (offset === 0) {
       slide.classList.add('is-active');
-      slide.style.transform = dragOffsetX
-        ? `translateX(${dragOffsetX}px) scale(1)`
-        : 'translateX(0) scale(1)';
-      slide.style.opacity = '1';
+    } else if (offset < 0) {
+      slide.classList.add('is-ahead');
     } else {
       slide.classList.add('is-behind');
-      slide.style.transform = `translateX(calc(${behind} * ${PEEK_PERCENT}%)) scale(${1 - behind * 0.035})`;
-      slide.style.opacity = String(Math.max(0.45, 0.9 - behind * 0.2));
     }
+
+    slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}%)) scale(${1 - absOffset * 0.035})`;
+    slide.style.opacity = String(Math.max(0.5, 1 - absOffset * 0.18));
   });
-  if (!dragOffsetX) syncHoloAnimations(state);
+
+  syncHoloAnimations(state);
 };
 
 const updateFooter = (state) => {

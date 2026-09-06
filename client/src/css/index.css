@@ -1791,7 +1791,7 @@ ul, li {
   align-items: center;
   justify-content: center;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   transition:
     transform 0.22s ease,
     opacity 0.22s ease;
@@ -1800,9 +1800,9 @@ ul, li {
   pointer-events: none;
 }
 .discard-pile-slide.is-active {
-  overflow: visible;
   pointer-events: auto;
 }
+.discard-pile-slide.is-ahead,
 .discard-pile-slide.is-behind {
   pointer-events: none;
 }
@@ -1814,6 +1814,12 @@ ul, li {
   width: 100%;
   height: 100%;
   aspect-ratio: var(--card-aspect);
+  overflow: hidden;
+  border-radius: 0.3rem;
+}
+.discard-pile-slide .mat-holo.discard-pile-holo .card__rotator {
+  overflow: hidden;
+  border-radius: 0.3rem;
 }
 .discard-pile-slide .mat-holo.discard-pile-holo .card__translater,
 .discard-pile-slide .mat-holo.discard-pile-holo .card__rotator,
@@ -1827,7 +1833,7 @@ ul, li {
   height: 100%;
   object-fit: cover;
 }
-.discard-pile-stack.is-dragging .discard-pile-slide.is-active {
+.discard-pile-stack.is-dragging .discard-pile-slide {
   transition: none;
 }
 .discard-pile-card {
