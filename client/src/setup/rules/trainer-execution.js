@@ -398,14 +398,23 @@ async function runSearchStep(card, searchStep, done) {
     });
   };
 
-  if ((searchStep.count || 1) > 1) {
+  if ((searchStep.count || 1) > 1 || searchStep.upTo) {
+    const count = searchStep.count || 1;
+    const upTo = searchStep.upTo === true;
+    const maxSel = Math.min(count, pool.length);
+    const minSel = upTo ? 0 : count;
     _openChoicePicker({
-      title: `${card.name} — choose ${searchStep.count} cards`,
+      title: upTo
+        ? `${card.name} — choose up to ${count} cards`
+        : `${card.name} — choose ${count} cards`,
       candidates: pool,
       zoneFrom: 'deck',
       destination: toBench ? 'bench' : 'hand',
       multiSelect: true,
-      requiredCount: searchStep.count,
+      requiredCount: maxSel,
+      minCount: minSel,
+      maxCount: count,
+      upTo,
       onConfirm: (selected) => {
         for (const s of selected) {
           const idx = zone('self', 'deck').array.indexOf(s);
@@ -413,7 +422,11 @@ async function runSearchStep(card, searchStep, done) {
             moveCardBundle('self', 'self', 'deck', toBench ? 'bench' : 'hand', idx, false, 'move');
           }
         }
-        msg(`  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`);
+        if (selected.length === 0) {
+          msg('  no cards taken — deck shuffled');
+        } else {
+          msg(`  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`);
+        }
         shuffleAfter();
         done?.();
       },

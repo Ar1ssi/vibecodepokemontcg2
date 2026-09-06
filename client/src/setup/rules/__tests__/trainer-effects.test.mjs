@@ -378,7 +378,11 @@ import test, { describe } from 'node:test';
     test('Firebreather: search up to 7 Basic {R} Energy (not generic "card")', () => {
       const r = parseTrainerEffect("Search your deck for up to 7 Basic { R } Energy cards, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
-      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic {R} Energy' && s.count === 7));
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {R} Energy');
+      assert.equal(search.count, 7);
+      assert.equal(search.upTo, true);
       assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
     });
 

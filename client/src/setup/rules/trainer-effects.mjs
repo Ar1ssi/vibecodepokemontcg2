@@ -139,6 +139,19 @@ export function parseSearchDeckParams(lower) {
   let what = 'card';
   let count = 1;
   let destination = 'hand';
+  if (
+    lower.includes('onto your bench') ||
+    lower.includes('put it onto your bench') ||
+    lower.includes('put them onto your bench')
+  ) {
+    destination = 'bench';
+  } else if (
+    lower.includes('attach them to') ||
+    lower.includes('attach them to 1') ||
+    (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
+  ) {
+    destination = 'attach';
+  }
 
   if (lower.includes('item card and a pokémon tool card')) {
     return { what: 'Item + Pokémon Tool', count: 1, destination: 'hand' };
@@ -234,12 +247,20 @@ export function parseSearchDeckParams(lower) {
   // Energy before generic Pokémon fallback (Misty's Vitality, etc.)
   else if (/up to\s+(\d+)\s+basic\s+\{[a-z]\}\s+energy/.test(lower)) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+(\{[a-z]\})\s+energy/);
-    what = `Basic ${m[2].toUpperCase()} Energy`;
-    count = Number(m[1]);
+    return {
+      what: `Basic ${m[2].toUpperCase()} Energy`,
+      count: Number(m[1]),
+      destination,
+      upTo: true,
+    };
   } else if (/up to\s+(\d+)\s+basic\s+energy/.test(lower)) {
     const m = lower.match(/up to\s+(\d+)\s+basic\s+energy/);
-    what = 'Basic Energy';
-    count = Number(m[1]);
+    return {
+      what: 'Basic Energy',
+      count: Number(m[1]),
+      destination,
+      upTo: true,
+    };
   } else if (lower.includes('basic') && lower.includes('energy') && !lower.includes('or')) {
     const typed = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
     const countMatch = lower.match(/up to\s+(\d+)/);
@@ -252,15 +273,12 @@ export function parseSearchDeckParams(lower) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
-  if (
-    lower.includes('attach them to') ||
-    lower.includes('attach them to 1') ||
-    (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
-  ) {
-    destination = 'attach';
-  }
-
-  return { what, count, destination };
+  return {
+    what,
+    count,
+    destination,
+    ...(/search your deck for up to\s+\d+/.test(lower) ? { upTo: true } : {}),
+  };
 }
 
 function parseCoinFlipStep(lower) {

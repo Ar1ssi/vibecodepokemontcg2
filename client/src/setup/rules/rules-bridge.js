@@ -1151,11 +1151,15 @@ import {
 // ── choice picker for search effects ─────────────────────────────────
     // Opens a modal with candidate cards (from deck/discard); clicking one
     // executes the pending move (to hand or bench) automatically.
-    const openChoicePicker = ({ title, candidates, zoneFrom, destination, user = 'self', pickOnly = false, multiSelect = false, requiredCount = 1, onPick, onConfirm, onCancel }) => {
+    const openChoicePicker = ({ title, candidates, zoneFrom, destination, user = 'self', pickOnly = false, multiSelect = false, requiredCount = 1, minCount, maxCount, upTo = false, onPick, onConfirm, onCancel }) => {
       // remove any existing picker
       document.getElementById('rulesChoicePicker')?.remove();
+
+      const maxSel = maxCount ?? requiredCount;
+      const minSel = minCount ?? (upTo ? 0 : requiredCount);
+      const cappedMax = Math.min(maxSel, candidates.length);
       
-      if (multiSelect && requiredCount > candidates.length) {
+      if (multiSelect && !upTo && minSel > candidates.length) {
         appendMessage('', `  not enough cards to select ${requiredCount} — play it manually`, 'announcement', false);
         return;
       }
@@ -1175,6 +1179,9 @@ import {
       const selected = new Set();
       const grid = overlay.querySelector('.choice-picker-grid');
       const confirmBtn = overlay.querySelector('.choice-picker-confirm');
+      if (confirmBtn && upTo && minSel === 0) {
+        confirmBtn.disabled = false;
+      }
       import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
         for (const cand of candidates) {
           const btn = document.createElement('button');
@@ -1190,11 +1197,13 @@ import {
               if (selected.has(cand)) {
                 selected.delete(cand);
                 btn.classList.remove('selected');
-              } else {
+              } else if (selected.size < cappedMax) {
                 selected.add(cand);
                 btn.classList.add('selected');
               }
-              if (confirmBtn) confirmBtn.disabled = selected.size !== requiredCount;
+              if (confirmBtn) {
+                confirmBtn.disabled = selected.size < minSel || selected.size > cappedMax;
+              }
               return;
             }
             try {
@@ -1518,15 +1527,21 @@ import {
       const toBench = dest === 'bench';
       const shuffleAfter = () => shuffleZone(user, user, 'deck');
       const count = step.count || 1;
+      const upTo = step.upTo === true;
 
-      if (count > 1) {
+      if (count > 1 || upTo) {
         const result = await awaitChoicePicker({
-          title: `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}`,
+          title: upTo
+            ? `${card.name} — choose up to ${count} cards to ${toBench ? 'Bench' : 'your hand'}`
+            : `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}`,
           candidates: pool,
           zoneFrom: 'deck',
           destination: dest,
           multiSelect: true,
-          requiredCount: count,
+          requiredCount: Math.min(count, pool.length),
+          minCount: upTo ? 0 : count,
+          maxCount: count,
+          upTo,
           onConfirm: (selected) => {
             import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
               for (const s of selected) {
