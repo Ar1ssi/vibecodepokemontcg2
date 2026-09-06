@@ -322,20 +322,18 @@ function normalizeCard(card, qty) {
 }
 
 async function resolveDeck(lines) {
-  const resolved = [];
-  for (const line of lines) {
+  const tasks = lines.map(async (line) => {
     const parsed = parseLine(line);
     if (parsed.modernEnergy) {
-      resolved.push(buildModernBasicEnergy(parsed.modernEnergy, parsed.qty));
-      continue;
+      return buildModernBasicEnergy(parsed.modernEnergy, parsed.qty);
     }
     const cardId =
       parsed.cardId ||
       toCardId(parsed.setCode, parsed.number);
     const card = await fetchCard(cardId);
-    resolved.push(normalizeCard(card, parsed.qty));
-  }
-  return resolved;
+    return normalizeCard(card, parsed.qty);
+  });
+  return Promise.all(tasks);
 }
 
 async function main() {

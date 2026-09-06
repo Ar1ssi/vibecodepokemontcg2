@@ -13,13 +13,17 @@ export function buildCardHint(card) {
   if (card.number) hint.number = card.number;
   if (card.set) hint.set = card.set;
   if (card.id) hint.id = card.id;
-  if (typeof card.syncInstance === 'number') {
+  if (card.cardId != null) {
+    hint.cardId = card.cardId;
+  }
+  if (card.syncInstance != null) {
     hint.syncInstance = card.syncInstance;
   }
   if (
     !src &&
     !name &&
-    typeof hint.syncInstance !== 'number'
+    hint.syncInstance == null &&
+    hint.cardId == null
   ) {
     return null;
   }
@@ -29,9 +33,14 @@ export function buildCardHint(card) {
 export function cardMatchesHint(card, hint) {
   if (!card || !hint) return false;
 
+  if (hint.cardId != null && card.cardId != null && hint.cardId === card.cardId) {
+    return true;
+  }
+
   if (
-    typeof hint.syncInstance === 'number' &&
-    card.syncInstance === hint.syncInstance
+    hint.syncInstance != null &&
+    card.syncInstance != null &&
+    String(card.syncInstance) === String(hint.syncInstance)
   ) {
     return true;
   }
@@ -63,8 +72,32 @@ export function resolveCardIndex(zone, hint, fallbackIndex) {
   const arr = zone?.array;
   if (!arr?.length) return typeof fallbackIndex === 'number' ? fallbackIndex : -1;
 
-  if (hint && typeof hint.syncInstance === 'number') {
-    const byInstance = arr.findIndex((c) => c.syncInstance === hint.syncInstance);
+  // Support direct card reference as fallbackIndex
+  if (typeof fallbackIndex === 'object' && fallbackIndex !== null) {
+    const directIdx = arr.indexOf(fallbackIndex);
+    if (directIdx >= 0) return directIdx;
+    hint = hint || buildCardHint(fallbackIndex);
+  } else if (typeof fallbackIndex === 'string' && isNaN(Number(fallbackIndex))) {
+    // fallbackIndex is a cardId/syncInstance string
+    const byId = arr.findIndex((c) => c.cardId === fallbackIndex || String(c.syncInstance) === fallbackIndex);
+    if (byId >= 0) return byId;
+  }
+
+  // Support string or number ID passed directly as hint
+  if (typeof hint === 'string' || typeof hint === 'number') {
+    const byId = arr.findIndex((c) => c.cardId === hint || String(c.syncInstance) === String(hint));
+    if (byId >= 0) return byId;
+  }
+
+  if (hint && hint.cardId != null) {
+    const byCardId = arr.findIndex((c) => c.cardId === hint.cardId);
+    if (byCardId >= 0) return byCardId;
+  }
+
+  if (hint && hint.syncInstance != null) {
+    const byInstance = arr.findIndex(
+      (c) => c.syncInstance != null && String(c.syncInstance) === String(hint.syncInstance)
+    );
     if (byInstance >= 0) return byInstance;
   }
 
@@ -109,8 +142,14 @@ export function resolveCardIndex(zone, hint, fallbackIndex) {
 /** True when the card at index satisfies the relay hint (used before mirror replay). */
 export function hintMatchesAtIndex(zone, index, hint) {
   if (!hint || !zone?.array?.length) return false;
-  if (typeof index !== 'number' || index < 0 || index >= zone.array.length) {
+  let idx = index;
+  if (typeof idx === 'object' && idx !== null) {
+    idx = zone.array.indexOf(idx);
+  } else if (typeof idx === 'string' && isNaN(Number(idx))) {
+    idx = zone.array.findIndex((c) => c.cardId === idx || String(c.syncInstance) === idx);
+  }
+  if (typeof idx !== 'number' || idx < 0 || idx >= zone.array.length) {
     return false;
   }
-  return cardMatchesHint(zone.array[index], hint);
+  return cardMatchesHint(zone.array[idx], hint);
 }

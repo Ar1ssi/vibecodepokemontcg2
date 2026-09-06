@@ -4,6 +4,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { instrument } from '@socket.io/admin-ui';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import path from 'path';
 import dotenv from 'dotenv';
 import sqlite3 from 'sqlite3';
@@ -18,15 +19,8 @@ const clientDir = path.join(__dirname, '../client');
 const envFilePath = path.join(__dirname, 'socket-admin-password.env');
 dotenv.config({ path: envFilePath });
 
-function generateRandomKey(length) {
-  const characters =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let key = '';
-  for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    key += characters.charAt(randomIndex);
-  }
-  return key;
+function generateRandomKey(length = 8) {
+  return crypto.randomBytes(length).toString('base64url').slice(0, length);
 }
 
 async function main() {
@@ -56,18 +50,21 @@ async function main() {
   const db = new sqlite3.Database(dbFilePath);
   let isDatabaseCapacityReached = false;
 
-  // Check database size
-  const checkDatabaseSizeGB = () => {
-    const stats = fs.statSync(dbFilePath);
-    const fileSizeInBytes = stats.size;
-    const fileSizeInGB = fileSizeInBytes / (1024 * 1024 * 1024); // Convert bytes to gigabytes
-    return fileSizeInGB;
+  // Check database size (async to avoid blocking the event loop)
+  const checkDatabaseSizeGB = async () => {
+    try {
+      const stats = await fs.promises.stat(dbFilePath);
+      const fileSizeInBytes = stats.size;
+      return fileSizeInBytes / (1024 * 1024 * 1024); // Convert bytes to gigabytes
+    } catch {
+      return 0; // File may not exist yet
+    }
   };
 
   // Perform size check periodically
   setInterval(
-    () => {
-      const currentSize = checkDatabaseSizeGB();
+    async () => {
+      const currentSize = await checkDatabaseSizeGB();
       if (currentSize > maxSizeGB) {
         isDatabaseCapacityReached = true;
       }
@@ -75,12 +72,25 @@ async function main() {
     1000 * 60 * 60
   );
 
-  // Create a table to store key-value pairs
+  // Create a table to store key-value pairs (with TTL support)
   db.serialize(() => {
     db.run(
-      'CREATE TABLE IF NOT EXISTS KeyValuePairs (key TEXT PRIMARY KEY, value TEXT)'
+      'CREATE TABLE IF NOT EXISTS KeyValuePairs (key TEXT PRIMARY KEY, value TEXT, created_at TEXT DEFAULT (datetime(\'now\')))'
     );
   });
+
+  // Evict saved game states older than 30 days (runs once per day)
+  const EVICTION_DAYS = 30;
+  setInterval(() => {
+    db.run(
+      `DELETE FROM KeyValuePairs WHERE created_at < datetime('now', '-${EVICTION_DAYS} days')`,
+      (err) => {
+        if (!err) {
+          isDatabaseCapacityReached = false; // Re-enable saves after cleanup
+        }
+      }
+    );
+  }, 1000 * 60 * 60 * 24);
 
   // Bcrypt Configuration
   const saltRounds = 10;
@@ -128,10 +138,31 @@ async function main() {
       return;
     }
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
       const upstream = await fetch(target.href, {
         headers: { 'User-Agent': 'PTCG-sim/1.0' },
-        redirect: 'follow',
+        redirect: 'manual',
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+      // If the CDN redirects, validate the redirect target stays in allowed hosts
+      if ([301, 302, 303, 307, 308].includes(upstream.status)) {
+        const location = upstream.headers.get('location');
+        if (location) {
+          try {
+            const redirectUrl = new URL(location, target.href);
+            if (!MAT_IMAGE_REMOTE_HOSTS.has(redirectUrl.hostname)) {
+              res.status(403).send('redirect host not allowed');
+              return;
+            }
+          } catch {
+            // fall through
+          }
+        }
+        res.status(403).send('redirect not allowed');
+        return;
+      }
       if (!upstream.ok) {
         res.status(upstream.status).send('upstream error');
         return;
@@ -140,8 +171,12 @@ async function main() {
       if (contentType) res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.send(Buffer.from(await upstream.arrayBuffer()));
-    } catch {
-      res.status(502).send('fetch failed');
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        res.status(504).send('upstream timeout');
+      } else {
+        res.status(502).send('fetch failed');
+      }
     }
   });
 
@@ -233,21 +268,50 @@ async function main() {
           'No more storage for game states! You should probably tell Michael/Xiao Xiao.'
         );
       } else {
-        const key = generateRandomKey(4);
-        db.run(
-          'INSERT OR REPLACE INTO KeyValuePairs (key, value) VALUES (?, ?)',
-          [key, exportData],
-          (err) => {
-            if (err) {
-              socket.emit(
-                'exportGameStateFailed',
-                'Error exporting game! Please try again or save as a file.'
-              );
-            } else {
-              socket.emit('exportGameStateSuccessful', key);
-            }
+        // Attempt up to 5 times to find a unique key
+        const tryInsert = (attemptsLeft) => {
+          if (attemptsLeft <= 0) {
+            socket.emit(
+              'exportGameStateFailed',
+              'Error exporting game! Please try again or save as a file.'
+            );
+            return;
           }
-        );
+          const key = generateRandomKey();
+          db.get(
+            'SELECT key FROM KeyValuePairs WHERE key = ?',
+            [key],
+            (err, row) => {
+              if (err) {
+                socket.emit(
+                  'exportGameStateFailed',
+                  'Error exporting game! Please try again or save as a file.'
+                );
+                return;
+              }
+              if (row) {
+                // Key collision — retry with a new key
+                tryInsert(attemptsLeft - 1);
+                return;
+              }
+              db.run(
+                'INSERT INTO KeyValuePairs (key, value) VALUES (?, ?)',
+                [key, exportData],
+                (insertErr) => {
+                  if (insertErr) {
+                    socket.emit(
+                      'exportGameStateFailed',
+                      'Error exporting game! Please try again or save as a file.'
+                    );
+                  } else {
+                    socket.emit('exportGameStateSuccessful', key);
+                  }
+                }
+              );
+            }
+          );
+        };
+        tryInsert(5);
       }
     });
     socket.on('joinGame', (roomId, username, isSpectator) => {
@@ -262,9 +326,14 @@ async function main() {
         if (isSpectator) {
           room.spectators.add(username);
           socket.emit('spectatorJoin');
+          socket.to(roomId).emit('requestSpectatorData', { roomId });
         } else {
           room.players.add(username);
           socket.emit('joinGame');
+          // Remove any existing disconnect listener to prevent leak on rejoin
+          if (socket.data.disconnectListener) {
+            socket.removeListener('disconnect', socket.data.disconnectListener);
+          }
           socket.data.disconnectListener = () =>
             disconnectHandler(roomId, username);
           socket.on('disconnect', socket.data.disconnectListener);
@@ -285,8 +354,13 @@ async function main() {
       socket.join(data.roomId);
       if (!data.notSpectator) {
         room.spectators.add(data.username);
+        socket.to(data.roomId).emit('requestSpectatorData', { roomId: data.roomId });
       } else {
         room.players.add(data.username);
+        // Remove any existing disconnect listener to prevent leak on reconnect
+        if (socket.data.disconnectListener) {
+          socket.removeListener('disconnect', socket.data.disconnectListener);
+        }
         socket.data.disconnectListener = () =>
           disconnectHandler(data.roomId, data.username);
         socket.on('disconnect', socket.data.disconnectListener);
@@ -308,40 +382,9 @@ async function main() {
       'syncLogBundle',
       'appendMessage',
       'spectatorActionData',
+      'requestSpectatorData',
       'initiateImport',
       'endImport',
-      // 'exchangeData',
-      // 'loadDeckData',
-      // 'reset',
-      // 'setup',
-      // 'takeTurn',
-      // 'draw',
-      // 'moveCardBundle',
-      // 'shuffleIntoDeck',
-      // 'moveToDeckTop',
-      // 'switchWithDeckTop',
-      // 'viewDeck',
-      // 'shuffleAll',
-      // 'discardAll',
-      // 'lostZoneAll',
-      // 'handAll',
-      // 'leaveAll',
-      // 'discardAndDraw',
-      // 'shuffleAndDraw',
-      // 'shuffleBottomAndDraw',
-      // 'shuffleZone',
-      // 'useAbility',
-      // 'removeAbilityCounter',
-      // 'addDamageCounter',
-      // 'updateDamageCounter',
-      // 'removeDamageCounter',
-      // 'addSpecialCondition',
-      // 'updateSpecialCondition',
-      // 'removeSpecialCondition',
-      // 'discardBoard',
-      // 'handBoard',
-      // 'shuffleBoard',
-      // 'lostZoneBoard',
       'lookAtCards',
       'stopLookingAtCards',
       'revealCards',
@@ -350,12 +393,6 @@ async function main() {
       'hideShortcut',
       'lookShortcut',
       'stopLookingShortcut',
-      // 'playRandomCardFaceDown',
-      // 'rotateCard',
-      // 'changeType',
-      // 'attack',
-      // 'pass',
-      // 'VSTARGXFunction',
     ];
 
     // Register event listeners using the common function

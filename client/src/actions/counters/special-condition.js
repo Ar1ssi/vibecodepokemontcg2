@@ -47,6 +47,9 @@ export const updateSpecialCondition = (
   }
 
   const specialCondition = card?.image?.specialCondition;
+  if (card) {
+    card.specialCondition = textContent || null;
+  }
   if (!specialCondition) return;
   setSpecialConditionCode(specialCondition, textContent);
   applySpecialConditionStyle(specialCondition, textContent);
@@ -57,6 +60,14 @@ export const updateSpecialCondition = (
     textContent,
     hint,
   ]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-status-changed', {
+        detail: { user, zoneId, index: resolved, condition: card ? card.specialCondition : textContent },
+      })
+    );
+  }
 };
 
 export const removeSpecialCondition = (
@@ -79,8 +90,9 @@ export const removeSpecialCondition = (
   }
 
   if (!targetCard) return;
+  targetCard.specialCondition = null;
   //make sure targetCard exists (it won't exist if it's already been removed)
-  if (targetCard.image.specialCondition) {
+  if (targetCard.image?.specialCondition) {
     targetCard.image.specialCondition.removeEventListener(
       'input',
       targetCard.image.specialCondition.handleColor
@@ -100,6 +112,14 @@ export const removeSpecialCondition = (
   }
 
   processAction(user, emit, 'removeSpecialCondition', [zoneId, resolved, hint]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-status-changed', {
+        detail: { user, zoneId, index: resolved, condition: null },
+      })
+    );
+  }
 };
 
 export const addSpecialCondition = (
@@ -122,6 +142,7 @@ export const addSpecialCondition = (
   }
 
   if (!targetCard) return;
+  targetCard.specialCondition = targetCard.specialCondition || '1';
   index = resolved;
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();
@@ -229,4 +250,12 @@ export const addSpecialCondition = (
   targetCard.image.specialCondition = specialCondition;
 
   processAction(user, emit, 'addSpecialCondition', [zoneId, resolved, hint]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-status-changed', {
+        detail: { user, zoneId, index: resolved, condition: targetCard.specialCondition },
+      })
+    );
+  }
 };

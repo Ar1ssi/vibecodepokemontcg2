@@ -1,7 +1,7 @@
 import { socket, systemState } from '../../state.js';
 
 export const appendMessage = (user, message, type, emit = true) => {
-  if (!systemState.isUndoInProgress) {
+  if (!systemState.isUndoInProgress && !systemState.syncReplaying && !systemState.isCatchingUp) {
     const chatbox = document.getElementById('chatbox');
     const p2Chatbox = document.getElementById('p2Chatbox');
 

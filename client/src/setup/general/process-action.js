@@ -1,5 +1,6 @@
 import { socket, systemState } from '../../state.js';
 import { logSyncAction } from './sync-logger-bridge.js';
+import { createAction } from './action-event.mjs';
 
 export const processAction = (user, emit, action, parameters) => {
   const notSpectator = !(
@@ -8,12 +9,7 @@ export const processAction = (user, emit, action, parameters) => {
   );
   if (!systemState.isUndoInProgress && emit && notSpectator) {
     if (!systemState.isTwoPlayer || user === 'self') {
-      const data = {
-        user: user,
-        emit: emit,
-        action: action,
-        parameters: parameters,
-      };
+      const data = createAction(action, user, parameters, { emit });
       if (user === 'self') {
         systemState.selfCounter++;
         systemState.selfActionData.push(data);
@@ -58,16 +54,17 @@ export const processAction = (user, emit, action, parameters) => {
           exportParameters[0] = 'self';
         }
       }
-      const data = {
-        user: user,
-        emit: emit,
-        action: action,
-        parameters: exportParameters,
-      };
+      const data = createAction(action, user, exportParameters, { emit });
       // systemState.spectatorActionData.push(data);
       if (action !== 'exchangeData' && action !== 'loadDeckData') {
         systemState.exportActionData.push(data);
       }
+    }
+
+    if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+      document.dispatchEvent(
+        new CustomEvent('action-processed', { detail: { action, user } })
+      );
     }
   }
 };

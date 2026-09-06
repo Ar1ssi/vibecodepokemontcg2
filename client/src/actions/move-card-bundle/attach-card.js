@@ -26,6 +26,13 @@ export const attachCard = (
   movingCard.image.relative = targetCard.image;
   movingCard.image.style.position = 'absolute';
 
+  // Pure data state attachment
+  movingCard.attached = true;
+  movingCard.parentCard = targetCard;
+  movingCard.parentCardId = targetCard.cardId ?? targetCard.syncInstance ?? null;
+  if (!Array.isArray(targetCard.attachedCards)) targetCard.attachedCards = [];
+  if (!targetCard.attachedCards.includes(movingCard)) targetCard.attachedCards.push(movingCard);
+
   let layer;
   if (movingCard.type !== 'Pokémon') {
     // hostParent is the element that owns the target card in the zone DOM

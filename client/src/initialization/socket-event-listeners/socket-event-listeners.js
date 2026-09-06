@@ -36,11 +36,58 @@ import {
 
 let isImporting = false;
 let syncCheckInterval;
-let spectatorActionInterval;
+let spectatorDebounceTimer = null;
+let syncCheckDebounceTimer = null;
+let lastSyncedSelfCounter = -1;
 let pushActionQueue = Promise.resolve();
+
+export const sendSpectatorData = () => {
+  if (systemState.isTwoPlayer && systemState.roomId) {
+    const data = {
+      selfUsername: systemState.p2SelfUsername,
+      selfDeckData: systemState.selfDeckData,
+      oppDeckData: systemState.p2OppDeckData,
+      oppUsername: systemState.p2OppUsername,
+      roomId: systemState.roomId,
+      spectatorActionData: systemState.exportActionData,
+      socketId: socket.id,
+    };
+    socket.emit('spectatorActionData', data);
+  }
+};
+
+export const emitSpectatorDataDebounced = (delay = 200) => {
+  if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
+  spectatorDebounceTimer = setTimeout(() => {
+    spectatorDebounceTimer = null;
+    sendSpectatorData();
+  }, delay);
+};
+
+export const emitSyncCheck = () => {
+  if (!systemState.isTwoPlayer || !systemState.roomId) return;
+  if (systemState.syncReplaying || systemState.isCatchingUp) return;
+  lastSyncedSelfCounter = systemState.selfCounter;
+  const data = {
+    roomId: systemState.roomId,
+    counter: systemState.selfCounter,
+    boardHash: hashUserBoard('self'),
+  };
+  socket.emit('syncCheck', data);
+};
+
+export const triggerSyncCheck = (delay = 300) => {
+  if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
+  syncCheckDebounceTimer = setTimeout(() => {
+    syncCheckDebounceTimer = null;
+    emitSyncCheck();
+  }, delay);
+};
+
 export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
-  clearInterval(spectatorActionInterval);
+  if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
+  if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
 };
 export const initializeSocketEventListeners = () => {
   socket.on('joinGame', () => {
@@ -81,35 +128,24 @@ export const initializeSocketEventListeners = () => {
       data: { socketId: socket.id },
     });
 
-    //initialize sync checker, which will routinely make sure game are synced
+    // Heartbeat backstop: slow 30s check, and only if an action occurred since last check
     syncCheckInterval = setInterval(() => {
-      if (systemState.isTwoPlayer) {
-        const data = {
-          roomId: systemState.roomId,
-          counter: systemState.selfCounter,
-          boardHash: hashUserBoard('self'),
-        };
-        socket.emit('syncCheck', data);
+      if (
+        systemState.isTwoPlayer &&
+        systemState.selfCounter !== lastSyncedSelfCounter
+      ) {
+        emitSyncCheck();
       }
-    }, 3000);
-
-    spectatorActionInterval = setInterval(() => {
-      if (systemState.isTwoPlayer) {
-        const data = {
-          selfUsername: systemState.p2SelfUsername,
-          selfDeckData: systemState.selfDeckData,
-          oppDeckData: systemState.p2OppDeckData,
-          oppUsername: systemState.p2OppUsername,
-          roomId: systemState.roomId,
-          spectatorActionData: systemState.exportActionData,
-          socketId: socket.id,
-        };
-        socket.emit('spectatorActionData', data);
-      }
-    }, 1000);
+    }, 30000);
+  });
+  socket.on('requestSpectatorData', () => {
+    sendSpectatorData();
   });
   socket.on('spectatorJoin', () => {
     spectatorJoin();
+    if (systemState.roomId) {
+      socket.emit('requestSpectatorData', { roomId: systemState.roomId });
+    }
   });
   socket.on('roomReject', () => {
     let overlay = document.createElement('div');
@@ -303,6 +339,8 @@ export const initializeSocketEventListeners = () => {
             parameters: data.parameters,
           });
         }
+        triggerSyncCheck();
+        emitSpectatorDataDebounced();
       } else if (data.counter > parseInt(systemState.oppCounter) + 1) {
         logSync('pushAction.gap', {
           expected: systemState.oppCounter + 1,
@@ -445,102 +483,6 @@ export const initializeSocketEventListeners = () => {
       }
     });
   });
-  // socket.on('exchangeData', (data) => {
-  //     exchangeData(data.user, data.username, data.deckData, data.emit);
-  // });
-  // socket.on('loadDeckData', (data) => {
-  //     loadDeckData(data.user, data.deckData, data.emit);
-  // });
-  // socket.on('reset', (data) => {
-  //     reset(data.user, data.clean, data.build, data.invalidMessage, data.emit);
-  // });
-  // socket.on('setup', (data) => {
-  //     setup(data.user, data.indices, data.emit);
-  // });
-  // socket.on('takeTurn', (data) => {
-  //     takeTurn(data.user, data.initiator, data.emit);
-  // });
-  // socket.on('draw', (data) => {
-  //     draw(data.user, data.initiator, data.drawAmount, data.emit);
-  // });
-  // socket.on('moveCardBundle', (data) => {
-  //     moveCardBundle(data.user, data.initiator, data.oZoneId, data.dZoneId, data.index, data.targetIndex, data.action, data.emit)
-  // });
-  // socket.on('shuffleIntoDeck', (data) => {
-  //     shuffleIntoDeck(data.user, data.initiator, data.zoneId, data.index, data.indices, data.emit);
-  // });
-  // socket.on('moveToDeckTop', (data) => {
-  //     moveToDeckTop(data.user, data.initiator, data.oZoneId, data.index, data.emit);
-  // });
-  // socket.on('switchWithDeckTop', (data) => {
-  //     switchWithDeckTop(data.user, data.initiator, data.oZoneId, data.index, data.emit);
-  // });
-  // socket.on('viewDeck', (data) => {
-  //     viewDeck(data.user, data.initiator, data.viewAmount, data.top, data.selectedDeckCount, data.targetIsOpp, data.emit);
-  // });
-  // socket.on('shuffleAll', (data) => {
-  //     shuffleAll(data.user, data.initiator, data.zoneId, data.indices, data.emit);
-  // });
-  // socket.on('discardAll', (data) => {
-  //     discardAll(data.user, data.initiator, data.zoneId, data.emit);
-  // });
-  // socket.on('lostZoneAll', (data) => {
-  //     lostZoneAll(data.user, data.initiator, data.zoneId, data.emit);
-  // });
-  // socket.on('handAll', (data) => {
-  //     handAll(data.user, data.initiator, data.zoneId, data.emit);
-  // });
-  // socket.on('leaveAll', (data) => {
-  //     leaveAll(data.user, data.initiator, data.oZoneId, data.emit);
-  // });
-  // socket.on('discardAndDraw', (data) => {
-  //     discardAndDraw(data.user, data.initiator, data.drawAmount, data.emit);
-  // });
-  // socket.on('shuffleAndDraw', (data) => {
-  //     shuffleAndDraw(data.user, data.initiator, data.drawAmount, data.indices, data.emit);
-  // });
-  // socket.on('shuffleBottomAndDraw', (data) => {
-  //     shuffleBottomAndDraw(data.user, data.initiator, data.drawAmount, data.indices, data.emit);
-  // });
-  // socket.on('shuffleZone', (data) => {
-  //     shuffleZone(data.user, data.initiator, data.zoneId, data.indices, data.message, data.emit);
-  // });
-  // socket.on('useAbility', (data) => {
-  //     useAbility(data.user, data.initiator, data.zoneId, data.index, data.emit);
-  // });
-  // socket.on('removeAbilityCounter', (data) => {
-  //     removeAbilityCounter(data.user, data.zoneId, data.index, data.emit);
-  // });
-  // socket.on('addDamageCounter', (data) => {
-  //     addDamageCounter(data.user, data.zoneId, data.index, data.damageAmount, data.emit);
-  // });
-  // socket.on('updateDamageCounter', (data) => {
-  //     updateDamageCounter(data.user, data.zoneId, data.index, data.damageAmount, data.emit);
-  // });
-  // socket.on('removeDamageCounter', (data) => {
-  //     removeDamageCounter(data.user, data.zoneId, data.index, data.emit);
-  // });
-  // socket.on('addSpecialCondition', (data) => {
-  //     addSpecialCondition(data.user, data.zoneId, data.index, data.emit);
-  // });
-  // socket.on('updateSpecialCondition', (data) => {
-  //     updateSpecialCondition(data.user, data.zoneId, data.index, data.textContent, data.emit);
-  // });
-  // socket.on('removeSpecialCondition', (data) => {
-  //     removeSpecialCondition(data.user, data.zoneId, data.index, data.emit);
-  // });
-  // socket.on('discardBoard', (data) => {
-  //     discardBoard(data.user, data.initiator, data.message, data.emit);
-  // });
-  // socket.on('handBoard', (data) => {
-  //     handBoard(data.user, data.initiator, data.message, data.emit);
-  // });
-  // socket.on('shuffleBoard', (data) => {
-  //     shuffleBoard(data.user, data.initiator, data.message, data.indices, data.emit);
-  // });
-  // socket.on('lostZoneBoard', (data) => {
-  //     lostZoneBoard(data.user, data.initiator, data.message, data.emit);
-  // });
   socket.on('lookAtCards', (data) => {
     if (data.socketId === systemState.spectatorId) {
       data.user = data.user === 'self' ? 'opp' : 'self';
@@ -654,4 +596,18 @@ export const initializeSocketEventListeners = () => {
   socket.on('exportGameStateFailed', (message) => {
     appendMessage('self', message, 'announcement', false);
   });
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('action-processed', () => {
+      if (systemState.isTwoPlayer) {
+        triggerSyncCheck();
+        emitSpectatorDataDebounced();
+      }
+    });
+    document.addEventListener('rules-turn-began', () => {
+      if (systemState.isTwoPlayer) {
+        triggerSyncCheck(100);
+      }
+    });
+  }
 };

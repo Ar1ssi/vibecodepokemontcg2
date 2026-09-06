@@ -57,6 +57,9 @@ export const updateDamageCounter = (
   }
 
   const damageCounter = card?.image?.damageCounter;
+  if (card) {
+    card.damage = Math.max(0, parseInt(damageAmount, 10) || 0);
+  }
   if (!damageCounter) return;
   if (damageCounter.textContent != damageAmount) {
     damageCounter.textContent = damageAmount;
@@ -69,6 +72,14 @@ export const updateDamageCounter = (
     damageAmount,
     hint,
   ]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-damage-changed', {
+        detail: { user, zoneId, index: resolved, damage: card ? card.damage : damageAmount },
+      })
+    );
+  }
 };
 
 export const removeDamageCounter = (
@@ -91,8 +102,9 @@ export const removeDamageCounter = (
   }
 
   if (!targetCard) return;
+  targetCard.damage = 0;
   //make sure targetCard exists (it won't exist if it's already been removed)
-  if (targetCard.image.damageCounter) {
+  if (targetCard.image?.damageCounter) {
     targetCard.image.damageCounter.removeEventListener(
       'input',
       targetCard.image.damageCounter.handleInput
@@ -112,6 +124,14 @@ export const removeDamageCounter = (
   }
 
   processAction(user, emit, 'removeDamageCounter', [zoneId, resolved, hint]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-damage-changed', {
+        detail: { user, zoneId, index: resolved, damage: 0 },
+      })
+    );
+  }
 };
 
 export const addDamageCounter = (
@@ -140,6 +160,8 @@ export const addDamageCounter = (
   }
 
   if (!targetCard) return;
+  const numericAmount = Math.max(0, parseInt(damageAmount ? damageAmount : '10', 10) || 0);
+  targetCard.damage = numericAmount;
   index = resolved;
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();
@@ -247,4 +269,12 @@ export const addDamageCounter = (
     damageAmount,
     hint,
   ]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-damage-changed', {
+        detail: { user, zoneId, index: resolved, damage: targetCard.damage },
+      })
+    );
+  }
 };

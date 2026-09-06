@@ -688,9 +688,9 @@ export const importDecklist = async (user) => {
 
         typeCell.appendChild(typeSelect);
 
-        qtyCell.innerHTML = quantity;
-        nameCell.innerHTML = name;
-        urlCell.innerHTML = url;
+        qtyCell.textContent = quantity;
+        nameCell.textContent = name;
+        urlCell.textContent = url;
 
         // Add red outline for empty/undefined/null values
         if (!quantity || quantity === 'undefined' || quantity === 'null') {

@@ -27,11 +27,14 @@ export function sortCardsByDeckList(cards, deckData) {
     let matched = 0;
     const candidates = cards
       .filter((card) => !used.has(card) && cardMatchesDeckEntry(card, entry))
-      .sort(
-        (a, b) =>
-          (a.syncInstance ?? Number.MAX_SAFE_INTEGER) -
-          (b.syncInstance ?? Number.MAX_SAFE_INTEGER)
-      );
+      .sort((a, b) => {
+        const aVal = a.syncInstance ?? a.cardId;
+        const bVal = b.syncInstance ?? b.cardId;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return aVal - bVal;
+        }
+        return String(aVal ?? '').localeCompare(String(bVal ?? ''));
+      });
     for (const card of candidates) {
       sorted.push(card);
       used.add(card);

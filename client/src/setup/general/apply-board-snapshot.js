@@ -36,8 +36,26 @@ function makeCard(user, rec) {
     rec.set,
     rec.id
   );
-  if (typeof rec.syncInstance === 'number') {
+  if (rec.cardId != null) {
+    card.cardId = rec.cardId;
+  } else if (rec.syncInstance != null) {
+    card.cardId = `c_${rec.syncInstance}`;
+  }
+  if (rec.syncInstance != null) {
     card.syncInstance = rec.syncInstance;
+  }
+  if (typeof rec.damage === 'number') {
+    card.damage = rec.damage;
+  }
+  if (rec.specialCondition) {
+    card.specialCondition = rec.specialCondition;
+  }
+  if (rec.abilityUsed) {
+    card.abilityUsed = true;
+  }
+  if (card.image) {
+    card.image.cardId = card.cardId;
+    card.image.syncInstance = card.syncInstance;
   }
   return card;
 }
@@ -48,6 +66,11 @@ function placeCard(user, zoneId, card, rec, placed) {
   if (rec.attached && rec.parentSyncInstance != null) {
     const parent = placed.get(rec.parentSyncInstance);
     if (parent) {
+      card.attached = true;
+      card.parentCard = parent;
+      card.parentCardId = parent.cardId ?? parent.syncInstance;
+      if (!Array.isArray(parent.attachedCards)) parent.attachedCards = [];
+      if (!parent.attachedCards.includes(card)) parent.attachedCards.push(card);
       attachCard(user, user, card, parent, zoneId, zone);
       return;
     }

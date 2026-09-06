@@ -27,8 +27,9 @@ export const removeAbilityCounter = (
   }
 
   if (!targetCard) return;
+  targetCard.abilityUsed = false;
   //make sure targetCard exists (it won't exist if it's already been removed)
-  if (targetCard.image.abilityCounter) {
+  if (targetCard.image?.abilityCounter) {
     targetCard.image.abilityCounter.handleRemove = null;
     window.removeEventListener(
       'resize',
@@ -45,6 +46,9 @@ export const addAbilityCounter = (user, zoneId, index) => {
   //identify target image and zone
   const zone = getZone(user, zoneId);
   const targetCard = zone.array[index];
+  if (targetCard) {
+    targetCard.abilityUsed = true;
+  }
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();
 

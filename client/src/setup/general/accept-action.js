@@ -147,21 +147,27 @@ export const acceptAction = async (
   isStateImport = false,
   isFromReplay = false
 ) => {
-  if (isBlockedByReplay('action', action, isFromReplay)) {
+  let actionName = action;
+  let actionParams = parameters;
+  if (typeof action === 'object' && action !== null) {
+    actionName = action.type || action.action;
+    actionParams = action.payload || action.parameters || [];
+  }
+  if (isBlockedByReplay('action', actionName, isFromReplay)) {
     return false;
   }
-  const selectedFunction = actionToFunction(action);
+  const selectedFunction = actionToFunction(actionName);
   if (typeof selectedFunction !== 'function') {
-    console.warn('acceptAction: unknown action', action);
+    console.warn('acceptAction: unknown action', actionName);
     return false;
   }
   const emit = user === 'self' || isStateImport ? true : false;
   if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
-    logSyncAction(action, parameters, 'in');
+    logSyncAction(actionName, actionParams, 'in');
   }
   try {
-    const result = parameters
-      ? selectedFunction(user, ...parameters, emit)
+    const result = actionParams
+      ? selectedFunction(user, ...actionParams, emit)
       : selectedFunction(user, emit);
     const resolved = await Promise.resolve(result);
     return resolved !== false;

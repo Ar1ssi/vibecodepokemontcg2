@@ -7,26 +7,41 @@ export const SNAPSHOT_ZONES = SYNC_HASH_ZONES.filter((id) => id !== 'stadium');
 export const HIDDEN_SNAPSHOT_ZONES = ['deck', 'hand', 'prizes'];
 
 function parentSyncInstance(card, zoneCards = []) {
+  if (card?.parentCard?.syncInstance != null) {
+    return card.parentCard.syncInstance;
+  }
   const rel = card?.image?.relative;
   if (!rel) return null;
-  const parent = zoneCards.find((c) => c !== card && c?.image === rel);
-  return typeof parent?.syncInstance === 'number' ? parent.syncInstance : null;
+  const parent = zoneCards.find((c) => c !== card && (c === rel.card || c?.image === rel));
+  return parent?.syncInstance != null ? parent.syncInstance : null;
 }
 
 /** JSON-safe identity for one board card (face URL, not the sleeve). */
 export function serializeCard(card, zoneCards = []) {
-  return {
+  const out = {
     name: card?.name || '',
     type: card?.type2 || card?.type || '',
     src: cardFaceSrc(card),
     number: card?.number ?? null,
     set: card?.set ?? null,
     id: card?.id ?? null,
-    syncInstance:
-      typeof card?.syncInstance === 'number' ? card.syncInstance : null,
-    attached: !!card?.image?.attached,
+    syncInstance: card?.syncInstance != null ? card.syncInstance : null,
+    attached: Boolean(card?.attached || card?.image?.attached),
     parentSyncInstance: parentSyncInstance(card, zoneCards),
   };
+  if (card?.cardId != null) {
+    out.cardId = card.cardId;
+  }
+  if (typeof card?.damage === 'number' && card.damage > 0) {
+    out.damage = card.damage;
+  }
+  if (card?.specialCondition) {
+    out.specialCondition = card.specialCondition;
+  }
+  if (card?.abilityUsed) {
+    out.abilityUsed = true;
+  }
+  return out;
 }
 
 export function serializeZoneCards(cards = []) {

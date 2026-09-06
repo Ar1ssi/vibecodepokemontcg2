@@ -25,6 +25,20 @@ export const evolveCard = (
   // at the end of this function.
   imageAnchor(targetCard.image).after(movingCard.image);
   targetCard.image.relative = movingCard.image;
+  targetCard.attached = true;
+  targetCard.parentCard = movingCard;
+  targetCard.parentCardId = movingCard.cardId ?? movingCard.syncInstance ?? null;
+  movingCard.isEvolution = true;
+  if (!Array.isArray(movingCard.attachedCards)) movingCard.attachedCards = [];
+  if (!movingCard.attachedCards.includes(targetCard)) movingCard.attachedCards.push(targetCard);
+
+  // Pure data transfer
+  movingCard.damage = targetCard.damage || 0;
+  targetCard.damage = 0;
+  targetCard.specialCondition = null;
+  movingCard.specialCondition = null;
+  targetCard.abilityUsed = false;
+
   //if counters exists, link the textcontent with the new Pokémon card
   if (targetCard.image.damageCounter) {
     addDamageCounter(user, dZoneId, dZone.getCount() - 1, false, false);
@@ -50,8 +64,11 @@ export const evolveCard = (
 
   // set relative of all of targetCard's attached cards to movingCard
   dZone.array.forEach((card) => {
-    if (card.image.relative === targetCard.image) {
-      card.image.relative = movingCard.image;
+    if (card.parentCard === targetCard || card.image?.relative === targetCard.image) {
+      card.parentCard = movingCard;
+      card.parentCardId = movingCard.cardId ?? movingCard.syncInstance ?? null;
+      if (card.image) card.image.relative = movingCard.image;
+      if (!movingCard.attachedCards.includes(card)) movingCard.attachedCards.push(card);
     }
   });
   //move the cards to the new host
