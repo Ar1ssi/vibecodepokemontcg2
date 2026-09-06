@@ -16,6 +16,7 @@
       markEnergyAttached,
       markAbilityUsed,
       abilityUsed,
+      setTurnAttackBonus,
       loadRulesEnabled,
       persistRulesEnabled,
       getStadium,
@@ -62,7 +63,7 @@ import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
 } from './collect-usable-abilities.mjs';
-import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
+import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
@@ -1624,6 +1625,72 @@ import {
       switch: switchAbility,
       attach: attachAbility,
       'energy-redirect': energyRedirectAbility,
+      status: statusAbility,
+      'move-damage': moveDamageAbility,
+      'self-damage': selfDamageAbility,
+      'move-damage-between': moveDamageBetweenAbility,
+      'look-at-top': lookAtTopAbility,
+      evolve: evolveAbility,
+      'recursion-discard': recursionAbility,
+    };
+
+    const runPromotionAbilityEffect = async (user, card, promo) => {
+      if (rulesState.enabled && abilityUsed(user, card)) return false;
+      if (promo.effect === 'damage' && promo.count) {
+        const oppPlayer = user === 'self' ? 'opp' : 'self';
+        const candidates = [];
+        const active = getZone(oppPlayer, 'active').array[0];
+        if (active?.type === 'Pokémon') {
+          candidates.push({ card: active, zone: 'active', idx: 0 });
+        }
+        getZone(oppPlayer, 'bench').array.forEach((c, idx) => {
+          if (c.type === 'Pokémon') candidates.push({ card: c, zone: 'bench', idx });
+        });
+        if (!candidates.length) {
+          appendMessage('', `  ${card.name}: no opponent Pokémon to damage`, 'announcement', false);
+          return false;
+        }
+        const amount = promo.count;
+        const applyDamage = async (pick) => {
+          const { card: target, zone, idx } = pick;
+          if (target.image?.damageCounter) {
+            const current =
+              parseInt(target.image.damageCounter.textContent || '0', 10) || 0;
+            updateDamageCounter(oppPlayer, zone, idx, current + amount, true);
+          } else {
+            addDamageCounter(oppPlayer, zone, idx, amount, true);
+          }
+          appendMessage(
+            '',
+            `⬆️ ${card.name} — ${promo.guidance}`,
+            'announcement',
+            false
+          );
+          if (rulesState.enabled) markAbilityUsed(user, card);
+        };
+        if (candidates.length === 1) {
+          await applyDamage(candidates[0]);
+          return true;
+        }
+        const result = await awaitChoicePicker({
+          title: `${card.name} — place ${amount} damage counter${amount !== 1 ? 's' : ''}`,
+          candidates: candidates.map((c) => c.card),
+          zoneFrom: 'board',
+          destination: null,
+          onPick: (picked) => {
+            const match = candidates.find((c) => c.card === picked);
+            if (match) applyDamage(match);
+          },
+        });
+        return result.ok;
+      }
+      if (promo.effect === 'moveEnergy') {
+        await energyRedirectAbility(user, true, card, { orchestrated: true });
+        if (rulesState.enabled) markAbilityUsed(user, card);
+        return true;
+      }
+      appendMessage('', `⬆️ ${card.name}: ${promo.guidance}`, 'announcement', false);
+      return false;
     };
 
     const autoExecuteAbilitySteps = (user, card, steps) => {
@@ -1675,6 +1742,7 @@ import {
       appendMessage('', `✦ ${card.name} — ${name}:`, 'announcement', false);
 
       let executed = false;
+      let skipAbilityMark = false;
       const orchestrated = { orchestrated: true };
 
       for (const item of plan) {
@@ -1690,9 +1758,27 @@ import {
           }
         } else if (item.action === 'when-played') {
           if (await runWhenPlayedStep(user, card, steps, item.stepIndex)) executed = true;
+        } else if (item.action === 'turn-damage-bonus') {
+          const amount = item.step.amount || 0;
+          if (amount > 0) {
+            setTurnAttackBonus(user, card, amount, { activeOnly: true });
+            appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
+            executed = true;
+          }
+        } else if (item.action === 'promotion') {
+          appendMessage(
+            '',
+            `  ${item.step.guidance} (triggers when this Pokémon moves from Bench to Active)`,
+            'announcement',
+            false
+          );
+        } else if (item.action === 'opponent-disrupt') {
+          appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
+          executed = true;
         } else if (item.action === 'executor' && item.executor) {
           const fn = ABILITY_EXECUTOR_FNS[item.executor];
           if (fn) {
+            if (item.step?.unlimited) skipAbilityMark = true;
             await fn(user, true, card, orchestrated);
             executed = true;
           }
@@ -1781,7 +1867,7 @@ import {
         }
       }
 
-      if (executed && rulesState.enabled) {
+      if (executed && rulesState.enabled && !skipAbilityMark) {
         markAbilityUsed(user, card);
       }
     }
@@ -1988,12 +2074,7 @@ if (!isTrainer) {
             const steps = parseAbility(card.ability?.text || card.abilityText || '');
             const promo = steps.find((s) => s.type === 'onPromotionAbility');
             if (promo) {
-              appendMessage(
-                '',
-                `⬆️ ${card.name}: ${promo.guidance}`,
-                'announcement',
-                false
-              );
+              runPromotionAbilityEffect(user, card, promo);
             }
           }
         });

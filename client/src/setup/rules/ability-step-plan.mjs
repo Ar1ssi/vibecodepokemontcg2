@@ -22,10 +22,8 @@ export const PASSIVE_ABILITY_STEP_TYPES = new Set([
   'firstTurnAttackAbility',
   'checkupAbility',
   'onOpponentEvolveAbility',
-  'onPromotionAbility',
   'endOfTurnAbility',
   'recursionAbility',
-  'statusAbility',
 ]);
 
 /** chat-buttons.js executor keys for actionable once-per-turn steps. */
@@ -35,6 +33,8 @@ export const EXECUTOR_BY_STEP = {
   attachAbility: 'attach',
   moveEnergyAbility: 'energy-redirect',
   moveDamageAbility: 'move-damage',
+  selfDamageAbility: 'self-damage',
+  moveDamageBetweenAbility: 'move-damage-between',
   statusAbility: 'status',
   lookAtTopAbility: 'look-at-top',
   evolveAbility: 'evolve',
@@ -100,6 +100,18 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
         planned.push({
           ...base,
           action: mode === 'auto' ? 'announce' : 'opponent-disrupt',
+        });
+        break;
+      case 'onPromotionAbility':
+        planned.push({
+          ...base,
+          action: mode === 'auto' ? 'announce' : 'promotion',
+        });
+        break;
+      case 'turnDamageBonusAbility':
+        planned.push({
+          ...base,
+          action: mode === 'auto' ? 'announce' : 'turn-damage-bonus',
         });
         break;
       default:

@@ -33,8 +33,8 @@
       pendingEffects: { self: [], opp: [] },
       // per-player per-turn facts
       flags: {
-        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
-        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
+        self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null },
+        opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null },
       },
       // Survives resetTurnFlags: a second endTurn on the same turn used to
       // clear drewThisTurn and let hookTurnStartDraw deal another card.
@@ -407,7 +407,7 @@
     }
     
     function resetTurnFlags(player) {
-      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, stadiumUsed: false, drewThisTurn: false };
+      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null, stadiumUsed: false, drewThisTurn: false };
     }
 
     // Mark that the start-of-turn draw already happened for this player this
@@ -510,6 +510,24 @@
     }
     export function abilityUsed(player, card) {
       return !!rulesState.flags[player]?.abilitiesUsed?.[abilityKey(card)];
+    }
+
+    /** Turn-scoped attack bonus from a once-per-turn ability (Torrential Heart, …). */
+    export function setTurnAttackBonus(player, card, amount, { activeOnly = true } = {}) {
+      const f = rulesState.flags[player];
+      if (!f || !amount) return;
+      f.turnAttackBonus = {
+        sourceKey: abilityKey(card),
+        amount,
+        activeOnly,
+      };
+    }
+
+    export function getTurnAttackBonus(player, attacker) {
+      const bonus = rulesState.flags[player]?.turnAttackBonus;
+      if (!bonus?.amount) return 0;
+      if (bonus.activeOnly && abilityKey(attacker) !== bonus.sourceKey) return 0;
+      return bonus.amount;
     }
 
     // ── per-stadium used-tracking (taxonomy E, once-per-turn) ─────────

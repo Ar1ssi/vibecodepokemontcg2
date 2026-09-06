@@ -3479,6 +3479,51 @@ import test from 'node:test';
       );
       assert.equal(steps[0].type, 'onPromotionAbility');
       assert.equal(steps[0].effect, 'damage');
+      assert.equal(steps.length, 1);
+    });
+
+    test('parseAbility: moveDamageBetweenAbility (Rocket Brain)', () => {
+      const steps = parseAbility(
+        'As often as you like during your turn, you may move 1 damage counter from 1 of your Benched {P} Pokémon to another of your Benched {P} Pokémon.'
+      );
+      assert.equal(steps[0].type, 'moveDamageBetweenAbility');
+      assert.equal(steps[0].unlimited, true);
+    });
+
+    test('parseAbility: turnDamageBonusAbility (Torrential Heart)', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may use this Ability. During this turn, this Pokémon\'s attacks do 60 more damage to your opponent\'s Active Pokémon.'
+      );
+      assert.equal(steps[0].type, 'turnDamageBonusAbility');
+      assert.equal(steps[0].amount, 60);
+    });
+
+    test('parseAbility: Cursed Blast is move-damage not recursion', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may put 4 damage counters on 1 of your opponent\'s Pokémon. If you use this Ability, this Pokémon is Knocked Out.'
+      );
+      assert.equal(steps[0].type, 'moveDamageAbility');
+      assert.equal(steps[0].selfKnockOut, true);
+    });
+
+    test('ability search filter: Evolution {M} via search-match.mjs', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const metalEvo = { name: 'Genesect', type: 'Pokémon', stage: 'Stage 1', types: ['Metal'] };
+      const basic = { name: 'Pikachu', type: 'Pokémon', stage: 'Basic', types: ['Lightning'] };
+      assert.equal(matchesSearch(metalEvo, 'Evolution {M} Pokémon'), true);
+      assert.equal(matchesSearch(basic, 'Evolution {M} Pokémon'), false);
+    });
+
+    test('isUsableAbilityCard: promotion-only abilities excluded from picker', async () => {
+      const { isUsableAbilityCard } = await import('../collect-usable-abilities.mjs');
+      const card = {
+        name: 'Iron Valiant',
+        type: 'Pokémon',
+        ability: {
+          text: 'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent\'s Pokémon.',
+        },
+      };
+      assert.equal(isUsableAbilityCard(card), false);
     });
 
     test('parseAbility: effectPreventAbility active-spot aura (Midnight Fluttering)', () => {

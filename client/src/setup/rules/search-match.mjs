@@ -1,6 +1,6 @@
 // Shared deck/discard search filtering (trainers, abilities, attacks).
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
-import { matchesBasicPokemonType } from './special-energy-effects.mjs';
+import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
 
 const SYMBOL_TO_TYPE = {
   c: 'Colorless',
@@ -77,6 +77,14 @@ export function matchesSearch(card, what = '') {
   }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
+    const typedEvolution = what.match(/evolution\s+\{([A-Za-z])\}\s+pokémon/i);
+    if (typedEvolution) {
+      const typeName = SYMBOL_TO_TYPE[typedEvolution[1].toLowerCase()];
+      if (!typeName) return false;
+      const stage = card.stage || 'Basic';
+      if (stage === 'Basic') return false;
+      return pokemonMatchesEnergyType(card, typeName);
+    }
     const typedBasic = what.match(/basic\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedBasic) {
       const typeName = SYMBOL_TO_TYPE[typedBasic[1].toLowerCase()];

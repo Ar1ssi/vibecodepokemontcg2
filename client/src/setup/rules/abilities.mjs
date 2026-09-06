@@ -104,6 +104,34 @@ export function parseAbilitySearchParams(lower) {
     };
   }
 
+  const typedEvolution = lower.match(
+    /(?:up to\s+(\d+)\s+)?evolution\s+(\{[a-z]\})\s+pok[ée]mon/
+  );
+  if (typedEvolution) {
+    const sym = typedEvolution[2].toUpperCase();
+    const n = typedEvolution[1] ? Number(typedEvolution[1]) : 1;
+    return {
+      what: `Evolution ${sym} Pokémon`,
+      count: n,
+      destination,
+      upTo: !!typedEvolution[1] || lower.includes('up to'),
+    };
+  }
+
+  const typedBasicMon = lower.match(
+    /(?:up to\s+(\d+)\s+)?basic\s+(\{[a-z]\})\s+pok[ée]mon/
+  );
+  if (typedBasicMon) {
+    const sym = typedBasicMon[2].toUpperCase();
+    const n = typedBasicMon[1] ? Number(typedBasicMon[1]) : 1;
+    return {
+      what: `Basic ${sym} Pokémon`,
+      count: n,
+      destination: destination === 'hand' && lower.includes('onto your bench') ? 'bench' : destination,
+      upTo: !!typedBasicMon[1] || lower.includes('up to'),
+    };
+  }
+
   if (destination === 'bench' && lower.includes('basic pok') && lower.includes('hp or less')) {
     const m = lower.match(/up to\s+(\d+)\s+basic pok/);
     const hp = lower.match(/(\d+)\s+hp\s+or\s+less/);
@@ -363,25 +391,93 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 8. Move / place damage counters ─────────────────────────────────────
-  if (
-    (hasWord(lower, 'move') || lower.includes('place')) &&
+  // Self-KO cost ("If you use this Ability, this Pokémon is Knocked Out") — not a KO trigger.
+  const selfKoOnUse =
+    /if you use this ability.*knocked out/i.test(lower) ||
+    (/this pokémon is knocked out/i.test(lower) && lower.includes('if you'));
+
+  const betweenOwnDamage =
+    !hasPromotionTrigger &&
+    !lower.includes('checkup') &&
+    hasWord(lower, 'move') &&
     lower.includes('damage counter') &&
-    hasDamageCounterPlacement(lower)
+    lower.includes('from') &&
+    (lower.includes('to another') || lower.includes('onto another'));
+
+  // ── 8. Move / place / put damage counters (before KO-recursion false positives) ──
+  if (
+    !hasPromotionTrigger &&
+    !lower.includes('checkup') &&
+    (hasWord(lower, 'move') || lower.includes('place') || hasWord(lower, 'put')) &&
+    lower.includes('damage counter') &&
+    (betweenOwnDamage ||
+      hasDamageCounterPlacement(lower) ||
+      lower.includes('on this pokémon') ||
+      lower.includes('on this pokemon') ||
+      lower.includes('on 1 of your opponent'))
   ) {
-    const upToMatch = lower.match(/(?:move|place)\s+up to\s+(\d+)\s+damage/);
-    const exactMatch = lower.match(/(?:move|place)\s+(\d+)\s+damage/);
+    const upToMatch = lower.match(/(?:move|place|put)\s+up to\s+(\d+)\s+damage/);
+    const exactMatch = lower.match(/(?:move|place|put)\s+(\d+)\s+damage/);
     const count = upToMatch ? Number(upToMatch[1]) : exactMatch ? Number(exactMatch[1]) : null;
+    const onSelf =
+      lower.includes('on this pokémon') || lower.includes('on this pokemon');
     const onOpponent = lower.includes('opponent');
-    const verb = hasWord(lower, 'move') && !lower.includes('place') ? 'move' : 'place';
+    const betweenOwn = betweenOwnDamage;
+    const verb = hasWord(lower, 'move') && !lower.includes('place') && !hasWord(lower, 'put')
+      ? 'move'
+      : hasWord(lower, 'put')
+        ? 'put'
+        : 'place';
+
+    if (betweenOwn) {
+      const unlimited = lower.includes('as often as you like');
+      steps.push({
+        type: 'moveDamageBetweenAbility',
+        count: count || 1,
+        unlimited,
+        guidance: unlimited
+          ? 'As often as you like during your turn: move 1 damage counter from 1 of your Pokémon to another.'
+          : 'Once during your turn: move damage counters between your Pokémon as described.',
+      });
+    } else if (onSelf) {
+      steps.push({
+        type: 'selfDamageAbility',
+        count,
+        selfKnockOut: selfKoOnUse,
+        guidance: count
+          ? `Once during your turn: put ${count} damage counter${count !== 1 ? 's' : ''} on this Pokémon.`
+          : 'Once during your turn: put damage counters on this Pokémon as described.',
+      });
+    } else {
+      steps.push({
+        type: 'moveDamageAbility',
+        count,
+        upTo: upToMatch ? count : null,
+        onOpponent,
+        selfKnockOut: selfKoOnUse,
+        guidance: count
+          ? `Once during your turn: ${verb} ${upToMatch ? 'up to ' : ''}${count} damage counter${count !== 1 ? 's' : ''} ${onOpponent ? 'on your opponent\'s Pokémon' : 'as described'}.`
+          : 'Once during your turn: move/place damage counters as described.',
+      });
+    }
+  }
+
+  // ── 8b. Turn-scoped attack damage bonus (Torrential Heart, …) ─────────────
+  if (
+    (lower.includes('once during your turn') || lower.includes('you may use this ability')) &&
+    lower.includes('during this turn') &&
+    lower.includes('more damage')
+  ) {
+    const amount =
+      lower.match(/(\d+)\s+more\s+damage/)?.[1] ||
+      lower.match(/do\s+(\d+)\s+more/)?.[1] ||
+      null;
     steps.push({
-      type: 'moveDamageAbility',
-      count,
-      upTo: upToMatch ? count : null,
-      onOpponent,
-      guidance: count
-        ? `Once during your turn: ${verb} ${upToMatch ? 'up to ' : ''}${count} damage counter${count !== 1 ? 's' : ''} ${onOpponent ? 'on your opponent\'s Pokémon' : 'as described'}.`
-        : 'Once during your turn: move/place damage counters as described.',
+      type: 'turnDamageBonusAbility',
+      amount: amount ? Number(amount) : null,
+      guidance: amount
+        ? `During this turn, this Pokémon's attacks do ${amount} more damage to your opponent's Active Pokémon.`
+        : 'During this turn, this Pokémon\'s attacks do more damage (as described).',
     });
   }
 
@@ -407,8 +503,13 @@ export function parseAbility(text = '') {
   }
 
   // ── 10. Recursion (KO-trigger: search/return from discard) ───────────────
+  const koTrigger =
+    (lower.includes('when this pokémon is knocked out') ||
+      lower.includes('when it is knocked out') ||
+      (lower.includes('when') && lower.includes('knocked out') && !lower.includes('if you use'))) &&
+    !selfKoOnUse;
   if (
-    lower.includes('knocked out') &&
+    koTrigger &&
     (lower.includes('search') || lower.includes('put') || lower.includes('return') || lower.includes('add'))
   ) {
     steps.push({
@@ -467,19 +568,35 @@ export function parseAbility(text = '') {
     isBenchActiveSwitchText(lower) &&
     lower.includes('if you do') &&
     lower.includes('poisoned');
+  const coinFlipStatus =
+    lower.includes('flip a coin') &&
+    (namesStatus || lower.includes('burned') || lower.includes('confused') || lower.includes('poisoned'));
   if (
     !conditionalPoisonOnSwitch &&
-    (namesStatus ||
+    (coinFlipStatus ||
+      namesStatus ||
       (lower.includes('make') &&
         lower.includes('opponent') &&
-        namesStatus) ||
+        (lower.includes('asleep') ||
+          lower.includes('burned') ||
+          lower.includes('confused') ||
+          lower.includes('poisoned'))) ||
       (lower.includes('special condition') && namesStatus && !lower.includes('recover')))
   ) {
     const target = lower.includes('opponent') ? 'opponent' : 'attacker';
+    let status = null;
+    if (lower.includes('asleep')) status = 'asleep';
+    else if (lower.includes('burned')) status = 'burned';
+    else if (lower.includes('poisoned') || lower.includes('now poisoned')) status = 'poisoned';
+    else if (lower.includes('confused')) status = 'confused';
     steps.push({
       type: 'statusAbility',
       target,
-      guidance: `Apply a Special Condition to the ${target === 'opponent' ? 'opponent\'s Active Pokémon' : 'attacking Pokémon'} as described.`,
+      status,
+      coinFlip: coinFlipStatus,
+      guidance: coinFlipStatus
+        ? 'Once during your turn: flip a coin — if heads, apply the Special Condition as described.'
+        : `Apply a Special Condition to the ${target === 'opponent' ? 'opponent\'s Active Pokémon' : 'attacking Pokémon'} as described.`,
     });
   }
 

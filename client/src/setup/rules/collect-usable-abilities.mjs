@@ -20,7 +20,9 @@ export function isUsableAbilityCard(
     card.ability?.text ?? card.abilityText ?? card.text ?? '';
   const steps = parseAbility(abilityText);
   const plan = planAbilitySteps(steps, { mode: 'interactive' });
-  const actionable = actionableAbilityPlan(plan, { mode: 'interactive' });
+  const actionable = actionableAbilityPlan(plan, { mode: 'interactive' }).filter(
+    (item) => item.action !== 'promotion'
+  );
   return actionable.length > 0;
 }
 
