@@ -153,8 +153,8 @@ const startDragLoop = (state) => {
   state.animFrameId = requestAnimationFrame(tick);
 };
 
-const isSlideOnScreen = (stackRect, stackWidth, peekOffset) => {
-  const peekPx = (PEEK_PERCENT / 100) * stackWidth;
+const isSlideOnScreen = (stackRect, stackWidth, peekOffset, peekPercent = PEEK_PERCENT) => {
+  const peekPx = (peekPercent / 100) * stackWidth;
   const centerX = stackRect.left + stackRect.width / 2;
   const scale = 1 - Math.abs(peekOffset) * 0.035;
   const cardWidth = stackWidth * scale;
@@ -189,37 +189,10 @@ const syncHoloAnimations = (state) => {
   });
 };
 
-const CHOOSE_PEEK_PERCENT = 14;
+const CHOOSE_PEEK_PERCENT = PEEK_PERCENT;
 
-const positionTriggerCard = (state) => {
-  if (!state.triggerSlot?.firstElementChild || !state.scene || !state.carouselCol) {
-    return;
-  }
-  const sceneRect = state.scene.getBoundingClientRect();
-  const carouselRect = state.carouselCol.getBoundingClientRect();
-  const triggerW = state.triggerSlot.offsetWidth || carouselRect.width;
-  const triggerH = state.triggerSlot.offsetHeight || carouselRect.height;
-  const gap = 16;
-  const sceneWidth = state.scene.clientWidth;
-
-  let left = carouselRect.right - sceneRect.left + gap;
-  let top = carouselRect.top - sceneRect.top + (carouselRect.height - triggerH) / 2;
-  state.triggerSlot.classList.remove('is-left', 'is-above');
-
-  if (left + triggerW > sceneWidth - 8) {
-    left = carouselRect.left - sceneRect.left - triggerW - gap;
-    state.triggerSlot.classList.add('is-left');
-  }
-  if (left < 4) {
-    left = carouselRect.left - sceneRect.left + (carouselRect.width - triggerW) / 2;
-    top = carouselRect.top - sceneRect.top - triggerH - 12;
-    state.triggerSlot.classList.add('is-above');
-    state.triggerSlot.classList.remove('is-left');
-  }
-
-  state.triggerSlot.style.left = `${Math.max(4, left)}px`;
-  state.triggerSlot.style.top = `${Math.max(4, top)}px`;
-};
+const getPeekPercent = (state) =>
+  state.mode === 'browse' ? PEEK_PERCENT : CHOOSE_PEEK_PERCENT;
 
 const updateSelectionUI = (state) => {
   if (state.multiSelect) {
@@ -255,21 +228,27 @@ const syncDropSlotLayout = (state) => {
   if (!state.slotElements?.length || !state.stack) return;
   const slotCount = state.slotElements.length;
   const gap = 6;
+  const minSlotW = 84;
   const maxRowW = Math.min(window.innerWidth * 0.92, 860);
-  const baseW = Math.max(120, Math.round(state.stack.clientWidth * 0.82) || 185);
-  let cardW = baseW;
-  const totalNeeded = slotCount * cardW + (slotCount - 1) * gap;
+  const preferredW = Math.max(
+    minSlotW,
+    Math.round(state.stack.clientWidth * 0.78) || 160
+  );
+  let slotW = preferredW;
+  const totalNeeded = slotCount * slotW + (slotCount - 1) * gap;
   if (totalNeeded > maxRowW) {
-    cardW = Math.floor((maxRowW - (slotCount - 1) * gap) / slotCount);
-    cardW = Math.max(56, cardW);
+    slotW = Math.max(
+      minSlotW,
+      Math.floor((maxRowW - (slotCount - 1) * gap) / slotCount)
+    );
   }
-  const cardH = Math.round(cardW * 1.397);
-  state.slotRow?.style.setProperty('--card-picker-slot-card-w', `${cardW}px`);
-  state.slotRow?.style.setProperty('--card-picker-slot-card-h', `${cardH}px`);
+  const slotH = Math.round(slotW * 1.397);
+  state.slotRow?.style.setProperty('--card-picker-slot-w', `${slotW}px`);
+  state.slotRow?.style.setProperty('--card-picker-slot-h', `${slotH}px`);
   state.slotRow?.style.setProperty('--card-picker-slot-gap', `${gap}px`);
   for (const slot of state.slotElements) {
-    slot.style.width = `${cardW}px`;
-    slot.style.height = `${cardH}px`;
+    slot.style.width = `${slotW}px`;
+    slot.style.height = `${slotH}px`;
   }
 };
 
@@ -282,6 +261,8 @@ const renderSlotCards = (state) => {
     slotEl.classList.toggle('has-card', Boolean(card));
     slotEl.classList.toggle('is-empty', !card);
     if (card) {
+      const inner = document.createElement('div');
+      inner.className = 'card-picker-slot-card-inner';
       const img = document.createElement('img');
       img.src =
         card?.image?.src ||
@@ -289,10 +270,10 @@ const renderSlotCards = (state) => {
         '';
       img.alt = card?.name ?? '';
       img.draggable = false;
-      slotEl.appendChild(img);
+      inner.appendChild(img);
+      slotEl.appendChild(inner);
     }
   });
-  positionTriggerCard(state);
 };
 
 const findDropSlotAt = (state, x, y) => {
@@ -340,7 +321,7 @@ const layoutStack = (state) => {
   const { slides, stack, index, renderDragPx, multiSelect } = state;
   const stackWidth = stack.clientWidth || 380;
   const stackRect = stack.getBoundingClientRect();
-  const peekPercent = state.mode === 'browse' ? PEEK_PERCENT : CHOOSE_PEEK_PERCENT;
+  const peekPercent = getPeekPercent(state);
   const peekPx = (peekPercent / 100) * stackWidth;
   const virtualIndex = computeVirtualIndex(
     index,
@@ -375,14 +356,13 @@ const layoutStack = (state) => {
     slide.style.transform = `translate3d(${layout.peekOffset * peekPercent}%, 0, 0) scale(${scale})`;
     slide.style.opacity = '1';
 
-    if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset)) {
+    if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset, peekPercent)) {
       slide.classList.add('is-hidden');
     }
   });
 
   syncHoloAnimations(state);
   updateFooter(state);
-  positionTriggerCard(state);
 };
 
 const updateFooter = (state) => {
@@ -840,7 +820,7 @@ export const openCardPicker = async ({
 
   let main = null;
   let scene = null;
-  let carouselCol = null;
+  let carouselWrap = null;
   let triggerSlot = null;
   let slotRow = null;
   let slotElements = [];
@@ -869,19 +849,18 @@ export const openCardPicker = async ({
     scene = document.createElement('div');
     scene.className = 'card-picker-scene';
 
-    const cardsRow = document.createElement('div');
-    cardsRow.className = 'card-picker-cards-row';
+    const topRow = document.createElement('div');
+    topRow.className = 'card-picker-top-row';
 
-    carouselCol = document.createElement('div');
-    carouselCol.className = 'card-picker-carousel-col';
-    carouselCol.appendChild(stage);
-
-    cardsRow.appendChild(carouselCol);
-    scene.appendChild(cardsRow);
+    carouselWrap = document.createElement('div');
+    carouselWrap.className = 'card-picker-carousel-wrap';
+    carouselWrap.appendChild(stage);
 
     triggerSlot = document.createElement('div');
     triggerSlot.className = 'card-picker-trigger-slot';
-    scene.appendChild(triggerSlot);
+
+    topRow.append(carouselWrap, triggerSlot);
+    scene.appendChild(topRow);
 
     meta = document.createElement('div');
     meta.className = 'card-picker-meta card-picker-meta--choose';
@@ -943,7 +922,7 @@ export const openCardPicker = async ({
     onCancel,
     triggerHoloWrapper: null,
     scene,
-    carouselCol,
+    carouselWrap,
     triggerSlot,
     slotRow,
     slotElements,
@@ -967,7 +946,6 @@ export const openCardPicker = async ({
       state.triggerHoloWrapper = holoWrapper;
       startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
     }
-    positionTriggerCard(state);
   }
 
   state.onKeyDown = (event) => {
