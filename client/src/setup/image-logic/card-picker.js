@@ -217,22 +217,34 @@ const updateSelectionUI = (state) => {
 const renderSlotCards = (state) => {
   if (!state.slotStack) return;
   state.slotStack.replaceChildren();
+  const slotCount = Math.max(1, state.maxCount || 1);
   const cardsInSlot = state.multiSelect
     ? Array.from(state.selected)
     : state.slotCard
       ? [state.slotCard]
       : [];
-  for (const card of cardsInSlot) {
+
+  state.dropSlot?.style.setProperty(
+    '--card-picker-slot-count',
+    String(slotCount)
+  );
+
+  for (let i = 0; i < slotCount; i += 1) {
+    const card = cardsInSlot[i];
     const wrap = document.createElement('div');
     wrap.className = 'card-picker-slot-card';
-    const img = document.createElement('img');
-    img.src =
-      card?.image?.src ||
-      (typeof card?.image === 'string' ? card.image : '') ||
-      '';
-    img.alt = card?.name ?? '';
-    img.draggable = false;
-    wrap.appendChild(img);
+    if (card) {
+      const img = document.createElement('img');
+      img.src =
+        card?.image?.src ||
+        (typeof card?.image === 'string' ? card.image : '') ||
+        '';
+      img.alt = card?.name ?? '';
+      img.draggable = false;
+      wrap.appendChild(img);
+    } else {
+      wrap.classList.add('is-empty');
+    }
     state.slotStack.appendChild(wrap);
   }
   state.dropSlot?.classList.toggle('has-cards', cardsInSlot.length > 0);
@@ -728,20 +740,27 @@ export const openCardPicker = async ({
     const scene = document.createElement('div');
     scene.className = 'card-picker-scene';
 
+    const cardsRow = document.createElement('div');
+    cardsRow.className = 'card-picker-cards-row';
+
     const carouselCol = document.createElement('div');
     carouselCol.className = 'card-picker-carousel-col';
     carouselCol.appendChild(stage);
 
-    dropSlot = document.createElement('div');
-    dropSlot.className = 'card-picker-drop-slot';
-    slotStack = document.createElement('div');
-    slotStack.className = 'card-picker-slot-stack';
-    dropSlot.appendChild(slotStack);
-
     triggerSlot = document.createElement('div');
     triggerSlot.className = 'card-picker-trigger-slot';
 
-    scene.append(carouselCol, dropSlot, triggerSlot);
+    cardsRow.append(carouselCol, triggerSlot);
+    scene.appendChild(cardsRow);
+
+    dropSlot = document.createElement('div');
+    dropSlot.className = 'card-picker-drop-slot';
+    dropSlot.style.setProperty('--card-picker-slot-count', String(maxSel));
+    slotStack = document.createElement('div');
+    slotStack.className = 'card-picker-slot-stack';
+    dropSlot.appendChild(slotStack);
+    scene.appendChild(dropSlot);
+
     main.appendChild(scene);
 
     meta = document.createElement('div');
@@ -805,6 +824,7 @@ export const openCardPicker = async ({
     const { node, holoWrapper } = await buildSlideContent(triggerCard);
     node.classList.add('card-picker-trigger-card');
     triggerSlot.appendChild(node);
+    main.classList.add('has-trigger');
     if (holoWrapper) {
       holoWrapper.classList.add('card-picker-trigger-holo');
       state.triggerHoloWrapper = holoWrapper;
@@ -871,6 +891,7 @@ export const openCardPicker = async ({
   if (isMulti && upTo) doneBtn.disabled = false;
 
   setCandidateList(state, candidates);
+  if (!isBrowse) renderSlotCards(state);
 };
 
 /** Browse-only wrapper (discard pile viewer). */
