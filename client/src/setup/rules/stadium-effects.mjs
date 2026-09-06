@@ -88,13 +88,26 @@ export function stadiumAffectsBothPlayers(card) {
   return BOTH_PLAYERS_RE.test(textOf(card));
 }
 
+/** True when the card has a real when-you-play effect, not stay-in-play reminder text. */
+export function stadiumHasWhenPlayedEffect(card) {
+  const t = textOf(card);
+  const clause = t.match(/when you play (?:this card|it),\s*([^.]+)/);
+  if (!clause) return false;
+  const body = clause[1].trim();
+  if (!body) return false;
+  if (/^discard (?:this|it) if another stadium/.test(body)) return false;
+  if (/^stays in play/.test(body)) return false;
+  return true;
+}
+
 // Bucket a card into a stadium-effect family. Non-stadium / unrecognizable
 // cards return 'unknown'. Precedence: the most restrictive trigger wins.
 export function classifyStadiumEffect(card) {
   if (!isStadiumCard(card)) return 'unknown';
   const t = textOf(card);
   if (!t) return 'none';
-  if (t.includes('when you play this card') || t.includes('when you play it')) {
+  // Real "When you play this card, draw 2" — not stay-in-play reminder text.
+  if (stadiumHasWhenPlayedEffect(card)) {
     return 'setup-once';
   }
   if (ONCE_PER_TURN_RE.test(t)) {
@@ -141,9 +154,15 @@ export function describeStadiumEffect(card) {
  */
 export function parseStadiumSetupDraw(card) {
   const t = textOf(card);
-  if (!t.includes('when you play')) return null;
-  const m = t.match(/draw (?:up to )?(\d+)/);
-  return m ? parseInt(m[1], 10) : 1;
+  // Only the when-you-play *sentence* may grant a draw. Official reminder
+  // text is "stays in play when you play it" and must not fall through to
+  // a default draw of 1, or pick up a later "once per turn, draw N".
+  const clause = t.match(/when you play (?:this card|it),\s*([^.]+)/);
+  if (!clause) return null;
+  const body = clause[1];
+  if (/stays in play/.test(body)) return null;
+  const m = body.match(/draw (?:up to )?(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
 /**
