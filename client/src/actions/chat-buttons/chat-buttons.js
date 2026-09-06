@@ -50,6 +50,8 @@ import {
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -1242,13 +1244,20 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  // Find the first Energy-type card in hand.
+  // Find a matching Energy card in hand (typed/basic when parsed).
+  const abilityText =
+    target.ability?.text ?? target.abilityText ?? target.text ?? '';
+  const attachStep = parseAbility(abilityText).find((s) => s.type === 'attachAbility');
+  const whatFilter = energySearchWhat({
+    basic: attachStep?.basic ?? abilityText.toLowerCase().includes('basic'),
+    energyType: attachStep?.energyType ?? null,
+  });
   const hand = getZone(user, 'hand');
-  const energyIndex = hand.array.findIndex((c) => c.type === 'Energy');
+  const energyIndex = hand.array.findIndex((c) => matchesSearch(c, whatFilter));
   if (energyIndex === -1) {
     appendMessage(
       user,
-      '⛔ No Energy in hand to attach.',
+      `⛔ No ${whatFilter} in hand to attach.`,
       'announcement',
       false
     );
@@ -1314,16 +1323,31 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
     return;
   }
 
-  // Find attached energies on the source Pokémon
+  // Find attached energies on the source Pokémon (typed/basic when parsed).
+  const abilityText =
+    source.ability?.text ?? source.abilityText ?? source.text ?? '';
+  const moveStep = parseAbility(abilityText).find((s) => s.type === 'moveEnergyAbility');
+  const whatFilter = energySearchWhat({
+    basic: moveStep?.basic ?? false,
+    energyType: moveStep?.energyType ?? null,
+  });
   const sourceZoneObj = getZone(user, sourceZone);
   const energies = sourceZoneObj.array
     .map((c, i) => ({ card: c, idx: i }))
     .filter(
-      ({ card }) => card.type === 'Energy' && card.image?.relative === source.image
+      ({ card }) =>
+        card.type === 'Energy' &&
+        card.image?.relative === source.image &&
+        matchesSearch(card, whatFilter)
     );
 
   if (energies.length === 0) {
-    appendMessage(user, `⛔ No Energy attached to ${source.name || 'source'}.`, 'announcement', false);
+    appendMessage(
+      user,
+      `⛔ No ${whatFilter || 'Energy'} attached to ${source.name || 'source'}.`,
+      'announcement',
+      false
+    );
     return;
   }
 
@@ -1568,59 +1592,6 @@ const resolveAbilityTarget = (user, targetCard) => {
   return { target, targetZone, targetIdx, activeCard };
 };
 
-const isPokemonCard = (card) => {
-  if (card?.hp) return true;
-  const t = String(card?.type || card?.supertype || '').toLowerCase();
-  return t.includes('pokémon') || t.includes('pokemon');
-};
-
-const matchesSearch = (card, what = '') => {
-  const w = what.toLowerCase();
-  if (w.includes(' or ')) {
-    return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg));
-  }
-  const isPokemon = isPokemonCard(card);
-  const isTrainer = String(card.supertype || card.type || '')
-    .toLowerCase()
-    .includes('trainer');
-  if (w.includes('item') && w.includes('tool')) return isTrainer;
-  if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {
-    const tt = String(card.trainerType || card.type || '').toLowerCase();
-    return tt.includes('item') || (isTrainer && tt.includes('item'));
-  }
-  if (w.includes('energy')) {
-    return (
-      String(card.type || '').toLowerCase().includes('energy') ||
-      String(card.name || '').toLowerCase().includes('energy')
-    );
-  }
-  if (w.includes('mega evolution')) {
-    return isPokemon && String(card.name || '').toLowerCase().includes('mega');
-  }
-  if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) {
-    return isPokemon;
-  }
-  if (w.includes('basic')) {
-    if (!isPokemon || (card.stage || 'Basic') !== 'Basic') return false;
-    const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
-    if (hpCap) {
-      const maxHp = Number(hpCap[1]);
-      const cardHp = Number(card.hp);
-      return Number.isFinite(cardHp) && cardHp <= maxHp;
-    }
-    return true;
-  }
-  if (w.includes('pokémon') || w.includes('pokemon')) return isPokemon;
-  // Named species (attack search: "up to 2 Grubbin", not a generic keyword)
-  const generic =
-    /\b(card|pokémon|pokemon|energy|item|tool|trainer|basic|supporter|stadium|mega|stage|evolution)\b/i;
-  if (what.trim() && !generic.test(what)) {
-    const needle = what.trim().toLowerCase();
-    return String(card.name || '').toLowerCase().includes(needle);
-  }
-  return true;
-};
-
 // Modal card picker (mirrors rules-bridge openChoicePicker for ability buttons).
 const openAbilityChoicePicker = ({
   user,
@@ -1770,10 +1741,16 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   const matches = [];
   for (const c of deck.array) {
     await ensureCardData(c);
-    if (matchesSearch(c, searchStep.what)) matches.push(c);
   }
-  const usingFallback = matches.length === 0 && deck.array.length > 0;
-  const pool = usingFallback ? deck.array : matches;
+  const pool = filterSearchMatches(deck.array, searchStep.what, {
+    onNoMatches: () =>
+      appendMessage(
+        user,
+        `🔍 ${atk.name} — no cards in deck match "${searchStep.what}".`,
+        'announcement',
+        false
+      ),
+  });
   if (pool.length === 0) {
     appendMessage(
       user,
@@ -1786,6 +1763,12 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   }
 
   const finishSearch = () => shuffleZone(user, user, 'deck');
+  const attackText = atk.text || '';
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal(user, atk.name, picked, appendMessage, {
+      step: searchStep,
+      sourceText: attackText,
+    });
 
   const useMulti = upTo ? effectiveMax >= 1 : effectiveMax > 1;
   const minPick = upTo ? 0 : effectiveMax;
@@ -1797,7 +1780,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
     await new Promise((resolve) => {
       openAbilityChoicePicker({
         user,
-        title: `${atk.name} — choose ${pickLabel} for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+        title: `${atk.name} — choose ${pickLabel} for ${destLabel}`,
         candidates: pool,
         zoneFrom: 'deck',
         destination: destZone,
@@ -1807,6 +1790,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         maxCount: effectiveMax,
         upTo,
         onConfirm: (selected) => {
+          revealPicked(selected);
           for (const s of selected) {
             const idx = getZone(user, 'deck').array.indexOf(s);
             if (idx >= 0) {
@@ -1839,11 +1823,12 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   await new Promise((resolve) => {
     openAbilityChoicePicker({
       user,
-      title: `${atk.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+      title: `${atk.name} — take a card to ${destLabel}`,
       candidates: pool,
       zoneFrom: 'deck',
       destination: destZone,
       onPick: (picked) => {
+        revealPicked(picked);
         appendMessage(
           user,
           `🔍 ${atk.name}: ${picked.name || 'a card'} → ${destLabel}.`,
@@ -1888,17 +1873,23 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
         ? 'Trainer'
         : 'a Pokémon');
   const count = searchStep?.count || 1;
+  const upTo = searchStep?.upTo === true;
   const destZone =
     searchStep?.destination === 'Bench' ? 'bench' : 'hand';
   const destLabel = destZone === 'bench' ? 'Bench' : 'hand';
 
-  const matches = [];
   for (const c of deck.array) {
     await ensureCardData(c);
-    if (matchesSearch(c, what)) matches.push(c);
   }
-  const usingFallback = matches.length === 0 && deck.array.length > 0;
-  const pool = usingFallback ? deck.array : matches;
+  const pool = filterSearchMatches(deck.array, what, {
+    onNoMatches: () =>
+      appendMessage(
+        user,
+        `⛔ ${target.name} — no cards in deck match "${what}".`,
+        'announcement',
+        false
+      ),
+  });
   if (pool.length === 0) {
     appendMessage(user, '⛔ No matching cards in your deck.', 'announcement', false);
     return;
@@ -1908,17 +1899,27 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     shuffleZone(user, user, 'deck');
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal(user, target.name, picked, appendMessage, {
+      step: searchStep,
+      sourceText: abilityText,
+    });
 
-  if (count > 1) {
+  if (count > 1 || upTo) {
+    const effectiveMax = upTo ? count : count;
     openAbilityChoicePicker({
       user,
-      title: `${target.name} — choose ${count} cards for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+      title: `${target.name} — choose ${upTo ? `up to ${effectiveMax}` : count} cards for ${destLabel}`,
       candidates: pool,
       zoneFrom: 'deck',
       destination: destZone,
       multiSelect: true,
-      requiredCount: count,
+      requiredCount: effectiveMax,
+      minCount: upTo ? 0 : count,
+      maxCount: effectiveMax,
+      upTo,
       onConfirm: (selected) => {
+        revealPicked(selected);
         for (const s of selected) {
           const idx = getZone(user, 'deck').array.indexOf(s);
           if (idx >= 0) {
@@ -1947,11 +1948,12 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
 
   openAbilityChoicePicker({
     user,
-    title: `${target.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
+    title: `${target.name} — take a card to ${destLabel}`,
     candidates: pool,
     zoneFrom: 'deck',
     destination: destZone,
     onPick: (picked) => {
+      revealPicked(picked);
       appendMessage(
         user,
         `🔍 ${target.name} searches: ${picked.name || 'a card'} → ${destLabel}.`,
@@ -2076,6 +2078,44 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null) =>
   const { target } = resolveAbilityTarget(user, targetCard);
   await ensureCardData(target);
   if (!abilityTurnAndUsageGuard(user, target, 'move-damage')) return;
+
+  const abilityText =
+    target.ability?.text ?? target.abilityText ?? target.text ?? '';
+  const steps = parseAbility(abilityText);
+  const costStep = steps.find((s) => s.type === 'discardCostAbility');
+
+  if (costStep) {
+    const whatFilter = energySearchWhat({
+      basic: costStep.basic,
+      energyType: costStep.energyType,
+    });
+    const hand = getZone(user, 'hand');
+    const candidates = hand.array.filter((c) => matchesSearch(c, whatFilter));
+    if (candidates.length === 0) {
+      appendMessage(
+        user,
+        `⛔ Discard ${whatFilter} from your hand to use ${target.name}'s ability.`,
+        'announcement',
+        false
+      );
+      return;
+    }
+    if (candidates.length === 1) {
+      const idx = hand.array.indexOf(candidates[0]);
+      moveCard(user, user, 'hand', 'discard', idx);
+    } else {
+      const pick = await _pickFromList(
+        `${target.name} — discard ${whatFilter} (cost)`,
+        candidates.map((c, i) => ({ label: c.name || 'Energy', idx: i }))
+      );
+      if (pick === null) {
+        appendMessage(user, 'Ability canceled — cost not paid.', 'announcement', false);
+        return;
+      }
+      const idx = hand.array.indexOf(candidates[pick]);
+      if (idx >= 0) moveCard(user, user, 'hand', 'discard', idx);
+    }
+  }
 
   const parsed = parseMoveDamage(target);
   if (!parsed || parsed.count === null) {
@@ -2250,6 +2290,7 @@ export const recursionAbility = async (user, emit = true, targetCard = null) => 
     zoneFrom: 'discard',
     destination: 'hand',
     onPick: (picked) => {
+      announceDiscardPick(user, target.name, picked, appendMessage);
       appendMessage(
         user,
         `♻️ ${target.name} returns ${picked.name || 'a card'} to hand.`,

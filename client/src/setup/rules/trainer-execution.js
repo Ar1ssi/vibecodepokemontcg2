@@ -10,6 +10,8 @@ import { applyStatus } from './status.mjs';
 import { ensureCardData, getStadium } from './rules-state.mjs';
 import { normalizeStage, isRareCandyJump, markEvolvedThisTurn } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
+import { filterSearchMatches } from './search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from './search-reveal.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -315,6 +317,12 @@ async function runSearchStep(card, searchStep, done) {
     done?.();
     return;
   }
+  const sourceText = card.text || card.effect || '';
+  const revealPicked = (picked) =>
+    maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+      step: searchStep,
+      sourceText,
+    });
   // Nest Ball: single Basic → bench
   if (searchStep.destination === 'bench' && searchStep.what === 'Basic Pokémon' && (searchStep.count || 1) === 1) {
     const deck = zone('self', 'deck');
@@ -325,6 +333,7 @@ async function runSearchStep(card, searchStep, done) {
     }
     if (basics.length === 1) {
       const idx = deck.array.indexOf(basics[0]);
+      revealPicked(basics[0]);
       moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
       _shuffleZone('self', 'self', 'deck');
@@ -340,13 +349,12 @@ async function runSearchStep(card, searchStep, done) {
   _openDeckSearchWindow(`${card.name} lets you search your deck`);
   msg(`  ${card.name} — opening card select…`);
   const deck = zone('self', 'deck');
-  const matches = [];
   for (const c of deck.array) {
     await ensureCardData(c);
-    if (_matchesSearch(c, searchStep.what)) matches.push(c);
   }
-  const usingFallback = matches.length === 0 && deck.array.length > 0;
-  const pool = usingFallback ? deck.array : matches;
+  const pool = filterSearchMatches(deck.array, searchStep.what, {
+    onNoMatches: (what) => msg(`  no cards in deck match "${what}"`),
+  });
   if (pool.length === 0) {
     msg('  no cards left in deck');
     done?.();
@@ -398,22 +406,36 @@ async function runSearchStep(card, searchStep, done) {
     });
   };
 
-  if ((searchStep.count || 1) > 1) {
+  if ((searchStep.count || 1) > 1 || searchStep.upTo) {
+    const count = searchStep.count || 1;
+    const upTo = searchStep.upTo === true;
+    const maxSel = Math.min(count, pool.length);
+    const minSel = upTo ? 0 : count;
     _openChoicePicker({
-      title: `${card.name} — choose ${searchStep.count} cards${usingFallback ? ' (full deck)' : ''}`,
+      title: upTo
+        ? `${card.name} — choose up to ${count} cards`
+        : `${card.name} — choose ${count} cards`,
       candidates: pool,
       zoneFrom: 'deck',
       destination: toBench ? 'bench' : 'hand',
       multiSelect: true,
-      requiredCount: searchStep.count,
+      requiredCount: maxSel,
+      minCount: minSel,
+      maxCount: count,
+      upTo,
       onConfirm: (selected) => {
+        revealPicked(selected);
         for (const s of selected) {
           const idx = zone('self', 'deck').array.indexOf(s);
           if (idx >= 0) {
             moveCardBundle('self', 'self', 'deck', toBench ? 'bench' : 'hand', idx, false, 'move');
           }
         }
-        msg(`  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`);
+        if (selected.length === 0) {
+          msg('  no cards taken — deck shuffled');
+        } else {
+          msg(`  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`);
+        }
         shuffleAfter();
         done?.();
       },
@@ -427,11 +449,12 @@ async function runSearchStep(card, searchStep, done) {
   }
 
   _openChoicePicker({
-    title: `${card.name} — ${toBench ? 'put a card on Bench' : toAttach ? 'choose Energy to attach' : 'take a card to hand'}${usingFallback ? ' (full deck)' : ''}`,
+    title: `${card.name} — ${toBench ? 'put a card on Bench' : toAttach ? 'choose Energy to attach' : 'take a card to hand'}`,
     candidates: pool,
     zoneFrom: 'deck',
     destination: toBench ? 'bench' : 'hand',
     onPick: (picked) => {
+      revealPicked(picked);
       if (toAttach) attachEnergyToPokemon(picked);
       else {
         shuffleAfter();
@@ -477,7 +500,11 @@ async function runLookStep(card, step, fromBottom, done) {
     candidates: pool,
     zoneFrom: 'deck',
     destination: step.destination === 'bench' ? 'bench' : 'hand',
-    onPick: () => {
+    onPick: (picked) => {
+      maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+        step,
+        sourceText: card.text || card.effect || '',
+      });
       _shuffleZone('self', 'self', 'deck');
       done?.();
     },
@@ -791,6 +818,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               candidates: matches,
               zoneFrom: 'discard',
               destination: 'hand',
+              onPick: (picked) => announceDiscardPick('self', card.name, picked, _appendMessage),
             });
           }
           break;
@@ -819,6 +847,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               requiredCount: Math.min(choice.count, pool.length),
               onConfirm: (picked) => {
                 const list = Array.isArray(picked) ? picked : [picked];
+                announceDiscardPick('self', card.name, list, _appendMessage);
                 for (const p of list) {
                   const i = zone('self', 'discard').array.indexOf(p);
                   if (i >= 0) moveCardBundle('self', 'self', 'discard', 'deck', i, false, 'move');
@@ -846,6 +875,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
             zoneFrom: 'discard',
             destination: 'hand',
             onPick: (energy) => {
+              announceDiscardPick('self', card.name, energy, _appendMessage);
               const targets = getInPlayPokemon('self');
               if (targets.length === 1) {
                 const t = targets[0];
@@ -1246,7 +1276,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               openPickOnly({
                 title: `${card.name} — choose discard Pokémon to swap`,
                 candidates: disc,
-                onPick: (d) => swapPokemonWithDiscard(play, d),
+                onPick: (d) => {
+                  announceDiscardPick('self', card.name, d, _appendMessage);
+                  swapPokemonWithDiscard(play, d);
+                },
               });
             },
           });

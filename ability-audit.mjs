@@ -153,6 +153,32 @@ function analyzeAbility(card, abilityName, abilityText) {
     issues.push({ kind: 'announce-only-family', severity: 'low' });
   }
 
+  const searchStep = steps.find((s) => s.type === 'searchAbility');
+  if (searchStep) {
+    const normalized = abilityText.replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}');
+    const symbolsInText = [...normalized.matchAll(/\{([A-Za-z])\}/g)].map((m) =>
+      m[1].toUpperCase()
+    );
+    const symbolInWhat = searchStep.what.match(/\{([A-Za-z])\}/);
+    if (symbolsInText.length > 0 && !symbolInWhat) {
+      issues.push({
+        kind: 'typed-symbol-collapsed',
+        severity: 'high',
+        detail: `text has {${symbolsInText.join('}/{')}} but what="${searchStep.what}"`,
+      });
+    }
+    if (
+      /basic\s+\{[a-z]\}\s+energy/i.test(abilityText) &&
+      searchStep.what === 'Energy'
+    ) {
+      issues.push({
+        kind: 'typed-energy-collapsed',
+        severity: 'high',
+        detail: `what="${searchStep.what}"`,
+      });
+    }
+  }
+
   return { steps, family, families, stepTypes, stepFamilies, issues };
 }
 
