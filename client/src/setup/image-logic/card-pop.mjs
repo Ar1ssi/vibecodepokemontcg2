@@ -6,13 +6,12 @@
 //   translate    → viewport center − card center
 //   rotateY      → 360° on every open (horizontal spin)
 // Spring settings are springPopoverSettings: { stiffness: 0.033, damping: 0.45 }.
-// Retreat uses a snappier spring and spins rotateY 360° → 0.
+// Retreat uses the same spring as open and spins rotateY 360° → 0.
 //
 // Rotate lives on `.card-preview-flip` (not the host) so the 3D sleeve back
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
-const RETREAT_SPRING = { stiffness: 0.18, damping: 0.72, precision: 0.01 };
 const PREVIEW_MAX_WIDTH = 780;
 const PREVIEW_WIDTH_FIT = 0.94;
 const PREVIEW_HEIGHT_FIT = 0.88;
@@ -237,9 +236,9 @@ export const createPopoverMotion = (host, { homeScale = 1 } = {}) => {
     },
     retreat() {
       return Promise.all([
-        scale.set(homeScale, RETREAT_SPRING),
-        translate.set({ x: 0, y: 0 }, RETREAT_SPRING),
-        rotateDelta.set(0, RETREAT_SPRING),
+        scale.set(homeScale, POPOVER_SPRING),
+        translate.set({ x: 0, y: 0 }, POPOVER_SPRING),
+        rotateDelta.set(0, POPOVER_SPRING),
       ]);
     },
     reset() {
