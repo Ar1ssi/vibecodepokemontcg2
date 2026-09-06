@@ -180,6 +180,20 @@ export function parseSearchDeckParams(lower) {
     return { what: 'Basic Energy', count: Number(basicEnergyHand[1]), destination: 'hand', upTo: true };
   }
 
+  const typedHpBench = lower.match(
+    /search your deck for up to\s+(\d+)\s+\{([a-z])\}\s+pok[ée]mon(?:\s+cards?)?(?:\s+with\s+(\d+)\s+hp\s+or\s+less)?/
+  );
+  if (typedHpBench && lower.includes('onto your bench')) {
+    const sym = typedHpBench[2].toUpperCase();
+    const hp = typedHpBench[3];
+    return {
+      what: hp ? `Basic {${sym}} Pokémon ≤${hp} HP` : `Basic {${sym}} Pokémon`,
+      count: Number(typedHpBench[1]),
+      destination: 'bench',
+      upTo: true,
+    };
+  }
+
   // up to N Basic Pokémon → bench WITH an HP cap (trainers e.g. Nest Ball-style)
   if (
     lower.includes('up to 2 basic pokémon') &&
@@ -353,8 +367,8 @@ export function parseTrainerEffect(text = '') {
 
   // search deck → hand/bench/attach (with optional discard cost)
   if (lower.includes('search your deck for')) {
-    const { what, count, destination } = parseSearchDeckParams(lower);
-    steps.push({ type: 'searchDeck', what, count, destination });
+    const { what, count, destination, upTo } = parseSearchDeckParams(lower);
+    steps.push({ type: 'searchDeck', what, count, destination, ...(upTo ? { upTo: true } : {}) });
     appendDiscardCost(steps, lower);
     // Compound effects: search-then-draw is common; append the trailing draw
     appendTrailingDraw(steps, lower);

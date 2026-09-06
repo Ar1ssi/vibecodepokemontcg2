@@ -10,6 +10,7 @@ import { applyStatus } from './status.mjs';
 import { ensureCardData, getStadium } from './rules-state.mjs';
 import { normalizeStage, isRareCandyJump, markEvolvedThisTurn } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
+import { filterSearchMatches } from './search-match.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -340,13 +341,12 @@ async function runSearchStep(card, searchStep, done) {
   _openDeckSearchWindow(`${card.name} lets you search your deck`);
   msg(`  ${card.name} — opening card select…`);
   const deck = zone('self', 'deck');
-  const matches = [];
   for (const c of deck.array) {
     await ensureCardData(c);
-    if (_matchesSearch(c, searchStep.what)) matches.push(c);
   }
-  const usingFallback = matches.length === 0 && deck.array.length > 0;
-  const pool = usingFallback ? deck.array : matches;
+  const pool = filterSearchMatches(deck.array, searchStep.what, {
+    onNoMatches: (what) => msg(`  no cards in deck match "${what}"`),
+  });
   if (pool.length === 0) {
     msg('  no cards left in deck');
     done?.();
@@ -400,7 +400,7 @@ async function runSearchStep(card, searchStep, done) {
 
   if ((searchStep.count || 1) > 1) {
     _openChoicePicker({
-      title: `${card.name} — choose ${searchStep.count} cards${usingFallback ? ' (full deck)' : ''}`,
+      title: `${card.name} — choose ${searchStep.count} cards`,
       candidates: pool,
       zoneFrom: 'deck',
       destination: toBench ? 'bench' : 'hand',
@@ -427,7 +427,7 @@ async function runSearchStep(card, searchStep, done) {
   }
 
   _openChoicePicker({
-    title: `${card.name} — ${toBench ? 'put a card on Bench' : toAttach ? 'choose Energy to attach' : 'take a card to hand'}${usingFallback ? ' (full deck)' : ''}`,
+    title: `${card.name} — ${toBench ? 'put a card on Bench' : toAttach ? 'choose Energy to attach' : 'take a card to hand'}`,
     candidates: pool,
     zoneFrom: 'deck',
     destination: toBench ? 'bench' : 'hand',

@@ -87,8 +87,13 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
       case 'recursionFromDiscardAbility':
         planned.push({
           ...base,
-          action: mode === 'auto' ? 'announce' : 'executor',
-          executor: 'recursion-discard',
+          action: mode === 'auto' ? 'announce' : 'recursion-discard',
+        });
+        break;
+      case 'discardCostAbility':
+        planned.push({
+          ...base,
+          action: mode === 'auto' ? 'announce' : 'discard-cost',
         });
         break;
       case 'opponentDisruptAbility':

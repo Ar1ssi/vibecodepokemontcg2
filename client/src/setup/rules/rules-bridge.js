@@ -35,6 +35,7 @@ import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay, combinedHandProtected } from './ability-executors.mjs';
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
+import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat } from './search-match.mjs';
 import {
   describeTypedSpecialEnergy,
   getTelepathicOnAttachSearch,
@@ -1447,59 +1448,8 @@ import {
       }, 1000);
     };
     
-    // Is this a Pokémon card? Prefer the locally-known `type`/`supertype`
-    // (set at deck-import time, always available) over the network-fetched
-    // `hp` field — `hp` only exists once ensureCardData's tcgdex lookup has
-    // resolved, which can be slow, rate-limited, or fail outright. Relying
-    // on `hp` alone silently starved every search picker (Ultra Ball,
-    // Buddy-Buddy Poffin, Nest Ball, …) of candidates whenever that lookup
-    // hadn't completed, which was the actual reason the menu seemed to
-    // require clicking the deck instead of just popping up.
-    const isPokemonCard = (card) => {
-      if (card.hp) return true;
-      const t = String(card.type || card.supertype || '').toLowerCase();
-      return t.includes('pokémon') || t.includes('pokemon');
-    };
-
-    // match a card against a search-step's target description
-    const matchesSearch = (card, what = '') => {
-      const w = what.toLowerCase();
-      // Or-clause (e.g. Fighting Gong: "Basic {F} Energy card or a Basic {F}
-      // Pokémon") — a card matches if it satisfies either side.
-      if (w.includes(' or ')) {
-        return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg));
-      }
-      const isPokemon = isPokemonCard(card);
-      const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
-      if (w.includes('item') && w.includes('tool')) return isTrainer;
-      if (w.includes('stadium') && w.includes('energy')) {
-        const isEnergy = String(card.type || '').toLowerCase().includes('energy') ||
-          String(card.name || '').toLowerCase().includes('energy');
-        const isStadium = (
-          String(card.type || card.supertype || '').toLowerCase().includes('trainer') &&
-          String(card.name || '').toLowerCase().includes('stadium')
-        ) || String(card.trainerType || '').toLowerCase() === 'stadium';
-        return isEnergy || isStadium;
-      }
-      if (w.includes('energy')) {
-        return energyMatchesSearchWhat(card, what);
-      }
-      if (w.includes('mega evolution')) return isPokemon && String(card.name || '').toLowerCase().includes('mega');
-      if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) return isPokemon;
-      if (w.includes('basic')) {
-        if (!isPokemon || (card.stage || 'Basic') !== 'Basic') return false;
-        // e.g. 'Basic Pokémon ≤70 HP' (Buddy-Buddy Poffin) — enforce the HP cap
-        const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
-        if (hpCap) {
-          const maxHp = Number(hpCap[1]);
-          const cardHp = Number(card.hp);
-          return Number.isFinite(cardHp) && cardHp <= maxHp;
-        }
-        return true;
-      }
-      if (w.includes('pokémon')) return isPokemon;
-      return true; // generic search: everything matches
-    };
+    // Is this a Pokémon card? Prefer locally-known type/supertype over async hp.
+    // Search matching lives in search-match.mjs (matchesSearch).
 
     const executeAbilityDraw = async (user, step) => {
       const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
@@ -1556,13 +1506,10 @@ import {
       openDeckSearchWindow(`${card.name} ability — search your deck`);
       appendMessage('', `  ${card.name} — opening card select…`, 'announcement', false);
       const deck = getZone(user, 'deck');
-      const matches = [];
-      for (const c of deck.array) {
-        await ensureCardData(c);
-        if (matchesSearch(c, step.what)) matches.push(c);
-      }
-      const usingFallback = matches.length === 0 && deck.array.length > 0;
-      const pool = usingFallback ? deck.array : matches;
+      const pool = filterSearchMatches(deck.array, step.what, {
+        onNoMatches: (what) =>
+          appendMessage('', `  no cards in deck match "${what}"`, 'announcement', false),
+      });
       if (pool.length === 0) {
         appendMessage('', '  no cards left in deck', 'announcement', false);
         return false;
@@ -1574,7 +1521,7 @@ import {
 
       if (count > 1) {
         const result = await awaitChoicePicker({
-          title: `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+          title: `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}`,
           candidates: pool,
           zoneFrom: 'deck',
           destination: dest,
@@ -1598,7 +1545,7 @@ import {
       }
 
       const result = await awaitChoicePicker({
-        title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}${usingFallback ? ' (showing full deck)' : ''}`,
+        title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}`,
         candidates: pool,
         zoneFrom: 'deck',
         destination: dest,
@@ -1722,14 +1669,45 @@ import {
             await fn(user, true, card, orchestrated);
             executed = true;
           }
+        } else if (item.action === 'discard-cost') {
+          const hand = getZone(user, 'hand');
+          const whatFilter = energySearchWhat({
+            basic: item.step.basic,
+            energyType: item.step.energyType,
+          });
+          const candidates = hand.array.filter((c) => matchesSearch(c, whatFilter));
+          if (!candidates.length) {
+            appendMessage('', '  no matching Energy in hand to pay the cost', 'announcement', false);
+          } else {
+            const result = await awaitChoicePicker({
+              title: `${card.name} — discard ${item.step.count} Energy (cost)`,
+              candidates,
+              zoneFrom: 'hand',
+              destination: 'discard',
+              multiSelect: item.step.count > 1,
+              requiredCount: Math.min(item.step.count, candidates.length),
+              onConfirm: (selected) => {
+                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
+                  for (const s of selected) {
+                    const idx = getZone(user, 'hand').array.indexOf(s);
+                    if (idx >= 0) moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
+                  }
+                });
+              },
+            });
+            if (result.ok) executed = true;
+          }
         } else if (item.action === 'recursion-discard') {
           const discard = getZone(user, 'discard');
+          const what = item.step.what || 'card';
+          const searchWhat = what === 'card' ? 'a card' : what === 'Pokémon' ? 'a Pokémon' : what;
           const matches = [];
           for (const c of discard.array) {
             await ensureCardData(c);
-            if (isPokemonCard(c) || String(c.name || '').toLowerCase().includes('energy')) {
-              matches.push(c);
-            }
+            if (matchesSearch(c, searchWhat)) matches.push(c);
+          }
+          if (matches.length === 0 && discard.array.length > 0) {
+            appendMessage('', `  no cards in discard match "${searchWhat}"`, 'announcement', false);
           }
           if (matches.length > 0) {
             const upTo = item.step.upTo || 1;

@@ -660,6 +660,36 @@ import test from 'node:test';
       assert.equal(classifyAbility({ ability: { text } }), 'move-damage');
     });
 
+    test('parseAbility: Fan Rotom Fan Call — typed {C} Pokémon with HP cap (ability parser, not trainer)', () => {
+      const text =
+        "Once during your first turn, you may search your deck for up to 3 {C} Pokémon with 100 HP or less, reveal them, and put them into your hand. Then, shuffle your deck.";
+      const steps = parseAbility(text);
+      const search = steps.find((s) => s.type === 'searchAbility');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {C} Pokémon ≤100 HP');
+      assert.equal(search.count, 3);
+      assert.equal(search.upTo, true);
+      assert.equal(search.destination, 'hand');
+    });
+
+    test('parseAbilitySearchParams: typed Basic {R} Energy preserved', async () => {
+      const { parseAbilitySearchParams } = await import('../abilities.mjs');
+      const lower =
+        'search your deck for up to 2 basic {r} energy cards and put them into your hand';
+      const parsed = parseAbilitySearchParams(lower);
+      assert.equal(parsed.what, 'Basic {R} Energy');
+      assert.equal(parsed.count, 2);
+      assert.equal(parsed.upTo, true);
+    });
+
+    test('ability search filter: typed {R} Energy via search-match.mjs', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
+      assert.equal(matchesSearch(fire, 'Basic {R} Energy'), true);
+      assert.equal(matchesSearch(water, 'Basic {R} Energy'), false);
+    });
+
     test('searchTargetType: determines card type from ability text', () => {
       assert.equal(searchTargetType({ ability: { text: 'Look through your deck and find a Basic Pokémon, put it into your hand.' } }), 'Pokémon');
       assert.equal(searchTargetType({ ability: { text: 'Search your deck for an Energy card and put it into your hand.' } }), 'Energy');

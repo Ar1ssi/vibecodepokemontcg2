@@ -64,6 +64,101 @@ const parseEnergyTypeHint = (t) => {
   return null;
 };
 
+/** Ability deck-search parsing — separate from trainer parseSearchDeckParams(). */
+export function parseAbilitySearchParams(lower) {
+  let what = 'a card';
+  let count = 1;
+  let destination = 'hand';
+  let upTo = false;
+
+  if (
+    lower.includes('onto your bench') ||
+    lower.includes('put it onto your bench') ||
+    lower.includes('put them onto your bench')
+  ) {
+    destination = 'bench';
+  }
+
+  const typedHp = lower.match(
+    /up to\s+(\d+)\s+\{([a-z])\}\s+pok[ée]mon(?:\s+cards?)?(?:\s+with\s+(\d+)\s+hp\s+or\s+less)?/
+  );
+  if (typedHp) {
+    const sym = typedHp[2].toUpperCase();
+    const hp = typedHp[3];
+    return {
+      what: hp ? `Basic {${sym}} Pokémon ≤${hp} HP` : `Basic {${sym}} Pokémon`,
+      count: Number(typedHp[1]),
+      destination,
+      upTo: true,
+    };
+  }
+
+  if (destination === 'bench' && lower.includes('basic pok') && lower.includes('hp or less')) {
+    const m = lower.match(/up to\s+(\d+)\s+basic pok/);
+    const hp = lower.match(/(\d+)\s+hp\s+or\s+less/);
+    return {
+      what: hp ? `Basic Pokémon ≤${hp[1]} HP` : 'Basic Pokémon',
+      count: m ? Number(m[1]) : 1,
+      destination: 'bench',
+      upTo: true,
+    };
+  }
+
+  const typedEnergyUpTo = lower.match(/up to\s+(\d+)\s+basic\s+(\{[a-z]\})\s+energy/);
+  if (typedEnergyUpTo) {
+    return {
+      what: `Basic ${typedEnergyUpTo[2].toUpperCase()} Energy`,
+      count: Number(typedEnergyUpTo[1]),
+      destination,
+      upTo: true,
+    };
+  }
+
+  const typedEnergy = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
+  if (typedEnergy) {
+    what = `Basic ${typedEnergy[1].toUpperCase()} Energy`;
+  } else if (/up to\s+(\d+)\s+basic energy/.test(lower)) {
+    const m = lower.match(/up to\s+(\d+)\s+basic energy/);
+    what = 'Basic Energy';
+    count = Number(m[1]);
+    upTo = true;
+  } else if (lower.includes('basic energy')) {
+    what = 'Basic Energy';
+  } else if (lower.includes('energy')) {
+    what = 'Energy';
+  } else if (/up to\s+(\d+)\s+basic pok/.test(lower)) {
+    const m = lower.match(/up to\s+(\d+)\s+basic pok/);
+    what = 'a Basic Pokémon';
+    count = Number(m[1]);
+    upTo = true;
+  } else if (lower.includes('basic pokémon') || lower.includes('basic pokemon')) {
+    what = 'a Basic Pokémon';
+  } else if (/up to\s+(\d+)\s+pok/.test(lower)) {
+    const m = lower.match(/up to\s+(\d+)\s+pok/);
+    what = 'a Pokémon';
+    count = Number(m[1]);
+    upTo = true;
+  } else if (lower.includes('pokémon') || lower.includes('pokemon')) {
+    what = 'a Pokémon';
+  } else if (lower.includes('supporter')) {
+    what = 'Supporter';
+  } else if (lower.includes('item')) {
+    what = 'Item';
+  } else if (lower.includes('trainer')) {
+    what = 'Trainer';
+  }
+
+  if (!upTo) {
+    const upToM = lower.match(/up to\s+(\d+)/);
+    if (upToM) {
+      count = Number(upToM[1]);
+      upTo = true;
+    }
+  }
+
+  return { what, count, destination, upTo };
+}
+
 export function parseAbility(text = '') {
   const lower = normalizeText(text);
   const steps = [];
@@ -75,22 +170,17 @@ export function parseAbility(text = '') {
     (lower.includes('find') && lower.includes('from your deck')) ||
     (lower.includes('up to') && lower.includes('from your deck') && lower.includes('into your hand'))
   ) {
-    let what = 'a card';
-    let count = 1;
-    if (lower.includes('energy')) what = 'Energy';
-    else if (lower.includes('basic pokémon')) what = 'a Basic Pokémon';
-    else if (lower.includes('pokémon')) what = 'a Pokémon';
-    if (lower.includes('up to 2')) count = 2;
-    else if (lower.includes('up to 3')) count = 3;
-    else if (lower.includes('up to 4')) count = 4;
-    else if (lower.includes('up to 5')) count = 5;
-    const dest = lower.includes('onto your bench') ? 'Bench' : 'hand';
+    const parsed = parseAbilitySearchParams(lower);
+    const what = parsed.what;
+    const dest = parsed.destination === 'bench' ? 'Bench' : 'hand';
+    const count = parsed.count || 1;
     steps.push({
       type: 'searchAbility',
       what,
       count,
       destination: dest,
-      guidance: `Once during your turn: search your deck for ${count > 1 ? `up to ${count} ` : ''}${what} → ${dest === 'Bench' ? 'put on Bench' : 'add to hand'}, then shuffle.`,
+      upTo: parsed.upTo || false,
+      guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${dest === 'Bench' ? 'put on Bench' : 'add to hand'}, then shuffle.`,
     });
   }
 
@@ -138,7 +228,12 @@ export function parseAbility(text = '') {
   }
 
   // ── 3. Switch / bring in ────────────────────────────────────────────────
-  if (lower.includes('switch') || lower.includes('bring in')) {
+  if (
+    (lower.includes('switch your active') ||
+      lower.includes('switch in 1 of') ||
+      lower.includes('bring in 1 of')) &&
+    (lower.includes('benched') || lower.includes('bench'))
+  ) {
     const isOpponent = lower.includes("opponent's benched") || lower.includes('opponent\'s benched');
     steps.push({
       type: 'switchAbility',
@@ -168,13 +263,21 @@ export function parseAbility(text = '') {
   }
 
   // ── 5. Attach energy (FIXED: verb only, not "attached" describing state) ──
-  if (hasVerbAttach(lower)) {
+  if (hasVerbAttach(lower) && !(
+    hasWord(lower, 'move') &&
+    lower.includes('energy') &&
+    (lower.includes('to 1 of your') || lower.includes('to another') || lower.includes('to your active'))
+  )) {
     const fromDiscard = lower.includes('from your discard pile');
     const upTo = lower.match(/(?:attach|put)\s+up to\s+(\d+)/)?.[1] || null;
+    const basic = lower.includes('basic');
+    const energyType = parseEnergyTypeHint(lower);
     steps.push({
       type: 'attachAbility',
       fromDiscard,
       upTo: upTo ? Number(upTo) : null,
+      basic,
+      energyType,
       guidance: fromDiscard
         ? 'Once during your turn: attach Energy from your discard pile.'
         : upTo
@@ -200,10 +303,14 @@ export function parseAbility(text = '') {
   ) {
     const upTo = lower.match(/move\s+(?:up to\s+)?(\d+)\s+energy/)?.[1] || null;
     const unlimited = lower.includes('as often as you like');
+    const energyType = parseEnergyTypeHint(lower);
+    const basic = lower.includes('basic');
     steps.push({
       type: 'moveEnergyAbility',
       upTo: upTo ? Number(upTo) : null,
       unlimited,
+      energyType,
+      basic,
       guidance: unlimited
         ? 'During your turn (as often as you like): move Energy between your Pokémon as described.'
         : upTo
@@ -328,13 +435,18 @@ export function parseAbility(text = '') {
   }
 
   // ── 14. Status conditions (Confuse / Burn / Poison / Asleep) ────────────
-  if (
+  const namesStatus =
     lower.includes('confused') ||
     lower.includes('burned') ||
     lower.includes('poisoned') ||
     lower.includes('asleep') ||
-    (lower.includes('make') && lower.includes('opponent')) ||
-    (lower.includes('special condition') && !lower.includes('recover'))
+    lower.includes('paralyzed');
+  if (
+    namesStatus ||
+    (lower.includes('make') &&
+      lower.includes('opponent') &&
+      namesStatus) ||
+    (lower.includes('special condition') && namesStatus && !lower.includes('recover'))
   ) {
     const target = lower.includes('opponent') ? 'opponent' : 'attacker';
     steps.push({
@@ -539,9 +651,15 @@ export function parseAbility(text = '') {
     (lower.includes('put') || lower.includes('return') || lower.includes('add'))
   ) {
     const upTo = lower.match(/up to\s+(\d+)/)?.[1] || null;
+    let what = 'card';
+    if (lower.includes('energy')) what = 'Energy';
+    else if (lower.includes('trainer')) what = 'Trainer';
+    else if (lower.includes('item')) what = 'Item';
+    else if (lower.includes('pokémon') || lower.includes('pokemon')) what = 'Pokémon';
     steps.push({
       type: 'recursionFromDiscardAbility',
       upTo: upTo ? Number(upTo) : null,
+      what,
       guidance: upTo
         ? `Once during your turn: put up to ${upTo} cards from your discard pile into your hand.`
         : 'Once during your turn: put cards from your discard pile into your hand.',

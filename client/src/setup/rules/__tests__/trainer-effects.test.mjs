@@ -391,6 +391,19 @@ import test, { describe } from 'node:test';
       assert.equal(energyMatchesSearchWhat(water, 'Basic Energy'), true);
     });
 
+    test('typed bench search: up to 3 {C} Pokémon with 100 HP or less', () => {
+      const r = parseTrainerEffect(
+        'Search your deck for up to 3 { C } Pokémon with 100 HP or less and put them onto your Bench. Then, shuffle your deck.'
+      );
+      assert.equal(r.recognizable, true);
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {C} Pokémon ≤100 HP');
+      assert.equal(search.count, 3);
+      assert.equal(search.destination, 'bench');
+      assert.equal(search.upTo, true);
+    });
+
     test('Fighting Gong: or-clause "Basic Energy or Basic Pokémon" (not plain Pokémon)', () => {
       const r = parseTrainerEffect("Search your deck for a Basic { F } Energy card or a Basic { F } Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
