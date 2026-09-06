@@ -2400,9 +2400,9 @@ a:hover {
     .native-deck-builder-sleeve-preview-image {
       height: 9vh;
       width: auto;
-      border-radius: 0.4vw;
-      border: 1px solid rgba(40, 57, 124, 0.2);
-      object-fit: cover;
+      border-radius: 4.55% / 3.5%;
+      border: none;
+      object-fit: contain;
       box-shadow: 0 3px 10px rgba(20, 30, 80, 0.18);
       flex: 0 0 auto;
     }
@@ -2468,6 +2468,7 @@ a:hover {
       height: 100%;
       object-fit: cover;
       display: block;
+      border-radius: 4.55% / 3.5%;
     }
     .native-deck-builder-sleeve-thumb:hover {
       border-color: rgba(65, 91, 168, 0.5);

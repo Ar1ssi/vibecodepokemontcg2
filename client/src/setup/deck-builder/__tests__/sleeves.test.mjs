@@ -63,4 +63,17 @@ import test from 'node:test';
       const same = setDeckSleeve(library, 'nope', 'x');
       assert.deepEqual(same, library);
     });
+
+    test('default card back resolves to the local asset', async () => {
+      const {
+        DEFAULT_CARD_BACK_PATH,
+        resolveDefaultCardBackSrc,
+      } = await import('../../deck-constructor/default-card-back.mjs');
+      assert.equal(DEFAULT_CARD_BACK_PATH, '/src/assets/cardback.png');
+      assert.equal(resolveDefaultCardBackSrc(undefined), '/src/assets/cardback.png');
+      assert.equal(
+        resolveDefaultCardBackSrc('http://localhost:4000'),
+        'http://localhost:4000/src/assets/cardback.png'
+      );
+    });
     

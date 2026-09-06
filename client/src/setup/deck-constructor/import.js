@@ -10,6 +10,7 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { processAction } from '../general/process-action.js';
 import { show } from '../home-header/header-toggle.js';
+import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { getCardType } from './find-type.js';
 import { getOldCardType } from './find-old-type.js';
 
@@ -1002,7 +1003,7 @@ changeCardBackButton.addEventListener('click', () => {
     userInput.trim() !== '' &&
     userInput.toLowerCase() === 'default'
   ) {
-    userInput = 'https://ptcgsim.online/src/assets/cardback.png';
+    userInput = resolveDefaultCardBackSrc();
   }
   const img = new Image();
   img.onload = () => {
