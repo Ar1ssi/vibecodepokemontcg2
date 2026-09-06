@@ -247,58 +247,35 @@ const CHOOSE_TOP_GAP = 16;
 const syncChooseLayout = (state) => {
   if (state.mode === 'browse' || !state.overlay) return;
 
-  const slotCount = state.slotElements?.length || 1;
   const hasTrigger = Boolean(state.triggerSlot?.childElementCount);
+  const cardCount = Math.max(1, state.cards?.length || 1);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const slotGap = 6;
-  const minSlotW = 84;
 
-  const slotRowReserve = Math.max(minSlotW * CARD_ASPECT, 110);
+  const slotRowReserve = 110;
   const reservedY = 230 + slotRowReserve;
-  const maxCardH = Math.max(240, vh - reservedY);
+  const maxCardH = Math.max(200, vh - reservedY);
   const cardWFromH = maxCardH / CARD_ASPECT;
-  const cardW = Math.min(vw * 0.56, 380, cardWFromH);
+  const cardW = Math.min(vw * 0.34, 240, cardWFromH);
   const cardH = cardW * CARD_ASPECT;
-  const peekFactor = hasTrigger ? 1.88 : 1.78;
-  const carouselW = cardW * peekFactor;
+
+  const peekSlots = Math.min(Math.max(cardCount - 1, 1), 3);
+  const leftPeek = cardW * (PEEK_PERCENT / 100) * peekSlots;
+  const carouselW = cardW + leftPeek;
 
   state.overlay.style.setProperty('--card-picker-card-w', `${Math.round(cardW)}px`);
   state.overlay.style.setProperty('--card-picker-card-h', `${Math.round(cardH)}px`);
   state.overlay.style.setProperty('--card-picker-carousel-w', `${Math.round(carouselW)}px`);
   state.overlay.style.setProperty('--card-picker-top-gap', `${CHOOSE_TOP_GAP}px`);
-
-  const preferredSlotW = Math.max(
-    minSlotW,
-    Math.round(cardW * 0.94)
+  state.overlay.style.setProperty(
+    '--card-picker-anchor-right',
+    hasTrigger ? 'clamp(20px, 4.5vw, 52px)' : '0px'
   );
-  const maxRowW = vw * 0.96;
-  let slotW = preferredSlotW;
-  const totalNeeded = slotCount * slotW + (slotCount - 1) * slotGap;
-  if (totalNeeded > maxRowW) {
-    slotW = Math.max(
-      minSlotW,
-      Math.floor((maxRowW - (slotCount - 1) * slotGap) / slotCount)
-    );
-  }
 
-  let shift = 0;
-  if (hasTrigger) {
-    shift += (cardW + CHOOSE_TOP_GAP) / 2;
-  }
-
-  const slotRowW = slotCount * slotW + (slotCount - 1) * slotGap;
-  const topRowW = carouselW + (hasTrigger ? CHOOSE_TOP_GAP + cardW : 0);
-  const extraWidth = Math.max(slotRowW, topRowW) - carouselW;
-  if (extraWidth > 0) {
-    shift += extraWidth * 0.22;
-  }
-
-  state.overlay.style.setProperty('--card-picker-center-shift', `${Math.round(shift)}px`);
   if (state.scene) {
-    state.scene.style.transform =
-      shift > 0 ? `translateX(-${Math.round(shift)}px)` : '';
+    state.scene.style.transform = '';
   }
+
   state.scene?.classList.toggle('has-trigger', hasTrigger);
   state.topRow?.classList.toggle('has-trigger', hasTrigger);
   state.main?.classList.toggle('has-trigger', hasTrigger);
