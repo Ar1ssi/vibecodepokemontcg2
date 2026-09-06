@@ -2159,7 +2159,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
 
 // Switch ability (taxonomy C, once-per-turn): free active↔bench swap using the
 // active's own switch-family ability. No energy cost (unlike retreat) and does
-// NOT end the turn. Card movement relays in multiplayer via moveCard.
+// NOT end the turn. Card movement relays in multiplayer via moveCardBundle.
 export const switchAbility = async (user, emit = true, targetCard = null) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
@@ -2232,14 +2232,18 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     return true;
   };
 
-  const performSwap = (benchCard) => {
+  const performSwap = async (benchCard) => {
     if (targetIsBench) {
       const idx = getZone(user, 'bench').array.indexOf(benchCard);
-      if (idx >= 0) moveCard(user, user, 'bench', 'active', idx);
+      if (idx >= 0) {
+        await moveCardBundle(user, user, 'bench', 'active', idx, false, 'move', emit);
+      }
     } else {
-      moveCard(user, user, 'active', 'bench', 0);
+      await moveCardBundle(user, user, 'active', 'bench', 0, false, 'move', emit);
       const idxAfter = getZone(user, 'bench').array.indexOf(benchCard);
-      if (idxAfter >= 0) moveCard(user, user, 'bench', 'active', idxAfter);
+      if (idxAfter >= 0) {
+        await moveCardBundle(user, user, 'bench', 'active', idxAfter, false, 'move', emit);
+      }
     }
 
     if (rulesState.enabled) markAbilityUsed(user, target);
@@ -2278,7 +2282,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
       return;
     }
     if (candidates.length === 1) {
-      performSwap(candidates[0].card);
+      await performSwap(candidates[0].card);
       return;
     }
     const pick = await _pickFromList(
@@ -2289,7 +2293,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
       appendMessage(user, 'Switch canceled.', 'announcement', false);
       return;
     }
-    performSwap(candidates[pick].card);
+    await performSwap(candidates[pick].card);
     return;
   }
 
@@ -2297,10 +2301,10 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
   // pushing the old active to bench. For active source, move active→bench first
   // then bench→active (two-step since active can't hold two cards).
   if (targetIsBench) {
-    moveCard(user, user, 'bench', 'active', targetIdx);
+    await moveCardBundle(user, user, 'bench', 'active', targetIdx, false, 'move', emit);
   } else {
-    moveCard(user, user, 'active', 'bench', 0);
-    moveCard(user, user, 'bench', 'active', 0);
+    await moveCardBundle(user, user, 'active', 'bench', 0, false, 'move', emit);
+    await moveCardBundle(user, user, 'bench', 'active', 0, false, 'move', emit);
   }
 
   if (rulesState.enabled) markAbilityUsed(user, target);
