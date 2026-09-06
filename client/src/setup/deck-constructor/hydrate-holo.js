@@ -9,6 +9,7 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 
 const hydrated = new WeakSet();
+const pendingHydrations = new WeakMap();
 
 export function cardBackSrcForUser(user) {
   return user === 'self'
@@ -47,25 +48,50 @@ export const imageAnchor = (image) =>
 // the enlarged view shrinks the card instead of growing it.
 export const fullViewHost = (image) => imageAnchor(image)?.parentElement ?? null;
 
+export function isInCardPreview(card) {
+  if (!card?.image) return false;
+  return (
+    card.image.closest('.card-preview-overlay') != null ||
+    card.wrapper?.closest('.card-preview-overlay') != null
+  );
+}
+
 export const isInFullView = (image) =>
   !!fullViewHost(image)?.classList.contains('full-view');
 
 export function hydrateHolo(card) {
-  if (HOLO_DISABLED) return;
-  if (!card?.image || hydrated.has(card) || isCardHidden(card)) return;
-  hydrated.add(card);
-  ensureCardData({ name: card.name, type: card.type })
+  if (HOLO_DISABLED) return Promise.resolve(null);
+  if (!card?.image || isCardHidden(card)) return Promise.resolve(null);
+  if (card.wrapper) return Promise.resolve(card.wrapper);
+
+  const pending = pendingHydrations.get(card);
+  if (pending) return pending;
+
+  const promise = ensureCardData({ name: card.name, type: card.type })
     .then((data) => {
-      if (!card.image.isConnected || isCardHidden(card)) return;
+      if (!card.image.isConnected || isCardHidden(card)) {
+        hydrated.delete(card);
+        return null;
+      }
+      if (card.wrapper) return card.wrapper;
+
       const effect = resolveHoloEffect(data);
-      if (!effect) return; // common / non-holo → stays plain
+      if (!effect) {
+        hydrated.delete(card);
+        return null;
+      }
+
+      const inPreview = isInCardPreview(card);
       const rect = card.image.getBoundingClientRect();
       const width = card.image.clientWidth || rect.width || 0;
       const height = card.image.clientHeight || rect.height || 0;
       const wrapper = buildHoloCard(card.image.src, effect);
       wrapper.classList.add('mat-holo');
-      if (width) wrapper.style.width = `${width}px`;
-      if (height) wrapper.style.height = `${height}px`;
+      // Let preview CSS size the wrapper; mat cards keep their px snapshot.
+      if (!inPreview) {
+        if (width) wrapper.style.width = `${width}px`;
+        if (height) wrapper.style.height = `${height}px`;
+      }
       const rotator = wrapper.querySelector('.card__rotator');
       // Where the <img> currently sits in its zone (captured BEFORE moving it).
       const { parentElement, nextSibling } = card.image;
@@ -85,10 +111,19 @@ export function hydrateHolo(card) {
       // suppresses pointermove, and cards often just sit still) — auto-play
       // a continuous left-to-right sweep instead of waiting on the pointer.
       startHoloAnimation(wrapper, { auto: true });
+      return wrapper;
     })
     .catch(() => {
-      /* rarity unresolved → card stays plain; deck never breaks */
+      hydrated.delete(card);
+      return null;
+    })
+    .finally(() => {
+      pendingHydrations.delete(card);
     });
+
+  hydrated.add(card);
+  pendingHydrations.set(card, promise);
+  return promise;
 }
 
 export function unhydrateHolo(card) {

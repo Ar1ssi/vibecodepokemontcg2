@@ -1,18 +1,34 @@
 import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
+  cardNode,
   fullViewHost,
+  hydrateHolo,
   imageAnchor,
+  isInCardPreview,
 } from '../deck-constructor/hydrate-holo.js';
 import {
   playSelectPop,
   playDeselectPop,
   makePopFrame,
+  stopPop,
 } from './card-pop.mjs';
 
-/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, wrapper?: HTMLElement } | null} */
+/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
+
+const adoptNode = (node, doc) => {
+  if (!node || node.ownerDocument === doc) return node;
+  return doc.adoptNode(node);
+};
+
+const startPreviewHolo = (wrapper) => {
+  if (!wrapper) return;
+  wrapper.style.width = '';
+  wrapper.style.height = '';
+  startHoloAnimation(wrapper, { auto: true });
+};
 
 const hideCardCounters = (image) => {
   if (image.damageCounter) image.damageCounter.style.display = 'none';
@@ -72,11 +88,12 @@ export const openCardPreview = (targetImage, card) => {
     closeCardPreview(null, true);
   }
 
-  const doc = targetImage.ownerDocument;
-  const anchor = imageAnchor(targetImage);
+  const zoneDoc = targetImage.ownerDocument;
+  const host = fullViewHost(targetImage);
+  const anchor = cardNode(card) ?? imageAnchor(targetImage);
   const rect = anchor.getBoundingClientRect();
 
-  const placeholder = doc.createElement('span');
+  const placeholder = zoneDoc.createElement('span');
   placeholder.className = 'card-preview-placeholder';
   placeholder.style.display = 'inline-block';
   placeholder.style.width = `${rect.width}px`;
@@ -84,26 +101,45 @@ export const openCardPreview = (targetImage, card) => {
   placeholder.style.verticalAlign = 'bottom';
   anchor.before(placeholder);
 
-  const overlay = doc.createElement('div');
+  const overlay = document.createElement('div');
   overlay.className = 'card-preview-overlay';
 
-  const popHost = doc.createElement('div');
+  const popHost = document.createElement('div');
   popHost.className = 'card-preview-pop';
-  popHost.appendChild(anchor);
+  popHost.appendChild(adoptNode(anchor, document));
   overlay.appendChild(popHost);
-  doc.body.appendChild(overlay);
+  document.body.appendChild(overlay);
 
   anchor.classList.add('card-preview-card');
   hideCardCounters(targetImage);
 
   const wrapper = card?.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
   if (wrapper) {
-    startHoloAnimation(wrapper);
+    startPreviewHolo(wrapper);
+  } else if (card) {
+    hydrateHolo(card).then((hydratedWrapper) => {
+      if (!hydratedWrapper || !cardPreviewState || cardPreviewState.card !== card) {
+        return;
+      }
+      hydratedWrapper.classList.add('card-preview-card');
+      cardPreviewState.wrapper = hydratedWrapper;
+      cardPreviewState.anchor = hydratedWrapper;
+      startPreviewHolo(hydratedWrapper);
+    });
   }
 
   playSelectPop(popHost, makePopFrame(popHost));
 
-  cardPreviewState = { overlay, popHost, placeholder, anchor, wrapper };
+  cardPreviewState = {
+    overlay,
+    popHost,
+    placeholder,
+    anchor: card?.wrapper ?? anchor.closest?.('.mat-holo') ?? anchor,
+    host,
+    zoneDoc,
+    card,
+    wrapper: card?.wrapper ?? wrapper,
+  };
 
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) {
@@ -118,27 +154,46 @@ export const closeCardPreview = (event, immediate = false) => {
     if (event.target !== cardPreviewState.overlay) return;
   }
 
-  const { overlay, popHost, placeholder, anchor, wrapper } = cardPreviewState;
+  const state = cardPreviewState;
+  cardPreviewState = null;
+  stopPop(state.popHost);
 
   const revert = () => {
+    const anchor =
+      (state.card ? cardNode(state.card) : null) ?? state.anchor;
+    const wrapper =
+      state.card?.wrapper ?? state.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
+
     if (wrapper) {
       startHoloAnimation(wrapper, { auto: true });
     }
     anchor.classList.remove('card-preview-card');
-    const primaryImg = anchor.matches('img') ? anchor : anchor.querySelector('img');
+    const primaryImg = anchor.matches('img')
+      ? anchor
+      : anchor.querySelector('img');
     if (primaryImg) {
       showCardCounters(primaryImg);
     }
-    placeholder.before(anchor);
-    placeholder.remove();
-    overlay.remove();
-    cardPreviewState = null;
+
+    const homeAnchor = adoptNode(anchor, state.zoneDoc);
+    if (state.placeholder.isConnected) {
+      state.placeholder.before(homeAnchor);
+      state.placeholder.remove();
+    } else if (state.host?.isConnected) {
+      state.host.appendChild(homeAnchor);
+    }
+
+    state.overlay.remove();
+
+    if (state.card && !isInCardPreview(state.card)) {
+      hydrateHolo(state.card);
+    }
   };
 
   if (immediate) {
     revert();
   } else {
-    playDeselectPop(popHost, makePopFrame(popHost), revert);
+    playDeselectPop(state.popHost, makePopFrame(state.popHost), revert);
   }
 };
 

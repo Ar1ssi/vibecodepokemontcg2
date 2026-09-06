@@ -4,6 +4,7 @@
     import { systemState, socket as rulesSocket } from '../../initialization/global-variables/global-variables.js';
     import { appendMessage } from '../chatbox/append-message.js';
     import { getZone } from '../zones/get-zone.js';
+    import { openCardPicker } from '../image-logic/card-picker.js';
     import {
       rulesState,
       canPerformAction,
@@ -1152,93 +1153,47 @@ import {
 // ── choice picker for search effects ─────────────────────────────────
     // Opens a modal with candidate cards (from deck/discard); clicking one
     // executes the pending move (to hand or bench) automatically.
-    const openChoicePicker = ({ title, candidates, zoneFrom, destination, user = 'self', pickOnly = false, multiSelect = false, requiredCount = 1, minCount, maxCount, upTo = false, onPick, onConfirm, onCancel }) => {
-      // remove any existing picker
-      document.getElementById('rulesChoicePicker')?.remove();
-
-      const maxSel = maxCount ?? requiredCount;
+    const openChoicePicker = ({
+      title,
+      candidates,
+      zoneFrom,
+      destination,
+      user = 'self',
+      pickOnly = false,
+      multiSelect = false,
+      requiredCount = 1,
+      minCount,
+      maxCount,
+      upTo = false,
+      onPick,
+      onConfirm,
+      onCancel,
+      triggerCard = null,
+      allCandidates = null,
+    }) => {
       const minSel = minCount ?? (upTo ? 0 : requiredCount);
-      const cappedMax = Math.min(maxSel, candidates.length);
-      
       if (multiSelect && !upTo && minSel > candidates.length) {
         appendMessage('', `  not enough cards to select ${requiredCount} — play it manually`, 'announcement', false);
         return;
       }
-    
-      const overlay = document.createElement('div');
-      overlay.id = 'rulesChoicePicker';
-      overlay.innerHTML = `
-        <div class="choice-picker-card">
-          <div class="choice-picker-title"></div>
-          <div class="choice-picker-grid"></div>
-          ${multiSelect ? '<button class="choice-picker-confirm" disabled>Confirm</button>' : ''}
-          <button class="choice-picker-cancel">Cancel</button>
-        </div>`;
-      document.body.appendChild(overlay);
-      overlay.querySelector('.choice-picker-title').textContent = title;
-    
-      const selected = new Set();
-      const grid = overlay.querySelector('.choice-picker-grid');
-      const confirmBtn = overlay.querySelector('.choice-picker-confirm');
-      if (confirmBtn && upTo && minSel === 0) {
-        confirmBtn.disabled = false;
-      }
-      import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-        for (const cand of candidates) {
-          const btn = document.createElement('button');
-          btn.className = 'choice-picker-item';
-          // zone cards carry a DOM <img> in `image`, not a URL string
-          const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
-          btn.innerHTML = thumb
-            ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
-            : `<span>${cand.name || 'Card'}</span>`;
-          btn.addEventListener('click', () => {
-            if (multiSelect) {
-              // toggle selection; the cards only move when Confirm is clicked
-              if (selected.has(cand)) {
-                selected.delete(cand);
-                btn.classList.remove('selected');
-              } else if (selected.size < cappedMax) {
-                selected.add(cand);
-                btn.classList.add('selected');
-              }
-              if (confirmBtn) {
-                confirmBtn.disabled = selected.size < minSel || selected.size > cappedMax;
-              }
-              return;
-            }
-            try {
-              if (!pickOnly && zoneFrom && destination) {
-                const z = getZone(user, zoneFrom);
-                const idx = z.array.indexOf(cand);
-                if (idx >= 0) {
-                  moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
-                  appendMessage('', `auto: ${cand.name} → ${destination === 'bench' ? 'Bench' : destination}`, 'announcement', false);
-                }
-              }
-            } catch {}
-            onPick?.(cand);
-            overlay.remove();
-          });
-          grid.appendChild(btn);
-        }
-      });
-      
-      if (confirmBtn) {
-        confirmBtn.addEventListener('click', () => {
-          onConfirm?.(Array.from(selected));
-          overlay.remove();
-        });
-      }
-      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
-        onCancel?.();
-        overlay.remove();
-      });
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          onCancel?.();
-          overlay.remove();
-        }
+
+      openCardPicker({
+        title,
+        candidates,
+        allCandidates,
+        triggerCard,
+        multiSelect,
+        requiredCount,
+        minCount: minSel,
+        maxCount: maxCount ?? requiredCount,
+        upTo,
+        pickOnly,
+        zoneFrom,
+        destination,
+        user,
+        onPick,
+        onConfirm,
+        onCancel,
       });
     };
     
@@ -1270,38 +1225,16 @@ import {
     };
 
     // ── guided heal picker: choose which of your Pokémon to heal ──────────
-    const openHealPicker = ({ title, candidates, amount, cure }) => {
-      document.getElementById('rulesChoicePicker')?.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'rulesChoicePicker';
-      overlay.innerHTML = `
-        <div class="choice-picker-card">
-          <div class="choice-picker-title"></div>
-          <div class="choice-picker-grid"></div>
-          <button class="choice-picker-cancel">Cancel</button>
-        </div>`;
-      document.body.appendChild(overlay);
-      overlay.querySelector('.choice-picker-title').textContent = title;
-      const grid = overlay.querySelector('.choice-picker-grid');
-      for (const cand of candidates) {
-        const btn = document.createElement('button');
-        btn.className = 'choice-picker-item';
-        const thumb = cand.images?.small || (typeof cand.image === 'string' ? cand.image : cand.image?.src) || '';
-        btn.innerHTML = thumb
-          ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
-          : `<span>${cand.name || 'Card'}</span>`;
-        btn.addEventListener('click', () => {
-          applyHealToCard(cand, amount, cure);
-          overlay.remove();
-        });
-        grid.appendChild(btn);
-      }
-      overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
-        appendMessage('', '  heal canceled', 'announcement', false);
-        overlay.remove();
-      });
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
+    const openHealPicker = ({ title, candidates, amount, cure, triggerCard = null }) => {
+      openCardPicker({
+        title,
+        candidates,
+        triggerCard,
+        pickOnly: true,
+        onPick: (cand) => applyHealToCard(cand, amount, cure),
+        onCancel: () => {
+          appendMessage('', '  heal canceled', 'announcement', false);
+        },
       });
     };
 
@@ -1542,6 +1475,8 @@ import {
             ? `${card.name} — choose up to ${count} cards to ${toBench ? 'Bench' : 'your hand'}`
             : `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}`,
           candidates: pool,
+          allCandidates: usingFallback ? null : deck.array,
+          triggerCard: card,
           zoneFrom: 'deck',
           destination: dest,
           multiSelect: true,
@@ -1570,6 +1505,8 @@ import {
       const result = await awaitChoicePicker({
         title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}`,
         candidates: pool,
+        allCandidates: usingFallback ? null : deck.array,
+        triggerCard: card,
         zoneFrom: 'deck',
         destination: dest,
         onPick: (picked) => {
@@ -1921,12 +1858,14 @@ if (!isTrainer) {
     };
 
     const hookTrainerPlay = () => {
+      // Guided trainer/auto-execution runs even when rules enforcement is off
+      // (easier solo testing). Turn gating still applies when rules are on.
       // Instant path: react the same tick a card lands on 'board'.
       document.addEventListener('rules-card-on-board', (event) => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
+        if (rulesState.phase === 'ended') return;
         const { user, card } = event.detail || {};
         if (user !== 'self' || !card) return;
+        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         processBoardCard(card);
       });
 
@@ -2000,8 +1939,8 @@ if (!isTrainer) {
       // the event above — same logic, just on a slow poll so it's never
       // the thing the player is waiting on.
       window.setInterval(() => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
+        if (rulesState.phase === 'ended') return;
+        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         try {
           const board = getZone('self', 'board');
           if (!board?.array) return;

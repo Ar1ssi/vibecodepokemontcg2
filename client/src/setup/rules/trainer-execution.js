@@ -68,6 +68,7 @@ let _shuffleZone = null;
 let _matchesSearch = null;
 let _isPokemonCard = null;
 let _prizeState = null;
+let _pickerTriggerCard = null;
 
 export function initTrainerExecution(deps) {
   _getZone = deps.getZone;
@@ -173,10 +174,12 @@ function collectAttachedForUser(user, filterFn) {
   return out;
 }
 
-function openPickOnly({ title, candidates, onPick, onCancel, user = 'self' }) {
+function openPickOnly({ title, candidates, onPick, onCancel, user = 'self', triggerCard = null, allCandidates = null }) {
   _openChoicePicker({
     title,
     candidates,
+    allCandidates,
+    triggerCard: triggerCard ?? _pickerTriggerCard,
     user,
     pickOnly: true,
     onPick,
@@ -184,14 +187,17 @@ function openPickOnly({ title, candidates, onPick, onCancel, user = 'self' }) {
   });
 }
 
-function openMultiPickOnly({ title, candidates, count, onConfirm, onCancel, user = 'self' }) {
+function openMultiPickOnly({ title, candidates, count, onConfirm, onCancel, user = 'self', triggerCard = null, allCandidates = null, upTo = false }) {
   _openChoicePicker({
     title,
     candidates,
+    allCandidates,
+    triggerCard: triggerCard ?? _pickerTriggerCard,
     user,
     pickOnly: true,
     multiSelect: true,
     requiredCount: Math.min(count, candidates.length),
+    upTo,
     onConfirm,
     onCancel,
   });
@@ -313,6 +319,7 @@ function openCoinFlipOverlay(cardName, onResult) {
 }
 
 async function runSearchStep(card, searchStep, done) {
+  _pickerTriggerCard = card;
   if (!searchStep) {
     done?.();
     return;
@@ -388,6 +395,7 @@ async function runSearchStep(card, searchStep, done) {
     _openChoicePicker({
       title: `${card.name} — choose a Pokémon to attach ${energyCard.name} to`,
       candidates: targets,
+      triggerCard: card,
       zoneFrom: 'active',
       destination: 'hand',
       onPick: (target) => {
@@ -416,6 +424,8 @@ async function runSearchStep(card, searchStep, done) {
         ? `${card.name} — choose up to ${count} cards`
         : `${card.name} — choose ${count} cards`,
       candidates: pool,
+      allCandidates: usingFallback ? null : deck.array,
+      triggerCard: card,
       zoneFrom: 'deck',
       destination: toBench ? 'bench' : 'hand',
       multiSelect: true,
@@ -451,6 +461,8 @@ async function runSearchStep(card, searchStep, done) {
   _openChoicePicker({
     title: `${card.name} — ${toBench ? 'put a card on Bench' : toAttach ? 'choose Energy to attach' : 'take a card to hand'}`,
     candidates: pool,
+    allCandidates: usingFallback ? null : deck.array,
+    triggerCard: card,
     zoneFrom: 'deck',
     destination: toBench ? 'bench' : 'hand',
     onPick: (picked) => {
@@ -544,6 +556,7 @@ function discardFromHandUntil(user, count, preferUser = 'self') {
 }
 
 export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
+  _pickerTriggerCard = card;
   const runAt = async (idx) => {
     if (idx >= steps.length) {
       onComplete?.();

@@ -101,7 +101,7 @@ const adjustRange = (v, lo, hi) => lo + v * (hi - lo);
 // just freeze in place).
 const AUTO_SWEEP_PERIOD_MS = 3200; // one full left→right→left cycle
 
-export function startHoloAnimation(card, { auto = false } = {}) {
+export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {}) {
   if (!card) return () => {};
   stopHoloAnimation(card);
 
@@ -111,7 +111,9 @@ export function startHoloAnimation(card, { auto = false } = {}) {
   let targetY = 0.5;
   let rafId = null;
   let running = true;
-  const startTime = auto ? performance.now() : 0;
+  const startTime = auto
+    ? performance.now() - phaseOffset * AUTO_SWEEP_PERIOD_MS
+    : 0;
 
   // snappier than svelte's default spring: the preview is large and the
   // light should feel immediately attached to the cursor
