@@ -144,6 +144,8 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const grassPokemonCount = ctx.grassPokemonCount;
   const specialEnergyOnSelfCount = ctx.specialEnergyOnSelfCount;
   const opponentStatusCount = ctx.opponentStatusCount;
+  const damagedOwnPokemonCount = ctx.damagedOwnPokemonCount;
+  const taurosDamagedCount = ctx.taurosDamagedCount;
 
   let total = base;
 
@@ -192,6 +194,12 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     } else if (/card in your hand/.test(unit)) {
       count = ownHandCount;
       label = 'cards in your hand';
+    } else if (/pok[ée]mon that has any damage counters/.test(unit) && !/benched/.test(unit)) {
+      count = damagedOwnPokemonCount;
+      label = 'your Pokémon with damage counters';
+    } else if (/tauros.*in its name/.test(unit) && /damage counter/.test(unit)) {
+      count = taurosDamagedCount;
+      label = 'Tauros with damage counters';
     } else if (/card in your opponent's hand/.test(unit)) {
       count = opponentHandCount;
       label = "cards in opponent's hand";
@@ -460,7 +468,8 @@ export function moveEnergyClause(attackText) {
   return (
     /move an? energy from this pok[ée]mon/i.test(text) ||
     (/move\b[^.;]*\benergy\b/i.test(text) && /benched pok[ée]mon|your bench/i.test(text)) ||
-    (/move\b[^.;]*\benergy\b/i.test(text) && /opponent's pok[ée]mon/i.test(text))
+    (/move\b[^.;]*\benergy\b/i.test(text) && /opponent's pok[ée]mon/i.test(text)) ||
+    /move any amount of (?:\{[a-zA-Z]\} )?energy from your pok[ée]mon to your other pok[ée]mon/i.test(text)
   );
 }
 
@@ -484,6 +493,15 @@ export function conditionalKoClause(attackText) {
     /if your opponent's active pok[ée]mon is a basic pok[ée]mon/i.test(text) &&
     /knocked out/i.test(text)
   ) {
+    return true;
+  }
+  if (
+    /if your opponent's active pok[ée]mon has any special energy attached/i.test(text) &&
+    /knocked out/i.test(text)
+  ) {
+    return true;
+  }
+  if (/both active pok[ée]mon are knocked out/i.test(text)) {
     return true;
   }
   if (/exactly \d+ damage counters?/.test(text) && /knocked out/i.test(text)) {
@@ -552,10 +570,16 @@ export function mirrorHealClause(attackText) {
 /** Copy another Pokémon's attack (copy-attack family). Returns target scope or null. */
 export function copyAttackScope(attackText) {
   const t = String(attackText || '').toLowerCase();
-  if (!/choose 1 of .* attacks and use it as this attack/.test(t)) return null;
+  if (
+    !/choose 1 of .* attacks and use it as this attack/.test(t) &&
+    !/choose an attack from .* and use it as this attack/.test(t)
+  ) {
+    return null;
+  }
   if (/benched n's pok[ée]mon/.test(t)) return 'own-bench-ns';
   if (/opponent's active tera/.test(t)) return 'opp-active-tera';
   if (/opponent's active/.test(t)) return 'opp-active';
+  if (/opponent's pok[ée]mon in play/.test(t)) return 'opp-in-play';
   return 'unknown';
 }
 
@@ -564,7 +588,7 @@ export function retaliateCount(attackText) {
   const t = String(attackText || '');
   if (
     !/if this pok[ée]mon is damaged by an attack/i.test(t) ||
-    !/put .* damage counters on the attacking pok[ée]mon/i.test(t)
+    !/put (\d+ )?damage counters on the attacking pok[ée]mon/i.test(t)
   ) {
     return 0;
   }
@@ -595,6 +619,62 @@ export function lookOpponentDeckCount(attackText) {
     String(attackText || '')
   );
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Look at top N of your own deck. */
+export function lookOwnDeckCount(attackText) {
+  const t = String(attackText || '');
+  if (/opponent's deck/i.test(t)) return 0;
+  const m = /look at the top (\d+) cards of your deck/i.exec(t);
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Each player draws N cards. */
+export function eachPlayerDrawCount(attackText) {
+  const m = /each player draws (\d+) cards?/i.exec(String(attackText || ''));
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Put/place damage counters on opponent Pokémon. */
+export function opponentCounterClause(attackText) {
+  const t = String(attackText || '');
+  let m = /choose (\d+) of your opponent's pok[ée]mon and put (\d+) damage counters on each/i.exec(t);
+  if (m) {
+    return {
+      mode: 'multi',
+      targets: parseInt(m[1], 10) || 1,
+      count: parseInt(m[2], 10) || 0,
+    };
+  }
+  m = /(?:place|put) (\d+) damage counters? on your opponent's active pok[ée]mon/i.exec(t);
+  if (m) return { mode: 'active', count: parseInt(m[1], 10) || 0 };
+  m = /(?:place|put) (\d+) damage counters? on 1 of your opponent's pok[ée]mon/i.exec(t);
+  if (m) return { mode: 'any', count: parseInt(m[1], 10) || 0 };
+  m = /(?:place|put) (\d+) damage counters? on your opponent's pok[ée]mon in any way/i.exec(t);
+  if (m) return { mode: 'any', count: parseInt(m[1], 10) || 0 };
+  return null;
+}
+
+/** Devolve a single opponent Active if evolved. */
+export function devolveActiveClause(attackText) {
+  return (
+    /if your opponent's active pok[ée]mon is an evolved pok[ée]mon/i.test(String(attackText || '')) &&
+    /devolve it by putting/i.test(String(attackText || ''))
+  );
+}
+
+/** Both Active Pokémon are Knocked Out. */
+export function bothActiveKoClause(attackText) {
+  return /both active pok[ée]mon are knocked out/i.test(String(attackText || ''));
+}
+
+/** KO if opponent Active has Special Energy attached. */
+export function specialEnergyKoClause(attackText) {
+  const t = String(attackText || '');
+  return (
+    /if your opponent's active pok[ée]mon has any special energy attached/i.test(t) &&
+    /knocked out/i.test(t)
+  );
 }
 
 /** Next-turn named attack bonus (Echoed Voice, Meteor Mash, …). */

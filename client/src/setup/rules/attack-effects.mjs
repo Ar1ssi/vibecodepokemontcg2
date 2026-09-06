@@ -71,6 +71,7 @@ export const ATTACK_FAMILIES = [
   'recover-status',   // recovers from all Special Conditions
   'hp-cap-damage',    // place counters until remaining HP is N
   'return-opponent-energy', // return opponent's Active Energy to their hand
+  'look-own-deck',    // look at top of your deck and reorder
   'unknown',          // attack we can't place
 ];
 
@@ -196,6 +197,32 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   ) {
     return 'conditional-ko';
   }
+  if (
+    /if your opponent's active pok[ée]mon has any special energy attached/i.test(t) &&
+    /knocked out/i.test(t)
+  ) {
+    return 'conditional-ko';
+  }
+  if (/both active pok[ée]mon are knocked out/i.test(t)) {
+    return 'conditional-ko';
+  }
+  if (
+    /if your opponent's active pok[ée]mon is an evolved pok[ée]mon/i.test(t) &&
+    /devolve it by putting/i.test(t)
+  ) {
+    return 'devolve-opponent';
+  }
+
+  // Counter placement on opponent Pokémon (Snipe, Pulverize, …).
+  if (/choose \d+ of your opponent's pok[ée]mon and put \d+ damage counters on each/i.test(t)) {
+    return 'multi-target';
+  }
+  if (
+    /(?:place|put) \d+ damage counters? on/i.test(t) &&
+    /your opponent's|opponent's active|1 of your opponent's pok[ée]mon/i.test(t)
+  ) {
+    return 'bench-damage';
+  }
 
   // Status application (single) — requires an application verb.
   if (appliesStatus(t, 'asleep')) return 'status-asleep';
@@ -222,13 +249,15 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   if (
     /move an? energy from this pok[ée]mon/i.test(t) ||
     (/move\b[^.;]*\benergy\b/i.test(t) && /benched pok[ée]mon|your bench/i.test(t)) ||
-    (/move\b[^.;]*\benergy\b/i.test(t) && /opponent's pok[ée]mon/i.test(t))
+    (/move\b[^.;]*\benergy\b/i.test(t) && /opponent's pok[ée]mon/i.test(t)) ||
+    /move any amount of (?:\{[a-zA-Z]\} )?energy from your pok[ée]mon to your other pok[ée]mon/i.test(t)
   ) {
     return 'move-energy';
   }
   if (/(remove|heal)[^.]*damage counter|remove [^.]*counters|heal \d+ damage/.test(t)) return 'heal';
   if (/switch/.test(t)) return 'switch';
   if (/draw cards until you have \d+ cards/.test(t)) return 'draw-until';
+  if (/each player draws \d+ cards?/.test(t)) return 'draw-attach';
   if (/draw (a |the )?card|draw \d+|attach [^.]*energy/.test(t)) return 'draw-attach';
 
   // Coin-flip branching (per-heads scaling is the more specific form).
@@ -250,6 +279,10 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     /special energy card attached to this pok[ée]mon/.test(t) ||
     /special condition affecting your opponent's active/.test(t) ||
     /for each card in your opponent's hand/.test(t) ||
+    /for each card in your hand/.test(t) ||
+    /for each of your pok[ée]mon that has any damage counters/.test(t) ||
+    /damage for each card in your hand/.test(t) ||
+    /tauros.*in its name.*damage counter/.test(t) ||
     /for each \{c\} in your opponent's active pok[ée]mon's retreat cost/.test(t)
   ) {
     return 'per-energy';
@@ -275,7 +308,12 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   // Next-turn lock (can't use / can't attack / can't retreat / can't play cards).
   if (
     /can't use|can't attack|can't retreat|cannot use|cannot attack|cannot retreat/.test(t) ||
-    /can't play any (item|supporter) cards?/.test(t)
+    /can't play any (item|supporter) cards?/.test(t) ||
+    /can't play any pok[ée]mon from their hand to evolve/.test(t) ||
+    /energy can't be attached from your opponent's hand/.test(t) ||
+    /retreat cost is \{c\} more/.test(t) ||
+    /attacks used by the defending pok[ée]mon cost \{c\} more/.test(t) ||
+    /defending pok[ée]mon's weakness is now \{c\}/.test(t)
   ) {
     return 'next-turn-lock';
   }
@@ -286,14 +324,17 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   }
 
   // Copy another Pokémon's attack.
-  if (/choose 1 of .* attacks and use it as this attack/.test(t)) {
+  if (
+    /choose 1 of .* attacks and use it as this attack/.test(t) ||
+    /choose an attack from .* and use it as this attack/.test(t)
+  ) {
     return 'copy-attack';
   }
 
   // Retaliate / thorns (damage attacker next turn if this Pokémon is hit).
   if (
     /if this pok[ée]mon is damaged by an attack/.test(t) &&
-    /put .* damage counters on the attacking pok[ée]mon/.test(t)
+    /put (\d+ )?damage counters on the attacking pok[ée]mon/.test(t)
   ) {
     return 'retaliate';
   }
@@ -316,6 +357,11 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     return 'look-opponent-deck';
   }
 
+  // Look at your own deck top.
+  if (/look at the top .* of your deck/.test(t)) {
+    return 'look-own-deck';
+  }
+
   // Next-turn attack bonus (Echoed Voice, Meteor Mash, …).
   if (
     /during your next turn.*attack does .* more damage/.test(t) ||
@@ -324,8 +370,11 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     return 'next-turn-bonus';
   }
 
-  // Devolve all opponent evolved Pokémon.
-  if (/devolve each of your opponent's evolved pok[ée]mon/.test(t)) {
+  // Devolve opponent evolved Pokémon (single or all).
+  if (
+    /devolve each of your opponent's evolved pok[ée]mon/.test(t) ||
+    /devolve 1 of your opponent's evolved pok[ée]mon/.test(t)
+  ) {
     return 'devolve-opponent';
   }
 
@@ -340,12 +389,18 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   }
 
   // Return opponent Active's Energy to their hand.
-  if (/put .* energy attached to your opponent's active pok[ée]mon into their hand/.test(t)) {
+  if (
+    /put .* energy attached to your opponent's active pok[ée]mon into their hand/.test(t) ||
+    /put \d+ energy attached to your opponent's active stage 2 pok[ée]mon into their hand/.test(t)
+  ) {
     return 'return-opponent-energy';
   }
 
-  // Next-turn vulnerability on Defending Pokémon.
-  if (/defending pok[ée]mon takes \d+ more damage from attacks/.test(t)) {
+  // Next-turn vulnerability on Defending Pokémon or this Pokémon.
+  if (
+    /defending pok[ée]mon takes \d+ more damage from attacks/.test(t) ||
+    /this pok[ée]mon takes \d+ more damage from attacks/.test(t)
+  ) {
     return 'next-turn-lock';
   }
 
@@ -375,14 +430,28 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   }
   if (/shuffle/.test(t)) return 'shuffle-cost';
 
-  // Turn-locked one-shot.
+  // Turn-locked one-shot / bench attacks.
   if (/once (during your turn|per turn|during the game)/.test(t)) return 'once-per-turn';
+  if (/this attack can be used even if this pok[ée]mon is on the bench/.test(t)) {
+    return 'once-per-turn';
+  }
 
   // Hand-scaling counter placement, return-energy, lowest-HP KO — before flat.
   if (/place \d+ damage counters? on your opponent's active.*for each card in your hand/.test(t)) {
     return 'bench-damage';
   }
   if (/put (?:\d+|an?) .*energy .* into your hand/.test(t)) return 'move-energy';
+  if (
+    /you may put all energy attached to this pok[ée]mon into your hand to have this attack do \d+ more damage/.test(t)
+  ) {
+    return 'conditional-damage';
+  }
+  if (/if this pok[ée]mon is affected by a special condition, ignore all energy in this attack's cost/.test(t)) {
+    return 'conditional-damage';
+  }
+  if (/you can use this attack only if this pok[ée]mon used .+ during your last turn/.test(t)) {
+    return 'conditional-damage';
+  }
   if (/exactly \d+ damage counters/.test(t) && /knocked out/.test(t)) return 'conditional-ko';
   if (/knock out 1 of your opponent's pok[ée]mon that has exactly \d+ damage counters/.test(t)) {
     return 'conditional-ko';
@@ -484,6 +553,8 @@ export function describeAttackEffect(attack, attackerCard = {}) {
       return `${name}: "${attackName}" places damage counters at the end of your opponent's next turn — remember the delayed hit.`;
     case 'look-opponent-deck':
       return `${name}: "${attackName}" lets you look at the top of your opponent's deck and put the cards back in any order.`;
+    case 'look-own-deck':
+      return `${name}: "${attackName}" lets you look at the top of your deck and put the cards back in any order.`;
     case 'next-turn-bonus':
       return `${name}: "${attackName}" boosts a named attack's damage on your next turn — track the bonus.`;
     case 'devolve-opponent':

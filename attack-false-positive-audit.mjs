@@ -53,6 +53,7 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
   'recover-status',
   'hp-cap-damage',
   'return-opponent-energy',
+  'look-own-deck',
 ]);
 
 /** Partial / heuristic execution — still flagged but lower priority. */

@@ -1199,6 +1199,65 @@ import test from 'node:test';
       );
     });
 
+    test('classifyAttackEffect: fourth-pass flat patterns', () => {
+      assert.equal(
+        classifyAttackEffect({
+          damage: 30,
+          text: 'This attack does 30 damage for each card in your hand.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "Put 4 damage counters on your opponent's Pokémon in any way you like.",
+        }),
+        'bench-damage',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "During your opponent's next turn, if this Pokémon is damaged by an attack (even if this Pokémon is Knocked Out), put damage counters on the Attacking Pokémon.",
+        }),
+        'retaliate',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "Look at the top 4 cards of your deck and put them back in any order.",
+        }),
+        'look-own-deck',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: 'Each player draws 3 cards.',
+        }),
+        'draw-attach',
+      );
+    });
+
+    test('fourth-pass parser helpers', async () => {
+      const {
+        lookOwnDeckCount,
+        eachPlayerDrawCount,
+        opponentCounterClause,
+        specialEnergyKoClause,
+        bothActiveKoClause,
+      } = await import('../damage-parser.mjs');
+      assert.equal(lookOwnDeckCount('Look at the top 4 cards of your deck and put them back in any order.'), 4);
+      assert.equal(eachPlayerDrawCount('Each player draws 3 cards.'), 3);
+      assert.deepEqual(
+        opponentCounterClause("Put 2 damage counters on 1 of your opponent's Pokémon."),
+        { mode: 'any', count: 2 },
+      );
+      assert.equal(
+        specialEnergyKoClause("If your opponent's Active Pokémon has any Special Energy attached, it is Knocked Out."),
+        true,
+      );
+      assert.equal(bothActiveKoClause('Both Active Pokémon are Knocked Out.'), true);
+    });
+
     test('parseAttackDamage: in-play scaling counts', () => {
       const roundAtk = {
         name: 'Round',
@@ -1223,6 +1282,13 @@ import test from 'node:test';
       };
       const p3 = parseAttackDamage(rocketAtk, {}, {}, { teamRocketCount: 2 });
       assert.equal(p3.total, 60);
+
+      const handOwn = {
+        name: 'Hand',
+        damage: 30,
+        text: 'This attack does 30 damage for each card in your hand.',
+      };
+      assert.equal(parseAttackDamage(handOwn, {}, {}, { ownHandCount: 5 }).total, 150);
     });
 
     test('parseSelfStatusFromAttackText', () => {
