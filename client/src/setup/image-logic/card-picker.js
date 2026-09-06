@@ -83,6 +83,22 @@ const computeVirtualIndex = (index, dragPx, peekPx, slideCount) => {
   return Math.max(0, Math.min(slideCount - 1, index + progress));
 };
 
+const resolveSwipeIndex = (state, dragPx) => {
+  const stackWidth = state.stack?.clientWidth || 380;
+  const peekPx = (getPeekPercent(state) / 100) * stackWidth;
+  const virtual = computeVirtualIndex(
+    state.index,
+    dragPx,
+    peekPx,
+    state.slides.length
+  );
+  let next = Math.round(virtual);
+  if (next === state.index && Math.abs(dragPx) >= SWIPE_THRESHOLD) {
+    next = state.index + (dragPx > 0 ? -1 : 1);
+  }
+  return clampIndex(next, state.slides.length - 1);
+};
+
 const computeSlideLayout = (slideIndex, virtualIndex) => {
   const peekOffset = virtualIndex - slideIndex;
   const absPeek = Math.abs(peekOffset);
@@ -799,8 +815,8 @@ const attachSwipe = (state) => {
       if (
         state.mode !== 'browse' &&
         state.slotElements?.length &&
-        Math.abs(dy) >= 8 &&
-        Math.abs(dy) >= Math.abs(dx) * 0.55
+        Math.abs(dy) >= 16 &&
+        Math.abs(dy) > Math.abs(dx) * 1.1
       ) {
         const slide = state.slides[state.index];
         const cardNode =
@@ -846,13 +862,10 @@ const attachSwipe = (state) => {
 
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
-    const horizontal =
-      wasDragging &&
-      Math.abs(dx) >= SWIPE_THRESHOLD &&
-      Math.abs(dx) > Math.abs(dy);
+    const horizontal = wasDragging && Math.abs(dx) >= SWIPE_THRESHOLD;
 
     if (horizontal) {
-      goToIndex(state, state.index + (dx > 0 ? -1 : 1));
+      goToIndex(state, resolveSwipeIndex(state, dx));
     } else if (!wasDragging && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
       if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
