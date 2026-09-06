@@ -53,3 +53,19 @@ test('countBenchPokemon: 4 bench Pokémon + attached Energy counts as 4', () => 
   };
   assert.equal(countBenchPokemon(zone), 4);
 });
+
+test('canAddToBench: 4 bench Pokémon + attached Energy still has one open slot', async () => {
+  const { canAddToBench } = await import('../../rules/ko-flow.mjs');
+  const hostImg = { attached: false, relative: null };
+  const zone = {
+    array: [
+      { type: 'Pokémon', name: 'Pikachu', image: hostImg },
+      { type: 'Pokémon', name: 'Eevee', image: { attached: false, relative: null } },
+      { type: 'Pokémon', name: 'Squirtle', image: { attached: false, relative: null } },
+      { type: 'Pokémon', name: 'Bulbasaur', image: { attached: false, relative: null } },
+      { type: 'Energy', name: 'Lightning Energy', image: { attached: true, relative: hostImg } },
+    ],
+  };
+  assert.equal(canAddToBench(countBenchPokemon(zone), 5).allowed, true);
+  assert.equal(canAddToBench(zone.array.length, 5).allowed, false);
+});
