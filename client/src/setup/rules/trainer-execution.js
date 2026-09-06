@@ -521,7 +521,7 @@ async function runLookStep(card, step, fromBottom, done) {
     zoneFrom: 'deck',
     destination: step.destination === 'bench' ? 'bench' : 'hand',
     onPick: (picked) => {
-      maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+      maybeAnnounceSearchReveal(_effectOwner, card.name, picked, _appendMessage, {
         step,
         sourceText: card.text || card.effect || '',
       });
