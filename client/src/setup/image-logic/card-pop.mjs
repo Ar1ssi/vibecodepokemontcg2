@@ -2,7 +2,7 @@
 // (simeydotme/pokemon-cards-151 Card.svelte).
 //
 // The card stays at its board size, then Svelte-style springs:
-//   scale        → min(0.9*vw/w, 0.9*vh/h, 1.75)
+//   scale        → original preview size (min(88vh, min(94vw, 780px) * 1.397))
 //   translate    → viewport center − card center
 //   rotateY      → 360° on every open (horizontal spin)
 // Spring settings are springPopoverSettings: { stiffness: 0.033, damping: 0.45 }.
@@ -12,8 +12,10 @@
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
-const MAX_SCALE = 1.75;
-const VIEW_FIT = 0.9;
+const PREVIEW_MAX_WIDTH = 780;
+const PREVIEW_WIDTH_FIT = 0.94;
+const PREVIEW_HEIGHT_FIT = 0.88;
+const CARD_ASPECT = 1.397;
 export const POPOVER_SPIN_DEGREES = 360;
 
 const tickSpring = (ctx, lastValue, currentValue, targetValue) => {
@@ -151,13 +153,22 @@ export const viewportRectOf = (el) => {
   };
 };
 
+export const previewTargetSize = (
+  viewport = { width: globalThis.innerWidth, height: globalThis.innerHeight }
+) => {
+  const maxWidth = Math.min(viewport.width * PREVIEW_WIDTH_FIT, PREVIEW_MAX_WIDTH);
+  const height = Math.min(viewport.height * PREVIEW_HEIGHT_FIT, maxWidth * CARD_ASPECT);
+  return { width: height / CARD_ASPECT, height };
+};
+
 export const popoverScaleFor = (
   rect,
   viewport = { width: globalThis.innerWidth, height: globalThis.innerHeight }
 ) => {
-  const scaleW = (viewport.width / Math.max(rect.width, 1)) * VIEW_FIT;
-  const scaleH = (viewport.height / Math.max(rect.height, 1)) * VIEW_FIT;
-  return Math.min(scaleW, scaleH, MAX_SCALE);
+  const target = previewTargetSize(viewport);
+  const scaleW = target.width / Math.max(rect.width, 1);
+  const scaleH = target.height / Math.max(rect.height, 1);
+  return Math.min(scaleW, scaleH);
 };
 
 export const centerDeltaFor = (
