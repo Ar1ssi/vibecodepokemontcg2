@@ -31,6 +31,10 @@
 import { statusState } from './status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
+import {
+  shouldExecuteLocalRulesEffect,
+  shouldEmitTurnStartDraw,
+} from './rules-local-effects.mjs';
 import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
 import { parseAbility } from './abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
@@ -1786,7 +1790,7 @@ import {
     // window.setInterval below stays only as a slow backstop (in case some
     // future code path pushes into the board zone array without going
     // through moveCard) and no longer determines how fast the popup opens.
-    const processBoardCard = (card) => {
+    const processBoardCard = (card, ownerUser = 'self') => {
       try {
             const img = card.image;
             if (!img || img.__rulesTrainerAnnounced || img.__rulesTrainerPending) return;
@@ -1825,7 +1829,7 @@ if (!isTrainer) {
                         }
     
                         // compound ability orchestration (auto: draw + when-played chains)
-                        autoExecuteAbilitySteps('self', card, steps);
+                        autoExecuteAbilitySteps(ownerUser, card, steps);
 
                         if (parseSetupFaceDown(card) && !img.__rulesSetupFaceDown) {
                           img.__rulesSetupFaceDown = true;
@@ -1908,7 +1912,7 @@ if (!isTrainer) {
               for (const step of parsed.steps) {
                 appendMessage('', '  ' + describeStep(step), 'announcement', false);
               }
-              runTrainerSteps(card, parsed.steps);
+              runTrainerSteps(card, parsed.steps, 0, undefined, ownerUser);
             });
       } catch {}
     };
@@ -1919,15 +1923,33 @@ if (!isTrainer) {
       // Instant path: react the same tick a card lands on 'board'.
       document.addEventListener('rules-card-on-board', (event) => {
         if (rulesState.phase === 'ended') return;
-        const { user, card } = event.detail || {};
-        if (user !== 'self' || !card) return;
-        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
-        processBoardCard(card);
+        const { user, card, localPlay = false } = event.detail || {};
+        if (
+          !shouldExecuteLocalRulesEffect({
+            isTwoPlayer: systemState.isTwoPlayer,
+            localPlay,
+            owner: user,
+          }) ||
+          !card
+        ) {
+          return;
+        }
+        if (rulesState.enabled && rulesState.turnPlayer !== user) return;
+        processBoardCard(card, user);
       });
 
       document.addEventListener('rules-pokemon-in-play', (event) => {
         if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        const { user, card, zoneId, fromZone } = event.detail || {};
+        const { user, card, zoneId, fromZone, localPlay = false } = event.detail || {};
+        if (
+          !shouldExecuteLocalRulesEffect({
+            isTwoPlayer: systemState.isTwoPlayer,
+            localPlay,
+            owner: user,
+          })
+        ) {
+          return;
+        }
         if (!card?.image || card.image.__rulesPokemonInPlay) return;
         card.image.__rulesPokemonInPlay = true;
         ensureCardData(card).then(() => {
@@ -1993,18 +2015,21 @@ if (!isTrainer) {
 
       // Backstop: catches anything that (for whatever reason) didn't fire
       // the event above — same logic, just on a slow poll so it's never
-      // the thing the player is waiting on.
-      window.setInterval(() => {
-        if (rulesState.phase === 'ended') return;
-        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
-        try {
-          for (const side of ['self', 'opp']) {
-            const board = getZone(side, 'board');
-            if (!board?.array) continue;
-            for (const card of board.array) processBoardCard(card);
-          }
-        } catch {}
-      }, 2000);
+      // the thing the player is waiting on. Disabled in online 2P: mirror
+      // replays must not re-trigger trainer auto-exec (see rules-local-effects).
+      if (!systemState.isTwoPlayer) {
+        window.setInterval(() => {
+          if (rulesState.phase === 'ended') return;
+          if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
+          try {
+            for (const side of ['self', 'opp']) {
+              const board = getZone(side, 'board');
+              if (!board?.array) continue;
+              for (const card of board.array) processBoardCard(card, side);
+            }
+          } catch {}
+        }, 2000);
+      }
     };
     
     // ── move gating ──────────────────────────────────────────────────────
@@ -2057,7 +2082,9 @@ if (!isTrainer) {
           lastDrawnTurn: rulesState.lastAutoDrawTurn?.[player],
         })) {
           markTurnDrawn(player);
-          draw(player, player, 1, true);
+          if (shouldEmitTurnStartDraw({ isTwoPlayer: systemState.isTwoPlayer, turnPlayer: player })) {
+            draw(player, player, 1, true);
+          }
           appendMessage('', `${player === 'self' ? 'P1' : 'P2'} draws a card (start of turn).`, 'announcement', false);
         } else if (Number(deckCount) <= 0) {
           appendMessage('', `${player === 'self' ? 'P1' : 'P2'}'s deck is empty — cannot draw.`, 'announcement', false);

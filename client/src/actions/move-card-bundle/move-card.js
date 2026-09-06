@@ -567,7 +567,9 @@ export const moveCard = async (
   if (!syncReplay) {
     if (dZoneId === 'board') {
       document.dispatchEvent(
-        new CustomEvent('rules-card-on-board', { detail: { user, card: movingCard } })
+        new CustomEvent('rules-card-on-board', {
+          detail: { user, card: movingCard, localPlay: true },
+        })
       );
     }
     if (
@@ -577,7 +579,13 @@ export const moveCard = async (
     ) {
       document.dispatchEvent(
         new CustomEvent('rules-pokemon-in-play', {
-          detail: { user, card: movingCard, zoneId: dZoneId, fromZone: oZoneId },
+          detail: {
+            user,
+            card: movingCard,
+            zoneId: dZoneId,
+            fromZone: oZoneId,
+            localPlay: true,
+          },
         })
       );
     }

@@ -69,6 +69,8 @@ let _matchesSearch = null;
 let _isPokemonCard = null;
 let _prizeState = null;
 let _pickerTriggerCard = null;
+/** Zone owner for the trainer effect currently executing (`self` or `opp`). */
+let _effectOwner = 'self';
 
 export function initTrainerExecution(deps) {
   _getZone = deps.getZone;
@@ -250,13 +252,13 @@ function attachEnergyCard(user, energy, target) {
 
 function swapPokemonWithDiscard(inPlay, fromDiscard) {
   const playLoc = pokemonZoneEntry('self', inPlay);
-  const discardIdx = zone('self', 'discard').array.indexOf(fromDiscard);
+  const discardIdx = zone(_effectOwner, 'discard').array.indexOf(fromDiscard);
   if (!playLoc || discardIdx < 0) return;
   const playZone = playLoc.zoneId;
   const playIndex = playLoc.index;
-  moveCardBundle('self', 'self', playZone, 'discard', playIndex, false, 'move');
-  const newDiscardIdx = zone('self', 'discard').array.indexOf(fromDiscard);
-  moveCardBundle('self', 'self', 'discard', playZone, newDiscardIdx >= 0 ? newDiscardIdx : 0, false, 'move');
+  moveCardBundle(_effectOwner, _effectOwner, playZone, 'discard', playIndex, false, 'move');
+  const newDiscardIdx = zone(_effectOwner, 'discard').array.indexOf(fromDiscard);
+  moveCardBundle(_effectOwner, _effectOwner, 'discard', playZone, newDiscardIdx >= 0 ? newDiscardIdx : 0, false, 'move');
   msg(`  auto: swapped ${inPlay.name} with ${fromDiscard.name}`);
 }
 
@@ -332,7 +334,7 @@ async function runSearchStep(card, searchStep, done) {
     });
   // Nest Ball: single Basic → bench
   if (searchStep.destination === 'bench' && searchStep.what === 'Basic Pokémon' && (searchStep.count || 1) === 1) {
-    const deck = zone('self', 'deck');
+    const deck = zone(_effectOwner, 'deck');
     const basics = [];
     for (const c of deck.array) {
       await ensureCardData(c);
@@ -341,7 +343,7 @@ async function runSearchStep(card, searchStep, done) {
     if (basics.length === 1) {
       const idx = deck.array.indexOf(basics[0]);
       revealPicked(basics[0]);
-      moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
+      moveCardBundle(_effectOwner, _effectOwner, 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
       shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
@@ -356,7 +358,7 @@ async function runSearchStep(card, searchStep, done) {
   }
   _openDeckSearchWindow(`${card.name} lets you search your deck`);
   msg(`  ${card.name} — opening card select…`);
-  const deck = zone('self', 'deck');
+  const deck = zone(_effectOwner, 'deck');
   for (const c of deck.array) {
     await ensureCardData(c);
   }
@@ -381,18 +383,18 @@ async function runSearchStep(card, searchStep, done) {
     const targets = getInPlayPokemon('self');
     if (targets.length === 0) {
       msg('  no Pokémon to attach to — put energy in hand instead');
-      const idx = zone('self', 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCardBundle('self', 'self', 'deck', 'hand', idx, false, 'move');
+      const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
+      if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', idx, false, 'move');
       shuffleAfter();
       done?.();
       return;
     }
     if (targets.length === 1) {
       const target = targets[0];
-      const zoneId = zone('self', 'active').array.includes(target) ? 'active' : 'bench';
-      const targetIndex = zone('self', zoneId).array.indexOf(target);
-      const idx = zone('self', 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCard('self', 'self', 'deck', zoneId, idx, targetIndex);
+      const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
+      const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
+      const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
+      if (idx >= 0) moveCard(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex);
       msg(`  auto: attached ${energyCard.name} to ${target.name}`);
       shuffleAfter();
       done?.();
@@ -405,10 +407,10 @@ async function runSearchStep(card, searchStep, done) {
       zoneFrom: 'active',
       destination: 'hand',
       onPick: (target) => {
-        const zoneId = zone('self', 'active').array.includes(target) ? 'active' : 'bench';
-        const targetIndex = zone('self', zoneId).array.indexOf(target);
-        const idx = zone('self', 'deck').array.indexOf(energyCard);
-        if (idx >= 0) moveCard('self', 'self', 'deck', zoneId, idx, targetIndex);
+        const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
+        const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
+        const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
+        if (idx >= 0) moveCard(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex);
         msg(`  auto: attached ${energyCard.name} to ${target.name}`);
         shuffleAfter();
         done?.();
@@ -442,9 +444,9 @@ async function runSearchStep(card, searchStep, done) {
       onConfirm: (selected) => {
         revealPicked(selected);
         for (const s of selected) {
-          const idx = zone('self', 'deck').array.indexOf(s);
+          const idx = zone(_effectOwner, 'deck').array.indexOf(s);
           if (idx >= 0) {
-            moveCardBundle('self', 'self', 'deck', toBench ? 'bench' : 'hand', idx, false, 'move');
+            moveCardBundle(_effectOwner, _effectOwner, 'deck', toBench ? 'bench' : 'hand', idx, false, 'move');
           }
         }
         if (selected.length === 0) {
@@ -489,7 +491,7 @@ async function runSearchStep(card, searchStep, done) {
 
 async function runLookStep(card, step, fromBottom, done) {
   _openDeckSearchWindow(`${card.name} — look at ${fromBottom ? 'bottom' : 'top'} of deck`);
-  const deck = zone('self', 'deck');
+  const deck = zone(_effectOwner, 'deck');
   const count = Math.min(step.count || 7, deck.getCount());
   if (count === 0) {
     done?.();
@@ -562,8 +564,9 @@ function discardFromHandUntil(user, count, preferUser = 'self') {
   });
 }
 
-export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
+export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUser) {
   _pickerTriggerCard = card;
+  _effectOwner = ownerUser || card?.user || 'self';
   const runAt = async (idx) => {
     if (idx >= steps.length) {
       onComplete?.();
@@ -577,7 +580,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
     }
 
     if (step.type === 'discardCost') {
-      const candidates = zone('self', 'hand').array.filter((c) => c !== card);
+      const candidates = zone(_effectOwner, 'hand').array.filter((c) => c !== card);
       _openChoicePicker({
         title: `${card.name} — discard ${step.count} cards to pay the cost`,
         candidates,
@@ -587,8 +590,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
         requiredCount: step.count,
         onConfirm: (selected) => {
           for (const s of selected) {
-            const i = zone('self', 'hand').array.indexOf(s);
-            if (i >= 0) moveCardBundle('self', 'self', 'hand', 'discard', i, false, 'move');
+            const i = zone(_effectOwner, 'hand').array.indexOf(s);
+            if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', i, false, 'move');
           }
           msg(`  cost paid: discarded ${selected.map((s) => s.name).join(', ')}`);
           runAt(idx + 1);
@@ -614,35 +617,35 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
     try {
       switch (step.type) {
         case 'discardHandThenDraw': {
-          while (zone('self', 'hand').getCount() > 0) {
-            moveCardBundle('self', 'self', 'hand', 'discard', 0, false, 'move');
+          while (zone(_effectOwner, 'hand').getCount() > 0) {
+            moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', 0, false, 'move');
           }
           for (let i = 0; i < step.count; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
           }
           msg(`  auto: discarded hand, drew ${step.count}`);
           break;
         }
         case 'shuffleHandThenDraw': {
-          const handCount0 = zone('self', 'hand').getCount();
-          for (let i = 0; i < handCount0; i++) moveCardBundle('self', 'self', 'hand', 'deck', 0, false, 'move');
+          const handCount0 = zone(_effectOwner, 'hand').getCount();
+          for (let i = 0; i < handCount0; i++) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
           let drawCount = step.count;
           const prizesRemaining = Math.max(0, 6 - (_prizeState?.self?.taken || 0));
           if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
             drawCount = step.bonusCount;
           }
           for (let i = 0; i < drawCount; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
           }
           msg(`  auto: shuffled hand in, drew ${drawCount}`);
           break;
         }
         case 'countShuffleDrawPlus': {
-          const n = zone('self', 'hand').getCount();
-          for (let i = 0; i < n; i++) moveCardBundle('self', 'self', 'hand', 'deck', 0, false, 'move');
+          const n = zone(_effectOwner, 'hand').getCount();
+          for (let i = 0; i < n; i++) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
           const drawCount = n + 1;
           for (let i = 0; i < drawCount; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
           }
           msg(`  auto: shuffled ${n} cards in, drew ${drawCount}`);
           break;
@@ -657,15 +660,15 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
         }
         case 'draw':
           for (let i = 0; i < step.count; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
           }
           msg(`  auto: drew ${step.count}`);
           break;
         case 'drawUntil': {
           const target = Number(step.target);
           let drew = 0;
-          while (zone('self', 'hand').getCount() < target && zone('self', 'deck').getCount() > 0) {
-            moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+          while (zone(_effectOwner, 'hand').getCount() < target && zone(_effectOwner, 'deck').getCount() > 0) {
+            moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
             drew++;
           }
           msg(`  auto: drew ${drew} until ${target} in hand`);
@@ -674,7 +677,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
         case 'variableDraw': {
           const n = countVariableDraw(step.source);
           for (let i = 0; i < n; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
           }
           msg(`  auto: drew ${n} (variable draw)`);
           break;
@@ -686,7 +689,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
           msg(`  auto: opponent drew ${step.count}`);
           break;
         case 'putHandOnBottom': {
-          const hand = zone('self', 'hand').array.filter((c) => c !== card);
+          const hand = zone(_effectOwner, 'hand').array.filter((c) => c !== card);
           if (hand.length < step.count) {
             msg('  not enough cards in hand — skipped');
             break;
@@ -705,7 +708,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
             requiredCount: step.count,
             onConfirm: (picks) => {
               for (const pick of picks) {
-                const i = zone('self', 'hand').array.indexOf(pick);
+                const i = zone(_effectOwner, 'hand').array.indexOf(pick);
                 if (i >= 0) moveToDeckBottom('self', 'self', 'hand', i);
               }
               msg(`  put ${picks.length} on bottom`);
@@ -726,14 +729,14 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
         }
         case 'millSelf':
           for (let i = 0; i < step.count; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCardBundle('self', 'self', 'deck', 'discard', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'discard', 0, false, 'move');
           }
           msg(`  auto: milled top ${step.count} to discard`);
           break;
         case 'healAmount': {
           const isActiveOnly = step.target === 'Active Pokémon';
           const candidates = isActiveOnly
-            ? zone('self', 'active').array.filter((c) => c?.hp)
+            ? zone(_effectOwner, 'active').array.filter((c) => c?.hp)
             : getInPlayPokemon('self').filter((c) => c?.hp);
           if (candidates.length === 0) msg('  no Pokémon to heal');
           else if (isActiveOnly || candidates.length === 1) _applyHealToCard(candidates[0], step.amount, step.cure);
@@ -762,11 +765,11 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               return;
             }
             _applyHealToCard(target, current, false);
-            const z = zone('self', loc.zoneId);
+            const z = zone(_effectOwner, loc.zoneId);
             for (const att of [...getAttachedCards(z, target)]) {
               if (isEnergyCard(att)) {
                 const ai = z.array.indexOf(att);
-                if (ai >= 0) moveCardBundle('self', 'self', loc.zoneId, 'hand', ai, false, 'move');
+                if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'hand', ai, false, 'move');
               }
             }
             msg(`  auto: healed all damage from ${target.name}`);
@@ -826,7 +829,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
           await runLookStep(card, step, true, () => runAt(idx + 1));
           return;
         case 'recursion': {
-          const discard = zone('self', 'discard');
+          const discard = zone(_effectOwner, 'discard');
           const matches = discard.array.filter((c) => {
             const isPokemon = _isPokemonCard(c);
             const isEnergy = String(c.name || '').toLowerCase().includes('energy');
@@ -844,7 +847,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
           break;
         }
         case 'shuffleFromDiscard': {
-          const discard = zone('self', 'discard');
+          const discard = zone(_effectOwner, 'discard');
           const choices = step.choices || [{ what: step.what, count: step.count }];
           const runChoice = (choiceIdx) => {
             if (choiceIdx >= choices.length) {
@@ -869,8 +872,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
                 const list = Array.isArray(picked) ? picked : [picked];
                 announceDiscardPick('self', card.name, list, _appendMessage);
                 for (const p of list) {
-                  const i = zone('self', 'discard').array.indexOf(p);
-                  if (i >= 0) moveCardBundle('self', 'self', 'discard', 'deck', i, false, 'move');
+                  const i = zone(_effectOwner, 'discard').array.indexOf(p);
+                  if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'discard', 'deck', i, false, 'move');
                 }
                 runChoice(choiceIdx + 1);
               },
@@ -882,7 +885,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
         }
         case 'attachFromDiscard':
         case 'attachMultipleFromDiscard': {
-          const discard = zone('self', 'discard');
+          const discard = zone(_effectOwner, 'discard');
           const energies = discard.array.filter((c) => String(c.name || '').toLowerCase().includes('energy'));
           const max = step.type === 'attachMultipleFromDiscard' ? step.count : 1;
           if (!energies.length) {
@@ -899,10 +902,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               const targets = getInPlayPokemon('self');
               if (targets.length === 1) {
                 const t = targets[0];
-                const zoneId = zone('self', 'active').array.includes(t) ? 'active' : 'bench';
-                const ti = zone('self', zoneId).array.indexOf(t);
-                const ei = zone('self', 'discard').array.indexOf(energy);
-                if (ei >= 0) moveCard('self', 'self', 'discard', zoneId, ei, ti);
+                const zoneId = zone(_effectOwner, 'active').array.includes(t) ? 'active' : 'bench';
+                const ti = zone(_effectOwner, zoneId).array.indexOf(t);
+                const ei = zone(_effectOwner, 'discard').array.indexOf(energy);
+                if (ei >= 0) moveCard(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti);
               } else {
                 _openChoicePicker({
                   title: 'Choose Pokémon to attach to',
@@ -910,10 +913,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
                   zoneFrom: 'active',
                   destination: 'hand',
                   onPick: (t) => {
-                    const zoneId = zone('self', 'active').array.includes(t) ? 'active' : 'bench';
-                    const ti = zone('self', zoneId).array.indexOf(t);
-                    const ei = zone('self', 'discard').array.indexOf(energy);
-                    if (ei >= 0) moveCard('self', 'self', 'discard', zoneId, ei, ti);
+                    const zoneId = zone(_effectOwner, 'active').array.includes(t) ? 'active' : 'bench';
+                    const ti = zone(_effectOwner, zoneId).array.indexOf(t);
+                    const ei = zone(_effectOwner, 'discard').array.indexOf(energy);
+                    if (ei >= 0) moveCard(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti);
                   },
                 });
               }
@@ -936,7 +939,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
           break;
         }
         case 'switchOwn': {
-          const bench = zone('self', 'bench').array.filter((c) => c && !c.image?.attached);
+          const bench = zone(_effectOwner, 'bench').array.filter((c) => c && !c.image?.attached);
           if (bench.length === 1) {
             switchBenchToActive('self', bench[0]);
           } else if (bench.length > 1) {
@@ -1052,28 +1055,28 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               const loc = pokemonZoneEntry('self', t);
               if (!loc) return;
               if (!step.keepAttached) {
-                const z = zone('self', loc.zoneId);
+                const z = zone(_effectOwner, loc.zoneId);
                 for (const att of [...getAttachedCards(z, t)]) {
                   const ai = z.array.indexOf(att);
-                  if (ai >= 0) moveCardBundle('self', 'self', loc.zoneId, 'discard', ai, false, 'move');
+                  if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'discard', ai, false, 'move');
                 }
               }
-              const i = zone('self', loc.zoneId).array.indexOf(t);
-              if (i >= 0) moveCardBundle('self', 'self', loc.zoneId, 'hand', i, false, 'move');
+              const i = zone(_effectOwner, loc.zoneId).array.indexOf(t);
+              if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'hand', i, false, 'move');
               msg(`  auto: returned ${t.name} to hand`);
             },
           });
           break;
         }
         case 'fossilItem': {
-          const bench = zone('self', 'bench');
+          const bench = zone(_effectOwner, 'bench');
           if (bench.getCount() >= 8) {
             msg('  bench full — play fossil manually');
             break;
           }
-          const boardIdx = zone('self', 'board').array.indexOf(card);
+          const boardIdx = zone(_effectOwner, 'board').array.indexOf(card);
           if (boardIdx >= 0) {
-            moveCardBundle('self', 'self', 'board', 'bench', boardIdx, false, 'move');
+            moveCardBundle(_effectOwner, _effectOwner, 'board', 'bench', boardIdx, false, 'move');
             msg(`  auto: played ${card.name} as Basic Pokémon on Bench`);
           }
           break;
@@ -1105,8 +1108,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
         }
         case 'moveEnergyToActive': {
           const fromBench = [];
-          for (const parent of zone('self', 'bench').array.filter((c) => c && !c.image?.attached)) {
-            for (const att of getAttachedCards(zone('self', 'bench'), parent)) {
+          for (const parent of zone(_effectOwner, 'bench').array.filter((c) => c && !c.image?.attached)) {
+            for (const att of getAttachedCards(zone(_effectOwner, 'bench'), parent)) {
               if (isEnergyCard(att)) fromBench.push({ energy: att, parent });
             }
           }
@@ -1119,7 +1122,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
             candidates: fromBench.map((e) => e.energy),
             count: step.count || 2,
             onConfirm: (picked) => {
-              const active = zone('self', 'active').array[0];
+              const active = zone(_effectOwner, 'active').array[0];
               if (!active) return;
               for (const energy of picked) {
                 attachEnergyCard('self', energy, active);
@@ -1139,7 +1142,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
             title: `${card.name} — choose Basic to evolve`,
             candidates: basics,
             onPick: async (base) => {
-              const hand = zone('self', 'hand');
+              const hand = zone(_effectOwner, 'hand');
               const options = [];
               for (const c of hand.array) {
                 await ensureCardData(c);
@@ -1156,7 +1159,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
                   const loc = pokemonZoneEntry('self', base);
                   const handIdx = hand.array.indexOf(evo);
                   if (!loc || handIdx < 0) return;
-                  await moveCard('self', 'self', 'hand', loc.zoneId, handIdx, loc.index);
+                  await moveCard(_effectOwner, _effectOwner, 'hand', loc.zoneId, handIdx, loc.index);
                   msg(`  auto: Rare Candy — ${base.name} → ${evo.name}`);
                 },
               });
@@ -1287,7 +1290,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
             title: `${card.name} — choose in-play Pokémon`,
             candidates: inPlay,
             onPick: (play) => {
-              const disc = zone('self', 'discard').array.filter((c) => matchesSwapFilter(c, step.filter));
+              const disc = zone(_effectOwner, 'discard').array.filter((c) => matchesSwapFilter(c, step.filter));
               if (!disc.length) {
                 msg('  no matching Pokémon in discard');
                 return;
@@ -1305,12 +1308,12 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
           break;
         }
         case 'reshufflePrizes': {
-          const n = zone('self', 'prizes').getCount();
+          const n = zone(_effectOwner, 'prizes').getCount();
           if (n === 0) break;
           for (let i = 0; i < n; i++) moveToDeckBottom('self', 'self', 'prizes', 0);
           _shuffleZone('self', 'self', 'deck');
           for (let i = 0; i < n; i++) {
-            if (zone('self', 'deck').getCount() > 0) moveCard('self', 'self', 'deck', 'prizes', 0);
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCard(_effectOwner, _effectOwner, 'deck', 'prizes', 0);
           }
           msg(`  auto: reshuffled ${n} Prize cards`);
           break;
