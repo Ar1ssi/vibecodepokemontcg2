@@ -65,7 +65,7 @@ import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../c
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick } from '../../setup/rules/search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -2602,6 +2602,8 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   // Mirror replay: the originator's moveCardBundle + shuffleZone actions
   // arrive separately. Opening a picker here would desync both boards.
   if (!emit) return;
+  const finishSearch = (opts) =>
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: atk.name, ...opts });
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
     appendMessage(
@@ -2610,7 +2612,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       'announcement',
       false
     );
-    shuffleZone(user, user, 'deck');
+    finishSearch({ message: null });
     return;
   }
 
@@ -2631,7 +2633,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         'announcement',
         false
       );
-      shuffleZone(user, user, 'deck');
+      finishSearch({ message: null });
       return;
     }
     effectiveMax = Math.min(maxCount, openSlots);
@@ -2657,11 +2659,10 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       'announcement',
       false
     );
-    shuffleZone(user, user, 'deck');
+    finishSearch({ message: null });
     return;
   }
 
-  const finishSearch = () => shuffleZone(user, user, 'deck');
   const attackText = atk.text || '';
   const revealPicked = (picked) =>
     maybeAnnounceSearchReveal(user, atk.name, picked, appendMessage, {
@@ -2701,6 +2702,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
           }
           if (selected.length === 0) {
             appendMessage(user, `🔍 ${atk.name}: no cards taken — deck shuffled.`, 'announcement', false);
+            finishSearch({ message: null });
           } else {
             appendMessage(
               user,
@@ -2708,13 +2710,13 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
               'announcement',
               false
             );
+            finishSearch();
           }
-          finishSearch();
           resolve();
         },
         onCancel: () => {
           appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-          finishSearch();
+          finishSearch({ message: null });
           resolve();
         },
       });
@@ -2744,7 +2746,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       },
       onCancel: () => {
         appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-        finishSearch();
+        finishSearch({ message: null });
         resolve();
       },
     });
@@ -2796,11 +2798,12 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
   });
   if (pool.length === 0) {
     appendMessage(user, '⛔ No matching cards in your deck.', 'announcement', false);
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name });
     return;
   }
 
-  const completeSearch = () => {
-    shuffleZone(user, user, 'deck');
+  const completeSearch = (opts) => {
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name, ...opts });
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
   const revealPicked = (picked) =>
@@ -2847,6 +2850,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
           'announcement',
           false
         );
+        completeSearch({ message: null });
       },
     });
     return;
@@ -2877,6 +2881,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
         'announcement',
         false
       );
+      completeSearch({ message: null });
     },
   });
 };

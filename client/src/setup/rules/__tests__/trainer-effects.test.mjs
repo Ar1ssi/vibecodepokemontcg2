@@ -427,6 +427,24 @@ import test, { describe } from 'node:test';
       assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
     });
 
+    test('shuffleDeckAfterSearch: shuffles silently and announces in chat', async () => {
+      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
+      const messages = [];
+      let shuffled = false;
+      const append = (_user, msg) => { messages.push(msg); };
+      const shuffleZone = () => { shuffled = true; };
+      shuffleDeckAfterSearch('self', append, shuffleZone, { sourceName: 'Ultra Ball' });
+      assert.equal(shuffled, true);
+      assert.match(messages[0], /Ultra Ball — deck shuffled/);
+    });
+
+    test('shuffleDeckAfterSearch: message null shuffles without duplicate chat line', async () => {
+      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
+      const messages = [];
+      shuffleDeckAfterSearch('self', (_u, m) => messages.push(m), () => {}, { message: null });
+      assert.equal(messages.length, 0);
+    });
+
     test('Firebreather search filter: typed {R} matches Fire only', () => {
       const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
       const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
