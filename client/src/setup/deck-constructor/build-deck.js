@@ -13,7 +13,12 @@ export const buildDeck = (user) => {
   for (const [quantity, name, type, imageURL, number, set, tcgId] of deckData) {
     for (let i = 0; i < quantity; i++) {
       const card = new Card(user, name, type, imageURL, number, set, tcgId);
+      card.cardId = `c_${syncInstance}`;
       card.syncInstance = syncInstance++;
+      if (card.image) {
+        card.image.cardId = card.cardId;
+        card.image.syncInstance = card.syncInstance;
+      }
       if (isE2eMode()) stampE2eCard(card);
       deck.array.push(card);
       deck.element.appendChild(card.image);

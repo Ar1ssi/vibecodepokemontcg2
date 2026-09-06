@@ -47,6 +47,9 @@ export const updateSpecialCondition = (
   }
 
   const specialCondition = card?.image?.specialCondition;
+  if (card) {
+    card.specialCondition = textContent || null;
+  }
   if (!specialCondition) return;
   setSpecialConditionCode(specialCondition, textContent);
   applySpecialConditionStyle(specialCondition, textContent);
@@ -79,8 +82,9 @@ export const removeSpecialCondition = (
   }
 
   if (!targetCard) return;
+  targetCard.specialCondition = null;
   //make sure targetCard exists (it won't exist if it's already been removed)
-  if (targetCard.image.specialCondition) {
+  if (targetCard.image?.specialCondition) {
     targetCard.image.specialCondition.removeEventListener(
       'input',
       targetCard.image.specialCondition.handleColor
@@ -122,6 +126,7 @@ export const addSpecialCondition = (
   }
 
   if (!targetCard) return;
+  targetCard.specialCondition = targetCard.specialCondition || '1';
   index = resolved;
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();

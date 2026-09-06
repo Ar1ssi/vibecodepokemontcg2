@@ -11,9 +11,15 @@
  * still works against plain mock objects in tests.
  */
 function hashCardCounters(c) {
-  const damage = c?.image?.damageCounter?.textContent ?? '';
-  const condition = c?.image?.specialCondition?.textContent ?? '';
-  const abilityUsed = c?.image?.abilityCounter ? '1' : '0';
+  const damage =
+    typeof c?.damage === 'number' && c.damage > 0
+      ? String(c.damage)
+      : (c?.image?.damageCounter?.textContent ?? '');
+  const condition = c?.specialCondition ?? c?.image?.specialCondition?.textContent ?? '';
+  const abilityUsed =
+    typeof c?.abilityUsed === 'boolean'
+      ? (c.abilityUsed ? '1' : '0')
+      : (c?.image?.abilityCounter ? '1' : '0');
   return [damage, condition, abilityUsed].join('|');
 }
 

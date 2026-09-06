@@ -439,3 +439,22 @@ older snapshot, run that install once, then rerun `pnpm test:2p`.
 
 `?e2e=1` installs `window.__ptcg` (`joinRoom`, `loadFixtureDeck`, `readyUp`,
 `playFromHand`, `zone`) and collapses the coin-flip / mulligan timers.
+
+## Agent Workspace & Isolation Policy (Worktree Default)
+
+To prevent file collision and allow concurrent agents to work safely:
+
+1. **Automatic Git Worktree Enforcement**:
+   - Before editing, refactoring, or writing code for any feature, fix, or task, the agent MUST verify whether it is currently working in an isolated worktree directory.
+   - If in the primary working tree on `main`, immediately create and switch to a dedicated worktree in a sibling folder before making edits:
+     ```bash
+     git worktree add -b feature/<task-name> ../vibecodepokemontcg2-<task-name> main
+     ```
+   - Direct all subsequent edits, builds, terminal commands, and test runs to that worktree directory.
+2. **Subagent Spawning**:
+   - Whenever invoking subagents (`invoke_subagent`), ALWAYS set `"Workspace": "share"`. Never use `"Workspace": "inherit"` when multiple subagents are active, ensuring each subagent operates in an independent branch.
+3. **Completion & Verification**:
+   - Verify code and run tests inside the worktree (`pnpm test`).
+   - Commit changes to the feature branch.
+   - Report the worktree branch name and commit hash so changes can be cleanly merged.
+

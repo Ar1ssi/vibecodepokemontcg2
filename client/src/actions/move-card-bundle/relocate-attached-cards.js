@@ -18,23 +18,29 @@ export const relocateAttachedCards = (
     if (image === movingCard.image) {
       break;
     }
-    if (image.relative === movingCard.image) {
+    const card = oZone.array[i];
+    if (image.relative === movingCard.image || card.parentCard === movingCard) {
       resetImage(image);
       //moving to active or bench
       if (['active', 'bench'].includes(dZoneId)) {
         image.attached = true;
+        card.attached = true;
+        card.parentCard = movingCard;
         const targetIndex = dZone.array.findIndex(
-          (card) => card.image === movingCard.image
+          (c) => c === movingCard || c.image === movingCard.image
         );
         moveCard(user, initiator, oZoneId, dZoneId, i, targetIndex);
       } else {
         if (
-          oZone.array[i].type === 'Pokémon' &&
-          movingCard.image.damageCounter
+          card.type === 'Pokémon' &&
+          (movingCard.damage > 0 || movingCard.image?.damageCounter)
         ) {
+          const dmg = movingCard.damage || parseInt(movingCard.image?.damageCounter?.textContent || '0', 10) || 0;
+          card.damage = dmg;
           addDamageCounter(user, oZoneId, i, false, false);
-          image.damageCounter.textContent =
-            movingCard.image.damageCounter.textContent;
+          if (image.damageCounter) {
+            image.damageCounter.textContent = String(dmg);
+          }
         }
         getZone(user, 'attachedCards').element.style.display = 'block';
         moveCard(user, initiator, oZoneId, 'attachedCards', i);

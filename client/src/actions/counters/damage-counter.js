@@ -57,6 +57,9 @@ export const updateDamageCounter = (
   }
 
   const damageCounter = card?.image?.damageCounter;
+  if (card) {
+    card.damage = Math.max(0, parseInt(damageAmount, 10) || 0);
+  }
   if (!damageCounter) return;
   if (damageCounter.textContent != damageAmount) {
     damageCounter.textContent = damageAmount;
@@ -91,8 +94,9 @@ export const removeDamageCounter = (
   }
 
   if (!targetCard) return;
+  targetCard.damage = 0;
   //make sure targetCard exists (it won't exist if it's already been removed)
-  if (targetCard.image.damageCounter) {
+  if (targetCard.image?.damageCounter) {
     targetCard.image.damageCounter.removeEventListener(
       'input',
       targetCard.image.damageCounter.handleInput
@@ -140,6 +144,8 @@ export const addDamageCounter = (
   }
 
   if (!targetCard) return;
+  const numericAmount = Math.max(0, parseInt(damageAmount ? damageAmount : '10', 10) || 0);
+  targetCard.damage = numericAmount;
   index = resolved;
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();

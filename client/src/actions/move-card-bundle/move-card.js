@@ -105,13 +105,37 @@ export const moveCard = async (
   let destZoneId = dZoneId;
   let dZone = getZone(user, destZoneId);
 
-  // define the card that's being targeted, i.e., the pokemon that is being attached to, if a target index is defined
+  // define the card that's being targeted
   let targetCard;
-  if (typeof targetIndex === 'number') {
-    targetCard = dZone.array[targetIndex];
+  let targetIdx = targetIndex;
+  if (typeof targetIdx === 'object' && targetIdx !== null) {
+    targetCard = targetIdx;
+    targetIdx = dZone.array.indexOf(targetCard);
+  } else if (typeof targetIdx === 'string' && isNaN(Number(targetIdx))) {
+    targetIdx = dZone.array.findIndex(
+      (c) => c.cardId === targetIdx || String(c.syncInstance) === targetIdx
+    );
+    if (targetIdx >= 0) targetCard = dZone.array[targetIdx];
+  } else if (typeof targetIdx === 'number' && targetIdx >= 0) {
+    targetCard = dZone.array[targetIdx];
   }
+
   // define the card that's being moved
-  const movingCard = oZone.array[index];
+  let moveIdx = index;
+  let movingCard;
+  if (typeof moveIdx === 'object' && moveIdx !== null) {
+    movingCard = moveIdx;
+    moveIdx = oZone.array.indexOf(movingCard);
+  } else if (typeof moveIdx === 'string' && isNaN(Number(moveIdx))) {
+    moveIdx = oZone.array.findIndex(
+      (c) => c.cardId === moveIdx || String(c.syncInstance) === moveIdx
+    );
+    if (moveIdx >= 0) movingCard = oZone.array[moveIdx];
+  } else if (typeof moveIdx === 'number' && moveIdx >= 0) {
+    movingCard = oZone.array[moveIdx];
+  }
+  index = moveIdx;
+  targetIndex = targetIdx;
 
   if (!movingCard) return { destZoneId, ok: false };
 

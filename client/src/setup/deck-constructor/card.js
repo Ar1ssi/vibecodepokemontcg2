@@ -19,6 +19,16 @@ export class Card {
   number;
   set;
   id;
+  cardId;
+  /** Pure data state properties (decoupled from DOM) */
+  damage = 0;
+  specialCondition = null;
+  abilityUsed = false;
+  attached = false;
+  parentCard = null;
+  parentCardId = null;
+  attachedCards = [];
+  isEvolution = false;
 
   constructor(user, name, type, imageURL, number = null, set = null, id = null) {
     this.user = user;
@@ -32,8 +42,18 @@ export class Card {
     this.number = number || null;
     this.set = set || null;
     this.id = id || null;
+    /** Unique permanent instance identifier for the card */
+    this.cardId = null;
     /** Stable deck-build index for multiplayer sync (same on both clients). */
     this.syncInstance = null;
+    this.damage = 0;
+    this.specialCondition = null;
+    this.abilityUsed = false;
+    this.attached = false;
+    this.parentCard = null;
+    this.parentCardId = null;
+    this.attachedCards = [];
+    this.isEvolution = false;
     this.imageAttributes = {
       user: user,
       type: type,
@@ -65,5 +85,6 @@ export class Card {
       }
     }
     resetImage(this.image);
+    this.image.card = this;
   }
 }

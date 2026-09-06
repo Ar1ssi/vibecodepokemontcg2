@@ -36,12 +36,16 @@ function requestHintResync(reason, extra = {}) {
 function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
   const oZone = getZone(user, oZoneId);
   const dZone = getZone(user, dZoneId);
-  const movingCard = oZone.array[index];
+  const resolvedIdx = resolveCardIndex(oZone, null, index);
+  const movingCard = oZone?.array?.[resolvedIdx];
   if (!movingCard) return null;
 
   const hints = { moving: buildCardHint(movingCard) };
-  if (typeof targetIndex === 'number') {
-    hints.target = buildCardHint(dZone.array[targetIndex]);
+  if (targetIndex != null && targetIndex !== false) {
+    const resolvedTarget = resolveCardIndex(dZone, null, targetIndex);
+    if (resolvedTarget >= 0 && dZone?.array?.[resolvedTarget]) {
+      hints.target = buildCardHint(dZone.array[resolvedTarget]);
+    }
   }
 
   const cardType = movingCard.type2 || movingCard.type;
@@ -60,16 +64,13 @@ function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
 export { buildMoveCardHints };
 
 function resolveMoveCardIndices(user, oZoneId, dZoneId, index, targetIndex, hints) {
-  if (!hints) {
-    return { index, targetIndex };
-  }
   const oZone = getZone(user, oZoneId);
   const dZone = getZone(user, dZoneId);
   return {
-    index: resolveCardIndex(oZone, hints.moving, index),
+    index: resolveCardIndex(oZone, hints?.moving, index),
     targetIndex:
-      typeof targetIndex === 'number'
-        ? resolveCardIndex(dZone, hints.target, targetIndex)
+      targetIndex != null && targetIndex !== false
+        ? resolveCardIndex(dZone, hints?.target, targetIndex)
         : targetIndex,
   };
 }
