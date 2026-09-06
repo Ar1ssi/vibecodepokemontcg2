@@ -1,17 +1,68 @@
 import { getZone } from '../zones/get-zone.js';
-import { stopHoloAnimation } from '../deck-builder/core/holo.mjs';
+import {
+  buildHoloCard,
+  resolveHoloEffect,
+  startHoloAnimation,
+  stopHoloAnimation,
+} from '../deck-builder/core/holo.mjs';
+import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 
-/** @type {{ overlay: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null, dragStartX: number, dragActive: boolean } | null} */
+/** @type {{ overlay: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
 let viewerState = null;
 
 const MAX_BEHIND = 2;
 const PEEK_PERCENT = 24;
-const SWIPE_THRESHOLD = 48;
+const SWIPE_THRESHOLD = 56;
+const SWIPE_START_PX = 14;
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
 
 const clampIndex = (index, max) => Math.max(0, Math.min(index, max));
+
+const slideWrapper = (slide) =>
+  slide.holoWrapper ?? slide.querySelector('.mat-holo');
+
+const buildSlideContent = async (card) => {
+  const existingRarity = card.wrapper?.dataset?.rarity;
+  if (existingRarity) {
+    const wrapper = buildHoloCard(card.image.src, existingRarity);
+    wrapper.classList.add('mat-holo', 'discard-pile-holo');
+    return { node: wrapper, holoWrapper: wrapper };
+  }
+
+  const data = await ensureCardData({
+    name: card.name,
+    type: card.type,
+    number: card.number,
+    set: card.set,
+    id: card.id,
+  });
+  const effect = resolveHoloEffect(data);
+  if (effect) {
+    const wrapper = buildHoloCard(card.image.src, effect);
+    wrapper.classList.add('mat-holo', 'discard-pile-holo');
+    return { node: wrapper, holoWrapper: wrapper };
+  }
+
+  const img = document.createElement('img');
+  img.src = card.image.src;
+  img.alt = card.name ?? '';
+  img.className = 'discard-pile-card';
+  img.draggable = false;
+  return { node: img, holoWrapper: null };
+};
+
+const syncHoloAnimations = (state) => {
+  state.slides.forEach((slide, i) => {
+    const wrapper = slideWrapper(slide);
+    if (!wrapper) return;
+    stopHoloAnimation(wrapper);
+    if (state.index - i === 0) {
+      startHoloAnimation(wrapper);
+    }
+  });
+};
 
 const layoutStack = (state) => {
   const { slides, index } = state;
@@ -25,7 +76,7 @@ const layoutStack = (state) => {
       slide.style.opacity = '';
       return;
     }
-    slide.style.zIndex = String(200 - behind);
+    slide.style.zIndex = String(300 - behind);
     if (behind === 0) {
       slide.classList.add('is-active');
       slide.style.transform = 'translateX(0) scale(1)';
@@ -36,6 +87,7 @@ const layoutStack = (state) => {
       slide.style.opacity = String(Math.max(0.45, 0.9 - behind * 0.2));
     }
   });
+  syncHoloAnimations(state);
 };
 
 const updateFooter = (state) => {
@@ -53,11 +105,11 @@ const goToIndex = (state, index) => {
 export const closeDiscardPileViewer = () => {
   if (!viewerState) return;
 
-  const { overlay, onKeyDown, stack } = viewerState;
+  const { overlay, onKeyDown, slides } = viewerState;
   document.removeEventListener('keydown', onKeyDown);
-  stack.replaceWith(stack.cloneNode(true));
-  overlay.querySelectorAll('.mat-holo').forEach((wrapper) => {
-    stopHoloAnimation(wrapper);
+  slides.forEach((slide) => {
+    const wrapper = slideWrapper(slide);
+    if (wrapper) stopHoloAnimation(wrapper);
   });
   overlay.remove();
   viewerState = null;
@@ -65,34 +117,63 @@ export const closeDiscardPileViewer = () => {
 
 const attachSwipe = (state) => {
   const { stack } = state;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  let dragging = false;
 
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
+    tracking = true;
+    dragging = false;
+    startX = event.clientX;
+    startY = event.clientY;
     state.pointerId = event.pointerId;
-    state.dragStartX = event.clientX;
-    state.dragActive = true;
     stack.setPointerCapture(event.pointerId);
   };
 
-  const onPointerUp = (event) => {
-    if (!state.dragActive || state.pointerId !== event.pointerId) return;
-    state.dragActive = false;
-    state.pointerId = null;
-    const delta = event.clientX - state.dragStartX;
-    if (delta <= -SWIPE_THRESHOLD) {
-      goToIndex(state, state.index + 1);
-    } else if (delta >= SWIPE_THRESHOLD) {
-      goToIndex(state, state.index - 1);
+  const onPointerMove = (event) => {
+    if (!tracking || state.pointerId !== event.pointerId) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (
+      !dragging &&
+      Math.abs(dx) >= SWIPE_START_PX &&
+      Math.abs(dx) > Math.abs(dy) * 1.35
+    ) {
+      dragging = true;
+      stack.classList.add('is-dragging');
     }
-    stack.releasePointerCapture(event.pointerId);
+  };
+
+  const endSwipe = (event) => {
+    if (!tracking || state.pointerId !== event.pointerId) return;
+    tracking = false;
+    stack.classList.remove('is-dragging');
+    const dx = event.clientX - startX;
+    if (dragging) {
+      if (dx <= -SWIPE_THRESHOLD) {
+        goToIndex(state, state.index + 1);
+      } else if (dx >= SWIPE_THRESHOLD) {
+        goToIndex(state, state.index - 1);
+      }
+    }
+    dragging = false;
+    state.pointerId = null;
+    try {
+      stack.releasePointerCapture(event.pointerId);
+    } catch {
+      // capture may already be released
+    }
   };
 
   stack.addEventListener('pointerdown', onPointerDown);
-  stack.addEventListener('pointerup', onPointerUp);
-  stack.addEventListener('pointercancel', onPointerUp);
+  stack.addEventListener('pointermove', onPointerMove);
+  stack.addEventListener('pointerup', endSwipe);
+  stack.addEventListener('pointercancel', endSwipe);
 };
 
-export const openDiscardPileViewer = (user, startIndex = null) => {
+export const openDiscardPileViewer = async (user, startIndex = null) => {
   closeCardPreview(null, true);
   closeDiscardPileViewer();
 
@@ -137,20 +218,18 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
   nextBtn.setAttribute('aria-label', 'Newer card');
   nextBtn.textContent = '›';
 
-  const slides = cards.map((card, i) => {
+  const slides = [];
+  for (let i = 0; i < cards.length; i += 1) {
+    const card = cards[i];
     const slide = document.createElement('div');
     slide.className = 'discard-pile-slide';
     slide.dataset.index = String(i);
-
-    const img = document.createElement('img');
-    img.src = card.image.src;
-    img.alt = card.name ?? '';
-    img.className = 'discard-pile-card';
-    img.draggable = false;
-    slide.appendChild(img);
+    const { node, holoWrapper } = await buildSlideContent(card);
+    slide.appendChild(node);
+    if (holoWrapper) slide.holoWrapper = holoWrapper;
     stack.appendChild(slide);
-    return slide;
-  });
+    slides.push(slide);
+  }
 
   stage.append(stack, nextBtn);
   if (cards.length > 1) {
@@ -177,8 +256,6 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
     countEl,
     nameEl,
     pointerId: null,
-    dragStartX: 0,
-    dragActive: false,
     onKeyDown: null,
   };
 
