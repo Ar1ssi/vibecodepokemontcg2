@@ -2080,7 +2080,7 @@ ul, li {
 .card-picker-choose {
   --card-picker-card-w: min(28vw, 220px);
   --card-picker-card-h: calc(var(--card-picker-card-w) * 1.397);
-  --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.96);
+  --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.36);
   --card-picker-top-gap: 16px;
   --card-picker-trigger-nudge: 10px;
   --card-picker-playmat-w: 76vw;
