@@ -1,4 +1,4 @@
-import { attack, pass } from '../../actions/chat-buttons/chat-buttons.js';
+import { attack, pass, retreat, stadiumEffect } from '../../actions/chat-buttons/chat-buttons.js';
 import { removeAbilityCounter } from '../../actions/counters/ability-counter.js';
 import {
   addDamageCounter,
@@ -121,6 +121,8 @@ const functions = {
   changeType: changeType,
   attack: attack,
   pass: pass,
+  retreat: retreat,
+  'stadium-effect': stadiumEffect,
   VSTARGXFunction: VSTARGXFunction,
   undo: undo,
 };
@@ -135,7 +137,7 @@ const actionToFunction = (action) => {
   }
 };
 
-export const acceptAction = (
+export const acceptAction = async (
   user,
   action,
   parameters,
@@ -143,15 +145,25 @@ export const acceptAction = (
   isFromReplay = false
 ) => {
   if (isBlockedByReplay('action', action, isFromReplay)) {
-    return;
+    return false;
+  }
+  const selectedFunction = actionToFunction(action);
+  if (typeof selectedFunction !== 'function') {
+    console.warn('acceptAction: unknown action', action);
+    return false;
   }
   const emit = user === 'self' || isStateImport ? true : false;
   if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
     logSyncAction(action, parameters, 'in');
   }
-  if (parameters) {
-    actionToFunction(action)(user, ...parameters, emit);
-  } else {
-    actionToFunction(action)(user, emit);
+  try {
+    const result = parameters
+      ? selectedFunction(user, ...parameters, emit)
+      : selectedFunction(user, emit);
+    const resolved = await Promise.resolve(result);
+    return resolved !== false;
+  } catch (err) {
+    console.error('acceptAction failed', action, err);
+    return false;
   }
 };

@@ -57,10 +57,11 @@ const enforceBenchLimit = async (user) => {
   if (!rulesState.enabled) return;
   const bench = getZone(user, 'bench');
   const limit = benchLimitFor(user);
+  const { moveCardBundle } = await import('./move-card-bundle.js');
   while (bench.getCount() > limit) {
     const idx = bench.getCount() - 1;
     const name = bench.array[idx]?.name || 'a Pokémon';
-    await moveCard(user, user, 'bench', 'discard', idx);
+    await moveCardBundle(user, user, 'bench', 'discard', idx, false, 'move');
     appendMessage(
       user,
       `🏟️ Bench trimmed to ${limit} — ${name} discarded.`,
@@ -98,7 +99,7 @@ export const moveCard = async (
   // define the card that's being moved
   const movingCard = oZone.array[index];
 
-  if (!movingCard) return;
+  if (!movingCard) return { destZoneId, ok: false };
 
   // ── rules: Item play blocked by opponent Active (effect-prevent family) ─
   if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
@@ -119,7 +120,7 @@ export const moveCard = async (
             'announcement',
             false
           );
-          return;
+          return { destZoneId, ok: false };
         }
       }
     }
@@ -143,7 +144,7 @@ export const moveCard = async (
     });
     if (!gate.allowed) {
       appendMessage(user, `⛔ ${movingCard.name}: ${gate.reason}`, 'announcement', false);
-      return;
+      return { destZoneId, ok: false };
     }
     markSupporterPlayed(user, movingCard.name);
   }
@@ -181,7 +182,7 @@ export const moveCard = async (
       appendMessage(user, describeStadiumEffect(movingCard), 'announcement', false);
       const drawN = parseStadiumSetupDraw(movingCard);
       if (drawN && classifyStadiumEffect(movingCard) === 'setup-once') {
-        draw(user, drawN, true);
+        draw(user, user, drawN, true);
         appendMessage(
           user,
           `◈ ${movingCard.name}: Drew ${drawN} card(s) (when-you-play effect).`,
@@ -206,7 +207,7 @@ export const moveCard = async (
     const gate = canAddToBench(bench.getCount(), limit);
     if (!gate.allowed) {
       appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
-      return;
+      return { destZoneId, ok: false };
     }
   }
 
@@ -226,7 +227,7 @@ export const moveCard = async (
     const playCheck = await canPlayPokemonFromHand(movingCard);
     if (!playCheck.allowed) {
       appendMessage(user, `⛔ ${playCheck.reason}`, 'announcement', false);
-      return;
+      return { destZoneId, ok: false };
     }
   }
 
@@ -244,7 +245,7 @@ export const moveCard = async (
     const evoCheck = await canEvolve(user, targetCard, movingCard, false);
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
-      return;
+      return { destZoneId, ok: false };
     }
   }
 
@@ -270,12 +271,15 @@ export const moveCard = async (
       'announcement',
       false
     );
-    return;
+    return { destZoneId, ok: false };
   }
 
   // ── rules: Nitro Fire Energy — return to hand when discarded by own attack ─
+  // Skip on mirror replay: the originator rewrites destZoneId and relays the
+  // actual destination so both clients land the energy in the same zone.
   if (
     rulesState.enabled &&
+    !syncReplay &&
     rulesState.attackExecuting &&
     movingCard.type === 'Energy' &&
     destZoneId === 'discard' &&
@@ -451,6 +455,7 @@ export const moveCard = async (
   // Risky Ruins-style: damage when playing a Basic onto the Bench from hand.
   if (
     rulesState.enabled &&
+    !syncReplay &&
     movingCard.type === 'Pokémon' &&
     oZoneId === 'hand' &&
     dZoneId === 'bench' &&
@@ -543,4 +548,6 @@ export const moveCard = async (
     await enforceBenchLimit(user);
     await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
   }
+
+  return { destZoneId, ok: true };
 };

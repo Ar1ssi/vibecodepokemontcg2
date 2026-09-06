@@ -49,6 +49,7 @@ import {
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
+import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -89,7 +90,7 @@ const syncAttackFromCard = (card, attackIndex, prev) => {
 
 // Rules mode: an attack (or pass) ends the turn — advance rulesState and
 // refresh the HUD/panel via the same event updateTurnBanner() uses.
-const endTurnWithBanner = (user) => {
+const endTurnWithBanner = (user, rngBundle = {}) => {
   // SOLO turn-boundary: resolve this player's active status (poison/burn
   // damage, asleep/paralyzed clear) BEFORE the turn advances. Shared by both
   // attack() and pass(), so pass is covered too. Mirrors the +Turn button
@@ -99,7 +100,8 @@ const endTurnWithBanner = (user) => {
   if (active) {
     const key = active.image?.dataset?.cardId || active.name;
     const checkupBonus = getStadiumCheckupPoisonBonus(active, user);
-    const boundary = resolveTurnBoundary(user, key, Math.random, {
+    const burnCoin = flipCoin(rngBundle, 'burn');
+    const boundary = resolveTurnBoundary(user, key, rngFromCoin(burnCoin), {
       checkupPoisonBonus: checkupBonus,
     });
     if (boundary.damage > 0) placeSelfDamage(user, 'active', 0, boundary.damage);
@@ -110,9 +112,14 @@ const endTurnWithBanner = (user) => {
   document.dispatchEvent(new CustomEvent('rules-turn-began', { detail: { player: rulesState.turnPlayer } }));
 };
 
-export const attack = async (user, emit = true, attackIndex = 0) => {
+export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, maybeEmit) => {
+  const { attackIndex, rngBundle, emit } = parseAttackArgs(
+    emitOrIndex,
+    attackIndexOrRng,
+    maybeEmit
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'attack', []);
+    processAction(user, emit, 'attack', [attackIndex, rngBundle]);
     return;
   }
 
@@ -132,7 +139,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
       const gate = canAct(user, key);
       if (!gate.can) {
         if (getStatus(user, key)?.asleep) {
-          const wake = resolveWake(user, key);
+          const wakeCoin = flipCoin(rngBundle, 'wake');
+          const wake = resolveWake(user, key, rngFromCoin(wakeCoin));
           if (!wake.woke) {
             appendMessage(
               user,
@@ -149,7 +157,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
       }
       if (getStatus(user, key)?.confused) {
-        const result = resolveConfusedAttack(user, key);
+        const confusedCoin = flipCoin(rngBundle, 'confused');
+        const result = resolveConfusedAttack(user, key, rngFromCoin(confusedCoin));
         if (!result.proceeds) {
           placeSelfDamage(user, 'active', 0, result.damage);
           appendMessage(
@@ -158,7 +167,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             'announcement',
             false
           );
-          // A failed attack is still an attack: the turn ends (below).
+          rngBundle.confusedFizzle = true;
         } else {
           appendMessage(
             user,
@@ -172,7 +181,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
     // ── Attack execution: energy cost, damage, KO ──
     const oppPlayer = user === 'self' ? 'opp' : 'self';
     const oppActive = getActivePokemonCard(getZone(oppPlayer, 'active'));
-    if (active) {
+    if (active && !rngBundle.confusedFizzle) {
       await ensureCardData(active);
       let atk = syncAttackFromCard(active, attackIndex, null);
       if (atk) {
@@ -406,9 +415,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           // the effective damage total by the parser; tails self-damage is
           // executed after the KO check (below).
           const coin = /flip a coin/.test(String(atk.text || '').toLowerCase())
-            ? Math.random() < 0.5
-              ? 'heads'
-              : 'tails'
+            ? flipCoin(rngBundle, 'attack')
             : null;
           // "is damaged" conditions (taxonomy §D "if conditional damage"):
           // pass the defender's current damage-counter count when it is in the
@@ -921,10 +928,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
   appendMessage(user, message, 'player', false);
   discardBoard(user, user, false, false);
 
-  processAction(user, emit, 'attack', []);
+  processAction(user, emit, 'attack', [attackIndex, rngBundle]);
 
   if (rulesState.enabled) {
-    endTurnWithBanner(user);
+    endTurnWithBanner(user, rngBundle);
   }
 };
 
@@ -1722,6 +1729,9 @@ const openAbilityChoicePicker = ({
 
 // Attack deck-search (Call for Family, Flock, …): filtered picker, then shuffle.
 async function _runAttackDeckSearch(user, atk, searchStep, emit) {
+  // Mirror replay: the originator's moveCardBundle + shuffleZone actions
+  // arrive separately. Opening a picker here would desync both boards.
+  if (!emit) return;
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
     appendMessage(
@@ -2318,9 +2328,11 @@ export const evolveAbility = async (user, emit = true, targetCard = null) => {
 };
 
 
-export const pass = (user, emit = true) => {
+export const pass = (user, rngOrEmit = true, maybeEmit) => {
+  const { emit, tail: rngIn } = splitEmitAndTail(rngOrEmit, maybeEmit);
+  const rngBundle = rngIn || {};
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'pass', []);
+    processAction(user, emit, 'pass', [rngBundle]);
     return;
   }
 
@@ -2337,10 +2349,10 @@ export const pass = (user, emit = true) => {
   appendMessage(user, message, 'player', false);
   discardBoard(user, user, false, false);
 
-  processAction(user, emit, 'pass', []);
+  processAction(user, emit, 'pass', [rngBundle]);
 
   if (rulesState.enabled) {
-    endTurnWithBanner(user);
+    endTurnWithBanner(user, rngBundle);
   }
 };
 
@@ -2358,7 +2370,7 @@ const payStadiumCost = (user, cost) => {
       appendMessage(user, '⛔ No Energy in hand to discard.', 'announcement', false);
       return false;
     }
-    moveCard(user, user, 'hand', 'discard', idx);
+    moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
     return true;
   }
   if (cost.type === 'discard-hand') {
@@ -2366,7 +2378,9 @@ const payStadiumCost = (user, cost) => {
       appendMessage(user, `⛔ Need ${cost.n} card(s) in hand to discard.`, 'announcement', false);
       return false;
     }
-    for (let i = 0; i < cost.n; i++) moveCard(user, user, 'hand', 'discard', 0);
+    for (let i = 0; i < cost.n; i++) {
+      moveCardBundle(user, user, 'hand', 'discard', 0, false, 'move');
+    }
     return true;
   }
   return true;
@@ -2381,7 +2395,17 @@ const finishStadiumAction = (user, card, emit, payload) => {
 // Uses the active stadium's once-per-turn or setup-once effect.
 // For once-per-turn: draw N / search / search-evolve / heal based on the parsed effect.
 // For setup-once: draw N (one-shot, applied immediately).
-export const stadiumEffect = async (user, emit = true) => {
+export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
+  const { emit, tail: payload } = splitEmitAndTail(payloadOrEmit, maybeEmit);
+  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+    processAction(user, emit, 'stadium-effect', [payload]);
+    return;
+  }
+  // Mirror: card moves already arrived via moveCardBundle. Only mark used.
+  if (!emit) {
+    if (rulesState.enabled) markStadiumUsed(user);
+    return;
+  }
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
@@ -2428,7 +2452,7 @@ export const stadiumEffect = async (user, emit = true) => {
         appendMessage(user, '⛔ Your hand is empty.', 'announcement', false);
         return;
       }
-      moveCard(user, user, 'hand', 'deck', 0, 0);
+      moveCardBundle(user, user, 'hand', 'deck', 0, 0, 'move');
       appendMessage(user, `◈ ${card.name}: Put a card from your hand on top of your deck.`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: 'hand-to-deck-top' });
       break;
@@ -2446,9 +2470,9 @@ export const stadiumEffect = async (user, emit = true) => {
         return;
       }
       const benchCard = bench.array[benchIdx];
-      moveCard(user, user, 'active', 'bench', 0);
+      moveCardBundle(user, user, 'active', 'bench', 0, false, 'move');
       const newIdx = getZone(user, 'bench').array.indexOf(benchCard);
-      if (newIdx >= 0) moveCard(user, user, 'bench', 'active', newIdx);
+      if (newIdx >= 0) moveCardBundle(user, user, 'bench', 'active', newIdx, false, 'move');
       appendMessage(user, `🔁 ${card.name}: Switched Active with a benched ${action.typeFilter} Pokémon.`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: 'switch-type' });
       break;
@@ -2469,7 +2493,7 @@ export const stadiumEffect = async (user, emit = true) => {
           if (action.typeFilter === 'lightning' && !name.includes('lightning')) continue;
         }
         if (!canAddToBench(bench.getCount(), limit).allowed) break;
-        moveCard(user, user, 'discard', 'bench', i - moved);
+        moveCardBundle(user, user, 'discard', 'bench', i - moved, false, 'move');
         moved++;
       }
       if (moved === 0) {
@@ -2521,7 +2545,7 @@ export const stadiumEffect = async (user, emit = true) => {
         return;
       }
       const foundName = deck.array[found]?.name || 'Basic Pokémon';
-      moveCard(user, user, 'deck', 'bench', found);
+      moveCardBundle(user, user, 'deck', 'bench', found, false, 'move');
       appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search-bench' });
@@ -2534,7 +2558,7 @@ export const stadiumEffect = async (user, emit = true) => {
       for (let i = 0; i < deck.array.length && moved < want; ) {
         await ensureCardData(deck.array[i]);
         if (matchesStadiumSearch(deck.array[i], action)) {
-          moveCard(user, user, 'deck', 'hand', i);
+          moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
           moved++;
         } else {
           i++;
@@ -2555,7 +2579,7 @@ export const stadiumEffect = async (user, emit = true) => {
     case 'discard-draw':
     case 'draw': {
       const n = action.n || 1;
-      draw(user, n, emit);
+      draw(user, user, n, emit);
       appendMessage(user, `◈ ${card.name}: Drew ${n} card(s).`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: action.action, n });
       break;
@@ -2570,7 +2594,7 @@ export const stadiumEffect = async (user, emit = true) => {
       // If it's a Pokémon, put it in hand; otherwise deck unchanged
       const isPokemon = (topCard.type || '').toLowerCase().includes('pokemon') || (topCard.subtypes || []).some(s => s.toLowerCase() === 'pokemon');
       if (isPokemon) {
-        moveCard(user, user, 'deck', 'hand', 0, 0);
+        moveCardBundle(user, user, 'deck', 'hand', 0, 0, 'move');
         appendMessage(user, `🔍 ${card.name} searches: found ${topCard.name || 'a Pokémon'} → hand.`, 'announcement', false);
       } else {
         appendMessage(user, `🔍 ${card.name} searches: top card was ${topCard.name || 'a card'} (not a Pokémon). Deck unchanged.`, 'announcement', false);

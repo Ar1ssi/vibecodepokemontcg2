@@ -1368,8 +1368,10 @@ import {
             } else if (type === 'peerSocketId') {
               const peerId = data?.socketId;
               if (peerId && peerId !== rulesSocket?.id) {
+                const alreadyKnown = systemState.opponentSocketId === peerId;
                 systemState.opponentSocketId = peerId;
                 if (
+                  !alreadyKnown &&
                   rulesState.enabled &&
                   rulesState.phase === 'setup' &&
                   !coinFlipPending &&
@@ -1378,12 +1380,12 @@ import {
                 ) {
                   handleSetupClick();
                 }
-              }
-              if (peerId && peerId !== rulesSocket?.id) {
-                rulesSocket.emit('rulesEvent', {
-                  type: 'peerSocketId',
-                  data: { socketId: rulesSocket.id },
-                });
+                if (!alreadyKnown) {
+                  rulesSocket.emit('rulesEvent', {
+                    type: 'peerSocketId',
+                    data: { socketId: rulesSocket.id },
+                  });
+                }
               }
             } else if (type === 'coinChosen') {
               // Opponent chose/changed their coin — show it on our mat

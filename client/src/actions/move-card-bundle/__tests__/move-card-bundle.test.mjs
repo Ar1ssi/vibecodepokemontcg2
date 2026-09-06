@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCardHint } from '../../../setup/zones/resolve-card-index.mjs';
+import { splitEmitAndTail } from '../../../setup/general/sync-action-args.mjs';
 
 // Mirrors buildMoveCardHints origin-zone lookup (must run before splice).
 function hintForHandIndex(handArray, index) {
@@ -52,6 +53,23 @@ test('pre-move hint must be captured before origin zone splice', () => {
   const hintAfterMove = hintForHandIndex(handBefore, index);
   assert.equal(hintBeforeMove?.syncInstance, 1);
   assert.equal(hintAfterMove?.syncInstance, 2);
+});
+
+test('acceptAction arity: hints object + trailing false is emit=false', () => {
+  const hints = {
+    moving: { name: 'Popplio', syncInstance: 1 },
+    isEvolution: false,
+  };
+  // How acceptAction calls moveCardBundle: (..., action, hints, emit)
+  const parsed = splitEmitAndTail(hints, false);
+  assert.equal(parsed.emit, false);
+  assert.equal(parsed.tail.moving.name, 'Popplio');
+});
+
+test('local shuffle/top calls still pass emit as a boolean', () => {
+  const parsed = splitEmitAndTail(false);
+  assert.equal(parsed.emit, false);
+  assert.equal(parsed.tail, null);
 });
 
 test('mirror autoMove bench swap inherits syncReplay from parent move', () => {
