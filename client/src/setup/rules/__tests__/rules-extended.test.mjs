@@ -10,7 +10,7 @@ import test from 'node:test';
     const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
@@ -1012,6 +1012,67 @@ import test from 'node:test';
       );
     });
 
+    test('classifyAttackEffect: move-energy, reveal-hand, conditional-ko', () => {
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Wheel Pass',
+          damage: 0,
+          text: 'Move an Energy from this Pokémon to 1 of your Benched Pokémon.',
+        }),
+        'move-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Silent Wing',
+          damage: 0,
+          text: 'Your opponent reveals their hand.',
+        }),
+        'reveal-hand',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Abyss Eye',
+          damage: 0,
+          text: "If your opponent's Active Pokémon is affected by a Special Condition, it is Knocked Out.",
+        }),
+        'conditional-ko',
+      );
+      assert.equal(
+        classifyAttackEffect({ name: 'Slam', damage: 30, text: '30' }),
+        'flat',
+      );
+    });
+
+    test('moveEnergyClause / revealHandClause / conditionalKoClause parsers', () => {
+      assert.equal(
+        moveEnergyClause('Move an Energy from this Pokémon to 1 of your Benched Pokémon.'),
+        true,
+      );
+      assert.equal(moveEnergyClause('Do 30 damage to the Defending Pokémon.'), false);
+      assert.equal(moveEnergyClause('Attach an Energy card to this Pokémon.'), false);
+      assert.equal(moveEnergyClause(''), false);
+
+      assert.equal(revealHandClause('Your opponent reveals their hand.'), true);
+      assert.equal(revealHandClause('Your opponent reveal their hand.'), true);
+      assert.equal(revealHandClause('Draw 2 cards.'), false);
+      assert.equal(revealHandClause(''), false);
+
+      assert.equal(
+        conditionalKoClause(
+          "If your opponent's Active Pokémon is affected by a Special Condition, it is Knocked Out.",
+        ),
+        true,
+      );
+      assert.equal(conditionalKoClause('Do 30 damage to the Defending Pokémon.'), false);
+      assert.equal(conditionalKoClause(''), false);
+    });
+
+    test('ATTACK_FAMILIES: includes move-energy, reveal-hand, conditional-ko', () => {
+      assert.ok(ATTACK_FAMILIES.includes('move-energy'));
+      assert.ok(ATTACK_FAMILIES.includes('reveal-hand'));
+      assert.ok(ATTACK_FAMILIES.includes('conditional-ko'));
+    });
+
     test('parseAttackSearchClause: Call for Family and rotation search attacks', () => {
       const callForFamilyOne =
         'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
@@ -1880,6 +1941,25 @@ import test from 'node:test';
       assert.equal(planBenchTarget(-1), null);
       assert.equal(planBenchTarget(undefined), null);
       assert.equal(planBenchTarget('3'), -1);
+    });
+
+    // ── §D draw-until family (drawUntilTarget) ──
+    test('drawUntilTarget: parses "draw cards until you have N cards", 0 otherwise', () => {
+      assert.equal(
+        drawUntilTarget('You may draw cards until you have 6 cards in your hand.'),
+        6
+      );
+      assert.equal(drawUntilTarget('Draw cards until you have 5 cards.'), 5);
+      assert.equal(drawUntilTarget('Draw cards until you have 1 card.'), 1);
+      assert.equal(drawUntilTarget('Draw 2 cards.'), 0);
+      assert.equal(drawUntilTarget('No draw clause here.'), 0);
+      assert.equal(drawUntilTarget(''), 0);
+      assert.equal(drawUntilTarget(undefined), 0);
+    });
+
+    test('drawCount: skips draw-until clauses (no false positive)', () => {
+      assert.equal(drawCount('Draw cards until you have 6 cards in your hand.'), 0);
+      assert.equal(drawCount('You may draw cards until you have 5 cards.'), 0);
     });
 
     // ── §D draw family (drawCount) ──
@@ -3280,6 +3360,74 @@ import test from 'node:test';
         };
         await ensureCardData(card);
         assert.equal(card.attacks[0].text, callForFamilyText);
+      });
+    });
+
+    test('ensureCardData: replaces multiplier placeholder "30×" with TCGdex effect', async () => {
+      const beatEffect =
+        'This attack does 30 damage for each Energy attached to this Pokémon.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv1-001')) {
+          return detailResponse({
+            id: 'sv1-001',
+            name: 'Testmon',
+            hp: '60',
+            attacks: [
+              {
+                name: 'Beat',
+                cost: ['Colorless'],
+                damage: '30',
+                effect: beatEffect,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv1-001',
+          name: 'Testmon',
+          hp: 60,
+          weakness: null,
+          attacks: [{ name: 'Beat', cost: ['Colorless'], damage: 30, text: '30×' }],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, beatEffect);
+      });
+    });
+
+    test('attacksNeedText returns true for text "30×"', async () => {
+      let fetched = false;
+      const handler = (url) => {
+        fetched = true;
+        if (url.includes('/cards/sv1-001')) {
+          return detailResponse({
+            id: 'sv1-001',
+            name: 'Testmon',
+            hp: '60',
+            attacks: [
+              {
+                name: 'Beat',
+                cost: ['Colorless'],
+                damage: '30',
+                effect: 'Real effect text.',
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv1-001',
+          name: 'Testmon',
+          hp: 60,
+          weakness: null,
+          attacks: [{ name: 'Beat', cost: ['Colorless'], damage: 30, text: '30×' }],
+        };
+        await ensureCardData(card);
+        assert.ok(fetched, 'attacksNeedText should treat "30×" as placeholder');
       });
     });
 

@@ -28,8 +28,9 @@
 // ctx (all optional, defaulted):
 //   { energyCount, opponentPrizes, turnCount,
 //     attackerHp, defenderHp, coin: 'heads'|'tails',
-//     defenderDamage /* number of damage counters on the defender; leave
-//                         undefined when unknown — enables "is damaged" */ }
+//     defenderDamage /* damage counters on the defender; leave undefined
+//                         when unknown — enables "is damaged" */,
+//     attackerDamage /* damage counters on the attacker (this Pokémon) */ }
 
 import { parseSearchDeckParams } from './trainer-effects.mjs';
 
@@ -132,6 +133,8 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const ownBenchCount = ctx.ownBenchCount; // your Benched Pokémon
   const opponentBenchCount = ctx.opponentBenchCount; // opponent's Benched Pokémon
   const damagedBenchCount = ctx.damagedBenchCount; // your Benched Pokémon with damage counters
+  const attackerDamage = ctx.attackerDamage; // damage counters on this Pokémon
+  const defenderDamage = ctx.defenderDamage; // damage counters on opponent's Active
   const headsCount = ctx.headsCount; // heads from a "flip … for each heads" coin
 
   let total = base;
@@ -190,8 +193,19 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
         : (ownBenchCount ?? 0) + (opponentBenchCount ?? 0);
       label = 'Benched Pokémon (both sides)';
     } else if (/damage counter|damaged/.test(unit)) {
-      count = damagedBenchCount;
-      label = 'your damaged Benched Pokémon';
+      if (/(?:your )?benched pok[ée]mon|benched.*damage counter|damaged benched/.test(unit)) {
+        count = damagedBenchCount;
+        label = 'your damaged Benched Pokémon';
+      } else if (/on this pok[ée]mon|this pok[ée]mon.*damage counter|damage counter.*on this pok/.test(unit)) {
+        count = attackerDamage;
+        label = 'damage counter on this Pokémon';
+      } else if (/opponent's active|defending pok[ée]mon|damage counter.*on your opponent/.test(unit)) {
+        count = defenderDamage;
+        label = "damage counter on opponent's Active Pokémon";
+      } else {
+        count = undefined;
+        label = unit || 'damage counter';
+      }
     } else if (/benched pok[ée]mon/.test(unit)) {
       count = ownBenchCount;
       label = 'your Benched Pokémon';
@@ -372,7 +386,18 @@ export function planBenchTarget(benchCount) {
 // Matches "draw/draws N card(s)"; returns 0 when the text has no such
 // clause. Pure.
 export function drawCount(attackText) {
-  const m = /draws? (\d+) cards?/i.exec(String(attackText || ''));
+  const text = String(attackText || '');
+  if (/draw cards until you have \d+ cards/i.test(text)) return 0;
+  const m = /draws? (\d+) cards?/i.exec(text);
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+// Draw-until target hand size (taxonomy §D draw-until family). Pure.
+// Same pattern as attack-effects draw-until / trainer-effects drawUntil.
+export function drawUntilTarget(attackText) {
+  const m = /draw\s+cards\s+until\s+you have\s+(\d+)\s+cards?/i.exec(
+    String(attackText || '')
+  );
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
 }
 
@@ -393,6 +418,33 @@ export function attachEnergyCount(attackText) {
 // Pure.
 export function switchClause(attackText) {
   return /switch your (?:active|bench|pok[ée]mon)/i.test(String(attackText || ''));
+}
+
+// Whether attack text moves attached Energy to a Benched Pokémon (taxonomy §D
+// move-energy family). Matches Wheel Pass: "Move an Energy from this Pokémon
+// to 1 of your Benched Pokémon". Pure.
+export function moveEnergyClause(attackText) {
+  const text = String(attackText || '');
+  return (
+    /move an? energy from this pok[ée]mon/i.test(text) ||
+    (/move\b[^.;]*\benergy\b/i.test(text) && /benched pok[ée]mon|your bench/i.test(text))
+  );
+}
+
+// Whether attack text reveals the opponent's hand (taxonomy §D reveal-hand
+// family). Matches Silent Wing: "Your opponent reveals their hand". Pure.
+export function revealHandClause(attackText) {
+  return /your opponent reveal(?:s)? (?:their )?hand/i.test(String(attackText || ''));
+}
+
+// Whether attack text Knocks Out the opponent's Active when it has a Special
+// Condition (taxonomy §D conditional-ko family). Matches Abyss Eye. Pure.
+export function conditionalKoClause(attackText) {
+  const text = String(attackText || '');
+  return (
+    /if your opponent's active pok[ée]mon is affected by a special condition/i.test(text) &&
+    /knocked out/i.test(text)
+  );
 }
 
 // Whether attack text carries a "Once during your turn" clause (taxonomy §D

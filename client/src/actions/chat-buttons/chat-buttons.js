@@ -22,7 +22,7 @@ import {
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
@@ -614,6 +614,48 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             }
           }
         }
+
+        // Conditional KO (taxonomy §D conditional-ko family): if the defender's
+        // Active has a Special Condition, it is KO'd (Abyss Eye). Skipped when
+        // already KO'd by damage this attack.
+        if (conditionalKoClause(atk.text)) {
+          const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
+          const alreadyKO = oppHp > 0 && totalDmg >= oppHp;
+          const status = getStatus(oppPlayer, oppKey);
+          const hasCondition = status && Object.values(status).some(Boolean);
+          if (!alreadyKO && hasCondition) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: oppActive,
+              defenderBoard: getZone(oppPlayer, 'active'),
+            });
+            if (koResult.won) {
+              appendMessage(user, '🏆 Victory!', 'announcement', false);
+            } else {
+              appendMessage(
+                user,
+                `🎯 Conditional KO! ${oppActive?.name || 'The active'} had a Special Condition — ${koResult.prizeCount} prize${koResult.prizeCount !== 1 ? 's' : ''} taken.`,
+                'announcement',
+                false
+              );
+              await _takePrizesWithPicker(user, koResult.prizeCount);
+              const benchCount = getZone(oppPlayer, 'bench').getCount();
+              const plan = planPromotion(true, benchCount);
+              if (plan.promote) {
+                const oldActiveName = oppActive.name || 'The active Pokémon';
+                moveCard(oppPlayer, user, 'active', 'discard', 0);
+                moveCard(oppPlayer, user, 'bench', 'active', 0);
+                const newActive = getZone(oppPlayer, 'active').array[0];
+                appendMessage(
+                  user,
+                  `⬆️ ${oldActiveName} was KO'd — ${newActive?.name || 'a benched Pokémon'} promotes to Active.`,
+                  'announcement',
+                  false
+                );
+              }
+            }
+          }
+        }
         }
 
         // Coin tails self-damage (taxonomy §D coin-flip family): the parser
@@ -815,6 +857,56 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
 
+        // Draw-until (taxonomy §D draw-until family): "draw cards until you
+        // have N cards". Loop deck→hand until hand size reaches the target
+        // (mirrors trainer-execution drawUntil).
+        const drawUntilN = drawUntilTarget(atk.text);
+        if (drawUntilN > 0) {
+          let drewUntil = 0;
+          while (
+            getZone(user, 'hand').getCount() < drawUntilN &&
+            getZone(user, 'deck').getCount() > 0
+          ) {
+            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', true);
+            drewUntil++;
+          }
+          if (drewUntil === 0 && getZone(user, 'deck').getCount() === 0) {
+            appendMessage(
+              user,
+              `📖 ${atk.name}'s draw fizzles — your deck is empty.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `📖 ${atk.name}: drew ${drewUntil} card${drewUntil !== 1 ? 's' : ''} until ${drawUntilN} in hand.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Draw-until (taxonomy §D draw-until family): "draw cards until you
+        // have N cards in your hand" — distinct from bare drawCount().
+        const drawUntilN = drawUntilTarget(atk.text);
+        if (drawUntilN > 0) {
+          let drew = 0;
+          while (
+            getZone(user, 'hand').getCount() < drawUntilN &&
+            getZone(user, 'deck').getCount() > 0
+          ) {
+            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', emit);
+            drew++;
+          }
+          appendMessage(
+            user,
+            `📖 ${atk.name}: drew ${drew} until ${drawUntilN} in hand.`,
+            'announcement',
+            false
+          );
+        }
+
         // Draw (taxonomy §D draw family): attack text saying "draw N card(s)".
         // Draws from your own deck (capped at what's left; fizzle announced
         // if empty). The shared draw action already handles the message and
@@ -875,6 +967,60 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           );
         }
 
+        // Move Energy (taxonomy §D move-energy family): move attached Energy
+        // from the active Pokémon to the first benched Pokémon (Wheel Pass).
+        if (moveEnergyClause(atk.text)) {
+          const activeZoneObj = getZone(user, 'active');
+          const activeCard = activeZoneObj.array[0];
+          const benchZoneObj = getZone(user, 'bench');
+          const benchIdx = benchZoneObj.array.findIndex((c) => c.type === 'Pokémon');
+          if (benchIdx === -1) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name}'s energy move fizzles — no Benched Pokémon.`,
+              'announcement',
+              false
+            );
+          } else {
+            const energyIdx = activeZoneObj.array.findIndex(
+              (c) => c.type === 'Energy' && c.image?.relative === activeCard?.image
+            );
+            if (energyIdx === -1) {
+              appendMessage(
+                user,
+                `⚡ ${atk.name}'s energy move fizzles — no Energy attached.`,
+                'announcement',
+                false
+              );
+            } else {
+              const energy = activeZoneObj.array[energyIdx];
+              const benchMon = benchZoneObj.array[benchIdx];
+              moveCard(user, user, 'active', 'bench', energyIdx, benchIdx);
+              appendMessage(
+                user,
+                `⚡ ${atk.name} moves ${energy.name || 'Energy'} to ${benchMon?.name || 'a benched Pokémon'}.`,
+                'announcement',
+                false
+              );
+            }
+          }
+        }
+
+        // Reveal hand (taxonomy §D reveal-hand family): list opponent hand
+        // card names in chat (Silent Wing).
+        if (revealHandClause(atk.text)) {
+          const handCards = getZone(oppPlayer, 'hand').array;
+          const listing = handCards.length
+            ? handCards.map((c) => c.name || 'Unknown').join(', ')
+            : '(empty)';
+          appendMessage(
+            user,
+            `👁 ${atk.name} — opponent reveals hand: ${listing}`,
+            'announcement',
+            false
+          );
+        }
+
         // Switch (taxonomy §D switch family): attack text saying "switch
         // your Active …". Auto-swaps with the first benched Pokémon — the
         // same moveCard pair the switch ability uses (no energy cost); the
@@ -898,6 +1044,60 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             appendMessage(
               user,
               `🔁 ${oldName} switches with ${newActive?.name || 'the benched Pokémon'}.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Reveal hand (Silent Wing): list opponent hand in chat.
+        if (rulesState.enabled && revealHandClause(atk.text)) {
+          const oppHand = getZone(oppPlayer, 'hand').array;
+          if (oppHand.length === 0) {
+            appendMessage(user, '👀 Opponent\'s hand is empty.', 'announcement', false);
+          } else {
+            appendMessage(
+              user,
+              `👀 Opponent reveals: ${oppHand.map((c) => c.name || 'Card').join(', ')}`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Move Energy (Wheel Pass): active → first benched Pokémon.
+        if (rulesState.enabled && moveEnergyClause(atk.text)) {
+          const activeZoneObj = getZone(user, 'active');
+          const energies = activeZoneObj.array
+            .map((c, idx) => ({ card: c, idx }))
+            .filter(
+              ({ card }) =>
+                card.type === 'Energy' && card.image?.relative === active.image
+            );
+          const benchZone = getZone(user, 'bench');
+          const benchTarget = benchZone.array.find((c) => c.type === 'Pokémon');
+          if (energies.length === 0) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} fizzles — no Energy to move.`,
+              'announcement',
+              false
+            );
+          } else if (!benchTarget) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} fizzles — no Benched Pokémon.`,
+              'announcement',
+              false
+            );
+          } else {
+            const energyIdx = energies[0].idx;
+            const benchIdx = benchZone.array.indexOf(benchTarget);
+            const energyName = energies[0].card.name || 'Energy';
+            moveCard(user, user, 'active', 'bench', energyIdx, benchIdx);
+            appendMessage(
+              user,
+              `⚡ ${atk.name} moves ${energyName} to ${benchTarget.name || 'the benched Pokémon'}.`,
               'announcement',
               false
             );
