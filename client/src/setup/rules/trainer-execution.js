@@ -8,7 +8,7 @@ import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus } from './status.mjs';
 import { ensureCardData, getStadium } from './rules-state.mjs';
-import { normalizeStage, isRareCandyJump } from './evolution.mjs';
+import { normalizeStage, isRareCandyJump, canEvolve } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
 import { filterSearchMatches, searchPickerAllCandidates } from './search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
@@ -1133,7 +1133,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           break;
         }
         case 'evolveStage2': {
-          const basics = getInPlayPokemon('self').filter((c) => (normalizeStage(c.stage) || 'Basic') === 'Basic');
+          const basics = getInPlayPokemon(_effectOwner).filter((c) => (normalizeStage(c.stage) || 'Basic') === 'Basic');
           if (!basics.length) {
             msg('  no Basic Pokémon in play');
             break;
@@ -1146,7 +1146,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               const options = [];
               for (const c of hand.array) {
                 await ensureCardData(c);
-                if (_isPokemonCard(c) && isRareCandyJump(base, c)) options.push(c);
+                if (_isPokemonCard(c) && isRareCandyJump(base, c)) {
+                  const check = await canEvolve(_effectOwner, base, c, false, { isRareCandy: true });
+                  if (check.allowed) options.push(c);
+                }
               }
               if (!options.length) {
                 msg('  no Stage 2 in hand that evolves from that Basic');
@@ -1156,11 +1159,25 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                 title: `${card.name} — choose Stage 2`,
                 candidates: options,
                 onPick: async (evo) => {
-                  const loc = pokemonZoneEntry('self', base);
+                  const loc = pokemonZoneEntry(_effectOwner, base);
                   const handIdx = hand.array.indexOf(evo);
                   if (!loc || handIdx < 0) return;
-                  await moveCard(_effectOwner, _effectOwner, 'hand', loc.zoneId, handIdx, loc.index);
-                  msg(`  auto: Rare Candy — ${base.name} → ${evo.name}`);
+                  const success = await moveCardBundle(
+                    _effectOwner,
+                    _effectOwner,
+                    'hand',
+                    loc.zoneId,
+                    handIdx,
+                    loc.index,
+                    'move',
+                    true,
+                    { isRareCandy: true }
+                  );
+                  if (success) {
+                    msg(`  auto: Rare Candy — ${base.name} → ${evo.name}`);
+                  } else {
+                    msg(`  ⛔ Rare Candy could not evolve ${base.name}`);
+                  }
                 },
               });
             },

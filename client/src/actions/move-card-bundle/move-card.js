@@ -94,7 +94,7 @@ export const moveCard = async (
   targetIndex,
   options = {}
 ) => {
-  const { forceEvolution = false, syncReplay = false } = options;
+  const { forceEvolution = false, syncReplay = false, isRareCandy = false } = options;
   oZoneId = oZoneId.replace('Cover', '');
   dZoneId = dZoneId.replace('Cover', '');
 
@@ -302,7 +302,7 @@ export const moveCard = async (
       appendMessage(user, `⛔ ${evolveGate.reason}`, 'announcement', false);
       return;
     }
-    const evoCheck = await canEvolve(user, targetCard, movingCard, false);
+    const evoCheck = await canEvolve(user, targetCard, movingCard, false, { isRareCandy });
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
       return { destZoneId, ok: false };
@@ -453,7 +453,8 @@ export const moveCard = async (
     if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
       evolveCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
       if (!syncReplay) {
-        markEvolvedThisTurn(user, targetCard.name);
+        markEvolvedThisTurn(user, targetCard);
+        markEvolvedThisTurn(user, movingCard);
         const evoKey = targetCard.image?.dataset?.cardId || targetCard.name;
         const wasConfused = getStatus(user, evoKey)?.confused;
         clearStatuses(user, evoKey);

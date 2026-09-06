@@ -42,7 +42,7 @@ import {
   combinedToolRetreatCost,
 } from '../../setup/rules/tool-combat.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
-import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
+import { canEvolve, markEvolvedThisTurn, normalizeStage } from '../../setup/rules/evolution.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
@@ -57,6 +57,7 @@ import {
   countBenchPokemon,
   energiesAttachedToPokemon,
   getActivePokemonCard,
+  isBoardPokemon,
 } from '../../setup/zones/active-pokemon.mjs';
 import { openCardPicker } from '../../setup/image-logic/card-picker.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
@@ -242,8 +243,18 @@ function countPokemonInPlay(player, filterFn = null) {
   let total = 0;
   for (const zoneId of ['active', 'bench']) {
     for (const card of getZone(player, zoneId).array) {
-      if (card.type !== 'Pokémon') continue;
+      if (!isBoardPokemon(card)) continue;
       if (!filterFn || filterFn(card)) total++;
+    }
+  }
+  return total;
+}
+
+function countBenchStage2Pokemon(player) {
+  let total = 0;
+  for (const card of getZone(player, 'bench').array) {
+    if (isBoardPokemon(card) && normalizeStage(card?.stage) === 'Stage 2') {
+      total++;
     }
   }
   return total;
@@ -734,6 +745,10 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             ).length,
             ownHandCount: getZone(user, 'hand').getCount(),
             opponentHandCount: getZone(oppPlayer, 'hand').getCount(),
+            ownBenchCount: countBenchPokemon(getZone(user, 'bench')),
+            opponentBenchCount: countBenchPokemon(getZone(oppPlayer, 'bench')),
+            stage2BenchCount: countBenchStage2Pokemon(user),
+            stage2InPlayCount: countPokemonInPlay(user, (c) => normalizeStage(c?.stage) === 'Stage 2'),
             ownPokemonInPlayCount: countPokemonInPlay(user),
             roundAttackCount: countPokemonInPlay(user, hasRoundAttack),
             teamRocketCount: countPokemonInPlay(user, isTeamRocketPokemon),
