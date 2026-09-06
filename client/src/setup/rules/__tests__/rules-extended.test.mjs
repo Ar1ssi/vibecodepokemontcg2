@@ -3333,9 +3333,9 @@ import test from 'node:test';
       const callForFamilyText =
         'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
       const handler = (url) => {
-        if (url.includes('/cards/sv03.5-016')) {
+        if (url.includes('/cards/sv03.5-016-stub-merge')) {
           return detailResponse({
-            id: 'sv03.5-016',
+            id: 'sv03.5-016-stub-merge',
             name: 'Pidgey',
             hp: '50',
             attacks: [
@@ -3352,7 +3352,7 @@ import test from 'node:test';
       };
       await withStubbedFetch(handler, async () => {
         const card = {
-          id: 'sv03.5-016',
+          id: 'sv03.5-016-stub-merge',
           name: 'Pidgey',
           hp: 50,
           weakness: null,

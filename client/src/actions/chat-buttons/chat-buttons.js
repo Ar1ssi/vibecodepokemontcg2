@@ -947,60 +947,6 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           );
         }
 
-        // Move Energy (taxonomy §D move-energy family): move attached Energy
-        // from the active Pokémon to the first benched Pokémon (Wheel Pass).
-        if (moveEnergyClause(atk.text)) {
-          const activeZoneObj = getZone(user, 'active');
-          const activeCard = activeZoneObj.array[0];
-          const benchZoneObj = getZone(user, 'bench');
-          const benchIdx = benchZoneObj.array.findIndex((c) => c.type === 'Pokémon');
-          if (benchIdx === -1) {
-            appendMessage(
-              user,
-              `⚡ ${atk.name}'s energy move fizzles — no Benched Pokémon.`,
-              'announcement',
-              false
-            );
-          } else {
-            const energyIdx = activeZoneObj.array.findIndex(
-              (c) => c.type === 'Energy' && c.image?.relative === activeCard?.image
-            );
-            if (energyIdx === -1) {
-              appendMessage(
-                user,
-                `⚡ ${atk.name}'s energy move fizzles — no Energy attached.`,
-                'announcement',
-                false
-              );
-            } else {
-              const energy = activeZoneObj.array[energyIdx];
-              const benchMon = benchZoneObj.array[benchIdx];
-              moveCard(user, user, 'active', 'bench', energyIdx, benchIdx);
-              appendMessage(
-                user,
-                `⚡ ${atk.name} moves ${energy.name || 'Energy'} to ${benchMon?.name || 'a benched Pokémon'}.`,
-                'announcement',
-                false
-              );
-            }
-          }
-        }
-
-        // Reveal hand (taxonomy §D reveal-hand family): list opponent hand
-        // card names in chat (Silent Wing).
-        if (revealHandClause(atk.text)) {
-          const handCards = getZone(oppPlayer, 'hand').array;
-          const listing = handCards.length
-            ? handCards.map((c) => c.name || 'Unknown').join(', ')
-            : '(empty)';
-          appendMessage(
-            user,
-            `👁 ${atk.name} — opponent reveals hand: ${listing}`,
-            'announcement',
-            false
-          );
-        }
-
         // Switch (taxonomy §D switch family): attack text saying "switch
         // your Active …". Auto-swaps with the first benched Pokémon — the
         // same moveCard pair the switch ability uses (no energy cost); the
@@ -1030,23 +976,24 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
 
-        // Reveal hand (Silent Wing): list opponent hand in chat.
-        if (rulesState.enabled && revealHandClause(atk.text)) {
+        // Reveal hand (taxonomy §D reveal-hand family): list opponent hand
+        // card names in chat (Silent Wing).
+        if (revealHandClause(atk.text)) {
           const oppHand = getZone(oppPlayer, 'hand').array;
           if (oppHand.length === 0) {
             appendMessage(user, '👀 Opponent\'s hand is empty.', 'announcement', false);
           } else {
             appendMessage(
               user,
-              `👀 Opponent reveals: ${oppHand.map((c) => c.name || 'Card').join(', ')}`,
+              `👀 ${atk.name} — opponent reveals hand: ${oppHand.map((c) => c.name || 'Card').join(', ')}`,
               'announcement',
               false
             );
           }
         }
 
-        // Move Energy (Wheel Pass): active → first benched Pokémon.
-        if (rulesState.enabled && moveEnergyClause(atk.text)) {
+        // Move Energy (taxonomy §D move-energy family): active → first benched Pokémon.
+        if (moveEnergyClause(atk.text)) {
           const activeZoneObj = getZone(user, 'active');
           const energies = activeZoneObj.array
             .map((c, idx) => ({ card: c, idx }))
