@@ -31,7 +31,6 @@ import { shouldRequestHashResync } from '../../setup/general/sync-replay.mjs';
 
 let isImporting = false;
 let syncCheckInterval;
-let lastHashResyncAt = 0;
 let spectatorActionInterval;
 let pushActionQueue = Promise.resolve();
 let lastHashResyncKey = null;
