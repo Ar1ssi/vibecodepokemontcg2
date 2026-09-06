@@ -45,6 +45,7 @@ import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import {
+  countBenchPokemon,
   energiesAttachedToPokemon,
   getActivePokemonCard,
 } from '../../setup/zones/active-pokemon.mjs';
@@ -897,7 +898,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             );
             await _takePrizesWithPicker(user, koResult.prizeCount);
             // P4: real promotion — move KO'd active to discard, promote first bench.
-            const benchCount = getZone(oppPlayer, 'bench').getCount();
+            const benchCount = countBenchPokemon(getZone(oppPlayer, 'bench'));
             const plan = planPromotion(true, benchCount);
             if (plan.promote) {
               const oldActiveName = oppActive.name || 'The active Pokémon';
@@ -1159,7 +1160,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 false
               );
               await _takePrizesWithPicker(user, koResult.prizeCount);
-              const benchCount = getZone(oppPlayer, 'bench').getCount();
+              const benchCount = countBenchPokemon(getZone(oppPlayer, 'bench'));
               const plan = planPromotion(true, benchCount);
               if (plan.promote) {
                 const oldActiveName = oppActive.name || 'The active Pokémon';
@@ -2004,7 +2005,7 @@ export const retreat = (user, emit = true) => {
 
     // Must have at least one bench card to retreat to
     const bench = getZone(user, 'bench');
-    if (bench.getCount() === 0) {
+    if (countBenchPokemon(bench) === 0) {
       appendMessage(user, '⛔ No bench Pokémon to retreat to.', 'announcement', false);
       return;
     }
@@ -2201,7 +2202,7 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
   }
 
   const bench = getZone(user, 'bench');
-  if (bench.getCount() === 0) {
+  if (countBenchPokemon(bench) === 0) {
     appendMessage(
       user,
       '⛔ No bench Pokémon to switch with.',
@@ -2707,7 +2708,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   let effectiveMax = maxCount;
 
   if (destZone === 'bench') {
-    const openSlots = 5 - getZone(user, 'bench').getCount();
+    const openSlots = 5 - countBenchPokemon(getZone(user, 'bench'));
     if (openSlots <= 0) {
       appendMessage(
         user,
@@ -3643,7 +3644,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
           const name = String(c.name || '').toLowerCase();
           if (action.typeFilter === 'lightning' && !name.includes('lightning')) continue;
         }
-        if (!canAddToBench(bench.getCount(), limit).allowed) break;
+        if (!canAddToBench(countBenchPokemon(bench), limit).allowed) break;
         moveCardBundle(user, user, 'discard', 'bench', i - moved, false, 'move');
         moved++;
       }
@@ -3677,7 +3678,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       const bench = getZone(user, 'bench');
       const inPlay = [...getZone(user, 'active').array, ...bench.array].filter((c) => c.type === 'Pokémon');
       const limit = getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));
-      if (!canAddToBench(bench.getCount(), limit).allowed) {
+      if (!canAddToBench(countBenchPokemon(bench), limit).allowed) {
         appendMessage(user, '⛔ Bench is full.', 'announcement', false);
         return;
       }

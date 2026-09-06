@@ -40,6 +40,7 @@ import {
   stadiumBlocksStatusApplication,
 } from '../../setup/rules/stadium-effects.mjs';
 import { canAddToBench } from '../../setup/rules/ko-flow.mjs';
+import { countBenchPokemon, isBoardPokemon } from '../../setup/zones/active-pokemon.mjs';
 import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
 import { blocksItemPlay } from '../../setup/rules/ability-executors.mjs';
 import { shouldNitroReturnToHand } from '../../setup/rules/special-energy-effects.mjs';
@@ -48,7 +49,7 @@ import { addDamageCounter } from '../counters/damage-counter.js';
 
 const pokemonInPlay = (user) =>
   [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
-    (c) => c.type === 'Pokémon'
+    isBoardPokemon
   );
 
 const benchLimitFor = (user, extraPokemon = null) => {
@@ -64,8 +65,15 @@ const enforceBenchLimit = async (user) => {
   const bench = getZone(user, 'bench');
   const limit = benchLimitFor(user);
   const { moveCardBundle } = await import('./move-card-bundle.js');
-  while (bench.getCount() > limit) {
-    const idx = bench.getCount() - 1;
+  while (countBenchPokemon(bench) > limit) {
+    let idx = -1;
+    for (let i = bench.array.length - 1; i >= 0; i--) {
+      if (isBoardPokemon(bench.array[i])) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) break;
     const name = bench.array[idx]?.name || 'a Pokémon';
     await moveCardBundle(user, user, 'bench', 'discard', idx, false, 'move');
     appendMessage(
@@ -227,7 +235,7 @@ export const moveCard = async (
   ) {
     const bench = getZone(user, 'bench');
     const limit = benchLimitFor(user, movingCard);
-    const gate = canAddToBench(bench.getCount(), limit);
+    const gate = canAddToBench(countBenchPokemon(bench), limit);
     if (!gate.allowed) {
       appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
       return { destZoneId, ok: false };

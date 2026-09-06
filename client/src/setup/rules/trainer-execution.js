@@ -12,6 +12,7 @@ import { normalizeStage, isRareCandyJump } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
 import { filterSearchMatches, searchPickerAllCandidates } from './search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
+import { countBenchPokemon } from '../zones/active-pokemon.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -1070,7 +1071,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         }
         case 'fossilItem': {
           const bench = zone(_effectOwner, 'bench');
-          if (bench.getCount() >= 8) {
+          if (countBenchPokemon(bench) >= 8) {
             msg('  bench full — play fossil manually');
             break;
           }
