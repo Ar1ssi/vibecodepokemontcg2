@@ -1994,6 +1994,14 @@ import test from 'node:test';
       assert.deepEqual(shuffleDrawClause(undefined), { draw: 0 });
     });
 
+    test('shuffleDrawClause + drawCount: both match shuffle-then-draw text (attack flow skips drawCount)', () => {
+      const text = 'Shuffle your hand into your deck, then draw 7 cards.';
+      assert.deepEqual(shuffleDrawClause(text), { draw: 7 });
+      assert.equal(drawCount(text), 7);
+      // chat-buttons attack(): shuffleAndDraw runs once; drawCount block is
+      // skipped when shuffledHandDraw > 0 or shuffle-hand-into-deck matches.
+    });
+
     // ── §F attach-type family: effective attached type execution ──
     const { canPayAttackCost } = await import('../attack-engine.mjs');
 
@@ -2785,6 +2793,32 @@ import test from 'node:test';
       const p = parseAttackDamage(atk, {}, {}, { damagedBenchCount: 2 });
       assert.equal(p.total, 130); // 30 + 50×2
       assert.ok(p.components.includes('per-each'));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each damage counter on this Pokémon (Retribution Strike)', () => {
+      const atk = {
+        name: 'Retribution Strike', damage: 20,
+        text: 'This attack does 10 more damage for each damage counter on this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { attackerDamage: 3 });
+      assert.equal(p.total, 50); // 20 + 10×3
+      assert.ok(p.components.includes('per-each'));
+      assert.ok(p.notes.some((n) => /damage counter.*on this/i.test(n)));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each damage counter on opponent Active (Damage Beat)', () => {
+      const atk = {
+        name: 'Damage Beat', damage: 20,
+        text: 'This attack does 20 damage for each damage counter on your opponent\u2019s Active Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { defenderDamage: 4 });
+      assert.equal(p.total, 80); // 20 × 4
+      assert.ok(p.components.includes('per-each'));
+      assert.ok(p.notes.some((n) => /opponent's Active/i.test(n)));
       const p2 = parseAttackDamage(atk, {}, {}, {});
       assert.equal(p2.resolved, false);
     });

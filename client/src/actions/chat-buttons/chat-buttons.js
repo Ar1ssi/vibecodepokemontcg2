@@ -324,9 +324,11 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // (e.g. Dunsparce's Coil Dance / Iono's signature). The whole hand
         // goes to the deck, it is shuffled, and N cards are drawn. Never
         // fails (an empty deck just yields fewer cards), so no fizzle gate.
+        let shuffledHandDraw = 0;
         if (rulesState.enabled) {
           const shuf = shuffleDrawClause(atk.text);
           if (shuf.draw > 0) {
+            shuffledHandDraw = shuf.draw;
             shuffleAndDraw(user, user, shuf.draw, undefined, false);
           }
         }
@@ -414,6 +416,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           // pass the defender's current damage-counter count when it is in the
           // DOM; leave undefined otherwise so the parser keeps it honestly unresolved.
           const defenderDmgEl = oppActive?.image?.damageCounter;
+          const attackerDmgEl = active?.image?.damageCounter;
           parsed = parseAttackDamage(atk, active, oppActive, {
             energyCount: attachedEnergies.length,
             energyDiscarded,
@@ -423,6 +426,9 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             defenderHp: oppActive?.hp ?? 0,
             defenderDamage: defenderDmgEl
               ? parseInt(defenderDmgEl.textContent || '0', 10) || 0
+              : undefined,
+            attackerDamage: attackerDmgEl
+              ? parseInt(attackerDmgEl.textContent || '0', 10) || 0
               : undefined,
             coin,
           });
@@ -812,9 +818,14 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // Draw (taxonomy §D draw family): attack text saying "draw N card(s)".
         // Draws from your own deck (capped at what's left; fizzle announced
         // if empty). The shared draw action already handles the message and
-        // multiplayer emission.
+        // multiplayer emission. Skip when shuffle-hand-then-draw already ran —
+        // drawCount also matches the trailing "draw N" in that clause.
+        const shuffleHandDrawText =
+          /shuffle\s+(?:your\s+)?hand\s+into\s+(?:your\s+|the\s+)?deck/i.test(
+            String(atk.text || '')
+          );
         const drawN = drawCount(atk.text);
-        if (drawN > 0) {
+        if (drawN > 0 && shuffledHandDraw === 0 && !shuffleHandDrawText) {
           const deckLeft = getZone(user, 'deck').getCount();
           const actual = Math.min(drawN, deckLeft);
           if (actual === 0) {
