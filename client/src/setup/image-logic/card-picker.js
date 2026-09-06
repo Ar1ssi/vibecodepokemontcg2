@@ -455,7 +455,7 @@ const setCandidateList = (state, candidates) => {
 
 const isSwipeBlockedTarget = (target) =>
   target.closest(
-    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-top-bar, button, a'
+    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-bottom-bar, button, a'
   );
 
 const attachSwipe = (state) => {
@@ -506,8 +506,11 @@ const attachSwipe = (state) => {
         const cardNode =
           slide?.querySelector('.discard-pile-card, .mat-holo') ?? slide;
         if (cardNode) {
+          const rect = cardNode.getBoundingClientRect();
           ghost = cardNode.cloneNode(true);
           ghost.classList.add('card-picker-drag-ghost');
+          ghost.style.width = `${rect.width}px`;
+          ghost.style.height = `${rect.height}px`;
           document.body.appendChild(ghost);
         }
       } else if (Math.abs(dx) > Math.abs(dy) * 1.1) {
@@ -700,7 +703,7 @@ export const openCardPicker = async ({
   let triggerSlot = null;
   let dropSlot = null;
   let slotStack = null;
-  let topBar = null;
+  let bottomBar = null;
   let actionBar = null;
   let meta = null;
 
@@ -719,38 +722,38 @@ export const openCardPicker = async ({
 
     overlay.append(filters, main, meta, actionBar);
   } else {
-    topBar = document.createElement('div');
-    topBar.className = 'card-picker-top-bar';
-    topBar.append(instructionEl, doneBtn);
-
     main = document.createElement('div');
     main.className = 'card-picker-workspace';
 
-    const row = document.createElement('div');
-    row.className = 'card-picker-row';
+    const scene = document.createElement('div');
+    scene.className = 'card-picker-scene';
 
     const carouselCol = document.createElement('div');
     carouselCol.className = 'card-picker-carousel-col';
     carouselCol.appendChild(stage);
-
-    triggerSlot = document.createElement('div');
-    triggerSlot.className = 'card-picker-trigger-slot';
-
-    row.append(carouselCol, triggerSlot);
-    main.appendChild(row);
 
     dropSlot = document.createElement('div');
     dropSlot.className = 'card-picker-drop-slot';
     slotStack = document.createElement('div');
     slotStack.className = 'card-picker-slot-stack';
     dropSlot.appendChild(slotStack);
-    main.appendChild(dropSlot);
+
+    triggerSlot = document.createElement('div');
+    triggerSlot.className = 'card-picker-trigger-slot';
+
+    scene.append(carouselCol, dropSlot, triggerSlot);
+    main.appendChild(scene);
 
     meta = document.createElement('div');
     meta.className = 'card-picker-meta card-picker-meta--choose';
     meta.append(countEl, nameEl);
+    main.appendChild(meta);
 
-    overlay.append(filters, topBar, main, meta);
+    bottomBar = document.createElement('div');
+    bottomBar.className = 'card-picker-bottom-bar';
+    bottomBar.append(instructionEl, doneBtn);
+
+    overlay.append(filters, main, bottomBar);
   }
 
   document.body.appendChild(overlay);

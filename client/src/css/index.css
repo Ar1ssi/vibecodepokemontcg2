@@ -1964,16 +1964,20 @@ ul, li {
   height: min(68vh, calc(min(72vw, 380px) * 1.397));
 }
 
-/* Choose mode — smaller carousel + full-size trigger + drop slot */
+/* Choose mode — carousel + drop slot + trigger in one row */
 .card-picker-choose {
-  justify-content: flex-start;
+  --card-picker-card-w: min(38vw, 220px);
+  --card-picker-card-h: min(52vh, calc(var(--card-picker-card-w) * 1.397));
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
 }
-.card-picker-choose .card-picker-top-bar {
+.card-picker-choose .card-picker-bottom-bar {
   position: relative;
   z-index: 420;
   flex: 0 0 auto;
   width: min(94vw, 860px);
-  margin: 0.65rem auto 0;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -2007,40 +2011,40 @@ ul, li {
   cursor: not-allowed;
 }
 .card-picker-choose .card-picker-workspace {
-  position: relative;
-  flex: 1;
+  flex: 0 1 auto;
   width: 100%;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  padding-top: 0.5rem;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 0;
+  padding: 0 0.5rem;
 }
-.card-picker-choose .card-picker-row {
-  position: relative;
-  z-index: 300;
+.card-picker-choose .card-picker-scene {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 1rem;
+  gap: clamp(0.65rem, 2.5vw, 1.35rem);
   width: 100%;
-  max-width: min(94vw, 720px);
-  margin-left: -7vw;
-  margin-top: 0.25rem;
-  transform: translateY(-0.5rem);
+  max-width: min(96vw, 820px);
 }
 .card-picker-choose .card-picker-carousel-col {
   flex: 0 0 auto;
 }
+.card-picker-choose .card-picker-stage {
+  flex: 0 0 auto;
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
+}
 .card-picker-choose .card-picker-stack {
-  width: min(40vw, 235px);
-  height: min(52vh, calc(min(40vw, 235px) * 1.397));
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
 }
 .card-picker-choose .card-picker-trigger-slot {
   flex: 0 0 auto;
-  width: min(40vw, 235px);
-  height: min(52vh, calc(min(40vw, 235px) * 1.397));
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2068,25 +2072,22 @@ ul, li {
 .card-picker-choose .card-picker-trigger-slot:empty {
   display: none;
 }
-.card-picker-drop-slot {
-  position: absolute;
-  left: 50%;
-  top: 54%;
-  transform: translate(-50%, -50%);
-  z-index: 340;
-  width: min(40vw, 235px);
-  aspect-ratio: var(--card-aspect);
-  border: 2px solid rgba(210, 210, 210, 0.65);
-  background: rgba(110, 110, 110, 0.38);
+.card-picker-choose .card-picker-drop-slot {
+  flex: 0 0 auto;
+  position: relative;
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
+  border: 2px solid rgba(210, 210, 210, 0.75);
+  background: rgba(110, 110, 110, 0.45);
   border-radius: 0.35rem;
   pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
-.card-picker-drop-slot.has-cards {
-  background: rgba(90, 90, 90, 0.28);
+.card-picker-choose .card-picker-drop-slot.has-cards {
+  background: rgba(90, 90, 90, 0.35);
 }
 .card-picker-slot-stack {
   position: absolute;
@@ -2115,26 +2116,26 @@ ul, li {
 .card-picker-drag-ghost {
   position: fixed;
   z-index: 5000;
-  width: min(36vw, 210px);
-  aspect-ratio: var(--card-aspect);
   pointer-events: none;
   transform: translate(-50%, -50%);
   opacity: 0.92;
   border-radius: 0.35rem;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
 }
-.card-picker-drag-ghost img {
+.card-picker-drag-ghost img,
+.card-picker-drag-ghost .mat-holo.discard-pile-holo,
+.card-picker-drag-ghost .card__translater,
+.card-picker-drag-ghost .card__rotator {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 0.35rem;
 }
 .card-picker-meta--choose {
-  position: absolute;
-  bottom: max(0.75rem, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 360;
+  position: static;
+  transform: none;
   display: flex;
   flex-direction: column;
   align-items: center;
