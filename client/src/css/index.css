@@ -1966,12 +1966,10 @@ ul, li {
 
 /* Choose mode — carousel row, meta, drop slot below */
 .card-picker-choose {
-  --card-picker-card-w: min(38vw, 220px);
-  --card-picker-card-h: min(52vh, calc(var(--card-picker-card-w) * 1.397));
+  --card-picker-card-w: min(34vw, 200px);
+  --card-picker-card-h: calc(var(--card-picker-card-w) * 1.397);
   --card-picker-slot-gap: 6px;
   --card-picker-slot-pad: 8px;
-  --card-picker-slot-card-w: min(32vw, 185px);
-  --card-picker-slot-card-h: calc(var(--card-picker-slot-card-w) * 1.397);
   justify-content: center;
   gap: 0.85rem;
   padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
@@ -2033,7 +2031,7 @@ ul, li {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.65rem;
   width: 100%;
   max-width: min(96vw, 820px);
 }
@@ -2043,6 +2041,7 @@ ul, li {
   justify-content: center;
   gap: clamp(0.65rem, 2.5vw, 1.35rem);
   width: 100%;
+  margin-bottom: 0.15rem;
 }
 .card-picker-choose .card-picker-carousel-col {
   flex: 0 0 auto;
@@ -2060,7 +2059,7 @@ ul, li {
   flex: 0 0 auto;
   width: var(--card-picker-card-w);
   height: var(--card-picker-card-h);
-  margin-left: 12px;
+  margin-left: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2091,12 +2090,6 @@ ul, li {
 .card-picker-choose .card-picker-drop-slot {
   flex: 0 0 auto;
   position: relative;
-  width: calc(
-    var(--card-picker-slot-count, 1) * var(--card-picker-slot-card-w) +
-      (var(--card-picker-slot-count, 1) - 1) * var(--card-picker-slot-gap) +
-      2 * var(--card-picker-slot-pad)
-  );
-  height: calc(var(--card-picker-slot-card-h) + 2 * var(--card-picker-slot-pad));
   border: 2px solid rgba(210, 210, 210, 0.75);
   background: rgba(110, 110, 110, 0.45);
   border-radius: 0.35rem;
@@ -2105,6 +2098,7 @@ ul, li {
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  margin-top: 0.15rem;
 }
 .card-picker-choose .card-picker-drop-slot.has-cards {
   background: rgba(90, 90, 90, 0.35);
@@ -2122,8 +2116,8 @@ ul, li {
 }
 .card-picker-slot-card {
   flex: 0 0 auto;
-  width: var(--card-picker-slot-card-w);
-  height: var(--card-picker-slot-card-h);
+  width: var(--card-picker-slot-card-w, 164px);
+  height: var(--card-picker-slot-card-h, 229px);
   aspect-ratio: var(--card-aspect);
   border-radius: 0.25rem;
   overflow: hidden;
@@ -2166,15 +2160,14 @@ ul, li {
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  margin: 0.1rem 0 0.25rem;
+  margin: 0.25rem 0 0.35rem;
+  min-height: 2.35rem;
   color: rgba(255, 255, 255, 0.9);
   pointer-events: none;
   text-align: center;
 }
 .card-picker-workspace.has-trigger .card-picker-meta--choose {
-  transform: translateX(
-    calc(-0.5 * (var(--card-picker-card-w) + 12px + 0.85rem))
-  );
+  transform: translateX(calc(-0.5 * (var(--card-picker-card-w) + 14px + 0.85rem)));
 }
 .card-picker-meta--choose .discard-pile-count {
   font-size: 0.9rem;

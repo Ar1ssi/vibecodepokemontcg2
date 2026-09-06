@@ -214,8 +214,24 @@ const updateSelectionUI = (state) => {
   renderSlotCards(state);
 };
 
+const syncDropSlotLayout = (state) => {
+  if (!state.dropSlot || !state.stack) return;
+  const slotCount = Math.max(1, state.maxCount || 1);
+  const gap = 6;
+  const pad = 8;
+  const cardW = Math.max(120, Math.round(state.stack.clientWidth * 0.82) || 185);
+  const cardH = Math.round(cardW * 1.397);
+  state.dropSlot.style.setProperty('--card-picker-slot-card-w', `${cardW}px`);
+  state.dropSlot.style.setProperty('--card-picker-slot-card-h', `${cardH}px`);
+  state.dropSlot.style.setProperty('--card-picker-slot-gap', `${gap}px`);
+  state.dropSlot.style.setProperty('--card-picker-slot-count', String(slotCount));
+  state.dropSlot.style.width = `${slotCount * cardW + (slotCount - 1) * gap + 2 * pad}px`;
+  state.dropSlot.style.height = `${cardH + 2 * pad}px`;
+};
+
 const renderSlotCards = (state) => {
   if (!state.slotStack) return;
+  syncDropSlotLayout(state);
   state.slotStack.replaceChildren();
   const slotCount = Math.max(1, state.maxCount || 1);
   const cardsInSlot = state.multiSelect
@@ -223,11 +239,6 @@ const renderSlotCards = (state) => {
     : state.slotCard
       ? [state.slotCard]
       : [];
-
-  state.dropSlot?.style.setProperty(
-    '--card-picker-slot-count',
-    String(slotCount)
-  );
 
   for (let i = 0; i < slotCount; i += 1) {
     const card = cardsInSlot[i];
@@ -461,6 +472,7 @@ const setCandidateList = (state, candidates) => {
   ).then(() => {
     if (pickerState === state) {
       goToIndex(state, clampIndex(state.index, candidates.length - 1));
+      if (state.dropSlot) renderSlotCards(state);
     }
   });
 };

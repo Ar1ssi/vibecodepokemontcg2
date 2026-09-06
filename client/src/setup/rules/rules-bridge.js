@@ -1808,12 +1808,14 @@ if (!isTrainer) {
     };
 
     const hookTrainerPlay = () => {
+      // Guided trainer/auto-execution runs even when rules enforcement is off
+      // (easier solo testing). Turn gating still applies when rules are on.
       // Instant path: react the same tick a card lands on 'board'.
       document.addEventListener('rules-card-on-board', (event) => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
+        if (rulesState.phase === 'ended') return;
         const { user, card } = event.detail || {};
         if (user !== 'self' || !card) return;
+        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         processBoardCard(card);
       });
 
@@ -1887,8 +1889,8 @@ if (!isTrainer) {
       // the event above — same logic, just on a slow poll so it's never
       // the thing the player is waiting on.
       window.setInterval(() => {
-        if (!rulesState.enabled || rulesState.phase === 'ended') return;
-        if (rulesState.turnPlayer !== 'self') return;
+        if (rulesState.phase === 'ended') return;
+        if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         try {
           const board = getZone('self', 'board');
           if (!board?.array) return;
