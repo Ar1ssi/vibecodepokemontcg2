@@ -33,3 +33,14 @@ export function energiesAttachedToPokemon(zone, hostImage) {
     (c) => c.type === 'Energy' && c.image?.relative === hostImage
   );
 }
+
+/** Top-level Pokémon in a zone (excludes attached cards and evolution bases). */
+export function isBoardPokemon(card) {
+  return (card?.type2 || card?.type) === 'Pokémon' && !card?.image?.attached;
+}
+
+/** Count benched Pokémon — attached Energy/Tools must not inflate the bench limit. */
+export function countBenchPokemon(zone) {
+  if (!zone?.array) return 0;
+  return zone.array.filter(isBoardPokemon).length;
+}
