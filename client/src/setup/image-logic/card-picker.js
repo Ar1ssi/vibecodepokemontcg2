@@ -12,7 +12,7 @@ import { closeCardPreview } from './full-view.js';
 let pickerState = null;
 
 const PEEK_PERCENT = 24;
-const SWIPE_THRESHOLD = 44;
+const SWIPE_THRESHOLD = 18;
 const SWIPE_LOCK_PX = 10;
 const SCREEN_EDGE_MARGIN = 32;
 const DRAG_CARD_SCALE = 1.65;
@@ -92,7 +92,11 @@ const resolveSwipeIndex = (state, dragPx) => {
     peekPx,
     state.slides.length
   );
+  const progress = virtual - state.index;
   let next = Math.round(virtual);
+  if (next === state.index && Math.abs(progress) >= 0.18) {
+    next = state.index + Math.sign(progress);
+  }
   if (next === state.index && Math.abs(dragPx) >= SWIPE_THRESHOLD) {
     next = state.index + (dragPx > 0 ? -1 : 1);
   }
@@ -377,12 +381,12 @@ const syncDropSlotLayout = (state) => {
   syncChooseLayout(state);
   const slotCount = state.slotElements.length;
   const gap = 6;
-  const minSlotW = 84;
+  const minSlotW = 52;
   const playmat = getPlaymatBounds();
-  const maxRowW = Math.min(playmat.width * 0.92, 860);
+  const maxRowW = Math.min(playmat.width * 0.88, 720);
   const preferredW = Math.max(
     minSlotW,
-    Math.round(state.stack.clientWidth * 0.94) || 160
+    Math.round((state.stack.clientWidth || 160) * 0.58)
   );
   let slotW = preferredW;
   const totalNeeded = slotCount * slotW + (slotCount - 1) * gap;
@@ -862,9 +866,7 @@ const attachSwipe = (state) => {
 
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
-    const horizontal = wasDragging && Math.abs(dx) >= SWIPE_THRESHOLD;
-
-    if (horizontal) {
+    if (wasDragging && Math.abs(dx) >= SWIPE_LOCK_PX) {
       goToIndex(state, resolveSwipeIndex(state, dx));
     } else if (!wasDragging && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
