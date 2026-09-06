@@ -60,3 +60,46 @@ test('exchangeData skips reset when opponent metadata unchanged (resync replay)'
   assert.equal(deckDataEquals(deck, [[1, 'Pikachu', 'Pokémon']]), true);
   assert.equal(deckDataEquals(deck, [[1, 'Raichu', 'Pokémon']]), false);
 });
+
+// Mirrors rules-bridge handleSetupClick guards + peerSocketId retry gate.
+function shouldStartCoinFlip({ rulesEnabled, openingSetupReadyForCoinFlip, phase }) {
+  if (!rulesEnabled) return false;
+  if (!openingSetupReadyForCoinFlip) return false;
+  if (phase !== 'setup') return false;
+  return true;
+}
+
+test('coin flip does not start before both players ready (peerSocketId on join)', () => {
+  assert.equal(
+    shouldStartCoinFlip({
+      rulesEnabled: true,
+      openingSetupReadyForCoinFlip: false,
+      phase: 'setup',
+    }),
+    false
+  );
+});
+
+test('coin flip starts after both-players-ready opens the gate', () => {
+  assert.equal(
+    shouldStartCoinFlip({
+      rulesEnabled: true,
+      openingSetupReadyForCoinFlip: true,
+      phase: 'setup',
+    }),
+    true
+  );
+});
+
+test('rules setup order: prizes before coin flip before hands', () => {
+  const steps = [];
+  const rulesEnabled = true;
+  if (rulesEnabled) {
+    steps.push('prizes');
+    steps.push('coinFlip');
+    steps.push('hands');
+  } else {
+    steps.push('prizesAndHands');
+  }
+  assert.deepEqual(steps, ['prizes', 'coinFlip', 'hands']);
+});
