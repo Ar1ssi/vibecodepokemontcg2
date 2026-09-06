@@ -2213,6 +2213,15 @@ import test from 'node:test';
         },
       };
       assert.equal(classifyAbility(voraciousness), 'recursion');
+
+      const pecharunt = {
+        name: 'Pecharunt ex',
+        ability: {
+          name: 'Subjugating Chains',
+          text: "Once during your turn, you may switch 1 of your Benched {D} Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon is now Poisoned. You can't use more than 1 Subjugating Chains Ability each turn.",
+        },
+      };
+      assert.equal(classifyAbility(pecharunt), 'switch');
     });
 
     // ── §D heal family (execute: remove up to N counters) ──
@@ -3289,6 +3298,41 @@ import test from 'node:test';
       const p = parseAttackDamage(atk, {}, {}, {});
       assert.equal(p.resolved, false);
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    test('parseAbility: Pecharunt ex Subjugating Chains (bench↔active switch + conditional Poison)', () => {
+      const text =
+        "Once during your turn, you may switch 1 of your Benched {D} Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon is now Poisoned. You can't use more than 1 Subjugating Chains Ability each turn.";
+      const steps = parseAbility(text);
+      assert.equal(steps.length, 1);
+      assert.equal(steps[0].type, 'switchAbility');
+      assert.equal(steps[0].pokemonType, 'darkness');
+      assert.equal(steps[0].exceptName, 'pecharunt ex');
+      assert.equal(steps[0].poisonNewActive, true);
+    });
+
+    test('parseSwitchAbility: Pecharunt ex filters and poison flag', async () => {
+      const { parseSwitchAbility } = await import('../ability-executors.mjs');
+      const parsed = parseSwitchAbility({
+        ability: {
+          text: "Once during your turn, you may switch 1 of your Benched {D} Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon is now Poisoned.",
+        },
+      });
+      assert.equal(parsed.benchToActive, true);
+      assert.equal(parsed.pokemonType, 'darkness');
+      assert.equal(parsed.exceptName, 'pecharunt ex');
+      assert.equal(parsed.poisonNewActive, true);
+    });
+
+    test('planAbilitySteps: Pecharunt ex switch is actionable interactively', async () => {
+      const { planAbilitySteps, actionableAbilityPlan } = await import('../ability-step-plan.mjs');
+      const text =
+        "Once during your turn, you may switch 1 of your Benched {D} Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon is now Poisoned. You can't use more than 1 Subjugating Chains Ability each turn.";
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(plan.map((p) => p.action), ['executor']);
+      assert.equal(plan[0].executor, 'switch');
+      assert.equal(actionableAbilityPlan(plan, { mode: 'interactive' }).length, 1);
     });
 
     test('parseAbility: recursionFromDiscardAbility (Snorlax Voraciousness)', () => {

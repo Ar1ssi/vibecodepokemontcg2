@@ -453,6 +453,42 @@ export function parseOnOpponentEvolve(card) {
   return { count: parseNumber(m) };
 }
 
+// Bench ↔ Active switch (Pecharunt ex Subjugating Chains, …)
+export function parseSwitchAbility(card) {
+  const out = {
+    benchToActive: false,
+    pokemonType: null,
+    exceptName: null,
+    poisonNewActive: false,
+    target: 'self',
+  };
+  const t = textOf(card);
+  if (!t) return out;
+
+  const benchActiveSwitch =
+    t.includes('switch') &&
+    (t.includes('benched') || t.includes('bench')) &&
+    t.includes('active');
+  if (!benchActiveSwitch) return out;
+  out.benchToActive = true;
+
+  const typed = t.match(/benched\s+\{([a-z])\}\s+pok/);
+  if (typed) {
+    const map = {
+      w: 'water', r: 'fire', g: 'grass', l: 'lightning', p: 'psychic',
+      f: 'fighting', d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy', c: 'colorless',
+    };
+    out.pokemonType = map[typed[1]] || null;
+  }
+
+  out.exceptName = t.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null;
+  out.poisonNewActive =
+    t.includes('if you do') &&
+    (t.includes('now poisoned') || t.includes('is now poisoned'));
+  if (t.includes("opponent's benched")) out.target = 'opponent';
+  return out;
+}
+
 // Special Condition infliction
 export function parseStatusInflict(card) {
   const out = { status: null, target: 'attacker' };
