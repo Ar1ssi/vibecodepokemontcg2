@@ -42,6 +42,10 @@ import { loadLastSession, saveLastSession } from '../../../setup/deck-builder/co
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
 import { updateReadyButtons } from '../../../actions/general/ready.js';
+import {
+  LEGACY_DEFAULT_CARD_BACK_SRC,
+  resolveDefaultCardBackSrc,
+} from '../../../setup/deck-constructor/default-card-back.mjs';
     
     import {
       buildHoloCard,
@@ -158,7 +162,7 @@ export const initializeNativeDeckBuilder = () => {
           const deck = activeId && lib?.decks?.[activeId];
           const sleeveId = deck?.sleeveId;
           const sleeve = sleeveId ? getSleeves().find((s) => s.id === sleeveId) : null;
-          const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
+          const fallback = resolveDefaultCardBackSrc();
           const image = sleeve?.image || fallback;
           import('../../../setup/deck-constructor/import.js').then(({ changeCardBack }) => {
             changeCardBack(currentLoadTarget, image, false);
@@ -404,12 +408,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // is immediately visible.
           const applySleeveToPlaymat = (image, target = 'self') => {
             try {
-              const fallback = 'https://ptcgsim.online/src/assets/cardback.png';
+              const fallback = resolveDefaultCardBackSrc();
               // when no sleeve is set for this deck, fall back to whatever
               // this player's own card back already is — never borrow the
               // default and never touch the other player's playmat
               const resolvedTarget = image || getCardBackForTarget(target) || fallback;
-              const knownBacks = [systemState.cardBackSrc, systemState.p1OppCardBackSrc, systemState.p2OppCardBackSrc, fallback];
+              const knownBacks = [
+                systemState.cardBackSrc,
+                systemState.p1OppCardBackSrc,
+                systemState.p2OppCardBackSrc,
+                fallback,
+                LEGACY_DEFAULT_CARD_BACK_SRC,
+              ];
               const containerId = target === 'opp' ? 'oppContainer' : 'selfContainer';
               const doc = document.getElementById(containerId)?.contentWindow?.document;
               if (!doc) return;

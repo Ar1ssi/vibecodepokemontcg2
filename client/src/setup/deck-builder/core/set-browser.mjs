@@ -658,18 +658,18 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       "qty": 2
     },
     {
-      "id": "g1-81",
-      "name": "Darkness Energy",
+      "id": "sve-007",
+      "name": "Basic Darkness Energy",
       "supertype": "Energy",
-      "localId": "81",
-      "image": "https://assets.tcgdex.net/en/xy/g1/81/high.webp",
+      "localId": "007",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/81/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/81/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_007_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 13
@@ -1085,18 +1085,18 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       "qty": 2
     },
     {
-      "id": "g1-79",
-      "name": "Psychic Energy",
+      "id": "sve-005",
+      "name": "Basic Psychic Energy",
       "supertype": "Energy",
-      "localId": "79",
-      "image": "https://assets.tcgdex.net/en/xy/g1/79/high.webp",
+      "localId": "005",
+      "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_005_R_EN.png",
       "images": {
-        "small": "https://assets.tcgdex.net/en/xy/g1/79/low.webp",
-        "large": "https://assets.tcgdex.net/en/xy/g1/79/high.webp"
+        "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_005_R_EN.png",
+        "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/SVE/SVE_005_R_EN.png"
       },
       "set": {
-        "id": "g1",
-        "name": "Generations",
+        "id": "sve",
+        "name": "Scarlet & Violet Energy",
         "releaseDate": ""
       },
       "qty": 14
@@ -1105,13 +1105,51 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 };
 
 export const STARTER_DECK_CATALOG = [
-  { key: 'gengar', name: 'Mega Gengar ex Battle Deck' },
-  { key: 'diancie', name: 'Mega Diancie ex Battle Deck' },
-  { key: 'lucario', name: 'Mega Lucario ex Starter Deck' },
-  { key: 'charizard', name: 'Mega Charizard X ex Starter Deck' },
-  { key: 'darkrai', name: 'Mega Darkrai ex Starter Deck' },
-  { key: 'dragonite', name: 'Mega Dragonite ex Starter Deck' },
-  { key: 'greninja', name: 'Mega Greninja ex Starter Deck' },
+  {
+    key: 'gengar',
+    name: 'Mega Gengar ex Battle Deck',
+    sleeveId: 'd92570dc-bbd5-43a4-b7d6-9094993ba975',
+    coinId: 'MBG_Purple_Mega_Gengar_Coin',
+  },
+  {
+    key: 'diancie',
+    name: 'Mega Diancie ex Battle Deck',
+    // No Mega Diancie sleeve in catalog — closest Mega Evolution fairy ETB art.
+    sleeveId: '00b68849-fd1f-4908-a8d8-b44ac392e455',
+    coinId: 'MBD_Magenta_Mega_Diancie_Coin',
+  },
+  {
+    key: 'lucario',
+    name: 'Mega Lucario ex Starter Deck',
+    sleeveId: '5341801a-a512-4842-ae15-bd8ce8748f8d',
+    coinId: 'MEGETB_Blue_Mega_Lucario_Coin',
+  },
+  {
+    key: 'charizard',
+    name: 'Mega Charizard X ex Starter Deck',
+    sleeveId: '5f123df1-82c9-4fae-998c-9e5ce1d7eb9a',
+    coinId: 'PFLETB_Mega_Charizard_X_Coin',
+  },
+  {
+    key: 'darkrai',
+    name: 'Mega Darkrai ex Starter Deck',
+    sleeveId: '52a78878-0457-4619-bc4a-6cba7853998e',
+    // No solo Mega Darkrai coin — best available features Darkrai prominently.
+    coinId: 'TCGBA_Gold_Pikachu_Darkrai_Armarouge_Coin',
+  },
+  {
+    key: 'dragonite',
+    name: 'Mega Dragonite ex Starter Deck',
+    sleeveId: '86456fdb-d9b2-4990-94c6-5ac3657b8260',
+    coinId: 'ASCETB_Yellow_Mega_Dragonite_Coin',
+  },
+  {
+    key: 'greninja',
+    name: 'Mega Greninja ex Starter Deck',
+    sleeveId: 'b4952582-3bc4-4bb8-87f6-07dd88f771ff',
+    // No Mega Greninja coin — normal Greninja variant.
+    coinId: 'M4_Blue_Greninja_Coin',
+  },
 ];
 
 export function getStarterDecks() {

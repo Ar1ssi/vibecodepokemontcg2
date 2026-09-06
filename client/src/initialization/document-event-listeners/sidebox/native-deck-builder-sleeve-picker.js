@@ -2,6 +2,7 @@ import {
       filterSleevesByName,
       getSleeves,
     } from '../../../setup/deck-builder/core/sleeves.mjs';
+    import { DEFAULT_CARD_BACK_PATH } from '../../../setup/deck-constructor/default-card-back.mjs';
     
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -52,7 +53,13 @@ import {
       const renderPreview = () => {
         const sleeve = sleeves.find((s) => s.id === selectedId) || null;
         if (!sleeve) {
-          previewEl.innerHTML = '<span class="native-deck-builder-sleeve-preview-none">No sleeve selected — cards will use the default card back.</span>';
+          previewEl.innerHTML = [
+            `<img class="native-deck-builder-sleeve-preview-image" src="${DEFAULT_CARD_BACK_PATH}" alt="Classic Pokémon card back" />`,
+            `<div class="native-deck-builder-sleeve-preview-text">`,
+            `  <strong>Classic Pokémon card back</strong>`,
+            `  <span>Default sleeve — used when no custom sleeve is selected</span>`,
+            `</div>`,
+          ].join('');
           return;
         }
         previewEl.innerHTML = [
@@ -66,26 +73,32 @@ import {
     
       const renderGallery = () => {
         const visible = filterSleevesByName(sleeves, filterTerm);
-        if (visible.length === 0) {
-          galleryEl.innerHTML = '<div class="native-deck-builder-sleeve-empty">No sleeves match your filter.</div>';
-          return;
-        }
-    
-        galleryEl.innerHTML = visible
-          .map((sleeve) => {
-            const isSelected = sleeve.id === selectedId;
-            return [
-              `<button class="native-deck-builder-sleeve-thumb${isSelected ? ' selected' : ''}" data-sleeve-id="${escapeHtml(sleeve.id)}" title="${escapeHtml(sleeve.name || 'Sleeve')}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
-              `  <img src="${escapeHtml(sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
-              `</button>`,
-            ].join('');
-          })
-          .join('');
+        const defaultSelected = !selectedId;
+        const defaultThumb = [
+          `<button class="native-deck-builder-sleeve-thumb${defaultSelected ? ' selected' : ''}" data-sleeve-id="" title="Classic Pokémon card back" aria-pressed="${defaultSelected ? 'true' : 'false'}">`,
+          `  <img src="${DEFAULT_CARD_BACK_PATH}" alt="Classic Pokémon card back" />`,
+          `</button>`,
+        ].join('');
+
+        const catalogHtml = visible.length === 0
+          ? '<div class="native-deck-builder-sleeve-empty">No sleeves match your filter.</div>'
+          : visible
+            .map((sleeve) => {
+              const isSelected = sleeve.id === selectedId;
+              return [
+                `<button class="native-deck-builder-sleeve-thumb${isSelected ? ' selected' : ''}" data-sleeve-id="${escapeHtml(sleeve.id)}" title="${escapeHtml(sleeve.name || 'Sleeve')}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
+                `  <img src="${escapeHtml(sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
+                `</button>`,
+              ].join('');
+            })
+            .join('');
+
+        galleryEl.innerHTML = defaultThumb + catalogHtml;
     
         galleryEl.querySelectorAll('[data-sleeve-id]').forEach((button) => {
           button.addEventListener('click', () => {
-            const id = button.dataset.sleeveId;
-            selectedId = selectedId === id ? null : id;
+            const id = button.dataset.sleeveId || null;
+            selectedId = id && selectedId === id ? null : id;
             renderPreview();
             renderGallery();
             const sleeve = sleeves.find((s) => s.id === selectedId) || null;

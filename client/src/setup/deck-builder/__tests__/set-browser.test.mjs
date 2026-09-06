@@ -4,9 +4,12 @@ import test from 'node:test';
     import {
       getLegalSetRegistry,
       getStarterDecks,
+      STARTER_DECK_CATALOG,
       filterCardsByName,
       sortCardsWithinGroup,
     } from '../core/set-browser.mjs';
+    import { getSleeves } from '../core/sleeves.mjs';
+    import { getCoins } from '../core/coins.mjs';
     
     test('legal registry contains the 21 Standard 2026-27 sets', () => {
       const registry = getLegalSetRegistry();
@@ -69,12 +72,21 @@ import test from 'node:test';
         assert.ok(card.supertype, `missing supertype for ${card.name}`);
       }
     
-      // energies resolved to real printings with images
+      // energies use modern SVE printings
       const gengar = decks.gengar;
-      const darkness = gengar.find((c) => c.name === 'Darkness Energy');
-      assert.ok(darkness, 'Gengar deck missing Darkness Energy');
+      const darkness = gengar.find((c) => c.name === 'Basic Darkness Energy');
+      assert.ok(darkness, 'Gengar deck missing Basic Darkness Energy');
       assert.equal(darkness.qty, 13);
-      assert.ok(darkness.image.includes('assets.tcgdex.net'));
+      assert.ok(darkness.id.startsWith('sve-'));
+    });
+
+    test('starter deck catalog maps to known sleeves and coins', () => {
+      const sleeveIds = new Set(getSleeves().map((s) => s.id));
+      const coinIds = new Set(getCoins().map((c) => c.id));
+      for (const entry of STARTER_DECK_CATALOG) {
+        assert.ok(sleeveIds.has(entry.sleeveId), `unknown sleeve for ${entry.key}`);
+        assert.ok(coinIds.has(entry.coinId), `unknown coin for ${entry.key}`);
+      }
     });
     
     test('filterCardsByName does substring matching, case-insensitive', () => {

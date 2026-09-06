@@ -5,6 +5,10 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import {
+  buildModernBasicEnergy,
+  isModernBasicEnergyLabel,
+} from '../client/src/setup/deck-builder/core/modern-energy.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, '../client/src/setup/deck-builder/core/starter-decks.generated.mjs');
@@ -75,12 +79,6 @@ const TRAINER_IDS = {
 };
 
 const ENERGY_IDS = {
-  'Basic {D} Energy': 'g1-81',
-  'Basic Darkness Energy': 'g1-81',
-  'Basic Fire Energy': 'g1-76',
-  'Basic Fighting Energy': 'g1-80',
-  'Basic Lightning Energy': 'g1-78',
-  'Basic Water Energy': 'g1-77',
   'Neo Upper Energy': 'sv05-162',
 };
 
@@ -119,6 +117,9 @@ function parseLine(line) {
   const qtyName = trimmed.match(/^(\d+)\s+(.+)$/);
   if (qtyName) {
     const name = qtyName[2].trim();
+    if (isModernBasicEnergyLabel(name)) {
+      return { qty: Number(qtyName[1]), modernEnergy: name };
+    }
     const energyId = ENERGY_IDS[name];
     if (energyId) {
       return { qty: Number(qtyName[1]), cardId: energyId, name };
@@ -324,6 +325,10 @@ async function resolveDeck(lines) {
   const resolved = [];
   for (const line of lines) {
     const parsed = parseLine(line);
+    if (parsed.modernEnergy) {
+      resolved.push(buildModernBasicEnergy(parsed.modernEnergy, parsed.qty));
+      continue;
+    }
     const cardId =
       parsed.cardId ||
       toCardId(parsed.setCode, parsed.number);
