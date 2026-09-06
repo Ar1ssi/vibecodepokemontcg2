@@ -8,14 +8,13 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 
-/** @type {{ overlay: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null } | null} */
+/** @type {{ overlay: HTMLElement, stage: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null, blockOverlayClose: boolean, pointerTracking: boolean } | null} */
 let viewerState = null;
 
-const MAX_BEHIND = 2;
-const MAX_AHEAD = 1;
 const PEEK_PERCENT = 24;
 const SWIPE_THRESHOLD = 40;
 const SWIPE_START_PX = 8;
+const SCREEN_EDGE_MARGIN = 32;
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
 
@@ -57,7 +56,20 @@ const buildSlideContent = async (card) => {
 const getVirtualIndex = (state, dragOffsetX = 0) => {
   const width = state.stack.clientWidth || 380;
   const progress = dragOffsetX / width;
-  return clampIndex(state.index + progress, state.slides.length - 1);
+  const raw = state.index + progress;
+  return Math.max(0, Math.min(state.slides.length - 1, raw));
+};
+
+const isSlideOnScreen = (stackRect, stackWidth, offset) => {
+  const peekPx = (PEEK_PERCENT / 100) * stackWidth;
+  const centerX = stackRect.left + stackRect.width / 2;
+  const scale = 1 - Math.abs(offset) * 0.035;
+  const cardWidth = stackWidth * scale;
+  const cardCenterX = centerX + offset * peekPx;
+  return (
+    cardCenterX + cardWidth / 2 >= -SCREEN_EDGE_MARGIN &&
+    cardCenterX - cardWidth / 2 <= window.innerWidth + SCREEN_EDGE_MARGIN
+  );
 };
 
 const syncHoloAnimations = (state) => {
@@ -86,24 +98,18 @@ const syncHoloAnimations = (state) => {
 
 const layoutStack = (state, dragOffsetX = 0) => {
   const virtualIndex = getVirtualIndex(state, dragOffsetX);
-  const { slides } = state;
+  const { slides, stack } = state;
+  const stackWidth = stack.clientWidth || 380;
+  const stackRect = stack.getBoundingClientRect();
 
   slides.forEach((slide, i) => {
     const offset = i - virtualIndex;
+    const absOffset = Math.abs(offset);
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
 
-    if (offset < -MAX_AHEAD || offset > MAX_BEHIND) {
-      slide.classList.add('is-hidden');
-      slide.style.zIndex = '0';
-      slide.style.transform = '';
-      slide.style.opacity = '';
-      return;
-    }
-
-    const absOffset = Math.abs(offset);
     slide.style.zIndex = String(300 - Math.round(absOffset * 10));
 
-    if (offset === 0) {
+    if (Math.abs(offset) < 0.05) {
       slide.classList.add('is-active');
     } else if (offset < 0) {
       slide.classList.add('is-ahead');
@@ -113,6 +119,10 @@ const layoutStack = (state, dragOffsetX = 0) => {
 
     slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}%)) scale(${1 - absOffset * 0.035})`;
     slide.style.opacity = String(Math.max(0.5, 1 - absOffset * 0.18));
+
+    if (!isSlideOnScreen(stackRect, stackWidth, offset)) {
+      slide.classList.add('is-hidden');
+    }
   });
 
   syncHoloAnimations(state);
@@ -144,7 +154,7 @@ export const closeDiscardPileViewer = () => {
 };
 
 const attachSwipe = (state) => {
-  const { stack } = state;
+  const { stack, overlay } = state;
   let startX = 0;
   let startY = 0;
   let tracking = false;
@@ -152,12 +162,14 @@ const attachSwipe = (state) => {
 
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
+    if (!stack.contains(event.target)) return;
     tracking = true;
     dragging = false;
+    state.pointerTracking = true;
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
-    stack.setPointerCapture(event.pointerId);
+    overlay.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event) => {
@@ -180,6 +192,7 @@ const attachSwipe = (state) => {
   const endSwipe = (event) => {
     if (!tracking || state.pointerId !== event.pointerId) return;
     tracking = false;
+    state.pointerTracking = false;
     stack.classList.remove('is-dragging');
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
@@ -196,17 +209,20 @@ const attachSwipe = (state) => {
     }
     dragging = false;
     state.pointerId = null;
+    state.blockOverlayClose = true;
+    event.preventDefault();
+    event.stopPropagation();
     try {
-      stack.releasePointerCapture(event.pointerId);
+      overlay.releasePointerCapture(event.pointerId);
     } catch {
       // capture may already be released
     }
   };
 
-  stack.addEventListener('pointerdown', onPointerDown);
-  stack.addEventListener('pointermove', onPointerMove);
-  stack.addEventListener('pointerup', endSwipe);
-  stack.addEventListener('pointercancel', endSwipe);
+  overlay.addEventListener('pointerdown', onPointerDown);
+  overlay.addEventListener('pointermove', onPointerMove);
+  overlay.addEventListener('pointerup', endSwipe);
+  overlay.addEventListener('pointercancel', endSwipe);
 };
 
 export const openDiscardPileViewer = async (user, startIndex = null) => {
@@ -285,6 +301,7 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
 
   const state = {
     overlay,
+    stage,
     stack,
     slides,
     cards,
@@ -292,6 +309,8 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
     countEl,
     nameEl,
     pointerId: null,
+    blockOverlayClose: false,
+    pointerTracking: false,
     onKeyDown: null,
   };
 
@@ -311,6 +330,11 @@ export const openDiscardPileViewer = async (user, startIndex = null) => {
     closeDiscardPileViewer();
   });
   overlay.addEventListener('click', (event) => {
+    if (state.blockOverlayClose) {
+      state.blockOverlayClose = false;
+      return;
+    }
+    if (state.pointerTracking) return;
     if (event.target === overlay) closeDiscardPileViewer();
   });
   prevBtn.addEventListener('click', (event) => {

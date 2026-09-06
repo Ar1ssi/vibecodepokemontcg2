@@ -1772,7 +1772,11 @@ ul, li {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  width: 100%;
   pointer-events: none;
+}
+.discard-pile-stage > * {
+  pointer-events: auto;
 }
 .discard-pile-stack {
   position: relative;
@@ -1807,7 +1811,7 @@ ul, li {
   pointer-events: none;
 }
 .discard-pile-slide.is-hidden {
-  visibility: hidden;
+  opacity: 0 !important;
   pointer-events: none;
 }
 .discard-pile-slide .mat-holo.discard-pile-holo {
