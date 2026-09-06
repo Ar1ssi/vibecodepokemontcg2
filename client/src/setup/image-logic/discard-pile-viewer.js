@@ -13,7 +13,7 @@ let viewerState = null;
 
 const PEEK_PERCENT = 24;
 const SWIPE_THRESHOLD = 40;
-const SWIPE_START_PX = 8;
+const SWIPE_START_PX = 16;
 const SCREEN_EDGE_MARGIN = 32;
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
@@ -65,23 +65,22 @@ const buildSlideContent = async (card) => {
   return { node: img, holoWrapper: null };
 };
 
-const getVirtualIndex = (state, dragOffsetX = 0) => {
-  const width = state.stack.clientWidth || 380;
-  const progress = dragOffsetX / width;
-  const raw = state.index + progress;
-  return Math.max(0, Math.min(state.slides.length - 1, raw));
-};
-
-const isSlideOnScreen = (stackRect, stackWidth, offset, dragOffsetX = 0) => {
+const isSlideOnScreen = (stackRect, stackWidth, offset, dragPx = 0) => {
   const peekPx = (PEEK_PERCENT / 100) * stackWidth;
   const centerX = stackRect.left + stackRect.width / 2;
   const scale = 1 - Math.abs(offset) * 0.035;
   const cardWidth = stackWidth * scale;
-  const cardCenterX = centerX + offset * peekPx + dragOffsetX;
+  const cardCenterX = centerX + offset * peekPx + dragPx;
   return (
     cardCenterX + cardWidth / 2 >= -SCREEN_EDGE_MARGIN &&
     cardCenterX - cardWidth / 2 <= window.innerWidth + SCREEN_EDGE_MARGIN
   );
+};
+
+const clampDragOffset = (state, dragOffsetX) => {
+  if (dragOffsetX > 0 && state.index >= state.slides.length - 1) return 0;
+  if (dragOffsetX < 0 && state.index <= 0) return 0;
+  return dragOffsetX;
 };
 
 const syncHoloAnimations = (state) => {
@@ -109,19 +108,21 @@ const syncHoloAnimations = (state) => {
 };
 
 const layoutStack = (state, dragOffsetX = 0) => {
-  const virtualIndex = getVirtualIndex(state, dragOffsetX);
-  const { slides, stack } = state;
+  const { slides, stack, index } = state;
   const stackWidth = stack.clientWidth || 380;
   const stackRect = stack.getBoundingClientRect();
+  const activeDragPx =
+    dragOffsetX !== 0 ? clampDragOffset(state, dragOffsetX) : 0;
 
   slides.forEach((slide, i) => {
-    const offset = virtualIndex - i;
+    const offset = index - i;
     const absOffset = Math.abs(offset);
+    const dragPx = i === index ? activeDragPx : 0;
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
 
     slide.style.zIndex = String(300 - Math.round(absOffset * 10));
 
-    if (absOffset < 0.05) {
+    if (absOffset === 0) {
       slide.classList.add('is-active');
     } else if (offset < 0) {
       slide.classList.add('is-ahead');
@@ -129,10 +130,10 @@ const layoutStack = (state, dragOffsetX = 0) => {
       slide.classList.add('is-behind');
     }
 
-    slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}% + ${dragOffsetX}px)) scale(${1 - absOffset * 0.035})`;
+    slide.style.transform = `translateX(calc(${offset * PEEK_PERCENT}% + ${dragPx}px)) scale(${1 - absOffset * 0.035})`;
     slide.style.opacity = '1';
 
-    if (!isSlideOnScreen(stackRect, stackWidth, offset, dragOffsetX)) {
+    if (!isSlideOnScreen(stackRect, stackWidth, offset, dragPx)) {
       slide.classList.add('is-hidden');
     }
   });
@@ -185,7 +186,6 @@ const attachSwipe = (state) => {
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
     if (!stack.contains(event.target)) return;
-    event.preventDefault();
     tracking = true;
     dragging = false;
     startX = event.clientX;
@@ -214,12 +214,16 @@ const attachSwipe = (state) => {
 
   const endSwipe = (event) => {
     if (!tracking || state.pointerId !== event.pointerId) return;
+    const wasDragging = dragging;
     tracking = false;
+    dragging = false;
     stack.classList.remove('is-dragging');
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
     const horizontal =
-      Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy);
+      wasDragging &&
+      Math.abs(dx) >= SWIPE_THRESHOLD &&
+      Math.abs(dx) > Math.abs(dy);
     if (horizontal) {
       if (dx > 0) {
         goToIndex(state, state.index + 1);
@@ -229,9 +233,10 @@ const attachSwipe = (state) => {
     } else {
       layoutStack(state);
     }
-    dragging = false;
     state.pointerId = null;
-    event.preventDefault();
+    if (wasDragging) {
+      event.preventDefault();
+    }
     event.stopPropagation();
     try {
       overlay.releasePointerCapture(event.pointerId);

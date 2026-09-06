@@ -1783,6 +1783,7 @@ ul, li {
   width: min(72vw, 380px);
   height: min(68vh, calc(min(72vw, 380px) * 1.397));
   touch-action: none;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   pointer-events: auto;
