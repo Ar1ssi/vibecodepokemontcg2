@@ -2045,6 +2045,13 @@ ul, li {
   width: 100%;
   overflow: visible;
 }
+.card-picker-choose .card-picker-top-row.has-trigger {
+  display: grid;
+  grid-template-columns: var(--card-picker-carousel-w) var(--card-picker-card-w);
+  justify-content: center;
+  align-items: flex-end;
+  gap: clamp(12px, 2.5vw, 20px);
+}
 .card-picker-choose .card-picker-carousel-wrap {
   flex: 0 0 auto;
   width: var(--card-picker-carousel-w);
@@ -2054,6 +2061,12 @@ ul, li {
   justify-content: center;
   overflow: visible;
   position: relative;
+}
+.card-picker-choose .card-picker-top-row.has-trigger .card-picker-carousel-wrap {
+  grid-column: 1;
+  overflow: hidden;
+  isolation: isolate;
+  z-index: 1;
 }
 .card-picker-choose .card-picker-stage {
   flex: 0 0 auto;
@@ -2076,7 +2089,12 @@ ul, li {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 2;
+  position: relative;
+  z-index: 500;
+  isolation: isolate;
+}
+.card-picker-choose .card-picker-top-row.has-trigger .card-picker-trigger-slot {
+  grid-column: 2;
 }
 .card-picker-choose .card-picker-trigger-card,
 .card-picker-choose .card-picker-trigger-holo {
@@ -2086,8 +2104,16 @@ ul, li {
   border-radius: 0.35rem;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
   transform-origin: center center;
-  opacity: 1;
+  opacity: 1 !important;
   filter: none;
+  visibility: visible;
+}
+.card-picker-choose .card-picker-trigger-slot .discard-pile-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.35rem;
 }
 .card-picker-choose .card-picker-trigger-holo {
   overflow: hidden;
@@ -2132,7 +2158,7 @@ ul, li {
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-  overflow: visible;
+  overflow: hidden;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 .card-picker-choose .card-picker-drop-slot.is-drop-target {
@@ -2143,8 +2169,10 @@ ul, li {
   background: rgba(90, 90, 90, 0.35);
 }
 .card-picker-choose .card-picker-slot-card-inner {
-  width: calc(100% - 10px);
-  height: calc(100% - 10px);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2152,12 +2180,19 @@ ul, li {
 }
 .card-picker-choose .card-picker-slot-card-inner img {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   border-radius: 0.2rem;
+}
+.card-picker-choose .discard-pile-slide.is-in-slot {
+  transition: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.card-picker-choose .discard-pile-slide.is-dragging-to-slot {
+  transition: none !important;
 }
 .card-picker-choose .card-picker-drop-slot img {
   display: block;

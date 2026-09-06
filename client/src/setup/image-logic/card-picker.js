@@ -194,6 +194,23 @@ const CHOOSE_PEEK_PERCENT = PEEK_PERCENT;
 const getPeekPercent = (state) =>
   state.mode === 'browse' ? PEEK_PERCENT : CHOOSE_PEEK_PERCENT;
 
+const isCardSlotted = (state, card) =>
+  state.mode !== 'browse' && state.slotAssignments?.includes(card);
+
+const focusNextAvailableCard = (state) => {
+  if (state.mode === 'browse' || !state.slotAssignments?.length) return;
+  if (!isCardSlotted(state, state.cards[state.index])) return;
+  for (let step = 1; step < state.cards.length; step += 1) {
+    const nextIdx = (state.index + step) % state.cards.length;
+    if (!isCardSlotted(state, state.cards[nextIdx])) {
+      state.index = nextIdx;
+      state.targetDragPx = 0;
+      state.renderDragPx = 0;
+      return;
+    }
+  }
+};
+
 const updateSelectionUI = (state) => {
   if (state.multiSelect) {
     const { slides, slotAssignments } = state;
@@ -232,7 +249,7 @@ const syncDropSlotLayout = (state) => {
   const maxRowW = Math.min(window.innerWidth * 0.92, 860);
   const preferredW = Math.max(
     minSlotW,
-    Math.round(state.stack.clientWidth * 0.78) || 160
+    Math.round(state.stack.clientWidth * 0.92) || 160
   );
   let slotW = preferredW;
   const totalNeeded = slotCount * slotW + (slotCount - 1) * gap;
@@ -300,6 +317,7 @@ const assignCardToSlot = (state, card, slotIndex) => {
   state.slotAssignments[target] = card;
   if (!state.multiSelect) state.slotCard = card;
   updateSelectionUI(state);
+  focusNextAvailableCard(state);
   layoutStack(state);
 };
 
@@ -340,8 +358,22 @@ const layoutStack = (state) => {
       'is-ahead',
       'is-behind',
       'is-hidden',
-      'is-focused'
+      'is-focused',
+      'is-in-slot',
+      'is-dragging-to-slot'
     );
+
+    if (
+      state.mode !== 'browse' &&
+      (isCardSlotted(state, card) || state.draggingToSlotIndex === i)
+    ) {
+      slide.classList.add('is-in-slot', 'is-hidden');
+      if (state.draggingToSlotIndex === i) {
+        slide.classList.add('is-dragging-to-slot');
+      }
+      return;
+    }
+
     slide.classList.add(`is-${layout.role}`);
     if (layout.role === 'active') slide.classList.add('is-focused');
     if (multiSelect && state.slotAssignments.includes(card)) {
@@ -379,7 +411,17 @@ const updateFooter = (state) => {
 };
 
 const goToIndex = (state, nextIndex) => {
-  state.index = clampIndex(nextIndex, state.slides.length - 1);
+  const len = state.slides.length;
+  if (!len) return;
+  let idx = clampIndex(nextIndex, len - 1);
+  if (state.mode !== 'browse' && state.slotAssignments?.length) {
+    const dir = nextIndex >= state.index ? 1 : -1;
+    for (let step = 0; step < len; step += 1) {
+      if (!isCardSlotted(state, state.cards[idx])) break;
+      idx = clampIndex(idx + dir, len - 1);
+    }
+  }
+  state.index = idx;
   state.targetDragPx = 0;
   state.renderDragPx = 0;
   stopDragLoop(state);
@@ -565,7 +607,9 @@ const attachSwipe = (state) => {
   const onDocPointerEnd = (event) => {
     if (activePointerId !== event.pointerId) return;
     const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
+    state.draggingToSlotIndex = null;
     if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
+    else layoutStack(state);
     cleanupGhost();
     unbindCardDrag();
     tracking = false;
@@ -583,6 +627,7 @@ const attachSwipe = (state) => {
     tracking = false;
     state.tracking = false;
     state.pointerId = null;
+    state.draggingToSlotIndex = state.index;
     stopDragLoop(state);
     state.targetDragPx = 0;
     state.renderDragPx = 0;
@@ -927,6 +972,8 @@ export const openCardPicker = async ({
     slotRow,
     slotElements,
     slotCard: null,
+    draggingToSlotIndex: null,
+    topRow: topRow ?? null,
     onKeyDown: null,
     allCandidates,
     filteredCandidates: candidates,
@@ -940,6 +987,7 @@ export const openCardPicker = async ({
     const { node, holoWrapper } = await buildSlideContent(triggerCard);
     node.classList.add('card-picker-trigger-card');
     triggerSlot.appendChild(node);
+    state.topRow?.classList.add('has-trigger');
     main.classList.add('has-trigger');
     if (holoWrapper) {
       holoWrapper.classList.add('card-picker-trigger-holo');
