@@ -2087,9 +2087,19 @@ ul, li {
 .card-picker-choose .card-picker-trigger-slot:empty {
   display: none;
 }
+.card-picker-choose .card-picker-slot-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--card-picker-slot-gap, 6px);
+  width: 100%;
+  max-width: min(94vw, 860px);
+  margin-top: 0.15rem;
+}
 .card-picker-choose .card-picker-drop-slot {
   flex: 0 0 auto;
-  position: relative;
+  box-sizing: border-box;
   border: 2px solid rgba(210, 210, 210, 0.75);
   background: rgba(110, 110, 110, 0.45);
   border-radius: 0.35rem;
@@ -2098,41 +2108,18 @@ ul, li {
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
-  margin-top: 0.15rem;
-}
-.card-picker-choose .card-picker-drop-slot.has-cards {
-  background: rgba(90, 90, 90, 0.35);
-}
-.card-picker-slot-stack {
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: var(--card-picker-slot-gap);
-  flex: 0 0 auto;
-  padding: 0;
-  pointer-events: none;
-}
-.card-picker-slot-card {
-  flex: 0 0 auto;
-  width: var(--card-picker-slot-card-w, 164px);
-  height: var(--card-picker-slot-card-h, 229px);
-  aspect-ratio: var(--card-aspect);
-  border-radius: 0.25rem;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
-.card-picker-slot-card.is-empty {
-  border: 1px dashed rgba(255, 255, 255, 0.28);
-  background: rgba(0, 0, 0, 0.14);
-  box-shadow: none;
+.card-picker-choose .card-picker-drop-slot.has-card {
+  background: rgba(90, 90, 90, 0.35);
+  padding: 4px;
 }
-.card-picker-slot-card img {
+.card-picker-choose .card-picker-drop-slot img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  border-radius: 0.25rem;
 }
 .card-picker-drag-ghost {
   position: fixed;

@@ -190,60 +190,65 @@ const syncHoloAnimations = (state) => {
 };
 
 const updateSelectionUI = (state) => {
-  if (!state.multiSelect) return;
-  const { slides, selected } = state;
-  const ordered = Array.from(selected);
-  slides.forEach((slide, i) => {
-    const card = state.cards[i];
-    const badge = slide.querySelector('.card-picker-select-badge');
-    if (selected.has(card)) {
-      slide.classList.add('is-selected');
-      if (badge) {
-        badge.hidden = false;
-        badge.textContent = String(ordered.indexOf(card) + 1);
+  if (state.multiSelect) {
+    const { slides, slotAssignments } = state;
+    state.selected.clear();
+    slotAssignments.forEach((card) => {
+      if (card) state.selected.add(card);
+    });
+    slides.forEach((slide, i) => {
+      const card = state.cards[i];
+      const badge = slide.querySelector('.card-picker-select-badge');
+      const assignIdx = slotAssignments.indexOf(card);
+      if (assignIdx >= 0) {
+        slide.classList.add('is-selected');
+        if (badge) {
+          badge.hidden = false;
+          badge.textContent = String(assignIdx + 1);
+        }
+      } else {
+        slide.classList.remove('is-selected');
+        if (badge) badge.hidden = true;
       }
-    } else {
-      slide.classList.remove('is-selected');
-      if (badge) badge.hidden = true;
+    });
+    if (state.doneBtn) {
+      const count = slotAssignments.filter(Boolean).length;
+      state.doneBtn.disabled = count < state.minCount || count > state.maxCount;
     }
-  });
-  if (state.doneBtn) {
-    const count = selected.size;
-    state.doneBtn.disabled = count < state.minCount || count > state.maxCount;
   }
   renderSlotCards(state);
 };
 
 const syncDropSlotLayout = (state) => {
-  if (!state.dropSlot || !state.stack) return;
-  const slotCount = Math.max(1, state.maxCount || 1);
+  if (!state.slotElements?.length || !state.stack) return;
+  const slotCount = state.slotElements.length;
   const gap = 6;
-  const pad = 8;
-  const cardW = Math.max(120, Math.round(state.stack.clientWidth * 0.82) || 185);
+  const maxRowW = Math.min(window.innerWidth * 0.94, 860);
+  const baseW = Math.max(120, Math.round(state.stack.clientWidth * 0.82) || 185);
+  let cardW = baseW;
+  const totalNeeded = slotCount * cardW + (slotCount - 1) * gap;
+  if (totalNeeded > maxRowW) {
+    cardW = Math.floor((maxRowW - (slotCount - 1) * gap) / slotCount);
+    cardW = Math.max(72, cardW);
+  }
   const cardH = Math.round(cardW * 1.397);
-  state.dropSlot.style.setProperty('--card-picker-slot-card-w', `${cardW}px`);
-  state.dropSlot.style.setProperty('--card-picker-slot-card-h', `${cardH}px`);
-  state.dropSlot.style.setProperty('--card-picker-slot-gap', `${gap}px`);
-  state.dropSlot.style.setProperty('--card-picker-slot-count', String(slotCount));
-  state.dropSlot.style.width = `${slotCount * cardW + (slotCount - 1) * gap + 2 * pad}px`;
-  state.dropSlot.style.height = `${cardH + 2 * pad}px`;
+  state.slotRow?.style.setProperty('--card-picker-slot-card-w', `${cardW}px`);
+  state.slotRow?.style.setProperty('--card-picker-slot-card-h', `${cardH}px`);
+  state.slotRow?.style.setProperty('--card-picker-slot-gap', `${gap}px`);
+  for (const slot of state.slotElements) {
+    slot.style.width = `${cardW}px`;
+    slot.style.height = `${cardH}px`;
+  }
 };
 
 const renderSlotCards = (state) => {
-  if (!state.slotStack) return;
+  if (!state.slotElements?.length) return;
   syncDropSlotLayout(state);
-  state.slotStack.replaceChildren();
-  const slotCount = Math.max(1, state.maxCount || 1);
-  const cardsInSlot = state.multiSelect
-    ? Array.from(state.selected)
-    : state.slotCard
-      ? [state.slotCard]
-      : [];
-
-  for (let i = 0; i < slotCount; i += 1) {
-    const card = cardsInSlot[i];
-    const wrap = document.createElement('div');
-    wrap.className = 'card-picker-slot-card';
+  state.slotElements.forEach((slotEl, i) => {
+    slotEl.replaceChildren();
+    const card = state.slotAssignments[i];
+    slotEl.classList.toggle('has-card', Boolean(card));
+    slotEl.classList.toggle('is-empty', !card);
     if (card) {
       const img = document.createElement('img');
       img.src =
@@ -252,33 +257,50 @@ const renderSlotCards = (state) => {
         '';
       img.alt = card?.name ?? '';
       img.draggable = false;
-      wrap.appendChild(img);
-    } else {
-      wrap.classList.add('is-empty');
+      slotEl.appendChild(img);
     }
-    state.slotStack.appendChild(wrap);
+  });
+};
+
+const findDropSlotAt = (state, x, y) => {
+  if (!state.slotElements?.length) return -1;
+  for (let i = 0; i < state.slotElements.length; i += 1) {
+    const rect = state.slotElements[i].getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      return i;
+    }
   }
-  state.dropSlot?.classList.toggle('has-cards', cardsInSlot.length > 0);
+  return -1;
 };
 
-const isPointInDropSlot = (state, x, y) => {
-  if (!state.dropSlot) return false;
-  const rect = state.dropSlot.getBoundingClientRect();
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+const assignCardToSlot = (state, card, slotIndex) => {
+  if (!card || !state.slotAssignments?.length) return;
+  for (let i = 0; i < state.slotAssignments.length; i += 1) {
+    if (state.slotAssignments[i] === card) state.slotAssignments[i] = null;
+  }
+  let target = slotIndex;
+  if (target < 0) {
+    target = state.slotAssignments.findIndex((entry) => entry == null);
+  }
+  if (target < 0 || target >= state.slotAssignments.length) return;
+  state.slotAssignments[target] = card;
+  if (!state.multiSelect) state.slotCard = card;
+  updateSelectionUI(state);
+  layoutStack(state);
 };
 
-const addFocusedCardToSlot = (state) => {
+const addFocusedCardToSlot = (state, slotIndex = -1) => {
   const card = state.cards[state.index];
   if (!card) return;
-  if (state.multiSelect) {
-    if (state.selected.has(card)) state.selected.delete(card);
-    else if (state.selected.size < state.maxCount) state.selected.add(card);
+  const existingIdx = state.slotAssignments.indexOf(card);
+  if (existingIdx >= 0 && (slotIndex < 0 || slotIndex === existingIdx)) {
+    state.slotAssignments[existingIdx] = null;
+    if (!state.multiSelect) state.slotCard = null;
     updateSelectionUI(state);
     layoutStack(state);
     return;
   }
-  state.slotCard = card;
-  renderSlotCards(state);
+  assignCardToSlot(state, card, slotIndex);
 };
 
 const layoutStack = (state) => {
@@ -307,7 +329,7 @@ const layoutStack = (state) => {
     );
     slide.classList.add(`is-${layout.role}`);
     if (layout.role === 'active') slide.classList.add('is-focused');
-    if (multiSelect && state.selected.has(card)) {
+    if (multiSelect && state.slotAssignments.includes(card)) {
       slide.classList.add('is-selected');
     }
 
@@ -374,10 +396,12 @@ export const closeCardPicker = (event) => {
 const toggleSelection = (state) => {
   if (!state.multiSelect) return;
   const card = state.cards[state.index];
-  if (state.selected.has(card)) {
-    state.selected.delete(card);
-  } else if (state.selected.size < state.maxCount) {
-    state.selected.add(card);
+  const existingIdx = state.slotAssignments.indexOf(card);
+  if (existingIdx >= 0) {
+    state.slotAssignments[existingIdx] = null;
+  } else {
+    const emptyIdx = state.slotAssignments.findIndex((entry) => entry == null);
+    if (emptyIdx >= 0) state.slotAssignments[emptyIdx] = card;
   }
   updateSelectionUI(state);
   layoutStack(state);
@@ -405,10 +429,10 @@ const confirmPicker = async (state) => {
 
   let picks;
   if (multiSelect) {
-    picks = Array.from(selected);
+    picks = state.slotAssignments.filter(Boolean);
     if (picks.length < state.minCount || picks.length > state.maxCount) return;
   } else {
-    picks = [state.slotCard ?? cards[index]];
+    picks = [state.slotAssignments[0] ?? state.slotCard ?? cards[index]];
   }
 
   if (!pickOnly && zoneFrom && destination) {
@@ -445,6 +469,7 @@ const setCandidateList = (state, candidates) => {
   state.stack.innerHTML = '';
   state.slides = [];
   state.selected.clear();
+  state.slotAssignments.fill(null);
 
   if (!candidates.length) return;
 
@@ -470,16 +495,16 @@ const setCandidateList = (state, candidates) => {
       if (holoWrapper) slide.holoWrapper = holoWrapper;
     })
   ).then(() => {
-    if (pickerState === state) {
+      if (pickerState === state) {
       goToIndex(state, clampIndex(state.index, candidates.length - 1));
-      if (state.dropSlot) renderSlotCards(state);
+      if (state.slotElements?.length) renderSlotCards(state);
     }
   });
 };
 
 const isSwipeBlockedTarget = (target) =>
   target.closest(
-    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-bottom-bar, button, a'
+    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-slot-row, .card-picker-bottom-bar, button, a'
   );
 
 const attachSwipe = (state) => {
@@ -522,7 +547,7 @@ const attachSwipe = (state) => {
     if (gesture === 'pending' && Math.hypot(dx, dy) >= SWIPE_LOCK_PX) {
       if (
         state.mode !== 'browse' &&
-        state.dropSlot &&
+        state.slotElements?.length &&
         Math.abs(dy) >= Math.abs(dx) * 0.85
       ) {
         gesture = 'cardDrag';
@@ -582,9 +607,8 @@ const attachSwipe = (state) => {
     stack.classList.remove('is-dragging');
 
     if (wasCardDrag) {
-      if (isPointInDropSlot(state, event.clientX, event.clientY)) {
-        addFocusedCardToSlot(state);
-      }
+      const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
+      if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
       cleanupGhost();
     } else {
       const dx = event.clientX - startX;
@@ -597,9 +621,8 @@ const attachSwipe = (state) => {
       if (horizontal) {
         goToIndex(state, state.index + (dx > 0 ? 1 : -1));
       } else if (!wasDragging && state.mode !== 'browse') {
-        if (isPointInDropSlot(state, event.clientX, event.clientY)) {
-          addFocusedCardToSlot(state);
-        }
+        const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
+        if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
       } else {
         state.targetDragPx = 0;
         stack.classList.add('is-dragging');
@@ -725,8 +748,8 @@ export const openCardPicker = async ({
 
   let main = null;
   let triggerSlot = null;
-  let dropSlot = null;
-  let slotStack = null;
+  let slotRow = null;
+  let slotElements = [];
   let bottomBar = null;
   let actionBar = null;
   let meta = null;
@@ -770,13 +793,17 @@ export const openCardPicker = async ({
     meta.append(countEl, nameEl);
     scene.appendChild(meta);
 
-    dropSlot = document.createElement('div');
-    dropSlot.className = 'card-picker-drop-slot';
-    dropSlot.style.setProperty('--card-picker-slot-count', String(maxSel));
-    slotStack = document.createElement('div');
-    slotStack.className = 'card-picker-slot-stack';
-    dropSlot.appendChild(slotStack);
-    scene.appendChild(dropSlot);
+    slotRow = document.createElement('div');
+    slotRow.className = 'card-picker-slot-row';
+    slotElements = [];
+    for (let i = 0; i < maxSel; i += 1) {
+      const slot = document.createElement('div');
+      slot.className = 'card-picker-drop-slot is-empty';
+      slot.dataset.slotIndex = String(i);
+      slotRow.appendChild(slot);
+      slotElements.push(slot);
+    }
+    scene.appendChild(slotRow);
 
     main.appendChild(scene);
 
@@ -809,6 +836,7 @@ export const openCardPicker = async ({
     mode,
     multiSelect: isMulti,
     selected: new Set(),
+    slotAssignments: Array(maxSel).fill(null),
     minCount: minSel,
     maxCount: maxSel,
     pickOnly,
@@ -820,8 +848,8 @@ export const openCardPicker = async ({
     onCancel,
     triggerHoloWrapper: null,
     triggerSlot,
-    dropSlot,
-    slotStack,
+    slotRow,
+    slotElements,
     slotCard: null,
     onKeyDown: null,
     allCandidates,
