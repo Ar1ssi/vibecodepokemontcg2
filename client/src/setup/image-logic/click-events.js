@@ -26,6 +26,9 @@ import {
 } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 
+const isPrizeTakeEvent = (event) =>
+  !!event?.target?.closest?.('#prizes.prize-take-ready');
+
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
   //closest() handles plain cards, play-container cards, and holo-wrapper cards
@@ -78,6 +81,11 @@ export const coverClick = (event) => {
 };
 
 export const openCardContextMenu = (event) => {
+  if (isPrizeTakeEvent(event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const cardContextMenu = document.getElementById('cardContextMenu');
 
   closeFullView(event);
@@ -232,6 +240,10 @@ export const openCardContextMenu = (event) => {
 };
 
 export const imageClick = (event) => {
+  if (isPrizeTakeEvent(event)) {
+    event.stopPropagation();
+    return;
+  }
   event.stopPropagation();
   identifyCard(event);
 
@@ -264,6 +276,10 @@ export const imageClick = (event) => {
 };
 
 export const doubleClick = (event) => {
+  if (isPrizeTakeEvent(event)) {
+    event?.stopPropagation();
+    return;
+  }
   if (event) {
     event.stopPropagation();
     identifyCard(event);

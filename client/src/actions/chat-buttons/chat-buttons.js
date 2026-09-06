@@ -24,7 +24,8 @@ import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
-import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
+import { takePrizes } from '../zones/prizes-actions.js';
+import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion } from '../../setup/rules/ko-flow.mjs';
 import { markRetreated } from '../../setup/rules/retreat.mjs';
@@ -1467,89 +1468,15 @@ function _pickFromList(title, items) {
   });
 }
 
-// Multi-select prize picker. Lets the player choose WHICH of their own prize
-// cards to take (up to `count`), instead of the automatic "take the top N".
-// Resolves to the array of chosen 0-based indices, or null (fallback to
-// automatic top-N). Reuses the same positioning/styling as `_pickFromList`.
-function _pickPrizeCards(count, cards) {
-  return new Promise((resolve) => {
-    const needed = Math.min(count, cards.length);
-    const host = document.createElement('div');
-    host.className = 'choice-picker-card';
-    const titleEl = document.createElement('div');
-    titleEl.className = 'choice-picker-title';
-    titleEl.textContent = `Choose ${needed} prize card${needed !== 1 ? 's' : ''} to take:`;
-    host.appendChild(titleEl);
-
-    const selected = new Set();
-    const grid = document.createElement('div');
-    grid.className = 'choice-picker-grid';
-    cards.forEach((card, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'choice-picker-item';
-      btn.textContent = card.name || `Prize ${idx + 1}`;
-      btn.addEventListener('click', () => {
-        if (selected.has(idx)) {
-          selected.delete(idx);
-          btn.classList.remove('selected');
-        } else if (selected.size < needed) {
-          selected.add(idx);
-          btn.classList.add('selected');
-        }
-        confirmBtn.disabled = selected.size !== needed;
-      });
-      grid.appendChild(btn);
-    });
-    host.appendChild(grid);
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'choice-picker-confirm';
-    confirmBtn.textContent = `Take ${needed} prize card${needed !== 1 ? 's' : ''}`;
-    confirmBtn.disabled = true; // enabled once exactly `needed` are selected
-    confirmBtn.addEventListener('click', () => {
-      host.remove();
-      resolve([...selected]);
-    });
-    host.appendChild(confirmBtn);
-
-    const cancel = document.createElement('button');
-    cancel.className = 'choice-picker-cancel';
-    cancel.textContent = 'Take the top ones (automatic)';
-    cancel.addEventListener('click', () => {
-      host.remove();
-      resolve(null);
-    });
-    host.appendChild(cancel);
-
-    const chatArea = document.querySelector('.chat-messages') || document.body;
-    chatArea.prepend(host);
-    host.style.position = 'fixed';
-    host.style.top = '10%';
-    host.style.left = '50%';
-    host.style.transform = 'translateX(-50%)';
-    host.style.zIndex = 9999;
-    host.style.minWidth = '220px';
-    host.style.padding = '12px';
-    host.style.borderRadius = '10px';
-    host.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)';
-  });
-}
-
-// Show the prize picker and take the chosen cards; fall back to the automatic
-// top-N behavior if the player cancels. Falls back to `takePrizes` when there
-// are no prize cards to choose from.
+// Highlight the prize zone (blue frame + orbiting glow, no reveal, no
+// menu) and take each face-down card the player clicks. Each click uses
+// the existing prizes→hand flight.
 async function _takePrizesWithPicker(user, count) {
-  const prizeCards = getZone(user, 'prizes').array.slice(0, count);
-  if (prizeCards.length === 0) {
+  if (getZone(user, 'prizes').getCount() === 0) {
     takePrizes(user, user, count);
     return;
   }
-  const chosen = await _pickPrizeCards(count, prizeCards);
-  if (chosen === null || chosen.length === 0) {
-    takePrizes(user, user, count);
-    return;
-  }
-  takePrizesByIndex(user, user, chosen);
+  await promptPrizeTake(user, count);
 }
 
 const abilityTurnAndUsageGuard = (user, target, family) => {
