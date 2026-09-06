@@ -29,7 +29,11 @@ export const shuffleZone = (
   }
 
   const zone = getZone(user, zoneId);
-  playShuffleFlight(user, zoneId, zone.getCount());
+  // Originator plays the flight; the mirror only applies the new order.
+  // Animating on receive made the other player's deck look like it shuffled too.
+  if (!(systemState.isTwoPlayer && !emit)) {
+    playShuffleFlight(user, zoneId, zone.getCount());
+  }
   removeImages(zone.element);
   indices = indices ? indices : shuffleIndices(zone.getCount());
 

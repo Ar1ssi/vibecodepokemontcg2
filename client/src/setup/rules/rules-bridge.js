@@ -2005,6 +2005,12 @@ if (!isTrainer) {
       document.addEventListener('rules-turn-began', (event) => {
         const player = event?.detail?.player || rulesState.turnPlayer;
         if (!rulesState.enabled) return;
+        // Catch-up/resync replays pass/attack and must not emit extra draws.
+        if (systemState.isCatchingUp || systemState.isReplay) return;
+        // In 2P each client draws only for itself; the peer's draw arrives
+        // as a `draw` action. Drawing for `opp` here duplicated start-of-turn
+        // draws and desynced both hands (sync log: 18× draw after one attack).
+        if (systemState.isTwoPlayer && player !== 'self') return;
         let deckCount = 0;
         try {
           deckCount = getZone(player, 'deck').getCount();

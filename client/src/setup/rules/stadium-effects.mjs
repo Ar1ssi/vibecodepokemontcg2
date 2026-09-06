@@ -41,9 +41,17 @@ const isStadiumCard = (card) => {
   if (!card) return false;
   if (subtypesOf(card).includes('stadium')) return true;
   if (subtypesOf(card).includes('location')) return true;
+  if (lower(card.trainerType) === 'stadium') return true;
   const type = lower(card.type);
+  if (type === 'stadium' || type.includes('stadium')) return true;
   const name = lower(card.name);
-  return type === 'stadium' || name.includes('zone') || name.includes('rooftop');
+  // Name fallbacks for deck-import stubs before TCGdex subtypes load.
+  // "Grand Tree" is a Stadium but matches none of the older zone/rooftop hints.
+  if (name.includes('zone') || name.includes('rooftop') || name === 'grand tree') {
+    return true;
+  }
+  const t = textOf(card);
+  return t.includes('this stadium stays in play') || t.includes('if another stadium');
 };
 
 export { isStadiumCard };
@@ -207,7 +215,12 @@ export function parseStadiumOncePerTurn(card) {
     return { ...base, kind: 'heal-all', n: 10 };
   }
   if (/search/.test(t) && /evolv/.test(t)) {
-    return { ...base, kind: 'search-evolve', n: 1 };
+    return {
+      ...base,
+      kind: 'search-evolve',
+      n: 1,
+      chainStage2: /stage 2/.test(t),
+    };
   }
   if (/search.*basic pokémon.*bench/.test(t)) {
     return { ...base, kind: 'search-bench', n: 1, searchWhat: 'basic pokemon' };
@@ -262,6 +275,14 @@ export function stadiumOnceConditionMet(condition, playerFlags = {}) {
     return !!name && name.includes(String(condition.contains || '').toLowerCase());
   }
   return true;
+}
+
+/** Whether a deck card evolves from a Pokémon currently in play (Grand Tree). */
+export function matchesStadiumEvolveSearch(deckCard, inPlayPokemon = []) {
+  if (!deckCard || !inPlayPokemon.length) return false;
+  const from = lower(deckCard.evolvesFrom);
+  if (!from) return false;
+  return inPlayPokemon.some((host) => lower(host?.name) === from);
 }
 
 /** Deck/hand search filter for stadium once-per-turn effects. */

@@ -8,7 +8,7 @@ import test from 'node:test';
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility } = await import('../abilities.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
@@ -738,6 +738,8 @@ import test from 'node:test';
       assert.equal(isStadiumCard({ type: 'Stadium' }), true);
       assert.equal(isStadiumCard({ name: 'Safari Zone' }), true);
       assert.equal(isStadiumCard({ name: 'Lillie’s Rooftop' }), true);
+      assert.equal(isStadiumCard({ name: 'Grand Tree', type: 'Trainer' }), true);
+      assert.equal(isStadiumCard({ name: 'Artazon', text: 'This Stadium stays in play when you play it. Discard it if another Stadium comes into play.' }), true);
       assert.equal(isStadiumCard({ name: 'Pikachu' }), false);
       assert.equal(isStadiumCard(null), false);
     });
@@ -832,6 +834,30 @@ import test from 'node:test';
       assert.equal(factory.kind, 'draw');
       assert.equal(factory.n, 2);
       assert.equal(factory.condition.type, 'named-supporter');
+    });
+
+    test('Grand Tree: once-per-turn search-evolve, including Stage 2 chain', () => {
+      const tree = {
+        name: 'Grand Tree',
+        type: 'Trainer',
+        text: "Once during each player's turn, that player may search their deck for a Stage 1 Pokémon that evolves from 1 of their Pokémon in play and put it onto that Pokémon to evolve it. If that Pokémon evolved during this turn, that player may search their deck for a Stage 2 Pokémon that evolves from that Pokémon and put it onto that Pokémon to evolve it. Then, that player shuffles their deck.",
+      };
+      assert.equal(isStadiumCard(tree), true);
+      assert.equal(classifyStadiumEffect(tree), 'once-per-turn');
+      const parsed = parseStadiumOncePerTurn(tree);
+      assert.equal(parsed.kind, 'search-evolve');
+      assert.equal(parsed.chainStage2, true);
+      const applied = applyStadiumEffect(tree);
+      assert.equal(applied.executed, true);
+      assert.equal(applied.results[0].action, 'search-evolve');
+      assert.equal(
+        matchesStadiumEvolveSearch({ name: 'Piloswine', evolvesFrom: 'Swinub' }, [{ name: 'Swinub' }]),
+        true,
+      );
+      assert.equal(
+        matchesStadiumEvolveSearch({ name: 'Piloswine', evolvesFrom: 'Swinub' }, [{ name: 'Pikipek' }]),
+        false,
+      );
     });
 
     test('Jamming Tower: tool effects blocked via combinedDamagePrevention', async () => {

@@ -377,6 +377,16 @@ import test, { describe } from 'node:test';
       assert.equal(r.steps[0].type, 'passive');
     });
 
+    test('Grand Tree: stadium search-evolve is passive, not a one-shot searchDeck', () => {
+      const r = parseTrainerEffect(
+        "Once during each player's turn, that player may search their deck for a Stage 1 Pokémon that evolves from 1 of their Pokémon in play and put it onto that Pokémon to evolve it. If that Pokémon evolved during this turn, that player may search their deck for a Stage 2 Pokémon that evolves from that Pokémon and put it onto that Pokémon to evolve it. Then, that player shuffles their deck."
+      );
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'passive');
+      assert.ok(!r.steps.some((s) => s.type === 'searchDeck'));
+    });
+
     test('Canari: discard 1 cost + search up to 4 Pokémon', () => {
       const r = parseTrainerEffect("You can use this card only if you discard another card from your hand. Search your deck for up to 4 { L } Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);

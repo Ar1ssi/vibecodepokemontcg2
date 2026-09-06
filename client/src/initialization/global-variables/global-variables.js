@@ -33,6 +33,7 @@ export const systemState = {
   oppCounter: 0,
   isTwoPlayer: false,
   isReplay: false, // should be treated as false no matter what if isTwoPlayer is true
+  isCatchingUp: false, // true while replaying opponent actions from catch-up/resync
   selfReady: false, // true once the self player has pressed Set Up (ready check)
   oppReady: false, // true once the opp player has pressed Set Up (ready check)
   replayActionData: [],

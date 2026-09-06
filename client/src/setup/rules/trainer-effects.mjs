@@ -375,6 +375,17 @@ export function parseTrainerEffect(text = '') {
     return { steps, recognizable: true };
   }
 
+  // Stadium once-per-turn text is not a one-shot trainer. Must beat
+  // searchDeck / draw (Grand Tree: "once during each player's turn …
+  // search your deck for a Stage 1"; Mesagoza draw-until; Factory draw).
+  if (
+    /once during (?:each|either) player/.test(lower) ||
+    (/once per turn/.test(lower) && /that player may/.test(lower)) ||
+    /this stadium stays in play/.test(lower)
+  ) {
+    return { steps: [{ type: 'passive', detail: passiveDetail(lower) }], recognizable: true };
+  }
+
   // opponent shuffles hand to bottom then draws (Special Red Card)
   if (lower.includes('your opponent shuffles their hand') && lower.includes('bottom of their deck')) {
     const drawM = lower.match(/they draw\s+(\d+)\s+cards?/);
@@ -519,15 +530,6 @@ export function parseTrainerEffect(text = '') {
     const oppDraw = lower.match(/your opponent draws?\s+(\d+)\s+cards?/i);
     if (oppDraw) steps.push({ type: 'opponentDraw', count: Number(oppDraw[1]) });
     return { steps, recognizable: true };
-  }
-
-  // Stadium once-per-turn text is not a one-shot trainer. Must beat drawUntil
-  // (Mesagoza: "once during each player's turn … draw cards until you have 3").
-  if (
-    /once during (?:each|either) player/.test(lower) ||
-    (/once per turn/.test(lower) && /that player may/.test(lower))
-  ) {
-    return { steps: [{ type: 'passive', detail: passiveDetail(lower) }], recognizable: true };
   }
 
   // draw until you have N (standalone — Iris's Fighting Spirit, Ariana)

@@ -62,7 +62,7 @@ import {
   resolveTurnBoundary,
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '../../setup/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '../../setup/rules/search-reveal.mjs';
@@ -3348,6 +3348,118 @@ const finishStadiumAction = (user, card, emit, payload) => {
   processAction(user, emit, 'stadium-effect', [payload]);
 };
 
+const pokemonInPlayForUser = (user) =>
+  [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
+    (c) => c && String(c.type || '').includes('Pokémon') && !c.image?.attached
+  );
+
+const zoneOfInPlay = (user, host) => {
+  if (getZone(user, 'active').array.includes(host)) return { zoneId: 'active', zone: getZone(user, 'active') };
+  return { zoneId: 'bench', zone: getZone(user, 'bench') };
+};
+
+async function runStadiumSearchEvolve(user, card, emit, action = {}) {
+  const inPlay = pokemonInPlayForUser(user);
+  const deck = getZone(user, 'deck');
+  await Promise.all([...inPlay, ...deck.array].map((c) => ensureCardData(c)));
+
+  const pool = deck.array.filter((c) => matchesStadiumEvolveSearch(c, inPlay));
+  const finish = (opts) => {
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: card.name, ...opts });
+    finishStadiumAction(user, card, emit, { action: 'search-evolve' });
+  };
+
+  if (deck.array.length === 0) {
+    appendMessage(user, `🔍 ${card.name}: your deck is empty.`, 'announcement', false);
+    finish({ message: null });
+    return;
+  }
+  if (!inPlay.length) {
+    appendMessage(user, `🔍 ${card.name}: no Pokémon in play to evolve.`, 'announcement', false);
+    finish();
+    return;
+  }
+  if (!pool.length) {
+    appendMessage(
+      user,
+      `🔍 ${card.name}: no card in your deck evolves from a Pokémon you have in play.`,
+      'announcement',
+      false
+    );
+    finish();
+    return;
+  }
+
+  const evolvePicked = async (picked) => {
+    const host = inPlay.find((p) => lowerName(p.name) === lowerName(picked.evolvesFrom));
+    if (!host) {
+      appendMessage(user, `⛔ No in-play Pokémon for ${picked.name} to evolve onto.`, 'announcement', false);
+      finish();
+      return;
+    }
+    const { zoneId, zone } = zoneOfInPlay(user, host);
+    const hostIdx = zone.array.indexOf(host);
+    const deckIdx = deck.array.indexOf(picked);
+    if (deckIdx < 0 || hostIdx < 0) {
+      finish();
+      return;
+    }
+    await moveCardBundle(user, user, 'deck', zoneId, deckIdx, hostIdx, 'evolve');
+    appendMessage(
+      user,
+      `🔍 ${card.name}: ${picked.name} evolves onto ${host.name}.`,
+      'announcement',
+      false
+    );
+    if (action.chainStage2) {
+      const nextHost = zone.array.find((c) => c === picked) || zone.array[hostIdx];
+      const stage2 = deck.array.filter((c) => lowerName(c.evolvesFrom) === lowerName(picked.name));
+      if (stage2.length) {
+        openAbilityChoicePicker({
+          user,
+          title: `${card.name} — evolve ${picked.name} to Stage 2`,
+          candidates: stage2,
+          allCandidates: searchPickerAllCandidates(stage2, deck.array),
+          triggerCard: card,
+          zoneFrom: 'deck',
+          destination: zoneId,
+          onPick: async (next) => {
+            const nextIdx = deck.array.indexOf(next);
+            const nextHostIdx = zone.array.indexOf(nextHost);
+            if (nextIdx >= 0 && nextHostIdx >= 0) {
+              await moveCardBundle(user, user, 'deck', zoneId, nextIdx, nextHostIdx, 'evolve');
+              appendMessage(
+                user,
+                `🔍 ${card.name}: ${next.name} evolves onto ${picked.name}.`,
+                'announcement',
+                false
+              );
+            }
+            finish();
+          },
+          onCancel: () => finish(),
+        });
+        return;
+      }
+    }
+    finish();
+  };
+
+  openAbilityChoicePicker({
+    user,
+    title: `${card.name} — evolve a Pokémon in play`,
+    candidates: pool,
+    allCandidates: searchPickerAllCandidates(pool, deck.array),
+    triggerCard: card,
+    zoneFrom: 'deck',
+    destination: 'bench',
+    onPick: evolvePicked,
+    onCancel: () => finish(),
+  });
+}
+
+const lowerName = (name) => String(name || '').toLowerCase();
+
 // ── Stadium effect (taxonomy E, once-per-turn / setup-once) ──────────
 // Uses the active stadium's once-per-turn or setup-once effect.
 // For once-per-turn: draw N / search / search-evolve / heal based on the parsed effect.
@@ -3560,20 +3672,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       break;
     }
     case 'search-evolve': {
-      // Search-and-evolve (e.g. Grand Tree) evolves a Pokémon already in
-      // play rather than fetching a card to hand, and its exact target
-      // (which of your Pokémon in play, chained Stage 1 → Stage 2 search)
-      // is a player choice this rules engine doesn't drive a picker for —
-      // so this is guided, not auto-executed, same as other multi-choice
-      // Trainer searches elsewhere in the engine.
-      appendMessage(
-        user,
-        `🔍 ${card.name}: search your deck for a Pokémon that evolves from one of your Pokémon in play, then evolve it onto that Pokémon manually (see card text for any chained follow-up search).`,
-        'announcement',
-        false
-      );
-      shuffleZone(user, user, 'deck');
-      finishStadiumAction(user, card, emit, { action: 'search-evolve' });
+      await runStadiumSearchEvolve(user, card, emit, action);
       break;
     }
     case 'energy': {

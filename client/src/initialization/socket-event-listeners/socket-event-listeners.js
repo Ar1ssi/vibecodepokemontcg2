@@ -30,6 +30,7 @@ import { hashUserBoard } from '../../setup/zones/board-hash.js';
 
 let isImporting = false;
 let syncCheckInterval;
+let lastHashResyncAt = 0;
 let spectatorActionInterval;
 let pushActionQueue = Promise.resolve();
 export const removeSyncIntervals = () => {
@@ -319,6 +320,10 @@ export const initializeSocketEventListeners = () => {
       return;
     }
     if (data.boardHash && data.boardHash !== hashUserBoard('opp')) {
+      if (systemState.isCatchingUp) return;
+      const now = Date.now();
+      if (now - lastHashResyncAt < 8000) return;
+      lastHashResyncAt = now;
       logSync('syncCheck.hash', {
         peerSelfCounter: data.counter,
         localOppCounter: systemState.oppCounter,

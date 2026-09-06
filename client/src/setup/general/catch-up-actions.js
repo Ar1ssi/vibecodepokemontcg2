@@ -7,25 +7,30 @@ import { acceptAction } from './accept-action.js';
  * does not).
  */
 export const catchUpActions = async (actionData, fullReplay = false) => {
-  if (fullReplay) {
-    systemState.oppCounter = 0;
-  }
-  const missingData = (actionData || []).slice(systemState.oppCounter);
+  systemState.isCatchingUp = true;
+  try {
+    if (fullReplay) {
+      systemState.oppCounter = 0;
+    }
+    const missingData = (actionData || []).slice(systemState.oppCounter);
 
-  for (const entry of missingData) {
-    const parameters = entry.parameters ? [...entry.parameters] : entry.parameters;
-    if (entry.action !== 'exchangeData' && entry.action !== 'loadDeckData') {
-      systemState.exportActionData.push({
-        user: 'opp',
-        emit: true,
-        action: entry.action,
-        parameters,
-      });
+    for (const entry of missingData) {
+      const parameters = entry.parameters ? [...entry.parameters] : entry.parameters;
+      if (entry.action !== 'exchangeData' && entry.action !== 'loadDeckData') {
+        systemState.exportActionData.push({
+          user: 'opp',
+          emit: true,
+          action: entry.action,
+          parameters,
+        });
+      }
+      const ok = await acceptAction('opp', entry.action, parameters);
+      if (ok === false) {
+        break;
+      }
+      systemState.oppCounter++;
     }
-    const ok = await acceptAction('opp', entry.action, parameters);
-    if (ok === false) {
-      break;
-    }
-    systemState.oppCounter++;
+  } finally {
+    systemState.isCatchingUp = false;
   }
 };
