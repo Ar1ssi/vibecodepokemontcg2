@@ -48,11 +48,10 @@ import {
 } from '../../../setup/deck-constructor/default-card-back.mjs';
     
     import {
-      buildHoloCard,
-      resolveHoloEffect,
-      startHoloAnimation,
-      stopHoloAnimation,
-    } from '../../../setup/deck-builder/core/holo.mjs';
+  closeCardPreview,
+  openFloatingCardPreview,
+} from '../../../setup/image-logic/full-view.js';
+import { toHighResCardImageUrl } from '../../../setup/image-logic/card-image-url.mjs';
 
 const deckToSimRows = (deck = {}) => {
   const rows = [];
@@ -238,7 +237,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         },
         // Deferred so this object can be built before showCardPreview is
         // declared below (it is referenced lazily, at call time).
-        onPreviewCard: (imageUrl, card) => showCardPreview(imageUrl, card),
+        onPreviewCard: (imageUrl, card, sourceEl) =>
+          showCardPreview(imageUrl, card, sourceEl),
       });
     
       const switchMode = (mode) => {
@@ -623,7 +623,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         refreshMatSelection();
       };
 
-let activeHoloStop = null;
       // cache the preview holder while the image is still in the DOM — after
       // replaceChildren the image's parentElement becomes null
       const previewHolder = previewImage?.parentElement || null;
@@ -645,36 +644,37 @@ let activeHoloStop = null;
         }
       };
     
-      const showCardPreview = async (imageUrl, card = null) => {
-        if (!previewScrim || !previewImage || !imageUrl) return;
-        if (activeHoloStop) {
-          activeHoloStop();
-          activeHoloStop = null;
+      const deckBuilderSleeveSrc = () => {
+        const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
+        const sleeve = sleeveId
+          ? getSleeves().find((entry) => entry.id === sleeveId)
+          : null;
+        return (
+          sleeve?.image ||
+          systemState.cardBackSrc ||
+          'https://ptcgsim.online/src/assets/cardback.png'
+        );
+      };
+
+      const showCardPreview = async (imageUrl, card = null, sourceEl = null) => {
+        if (!imageUrl) return;
+        if (card?.id && !card.rarity) {
+          card = { ...card, rarity: await fetchRarity(card.id) };
         }
-        previewScrim.removeAttribute('hidden');
-    
-        let effect = null;
-        if (card?.id) {
-          const rarity = card.rarity || (await fetchRarity(card.id));
-          effect = resolveHoloEffect({ rarity });
-        }
-    
-        const holder = previewHolder;
-        if (effect) {
-          const cardEl = buildHoloCard(imageUrl, effect);
-          holder.replaceChildren(cardEl);
-          activeHoloStop = startHoloAnimation(cardEl);
-        } else {
-          previewImage.src = imageUrl;
-          holder.replaceChildren(previewImage);
-        }
+        const origin =
+          sourceEl?.querySelector?.('img.native-deck-builder-result-image') ||
+          sourceEl?.querySelector?.('img') ||
+          sourceEl;
+        openFloatingCardPreview({
+          sourceEl: origin || previewImage,
+          imageUrl: toHighResCardImageUrl(imageUrl),
+          card,
+          sleeveSrc: deckBuilderSleeveSrc(),
+        });
       };
     
       const hideCardPreview = () => {
-        if (activeHoloStop) {
-          activeHoloStop();
-          activeHoloStop = null;
-        }
+        closeCardPreview(null, false);
         if (!previewScrim) return;
         previewScrim.setAttribute('hidden', '');
         const holder = previewHolder;
@@ -696,7 +696,7 @@ let activeHoloStop = null;
         event.preventDefault();
         const index = target.dataset.resultIndex;
         const card = index !== undefined ? currentResults[Number(index)] : null;
-        showCardPreview(target.dataset.previewImage, card);
+        showCardPreview(target.dataset.previewImage, card, target);
       });
   }
 
@@ -713,7 +713,7 @@ let activeHoloStop = null;
           const index = row ? Number(row.dataset.deckRowIndex) : -1;
           const sortedCards = getSortedDeckCardArray(deck);
           const card = index >= 0 ? sortedCards[index] : null;
-          showCardPreview(target.dataset.previewImage, card);
+          showCardPreview(target.dataset.previewImage, card, target);
         });
   }
 

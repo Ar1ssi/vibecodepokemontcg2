@@ -1,5 +1,6 @@
 import { systemState } from '../../state.js';
 import { resetImage } from '../../setup/image-logic/reset-image.js';
+import { playDrawToHand } from '../../setup/image-logic/draw-flight.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { closePopups, deselectCard } from '../general/close-popups.js';
 import { updateCount } from '../general/count.js';
@@ -416,6 +417,9 @@ export const moveCard = async (
     } else {
       dZone.element.appendChild(movingCard.image);
       if (['hand', 'prizes', 'discard', 'lostZone'].includes(dZoneId)) hydrateHolo(movingCard);
+      if (oZoneId === 'deck' && dZoneId === 'hand') {
+        playDrawToHand(user, movingCard);
+      }
     }
     //update the cover of the deck/lostzone/discard if applicable
     updateDestinationCover(user, movingCard, dZoneId);

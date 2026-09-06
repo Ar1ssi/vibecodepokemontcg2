@@ -32,9 +32,10 @@ export const initializeActiveBenchCard = (user, movingCard, dZoneId, dZone) => {
     mutations.forEach((mutation) => {
       if (mutation.removedNodes.length > 0) {
         for (const removedNode of mutation.removedNodes) {
-          // Reparented nodes (double-click preview, holo wrapper) stay in the
-          // document — only discard an empty slot when the Pokémon was removed.
-          if (removedNode.isConnected) continue;
+          // Preview now clones instead of reparenting. An empty slot should
+          // always be discarded — including when moveCard reparents the <img>
+          // into a new play-container (the node stays `isConnected` there).
+          if (removedNode.closest?.('.card-preview-overlay')) continue;
           if (
             removedNode.nodeName === 'IMG' &&
             container.getElementsByTagName('img').length === 0

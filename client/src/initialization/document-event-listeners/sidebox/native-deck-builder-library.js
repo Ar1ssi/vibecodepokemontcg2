@@ -97,17 +97,10 @@ import {
             { sleeveId: entry.sleeveId || null, coinId: entry.coinId || null }
           );
           nextLibrary = created.library;
-<<<<<<< HEAD
-          seeded = true;
-        }
-
-        if (seeded) {
-=======
           changed = true;
         }
 
         if (changed) {
->>>>>>> origin/cursor/mega-ex-starter-decks-f133
           library = nextLibrary;
           saveLibraryToStorage(window.localStorage, library);
         }

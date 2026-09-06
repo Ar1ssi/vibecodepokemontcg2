@@ -1682,49 +1682,110 @@ ul, li {
   z-index: 2400;
   background-color: rgba(0, 0, 0, 0.8);
   cursor: pointer;
+  transition: background-color 0.18s ease, opacity 0.18s ease;
+}
+.card-preview-overlay.is-closing {
+  background-color: transparent;
+  cursor: default;
 }
 .card-preview-pop {
   position: fixed;
-  top: 50%;
-  left: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: 92vh;
-  max-width: min(94vw, 780px);
+  transform-origin: center center;
+  perspective: 1600px;
+  transform-style: preserve-3d;
   pointer-events: none;
+  z-index: 1;
+  will-change: transform;
 }
-.card-preview-pop > img.card-preview-card {
+.card-preview-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transform-origin: center center;
+  will-change: transform;
+}
+.card-preview-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.3rem;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: flat;
+}
+.card-preview-face--front {
+  pointer-events: auto;
+}
+.card-preview-face--back {
+  transform: rotateY(180deg);
+}
+.card-preview-sleeve {
   display: block;
-  height: min(88vh, calc(min(94vw, 780px) * 1.397));
-  width: auto;
-  max-height: 88vh;
-  max-width: min(94vw, 780px);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card-preview-face--front > img.card-preview-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   margin: 0;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
   border-radius: 0.3rem;
   pointer-events: auto;
+  image-rendering: auto;
 }
-.card-preview-pop > .mat-holo.card-preview-card {
-  width: auto !important;
-  height: min(88vh, calc(min(94vw, 780px) * 1.397)) !important;
-  max-height: 88vh;
-  max-width: min(94vw, 780px);
+.card-preview-face--front > .mat-holo.card-preview-card {
+  width: 100% !important;
+  height: 100% !important;
   aspect-ratio: var(--card-aspect);
   margin: 0;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
   pointer-events: auto;
   overflow: visible;
 }
-.card-preview-pop > .mat-holo.card-preview-card .card__translater,
-.card-preview-pop > .mat-holo.card-preview-card .card__rotator,
-.card-preview-pop > .mat-holo.card-preview-card .card__rotator > * {
+.card-preview-face--front > .mat-holo.card-preview-card .card__translater,
+.card-preview-face--front > .mat-holo.card-preview-card .card__rotator,
+.card-preview-face--front > .mat-holo.card-preview-card .card__rotator > * {
   width: 100%;
   height: 100%;
 }
-.card-preview-pop > .mat-holo.card-preview-card img {
+.card-preview-face--front > .mat-holo.card-preview-card img {
   display: block;
   object-fit: cover;
+}
+.card-draw-flight {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  perspective: 1600px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  z-index: 2200;
+  will-change: transform;
+}
+.card-draw-flight .card-preview-face--front > img.card-preview-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0.3rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+.card-preview-overlay.is-closing .card-preview-pop,
+.card-preview-overlay.is-closing .card-preview-face--front,
+.card-preview-overlay.is-closing .card-preview-face--front > img.card-preview-card,
+.card-preview-overlay.is-closing .card-preview-face--front > .mat-holo.card-preview-card {
+  pointer-events: none;
 }
 
 /* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */

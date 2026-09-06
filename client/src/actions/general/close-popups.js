@@ -171,6 +171,17 @@ export const closeFullView = (event) => {
 
 export const closePopups = (event) => {
   deselectCard();
+  // Preview close must not run closeFullView → refreshBoard, which re-seats
+  // every Active/Bench card. Keep the overlay as the only closer while it
+  // is up so the return flight cannot reshuffle the mat.
+  if (
+    isCardPreviewOpen() ||
+    event?.target?.closest?.('.card-preview-overlay')
+  ) {
+    closeCardPreview(event);
+    document.getElementById('cardContextMenu').style.display = 'none';
+    return;
+  }
   closeCardPreview(event);
   closeDiscardPileViewer(event);
   closeFullView(event);
