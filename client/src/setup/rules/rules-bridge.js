@@ -643,9 +643,9 @@ import {
           resetPrizes();
           resetStatuses();
           void (async () => {
-            await drawOpeningHand('self', 'self');
+            await drawOpeningHand('self', 'self', true);
             if (!systemState.isTwoPlayer) {
-              await drawOpeningHand('opp', 'opp');
+              await drawOpeningHand('opp', 'opp', true);
             }
             appendMessage('', 'Opening hands drawn!', 'announcement', false);
             appendMessage('', 'Rules engine active — good luck!', 'announcement', false);

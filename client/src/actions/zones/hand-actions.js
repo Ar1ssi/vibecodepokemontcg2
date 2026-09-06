@@ -20,11 +20,21 @@ export const setOpeningPrizes = async (user, initiator) => {
 };
 
 // Draw opening hand from the top of the deck (rules-mode step 2, after coin flip).
-export const drawOpeningHand = async (user, initiator) => {
+// emit=false when nested inside setup()/drawHand (those emit a parent action).
+// rules-bridge passes emit=true so the opponent receives the seven cards.
+export const drawOpeningHand = async (user, initiator, emit = false) => {
+  const oInitiator = initiator === 'self' ? 'opp' : 'self';
+  if (emit && user === 'opp' && systemState.isTwoPlayer) {
+    processAction(user, emit, 'drawOpeningHand', [oInitiator]);
+    return;
+  }
   const moveOpts = dealMoveOpts();
   const plan = setupDealPlan(getZone(user, 'deck').getCount());
   for (let i = 0; i < plan.hand; i++) {
     await moveCard(user, initiator, 'deck', 'hand', 0, false, moveOpts);
+  }
+  if (emit) {
+    processAction(user, emit, 'drawOpeningHand', [oInitiator]);
   }
 };
 

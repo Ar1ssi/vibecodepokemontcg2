@@ -55,6 +55,7 @@ import {
 } from '../../actions/zones/general.js';
 import {
   discardAndDraw,
+  drawOpeningHand,
   shuffleAndDraw,
   shuffleBottomAndDraw,
 } from '../../actions/zones/hand-actions.js';
@@ -76,6 +77,7 @@ const functions = {
   restartGame: restartGame,
   setup: setup,
   setupPrizes: setupPrizes,
+  drawOpeningHand: drawOpeningHand,
   readyUp: readyUp,
   takeTurn: takeTurn,
   draw: draw,
