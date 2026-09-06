@@ -1757,8 +1757,25 @@ import {
     const processBoardCard = (card) => {
       try {
             const img = card.image;
-            if (!img || img.__rulesTrainerAnnounced) return;
-            img.__rulesTrainerAnnounced = true;
+            if (!img || img.__rulesTrainerAnnounced || img.__rulesTrainerPending) return;
+            img.__rulesTrainerPending = true;
+            ensureCardData(card).then(async () => {
+              img.__rulesTrainerPending = false;
+              if (isStadiumCard(card)) {
+                for (const side of ['self', 'opp']) {
+                  const board = getZone(side, 'board');
+                  const idx = board.array.indexOf(card);
+                  if (idx >= 0) {
+                    const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+                    moveCardBundle(side, side, 'board', 'stadium', idx, false, 'move');
+                    break;
+                  }
+                }
+                img.__rulesTrainerAnnounced = true;
+                return;
+              }
+              if (img.__rulesTrainerAnnounced) return;
+              img.__rulesTrainerAnnounced = true;
             const isTrainer = String(card.type || '').toLowerCase().includes('trainer') ||
               String(card.supertype || '').toLowerCase().includes('trainer');
 if (!isTrainer) {
@@ -1848,10 +1865,7 @@ if (!isTrainer) {
                       });
                       return;
                     }
-            ensureCardData(card).then(() => {
-              // Stadiums are not one-shot Trainers. Playing one onto the board
-              // must not run draw / drawUntil / search as if it were a Supporter.
-              if (isStadiumCard(card)) return;
+              // Stadiums are not one-shot Trainers (play path is hand → stadium).
               const text = [card.effect || card.text || []].flat().join(' ');
               const parsed = parseTrainerEffect(text);
               if (!parsed.recognizable) {
@@ -1952,9 +1966,11 @@ if (!isTrainer) {
         if (rulesState.phase === 'ended') return;
         if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
         try {
-          const board = getZone('self', 'board');
-          if (!board?.array) return;
-          for (const card of board.array) processBoardCard(card);
+          for (const side of ['self', 'opp']) {
+            const board = getZone(side, 'board');
+            if (!board?.array) continue;
+            for (const card of board.array) processBoardCard(card);
+          }
         } catch {}
       }, 2000);
     };

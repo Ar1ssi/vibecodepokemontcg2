@@ -19,7 +19,7 @@ import { relocateAttachedCards } from './relocate-attached-cards.js';
 import { updateAttachedCardsPosition } from './update-attached-cards-position.js';
 import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
-import { updateStadiumCard } from './update-stadium-card.js';
+import { discardStadiumCardFromField, updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction } from '../../setup/rules/rules-state.mjs';
 import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
@@ -106,6 +106,16 @@ export const moveCard = async (
 
   if (!movingCard) return { destZoneId, ok: false };
 
+  // Stadium Trainers belong on the dedicated left-side field, not the play board.
+  if (oZoneId === 'hand' && dZoneId === 'board') {
+    await ensureCardData(movingCard);
+    if (isStadiumCard(movingCard)) {
+      dZoneId = 'stadium';
+      destZoneId = 'stadium';
+      dZone = getZone(user, 'stadium');
+    }
+  }
+
   // ── rules: Item play blocked by opponent Active (effect-prevent family) ─
   if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
     await ensureCardData(movingCard);
@@ -171,20 +181,10 @@ export const moveCard = async (
   }
 
   // ── rules: record a Stadium placed on the field (taxonomy E) ─────────
-  // hand → board is the play path; updateStadiumCard() (below) handles the
-  // UI-side discard of any existing Stadium. Recording state here — before
-  // the splice and before updateStadiumCard's recursive moveCard call —
-  // avoids that recursion clobbering the record with the discarded card.
-  //
-  // movingCard.type is always the coarse 'Trainer' bucket assigned at deck
-  // import (Stadiums/Supporters/Items/Tools are indistinguishable there),
-  // and movingCard.subtypes is only ever populated by ensureCardData()'s
-  // async TCGdex fetch — nothing awaited it before this check used to run,
-  // so subtypes was always still undefined and no Stadium was ever
-  // recorded. Awaiting it here (moveCard is already async) enriches the
-  // card first, then the shared isStadiumCard() detector (also used by
-  // stadium-effects.mjs, so the two no longer disagree) can see it.
-  if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
+  // hand → stadium is the play path (board drops are redirected above).
+  // discardStadiumCardFromField() clears the displaced card before the
+  // splice; updateStadiumCard() (below) is a safety net + orients the slot.
+  if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'stadium') {
     await ensureCardData(movingCard);
     if (isStadiumCard(movingCard)) {
       const displaced = markStadiumPlayed(user, movingCard);
@@ -195,6 +195,7 @@ export const moveCard = async (
           'announcement',
           false
         );
+        await discardStadiumCardFromField(displaced.user, displaced.card, initiator);
         if (parseStadiumBenchLimit(displaced.card)) {
           await enforceBenchLimit(user);
           await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
@@ -385,9 +386,9 @@ export const moveCard = async (
     systemState.isTwoPlayer &&
     systemState.initiator !== user;
   const isFaceDownCard =
-    movingCard.image.faceDown && ['active', 'bench', 'board'].includes(dZoneId);
+    movingCard.image.faceDown && ['active', 'bench', 'board', 'stadium'].includes(dZoneId);
   const mirrorPlayVisible =
-    syncReplay && ['active', 'bench', 'board'].includes(dZoneId);
+    syncReplay && ['active', 'bench', 'board', 'stadium'].includes(dZoneId);
 
   if (mirrorPlayVisible) {
     revealCard(user, movingCard);
@@ -541,7 +542,7 @@ export const moveCard = async (
 
   //reset type classification of the card if the card is no longer in play
   if (
-    !['active', 'board', 'bench', 'attachedCards'].includes(dZoneId) &&
+    !['active', 'board', 'bench', 'stadium', 'attachedCards'].includes(dZoneId) &&
     movingCard.type2
   ) {
     movingCard.type = movingCard.type2;
