@@ -3401,9 +3401,9 @@ import test from 'node:test';
       let fetched = false;
       const handler = (url) => {
         fetched = true;
-        if (url.includes('/cards/sv1-001')) {
+        if (url.includes('/cards/test-ph-30x-needtext')) {
           return detailResponse({
-            id: 'sv1-001',
+            id: 'test-ph-30x-needtext',
             name: 'Testmon',
             hp: '60',
             attacks: [
@@ -3420,7 +3420,7 @@ import test from 'node:test';
       };
       await withStubbedFetch(handler, async () => {
         const card = {
-          id: 'sv1-001',
+          id: 'test-ph-30x-needtext',
           name: 'Testmon',
           hp: 60,
           weakness: null,

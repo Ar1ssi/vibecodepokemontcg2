@@ -201,6 +201,8 @@
       const t = String(text).trim();
       if (!t) return true;
       if (/^\d+\+?$/.test(t)) return true;
+      if (/^\d+\s*[×x]\s*$/i.test(t)) return true;
+      if (/^[—–-]+$/.test(t)) return true;
       if (damage != null && String(damage) === t) return true;
       return false;
     }
