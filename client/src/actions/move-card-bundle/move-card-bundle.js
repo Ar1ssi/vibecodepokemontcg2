@@ -1,5 +1,6 @@
 import { socket, systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
+import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import {
   buildCardHint,
@@ -59,9 +60,10 @@ export const moveCardBundle = async (
   index,
   targetIndex,
   action,
-  emit = true,
-  cardHints = null
+  emitOrHints = true,
+  maybeHintsOrEmit
 ) => {
+  const { emit, tail: cardHints } = splitEmitAndTail(emitOrHints, maybeHintsOrEmit);
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'moveCardBundle', [
@@ -109,8 +111,11 @@ export const moveCardBundle = async (
         resolvedIndex,
         moving: cardHints.moving,
       });
-      socket.emit('resyncActions', { roomId: systemState.roomId });
-      return;
+      socket.emit('resyncActions', {
+        roomId: systemState.roomId,
+        reason: 'hint_mismatch',
+      });
+      return false;
     }
     if (!oZone.array[resolvedIndex]) {
       console.warn('moveCardBundle: no card at resolved index on mirror — requesting resync', {
@@ -122,8 +127,11 @@ export const moveCardBundle = async (
         oZoneId,
         resolvedIndex,
       });
-      socket.emit('resyncActions', { roomId: systemState.roomId });
-      return;
+      socket.emit('resyncActions', {
+        roomId: systemState.roomId,
+        reason: 'hint_mismatch',
+      });
+      return false;
     }
     syncOptions = { syncReplay: true };
     if (cardHints.isEvolution) {
@@ -161,8 +169,9 @@ export const moveCardBundle = async (
     resolvedTargetIndex,
     action
   );
+  let moveResult;
   try {
-    await moveCard(
+    moveResult = await moveCard(
       user,
       initiator,
       oZoneId,
@@ -184,16 +193,23 @@ export const moveCardBundle = async (
       targetIndex: resolvedTargetIndex,
       action,
     });
-    return;
+    return false;
   }
+
+  if (!moveResult || moveResult.ok === false) {
+    return false;
+  }
+
+  const actualDest = moveResult.destZoneId || dZoneId;
 
   processAction(user, emit, 'moveCardBundle', [
     oInitiator,
     oZoneId,
-    dZoneId,
+    actualDest,
     resolvedIndex,
     resolvedTargetIndex,
     action,
     hintsToSend,
   ]);
+  return true;
 };

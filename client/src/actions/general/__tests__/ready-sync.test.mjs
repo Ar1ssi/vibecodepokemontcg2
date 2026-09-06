@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { deckDataEquals } from '../../../setup/general/sync-action-args.mjs';
 
 // Simulates selfReady/oppReady on two clients for the fixed readyUp contract.
 function simulateReadyExchange({ hostInitiator, joinerInitiator }) {
@@ -54,27 +55,8 @@ test('ready exchange completes when joiner clicks first', () => {
   assert.equal(joiner.selfReady && joiner.oppReady, true);
 });
 
-function exchangeShouldReset({ prevUsername, prevDeck, username, deckData }) {
-  return prevUsername !== username || prevDeck !== deckData;
-}
-
 test('exchangeData skips reset when opponent metadata unchanged (resync replay)', () => {
-  assert.equal(
-    exchangeShouldReset({
-      prevUsername: 'Ash',
-      prevDeck: 'deck-a',
-      username: 'Ash',
-      deckData: 'deck-a',
-    }),
-    false
-  );
-  assert.equal(
-    exchangeShouldReset({
-      prevUsername: 'Ash',
-      prevDeck: 'deck-a',
-      username: 'Misty',
-      deckData: 'deck-b',
-    }),
-    true
-  );
+  const deck = [[1, 'Pikachu', 'Pokémon']];
+  assert.equal(deckDataEquals(deck, [[1, 'Pikachu', 'Pokémon']]), true);
+  assert.equal(deckDataEquals(deck, [[1, 'Raichu', 'Pokémon']]), false);
 });
