@@ -37,7 +37,7 @@ import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHa
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat } from './search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick } from './search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
 import {
   describeTypedSpecialEnergy,
   getTelepathicOnAttachSearch,
@@ -990,12 +990,12 @@ import {
                     'announcement',
                     false,
                   );
-                  shuffleZone(user, user, 'deck');
+                  shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
                 });
               },
               onCancel: () => {
                 appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
-                shuffleZone(user, user, 'deck');
+                shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name, message: null });
               },
             });
           }
@@ -1455,11 +1455,16 @@ import {
       });
       if (pool.length === 0) {
         appendMessage('', '  no cards left in deck', 'announcement', false);
+        shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: card.name });
         return false;
       }
       const dest = step.destination === 'Bench' ? 'bench' : 'hand';
       const toBench = dest === 'bench';
-      const shuffleAfter = () => shuffleZone(user, user, 'deck');
+      const shuffleAfter = (opts) =>
+        shuffleDeckAfterSearch(user, appendMessage, shuffleZone, {
+          sourceName: card.name,
+          ...opts,
+        });
       const count = step.count || 1;
       const upTo = step.upTo === true;
       const abilityText = card.ability?.text ?? card.abilityText ?? card.text ?? '';
@@ -1497,6 +1502,7 @@ import {
           },
           onCancel: () => {
             appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
+            shuffleAfter({ message: null });
           },
         });
         return result.ok;
@@ -1515,6 +1521,7 @@ import {
         },
         onCancel: () => {
           appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
+          shuffleAfter({ message: null });
         },
       });
       return result.ok;
