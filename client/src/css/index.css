@@ -3203,16 +3203,38 @@ a:hover {
       display: grid;
       place-items: center;
       background: conic-gradient(from 210deg,
-        rgba(255,255,255,0.35), rgba(120,120,130,0.15) 25%,
-        rgba(255,255,255,0.5) 50%, rgba(90,95,110,0.2) 75%,
-        rgba(255,255,255,0.35));
+        rgba(255,255,255,0.18), rgba(70,74,82,0.22) 25%,
+        rgba(255,255,255,0.22) 50%, rgba(50,54,62,0.28) 75%,
+        rgba(255,255,255,0.18));
       padding: 3px;
-    
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.5);}
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.28),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.45),
+        0 8px 14px rgba(0, 0, 0, 0.42);
+    }
     .coin-face img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
     .coin-face.coin-backc { transform: rotateX(180deg); }
-    
-    /* specular sheen layers (material-adapted) */
+
+    /* Brushed-metal grain (gold/silver only) — concentric micro-lines, not a gloss blob. */
+    .coin-mat-gold .coin-face::before,
+    .coin-mat-silver .coin-face::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      pointer-events: none;
+      background:
+        repeating-conic-gradient(
+          from 0deg,
+          rgba(255, 255, 255, 0.035) 0deg 0.7deg,
+          transparent 0.7deg 1.6deg
+        );
+      mix-blend-mode: overlay;
+      opacity: 0.55;
+    }
+
+    /* Specular layers: elongated anisotropic sweep, overlay (not screen).
+       Screen + a circular hotspot is what made the old coins look like plastic. */
     .coin-face::after {
       content: "";
       position: absolute;
@@ -3220,46 +3242,39 @@ a:hover {
       border-radius: 50%;
       pointer-events: none;
     }
-    /* GOLD: tight bright band + warm second bounce, like polished brass */
+    /* GOLD: warm metal streak, muted peak */
     .coin-mat-gold .coin-face::after {
       background:
-        radial-gradient(ellipse 34% 22% at var(--coin-x) var(--coin-y),
-          rgba(255, 246, 200, 0.85) 0%, rgba(255, 215, 120, 0.35) 42%, transparent 68%),
-        linear-gradient(115deg,
-          transparent 32%,
-          rgba(255, 230, 150, 0.28) 45%,
-          rgba(255, 250, 220, 0.4) 50%,
-          rgba(255, 230, 150, 0.28) 55%,
-          transparent 68%);
-      mix-blend-mode: screen;
+        radial-gradient(ellipse 78% 13% at var(--coin-x) var(--coin-y),
+          rgba(255, 228, 160, 0.32) 0%,
+          rgba(210, 160, 70, 0.1) 36%,
+          transparent 62%),
+        radial-gradient(ellipse 16% 10% at calc(var(--coin-x) - 10%) calc(var(--coin-y) - 12%),
+          rgba(255, 244, 210, 0.16) 0%,
+          transparent 72%);
+      mix-blend-mode: overlay;
     }
-    /* SILVER: cool white core + faint blue rim reflection */
+    /* SILVER: cool steel streak */
     .coin-mat-silver .coin-face::after {
       background:
-        radial-gradient(ellipse 30% 20% at var(--coin-x) var(--coin-y),
-          rgba(255, 255, 255, 0.9) 0%, rgba(210, 225, 245, 0.35) 45%, transparent 70%),
-        linear-gradient(115deg,
-          transparent 30%,
-          rgba(220, 235, 255, 0.25) 46%,
-          rgba(255, 255, 255, 0.38) 50%,
-          rgba(220, 235, 255, 0.25) 54%,
-          transparent 70%);
-      mix-blend-mode: screen;
+        radial-gradient(ellipse 76% 12% at var(--coin-x) var(--coin-y),
+          rgba(240, 246, 255, 0.28) 0%,
+          rgba(170, 185, 205, 0.09) 38%,
+          transparent 64%),
+        radial-gradient(ellipse 14% 9% at calc(var(--coin-x) - 10%) calc(var(--coin-y) - 12%),
+          rgba(255, 255, 255, 0.14) 0%,
+          transparent 72%);
+      mix-blend-mode: overlay;
     }
-    /* ENAMEL: broad soft sheen — glossy paint, not bare metal */
+    /* ENAMEL: satin paint, not wet lacquer */
     .coin-mat-enamel .coin-face::after {
       background:
-        radial-gradient(ellipse 46% 34% at var(--coin-x) var(--coin-y),
-          rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.12) 48%, transparent 72%);
-      mix-blend-mode: soft-light;
+        radial-gradient(ellipse 36% 20% at var(--coin-x) var(--coin-y),
+          rgba(255, 255, 255, 0.14) 0%,
+          rgba(255, 255, 255, 0.04) 42%,
+          transparent 68%);
+      mix-blend-mode: overlay;
     }
-    
-    /* beveled rim (shared) */
-    
-        
-    
-    
-    /* drop shadow under the disc */
         
     /* gallery cells */
     .native-deck-builder-coin-gallery {
@@ -3359,10 +3374,10 @@ a:hover {
     
     /* material rims (on the faces themselves — preserves 3D flip) */
     .coin-mat-gold .coin-face {
-      background: conic-gradient(from 210deg, #f5d67a, #8a6a1e 25%, #ffe9a8 50%, #6e5416 75%, #f5d67a);
+      background: conic-gradient(from 210deg, #c9a24a, #6a5218 25%, #e4c878 50%, #4d3c12 75%, #c9a24a);
     }
     .coin-mat-silver .coin-face {
-      background: conic-gradient(from 210deg, #e8edf5, #7a828f 25%, #ffffff 50%, #6b7380 75%, #e8edf5);
+      background: conic-gradient(from 210deg, #c5ccd6, #5c636e 25%, #dce2ea 50%, #4a515b 75%, #c5ccd6);
     }
     
     /* ── TCG Live-style coin toss ─────────────────────────────────────────
