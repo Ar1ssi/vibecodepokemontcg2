@@ -3,6 +3,7 @@ import test, { describe } from 'node:test';
     
     const { parseTrainerEffect, describeStep } = await import('../trainer-effects.mjs');
     const { energyMatchesSearchWhat } = await import('../energy-effects.mjs');
+    const { matchesSearch, filterSearchMatches, isPokemonCard } = await import('../search-match.mjs');
     
     test("Professor's Research: discard hand, draw 7", () => {
       const r = parseTrainerEffect("Discard your hand and draw 7 cards.");
@@ -424,6 +425,28 @@ import test, { describe } from 'node:test';
       assert.equal(energyMatchesSearchWhat(water, 'Basic {R} Energy'), false);
       assert.equal(energyMatchesSearchWhat(fire, 'Basic Energy'), true);
       assert.equal(energyMatchesSearchWhat(water, 'Basic Energy'), true);
+    });
+
+    test('Buddy-Buddy Poffin filter: Basic ≤70 HP includes stubs without hp', () => {
+      const stub = { name: 'Pikachu', type: 'Pokémon', stage: 'Basic' };
+      const overCap = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', hp: 90 };
+      const underCap = { name: 'Clefairy', type: 'Pokémon', stage: 'Basic', hp: 60 };
+      const what = 'Basic Pokémon ≤70 HP';
+      assert.equal(matchesSearch(stub, what), true);
+      assert.equal(matchesSearch(underCap, what), true);
+      assert.equal(matchesSearch(overCap, what), false);
+      const pool = filterSearchMatches([stub, overCap, underCap], what);
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu', 'Clefairy']);
+    });
+
+    test('Ultra Ball filter: any Pokémon in deck (type on image fallback)', () => {
+      const fromImageType = { name: 'Pikachu', image: { type: 'Pokémon' } };
+      const energy = { name: 'Basic Fire Energy', type: 'Energy' };
+      assert.equal(isPokemonCard(fromImageType), true);
+      assert.equal(matchesSearch(fromImageType, 'Pokémon'), true);
+      assert.equal(matchesSearch(energy, 'Pokémon'), false);
+      const pool = filterSearchMatches([fromImageType, energy], 'Pokémon');
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu']);
     });
 
     test('typed bench search: up to 3 {C} Pokémon with 100 HP or less', () => {

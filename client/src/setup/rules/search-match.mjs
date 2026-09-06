@@ -16,8 +16,19 @@ const SYMBOL_TO_TYPE = {
 
 export function isPokemonCard(card) {
   if (card?.hp) return true;
-  const t = String(card?.type || card?.supertype || '').toLowerCase();
+  const t = String(
+    card?.type || card?.supertype || card?.image?.type || ''
+  ).toLowerCase();
   return t.includes('pokémon') || t.includes('pokemon');
+}
+
+/** HP-cap search: exclude when HP is known over the cap; include when HP is not loaded yet. */
+function matchesHpCap(card, maxHp) {
+  const cardHp = Number(card.hp);
+  if (Number.isFinite(cardHp)) return cardHp <= maxHp;
+  // Deck zone cards often lack hp until async enrichment; keep Basic matches
+  // in the pool so the picker is usable (player verifies the card visually).
+  return true;
 }
 
 export function energySearchWhat({ basic = false, energyType = null } = {}) {
@@ -73,17 +84,9 @@ export function matchesSearch(card, what = '') {
     }
     if (w.includes('basic') && (card.stage || 'Basic') !== 'Basic') return false;
     const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
-    if (hpCap) {
-      const maxHp = Number(hpCap[1]);
-      const cardHp = Number(card.hp);
-      return Number.isFinite(cardHp) && cardHp <= maxHp;
-    }
+    if (hpCap) return matchesHpCap(card, Number(hpCap[1]));
     const hpOrLess = what.match(/(\d+)\s*hp\s*or\s*less/i);
-    if (hpOrLess) {
-      const maxHp = Number(hpOrLess[1]);
-      const cardHp = Number(card.hp);
-      return Number.isFinite(cardHp) && cardHp <= maxHp;
-    }
+    if (hpOrLess) return matchesHpCap(card, Number(hpOrLess[1]));
     if (w.includes('basic')) return (card.stage || 'Basic') === 'Basic';
     return true;
   }
