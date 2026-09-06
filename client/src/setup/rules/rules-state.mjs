@@ -268,6 +268,19 @@
           card[k] = v;
         }
       }
+      normalizeTrainerEnrichment(card);
+    }
+
+    /** TCGdex stores Trainer/Stadium/Tool text in `effect`; parsers read `text`. */
+    function normalizeTrainerEnrichment(card) {
+      const tt = String(card?.trainerType || '').trim();
+      if (!tt && !card?.effect) return;
+      if (!card.text && card.effect) {
+        card.text = card.effect;
+      }
+      if (tt && (!Array.isArray(card.subtypes) || card.subtypes.length === 0)) {
+        card.subtypes = [tt];
+      }
     }
 
     
@@ -326,9 +339,10 @@
           evolvesFrom: detail.evolvesFrom || null,
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || [],
+          trainerType: detail.trainerType || null,
           rarity: detail.rarity || card.rarity || '',
           effect: detail.effect || null,
-          text: detail.text || null,
+          text: detail.text || detail.effect || null,
         };
         cardDataCache.set(card.id, data);
         applyEnrichedData(card, data);

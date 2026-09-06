@@ -2728,6 +2728,92 @@ import test from 'node:test';
       }
     });
 
+    test('effectiveHp: applies attached Tool HP bonus', () => {
+      const mon = { name: 'Pikachu', hp: 100, image: { name: 'host' } };
+      const tool = {
+        name: "Hero's Cape",
+        type: 'Trainer',
+        trainerType: 'Tool',
+        text: 'The Pokémon this card is attached to gets +50 HP.',
+        image: { relative: mon.image },
+      };
+      const zone = [mon, tool];
+      assert.equal(effectiveHp(100, 'self', mon, zone), 150);
+    });
+
+    test('isPokemonToolCard / isStadiumCard: TCGdex trainerType', () => {
+      assert.equal(isPokemonToolCard({ type: 'Trainer', trainerType: 'Tool' }), true);
+      assert.equal(isStadiumCard({ type: 'Trainer', trainerType: 'Stadium', text: 'Once per turn, draw a card.' }), true);
+    });
+
+    // ── Tool combat hooks ────────────────────────────────────────────────
+
+    test('tool-combat: retreat, prize adjust, KO prevention, on-damage', async () => {
+      const {
+        combinedToolRetreatCost,
+        toolPrizeCountAdjust,
+        evaluateToolKoPrevention,
+        parseToolOnDamageEffect,
+        combinedToolAttackBonus,
+      } = await import('../tool-combat.mjs');
+      const mon = { name: 'Snorlax', hp: 100, retreatCost: 4, image: { name: 'host' } };
+      const heavyBoots = {
+        name: 'Heavy Boots',
+        type: 'Trainer',
+        trainerType: 'Tool',
+        text: 'The Retreat Cost of the Pokémon this card is attached to is {C} more.',
+        image: { relative: mon.image },
+      };
+      assert.equal(combinedToolRetreatCost(4, mon, [mon, heavyBoots]), 5);
+
+      const pearl = {
+        name: "Lillie's Pearl",
+        type: 'Trainer',
+        trainerType: 'Tool',
+        text: 'If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent\'s Pokémon, that player takes 1 fewer Prize card.',
+        image: { relative: mon.image },
+      };
+      assert.equal(toolPrizeCountAdjust(mon, [mon, pearl], 2), 1);
+
+      const brace = {
+        name: 'Survival Brace',
+        type: 'Trainer',
+        trainerType: 'Tool',
+        text: 'If the Pokémon this card is attached to has full HP and would be Knocked Out by damage from an attack from your opponent\'s Pokémon, it is not Knocked Out, and its remaining HP becomes 10.',
+        image: { relative: mon.image },
+      };
+      const koPrev = evaluateToolKoPrevention(mon, [mon, brace], {
+        currentDamage: 0,
+        incomingDamage: 10,
+        baseHp: 100,
+      });
+      assert.equal(koPrev.prevented, true);
+      assert.equal(koPrev.totalDamage, 9);
+
+      const helmet = {
+        name: 'Lucky Helmet',
+        type: 'Trainer',
+        trainerType: 'Tool',
+        text: 'If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent\'s Pokémon, draw 2 cards.',
+        image: { relative: mon.image },
+      };
+      assert.equal(parseToolOnDamageEffect(helmet).draw, 2);
+
+      const attacker = { name: 'Pikachu', types: ['Lightning'], image: { name: 'atk' } };
+      const bangle = {
+        name: 'Brave Bangle',
+        type: 'Trainer',
+        trainerType: 'Tool',
+        text: 'If the Pokémon this card is attached to doesn\'t have a Rule Box, the attacks it uses do 30 more damage to your opponent\'s Active Pokémon ex.',
+        image: { relative: attacker.image },
+      };
+      const defender = { name: 'Charizard ex', hp: 330, subtypes: ['ex'], image: { name: 'def' } };
+      assert.equal(
+        combinedToolAttackBonus(attacker, [attacker, bangle], defender, { defenderIsActive: true }),
+        30
+      );
+    });
+
     // ── Stadium evolution speed (continuous) ─────────────────────────────
 
     test('parseStadiumEvolutionSpeed: turn-gate relax / cost reduce / none', () => {

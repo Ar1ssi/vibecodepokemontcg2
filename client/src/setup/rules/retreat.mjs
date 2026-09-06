@@ -4,8 +4,9 @@
 import { rulesState } from './rules-state.mjs';
 import { canPayAttackCost } from './attack-engine.mjs';
 import { parseRetreatCostModifier, applyRetreatCostModifier } from './ability-executors.mjs';
+import { combinedToolRetreatCost } from './tool-combat.mjs';
 
-export function canRetreat(player, activeCard, attachedEnergies = []) {
+export function canRetreat(player, activeCard, attachedEnergies = [], zoneCards = []) {
   if (!rulesState.enabled) return { allowed: true };
   if (rulesState.turnPlayer !== player) {
     return { allowed: false, reason: "It's not your turn." };
@@ -16,8 +17,7 @@ export function canRetreat(player, activeCard, attachedEnergies = []) {
   if (rulesState.flags[player]?.retreatedThisTurn) {
     return { allowed: false, reason: 'You already retreated this turn.' };
   }
-  const mod = parseRetreatCostModifier(activeCard);
-  const costN = applyRetreatCostModifier(activeCard?.retreatCost || 0, mod?.delta || 0);
+  const costN = combinedToolRetreatCost(activeCard?.retreatCost || 0, activeCard, zoneCards);
   const cost = new Array(costN).fill('Colorless');
   if (!canPayAttackCost(attachedEnergies, cost)) {
     return { allowed: false, reason: `Not enough energy to retreat (costs ${costN}).` };

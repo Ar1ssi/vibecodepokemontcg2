@@ -86,7 +86,7 @@
     
     // Called when the attack engine reports a KO. Handles prize award + any
     // win check. Returns an announcement payload for the UI.
-    export function handleKO({ attackerPlayer, defender, defenderBoard }) {
+    export function handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride }) {
       const outcome = koOutcome(defender);
       // GX rule: KO'ing the opponent's Pokémon GX wins the match immediately
       // (no prizes are taken for the GX knockout itself).
@@ -100,7 +100,7 @@
           reason: 'opponent Pokémon GX was Knocked Out',
         };
       }
-      const prizeCount = outcome.count;
+      const prizeCount = prizeCountOverride ?? outcome.count;
       const award = awardPrizes(attackerPlayer, prizeCount);
       return {
         prizeCount,

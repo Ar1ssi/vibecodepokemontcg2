@@ -32,6 +32,15 @@ import {
   isPokemonToolCard,
   attachedTools,
 } from '../../setup/rules/ability-executors.mjs';
+import {
+  combinedToolDamagePrevention,
+  applyToolDamageReduction,
+  combinedToolAttackBonus,
+  evaluateToolKoPrevention,
+  toolPrizeCountAdjust,
+  attachedToolOnDamageEffects,
+  combinedToolRetreatCost,
+} from '../../setup/rules/tool-combat.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '../../setup/rules/damage-parser.mjs';
@@ -39,7 +48,7 @@ import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
-import { handleKO, promotionGuidance, planPromotion } from '../../setup/rules/ko-flow.mjs';
+import { handleKO, promotionGuidance, planPromotion, koOutcome } from '../../setup/rules/ko-flow.mjs';
 import { markRetreated } from '../../setup/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
@@ -316,10 +325,22 @@ function opponentHasSpecialEnergy(player) {
 }
 
 function remainingHp(player, card, zoneId, index) {
-  const hp = effectiveHp(card.hp ?? 0, player, card);
-  const el = getZone(player, zoneId).array[index]?.image?.damageCounter;
+  const zone = getZone(player, zoneId);
+  const hp = effectiveHp(card.hp ?? 0, player, card, zone.array);
+  const el = zone.array[index]?.image?.damageCounter;
   const dmg = el ? parseInt(el.textContent || '0', 10) || 0 : 0;
   return Math.max(0, hp - dmg);
+}
+
+function koWithToolPrizes(attackerPlayer, defender, defenderBoard) {
+  const blockTools = stadiumBlocksToolEffects();
+  const zoneCards = defenderBoard?.array || [];
+  const outcome = koOutcome(defender);
+  const prizeCountOverride =
+    outcome.type === 'prizes'
+      ? toolPrizeCountAdjust(defender, zoneCards, outcome.count, { blockTools })
+      : undefined;
+  return handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride });
 }
 
 // Re-read attack effect text after ensureCardData may have merged TCGdex data.
@@ -771,16 +792,36 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               false,
             );
           }
+          const activeZone = getZone(user, 'active');
+          const oppKeyForBonus =
+            oppActive?.image?.dataset?.cardId || oppActive?.name || '';
+          const oppStatusForBonus = getStatus(oppPlayer, oppKeyForBonus);
+          const defenderPoisoned = !!oppStatusForBonus?.poisoned;
+          const toolBonus = combinedToolAttackBonus(active, activeZone.array, oppActive, {
+            blockTools: stadiumBlocksToolEffects(),
+            defenderIsActive: true,
+            defenderPoisoned,
+          });
+          if (toolBonus > 0) {
+            dmg = { ...dmg, total: dmg.total + toolBonus };
+            appendMessage(
+              user,
+              `🔧 Tool — +${toolBonus} damage to ${oppActive?.name || 'Defending Pokémon'}!`,
+              'announcement',
+              false,
+            );
+          }
         }
 
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
           const oppActiveZone = getZone(oppPlayer, 'active');
+          const blockTools = stadiumBlocksToolEffects();
           const prevention = combinedPendingDamagePrevention(
             rulesState,
             oppPlayer,
-            combinedDamagePrevention(oppActive, oppActiveZone.array, {
-              blockTools: stadiumBlocksToolEffects(),
+            combinedToolDamagePrevention(oppActive, oppActiveZone.array, active, {
+              blockTools,
             }),
             active
           );
@@ -793,6 +834,22 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               false
             );
             dmg = { ...dmg, total: prevented };
+          }
+          const toolReduced = applyToolDamageReduction(
+            dmg.total,
+            oppActive,
+            oppActiveZone.array,
+            active,
+            { blockTools }
+          );
+          if (toolReduced !== dmg.total) {
+            appendMessage(
+              user,
+              `🔧 Tool on ${oppActive?.name || 'the defender'} reduces damage!`,
+              'announcement',
+              false
+            );
+            dmg = { ...dmg, total: toolReduced };
           }
           // Continuous stadium damage prevention (taxonomy E)
           const st = getStadium()?.card;
@@ -864,10 +921,37 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           currentDmg =
             parseInt(oppActive.image.damageCounter.textContent || '0', 10) || 0;
         }
-        totalDmg = currentDmg + dmg.total;
-
-        // Place damage counters
-        placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
+        const oppActiveZoneForKo = getZone(oppPlayer, 'active');
+        const blockToolsKo = stadiumBlocksToolEffects();
+        const koPrev = rulesState.enabled
+          ? evaluateToolKoPrevention(oppActive, oppActiveZoneForKo.array, {
+              currentDamage: currentDmg,
+              incomingDamage: dmg.total,
+              baseHp: effectiveHp(
+                oppActive.hp ?? 0,
+                oppPlayer,
+                oppActive,
+                oppActiveZoneForKo.array
+              ),
+              blockTools: blockToolsKo,
+            })
+          : { prevented: false, totalDamage: currentDmg + dmg.total };
+        if (koPrev.prevented) {
+          totalDmg = koPrev.totalDamage;
+          const damageToPlace = Math.max(0, koPrev.totalDamage - currentDmg);
+          if (damageToPlace > 0) {
+            placeSelfDamage(oppPlayer, 'active', 0, damageToPlace);
+          }
+          appendMessage(
+            user,
+            `🔧 ${koPrev.tool || 'Tool'} — ${oppActive?.name || 'Defender'} survives with ${koPrev.surviveHp ?? 10} HP remaining!`,
+            'announcement',
+            false
+          );
+        } else {
+          totalDmg = currentDmg + dmg.total;
+          placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
+        }
         const willSearch =
           rulesState.enabled && parseAttackSearchClause(atk.text);
         if (dmg.total > 0 || !willSearch) {
@@ -879,14 +963,46 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           );
         }
 
-        // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
+        if (rulesState.enabled && dmg.total > 0) {
+          for (const eff of attachedToolOnDamageEffects(oppActive, oppActiveZoneForKo.array, {
+            blockTools: blockToolsKo,
+            isActive: true,
+          })) {
+            if (eff.draw > 0) {
+              draw(oppPlayer, oppPlayer, eff.draw, emit);
+              appendMessage(
+                user,
+                `🔧 ${eff.tool.name}: ${oppPlayer === 'self' ? 'You' : 'Opponent'} draw ${eff.draw} card(s).`,
+                'announcement',
+                false
+              );
+            }
+            if (eff.damageAttacker > 0) {
+              placeSelfDamage(user, 'active', 0, eff.damageAttacker);
+              appendMessage(
+                user,
+                `🔧 ${eff.tool.name}: Attacking Pokémon takes ${eff.damageAttacker} damage counter(s)!`,
+                'announcement',
+                false
+              );
+            }
+            if (eff.discardTool && eff.tool?.image) {
+              const z = oppActiveZoneForKo;
+              const idx = z.array.indexOf(eff.tool);
+              if (idx >= 0) moveCard(oppPlayer, user, 'active', 'discard', idx);
+            }
+          }
+        }
+
+        // KO check → prizes (effective HP includes stadium + tool HP modifiers)
+        oppHp = effectiveHp(
+          oppActive.hp ?? 0,
+          oppPlayer,
+          oppActive,
+          oppActiveZoneForKo.array
+        );
         if (oppHp > 0 && totalDmg >= oppHp) {
-          const koResult = handleKO({
-            attackerPlayer: user,
-            defender: oppActive,
-            defenderBoard: getZone(oppPlayer, 'active'),
-          });
+          const koResult = koWithToolPrizes(user, oppActive, getZone(oppPlayer, 'active'));
           if (koResult.won) {
             appendMessage(user, '🏆 Victory!', 'announcement', false);
           } else {
@@ -897,6 +1013,26 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               false
             );
             await _takePrizesWithPicker(user, koResult.prizeCount);
+            for (const eff of attachedToolOnDamageEffects(oppActive, oppActiveZoneForKo.array, {
+              blockTools: blockToolsKo,
+              isActive: true,
+            })) {
+              if (eff.searchDeckOnKo > 0) {
+                const deck = getZone(oppPlayer, 'deck');
+                let moved = 0;
+                for (let i = 0; i < deck.array.length && moved < eff.searchDeckOnKo; ) {
+                  moveCardBundle(oppPlayer, oppPlayer, 'deck', 'hand', i, false, 'move');
+                  moved++;
+                }
+                shuffleZone(oppPlayer, oppPlayer, 'deck');
+                appendMessage(
+                  user,
+                  `🔧 ${eff.tool.name}: put ${moved} card(s) from deck into hand.`,
+                  'announcement',
+                  false
+                );
+              }
+            }
             // P4: real promotion — move KO'd active to discard, promote first bench.
             const benchCount = countBenchPokemon(getZone(oppPlayer, 'bench'));
             const plan = planPromotion(true, benchCount);
@@ -1026,11 +1162,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           const lowestHpKo = /least hp remaining/i.test(String(atk.text || ''));
 
           if (!alreadyKO && exactThreshold !== null && totalDmg === exactThreshold) {
-            const koResult = handleKO({
-              attackerPlayer: user,
-              defender: oppActive,
-              defenderBoard: getZone(oppPlayer, 'active'),
-            });
+            const koResult = koWithToolPrizes(user, oppActive, getZone(oppPlayer, 'active'));
             if (koResult.won) {
               appendMessage(user, '🏆 Victory!', 'announcement', false);
             } else {
@@ -1049,11 +1181,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             const stage = String(oppActive?.stage || 'Basic').toLowerCase();
             const isBasic = stage === 'basic' || oppActive?.basic !== false;
             if (isBasic) {
-              const koResult = handleKO({
-                attackerPlayer: user,
-                defender: oppActive,
-                defenderBoard: getZone(oppPlayer, 'active'),
-              });
+              const koResult = koWithToolPrizes(user, oppActive, getZone(oppPlayer, 'active'));
               appendMessage(
                 user,
                 `🎯 ${oppActive?.name || 'The active'} is Basic — KO!`,
@@ -1067,11 +1195,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             specialEnergyKoClause(atk.text) &&
             opponentHasSpecialEnergy(oppPlayer)
           ) {
-            const koResult = handleKO({
-              attackerPlayer: user,
-              defender: oppActive,
-              defenderBoard: getZone(oppPlayer, 'active'),
-            });
+            const koResult = koWithToolPrizes(user, oppActive, getZone(oppPlayer, 'active'));
             appendMessage(
               user,
               `🎯 ${oppActive?.name || 'The active'} has Special Energy — KO!`,
@@ -1083,19 +1207,11 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             const selfActive = getZone(user, 'active').array[0];
             appendMessage(user, '🎯 Both Active Pokémon are Knocked Out!', 'announcement', false);
             if (selfActive) {
-              const selfKo = handleKO({
-                attackerPlayer: oppPlayer,
-                defender: selfActive,
-                defenderBoard: getZone(user, 'active'),
-              });
+              const selfKo = koWithToolPrizes(oppPlayer, selfActive, getZone(user, 'active'));
               if (!selfKo.won) await _takePrizesWithPicker(oppPlayer, selfKo.prizeCount);
             }
             if (!alreadyKO) {
-              const koResult = handleKO({
-                attackerPlayer: user,
-                defender: oppActive,
-                defenderBoard: getZone(oppPlayer, 'active'),
-              });
+              const koResult = koWithToolPrizes(user, oppActive, getZone(oppPlayer, 'active'));
               if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
             }
           } else if (!alreadyKO && lowestHpKo) {
@@ -1131,11 +1247,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 false
               );
               if (pick.zoneId === 'active') {
-                const koResult = handleKO({
-                  attackerPlayer: user,
-                  defender: pick.card,
-                  defenderBoard: getZone(pick.player, 'active'),
-                });
+                const koResult = koWithToolPrizes(user, pick.card, getZone(pick.player, 'active'));
                 if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
               } else {
                 placeSelfDamage(pick.player, pick.zoneId, pick.index, pick.remaining || 999);
@@ -1145,11 +1257,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           const status = getStatus(oppPlayer, oppKey);
           const hasCondition = status && Object.values(status).some(Boolean);
           if (hasCondition) {
-            const koResult = handleKO({
-              attackerPlayer: user,
-              defender: oppActive,
-              defenderBoard: getZone(oppPlayer, 'active'),
-            });
+            const koResult = koWithToolPrizes(user, oppActive, getZone(oppPlayer, 'active'));
             if (koResult.won) {
               appendMessage(user, '🏆 Victory!', 'announcement', false);
             } else {
@@ -1292,19 +1400,19 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               );
             }
             placeSelfDamage(oppPlayer, 'bench', benchIdx, parsed.bench);
-            const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer, benchTarget);
-            const benchDmgEl =
-              getZone(oppPlayer, 'bench').array[benchIdx]?.image
-                ?.damageCounter;
+            const benchZone = getZone(oppPlayer, 'bench');
+            const benchHp = effectiveHp(
+              benchTarget.hp ?? 0,
+              oppPlayer,
+              benchTarget,
+              benchZone.array
+            );
+            const benchDmgEl = benchZone.array[benchIdx]?.image?.damageCounter;
             const benchDmg = benchDmgEl
               ? parseInt(benchDmgEl.textContent || '0', 10) || 0
               : 0;
             if (benchHp > 0 && benchDmg >= benchHp) {
-              const benchKO = handleKO({
-                attackerPlayer: user,
-                defender: benchTarget,
-                defenderBoard: getZone(oppPlayer, 'bench'),
-              });
+              const benchKO = koWithToolPrizes(user, benchTarget, benchZone);
               if (benchKO.won) {
                 appendMessage(user, '🏆 Victory!', 'announcement', false);
               } else {
@@ -1354,19 +1462,19 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             for (const { card: benchTarget, idx: benchIdx } of oppBench) {
               const hitName = benchTarget?.name || 'a benched Pokémon';
               placeSelfDamage(oppPlayer, 'bench', benchIdx, allBench);
-              const benchDmgEl =
-                getZone(oppPlayer, 'bench').array[benchIdx]?.image
-                  ?.damageCounter;
+              const benchZone = getZone(oppPlayer, 'bench');
+              const benchDmgEl = benchZone.array[benchIdx]?.image?.damageCounter;
               const benchDmg = benchDmgEl
                 ? parseInt(benchDmgEl.textContent || '0', 10) || 0
                 : 0;
-              const benchHp = effectiveHp(benchTarget.hp ?? 0, oppPlayer, benchTarget);
+              const benchHp = effectiveHp(
+                benchTarget.hp ?? 0,
+                oppPlayer,
+                benchTarget,
+                benchZone.array
+              );
               if (benchHp > 0 && benchDmg >= benchHp) {
-                const benchKO = handleKO({
-                  attackerPlayer: user,
-                  defender: benchTarget,
-                  defenderBoard: getZone(oppPlayer, 'bench'),
-                });
+                const benchKO = koWithToolPrizes(user, benchTarget, benchZone);
                 if (benchKO.won) {
                   appendMessage(user, '🏆 Victory!', 'announcement', false);
                 } else {
@@ -1644,11 +1752,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             return dmgN === benchKoThreshold;
           });
           if (match) {
-            const koResult = handleKO({
-              attackerPlayer: user,
-              defender: match.card,
-              defenderBoard: getZone(oppPlayer, 'bench'),
-            });
+            const koResult = koWithToolPrizes(user, match.card, getZone(oppPlayer, 'bench'));
             appendMessage(
               user,
               `🎯 ${match.card.name || 'A benched Pokémon'} had exactly ${benchKoThreshold} damage counters — KO!`,
@@ -2026,10 +2130,17 @@ export const retreat = (user, emit = true) => {
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
     const baseRetreatCost = active?.retreatCost ?? 0;
+    const activeZoneForRetreat = getZone(user, 'active');
     let retreatCost = rulesState.enabled
       ? getStadiumRetreatCost(baseRetreatCost, active, user)
       : baseRetreatCost;
     if (rulesState.enabled) {
+      retreatCost = combinedToolRetreatCost(
+        retreatCost,
+        active,
+        activeZoneForRetreat.array,
+        { blockTools: stadiumBlocksToolEffects() }
+      );
       retreatCost += pendingRetreatCostDelta(rulesState, user);
     }
     if (retreatCost > 0 && !hasRedirectEnergy) {

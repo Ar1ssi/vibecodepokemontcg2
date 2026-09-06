@@ -1121,7 +1121,7 @@ import {
                 const damage = parseInt(dmgText, 10) || 0;
                 if (damage <= 0 || !card.hp) continue;
                 await ensureCardData(card);
-                const effHp = effectiveHp(card.hp, player);
+                const effHp = effectiveHp(card.hp, player, card, zone.array);
                 if (effHp > 0 && damage >= effHp) {
                   card.__rulesKODetected = true;
                   const who = player === 'self' ? 'Your' : "Opponent's";
