@@ -11,7 +11,7 @@ import { ensureCardData, getStadium } from './rules-state.mjs';
 import { normalizeStage, isRareCandyJump, markEvolvedThisTurn } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
 import { filterSearchMatches } from './search-match.mjs';
-import { maybeAnnounceSearchReveal } from './search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from './search-reveal.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -818,6 +818,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               candidates: matches,
               zoneFrom: 'discard',
               destination: 'hand',
+              onPick: (picked) => announceDiscardPick('self', card.name, picked, _appendMessage),
             });
           }
           break;
@@ -846,6 +847,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               requiredCount: Math.min(choice.count, pool.length),
               onConfirm: (picked) => {
                 const list = Array.isArray(picked) ? picked : [picked];
+                announceDiscardPick('self', card.name, list, _appendMessage);
                 for (const p of list) {
                   const i = zone('self', 'discard').array.indexOf(p);
                   if (i >= 0) moveCardBundle('self', 'self', 'discard', 'deck', i, false, 'move');
@@ -873,6 +875,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
             zoneFrom: 'discard',
             destination: 'hand',
             onPick: (energy) => {
+              announceDiscardPick('self', card.name, energy, _appendMessage);
               const targets = getInPlayPokemon('self');
               if (targets.length === 1) {
                 const t = targets[0];
@@ -1273,7 +1276,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               openPickOnly({
                 title: `${card.name} — choose discard Pokémon to swap`,
                 candidates: disc,
-                onPick: (d) => swapPokemonWithDiscard(play, d),
+                onPick: (d) => {
+                  announceDiscardPick('self', card.name, d, _appendMessage);
+                  swapPokemonWithDiscard(play, d);
+                },
               });
             },
           });

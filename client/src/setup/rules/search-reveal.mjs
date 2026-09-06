@@ -13,6 +13,11 @@ export function announceSearchReveal(user, sourceName, picked, appendMessage) {
   );
 }
 
+/** Discard picks are always public — broadcast without requiring "reveal" in text. */
+export function announceDiscardPick(user, sourceName, picked, appendMessage) {
+  announceSearchReveal(user, sourceName, picked, appendMessage);
+}
+
 /** Reveal when the parsed step or source text calls for it. */
 export function maybeAnnounceSearchReveal(
   user,

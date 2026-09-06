@@ -387,6 +387,15 @@ import test, { describe } from 'node:test';
       assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
     });
 
+    test('announceDiscardPick: always broadcasts picked discard card', async () => {
+      const { announceDiscardPick } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      announceDiscardPick('self', 'Super Rod', [{ name: 'Pikachu' }], append);
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Super Rod\): Pikachu/);
+    });
+
     test('maybeAnnounceSearchReveal: skips when effect has no reveal', async () => {
       const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
       let called = 0;

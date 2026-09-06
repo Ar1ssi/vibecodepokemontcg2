@@ -36,7 +36,7 @@ import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHa
 import { isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat } from './search-match.mjs';
-import { maybeAnnounceSearchReveal } from './search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from './search-reveal.mjs';
 import {
   describeTypedSpecialEnergy,
   getTelepathicOnAttachSearch,
@@ -1746,6 +1746,7 @@ import {
                 multiSelect: true,
                 requiredCount: Math.min(upTo, matches.length),
                 onConfirm: (selected) => {
+                  announceDiscardPick(user, card.name, selected, appendMessage);
                   import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
                     for (const s of selected) {
                       const idx = getZone(user, 'discard').array.indexOf(s);
@@ -1761,6 +1762,9 @@ import {
                 candidates: matches,
                 zoneFrom: 'discard',
                 destination: 'hand',
+                onPick: (picked) => {
+                  announceDiscardPick(user, card.name, picked, appendMessage);
+                },
               });
               if (result.ok) executed = true;
             }

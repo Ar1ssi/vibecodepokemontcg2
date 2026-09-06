@@ -51,7 +51,7 @@ import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../c
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
-import { maybeAnnounceSearchReveal } from '../../setup/rules/search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -2290,6 +2290,7 @@ export const recursionAbility = async (user, emit = true, targetCard = null) => 
     zoneFrom: 'discard',
     destination: 'hand',
     onPick: (picked) => {
+      announceDiscardPick(user, target.name, picked, appendMessage);
       appendMessage(
         user,
         `♻️ ${target.name} returns ${picked.name || 'a card'} to hand.`,
