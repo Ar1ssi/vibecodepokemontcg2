@@ -172,14 +172,27 @@ export const previewTargetSize = (
   return { width: height / CARD_ASPECT, height };
 };
 
+export const previewSizeForSource = (
+  sourceRect,
+  viewport = { width: globalThis.innerWidth, height: globalThis.innerHeight }
+) => {
+  const max = previewTargetSize(viewport);
+  const aspect = sourceRect.height / Math.max(sourceRect.width, 1);
+  let width = max.width;
+  let height = width * aspect;
+  if (height > max.height) {
+    height = max.height;
+    width = height / Math.max(aspect, 0.01);
+  }
+  return { width, height };
+};
+
 export const popoverScaleFor = (
   rect,
   viewport = { width: globalThis.innerWidth, height: globalThis.innerHeight }
 ) => {
-  const target = previewTargetSize(viewport);
-  const scaleW = target.width / Math.max(rect.width, 1);
-  const scaleH = target.height / Math.max(rect.height, 1);
-  return Math.min(scaleW, scaleH);
+  const target = previewSizeForSource(rect, viewport);
+  return target.width / Math.max(rect.width, 1);
 };
 
 export const centerDeltaFor = (

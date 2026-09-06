@@ -5,6 +5,7 @@ import {
   centerDeltaFor,
   createPopoverMotion,
   popoverScaleFor,
+  previewSizeForSource,
   previewTargetSize,
 } from '../card-pop.mjs';
 
@@ -28,6 +29,14 @@ test('popoverScaleFor grows a board card to the original preview size', () => {
     target.width / 100
   );
   assert.ok(popoverScaleFor({ width: 100, height: 140 }, viewport) > 4);
+});
+
+test('previewSizeForSource keeps the source aspect inside the preview box', () => {
+  const source = { width: 80, height: 128 };
+  const target = previewSizeForSource(source, viewport);
+  assert.ok(target.width <= previewTargetSize(viewport).width + 0.01);
+  assert.ok(target.height <= previewTargetSize(viewport).height + 0.01);
+  assert.ok(Math.abs(target.height / target.width - 128 / 80) < 0.001);
 });
 
 test('centerDeltaFor moves the card center onto the viewport center', () => {

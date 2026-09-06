@@ -7,24 +7,21 @@ import {
   cardBackSrcForUser,
   cardNode,
   fullViewHost,
-  hydrateHolo,
   imageAnchor,
-  isCardHidden,
-  isInCardPreview,
 } from '../deck-constructor/hydrate-holo.js';
 import { toHighResCardImageUrl } from './card-image-url.mjs';
 import {
   playSelectPop,
   playDeselectPop,
   makePopFrame,
-  previewTargetSize,
+  previewSizeForSource,
   stopPop,
   viewportRectOf,
 } from './card-pop.mjs';
 
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 
-/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement | null, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement, mode?: 'board' | 'float' } | null} */
+/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement | null, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement, mode?: 'board' | 'float', onClosed?: () => void } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
@@ -34,15 +31,8 @@ export const resolvePreviewSleeveSrc = (card, image) => {
   return cardBackSrcForUser(user) || DEFAULT_SLEEVE;
 };
 
-const adoptNode = (node, doc) => {
-  if (!node || node.ownerDocument === doc) return node;
-  return doc.adoptNode(node);
-};
-
 const startPreviewHolo = (wrapper) => {
   if (!wrapper) return;
-  wrapper.style.width = '';
-  wrapper.style.height = '';
   startHoloAnimation(wrapper, { auto: true });
 };
 
@@ -61,17 +51,17 @@ const showCardCounters = (image) => {
 const applyHighResToImage = (image) => {
   if (!image?.src) return;
   const next = toHighResCardImageUrl(image.currentSrc || image.src);
-  if (next && next !== image.src) {
-    image.src = next;
-  }
+  if (!next || next === image.src) return;
+  const probe = new Image();
+  probe.onload = () => {
+    if (image.isConnected) image.src = next;
+  };
+  probe.src = next;
 };
 
 const placePopHostOnSource = (popHost, sourceRect) => {
-  const target = previewTargetSize();
-  const startScale = Math.min(
-    sourceRect.width / target.width,
-    sourceRect.height / target.height
-  );
+  const target = previewSizeForSource(sourceRect);
+  const startScale = sourceRect.width / Math.max(target.width, 1);
   const left = sourceRect.left + sourceRect.width / 2 - target.width / 2;
   const top = sourceRect.top + sourceRect.height / 2 - target.height / 2;
   popHost.style.left = `${left}px`;
@@ -145,81 +135,23 @@ export const openAttachedCardsPanel = (targetImage, card) => {
   return true;
 };
 
-// Double-click on active/bench: spring-pop enlargement of the Pokémon only.
+// Double-click on active/bench: hide the mat card in place and animate a
+// high-res clone so closing does not re-seat a second copy.
 export const openCardPreview = (targetImage, card) => {
-  if (cardPreviewState) {
-    closeCardPreview(null, true);
-  }
-
-  const zoneDoc = targetImage.ownerDocument;
-  const host = fullViewHost(targetImage);
   const anchor = cardNode(card) ?? imageAnchor(targetImage);
-  const rect = viewportRectOf(anchor);
-
-  const placeholder = zoneDoc.createElement('span');
-  placeholder.className = 'card-preview-placeholder';
-  placeholder.style.display = 'inline-block';
-  placeholder.style.width = `${rect.width}px`;
-  placeholder.style.height = `${rect.height}px`;
-  placeholder.style.verticalAlign = 'bottom';
-  anchor.before(placeholder);
-
-  const overlay = document.createElement('div');
-  overlay.className = 'card-preview-overlay';
-
-  const popHost = document.createElement('div');
-  popHost.className = 'card-preview-pop';
-  const { startScale, hostRect } = placePopHostOnSource(popHost, rect);
-
-  if (card && !isCardHidden(card)) {
-    applyHighResToImage(targetImage);
-  }
-
-  const frontNode = adoptNode(anchor, document);
-  frontNode.classList.add('card-preview-card');
-  popHost.appendChild(buildPreviewFlip(frontNode, resolvePreviewSleeveSrc(card, targetImage)));
-  overlay.appendChild(popHost);
-  document.body.appendChild(overlay);
-
+  if (!anchor) return;
   hideCardCounters(targetImage);
-
-  const wrapper = card?.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
-  if (wrapper) {
-    startPreviewHolo(wrapper);
-  } else if (card) {
-    hydrateHolo(card).then((hydratedWrapper) => {
-      if (!hydratedWrapper || !cardPreviewState || cardPreviewState.card !== card) {
-        return;
-      }
-      hydratedWrapper.classList.add('card-preview-card');
-      const front = cardPreviewState.popHost.querySelector('.card-preview-face--front');
-      if (front && hydratedWrapper.parentElement !== front) {
-        front.appendChild(hydratedWrapper);
-      }
-      cardPreviewState.wrapper = hydratedWrapper;
-      cardPreviewState.anchor = hydratedWrapper;
-      startPreviewHolo(hydratedWrapper);
-    });
-  }
-
-  playSelectPop(popHost, null, null, hostRect, { startScale, endScale: 1 });
-
-  cardPreviewState = {
-    overlay,
-    popHost,
-    placeholder,
-    anchor: card?.wrapper ?? anchor.closest?.('.mat-holo') ?? anchor,
-    host,
-    zoneDoc,
+  openFloatingCardPreview({
+    sourceEl: anchor,
+    imageUrl: toHighResCardImageUrl(targetImage.currentSrc || targetImage.src),
     card,
-    wrapper: card?.wrapper ?? wrapper,
-    mode: 'board',
-  };
-
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) {
-      closeCardPreview(event);
-    }
+    sleeveSrc: resolvePreviewSleeveSrc(card, targetImage),
+    cloneFrom: card?.wrapper ?? (anchor.classList?.contains('mat-holo') ? anchor : null),
+    hideSource: true,
+    onClosed: () => {
+      anchor.style.visibility = '';
+      showCardCounters(targetImage);
+    },
   });
 };
 
@@ -227,16 +159,20 @@ export const openCardPreview = (targetImage, card) => {
 // thumbnail's seat and run the same 360° spring as the board preview.
 export const openFloatingCardPreview = ({
   sourceEl,
+  sourceRect,
   imageUrl,
   card = null,
   sleeveSrc = DEFAULT_SLEEVE,
+  cloneFrom = null,
+  hideSource = false,
+  onClosed = null,
 } = {}) => {
   if (cardPreviewState) {
     closeCardPreview(null, true);
   }
-  if (!sourceEl || !imageUrl) return;
+  if ((!sourceEl && !sourceRect) || !imageUrl) return;
 
-  const rect = viewportRectOf(sourceEl);
+  const rect = sourceRect ?? viewportRectOf(sourceEl);
   const overlay = document.createElement('div');
   overlay.className = 'card-preview-overlay';
 
@@ -245,24 +181,35 @@ export const openFloatingCardPreview = ({
   const { startScale, hostRect } = placePopHostOnSource(popHost, rect);
 
   const hiRes = toHighResCardImageUrl(imageUrl);
-  const effect = resolveHoloEffect(card || {});
   let frontNode;
   let wrapper;
-  if (effect) {
-    wrapper = buildHoloCard(hiRes, effect);
-    wrapper.classList.add('card-preview-card', 'mat-holo');
-    frontNode = wrapper;
+  if (cloneFrom) {
+    frontNode = cloneFrom.cloneNode(true);
+    frontNode.classList.add('card-preview-card', 'mat-holo');
+    frontNode.style.visibility = '';
+    applyHighResToImage(frontNode.matches('img') ? frontNode : frontNode.querySelector('img'));
+    wrapper = frontNode;
   } else {
-    frontNode = document.createElement('img');
-    frontNode.className = 'card-preview-card';
-    frontNode.src = hiRes;
-    frontNode.alt = card?.name || '';
-    frontNode.draggable = false;
+    const effect = resolveHoloEffect(card || {});
+    if (effect) {
+      wrapper = buildHoloCard(hiRes, effect);
+      wrapper.classList.add('card-preview-card', 'mat-holo');
+      frontNode = wrapper;
+    } else {
+      frontNode = document.createElement('img');
+      frontNode.className = 'card-preview-card';
+      frontNode.src = hiRes;
+      frontNode.alt = card?.name || '';
+      frontNode.draggable = false;
+    }
   }
 
   popHost.appendChild(buildPreviewFlip(frontNode, sleeveSrc || DEFAULT_SLEEVE));
   overlay.appendChild(popHost);
   document.body.appendChild(overlay);
+  if (hideSource && sourceEl) {
+    sourceEl.style.visibility = 'hidden';
+  }
 
   if (wrapper) {
     startPreviewHolo(wrapper);
@@ -280,6 +227,7 @@ export const openFloatingCardPreview = ({
     card: null,
     wrapper,
     mode: 'float',
+    onClosed,
   };
 
   overlay.addEventListener('click', (event) => {
@@ -300,40 +248,8 @@ export const closeCardPreview = (event, immediate = false) => {
   state.overlay.classList.add('is-closing');
 
   const revert = () => {
-    if (state.mode === 'float' || !state.placeholder) {
-      state.overlay.remove();
-      return;
-    }
-
-    const anchor =
-      (state.card ? cardNode(state.card) : null) ?? state.anchor;
-    const wrapper =
-      state.card?.wrapper ?? state.wrapper ?? anchor.closest?.('.mat-holo') ?? undefined;
-
-    if (wrapper) {
-      startHoloAnimation(wrapper, { auto: true });
-    }
-    anchor.classList.remove('card-preview-card');
-    const primaryImg = anchor.matches('img')
-      ? anchor
-      : anchor.querySelector('img');
-    if (primaryImg) {
-      showCardCounters(primaryImg);
-    }
-
-    const homeAnchor = adoptNode(anchor, state.zoneDoc);
-    if (state.placeholder.isConnected) {
-      state.placeholder.before(homeAnchor);
-      state.placeholder.remove();
-    } else if (state.host?.isConnected) {
-      state.host.appendChild(homeAnchor);
-    }
-
     state.overlay.remove();
-
-    if (state.card && !isInCardPreview(state.card)) {
-      hydrateHolo(state.card);
-    }
+    state.onClosed?.();
   };
 
   if (immediate) {
