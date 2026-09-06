@@ -23,11 +23,22 @@ const clampIndex = (index, max) => Math.max(0, Math.min(index, max));
 const slideWrapper = (slide) =>
   slide.holoWrapper ?? slide.querySelector('.mat-holo');
 
+const disableNativeDrag = (node) => {
+  if (!node) return;
+  if (node instanceof HTMLImageElement) {
+    node.draggable = false;
+  }
+  node.querySelectorAll?.('img').forEach((img) => {
+    img.draggable = false;
+  });
+};
+
 const buildSlideContent = async (card) => {
   const existingRarity = card.wrapper?.dataset?.rarity;
   if (existingRarity) {
     const wrapper = buildHoloCard(card.image.src, existingRarity);
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
+    disableNativeDrag(wrapper);
     return { node: wrapper, holoWrapper: wrapper };
   }
 
@@ -42,6 +53,7 @@ const buildSlideContent = async (card) => {
   if (effect) {
     const wrapper = buildHoloCard(card.image.src, effect);
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
+    disableNativeDrag(wrapper);
     return { node: wrapper, holoWrapper: wrapper };
   }
 
@@ -166,9 +178,14 @@ const attachSwipe = (state) => {
   let tracking = false;
   let dragging = false;
 
+  const blockNativeDrag = (event) => {
+    event.preventDefault();
+  };
+
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
     if (!stack.contains(event.target)) return;
+    event.preventDefault();
     tracking = true;
     dragging = false;
     startX = event.clientX;
@@ -190,6 +207,7 @@ const attachSwipe = (state) => {
       stack.classList.add('is-dragging');
     }
     if (dragging) {
+      event.preventDefault();
       layoutStack(state, dx);
     }
   };
@@ -226,6 +244,8 @@ const attachSwipe = (state) => {
   overlay.addEventListener('pointermove', onPointerMove);
   overlay.addEventListener('pointerup', endSwipe);
   overlay.addEventListener('pointercancel', endSwipe);
+  overlay.addEventListener('dragstart', blockNativeDrag, true);
+  stack.addEventListener('dragstart', blockNativeDrag, true);
 };
 
 export const openDiscardPileViewer = async (user, startIndex = null) => {

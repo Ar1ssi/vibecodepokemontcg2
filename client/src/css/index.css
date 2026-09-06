@@ -1783,7 +1783,15 @@ ul, li {
   width: min(72vw, 380px);
   height: min(68vh, calc(min(72vw, 380px) * 1.397));
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   pointer-events: auto;
+}
+.discard-pile-stack img,
+.discard-pile-stack .mat-holo.discard-pile-holo {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .discard-pile-stack.is-dragging {
   cursor: grabbing;
@@ -1855,6 +1863,8 @@ ul, li {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
   pointer-events: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 .discard-pile-nav {
   position: absolute;
