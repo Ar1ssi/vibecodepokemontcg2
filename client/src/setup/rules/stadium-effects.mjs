@@ -6,6 +6,7 @@
 // `ability-executors.mjs`.
 
 import { rulesState, getStadium } from './rules-state.mjs';
+import { attachedTools, parseHpBonus, applyHpBonus } from './ability-executors.mjs';
 //
 // Layers:
 //   - `classifyStadiumEffect` — buckets a card into an effect family.
@@ -35,7 +36,7 @@ const lower = (v) =>
 const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
-const textOf = (card) => lower(card?.text ?? card?.cardText ?? '');
+const textOf = (card) => lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
 
 const isStadiumCard = (card) => {
   if (!card) return false;
@@ -516,13 +517,19 @@ export function getStadiumHpBonus(targetPlayer, pokemon = null) {
 
 /**
  * Compute effective HP for a Pokémon given a base HP and the target player.
+ * Optional zoneCards includes attached Tools for HP bonuses (Hero's Cape, etc.).
  * Clamped to ≥ 1 so a −HP modifier can't make a Pokémon have 0 HP.
  */
-export function effectiveHp(baseHp, targetPlayer, pokemon = null) {
+export function effectiveHp(baseHp, targetPlayer, pokemon = null, zoneCards = null) {
   const base = baseHp || 0;
   if (!base) return 0;
-  const bonus = getStadiumHpBonus(targetPlayer, pokemon);
-  return Math.max(1, base + bonus);
+  let total = base + getStadiumHpBonus(targetPlayer, pokemon);
+  if (zoneCards?.length && pokemon && !stadiumBlocksToolEffects()) {
+    for (const tool of attachedTools(pokemon, zoneCards)) {
+      total = applyHpBonus(total, parseHpBonus(tool).bonus);
+    }
+  }
+  return Math.max(1, total);
 }
 
 /**

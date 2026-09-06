@@ -68,7 +68,7 @@ const lower = (v) =>
     .replace(/[\u2018\u2019]/g, "'");
 
 const textOf = (card) =>
-  lower(card?.ability?.text ?? card?.abilityText ?? card?.text ?? '');
+  lower(card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? '');
 
 const nameOf = (card) => lower(card?.name ?? '');
 
