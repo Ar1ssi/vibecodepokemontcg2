@@ -91,9 +91,13 @@ const computeSlideLayout = (slideIndex, virtualIndex) => {
   };
 };
 
+/** When (as a fraction of one card step) the incoming card may pass above the outgoing one. */
+const Z_HANDOFF_START = 0.68;
+const Z_HANDOFF_MAX = 6;
+
 /**
- * Crossfade stacking during drag so the incoming card rises above the outgoing
- * one past halfway — avoids a mid-swipe pop where the old front clips on top.
+ * Crossfade stacking late in the swipe so the outgoing card stays in front until
+ * ~80–85% through the transition, then the incoming card flows on top.
  */
 const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
   const dist = Math.abs(slideIndex - virtualIndex);
@@ -101,13 +105,21 @@ const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
 
   if (dragPx !== 0) {
     const progress = virtualIndex - index;
-    const handoff = smoothstep(Math.abs(progress)) * 5;
+    const absProgress = Math.abs(progress);
     const incoming = dragPx > 0 ? index + 1 : index - 1;
+    const handoffSpan = 1 - Z_HANDOFF_START;
+    const t =
+      handoffSpan > 0
+        ? Math.max(0, Math.min(1, (absProgress - Z_HANDOFF_START) / handoffSpan))
+        : 0;
+    const handoff = smoothstep(t) * Z_HANDOFF_MAX;
 
     if (slideIndex === index) {
       z -= handoff;
+      if (t < 0.05) z += 1;
     } else if (slideIndex === incoming) {
       z += handoff;
+      if (t < 0.05) z -= 1;
     }
   }
 
@@ -131,7 +143,7 @@ const startDragLoop = (state) => {
     }
 
     const delta = state.targetDragPx - state.renderDragPx;
-    if (!state.tracking && Math.abs(delta) < 0.35) {
+    if (!state.tracking && Math.abs(delta) < 0.2) {
       state.renderDragPx = state.targetDragPx;
       layoutStack(state);
       state.stack.classList.remove('is-dragging');
