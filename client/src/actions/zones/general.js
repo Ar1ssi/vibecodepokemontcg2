@@ -3,7 +3,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineDeckData } from '../../setup/general/determine-deckdata.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
@@ -15,6 +15,7 @@ import { addAbilityCounter } from '../counters/ability-counter.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { sortCardsByDeckList } from '../../setup/zones/hand-sort.mjs';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
@@ -286,22 +287,28 @@ export const sort = (user, zoneId) => {
   removeImages(zone.element);
   zone.array.forEach((card) => unhydrateHolo(card));
 
-  if (checkbox.checked && deckData) {
-    deckData.forEach((entry) => {
-      const name = entry[1];
-      zone.array.forEach((card) => {
-        if (card.name === name) {
-          // eslint-disable-next-line no-self-assign
-          card.image.src = card.image.src; // redraw trick as insurance
-          zone.element.appendChild(card.image);
-          if (card.image.abilityCounter) {
-            const index = zone.array.findIndex(
-              (selectedCard) => selectedCard === card
-            );
-            addAbilityCounter(user, zoneId, index);
-          }
-        }
-      });
+  // In multiplayer, hand order must match on both clients. Local "Sort"
+  // checkboxes differ per view (self vs opp iframe), so always use deck-list
+  // order for hands when online — otherwise relayed hand indices desync.
+  const sortByDeckList =
+    ((checkbox?.checked ||
+      (systemState.isTwoPlayer && zoneId === 'hand')) &&
+      deckData);
+
+  if (sortByDeckList) {
+    const sorted = sortCardsByDeckList(zone.array, deckData);
+    zone.array.length = 0;
+    zone.array.push(...sorted);
+    zone.array.forEach((card) => {
+      // eslint-disable-next-line no-self-assign
+      card.image.src = card.image.src; // redraw trick as insurance
+      zone.element.appendChild(card.image);
+      if (card.image.abilityCounter) {
+        const index = zone.array.findIndex(
+          (selectedCard) => selectedCard === card
+        );
+        addAbilityCounter(user, zoneId, index);
+      }
     });
   } else {
     zone.array.forEach((card) => {

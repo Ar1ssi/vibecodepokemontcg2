@@ -3,7 +3,7 @@ import {
   getRandomDeckList,
   showDecklistsContextMenu,
 } from '../../../setup/deck-constructor/sample.decklists.js';
-import { systemState } from '../../global-variables/global-variables.js';
+import { systemState } from '../../../state.js';
 
 export const initializeImport = () => {
   const altDeckImportInput = document.getElementById('altDeckImportInput');

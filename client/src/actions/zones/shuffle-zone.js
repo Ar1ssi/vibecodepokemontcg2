@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
@@ -39,7 +39,9 @@ export const shuffleZone = (
   if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
     zone.array.forEach((card) => hydrateHolo(card));
   }
-  if (zoneId === 'deck') {
+  // Never re-sort a just-shuffled deck in 2P — each client has its own
+  // "sort deck" checkbox, so sorting here would destroy the shared order.
+  if (zoneId === 'deck' && !systemState.isTwoPlayer) {
     sort(user, zoneId);
   }
   if (message) {

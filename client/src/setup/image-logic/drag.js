@@ -6,10 +6,11 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { getZone } from '../zones/get-zone.js';
+import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { identifyCard } from './click-events.js';
-import { manualDeckActionAllowed } from '../rules/rules-state.mjs';
+import { findZoneCardIndex } from './zone-card-lookup.js';
 import { appendMessage } from '../chatbox/append-message.js';
 
 const popupContainers = [
@@ -50,9 +51,10 @@ export const dragStart = (event) => {
   if (popupContainers.includes(mouseClick.zoneId)) {
     getZone(mouseClick.cardUser, mouseClick.zoneId).element.style.opacity = '0';
   }
-  if (event.target.parentElement.classList.contains('full-view')) {
-    mouseClick.playContainer = event.target.parentElement;
-    mouseClick.playContainerParent = event.target.parentElement.parentElement;
+  const dragHost = fullViewHost(event.target);
+  if (dragHost?.classList.contains('full-view')) {
+    mouseClick.playContainer = dragHost;
+    mouseClick.playContainerParent = dragHost.parentElement;
     mouseClick.playContainer.style.opacity = '0';
   }
 };
@@ -252,8 +254,9 @@ export const drop = (event) => {
       ['active', 'bench'].includes(zoneOf(event.target)?.id)
     ) {
       dZoneId = zoneOf(event.target)?.id;
-      targetIndex = getZone(event.target.user, dZoneId).array.findIndex(
-        (card) => card.image === event.target
+      targetIndex = findZoneCardIndex(
+        getZone(event.target.user, dZoneId),
+        event.target
       );
     } else if (event.target.tagName === 'IMG') {
       dZoneId = zoneOf(event.target)?.id;
@@ -286,6 +289,23 @@ export const drop = (event) => {
         );
         }
       } else {
+        const fromZone = mouseClick.zoneId;
+        if (
+          dZoneId === 'hand' &&
+          (fromZone === 'deck' || fromZone === 'viewCards')
+        ) {
+          const drawCheck = manualDeckActionAllowed('draw');
+          if (!drawCheck.allowed) {
+            appendMessage(
+              systemState.initiator,
+              '⛔ ' + drawCheck.reason,
+              'announcement',
+              false
+            );
+            event.stopPropagation();
+            return;
+          }
+        }
         moveCardBundle(
           mouseClick.cardUser,
           systemState.initiator,

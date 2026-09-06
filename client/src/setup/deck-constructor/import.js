@@ -4,12 +4,13 @@ import {
   oppContainerDocument,
   selfContainer,
   selfContainerDocument,
-  systemState,
-} from '../../front-end.js';
+} from '../../initialization/global-variables/containers.js';
+import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { processAction } from '../general/process-action.js';
 import { show } from '../home-header/header-toggle.js';
+import { LEGACY_SET_CODE_TO_TCGDEX_ID } from '../shared/legacy-set-ids.mjs';
 import { getCardType } from './find-type.js';
 import { getOldCardType } from './find-old-type.js';
 
@@ -54,99 +55,9 @@ const cardDataToID = (card, formatHint) => {
     return null;
   }
 
-  const oldSetCode_to_id = {
-    // the following are taken from pokemontcg.io (v2)'s ptcgoCode
-    BS: 'base1',
-    JU: 'base2',
-    PR: 'basep',
-    FO: 'base3',
-    B2: 'base4',
-    TR: 'base5',
-    G1: 'gym1',
-    G2: 'gym2',
-    N1: 'neo1',
-    N2: 'neo2',
-    N3: 'neo3',
-    N4: 'neo4',
-    LC: 'base6',
-    EX: 'ecard1',
-    BP: 'bp',
-    AQ: 'ecard2',
-    SK: 'ecard3',
-    RS: 'ex1',
-    SS: 'ex2',
-    DR: 'ex3',
-    'PR-NP': 'np',
-    MA: 'ex4',
-    HL: 'ex5',
-    RG: 'ex6',
-    TRR: 'ex7',
-    DX: 'ex8',
-    EM: 'ex9',
-    UF: 'ex10',
-    DS: 'ex11',
-    LM: 'ex12',
-    HP: 'ex13',
-    CG: 'ex14',
-    DF: 'ex15',
-    PK: 'ex16',
-    DP: 'dp1',
-    MT: 'dp2',
-    SW: 'dp3',
-    GE: 'dp4',
-    MD: 'dp5',
-    LA: 'dp6',
-    SF: 'dp7',
-    PL: 'pl1',
-    RR: 'pl2',
-    SV: 'pl3',
-    AR: 'pl4',
-    // the following were written by hand
-    POP1: 'pop1',
-    POP2: 'pop2',
-    POP3: 'pop3',
-    POP4: 'pop4',
-    POP5: 'pop5',
-    POP6: 'pop6',
-    POP7: 'pop7',
-    POP8: 'pop8',
-    POP9: 'pop9',
-    P1: 'pop1',
-    P2: 'pop2',
-    P3: 'pop3',
-    P4: 'pop4',
-    P5: 'pop5',
-    P6: 'pop6',
-    P7: 'pop7',
-    P8: 'pop8',
-    P9: 'pop9',
-    pop1: 'pop1',
-    pop2: 'pop2',
-    pop3: 'pop3',
-    pop4: 'pop4',
-    pop5: 'pop5',
-    pop6: 'pop6',
-    pop7: 'pop7',
-    pop8: 'pop8',
-    pop9: 'pop9',
-    SI: 'si1',
-    RM: 'ru1',
-    FUT20: 'fut20',
-    // https://limitlesstcg.com/cards
-    BS2: 'base4',
-    EXP: 'ecard1',
-    AQP: 'ecard2',
-    SKR: 'ecard3',
-    E1: 'ecard1',
-    E2: 'ecard2',
-    E3: 'ecard3',
-    WBP: 'basep',
-    WBSP: 'basep',
-    NP: 'np',
-    NBSP: 'np',
-    FRLG: 'ex6',
-    BG: 'bp',
-  };
+  // Shared with the rules engine (see setup/shared/legacy-set-ids.mjs) — it
+  // needs the same code→set-id mapping to pin a board card to one printing.
+  const oldSetCode_to_id = LEGACY_SET_CODE_TO_TCGDEX_ID;
   if (oldSetCode_to_id[set] && !isPocketSet(set, formatHint)) {
     return oldSetCode_to_id[set] + '-' + number;
   }
@@ -472,8 +383,8 @@ const LimitlessDecklistArray = async (decklist) => {
     decklistArray.push([
       card['count'],
       card['name'],
-      null,
-      null,
+      card['set'] || null,
+      card['number'] || null,
       null,
       cardDataToImageURL({
         name: card['name'],
@@ -739,15 +650,17 @@ export const importDecklist = async (user) => {
 
       let tableBody = decklistTable.getElementsByTagName('tbody')[0];
       decklistTable.style.display = 'block';
-      decklistArray.forEach(([quantity, name, , number, , url, type]) => {
+      decklistArray.forEach(([quantity, name, set, number, tcgId, url, type]) => {
         let newRow = tableBody.insertRow();
-        // Stash the printed collector number (not shown as its own visible
-        // column) so the rules engine can later disambiguate cards that
-        // share an identical name across many different sets/printings —
-        // see resolveCardId() in rules-state.mjs. cloneNode(true) below
-        // preserves this data-* attribute when the row is copied into
-        // currentDecklistTable.
+        // Stash the printed set code, collector number, and pre-resolved TCGdex
+        // id (neither is shown as its own visible column) so the rules engine
+        // can later disambiguate cards that share an identical name across many
+        // different sets/printings — see resolveCardId()/ensureCardData() in
+        // rules-state.mjs. cloneNode(true) below preserves these data-*
+        // attributes when the row is copied into currentDecklistTable.
         newRow.dataset.cardNumber = number || '';
+        newRow.dataset.cardSet = set || '';
+        newRow.dataset.cardTcgId = tcgId || '';
 
         let qtyCell = newRow.insertCell(0);
         let nameCell = newRow.insertCell(1);
@@ -887,8 +800,10 @@ confirmButton.addEventListener('click', () => {
     let type = cells[2].querySelector('select').value;
     let url = cells[3].innerText;
     let number = rows[i].dataset.cardNumber || null;
+    let set = rows[i].dataset.cardSet || null;
+    let tcgId = rows[i].dataset.cardTcgId || null;
 
-    let cardData = [quantity, name, type, url, number];
+    let cardData = [quantity, name, type, url, number, set, tcgId];
     deckData.push(cardData);
   }
 
@@ -941,23 +856,37 @@ const downloadCSV = (csv, filename) => {
 };
 
 const exportTableToCSV = (filename, table) => {
-  let csv = [];
-  let rows = document.querySelectorAll(table);
+  const csv = [];
+  const rows = document.querySelectorAll(table);
 
   for (let i = 0; i < rows.length; i++) {
-    let row = [],
-      cols = rows[i].querySelectorAll('td, th');
+    const rowEl = rows[i];
+    const cols = rowEl.querySelectorAll('td, th');
+    if (cols.length === 0) continue;
 
+    const cells = [];
     for (let j = 0; j < cols.length; j++) {
-      let cell = cols[j];
-      let select = cell.querySelector('select');
-      if (select) {
-        row.push(select.value);
-      } else {
-        row.push(cell.innerText);
-      }
+      const cell = cols[j];
+      const select = cell.querySelector('select');
+      cells.push(select ? select.value : cell.innerText);
     }
-    csv.push(row.join(','));
+
+    // Identity fields live on the row dataset, not in visible columns.
+    if (rowEl.tagName === 'TR' && cols[0]?.tagName === 'TD') {
+      cells.push(rowEl.dataset.cardNumber || '');
+      cells.push(rowEl.dataset.cardSet || '');
+      cells.push(rowEl.dataset.cardTcgId || '');
+    }
+
+    csv.push(cells.join(','));
+  }
+
+  const headerRow = csv.find((line) => /^QTY,/i.test(line));
+  if (headerRow && !/Number,Set,TcgId/i.test(headerRow)) {
+    const headerIndex = csv.indexOf(headerRow);
+    csv[headerIndex] = `${headerRow},Number,Set,TcgId`;
+  } else if (!headerRow && csv.length > 0) {
+    csv.unshift('QTY,Name,Type,URL,Number,Set,TcgId');
   }
 
   downloadCSV(csv.join('\n'), filename);

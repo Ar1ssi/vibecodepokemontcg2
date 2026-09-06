@@ -1,3 +1,5 @@
+import { systemState } from '../../front-end.js';
+import { isShowingCardBack } from '../deck-builder/core/card-compare.mjs';
 import {
   resolveHoloEffect,
   buildHoloCard,
@@ -7,6 +9,20 @@ import {
 import { ensureCardData } from '../rules/rules-state.mjs';
 
 const hydrated = new WeakSet();
+
+export function cardBackSrcForUser(user) {
+  return user === 'self'
+    ? systemState.cardBackSrc
+    : systemState.isTwoPlayer
+      ? systemState.p2OppCardBackSrc
+      : systemState.p1OppCardBackSrc;
+}
+
+export function isCardHidden(card) {
+  if (!card?.image?.src) return false;
+  const user = card.user ?? card.image.user;
+  return isShowingCardBack(card.image.src, cardBackSrcForUser(user));
+}
 
 // Kill-switch: set to false to re-enable mat holofoil rendering.
 const HOLO_DISABLED = false;
@@ -24,13 +40,23 @@ export const cardNode = (card) => card?.wrapper ?? card?.image;
 export const imageAnchor = (image) =>
   image?.parentElement?.closest?.('.mat-holo') ?? image;
 
+// The element that becomes `.full-view` when a mat card is double-clicked: the
+// card's slot in the zone (`.play-container`), which holds the Pokémon plus its
+// attached energies/tools. Always go through `imageAnchor` — for a holo card the
+// <img>'s own parent is the overflow-hidden `.card__rotator`, and sizing THAT as
+// the enlarged view shrinks the card instead of growing it.
+export const fullViewHost = (image) => imageAnchor(image)?.parentElement ?? null;
+
+export const isInFullView = (image) =>
+  !!fullViewHost(image)?.classList.contains('full-view');
+
 export function hydrateHolo(card) {
   if (HOLO_DISABLED) return;
-  if (!card?.image || hydrated.has(card)) return;
+  if (!card?.image || hydrated.has(card) || isCardHidden(card)) return;
   hydrated.add(card);
   ensureCardData({ name: card.name, type: card.type })
     .then((data) => {
-      if (!card.image.isConnected) return; // card was removed meanwhile
+      if (!card.image.isConnected || isCardHidden(card)) return;
       const effect = resolveHoloEffect(data);
       if (!effect) return; // common / non-holo → stays plain
       const rect = card.image.getBoundingClientRect();

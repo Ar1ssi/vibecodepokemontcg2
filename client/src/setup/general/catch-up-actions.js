@@ -1,77 +1,31 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { acceptAction } from './accept-action.js';
 
-export const catchUpActions = (actionData) => {
-  const missingData = actionData.slice(systemState.oppCounter); // make sure you are only implementing actions that you don't have
+/**
+ * Replay missing opponent actions. parameters[0] is already the inverted
+ * initiator stored by processAction — do not flip it again (live pushAction
+ * does not).
+ */
+export const catchUpActions = async (actionData, fullReplay = false) => {
+  if (fullReplay) {
+    systemState.oppCounter = 0;
+  }
+  const missingData = (actionData || []).slice(systemState.oppCounter);
 
-  missingData.forEach((entry) => {
-    systemState.oppCounter++;
-    // Deep-copy parameters to avoid mutating the sender's action data
-    entry.parameters = [...entry.parameters];
-    if (entry.parameters[0] === 'self') {
-      entry.parameters[0] = 'opp';
-    } else if (entry.parameters[0] === 'opp') {
-      entry.parameters[0] = 'self';
-    }
-    // systemState.spectatorActionData.push({user: 'opp', action: entry.action, parameters: entry.parameters});
+  for (const entry of missingData) {
+    const parameters = entry.parameters ? [...entry.parameters] : entry.parameters;
     if (entry.action !== 'exchangeData' && entry.action !== 'loadDeckData') {
       systemState.exportActionData.push({
         user: 'opp',
         emit: true,
         action: entry.action,
-        parameters: entry.parameters,
+        parameters,
       });
     }
-  });
-
-  const mostRecentDeckDataIndex = [...missingData]
-    .reverse()
-    .findIndex(
-      (entry) =>
-        entry.action === 'exchangeData' || entry.action === 'loadDeckData'
-    );
-
-  const mostRecentResetEntryIndex = [...missingData]
-    .reverse()
-    .findIndex((entry) => entry.action === 'reset' || entry.action === 'setup');
-
-  // Retrieve all entries starting from the most recent reset/setup entry
-  const mostRecentResetAndAfterEntries =
-    mostRecentResetEntryIndex !== -1
-      ? missingData.slice(missingData.length - mostRecentResetEntryIndex - 1)
-      : 0;
-
-  const mostRecentDeckDataEntry =
-    mostRecentDeckDataIndex !== -1
-      ? missingData[missingData.length - mostRecentDeckDataIndex - 1]
-      : 0;
-
-  const entriesAfterMostRecentDeckData =
-    mostRecentDeckDataIndex !== -1
-      ? missingData.slice(missingData.length - mostRecentDeckDataIndex)
-      : 0;
-
-  if (mostRecentDeckDataEntry) {
-    acceptAction(
-      'opp',
-      mostRecentDeckDataEntry.action,
-      mostRecentDeckDataEntry.parameters
-    );
-  }
-  if (
-    mostRecentResetAndAfterEntries &&
-    mostRecentResetEntryIndex < mostRecentDeckDataIndex
-  ) {
-    mostRecentResetAndAfterEntries.forEach((data) =>
-      acceptAction('opp', data.action, data.parameters)
-    );
-  } else if (mostRecentDeckDataEntry) {
-    entriesAfterMostRecentDeckData.forEach((data) =>
-      acceptAction('opp', data.action, data.parameters)
-    );
-  } else {
-    missingData.forEach((data) =>
-      acceptAction('opp', data.action, data.parameters)
-    );
+    const ok = await acceptAction('opp', entry.action, parameters);
+    if (ok === false) {
+      break;
+    }
+    systemState.oppCounter++;
   }
 };

@@ -2,71 +2,83 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
+import { applySpecialConditionStyle } from '../../setup/counters/special-condition-style-apply.js';
+import {
+  getSpecialConditionCode,
+  setSpecialConditionCode,
+} from '../../setup/counters/special-condition-code.mjs';
 import { processAction } from '../../setup/general/process-action.js';
+import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { buildCardHint, resolveCardIndex } from '../../setup/zones/resolve-card-index.mjs';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
+
+function resolveConditionTarget(user, zoneId, index, hint) {
+  const zone = getZone(user, zoneId);
+  const resolved = resolveCardIndex(zone, hint, index);
+  const card = zone?.array?.[resolved];
+  return { zone, index: resolved, card, hint: hint || buildCardHint(card) };
+}
 
 export const updateSpecialCondition = (
   user,
   zoneId,
   index,
   textContent,
-  emit = true
+  emitOrHint = true,
+  maybeEmit
 ) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const { index: resolved, card, hint } = resolveConditionTarget(
+    user,
+    zoneId,
+    index,
+    hintIn
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'updateSpecialCondition', [
       zoneId,
-      index,
+      resolved,
       textContent,
+      hint,
     ]);
     return;
   }
 
-  const specialCondition = getZone(user, zoneId).array[index].image
-    .specialCondition;
-  specialCondition.textContent = textContent;
-  let text = specialCondition.textContent.toUpperCase();
-  switch (text) {
-    case 'P':
-      specialCondition.style.backgroundColor = 'green';
-      specialCondition.style.color = 'white';
-      break;
-    case 'B':
-      specialCondition.style.backgroundColor = 'red';
-      specialCondition.style.color = 'white';
-      break;
-    case 'A':
-      specialCondition.style.backgroundColor = 'blue';
-      specialCondition.style.color = 'white';
-      break;
-    case 'PA':
-      specialCondition.style.backgroundColor = 'yellow';
-      specialCondition.style.color = 'black';
-      break;
-    case 'C':
-      specialCondition.style.backgroundColor = 'purple';
-      specialCondition.style.color = 'white';
-      break;
-    default:
-      specialCondition.style.backgroundColor = 'white';
-      specialCondition.style.color = 'black';
-      break;
-  }
+  const specialCondition = card?.image?.specialCondition;
+  if (!specialCondition) return;
+  setSpecialConditionCode(specialCondition, textContent);
+  applySpecialConditionStyle(specialCondition, textContent);
 
   processAction(user, emit, 'updateSpecialCondition', [
     zoneId,
-    index,
+    resolved,
     textContent,
+    hint,
   ]);
 };
 
-export const removeSpecialCondition = (user, zoneId, index, emit = true) => {
+export const removeSpecialCondition = (
+  user,
+  zoneId,
+  index,
+  emitOrHint = true,
+  maybeEmit
+) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const { index: resolved, card: targetCard, hint } = resolveConditionTarget(
+    user,
+    zoneId,
+    index,
+    hintIn
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'removeSpecialCondition', [zoneId, index]);
+    processAction(user, emit, 'removeSpecialCondition', [zoneId, resolved, hint]);
     return;
   }
 
-  const targetCard = getZone(user, zoneId).array[index];
+  if (!targetCard) return;
   //make sure targetCard exists (it won't exist if it's already been removed)
   if (targetCard.image.specialCondition) {
     targetCard.image.specialCondition.removeEventListener(
@@ -87,17 +99,30 @@ export const removeSpecialCondition = (user, zoneId, index, emit = true) => {
     targetCard.image.specialCondition = null;
   }
 
-  processAction(user, emit, 'removeSpecialCondition', [zoneId, index]);
+  processAction(user, emit, 'removeSpecialCondition', [zoneId, resolved, hint]);
 };
 
-export const addSpecialCondition = (user, zoneId, index, emit = true) => {
+export const addSpecialCondition = (
+  user,
+  zoneId,
+  index,
+  emitOrHint = true,
+  maybeEmit
+) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const { zone, index: resolved, card: targetCard, hint } = resolveConditionTarget(
+    user,
+    zoneId,
+    index,
+    hintIn
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'addSpecialCondition', [zoneId, index]);
+    processAction(user, emit, 'addSpecialCondition', [zoneId, resolved, hint]);
     return;
   }
 
-  const zone = getZone(user, zoneId);
-  const targetCard = zone.array[index];
+  if (!targetCard) return;
+  index = resolved;
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();
 
@@ -123,17 +148,21 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
         systemState.initiator === 'self' ? 'opp-circle' : 'self-circle';
     }
     specialCondition.contentEditable = 'true';
-    specialCondition.textContent = 'P';
-    specialCondition.style.backgroundColor = 'green';
-    specialCondition.style.color = 'white';
+    setSpecialConditionCode(specialCondition, 'P');
+    applySpecialConditionStyle(specialCondition, 'P');
   }
+
+  applySpecialConditionStyle(
+    specialCondition,
+    getSpecialConditionCode(specialCondition)
+  );
 
   specialCondition.style.display = 'inline-block';
   specialCondition.style.left = `${targetRect.left - zoneElementRect.left}px`;
   specialCondition.style.top = `${targetRect.top - zoneElementRect.top + targetRect.height / 4}px`;
   zone.element.appendChild(specialCondition);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     specialCondition.style.display = 'none';
   }
 
@@ -144,7 +173,12 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
   specialCondition.style.zIndex = '1';
 
   const handleColor = () => {
-    updateSpecialCondition(user, zoneId, index, specialCondition.textContent);
+    updateSpecialCondition(
+      user,
+      zoneId,
+      index,
+      getSpecialConditionCode(specialCondition)
+    );
   };
 
   const handleResize = () => {
@@ -153,8 +187,8 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
 
   const handleRemove = (fromBlurEvent = false) => {
     if (
-      specialCondition.textContent.trim() === '' ||
-      specialCondition.textContent === '0'
+      getSpecialConditionCode(specialCondition) === '' ||
+      getSpecialConditionCode(specialCondition) === '0'
     ) {
       targetCard.image.specialCondition.removeEventListener(
         'input',
@@ -194,5 +228,5 @@ export const addSpecialCondition = (user, zoneId, index, emit = true) => {
   //save the specialCondition on the card
   targetCard.image.specialCondition = specialCondition;
 
-  processAction(user, emit, 'addSpecialCondition', [zoneId, index]);
+  processAction(user, emit, 'addSpecialCondition', [zoneId, resolved, hint]);
 };

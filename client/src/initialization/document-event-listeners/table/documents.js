@@ -3,7 +3,7 @@ import { keyDown, keyUp } from '../../../actions/keybinds/keybinds.js';
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../../front-end.js';
+} from '../../../state.js';
 
 const addDocumentEventListeners = (document) => {
   document.addEventListener('click', (event) => closePopups(event));

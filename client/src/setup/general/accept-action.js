@@ -1,4 +1,4 @@
-import { attack, pass } from '../../actions/chat-buttons/chat-buttons.js';
+import { attack, pass, retreat, stadiumEffect } from '../../actions/chat-buttons/chat-buttons.js';
 import { removeAbilityCounter } from '../../actions/counters/ability-counter.js';
 import {
   addDamageCounter,
@@ -20,6 +20,7 @@ import {
 } from '../../actions/general/board-actions.js';
 import { changeType } from '../../actions/general/change-type.js';
 import { reset } from '../../actions/general/reset.js';
+import { restartGame } from '../../actions/general/restart.js';
 import {
   hideCards,
   hideShortcut,
@@ -61,13 +62,18 @@ import { shufflePrizesToDeckBottom, takePrizes, takePrizesByIndex } from '../../
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
+import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
+import { logSyncAction } from './sync-logger-bridge.js';
+import { systemState } from '../../state.js';
 
 const functions = {
   exchangeData: exchangeData,
   loadDeckData: loadDeckData,
   changeCardBack: changeCardBack,
+  changePlaymat: changePlaymat,
   reset: reset,
+  restartGame: restartGame,
   setup: setup,
   readyUp: readyUp,
   takeTurn: takeTurn,
@@ -115,6 +121,8 @@ const functions = {
   changeType: changeType,
   attack: attack,
   pass: pass,
+  retreat: retreat,
+  'stadium-effect': stadiumEffect,
   VSTARGXFunction: VSTARGXFunction,
   undo: undo,
 };
@@ -129,7 +137,7 @@ const actionToFunction = (action) => {
   }
 };
 
-export const acceptAction = (
+export const acceptAction = async (
   user,
   action,
   parameters,
@@ -137,12 +145,25 @@ export const acceptAction = (
   isFromReplay = false
 ) => {
   if (isBlockedByReplay('action', action, isFromReplay)) {
-    return;
+    return false;
+  }
+  const selectedFunction = actionToFunction(action);
+  if (typeof selectedFunction !== 'function') {
+    console.warn('acceptAction: unknown action', action);
+    return false;
   }
   const emit = user === 'self' || isStateImport ? true : false;
-  if (parameters) {
-    actionToFunction(action)(user, ...parameters, emit);
-  } else {
-    actionToFunction(action)(user, emit);
+  if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
+    logSyncAction(action, parameters, 'in');
+  }
+  try {
+    const result = parameters
+      ? selectedFunction(user, ...parameters, emit)
+      : selectedFunction(user, emit);
+    const resolved = await Promise.resolve(result);
+    return resolved !== false;
+  } catch (err) {
+    console.error('acceptAction failed', action, err);
+    return false;
   }
 };

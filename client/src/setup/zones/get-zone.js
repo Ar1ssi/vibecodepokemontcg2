@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../initialization/global-variables/containers.js';
 
 const selfZoneArrays = {
   deck: [],

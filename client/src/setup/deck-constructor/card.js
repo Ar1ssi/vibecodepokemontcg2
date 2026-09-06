@@ -17,17 +17,23 @@ export class Card {
   user;
   image;
   number;
+  set;
+  id;
 
-  constructor(user, name, type, imageURL, number = null) {
+  constructor(user, name, type, imageURL, number = null, set = null, id = null) {
     this.user = user;
     this.name = name;
     this.type = type;
-    // Printed collector number from the decklist (e.g. "32"), when known.
-    // Kept alongside `name` so the rules engine can disambiguate cards that
-    // share an identical name across many different printings/sets (see
-    // resolveCardId in rules-state.mjs) instead of guessing from a
-    // name-only search.
-    this.number = number || null;
+    // Printed collector number, set code, and TCGdex id from the decklist /
+    // deck-builder when known. Kept alongside `name` so the rules engine can
+    // disambiguate cards that share an identical name across many different
+    // printings/sets (see resolveCardId and ensureCardData in
+    // rules-state.mjs) instead of guessing from a name-only search.
+  this.number = number || null;
+  this.set = set || null;
+  this.id = id || null;
+  /** Stable deck-build index for multiplayer sync (same on both clients). */
+  this.syncInstance = null;
     this.imageAttributes = {
       user: user,
       type: type,

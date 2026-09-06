@@ -3,8 +3,8 @@ import {
   oppContainerDocument,
   selfContainer,
   selfContainerDocument,
-  systemState,
-} from '../../front-end.js';
+} from '../../initialization/global-variables/containers.js';
+import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import {
   flippedOppHandleMouseDown,

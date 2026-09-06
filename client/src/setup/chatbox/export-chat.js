@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 
 const chatbox = document.getElementById('chatbox');
 const p2Chatbox = document.getElementById('p2Chatbox');

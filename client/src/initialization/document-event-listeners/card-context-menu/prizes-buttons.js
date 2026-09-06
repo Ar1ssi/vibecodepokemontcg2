@@ -6,7 +6,7 @@ import {
 } from '../../../actions/general/reveal-and-hide.js';
 import { shufflePrizesToDeckBottom } from '../../../actions/zones/prizes-actions.js';
 import { shuffleZone } from '../../../actions/zones/shuffle-zone.js';
-import { mouseClick, systemState } from '../../../front-end.js';
+import { mouseClick, systemState } from '../../../state.js';
 
 export const initializePrizesButtons = () => {
   const shufflePrizesButton = document.getElementById('shufflePrizesButton');

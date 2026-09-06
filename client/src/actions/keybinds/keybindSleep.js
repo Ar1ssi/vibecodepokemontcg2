@@ -1,4 +1,4 @@
-import { mouseClick } from '../../front-end.js';
+import { mouseClick } from '../../state.js';
 
 export let areKeybindsSleeping = false;
 

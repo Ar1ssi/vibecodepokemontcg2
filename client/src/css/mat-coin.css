@@ -1,0 +1,138 @@
+/* Shared mat coin token styles — loaded inside self/opp container iframes. */
+
+@keyframes coin-toss-arc {
+  0%   { transform: translateY(0) scale(1); }
+  12%  { transform: translateY(-12%) scale(1.05); }
+  38%  { transform: translateY(-46%) scale(1.1); }
+  64%  { transform: translateY(-4%) scale(1.01); }
+  74%  { transform: translateY(-9%) scale(1.02); }
+  86%  { transform: translateY(-1%) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.coin-3d {
+  --coin-x: 50%;
+  --coin-y: 50%;
+  --coin-rx: 0deg;
+  --coin-ry: 0deg;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: perspective(700px) rotateX(calc(var(--coin-rx) + var(--coin-flip, 0deg))) rotateY(var(--coin-ry));
+  transition: transform 0.18s ease-out;
+}
+
+.coin-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(from 210deg,
+    rgba(255,255,255,0.35), rgba(120,120,130,0.15) 25%,
+    rgba(255,255,255,0.5) 50%, rgba(90,95,110,0.2) 75%,
+    rgba(255,255,255,0.35));
+  padding: 3px;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.5);
+}
+
+.coin-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
+}
+
+.coin-face.coin-backc { transform: rotateX(180deg); }
+
+.coin-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.coin-mat-gold .coin-face::after {
+  background:
+    radial-gradient(ellipse 34% 22% at var(--coin-x) var(--coin-y),
+      rgba(255, 246, 200, 0.85) 0%, rgba(255, 215, 120, 0.35) 42%, transparent 68%),
+    linear-gradient(115deg,
+      transparent 32%,
+      rgba(255, 230, 150, 0.28) 45%,
+      rgba(255, 250, 220, 0.4) 50%,
+      rgba(255, 230, 150, 0.28) 55%,
+      transparent 68%);
+  mix-blend-mode: screen;
+}
+
+.coin-mat-silver .coin-face::after {
+  background:
+    radial-gradient(ellipse 30% 20% at var(--coin-x) var(--coin-y),
+      rgba(255, 255, 255, 0.9) 0%, rgba(210, 225, 245, 0.35) 45%, transparent 70%),
+    linear-gradient(115deg,
+      transparent 30%,
+      rgba(220, 235, 255, 0.25) 46%,
+      rgba(255, 255, 255, 0.38) 50%,
+      rgba(220, 235, 255, 0.25) 54%,
+      transparent 70%);
+  mix-blend-mode: screen;
+}
+
+.coin-mat-enamel .coin-face::after {
+  background:
+    radial-gradient(ellipse 46% 34% at var(--coin-x) var(--coin-y),
+      rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.12) 48%, transparent 72%);
+  mix-blend-mode: soft-light;
+}
+
+.coin-mat-gold .coin-face {
+  background: conic-gradient(from 210deg, #f5d67a, #8a6a1e 25%, #ffe9a8 50%, #6e5416 75%, #f5d67a);
+}
+
+.coin-mat-silver .coin-face {
+  background: conic-gradient(from 210deg, #e8edf5, #7a828f 25%, #ffffff 50%, #6b7380 75%, #e8edf5);
+}
+
+.coin-toss-wrap {
+  display: block;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.coin-toss-wrap.tossing .coin-3d {
+  transition: transform 1.35s cubic-bezier(0.22, 0.08, 0.24, 1);
+}
+
+.coin-toss-wrap.tossing {
+  animation: coin-toss-arc 1.35s cubic-bezier(0.3, 0.0, 0.35, 1);
+}
+
+/* Player-right of Active in this iframe's frame. On the mirrored top half
+   that renders as screen-left beside the opponent's Active zone. */
+#matCoinSlot {
+  position: fixed;
+  bottom: calc(var(--active-bottom) + var(--active-height) / 2);
+  left: calc(var(--active-left) + var(--active-width) + 0.6%);
+  width: calc(var(--active-height) * 0.24);
+  aspect-ratio: 1;
+  height: auto;
+  transform: translateY(50%);
+  z-index: 3;
+  pointer-events: none;
+  display: none;
+  filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.6));
+}
+
+#matCoinSlot.has-coin { display: block; }
+
+#matCoinSlot.flipping {
+  z-index: 12;
+  filter: drop-shadow(0 0.6vh 1.2vh rgba(0, 0, 0, 0.75));
+}

@@ -2,7 +2,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { buildDeck } from '../../setup/deck-constructor/build-deck.js';
 import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';

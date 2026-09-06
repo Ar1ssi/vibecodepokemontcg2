@@ -1,10 +1,58 @@
-import { systemState } from '../../front-end.js';
+import { socket, systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
-import { refreshBoard } from '../../setup/sizing/refresh-board.js';
+import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { getZone } from '../../setup/zones/get-zone.js';
+import {
+  buildCardHint,
+  hintMatchesAtIndex,
+  resolveCardIndex,
+} from '../../setup/zones/resolve-card-index.mjs';
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
+import { logSync } from '../../setup/general/sync-logger-bridge.js';
 
-export const moveCardBundle = (
+function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
+  const oZone = getZone(user, oZoneId);
+  const dZone = getZone(user, dZoneId);
+  const movingCard = oZone.array[index];
+  if (!movingCard) return null;
+
+  const hints = { moving: buildCardHint(movingCard) };
+  if (typeof targetIndex === 'number') {
+    hints.target = buildCardHint(dZone.array[targetIndex]);
+  }
+
+  const cardType = movingCard.type2 || movingCard.type;
+  const fromHandOrDeck = !['active', 'bench'].includes(oZoneId);
+  const toActiveOrBench = ['active', 'bench'].includes(dZoneId);
+  hints.isEvolution =
+    !!hints.target &&
+    cardType === 'Pokémon' &&
+    fromHandOrDeck &&
+    toActiveOrBench;
+
+  return hints;
+}
+
+/** @internal exported for unit tests */
+export { buildMoveCardHints };
+
+function resolveMoveCardIndices(user, oZoneId, dZoneId, index, targetIndex, hints) {
+  if (!hints) {
+    return { index, targetIndex };
+  }
+  const oZone = getZone(user, oZoneId);
+  const dZone = getZone(user, dZoneId);
+  return {
+    index: resolveCardIndex(oZone, hints.moving, index),
+    targetIndex:
+      typeof targetIndex === 'number'
+        ? resolveCardIndex(dZone, hints.target, targetIndex)
+        : targetIndex,
+  };
+}
+
+export const moveCardBundle = async (
   user,
   initiator,
   oZoneId,
@@ -12,8 +60,10 @@ export const moveCardBundle = (
   index,
   targetIndex,
   action,
-  emit = true
+  emitOrHints = true,
+  maybeHintsOrEmit
 ) => {
+  const { emit, tail: cardHints } = splitEmitAndTail(emitOrHints, maybeHintsOrEmit);
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'moveCardBundle', [
@@ -23,32 +73,143 @@ export const moveCardBundle = (
       index,
       targetIndex,
       action,
+      cardHints,
     ]);
     return;
   }
+
+  let resolvedIndex = index;
+  let resolvedTargetIndex = targetIndex;
+  let syncOptions = {};
+  const isMirrorReplay =
+    cardHints && systemState.isTwoPlayer && !emit && user === 'opp';
+  if (isMirrorReplay) {
+    ({ index: resolvedIndex, targetIndex: resolvedTargetIndex } =
+      resolveMoveCardIndices(
+        user,
+        oZoneId,
+        dZoneId,
+        index,
+        targetIndex,
+        cardHints
+      ));
+    const oZone = getZone(user, oZoneId);
+    if (
+      cardHints.moving &&
+      !hintMatchesAtIndex(oZone, resolvedIndex, cardHints.moving)
+    ) {
+      console.warn('moveCardBundle: hint mismatch after resolve — requesting resync', {
+        oZoneId,
+        relayIndex: index,
+        resolvedIndex,
+        hint: cardHints.moving,
+      });
+      logSync('moveCardBundle.mirror.abort', {
+        reason: 'hint_mismatch',
+        oZoneId,
+        relayIndex: index,
+        resolvedIndex,
+        moving: cardHints.moving,
+      });
+      socket.emit('resyncActions', {
+        roomId: systemState.roomId,
+        reason: 'hint_mismatch',
+      });
+      return false;
+    }
+    if (!oZone.array[resolvedIndex]) {
+      console.warn('moveCardBundle: no card at resolved index on mirror — requesting resync', {
+        oZoneId,
+        resolvedIndex,
+      });
+      logSync('moveCardBundle.mirror.abort', {
+        reason: 'missing_card',
+        oZoneId,
+        resolvedIndex,
+      });
+      socket.emit('resyncActions', {
+        roomId: systemState.roomId,
+        reason: 'hint_mismatch',
+      });
+      return false;
+    }
+    syncOptions = { syncReplay: true };
+    if (cardHints.isEvolution) {
+      syncOptions.forceEvolution = true;
+    }
+    logSync('moveCardBundle.mirror.resolve', {
+      oZoneId,
+      dZoneId,
+      relayIndex: index,
+      resolvedIndex,
+      resolvedTargetIndex,
+      moving: cardHints.moving,
+    });
+  }
+
+  // Capture sync hints BEFORE moveCard splices the origin zone — building
+  // hints after the move reads the wrong card at the relayed index.
+  const hintsToSend =
+    emit && systemState.isTwoPlayer
+      ? buildMoveCardHints(
+          user,
+          oZoneId,
+          dZoneId,
+          resolvedIndex,
+          resolvedTargetIndex
+        )
+      : cardHints;
+
   moveCardMessage(
     user,
     initiator,
     oZoneId,
     dZoneId,
-    index,
-    targetIndex,
+    resolvedIndex,
+    resolvedTargetIndex,
     action
   );
+  let moveResult;
   try {
-    moveCard(user, initiator, oZoneId, dZoneId, index, targetIndex);
-    refreshBoard(); //refreshing the board rearranges the array of the cards on the active/bench. to prevent desyncs, refresh the board whenever a user moves a card to ensure that the array for both users is the same
-    // the issue arised when one player would refresh their board by flipping board/resizing window, changing their arrays, but the other player would still have the original arrays.
+    moveResult = await moveCard(
+      user,
+      initiator,
+      oZoneId,
+      dZoneId,
+      resolvedIndex,
+      resolvedTargetIndex,
+      syncOptions
+    );
+    // Do not call refreshBoard here — it used to invoke moveCard on every
+    // active/bench Pokémon, recreating play-containers and re-firing rules
+    // hooks. Array sync is handled by the socket replay itself; refreshBoard
+    // remains available for resize / flip-board / manual image reload.
   } catch (e) {
-    console.error('Error in moveCardBundle:', e, { user, oZoneId, dZoneId, index, targetIndex, action });
-    return;
+    console.error('Error in moveCardBundle:', e, {
+      user,
+      oZoneId,
+      dZoneId,
+      index: resolvedIndex,
+      targetIndex: resolvedTargetIndex,
+      action,
+    });
+    return false;
   }
+
+  if (!moveResult || moveResult.ok === false) {
+    return false;
+  }
+
+  const actualDest = moveResult.destZoneId || dZoneId;
+
   processAction(user, emit, 'moveCardBundle', [
     oInitiator,
     oZoneId,
-    dZoneId,
-    index,
-    targetIndex,
+    actualDest,
+    resolvedIndex,
+    resolvedTargetIndex,
     action,
+    hintsToSend,
   ]);
+  return true;
 };

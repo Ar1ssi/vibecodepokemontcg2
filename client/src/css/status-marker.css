@@ -1,0 +1,113 @@
+/* 3D status tokens: user-provided burn/poison faces + Bulbapedia coin back. */
+
+.self-circle.status-token-wrap,
+.opp-circle.status-token-wrap {
+  position: absolute;
+  display: block;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.status-token-wrap .status-marker-code {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.status-token-wrap .status-token-coin {
+  width: 100%;
+  height: 100%;
+  --coin-rx: 56deg;
+  --coin-ry: 0deg;
+  transform: perspective(520px) rotateX(var(--coin-rx)) rotateY(var(--coin-ry));
+  transition: none;
+  cursor: default;
+}
+
+.status-token-wrap .coin-3d {
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.status-token-wrap .coin-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 0.16em 0.34em rgba(0, 0, 0, 0.42);
+}
+
+.status-token-wrap .coin-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
+}
+
+.status-token-wrap .coin-face.coin-backc {
+  transform: rotateX(180deg);
+}
+
+/* Cardboard token — no metal sweep, just a soft top highlight */
+.status-token-wrap .coin-mat-cardboard .coin-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 38% 28% at 34% 28%,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0) 68%
+  );
+}
+
+/* Simple colored discs for other conditions (unchanged). */
+.self-circle.status-marker:not(.status-token-wrap),
+.opp-circle.status-marker:not(.status-token-wrap) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 0.14em rgba(0, 0, 0, 0.35),
+    0 0.12em 0.24em rgba(0, 0, 0, 0.35);
+}
+
+.self-circle.status-marker.status-asleep,
+.opp-circle.status-marker.status-asleep {
+  background-color: #3b8dad;
+  color: #fff;
+}
+.self-circle.status-marker.status-paralyzed,
+.opp-circle.status-marker.status-paralyzed {
+  background-color: #f4d03f;
+  color: #111;
+}
+.self-circle.status-marker.status-confused,
+.opp-circle.status-marker.status-confused {
+  background-color: #8e44ad;
+  color: #fff;
+}
+.self-circle.status-marker.status-default,
+.opp-circle.status-marker.status-default {
+  background-color: #fff;
+  color: #111;
+}
+
+.self-circle.status-marker.status-poison:not(.status-token-wrap),
+.opp-circle.status-marker.status-poison:not(.status-token-wrap),
+.self-circle.status-marker.status-burn:not(.status-token-wrap),
+.opp-circle.status-marker.status-burn:not(.status-token-wrap) {
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+}

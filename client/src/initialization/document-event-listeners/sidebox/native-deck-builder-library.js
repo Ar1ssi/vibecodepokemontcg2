@@ -9,9 +9,10 @@ import {
       saveLibraryToStorage,
       setDeckSleeve,
       setDeckCoin,
+      setDeckMat,
       MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
-    import { getStarterDecks } from '../../../setup/deck-builder/core/set-browser.mjs';
+    import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
     
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -50,20 +51,22 @@ import {
       let currentTarget = 'self';
       const activeDeckIds = { self: null, opp: null };
     
-      // First visit: seed the two Mega Battle Deck starter decks so every new
-      // player starts with playable decks. Card data (ids + images) is baked in,
-      // so seeding needs zero API calls. Skipped once any deck exists.
+      // Seed premade starter/battle decks so every player has playable lists.
+      // Adds any catalog deck missing from the library (new players get all six;
+      // returning players pick up newly added decks without overwriting saves).
       const seedStarterDecks = () => {
-        if (listDecks(library).length > 0) return;
         const starters = getStarterDecks();
-        const seed = [
-          { name: 'Mega Gengar ex Battle Deck', cards: starters.gengar },
-          { name: 'Mega Diancie ex Battle Deck', cards: starters.diancie },
-        ];
-        for (const entry of seed) {
-          // Build the grouped deck structure { name: { cards: [...], totalCount } }
+        const existingNames = new Set(listDecks(library).map((d) => d.name));
+        let nextLibrary = library;
+        let seeded = false;
+
+        for (const entry of STARTER_DECK_CATALOG) {
+          if (existingNames.has(entry.name)) continue;
+          const cards = starters[entry.key];
+          if (!cards?.length) continue;
+
           const grouped = {};
-          for (const card of entry.cards) {
+          for (const card of cards) {
             const variant = { ...card };
             delete variant.qty;
             const count = card.qty;
@@ -73,15 +76,20 @@ import {
             grouped[card.name].cards.push({ data: variant, count });
             grouped[card.name].totalCount += count;
           }
-          const { library: nextLibrary } = createDeckInLibrary(
-            library,
+          const created = createDeckInLibrary(
+            nextLibrary,
             entry.name,
             grouped,
             Date.now()
           );
-          library = nextLibrary;
+          nextLibrary = created.library;
+          seeded = true;
         }
-        saveLibraryToStorage(window.localStorage, library);
+
+        if (seeded) {
+          library = nextLibrary;
+          saveLibraryToStorage(window.localStorage, library);
+        }
       };
       seedStarterDecks();
     
@@ -228,6 +236,12 @@ import {
               commit(setDeckCoin(library, activeId, coinId), { silent: true });
               return true;
             },
+        setActiveMat: (target, matId) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              if (!activeId || !library?.decks?.[activeId]) return false;
+              commit(setDeckMat(library, activeId, matId), { silent: true });
+              return true;
+            },
             getActiveDeckName: (target) => {
           const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
         },
@@ -239,6 +253,10 @@ import {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].coinId || null : null;
             },
+        getActiveMat: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
+            },
             saveActiveDeck: (cards) => {
           const activeId = activeDeckIds[currentTarget];
           if (!activeId || !library?.decks?.[activeId]) return false;
@@ -247,7 +265,9 @@ import {
           });
           return true;
         },
-        getActiveDeckId: () => activeDeckIds[currentTarget],
+        getActiveDeckId: (target) =>
+          activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??
+          activeDeckIds[currentTarget],
         getLibrary: () => library,
       };
     };
