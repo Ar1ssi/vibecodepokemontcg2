@@ -2,31 +2,39 @@ import { getZone } from '../zones/get-zone.js';
 import { stopHoloAnimation } from '../deck-builder/core/holo.mjs';
 import { closeCardPreview } from './full-view.js';
 
-/** @type {{ overlay: HTMLElement, viewport: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, onScroll: () => void, scrollTimer: ReturnType<typeof setTimeout> | null } | null} */
+/** @type {{ overlay: HTMLElement, stack: HTMLElement, slides: HTMLElement[], cards: object[], index: number, countEl: HTMLElement, nameEl: HTMLElement, onKeyDown: (event: KeyboardEvent) => void, pointerId: number | null, dragStartX: number, dragActive: boolean } | null} */
 let viewerState = null;
+
+const MAX_BEHIND = 2;
+const PEEK_PERCENT = 24;
+const SWIPE_THRESHOLD = 48;
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
 
 const clampIndex = (index, max) => Math.max(0, Math.min(index, max));
 
-const findNearestIndex = (viewport, slides) => {
-  const center = viewport.scrollLeft + viewport.clientWidth / 2;
-  let best = 0;
-  let bestDist = Infinity;
+const layoutStack = (state) => {
+  const { slides, index } = state;
   slides.forEach((slide, i) => {
-    const slideCenter = slide.offsetLeft + slide.offsetWidth / 2;
-    const dist = Math.abs(center - slideCenter);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = i;
+    const behind = index - i;
+    slide.classList.remove('is-active', 'is-behind', 'is-hidden');
+    if (behind < 0 || behind > MAX_BEHIND) {
+      slide.classList.add('is-hidden');
+      slide.style.zIndex = '0';
+      slide.style.transform = '';
+      slide.style.opacity = '';
+      return;
     }
-  });
-  return best;
-};
-
-const updateSlideFocus = (state) => {
-  state.slides.forEach((slide, i) => {
-    slide.classList.toggle('is-active', i === state.index);
+    slide.style.zIndex = String(200 - behind);
+    if (behind === 0) {
+      slide.classList.add('is-active');
+      slide.style.transform = 'translateX(0) scale(1)';
+      slide.style.opacity = '1';
+    } else {
+      slide.classList.add('is-behind');
+      slide.style.transform = `translateX(calc(${behind} * ${PEEK_PERCENT}%)) scale(${1 - behind * 0.035})`;
+      slide.style.opacity = String(Math.max(0.45, 0.9 - behind * 0.2));
+    }
   });
 };
 
@@ -34,31 +42,54 @@ const updateFooter = (state) => {
   const card = state.cards[state.index];
   state.countEl.textContent = `${state.index + 1} / ${state.cards.length}`;
   state.nameEl.textContent = card?.name ?? '';
-  updateSlideFocus(state);
+  layoutStack(state);
 };
 
-const scrollToIndex = (state, index, behavior = 'smooth') => {
+const goToIndex = (state, index) => {
   state.index = clampIndex(index, state.slides.length - 1);
-  state.slides[state.index].scrollIntoView({
-    inline: 'center',
-    block: 'nearest',
-    behavior,
-  });
   updateFooter(state);
 };
 
 export const closeDiscardPileViewer = () => {
   if (!viewerState) return;
 
-  const { overlay, onKeyDown, onScroll, viewport, scrollTimer } = viewerState;
+  const { overlay, onKeyDown, stack } = viewerState;
   document.removeEventListener('keydown', onKeyDown);
-  viewport.removeEventListener('scroll', onScroll);
-  if (scrollTimer) clearTimeout(scrollTimer);
+  stack.replaceWith(stack.cloneNode(true));
   overlay.querySelectorAll('.mat-holo').forEach((wrapper) => {
     stopHoloAnimation(wrapper);
   });
   overlay.remove();
   viewerState = null;
+};
+
+const attachSwipe = (state) => {
+  const { stack } = state;
+
+  const onPointerDown = (event) => {
+    if (event.button !== 0) return;
+    state.pointerId = event.pointerId;
+    state.dragStartX = event.clientX;
+    state.dragActive = true;
+    stack.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerUp = (event) => {
+    if (!state.dragActive || state.pointerId !== event.pointerId) return;
+    state.dragActive = false;
+    state.pointerId = null;
+    const delta = event.clientX - state.dragStartX;
+    if (delta <= -SWIPE_THRESHOLD) {
+      goToIndex(state, state.index + 1);
+    } else if (delta >= SWIPE_THRESHOLD) {
+      goToIndex(state, state.index - 1);
+    }
+    stack.releasePointerCapture(event.pointerId);
+  };
+
+  stack.addEventListener('pointerdown', onPointerDown);
+  stack.addEventListener('pointerup', onPointerUp);
+  stack.addEventListener('pointercancel', onPointerUp);
 };
 
 export const openDiscardPileViewer = (user, startIndex = null) => {
@@ -88,6 +119,12 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
   closeBtn.setAttribute('aria-label', 'Close discard pile viewer');
   closeBtn.textContent = '×';
 
+  const stage = document.createElement('div');
+  stage.className = 'discard-pile-stage';
+
+  const stack = document.createElement('div');
+  stack.className = 'discard-pile-stack';
+
   const prevBtn = document.createElement('button');
   prevBtn.type = 'button';
   prevBtn.className = 'discard-pile-nav discard-pile-nav--prev';
@@ -100,12 +137,6 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
   nextBtn.setAttribute('aria-label', 'Newer card');
   nextBtn.textContent = '›';
 
-  const viewport = document.createElement('div');
-  viewport.className = 'discard-pile-viewport';
-
-  const track = document.createElement('div');
-  track.className = 'discard-pile-track';
-
   const slides = cards.map((card, i) => {
     const slide = document.createElement('div');
     slide.className = 'discard-pile-slide';
@@ -117,11 +148,14 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
     img.className = 'discard-pile-card';
     img.draggable = false;
     slide.appendChild(img);
-    track.appendChild(slide);
+    stack.appendChild(slide);
     return slide;
   });
 
-  viewport.appendChild(track);
+  stage.append(stack, nextBtn);
+  if (cards.length > 1) {
+    stage.appendChild(prevBtn);
+  }
 
   const footer = document.createElement('div');
   footer.className = 'discard-pile-footer';
@@ -131,28 +165,21 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
   nameEl.className = 'discard-pile-name';
   footer.append(countEl, nameEl);
 
-  overlay.append(header, closeBtn, prevBtn, nextBtn, viewport, footer);
+  overlay.append(header, closeBtn, stage, footer);
   document.body.appendChild(overlay);
 
   const state = {
     overlay,
-    viewport,
+    stack,
     slides,
     cards,
     index: initialIndex,
     countEl,
     nameEl,
-    scrollTimer: null,
-    onScroll: null,
+    pointerId: null,
+    dragStartX: 0,
+    dragActive: false,
     onKeyDown: null,
-  };
-
-  state.onScroll = () => {
-    if (state.scrollTimer) clearTimeout(state.scrollTimer);
-    state.scrollTimer = setTimeout(() => {
-      state.index = findNearestIndex(viewport, slides);
-      updateFooter(state);
-    }, 80);
   };
 
   state.onKeyDown = (event) => {
@@ -160,9 +187,9 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
     if (event.key === 'Escape' || event.key === 'v') {
       closeDiscardPileViewer();
     } else if (event.key === 'ArrowLeft') {
-      scrollToIndex(state, state.index - 1);
+      goToIndex(state, state.index - 1);
     } else if (event.key === 'ArrowRight') {
-      scrollToIndex(state, state.index + 1);
+      goToIndex(state, state.index + 1);
     }
   };
 
@@ -175,19 +202,15 @@ export const openDiscardPileViewer = (user, startIndex = null) => {
   });
   prevBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    scrollToIndex(state, state.index - 1);
+    goToIndex(state, state.index - 1);
   });
   nextBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    scrollToIndex(state, state.index + 1);
+    goToIndex(state, state.index + 1);
   });
-  viewport.addEventListener('scroll', state.onScroll, { passive: true });
   document.addEventListener('keydown', state.onKeyDown);
+  attachSwipe(state);
 
   viewerState = state;
-  updateFooter(state);
-
-  requestAnimationFrame(() => {
-    scrollToIndex(state, initialIndex, 'instant');
-  });
+  goToIndex(state, initialIndex);
 };

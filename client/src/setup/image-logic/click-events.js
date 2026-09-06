@@ -44,17 +44,16 @@ export const identifyCard = (event) => {
   }
 };
 
-export const coverDoubleClick = (event) => {
-  event.stopPropagation();
-  const user = event.target.user === 'self' ? 'self' : 'opp';
-  if (event.target.id !== 'discardCover') return;
-
-  const zone = getZone(user, 'discard');
-  if (zone.getCount() === 0) return;
-  openDiscardPileViewer(user, zone.getCount() - 1);
-};
-
 export const coverClick = (event) => {
+  if (event.target.id === 'discardCover') {
+    event.stopPropagation();
+    const user = event.target.user === 'self' ? 'self' : 'opp';
+    const zone = getZone(user, 'discard');
+    if (zone.getCount() === 0) return;
+    openDiscardPileViewer(user, zone.getCount() - 1);
+    return;
+  }
+
   const selectedZone = getZone(event.target.user, event.target.id);
   if (selectedZone.elementCover) {
     selectedZone.element.style.display = 'block';
@@ -233,6 +232,12 @@ export const openCardContextMenu = (event) => {
 
 export const imageClick = (event) => {
   event.stopPropagation();
+  identifyCard(event);
+
+  if (mouseClick.zoneId === 'discard') {
+    openDiscardPileViewer(mouseClick.cardUser, mouseClick.cardIndex);
+    return;
+  }
 
   if (event.target.classList.contains('selectHighlight')) {
     closePopups(event);
@@ -251,7 +256,6 @@ export const imageClick = (event) => {
     );
   } else {
     closePopups(event); //need both because of highlights condition in the if block above
-    identifyCard(event);
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
   }
@@ -271,14 +275,6 @@ export const doubleClick = (event) => {
     if (!host?.classList.contains('full-view')) {
       openCardPreview(targetImage, mouseClick.card);
     }
-  } else if (mouseClick.zoneId === 'discard') {
-    openDiscardPileViewer(mouseClick.cardUser, mouseClick.cardIndex);
-  } else if (mouseClick.zoneId === 'discardCover') {
-    const zone = getZone(mouseClick.cardUser, 'discard');
-    openDiscardPileViewer(
-      mouseClick.cardUser,
-      Math.max(0, zone.getCount() - 1)
-    );
   } else {
     let overlay = document.createElement('div');
     overlay.id = 'fullImage';

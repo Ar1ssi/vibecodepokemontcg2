@@ -1724,7 +1724,7 @@ ul, li {
   object-fit: cover;
 }
 
-/* Discard pile viewer — PTCG Live-style swipe carousel on double-click. */
+/* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */
 .discard-pile-overlay {
   position: fixed;
   inset: 0;
@@ -1765,51 +1765,47 @@ ul, li {
 .discard-pile-close:hover {
   background: rgba(255, 255, 255, 0.22);
 }
-.discard-pile-viewport {
+.discard-pile-stage {
+  position: relative;
   flex: 1;
   display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
   align-items: center;
-  padding: 0 max(7.5vw, calc((100vw - 560px) / 2));
-  cursor: grab;
-  touch-action: pan-x;
+  justify-content: center;
+  min-height: 0;
+  pointer-events: none;
 }
-.discard-pile-viewport:active {
+.discard-pile-stack {
+  position: relative;
+  width: min(72vw, 380px);
+  height: min(68vh, calc(min(72vw, 380px) * 1.397));
+  touch-action: pan-y;
+  cursor: grab;
+  pointer-events: auto;
+}
+.discard-pile-stack:active {
   cursor: grabbing;
 }
-.discard-pile-viewport::-webkit-scrollbar {
-  display: none;
-}
-.discard-pile-track {
-  display: flex;
-  align-items: center;
-  gap: clamp(1rem, 3vw, 2rem);
-  min-height: min(72vh, calc(560px * 1.397));
-}
 .discard-pile-slide {
-  flex: 0 0 min(85vw, 560px);
-  scroll-snap-align: center;
+  position: absolute;
+  inset: 0;
   display: flex;
-  justify-content: center;
   align-items: center;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  transform: scale(0.88);
-  opacity: 0.55;
+  justify-content: center;
+  transition:
+    transform 0.22s ease,
+    opacity 0.22s ease;
+  transform-origin: center center;
+  will-change: transform, opacity;
 }
-.discard-pile-slide.is-active {
-  transform: scale(1);
-  opacity: 1;
+.discard-pile-slide.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 .discard-pile-card {
   display: block;
-  height: min(72vh, calc(min(85vw, 560px) * 1.397));
+  height: 100%;
   width: auto;
-  max-width: min(85vw, 560px);
+  max-width: 100%;
   border-radius: 0.3rem;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
   pointer-events: none;
@@ -1819,25 +1815,27 @@ ul, li {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 2;
+  z-index: 300;
   width: 2.75rem;
   height: 2.75rem;
   border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1a1a;
   font-size: 2rem;
   line-height: 1;
   cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 .discard-pile-nav:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: #fff;
 }
 .discard-pile-nav--prev {
-  left: max(0.5rem, env(safe-area-inset-left));
+  left: max(-4.5rem, calc(-1 * min(18vw, 5rem)));
 }
 .discard-pile-nav--next {
-  right: max(0.5rem, env(safe-area-inset-right));
+  right: max(-4.5rem, calc(-1 * min(18vw, 5rem)));
 }
 .discard-pile-footer {
   position: absolute;

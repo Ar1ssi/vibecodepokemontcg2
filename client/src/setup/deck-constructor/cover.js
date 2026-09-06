@@ -7,7 +7,6 @@ import {
 } from '../../setup/image-logic/drag.js';
 import {
   coverClick,
-  coverDoubleClick,
   openCardContextMenu,
 } from '../image-logic/click-events.js';
 import { resetImage } from '../image-logic/reset-image.js';
@@ -25,7 +24,6 @@ export class Cover {
       alt: id,
       draggable: true,
       click: coverClick,
-      ...(id === 'discardCover' ? { dblclick: coverDoubleClick } : {}),
       dragstart: dragStart,
       dragover: dragOver,
       dragleave: dragLeave,
