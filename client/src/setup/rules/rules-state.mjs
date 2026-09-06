@@ -36,6 +36,9 @@
         self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
         opp: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
       },
+      // Survives resetTurnFlags: a second endTurn on the same turn used to
+      // clear drewThisTurn and let hookTurnStartDraw deal another card.
+      lastAutoDrawTurn: { self: 0, opp: 0 },
     };
     
     // ── card data enrichment: type chart data from TCGdex card details ──
@@ -358,6 +361,7 @@
       rulesState.mulligansResolved = false;
       rulesState.attackExecuting = false;
       rulesState.pendingEffects = { self: [], opp: [] };
+      rulesState.lastAutoDrawTurn = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -372,6 +376,7 @@
       rulesState.stadium = null; // new game: nothing on the stadium field
       rulesState.mulligansResolved = false;
       rulesState.pendingEffects = { self: [], opp: [] };
+      rulesState.lastAutoDrawTurn = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -385,6 +390,12 @@
     }
     
     export function endTurn(player) {
+      // Pass + capture-phase +Turn both used to call this for the same
+      // player. A second call after the turn already flipped reset the next
+      // player's flags (including drewThisTurn) and hooked another draw.
+      if (rulesState.turnPlayer !== player) {
+        return rulesState.turnPlayer;
+      }
       expirePendingEffectsForTurnEnd(rulesState, player);
       const next = player === 'self' ? 'opp' : 'self';
       rulesState.turnPlayer = next;
@@ -404,6 +415,9 @@
     // re-render) cannot double-draw.
     export function markTurnDrawn(player) {
       if (rulesState.flags[player]) rulesState.flags[player].drewThisTurn = true;
+      if (rulesState.lastAutoDrawTurn) {
+        rulesState.lastAutoDrawTurn[player] = rulesState.turnNumber;
+      }
     }
 
     // Mulligan execution gate: ensures the auto-reshuffle/redraw + bonus draw
@@ -429,8 +443,15 @@
     // (rules-bridge.js) calls the real draw() when this returns true.
     // Turn 1 is skipped: the player who goes first does not draw at the start
     // of their opening turn (bonus mulligan draws are handled separately).
-    export function shouldAutoDrawAtTurnStart({ enabled = true, drewThisTurn = false, deckCount = 0, turnNumber = 0 } = {}) {
+    export function shouldAutoDrawAtTurnStart({
+      enabled = true,
+      drewThisTurn = false,
+      deckCount = 0,
+      turnNumber = 0,
+      lastDrawnTurn = 0,
+    } = {}) {
       if (Number(turnNumber) === 1) return false;
+      if (lastDrawnTurn && Number(lastDrawnTurn) === Number(turnNumber)) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }
 

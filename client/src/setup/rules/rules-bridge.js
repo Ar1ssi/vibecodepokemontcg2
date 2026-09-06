@@ -3,6 +3,7 @@
     
     import { systemState, socket as rulesSocket } from '../../initialization/global-variables/global-variables.js';
     import { appendMessage } from '../chatbox/append-message.js';
+    import { processAction } from '../general/process-action.js';
     import { getZone } from '../zones/get-zone.js';
     import { openCardPicker } from '../image-logic/card-picker.js';
     import {
@@ -362,9 +363,7 @@ import {
     
     // ── turn flow: attack ends turn; +Turn advances ──────────────────────
     const hookTurnButton = () => {
-      const btn = document.getElementById('passButton');
-      if (!btn) return;
-      btn.addEventListener('click', async (event) => {
+      const handlePassClick = async (event) => {
         if (!rulesState.enabled) return;
         // Suppress pass() and legacy takeTurn before any await — otherwise
         // the bubble handler runs while this async listener is suspended and
@@ -524,10 +523,22 @@ import {
         // "interrupt" the opponent right after we passed the turn. Deliberate,
         // rules-mode-only exception to the "capture hooks don't suppress"
         // invariant (which protects the Set Up / Reset hooks).
-        const next = endTurn(rulesState.turnPlayer);
+        const next = endTurn(endingPlayer);
         appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
         updateTurnBanner();
-      }, true); // capture phase, runs before existing handler
+        // Capture-phase stop keeps pass() from double-ending the turn, so
+        // 2P still needs an explicit pass relay (the log's extra draw was
+        // the peer also emitting a start-of-turn draw for this client).
+        if (systemState.isTwoPlayer && endingPlayer === 'self') {
+          processAction('self', true, 'pass', [{}]);
+        }
+      };
+      ['passButton', 'p2PassButton'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (!btn || btn.dataset.rulesPassHooked) return;
+        btn.dataset.rulesPassHooked = '1';
+        btn.addEventListener('click', handlePassClick, true);
+      });
     };
     
     const hookSetupButton = () => {
@@ -2022,6 +2033,7 @@ if (!isTrainer) {
           drewThisTurn: rulesState.flags[player]?.drewThisTurn,
           deckCount,
           turnNumber: rulesState.turnNumber,
+          lastDrawnTurn: rulesState.lastAutoDrawTurn?.[player],
         })) {
           markTurnDrawn(player);
           draw(player, player, 1, true);

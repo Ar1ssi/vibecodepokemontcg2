@@ -464,6 +464,7 @@ import test from 'node:test';
       // re-use and cross a turn boundary (opp ends turn -> self's turn starts)
       markAbilityUsed('self', card);
       assert.equal(abilityUsed('self', card), true);
+      endTurn('self');
       endTurn('opp');
       assert.equal(abilityUsed('self', card), false);
       // startGame clears everything for a fresh game
@@ -2878,6 +2879,42 @@ import test from 'node:test';
 
     test('shouldAutoDrawAtTurnStart: turn 1 skipped (first player does not draw)', () => {
       assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), false);
+    });
+
+    test('shouldAutoDrawAtTurnStart: lastDrawnTurn blocks a second draw on the same turn', () => {
+      assert.equal(
+        shouldAutoDrawAtTurnStart({
+          enabled: true,
+          drewThisTurn: false,
+          deckCount: 3,
+          turnNumber: 4,
+          lastDrawnTurn: 4,
+        }),
+        false,
+      );
+      assert.equal(
+        shouldAutoDrawAtTurnStart({
+          enabled: true,
+          drewThisTurn: false,
+          deckCount: 3,
+          turnNumber: 4,
+          lastDrawnTurn: 3,
+        }),
+        true,
+      );
+    });
+
+    test('endTurn: second call for the same player is a no-op (no extra turn / flag reset)', () => {
+      startGame();
+      beginTurn('self');
+      const first = endTurn('self');
+      assert.equal(first, 'opp');
+      const turnAfter = rulesState.turnNumber;
+      markTurnDrawn('opp');
+      const second = endTurn('self');
+      assert.equal(second, 'opp');
+      assert.equal(rulesState.turnNumber, turnAfter);
+      assert.equal(rulesState.flags.opp.drewThisTurn, true);
     });
 
     test('markTurnDrawn: sets the per-turn dedupe guard, survives flag reset', () => {
