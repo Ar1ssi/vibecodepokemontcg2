@@ -189,6 +189,38 @@ const syncHoloAnimations = (state) => {
   });
 };
 
+const CHOOSE_PEEK_PERCENT = 14;
+
+const positionTriggerCard = (state) => {
+  if (!state.triggerSlot?.firstElementChild || !state.scene || !state.carouselCol) {
+    return;
+  }
+  const sceneRect = state.scene.getBoundingClientRect();
+  const carouselRect = state.carouselCol.getBoundingClientRect();
+  const triggerW = state.triggerSlot.offsetWidth || carouselRect.width;
+  const triggerH = state.triggerSlot.offsetHeight || carouselRect.height;
+  const gap = 16;
+  const sceneWidth = state.scene.clientWidth;
+
+  let left = carouselRect.right - sceneRect.left + gap;
+  let top = carouselRect.top - sceneRect.top + (carouselRect.height - triggerH) / 2;
+  state.triggerSlot.classList.remove('is-left', 'is-above');
+
+  if (left + triggerW > sceneWidth - 8) {
+    left = carouselRect.left - sceneRect.left - triggerW - gap;
+    state.triggerSlot.classList.add('is-left');
+  }
+  if (left < 4) {
+    left = carouselRect.left - sceneRect.left + (carouselRect.width - triggerW) / 2;
+    top = carouselRect.top - sceneRect.top - triggerH - 12;
+    state.triggerSlot.classList.add('is-above');
+    state.triggerSlot.classList.remove('is-left');
+  }
+
+  state.triggerSlot.style.left = `${Math.max(4, left)}px`;
+  state.triggerSlot.style.top = `${Math.max(4, top)}px`;
+};
+
 const updateSelectionUI = (state) => {
   if (state.multiSelect) {
     const { slides, slotAssignments } = state;
@@ -223,13 +255,13 @@ const syncDropSlotLayout = (state) => {
   if (!state.slotElements?.length || !state.stack) return;
   const slotCount = state.slotElements.length;
   const gap = 6;
-  const maxRowW = Math.min(window.innerWidth * 0.94, 860);
+  const maxRowW = Math.min(window.innerWidth * 0.92, 860);
   const baseW = Math.max(120, Math.round(state.stack.clientWidth * 0.82) || 185);
   let cardW = baseW;
   const totalNeeded = slotCount * cardW + (slotCount - 1) * gap;
   if (totalNeeded > maxRowW) {
     cardW = Math.floor((maxRowW - (slotCount - 1) * gap) / slotCount);
-    cardW = Math.max(72, cardW);
+    cardW = Math.max(56, cardW);
   }
   const cardH = Math.round(cardW * 1.397);
   state.slotRow?.style.setProperty('--card-picker-slot-card-w', `${cardW}px`);
@@ -260,6 +292,7 @@ const renderSlotCards = (state) => {
       slotEl.appendChild(img);
     }
   });
+  positionTriggerCard(state);
 };
 
 const findDropSlotAt = (state, x, y) => {
@@ -307,7 +340,8 @@ const layoutStack = (state) => {
   const { slides, stack, index, renderDragPx, multiSelect } = state;
   const stackWidth = stack.clientWidth || 380;
   const stackRect = stack.getBoundingClientRect();
-  const peekPx = (PEEK_PERCENT / 100) * stackWidth;
+  const peekPercent = state.mode === 'browse' ? PEEK_PERCENT : CHOOSE_PEEK_PERCENT;
+  const peekPx = (peekPercent / 100) * stackWidth;
   const virtualIndex = computeVirtualIndex(
     index,
     renderDragPx,
@@ -338,7 +372,7 @@ const layoutStack = (state) => {
     );
 
     const scale = 1 - absPeek * 0.035;
-    slide.style.transform = `translate3d(${layout.peekOffset * PEEK_PERCENT}%, 0, 0) scale(${scale})`;
+    slide.style.transform = `translate3d(${layout.peekOffset * peekPercent}%, 0, 0) scale(${scale})`;
     slide.style.opacity = '1';
 
     if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset)) {
@@ -348,6 +382,7 @@ const layoutStack = (state) => {
 
   syncHoloAnimations(state);
   updateFooter(state);
+  positionTriggerCard(state);
 };
 
 const updateFooter = (state) => {
@@ -515,6 +550,7 @@ const attachSwipe = (state) => {
   let dragging = false;
   let gesture = 'pending';
   let ghost = null;
+  let activePointerId = null;
 
   const blockNativeDrag = (event) => event.preventDefault();
 
@@ -523,9 +559,78 @@ const attachSwipe = (state) => {
     ghost = null;
   };
 
+  const clearSlotHighlights = () => {
+    state.slotElements?.forEach((slot) => slot.classList.remove('is-drop-target'));
+  };
+
+  const unbindCardDrag = () => {
+    document.removeEventListener('pointermove', onDocPointerMove, true);
+    document.removeEventListener('pointerup', onDocPointerEnd, true);
+    document.removeEventListener('pointercancel', onDocPointerEnd, true);
+    clearSlotHighlights();
+  };
+
+  const onDocPointerMove = (event) => {
+    if (activePointerId !== event.pointerId) return;
+    event.preventDefault();
+    if (ghost) {
+      ghost.style.left = `${event.clientX}px`;
+      ghost.style.top = `${event.clientY}px`;
+    }
+    clearSlotHighlights();
+    const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
+    if (slotIdx >= 0) state.slotElements[slotIdx]?.classList.add('is-drop-target');
+  };
+
+  const onDocPointerEnd = (event) => {
+    if (activePointerId !== event.pointerId) return;
+    const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
+    if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
+    cleanupGhost();
+    unbindCardDrag();
+    tracking = false;
+    state.tracking = false;
+    activePointerId = null;
+    gesture = 'pending';
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const beginCardDrag = (event, cardNode) => {
+    gesture = 'cardDrag';
+    dragging = false;
+    activePointerId = event.pointerId;
+    tracking = false;
+    state.tracking = false;
+    state.pointerId = null;
+    stopDragLoop(state);
+    state.targetDragPx = 0;
+    state.renderDragPx = 0;
+    layoutStack(state);
+    stage.classList.remove('is-dragging');
+    stack.classList.remove('is-dragging');
+    const rect = cardNode.getBoundingClientRect();
+    ghost = cardNode.cloneNode(true);
+    ghost.classList.add('card-picker-drag-ghost');
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.left = `${event.clientX}px`;
+    ghost.style.top = `${event.clientY}px`;
+    document.body.appendChild(ghost);
+    try {
+      stage.releasePointerCapture(event.pointerId);
+    } catch {
+      // already released
+    }
+    document.addEventListener('pointermove', onDocPointerMove, true);
+    document.addEventListener('pointerup', onDocPointerEnd, true);
+    document.addEventListener('pointercancel', onDocPointerEnd, true);
+  };
+
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
     if (isSwipeBlockedTarget(event.target)) return;
+    if (activePointerId != null) return;
     stopDragLoop(state);
     tracking = true;
     state.tracking = true;
@@ -534,13 +639,13 @@ const attachSwipe = (state) => {
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
-    state.targetDragPx = 0;
-    state.renderDragPx = 0;
     stage.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event) => {
-    if (!tracking || state.pointerId !== event.pointerId) return;
+    if (!tracking || state.pointerId !== event.pointerId || gesture === 'cardDrag') {
+      return;
+    }
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
 
@@ -548,39 +653,25 @@ const attachSwipe = (state) => {
       if (
         state.mode !== 'browse' &&
         state.slotElements?.length &&
-        Math.abs(dy) >= Math.abs(dx) * 0.85
+        Math.abs(dy) >= 8 &&
+        Math.abs(dy) >= Math.abs(dx) * 0.55
       ) {
-        gesture = 'cardDrag';
         const slide = state.slides[state.index];
         const cardNode =
           slide?.querySelector('.discard-pile-card, .mat-holo') ?? slide;
-        if (cardNode) {
-          const rect = cardNode.getBoundingClientRect();
-          ghost = cardNode.cloneNode(true);
-          ghost.classList.add('card-picker-drag-ghost');
-          ghost.style.width = `${rect.width}px`;
-          ghost.style.height = `${rect.height}px`;
-          document.body.appendChild(ghost);
-        }
-      } else if (Math.abs(dx) > Math.abs(dy) * 1.1) {
+        if (cardNode) beginCardDrag(event, cardNode);
+        return;
+      }
+      if (Math.abs(dx) > Math.abs(dy) * 1.15) {
         gesture = 'swipe';
       }
-    }
-
-    if (gesture === 'cardDrag') {
-      event.preventDefault();
-      if (ghost) {
-        ghost.style.left = `${event.clientX}px`;
-        ghost.style.top = `${event.clientY}px`;
-      }
-      return;
     }
 
     if (
       gesture !== 'cardDrag' &&
       !dragging &&
       Math.abs(dx) >= SWIPE_LOCK_PX &&
-      Math.abs(dx) > Math.abs(dy) * 1.1
+      Math.abs(dx) > Math.abs(dy) * 1.15
     ) {
       gesture = 'swipe';
       dragging = true;
@@ -596,9 +687,10 @@ const attachSwipe = (state) => {
   };
 
   const endSwipe = (event) => {
-    if (!tracking || state.pointerId !== event.pointerId) return;
+    if (!tracking || state.pointerId !== event.pointerId || gesture === 'cardDrag') {
+      return;
+    }
     const wasDragging = dragging;
-    const wasCardDrag = gesture === 'cardDrag';
     tracking = false;
     state.tracking = false;
     dragging = false;
@@ -606,33 +698,27 @@ const attachSwipe = (state) => {
     stage.classList.remove('is-dragging');
     stack.classList.remove('is-dragging');
 
-    if (wasCardDrag) {
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    const horizontal =
+      wasDragging &&
+      Math.abs(dx) >= SWIPE_THRESHOLD &&
+      Math.abs(dx) > Math.abs(dy);
+
+    if (horizontal) {
+      goToIndex(state, state.index + (dx > 0 ? 1 : -1));
+    } else if (!wasDragging && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
       if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
-      cleanupGhost();
-    } else {
-      const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
-      const horizontal =
-        wasDragging &&
-        Math.abs(dx) >= SWIPE_THRESHOLD &&
-        Math.abs(dx) > Math.abs(dy);
-
-      if (horizontal) {
-        goToIndex(state, state.index + (dx > 0 ? 1 : -1));
-      } else if (!wasDragging && state.mode !== 'browse') {
-        const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
-        if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
-      } else {
-        state.targetDragPx = 0;
-        stack.classList.add('is-dragging');
-        stage.classList.add('is-dragging');
-        startDragLoop(state);
-      }
+    } else if (wasDragging) {
+      state.targetDragPx = 0;
+      stack.classList.add('is-dragging');
+      stage.classList.add('is-dragging');
+      startDragLoop(state);
     }
 
     state.pointerId = null;
-    if (wasDragging || wasCardDrag) event.preventDefault();
+    if (wasDragging) event.preventDefault();
     event.stopPropagation();
     try {
       stage.releasePointerCapture(event.pointerId);
@@ -717,20 +803,26 @@ export const openCardPicker = async ({
   const stack = document.createElement('div');
   stack.className = 'discard-pile-stack card-picker-stack';
 
-  const prevBtn = document.createElement('button');
-  prevBtn.type = 'button';
-  prevBtn.className = 'discard-pile-nav discard-pile-nav--prev';
-  prevBtn.setAttribute('aria-label', 'Previous card');
-  prevBtn.textContent = '‹';
+  let prevBtn = null;
+  let nextBtn = null;
+  if (isBrowse) {
+    prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'discard-pile-nav discard-pile-nav--prev';
+    prevBtn.setAttribute('aria-label', 'Previous card');
+    prevBtn.textContent = '‹';
 
-  const nextBtn = document.createElement('button');
-  nextBtn.type = 'button';
-  nextBtn.className = 'discard-pile-nav discard-pile-nav--next';
-  nextBtn.setAttribute('aria-label', 'Next card');
-  nextBtn.textContent = '›';
+    nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'discard-pile-nav discard-pile-nav--next';
+    nextBtn.setAttribute('aria-label', 'Next card');
+    nextBtn.textContent = '›';
 
-  stage.append(stack, nextBtn);
-  if (candidates.length > 1) stage.appendChild(prevBtn);
+    stage.append(stack, nextBtn);
+    if (candidates.length > 1) stage.appendChild(prevBtn);
+  } else {
+    stage.appendChild(stack);
+  }
 
   const instructionEl = document.createElement('div');
   instructionEl.className = 'card-picker-instruction';
@@ -747,6 +839,8 @@ export const openCardPicker = async ({
   nameEl.className = 'discard-pile-name';
 
   let main = null;
+  let scene = null;
+  let carouselCol = null;
   let triggerSlot = null;
   let slotRow = null;
   let slotElements = [];
@@ -772,21 +866,22 @@ export const openCardPicker = async ({
     main = document.createElement('div');
     main.className = 'card-picker-workspace';
 
-    const scene = document.createElement('div');
+    scene = document.createElement('div');
     scene.className = 'card-picker-scene';
 
     const cardsRow = document.createElement('div');
     cardsRow.className = 'card-picker-cards-row';
 
-    const carouselCol = document.createElement('div');
+    carouselCol = document.createElement('div');
     carouselCol.className = 'card-picker-carousel-col';
     carouselCol.appendChild(stage);
 
+    cardsRow.appendChild(carouselCol);
+    scene.appendChild(cardsRow);
+
     triggerSlot = document.createElement('div');
     triggerSlot.className = 'card-picker-trigger-slot';
-
-    cardsRow.append(carouselCol, triggerSlot);
-    scene.appendChild(cardsRow);
+    scene.appendChild(triggerSlot);
 
     meta = document.createElement('div');
     meta.className = 'card-picker-meta card-picker-meta--choose';
@@ -847,6 +942,8 @@ export const openCardPicker = async ({
     onConfirm,
     onCancel,
     triggerHoloWrapper: null,
+    scene,
+    carouselCol,
     triggerSlot,
     slotRow,
     slotElements,
@@ -870,6 +967,7 @@ export const openCardPicker = async ({
       state.triggerHoloWrapper = holoWrapper;
       startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
     }
+    positionTriggerCard(state);
   }
 
   state.onKeyDown = (event) => {
@@ -908,14 +1006,16 @@ export const openCardPicker = async ({
     });
   }
 
-  prevBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    goToIndex(state, state.index - 1);
-  });
-  nextBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    goToIndex(state, state.index + 1);
-  });
+  if (prevBtn && nextBtn) {
+    prevBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      goToIndex(state, state.index - 1);
+    });
+    nextBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      goToIndex(state, state.index + 1);
+    });
+  }
 
   overlay.addEventListener('click', (event) => {
     event.stopPropagation();
