@@ -28,22 +28,31 @@
       return String(card.name || '').toLowerCase().endsWith('gx');
     }
 
+    export function isMegaCard(card = {}) {
+      const rarity = String(card.rarity || '').toLowerCase();
+      if (rarity.includes('mega')) return true;
+      const subtypes = Array.isArray(card.subtypes)
+        ? card.subtypes.map((s) => String(s).toLowerCase())
+        : [];
+      if (subtypes.some((s) => s.includes('mega'))) return true;
+      return /\bmega\b/.test(String(card.name || '').toLowerCase());
+    }
+
     // How many prizes does knocking out this card award?
-    // Modern rules: ex gives 2 EXTRA prizes (3 total when KO'd); VMAX = 3;
-    // V/VSTAR = 2; standard = 1. (GX doesn't award prizes — see `koOutcome`.)
+    // Mega (including Mega ex) = 3; VMAX = 3; ex / Double Rare = 2;
+    // V / VSTAR = 2; standard = 1. (GX doesn't award prizes — see `koOutcome`.)
     export function prizesForKO(card = {}) {
       const rarity = String(card.rarity || '').toLowerCase();
       const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(s => String(s).toLowerCase()) : [];
-      if (isExCard(card) || rarity.includes('double rare')) return 3;
-      if (subtypes.includes('vmax')) return 3;
+      if (isMegaCard(card) || subtypes.includes('vmax')) return 3;
+      if (isExCard(card) || rarity.includes('double rare')) return 2;
       if (subtypes.includes('vstar') || subtypes.includes('v')) return 2;
-      if (rarity.includes('mega')) return 2;
       return 1;
     }
 
     // Special KO outcome for a card, per official rules.
     //  - GX: the player who had the GX LOSES the match when it is KO'd.
-    //  - everything else: award `count` prize cards (ex = 3, see prizesForKO).
+    //  - everything else: award `count` prize cards (ex = 2, mega = 3; see prizesForKO).
     // Returns { type: 'matchLoss' } | { type: 'prizes', count: number }
     export function koOutcome(card = {}) {
       if (isGxCard(card)) return { type: 'matchLoss' };

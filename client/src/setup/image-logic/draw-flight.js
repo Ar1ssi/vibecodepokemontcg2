@@ -10,17 +10,23 @@ import {
 import { toHighResCardImageUrl } from './card-image-url.mjs';
 import { playDrawFlight, viewportRectOf } from './card-pop.mjs';
 
+const pendingHandOrigins = new WeakMap();
+
+export const setHandFlightOrigin = (card, rect) => {
+  if (card && rect) pendingHandOrigins.set(card, rect);
+};
+
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 const STAGGER_MS = 180;
 
 let nextStartAt = 0;
 
-const hideForFlight = (card) => {
+export const hideForFlight = (card) => {
   card?.image?.classList.add('draw-flight-source');
   card?.wrapper?.classList.add('draw-flight-source');
 };
 
-const showAfterFlight = (card) => {
+export const showAfterFlight = (card) => {
   card?.image?.classList.remove('draw-flight-source');
   card?.wrapper?.classList.remove('draw-flight-source');
 };
@@ -57,17 +63,31 @@ const buildDrawFlip = (faceSrc, sleeveSrc) => {
   return flip;
 };
 
-const startDrawToHand = (user, card) => {
+export const originRectForHandFlight = (user, oZoneId, card) => {
+  const override = pendingHandOrigins.get(card);
+  if (override) {
+    pendingHandOrigins.delete(card);
+    return override;
+  }
+  const el =
+    oZoneId === 'deck'
+      ? deckOriginEl(user)
+      : oZoneId === 'prizes'
+        ? cardNode(card) ?? card?.image
+        : null;
+  return el ? viewportRectOf(el) : null;
+};
+
+const startDrawToHand = (user, card, fromRect) => {
   hideForFlight(card);
   const toEl = cardNode(card) ?? card.image;
-  const fromEl = deckOriginEl(user);
-  if (!toEl?.isConnected || !fromEl) {
+  const origin = fromRect || (deckOriginEl(user) && viewportRectOf(deckOriginEl(user)));
+  if (!toEl?.isConnected || !origin) {
     showAfterFlight(card);
     return;
   }
 
   const dest = viewportRectOf(toEl);
-  const origin = viewportRectOf(fromEl);
   if (dest.width < 2 || dest.height < 2) {
     showAfterFlight(card);
     return;
@@ -108,12 +128,12 @@ const startDrawToHand = (user, card) => {
   });
 };
 
-// Pokémon TCG Live draw (see "Arcanine EX - Pokemon TCG Live Gameplay"):
-// the top deck card lifts, arcs into the hand, and flips sleeve → face.
-export const playDrawToHand = (user, card) => {
+// Pokémon TCG Live draw / prize take: card lifts from the origin, arcs
+// into the hand, and flips sleeve → face.
+export const playDrawToHand = (user, card, { fromRect } = {}) => {
   if (!card?.image || typeof document === 'undefined') return;
   hideForFlight(card);
   const wait = Math.max(0, nextStartAt - performance.now());
   nextStartAt = performance.now() + wait + STAGGER_MS;
-  globalThis.setTimeout(() => startDrawToHand(user, card), wait);
+  globalThis.setTimeout(() => startDrawToHand(user, card, fromRect), wait);
 };

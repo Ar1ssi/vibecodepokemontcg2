@@ -18,9 +18,11 @@
   position: relative;
   width: 100%;
   height: 100%;
+  pointer-events: auto;
   transform-style: preserve-3d;
   transform: perspective(700px) rotateX(calc(var(--coin-rx) + var(--coin-flip, 0deg))) rotateY(var(--coin-ry));
   transition: transform 0.18s ease-out;
+  cursor: default;
 }
 
 .coin-face {
@@ -120,7 +122,7 @@
   position: fixed;
   bottom: calc(var(--active-bottom) + var(--active-height) / 2);
   left: calc(var(--active-left) + var(--active-width) + 0.6%);
-  width: calc(var(--active-height) * 0.24);
+  width: calc(var(--active-height) * 0.12);
   aspect-ratio: 1;
   height: auto;
   transform: translateY(50%);

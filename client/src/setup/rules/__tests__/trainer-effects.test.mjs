@@ -3,6 +3,7 @@ import test, { describe } from 'node:test';
     
     const { parseTrainerEffect, describeStep } = await import('../trainer-effects.mjs');
     const { energyMatchesSearchWhat } = await import('../energy-effects.mjs');
+    const { matchesSearch, filterSearchMatches, isPokemonCard } = await import('../search-match.mjs');
     
     test("Professor's Research: discard hand, draw 7", () => {
       const r = parseTrainerEffect("Discard your hand and draw 7 cards.");
@@ -360,6 +361,15 @@ import test, { describe } from 'node:test';
       assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target === 5));
     });
 
+    test('Mesagoza-style stadium draw-until is passive, not a one-shot drawUntil', () => {
+      const r = parseTrainerEffect(
+        "This Stadium stays in play when you play it. Once during each player's turn, that player may draw cards until they have 3 cards in their hand."
+      );
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'passive');
+    });
+
     test("Team Rocket's Factory: stadium 'once during each player's turn' is passive, NOT a bare draw", () => {
       const r = parseTrainerEffect("Once during each player’s turn, if they played a Supporter card that has “Team Rocket” in its name from their hand this turn, they may draw 2 cards.");
       assert.equal(r.recognizable, true);
@@ -417,6 +427,24 @@ import test, { describe } from 'node:test';
       assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
     });
 
+    test('shuffleDeckAfterSearch: shuffles silently and announces in chat', async () => {
+      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
+      const messages = [];
+      let shuffled = false;
+      const append = (_user, msg) => { messages.push(msg); };
+      const shuffleZone = () => { shuffled = true; };
+      shuffleDeckAfterSearch('self', append, shuffleZone, { sourceName: 'Ultra Ball' });
+      assert.equal(shuffled, true);
+      assert.match(messages[0], /Ultra Ball — deck shuffled/);
+    });
+
+    test('shuffleDeckAfterSearch: message null shuffles without duplicate chat line', async () => {
+      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
+      const messages = [];
+      shuffleDeckAfterSearch('self', (_u, m) => messages.push(m), () => {}, { message: null });
+      assert.equal(messages.length, 0);
+    });
+
     test('Firebreather search filter: typed {R} matches Fire only', () => {
       const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
       const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
@@ -424,6 +452,28 @@ import test, { describe } from 'node:test';
       assert.equal(energyMatchesSearchWhat(water, 'Basic {R} Energy'), false);
       assert.equal(energyMatchesSearchWhat(fire, 'Basic Energy'), true);
       assert.equal(energyMatchesSearchWhat(water, 'Basic Energy'), true);
+    });
+
+    test('Buddy-Buddy Poffin filter: Basic ≤70 HP includes stubs without hp', () => {
+      const stub = { name: 'Pikachu', type: 'Pokémon', stage: 'Basic' };
+      const overCap = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', hp: 90 };
+      const underCap = { name: 'Clefairy', type: 'Pokémon', stage: 'Basic', hp: 60 };
+      const what = 'Basic Pokémon ≤70 HP';
+      assert.equal(matchesSearch(stub, what), true);
+      assert.equal(matchesSearch(underCap, what), true);
+      assert.equal(matchesSearch(overCap, what), false);
+      const pool = filterSearchMatches([stub, overCap, underCap], what);
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu', 'Clefairy']);
+    });
+
+    test('Ultra Ball filter: any Pokémon in deck (type on image fallback)', () => {
+      const fromImageType = { name: 'Pikachu', image: { type: 'Pokémon' } };
+      const energy = { name: 'Basic Fire Energy', type: 'Energy' };
+      assert.equal(isPokemonCard(fromImageType), true);
+      assert.equal(matchesSearch(fromImageType, 'Pokémon'), true);
+      assert.equal(matchesSearch(energy, 'Pokémon'), false);
+      const pool = filterSearchMatches([fromImageType, energy], 'Pokémon');
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu']);
     });
 
     test('typed bench search: up to 3 {C} Pokémon with 100 HP or less', () => {

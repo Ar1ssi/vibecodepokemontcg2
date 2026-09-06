@@ -7,7 +7,16 @@ import { discardBoard } from '../general/board-actions.js';
 import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium } from '../../setup/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '../../setup/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
-import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
+import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '../../setup/rules/energy-effects.mjs';
+import {
+  parsePendingAttackEffects,
+  parseDiscardOpponentEffect,
+  queuePendingAttackEffects,
+  combinedPendingDamagePrevention,
+  pendingDamageVulnerability,
+  pendingCantUseAttack,
+  pendingRetreatCostDelta,
+} from '../../setup/rules/attack-pending-effects.mjs';
 import {
   parseDamagePrevention,
   applyDamagePrevention,
@@ -19,12 +28,15 @@ import {
   parseMoveDamage,
   parseLookAtTop,
   parseRecursionFromDiscard,
+  isPokemonToolCard,
+  attachedTools,
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
-import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
+import { takePrizes } from '../zones/prizes-actions.js';
+import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion } from '../../setup/rules/ko-flow.mjs';
 import { markRetreated } from '../../setup/rules/retreat.mjs';
@@ -46,13 +58,14 @@ import {
   clearStatuses,
   applyStatus,
   parseStatusFromAttackText,
+  parseSelfStatusFromAttackText,
   resolveTurnBoundary,
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick } from '../../setup/rules/search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -67,6 +80,127 @@ const abilityBlockedByStadium = (user, target) => {
 
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
+const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, emit) => {
+  if (!discardSpec) return;
+  const { deckTop, energyActive, handRandom, discardTools } = discardSpec;
+  if (!(deckTop > 0 || energyActive > 0 || handRandom > 0 || discardTools)) return;
+
+  if (deckTop > 0) {
+    let discarded = 0;
+    for (let i = 0; i < deckTop; i++) {
+      if (getZone(oppPlayer, 'deck').getCount() === 0) break;
+      moveCard(oppPlayer, user, 'deck', 'discard', 0);
+      discarded++;
+    }
+    if (discarded > 0) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: discarded ${discarded} card${discarded !== 1 ? 's' : ''} from opponent's deck.`,
+        'announcement',
+        false
+      );
+    } else {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: deck discard fizzles — opponent's deck is empty.`,
+        'announcement',
+        false
+      );
+    }
+  }
+
+  if (energyActive > 0) {
+    const oppActiveZone = getZone(oppPlayer, 'active');
+    const oppActive = oppActiveZone.array[0];
+    if (!oppActive) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: energy discard fizzles — no opponent Active.`,
+        'announcement',
+        false
+      );
+    } else {
+      const energyIdx = oppActiveZone.array.findIndex(
+        (c) => c.type === 'Energy' && c.image?.relative === oppActive.image
+      );
+      if (energyIdx === -1) {
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: energy discard fizzles — no Energy on opponent Active.`,
+          'announcement',
+          false
+        );
+      } else {
+        const energy = oppActiveZone.array[energyIdx];
+        moveCard(oppPlayer, user, 'active', 'discard', energyIdx);
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: discarded ${energy.name || 'Energy'} from opponent Active.`,
+          'announcement',
+          false
+        );
+      }
+    }
+  }
+
+  if (handRandom > 0) {
+    const hand = getZone(oppPlayer, 'hand');
+    const count = hand.getCount();
+    if (count === 0) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: hand discard fizzles — opponent's hand is empty.`,
+        'announcement',
+        false
+      );
+    } else {
+      const idx = Math.floor(Math.random() * count);
+      const card = hand.array[idx];
+      moveCard(oppPlayer, user, 'hand', 'discard', idx);
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: discarded a random card (${card?.name || 'card'}) from opponent's hand.`,
+        'announcement',
+        false
+      );
+    }
+  }
+
+  if (discardTools) {
+    const oppActiveZone = getZone(oppPlayer, 'active');
+    const oppActive = oppActiveZone.array[0];
+    if (!oppActive) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: tool discard fizzles — no opponent Active.`,
+        'announcement',
+        false
+      );
+    } else {
+      const tools = attachedTools(oppActive, oppActiveZone.array);
+      if (!tools.length) {
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: tool discard fizzles — no Tools on opponent Active.`,
+          'announcement',
+          false
+        );
+      } else {
+        for (const tool of [...tools]) {
+          const idx = oppActiveZone.array.indexOf(tool);
+          if (idx >= 0) moveCard(oppPlayer, user, 'active', 'discard', idx);
+        }
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: discarded ${tools.length} Pokémon Tool${tools.length !== 1 ? 's' : ''} from opponent Active.`,
+          'announcement',
+          false
+        );
+      }
+    }
+  }
+};
+
 const placeSelfDamage = (user, zoneId, index, damage) => {
   if (!(damage > 0)) return;
   const target = getZone(user, zoneId).array[index];
@@ -79,6 +213,112 @@ const placeSelfDamage = (user, zoneId, index, damage) => {
     addDamageCounter(user, zoneId, index, damage);
   }
 };
+
+function countEnergyOnPlayerSide(player) {
+  let total = 0;
+  for (const zoneId of ['active', 'bench']) {
+    const zone = getZone(player, zoneId);
+    for (const card of zone.array) {
+      if (card.type === 'Pokémon' && card.image) {
+        total += energiesAttachedToPokemon(zone, card.image).length;
+      }
+    }
+  }
+  return total;
+}
+
+function countPokemonInPlay(player, filterFn = null) {
+  let total = 0;
+  for (const zoneId of ['active', 'bench']) {
+    for (const card of getZone(player, zoneId).array) {
+      if (card.type !== 'Pokémon') continue;
+      if (!filterFn || filterFn(card)) total++;
+    }
+  }
+  return total;
+}
+
+function isTeamRocketPokemon(card) {
+  return /team rocket/i.test(String(card?.name || ''));
+}
+
+function isAncientPokemon(card) {
+  const name = String(card?.name || '');
+  if (/\bancient\b/i.test(name)) return true;
+  return (card?.subtypes || []).some((s) => /ancient/i.test(String(s)));
+}
+
+function hasRoundAttack(card) {
+  return (card?.attacks || []).some((a) => /^round$/i.test(String(a?.name || '')));
+}
+
+function isGrassPokemon(card) {
+  const types = (card?.types || []).map((t) => String(t).toLowerCase());
+  return types.includes('grass');
+}
+
+function countSpecialEnergyOnPokemon(zone, pokemonImage) {
+  return energiesAttachedToPokemon(zone, pokemonImage).filter(
+    (e) => e.type === 'Energy' && classifyEnergyEffect(e) !== 'basic'
+  ).length;
+}
+
+function isBeedrillPokemon(card) {
+  return /beedrill/i.test(String(card?.name || ''));
+}
+
+function countOpponentStatuses(player, cardKey) {
+  const s = getStatus(player, cardKey);
+  if (!s) return 0;
+  return Object.values(s).filter(Boolean).length;
+}
+
+function pokemonHasDamage(player, zoneId, index) {
+  const el = getZone(player, zoneId).array[index]?.image?.damageCounter;
+  const dmg = el ? parseInt(el.textContent || '0', 10) || 0 : 0;
+  return dmg > 0;
+}
+
+function countDamagedOwnPokemon(player) {
+  let n = 0;
+  for (const zoneId of ['active', 'bench']) {
+    const zone = getZone(player, zoneId);
+    zone.array.forEach((card, idx) => {
+      if (card.type === 'Pokémon' && pokemonHasDamage(player, zoneId, idx)) n++;
+    });
+  }
+  return n;
+}
+
+function countTaurosDamaged(player) {
+  let n = 0;
+  for (const zoneId of ['active', 'bench']) {
+    const zone = getZone(player, zoneId);
+    zone.array.forEach((card, idx) => {
+      if (
+        card.type === 'Pokémon' &&
+        /tauros/i.test(String(card.name || '')) &&
+        pokemonHasDamage(player, zoneId, idx)
+      ) {
+        n++;
+      }
+    });
+  }
+  return n;
+}
+
+function opponentHasSpecialEnergy(player) {
+  const active = getZone(player, 'active').array[0];
+  if (!active?.image) return false;
+  return countSpecialEnergyOnPokemon(getZone(player, 'active'), active.image) > 0;
+}
+
+function remainingHp(player, card, zoneId, index) {
+  const hp = effectiveHp(card.hp ?? 0, player, card);
+  const el = getZone(player, zoneId).array[index]?.image?.damageCounter;
+  const dmg = el ? parseInt(el.textContent || '0', 10) || 0 : 0;
+  return Math.max(0, hp - dmg);
+}
 
 // Re-read attack effect text after ensureCardData may have merged TCGdex data.
 const syncAttackFromCard = (card, attackIndex, prev) => {
@@ -205,6 +445,15 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             );
             return; // turn does NOT end; player can retry or pass
           }
+        }
+        if (rulesState.enabled && pendingCantUseAttack(user, user, atk.name)) {
+          appendMessage(
+            user,
+            `⛔ ${active?.name || 'This Pokémon'} can't use ${atk.name} (attack effect).`,
+            'announcement',
+            false
+          );
+          return;
         }
 
         // Energy cost check
@@ -336,9 +585,11 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // (e.g. Dunsparce's Coil Dance / Iono's signature). The whole hand
         // goes to the deck, it is shuffled, and N cards are drawn. Never
         // fails (an empty deck just yields fewer cards), so no fizzle gate.
+        let shuffledHandDraw = 0;
         if (rulesState.enabled) {
           const shuf = shuffleDrawClause(atk.text);
           if (shuf.draw > 0) {
+            shuffledHandDraw = shuf.draw;
             shuffleAndDraw(user, user, shuf.draw, undefined, false);
           }
         }
@@ -400,6 +651,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // Damage calculation (requires a defending Active — skipped for
         // effect-only attacks like Call for Family when none is in play).
         let parsed = null;
+        let oppHp = 0;
+        let totalDmg = 0;
         if (oppActive) {
         await ensureCardData(oppActive);
         await ensureCardData(active);
@@ -413,17 +666,37 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // carries no recognized scaling — the flat-damage path stays intact.
         let effectiveAttack = atk;
         if (rulesState.enabled) {
+          const atkText = String(atk.text || '');
+          const atkLower = atkText.toLowerCase();
           // Coin-flip modifiers (taxonomy §D): attacks that say "Flip a coin"
           // resolve the coin here in the live path. Heads bonus is added to
           // the effective damage total by the parser; tails self-damage is
           // executed after the KO check (below).
-          const coin = /flip a coin/.test(String(atk.text || '').toLowerCase())
+          const coin = /flip a coin/.test(atkLower)
             ? flipCoin(rngBundle, 'attack')
             : null;
+          let headsCount;
+          const multiFlip = atkLower.match(/flip (\d+) coins?/);
+          if (multiFlip && /for each heads/.test(atkText)) {
+            const flips = parseInt(multiFlip[1], 10);
+            headsCount = 0;
+            for (let i = 0; i < flips; i++) {
+              if (Math.random() < 0.5) headsCount++;
+            }
+            appendMessage(
+              user,
+              `🪙 Flipped ${flips} coins — ${headsCount} head${headsCount !== 1 ? 's' : ''}!`,
+              'announcement',
+              false
+            );
+          }
+          const oppActiveZoneForEnergy = getZone(oppPlayer, 'active');
           // "is damaged" conditions (taxonomy §D "if conditional damage"):
           // pass the defender's current damage-counter count when it is in the
           // DOM; leave undefined otherwise so the parser keeps it honestly unresolved.
           const defenderDmgEl = oppActive?.image?.damageCounter;
+          const attackerDmgEl = active?.image?.damageCounter;
+          const oppKeyForStatus = oppActive?.image?.dataset?.cardId || oppActive?.name;
           parsed = parseAttackDamage(atk, active, oppActive, {
             energyCount: attachedEnergies.length,
             energyDiscarded,
@@ -431,10 +704,32 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             turnCount: Math.max(1, rulesState.turnNumber),
             attackerHp: active?.hp ?? 0,
             defenderHp: oppActive?.hp ?? 0,
+            ownEnergyCount: countEnergyOnPlayerSide(user),
+            opponentEnergyCount: energiesAttachedToPokemon(
+              oppActiveZoneForEnergy,
+              oppActive.image
+            ).length,
+            ownHandCount: getZone(user, 'hand').getCount(),
+            opponentHandCount: getZone(oppPlayer, 'hand').getCount(),
+            ownPokemonInPlayCount: countPokemonInPlay(user),
+            roundAttackCount: countPokemonInPlay(user, hasRoundAttack),
+            teamRocketCount: countPokemonInPlay(user, isTeamRocketPokemon),
+            ancientCount: countPokemonInPlay(user, isAncientPokemon),
+            speciesCount: countPokemonInPlay(user, isBeedrillPokemon),
+            grassPokemonCount: countPokemonInPlay(user, isGrassPokemon),
+            specialEnergyOnSelfCount: countSpecialEnergyOnPokemon(activeZone, active.image),
+            opponentStatusCount: countOpponentStatuses(oppPlayer, oppKeyForStatus),
+            damagedOwnPokemonCount: countDamagedOwnPokemon(user),
+            taurosDamagedCount: countTaurosDamaged(user),
+            retreatCostColorless: oppActive?.retreatCost ?? 0,
             defenderDamage: defenderDmgEl
               ? parseInt(defenderDmgEl.textContent || '0', 10) || 0
               : undefined,
+            attackerDamage: attackerDmgEl
+              ? parseInt(attackerDmgEl.textContent || '0', 10) || 0
+              : undefined,
             coin,
+            headsCount,
           });
           if (coin) {
             appendMessage(
@@ -458,6 +753,10 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           }
         }
         let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
+        if (rulesState.enabled && immunityClause(atk.text)) {
+          const raw = parsed?.total ?? effectiveAttack.damage ?? dmg.total;
+          dmg = { ...dmg, total: raw, multiplier: 1, flat: 0, resistance: 0 };
+        }
 
         if (rulesState.enabled) {
           const stadiumBonus = getStadiumAttackDamageBonus(active, user);
@@ -475,9 +774,14 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
           const oppActiveZone = getZone(oppPlayer, 'active');
-          const prevention = combinedDamagePrevention(oppActive, oppActiveZone.array, {
-            blockTools: stadiumBlocksToolEffects(),
-          });
+          const prevention = combinedPendingDamagePrevention(
+            rulesState,
+            oppPlayer,
+            combinedDamagePrevention(oppActive, oppActiveZone.array, {
+              blockTools: stadiumBlocksToolEffects(),
+            }),
+            active
+          );
           const prevented = applyDamagePrevention(dmg.total, prevention);
           if (prevented !== dmg.total) {
             appendMessage(
@@ -541,13 +845,24 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           }
         }
 
+        const vulnExtra = rulesState.enabled ? pendingDamageVulnerability(rulesState, oppPlayer) : 0;
+        if (vulnExtra > 0) {
+          dmg = { ...dmg, total: dmg.total + vulnExtra };
+          appendMessage(
+            user,
+            `📈 +${vulnExtra} damage (Defending is vulnerable to attacks)!`,
+            'announcement',
+            false
+          );
+        }
+
         // Read current damage on opponent's active (for KO check)
         let currentDmg = 0;
         if (oppActive.image?.damageCounter) {
           currentDmg =
             parseInt(oppActive.image.damageCounter.textContent || '0', 10) || 0;
         }
-        const totalDmg = currentDmg + dmg.total;
+        totalDmg = currentDmg + dmg.total;
 
         // Place damage counters
         placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
@@ -563,7 +878,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         }
 
         // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
+        oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
         if (oppHp > 0 && totalDmg >= oppHp) {
           const koResult = handleKO({
             attackerPlayer: user,
@@ -618,6 +933,249 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             }
           }
         }
+
+        const selfSt = parseSelfStatusFromAttackText(atk.text);
+        if (selfSt && active) {
+          const selfKey = active.image?.dataset?.cardId || active.name;
+          if (applyStatus(user, selfKey, selfSt)) {
+            appendMessage(
+              user,
+              `💫 ${active?.name || 'Your Pokémon'} is now ${selfSt}!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Hand-scaling counter placement on opponent Active.
+        const handScale = handScalingDamage(atk.text);
+        if (handScale > 0) {
+          const handCards = getZone(user, 'hand').getCount();
+          const extra = handScale * handCards;
+          if (extra > 0) {
+            placeSelfDamage(oppPlayer, 'active', 0, extra);
+            appendMessage(
+              user,
+              `💥 ${extra} damage (${handScale} × ${handCards} cards in hand)!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Put/place damage counters on opponent Pokémon (Snipe, etc.).
+        const oppCounters = opponentCounterClause(atk.text);
+        if (oppCounters?.count > 0) {
+          if (oppCounters.mode === 'multi') {
+            const targets = [];
+            const addT = (player, zoneId, idx, card) => {
+              if (card?.type === 'Pokémon') targets.push({ player, zoneId, idx, card });
+            };
+            addT(oppPlayer, 'active', 0, oppActive);
+            getZone(oppPlayer, 'bench').array.forEach((c, i) => addT(oppPlayer, 'bench', i, c));
+            const pick = targets.slice(0, oppCounters.targets);
+            for (const t of pick) {
+              placeSelfDamage(t.player, t.zoneId, t.idx, oppCounters.count);
+              appendMessage(
+                user,
+                `💥 ${oppCounters.count} damage counters on ${t.card.name || 'a Pokémon'}!`,
+                'announcement',
+                false
+              );
+            }
+            if (pick.length === 0) {
+              appendMessage(user, `💤 ${atk.name} fizzles — no opponent Pokémon to hit.`, 'announcement', false);
+            }
+          } else if (oppCounters.mode === 'active') {
+            placeSelfDamage(oppPlayer, 'active', 0, oppCounters.count);
+            appendMessage(
+              user,
+              `💥 ${oppCounters.count} damage counters on ${oppActive?.name || 'the Active'}!`,
+              'announcement',
+              false
+            );
+          } else {
+            const targets = [];
+            if (oppActive) targets.push({ player: oppPlayer, zoneId: 'active', idx: 0, card: oppActive });
+            getZone(oppPlayer, 'bench').array.forEach((c, i) => {
+              if (c.type === 'Pokémon') targets.push({ player: oppPlayer, zoneId: 'bench', idx: i, card: c });
+            });
+            const t = targets[0];
+            if (t) {
+              placeSelfDamage(t.player, t.zoneId, t.idx, oppCounters.count);
+              appendMessage(
+                user,
+                `💥 ${oppCounters.count} damage counters on ${t.card.name || 'a Pokémon'}!`,
+                'announcement',
+                false
+              );
+            } else {
+              appendMessage(user, `💤 ${atk.name} fizzles — no opponent Pokémon to hit.`, 'announcement', false);
+            }
+          }
+        }
+
+        // Conditional KO (taxonomy §D conditional-ko family): Special Condition
+        // (Abyss Eye), exact damage-counter threshold, or lowest remaining HP.
+        if (conditionalKoClause(atk.text)) {
+          const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
+          const alreadyKO = oppHp > 0 && totalDmg >= oppHp;
+          const exactThreshold = exactCounterKoThreshold(atk.text);
+          const lowestHpKo = /least hp remaining/i.test(String(atk.text || ''));
+
+          if (!alreadyKO && exactThreshold !== null && totalDmg === exactThreshold) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: oppActive,
+              defenderBoard: getZone(oppPlayer, 'active'),
+            });
+            if (koResult.won) {
+              appendMessage(user, '🏆 Victory!', 'announcement', false);
+            } else {
+              appendMessage(
+                user,
+                `🎯 Conditional KO! ${oppActive?.name || 'The active'} had exactly ${exactThreshold} damage counters — ${koResult.prizeCount} prize${koResult.prizeCount !== 1 ? 's' : ''} taken.`,
+                'announcement',
+                false
+              );
+              await _takePrizesWithPicker(user, koResult.prizeCount);
+            }
+          } else if (
+            !alreadyKO &&
+            /if your opponent's active pok[ée]mon is a basic pok[ée]mon/i.test(String(atk.text || ''))
+          ) {
+            const stage = String(oppActive?.stage || 'Basic').toLowerCase();
+            const isBasic = stage === 'basic' || oppActive?.basic !== false;
+            if (isBasic) {
+              const koResult = handleKO({
+                attackerPlayer: user,
+                defender: oppActive,
+                defenderBoard: getZone(oppPlayer, 'active'),
+              });
+              appendMessage(
+                user,
+                `🎯 ${oppActive?.name || 'The active'} is Basic — KO!`,
+                'announcement',
+                false
+              );
+              if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+            }
+          } else if (
+            !alreadyKO &&
+            specialEnergyKoClause(atk.text) &&
+            opponentHasSpecialEnergy(oppPlayer)
+          ) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: oppActive,
+              defenderBoard: getZone(oppPlayer, 'active'),
+            });
+            appendMessage(
+              user,
+              `🎯 ${oppActive?.name || 'The active'} has Special Energy — KO!`,
+              'announcement',
+              false
+            );
+            if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+          } else if (!alreadyKO && bothActiveKoClause(atk.text)) {
+            const selfActive = getZone(user, 'active').array[0];
+            appendMessage(user, '🎯 Both Active Pokémon are Knocked Out!', 'announcement', false);
+            if (selfActive) {
+              const selfKo = handleKO({
+                attackerPlayer: oppPlayer,
+                defender: selfActive,
+                defenderBoard: getZone(user, 'active'),
+              });
+              if (!selfKo.won) await _takePrizesWithPicker(oppPlayer, selfKo.prizeCount);
+            }
+            if (!alreadyKO) {
+              const koResult = handleKO({
+                attackerPlayer: user,
+                defender: oppActive,
+                defenderBoard: getZone(oppPlayer, 'active'),
+              });
+              if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+            }
+          } else if (!alreadyKO && lowestHpKo) {
+            const candidates = [];
+            const addCandidate = (player, zoneId, index, card) => {
+              if (!card || card.type !== 'Pokémon') return;
+              if (player === user && zoneId === 'active' && card === active) return;
+              candidates.push({
+                player,
+                zoneId,
+                index,
+                card,
+                remaining: remainingHp(player, card, zoneId, index),
+              });
+            };
+            addCandidate(oppPlayer, 'active', 0, oppActive);
+            getZone(oppPlayer, 'bench').array.forEach((c, i) =>
+              addCandidate(oppPlayer, 'bench', i, c)
+            );
+            getZone(user, 'active').array.forEach((c, i) =>
+              addCandidate(user, 'active', i, c)
+            );
+            getZone(user, 'bench').array.forEach((c, i) =>
+              addCandidate(user, 'bench', i, c)
+            );
+            candidates.sort((a, b) => a.remaining - b.remaining);
+            const pick = candidates[0];
+            if (pick && pick.remaining > 0) {
+              appendMessage(
+                user,
+                `🎯 ${atk.name} KOs ${pick.card.name || 'the lowest-HP Pokémon'} (${pick.remaining} HP left).`,
+                'announcement',
+                false
+              );
+              if (pick.zoneId === 'active') {
+                const koResult = handleKO({
+                  attackerPlayer: user,
+                  defender: pick.card,
+                  defenderBoard: getZone(pick.player, 'active'),
+                });
+                if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+              } else {
+                placeSelfDamage(pick.player, pick.zoneId, pick.index, pick.remaining || 999);
+              }
+            }
+          } else if (!alreadyKO) {
+          const status = getStatus(oppPlayer, oppKey);
+          const hasCondition = status && Object.values(status).some(Boolean);
+          if (hasCondition) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: oppActive,
+              defenderBoard: getZone(oppPlayer, 'active'),
+            });
+            if (koResult.won) {
+              appendMessage(user, '🏆 Victory!', 'announcement', false);
+            } else {
+              appendMessage(
+                user,
+                `🎯 Conditional KO! ${oppActive?.name || 'The active'} had a Special Condition — ${koResult.prizeCount} prize${koResult.prizeCount !== 1 ? 's' : ''} taken.`,
+                'announcement',
+                false
+              );
+              await _takePrizesWithPicker(user, koResult.prizeCount);
+              const benchCount = getZone(oppPlayer, 'bench').getCount();
+              const plan = planPromotion(true, benchCount);
+              if (plan.promote) {
+                const oldActiveName = oppActive.name || 'The active Pokémon';
+                moveCard(oppPlayer, user, 'active', 'discard', 0);
+                moveCard(oppPlayer, user, 'bench', 'active', 0);
+                const newActive = getZone(oppPlayer, 'active').array[0];
+                appendMessage(
+                  user,
+                  `⬆️ ${oldActiveName} was KO'd — ${newActive?.name || 'a benched Pokémon'} promotes to Active.`,
+                  'announcement',
+                  false
+                );
+              }
+            }
+          }
+          }
+        }
         }
 
         // Coin tails self-damage (taxonomy §D coin-flip family): the parser
@@ -628,6 +1186,17 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           appendMessage(
             user,
             `🩸 ${parsed.selfDamage} damage to ${active?.name || 'your Pokémon'} instead!`,
+            'announcement',
+            false
+          );
+        }
+
+        const redirectDmg = redirectDamageCount(atk.text);
+        if (redirectDmg > 0) {
+          placeSelfDamage(user, 'active', 0, redirectDmg);
+          appendMessage(
+            user,
+            `🩸 ${redirectDmg} damage placed on ${active?.name || 'the Attacking Pokémon'}!`,
             'announcement',
             false
           );
@@ -819,12 +1388,47 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           }
         }
 
+        // Draw-until (taxonomy §D draw-until family): "draw cards until you
+        // have N cards". Loop deck→hand until hand size reaches the target
+        // (mirrors trainer-execution drawUntil).
+        const drawUntilN = drawUntilTarget(atk.text);
+        if (drawUntilN > 0) {
+          let drewUntil = 0;
+          while (
+            getZone(user, 'hand').getCount() < drawUntilN &&
+            getZone(user, 'deck').getCount() > 0
+          ) {
+            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', emit);
+            drewUntil++;
+          }
+          if (drewUntil === 0 && getZone(user, 'deck').getCount() === 0) {
+            appendMessage(
+              user,
+              `📖 ${atk.name}'s draw fizzles — your deck is empty.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `📖 ${atk.name}: drew ${drewUntil} card${drewUntil !== 1 ? 's' : ''} until ${drawUntilN} in hand.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
         // Draw (taxonomy §D draw family): attack text saying "draw N card(s)".
         // Draws from your own deck (capped at what's left; fizzle announced
         // if empty). The shared draw action already handles the message and
-        // multiplayer emission.
+        // multiplayer emission. Skip when shuffle-hand-then-draw already ran —
+        // drawCount also matches the trailing "draw N" in that clause.
+        const shuffleHandDrawText =
+          /shuffle\s+(?:your\s+)?hand\s+into\s+(?:your\s+|the\s+)?deck/i.test(
+            String(atk.text || '')
+          );
         const drawN = drawCount(atk.text);
-        if (drawN > 0) {
+        if (drawN > 0 && shuffledHandDraw === 0 && !shuffleHandDrawText) {
           const deckLeft = getZone(user, 'deck').getCount();
           const actual = Math.min(drawN, deckLeft);
           if (actual === 0) {
@@ -903,6 +1507,417 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           }
         }
 
+        // Reveal hand (taxonomy §D reveal-hand family): list opponent hand
+        // card names in chat (Silent Wing).
+        if (revealHandClause(atk.text)) {
+          const oppHand = getZone(oppPlayer, 'hand').array;
+          if (oppHand.length === 0) {
+            appendMessage(user, '👀 Opponent\'s hand is empty.', 'announcement', false);
+          } else {
+            appendMessage(
+              user,
+              `👀 ${atk.name} — opponent reveals hand: ${oppHand.map((c) => c.name || 'Card').join(', ')}`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Move Energy (taxonomy §D move-energy family): active → first benched Pokémon.
+        if (moveEnergyClause(atk.text)) {
+          const activeZoneObj = getZone(user, 'active');
+          const energies = activeZoneObj.array
+            .map((c, idx) => ({ card: c, idx }))
+            .filter(
+              ({ card }) =>
+                card.type === 'Energy' && card.image?.relative === active.image
+            );
+          const benchZone = getZone(user, 'bench');
+          const benchTarget = benchZone.array.find((c) => c.type === 'Pokémon');
+          if (energies.length === 0) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} fizzles — no Energy to move.`,
+              'announcement',
+              false
+            );
+          } else if (!benchTarget) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} fizzles — no Benched Pokémon.`,
+              'announcement',
+              false
+            );
+          } else {
+            const energyIdx = energies[0].idx;
+            const benchIdx = benchZone.array.indexOf(benchTarget);
+            const energyName = energies[0].card.name || 'Energy';
+            moveCard(user, user, 'active', 'bench', energyIdx, benchIdx);
+            appendMessage(
+              user,
+              `⚡ ${atk.name} moves ${energyName} to ${benchTarget.name || 'the benched Pokémon'}.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Return attached Energy to hand (Put N Energy … into your hand).
+        if (returnEnergyClause(atk.text)) {
+          const returnN = returnEnergyCount(atk.text);
+          const activeZoneObj = getZone(user, 'active');
+          let returned = 0;
+          for (let i = 0; i < returnN; i++) {
+            const energyIdx = activeZoneObj.array.findIndex(
+              (c) => c.type === 'Energy' && c.image?.relative === active.image
+            );
+            if (energyIdx === -1) break;
+            moveCard(user, user, 'active', 'hand', energyIdx);
+            returned++;
+          }
+          if (returned === 0) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name}'s return fizzles — no Energy to put into your hand.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} returns ${returned} Energy to your hand.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Mirror heal: heal this Pokémon for damage dealt this attack.
+        if (mirrorHealClause(atk.text) && dmg.total > 0) {
+          const countersEl = active?.image?.damageCounter;
+          const current = countersEl
+            ? parseInt(countersEl.textContent || '0', 10) || 0
+            : 0;
+          const plan = planHeal(current, dmg.total);
+          if (plan.removed > 0) {
+            if (plan.zeroOut) {
+              removeDamageCounter(user, 'active', 0, true);
+            } else {
+              updateDamageCounter(user, 'active', 0, plan.remaining, true);
+            }
+            appendMessage(
+              user,
+              `💖 ${atk.name} heals ${plan.removed} damage (same as dealt)!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // HP-cap damage: place counters until remaining HP hits the cap.
+        const hpCap = hpCapRemaining(atk.text);
+        if (hpCap !== null && oppActive) {
+          const rem = remainingHp(oppPlayer, oppActive, 'active', 0);
+          const toPlace = Math.max(0, rem - hpCap);
+          if (toPlace > 0) {
+            placeSelfDamage(oppPlayer, 'active', 0, toPlace);
+            appendMessage(
+              user,
+              `💥 ${atk.name} places ${toPlace} damage until ${hpCap} HP remains.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Bench exact-counter KO.
+        const benchKoThreshold = benchExactKoThreshold(atk.text);
+        if (benchKoThreshold !== null) {
+          const oppBench = getZone(oppPlayer, 'bench').array
+            .map((card, idx) => ({ card, idx }))
+            .filter(({ card }) => card.type === 'Pokémon');
+          const match = oppBench.find(({ card, idx }) => {
+            const el = getZone(oppPlayer, 'bench').array[idx]?.image?.damageCounter;
+            const dmgN = el ? parseInt(el.textContent || '0', 10) || 0 : 0;
+            return dmgN === benchKoThreshold;
+          });
+          if (match) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: match.card,
+              defenderBoard: getZone(oppPlayer, 'bench'),
+            });
+            appendMessage(
+              user,
+              `🎯 ${match.card.name || 'A benched Pokémon'} had exactly ${benchKoThreshold} damage counters — KO!`,
+              'announcement',
+              false
+            );
+            if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+          } else {
+            appendMessage(
+              user,
+              `💤 ${atk.name}'s bench KO fizzles — no benched Pokémon with exactly ${benchKoThreshold} counters.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Return self to hand with attachments.
+        if (returnSelfClause(atk.text)) {
+          moveCardBundle(user, user, 'active', 'hand', 0, false, 'move', emit);
+          appendMessage(
+            user,
+            `🔁 ${active?.name || 'This Pokémon'} and attached cards return to your hand.`,
+            'announcement',
+            false
+          );
+        }
+
+        // Recover from all Special Conditions.
+        if (recoverAllStatusClause(atk.text) && active) {
+          const selfKey = active.image?.dataset?.cardId || active.name;
+          clearStatuses(user, selfKey);
+          appendMessage(
+            user,
+            `✨ ${active.name || 'Your Pokémon'} recovers from all Special Conditions!`,
+            'announcement',
+            false
+          );
+        }
+
+        // Return opponent Active Energy to their hand.
+        if (returnOpponentEnergyClause(atk.text)) {
+          const returnN = returnOpponentEnergyCount(atk.text);
+          const oppActiveZoneObj = getZone(oppPlayer, 'active');
+          let returned = 0;
+          for (let i = 0; i < returnN; i++) {
+            const energyIdx = oppActiveZoneObj.array.findIndex(
+              (c) =>
+                c.type === 'Energy' && c.image?.relative === oppActive?.image
+            );
+            if (energyIdx === -1) break;
+            moveCard(oppPlayer, oppPlayer, 'active', 'hand', energyIdx);
+            returned++;
+          }
+          if (returned === 0) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name}'s return fizzles — no Energy on opponent's Active.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} returns ${returned} Energy to opponent's hand.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Look at top of opponent's deck.
+        const lookOppN = lookOpponentDeckCount(atk.text);
+        if (lookOppN > 0) {
+          const oppDeck = getZone(oppPlayer, 'deck');
+          const topCards = oppDeck.array.slice(0, lookOppN);
+          if (topCards.length === 0) {
+            appendMessage(
+              user,
+              `👁️ ${atk.name} fizzles — opponent's deck is empty.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `👁️ ${atk.name} — top ${topCards.length} of opponent's deck: ${topCards.map((c) => c.name || 'Card').join(', ')} (put back in any order).`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Look at top of your own deck.
+        const lookOwnN = lookOwnDeckCount(atk.text);
+        if (lookOwnN > 0) {
+          const deck = getZone(user, 'deck');
+          const topCards = deck.array.slice(0, lookOwnN);
+          if (topCards.length === 0) {
+            appendMessage(user, `👁️ ${atk.name} fizzles — your deck is empty.`, 'announcement', false);
+          } else {
+            appendMessage(
+              user,
+              `👁️ ${atk.name} — top ${topCards.length} of your deck: ${topCards.map((c) => c.name || 'Card').join(', ')} (put back in any order).`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Each player draws N cards.
+        const eachDrawN = eachPlayerDrawCount(atk.text);
+        if (eachDrawN > 0) {
+          for (const who of [user, oppPlayer]) {
+            let drew = 0;
+            for (let i = 0; i < eachDrawN; i++) {
+              if (getZone(who, 'deck').getCount() > 0) {
+                moveCardBundle(who, who, 'deck', 'hand', 0, false, 'move', emit);
+                drew++;
+              }
+            }
+            appendMessage(
+              user,
+              `📖 ${who === user ? 'You' : 'Opponent'} drew ${drew} card${drew !== 1 ? 's' : ''}.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Copy attack — list available attacks for manual resolution.
+        const copyScope = copyAttackScope(atk.text);
+        if (copyScope) {
+          let pool = [];
+          if (copyScope === 'opp-active' || copyScope === 'opp-active-tera') {
+            await ensureCardData(oppActive);
+            pool = (oppActive?.attacks || []).map((a) => a.name).filter(Boolean);
+          } else if (copyScope === 'opp-in-play') {
+            for (const zoneId of ['active', 'bench']) {
+              for (const card of getZone(oppPlayer, zoneId).array) {
+                if (card.type !== 'Pokémon') continue;
+                await ensureCardData(card);
+                for (const a of card.attacks || []) {
+                  if (a?.name) pool.push(`${card.name}: ${a.name}`);
+                }
+              }
+            }
+          } else if (copyScope === 'own-bench-ns') {
+            for (const card of getZone(user, 'bench').array) {
+              if (card.type !== 'Pokémon' || !/n's/i.test(card.name || '')) continue;
+              await ensureCardData(card);
+              for (const a of card.attacks || []) {
+                if (a?.name) pool.push(`${card.name}: ${a.name}`);
+              }
+            }
+          }
+          appendMessage(
+            user,
+            pool.length
+              ? `📋 ${atk.name} — choose an attack to copy: ${pool.join('; ')}`
+              : `📋 ${atk.name} — no valid attacks to copy.`,
+            'announcement',
+            false
+          );
+        }
+
+        // Retaliate / deferred / next-turn bonus — track as announcements.
+        const thornsN = retaliateCount(atk.text);
+        if (
+          /if this pok[ée]mon is damaged by an attack/i.test(String(atk.text || '')) &&
+          /put (\d+ )?damage counters on the attacking pok[ée]mon/i.test(String(atk.text || ''))
+        ) {
+          appendMessage(
+            user,
+            `🌵 ${atk.name}: if damaged next turn, Attacking Pokémon takes ${thornsN > 0 ? thornsN : 'damage'} counter${thornsN === 1 ? '' : 's'}.`,
+            'announcement',
+            false
+          );
+        }
+        const deferredN = deferredDamageCount(atk.text);
+        if (deferredN > 0) {
+          appendMessage(
+            user,
+            `⏳ ${atk.name}: ${deferredN} damage counters at end of opponent's next turn on Defending Pokémon.`,
+            'announcement',
+            false
+          );
+        }
+        const nextBonus = nextTurnBonusClause(atk.text);
+        if (nextBonus) {
+          appendMessage(
+            user,
+            `📈 ${atk.name}: next turn ${nextBonus.attackName} does +${nextBonus.bonus} damage.`,
+            'announcement',
+            false
+          );
+        }
+        if (devolveOpponentClause(atk.text) || devolveActiveClause(atk.text)) {
+          const evolved = [];
+          for (const zoneId of ['active', 'bench']) {
+            for (const card of getZone(oppPlayer, zoneId).array) {
+              if (card.type !== 'Pokémon') continue;
+              await ensureCardData(card);
+              const stage = String(card.stage || 'Basic').toLowerCase();
+              if (stage !== 'basic') evolved.push(card.name || 'Pokémon');
+            }
+          }
+          appendMessage(
+            user,
+            evolved.length
+              ? `🔄 ${atk.name} devolves: ${evolved.join(', ')} — shuffle highest Evolution into opponent's deck/hand.`
+              : `🔄 ${atk.name} fizzles — no evolved opponent Pokémon.`,
+            'announcement',
+            false
+          );
+        }
+        if (/can't play any pok[ée]mon from their hand to evolve/i.test(String(atk.text || ''))) {
+          appendMessage(user, `🔒 ${atk.name}: opponent can't evolve from hand next turn.`, 'announcement', false);
+        }
+        if (/energy can't be attached from your opponent's hand/i.test(String(atk.text || ''))) {
+          appendMessage(user, `🔒 ${atk.name}: opponent can't attach Energy from hand next turn.`, 'announcement', false);
+        }
+        if (/retreat cost is \{c\} more|attacks used by the defending pok[ée]mon cost \{c\} more/i.test(String(atk.text || ''))) {
+          appendMessage(user, `🔒 ${atk.name}: Defending Pokémon has +{C} Retreat Cost and attack costs next turn.`, 'announcement', false);
+        }
+        if (/defending pok[ée]mon's weakness is now \{c\}/i.test(String(atk.text || ''))) {
+          appendMessage(user, `🛡️ ${atk.name}: Defending Pokémon's Weakness becomes {C} until end of your next turn.`, 'announcement', false);
+        }
+        if (/this attack can be used even if this pok[ée]mon is on the bench/i.test(String(atk.text || ''))) {
+          appendMessage(user, `📋 ${atk.name} can be used from the Bench.`, 'announcement', false);
+        }
+        if (/ignore all energy in this attack's cost/i.test(String(atk.text || ''))) {
+          appendMessage(user, `⚡ ${atk.name}: ignore Energy in attack cost while affected by a Special Condition.`, 'announcement', false);
+        }
+        if (/you can use this attack only if this pok[ée]mon used .+ during your last turn/i.test(String(atk.text || ''))) {
+          appendMessage(user, `📋 ${atk.name}: requires using the named attack last turn.`, 'announcement', false);
+        }
+        if (/put all energy attached to this pok[ée]mon into your hand to have this attack do \d+ more damage/i.test(String(atk.text || ''))) {
+          appendMessage(user, `⚡ ${atk.name}: you may return Energy to hand for bonus damage.`, 'announcement', false);
+        }
+        if (/move any amount of (?:\{[a-zA-Z]\} )?energy from your pok[ée]mon to your other pok[ée]mon/i.test(String(atk.text || ''))) {
+          appendMessage(user, `⚡ ${atk.name}: move Energy freely among your Pokémon.`, 'announcement', false);
+        }
+        if (/can't play any (item|supporter) cards?/i.test(String(atk.text || ''))) {
+          const lock = /item/i.test(atk.text) ? 'Item' : 'Supporter';
+          appendMessage(
+            user,
+            `🔒 ${atk.name}: opponent can't play ${lock} cards next turn.`,
+            'announcement',
+            false
+          );
+        }
+        if (/defending pok[ée]mon takes \d+ more damage from attacks|this pok[ée]mon takes \d+ more damage from attacks/i.test(String(atk.text || ''))) {
+          const m = /takes (\d+) more damage/i.exec(atk.text);
+          const who = /this pok[ée]mon takes/i.test(String(atk.text || '')) ? 'This Pokémon' : 'Defending Pokémon';
+          appendMessage(
+            user,
+            `📈 ${atk.name}: ${who} takes +${m?.[1] || '?'} damage from attacks next turn.`,
+            'announcement',
+            false
+          );
+        }
+        if (/this pok[ée]mon has no weakness/i.test(String(atk.text || ''))) {
+          appendMessage(
+            user,
+            `🛡️ ${atk.name}: this Pokémon has no Weakness during opponent's next turn.`,
+            'announcement',
+            false
+          );
+        }
+
         // Deck search (taxonomy §D search-deck family): Call for Family, Flock,
         // Lucky Find, etc. Opens the filtered deck picker, moves to Bench/hand,
         // then shuffles — awaited so the turn does not end before the pick.
@@ -913,6 +1928,16 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           if (searchStep) {
             await _runAttackDeckSearch(user, atk, searchStep, emit);
           }
+        }
+
+        // Pending next-turn locks / damage windows (taxonomy partial families).
+        if (rulesState.enabled) {
+          const pending = parsePendingAttackEffects(atk.text, atk.name);
+          if (pending.length) {
+            queuePendingAttackEffects(rulesState, user, pending, atk.name);
+          }
+          const discardSpec = parseDiscardOpponentEffect(atk.text);
+          executeDiscardOpponentEffect(user, oppPlayer, discardSpec, atk.name, emit);
         }
 
         // Record the once-per-turn attack as used this turn (only reached on
@@ -999,9 +2024,12 @@ export const retreat = (user, emit = true) => {
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
     const baseRetreatCost = active?.retreatCost ?? 0;
-    const retreatCost = rulesState.enabled
+    let retreatCost = rulesState.enabled
       ? getStadiumRetreatCost(baseRetreatCost, active, user)
       : baseRetreatCost;
+    if (rulesState.enabled) {
+      retreatCost += pendingRetreatCostDelta(rulesState, user);
+    }
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
       if (attachedEnergies.length < retreatCost) {
@@ -1467,89 +2495,14 @@ function _pickFromList(title, items) {
   });
 }
 
-// Multi-select prize picker. Lets the player choose WHICH of their own prize
-// cards to take (up to `count`), instead of the automatic "take the top N".
-// Resolves to the array of chosen 0-based indices, or null (fallback to
-// automatic top-N). Reuses the same positioning/styling as `_pickFromList`.
-function _pickPrizeCards(count, cards) {
-  return new Promise((resolve) => {
-    const needed = Math.min(count, cards.length);
-    const host = document.createElement('div');
-    host.className = 'choice-picker-card';
-    const titleEl = document.createElement('div');
-    titleEl.className = 'choice-picker-title';
-    titleEl.textContent = `Choose ${needed} prize card${needed !== 1 ? 's' : ''} to take:`;
-    host.appendChild(titleEl);
-
-    const selected = new Set();
-    const grid = document.createElement('div');
-    grid.className = 'choice-picker-grid';
-    cards.forEach((card, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'choice-picker-item';
-      btn.textContent = card.name || `Prize ${idx + 1}`;
-      btn.addEventListener('click', () => {
-        if (selected.has(idx)) {
-          selected.delete(idx);
-          btn.classList.remove('selected');
-        } else if (selected.size < needed) {
-          selected.add(idx);
-          btn.classList.add('selected');
-        }
-        confirmBtn.disabled = selected.size !== needed;
-      });
-      grid.appendChild(btn);
-    });
-    host.appendChild(grid);
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'choice-picker-confirm';
-    confirmBtn.textContent = `Take ${needed} prize card${needed !== 1 ? 's' : ''}`;
-    confirmBtn.disabled = true; // enabled once exactly `needed` are selected
-    confirmBtn.addEventListener('click', () => {
-      host.remove();
-      resolve([...selected]);
-    });
-    host.appendChild(confirmBtn);
-
-    const cancel = document.createElement('button');
-    cancel.className = 'choice-picker-cancel';
-    cancel.textContent = 'Take the top ones (automatic)';
-    cancel.addEventListener('click', () => {
-      host.remove();
-      resolve(null);
-    });
-    host.appendChild(cancel);
-
-    const chatArea = document.querySelector('.chat-messages') || document.body;
-    chatArea.prepend(host);
-    host.style.position = 'fixed';
-    host.style.top = '10%';
-    host.style.left = '50%';
-    host.style.transform = 'translateX(-50%)';
-    host.style.zIndex = 9999;
-    host.style.minWidth = '220px';
-    host.style.padding = '12px';
-    host.style.borderRadius = '10px';
-    host.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)';
-  });
-}
-
-// Show the prize picker and take the chosen cards; fall back to the automatic
-// top-N behavior if the player cancels. Falls back to `takePrizes` when there
-// are no prize cards to choose from.
+// TCG Live prize pick: remaining prizes fly up sleeve-forward. The
+// player clicks as many as they earned; those fly into the hand.
 async function _takePrizesWithPicker(user, count) {
-  const prizeCards = getZone(user, 'prizes').array.slice(0, count);
-  if (prizeCards.length === 0) {
+  if (getZone(user, 'prizes').getCount() === 0) {
     takePrizes(user, user, count);
     return;
   }
-  const chosen = await _pickPrizeCards(count, prizeCards);
-  if (chosen === null || chosen.length === 0) {
-    takePrizes(user, user, count);
-    return;
-  }
-  takePrizesByIndex(user, user, chosen);
+  await promptPrizeTake(user, count);
 }
 
 const abilityTurnAndUsageGuard = (user, target, family) => {
@@ -1649,6 +2602,8 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   // Mirror replay: the originator's moveCardBundle + shuffleZone actions
   // arrive separately. Opening a picker here would desync both boards.
   if (!emit) return;
+  const finishSearch = (opts) =>
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: atk.name, ...opts });
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
     appendMessage(
@@ -1657,7 +2612,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       'announcement',
       false
     );
-    shuffleZone(user, user, 'deck');
+    finishSearch({ message: null });
     return;
   }
 
@@ -1678,7 +2633,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         'announcement',
         false
       );
-      shuffleZone(user, user, 'deck');
+      finishSearch({ message: null });
       return;
     }
     effectiveMax = Math.min(maxCount, openSlots);
@@ -1704,11 +2659,10 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       'announcement',
       false
     );
-    shuffleZone(user, user, 'deck');
+    finishSearch({ message: null });
     return;
   }
 
-  const finishSearch = () => shuffleZone(user, user, 'deck');
   const attackText = atk.text || '';
   const revealPicked = (picked) =>
     maybeAnnounceSearchReveal(user, atk.name, picked, appendMessage, {
@@ -1748,6 +2702,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
           }
           if (selected.length === 0) {
             appendMessage(user, `🔍 ${atk.name}: no cards taken — deck shuffled.`, 'announcement', false);
+            finishSearch({ message: null });
           } else {
             appendMessage(
               user,
@@ -1755,13 +2710,13 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
               'announcement',
               false
             );
+            finishSearch();
           }
-          finishSearch();
           resolve();
         },
         onCancel: () => {
           appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-          finishSearch();
+          finishSearch({ message: null });
           resolve();
         },
       });
@@ -1791,7 +2746,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       },
       onCancel: () => {
         appendMessage(user, '🔍 Search canceled — shuffle your deck.', 'announcement', false);
-        finishSearch();
+        finishSearch({ message: null });
         resolve();
       },
     });
@@ -1843,11 +2798,12 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
   });
   if (pool.length === 0) {
     appendMessage(user, '⛔ No matching cards in your deck.', 'announcement', false);
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name });
     return;
   }
 
-  const completeSearch = () => {
-    shuffleZone(user, user, 'deck');
+  const completeSearch = (opts) => {
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name, ...opts });
     if (rulesState.enabled) markAbilityUsed(user, target);
   };
   const revealPicked = (picked) =>
@@ -1894,6 +2850,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
           'announcement',
           false
         );
+        completeSearch({ message: null });
       },
     });
     return;
@@ -1924,6 +2881,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
         'announcement',
         false
       );
+      completeSearch({ message: null });
     },
   });
 };

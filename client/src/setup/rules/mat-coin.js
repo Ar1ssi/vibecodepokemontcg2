@@ -20,6 +20,25 @@ const selectedCoins = { self: null, opp: null };
 const tossRevolutions = { self: 0, opp: 0 };
 let layoutHooked = false;
 
+const wireMatCoinLighting = (coinEl) => {
+  if (!coinEl) return;
+  coinEl.addEventListener('pointermove', (e) => {
+    const r = coinEl.getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * 100;
+    const py = ((e.clientY - r.top) / r.height) * 100;
+    coinEl.style.setProperty('--coin-x', px.toFixed(1) + '%');
+    coinEl.style.setProperty('--coin-y', py.toFixed(1) + '%');
+    coinEl.style.setProperty('--coin-rx', ((py - 50) * -0.14).toFixed(2) + 'deg');
+    coinEl.style.setProperty('--coin-ry', ((px - 50) * 0.16).toFixed(2) + 'deg');
+  });
+  coinEl.addEventListener('pointerleave', () => {
+    coinEl.style.setProperty('--coin-x', '50%');
+    coinEl.style.setProperty('--coin-y', '50%');
+    coinEl.style.setProperty('--coin-rx', '0deg');
+    coinEl.style.setProperty('--coin-ry', '0deg');
+  });
+};
+
 const escapeHtml = (value = '') =>
   String(value)
     .replaceAll('&', '&amp;')
@@ -71,6 +90,7 @@ export const renderMatCoinSlot = (target) => {
     `</div>`,
     `</span>`,
   ].join('');
+  wireMatCoinLighting(slot.querySelector('[data-mat-coin-el]'));
 };
 
 export const renderMatCoins = () => {

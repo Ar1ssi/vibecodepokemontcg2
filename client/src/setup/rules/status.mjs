@@ -151,6 +151,14 @@ export function parseStatusFromAttackText(text = '') {
   return found;
 }
 
+/** Status applied to the attacker ("This Pokémon is now Asleep."). */
+export function parseSelfStatusFromAttackText(text = '') {
+  const m = String(text || '')
+    .toLowerCase()
+    .match(/this pok[ée]mon\s+is\s+now\s+(asleep|paralyzed|poisoned|burned|confused)/);
+  return m ? m[1] : null;
+}
+
 // ── Backward-compat wrapper (deprecated) ───────────────────────────
 // Old API: single call that both queried and (side-effectfully) flipped the
 // asleep coin. New code should call canAct() then resolveWake() /

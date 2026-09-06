@@ -11,6 +11,10 @@ import {
   popoverScaleFor,
   previewSizeForSource,
   previewTargetSize,
+  prizeFanCardSize,
+  prizeFanSlots,
+  iframeIsFlipped,
+  mapIframeRectToPage,
 } from '../card-pop.mjs';
 
 const viewport = { width: 1200, height: 800 };
@@ -119,4 +123,57 @@ test('drawFlightPose lifts and enlarges at mid-flight, then settles in the hand'
   assert.ok(Math.abs(end.y) < 1e-10);
   assert.ok(Math.abs(end.scale - 1) < 1e-10);
   assert.equal(end.rotateY, 0);
+});
+
+test('prizeFanSlots lays out a centered sleeve-forward row', () => {
+  const size = prizeFanCardSize(6, viewport);
+  const slots = prizeFanSlots(6, viewport, size);
+  assert.equal(slots.length, 6);
+  assert.ok(size.width < 168);
+  assert.ok(Math.abs(size.height / size.width - 1.397) < 0.001);
+  const first = slots[0];
+  const last = slots[5];
+  assert.ok(first.left > 0);
+  assert.ok(last.left + last.width < viewport.width);
+  const mid = (first.left + last.left + last.width) / 2;
+  assert.ok(Math.abs(mid - viewport.width / 2) < 1);
+  assert.equal(first.top, viewport.height * 0.28);
+});
+
+test('prizeFanCardSize shrinks so six prizes fit the viewport', () => {
+  const wide = prizeFanCardSize(2, viewport);
+  const packed = prizeFanCardSize(6, viewport);
+  assert.ok(packed.width <= wide.width);
+  const row = packed.width * 6 + packed.gap * 5;
+  assert.ok(row <= viewport.width * 0.86 + 0.01);
+});
+
+test('mapIframeRectToPage offsets an upright iframe by its page box', () => {
+  const local = { left: 40, top: 80, width: 60, height: 84 };
+  const frame = { left: 100, top: 200, width: 800, height: 400 };
+  assert.deepEqual(mapIframeRectToPage(local, frame, false), {
+    left: 140,
+    top: 280,
+    width: 60,
+    height: 84,
+  });
+});
+
+test('mapIframeRectToPage mirrors a flipped opp iframe so the hand stays at the top', () => {
+  // Opp playmat sits in the top half and is CSS-flipped 180°. A hand card
+  // at the bottom of that iframe document is visually at the top of the page.
+  const local = { left: 100, top: 300, width: 80, height: 80 };
+  const frame = { left: 0, top: 0, width: 800, height: 500 };
+  const page = mapIframeRectToPage(local, frame, true);
+  assert.equal(page.left, 800 - 100 - 80);
+  assert.equal(page.top, 500 - 300 - 80);
+  assert.equal(page.width, 80);
+  assert.equal(page.height, 80);
+  assert.ok(page.top < 150);
+});
+
+test('iframeIsFlipped treats the opp playmat class as flipped', () => {
+  assert.equal(iframeIsFlipped({ classList: { contains: (name) => name === 'opp' } }), true);
+  assert.equal(iframeIsFlipped({ classList: { contains: () => false } }), false);
+  assert.equal(iframeIsFlipped(null), false);
 });

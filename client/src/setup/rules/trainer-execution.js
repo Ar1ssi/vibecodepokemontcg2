@@ -8,10 +8,10 @@ import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus } from './status.mjs';
 import { ensureCardData, getStadium } from './rules-state.mjs';
-import { normalizeStage, isRareCandyJump, markEvolvedThisTurn } from './evolution.mjs';
+import { normalizeStage, isRareCandyJump } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
 import { filterSearchMatches } from './search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick } from './search-reveal.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -343,12 +343,13 @@ async function runSearchStep(card, searchStep, done) {
       revealPicked(basics[0]);
       moveCardBundle('self', 'self', 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
-      _shuffleZone('self', 'self', 'deck');
+      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
       return;
     }
     if (basics.length === 0) {
       msg('  no Basic Pokémon in deck');
+      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
       return;
     }
@@ -364,10 +365,15 @@ async function runSearchStep(card, searchStep, done) {
   });
   if (pool.length === 0) {
     msg('  no cards left in deck');
+    shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
     done?.();
     return;
   }
-  const shuffleAfter = () => _shuffleZone('self', 'self', 'deck');
+  const shuffleAfter = (opts) =>
+    shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, {
+      sourceName: card.name,
+      ...opts,
+    });
   const toBench = searchStep.destination === 'bench';
   const toAttach = searchStep.destination === 'attach';
 
@@ -443,15 +449,16 @@ async function runSearchStep(card, searchStep, done) {
         }
         if (selected.length === 0) {
           msg('  no cards taken — deck shuffled');
+          shuffleAfter({ message: null });
         } else {
           msg(`  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`);
+          shuffleAfter();
         }
-        shuffleAfter();
         done?.();
       },
       onCancel: () => {
         msg('  search canceled — shuffle your deck');
-        shuffleAfter();
+        shuffleAfter({ message: null });
         done?.();
       },
     });
@@ -517,12 +524,12 @@ async function runLookStep(card, step, fromBottom, done) {
         step,
         sourceText: card.text || card.effect || '',
       });
-      _shuffleZone('self', 'self', 'deck');
+      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
     },
     onCancel: () => {
       msg('  kept all looked-at cards in deck order — shuffle your deck');
-      _shuffleZone('self', 'self', 'deck');
+      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
       done?.();
     },
   });
@@ -1145,12 +1152,11 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete) {
               openPickOnly({
                 title: `${card.name} — choose Stage 2`,
                 candidates: options,
-                onPick: (evo) => {
+                onPick: async (evo) => {
                   const loc = pokemonZoneEntry('self', base);
                   const handIdx = hand.array.indexOf(evo);
                   if (!loc || handIdx < 0) return;
-                  moveCard('self', 'self', 'hand', loc.zoneId, handIdx, loc.index);
-                  markEvolvedThisTurn('self', base.name);
+                  await moveCard('self', 'self', 'hand', loc.zoneId, handIdx, loc.index);
                   msg(`  auto: Rare Candy — ${base.name} → ${evo.name}`);
                 },
               });

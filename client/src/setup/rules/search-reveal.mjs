@@ -18,6 +18,21 @@ export function announceDiscardPick(user, sourceName, picked, appendMessage) {
   announceSearchReveal(user, sourceName, picked, appendMessage);
 }
 
+/** Shuffle after a deck search/look and post a rules-style chat line (not the generic player-action shuffle). */
+export function shuffleDeckAfterSearch(
+  user,
+  appendMessage,
+  shuffleZone,
+  { sourceName, message } = {}
+) {
+  shuffleZone(user, user, 'deck', undefined, false);
+  if (message === null) return;
+  const text =
+    message ??
+    (sourceName ? `  🔀 ${sourceName} — deck shuffled` : '  🔀 deck shuffled');
+  appendMessage(user, text, 'announcement', false);
+}
+
 /** Reveal when the parsed step or source text calls for it. */
 export function maybeAnnounceSearchReveal(
   user,

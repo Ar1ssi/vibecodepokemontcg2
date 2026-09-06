@@ -11,8 +11,6 @@
 // Rotate lives on `.card-preview-flip` (not the host) so the 3D sleeve back
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
-import { mapIframeLocalToViewport, readFrameTransform } from './iframe-rect.mjs';
-
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
 const DRAW_SPRING = { stiffness: 0.09, damping: 0.68, precision: 0.02 };
 const PREVIEW_MAX_WIDTH = 780;
@@ -23,6 +21,10 @@ export const POPOVER_SPIN_DEGREES = 360;
 export const DRAW_FLIP_DEGREES = 180;
 export const DRAW_ARC_PX = 96;
 export const DRAW_PEAK_SCALE = 0.45;
+export const PRIZE_FAN_WIDTH_FIT = 0.86;
+export const PRIZE_FAN_MAX_WIDTH = 168;
+export const PRIZE_FAN_GAP = 16;
+export const PRIZE_FAN_TOP = 0.28;
 
 const tickSpring = (ctx, lastValue, currentValue, targetValue) => {
   if (typeof currentValue === 'number') {
@@ -149,6 +151,41 @@ const createSpring = (initial, opts) => {
   return spring;
 };
 
+/**
+ * Map an iframe-local getBoundingClientRect into the parent page.
+ * The `.opp` playmat iframe is CSS-flipped 180° (`scaleX(-1) scaleY(-1)`
+ * around its center). Adding frame.top/left alone would land flights at
+ * the unflipped seat (P2's hand on P1's screen goes to mid-board).
+ */
+export const mapIframeRectToPage = (local, frameRect, flipped) => {
+  if (!flipped) {
+    return {
+      left: local.left + frameRect.left,
+      top: local.top + frameRect.top,
+      width: local.width,
+      height: local.height,
+    };
+  }
+  return {
+    left: frameRect.left + frameRect.width - local.left - local.width,
+    top: frameRect.top + frameRect.height - local.top - local.height,
+    width: local.width,
+    height: local.height,
+  };
+};
+
+export const iframeIsFlipped = (frame) => {
+  if (!frame) return false;
+  if (frame.classList?.contains('opp')) return true;
+  const view = frame.ownerDocument?.defaultView ?? globalThis;
+  const transform = view.getComputedStyle?.(frame)?.transform;
+  if (!transform || transform === 'none') return false;
+  const match = transform.match(/matrix\(([^)]+)\)/);
+  if (!match) return false;
+  const parts = match[1].split(',').map((n) => Number(n.trim()));
+  return parts[0] < 0 && parts[3] < 0;
+};
+
 export const viewportRectOf = (el) => {
   const local = el.getBoundingClientRect();
   const frame = el.ownerDocument?.defaultView?.frameElement;
@@ -160,8 +197,11 @@ export const viewportRectOf = (el) => {
       height: local.height,
     };
   }
-  const { frameRect, matrix, origin } = readFrameTransform(frame);
-  return mapIframeLocalToViewport(local, frameRect, matrix, origin);
+  return mapIframeRectToPage(
+    local,
+    frame.getBoundingClientRect(),
+    iframeIsFlipped(frame)
+  );
 };
 
 export const previewTargetSize = (
@@ -202,6 +242,46 @@ export const centerDeltaFor = (
   x: Math.round(viewport.width / 2 - rect.left - rect.width / 2),
   y: Math.round(viewport.height / 2 - rect.top - rect.height / 2),
 });
+
+const defaultViewport = () => ({
+  width: globalThis.innerWidth || 0,
+  height: globalThis.innerHeight || 0,
+});
+
+/** Card size for the TCG Live prize-pick fan that flies up to the screen. */
+export const prizeFanCardSize = (
+  count,
+  viewport = defaultViewport()
+) => {
+  const n = Math.max(1, count);
+  const gap = PRIZE_FAN_GAP;
+  const maxWidth = Math.min(PRIZE_FAN_MAX_WIDTH, viewport.width * 0.16);
+  const available = viewport.width * PRIZE_FAN_WIDTH_FIT;
+  const width = Math.min(
+    maxWidth,
+    (available - gap * Math.max(0, n - 1)) / n
+  );
+  return { width, height: width * CARD_ASPECT, gap };
+};
+
+/** Centered row of slots for `count` sleeve-forward prize cards. */
+export const prizeFanSlots = (
+  count,
+  viewport = defaultViewport(),
+  size = prizeFanCardSize(count, viewport)
+) => {
+  const { width, height, gap } = size;
+  const n = Math.max(0, count);
+  const total = n * width + Math.max(0, n - 1) * gap;
+  const left0 = (viewport.width - total) / 2;
+  const top = viewport.height * PRIZE_FAN_TOP;
+  return Array.from({ length: n }, (_, i) => ({
+    left: left0 + i * (width + gap),
+    top,
+    width,
+    height,
+  }));
+};
 
 const applyHostTransform = (host, translate, scale, rotateY) => {
   if (!host) return;
@@ -373,6 +453,47 @@ export const playDrawFlight = (
     translate.set({ x: 0, y: 0 }),
     scale.set(1),
     rotateDelta.set(0),
+  ]).then(() => {
+    motion.stop();
+    activePops.delete(host);
+    onDone?.();
+  });
+  return motion;
+};
+
+/**
+ * Spring a settled overlay card back to its prize-zone seat (no flip).
+ */
+export const playReturnFlight = (
+  host,
+  { endTranslate, endScale = 1, onDone } = {}
+) => {
+  stopPop(host);
+  const scale = createSpring(1, DRAW_SPRING);
+  const translate = createSpring({ x: 0, y: 0 }, DRAW_SPRING);
+  const paint = () => {
+    applyHostTransform(host, translate.value, scale.value, 0);
+  };
+  const unsubs = [scale.subscribe(paint), translate.subscribe(paint)];
+  const motion = {
+    get rotateTarget() {
+      return 0;
+    },
+    retreat() {},
+    reset() {},
+    stop() {
+      unsubs.forEach((off) => off());
+      scale.stop();
+      translate.stop();
+    },
+  };
+  activePops.set(host, motion);
+  Promise.all([
+    translate.set({
+      x: endTranslate?.x ?? 0,
+      y: endTranslate?.y ?? 0,
+    }),
+    scale.set(endScale),
   ]).then(() => {
     motion.stop();
     activePops.delete(host);
