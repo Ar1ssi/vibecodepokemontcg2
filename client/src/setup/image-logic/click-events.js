@@ -11,17 +11,20 @@ import {
   selfContainer,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
-import { startHoloAnimation } from '../deck-builder/core/holo.mjs';
 import {
-  playSelectPop,
-  popHostFor,
-  makePopFrame,
-} from './card-pop.mjs';
+  fullViewHost,
+} from '../deck-constructor/hydrate-holo.js';
+import { findZoneCardIndex } from './zone-card-lookup.js';
+import {
+  closeCardPreview,
+  openCardPreview,
+} from './full-view.js';
+import { openDiscardPileViewer } from './discard-pile-viewer.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -35,14 +38,23 @@ export const identifyCard = (event) => {
     mouseClick.cardIndex =
       getZone(mouseClick.cardUser, mouseClick.zoneId).getCount() - 1;
   } else {
-    mouseClick.cardIndex = getZone(
-      mouseClick.cardUser,
-      mouseClick.zoneId
-    ).array.findIndex((card) => card.image === event.target);
+    mouseClick.cardIndex = findZoneCardIndex(
+      getZone(mouseClick.cardUser, mouseClick.zoneId),
+      event.target
+    );
   }
 };
 
 export const coverClick = (event) => {
+  if (event.target.id === 'discardCover') {
+    event.stopPropagation();
+    const user = event.target.user === 'self' ? 'self' : 'opp';
+    const zone = getZone(user, 'discard');
+    if (zone.getCount() === 0) return;
+    openDiscardPileViewer(user, zone.getCount() - 1);
+    return;
+  }
+
   const selectedZone = getZone(event.target.user, event.target.id);
   if (selectedZone.elementCover) {
     selectedZone.element.style.display = 'block';
@@ -69,6 +81,7 @@ export const openCardContextMenu = (event) => {
   const cardContextMenu = document.getElementById('cardContextMenu');
 
   closeFullView(event);
+  closeCardPreview(event);
   deselectCard();
   cardContextMenu.style.cssText = '';
 
@@ -122,6 +135,10 @@ export const openCardContextMenu = (event) => {
     shuffleBoardButton: [[true, 'board']],
     lostZoneBoardButton: [[true, 'board']],
     changeButton: [
+      [true, 'active'],
+      [true, 'bench'],
+    ],
+    viewAttachedCardsButton: [
       [true, 'active'],
       [true, 'bench'],
     ],
@@ -216,12 +233,19 @@ export const openCardContextMenu = (event) => {
 
 export const imageClick = (event) => {
   event.stopPropagation();
+  identifyCard(event);
+
+  if (mouseClick.zoneId === 'discard') {
+    openDiscardPileViewer(mouseClick.cardUser, mouseClick.cardIndex);
+    return;
+  }
 
   if (event.target.classList.contains('selectHighlight')) {
     closePopups(event);
     const dZoneId = event.target.parentElement.parentElement.id;
-    const targetIndex = getZone(event.target.user, dZoneId).array.findIndex(
-      (card) => card.image === event.target
+    const targetIndex = findZoneCardIndex(
+      getZone(event.target.user, dZoneId),
+      event.target
     );
     moveCardBundle(
       mouseClick.cardUser,
@@ -234,7 +258,6 @@ export const imageClick = (event) => {
     );
   } else {
     closePopups(event); //need both because of highlights condition in the if block above
-    identifyCard(event);
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
   }
@@ -242,54 +265,18 @@ export const imageClick = (event) => {
 
 export const doubleClick = (event) => {
   if (event) {
+    event.stopPropagation();
     identifyCard(event);
   }
+  if (!mouseClick.card?.image) return;
   const targetImage = mouseClick.card.image;
   targetImage.classList.remove('highlight');
-  if (
-    ['active', 'bench'].includes(mouseClick.zoneId) &&
-    !targetImage.parentElement.classList.contains('full-view')
-  ) {
-    const images = targetImage.parentElement.querySelectorAll('img');
-    images.forEach((image) => {
-      if (image.damageCounter) {
-        image.damageCounter.style.display = 'none';
-      }
-      if (image.specialCondition) {
-        image.specialCondition.style.display = 'none';
-      }
-      if (image.abilityCounter) {
-        image.abilityCounter.style.display = 'none';
-      }
-      if (image.attached) {
-        image.style.position = 'static';
-      }
-      image.classList.add('default-rotation');
-    });
-    // classList.add (not a className overwrite) so holo cards keep their
-    // .card__rotator class — losing it would break the shine/glare sizing
-    // rules that key off `.card__rotator`.
-    targetImage.parentElement.classList.add('full-view');
-    if (document.querySelector('.dark-mode-1')) {
-      targetImage.parentElement.classList.add('dark-mode-5'); //dynamically add dark-mode
+  if (['active', 'bench', 'hand'].includes(mouseClick.zoneId)) {
+    closeCardPreview(null, true);
+    const host = fullViewHost(targetImage);
+    if (!host?.classList.contains('full-view')) {
+      openCardPreview(targetImage, mouseClick.card);
     }
-    targetImage.parentElement.style.zIndex = '2';
-    targetImage.parentElement.style.height = '70%';
-    targetImage.parentElement.style.width = '69%';
-
-    targetImage.parentElement.parentElement.style.zIndex = '2';
-    document.getElementById('stadium').style.zIndex = '-1';
-
-    // Enlarged holo cards get the deck-builder-preview treatment: the
-    // shine follows the real cursor instead of auto-sweeping.
-    if (mouseClick.card.wrapper) {
-      startHoloAnimation(mouseClick.card.wrapper);
-    }
-
-    // Pop the enlarged view into place. `.full-view` sizing above is applied
-    // synchronously, so the preview is already visible (immediate) — the spring
-    // just adds the grow-and-settle on top.
-    playSelectPop(popHostFor(targetImage), makePopFrame(targetImage));
   } else {
     let overlay = document.createElement('div');
     overlay.id = 'fullImage';

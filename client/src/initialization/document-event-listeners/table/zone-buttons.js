@@ -12,7 +12,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../../front-end.js';
+} from '../../../state.js';
 
 export const initializeZoneButtons = () => {
   // Self buttons

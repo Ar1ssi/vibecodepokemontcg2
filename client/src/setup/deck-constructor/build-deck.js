@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { determineDeckData } from '../general/determine-deckdata.js';
 import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
@@ -8,9 +8,11 @@ import { Cover } from './cover.js';
 export const buildDeck = (user) => {
   const deckData = determineDeckData(user);
   const deck = getZone(user, 'deck');
-  for (const [quantity, name, type, imageURL, number] of deckData) {
+  let syncInstance = 0;
+  for (const [quantity, name, type, imageURL, number, set, tcgId] of deckData) {
     for (let i = 0; i < quantity; i++) {
-      const card = new Card(user, name, type, imageURL, number);
+      const card = new Card(user, name, type, imageURL, number, set, tcgId);
+      card.syncInstance = syncInstance++;
       deck.array.push(card);
       deck.element.appendChild(card.image);
     }

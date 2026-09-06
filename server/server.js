@@ -105,6 +105,46 @@ async function main() {
         res.setHeader('Cache-Control', 'no-store');
         next();
       });
+
+  const MAT_IMAGE_REMOTE_HOSTS = new Set(['cdn.artofpkm.com']);
+
+  // Proxy playmat CDN art so browsers never hit cdn.artofpkm.com directly.
+  // That CDN 302s to a watermark when a Referer is present.
+  app.get('/api/mat-image', async (req, res) => {
+    const raw = req.query.url;
+    if (!raw || typeof raw !== 'string') {
+      res.status(400).send('missing url');
+      return;
+    }
+    let target;
+    try {
+      target = new URL(raw);
+    } catch {
+      res.status(400).send('invalid url');
+      return;
+    }
+    if (!MAT_IMAGE_REMOTE_HOSTS.has(target.hostname)) {
+      res.status(403).send('host not allowed');
+      return;
+    }
+    try {
+      const upstream = await fetch(target.href, {
+        headers: { 'User-Agent': 'PTCG-sim/1.0' },
+        redirect: 'follow',
+      });
+      if (!upstream.ok) {
+        res.status(upstream.status).send('upstream error');
+        return;
+      }
+      const contentType = upstream.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(Buffer.from(await upstream.arrayBuffer()));
+    } catch {
+      res.status(502).send('fetch failed');
+    }
+  });
+
       app.use(express.static(clientDir));
   app.get('/', (_, res) => {
     res.render('index', { importDataJSON: null });
@@ -262,6 +302,8 @@ async function main() {
       'resyncActions',
       'catchUpActions',
       'syncCheck',
+      'requestSyncLogBundle',
+      'syncLogBundle',
       'appendMessage',
       'spectatorActionData',
       'initiateImport',

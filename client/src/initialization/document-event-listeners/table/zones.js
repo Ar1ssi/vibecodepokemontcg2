@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../../front-end.js';
+} from '../../../state.js';
 import { dragLeave, dragOver, drop } from '../../../setup/image-logic/drag.js';
 
 const addZoneEventListeners = (zoneElement) => {

@@ -2,7 +2,7 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { buildDeck } from '../../setup/deck-constructor/build-deck.js';
 import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
@@ -12,6 +12,7 @@ import { processAction } from '../../setup/general/process-action.js';
 import { removeImages } from '../../setup/image-logic/remove-images.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { hideZoneElements } from './close-popups.js';
+import { cancelPrizeTake } from '../zones/prize-take-prompt.js';
 import { updateCount } from './count.js';
 import { clearReady } from './ready.js';
 
@@ -26,6 +27,8 @@ export const reset = (
     processAction(user, emit, 'reset', [clean, build, invalidMessage]);
     return;
   }
+
+  cancelPrizeTake();
 
   const stadium = getZone('neutral', 'stadium');
   systemState.turn = 0;

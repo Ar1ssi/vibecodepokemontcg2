@@ -2,17 +2,31 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
+import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { buildCardHint, resolveCardIndex } from '../../setup/zones/resolve-card-index.mjs';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 
-export const removeAbilityCounter = (user, zoneId, index, emit = true) => {
+export const removeAbilityCounter = (
+  user,
+  zoneId,
+  index,
+  emitOrHint = true,
+  maybeEmit
+) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const zone = getZone(user, zoneId);
+  const resolved = resolveCardIndex(zone, hintIn, index);
+  const targetCard = zone?.array?.[resolved];
+  const hint = hintIn || buildCardHint(targetCard);
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'removeAbilityCounter', [zoneId, index]);
+    processAction(user, emit, 'removeAbilityCounter', [zoneId, resolved, hint]);
     return;
   }
 
-  const targetCard = getZone(user, zoneId).array[index];
+  if (!targetCard) return;
   //make sure targetCard exists (it won't exist if it's already been removed)
   if (targetCard.image.abilityCounter) {
     targetCard.image.abilityCounter.handleRemove = null;
@@ -24,7 +38,7 @@ export const removeAbilityCounter = (user, zoneId, index, emit = true) => {
     targetCard.image.abilityCounter = null;
   }
 
-  processAction(user, emit, 'removeAbilityCounter', [zoneId, index]);
+  processAction(user, emit, 'removeAbilityCounter', [zoneId, resolved, hint]);
 };
 
 export const addAbilityCounter = (user, zoneId, index) => {
@@ -78,7 +92,7 @@ export const addAbilityCounter = (user, zoneId, index) => {
   }
   zone.element.appendChild(abilityCounter);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     abilityCounter.style.display = 'none';
   }
 

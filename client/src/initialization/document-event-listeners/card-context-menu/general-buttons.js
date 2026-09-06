@@ -12,7 +12,7 @@ import {
 import {
   mouseClick,
   systemState,
-} from '../../global-variables/global-variables.js';
+} from '../../../state.js';
 import { manualDeckActionAllowed } from '../../../setup/rules/rules-state.mjs';
 import { appendMessage } from '../../../setup/chatbox/append-message.js';
 

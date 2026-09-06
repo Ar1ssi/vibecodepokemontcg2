@@ -1,7 +1,9 @@
-import test from 'node:test';
+import test, { describe } from 'node:test';
     import assert from 'node:assert/strict';
     
     const { parseTrainerEffect, describeStep } = await import('../trainer-effects.mjs');
+    const { energyMatchesSearchWhat } = await import('../energy-effects.mjs');
+    const { matchesSearch, filterSearchMatches, isPokemonCard } = await import('../search-match.mjs');
     
     test("Professor's Research: discard hand, draw 7", () => {
       const r = parseTrainerEffect("Discard your hand and draw 7 cards.");
@@ -359,6 +361,15 @@ import test from 'node:test';
       assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target === 5));
     });
 
+    test('Mesagoza-style stadium draw-until is passive, not a one-shot drawUntil', () => {
+      const r = parseTrainerEffect(
+        "This Stadium stays in play when you play it. Once during each player's turn, that player may draw cards until they have 3 cards in their hand."
+      );
+      assert.equal(r.recognizable, true);
+      assert.equal(r.steps.length, 1);
+      assert.equal(r.steps[0].type, 'passive');
+    });
+
     test("Team Rocket's Factory: stadium 'once during each player's turn' is passive, NOT a bare draw", () => {
       const r = parseTrainerEffect("Once during each player’s turn, if they played a Supporter card that has “Team Rocket” in its name from their hand this turn, they may draw 2 cards.");
       assert.equal(r.recognizable, true);
@@ -374,10 +385,108 @@ import test from 'node:test';
       assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Pokémon' && s.count === 4));
     });
 
-    test('Firebreather: search up to 7 Basic Energy (not generic "card")', () => {
+    test('Firebreather: search up to 7 Basic {R} Energy (not generic "card")', () => {
       const r = parseTrainerEffect("Search your deck for up to 7 Basic { R } Energy cards, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
-      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic Energy' && s.count === 7));
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {R} Energy');
+      assert.equal(search.count, 7);
+      assert.equal(search.upTo, true);
+      assert.equal(search.reveal, true);
+      assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
+    });
+
+    test('announceDiscardPick: always broadcasts picked discard card', async () => {
+      const { announceDiscardPick } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      announceDiscardPick('self', 'Super Rod', [{ name: 'Pikachu' }], append);
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Super Rod\): Pikachu/);
+    });
+
+    test('maybeAnnounceSearchReveal: skips when effect has no reveal', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      let called = 0;
+      const append = () => { called++; };
+      maybeAnnounceSearchReveal('self', 'Ultra Ball', [{ name: 'Pikachu' }], append, {
+        sourceText: 'Search your deck for a Pokémon and put it into your hand.',
+      });
+      assert.equal(called, 0);
+    });
+
+    test('maybeAnnounceSearchReveal: announces when effect text includes reveal', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      maybeAnnounceSearchReveal('self', 'Firebreather', [{ name: 'Basic Fire Energy' }], append, {
+        sourceText: 'Search your deck for up to 7 Basic {R} Energy cards, reveal them, and put them into your hand.',
+      });
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
+    });
+
+    test('shuffleDeckAfterSearch: shuffles silently and announces in chat', async () => {
+      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
+      const messages = [];
+      let shuffled = false;
+      const append = (_user, msg) => { messages.push(msg); };
+      const shuffleZone = () => { shuffled = true; };
+      shuffleDeckAfterSearch('self', append, shuffleZone, { sourceName: 'Ultra Ball' });
+      assert.equal(shuffled, true);
+      assert.match(messages[0], /Ultra Ball — deck shuffled/);
+    });
+
+    test('shuffleDeckAfterSearch: message null shuffles without duplicate chat line', async () => {
+      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
+      const messages = [];
+      shuffleDeckAfterSearch('self', (_u, m) => messages.push(m), () => {}, { message: null });
+      assert.equal(messages.length, 0);
+    });
+
+    test('Firebreather search filter: typed {R} matches Fire only', () => {
+      const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
+      assert.equal(energyMatchesSearchWhat(fire, 'Basic {R} Energy'), true);
+      assert.equal(energyMatchesSearchWhat(water, 'Basic {R} Energy'), false);
+      assert.equal(energyMatchesSearchWhat(fire, 'Basic Energy'), true);
+      assert.equal(energyMatchesSearchWhat(water, 'Basic Energy'), true);
+    });
+
+    test('Buddy-Buddy Poffin filter: Basic ≤70 HP includes stubs without hp', () => {
+      const stub = { name: 'Pikachu', type: 'Pokémon', stage: 'Basic' };
+      const overCap = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', hp: 90 };
+      const underCap = { name: 'Clefairy', type: 'Pokémon', stage: 'Basic', hp: 60 };
+      const what = 'Basic Pokémon ≤70 HP';
+      assert.equal(matchesSearch(stub, what), true);
+      assert.equal(matchesSearch(underCap, what), true);
+      assert.equal(matchesSearch(overCap, what), false);
+      const pool = filterSearchMatches([stub, overCap, underCap], what);
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu', 'Clefairy']);
+    });
+
+    test('Ultra Ball filter: any Pokémon in deck (type on image fallback)', () => {
+      const fromImageType = { name: 'Pikachu', image: { type: 'Pokémon' } };
+      const energy = { name: 'Basic Fire Energy', type: 'Energy' };
+      assert.equal(isPokemonCard(fromImageType), true);
+      assert.equal(matchesSearch(fromImageType, 'Pokémon'), true);
+      assert.equal(matchesSearch(energy, 'Pokémon'), false);
+      const pool = filterSearchMatches([fromImageType, energy], 'Pokémon');
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu']);
+    });
+
+    test('typed bench search: up to 3 {C} Pokémon with 100 HP or less', () => {
+      const r = parseTrainerEffect(
+        'Search your deck for up to 3 { C } Pokémon with 100 HP or less and put them onto your Bench. Then, shuffle your deck.'
+      );
+      assert.equal(r.recognizable, true);
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {C} Pokémon ≤100 HP');
+      assert.equal(search.count, 3);
+      assert.equal(search.destination, 'bench');
+      assert.equal(search.upTo, true);
     });
 
     test('Fighting Gong: or-clause "Basic Energy or Basic Pokémon" (not plain Pokémon)', () => {
@@ -389,7 +498,7 @@ import test from 'node:test';
     test("Team Rocket's Proton: search up to 3 Basic Pokémon", () => {
       const r = parseTrainerEffect("Search your deck for up to 3 Basic Team Rocket’s Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
-      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Basic Pokémon' && s.count === 3));
+      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === "Basic Team Rocket's Pokémon" && s.count === 3));
     });
 
     test('describeStep: drawUntil and opponentRead wording', () => {
@@ -500,5 +609,511 @@ import test from 'node:test';
       assert.ok(describeStep({ type: 'discardTools', count: 2 }).includes('2'));
       assert.ok(describeStep({ type: 'switchOpponentOut' }).includes('opponent'));
       assert.ok(describeStep({ type: 'passive', detail: 'Custom detail.' }).includes('Custom detail.'));
+    });
+
+    describe('misparse fixes', () => {
+      test('Picnicker: coin flip draw 4 / draw 2', () => {
+        const r = parseTrainerEffect('Flip a coin. If heads, draw 4 cards. If tails, draw 2 cards.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'coinFlip');
+        assert.equal(r.steps[0].heads.type, 'draw');
+        assert.equal(r.steps[0].heads.count, 4);
+        assert.equal(r.steps[0].tails.type, 'draw');
+        assert.equal(r.steps[0].tails.count, 2);
+        assert.ok(describeStep(r.steps[0]).includes('heads'));
+      });
+
+      test('Kofu: put hand on bottom then draw 4', () => {
+        const r = parseTrainerEffect(
+          "Put 2 cards from your hand on the bottom of your deck in any order. If you put 2 cards on the bottom of your deck in this way, draw 4 cards. (If you can't put 2 cards from your hand on the bottom of your deck, you can't use this card.)"
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'putHandOnBottom');
+        assert.equal(r.steps[0].count, 2);
+        assert.equal(r.steps[1].type, 'draw');
+        assert.equal(r.steps[1].count, 4);
+        assert.ok(describeStep(r.steps[0]).includes('bottom'));
+      });
+
+      test('Special Red Card: opponent shuffle hand + draw with prize gate', () => {
+        const r = parseTrainerEffect(
+          "You can use this card only if your opponent has 3 or fewer Prize cards remaining.\n\nYour opponent shuffles their hand and puts it on the bottom of their deck. If they put any cards on the bottom of their deck in this way, they draw 3 cards."
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'opponentShuffleHandDraw');
+        assert.equal(r.steps[0].count, 3);
+        assert.equal(r.steps[0].prizeCondition, 'opponentPrizes<=3');
+        assert.ok(describeStep(r.steps[0]).includes('opponent'));
+      });
+
+      test("Misty's Vitality: search Basic {W} Energy and attach", () => {
+        const r = parseTrainerEffect(
+          'Search your deck for up to 4 Basic {W} Energy cards and attach them to 1 of your Pokémon. Then, shuffle your deck. Your turn ends.'
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'searchDeck');
+        assert.equal(r.steps[0].what, 'Basic {W} Energy');
+        assert.equal(r.steps[0].count, 4);
+        assert.equal(r.steps[0].destination, 'attach');
+        assert.ok(describeStep(r.steps[0]).includes('attach'));
+      });
+
+      test("Colress's Tenacity: Stadium + Energy search", () => {
+        const r = parseTrainerEffect(
+          'Search your deck for a Stadium card and an Energy card, reveal them, and put them into your hand. Then, shuffle your deck.'
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'searchDeck');
+        assert.equal(r.steps[0].what, 'Stadium + Energy');
+        assert.equal(r.steps[0].count, 2);
+      });
+
+      test('Poké Ball: coin flip heads search', () => {
+        const r = parseTrainerEffect(
+          'Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.'
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'coinFlip');
+        assert.equal(r.steps[0].heads.type, 'searchDeck');
+        assert.equal(r.steps[0].heads.what, 'Pokémon');
+        assert.equal(r.steps[0].tails, null);
+      });
+
+      test("Team Rocket's Great Ball: coin flip Evolution vs Basic search", () => {
+        const r = parseTrainerEffect(
+          "Flip a coin. If heads, search your deck for an Evolution Team Rocket's Pokémon, reveal it, and put it into your hand. If tails, search your deck for a Basic Team Rocket's Pokémon, reveal it, and put it into your hand. Then, shuffle your deck."
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'coinFlip');
+        assert.equal(r.steps[0].heads.what, "Evolution Team Rocket's Pokémon");
+        assert.equal(r.steps[0].tails.what, "Basic Team Rocket's Pokémon");
+      });
+    });
+    describe('draw shuffle status families', () => {
+      test('Awakening Drum: variableDraw ancientInPlay', () => {
+        const r = parseTrainerEffect('Draw a card for each of your Ancient Pokémon in play.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps.length, 1);
+        assert.equal(r.steps[0].type, 'variableDraw');
+        assert.equal(r.steps[0].source, 'ancientInPlay');
+        assert.equal(r.steps[0].per, 'card');
+        assert.ok(describeStep(r.steps[0]).includes('Ancient'));
+      });
+
+      test("Morty's Conviction: variableDraw opponentBench + discardCost", () => {
+        const r = parseTrainerEffect("You can use this card only if you discard another card from your hand.\n\nDraw a card for each of your opponent's Benched Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'discardCost');
+        assert.equal(r.steps[0].count, 1);
+        assert.equal(r.steps[1].type, 'variableDraw');
+        assert.equal(r.steps[1].source, 'opponentBench');
+      });
+
+      test('Emma: variableDraw opponentHandPokemon', () => {
+        const r = parseTrainerEffect('Your opponent reveals their hand, and you draw a card for each Pokémon you find there.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'variableDraw');
+        assert.equal(r.steps[0].source, 'opponentHandPokemon');
+        assert.ok(describeStep(r.steps[0]).includes('revealed hand'));
+      });
+
+      test("Jett: variableDraw opponentMegaExInPlay", () => {
+        const r = parseTrainerEffect("Draw a card for each of your opponent's Mega Evolution Pokémon ex in play.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'variableDraw');
+        assert.equal(r.steps[0].source, 'opponentMegaExInPlay');
+      });
+
+      test('Brassius: countShuffleDrawPlus', () => {
+        const r = parseTrainerEffect('Count the cards in your hand, shuffle those cards into your deck, then draw that many cards plus 1.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps.length, 1);
+        assert.equal(r.steps[0].type, 'countShuffleDrawPlus');
+        assert.ok(describeStep(r.steps[0]).includes('plus 1'));
+      });
+
+      test('Energy Recycler: shuffleFromDiscard Basic Energy', () => {
+        const r = parseTrainerEffect('Shuffle up to 5 Basic Energy cards from your discard pile into your deck.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'shuffleFromDiscard');
+        assert.equal(r.steps[0].what, 'Basic Energy');
+        assert.equal(r.steps[0].count, 5);
+      });
+
+      test('Sacred Ash: shuffleFromDiscard Pokémon', () => {
+        const r = parseTrainerEffect('Shuffle up to 5 Pokémon from your discard pile into your deck.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'shuffleFromDiscard');
+        assert.equal(r.steps[0].what, 'Pokémon');
+        assert.equal(r.steps[0].count, 5);
+      });
+
+      test('Great Haul Net: shuffleFromDiscard with choices', () => {
+        const r = parseTrainerEffect('Choose 1 or both:\n• Shuffle up to 3 {W} Pokémon from your discard pile into your deck.\n• Shuffle up to 3 Basic {W} Energy cards from your discard pile into your deck.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'shuffleFromDiscard');
+        assert.ok(Array.isArray(r.steps[0].choices));
+        assert.equal(r.steps[0].choices.length, 2);
+        assert.equal(r.steps[0].choices[0].what, '{W} Pokémon');
+        assert.equal(r.steps[0].choices[0].count, 3);
+        assert.equal(r.steps[0].choices[1].what, 'Basic {W} Energy');
+        assert.ok(describeStep(r.steps[0]).includes('Choose 1 or both'));
+      });
+
+      test('Dangerous Laser: applyStatus opponentActive Burned+Confused', () => {
+        const r = parseTrainerEffect("Your opponent's Active Pokémon is now Burned and Confused.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'applyStatus');
+        assert.equal(r.steps[0].target, 'opponentActive');
+        assert.deepEqual(r.steps[0].conditions, ['Burned', 'Confused']);
+        assert.ok(describeStep(r.steps[0]).includes('Burned'));
+      });
+
+      test('Dark Bell: applyStatus bothActiveNonDark Confused', () => {
+        const r = parseTrainerEffect('Both Active non-{D} Pokémon are now Confused.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'applyStatus');
+        assert.equal(r.steps[0].target, 'bothActiveNonDark');
+        assert.deepEqual(r.steps[0].conditions, ['Confused']);
+        assert.ok(describeStep(r.steps[0]).includes('non-{D}'));
+      });
+
+      test('Regression: variableDraw is not shadowed by bare draw', () => {
+        const r = parseTrainerEffect('Draw a card for each of your Ancient Pokémon in play.');
+        assert.notEqual(r.steps[0].type, 'draw');
+      });
+    });
+
+    describe('near-miss audit fixes', () => {
+      test('Briar: singular "take 1 more Prize card" is passive', () => {
+        const r = parseTrainerEffect(
+          "You can use this card only if your opponent has exactly 2 Prize cards remaining.\n\nDuring this turn, if your opponent's Active Pokémon is Knocked Out by damage from an attack used by your Tera Pokémon, take 1 more Prize card."
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('prize'));
+      });
+
+      test("Lisia's Appeal: Benched Basic Pokémon switchOpponent", () => {
+        const r = parseTrainerEffect(
+          "Switch in 1 of your opponent's Benched Basic Pokémon to the Active Spot. If you do, the new Active Pokémon is now Confused."
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'switchOpponent');
+        assert.ok(describeStep(r.steps[0]).includes('Benched'));
+      });
+
+      test('Bravery Charm: +50 HP passive tool', () => {
+        const r = parseTrainerEffect('The Basic Pokémon this card is attached to gets +50 HP.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('HP'));
+      });
+
+      test("Hero's Cape: +100 HP passive tool", () => {
+        const r = parseTrainerEffect('The Pokémon this card is attached to gets +100 HP.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('HP'));
+      });
+
+      test("Cynthia's Power Weight: +70 HP passive tool", () => {
+        const r = parseTrainerEffect("The Cynthia's Pokémon this card is attached to gets +70 HP.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('HP'));
+      });
+
+      test('Ancient Booster Energy Capsule: +60 HP and Special Condition immunity passive', () => {
+        const r = parseTrainerEffect(
+          "The Ancient Pokémon this card is attached to gets +60 HP, recovers from all Special Conditions, and can't be affected by any Special Conditions."
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(
+          r.steps[0].detail.includes('HP') || r.steps[0].detail.includes('Special Condition'),
+          `expected HP or Special Condition detail, got: ${r.steps[0].detail}`
+        );
+      });
+
+      test('Dusk Ball: lookAtBottom 7 for Pokémon to hand', () => {
+        const r = parseTrainerEffect(
+          'Look at the bottom 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.'
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'lookAtBottom');
+        assert.equal(r.steps[0].count, 7);
+        assert.equal(r.steps[0].pick, 'Pokémon');
+        assert.equal(r.steps[0].destination, 'hand');
+        assert.ok(describeStep(r.steps[0]).includes('bottom'));
+        assert.ok(describeStep(r.steps[0]).includes('7'));
+      });
+    });
+
+    describe('hand energy coin families', () => {
+      test('Eri: revealOpponentHandDiscard up to 2 Items', () => {
+        const r = parseTrainerEffect('Your opponent reveals their hand, and you discard up to 2 Item cards you find there.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'revealOpponentHandDiscard');
+        assert.equal(r.steps[0].what, 'Item');
+        assert.equal(r.steps[0].count, 2);
+        assert.ok(describeStep(r.steps[0]).includes('Item'));
+      });
+
+      test('Ortega: opponentHandBottom with optional opponent draw', () => {
+        const r = parseTrainerEffect("Your opponent reveals their hand, and you choose a card you find there and put it on the bottom of their deck. If you put a card on the bottom of your opponent's deck in this way, your opponent may draw a card.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'opponentHandBottom');
+        assert.equal(r.steps[0].what, 'card');
+        assert.equal(r.steps[0].optionalOpponentDraw, true);
+        assert.ok(describeStep(r.steps[0]).includes('may draw'));
+      });
+
+      test('Energy Swatter: opponentHandBottom Energy only', () => {
+        const r = parseTrainerEffect('Your opponent reveals their hand, and you choose an Energy card you find there and put it on the bottom of their deck.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'opponentHandBottom');
+        assert.equal(r.steps[0].what, 'Energy');
+        assert.equal(r.steps[0].optionalOpponentDraw, undefined);
+      });
+
+      test("Xerosic's Machinations: opponentDiscardUntil count 3", () => {
+        const r = parseTrainerEffect('Your opponent discards cards from their hand until they have 3 cards in their hand.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'opponentDiscardUntil');
+        assert.equal(r.steps[0].count, 3);
+      });
+
+      test('Hand Trimmer: eachPlayerDiscardUntil count 5 opponent first', () => {
+        const r = parseTrainerEffect('Each player discards cards from their hand until they have 5 cards in their hand. Your opponent discards first. (If a player has 5 or fewer cards in their hand, they do not discard.)');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'eachPlayerDiscardUntil');
+        assert.equal(r.steps[0].count, 5);
+        assert.equal(r.steps[0].opponentFirst, true);
+        assert.ok(describeStep(r.steps[0]).includes('opponent first'));
+      });
+
+      test('Meddling Memo: opponentCountShuffleDraw', () => {
+        const r = parseTrainerEffect('Your opponent counts the cards in their hand, shuffles those cards, and puts them on the bottom of their deck. If they do, they draw that many cards.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'opponentCountShuffleDraw');
+        assert.ok(describeStep(r.steps[0]).includes('counts'));
+      });
+
+      test('Enhanced Hammer: discardEnergyFromOpponent Special Energy', () => {
+        const r = parseTrainerEffect("Discard a Special Energy from 1 of your opponent's Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+        assert.equal(r.steps[0].energy, 'Special Energy');
+        assert.equal(r.steps[0].scope, '1 Pokémon');
+      });
+
+      test('Rust Syndicate Grunt: discardEnergyFromOpponent any Energy', () => {
+        const r = parseTrainerEffect("You can use this card only if any of your Pokémon were Knocked Out during your opponent's last turn.\n\nDiscard an Energy from 1 of your opponent's Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+        assert.equal(r.steps[0].energy, 'any Energy');
+        assert.equal(r.steps[0].scope, '1 Pokémon');
+      });
+
+      test('Giacomo: discardEnergyFromOpponent each Pokémon Special Energy', () => {
+        const r = parseTrainerEffect("Discard a Special Energy from each of your opponent's Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+        assert.equal(r.steps[0].energy, 'Special Energy');
+        assert.equal(r.steps[0].scope, 'each Pokémon');
+      });
+
+      test('Chill Teaser Toy: discardEnergyFromOpponent returnToHand', () => {
+        const r = parseTrainerEffect("You can use this card only if you go second, and only during your first turn.\n\nPut an Energy attached to 1 of your opponent's Pokémon into their hand.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+        assert.equal(r.steps[0].action, 'returnToHand');
+        assert.ok(describeStep(r.steps[0]).includes('into their hand'));
+      });
+
+      test('Crushing Hammer: coinFlip heads discard energy from opponent', () => {
+        const r = parseTrainerEffect("Flip a coin. If heads, discard an Energy from 1 of your opponent's Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'coinFlip');
+        assert.equal(r.steps[0].heads[0].type, 'discardEnergyFromOpponent');
+        assert.equal(r.steps[0].heads[0].energy, 'any Energy');
+        assert.deepEqual(r.steps[0].tails, []);
+        assert.ok(describeStep(r.steps[0]).includes('discard Energy'));
+      });
+
+      test("Team Rocket's Venture Bomb: coinFlip heads/tails damage", () => {
+        const r = parseTrainerEffect("Flip a coin. If heads, put 2 damage counters on 1 of your opponent's Pokémon. If tails, put 2 damage counters on your Active Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'coinFlip');
+        assert.equal(r.steps[0].heads[0].type, 'damageCounters');
+        assert.equal(r.steps[0].heads[0].count, 2);
+        assert.equal(r.steps[0].tails[0].type, 'damageCounters');
+        assert.equal(r.steps[0].tails[0].target, 'your Active Pokémon');
+        assert.ok(describeStep(r.steps[0]).includes('heads'));
+        assert.ok(describeStep(r.steps[0]).includes('tails'));
+      });
+
+      test('Hole-Digging Shovel: millSelf discard top 2', () => {
+        const r = parseTrainerEffect('Discard the top 2 cards of your deck.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'millSelf');
+        assert.equal(r.steps[0].count, 2);
+        assert.ok(describeStep(r.steps[0]).includes('top 2'));
+      });
+
+      test('Regression: Eri is not shadowed by variableDraw (Emma)', () => {
+        const eri = parseTrainerEffect('Your opponent reveals their hand, and you discard up to 2 Item cards you find there.');
+        assert.equal(eri.steps[0].type, 'revealOpponentHandDiscard');
+        const emma = parseTrainerEffect('Your opponent reveals their hand, and you draw a card for each Pokémon you find there.');
+        assert.equal(emma.steps[0].type, 'variableDraw');
+      });
+    });
+
+    describe('complex trainer families', () => {
+      const FOSSIL_TEXT =
+        "Play this card as if it were a 60-HP Basic {C} Pokémon. This card can't be affected by any Special Conditions and can't retreat.\n\nAt any time during your turn, you may discard this card from play.";
+
+      test('Fossil items: fossilItem (8-card family)', () => {
+        const r = parseTrainerEffect(FOSSIL_TEXT);
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'fossilItem');
+        assert.equal(r.steps[0].hp, 60);
+        assert.ok(describeStep(r.steps[0]).includes('60-HP'));
+      });
+
+      test("N's Plan: moveEnergyToActive count 2 (distinct from moveEnergy)", () => {
+        const r = parseTrainerEffect('Move up to 2 Energy from your Benched Pokémon to your Active Pokémon.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'moveEnergyToActive');
+        assert.equal(r.steps[0].count, 2);
+        assert.ok(describeStep(r.steps[0]).includes('Active'));
+      });
+
+      test('Philippe: attachMultipleFromDiscard typed Metal Energy', () => {
+        const r = parseTrainerEffect('Attach up to 2 Basic {M} Energy cards from your discard pile to 1 of your {M} Pokémon.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'attachMultipleFromDiscard');
+        assert.equal(r.steps[0].count, 2);
+        assert.equal(r.steps[0].energy, 'Basic {M} Energy');
+        assert.equal(r.steps[0].target, '1 of your {M} Pokémon');
+      });
+
+      test('Scoop Up Cyclone: returnPokemonToHand keepAttached', () => {
+        const r = parseTrainerEffect('Put 1 of your Pokémon and all attached cards into your hand.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'returnPokemonToHand');
+        assert.equal(r.steps[0].keepAttached, true);
+        assert.ok(describeStep(r.steps[0]).includes('all attached cards'));
+      });
+
+      test("Professor Turo's Scenario: returnPokemonToHand discard attached", () => {
+        const r = parseTrainerEffect('Put 1 of your Pokémon in play into your hand. (Discard all cards attached to that Pokémon.)');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'returnPokemonToHand');
+        assert.equal(r.steps[0].keepAttached, false);
+      });
+
+      test("Ogre's Mask: swapWithDiscard Ogerpon ex", () => {
+        const r = parseTrainerEffect('Choose a Pokémon ex in your discard pile that has "Ogerpon" in its name, and switch it with 1 of your Pokémon ex in play that has "Ogerpon" in its name. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'swapWithDiscard');
+        assert.equal(r.steps[0].filter, 'Pokémon ex (Ogerpon)');
+      });
+
+      test('Transformation Tome: swapWithDiscard Basic Pokémon', () => {
+        const r = parseTrainerEffect('Choose a Basic Pokémon in your discard pile and switch it with 1 of your Basic Pokémon in play. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'swapWithDiscard');
+        assert.equal(r.steps[0].filter, 'Basic Pokémon');
+      });
+
+      test('Megaton Blower: massDiscardAttached', () => {
+        const r = parseTrainerEffect("Discard all Pokémon Tools and Special Energy from all of your opponent's Pokémon, and discard a Stadium in play.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'massDiscardAttached');
+        assert.ok(describeStep(r.steps[0]).includes('Stadium'));
+      });
+
+      test('Ruffian: discardToolAndSpecialEnergy', () => {
+        const r = parseTrainerEffect("Discard a Pokémon Tool and a Special Energy from 1 of your opponent's Pokémon.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'discardToolAndSpecialEnergy');
+      });
+
+      test("Roxie's Performance: passive can't retreat", () => {
+        const r = parseTrainerEffect("During your opponent's next turn, their Poisoned Pokémon can't retreat. (This includes newly Poisoned Pokémon.)");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('Retreat restriction'));
+      });
+
+      test('Redeemable Ticket: reshufflePrizes', () => {
+        const r = parseTrainerEffect('Count your Prize cards, shuffle them, and put them on the bottom of your deck. Then, take that many cards from the top of your deck and put them face down as your Prize cards.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'reshufflePrizes');
+      });
+
+      test("Lillie's Pearl: passive fewer prize on KO", () => {
+        const r = parseTrainerEffect("If the Lillie's Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent's Pokémon, that player takes 1 fewer Prize card.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('Fewer Prize'));
+      });
+
+      test('Accompanying Flute: revealOpponentDeckBench', () => {
+        const r = parseTrainerEffect("Reveal the top 5 cards of your opponent's deck. You may choose any number of Basic Pokémon you find there and put those Pokémon onto their Bench. Your opponent shuffles the other cards back into their deck.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'revealOpponentDeckBench');
+        assert.equal(r.steps[0].count, 5);
+      });
+
+      test('Survival Brace: passive KO prevention', () => {
+        const r = parseTrainerEffect("If the Pokémon this card is attached to has full HP and would be Knocked Out by damage from an attack from your opponent's Pokémon, it is not Knocked Out, and its remaining HP becomes 10. Then, discard this card.");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('KO prevention'));
+      });
+
+      test('Core Memory: passive grant attack', () => {
+        const r = parseTrainerEffect('The Mega Zygarde ex this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.)');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('Grants an attack'));
+      });
+
+      test('Technical Machine: Fluorite: passive grant attack', () => {
+        const r = parseTrainerEffect('The Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.) If this card is attached to 1 of your Pokémon, discard it at the end of your turn.');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('Grants an attack'));
+      });
+
+      test('Sparkling Crystal: passive cost reduction', () => {
+        const r = parseTrainerEffect('When the Tera Pokémon this card is attached to uses an attack, that attack costs 1 Energy less. (The Energy can be of any type.)');
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'passive');
+        assert.ok(r.steps[0].detail.includes('cost reduction'));
+      });
+
+      test("Team Rocket's Bother-Bot: opponentPrizeHandSwap", () => {
+        const r = parseTrainerEffect("Turn 1 of your opponent's face-down Prize cards face up and choose a random card from your opponent's hand. Your opponent reveals that card. You may have your opponent switch those cards. (That Prize card remains face up for the rest of the game.)");
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'opponentPrizeHandSwap');
+        assert.ok(describeStep(r.steps[0]).includes('face up'));
+      });
+
+      test('describeStep: complex trainer families produce non-empty guidance', () => {
+        assert.ok(describeStep({ type: 'fossilItem', hp: 60 }).length > 0);
+        assert.ok(describeStep({ type: 'moveEnergyToActive', count: 2 }).includes('2'));
+        assert.ok(describeStep({ type: 'attachMultipleFromDiscard', count: 2, energy: 'Basic {M} Energy', target: '1 of your {M} Pokémon' }).includes('{M}'));
+        assert.ok(describeStep({ type: 'returnPokemonToHand', keepAttached: true }).includes('attached'));
+        assert.ok(describeStep({ type: 'swapWithDiscard', filter: 'Basic Pokémon' }).includes('Basic'));
+        assert.ok(describeStep({ type: 'massDiscardAttached' }).includes('Tools'));
+        assert.ok(describeStep({ type: 'discardToolAndSpecialEnergy' }).includes('Tool'));
+        assert.ok(describeStep({ type: 'reshufflePrizes' }).includes('Prize'));
+        assert.ok(describeStep({ type: 'revealOpponentDeckBench', count: 5 }).includes('5'));
+        assert.ok(describeStep({ type: 'opponentPrizeHandSwap' }).includes('Prize'));
+      });
     });
     

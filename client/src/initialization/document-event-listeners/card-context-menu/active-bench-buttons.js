@@ -9,7 +9,8 @@ import {
   handAll,
   leaveAll,
 } from '../../../actions/zones/general.js';
-import { mouseClick, systemState } from '../../../front-end.js';
+import { openAttachedCardsPanel } from '../../../setup/image-logic/full-view.js';
+import { mouseClick, systemState } from '../../../state.js';
 
 export const initializeActiveAndBenchButtons = () => {
   const damageCounterButton = document.getElementById('damageCounterButton');
@@ -79,8 +80,18 @@ export const initializeActiveAndBenchButtons = () => {
     );
   });
 
-  // Attached-cards submenu: same zone-wide actions as the standalone
-  // #attachedCards panel, but scoped to whichever side's card was right-clicked.
+  // View the play-container panel (Pokémon + attached cards in a row).
+  const viewAttachedCardsButton = document.getElementById(
+    'viewAttachedCardsButton'
+  );
+  viewAttachedCardsButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!mouseClick.card?.image) return;
+    document.getElementById('cardContextMenu').style.display = 'none';
+    openAttachedCardsPanel(mouseClick.card.image, mouseClick.card);
+  });
+
+  // Attached-cards submenu: bulk actions on cards in the #attachedCards zone.
   const attachedDiscardButton = document.getElementById('attachedDiscardButton');
   attachedDiscardButton.addEventListener('click', () =>
     discardAll(mouseClick.cardUser, systemState.initiator, 'attachedCards')

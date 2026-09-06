@@ -1,27 +1,38 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn } = await import('../rules-state.mjs');
-    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
+    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
+    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
-    const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
-    const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
+    const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
+    const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed } = await import('../stadium-effects.mjs');
+    const { parseAbility } = await import('../abilities.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
     
     // ── KO / prizes ──
-    test('prizesForKO: standard = 1, ex = 3 (2 extra), VMAX = 3', () => {
+    test('prizesForKO: standard = 1, ex = 2, mega = 3, VMAX = 3', () => {
       assert.equal(prizesForKO({ rarity: 'Common' }), 1);
-      assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 3);
-      assert.equal(prizesForKO({ name: 'Cetitan ex' }), 3);
+      assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 2);
+      assert.equal(prizesForKO({ name: 'Cetitan ex' }), 2);
       assert.equal(prizesForKO({ subtypes: ['VMAX'] }), 3);
       assert.equal(prizesForKO({ subtypes: ['VSTAR'] }), 2);
-      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 2);
+      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 3);
+      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 3);
+      assert.equal(prizesForKO({ name: 'Yanmega' }), 1);
+    });
+
+    test('isMegaCard: rarity, subtype, or Mega name — not Yanmega', () => {
+      assert.equal(isMegaCard({ rarity: 'Mega Hyper Rare' }), true);
+      assert.equal(isMegaCard({ subtypes: ['Mega Evolution'] }), true);
+      assert.equal(isMegaCard({ name: 'Mega Lucario ex' }), true);
+      assert.equal(isMegaCard({ name: 'Yanmega' }), false);
+      assert.equal(isMegaCard({ name: 'Cetitan ex' }), false);
     });
 
     test('isExCard / isGxCard: subtypes first, name suffix fallback', () => {
@@ -37,7 +48,8 @@ import test from 'node:test';
 
     test('koOutcome: GX = match loss, otherwise prize counts', () => {
       assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'matchLoss' });
-      assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 3 });
+      assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 2 });
+      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 3 });
       assert.deepEqual(koOutcome({ rarity: 'Common' }), { type: 'prizes', count: 1 });
     });
 
@@ -51,12 +63,12 @@ import test from 'node:test';
       assert.match(r.reason, /GX/);
     });
 
-    test('handleKO: ex awards 3 prizes', () => {
+    test('handleKO: ex awards 2 prizes', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { name: 'Cetitan ex' } });
-      assert.equal(r.prizeCount, 3);
-      assert.equal(r.prizesTaken, 3);
-      assert.equal(r.prizesRemaining, 3);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 2);
+      assert.equal(r.prizesRemaining, 4);
       assert.equal(r.won, false);
     });
     
@@ -75,9 +87,9 @@ import test from 'node:test';
     test('handleKO packages prize info', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { rarity: 'Double rare', subtypes: ['ex'] } });
-      assert.equal(r.prizeCount, 3);
-      assert.equal(r.prizesTaken, 3);
-      assert.equal(r.prizesRemaining, 3);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 2);
+      assert.equal(r.prizesRemaining, 4);
     });
     
     test('checkWinConditions: deck-out loses', () => {
@@ -370,6 +382,53 @@ import test from 'node:test';
       assert.equal(getStadium(), null);
     });
 
+    // ── TCGdex ability mapping (ensureCardData enrichment) ──
+    test('tcgAbilityFromDetail: prefers legacy detail.ability', () => {
+      const legacy = { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage.' };
+      assert.deepEqual(
+        tcgAbilityFromDetail({ ability: legacy, abilities: [{ type: 'Ability', name: 'Other', effect: 'x' }] }),
+        legacy
+      );
+    });
+
+    test('tcgAbilityFromDetail: maps TCGdex v2 abilities[] with type Ability', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'Ability', name: 'Solid Shell', effect: 'This Pokémon takes 20 less damage from attacks.' },
+          ],
+        }),
+        { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage from attacks.' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: type match is case-insensitive; uses first Ability entry', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'ability', name: 'First', effect: 'First effect' },
+            { type: 'Ability', name: 'Second', effect: 'Second effect' },
+          ],
+        }),
+        { name: 'First', text: 'First effect' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: falls back to entry.text when effect is missing', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [{ type: 'Ability', name: 'Draw Power', text: 'Draw a card.' }],
+        }),
+        { name: 'Draw Power', text: 'Draw a card.' }
+      );
+    });
+
+    test('tcgAbilityFromDetail: returns null when no ability present', () => {
+      assert.equal(tcgAbilityFromDetail(null), null);
+      assert.equal(tcgAbilityFromDetail({}), null);
+      assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Pokémon Power', name: 'X', effect: 'y' }] }), null);
+    });
+
     // ── per-ability used-tracking (taxonomy C) ──
     test('abilityKey: stable identity via id, then name+number fallback', () => {
       assert.equal(abilityKey({ id: 123, name: 'Pikachu' }), 'id:123');
@@ -583,6 +642,65 @@ import test from 'node:test';
       assert.equal(classifyAbility({ name: 'Pikachu' }), 'unknown');
     });
 
+    test('parseAbility: Mega Greninja ex Mortal Shuriken (discard Water Energy → place damage on opponent)', () => {
+      const text =
+        "Once during your turn, if this Pokémon is in the Active Spot, you may discard a Basic Water Energy card from your hand in order to use this Ability. Place 6 damage counters on 1 of your opponent's Pokémon.";
+      const steps = parseAbility(text);
+      assert.equal(steps.some((s) => s.type === 'discardCostAbility'), true);
+      assert.equal(steps.some((s) => s.type === 'moveDamageAbility'), true);
+      assert.equal(steps.some((s) => s.type === 'opponentDisruptAbility'), false);
+
+      const cost = steps.find((s) => s.type === 'discardCostAbility');
+      assert.equal(cost.count, 1);
+      assert.equal(cost.basic, true);
+      assert.equal(cost.energyType, 'water');
+
+      const dmg = steps.find((s) => s.type === 'moveDamageAbility');
+      assert.equal(dmg.count, 6);
+      assert.equal(dmg.onOpponent, true);
+
+      assert.equal(classifyAbility({ name: 'Mega Greninja ex', ability: { text } }), 'move-damage');
+    });
+
+    test('parseAbility: place damage on opponent without incidental "to" in cost clause', () => {
+      const text =
+        "Once during your turn, you may discard a Basic Water Energy card from your hand. Place 6 damage counters on 1 of your opponent's Pokémon.";
+      const steps = parseAbility(text);
+      assert.equal(steps.some((s) => s.type === 'moveDamageAbility'), true);
+      assert.equal(steps.some((s) => s.type === 'opponentDisruptAbility'), false);
+      assert.equal(classifyAbility({ ability: { text } }), 'move-damage');
+    });
+
+    test('parseAbility: Fan Rotom Fan Call — typed {C} Pokémon with HP cap (ability parser, not trainer)', () => {
+      const text =
+        "Once during your first turn, you may search your deck for up to 3 {C} Pokémon with 100 HP or less, reveal them, and put them into your hand. Then, shuffle your deck.";
+      const steps = parseAbility(text);
+      const search = steps.find((s) => s.type === 'searchAbility');
+      assert.ok(search);
+      assert.equal(search.what, 'Basic {C} Pokémon ≤100 HP');
+      assert.equal(search.count, 3);
+      assert.equal(search.upTo, true);
+      assert.equal(search.destination, 'hand');
+    });
+
+    test('parseAbilitySearchParams: typed Basic {R} Energy preserved', async () => {
+      const { parseAbilitySearchParams } = await import('../abilities.mjs');
+      const lower =
+        'search your deck for up to 2 basic {r} energy cards and put them into your hand';
+      const parsed = parseAbilitySearchParams(lower);
+      assert.equal(parsed.what, 'Basic {R} Energy');
+      assert.equal(parsed.count, 2);
+      assert.equal(parsed.upTo, true);
+    });
+
+    test('ability search filter: typed {R} Energy via search-match.mjs', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
+      assert.equal(matchesSearch(fire, 'Basic {R} Energy'), true);
+      assert.equal(matchesSearch(water, 'Basic {R} Energy'), false);
+    });
+
     test('searchTargetType: determines card type from ability text', () => {
       assert.equal(searchTargetType({ ability: { text: 'Look through your deck and find a Basic Pokémon, put it into your hand.' } }), 'Pokémon');
       assert.equal(searchTargetType({ ability: { text: 'Search your deck for an Energy card and put it into your hand.' } }), 'Energy');
@@ -639,7 +757,7 @@ import test from 'node:test';
       );
       assert.equal(
         classifyStadiumEffect({ type: 'Stadium', name: 'Lillie’s Rooftop', text: 'Prevent all damage that would be dealt to your Active Pokémon by attacks.' }),
-        'unknown', // prevention effect: no trigger keyword → unknown (guidance says read text)
+        'continuous-both',
       );
       assert.equal(
         classifyStadiumEffect({ type: 'Stadium', name: 'Misty’s Cove', text: 'Your opponent’s Water Pokémon are harder to evolve.' }),
@@ -671,11 +789,18 @@ import test from 'node:test';
       assert.equal(r.results[0].n, 2);
     });
 
-    test('parseStadiumSetupDraw: parses draw N or falls back to 1', () => {
+    test('parseStadiumSetupDraw: only the when-you-play sentence, never a default 1', () => {
       assert.equal(parseStadiumSetupDraw({ name: 'Victory Road', text: 'When you play this card, draw 2 cards.' }), 2);
-      assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'When you play this card, do something.' }), 1);
+      assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'When you play this card, do something.' }), null);
       assert.equal(parseStadiumSetupDraw({ name: 'X', text: 'Once per turn, draw 1 card.' }), null);
       assert.equal(parseStadiumSetupDraw(null), null);
+      const boilerplate =
+        'This Stadium stays in play when you play it. Discard it if another Stadium comes into play. Once during each player\'s turn, that player may draw 2 cards.';
+      assert.equal(parseStadiumSetupDraw({ type: 'Stadium', name: 'Mesagoza', text: boilerplate }), null);
+      assert.equal(
+        classifyStadiumEffect({ type: 'Stadium', name: 'Mesagoza', text: boilerplate }),
+        'once-per-turn',
+      );
     });
 
     test('parseStadiumOncePerTurn: buckets draw/search/energy/heal', () => {
@@ -684,6 +809,65 @@ import test from 'node:test';
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, attach an Energy.' }).kind, 'energy');
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, heal 20 damage.' }).kind, 'heal');
       assert.equal(parseStadiumOncePerTurn({ text: 'Prevent all damage.' }), null);
+    });
+
+    test('parseStadiumOncePerTurn: complex TCG Live once-per-turn stadiums', () => {
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may discard an Energy card from their hand in order to draw a card." }).kind,
+        'discard-draw',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may put a card from their hand on top of their deck." }).kind,
+        'hand-to-deck-top',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may switch their Active {W} Pokémon with 1 of their Benched {W} Pokémon." }).kind,
+        'switch-type',
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may heal 10 damage from each of their Pokémon." }).kind,
+        'heal-all',
+      );
+      const factory = parseStadiumOncePerTurn({ text: 'Once during each player\'s turn, if they played a Supporter card that has "Team Rocket" in its name from their hand, they may draw 2 cards.' });
+      assert.equal(factory.kind, 'draw');
+      assert.equal(factory.n, 2);
+      assert.equal(factory.condition.type, 'named-supporter');
+    });
+
+    test('Jamming Tower: tool effects blocked via combinedDamagePrevention', async () => {
+      const { combinedDamagePrevention } = await import('../ability-executors.mjs');
+      const { markStadiumPlayed, getStadium } = await import('../rules-state.mjs');
+      const { stadiumBlocksToolEffects } = await import('../stadium-effects.mjs');
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        const mon = { name: 'Pikachu', ability: { text: 'Prevent all damage done to this Pokémon by attacks.' } };
+        const tool = { name: 'Bravery Charm', type: 'Trainer', subtypes: ['Tool'], ability: { text: 'Prevent all damage done to this Pokémon by attacks from Pokémon ex.' } };
+        markStadiumPlayed('self', { name: 'Jamming Tower', subtypes: ['Stadium'], text: 'Pokémon Tools attached to each Pokémon (both yours and your opponent\'s) have no effect.' });
+        assert.equal(stadiumBlocksToolEffects(), true);
+        const blocked = combinedDamagePrevention(mon, [tool], { blockTools: true });
+        assert.equal(blocked.preventAll, true);
+        const withTool = combinedDamagePrevention(mon, [tool], { blockTools: false });
+        assert.equal(withTool.preventAll, true);
+      } finally {
+        rulesState.stadium = prev;
+      }
+    });
+
+    test('Area Zero Underdepths: bench limit 8 with Tera, else 5', () => {
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        markStadiumPlayed('self', {
+          name: 'Area Zero Underdepths',
+          subtypes: ['Stadium'],
+          text: 'Each player who has any Tera Pokémon in play can have up to 8 Pokémon on their Bench.',
+        });
+        assert.equal(getEffectiveBenchLimit(false), 5);
+        assert.equal(getEffectiveBenchLimit(true), 8);
+      } finally {
+        rulesState.stadium = prev;
+      }
     });
 
     test('parseStadiumDamagePrevention: numbers, all, and null', () => {
@@ -861,6 +1045,391 @@ import test from 'node:test';
       assert.equal(classifyAttackEffect({ name: 'Mystery' }), 'unknown');
       assert.equal(classifyAttackEffect(null), 'unknown');
       assert.equal(classifyAttackEffect({ damage: 50 }), 'flat');
+    });
+
+    test('classifyAttackEffect: search-deck before trailing shuffle (Call for Family)', () => {
+      const callForFamily =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      assert.equal(
+        classifyAttackEffect({ name: 'Call for Family', damage: 0, text: callForFamily }),
+        'search-deck',
+      );
+      assert.notEqual(
+        classifyAttackEffect({ name: 'Call for Family', damage: 0, text: callForFamily }),
+        'shuffle-cost',
+      );
+    });
+
+    test('classifyAttackEffect: move-energy, reveal-hand, conditional-ko', () => {
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Wheel Pass',
+          damage: 0,
+          text: 'Move an Energy from this Pokémon to 1 of your Benched Pokémon.',
+        }),
+        'move-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Silent Wing',
+          damage: 0,
+          text: 'Your opponent reveals their hand.',
+        }),
+        'reveal-hand',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Abyss Eye',
+          damage: 0,
+          text: "If your opponent's Active Pokémon is affected by a Special Condition, it is Knocked Out.",
+        }),
+        'conditional-ko',
+      );
+      assert.equal(
+        classifyAttackEffect({ name: 'Slam', damage: 30, text: '30' }),
+        'flat',
+      );
+    });
+
+    test('moveEnergyClause / revealHandClause / conditionalKoClause parsers', () => {
+      assert.equal(
+        moveEnergyClause('Move an Energy from this Pokémon to 1 of your Benched Pokémon.'),
+        true,
+      );
+      assert.equal(moveEnergyClause('Do 30 damage to the Defending Pokémon.'), false);
+      assert.equal(moveEnergyClause('Attach an Energy card to this Pokémon.'), false);
+      assert.equal(moveEnergyClause(''), false);
+
+      assert.equal(revealHandClause('Your opponent reveals their hand.'), true);
+      assert.equal(revealHandClause('Your opponent reveal their hand.'), true);
+      assert.equal(revealHandClause('Draw 2 cards.'), false);
+      assert.equal(revealHandClause(''), false);
+
+      assert.equal(
+        conditionalKoClause(
+          "If your opponent's Active Pokémon is affected by a Special Condition, it is Knocked Out.",
+        ),
+        true,
+      );
+      assert.equal(conditionalKoClause('Do 30 damage to the Defending Pokémon.'), false);
+      assert.equal(conditionalKoClause(''), false);
+
+      assert.equal(
+        conditionalKoClause(
+          "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+        ),
+        true,
+      );
+      assert.equal(exactCounterKoThreshold(
+        "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+      ), 6);
+      assert.equal(redirectDamageCount('Place 2 damage counters on the Attacking Pokémon.'), 2);
+      assert.equal(
+        handScalingDamage(
+          "Place 2 damage counters on your opponent's Active Pokémon for each card in your hand.",
+        ),
+        2,
+      );
+      assert.equal(
+        returnEnergyClause('Put 2 Fire Energy attached to this Pokémon into your hand.'),
+        true,
+      );
+      assert.equal(returnEnergyCount('Put 2 Fire Energy attached to this Pokémon into your hand.'), 2);
+      assert.equal(
+        immunityClause("This attack's damage isn't affected by Weakness or Resistance."),
+        true,
+      );
+    });
+
+    test('classifyAttackEffect: bracket Energy and backlog flat patterns', () => {
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Symphonia',
+          damage: 50,
+          text: 'This attack does 50 damage for each {P} Energy attached to all of your Pokémon.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Growth',
+          damage: 30,
+          text: 'This attack does 30 more damage for each {G} Energy attached to this Pokémon.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Damage Beat',
+          damage: 20,
+          text: "This attack does 20 damage for each damage counter on your opponent's Active Pokémon.",
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Exact KO',
+          damage: 0,
+          text: "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+        }),
+        'conditional-ko',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Mirror Heal',
+          damage: 30,
+          text: "Heal from this Pokémon the same amount of damage you did to your opponent's Active Pokémon.",
+        }),
+        'mirror-heal',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Copy',
+          damage: 0,
+          text: "Choose 1 of your opponent's Active Pokémon's attacks and use it as this attack.",
+        }),
+        'copy-attack',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Round',
+          damage: 40,
+          text: 'This attack does 40 damage for each of your Pokémon in play that has the Round attack.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Item Lock',
+          damage: 0,
+          text: "During your opponent's next turn, they can't play any Item cards from their hand.",
+        }),
+        'next-turn-lock',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Return',
+          damage: 0,
+          text: 'Put this Pokémon and all attached cards into your hand.',
+        }),
+        'return-self',
+      );
+    });
+
+    test('backlog parser helpers: mirror heal, copy, deferred, hp cap', async () => {
+      const {
+        mirrorHealClause,
+        copyAttackScope,
+        deferredDamageCount,
+        lookOpponentDeckCount,
+        nextTurnBonusClause,
+        hpCapRemaining,
+        benchExactKoThreshold,
+        recoverAllStatusClause,
+        returnSelfClause,
+        retaliateCount,
+      } = await import('../damage-parser.mjs');
+      assert.equal(mirrorHealClause("Heal from this Pokémon the same amount of damage you did to your opponent's Active Pokémon."), true);
+      assert.equal(copyAttackScope("Choose 1 of your opponent's Active Pokémon's attacks and use it as this attack."), 'opp-active');
+      assert.equal(deferredDamageCount("At the end of your opponent's next turn, put 9 damage counters on the Defending Pokémon."), 9);
+      assert.equal(lookOpponentDeckCount("Look at the top 5 cards of your opponent's deck and put them back in any order."), 5);
+      assert.deepEqual(
+        nextTurnBonusClause("During your next turn, this Pokémon's Echoed Voice attack does 80 more damage (before applying Weakness and Resistance)."),
+        { attackName: 'Echoed Voice', bonus: 80 },
+      );
+      assert.equal(hpCapRemaining("Put damage counters on your opponent's Active Pokémon until its remaining HP is 50."), 50);
+      assert.equal(benchExactKoThreshold("Knock Out 1 of your opponent's Pokémon that has exactly 6 damage counters on it."), 6);
+      assert.equal(recoverAllStatusClause('This Pokémon recovers from all Special Conditions.'), true);
+      assert.equal(returnSelfClause('Put this Pokémon and all attached cards into your hand.'), true);
+      assert.equal(
+        retaliateCount("During your opponent's next turn, if this Pokémon is damaged by an attack (even if it is Knocked Out), put 8 damage counters on the Attacking Pokémon."),
+        8,
+      );
+    });
+
+    test('classifyAttackEffect: fourth-pass flat patterns', () => {
+      assert.equal(
+        classifyAttackEffect({
+          damage: 30,
+          text: 'This attack does 30 damage for each card in your hand.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "Put 4 damage counters on your opponent's Pokémon in any way you like.",
+        }),
+        'bench-damage',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "During your opponent's next turn, if this Pokémon is damaged by an attack (even if this Pokémon is Knocked Out), put damage counters on the Attacking Pokémon.",
+        }),
+        'retaliate',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "Look at the top 4 cards of your deck and put them back in any order.",
+        }),
+        'look-own-deck',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: 'Each player draws 3 cards.',
+        }),
+        'draw-attach',
+      );
+    });
+
+    test('fourth-pass parser helpers', async () => {
+      const {
+        lookOwnDeckCount,
+        eachPlayerDrawCount,
+        opponentCounterClause,
+        specialEnergyKoClause,
+        bothActiveKoClause,
+      } = await import('../damage-parser.mjs');
+      assert.equal(lookOwnDeckCount('Look at the top 4 cards of your deck and put them back in any order.'), 4);
+      assert.equal(eachPlayerDrawCount('Each player draws 3 cards.'), 3);
+      assert.deepEqual(
+        opponentCounterClause("Put 2 damage counters on 1 of your opponent's Pokémon."),
+        { mode: 'any', count: 2 },
+      );
+      assert.equal(
+        specialEnergyKoClause("If your opponent's Active Pokémon has any Special Energy attached, it is Knocked Out."),
+        true,
+      );
+      assert.equal(bothActiveKoClause('Both Active Pokémon are Knocked Out.'), true);
+    });
+
+    test('parseAttackDamage: in-play scaling counts', () => {
+      const roundAtk = {
+        name: 'Round',
+        damage: 40,
+        text: 'This attack does 40 damage for each of your Pokémon in play that has the Round attack.',
+      };
+      const p1 = parseAttackDamage(roundAtk, {}, {}, { roundAttackCount: 3 });
+      assert.equal(p1.total, 120);
+
+      const handAtk = {
+        name: 'Hand Crush',
+        damage: 50,
+        text: "This attack does 50 damage for each card in your opponent's hand.",
+      };
+      const p2 = parseAttackDamage(handAtk, {}, {}, { opponentHandCount: 4 });
+      assert.equal(p2.total, 200);
+
+      const rocketAtk = {
+        name: 'Rocket Strike',
+        damage: 30,
+        text: "This attack does 30 damage for each of your Team Rocket's Pokémon in play.",
+      };
+      const p3 = parseAttackDamage(rocketAtk, {}, {}, { teamRocketCount: 2 });
+      assert.equal(p3.total, 60);
+
+      const handOwn = {
+        name: 'Hand',
+        damage: 30,
+        text: 'This attack does 30 damage for each card in your hand.',
+      };
+      assert.equal(parseAttackDamage(handOwn, {}, {}, { ownHandCount: 5 }).total, 150);
+    });
+
+    test('parseSelfStatusFromAttackText', () => {
+      assert.equal(
+        parseSelfStatusFromAttackText('This Pokémon is now Confused.'),
+        'confused',
+      );
+      assert.equal(parseSelfStatusFromAttackText('The Defending Pokémon is now Asleep.'), null);
+    });
+
+    test('parseAttackDamage: per-each cards in your hand (with ctx)', () => {
+      const atk = {
+        name: 'Hand Scale',
+        damage: 10,
+        text: 'This attack does 10 more damage for each card in your hand.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { ownHandCount: 4 });
+      assert.equal(p.total, 50);
+      assert.ok(p.components.includes('per-each'));
+    });
+
+    test('ATTACK_FAMILIES: includes move-energy, reveal-hand, conditional-ko', () => {
+      assert.ok(ATTACK_FAMILIES.includes('move-energy'));
+      assert.ok(ATTACK_FAMILIES.includes('reveal-hand'));
+      assert.ok(ATTACK_FAMILIES.includes('conditional-ko'));
+    });
+
+    test('parseAttackSearchClause: Call for Family and rotation search attacks', () => {
+      const callForFamilyOne =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callForFamilyOne), {
+        what: 'Basic Pokémon',
+        count: 1,
+        destination: 'bench',
+        upTo: false,
+      });
+
+      const callForFamilyTwo =
+        'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callForFamilyTwo), {
+        what: 'Basic Pokémon',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const nestBallStyle =
+        'Search your deck for up to 2 Basic Pokémon with 70 HP or less and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(nestBallStyle), {
+        what: 'Basic Pokémon ≤70 HP',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const flock =
+        'Search your deck for up to 2 Grubbin and put them onto your Bench. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(flock), {
+        what: 'grubbin',
+        count: 2,
+        destination: 'bench',
+        upTo: true,
+      });
+
+      const luckyFind =
+        'Search your deck for an Item card, reveal it, and put it into your hand. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(luckyFind), {
+        what: 'Item',
+        count: 1,
+        destination: 'hand',
+      });
+
+      assert.equal(parseAttackSearchClause('Flip a coin. If heads, this attack does 30 more damage.'), null);
+    });
+
+    test('resolveAttackText: reads effect text from sibling attack on card', () => {
+      const card = {
+        attacks: [
+          {
+            name: 'Call for Family',
+            cost: ['Colorless'],
+            damage: 0,
+            text: 'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.',
+          },
+        ],
+      };
+      const stub = { name: 'Call for Family', cost: ['Colorless'], damage: 0 };
+      assert.match(resolveAttackText(card, stub), /search your deck for/i);
+      assert.ok(parseAttackSearchClause(resolveAttackText(card, stub)));
+    });
+
+    test('ATTACK_FAMILIES: includes search-deck', () => {
+      assert.ok(ATTACK_FAMILIES.includes('search-deck'));
     });
 
     test('describeAttackEffect: one guidance line naming the attack', () => {
@@ -1126,6 +1695,16 @@ import test from 'node:test';
       assert.ok(heal.components.includes('heal'));
     });
 
+    test('parseAttackDamage: "also does N damage" bench clause (Jetting Blow)', () => {
+      const jetting = parseAttackDamage({
+        damage: 120,
+        text: "This attack also does 50 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+      });
+      assert.equal(jetting.total, 120);
+      assert.equal(jetting.bench, 50);
+      assert.ok(jetting.components.includes('bench'));
+    });
+
     test('parseAttackDamage: feeds computeAttackDamage (weakness ×2 on parsed total)', () => {
       const parsed = parseAttackDamage(
         { name: 'Type Surge', damage: 30, text: 'If the Defending Pokémon is a Water Pokémon, this attack does 20 more damage.' },
@@ -1342,6 +1921,14 @@ import test from 'node:test';
       assert.equal(parseOpponentDiscard({ ability: { text: 'Discard up to 2 cards from your opponent’s hand.' } }), 2);
       assert.equal(parseOpponentDiscard({ ability: { text: 'Discard a card from your opponent’s hand.' } }), 1);
       assert.equal(parseOpponentDiscard({ ability: { text: 'Draw a card.' } }), 0);
+      assert.equal(
+        parseOpponentDiscard({
+          ability: {
+            text: "Once during your turn, you may discard a Basic Water Energy card from your hand. Place 6 damage counters on 1 of your opponent's Pokémon.",
+          },
+        }),
+        0,
+      );
     });
 
     test('parseEnergyRedirect', () => {
@@ -1362,6 +1949,221 @@ import test from 'node:test';
       assert.equal(parseEnergyRedirect({ name: 'Pikachu' }), null);
     });
 
+    // ── Announce-only ability family parsers (ability-executors.mjs) ──
+
+    test('parseDamageReduction: takes N less / reduce damage by N', () => {
+      assert.deepEqual(
+        parseDamageReduction({ ability: { text: 'This Pokémon takes 2 less damage from attacks.' } }),
+        { reduce: 2 }
+      );
+      assert.deepEqual(
+        parseDamageReduction({ ability: { text: 'Reduce damage by 3 done to this Pokémon.' } }),
+        { reduce: 3 }
+      );
+      assert.deepEqual(parseDamageReduction({ ability: { text: 'Draw a card.' } }), { reduce: 0 });
+    });
+
+    test('parseDamageBonus / applyDamageBonus', () => {
+      assert.deepEqual(
+        parseDamageBonus({ ability: { text: 'This Pokémon\'s attacks do 20 more damage.' } }),
+        { bonus: 20 }
+      );
+      assert.deepEqual(
+        parseDamageBonus({ ability: { text: 'This Pokémon deals 30 more damage to the Defending Pokémon.' } }),
+        { bonus: 30 }
+      );
+      assert.equal(applyDamageBonus(50, 20), 70);
+      assert.equal(applyDamageBonus(50, 0), 50);
+      assert.deepEqual(parseDamageBonus({ ability: { text: 'Draw a card.' } }), { bonus: 0 });
+    });
+
+    test('parseHpBonus / applyHpBonus', () => {
+      assert.deepEqual(
+        parseHpBonus({ ability: { text: 'If this Pokémon has any Special Energy attached, it gets +100 HP.' } }),
+        { bonus: 100 }
+      );
+      assert.deepEqual(
+        parseHpBonus({ ability: { text: 'This Pokémon gets +20 HP for each Energy attached to it.' } }),
+        { bonus: 20 }
+      );
+      assert.equal(applyHpBonus(120, 100), 220);
+      assert.equal(applyHpBonus(5, -10), 1); // clamped to ≥ 1
+      assert.equal(applyHpBonus(0, 20), 0);
+    });
+
+    test('parseRetreatCostModifier / applyRetreatCostModifier', () => {
+      assert.deepEqual(
+        parseRetreatCostModifier({ ability: { text: 'This Pokémon\'s Retreat Cost is 1 less.' } }),
+        { delta: -1 }
+      );
+      assert.deepEqual(
+        parseRetreatCostModifier({ ability: { text: 'It costs 2 more to retreat this Pokémon.' } }),
+        { delta: 2 }
+      );
+      assert.equal(applyRetreatCostModifier(3, -1), 2);
+      assert.equal(applyRetreatCostModifier(1, -5), 0);
+    });
+
+    test('parsePrizeModify / applyPrizeModify', () => {
+      assert.deepEqual(
+        parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 1 fewer Prize card.' } }),
+        { delta: -1 }
+      );
+      assert.deepEqual(
+        parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 2 more Prize cards.' } }),
+        { delta: 2 }
+      );
+      assert.equal(applyPrizeModify(3, -1), 2);
+      assert.equal(applyPrizeModify(1, -5), 0);
+    });
+
+    test('parseKoPrevention: Resolute Heart + coin-flip patterns', () => {
+      assert.deepEqual(
+        parseKoPrevention({
+          ability: {
+            text: 'If this Pokémon has full HP and would be Knocked Out by damage from an attack, it is not Knocked Out, and its remaining HP becomes 10.',
+          },
+        }),
+        { fullHpOnly: true, surviveHp: 10 }
+      );
+      assert.deepEqual(
+        parseKoPrevention({ ability: { text: 'When this Pokémon would be Knocked Out, flip a coin. If heads, it is not Knocked Out.' } }),
+        { fullHpOnly: false, surviveHp: null }
+      );
+      assert.deepEqual(parseKoPrevention({ ability: { text: 'Draw a card.' } }), { fullHpOnly: false, surviveHp: null });
+    });
+
+    test('parseThorns: damage counters on attacker', () => {
+      assert.deepEqual(
+        parseThorns({ ability: { text: 'When this Pokémon is damaged by an attack, put 2 damage counters on the Attacking Pokémon.' } }),
+        { count: 2 }
+      );
+      assert.deepEqual(parseThorns({ ability: { text: 'Draw a card.' } }), { count: 0 });
+    });
+
+    test('parseCheckupEffect: checkup damage + filter', () => {
+      assert.deepEqual(
+        parseCheckupEffect({ ability: { text: 'During Pokémon Checkup, put 1 damage counter on each Poisoned Pokémon.' } }),
+        { count: 1, filter: 'poisoned', exceptName: null, targetHasAbility: false, source: 'Ability' }
+      );
+      assert.deepEqual(
+        parseCheckupEffect({ ability: { text: 'During Pokémon Checkup, put 2 damage counters on your opponent\'s Pokémon.' } }),
+        { count: 2, filter: 'opponent', exceptName: null, targetHasAbility: false, source: 'Ability' }
+      );
+      assert.deepEqual(parseCheckupEffect({ ability: { text: 'Draw a card.' } }), { count: 0, filter: null, exceptName: null, targetHasAbility: false, source: 'Ability' });
+    });
+
+    test('parseEnergyMultiplier: Wild Growth pattern', () => {
+      assert.deepEqual(
+        parseEnergyMultiplier({
+          ability: {
+            text: "Each Basic {G} Energy attached to all of your Pokémon provides {G}{G} Energy. The effect of Wild Growth doesn't stack.",
+          },
+        }),
+        { multiplier: 2, energyType: 'Grass' }
+      );
+      assert.deepEqual(parseEnergyMultiplier({ ability: { text: 'Draw a card.' } }), { multiplier: 0, energyType: null });
+    });
+
+    test('parseToolCap: extra Tool slot', () => {
+      assert.deepEqual(
+        parseToolCap({ ability: { text: 'This Pokémon can have an extra Pokémon Tool attached to it.' } }),
+        { extra: 1 }
+      );
+      assert.deepEqual(
+        parseToolCap({ ability: { text: 'This Pokémon can have 2 more Pokémon Tools attached to it.' } }),
+        { extra: 2 }
+      );
+      assert.deepEqual(parseToolCap({ ability: { text: 'Draw a card.' } }), { extra: 0 });
+    });
+
+    test('parseAttackInheritance', () => {
+      assert.equal(
+        parseAttackInheritance({
+          ability: {
+            text: 'Each of your evolved Pokémon can use any attack from its previous Evolutions. (You still need the necessary Energy to use each attack.)',
+          },
+        }),
+        true
+      );
+      assert.equal(parseAttackInheritance({ ability: { text: 'Draw a card.' } }), false);
+    });
+
+    test('parseOnOpponentEvolve: Darkest Impulse pattern', () => {
+      assert.deepEqual(
+        parseOnOpponentEvolve({
+          ability: {
+            text: 'Whenever your opponent plays a Pokémon from their hand to evolve 1 of their Pokémon, put 4 damage counters on that Pokémon.',
+          },
+        }),
+        { count: 4 }
+      );
+      assert.deepEqual(parseOnOpponentEvolve({ ability: { text: 'Draw a card.' } }), { count: 0 });
+    });
+
+    test('parseStatusInflict: asleep on opponent active', () => {
+      assert.deepEqual(
+        parseStatusInflict({
+          ability: {
+            text: 'Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent\'s Active Pokémon Asleep.',
+          },
+        }),
+        { status: 'asleep', target: 'opponent-active' }
+      );
+      assert.deepEqual(parseStatusInflict({ ability: { text: 'Draw a card.' } }), { status: null, target: 'attacker' });
+    });
+
+    test('parseMoveDamage: move/place counters on opponent', () => {
+      assert.deepEqual(
+        parseMoveDamage({ ability: { text: 'Once during your turn, you may move up to 3 damage counters from 1 of your Pokémon to another.' } }),
+        { count: 3, onOpponent: false }
+      );
+      assert.deepEqual(
+        parseMoveDamage({ ability: { text: 'Put 2 damage counters on your opponent\'s Active Pokémon.' } }),
+        { count: 2, onOpponent: true }
+      );
+      assert.deepEqual(parseMoveDamage({ ability: { text: 'Draw a card.' } }), { count: null, onOpponent: false });
+    });
+
+    test('parseLookAtTop', () => {
+      assert.deepEqual(
+        parseLookAtTop({ ability: { text: 'Once during your turn, look at the top 3 cards of your deck.' } }),
+        { count: 3, takeToHand: false }
+      );
+      assert.deepEqual(parseLookAtTop({ ability: { text: 'Draw a card.' } }), { count: 0, takeToHand: false });
+    });
+
+    test('parseRecursionFromDiscard: Snorlax Voraciousness pattern', () => {
+      assert.deepEqual(
+        parseRecursionFromDiscard({
+          ability: { text: 'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.' },
+        }),
+        { count: 2, what: 'Leftovers' }
+      );
+      assert.deepEqual(
+        parseRecursionFromDiscard({ ability: { text: 'Put an Energy card from your discard pile into your hand.' } }),
+        { count: 0, what: 'Energy' }
+      );
+      assert.deepEqual(parseRecursionFromDiscard({ ability: { text: 'Draw a card.' } }), { count: 0, what: '' });
+    });
+
+    test('parseEffectPrevent: Initialization pattern', () => {
+      assert.deepEqual(
+        parseEffectPrevent({
+          ability: {
+            text: "As long as this Pokémon is in the Active Spot, Pokémon with a Rule Box in play (both yours and your opponent's) have no Abilities, except for Future Pokémon.",
+          },
+        }),
+        { scope: 'abilities' }
+      );
+      assert.deepEqual(parseEffectPrevent({ ability: { text: 'Draw a card.' } }), { scope: null });
+    });
+
+    test('parseSetupFaceDown', () => {
+      assert.equal(parseSetupFaceDown({ ability: { text: 'When you play this Pokémon, put it face-down in the Active Spot.' } }), true);
+      assert.equal(parseSetupFaceDown({ ability: { text: 'Draw a card.' } }), false);
+    });
+
     test('classifyAbility: energy-redirect family', () => {
       const ironTinker = { ability: { text: 'Once During Your Turn: You may move 1 Energy from this Pokémon to 1 of your other Pokémon.' } };
       assert.equal(classifyAbility(ironTinker), 'energy-redirect');
@@ -1369,6 +2171,48 @@ import test from 'node:test';
       // Attach-energy card still classifies as 'attach'
       const attach = { ability: { text: 'Once During Your Turn: You may attach an Energy card to this Pokémon.' } };
       assert.equal(classifyAbility(attach), 'attach');
+    });
+
+    test('classifyAbility: Standard 2026-27 audit fixes', () => {
+      const fanRotom = {
+        name: 'Fan Rotom',
+        ability: {
+          text: "Once during your first turn, you may search your deck for up to 3 {C} Pokémon with 100 HP or less, reveal them, and put them into your hand. Then, shuffle your deck. You can't use more than 1 Fan Call Ability during your turn.",
+        },
+      };
+      assert.equal(classifyAbility(fanRotom), 'search');
+
+      const wildGrowth = {
+        name: 'Meganium',
+        ability: {
+          text: "Each Basic {G} Energy attached to all of your Pokémon provides {G}{G} Energy. The effect of Wild Growth doesn't stack.",
+        },
+      };
+      assert.equal(classifyAbility(wildGrowth), 'energy-multiplier');
+
+      const calmingLight = {
+        name: 'Shiinotic',
+        ability: {
+          text: "Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent's Active Pokémon Asleep.",
+        },
+      };
+      assert.equal(classifyAbility(calmingLight), 'status');
+
+      const washOut = {
+        name: 'Dewgong',
+        ability: {
+          text: 'As often as you like during your turn, you may use this Ability. Move a {W} Energy from 1 of your Benched Pokémon to your Active Pokémon.',
+        },
+      };
+      assert.equal(classifyAbility(washOut), 'energy-redirect');
+
+      const voraciousness = {
+        name: 'Snorlax',
+        ability: {
+          text: 'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.',
+        },
+      };
+      assert.equal(classifyAbility(voraciousness), 'recursion');
     });
 
     // ── §D heal family (execute: remove up to N counters) ──
@@ -1398,6 +2242,25 @@ import test from 'node:test';
       assert.equal(planBenchTarget(-1), null);
       assert.equal(planBenchTarget(undefined), null);
       assert.equal(planBenchTarget('3'), -1);
+    });
+
+    // ── §D draw-until family (drawUntilTarget) ──
+    test('drawUntilTarget: parses "draw cards until you have N cards", 0 otherwise', () => {
+      assert.equal(
+        drawUntilTarget('You may draw cards until you have 6 cards in your hand.'),
+        6
+      );
+      assert.equal(drawUntilTarget('Draw cards until you have 5 cards.'), 5);
+      assert.equal(drawUntilTarget('Draw cards until you have 1 card.'), 1);
+      assert.equal(drawUntilTarget('Draw 2 cards.'), 0);
+      assert.equal(drawUntilTarget('No draw clause here.'), 0);
+      assert.equal(drawUntilTarget(''), 0);
+      assert.equal(drawUntilTarget(undefined), 0);
+    });
+
+    test('drawCount: skips draw-until clauses (no false positive)', () => {
+      assert.equal(drawCount('Draw cards until you have 6 cards in your hand.'), 0);
+      assert.equal(drawCount('You may draw cards until you have 5 cards.'), 0);
     });
 
     // ── §D draw family (drawCount) ──
@@ -1512,6 +2375,14 @@ import test from 'node:test';
       assert.deepEqual(shuffleDrawClause(undefined), { draw: 0 });
     });
 
+    test('shuffleDrawClause + drawCount: both match shuffle-then-draw text (attack flow skips drawCount)', () => {
+      const text = 'Shuffle your hand into your deck, then draw 7 cards.';
+      assert.deepEqual(shuffleDrawClause(text), { draw: 7 });
+      assert.equal(drawCount(text), 7);
+      // chat-buttons attack(): shuffleAndDraw runs once; drawCount block is
+      // skipped when shuffledHandDraw > 0 or shuffle-hand-into-deck matches.
+    });
+
     // ── §F attach-type family: effective attached type execution ──
     const { canPayAttackCost } = await import('../attack-engine.mjs');
 
@@ -1547,6 +2418,107 @@ import test from 'node:test';
       assert.equal(effectiveEnergyType({ name: 'Double Water Energy', subtypes: ['Energy', 'Double'] }), null);
       assert.equal(effectiveEnergyType({ name: 'Pikachu' }), null);
       assert.equal(effectiveEnergyType(null), null);
+    });
+
+    test('typed special energies: TCGdex cards without subtypes/types resolve correctly', () => {
+      const rocky = {
+        name: 'Rocky Fighting Energy',
+        type: 'Energy',
+        types: [],
+        subtypes: [],
+        effect: 'As long as this card is attached to a Pokémon, it provides {F} Energy.',
+      };
+      assert.equal(classifyEnergyEffect(rocky), 'attach-type');
+      assert.equal(effectiveEnergyType(rocky), 'Fighting');
+      assert.equal(resolveAttachedEnergyType(rocky), 'Fighting');
+
+      const growing = {
+        name: 'Growing Grass Energy',
+        type: 'Energy',
+        effect: 'As long as this card is attached to a Pokémon, it provides {G} Energy.',
+      };
+      assert.equal(classifyEnergyEffect(growing), 'attach-type');
+      assert.equal(resolveAttachedEnergyType(growing), 'Grass');
+
+      const telepathic = {
+        name: 'Telepathic Psychic Energy',
+        type: 'Energy',
+        effect: 'As long as this card is attached to a Pokémon, it provides {P} Energy.',
+      };
+      assert.equal(resolveAttachedEnergyType(telepathic), 'Psychic');
+    });
+
+    test('cost payment: typed specials pay as their effective type', () => {
+      const rocky = {
+        name: 'Rocky Fighting Energy',
+        type: 'Energy',
+        effect: 'provides {F} Energy.',
+      };
+      const entry = {
+        type: resolveAttachedEnergyType(rocky),
+        family: classifyEnergyEffect(rocky),
+      };
+      assert.equal(canPayAttackCost([entry], ['Fighting']), true);
+      assert.equal(canPayAttackCost([entry], ['Water']), false);
+    });
+
+    test('typed special energy catalog: all eight ME03–ME05 cards parse and describe', async () => {
+      const {
+        parseTypedSpecialEnergy,
+        describeTypedSpecialEnergy,
+        getEnergyHpBonus,
+        hasRockyEffectShield,
+        hasBubblyStatusImmunity,
+        hasMagneticFreeRetreat,
+        getVoltaicDamageBonus,
+        blocksBenchAttackDamage,
+        shouldNitroReturnToHand,
+        getTelepathicOnAttachSearch,
+      } = await import('../special-energy-effects.mjs');
+
+      const cards = [
+        ['Growing Grass Energy', 'Grass', { hpBonus: 20 }],
+        ['Rocky Fighting Energy', 'Fighting', { rocky: true }],
+        ['Telepathic Psychic Energy', 'Psychic', { telepathic: true }],
+        ['Bubbly Water Energy', 'Water', { bubbly: true }],
+        ['Magnetic Metal Energy', 'Metal', { magnetic: true }],
+        ['Nitro Fire Energy', 'Fire', { nitro: true }],
+        ['Shadowy Darkness Energy', 'Darkness', { shadowy: true }],
+        ['Voltaic Lightning Energy', 'Lightning', { voltaic: 20 }],
+      ];
+
+      for (const [name, type, flags] of cards) {
+        const card = { name, type: 'Energy' };
+        const def = parseTypedSpecialEnergy(card);
+        assert.ok(def, `${name} should parse`);
+        assert.ok(describeTypedSpecialEnergy(card), `${name} should describe`);
+
+        const hostImg = {};
+        const host = { types: [type], type: 'Pokémon', stage: 'Basic', image: hostImg };
+        const attached = { name, type: 'Energy', image: { relative: hostImg } };
+        const zone = [host, attached];
+
+        if (flags.hpBonus) {
+          assert.equal(getEnergyHpBonus(host, zone), flags.hpBonus);
+        }
+        if (flags.rocky) assert.equal(hasRockyEffectShield(host, zone), true);
+        if (flags.bubbly) assert.equal(hasBubblyStatusImmunity(host, zone), true);
+        if (flags.magnetic) assert.equal(hasMagneticFreeRetreat(host, zone), true);
+        if (flags.voltaic) assert.equal(getVoltaicDamageBonus(host, zone), flags.voltaic);
+        if (flags.shadowy) {
+          assert.equal(blocksBenchAttackDamage(host, 'bench', zone), true);
+          assert.equal(blocksBenchAttackDamage(host, 'active', zone), false);
+        }
+        if (flags.nitro) {
+          assert.equal(shouldNitroReturnToHand(card, host, true), true);
+          assert.equal(shouldNitroReturnToHand(card, host, false), false);
+        }
+        if (flags.telepathic) {
+          const search = getTelepathicOnAttachSearch(card);
+          assert.equal(search.count, 2);
+          assert.equal(search.destination, 'bench');
+        }
+      }
     });
 
     test('applyEnergyEffect: attach-type reports executed with effective type', () => {
@@ -1627,6 +2599,42 @@ import test from 'node:test';
 
       assert.equal(parseStadiumHpModifier(null), 0);
       assert.equal(parseStadiumHpModifier({ name: 'X' }), 0);
+
+      const gravity = { name: 'Gravity Mountain', subtypes: ['Stadium'], text: 'Each Stage 2 Pokémon in play (both yours and your opponent\'s) gets -30 HP.' };
+      assert.equal(parseStadiumHpModifier(gravity), -30);
+    });
+
+    test('TCG Live Standard stadiums: key passive/active parsers recognize real card text', () => {
+      const cards = [
+        { name: 'Full Metal Lab', text: '{M} Pokémon (both yours and your opponent\'s) take 30 less damage from attacks from the opponent\'s Pokémon (after applying Weakness and Resistance).' },
+        { name: 'Forest of Vitality', text: 'Each player\'s {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.' },
+        { name: 'Risky Ruins', text: 'Whenever any player puts a Basic non-{D} Pokémon onto their Bench during their turn, place 2 damage counters on that Pokémon.' },
+        { name: 'Postwick', text: 'Attacks used by Hop\'s Pokémon (both yours and your opponent\'s) do 30 more damage to the opponent\'s Active Pokémon (before applying Weakness and Resistance).' },
+        { name: 'Perilous Jungle', text: 'During Pokémon Checkup, put 2 more damage counters on each Poisoned non-{D} Pokémon (both yours and your opponent\'s).' },
+        { name: 'N\'s Castle', text: 'N\'s Pokémon in play (both yours and your opponent\'s) have no Retreat Cost.' },
+      ].map((c) => ({ ...c, subtypes: ['Stadium'], type: 'Stadium' }));
+
+      for (const c of cards) {
+        assert.notEqual(classifyStadiumEffect(c), 'unknown', c.name);
+        assert.equal(hasRecognizedPassiveStadiumEffect(c), true, c.name);
+        assert.ok(applyStadiumEffect(c).results.length > 0, c.name);
+      }
+
+      assert.equal(parseStadiumDamageReduction(cards[0]), 30);
+      assert.equal(parseStadiumEvolutionSpeed(cards[1]).relaxTurnGate, true);
+      assert.equal(parseStadiumEvolutionSpeed(cards[1]).typeFilter, 'grass');
+      assert.equal(stadiumBenchDamageApplies({ name: 'Pikachu', stage: 'Basic', types: ['Lightning'] }, cards[2]), 2);
+      assert.equal(stadiumBenchDamageApplies({ name: 'Umbreon', stage: 'Basic', types: ['Darkness'] }, cards[2]), null);
+      assert.equal(parseStadiumAttackDamageBonus(cards[3]), 30);
+      assert.equal(parseStadiumCheckupPoisonBonus(cards[4]), 2);
+      assert.equal(parseStadiumRetreatModifier(cards[5]), -Infinity);
+    });
+
+    test('resolveTurnBoundary: Perilous Jungle adds extra poison damage', () => {
+      applyStatus('self', 'c1', 'poisoned');
+      const r = resolveTurnBoundary('self', 'c1', Math.random, { checkupPoisonBonus: 2 });
+      assert.equal(r.damage, 30);
+      assert.match(r.notes.join(' '), /Stadium \+2 counter/);
     });
 
     test('getStadiumHpBonus: targeting follows the stadium pronouns', () => {
@@ -1683,7 +2691,7 @@ import test from 'node:test';
 
     test('parseStadiumEvolutionSpeed: turn-gate relax / cost reduce / none', () => {
       const relax = { name: 'Fast Evolve', subtypes: ['Stadium'], text: 'Your Pokémon in play may evolve as if it had been in play for 1 more turn.' };
-      assert.deepEqual(parseStadiumEvolutionSpeed(relax), { relaxTurnGate: true, costReduce: 0 });
+      assert.deepEqual(parseStadiumEvolutionSpeed(relax), { relaxTurnGate: true, costReduce: 0, typeFilter: null });
 
       // plural "they" phrasing (real-card style)
       const relaxThey = { name: 'Fast Evolve 2', subtypes: ['Stadium'], text: 'Your Benched Pokémon may evolve as if they had been in play for one more turn.' };
@@ -1694,10 +2702,10 @@ import test from 'node:test';
       assert.equal(parseStadiumEvolutionSpeed(cost).relaxTurnGate, false);
 
       const none = { name: 'Heal Center', subtypes: ['Stadium'], text: 'Heal 30 damage from your Active Pokémon.' };
-      assert.deepEqual(parseStadiumEvolutionSpeed(none), { relaxTurnGate: false, costReduce: 0 });
+      assert.deepEqual(parseStadiumEvolutionSpeed(none), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
 
-      assert.deepEqual(parseStadiumEvolutionSpeed(null), { relaxTurnGate: false, costReduce: 0 });
-      assert.deepEqual(parseStadiumEvolutionSpeed({ name: 'X' }), { relaxTurnGate: false, costReduce: 0 });
+      assert.deepEqual(parseStadiumEvolutionSpeed(null), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
+      assert.deepEqual(parseStadiumEvolutionSpeed({ name: 'X' }), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
     });
 
     test('getStadiumEvolutionSpeed: targeting follows the stadium pronouns', () => {
@@ -1707,13 +2715,13 @@ import test from 'node:test';
       try {
         // "your Pokémon" → owner only
         markStadiumPlayed('self', { name: 'A', subtypes: ['Stadium'], text: 'Your Pokémon in play may evolve as if it had been in play for 1 more turn.' });
-        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: true, costReduce: 0 });
-        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: false, costReduce: 0 });
+        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: true, costReduce: 0, typeFilter: null });
+        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
 
         // "your opponent" → non-owner only
         markStadiumPlayed('self', { name: 'B', subtypes: ['Stadium'], text: 'Your opponent\'s Pokémon may evolve as if it had been in play for 1 more turn.' });
-        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: false, costReduce: 0 });
-        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: true, costReduce: 0 });
+        assert.deepEqual(getStadiumEvolutionSpeed('self'), { relaxTurnGate: false, costReduce: 0, typeFilter: null });
+        assert.deepEqual(getStadiumEvolutionSpeed('opp'), { relaxTurnGate: true, costReduce: 0, typeFilter: null });
 
         // General (no pronoun) → both
         markStadiumPlayed('self', { name: 'C', subtypes: ['Stadium'], text: 'Pokémon in play may evolve as if it had been in play for 1 more turn.' });
@@ -1836,10 +2844,14 @@ import test from 'node:test';
 
     // ── start-of-turn draw (taxonomy B) ──
     test('shouldAutoDrawAtTurnStart: true when enabled, not drawn, deck non-empty', () => {
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3 }), true);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: true, deckCount: 3 }), false);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 0 }), false);
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), true);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: true, deckCount: 3, turnNumber: 2 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 0, turnNumber: 2 }), false);
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), false);
+    });
+
+    test('shouldAutoDrawAtTurnStart: turn 1 skipped (first player does not draw)', () => {
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), false);
     });
 
     test('markTurnDrawn: sets the per-turn dedupe guard, survives flag reset', () => {
@@ -1950,25 +2962,36 @@ import test from 'node:test';
     test('resolveCardId: same-name reprints disambiguated by collector number', () => {
       const summaries = [
         { id: 'ex7-13', localId: '13', name: 'Piloswine', category: 'pokemon' }, // EX Team Rocket Returns
-        { id: 'sv10-32', localId: '32', name: 'Piloswine', category: 'pokemon' }, // Phantasmal Flames
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' }, // Phantasmal Flames
         { id: 'neo2-16', localId: '16', name: 'Piloswine', category: 'pokemon' }, // Neo Genesis
       ];
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'sv10-32');
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '13'), 'ex7-13');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '13', 'TRR'), 'ex7-13');
+    });
+
+    test('resolveCardId: collector number alone is ambiguous across sets (PFL #24 vs Skyridge #24)', () => {
+      const summaries = [
+        { id: 'ecard3-24', localId: '24', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
+      ];
+      // Without a set code both tie on number — first wins (legacy behaviour).
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24'), 'ecard3-24');
+      // With the printed set code the Phantasmal Flames printing wins decisively.
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
     });
 
     test('resolveCardId: collector number normalizes leading zeros', () => {
       const summaries = [
-        { id: 'sv10-32', localId: '032', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
       ];
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'sv10-32');
-      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '032'), 'sv10-32');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '24', 'PFL'), 'me02-024');
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '024', 'PFL'), 'me02-024');
     });
 
     test('resolveCardId: no number given falls back to prior (order-based) behavior', () => {
       const summaries = [
         { id: 'ex7-13', localId: '13', name: 'Piloswine', category: 'pokemon' },
-        { id: 'sv10-32', localId: '32', name: 'Piloswine', category: 'pokemon' },
+        { id: 'me02-024', localId: '024', name: 'Piloswine', category: 'pokemon' },
       ];
       assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon'), 'ex7-13');
     });
@@ -2155,6 +3178,32 @@ import test from 'node:test';
       assert.equal(p2.resolved, false);
     });
 
+    test('parseAttackDamage: per-each damage counter on this Pokémon (Retribution Strike)', () => {
+      const atk = {
+        name: 'Retribution Strike', damage: 20,
+        text: 'This attack does 10 more damage for each damage counter on this Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { attackerDamage: 3 });
+      assert.equal(p.total, 50); // 20 + 10×3
+      assert.ok(p.components.includes('per-each'));
+      assert.ok(p.notes.some((n) => /damage counter.*on this/i.test(n)));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
+    test('parseAttackDamage: per-each damage counter on opponent Active (Damage Beat)', () => {
+      const atk = {
+        name: 'Damage Beat', damage: 20,
+        text: 'This attack does 20 damage for each damage counter on your opponent\u2019s Active Pok\u00e9mon.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { defenderDamage: 4 });
+      assert.equal(p.total, 80); // 20 × 4
+      assert.ok(p.components.includes('per-each'));
+      assert.ok(p.notes.some((n) => /opponent's Active/i.test(n)));
+      const p2 = parseAttackDamage(atk, {}, {}, {});
+      assert.equal(p2.resolved, false);
+    });
+
     test('parseAttackDamage: per-each attached Energy (Meganium)', () => {
       const atk = {
         name: 'Giant Bouquet', damage: 70,
@@ -2240,4 +3289,608 @@ import test from 'node:test';
       const p = parseAttackDamage(atk, {}, {}, {});
       assert.equal(p.resolved, false);
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
+    });
+
+    test('parseAbility: recursionFromDiscardAbility (Snorlax Voraciousness)', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may put up to 2 Leftovers cards from your discard pile into your hand.'
+      );
+      assert.equal(steps[0].type, 'recursionFromDiscardAbility');
+    });
+
+    test('parseAbility: checkupAbility (Froslass Freezing Shroud)', () => {
+      const steps = parseAbility(
+        'During Pokémon Checkup, put 1 damage counter on each Pokémon that has an Ability (both yours and your opponent\'s), except any Froslass.'
+      );
+      assert.equal(steps[0].type, 'checkupAbility');
+    });
+
+    test('parseAbility: onPromotionAbility damage (Iron Valiant Tachyon Bits)', () => {
+      const steps = parseAbility(
+        'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent\'s Pokémon.'
+      );
+      assert.equal(steps[0].type, 'onPromotionAbility');
+      assert.equal(steps[0].effect, 'damage');
+    });
+
+    test('parseAbility: effectPreventAbility active-spot aura (Midnight Fluttering)', () => {
+      const steps = parseAbility(
+        'As long as this Pokémon is in the Active Spot, your opponent\'s Active Pokémon has no Abilities, except for Midnight Fluttering.'
+      );
+      assert.equal(steps[0].type, 'effectPreventAbility');
+    });
+
+    // ── compound ability step orchestration (planAbilitySteps) ──
+
+    test('planAbilitySteps: draw + search interactive order', async () => {
+      const { planAbilitySteps } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'Once during your turn, you may draw 2 cards. Once during your turn, you may search your deck for a Basic Pokémon and put it onto your Bench.';
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['search', 'draw']
+      );
+    });
+
+    test('planAbilitySteps: auto mode — self draw only; opponentDraw alone announces', async () => {
+      const { planAbilitySteps, actionableAbilityPlan } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const drawText = 'Once during your turn, you may draw 2 cards.';
+      const drawSteps = parseAbility(drawText);
+      const drawPlan = planAbilitySteps(drawSteps, { mode: 'auto' });
+      assert.deepEqual(drawPlan.map((p) => p.action), ['draw']);
+      assert.equal(actionableAbilityPlan(drawPlan, { mode: 'auto' }).length, 1);
+
+      const oppText = 'Once during your turn, your opponent draws 2 cards.';
+      const oppPlan = planAbilitySteps(parseAbility(oppText), { mode: 'auto' });
+      assert.deepEqual(oppPlan.map((p) => p.action), ['announce']);
+    });
+
+    test('planAbilitySteps: when-played + search compound detected', async () => {
+      const { planAbilitySteps, hasWhenPlayedSearchChain } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'When you play this Pokémon from your hand, search your deck for up to 2 Basic Pokémon and put them onto your Bench.';
+      const steps = parseAbility(text);
+      assert.ok(hasWhenPlayedSearchChain(steps));
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['search', 'when-played']
+      );
+    });
+
+    test('planAbilitySteps: passive steps skipped in compound plan', async () => {
+      const { planAbilitySteps } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const text =
+        'Once during your turn, you may draw a card. This Pokémon takes 30 less damage from attacks.';
+      const steps = parseAbility(text);
+      const plan = planAbilitySteps(steps, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['draw', 'skip']
+      );
+      assert.equal(plan[1].reason, 'passive');
+    });
+
+    test('markAbilityUseAfterSearchStep: cancel does not consume optional search (Mammoth Hauler)', async () => {
+      const { markAbilityUseAfterSearchStep } = await import('../ability-step-plan.mjs');
+      const { parseAbility } = await import('../abilities.mjs');
+      const { classifyAbility } = await import('../ability-effects.mjs');
+
+      const card = {
+        name: 'Mamoswine ex',
+        ability: {
+          name: 'Mammoth Hauler',
+          text: 'Once during your turn, you may search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.',
+        },
+      };
+      assert.equal(classifyAbility(card), 'search');
+      const steps = parseAbility(card.ability.text);
+      assert.equal(steps[0].type, 'searchAbility');
+
+      assert.equal(markAbilityUseAfterSearchStep(false), false, 'cancel must not mark ability used');
+      assert.equal(markAbilityUseAfterSearchStep(true), true, 'confirmed pick marks ability used');
+    });
+
+    // ── card identity resolution (name collisions across sets) ──
+    //
+    // Regression coverage for the "wrong Piloswine" incident: board cards carry
+    // no TCGdex id, so the engine used to resolve one by name alone. Pokémon
+    // names are reprinted verbatim across dozens of sets, every reprint scored
+    // identically, and the winner was whatever order the API happened to
+    // return — which could hand the attack parser a completely different
+    // card's attacks[].
+    const { ensureCardData } = await import('../rules-state.mjs');
+
+    const piloswinePrintings = [
+      { id: 'neo1-38', name: 'Piloswine', category: 'pokemon', localId: '38' },
+      { id: 'ex7-32', name: 'Piloswine', category: 'pokemon', localId: '32' },
+      { id: 'dp6-71', name: 'Piloswine', category: 'pokemon', localId: '71' },
+    ];
+
+    test('resolveCardId: collector number picks the printing regardless of API order', () => {
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '71'), 'dp6-71');
+      assert.equal(
+        resolveCardId([...piloswinePrintings].reverse(), 'Piloswine', 'Pokémon', '71'),
+        'dp6-71'
+      );
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '32'), 'ex7-32');
+    });
+
+    test('resolveCardId: collector number ignores leading zeros and whitespace', () => {
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '032'), 'ex7-32');
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', ' 32 '), 'ex7-32');
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', 32), 'ex7-32');
+    });
+
+    test('resolveCardId: without a number it still resolves (first exact match wins)', () => {
+      // Documents the remaining gap: no number means no tiebreaker, so the
+      // result is only as good as the API's ordering.
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon'), 'neo1-38');
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', null), 'neo1-38');
+    });
+
+    test('resolveCardId: a number match never promotes a partial-name candidate', () => {
+      const summaries = [
+        { id: 'sv1-32', name: 'Piloswine ex', category: 'pokemon', localId: '32' },
+        { id: 'dp6-71', name: 'Piloswine', category: 'pokemon', localId: '71' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Piloswine', 'Pokémon', '32'), 'dp6-71');
+    });
+
+    test('resolveCardId: a number match never promotes a wrong-category candidate', () => {
+      const summaries = [
+        { id: 'trn-32', name: 'Cyrus', category: 'trainer', localId: '32' },
+        { id: 'pkm-71', name: 'Cyrus', category: 'pokemon', localId: '71' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Cyrus', 'Pokémon', '32'), 'pkm-71');
+    });
+
+    test('resolveCardId: an unmatched number leaves the existing scoring intact', () => {
+      assert.equal(resolveCardId(piloswinePrintings, 'Piloswine', 'Pokémon', '999'), 'neo1-38');
+    });
+
+    // ── ensureCardData: deterministic id from (set code, collector number) ──
+
+    const withStubbedFetch = async (handler, fn) => {
+      const previous = globalThis.fetch;
+      const calls = [];
+      globalThis.fetch = async (url) => {
+        calls.push(url);
+        return handler(url);
+      };
+      try {
+        return await fn(calls);
+      } finally {
+        globalThis.fetch = previous;
+      }
+    };
+
+    const detailResponse = (body) => ({ ok: true, json: async () => body });
+
+    test('ensureCardData: legacy set code + number resolves without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/ex7-901')) {
+          return detailResponse({
+            id: 'ex7-901',
+            name: 'Piloswine',
+            hp: '80',
+            attacks: [{ name: 'Rock Throw', damage: '30', effect: '' }],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'TRR', number: '901' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'ex7-901');
+        assert.equal(card.hp, 80);
+        assert.deepEqual(
+          card.attacks.map((a) => a.name),
+          ['Rock Throw']
+        );
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: legacy id whose name disagrees falls back to the name search', async () => {
+      const handler = (url) => {
+        // The legacy table is hand-built for limitlesstcg's URL scheme, so a
+        // candidate id can land on an unrelated card — that must not be trusted.
+        if (url.includes('/cards/ex7-902')) {
+          return detailResponse({ id: 'ex7-902', name: 'Team Rocket Base', hp: null });
+        }
+        if (url.includes('/cards?name=')) {
+          return detailResponse([
+            { id: 'dp6-902', name: 'Piloswine', category: 'pokemon', localId: '902' },
+          ]);
+        }
+        if (url.includes('/cards/dp6-902')) {
+          return detailResponse({ id: 'dp6-902', name: 'Piloswine', hp: '90', attacks: [] });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'TRR', number: '902' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'dp6-902');
+        assert.equal(card.hp, 90);
+        assert.ok(calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('resolveCardId: Pitch Black Popplio disambiguated by PBL set code', () => {
+      const summaries = [
+        { id: 'smp-SM03', localId: 'SM03', name: 'Popplio', category: 'pokemon' },
+        { id: 'me05-018', localId: '018', name: 'Popplio', category: 'pokemon' },
+        { id: 'sm1-39', localId: '39', name: 'Popplio', category: 'pokemon' },
+      ];
+      assert.equal(resolveCardId(summaries, 'Popplio', 'Pokémon', '18', 'PBL'), 'me05-018');
+      assert.equal(resolveCardId(summaries, 'Popplio', 'Pokémon', '18'), 'me05-018');
+    });
+
+    test('ensureCardData: Pitch Black (PBL) resolves via set code without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/me05-018')) {
+          return detailResponse({
+            id: 'me05-018',
+            name: 'Popplio',
+            hp: '70',
+            attacks: [{ name: 'Pound', damage: '10', effect: '' }],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Popplio', type: 'Pokémon', set: 'PBL', number: '18' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'me05-018');
+        assert.deepEqual(card.attacks.map((a) => a.name), ['Pound']);
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: modern set code (PFL) resolves via padded id without a name search', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/me02-024')) {
+          return detailResponse({
+            id: 'me02-024',
+            name: 'Piloswine',
+            hp: '120',
+            attacks: [
+              { name: 'Rising Lunge', damage: '30+', effect: 'Flip a coin.' },
+              { name: 'Frost Smash', damage: '70', effect: '' },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'PFL', number: '24' };
+        await ensureCardData(card);
+        assert.equal(card.id, 'me02-024');
+        assert.equal(card.hp, 120);
+        assert.deepEqual(card.attacks.map((a) => a.name), ['Rising Lunge', 'Frost Smash']);
+        assert.ok(!calls.some((u) => u.includes('/cards?name=')));
+      });
+    });
+
+    test('ensureCardData: a truly unknown set code uses name search only', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards?name=')) {
+          return detailResponse([
+            { id: 'sv1-903', name: 'Piloswine', category: 'pokemon', localId: '903' },
+          ]);
+        }
+        if (url.includes('/cards/sv1-903')) {
+          return detailResponse({ id: 'sv1-903', name: 'Piloswine', hp: '110', attacks: [] });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = { name: 'Piloswine', type: 'Pokémon', set: 'ZZZ', number: '903' };
+        await ensureCardData(card);
+        assert.ok(!calls.some((u) => u.match(/\/cards\/zzz-/i)));
+        assert.equal(card.id, 'sv1-903');
+        assert.equal(card.hp, 110);
+      });
+    });
+
+    test('ensureCardData: an already-enriched card short-circuits (weakness, not weaknesses)', async () => {
+      const handler = () => {
+        throw new Error('ensureCardData must not re-fetch an enriched card');
+      };
+      await withStubbedFetch(handler, async (calls) => {
+        const card = {
+          name: 'Piloswine',
+          id: 'ex7-904',
+          hp: 80,
+          weakness: null,
+          attacks: [
+            {
+              name: 'Stampede',
+              cost: ['Fighting', 'Colorless'],
+              damage: 20,
+              text: 'Flip a coin. If heads, this attack does 10 more damage.',
+            },
+          ],
+        };
+        await ensureCardData(card);
+        assert.equal(calls.length, 0);
+      });
+    });
+
+    test('ensureCardData: replaces placeholder attack text with TCGdex effect', async () => {
+      const callForFamilyText =
+        'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv03.5-016')) {
+          return detailResponse({
+            id: 'sv03.5-016',
+            name: 'Pidgey',
+            hp: '50',
+            attacks: [
+              {
+                name: 'Call for Family',
+                cost: ['Colorless'],
+                damage: '0',
+                effect: callForFamilyText,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv03.5-016',
+          name: 'Pidgey',
+          hp: 50,
+          weakness: null,
+          attacks: [
+            { name: 'Call for Family', cost: ['Colorless'], damage: 0, text: '0' },
+          ],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, callForFamilyText);
+      });
+    });
+
+    test('ensureCardData: merges attack effect text onto stub attacks[]', async () => {
+      const callForFamilyText =
+        'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv03.5-016-stub-merge')) {
+          return detailResponse({
+            id: 'sv03.5-016-stub-merge',
+            name: 'Pidgey',
+            hp: '50',
+            attacks: [
+              {
+                name: 'Call for Family',
+                cost: ['Colorless'],
+                damage: '0',
+                effect: callForFamilyText,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv03.5-016-stub-merge',
+          name: 'Pidgey',
+          hp: 50,
+          weakness: null,
+          attacks: [{ name: 'Call for Family', cost: ['Colorless'], damage: 0 }],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, callForFamilyText);
+      });
+    });
+
+    test('ensureCardData: replaces multiplier placeholder "30×" with TCGdex effect', async () => {
+      const beatEffect =
+        'This attack does 30 damage for each Energy attached to this Pokémon.';
+      const handler = (url) => {
+        if (url.includes('/cards/sv1-001')) {
+          return detailResponse({
+            id: 'sv1-001',
+            name: 'Testmon',
+            hp: '60',
+            attacks: [
+              {
+                name: 'Beat',
+                cost: ['Colorless'],
+                damage: '30',
+                effect: beatEffect,
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'sv1-001',
+          name: 'Testmon',
+          hp: 60,
+          weakness: null,
+          attacks: [{ name: 'Beat', cost: ['Colorless'], damage: 30, text: '30×' }],
+        };
+        await ensureCardData(card);
+        assert.equal(card.attacks[0].text, beatEffect);
+      });
+    });
+
+    test('attacksNeedText returns true for text "30×"', async () => {
+      let fetched = false;
+      const handler = (url) => {
+        fetched = true;
+        if (url.includes('/cards/test-ph-30x-needtext')) {
+          return detailResponse({
+            id: 'test-ph-30x-needtext',
+            name: 'Testmon',
+            hp: '60',
+            attacks: [
+              {
+                name: 'Beat',
+                cost: ['Colorless'],
+                damage: '30',
+                effect: 'Real effect text.',
+              },
+            ],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const card = {
+          id: 'test-ph-30x-needtext',
+          name: 'Testmon',
+          hp: 60,
+          weakness: null,
+          attacks: [{ name: 'Beat', cost: ['Colorless'], damage: 30, text: '30×' }],
+        };
+        await ensureCardData(card);
+        assert.ok(fetched, 'attacksNeedText should treat "30×" as placeholder');
+      });
+    });
+
+    // ── card identity resolution (name collisions across sets) ──
+
+    // ── pending attack effects (next-turn-lock, damage-prevention, discard-opponent) ──
+    test('parsePendingAttackEffects: defender locks and self damage reduction', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+        pendingCantRetreat,
+        pendingDamagePrevention,
+        combinedPendingDamagePrevention,
+        expirePendingEffectsForTurnEnd,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, beginTurn, endTurn } = await import('../rules-state.mjs');
+
+      const text =
+        "During your opponent's next turn, the Defending Pokémon can't retreat. This Pokémon takes 30 less damage from attacks.";
+      const parsed = parsePendingAttackEffects(text);
+      assert.equal(parsed.length, 2);
+      assert.ok(parsed.some((e) => e.kind === 'cant-retreat'));
+      assert.ok(parsed.some((e) => e.kind === 'damage-reduce' && e.value === 30));
+
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', parsed, 'Test Lock');
+      assert.equal(pendingCantRetreat(rulesState, 'opp'), false);
+      assert.equal(pendingDamagePrevention(rulesState, 'self').reduce, 0);
+
+      endTurn('self');
+      beginTurn('opp');
+      assert.equal(pendingCantRetreat(rulesState, 'opp'), true);
+      assert.equal(pendingDamagePrevention(rulesState, 'self').reduce, 30);
+
+      const merged = combinedPendingDamagePrevention(
+        rulesState,
+        'self',
+        { preventAll: false, reduce: 0 },
+        { stage: 'Basic', name: 'Pikachu' }
+      );
+      assert.equal(merged.reduce, 30);
+
+      endTurn('opp');
+      expirePendingEffectsForTurnEnd(rulesState, 'opp');
+      assert.equal(pendingCantRetreat(rulesState, 'opp'), false);
+      assert.equal(pendingDamagePrevention(rulesState, 'self').reduce, 0);
+    });
+
+    test('parsePendingAttackEffects: until-leaves-active and self-next-turn', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+        pendingCantUseAttack,
+        pendingCantAttack,
+        clearActiveSpotPendingEffects,
+        expirePendingEffectsForTurnEnd,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, beginTurn, endTurn } = await import('../rules-state.mjs');
+
+      const untilText =
+        "This Pokémon can't use Hyper Beam again until it leaves the Active Spot.";
+      const untilParsed = parsePendingAttackEffects(untilText);
+      assert.equal(untilParsed.length, 1);
+      assert.equal(untilParsed[0].window, 'until-leaves-active');
+
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', untilParsed, 'Hyper Beam');
+      assert.equal(pendingCantUseAttack(rulesState, 'self', 'Hyper Beam'), true);
+
+      clearActiveSpotPendingEffects(rulesState, 'self');
+      assert.equal(pendingCantUseAttack(rulesState, 'self', 'Hyper Beam'), false);
+
+      const selfTurnText = "During your next turn, this Pokémon can't attack.";
+      const selfParsed = parsePendingAttackEffects(selfTurnText);
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', selfParsed, 'Rest');
+      assert.equal(pendingCantAttack(rulesState, 'self'), false);
+      endTurn('self');
+      beginTurn('opp');
+      assert.equal(pendingCantAttack(rulesState, 'self'), false);
+      endTurn('opp');
+      beginTurn('self');
+      assert.equal(pendingCantAttack(rulesState, 'self'), true);
+      endTurn('self');
+      expirePendingEffectsForTurnEnd(rulesState, 'self');
+      assert.equal(pendingCantAttack(rulesState, 'self'), false);
+    });
+
+    test('parseDiscardOpponentEffect: deck, energy, hand, tools', async () => {
+      const { parseDiscardOpponentEffect } = await import('../attack-pending-effects.mjs');
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard the top 2 cards of your opponent's deck."),
+        { deckTop: 2, energyActive: 0, handRandom: 0, discardTools: false }
+      );
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard an Energy from your opponent's Active Pokémon."),
+        { deckTop: 0, energyActive: 1, handRandom: 0, discardTools: false }
+      );
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard a random card from your opponent's hand."),
+        { deckTop: 0, energyActive: 0, handRandom: 1, discardTools: false }
+      );
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard all Pokémon Tools from your opponent's Active Pokémon."),
+        { deckTop: 0, energyActive: 0, handRandom: 0, discardTools: true }
+      );
+      assert.deepEqual(parseDiscardOpponentEffect('No discard here.'), {
+        deckTop: 0,
+        energyActive: 0,
+        handRandom: 0,
+        discardTools: false,
+      });
+    });
+
+    test('pending gates: cant play Item/Supporter/evolve/attach during opponent-turn lock', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, canPerformAction, beginTurn, endTurn } =
+        await import('../rules-state.mjs');
+
+      const text =
+        "During your opponent's next turn, they can't play any Item cards from their hand. Your opponent can't play any Supporter cards. They can't play any Pokémon from their hand to evolve their Pokémon. Energy can't be attached from your opponent's hand to the Defending Pokémon.";
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', parsePendingAttackEffects(text), 'Lockdown');
+      endTurn('self');
+      beginTurn('opp');
+
+      assert.equal(canPerformAction({ user: 'opp', action: 'playItem' }).allowed, false);
+      assert.equal(canPerformAction({ user: 'opp', action: 'playSupporter' }).allowed, false);
+      assert.equal(canPerformAction({ user: 'opp', action: 'evolve' }).allowed, false);
+      assert.equal(canPerformAction({ user: 'opp', action: 'attachEnergy' }).allowed, false);
     });

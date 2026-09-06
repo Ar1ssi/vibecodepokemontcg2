@@ -154,6 +154,7 @@ ul, li {
   bottom: 0;
   width: 75.5%;
   height: 50%;
+  z-index: 2;
 }
 .opp {
   position: fixed;
@@ -162,6 +163,7 @@ ul, li {
   width: 75.5%;
   height: 50%;
   transform: scaleX(-1) scaleY(-1);
+  z-index: 2;
 }
 /* ── Battle mat: hexagonal red/blue arena, PTCG Live style ─────────────
    Sits fixed behind the self/opp iframes (which render transparent
@@ -194,6 +196,70 @@ ul, li {
     #1b2646 51.5%, #1e3a72 76%, #22458a 100%);
   overflow: hidden;
 }
+/* Chosen playmat artwork, layered over the synthetic mat surface but under
+   the seam/floor/glow highlights. A one-player mat is a single player's
+   sheet, so it is painted into each half with the far half rotated to face
+   the opponent; a full-size mat already covers both players, so it is
+   painted once across the whole surface. `--mat-fit` comes from the layout
+   profile (background-size), letting a mat stretch to the board or sit
+   letterboxed inside it. */
+#battleMatArt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#battleMatArt[hidden] {
+  display: none;
+}
+#battleMatArt .mat-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  background: #0a0a0c;
+}
+#battleMatArt .mat-half img.mat-art-image {
+  width: 100%;
+  height: 100%;
+  /* Trimmed board WebPs match mat aspect; fill the half so zone overlays
+     line up. cover cropped the center band when the half is wider (~2.4:1)
+     than the art (~1.9:1), which read as an oversized zoomed-in mat. */
+  object-fit: fill;
+  display: block;
+}
+#battleMatArt .mat-half-self {
+  bottom: 0;
+}
+#battleMatArt .mat-half-opp {
+  top: 0;
+  transform: rotate(180deg);
+}
+/* A full-size mat is one sheet spanning both players. */
+#battleMat.mat-two-player #battleMatArt .mat-half-opp {
+  display: none;
+}
+#battleMat.mat-two-player #battleMatArt .mat-half-self {
+  height: 100%;
+}
+/* Opp-only full-size mat: the artwork lives in the top half element. */
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-self {
+  display: none;
+}
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-opp {
+  height: 100%;
+  top: 0;
+}
+/* With real mat art behind the board, the synthetic arena decoration would
+   read as grime on top of the artwork. */
+#battleMat.mat-active #battleMatFloor,
+#battleMat.mat-active #battleMatGlow {
+  display: none;
+}
+#battleMat.mat-active #battleMatSeam {
+  opacity: 0.35;
+}
+
 #battleMatSeam {
   position: absolute;
   top: 50%;
@@ -228,10 +294,10 @@ ul, li {
 }
 #stadium {
   position: fixed;
-  bottom: 42%;
-  left: 11%;
-  width: 6%;
-  height: 16%;
+  bottom: var(--stadium-bottom, 42%);
+  left: var(--stadium-left, 11%);
+  width: var(--stadium-width, 6%);
+  height: var(--stadium-height, 16%);
   display: flex;
 	justify-content: center;
   border-radius: 15px;
@@ -1608,6 +1674,769 @@ ul, li {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
+/* Double-click bench/active preview — rendered on the main page so the scrim
+   covers the full viewport (both playmat iframes + chrome). */
+.card-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  background-color: rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+  transition: background-color 0.18s ease, opacity 0.18s ease;
+}
+.card-preview-overlay.is-closing {
+  background-color: transparent;
+  cursor: default;
+}
+.card-preview-pop {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  perspective: 1600px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  z-index: 1;
+  will-change: transform;
+}
+.card-preview-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transform-origin: center center;
+  will-change: transform;
+}
+.card-preview-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.3rem;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: flat;
+}
+.card-preview-face--front {
+  pointer-events: auto;
+}
+.card-preview-face--back {
+  transform: rotateY(180deg);
+}
+.card-preview-sleeve {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card-preview-face--front > img.card-preview-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  border-radius: 0.3rem;
+  pointer-events: auto;
+  image-rendering: auto;
+}
+.card-preview-face--front > .mat-holo.card-preview-card {
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: var(--card-aspect);
+  margin: 0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  overflow: visible;
+}
+.card-preview-face--front > .mat-holo.card-preview-card .card__translater,
+.card-preview-face--front > .mat-holo.card-preview-card .card__rotator,
+.card-preview-face--front > .mat-holo.card-preview-card .card__rotator > * {
+  width: 100%;
+  height: 100%;
+}
+.card-preview-face--front > .mat-holo.card-preview-card img {
+  display: block;
+  object-fit: cover;
+}
+.card-draw-flight {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  perspective: 1600px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  z-index: 2200;
+  will-change: transform;
+}
+.card-draw-flight .card-preview-face--front > img.card-preview-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0.3rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+.prize-take-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2300;
+  background: rgba(6, 10, 20, 0.55);
+  pointer-events: auto;
+}
+.prize-take-hint {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+  color: #f4f7ff;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.prize-take-card {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  z-index: 2301;
+  pointer-events: none;
+  cursor: pointer;
+  will-change: transform;
+}
+.prize-take-overlay.is-ready .prize-take-card {
+  pointer-events: auto;
+}
+.prize-take-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.3rem;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.prize-take-card.is-selected img {
+  transform: translateY(-18px);
+  box-shadow:
+    0 0 0 3px #f4d35e,
+    0 22px 40px rgba(0, 0, 0, 0.5);
+}
+.card-preview-overlay.is-closing .card-preview-pop,
+.card-preview-overlay.is-closing .card-preview-face--front,
+.card-preview-overlay.is-closing .card-preview-face--front > img.card-preview-card,
+.card-preview-overlay.is-closing .card-preview-face--front > .mat-holo.card-preview-card {
+  pointer-events: none;
+}
+
+/* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */
+.discard-pile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2350;
+  background: rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+}
+.discard-pile-header {
+  position: absolute;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.discard-pile-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 1rem;
+  z-index: 2;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.discard-pile-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.discard-pile-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.discard-pile-stage.is-dragging {
+  cursor: grabbing;
+}
+.discard-pile-nav,
+.discard-pile-close {
+  cursor: pointer;
+}
+.discard-pile-stack {
+  position: relative;
+  width: min(72vw, 380px);
+  height: min(68vh, calc(min(72vw, 380px) * 1.397));
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+.discard-pile-stack img,
+.discard-pile-stack .mat-holo.discard-pile-holo {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.discard-pile-stack.is-dragging {
+  cursor: grabbing;
+}
+.discard-pile-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  transition: transform 0.22s ease;
+  transform-origin: center center;
+  will-change: transform;
+  pointer-events: none;
+  opacity: 1;
+}
+.discard-pile-slide.is-active,
+.discard-pile-slide.is-ahead,
+.discard-pile-slide.is-behind {
+  pointer-events: none;
+}
+.discard-pile-slide.is-hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+  visibility: hidden;
+}
+.discard-pile-slide.is-behind {
+  pointer-events: none;
+}
+.discard-pile-slide.is-behind .mat-holo.discard-pile-holo,
+.discard-pile-slide.is-behind .discard-pile-card {
+  opacity: 1;
+}
+.discard-pile-slide .mat-holo.discard-pile-holo {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: var(--card-aspect);
+  overflow: hidden;
+  border-radius: 0.3rem;
+}
+.discard-pile-slide .mat-holo.discard-pile-holo .card__rotator {
+  overflow: hidden;
+  border-radius: 0.3rem;
+}
+.discard-pile-slide .mat-holo.discard-pile-holo .card__translater,
+.discard-pile-slide .mat-holo.discard-pile-holo .card__rotator,
+.discard-pile-slide .mat-holo.discard-pile-holo .card__rotator > * {
+  width: 100%;
+  height: 100%;
+}
+.discard-pile-slide .mat-holo.discard-pile-holo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.discard-pile-stack.is-dragging .discard-pile-slide {
+  transition: none;
+}
+.discard-pile-card {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  border-radius: 0.3rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+.discard-pile-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 400;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1a1a;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.discard-pile-nav:hover {
+  background: #fff;
+}
+.discard-pile-nav--prev {
+  left: max(-4.5rem, calc(-1 * min(18vw, 5rem)));
+}
+.discard-pile-nav--next {
+  right: max(-4.5rem, calc(-1 * min(18vw, 5rem)));
+}
+.discard-pile-footer {
+  position: absolute;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  color: rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+  text-align: center;
+  max-width: min(92vw, 640px);
+}
+.discard-pile-count {
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+.discard-pile-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* Unified card picker — PTCG Live-style choose UI */
+.card-picker-overlay {
+  cursor: default;
+}
+.card-picker-filters {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  z-index: 410;
+  display: flex;
+  gap: 0.35rem;
+}
+.card-picker-filter {
+  border: none;
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.82);
+}
+.card-picker-filter.is-active {
+  background: #f5d547;
+  color: #1a1a1a;
+}
+
+/* Browse mode (discard pile) — large cards, centered */
+.card-picker-browse .card-picker-main--browse {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+.card-picker-browse .card-picker-stack {
+  width: min(72vw, 380px);
+  height: min(68vh, calc(min(72vw, 380px) * 1.397));
+}
+
+/* Choose mode — carousel, meta, separate drop slots below */
+.card-picker-choose {
+  --card-picker-card-w: min(28vw, 220px);
+  --card-picker-card-h: calc(var(--card-picker-card-w) * 1.397);
+  --card-picker-carousel-w: calc(var(--card-picker-card-w) * 1.36);
+  --card-picker-top-gap: 16px;
+  --card-picker-trigger-nudge: 10px;
+  --card-picker-playmat-w: 76vw;
+  --card-picker-playmat-right: 24vw;
+  --card-picker-slot-gap: 6px;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: clamp(4rem, 12vh, 6.5rem) var(--card-picker-playmat-right) max(1rem, env(safe-area-inset-bottom)) 0;
+  box-sizing: border-box;
+}
+.card-picker-choose .card-picker-bottom-bar {
+  position: relative;
+  z-index: 420;
+  flex: 0 0 auto;
+  width: min(94%, 860px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem 0.6rem 1.15rem;
+  background: #2a7eb8;
+  border-top: 3px solid #e8c547;
+  border-bottom: 3px solid #e8c547;
+  box-shadow: none;
+}
+.card-picker-choose .card-picker-instruction {
+  grid-column: 2;
+  color: #fff;
+  font-size: clamp(0.82rem, 2vw, 1rem);
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+.card-picker-choose .card-picker-done {
+  grid-column: 3;
+  justify-self: end;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 0.15rem;
+  padding: 0.5rem 1.25rem;
+  background: #f5d547;
+  color: #1a1a1a;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.card-picker-choose .card-picker-done:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.card-picker-choose .card-picker-workspace {
+  flex: 1 1 auto;
+  width: var(--card-picker-playmat-w);
+  max-width: var(--card-picker-playmat-w);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  box-sizing: border-box;
+}
+.card-picker-choose .card-picker-scene {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+}
+.card-picker-choose .card-picker-cards-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: visible;
+}
+.card-picker-choose .card-picker-top-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: var(--card-picker-top-gap, 16px);
+  width: 100%;
+  overflow: visible;
+}
+.card-picker-choose .card-picker-carousel-wrap {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: var(--card-picker-carousel-w);
+  height: var(--card-picker-card-h);
+  padding-left: var(--card-picker-peek-left, 0px);
+  padding-right: var(--card-picker-peek-right, 0px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+  position: relative;
+}
+.card-picker-choose .card-picker-top-row.has-trigger .card-picker-carousel-wrap {
+  overflow: hidden;
+  isolation: isolate;
+  z-index: 1;
+}
+.card-picker-choose .card-picker-stage {
+  flex: 0 0 auto;
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
+  min-height: 0;
+  overflow: visible;
+  position: relative;
+}
+.card-picker-choose .card-picker-stack {
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
+  overflow: visible;
+}
+.card-picker-choose .card-picker-trigger-slot {
+  flex: 0 0 auto;
+  width: var(--card-picker-card-w);
+  height: var(--card-picker-card-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  position: relative;
+  z-index: 500;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 0.35rem;
+  margin-left: var(--card-picker-trigger-nudge, 10px);
+  animation: card-picker-float 3.2s ease-in-out infinite;
+}
+.card-picker-choose .card-picker-trigger-card,
+.card-picker-choose .card-picker-trigger-holo {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: var(--card-aspect);
+  border-radius: 0.35rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  transform-origin: center center;
+  opacity: 1 !important;
+  filter: none;
+  visibility: visible;
+}
+.card-picker-choose .card-picker-trigger-slot .discard-pile-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.35rem;
+}
+.card-picker-choose .card-picker-trigger-holo {
+  overflow: hidden;
+  background: transparent;
+}
+.card-picker-choose .card-picker-trigger-holo .card__translater,
+.card-picker-choose .card-picker-trigger-holo .card__rotator,
+.card-picker-choose .card-picker-trigger-holo img {
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+.card-picker-choose .card-picker-trigger-slot:empty {
+  display: none;
+}
+.card-picker-choose .card-picker-slot-row {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--card-picker-slot-gap, 6px);
+  width: 100%;
+  max-width: none;
+  margin: 1.1rem 0 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 2px 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.card-picker-choose .card-picker-slot-row::-webkit-scrollbar {
+  display: none;
+}
+.card-picker-choose .card-picker-drop-slot {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 2px solid rgba(210, 210, 210, 0.75);
+  background: rgba(110, 110, 110, 0.45);
+  border-radius: 0.35rem;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.card-picker-choose .card-picker-drop-slot.is-drop-target {
+  border-color: rgba(245, 213, 71, 0.95);
+  background: rgba(130, 130, 130, 0.5);
+}
+.card-picker-choose .card-picker-drop-slot.has-card {
+  background: rgba(90, 90, 90, 0.35);
+}
+.card-picker-choose .card-picker-slot-card-inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.card-picker-choose .card-picker-slot-card-inner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.18rem;
+}
+.card-picker-choose .discard-pile-slide.is-in-slot {
+  transition: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.card-picker-choose .discard-pile-slide.is-dragging-to-slot {
+  transition: none !important;
+}
+.card-picker-choose .card-picker-drop-slot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.18rem;
+}
+.card-picker-choose .discard-pile-nav {
+  display: none;
+}
+.card-picker-drag-ghost {
+  position: fixed;
+  z-index: 5000;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0.92;
+  border-radius: 0.35rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.card-picker-drag-ghost img,
+.card-picker-drag-ghost .mat-holo.discard-pile-holo,
+.card-picker-drag-ghost .card__translater,
+.card-picker-drag-ghost .card__rotator {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.35rem;
+}
+.card-picker-meta--choose {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0.1rem 0 0.15rem;
+  min-height: 2.35rem;
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  text-align: center;
+}
+.card-picker-meta--choose .discard-pile-count {
+  font-size: 0.9rem;
+}
+.card-picker-meta--choose .discard-pile-name {
+  font-size: 1rem;
+}
+@keyframes card-picker-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
+}
+
+/* Legacy browse bottom bar */
+.card-picker-browse .card-picker-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 420;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: min(92vw, 760px);
+  padding: 0.85rem 1rem 0.85rem 1.25rem;
+  border-radius: 0.2rem;
+  background: linear-gradient(180deg, #2f8fd4 0%, #2575b0 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.card-picker-browse .card-picker-instruction {
+  flex: 1;
+  color: #fff;
+  font-size: clamp(0.85rem, 2.2vw, 1.05rem);
+  font-weight: 600;
+}
+.card-picker-browse .card-picker-done {
+  border: none;
+  border-radius: 0.15rem;
+  padding: 0.55rem 1.35rem;
+  background: #f5d547;
+  color: #1a1a1a;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.card-picker-slide.is-selected .discard-pile-card,
+.card-picker-slide.is-selected .mat-holo.discard-pile-holo {
+  outline: 3px solid #5eead4;
+  outline-offset: 2px;
+  border-radius: 0.35rem;
+}
+.card-picker-select-badge {
+  position: absolute;
+  bottom: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.card-picker-browse .card-picker-meta {
+  bottom: max(4.5rem, calc(env(safe-area-inset-bottom) + 3.5rem));
+}
+
 /* Custom card modal */
 .native-deck-builder-modal {
   position: absolute;
@@ -2948,6 +3777,9 @@ a:hover {
       box-shadow: 0 6px 24px rgba(0,0,0,0.4);
       pointer-events: none;
     }
+    #rulesTurnHUD[hidden] {
+      display: none !important;
+    }
     #rulesTurnHUD.my-turn {
       border-color: rgba(120, 220, 140, 0.6);
       background: rgba(20, 42, 28, 0.92);
@@ -3337,7 +4169,7 @@ a:hover {
       border-radius: 12px;
       flex: 0 0 auto;
       overflow: visible;
-    }}
+    }
     .native-deck-builder-coin-preview .coin-3d { width: 120px; height: 120px; flex: 0 0 auto; }
     .native-deck-builder-coin-preview-text { display: flex; flex-direction: column; gap: 0.4vh; }
     .native-deck-builder-coin-preview-text strong { font-size: 1.7vh; }
@@ -3492,6 +4324,9 @@ a:hover {
     .native-deck-builder-coin-picker .native-deck-builder-coin-filter { display: none; }
     .native-deck-builder-coin-picker .native-deck-builder-section-title,
     .native-deck-builder-coin-picker .native-deck-builder-set-browser-series-tag { display: none; }
+    .native-deck-builder-mat-picker .native-deck-builder-mat-filter { display: none; }
+    .native-deck-builder-mat-picker .native-deck-builder-section-title,
+    .native-deck-builder-mat-picker .native-deck-builder-set-browser-series-tag { display: none; }
 
     /* ── Attack Window ── */
     #rulesAttackWindow {
@@ -3544,36 +4379,134 @@ a:hover {
     .rules-aw-unusable { color: #ff5555; }
     .rules-aw-reason { font-size: 0.72rem; color: #999; margin-left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ═══ MAT COIN SLOTS ═════════════════════════════════════════════
-       Persistent coin tokens on the battle mat: each player's chosen
-       coin stays visible all game (self on the blue side, opp on the
-       red side), so both coins are always visible. Reuses the .coin-3d
-       / .coin-face / .coin-mat-* coin-picker CSS; sized down with the
-       same pointer-tracked specular as the Customize preview.
-       Rendered as a top-level body child (not inside #battleMat) so it
-       isn't clipped by the mat's overflow/clip-path; the slot itself
-       ignores pointer events so empty space never blocks zones, but the
-       coin disc re-enables them for hover lighting. */
-    .mat-coin-slot {
-      /* Rendered at the right-side reference spots (top + bottom circles),
-         fixed to the viewport so they sit beside the button cluster. */
-      position: fixed;
-      left: auto;
-      right: 2.5%;
-      width: 6vh;
-      height: 6vh;
+    /* ── Mat picker (Customize > Mat) ─────────────────────────────────────
+       Same panel/grid look as the coin and sleeve pickers, with wide tiles:
+       one-player mats are roughly 2:1 and full-size mats roughly 1:1, so
+       tiles are letterboxed with object-fit: contain instead of cropped. */
+    .native-deck-builder-mat-picker {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 0.8vh 0.75vw;
+      overflow: hidden;
+    }
+    .native-deck-builder-mat-picker[hidden] {
       display: none;
-      pointer-events: none;
-      filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.6));
     }
-    .mat-coin-slot.has-coin { display: block; }
-    .mat-coin-slot .coin-3d {
+    .native-deck-builder-mat-filter {
+      font-size: 1.3vh;
+      padding: 0.5vh 0.6vw;
+      border-radius: 8px;
+      border: 1px solid rgba(65, 91, 168, 0.3);
+      background: rgba(0, 0, 0, 0.15);
+      color: inherit;
+    }
+    .native-deck-builder-mat-preview {
+      display: flex;
+      align-items: center;
+      gap: 1.4vw;
+      padding: 1.2vh 1vw;
+      margin-bottom: 1vh;
+      background: rgba(65, 91, 168, 0.08);
+      border: 1px solid rgba(65, 91, 168, 0.18);
+      border-radius: 12px;
+      flex: 0 0 auto;
+    }
+    .native-deck-builder-mat-preview-image {
+      width: 22vh;
+      height: 11vh;
+      object-fit: contain;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      flex: 0 0 auto;
+    }
+    .native-deck-builder-mat-preview-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4vh;
+    }
+    .native-deck-builder-mat-preview-text strong { font-size: 1.7vh; }
+    .native-deck-builder-mat-preview-text span { font-size: 1.3vh; opacity: 0.7; }
+    .native-deck-builder-mat-preview-none {
+      font-size: 1.4vh;
+      opacity: 0.6;
+      font-style: italic;
+    }
+    .native-deck-builder-mat-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1.4vh 0.8vw;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      padding: 0.4vw;
+      align-content: start;
+      scrollbar-width: thin;
+    }
+    .native-deck-builder-mat-cell {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5vh;
+      background: transparent;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      padding: 0.6vh 0.3vw;
+      cursor: pointer;
+      color: inherit;
+      text-align: center;
+    }
+    .native-deck-builder-mat-cell:hover { background: rgba(65, 91, 168, 0.12); }
+    .native-deck-builder-mat-cell.selected {
+      border-color: rgba(120, 190, 255, 0.8);
+      background: rgba(65, 91, 168, 0.18);
+    }
+    .native-deck-builder-mat-cell img {
       width: 100%;
-      height: 100%;
-      pointer-events: auto;
-      transform: perspective(700px) rotateX(var(--coin-rx)) rotateY(var(--coin-ry));
-      transition: transform 0.18s ease-out;
-      cursor: default;
+      aspect-ratio: 2 / 1;
+      object-fit: contain;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      display: block;
     }
-    #matCoinSlotSelf { top: 36%; transform: translate(0, -50%); }
-    #matCoinSlotOpp { top: 64%; transform: translate(0, -50%); }
+    .native-deck-builder-mat-cell-name {
+      font-size: 1.15vh;
+      opacity: 0.75;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .native-deck-builder-mat-cell-badge {
+      position: absolute;
+      top: 0.9vh;
+      right: 0.5vw;
+      font-size: 1vh;
+      padding: 0.2vh 0.4vw;
+      border-radius: 999px;
+      background: rgba(65, 91, 168, 0.75);
+      color: #fff;
+    }
+    .native-deck-builder-mat-cell-blank {
+      width: 100%;
+      aspect-ratio: 2 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3vh;
+      border-radius: 6px;
+      border: 1px dashed rgba(120, 144, 214, 0.6);
+      background: rgba(0, 0, 0, 0.2);
+      opacity: 0.8;
+    }
+    .native-deck-builder-mat-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      opacity: 0.6;
+      padding: 3vh 0;
+      font-style: italic;
+    }

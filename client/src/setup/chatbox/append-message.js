@@ -1,4 +1,4 @@
-import { socket, systemState } from '../../front-end.js';
+import { socket, systemState } from '../../state.js';
 
 export const appendMessage = (user, message, type, emit = true) => {
   if (!systemState.isUndoInProgress) {

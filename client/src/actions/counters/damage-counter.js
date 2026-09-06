@@ -2,45 +2,95 @@ import {
   oppContainerDocument,
   selfContainerDocument,
   systemState,
-} from '../../front-end.js';
+} from '../../state.js';
+import {
+  DAMAGE_COUNTER_TIERS,
+  getDamageCounterTier,
+} from '../../setup/counters/damage-counter-style.mjs';
 import { processAction } from '../../setup/general/process-action.js';
+import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { buildCardHint, resolveCardIndex } from '../../setup/zones/resolve-card-index.mjs';
+import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
+
+function resolveCounterTarget(user, zoneId, index, hint) {
+  const zone = getZone(user, zoneId);
+  const resolved = resolveCardIndex(zone, hint, index);
+  const card = zone?.array?.[resolved];
+  return {
+    zone,
+    index: resolved,
+    card,
+    hint: hint || buildCardHint(card),
+  };
+}
+
+const applyDamageCounterStyle = (damageCounter, damageAmount) => {
+  damageCounter.classList.add('damage-counter');
+  damageCounter.classList.remove(...DAMAGE_COUNTER_TIERS);
+  damageCounter.classList.add(getDamageCounterTier(damageAmount));
+};
 
 export const updateDamageCounter = (
   user,
   zoneId,
   index,
   damageAmount,
-  emit = true
+  emitOrHint = true,
+  maybeEmit
 ) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const { index: resolved, card, hint } = resolveCounterTarget(
+    user,
+    zoneId,
+    index,
+    hintIn
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'updateDamageCounter', [
       zoneId,
-      index,
+      resolved,
       damageAmount,
+      hint,
     ]);
     return;
   }
 
-  const damageCounter = getZone(user, zoneId).array[index].image.damageCounter;
+  const damageCounter = card?.image?.damageCounter;
+  if (!damageCounter) return;
   if (damageCounter.textContent != damageAmount) {
     damageCounter.textContent = damageAmount;
   }
+  applyDamageCounterStyle(damageCounter, damageAmount);
 
   processAction(user, emit, 'updateDamageCounter', [
     zoneId,
-    index,
+    resolved,
     damageAmount,
+    hint,
   ]);
 };
 
-export const removeDamageCounter = (user, zoneId, index, emit = true) => {
+export const removeDamageCounter = (
+  user,
+  zoneId,
+  index,
+  emitOrHint = true,
+  maybeEmit
+) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const { index: resolved, card: targetCard, hint } = resolveCounterTarget(
+    user,
+    zoneId,
+    index,
+    hintIn
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'removeDamageCounter', [zoneId, index]);
+    processAction(user, emit, 'removeDamageCounter', [zoneId, resolved, hint]);
     return;
   }
 
-  const targetCard = getZone(user, zoneId).array[index];
+  if (!targetCard) return;
   //make sure targetCard exists (it won't exist if it's already been removed)
   if (targetCard.image.damageCounter) {
     targetCard.image.damageCounter.removeEventListener(
@@ -61,7 +111,7 @@ export const removeDamageCounter = (user, zoneId, index, emit = true) => {
     targetCard.image.damageCounter = null;
   }
 
-  processAction(user, emit, 'removeDamageCounter', [zoneId, index]);
+  processAction(user, emit, 'removeDamageCounter', [zoneId, resolved, hint]);
 };
 
 export const addDamageCounter = (
@@ -69,19 +119,28 @@ export const addDamageCounter = (
   zoneId,
   index,
   damageAmount,
-  emit = true
+  emitOrHint = true,
+  maybeEmit
 ) => {
+  const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
+  const { zone, index: resolved, card: targetCard, hint } = resolveCounterTarget(
+    user,
+    zoneId,
+    index,
+    hintIn
+  );
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'addDamageCounter', [
       zoneId,
-      index,
+      resolved,
       damageAmount,
+      hint,
     ]);
     return;
   }
 
-  const zone = getZone(user, zoneId);
-  const targetCard = zone.array[index];
+  if (!targetCard) return;
+  index = resolved;
   const targetRect = targetCard.image.getBoundingClientRect();
   const zoneElementRect = zone.element.getBoundingClientRect();
 
@@ -108,14 +167,20 @@ export const addDamageCounter = (
     }
     damageCounter.contentEditable = 'true';
     damageCounter.textContent = damageAmount ? damageAmount : '10';
+    applyDamageCounterStyle(
+      damageCounter,
+      damageAmount ? damageAmount : '10'
+    );
   }
+
+  applyDamageCounterStyle(damageCounter, damageCounter.textContent);
 
   damageCounter.style.display = 'inline-block';
   damageCounter.style.left = `${targetRect.left - zoneElementRect.left + targetRect.width / 1.5}px`;
   damageCounter.style.top = `${targetRect.top - zoneElementRect.top + targetRect.height / 4}px`;
   zone.element.appendChild(damageCounter);
 
-  if (targetCard.image.parentElement.classList.contains('full-view')) {
+  if (isInFullView(targetCard.image)) {
     damageCounter.style.display = 'none';
   }
   //adjust size of the circle based on card size
@@ -176,5 +241,10 @@ export const addDamageCounter = (
   //save the damageCounter on the card
   targetCard.image.damageCounter = damageCounter;
 
-  processAction(user, emit, 'addDamageCounter', [zoneId, index, damageAmount]);
+  processAction(user, emit, 'addDamageCounter', [
+    zoneId,
+    resolved,
+    damageAmount,
+    hint,
+  ]);
 };

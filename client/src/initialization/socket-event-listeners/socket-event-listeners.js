@@ -10,7 +10,7 @@ import {
   stopLookingAtCards,
   stopLookingShortcut,
 } from '../../actions/general/reveal-and-hide.js';
-import { socket, systemState } from '../../front-end.js';
+import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { exchangeData } from '../../setup/deck-constructor/exchange-data.js';
 import { acceptAction } from '../../setup/general/accept-action.js';
@@ -20,10 +20,18 @@ import { resyncActions } from '../../setup/general/resync-actions.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
+import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
+import { restoreLastUsedDeckToPlaymat } from '../document-event-listeners/sidebox/native-deck-builder.js';
+import {
+  enableSyncLogForMultiplayer,
+  logSync,
+} from '../../setup/general/sync-logger-bridge.js';
+import { hashUserBoard } from '../../setup/zones/board-hash.js';
 
 let isImporting = false;
 let syncCheckInterval;
 let spectatorActionInterval;
+let pushActionQueue = Promise.resolve();
 export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
   clearInterval(spectatorActionInterval);
@@ -47,16 +55,25 @@ export const initializeSocketEventListeners = () => {
     }
     systemState.isTwoPlayer = true;
     forceRulesEnabledForMultiplayer();
+    enableSyncLogForMultiplayer();
     cleanActionData('self');
     cleanActionData('opp');
     reset('opp', true, false, false, false);
+    restoreLastUsedDeckToPlaymat();
     exchangeData(
       'self',
       systemState.p2SelfUsername,
       systemState.selfDeckData,
       systemState.cardBackSrc,
-      document.getElementById('coachingModeCheckbox').checked
+      document.getElementById('coachingModeCheckbox').checked,
+      false,
+      getStoredMatId('self'),
+      true
     );
+    socket.emit('rulesEvent', {
+      type: 'peerSocketId',
+      data: { socketId: socket.id },
+    });
 
     //initialize sync checker, which will routinely make sure game are synced
     syncCheckInterval = setInterval(() => {
@@ -64,6 +81,7 @@ export const initializeSocketEventListeners = () => {
         const data = {
           roomId: systemState.roomId,
           counter: systemState.selfCounter,
+          boardHash: hashUserBoard('self'),
         };
         socket.emit('syncCheck', data);
       }
@@ -139,8 +157,10 @@ export const initializeSocketEventListeners = () => {
       }
       // Trigger immediate resync to recover any actions missed during disconnect
       if (notSpectator) {
+        logSync('resync.request.emit', { reason: 'connect' }, 'out');
         socket.emit('resyncActions', {
           roomId: systemState.roomId,
+          reason: 'reconnect',
         });
       }
     }
@@ -184,7 +204,9 @@ export const initializeSocketEventListeners = () => {
       isImporting
     ) {
       startKeybindsSleep();
-      acceptAction('self', data.action, data.parameters);
+      pushActionQueue = pushActionQueue.then(() =>
+        acceptAction('self', data.action, data.parameters)
+      );
     }
   });
   // reset counter when importing game state
@@ -202,13 +224,24 @@ export const initializeSocketEventListeners = () => {
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
-    if (notSpectator) {
-      if (data.action === 'exchangeData') {
-        cleanActionData('opp');
-      }
+    if (!notSpectator) return;
+    pushActionQueue = pushActionQueue.then(async () => {
       if (data.counter === parseInt(systemState.oppCounter) + 1) {
+        startKeybindsSleep();
+        const ok = await acceptAction('opp', data.action, data.parameters);
+        if (ok === false) {
+          logSync(
+            'pushAction.apply_failed',
+            { counter: data.counter, action: data.action },
+            'in'
+          );
+          socket.emit('resyncActions', {
+            roomId: systemState.roomId,
+            reason: 'apply_failed',
+          });
+          return;
+        }
         systemState.oppCounter++;
-        // systemState.spectatorActionData.push({user: 'opp', emit: true, action: data.action, parameters: data.parameters});
         if (data.action !== 'exchangeData' && data.action !== 'loadDeckData') {
           systemState.exportActionData.push({
             user: 'opp',
@@ -217,24 +250,39 @@ export const initializeSocketEventListeners = () => {
             parameters: data.parameters,
           });
         }
-        startKeybindsSleep();
-        acceptAction('opp', data.action, data.parameters);
       } else if (data.counter > parseInt(systemState.oppCounter) + 1) {
-        const data = {
+        logSync('pushAction.gap', {
+          expected: systemState.oppCounter + 1,
+          received: data.counter,
+          action: data.action,
+        }, 'in');
+        socket.emit('resyncActions', {
           roomId: systemState.roomId,
           counter: systemState.oppCounter,
-        };
-        socket.emit('resyncActions', data);
+          reason: 'gap',
+        });
+      } else if (data.counter <= parseInt(systemState.oppCounter)) {
+        logSync('pushAction.stale', {
+          oppCounter: systemState.oppCounter,
+          received: data.counter,
+          action: data.action,
+        }, 'in');
       }
-    }
+    });
   });
-  socket.on('resyncActions', () => {
+  socket.on('resyncActions', (data) => {
     const notSpectator = !(
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
     if (notSpectator) {
-      resyncActions();
+      const fullReplay =
+        data?.reason === 'hash' ||
+        data?.reason === 'hint_mismatch' ||
+        data?.reason === 'apply_failed' ||
+        data?.reason === 'reconnect';
+      logSync('resync.request.recv', { reason: data?.reason, fullReplay }, 'in');
+      resyncActions({ fullReplay });
     }
   });
   socket.on('catchUpActions', (data) => {
@@ -243,7 +291,13 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (notSpectator) {
-      catchUpActions(data.actionData);
+      logSync('catchUp.recv', {
+        count: data.actionData?.length ?? 0,
+        fullReplay: !!data.fullReplay,
+      }, 'in');
+      pushActionQueue = pushActionQueue.then(() =>
+        catchUpActions(data.actionData, !!data.fullReplay)
+      );
     }
   });
   socket.on('syncCheck', (data) => {
@@ -251,12 +305,29 @@ export const initializeSocketEventListeners = () => {
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
-    if (notSpectator && data.counter >= parseInt(systemState.oppCounter) + 1) {
-      const data = {
+    if (!notSpectator) return;
+    if (data.counter >= parseInt(systemState.oppCounter) + 1) {
+      logSync('syncCheck.gap', {
+        peerSelfCounter: data.counter,
+        localOppCounter: systemState.oppCounter,
+      }, 'in');
+      socket.emit('resyncActions', {
         roomId: systemState.roomId,
         counter: systemState.oppCounter,
-      };
-      socket.emit('resyncActions', data);
+        reason: 'gap',
+      });
+      return;
+    }
+    if (data.boardHash && data.boardHash !== hashUserBoard('opp')) {
+      logSync('syncCheck.hash', {
+        peerSelfCounter: data.counter,
+        localOppCounter: systemState.oppCounter,
+      }, 'in');
+      socket.emit('resyncActions', {
+        roomId: systemState.roomId,
+        counter: systemState.oppCounter,
+        reason: 'hash',
+      });
     }
   });
   // socket.on('exchangeData', (data) => {

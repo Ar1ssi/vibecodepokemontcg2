@@ -54,23 +54,69 @@ export { isStadiumCard };
 // substring "once per turn".
 const ONCE_PER_TURN_RE = /once per turn|once during (?:each|your|either) player'?s turn/;
 
+const BOTH_PLAYERS_RE =
+  /both players|each player|both active pokémon|both yours and your opponent'?s/;
+
+/** True when card text names a passive modifier the execution layer can hook. */
+export function hasRecognizedPassiveStadiumEffect(card) {
+  const t = textOf(card);
+  if (!t) return false;
+  return (
+    parseStadiumDamagePrevention(card) !== null ||
+    parseStadiumDamageReduction(card) > 0 ||
+    isStadiumRetreatPrevention(card) ||
+    isStadiumHandProtect(card) ||
+    parseStadiumCostModifier(card) > 0 ||
+    parseStadiumHpModifier(card) !== 0 ||
+    parseStadiumEvolutionSpeed(card).relaxTurnGate ||
+    parseStadiumEvolutionSpeed(card).costReduce > 0 ||
+    parseStadiumRetreatModifier(card) !== 0 ||
+    parseStadiumBenchDamageOnPlay(card) !== null ||
+    parseStadiumAttackDamageBonus(card) > 0 ||
+    isStadiumStatusImmunity(card) ||
+    isStadiumConfusedPersist(card) ||
+    parseStadiumBenchLimit(card) !== null ||
+    isStadiumToolNegation(card) ||
+    isStadiumAbilityNegation(card) ||
+    parseStadiumCheckupPoisonBonus(card) > 0 ||
+    parseStadiumAttackCostIncrease(card) > 0
+  );
+}
+
+/** Stadium text applies to both players (not opponent-only targeting). */
+export function stadiumAffectsBothPlayers(card) {
+  return BOTH_PLAYERS_RE.test(textOf(card));
+}
+
+/** True when the card has a real when-you-play effect, not stay-in-play reminder text. */
+export function stadiumHasWhenPlayedEffect(card) {
+  const t = textOf(card);
+  const clause = t.match(/when you play (?:this card|it),\s*([^.]+)/);
+  if (!clause) return false;
+  const body = clause[1].trim();
+  if (!body) return false;
+  if (/^discard (?:this|it) if another stadium/.test(body)) return false;
+  if (/^stays in play/.test(body)) return false;
+  return true;
+}
+
 // Bucket a card into a stadium-effect family. Non-stadium / unrecognizable
 // cards return 'unknown'. Precedence: the most restrictive trigger wins.
 export function classifyStadiumEffect(card) {
   if (!isStadiumCard(card)) return 'unknown';
   const t = textOf(card);
   if (!t) return 'none';
-  if (t.includes('when you play this card') || t.includes('when you play it')) {
+  // Real "When you play this card, draw 2" — not stay-in-play reminder text.
+  if (stadiumHasWhenPlayedEffect(card)) {
     return 'setup-once';
   }
   if (ONCE_PER_TURN_RE.test(t)) {
     return 'once-per-turn';
   }
-  if (
-    t.includes('both players') ||
-    t.includes('each player') ||
-    t.includes('both active pokémon')
-  ) {
+  if (BOTH_PLAYERS_RE.test(t)) {
+    return 'continuous-both';
+  }
+  if (hasRecognizedPassiveStadiumEffect(card)) {
     return 'continuous-both';
   }
   if (t.includes('your opponent')) {
@@ -108,45 +154,149 @@ export function describeStadiumEffect(card) {
  */
 export function parseStadiumSetupDraw(card) {
   const t = textOf(card);
-  if (!t.includes('when you play')) return null;
-  const m = t.match(/draw (?:up to )?(\d+)/);
-  return m ? parseInt(m[1], 10) : 1;
+  // Only the when-you-play *sentence* may grant a draw. Official reminder
+  // text is "stays in play when you play it" and must not fall through to
+  // a default draw of 1, or pick up a later "once per turn, draw N".
+  const clause = t.match(/when you play (?:this card|it),\s*([^.]+)/);
+  if (!clause) return null;
+  const body = clause[1];
+  if (/stays in play/.test(body)) return null;
+  const m = body.match(/draw (?:up to )?(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
 /**
- * Once-per-turn: "Once per turn, you may …" (also matches "Once during
- * each player's turn" wording — see ONCE_PER_TURN_RE above).
- * Returns { kind: 'draw'|'search'|'search-evolve'|'heal'|'energy', n } or null.
+ * Once-per-turn stadium effect descriptor.
+ * Returns { kind, n, cost?, condition?, typeFilter?, searchFilter?, destination? } or null.
  */
 export function parseStadiumOncePerTurn(card) {
   const t = textOf(card);
   if (!ONCE_PER_TURN_RE.test(t)) return null;
-  if (/draw/.test(t)) {
-    const m = t.match(/draw (?:up to )?(\d+)/);
-    return { kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
+
+  const base = { n: 1 };
+  if (/played a supporter card from their hand this turn/.test(t)) {
+    base.condition = { type: 'supporter-played' };
   }
-  // Energy attach is checked before search: attach text may also mention
-  // searching, but attaching is the primary action.
+  if (/supporter card that has "team rocket" in its name/.test(t)) {
+    base.condition = { type: 'named-supporter', contains: 'team rocket' };
+  }
+  if (/discard an energy card from their hand/.test(t)) {
+    base.cost = { type: 'discard-energy', n: 1 };
+  }
+  const discardHand = t.match(/discard (\d+) cards? from their hand/);
+  if (discardHand) {
+    base.cost = { type: 'discard-hand', n: parseInt(discardHand[1], 10) || 2 };
+  }
+
+  if (/put a card from their hand on top of their deck/.test(t)) {
+    return { ...base, kind: 'hand-to-deck-top', n: 1 };
+  }
+  if (/switch their active \{w\}/.test(t) || /switch their active.*\{w\}/.test(t)) {
+    return { ...base, kind: 'switch-type', typeFilter: 'water' };
+  }
+  if (/put up to (\d+) basic \{l\} energy/.test(t) && /discard.*bench/.test(t)) {
+    const m = t.match(/put up to (\d+)/);
+    return {
+      ...base,
+      kind: 'discard-to-bench',
+      n: m ? parseInt(m[1], 10) : 2,
+      typeFilter: 'lightning',
+    };
+  }
+  if (/heal 10 damage from each of their pokémon/.test(t) || /heal 10 damage from each/.test(t)) {
+    return { ...base, kind: 'heal-all', n: 10 };
+  }
+  if (/search/.test(t) && /evolv/.test(t)) {
+    return { ...base, kind: 'search-evolve', n: 1 };
+  }
+  if (/search.*basic pokémon.*bench/.test(t)) {
+    return { ...base, kind: 'search-bench', n: 1, searchWhat: 'basic pokemon' };
+  }
+  const fusion = t.match(/search.*up to (\d+) item cards that have "([^"]+)"/);
+  if (fusion) {
+    return {
+      ...base,
+      kind: 'search-hand',
+      n: parseInt(fusion[1], 10) || 2,
+      searchFilter: fusion[2],
+      searchWhat: 'item',
+    };
+  }
+  if (/search.*marnie's pokémon/.test(t)) {
+    return { ...base, kind: 'search-hand', n: 1, searchFilter: "marnie's", searchWhat: 'pokemon' };
+  }
   if (/attach/.test(t) && /energy/.test(t)) {
     const m = t.match(/up to (\d+)/);
-    return { kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
+    return { ...base, kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
   }
-  // Search-and-evolve (e.g. Grand Tree: search for an evolution and put it
-  // onto a Pokémon already in play to evolve it) is a distinct mechanic
-  // from a plain search-to-hand — evolving a Pokémon, not fetching a card
-  // to hand — so it needs its own kind rather than falling into 'search'
-  // and being misrouted as a hand pickup.
-  if (/search/.test(t) && /evolv/.test(t)) {
-    return { kind: 'search-evolve', n: 1 };
+  if (/discard/.test(t) && /draw/.test(t)) {
+    const dm = t.match(/draw (?:up to )?(\d+|a card)/);
+    const n = !dm || dm[1] === 'a card' ? 1 : parseInt(dm[1], 10) || 1;
+    return {
+      ...base,
+      kind: 'discard-draw',
+      n,
+      cost: base.cost || { type: 'discard-hand', n: 2 },
+    };
+  }
+  if (/draw/.test(t)) {
+    const m = t.match(/draw (?:up to )?(\d+)/);
+    return { ...base, kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
   }
   if (/search|look through|find/.test(t)) {
-    return { kind: 'search', n: 1 };
+    return { ...base, kind: 'search', n: 1 };
   }
   if (/heal/.test(t)) {
     const m = t.match(/heal\s*(\d+)?/);
-    return { kind: 'heal', n: m?.[1] ? parseInt(m[1], 10) : 1 };
+    return { ...base, kind: 'heal', n: m?.[1] ? parseInt(m[1], 10) : 10 };
   }
-  return { kind: 'search', n: 1 };
+  return { ...base, kind: 'search', n: 1 };
+}
+
+/** Whether a once-per-turn stadium condition is met for this player. */
+export function stadiumOnceConditionMet(condition, playerFlags = {}) {
+  if (!condition) return true;
+  if (condition.type === 'supporter-played') return !!playerFlags.supporterPlayed;
+  if (condition.type === 'named-supporter') {
+    const name = String(playerFlags.lastSupporterName || '').toLowerCase();
+    return !!name && name.includes(String(condition.contains || '').toLowerCase());
+  }
+  return true;
+}
+
+/** Deck/hand search filter for stadium once-per-turn effects. */
+export function matchesStadiumSearch(card, { searchWhat, searchFilter } = {}) {
+  if (!card) return false;
+  const name = lower(card.name || '');
+  if (searchFilter && !name.includes(String(searchFilter).toLowerCase())) return false;
+  const type = lower(card.type || '');
+  const sub = (card.subtypes || []).map(lower);
+  if (searchWhat === 'basic pokemon') {
+    return type.includes('pok') && (sub.includes('basic') || lower(card.stage) === 'basic' || !card.stage);
+  }
+  if (searchWhat === 'item') {
+    return type.includes('trainer') && (sub.includes('item') || lower(card.trainerType) === 'item');
+  }
+  if (searchWhat === 'pokemon') return type.includes('pok');
+  return true;
+}
+
+export function isTeraCard(card) {
+  if (!card) return false;
+  return (card.subtypes || []).map(lower).includes('tera');
+}
+
+/** Bench limit for a player (5 default; 8 when Area Zero + any Tera in play). */
+export function getEffectiveBenchLimit(hasTeraInPlay) {
+  if (!rulesState.enabled) return 5;
+  const stadium = getStadium()?.card;
+  const raised = parseStadiumBenchLimit(stadium);
+  if (!raised) return 5;
+  return hasTeraInPlay ? raised : 5;
+}
+
+export function playerHasTeraInPlay(pokemonInPlay = []) {
+  return pokemonInPlay.some(isTeraCard);
 }
 
 /**
@@ -154,15 +304,99 @@ export function parseStadiumOncePerTurn(card) {
  * Returns the number of damage counters prevented (Infinity for "all"),
  * or null if not a prevention effect.
  */
-export function parseStadiumDamagePrevention(card) {
+/**
+ * Continuous damage prevention: "Prevent all damage …"
+ * Returns { amount, zone: 'active'|'bench'|'any', ruleBoxOnly?: bool } or null.
+ */
+export function parseStadiumDamagePreventionDetail(card) {
   const t = textOf(card);
-  if (!t) return null;
-  if (!/prevent/.test(t)) return null;
-  if (!/damage/.test(t)) return null;
-  // "prevent all damage" → Infinity
-  if (/all damage|all\s+damage/.test(t)) return Infinity;
-  const m = t.match(/(\d+)\s*(?:damage|poison|special)/);
-  return m ? parseInt(m[1], 10) : Infinity;
+  if (!t || !/prevent/.test(t) || !/damage/.test(t)) return null;
+  let zone = 'any';
+  if (/benched pokémon|on the bench|from the bench/.test(t)) zone = 'bench';
+  else if (/active pokémon|your active|the active/.test(t)) zone = 'active';
+  const ruleBoxOnly = /don't have a rule box|without a rule box|non-rule box/.test(t);
+  let amount = Infinity;
+  if (!/all damage|all\s+damage/.test(t)) {
+    const m = t.match(/(\d+)\s*(?:damage|poison|special)/);
+    amount = m ? parseInt(m[1], 10) : Infinity;
+  }
+  return { amount, zone, ruleBoxOnly };
+}
+
+/** Back-compat shim: amount only (Infinity = all). */
+export function parseStadiumDamagePrevention(card) {
+  const d = parseStadiumDamagePreventionDetail(card);
+  return d ? d.amount : null;
+}
+
+/** Whether stadium prevention applies to a defender in `zoneId`. */
+export function stadiumPreventionApplies(stadiumCard, { zoneId = 'active', defender = null } = {}) {
+  const d = parseStadiumDamagePreventionDetail(stadiumCard);
+  if (!d) return false;
+  if (d.zone === 'bench' && zoneId !== 'bench') return false;
+  if (d.zone === 'active' && zoneId !== 'active') return false;
+  if (d.ruleBoxOnly && defender && pokemonHasRuleBox(defender)) return false;
+  return true;
+}
+
+/**
+ * Continuous damage reduction: "take N less damage from attacks"
+ * Returns the amount reduced, or 0 if not a reduction effect.
+ */
+export function parseStadiumDamageReduction(card) {
+  const t = textOf(card);
+  if (!t || !/take\s+\d+\s+less damage/.test(t)) return 0;
+  const m = t.match(/take\s+(\d+)\s+less damage/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/** Whether a Pokémon matches a stadium's printed name/type filter (e.g. {M}, Hop's). */
+export function stadiumFilterMatches(card, stadiumCard) {
+  const t = textOf(stadiumCard);
+  const name = lower(card?.name || '');
+  if (!name) return false;
+  if (/steven's pokémon/.test(t) && !name.includes('steven')) return false;
+  if (/hop's pokémon/.test(t) && !name.includes('hop')) return false;
+  if (/n's pokémon/.test(t) && !/\bn's\b/.test(name) && !name.startsWith("n ")) return false;
+  if (/\{c\} pokémon/.test(t)) {
+    const types = (card?.types || []).map(lower);
+    if (types.length && !types.includes('colorless')) return false;
+  }
+  const typeMatch = t.match(/\{([wlfmpdgyn])\}/i);
+  if (typeMatch) {
+    const typeMap = {
+      w: 'water',
+      l: 'lightning',
+      f: 'fighting',
+      m: 'metal',
+      p: 'psychic',
+      d: 'darkness',
+      g: 'grass',
+      y: 'fairy',
+      n: 'dragon',
+    };
+    const want = typeMap[typeMatch[1].toLowerCase()];
+    const types = (card?.types || []).map(lower);
+    if (want && types.length && !types.includes(want)) return false;
+  }
+  if (/stage 2 pokémon/.test(t)) {
+    const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
+    if (stage && stage !== 'stage2') return false;
+  }
+  if (/basic pokémon/.test(t)) {
+    const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
+    if (stage && stage !== 'basic') return false;
+  }
+  if (/each psyduck/.test(t) && !name.includes('psyduck')) return false;
+  if (/tera pokémon/.test(t) && !(card?.subtypes || []).map(lower).includes('tera')) return false;
+  return true;
+}
+
+export function pokemonHasRuleBox(card) {
+  const sub = (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
+  return sub.some((s) =>
+    ['ex', 'gx', 'v', 'vstar', 'vmax', 'tera', 'radiant', 'prism star', 'ace spec'].includes(s)
+  );
 }
 
 /**
@@ -212,47 +446,50 @@ export function isStadiumHandProtect(card) {
  */
 export function parseStadiumHpModifier(card) {
   const t = textOf(card);
-  if (!t) return 0;
-  // Must mention HP explicitly
-  if (!/hp/.test(t)) return 0;
-  // Negative: "have N less HP" / "HP decreases by N" / "N less HP"
+  if (!t || !/hp/.test(t)) return 0;
+  // Negative: "-N HP" / "gets -N HP" / "have N less HP"
+  const negSigned = t.match(/(?:gets?\s*)?-\s*(\d+)\s*hp/);
+  if (negSigned) return -parseInt(negSigned[1], 10);
   if (/(less|decrease|reduc|lower)/.test(t)) {
     const m = t.match(/(\d+)\s*(?:less|hp)|decreases? by\s*(\d+)|reduced by\s*(\d+)/);
     const n = m ? parseInt(m[1] || m[2] || m[3], 10) : 10;
     return -(n || 10);
   }
-  // Positive: "+N HP" / "have N more HP" / "HP increases by N" / "N more HP"
   const m =
-    t.match(/\+?(\d+)\s*(?:hp|more hp)|hp\s*(?:increases?|goes? up|raises?)\s*by\s*(\d+)|(\d+)\s*more hp/);
+    t.match(/\+\s*(\d+)\s*(?:hp|more hp)|hp\s*(?:increases?|goes? up|raises?)\s*by\s*(\d+)|(\d+)\s*more hp/);
   const n = m ? parseInt(m[1] || m[2] || m[3], 10) : 0;
   return n || 0;
+}
+
+/** Stadium HP modifier applies to this Pokémon (stage/name/type filters). */
+export function stadiumHpModifierMatches(stadiumCard, pokemon) {
+  if (!pokemon) return true;
+  return stadiumFilterMatches(pokemon, stadiumCard);
+}
+
+/** Who receives a stadium modifier: owner, opponent, or both. */
+function stadiumTargetScope(stadiumCard) {
+  const t = textOf(stadiumCard);
+  if (stadiumAffectsBothPlayers(stadiumCard)) return 'both';
+  if (/your opponent|opponent's/.test(t)) return 'opponent';
+  if (/your pokémon|your (?!opponent)/.test(t)) return 'owner';
+  return 'both';
 }
 
 /**
  * Determine the HP bonus applicable to a given player's Pokémon from the
  * current stadium. Returns a number (positive or negative, 0 if none).
- * Checks `rulesState.enabled` and stadium ownership:
- *   - "your" → only the stadium owner
- *   - "opponent" → only the non-owner
- *   - general ("all", "in play", no pronoun) → both players
  */
-export function getStadiumHpBonus(targetPlayer) {
+export function getStadiumHpBonus(targetPlayer, pokemon = null) {
   if (!rulesState.enabled) return 0;
   const stadium = getStadium();
   if (!stadium?.card) return 0;
   const bonus = parseStadiumHpModifier(stadium.card);
   if (bonus === 0) return 0;
-  const t = textOf(stadium.card);
-  // Determine who the bonus targets
-  if (/your opponent|opponent's/.test(t)) {
-    // Only applies to the non-owner
-    return targetPlayer !== stadium.user ? bonus : 0;
-  }
-  if (/your pokémon|your (?!opponent)/.test(t)) {
-    // Only applies to the owner
-    return targetPlayer === stadium.user ? bonus : 0;
-  }
-  // General / both — applies to all
+  if (pokemon && !stadiumHpModifierMatches(stadium.card, pokemon)) return 0;
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent') return targetPlayer !== stadium.user ? bonus : 0;
+  if (scope === 'owner') return targetPlayer === stadium.user ? bonus : 0;
   return bonus;
 }
 
@@ -260,10 +497,10 @@ export function getStadiumHpBonus(targetPlayer) {
  * Compute effective HP for a Pokémon given a base HP and the target player.
  * Clamped to ≥ 1 so a −HP modifier can't make a Pokémon have 0 HP.
  */
-export function effectiveHp(baseHp, targetPlayer) {
+export function effectiveHp(baseHp, targetPlayer, pokemon = null) {
   const base = baseHp || 0;
   if (!base) return 0;
-  const bonus = getStadiumHpBonus(targetPlayer);
+  const bonus = getStadiumHpBonus(targetPlayer, pokemon);
   return Math.max(1, base + bonus);
 }
 
@@ -280,18 +517,32 @@ export function effectiveHp(baseHp, targetPlayer) {
  */
 export function parseStadiumEvolutionSpeed(card) {
   const t = textOf(card);
-  const out = { relaxTurnGate: false, costReduce: 0 };
+  const out = { relaxTurnGate: false, costReduce: 0, typeFilter: null };
   if (!t || !/evolv/.test(t)) return out;
-  // Turn-gate relaxer phrasings.
+  const typeMatch = t.match(/\{([wlfmpdgyn])\}/i);
+  if (typeMatch) {
+    const typeMap = {
+      w: 'water',
+      l: 'lightning',
+      f: 'fighting',
+      m: 'metal',
+      p: 'psychic',
+      d: 'darkness',
+      g: 'grass',
+      y: 'fairy',
+      n: 'dragon',
+    };
+    out.typeFilter = typeMap[typeMatch[1].toLowerCase()] || null;
+  }
   if (
     /as if (?:it|they) (?:had been|were) (?:in play|already)/.test(t) ||
     /since the start of the (?:game|battle|previous turn)/.test(t) ||
-    /even if (?:it|they) (?:had been|were) (?:just )?played/.test(t)
+    /even if (?:it|they) (?:had been|were) (?:just )?played/.test(t) ||
+    /during the turn (?:they|you) play those pokémon/.test(t) ||
+    /can evolve .* during the turn they play/.test(t)
   ) {
     out.relaxTurnGate = true;
   }
-  // Cost reducer: "evolving costs N less" / "evolutions cost N less Energy"
-  // / "the Cost of evolving … is reduced by N".
   if (/cost/.test(t) && /(less|reduc|lower)/.test(t)) {
     const m = t.match(/(?:by|less)\s*(\d+)/) || t.match(/(\d+)\s+less/);
     if (m) out.costReduce = parseInt(m[1], 10) || 1;
@@ -299,32 +550,256 @@ export function parseStadiumEvolutionSpeed(card) {
   return out;
 }
 
-/**
- * Determine the evolution-speed modifier applicable to a given player from
- * the current stadium, honouring the stadium's ownership targeting:
- *   - "your opponent" → only the non-owner
- *   - "your Pokémon" → only the owner
- *   - general (no pronoun) → both players
- * Returns `{ relaxTurnGate, costReduce }` (both neutral when none).
- */
-export function getStadiumEvolutionSpeed(targetPlayer) {
-  const neutral = { relaxTurnGate: false, costReduce: 0 };
+export function getStadiumEvolutionSpeed(targetPlayer, pokemon = null) {
+  const neutral = { relaxTurnGate: false, costReduce: 0, typeFilter: null };
   if (!rulesState.enabled) return neutral;
   const stadium = getStadium();
   if (!stadium?.card) return neutral;
   const parsed = parseStadiumEvolutionSpeed(stadium.card);
   if (!parsed.relaxTurnGate && parsed.costReduce === 0) return neutral;
-  const t = textOf(stadium.card);
-  if (/your opponent|opponent's/.test(t)) {
+  if (pokemon && parsed.typeFilter) {
+    const types = (pokemon?.types || []).map(lower);
+    if (types.length && !types.includes(parsed.typeFilter)) return neutral;
+  }
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent') {
     return targetPlayer !== stadium.user ? parsed : neutral;
   }
-  if (/your pokémon|your (?!opponent)/.test(t)) {
+  if (scope === 'owner') {
     return targetPlayer === stadium.user ? parsed : neutral;
   }
   return parsed;
 }
 
+/**
+ * Retreat cost modifier: "Retreat Cost … is {C} less" / "have no Retreat Cost".
+ * Returns delta applied to printed retreat (negative = cheaper).
+ */
+export function parseStadiumRetreatModifier(card) {
+  const t = textOf(card);
+  if (!t || !/retreat cost|retreat/.test(t)) return 0;
+  if (/no retreat cost|retreat cost of 0|retreat for free/.test(t)) return -Infinity;
+  if (/(less|reduc|lower)/.test(t)) {
+    const m = t.match(/(?:by|less)\s*(\d+)|(\d+)\s+less/);
+    return -(m ? parseInt(m[1] || m[2], 10) || 1 : 1);
+  }
+  return 0;
+}
+
+/** Effective retreat cost for a Pokémon with the current stadium in play. */
+export function getStadiumRetreatCost(baseRetreat, pokemon, targetPlayer) {
+  if (!rulesState.enabled) return baseRetreat;
+  const stadium = getStadium();
+  if (!stadium?.card) return baseRetreat;
+  const delta = parseStadiumRetreatModifier(stadium.card);
+  if (delta === 0) return baseRetreat;
+  if (!stadiumFilterMatches(pokemon, stadium.card)) return baseRetreat;
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent' && targetPlayer === stadium.user) return baseRetreat;
+  if (scope === 'owner' && targetPlayer !== stadium.user) return baseRetreat;
+  if (delta === -Infinity) return 0;
+  return Math.max(0, baseRetreat + delta);
+}
+
+/** Bench play damage (Risky Ruins): damage counters placed when benching Basics. */
+export function parseStadiumBenchDamageOnPlay(card) {
+  const t = textOf(card);
+  if (!t || !/bench/.test(t)) return null;
+  if (!/place\s+\d+\s+damage counter/.test(t)) return null;
+  const m = t.match(/place\s+(\d+)\s+damage counter/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** Attack damage bonus from stadium (Postwick-style). */
+export function parseStadiumAttackDamageBonus(card) {
+  const t = textOf(card);
+  if (!t || !/do\s+\d+\s+more damage/.test(t)) return 0;
+  const m = t.match(/do\s+(\d+)\s+more damage/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+export function getStadiumAttackDamageBonus(attacker, targetPlayer) {
+  if (!rulesState.enabled || !attacker) return 0;
+  const stadium = getStadium();
+  if (!stadium?.card) return 0;
+  const bonus = parseStadiumAttackDamageBonus(stadium.card);
+  if (bonus <= 0) return 0;
+  if (!stadiumFilterMatches(attacker, stadium.card)) return 0;
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
+  if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
+  return bonus;
+}
+
+/** Festival Grounds-style: Energy-attached Pokémon can't gain Special Conditions. */
+export function isStadiumStatusImmunity(card) {
+  const t = textOf(card);
+  return (
+    /special condition/.test(t) &&
+    /can'?t be affected|can't be affected|recover/.test(t) &&
+    /energy attached/.test(t)
+  );
+}
+
+/** Dizzying Valley: Confused Pokémon don't recover on evolve/devolve. */
+export function isStadiumConfusedPersist(card) {
+  const t = textOf(card);
+  return /confused pokémon/.test(t) && /don'?t recover/.test(t) && /evolve|devolve/.test(t);
+}
+
+/** Area Zero Underdepths-style bench limit (null = default 5). */
+export function parseStadiumBenchLimit(card) {
+  const t = textOf(card);
+  const m = t.match(/up to (\d+) pokémon on (?:their|your) bench/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** Bench play damage applies to this Pokémon (Risky Ruins filters). */
+export function stadiumBenchDamageApplies(pokemon, stadiumCard) {
+  const amount = parseStadiumBenchDamageOnPlay(stadiumCard);
+  if (!amount) return null;
+  const t = textOf(stadiumCard);
+  const stage = lower(pokemon?.stage || '').replace(/[^a-z0-9]/g, '');
+  if (/basic/.test(t) && stage && stage !== 'basic') return null;
+  if (/non-\{d\}/.test(t)) {
+    const types = (pokemon?.types || []).map(lower);
+    if (types.includes('darkness')) return null;
+  }
+  return amount;
+}
+
+/** Festival Grounds: block new Special Conditions on Energy-attached Pokémon. */
+export function stadiumBlocksStatusApplication(pokemon, zoneCards = []) {
+  if (!rulesState.enabled) return false;
+  const stadium = getStadium()?.card;
+  if (!stadium || !isStadiumStatusImmunity(stadium)) return false;
+  if (!pokemon?.image) return false;
+  const attached = (zoneCards || []).filter(
+    (c) => c.type === 'Energy' && c.image?.relative === pokemon.image
+  );
+  return attached.length > 0;
+}
+
+export function getStadiumDamageReduction(defender, targetPlayer, zoneId = 'active') {
+  if (!rulesState.enabled || !defender) return 0;
+  const stadium = getStadium();
+  if (!stadium?.card) return 0;
+  const amount = parseStadiumDamageReduction(stadium.card);
+  if (amount <= 0) return 0;
+  if (!stadiumFilterMatches(defender, stadium.card)) return 0;
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
+  if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
+  return amount;
+}
+
+export function stadiumBlocksToolEffects() {
+  if (!rulesState.enabled) return false;
+  const stadium = getStadium()?.card;
+  return stadium ? isStadiumToolNegation(stadium) : false;
+}
+
+/** Jamming Tower: Pokémon Tools have no effect. */
+export function isStadiumToolNegation(card) {
+  const t = textOf(card);
+  return /pokémon tools/.test(t) && /have no effect/.test(t);
+}
+
+/** Team Rocket's Watchtower: matching Pokémon have no Abilities. */
+export function isStadiumAbilityNegation(card) {
+  const t = textOf(card);
+  return /have no abilities/.test(t);
+}
+
+export function stadiumAbilityBlocked(pokemon) {
+  if (!rulesState.enabled || !pokemon) return false;
+  const stadium = getStadium()?.card;
+  if (!stadium || !isStadiumAbilityNegation(stadium)) return false;
+  return stadiumFilterMatches(pokemon, stadium);
+}
+
+/** Perilous Jungle: extra poison damage during Pokémon Checkup. */
+export function parseStadiumCheckupPoisonBonus(card) {
+  const t = textOf(card);
+  if (!/pokémon checkup/.test(t) || !/poisoned/.test(t)) return 0;
+  const m = t.match(/(\d+)\s+more damage counter/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+export function getStadiumCheckupPoisonBonus(pokemon, targetPlayer) {
+  if (!rulesState.enabled || !pokemon) return 0;
+  const stadium = getStadium();
+  if (!stadium?.card) return 0;
+  const bonus = parseStadiumCheckupPoisonBonus(stadium.card);
+  if (bonus <= 0) return 0;
+  const t = textOf(stadium.card);
+  if (/non-\{d\}/.test(t)) {
+    const types = (pokemon?.types || []).map(lower);
+    if (types.includes('darkness')) return 0;
+  }
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
+  if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
+  return bonus;
+}
+
+/** Nighttime Mine: attacks cost {C} more for filtered Pokémon. */
+export function parseStadiumAttackCostIncrease(card) {
+  const t = textOf(card);
+  if (!/cost/.test(t) || !/more/.test(t)) return 0;
+  const m = t.match(/\{c\}\s+more|cost\s+\{c\}\s+more|(\d+)\s+more/);
+  return m ? parseInt(m[1], 10) || 1 : 1;
+}
+
+export function getStadiumAttackCostIncrease(attacker, targetPlayer) {
+  if (!rulesState.enabled || !attacker) return 0;
+  const stadium = getStadium();
+  if (!stadium?.card) return 0;
+  const increase = parseStadiumAttackCostIncrease(stadium.card);
+  if (increase <= 0) return 0;
+  if (!stadiumFilterMatches(attacker, stadium.card)) return 0;
+  const scope = stadiumTargetScope(stadium.card);
+  if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
+  if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
+  return increase;
+}
+
 // ── Execution orchestrator ─────────────────────────────────────────────
+
+function collectPassiveStadiumResults(card) {
+  const results = [];
+  const prevention = parseStadiumDamagePreventionDetail(card);
+  if (prevention) results.push({ action: 'damage-prevention', ...prevention });
+  const reduction = parseStadiumDamageReduction(card);
+  if (reduction > 0) results.push({ action: 'damage-reduction', amount: reduction });
+  if (isStadiumRetreatPrevention(card)) {
+    results.push({ action: 'retreat-prevention', target: 'opponent' });
+  }
+  if (isStadiumHandProtect(card)) results.push({ action: 'hand-protect' });
+  const hpMod = parseStadiumHpModifier(card);
+  if (hpMod !== 0) results.push({ action: 'hp-modifier', amount: hpMod });
+  const evo = parseStadiumEvolutionSpeed(card);
+  if (evo.relaxTurnGate || evo.costReduce > 0) results.push({ action: 'evolution-speed', ...evo });
+  const retreatMod = parseStadiumRetreatModifier(card);
+  if (retreatMod !== 0) results.push({ action: 'retreat-modifier', delta: retreatMod });
+  const benchDmg = parseStadiumBenchDamageOnPlay(card);
+  if (benchDmg) results.push({ action: 'bench-damage-on-play', amount: benchDmg });
+  const atkBonus = parseStadiumAttackDamageBonus(card);
+  if (atkBonus > 0) results.push({ action: 'attack-damage-bonus', amount: atkBonus });
+  if (isStadiumStatusImmunity(card)) results.push({ action: 'status-immunity' });
+  if (isStadiumConfusedPersist(card)) results.push({ action: 'confused-persist' });
+  const benchLimit = parseStadiumBenchLimit(card);
+  if (benchLimit) results.push({ action: 'bench-limit', limit: benchLimit });
+  const costMod = parseStadiumCostModifier(card);
+  if (costMod > 0) results.push({ action: 'cost-modifier', amount: costMod });
+  if (isStadiumToolNegation(card)) results.push({ action: 'tool-negation' });
+  if (isStadiumAbilityNegation(card)) results.push({ action: 'ability-negation' });
+  const checkupPoison = parseStadiumCheckupPoisonBonus(card);
+  if (checkupPoison > 0) results.push({ action: 'checkup-poison', amount: checkupPoison });
+  const costInc = parseStadiumAttackCostIncrease(card);
+  if (costInc > 0) results.push({ action: 'attack-cost-increase', amount: costInc });
+  return results;
+}
 
 /**
  * Apply (or describe) a stadium effect. Returns:
@@ -355,7 +830,7 @@ export function applyStadiumEffect(card) {
     }
     case 'once-per-turn': {
       const parsed = parseStadiumOncePerTurn(card);
-      if (parsed) results.push({ action: parsed.kind, n: parsed.n });
+      if (parsed) results.push({ action: parsed.kind, ...parsed });
       return {
         family,
         executed: true,
@@ -365,31 +840,33 @@ export function applyStadiumEffect(card) {
     }
     case 'continuous-both':
     case 'opponent-affected': {
-      const prevention = parseStadiumDamagePrevention(card);
-      if (prevention !== null) {
-        results.push({ action: 'damage-prevention', amount: prevention });
-      }
-      if (isStadiumRetreatPrevention(card)) {
-        results.push({ action: 'retreat-prevention', target: 'opponent' });
-      }
-      if (isStadiumHandProtect(card)) {
-        results.push({ action: 'hand-protect' });
-      }
+      const passiveResults = collectPassiveStadiumResults(card);
+      results.push(...passiveResults);
       return {
         family,
-        executed: true,
+        executed: results.length > 0,
         message: `◈ ${description} (continuous — always active while in play).`,
         results,
       };
     }
     case 'none':
     case 'unknown':
-    default:
+    default: {
+      const passiveResults = collectPassiveStadiumResults(card);
+      if (passiveResults.length > 0) {
+        return {
+          family: 'continuous-both',
+          executed: true,
+          message: `◈ ${description} (continuous — always active while in play).`,
+          results: passiveResults,
+        };
+      }
       return {
         family,
         executed: false,
         message: `◈ ${description} (no recognized effect to execute)`,
         results: [],
       };
+    }
   }
 }

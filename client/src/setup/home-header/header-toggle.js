@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../initialization/global-variables/global-variables.js';
 
 export const show = (id, button) => {
   const deckImport = document.getElementById('deckImport');

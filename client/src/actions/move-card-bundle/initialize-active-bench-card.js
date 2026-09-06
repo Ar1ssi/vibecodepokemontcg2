@@ -1,7 +1,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addAbilityCounter } from '../counters/ability-counter.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
@@ -31,15 +31,20 @@ export const initializeActiveBenchCard = (user, movingCard, dZoneId, dZone) => {
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.removedNodes.length > 0) {
-        const removedNode = mutation.removedNodes[0];
-        if (
-          removedNode.nodeName === 'IMG' &&
-          container.getElementsByTagName('img').length === 0
-        ) {
-          if (container.parentElement) {
-            container.parentElement.style.zIndex = '0';
+        for (const removedNode of mutation.removedNodes) {
+          // Preview now clones instead of reparenting. An empty slot should
+          // always be discarded — including when moveCard reparents the <img>
+          // into a new play-container (the node stays `isConnected` there).
+          if (removedNode.closest?.('.card-preview-overlay')) continue;
+          if (
+            removedNode.nodeName === 'IMG' &&
+            container.getElementsByTagName('img').length === 0
+          ) {
+            if (container.parentElement) {
+              container.parentElement.style.zIndex = '0';
+            }
+            container.remove();
           }
-          container.remove();
         }
         if (['bench'].includes(dZoneId)) {
           const selectedBenchZone = getZone(user, 'bench');

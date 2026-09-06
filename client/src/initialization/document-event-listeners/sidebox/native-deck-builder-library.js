@@ -9,6 +9,7 @@ import {
       saveLibraryToStorage,
       setDeckSleeve,
       setDeckCoin,
+      setDeckMat,
       MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
     import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
@@ -249,6 +250,12 @@ import {
               commit(setDeckCoin(library, activeId, coinId), { silent: true });
               return true;
             },
+        setActiveMat: (target, matId) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              if (!activeId || !library?.decks?.[activeId]) return false;
+              commit(setDeckMat(library, activeId, matId), { silent: true });
+              return true;
+            },
             getActiveDeckName: (target) => {
           const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
         },
@@ -260,6 +267,10 @@ import {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].coinId || null : null;
             },
+        getActiveMat: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
+            },
             saveActiveDeck: (cards) => {
           const activeId = activeDeckIds[currentTarget];
           if (!activeId || !library?.decks?.[activeId]) return false;
@@ -268,7 +279,9 @@ import {
           });
           return true;
         },
-        getActiveDeckId: () => activeDeckIds[currentTarget],
+        getActiveDeckId: (target) =>
+          activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??
+          activeDeckIds[currentTarget],
         getLibrary: () => library,
       };
     };

@@ -44,6 +44,7 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
         cards: structuredClone(cards),
         sleeveId: options.sleeveId ?? null,
         coinId: options.coinId ?? null,
+        matId: options.matId ?? null,
       };
       nextLibrary.order = [...(nextLibrary.order || []), deckId];
       return { library: nextLibrary, deckId };
@@ -82,6 +83,14 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
           if (!library?.decks?.[deckId]) return structuredClone(library);
           const nextLibrary = structuredClone(library);
           nextLibrary.decks[deckId].coinId = coinId || null;
+          nextLibrary.decks[deckId].updatedAt = Date.now();
+          return nextLibrary;
+        }
+    
+        export function setDeckMat(library = {}, deckId, matId = null) {
+          if (!library?.decks?.[deckId]) return structuredClone(library);
+          const nextLibrary = structuredClone(library);
+          nextLibrary.decks[deckId].matId = matId || null;
           nextLibrary.decks[deckId].updatedAt = Date.now();
           return nextLibrary;
         }

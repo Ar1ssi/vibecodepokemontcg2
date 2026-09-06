@@ -1,10 +1,10 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, canPerformAction, startGame, beginTurn, endTurn, markAttacked } = await import('../rules-state.mjs');
+    const { rulesState, canPerformAction, startGame, beginTurn, endTurn, markAttacked, resetRulesSessionState } = await import('../rules-state.mjs');
     const { computeAttackDamage, canPayAttackCost, expandEnergyEntries } = await import('../attack-engine.mjs');
 const { classifyEnergyEffect } = await import('../energy-effects.mjs');
-const { decideTurnOrder } = await import('../rules-turnorder.mjs');
+const { decideTurnOrder, resolveTurnOrderCaller } = await import('../rules-turnorder.mjs');
     
     test('weakness doubles damage', () => {
       const result = computeAttackDamage({ types: ['Water'] }, { weakness: { type: 'Water', value: 2 } }, { damage: 60 });
@@ -243,5 +243,94 @@ const { decideTurnOrder } = await import('../rules-turnorder.mjs');
       assert.equal(decideTurnOrder({ caller: 'nonsense', call: 'heads', result: 'heads' }), 'self');
       assert.equal(decideTurnOrder({ caller: 'self', call: 'bogus', result: 'heads' }), 'opp');
       assert.equal(decideTurnOrder({}), 'self');
+    });
+
+    test('resolveTurnOrderCaller: paired socket ids give opposite designations', () => {
+      const roomId = 'room-abc';
+      const alpha = resolveTurnOrderCaller({
+        roomId,
+        socketId: 'alpha',
+        opponentSocketId: 'omega',
+        sessionKey: '0',
+        isMultiplayer: true,
+      });
+      const omega = resolveTurnOrderCaller({
+        roomId,
+        socketId: 'omega',
+        opponentSocketId: 'alpha',
+        sessionKey: '0',
+        isMultiplayer: true,
+      });
+      assert.notEqual(alpha, omega);
+      assert(['self', 'opp'].includes(alpha));
+      assert(['self', 'opp'].includes(omega));
+    });
+
+    test('resolveTurnOrderCaller: deterministic for same inputs', () => {
+      const first = resolveTurnOrderCaller({
+        roomId: 'room42',
+        socketId: 'aaa',
+        opponentSocketId: 'zzz',
+        sessionKey: '1',
+        isMultiplayer: true,
+      });
+      const second = resolveTurnOrderCaller({
+        roomId: 'room42',
+        socketId: 'aaa',
+        opponentSocketId: 'zzz',
+        sessionKey: '1',
+        isMultiplayer: true,
+      });
+      assert.equal(first, second);
+    });
+
+    test('resolveTurnOrderCaller: returns null until peer socket id is known', () => {
+      assert.equal(
+        resolveTurnOrderCaller({
+          roomId: 'room',
+          socketId: 'aaa',
+          opponentSocketId: null,
+          isMultiplayer: true,
+        }),
+        null
+      );
+    });
+
+    test('resolveTurnOrderCaller: solo always returns self', () => {
+      assert.equal(
+        resolveTurnOrderCaller({ roomId: '', socketId: '', isMultiplayer: false }),
+        'self'
+      );
+    });
+
+    test('resetRulesSessionState returns phase to setup for a fresh coin flip', async () => {
+      const { markMulligansResolved } = await import('../rules-state.mjs');
+      startGame('opp');
+      beginTurn('opp');
+      markMulligansResolved();
+      rulesState.turnNumber = 4;
+      rulesState.stadium = { user: 'self', card: { name: 'Path to the Peak' } };
+      rulesState.flags.self.attackerAttacked = true;
+
+      resetRulesSessionState();
+
+      assert.equal(rulesState.phase, 'setup');
+      assert.equal(rulesState.turnNumber, 0);
+      assert.equal(rulesState.turnPlayer, 'self');
+      assert.equal(rulesState.stadium, null);
+      assert.equal(rulesState.attackExecuting, false);
+      assert.equal(rulesState.flags.self.attackerAttacked, false);
+    });
+
+    test('resetRulesSessionState clears mulligansResolved for a new opening-hand check', async () => {
+      const { markMulligansResolved } = await import('../rules-state.mjs');
+      startGame('self');
+      beginTurn('self');
+      markMulligansResolved();
+      assert.equal(rulesState.mulligansResolved, true);
+
+      resetRulesSessionState();
+
+      assert.equal(rulesState.mulligansResolved, false);
     });
     

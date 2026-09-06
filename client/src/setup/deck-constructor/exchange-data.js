@@ -1,7 +1,9 @@
 import { reset } from '../../actions/general/reset.js';
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { processAction } from '../general/process-action.js';
+import { deckDataEquals } from '../general/sync-action-args.mjs';
+import { changePlaymat, getStoredMatId } from '../sizing/apply-mat-layout.js';
 
 export const exchangeData = (
   user,
@@ -10,47 +12,51 @@ export const exchangeData = (
   cardBack,
   coachingMode,
   callback = true,
+  matId = null,
   emit = true
 ) => {
   const flipBoardButton = document.getElementById('flipBoardButton');
   const coachingModeCheckbox = document.getElementById('coachingModeCheckbox');
 
   if (user === 'self') {
-    if (callback) {
-      appendMessage(
-        '',
-        systemState.p2SelfUsername + ' joined',
-        'announcement',
-        false
-      );
-    }
     systemState.selfDeckData = deckData;
-    systemState.p2OppCardBackSrc = cardBack;
-    reset('self', true, true, false, false);
+    if (emit) {
+      reset('self', true, true, false, false);
+    }
   } else if (user === 'opp') {
+    const opponentChanged =
+      systemState.p2OppUsername !== username ||
+      !deckDataEquals(systemState.p2OppDeckData, deckData);
     systemState.p2OppUsername = username;
     systemState.p2OppDeckData = deckData;
     systemState.p2OppCardBackSrc = cardBack;
+    if (matId) changePlaymat('opp', matId, false);
     if (coachingModeCheckbox.checked && coachingMode) {
       systemState.coachingMode = true;
       flipBoardButton.style.display = 'inline-block';
     }
-    appendMessage(
-      '',
-      systemState.p2OppUsername + ' joined',
-      'announcement',
-      false
-    );
-    reset('opp', true, true, false, false);
+    if (opponentChanged) {
+      appendMessage(
+        '',
+        systemState.p2OppUsername + ' joined',
+        'announcement',
+        false
+      );
+      reset('opp', true, true, false, false);
+    }
 
-    if (callback) {
+    // Only the originating client should chain a response; mirror/resync replays
+    // arrive with emit=false and must not send a second exchange or reset ready state.
+    if (callback && emit) {
       exchangeData(
         'self',
         systemState.p2SelfUsername,
         systemState.selfDeckData,
         systemState.cardBackSrc,
         coachingModeCheckbox.checked,
-        false
+        false,
+        getStoredMatId('self'),
+        true
       );
     }
   }
@@ -61,5 +67,6 @@ export const exchangeData = (
     cardBack,
     coachingMode,
     callback,
+    matId,
   ]);
 };

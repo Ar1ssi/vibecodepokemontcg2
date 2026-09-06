@@ -2,6 +2,12 @@
 import { resolveDefaultCardBackSrc } from '../../setup/deck-constructor/default-card-back.mjs';
 import { preloadImage } from '../../setup/general/preload-image.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+export {
+  selfContainer,
+  oppContainer,
+  selfContainerDocument,
+  oppContainerDocument,
+} from './containers.js';
 
 const defaultCardBackSrc = resolveDefaultCardBackSrc();
 
@@ -14,11 +20,6 @@ const socketUrl = window.location.hostname === 'ptcgsim.online'
 export const socket = io(socketUrl);
 // export const socket = io('http://localhost:4000/');
 
-// export references to HTML elements 'selfContainer' and 'oppContainer', and their respective content window documents for ease of access to the iframes
-export const selfContainer = document.getElementById('selfContainer');
-export const selfContainerDocument = selfContainer.contentWindow.document;
-export const oppContainer = document.getElementById('oppContainer');
-export const oppContainerDocument = oppContainer.contentWindow.document;
 // create globally accessible variable systemState, which holds information relevant to the state of the user's game
 export const systemState = {
   coachingMode: false,
@@ -41,6 +42,7 @@ export const systemState = {
     //refers to the user on the bottom half of the screen, e.g., initiator === 'self' means that the bottom half is the 'self' user
   },
   roomId: '',
+  opponentSocketId: '', // multiplayer peer socket.id for synced turn-order coin caller
   p1Username: (user) => {
     return user === 'self' ? 'Blue' : 'Red';
   },

@@ -2,7 +2,7 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
-} from '../../front-end.js';
+} from '../../state.js';
 
 export const initializePrizesObserver = () => {
   const prizesElement = selfContainerDocument.getElementById('prizes');

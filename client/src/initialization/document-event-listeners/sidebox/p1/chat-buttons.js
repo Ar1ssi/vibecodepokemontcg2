@@ -1,7 +1,7 @@
 import { attack, attachAbility, healAbility, pass, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
 import { abilityPicker } from '../../../../actions/ability-picker.js';
 import { undo } from '../../../../actions/general/undo.js';
-import { systemState } from '../../../../front-end.js';
+import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
 

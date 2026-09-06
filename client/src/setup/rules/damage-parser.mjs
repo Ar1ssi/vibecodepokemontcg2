@@ -28,8 +28,11 @@
 // ctx (all optional, defaulted):
 //   { energyCount, opponentPrizes, turnCount,
 //     attackerHp, defenderHp, coin: 'heads'|'tails',
-//     defenderDamage /* number of damage counters on the defender; leave
-//                         undefined when unknown — enables "is damaged" */ }
+//     defenderDamage /* damage counters on the defender; leave undefined
+//                         when unknown — enables "is damaged" */,
+//     attackerDamage /* damage counters on the attacker (this Pokémon) */ }
+
+import { parseSearchDeckParams } from './trainer-effects.mjs';
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
@@ -130,7 +133,19 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const ownBenchCount = ctx.ownBenchCount; // your Benched Pokémon
   const opponentBenchCount = ctx.opponentBenchCount; // opponent's Benched Pokémon
   const damagedBenchCount = ctx.damagedBenchCount; // your Benched Pokémon with damage counters
+  const attackerDamage = ctx.attackerDamage; // damage counters on this Pokémon
+  const defenderDamage = ctx.defenderDamage; // damage counters on opponent's Active
   const headsCount = ctx.headsCount; // heads from a "flip … for each heads" coin
+  const ownHandCount = ctx.ownHandCount; // cards in your hand
+  const ownPokemonInPlayCount = ctx.ownPokemonInPlayCount;
+  const roundAttackCount = ctx.roundAttackCount;
+  const teamRocketCount = ctx.teamRocketCount;
+  const ancientCount = ctx.ancientCount;
+  const grassPokemonCount = ctx.grassPokemonCount;
+  const specialEnergyOnSelfCount = ctx.specialEnergyOnSelfCount;
+  const opponentStatusCount = ctx.opponentStatusCount;
+  const damagedOwnPokemonCount = ctx.damagedOwnPokemonCount;
+  const taurosDamagedCount = ctx.taurosDamagedCount;
 
   let total = base;
 
@@ -176,9 +191,39 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     } else if (/beedrill/.test(unit)) {
       count = speciesCount;
       label = 'Beedrill/Beedrill ex in play';
+    } else if (/card in your hand/.test(unit)) {
+      count = ownHandCount;
+      label = 'cards in your hand';
+    } else if (/pok[ée]mon that has any damage counters/.test(unit) && !/benched/.test(unit)) {
+      count = damagedOwnPokemonCount;
+      label = 'your Pokémon with damage counters';
+    } else if (/tauros.*in its name/.test(unit) && /damage counter/.test(unit)) {
+      count = taurosDamagedCount;
+      label = 'Tauros with damage counters';
     } else if (/card in your opponent's hand/.test(unit)) {
       count = opponentHandCount;
       label = "cards in opponent's hand";
+    } else if (/round attack/.test(unit)) {
+      count = roundAttackCount;
+      label = 'Pokémon in play with the Round attack';
+    } else if (/team rocket's pok[ée]mon/.test(unit)) {
+      count = teamRocketCount;
+      label = "Team Rocket's Pokémon in play";
+    } else if (/ancient pok[ée]mon/.test(unit)) {
+      count = ancientCount;
+      label = 'Ancient Pokémon in play';
+    } else if (/\{g\} pok[ée]mon in play/.test(unit)) {
+      count = grassPokemonCount;
+      label = '{G} Pokémon in play';
+    } else if (/pok[ée]mon in play/.test(unit)) {
+      count = ownPokemonInPlayCount;
+      label = 'Pokémon in play';
+    } else if (/special energy card attached to this pok[ée]mon/.test(unit)) {
+      count = specialEnergyOnSelfCount;
+      label = 'Special Energy attached to this Pokémon';
+    } else if (/special condition affecting your opponent's active/.test(unit)) {
+      count = opponentStatusCount;
+      label = "Special Conditions on opponent's Active";
     } else if (/retreat cost/.test(unit)) {
       count = retreatCostColorless;
       label = "Colorless in opponent's Active's Retreat Cost";
@@ -188,8 +233,19 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
         : (ownBenchCount ?? 0) + (opponentBenchCount ?? 0);
       label = 'Benched Pokémon (both sides)';
     } else if (/damage counter|damaged/.test(unit)) {
-      count = damagedBenchCount;
-      label = 'your damaged Benched Pokémon';
+      if (/(?:your )?benched pok[ée]mon|benched.*damage counter|damaged benched/.test(unit)) {
+        count = damagedBenchCount;
+        label = 'your damaged Benched Pokémon';
+      } else if (/on this pok[ée]mon|this pok[ée]mon.*damage counter|damage counter.*on this pok/.test(unit)) {
+        count = attackerDamage;
+        label = 'damage counter on this Pokémon';
+      } else if (/opponent's active|defending pok[ée]mon|damage counter.*on your opponent/.test(unit)) {
+        count = defenderDamage;
+        label = "damage counter on opponent's Active Pokémon";
+      } else {
+        count = undefined;
+        label = unit || 'damage counter';
+      }
     } else if (/benched pok[ée]mon/.test(unit)) {
       count = ownBenchCount;
       label = 'your Benched Pokémon';
@@ -301,8 +357,8 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
 
   // ── Side effects (reported, never executed) ──
   let bench = 0;
-  if (text && /benched pokémon|your bench/.test(text) && /damage|do \d/.test(text)) {
-    bench = amount(text, /(?:also )?do (\d+) damage/);
+  if (text && /benched pok[ée]mon|your bench/.test(text) && /damage|do(?:es)? \d/.test(text)) {
+    bench = amount(text, /(?:also )?do(?:es)? (\d+) damage/);
     if (bench > 0) components.push('bench');
   }
   let heal = 0;
@@ -370,7 +426,18 @@ export function planBenchTarget(benchCount) {
 // Matches "draw/draws N card(s)"; returns 0 when the text has no such
 // clause. Pure.
 export function drawCount(attackText) {
-  const m = /draws? (\d+) cards?/i.exec(String(attackText || ''));
+  const text = String(attackText || '');
+  if (/draw\s+cards\s+until\s+you have\s+\d+\s+cards?/i.test(text)) return 0;
+  const m = /draws? (\d+) cards?/i.exec(text);
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+// Draw-until target hand size (taxonomy §D draw-until family). Pure.
+// Same pattern as attack-effects draw-until / trainer-effects drawUntil.
+export function drawUntilTarget(attackText) {
+  const m = /draw\s+cards\s+until\s+you have\s+(\d+)\s+cards?/i.exec(
+    String(attackText || '')
+  );
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
 }
 
@@ -393,11 +460,276 @@ export function switchClause(attackText) {
   return /switch your (?:active|bench|pok[ée]mon)/i.test(String(attackText || ''));
 }
 
-// Whether attack text carries a "Once during your turn" clause (taxonomy §D
-// once-per-turn family). Matches the common printed forms: "Once during your
-// turn: …", "Once during your turn, you may …". Only applied to attack text;
-// ability-side once-per-turn tracking is handled by the rules-state flag map.
-// Pure.
+// Whether attack text moves attached Energy to a Benched Pokémon (taxonomy §D
+// move-energy family). Matches Wheel Pass: "Move an Energy from this Pokémon
+// to 1 of your Benched Pokémon". Pure.
+export function moveEnergyClause(attackText) {
+  const text = String(attackText || '');
+  return (
+    /move an? energy from this pok[ée]mon/i.test(text) ||
+    (/move\b[^.;]*\benergy\b/i.test(text) && /benched pok[ée]mon|your bench/i.test(text)) ||
+    (/move\b[^.;]*\benergy\b/i.test(text) && /opponent's pok[ée]mon/i.test(text)) ||
+    /move any amount of (?:\{[a-zA-Z]\} )?energy from your pok[ée]mon to your other pok[ée]mon/i.test(text)
+  );
+}
+
+// Whether attack text reveals the opponent's hand (taxonomy §D reveal-hand
+// family). Matches Silent Wing: "Your opponent reveals their hand". Pure.
+export function revealHandClause(attackText) {
+  return /your opponent reveal(?:s)? (?:their )?hand/i.test(String(attackText || ''));
+}
+
+// Whether attack text Knocks Out the opponent's Active when it has a Special
+// Condition (taxonomy §D conditional-ko family). Matches Abyss Eye. Pure.
+export function conditionalKoClause(attackText) {
+  const text = String(attackText || '');
+  if (
+    /if your opponent's active pok[ée]mon is affected by a special condition/i.test(text) &&
+    /knocked out/i.test(text)
+  ) {
+    return true;
+  }
+  if (
+    /if your opponent's active pok[ée]mon is a basic pok[ée]mon/i.test(text) &&
+    /knocked out/i.test(text)
+  ) {
+    return true;
+  }
+  if (
+    /if your opponent's active pok[ée]mon has any special energy attached/i.test(text) &&
+    /knocked out/i.test(text)
+  ) {
+    return true;
+  }
+  if (/both active pok[ée]mon are knocked out/i.test(text)) {
+    return true;
+  }
+  if (/exactly \d+ damage counters?/.test(text) && /knocked out/i.test(text)) {
+    return true;
+  }
+  if (/least hp remaining/.test(text) && /knocked out/i.test(text)) {
+    return true;
+  }
+  if (/knock out 1 of your opponent's pok[ée]mon that has exactly \d+ damage counters/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+/** Exact damage-counter threshold for conditional KO (e.g. exactly 6 counters). */
+export function exactCounterKoThreshold(attackText) {
+  const m = /exactly (\d+) damage counters?/i.exec(String(attackText || ''));
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
+}
+
+/** Place N damage counters on the Attacking Pokémon (redirect-damage family). */
+export function redirectDamageCount(attackText) {
+  const m = /place (\d+) damage counters? on the attacking pok[ée]mon/i.exec(
+    String(attackText || '')
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Place N counters on opponent Active per card in your hand (hand-scaling). */
+export function handScalingDamage(attackText) {
+  const m =
+    /place (\d+) damage counters? on your opponent's active pok[ée]mon for each card in your hand/i.exec(
+      String(attackText || '')
+    );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Put attached Energy from this Pokémon into your hand (return-energy). */
+export function returnEnergyClause(attackText) {
+  return /put (?:\d+|an?) [^.]*energy[^.]*attached to this pok[ée]mon into your hand/i.test(
+    String(attackText || '')
+  );
+}
+
+export function returnEnergyCount(attackText) {
+  const text = String(attackText || '');
+  const m = /put (\d+)/i.exec(text);
+  if (m) return Math.max(1, parseInt(m[1], 10));
+  return /put an energy/i.test(text) ? 1 : 1;
+}
+
+/** Damage ignores Weakness and Resistance (immunity family). */
+export function immunityClause(attackText) {
+  return /isn't affected by|is not affected by|not affected by (?:any )?(?:weakness|resistance)/i.test(
+    String(attackText || '')
+  );
+}
+
+/** Heal self for damage dealt this attack (mirror-heal family). */
+export function mirrorHealClause(attackText) {
+  return /heal from this pok[ée]mon the same amount of damage you did/i.test(
+    String(attackText || '')
+  );
+}
+
+/** Copy another Pokémon's attack (copy-attack family). Returns target scope or null. */
+export function copyAttackScope(attackText) {
+  const t = String(attackText || '').toLowerCase();
+  if (
+    !/choose 1 of .* attacks and use it as this attack/.test(t) &&
+    !/choose an attack from .* and use it as this attack/.test(t)
+  ) {
+    return null;
+  }
+  if (/benched n's pok[ée]mon/.test(t)) return 'own-bench-ns';
+  if (/opponent's active tera/.test(t)) return 'opp-active-tera';
+  if (/opponent's active/.test(t)) return 'opp-active';
+  if (/opponent's pok[ée]mon in play/.test(t)) return 'opp-in-play';
+  return 'unknown';
+}
+
+/** Retaliate/thorns: counters on Attacking Pokémon if damaged next turn. */
+export function retaliateCount(attackText) {
+  const t = String(attackText || '');
+  if (
+    !/if this pok[ée]mon is damaged by an attack/i.test(t) ||
+    !/put (\d+ )?damage counters on the attacking pok[ée]mon/i.test(t)
+  ) {
+    return 0;
+  }
+  const m = /put (\d+) damage counters/i.exec(t);
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Put this Pokémon and attachments into your hand. */
+export function returnSelfClause(attackText) {
+  const t = String(attackText || '');
+  return (
+    /put this pok[ée]mon and all attached cards into your hand/i.test(t) ||
+    /put 1 of your benched pok[ée]mon and all attached cards into your hand/i.test(t)
+  );
+}
+
+/** Deferred damage at end of opponent's next turn. */
+export function deferredDamageCount(attackText) {
+  const m = /at the end of your opponent's next turn, put (\d+) damage counters/i.exec(
+    String(attackText || '')
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Look at top N of opponent's deck. */
+export function lookOpponentDeckCount(attackText) {
+  const m = /look at the top (\d+) cards of your opponent's deck/i.exec(
+    String(attackText || '')
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Look at top N of your own deck. */
+export function lookOwnDeckCount(attackText) {
+  const t = String(attackText || '');
+  if (/opponent's deck/i.test(t)) return 0;
+  const m = /look at the top (\d+) cards of your deck/i.exec(t);
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Each player draws N cards. */
+export function eachPlayerDrawCount(attackText) {
+  const m = /each player draws (\d+) cards?/i.exec(String(attackText || ''));
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Put/place damage counters on opponent Pokémon. */
+export function opponentCounterClause(attackText) {
+  const t = String(attackText || '');
+  let m = /choose (\d+) of your opponent's pok[ée]mon and put (\d+) damage counters on each/i.exec(t);
+  if (m) {
+    return {
+      mode: 'multi',
+      targets: parseInt(m[1], 10) || 1,
+      count: parseInt(m[2], 10) || 0,
+    };
+  }
+  m = /(?:place|put) (\d+) damage counters? on your opponent's active pok[ée]mon/i.exec(t);
+  if (m) return { mode: 'active', count: parseInt(m[1], 10) || 0 };
+  m = /(?:place|put) (\d+) damage counters? on 1 of your opponent's pok[ée]mon/i.exec(t);
+  if (m) return { mode: 'any', count: parseInt(m[1], 10) || 0 };
+  m = /(?:place|put) (\d+) damage counters? on your opponent's pok[ée]mon in any way/i.exec(t);
+  if (m) return { mode: 'any', count: parseInt(m[1], 10) || 0 };
+  return null;
+}
+
+/** Devolve a single opponent Active if evolved. */
+export function devolveActiveClause(attackText) {
+  return (
+    /if your opponent's active pok[ée]mon is an evolved pok[ée]mon/i.test(String(attackText || '')) &&
+    /devolve it by putting/i.test(String(attackText || ''))
+  );
+}
+
+/** Both Active Pokémon are Knocked Out. */
+export function bothActiveKoClause(attackText) {
+  return /both active pok[ée]mon are knocked out/i.test(String(attackText || ''));
+}
+
+/** KO if opponent Active has Special Energy attached. */
+export function specialEnergyKoClause(attackText) {
+  const t = String(attackText || '');
+  return (
+    /if your opponent's active pok[ée]mon has any special energy attached/i.test(t) &&
+    /knocked out/i.test(t)
+  );
+}
+
+/** Next-turn named attack bonus (Echoed Voice, Meteor Mash, …). */
+export function nextTurnBonusClause(attackText) {
+  const m =
+    /during your next turn, this pok[ée]mon's ([^.]+?) attack does (\d+) more damage/i.exec(
+      String(attackText || '')
+    );
+  if (!m) return null;
+  return { attackName: m[1].trim(), bonus: parseInt(m[2], 10) || 0 };
+}
+
+/** Devolve each opponent evolved Pokémon. */
+export function devolveOpponentClause(attackText) {
+  return /devolve each of your opponent's evolved pok[ée]mon/i.test(String(attackText || ''));
+}
+
+/** Recovers from all Special Conditions. */
+export function recoverAllStatusClause(attackText) {
+  return /recovers from all special conditions/i.test(String(attackText || ''));
+}
+
+/** Remaining HP cap for damage placement. */
+export function hpCapRemaining(attackText) {
+  const m = /until its remaining hp is (\d+)/i.exec(String(attackText || ''));
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
+}
+
+/** Return opponent Active Energy to their hand. */
+export function returnOpponentEnergyClause(attackText) {
+  return /put .* energy attached to your opponent's active pok[ée]mon into their hand/i.test(
+    String(attackText || '')
+  );
+}
+
+export function returnOpponentEnergyCount(attackText) {
+  const m = /put (\d+) energy/i.exec(String(attackText || ''));
+  return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+}
+
+/** Bench exact-counter KO threshold. */
+export function benchExactKoThreshold(attackText) {
+  const m =
+    /knock out 1 of your opponent's pok[ée]mon that has exactly (\d+) damage counters/i.exec(
+      String(attackText || '')
+    );
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
+}
+
+/** Whether attack text carries a "Once during your turn" clause (taxonomy §D
+ * once-per-turn family). Matches the common printed forms: "Once during your
+ * turn: …", "Once during your turn, you may …". Only applied to attack text;
+ * ability-side once-per-turn tracking is handled by the rules-state flag map.
+ * Pure.
+ */
 export function oncePerTurnClause(attackText) {
   return /once during your turn/i.test(String(attackText || ''));
 }
@@ -464,6 +796,25 @@ export function shuffleDrawClause(attackText) {
   }
   const m = /draw\s+(?:up\s+to\s+)?(\d+)?\s+cards?/i.exec(text);
   return { draw: m && m[1] ? Math.max(0, parseInt(m[1], 10)) : 1 };
+}
+
+// Parse a deck-search clause from attack text (Call for Family, Flock, …).
+// Returns { what, count, destination } or null when absent. Pure.
+export function parseAttackSearchClause(attackText) {
+  const text = String(attackText || '');
+  if (!/search your deck for/i.test(text)) return null;
+  return parseSearchDeckParams(lower(text));
+}
+
+// Resolve printed attack effect text from the attack object or its parent card.
+// Board cards sometimes carry stub attacks (name/cost/damage) before enrichment
+// fills `text` — always read through this before text-driven attack logic.
+export function resolveAttackText(card, attack) {
+  if (!attack) return '';
+  const direct = attack.text || attack.effect || '';
+  if (direct) return direct;
+  const match = card?.attacks?.find((a) => a?.name && a.name === attack.name);
+  return match?.text || match?.effect || '';
 }
 
 // One-line human summary of the parsed damage (for announcements).

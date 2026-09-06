@@ -1,17 +1,22 @@
 import { reset } from '../../../../actions/general/reset.js';
-import { readyUp } from '../../../../actions/general/ready.js';
+import { restartGame } from '../../../../actions/general/restart.js';
+import { readyUp, updateReadyButtons } from '../../../../actions/general/ready.js';
 import {
   socket,
   systemState,
   version,
   oppContainerDocument,
   selfContainerDocument,
-} from '../../../../front-end.js';
+} from '../../../../state.js';
 import {
   clearChatboxContent,
   exportChatboxContent,
 } from '../../../../setup/chatbox/export-chat.js';
 import { hideOptionsContextMenu } from '../../../../setup/chatbox/hide-options-context-menu.js';
+import {
+  copySyncCompareLog,
+  exportSyncLog,
+} from '../../../../setup/general/sync-logger-bridge.js';
 import { acceptAction } from '../../../../setup/general/accept-action.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
@@ -28,6 +33,8 @@ export const initializeP1BottomButtons = () => {
   };
   setupBothButton.addEventListener('click', setupBothFunction);
 
+  updateReadyButtons();
+
   const resetButton = document.getElementById('resetButton');
   const resetFunction = () => reset(systemState.initiator);
   resetButton.addEventListener('click', resetFunction);
@@ -38,6 +45,10 @@ export const initializeP1BottomButtons = () => {
     reset('opp');
   };
   resetBothButton.addEventListener('click', resetBothFunction);
+
+  const restartButton = document.getElementById('restartButton');
+  const restartFunction = () => restartGame();
+  restartButton.addEventListener('click', restartFunction);
 
   const optionsContextMenu = document.getElementById('optionsContextMenu');
 
@@ -59,6 +70,22 @@ export const initializeP1BottomButtons = () => {
   const exportLog = document.getElementById('exportLog');
   exportLog.addEventListener('click', () => {
     exportChatboxContent();
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const exportSyncLogButton = document.getElementById('exportSyncLog');
+  exportSyncLogButton.addEventListener('click', () => {
+    exportSyncLog().catch((err) => console.error('Export sync log failed:', err));
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const copySyncCompareLogButton = document.getElementById('copySyncCompareLog');
+  copySyncCompareLogButton.addEventListener('click', async () => {
+    try {
+      await copySyncCompareLog();
+    } catch (err) {
+      console.error('Copy sync compare failed:', err);
+    }
     optionsContextMenu.style.display = 'none';
   });
 
@@ -142,6 +169,7 @@ export const initializeP1BottomButtons = () => {
     setupBothButton.addEventListener('click', setupBothFunction);
     resetButton.addEventListener('click', resetFunction);
     resetBothButton.addEventListener('click', resetBothFunction);
+    restartButton.addEventListener('click', restartFunction);
   }
 
   function removeReplayListeners() {
@@ -156,6 +184,7 @@ export const initializeP1BottomButtons = () => {
     setupBothButton.removeEventListener('click', setupBothFunction);
     resetButton.removeEventListener('click', resetFunction);
     resetBothButton.removeEventListener('click', resetBothFunction);
+    restartButton.removeEventListener('click', restartFunction);
   }
 
   function enterReplayMode() {
@@ -176,6 +205,7 @@ export const initializeP1BottomButtons = () => {
     clearLog.style.display = 'none';
     document.getElementById('passBoardButton').style.display = 'none';
     document.getElementById('flipCoinButton').style.display = 'none';
+    restartButton.style.display = 'none';
 
     [oppContainerDocument, selfContainerDocument].forEach((doc) => {
       [
@@ -231,6 +261,7 @@ export const initializeP1BottomButtons = () => {
     clearLog.style.display = 'block';
     document.getElementById('passBoardButton').style.display = 'block';
     document.getElementById('flipCoinButton').style.display = 'block';
+    restartButton.style.display = '';
 
     [oppContainerDocument, selfContainerDocument].forEach((doc) => {
       [

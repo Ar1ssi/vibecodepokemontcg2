@@ -1,4 +1,4 @@
-import { systemState } from '../../front-end.js';
+import { systemState } from '../../state.js';
 
 export const cleanActionData = (user) => {
   if (user === 'self') {

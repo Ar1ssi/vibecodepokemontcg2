@@ -1,5 +1,6 @@
 
 /* Holofoil (simey) — @import must precede all other rules in this stylesheet. */
+@import url('./mat-coin.css');
 @import url('./holo/base.css');
 @import url('./holo/regular-holo.css');
 @import url('./holo/ex-regular.css');
@@ -10,6 +11,48 @@
 @import url('./holo/radiant-holo.css');
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
+@import url('./damage-counter.css');
+@import url('./status-marker.css');
+
+/* ── Modular zone geometry ────────────────────────────────────────────
+   Mirror of the block in `self-containers.css`; see the comment there.
+   Both playmat iframes read the same variable names so a picked mat can
+   re-fit either side's zones with one set of values. */
+:root {
+  --hand-height: 32%;
+
+  --bench-bottom: 34%;
+  --bench-left: 20%;
+  --bench-width: 60%;
+  --bench-height: 28%;
+  --bench-gap: 0.35vw;
+
+  --active-bottom: 63%;
+  --active-left: 32.5%;
+  --active-width: 35%;
+  --active-height: 32%;
+
+  --prizes-bottom: 35%;
+  --prizes-left: 1%;
+  --prizes-width: 7%;
+  --prizes-height: 46%;
+  --prizes-card-max-width: calc(50% - .1vw);
+
+  --deck-bottom: 64%;
+  --deck-right: 1%;
+  --deck-width: 9%;
+  --deck-height: 28%;
+
+  --discard-bottom: 35%;
+  --discard-right: 1%;
+  --discard-width: 9%;
+  --discard-height: 26%;
+
+  --lost-zone-bottom: 84%;
+  --lost-zone-left: 1%;
+  --lost-zone-width: 7%;
+  --lost-zone-height: 15%;
+}
 
 * {
   user-select: none;
@@ -98,7 +141,7 @@ body, input, textarea, button {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: calc(30% - 3px);
+  height: calc(var(--hand-height) - 3px);
   overflow-x: auto;
   display: flex;
   z-index: 0;
@@ -107,8 +150,8 @@ body, input, textarea, button {
 #hand img {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 3vh);
-  margin-bottom: 2vh;
+  max-height: calc(100% - 1.5vh);
+  margin-bottom: 1.5vh;
   margin-left: .25vw;
   margin-right: .25vw;
 }
@@ -118,8 +161,8 @@ body, input, textarea, button {
 #hand .mat-holo {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 3vh);
-  margin-bottom: 2vh;
+  max-height: calc(100% - 1.5vh);
+  margin-bottom: 1.5vh;
   margin-left: .25vw;
   margin-right: .25vw;
 }
@@ -130,40 +173,46 @@ body, input, textarea, button {
   max-height: none;
   margin: 0;
 }
+img.draw-flight-source,
+.mat-holo:has(img.draw-flight-source),
+.draw-flight-source {
+  visibility: hidden !important;
+}
 #handText {
   position: fixed;
   right: 2%;
-  bottom: 30%;
+  bottom: var(--hand-height);
   color: rgba(188, 90, 113, 0.864);  
 }
 #handLabel {
   position: fixed;
   left: 0%;
-  bottom: 29.5%;
+  bottom: calc(var(--hand-height) - 0.5%);
   color: rgba(188, 90, 113, 0.864);
   font-size: 5vh;
 }
 #bench {
   position: fixed;
-	bottom: 35%;
-	left: 10%;
-	width: 79%;
-	height: 25%;
+	bottom: var(--bench-bottom);
+	left: var(--bench-left);
+	width: var(--bench-width);
+	height: var(--bench-height);
 	display: flex;
 	justify-content: center;
 	align-items: flex-end;
+	gap: var(--bench-gap);
 	z-index: 0;
 }
 #bench div {
   height: 100%;
-	margin-right: 1%;
+	flex: 0 0 auto;
 }
 #active {
   position: fixed;
-	bottom: 65%;
-	left: 34%;
-	width: 32%;
-	height: 28%;
+	bottom: var(--active-bottom);
+	left: var(--active-left);
+	width: var(--active-width);
+	height: var(--active-height);
 	display: flex;
 	justify-content: center;
 	align-items: flex-end;
@@ -175,24 +224,24 @@ body, input, textarea, button {
 }
 #prizes {
   position: fixed;
-  bottom: 36%;
-  left: 1%;
-  width: 6%;
-  height: 43%;
+  bottom: var(--prizes-bottom);
+  left: var(--prizes-left);
+  width: var(--prizes-width);
+  height: var(--prizes-height);
   z-index: 0;
   padding: 5px;
 }
 #prizes img {
   margin-left: .1vw;
   width: auto;
-  max-width: calc(50% - .1vw);
+  max-width: var(--prizes-card-max-width);
 }
 /* Holo cards in prizes: same wrapper-sizes-live-instead-of-frozen-px
    approach as #hand .mat-holo above. */
 #prizes .mat-holo {
   margin-left: .1vw;
   width: auto;
-  max-width: calc(50% - .1vw);
+  max-width: var(--prizes-card-max-width);
   max-height: 33%;
 }
 #prizes .mat-holo img {
@@ -210,10 +259,10 @@ body, input, textarea, button {
 }
 #lostZoneCover {
   position: fixed;
-  bottom: 84%;
-  left: 1%;
-  width: 7%;
-  height: 15%;
+  bottom: var(--lost-zone-bottom);
+  left: var(--lost-zone-left);
+  width: var(--lost-zone-width);
+  height: var(--lost-zone-height);
   z-index: 0;
   background-color: rgba(233, 198, 233, 0.111);
   display: flex;
@@ -236,10 +285,10 @@ body, input, textarea, button {
 }
 #deckCover {
   position: fixed;
-  bottom: 66%;
-  right: 1%;
-  width: 8%;
-  height: 25%;
+  bottom: var(--deck-bottom);
+  right: var(--deck-right);
+  width: var(--deck-width);
+  height: var(--deck-height);
   display: flex;
   justify-content: center; 
   align-items:flex-start;
@@ -272,10 +321,10 @@ body, input, textarea, button {
 }
 #discardCover {
   position: fixed;
-  bottom: 36%;
-  right: 1%;
-  width: 8%;
-  height: 23%;
+  bottom: var(--discard-bottom);
+  right: var(--discard-right);
+  width: var(--discard-width);
+  height: var(--discard-height);
   display: flex;
   justify-content: center; 
   align-items:flex-start;
@@ -306,9 +355,24 @@ body, input, textarea, button {
   z-index: -1;
 }
 #board img {
+  box-sizing: border-box;
   width: auto;
-  height: 70%;
+  height: auto;
+  max-height: calc(100% - 1.5vh);
   margin: .25vw;
+}
+#board .mat-holo {
+  box-sizing: border-box;
+  width: auto;
+  max-height: calc(100% - 1.5vh);
+  margin: .25vw;
+}
+#board .mat-holo img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
 }
 .self-board {
   bottom: 61%;
@@ -353,23 +417,45 @@ body, input, textarea, button {
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
   padding: 20px;
   margin-right: 1%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .full-view img {
   height: 24%;
   margin: 0.5%;
 }
+/* The double-clicked card fills the panel so the preview is an enlargement;
+   `.full-view img { height: 24% }` above only sizes the attached energies and
+   tools around it. Holo wrappers carry a pixel size frozen at hydration time,
+   so it has to be overridden here (hence `!important`) and the aspect ratio
+   restated — the wrapper has no intrinsic width of its own. */
+.full-view > img.full-view-card {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+}
+.full-view > .mat-holo.full-view-card {
+  width: auto !important;
+  height: 100% !important;
+  aspect-ratio: var(--card-aspect);
+  margin: 0;
+}
+/* Double-click preview styles live in index.css (overlay is on the main page). */
+.card-preview-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
 .self-circle {
   position: absolute;
   border-radius: 50%;
-  background-color: rgb(255, 98, 0);
-  color: white;
   text-align: center;
 }
 .opp-circle {
   position: absolute;
   border-radius: 50%;
-  background-color: rgb(255, 98, 0);
-  color: white;
   text-align: center;
   transform: scaleX(-1) scaleY(-1);
 }
@@ -673,3 +759,22 @@ body, input, textarea, button {
     }
     .tcgl-shuffle { animation: tcgl-shuffle 0.42s ease-in-out; }
     
+/* ── Chosen playmat: let the parent page's mat art show through ────────
+   Mirror of the block in `self-containers.css`; see the comment there. */
+body.mat-active {
+  background: transparent !important;
+}
+body.mat-active::before {
+  display: none;
+}
+body.mat-active #deck,
+body.mat-active #discard,
+body.mat-active #lostZone,
+body.mat-active #active,
+body.mat-active #hand {
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: none !important;
+}
+body.mat-active .outline {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
