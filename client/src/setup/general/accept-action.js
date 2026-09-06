@@ -34,7 +34,7 @@ import {
 } from '../../actions/general/reveal-and-hide.js';
 import { rotateCard } from '../../actions/general/rotate-card.js';
 import { readyUp } from '../../actions/general/ready.js';
-import { setup } from '../../actions/general/setup.js';
+import { setup, setupPrizes } from '../../actions/general/setup.js';
 import { takeTurn } from '../../actions/general/take-turn.js';
 import { undo } from '../../actions/general/undo.js';
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
@@ -75,6 +75,7 @@ const functions = {
   reset: reset,
   restartGame: restartGame,
   setup: setup,
+  setupPrizes: setupPrizes,
   readyUp: readyUp,
   takeTurn: takeTurn,
   draw: draw,

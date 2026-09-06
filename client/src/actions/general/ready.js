@@ -3,7 +3,8 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { hasDeckLoaded } from '../../setup/general/has-deck-loaded.js';
 import { processAction } from '../../setup/general/process-action.js';
-import { setup } from './setup.js';
+import { rulesState } from '../../setup/rules/rules-state.mjs';
+import { setup, setupPrizes } from './setup.js';
 
 const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
 
@@ -63,9 +64,8 @@ export const clearReady = (user) => {
 
 // Called when a player presses their Set Up button. Rather than drawing a
 // hand and setting prizes immediately, this marks that player as "ready".
-// Once both players have pressed their Set Up button, the game
-// automatically sets 6 prizes and draws an opening hand of 7 for both
-// players.
+// Once both players have pressed their Set Up button, prizes are placed
+// (rules mode: hands wait until after the turn-order coin flip).
 export const readyUp = async (user, emit = true) => {
   // Local Set Up passes initiator; in 2P the local player always sits in self zones.
   if (emit && systemState.isTwoPlayer && user === systemState.initiator) {
@@ -104,17 +104,30 @@ export const readyUp = async (user, emit = true) => {
     }
     systemState.selfReady = false;
     systemState.oppReady = false;
-    appendMessage(
-      '',
-      'Both players are ready -- setting prizes and drawing opening hands!',
-      'announcement',
-      false
-    );
-    await setup('self');
-    if (!systemState.isTwoPlayer) {
-      // In solo/one-player mode there's no separate opponent client to
-      // trigger the mirrored setup, so do it locally for both sides.
-      await setup('opp');
+    if (rulesState.enabled) {
+      appendMessage(
+        '',
+        'Both players are ready — setting prizes!',
+        'announcement',
+        false
+      );
+      await setupPrizes('self');
+      if (!systemState.isTwoPlayer) {
+        await setupPrizes('opp');
+      }
+    } else {
+      appendMessage(
+        '',
+        'Both players are ready -- setting prizes and drawing opening hands!',
+        'announcement',
+        false
+      );
+      await setup('self');
+      if (!systemState.isTwoPlayer) {
+        // In solo/one-player mode there's no separate opponent client to
+        // trigger the mirrored setup, so do it locally for both sides.
+        await setup('opp');
+      }
     }
     updateReadyButtons();
     // Let other systems (e.g. the rules engine's turn-order coin flip)

@@ -8,18 +8,32 @@ import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { setupDealPlan } from '../general/setup-deal.mjs';
 
-// Draw starting hand of 7 and prize 6.
-// moveCard is async (ensureCardData). Firing the loop without await raced
-// every deal off deck[0]; the sync log sometimes showed only 3 prize moves.
-export const drawHand = async (user, initiator) => {
-  const moveOpts = systemState.syncReplaying ? { syncReplay: true } : {};
+const dealMoveOpts = () => (systemState.syncReplaying ? { syncReplay: true } : {});
+
+// Place prize cards from the top of the deck (rules-mode step 1).
+export const setOpeningPrizes = async (user, initiator) => {
+  const moveOpts = dealMoveOpts();
+  const plan = setupDealPlan(getZone(user, 'deck').getCount());
+  for (let i = 0; i < plan.prizes; i++) {
+    await moveCard(user, initiator, 'deck', 'prizes', 0, false, moveOpts);
+  }
+};
+
+// Draw opening hand from the top of the deck (rules-mode step 2, after coin flip).
+export const drawOpeningHand = async (user, initiator) => {
+  const moveOpts = dealMoveOpts();
   const plan = setupDealPlan(getZone(user, 'deck').getCount());
   for (let i = 0; i < plan.hand; i++) {
     await moveCard(user, initiator, 'deck', 'hand', 0, false, moveOpts);
   }
-  for (let i = 0; i < plan.prizes; i++) {
-    await moveCard(user, initiator, 'deck', 'prizes', 0, false, moveOpts);
-  }
+};
+
+// Draw starting hand of 7 and prize 6 (non-rules / legacy setup path).
+// moveCard is async (ensureCardData). Firing the loop without await raced
+// every deal off deck[0]; the sync log sometimes showed only 3 prize moves.
+export const drawHand = async (user, initiator) => {
+  await drawOpeningHand(user, initiator);
+  await setOpeningPrizes(user, initiator);
 };
 
 export const discardAndDraw = async (user, initiator, drawAmount, emit = true) => {
