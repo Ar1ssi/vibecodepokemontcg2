@@ -144,22 +144,42 @@ const isMoveEnergy = (t) => {
   return movesEnergy || unlimited || onPromotion;
 };
 
-const isMoveDamage = (t) =>
-  (hasWord(t, 'move') || t.includes('place')) &&
-  t.includes('damage counter') &&
-  hasDamageCounterPlacement(t);
+const isMoveDamage = (t) => {
+  const betweenOwn =
+    hasWord(t, 'move') &&
+    t.includes('damage counter') &&
+    t.includes('from') &&
+    (t.includes('to another') || t.includes('onto another'));
+  return (
+    betweenOwn ||
+    ((hasWord(t, 'move') || t.includes('place') || hasWord(t, 'put')) &&
+      t.includes('damage counter') &&
+      (hasDamageCounterPlacement(t) ||
+        t.includes('on 1 of your opponent') ||
+        t.includes('on this pokémon') ||
+        t.includes('on this pokemon')))
+  );
+};
 
 const isOpponentDisrupt = (t) =>
   t.includes('opponent') &&
   !isSelfHandDiscardCost(t) &&
   (t.includes('discard') || t.includes('shuffle') || t.includes('can\'t') || t.includes('cannot') || t.includes('lose') || (t.includes('put') && t.includes('into their hand')));
 
-const isRecursion = (t) =>
-  (t.includes('knocked out') &&
-    (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'))) ||
-  (t.includes('discard pile') &&
-    t.includes('into your hand') &&
-    (t.includes('put') || t.includes('return') || t.includes('add')));
+const isSelfKoOnUse = (t) =>
+  /if you use this ability.*knocked out/i.test(t) ||
+  (/this pokémon is knocked out/i.test(t) && t.includes('if you'));
+
+const isRecursion = (t) => {
+  if (isSelfKoOnUse(t)) return false;
+  return (
+    (t.includes('knocked out') &&
+      (t.includes('search') || t.includes('put') || t.includes('return') || t.includes('add'))) ||
+    (t.includes('discard pile') &&
+      t.includes('into your hand') &&
+      (t.includes('put') || t.includes('return') || t.includes('add')))
+  );
+};
 
 const isEvolve = (t) =>
   t.includes('evolve') && (t.includes('this pokémon') || t.includes('onto this pokémon'));
