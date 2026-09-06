@@ -387,7 +387,7 @@ export function planBenchTarget(benchCount) {
 // clause. Pure.
 export function drawCount(attackText) {
   const text = String(attackText || '');
-  if (/draw cards until you have \d+ cards/i.test(text)) return 0;
+  if (/draw\s+cards\s+until\s+you have\s+\d+\s+cards?/i.test(text)) return 0;
   const m = /draws? (\d+) cards?/i.exec(text);
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
 }
