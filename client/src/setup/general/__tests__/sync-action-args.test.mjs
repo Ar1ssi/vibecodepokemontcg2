@@ -8,9 +8,13 @@ import {
   splitEmitAndTail,
 } from '../sync-action-args.mjs';
 import { hashBoardSnapshot, hashCardList } from '../../zones/zone-hash.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   hashResyncKey,
+  resetBoardResyncDedupe,
   shouldAnimateDrawFlight,
+  shouldEmitBoardResync,
   shouldRequestHashResync,
 } from '../sync-replay.mjs';
 
@@ -106,4 +110,60 @@ test('shouldRequestHashResync: one fullReplay per matching counter pair', () => 
   assert.equal(next.request, true);
   assert.equal(next.key, '13:13');
   assert.equal(shouldRequestHashResync(next.key, 13, 13).request, false);
+});
+
+test('shouldEmitBoardResync: skip while catch-up is rebuilding the board', () => {
+  resetBoardResyncDedupe();
+  assert.equal(
+    shouldEmitBoardResync({
+      selfCounter: 56,
+      oppCounter: 17,
+      syncReplaying: true,
+    }).request,
+    false
+  );
+  assert.equal(
+    shouldEmitBoardResync({
+      selfCounter: 56,
+      oppCounter: 17,
+      isCatchingUp: true,
+    }).skipped,
+    'replaying'
+  );
+  const live = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 17 });
+  assert.equal(live.request, true);
+  assert.equal(live.key, '56:17');
+});
+
+test('shouldEmitBoardResync: hint_mismatch and apply_failed share one slot', () => {
+  resetBoardResyncDedupe();
+  const hint = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 17 });
+  assert.equal(hint.request, true);
+  // Same counters: the failed Darkrai drag would otherwise emit both
+  // hint_mismatch and apply_failed, then each replay would emit again.
+  const applyFailed = shouldEmitBoardResync({
+    selfCounter: 56,
+    oppCounter: 17,
+  });
+  assert.equal(applyFailed.request, false);
+  const later = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 19 });
+  assert.equal(later.request, true);
+  resetBoardResyncDedupe();
+});
+
+test('switchAbility relays active/bench swaps via moveCardBundle', () => {
+  const path = fileURLToPath(
+    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  const start = src.indexOf('export const switchAbility');
+  assert.ok(start >= 0, 'switchAbility export');
+  const next = src.indexOf('\nexport const ', start + 1);
+  const body = src.slice(start, next === -1 ? undefined : next);
+  assert.match(body, /moveCardBundle\(/);
+  assert.equal(
+    [...body.matchAll(/(?<![\w])moveCard\(/g)].length,
+    0,
+    'switchAbility must not call raw moveCard (local-only, never emitted)'
+  );
 });

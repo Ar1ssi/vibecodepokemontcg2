@@ -285,7 +285,7 @@ function discardStadiumInPlay() {
 function switchBenchToActive(user, benchCard) {
   const benchIdx = zone(user, 'bench').array.indexOf(benchCard);
   if (benchIdx < 0) return;
-  moveCard(user, user, 'bench', 'active', benchIdx, 0);
+  moveCardBundle(user, user, 'bench', 'active', benchIdx, false, 'move');
   msg(`  auto: switched in ${benchCard.name}`);
 }
 
