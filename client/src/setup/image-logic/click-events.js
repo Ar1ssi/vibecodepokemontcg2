@@ -254,7 +254,7 @@ export const doubleClick = (event) => {
   if (!mouseClick.card?.image) return;
   const targetImage = mouseClick.card.image;
   targetImage.classList.remove('highlight');
-  if (['active', 'bench'].includes(mouseClick.zoneId)) {
+  if (['active', 'bench', 'hand'].includes(mouseClick.zoneId)) {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {

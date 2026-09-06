@@ -135,7 +135,7 @@ export const openAttachedCardsPanel = (targetImage, card) => {
   return true;
 };
 
-// Double-click on active/bench: hide the mat card in place and animate a
+// Double-click on active/bench/hand: hide the card in place and animate a
 // high-res clone so closing does not re-seat a second copy.
 export const openCardPreview = (targetImage, card) => {
   const anchor = cardNode(card) ?? imageAnchor(targetImage);
