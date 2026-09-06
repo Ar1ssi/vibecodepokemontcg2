@@ -99,5 +99,5 @@ test('visualCardCount skips empty or single-card zones', () => {
   assert.equal(visualCardCount(0), 0);
   assert.equal(visualCardCount(1), 0);
   assert.equal(visualCardCount(2), 6);
-  assert.equal(visualCardCount(60), 10);
+  assert.equal(visualCardCount(60), 12);
 });

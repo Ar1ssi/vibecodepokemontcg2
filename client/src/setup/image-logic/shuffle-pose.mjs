@@ -3,9 +3,9 @@
 // tight ring, then collapse back onto the same pile.
 
 export const SHUFFLE_DURATION_MS = 1320;
-export const SHUFFLE_REVOLUTIONS = 1.12;
-export const SHUFFLE_VISUAL_CARDS = 10;
-export const SHUFFLE_BOARD_PULL = 0.16;
+export const SHUFFLE_REVOLUTIONS = 1.2;
+export const SHUFFLE_VISUAL_CARDS = 12;
+export const SHUFFLE_BOARD_PULL = 0.12;
 
 export const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 export const easeInCubic = (t) => t ** 3;
@@ -34,8 +34,8 @@ export const towardBoardOffset = (
 });
 
 export const shuffleRadiiFor = (deckRect) => ({
-  radiusX: Math.max(deckRect.width * 1.45, 56),
-  radiusY: Math.max(deckRect.height * 0.58, 34),
+  radiusX: Math.max(deckRect.width * 1.12, 48),
+  radiusY: Math.max(deckRect.height * 0.42, 28),
 });
 
 export const shuffleCardPose = (
@@ -45,13 +45,13 @@ export const shuffleCardPose = (
   { radiusX, radiusY, revolutions = SHUFFLE_REVOLUTIONS } = {}
 ) => {
   const spread = shuffleSpread(t);
-  const ring = 0.78 + 0.22 * ((index % 3) / 2);
+  const ring = 0.9 + 0.1 * ((index % 2) / 1);
   const angle =
     (index / Math.max(count, 1)) * Math.PI * 2 + t * revolutions * Math.PI * 2;
   return {
     x: Math.cos(angle) * radiusX * ring * spread || 0,
-    y: (Math.sin(angle) * radiusY * ring * spread - 8 * spread) || 0,
-    rotate: Math.sin(angle) * 18 * spread,
+    y: (Math.sin(angle) * radiusY * ring * spread - 6 * spread) || 0,
+    rotate: Math.sin(angle) * 10 * spread,
     scale: 1 + 0.07 * spread,
     z: Math.sin(angle),
     spread,
