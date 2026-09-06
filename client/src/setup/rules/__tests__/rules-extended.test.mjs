@@ -4266,3 +4266,91 @@ import test from 'node:test';
       assert.deepEqual(parseStatusFromAttackText(lilligant, 'tails'), ['confused']);
     });
 
+    // ── Rare Candy & Evolution Instance Tracking Regression Tests ──
+    test('evolution: two distinct card instances of the same species can both evolve in the same turn', async () => {
+      const { canEvolve, markEvolvedThisTurn } = await import('../evolution.mjs');
+      startGame();
+      beginTurn('self');
+      beginTurn('opp');
+      beginTurn('self'); // turn 3, evolution allowed
+      rulesState.enabled = true;
+
+      const swinub1 = { name: 'Swinub', stage: 'Basic', cardId: 'c_swinub_1' };
+      const swinub2 = { name: 'Swinub', stage: 'Basic', cardId: 'c_swinub_2' };
+      const piloswine = { name: 'Piloswine', stage: 'Stage 1', evolvesFrom: 'Swinub', cardId: 'c_piloswine_1' };
+      const mamoswine = { name: 'Mamoswine ex', stage: 'Stage 2', evolvesFrom: 'Piloswine', cardId: 'c_mamoswine_1' };
+
+      // Swinub 1 evolves into Piloswine
+      const r1 = await canEvolve('self', swinub1, piloswine, false);
+      assert.equal(r1.allowed, true);
+      markEvolvedThisTurn('self', swinub1);
+      markEvolvedThisTurn('self', piloswine);
+
+      // Swinub 1 cannot evolve again this turn
+      const r1Again = await canEvolve('self', swinub1, piloswine, false);
+      assert.equal(r1Again.allowed, false);
+      assert.match(r1Again.reason, /Already evolved/i);
+
+      // Piloswine 1 cannot evolve again this turn
+      const rPiloAgain = await canEvolve('self', piloswine, mamoswine, false);
+      assert.equal(rPiloAgain.allowed, false);
+      assert.match(rPiloAgain.reason, /Already evolved/i);
+
+      // Swinub 2 (same species, different instance) CAN evolve via Rare Candy!
+      const r2 = await canEvolve('self', swinub2, mamoswine, false, { isRareCandy: true });
+      assert.equal(r2.allowed, true);
+    });
+
+    test('evolution: Rare Candy validates evolution chain (Piloswine -> Swinub vs Charmeleon -> Swinub)', async () => {
+      const { canEvolve } = await import('../evolution.mjs');
+      startGame();
+      beginTurn('self');
+      beginTurn('opp');
+      beginTurn('self'); // turn 3
+      rulesState.enabled = true;
+
+      const swinub = { name: 'Swinub', stage: 'Basic', cardId: 'swinub_x' };
+      const mamoswine = { name: 'Mamoswine ex', stage: 'Stage 2', evolvesFrom: 'Piloswine', cardId: 'mamo_x' };
+      const charizard = { name: 'Charizard ex', stage: 'Stage 2', evolvesFrom: 'Charmeleon', cardId: 'char_x' };
+
+      // Mamoswine on Swinub via Rare Candy is allowed (Piloswine evolves from Swinub)
+      const rMamo = await canEvolve('self', swinub, mamoswine, false, { isRareCandy: true });
+      assert.equal(rMamo.allowed, true);
+
+      // Charizard on Swinub via Rare Candy is rejected (Charmeleon evolves from Charmander, not Swinub)
+      const rChar = await canEvolve('self', swinub, charizard, false, { isRareCandy: true });
+      assert.equal(rChar.allowed, false);
+      assert.match(rChar.reason, /Charmeleon.*Swinub/i);
+
+      // Mamoswine on Swinub WITHOUT Rare Candy is rejected
+      const rNormal = await canEvolve('self', swinub, mamoswine, false);
+      assert.equal(rNormal.allowed, false);
+      assert.match(rNormal.reason, /evolves from/i);
+    });
+
+    test('damage-parser: Rumbling March scales with Stage 2 Pokémon on Bench', async () => {
+      const { parseAttackDamage } = await import('../damage-parser.mjs');
+      const atk = {
+        name: 'Rumbling March',
+        damage: 180,
+        text: 'This attack does 40 more damage for each Stage 2 Pokémon on your Bench.',
+      };
+
+      // 0 Stage 2 on bench
+      const d0 = parseAttackDamage(atk, { hp: 340 }, { hp: 100 }, { stage2BenchCount: 0 });
+      assert.equal(d0.total, 180);
+      assert.equal(d0.resolved, true);
+
+      // 1 Stage 2 on bench: 180 + 40 = 220
+      const d1 = parseAttackDamage(atk, { hp: 340 }, { hp: 100 }, { stage2BenchCount: 1 });
+      assert.equal(d1.total, 220);
+      assert.equal(d1.resolved, true);
+      assert.ok(d1.notes.some((n) => n.includes('+ 40 × 1 (Stage 2 Pokémon on your Bench)')));
+
+      // 2 Stage 2 on bench: 180 + 80 = 260
+      const d2 = parseAttackDamage(atk, { hp: 340 }, { hp: 100 }, { stage2BenchCount: 2 });
+      assert.equal(d2.total, 260);
+      assert.equal(d2.resolved, true);
+      assert.ok(d2.notes.some((n) => n.includes('+ 40 × 2 (Stage 2 Pokémon on your Bench)')));
+    });
+

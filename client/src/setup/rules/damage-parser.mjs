@@ -147,6 +147,8 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const opponentStatusCount = ctx.opponentStatusCount;
   const damagedOwnPokemonCount = ctx.damagedOwnPokemonCount;
   const taurosDamagedCount = ctx.taurosDamagedCount;
+  const stage2BenchCount = ctx.stage2BenchCount;
+  const stage2InPlayCount = ctx.stage2InPlayCount;
 
   let total = base;
 
@@ -213,6 +215,12 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     } else if (/ancient pok[ée]mon/.test(unit)) {
       count = ancientCount;
       label = 'Ancient Pokémon in play';
+    } else if (/stage 2 pok[ée]mon (?:on your bench|benched)/.test(unit)) {
+      count = stage2BenchCount;
+      label = 'Stage 2 Pokémon on your Bench';
+    } else if (/stage 2 pok[ée]mon in play/.test(unit)) {
+      count = stage2InPlayCount;
+      label = 'Stage 2 Pokémon in play';
     } else if (/\{g\} pok[ée]mon in play/.test(unit)) {
       count = grassPokemonCount;
       label = '{G} Pokémon in play';
@@ -247,7 +255,7 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
         count = undefined;
         label = unit || 'damage counter';
       }
-    } else if (/benched pok[ée]mon/.test(unit)) {
+    } else if (/(?:benched pok[ée]mon|pok[ée]mon on your bench)/.test(unit)) {
       count = ownBenchCount;
       label = 'your Benched Pokémon';
     } else if (/heads/.test(unit)) {

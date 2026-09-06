@@ -20,6 +20,7 @@ export class Card {
   set;
   id;
   cardId;
+  uuid;
   /** Pure data state properties (decoupled from DOM) */
   damage = 0;
   specialCondition = null;
@@ -42,6 +43,10 @@ export class Card {
     this.number = number || null;
     this.set = set || null;
     this.id = id || null;
+    this.uuid =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `card_${Math.random().toString(36).slice(2)}_${Date.now()}`;
     /** Unique permanent instance identifier for the card */
     this.cardId = null;
     /** Stable deck-build index for multiplayer sync (same on both clients). */

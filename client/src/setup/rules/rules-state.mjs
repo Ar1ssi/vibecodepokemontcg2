@@ -43,7 +43,7 @@
     
     // ── card data enrichment: type chart data from TCGdex card details ──
     // Weakness/resistance: TCGdex exposes { type, value } on card details.
-    const cardDataCache = new Map();
+    export const cardDataCache = new Map();
     
     // ── name → id resolution for zone cards (built without a TCGdex id) ──
     // Zone `Card` objects carry only name/type/user/image. We resolve a TCGdex
@@ -169,7 +169,7 @@
     // candidate id doesn't cost a second round trip. `null` = fetch failed or
     // the id doesn't exist; failures are not memoized so a later call retries.
     const cardDetailCache = new Map();
-    async function fetchCardDetail(id) {
+    export async function fetchCardDetail(id) {
       if (cardDetailCache.has(id)) return cardDetailCache.get(id);
       try {
         const res = await fetch(`https://api.tcgdex.net/v2/en/cards/${id}`);
@@ -336,7 +336,7 @@
           retreatCost: detail.retreat ? detail.retreat.length : 0,
           attacks: mapDetailAttacks(detail.attacks),
           stage: detail.stage || null,
-          evolvesFrom: detail.evolvesFrom || null,
+          evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || [],
           trainerType: detail.trainerType || null,

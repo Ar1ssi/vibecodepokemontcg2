@@ -177,6 +177,9 @@ export const moveCardBundle = async (
     if (cardHints.isEvolution) {
       syncOptions.forceEvolution = true;
     }
+    if (cardHints.isRareCandy) {
+      syncOptions.isRareCandy = true;
+    }
     logSync('moveCardBundle.mirror.resolve', {
       oZoneId,
       dZoneId,
@@ -199,6 +202,13 @@ export const moveCardBundle = async (
           resolvedTargetIndex
         )
       : cardHints;
+
+  if (cardHints?.isRareCandy) {
+    syncOptions.isRareCandy = true;
+    if (hintsToSend && typeof hintsToSend === 'object') {
+      hintsToSend.isRareCandy = true;
+    }
+  }
 
   moveCardMessage(
     user,
