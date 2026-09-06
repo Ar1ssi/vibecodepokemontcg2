@@ -45,10 +45,12 @@ export function shouldRequestHashResync(
 }
 
 let lastBoardResyncKey = null;
+let lastSnapshotKey = null;
 
 /** @internal reset between unit tests */
 export function resetBoardResyncDedupe() {
   lastBoardResyncKey = null;
+  lastSnapshotKey = null;
 }
 
 /**
@@ -75,5 +77,32 @@ export function shouldEmitBoardResync({
     oppCounter
   );
   if (request) lastBoardResyncKey = key;
+  return { request, key };
+}
+
+/**
+ * One board snapshot per counter pair after action replay cannot converge.
+ * Separate from fullReplay dedupe so a failed replay can still request a
+ * snapshot of the peer's self board.
+ */
+export function shouldRequestBoardSnapshot({
+  selfCounter,
+  oppCounter,
+  syncReplaying = false,
+  isCatchingUp = false,
+} = {}) {
+  if (syncReplaying || isCatchingUp) {
+    return {
+      request: false,
+      skipped: 'replaying',
+      key: lastSnapshotKey,
+    };
+  }
+  const { request, key } = shouldRequestHashResync(
+    lastSnapshotKey,
+    selfCounter,
+    oppCounter
+  );
+  if (request) lastSnapshotKey = key;
   return { request, key };
 }

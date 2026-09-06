@@ -28,6 +28,11 @@ import {
 } from '../../setup/general/sync-logger-bridge.js';
 import { hashUserBoard } from '../../setup/zones/board-hash.js';
 import { shouldEmitBoardResync } from '../../setup/general/sync-replay.mjs';
+import { applyOppBoardSnapshot } from '../../setup/general/apply-board-snapshot.js';
+import {
+  emitSelfBoardSnapshot,
+  requestBoardSnapshot,
+} from '../../setup/general/request-board-snapshot.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -252,6 +257,7 @@ export const initializeSocketEventListeners = () => {
               },
               'in'
             );
+            requestBoardSnapshot();
             return;
           }
           socket.emit('resyncActions', {
@@ -332,10 +338,33 @@ export const initializeSocketEventListeners = () => {
         count: data.actionData?.length ?? 0,
         fullReplay: !!data.fullReplay,
       }, 'in');
-      pushActionQueue = pushActionQueue.then(() =>
-        catchUpActions(data.actionData, !!data.fullReplay)
-      );
+      pushActionQueue = pushActionQueue.then(async () => {
+        const ok = await catchUpActions(data.actionData, !!data.fullReplay);
+        if (!ok) requestBoardSnapshot();
+      });
     }
+  });
+  socket.on('requestBoardSnapshot', () => {
+    const notSpectator = !(
+      document.getElementById('spectatorModeCheckbox').checked &&
+      systemState.isTwoPlayer
+    );
+    if (!notSpectator) return;
+    logSync('snapshot.request.recv', {}, 'in');
+    void emitSelfBoardSnapshot();
+  });
+  socket.on('applyBoardSnapshot', (data) => {
+    const notSpectator = !(
+      document.getElementById('spectatorModeCheckbox').checked &&
+      systemState.isTwoPlayer
+    );
+    if (!notSpectator) return;
+    pushActionQueue = pushActionQueue.then(() => {
+      applyOppBoardSnapshot(data);
+      if (typeof data.counter === 'number') {
+        systemState.oppCounter = data.counter;
+      }
+    });
   });
   socket.on('syncCheck', (data) => {
     const notSpectator = !(

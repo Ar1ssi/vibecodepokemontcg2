@@ -16,6 +16,7 @@ export const catchUpActions = async (actionData, fullReplay = false) => {
     }
     const missingData = (actionData || []).slice(systemState.oppCounter);
 
+    let ok = true;
     for (const entry of missingData) {
       const parameters = entry.parameters ? [...entry.parameters] : entry.parameters;
       if (entry.action !== 'exchangeData' && entry.action !== 'loadDeckData') {
@@ -26,12 +27,14 @@ export const catchUpActions = async (actionData, fullReplay = false) => {
           parameters,
         });
       }
-      const ok = await acceptAction('opp', entry.action, parameters);
-      if (ok === false) {
+      const applied = await acceptAction('opp', entry.action, parameters);
+      if (applied === false) {
+        ok = false;
         break;
       }
       systemState.oppCounter++;
     }
+    return ok;
   } finally {
     systemState.isCatchingUp = false;
     systemState.syncReplaying = wasReplaying;

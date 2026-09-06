@@ -301,6 +301,8 @@ async function main() {
       'pushAction',
       'resyncActions',
       'catchUpActions',
+      'requestBoardSnapshot',
+      'applyBoardSnapshot',
       'syncCheck',
       'requestSyncLogBundle',
       'syncLogBundle',

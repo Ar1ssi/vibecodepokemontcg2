@@ -2,6 +2,7 @@ import { socket, systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { shouldEmitBoardResync } from '../../setup/general/sync-replay.mjs';
+import { requestBoardSnapshot } from '../../setup/general/request-board-snapshot.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import {
   buildCardHint,
@@ -21,6 +22,7 @@ function requestHintResync(reason, extra = {}) {
   });
   if (!request) {
     logSync('moveCardBundle.resync.skip', { reason, skipped, ...extra });
+    if (skipped !== 'replaying') requestBoardSnapshot();
     return;
   }
   socket.emit('resyncActions', {

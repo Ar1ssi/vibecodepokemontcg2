@@ -1,7 +1,7 @@
 {
   "name": "PTCG-sim",
   "user": "ubuntu",
-  "install": "pnpm install --frozen-lockfile",
+  "install": "pnpm install --frozen-lockfile && pnpm exec playwright install chromium",
   "terminals": [
     {
       "name": "server",
