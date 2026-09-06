@@ -197,6 +197,41 @@ const getPeekPercent = (state) =>
 const isCardSlotted = (state, card) =>
   state.mode !== 'browse' && state.slotAssignments?.includes(card);
 
+const countAvailableAround = (state) => {
+  const cards = state.cards ?? [];
+  const index = clampIndex(state.index ?? 0, Math.max(0, cards.length - 1));
+  let ahead = 0;
+  let behind = 0;
+  for (let i = index + 1; i < cards.length; i += 1) {
+    if (!isCardSlotted(state, cards[i])) ahead += 1;
+  }
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (!isCardSlotted(state, cards[i])) behind += 1;
+  }
+  return { ahead, behind, index };
+};
+
+const getChoosePeekCounts = (state) => {
+  const { ahead, behind } = countAvailableAround(state);
+  const total = ahead + behind + 1;
+  if (total <= CHOOSE_PEEK_MAX + 1) {
+    return { ahead, behind };
+  }
+  return {
+    ahead: Math.min(ahead, CHOOSE_PEEK_MAX),
+    behind: Math.min(behind, 1),
+  };
+};
+
+const chooseStartIndex = (candidates, requestedIndex) => {
+  const last = Math.max(0, candidates.length - 1);
+  if (requestedIndex !== 0) return clampIndex(requestedIndex, last);
+  if (candidates.length > 1 && candidates.length <= CHOOSE_PEEK_MAX + 1) {
+    return Math.floor(last / 2);
+  }
+  return 0;
+};
+
 const focusNextAvailableCard = (state) => {
   if (state.mode === 'browse' || !state.slotAssignments?.length) return;
   if (!isCardSlotted(state, state.cards[state.index])) return;
@@ -264,7 +299,6 @@ const syncChooseLayout = (state) => {
   if (state.mode === 'browse' || !state.overlay) return;
 
   const hasTrigger = Boolean(state.triggerSlot?.childElementCount);
-  const cardCount = Math.max(1, state.cards?.length || 1);
   const playmat = getPlaymatBounds();
   const vh = window.innerHeight;
 
@@ -274,9 +308,10 @@ const syncChooseLayout = (state) => {
   const cardW = Math.min(playmat.width * 0.28, 220, cardWFromH);
   const cardH = cardW * CARD_ASPECT;
 
-  const peekSlots = Math.min(Math.max(cardCount - 1, 1), CHOOSE_PEEK_MAX);
-  const leftPeek = cardW * (PEEK_PERCENT / 100) * peekSlots;
-  const carouselW = cardW + leftPeek;
+  const peeks = getChoosePeekCounts(state);
+  const leftPeek = cardW * (PEEK_PERCENT / 100) * peeks.ahead;
+  const rightPeek = cardW * (PEEK_PERCENT / 100) * peeks.behind;
+  const carouselW = cardW + leftPeek + rightPeek;
   const triggerNudge = hasTrigger ? TRIGGER_NUDGE_PX : 0;
   const topRowW =
     carouselW + (hasTrigger ? CHOOSE_TOP_GAP + triggerNudge + cardW : 0);
@@ -297,6 +332,8 @@ const syncChooseLayout = (state) => {
   state.overlay.style.setProperty('--card-picker-card-w', `${Math.round(cardW)}px`);
   state.overlay.style.setProperty('--card-picker-card-h', `${Math.round(cardH)}px`);
   state.overlay.style.setProperty('--card-picker-carousel-w', `${Math.round(carouselW)}px`);
+  state.overlay.style.setProperty('--card-picker-peek-left', `${Math.round(leftPeek)}px`);
+  state.overlay.style.setProperty('--card-picker-peek-right', `${Math.round(rightPeek)}px`);
   state.overlay.style.setProperty('--card-picker-top-gap', `${CHOOSE_TOP_GAP}px`);
   state.overlay.style.setProperty(
     '--card-picker-trigger-nudge',
@@ -505,6 +542,7 @@ const goToIndex = (state, nextIndex) => {
   state.targetDragPx = 0;
   state.renderDragPx = 0;
   stopDragLoop(state);
+  if (state.mode !== 'browse') syncChooseLayout(state);
   layoutStack(state);
 };
 
@@ -1029,7 +1067,9 @@ export const openCardPicker = async ({
     stack,
     slides: [],
     cards: candidates,
-    index: clampIndex(initialIndex, candidates.length - 1),
+    index: isBrowse
+      ? clampIndex(initialIndex, candidates.length - 1)
+      : chooseStartIndex(candidates, initialIndex),
     targetDragPx: 0,
     renderDragPx: 0,
     animFrameId: null,

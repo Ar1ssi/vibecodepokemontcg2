@@ -2062,16 +2062,18 @@ ul, li {
 }
 .card-picker-choose .card-picker-carousel-wrap {
   flex: 0 0 auto;
+  box-sizing: border-box;
   width: var(--card-picker-carousel-w);
   height: var(--card-picker-card-h);
+  padding-left: var(--card-picker-peek-left, 0px);
+  padding-right: var(--card-picker-peek-right, 0px);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   overflow: visible;
   position: relative;
 }
 .card-picker-choose .card-picker-top-row.has-trigger .card-picker-carousel-wrap {
-  justify-content: flex-end;
   overflow: hidden;
   isolation: isolate;
   z-index: 1;
