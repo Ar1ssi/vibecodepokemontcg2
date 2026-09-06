@@ -178,6 +178,11 @@ body, input, textarea, button {
   max-height: none;
   margin: 0;
 }
+img.draw-flight-source,
+.mat-holo:has(img.draw-flight-source),
+.draw-flight-source {
+  visibility: hidden !important;
+}
 #handText {
   position: fixed;
   right: 2%;

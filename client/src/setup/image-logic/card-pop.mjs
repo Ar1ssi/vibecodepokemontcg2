@@ -12,11 +12,15 @@
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
+const DRAW_SPRING = { stiffness: 0.09, damping: 0.68, precision: 0.02 };
 const PREVIEW_MAX_WIDTH = 780;
 const PREVIEW_WIDTH_FIT = 0.94;
 const PREVIEW_HEIGHT_FIT = 0.88;
 const CARD_ASPECT = 1.397;
 export const POPOVER_SPIN_DEGREES = 360;
+export const DRAW_FLIP_DEGREES = 180;
+export const DRAW_ARC_PX = 96;
+export const DRAW_PEAK_SCALE = 0.45;
 
 const tickSpring = (ctx, lastValue, currentValue, targetValue) => {
   if (typeof currentValue === 'number') {
@@ -301,6 +305,83 @@ export const playDeselectPop = (host, _onFrame, onDone) => {
     activePops.delete(host);
     onDone?.();
   });
+};
+
+/** TCG Live draw: pose along the deck→hand flight (arc + mid-air scale). */
+export const drawFlightPose = (
+  translate,
+  startTranslate,
+  scale,
+  rotateY,
+  arcSign = 1
+) => {
+  const startDist = Math.hypot(startTranslate.x, startTranslate.y) || 1;
+  const progress = 1 - Math.min(1, Math.hypot(translate.x, translate.y) / startDist);
+  const wave = Math.sin(progress * Math.PI);
+  return {
+    x: translate.x,
+    y: translate.y - arcSign * DRAW_ARC_PX * wave,
+    scale: scale * (1 + DRAW_PEAK_SCALE * wave),
+    rotateY,
+    progress,
+  };
+};
+
+/**
+ * Fly a host from the deck pile to a hand seat: sleeve-forward at takeoff,
+ * 180° flip to the face, slight lift toward the board center, then settle.
+ */
+export const playDrawFlight = (
+  host,
+  { startTranslate, startScale = 1, flip = true, arcSign = 1, onDone } = {}
+) => {
+  stopPop(host);
+  const origin = {
+    x: startTranslate?.x ?? 0,
+    y: startTranslate?.y ?? 0,
+  };
+  const scale = createSpring(startScale, DRAW_SPRING);
+  const translate = createSpring(origin, DRAW_SPRING);
+  const rotateDelta = createSpring(flip ? DRAW_FLIP_DEGREES : 0, DRAW_SPRING);
+  const paint = () => {
+    const pose = drawFlightPose(
+      translate.value,
+      origin,
+      scale.value,
+      rotateDelta.value,
+      arcSign
+    );
+    applyHostTransform(host, { x: pose.x, y: pose.y }, pose.scale, pose.rotateY);
+  };
+  const unsubs = [
+    scale.subscribe(paint),
+    translate.subscribe(paint),
+    rotateDelta.subscribe(paint),
+  ];
+  const motion = {
+    get rotateTarget() {
+      return rotateDelta.target;
+    },
+    retreat() {},
+    reset() {},
+    stop() {
+      unsubs.forEach((off) => off());
+      scale.stop();
+      translate.stop();
+      rotateDelta.stop();
+    },
+  };
+  activePops.set(host, motion);
+  Promise.all([
+    translate.set({ x: 0, y: 0 }),
+    scale.set(1),
+    rotateDelta.set(0),
+  ]).then(() => {
+    motion.stop();
+    activePops.delete(host);
+    onDone?.();
+  });
+  return motion;
 };
 
 /** @deprecated overlay-centering helper; popover motion no longer uses it */

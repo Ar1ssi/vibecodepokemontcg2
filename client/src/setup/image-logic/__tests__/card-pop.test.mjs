@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import {
+  DRAW_ARC_PX,
+  DRAW_FLIP_DEGREES,
+  DRAW_PEAK_SCALE,
   POPOVER_SPIN_DEGREES,
   centerDeltaFor,
   createPopoverMotion,
+  drawFlightPose,
   popoverScaleFor,
   previewSizeForSource,
   previewTargetSize,
@@ -89,4 +93,30 @@ test('retreat animates rotateY back to 0 for a reverse spin', () => {
   motion.retreat();
   assert.equal(motion.rotateTarget, 0);
   motion.stop();
+});
+
+test('drawFlightPose starts at the deck offset with no arc', () => {
+  const start = { x: 200, y: -80 };
+  const pose = drawFlightPose(start, start, 1, DRAW_FLIP_DEGREES, 1);
+  assert.equal(pose.progress, 0);
+  assert.equal(pose.x, 200);
+  assert.equal(pose.y, -80);
+  assert.equal(pose.rotateY, DRAW_FLIP_DEGREES);
+  assert.equal(pose.scale, 1);
+});
+
+test('drawFlightPose lifts and enlarges at mid-flight, then settles in the hand', () => {
+  const start = { x: 200, y: 0 };
+  const mid = drawFlightPose({ x: 100, y: 0 }, start, 1, 90, 1);
+  assert.ok(Math.abs(mid.progress - 0.5) < 0.001);
+  assert.ok(mid.y < 0);
+  assert.equal(mid.y, -DRAW_ARC_PX);
+  assert.equal(mid.scale, 1 + DRAW_PEAK_SCALE);
+
+  const end = drawFlightPose({ x: 0, y: 0 }, start, 1, 0, 1);
+  assert.equal(end.progress, 1);
+  assert.equal(end.x, 0);
+  assert.ok(Math.abs(end.y) < 1e-10);
+  assert.ok(Math.abs(end.scale - 1) < 1e-10);
+  assert.equal(end.rotateY, 0);
 });
