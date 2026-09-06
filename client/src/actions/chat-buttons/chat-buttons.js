@@ -867,7 +867,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             getZone(user, 'hand').getCount() < drawUntilN &&
             getZone(user, 'deck').getCount() > 0
           ) {
-            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', true);
+            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', emit);
             drewUntil++;
           }
           if (drewUntil === 0 && getZone(user, 'deck').getCount() === 0) {
@@ -885,26 +885,6 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               false
             );
           }
-        }
-
-        // Draw-until (taxonomy §D draw-until family): "draw cards until you
-        // have N cards in your hand" — distinct from bare drawCount().
-        const drawUntilN = drawUntilTarget(atk.text);
-        if (drawUntilN > 0) {
-          let drew = 0;
-          while (
-            getZone(user, 'hand').getCount() < drawUntilN &&
-            getZone(user, 'deck').getCount() > 0
-          ) {
-            moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move', emit);
-            drew++;
-          }
-          appendMessage(
-            user,
-            `📖 ${atk.name}: drew ${drew} until ${drawUntilN} in hand.`,
-            'announcement',
-            false
-          );
         }
 
         // Draw (taxonomy §D draw family): attack text saying "draw N card(s)".

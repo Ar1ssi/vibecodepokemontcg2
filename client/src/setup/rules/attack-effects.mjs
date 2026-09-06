@@ -51,6 +51,9 @@ export const ATTACK_FAMILIES = [
   'draw-until',       // "draw cards until you have N cards"
   'search-deck',      // "search your deck for … put onto Bench / into hand"
   'switch',           // "then switch your Active"
+  'move-energy',      // "move an Energy from this Pokémon to a Benched Pokémon"
+  'reveal-hand',      // "your opponent reveals their hand"
+  'conditional-ko',   // "if … Special Condition … Knocked Out"
   'once-per-turn',    // "Once during your turn: …"
   'damage-prevention', // "takes N less damage" / "prevent all damage"
   'next-turn-lock',   // "can't use [attack]" / "can't attack" / "can't retreat"
@@ -169,6 +172,14 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     return 'conditional-damage';
   }
 
+  // Conditional KO (Abyss Eye) — before status so Special Condition refs aren't misfiled.
+  if (
+    /if your opponent's active pok[ée]mon is affected by a special condition/i.test(t) &&
+    /knocked out/i.test(t)
+  ) {
+    return 'conditional-ko';
+  }
+
   // Status application (single) — requires an application verb.
   if (appliesStatus(t, 'asleep')) return 'status-asleep';
   if (appliesStatus(t, 'paralyzed')) return 'status-paralyzed';
@@ -189,6 +200,13 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   }
 
   // Follow-up actions that ride on the attack.
+  if (/your opponent reveal(?:s)? (?:their )?hand/i.test(t)) return 'reveal-hand';
+  if (
+    /move an? energy from this pok[ée]mon/i.test(t) ||
+    (/move\b[^.;]*\benergy\b/i.test(t) && /benched pok[ée]mon|your bench/i.test(t))
+  ) {
+    return 'move-energy';
+  }
   if (/(remove|heal)[^.]*damage counter|remove [^.]*counters|heal \d+ damage/.test(t)) return 'heal';
   if (/switch/.test(t)) return 'switch';
   if (/draw cards until you have \d+ cards/.test(t)) return 'draw-until';
@@ -314,6 +332,12 @@ export function describeAttackEffect(attack, attackerCard = {}) {
       return `${name}: "${attackName}" searches your deck — pick the matching card(s), put them on your Bench or into your hand, then shuffle.`;
     case 'switch':
       return `${name}: "${attackName}" includes a switch — bring in or swap a Pokémon after resolving damage.`;
+    case 'move-energy':
+      return `${name}: "${attackName}" moves Energy from this Pokémon to a Benched Pokémon — pick the Energy and destination as printed.`;
+    case 'reveal-hand':
+      return `${name}: "${attackName}" reveals your opponent's hand — list the cards for both players.`;
+    case 'conditional-ko':
+      return `${name}: "${attackName}" Knocks Out the opponent's Active if it has a Special Condition — check status before resolving.`;
     case 'once-per-turn':
       return `${name}: "${attackName}" has a once-per-turn effect — it can be used only once before your next turn.`;
     case 'damage-prevention':
