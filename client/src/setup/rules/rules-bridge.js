@@ -68,6 +68,7 @@ import { addDamageCounter, updateDamageCounter } from '../../actions/counters/da
 import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
+import { e2eDelayMs, isE2eMode } from '../general/e2e-mode.mjs';
 import { getCoinById } from '../deck-builder/core/coins.mjs';
 import {
   flipMatCoin,
@@ -711,7 +712,7 @@ import {
             } catch (e) {
               console.error('Mulligan execution error:', e);
             }
-          }, 2500);
+          }, e2eDelayMs(2500));
           updateTurnBanner();
     };
     
@@ -832,7 +833,7 @@ import {
           });
         }
     
-        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner, caller, call: chosenCall }), 2700);
+        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner, caller, call: chosenCall }), e2eDelayMs(2700));
       });
     };
     
@@ -1301,6 +1302,7 @@ import {
         socket.on('rulesEvent', (payload) => {
           try {
             const { type, data } = payload || {};
+            window.__ptcg?.noteRulesEvent?.(type, data);
             if (type === 'turnPassed') {
               appendMessage('', `Opponent ended their turn.`, 'announcement', false);
               // the attacking client already advanced its own rulesState;
@@ -1345,7 +1347,7 @@ import {
               if (
                 rulesState.enabled &&
                 rulesState.phase === 'setup' &&
-                openingSetupReadyForCoinFlip
+                (openingSetupReadyForCoinFlip || isE2eMode())
               ) {
                 flipSuperseded = true;
                 syncedTurnOrder = null;

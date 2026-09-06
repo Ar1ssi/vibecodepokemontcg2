@@ -48,6 +48,7 @@ pnpm test          # node --test over the explicit list of *.test.mjs files
 pnpm lint          # eslint .
 pnpm format        # prettier --write "**/*.{js,json,md}"
 node browser-test.mjs      # needs a RUNNING server + Playwright chromium
+node two-player-sync-test.mjs  # two Playwright contexts; needs RUNNING server + Chromium
 node integration-test.mjs  # jsdom smoke test of the real page; no server needed
 ```
 
@@ -413,3 +414,28 @@ instead of showing an enlarged preview. Plain cards shrank too (92px → 55px).
 - **Baseline correction:** this file previously said 163/163. `pnpm test` on the
   current tree is **396/396 pass, 0 fail** — use 396. `integration-test.mjs`
   cannot run as-is: `jsdom` is not in any `package.json`.
+
+## Cursor Cloud specific instructions
+
+The `server` terminal already runs `node server/server.js` on port 4000.
+
+`pnpm test` is DOM-free and does **not** prove two-client sync. After any
+multiplayer / action-log / hand / Active change, run:
+
+```bash
+pnpm test:2p
+# same as: node two-player-sync-test.mjs
+```
+
+That script opens two Playwright contexts on `http://localhost:4000/?e2e=1`,
+joins one room, loads fixture decks, readies, calls the coin, and asserts:
+
+1. each client sees 7 cards in the opponent hand
+2. a hand → Active play appears on the far client's opp Active
+
+Pass is `ALL PASS`. Chromium comes from `pnpm exec playwright install chromium`
+(install step in `.cursor/environment.json`). If Playwright is missing in an
+older snapshot, run that install once, then rerun `pnpm test:2p`.
+
+`?e2e=1` installs `window.__ptcg` (`joinRoom`, `loadFixtureDeck`, `readyUp`,
+`playFromHand`, `zone`) and collapses the coin-flip / mulligan timers.

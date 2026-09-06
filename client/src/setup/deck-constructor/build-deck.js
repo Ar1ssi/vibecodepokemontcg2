@@ -3,6 +3,7 @@ import { determineDeckData } from '../general/determine-deckdata.js';
 import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
+import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
 
 
 export const buildDeck = (user) => {
@@ -13,6 +14,7 @@ export const buildDeck = (user) => {
     for (let i = 0; i < quantity; i++) {
       const card = new Card(user, name, type, imageURL, number, set, tcgId);
       card.syncInstance = syncInstance++;
+      if (isE2eMode()) stampE2eCard(card);
       deck.array.push(card);
       deck.element.appendChild(card.image);
     }
