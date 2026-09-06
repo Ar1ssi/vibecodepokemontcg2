@@ -60,6 +60,14 @@ export const updateSpecialCondition = (
     textContent,
     hint,
   ]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-status-changed', {
+        detail: { user, zoneId, index: resolved, condition: card ? card.specialCondition : textContent },
+      })
+    );
+  }
 };
 
 export const removeSpecialCondition = (
@@ -104,6 +112,14 @@ export const removeSpecialCondition = (
   }
 
   processAction(user, emit, 'removeSpecialCondition', [zoneId, resolved, hint]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-status-changed', {
+        detail: { user, zoneId, index: resolved, condition: null },
+      })
+    );
+  }
 };
 
 export const addSpecialCondition = (
@@ -234,4 +250,12 @@ export const addSpecialCondition = (
   targetCard.image.specialCondition = specialCondition;
 
   processAction(user, emit, 'addSpecialCondition', [zoneId, resolved, hint]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-status-changed', {
+        detail: { user, zoneId, index: resolved, condition: targetCard.specialCondition },
+      })
+    );
+  }
 };

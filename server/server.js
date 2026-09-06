@@ -326,6 +326,7 @@ async function main() {
         if (isSpectator) {
           room.spectators.add(username);
           socket.emit('spectatorJoin');
+          socket.to(roomId).emit('requestSpectatorData', { roomId });
         } else {
           room.players.add(username);
           socket.emit('joinGame');
@@ -353,6 +354,7 @@ async function main() {
       socket.join(data.roomId);
       if (!data.notSpectator) {
         room.spectators.add(data.username);
+        socket.to(data.roomId).emit('requestSpectatorData', { roomId: data.roomId });
       } else {
         room.players.add(data.username);
         // Remove any existing disconnect listener to prevent leak on reconnect
@@ -380,6 +382,7 @@ async function main() {
       'syncLogBundle',
       'appendMessage',
       'spectatorActionData',
+      'requestSpectatorData',
       'initiateImport',
       'endImport',
       'lookAtCards',

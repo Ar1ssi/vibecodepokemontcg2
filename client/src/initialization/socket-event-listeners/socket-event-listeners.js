@@ -36,11 +36,58 @@ import {
 
 let isImporting = false;
 let syncCheckInterval;
-let spectatorActionInterval;
+let spectatorDebounceTimer = null;
+let syncCheckDebounceTimer = null;
+let lastSyncedSelfCounter = -1;
 let pushActionQueue = Promise.resolve();
+
+export const sendSpectatorData = () => {
+  if (systemState.isTwoPlayer && systemState.roomId) {
+    const data = {
+      selfUsername: systemState.p2SelfUsername,
+      selfDeckData: systemState.selfDeckData,
+      oppDeckData: systemState.p2OppDeckData,
+      oppUsername: systemState.p2OppUsername,
+      roomId: systemState.roomId,
+      spectatorActionData: systemState.exportActionData,
+      socketId: socket.id,
+    };
+    socket.emit('spectatorActionData', data);
+  }
+};
+
+export const emitSpectatorDataDebounced = (delay = 200) => {
+  if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
+  spectatorDebounceTimer = setTimeout(() => {
+    spectatorDebounceTimer = null;
+    sendSpectatorData();
+  }, delay);
+};
+
+export const emitSyncCheck = () => {
+  if (!systemState.isTwoPlayer || !systemState.roomId) return;
+  if (systemState.syncReplaying || systemState.isCatchingUp) return;
+  lastSyncedSelfCounter = systemState.selfCounter;
+  const data = {
+    roomId: systemState.roomId,
+    counter: systemState.selfCounter,
+    boardHash: hashUserBoard('self'),
+  };
+  socket.emit('syncCheck', data);
+};
+
+export const triggerSyncCheck = (delay = 300) => {
+  if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
+  syncCheckDebounceTimer = setTimeout(() => {
+    syncCheckDebounceTimer = null;
+    emitSyncCheck();
+  }, delay);
+};
+
 export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
-  clearInterval(spectatorActionInterval);
+  if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
+  if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
 };
 export const initializeSocketEventListeners = () => {
   socket.on('joinGame', () => {
@@ -81,35 +128,24 @@ export const initializeSocketEventListeners = () => {
       data: { socketId: socket.id },
     });
 
-    //initialize sync checker, which will routinely make sure game are synced
+    // Heartbeat backstop: slow 30s check, and only if an action occurred since last check
     syncCheckInterval = setInterval(() => {
-      if (systemState.isTwoPlayer) {
-        const data = {
-          roomId: systemState.roomId,
-          counter: systemState.selfCounter,
-          boardHash: hashUserBoard('self'),
-        };
-        socket.emit('syncCheck', data);
+      if (
+        systemState.isTwoPlayer &&
+        systemState.selfCounter !== lastSyncedSelfCounter
+      ) {
+        emitSyncCheck();
       }
-    }, 3000);
-
-    spectatorActionInterval = setInterval(() => {
-      if (systemState.isTwoPlayer) {
-        const data = {
-          selfUsername: systemState.p2SelfUsername,
-          selfDeckData: systemState.selfDeckData,
-          oppDeckData: systemState.p2OppDeckData,
-          oppUsername: systemState.p2OppUsername,
-          roomId: systemState.roomId,
-          spectatorActionData: systemState.exportActionData,
-          socketId: socket.id,
-        };
-        socket.emit('spectatorActionData', data);
-      }
-    }, 1000);
+    }, 30000);
+  });
+  socket.on('requestSpectatorData', () => {
+    sendSpectatorData();
   });
   socket.on('spectatorJoin', () => {
     spectatorJoin();
+    if (systemState.roomId) {
+      socket.emit('requestSpectatorData', { roomId: systemState.roomId });
+    }
   });
   socket.on('roomReject', () => {
     let overlay = document.createElement('div');
@@ -303,6 +339,8 @@ export const initializeSocketEventListeners = () => {
             parameters: data.parameters,
           });
         }
+        triggerSyncCheck();
+        emitSpectatorDataDebounced();
       } else if (data.counter > parseInt(systemState.oppCounter) + 1) {
         logSync('pushAction.gap', {
           expected: systemState.oppCounter + 1,
@@ -558,4 +596,18 @@ export const initializeSocketEventListeners = () => {
   socket.on('exportGameStateFailed', (message) => {
     appendMessage('self', message, 'announcement', false);
   });
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('action-processed', () => {
+      if (systemState.isTwoPlayer) {
+        triggerSyncCheck();
+        emitSpectatorDataDebounced();
+      }
+    });
+    document.addEventListener('rules-turn-began', () => {
+      if (systemState.isTwoPlayer) {
+        triggerSyncCheck(100);
+      }
+    });
+  }
 };

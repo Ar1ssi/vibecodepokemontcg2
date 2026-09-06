@@ -72,6 +72,14 @@ export const updateDamageCounter = (
     damageAmount,
     hint,
   ]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-damage-changed', {
+        detail: { user, zoneId, index: resolved, damage: card ? card.damage : damageAmount },
+      })
+    );
+  }
 };
 
 export const removeDamageCounter = (
@@ -116,6 +124,14 @@ export const removeDamageCounter = (
   }
 
   processAction(user, emit, 'removeDamageCounter', [zoneId, resolved, hint]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-damage-changed', {
+        detail: { user, zoneId, index: resolved, damage: 0 },
+      })
+    );
+  }
 };
 
 export const addDamageCounter = (
@@ -253,4 +269,12 @@ export const addDamageCounter = (
     damageAmount,
     hint,
   ]);
+
+  if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    document.dispatchEvent(
+      new CustomEvent('rules-damage-changed', {
+        detail: { user, zoneId, index: resolved, damage: targetCard.damage },
+      })
+    );
+  }
 };

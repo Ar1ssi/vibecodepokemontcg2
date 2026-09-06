@@ -181,7 +181,11 @@ import {
       document.addEventListener('rules-turn-began', refresh);
       document.addEventListener('rules-mode-changed', refresh);
       document.addEventListener('rules-session-reset', refresh);
-      window.setInterval(refresh, 1500);
+      document.addEventListener('rules-energy-attached', refresh);
+      document.addEventListener('rules-card-moved', refresh);
+      document.addEventListener('rules-damage-changed', refresh);
+      document.addEventListener('rules-status-changed', refresh);
+      document.addEventListener('action-processed', refresh);
     };
 
     // ── attack window: list attacks + abilities, let the player choose ──
@@ -338,7 +342,10 @@ import {
       document.addEventListener('rules-turn-began', refresh);
       document.addEventListener('rules-mode-changed', refresh);
       document.addEventListener('rules-session-reset', refresh);
-      window.setInterval(refresh, 1500);
+      document.addEventListener('rules-energy-attached', refresh);
+      document.addEventListener('rules-card-moved', refresh);
+      document.addEventListener('rules-damage-changed', refresh);
+      document.addEventListener('action-processed', refresh);
     };
 
     // ── settings toggle ──────────────────────────────────────────────────
@@ -539,7 +546,9 @@ import {
           });
           if (win.over) {
             rulesState.phase = 'ended';
-            appendMessage('', `🏆 Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`, 'announcement', false);
+            const reason = `Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`;
+            appendMessage('', `🏆 ${reason}`, 'announcement', false);
+            document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
             return;
           }
         } catch {}
@@ -942,7 +951,7 @@ import {
       });
     
       // observe self attached cards for energy adds
-      const checkInterval = window.setInterval(() => {
+      const checkEnergyAdds = () => {
         if (!rulesState.enabled || rulesState.phase === 'ended') return;
         const player = rulesState.turnPlayer;
         if (player !== 'self') return;
@@ -974,7 +983,11 @@ import {
             }
           }
         } catch {}
-      }, 1200);
+      };
+
+      document.addEventListener('rules-energy-attached', checkEnergyAdds);
+      document.addEventListener('rules-card-moved', checkEnergyAdds);
+      document.addEventListener('action-processed', checkEnergyAdds);
 
       document.addEventListener('rules-energy-attached', async (event) => {
         if (!rulesState.enabled) return;
@@ -1083,10 +1096,10 @@ import {
         }
       };
     
-      window.setInterval(() => {
+      const checkDeckOut = () => {
         if (!rulesState.enabled || rulesState.phase === 'ended') return;
         if (rulesState.phase !== 'main') return;
-    
+
         // auto-draw once per new turn for the turn player (skip turn 1's
         // opening hand — setup handles that)
         if (rulesState.turnNumber !== lastProcessedTurn) {
@@ -1099,19 +1112,22 @@ import {
             if (deckCount === 0) {
               appendMessage('', 'Deck empty — deck-out loss!', 'announcement', false);
               rulesState.phase = 'ended';
+              document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason: 'Deck empty — deck-out loss!' } }));
             }
           }
         }
-      }, 1500);
+      };
+
+      document.addEventListener('rules-turn-began', checkDeckOut);
     };
     
     // continuous KO detection: watch all in-play Pokémon for damage >= HP
     const koWatcher = () => {
       // per-turn ability flags now live in rulesState.flags[player].abilitiesUsed
       // and are cleared by resetTurnFlags() each turn — no DOM-flag reset here.
-      window.setInterval(async () => {
+      const checkKnockouts = async () => {
         if (!rulesState.enabled || rulesState.phase === 'ended') return;
-    
+
         try {
           for (const player of ['self', 'opp']) {
             for (const zoneId of ['active', 'bench']) {
@@ -1162,7 +1178,12 @@ import {
             }
           }
         } catch {}
-      }, 2000);
+      };
+
+      document.addEventListener('rules-damage-changed', checkKnockouts);
+      document.addEventListener('rules-card-moved', checkKnockouts);
+      document.addEventListener('rules-turn-began', checkKnockouts);
+      document.addEventListener('action-processed', checkKnockouts);
     };
     
     
@@ -1170,7 +1191,7 @@ import {
     const STATUS_EMOJI = { asleep: '💤', paralyzed: '⚡', poisoned: '☠️', burned: '🔥', confused: '❓' };
     
     const renderStatusBadges = () => {
-      window.setInterval(() => {
+      const updateBadges = () => {
         if (!rulesState.enabled) return;
         try {
           for (const player of ['self', 'opp']) {
@@ -1201,7 +1222,13 @@ import {
             }
           }
         } catch {}
-      }, 2000);
+      };
+
+      document.addEventListener('rules-status-changed', updateBadges);
+      document.addEventListener('rules-turn-began', updateBadges);
+      document.addEventListener('rules-card-moved', updateBadges);
+      document.addEventListener('rules-session-reset', updateBadges);
+      document.addEventListener('action-processed', updateBadges);
     };
     
 // ── choice picker for search effects ─────────────────────────────────
@@ -1436,19 +1463,28 @@ import {
         el.hidden = true;
       });
     
-      window.setInterval(() => {
-        if (rulesState.enabled && rulesState.phase === 'ended' && rulesState.turnNumber > 0) {
-          const reason = el.querySelector('.rules-end-reason');
-          if (reason && !reason.textContent) {
-            reason.textContent = 'A win condition was met. Reset the board to play again.';
-          }
-          el.hidden = false;
-        } else {
-          el.hidden = true;
-          const reason = el.querySelector('.rules-end-reason');
-          if (reason) reason.textContent = '';
+      const showEnd = (event) => {
+        if (!rulesState.enabled || rulesState.phase !== 'ended') return;
+        const reason = el.querySelector('.rules-end-reason');
+        const customReason = event?.detail?.reason;
+        if (reason) {
+          reason.textContent =
+            customReason ||
+            reason.textContent ||
+            'A win condition was met. Reset the board to play again.';
         }
-      }, 1000);
+        el.hidden = false;
+      };
+
+      const hideEnd = () => {
+        el.hidden = true;
+        const reason = el.querySelector('.rules-end-reason');
+        if (reason) reason.textContent = '';
+      };
+
+      document.addEventListener('rules-game-ended', showEnd);
+      document.addEventListener('rules-session-reset', hideEnd);
+      document.addEventListener('game-restarted', hideEnd);
     };
     
     // Is this a Pokémon card? Prefer locally-known type/supertype over async hp.
@@ -2122,7 +2158,7 @@ if (!isTrainer) {
       // the thing the player is waiting on. Disabled in online 2P: mirror
       // replays must not re-trigger trainer auto-exec (see rules-local-effects).
       if (!systemState.isTwoPlayer) {
-        window.setInterval(() => {
+        const checkBoardCards = () => {
           if (rulesState.phase === 'ended') return;
           if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
           try {
@@ -2132,7 +2168,9 @@ if (!isTrainer) {
               for (const card of board.array) processBoardCard(card, side);
             }
           } catch {}
-        }, 2000);
+        };
+        document.addEventListener('rules-card-moved', checkBoardCards);
+        document.addEventListener('action-processed', checkBoardCards);
       }
     };
     

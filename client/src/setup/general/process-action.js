@@ -60,5 +60,11 @@ export const processAction = (user, emit, action, parameters) => {
         systemState.exportActionData.push(data);
       }
     }
+
+    if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+      document.dispatchEvent(
+        new CustomEvent('action-processed', { detail: { action, user } })
+      );
+    }
   }
 };
