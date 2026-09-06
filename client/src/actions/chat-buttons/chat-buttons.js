@@ -22,7 +22,7 @@ import {
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause } from '../../setup/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause } from '../../setup/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes, takePrizesByIndex } from '../zones/prizes-actions.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
@@ -45,6 +45,7 @@ import {
   clearStatuses,
   applyStatus,
   parseStatusFromAttackText,
+  parseSelfStatusFromAttackText,
   resolveTurnBoundary,
 } from '../../setup/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
@@ -75,6 +76,26 @@ const placeSelfDamage = (user, zoneId, index, damage) => {
     addDamageCounter(user, zoneId, index, damage);
   }
 };
+
+function countEnergyOnPlayerSide(player) {
+  let total = 0;
+  for (const zoneId of ['active', 'bench']) {
+    const zone = getZone(player, zoneId);
+    for (const card of zone.array) {
+      if (card.type === 'Pokémon' && card.image) {
+        total += energiesAttachedToPokemon(zone, card.image).length;
+      }
+    }
+  }
+  return total;
+}
+
+function remainingHp(player, card, zoneId, index) {
+  const hp = effectiveHp(card.hp ?? 0, player, card);
+  const el = getZone(player, zoneId).array[index]?.image?.damageCounter;
+  const dmg = el ? parseInt(el.textContent || '0', 10) || 0 : 0;
+  return Math.max(0, hp - dmg);
+}
 
 // Re-read attack effect text after ensureCardData may have merged TCGdex data.
 const syncAttackFromCard = (card, attackIndex, prev) => {
@@ -390,6 +411,8 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // Damage calculation (requires a defending Active — skipped for
         // effect-only attacks like Call for Family when none is in play).
         let parsed = null;
+        let oppHp = 0;
+        let totalDmg = 0;
         if (oppActive) {
         await ensureCardData(oppActive);
         await ensureCardData(active);
@@ -403,15 +426,33 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // carries no recognized scaling — the flat-damage path stays intact.
         let effectiveAttack = atk;
         if (rulesState.enabled) {
+          const atkText = String(atk.text || '');
+          const atkLower = atkText.toLowerCase();
           // Coin-flip modifiers (taxonomy §D): attacks that say "Flip a coin"
           // resolve the coin here in the live path. Heads bonus is added to
           // the effective damage total by the parser; tails self-damage is
           // executed after the KO check (below).
-          const coin = /flip a coin/.test(String(atk.text || '').toLowerCase())
+          const coin = /flip a coin/.test(atkLower)
             ? Math.random() < 0.5
               ? 'heads'
               : 'tails'
             : null;
+          let headsCount;
+          const multiFlip = atkLower.match(/flip (\d+) coins?/);
+          if (multiFlip && /for each heads/.test(atkText)) {
+            const flips = parseInt(multiFlip[1], 10);
+            headsCount = 0;
+            for (let i = 0; i < flips; i++) {
+              if (Math.random() < 0.5) headsCount++;
+            }
+            appendMessage(
+              user,
+              `🪙 Flipped ${flips} coins — ${headsCount} head${headsCount !== 1 ? 's' : ''}!`,
+              'announcement',
+              false
+            );
+          }
+          const oppActiveZoneForEnergy = getZone(oppPlayer, 'active');
           // "is damaged" conditions (taxonomy §D "if conditional damage"):
           // pass the defender's current damage-counter count when it is in the
           // DOM; leave undefined otherwise so the parser keeps it honestly unresolved.
@@ -424,6 +465,12 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             turnCount: Math.max(1, rulesState.turnNumber),
             attackerHp: active?.hp ?? 0,
             defenderHp: oppActive?.hp ?? 0,
+            ownEnergyCount: countEnergyOnPlayerSide(user),
+            opponentEnergyCount: energiesAttachedToPokemon(
+              oppActiveZoneForEnergy,
+              oppActive.image
+            ).length,
+            ownHandCount: getZone(user, 'hand').getCount(),
             defenderDamage: defenderDmgEl
               ? parseInt(defenderDmgEl.textContent || '0', 10) || 0
               : undefined,
@@ -431,6 +478,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               ? parseInt(attackerDmgEl.textContent || '0', 10) || 0
               : undefined,
             coin,
+            headsCount,
           });
           if (coin) {
             appendMessage(
@@ -454,6 +502,10 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
         let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
+        if (rulesState.enabled && immunityClause(atk.text)) {
+          const raw = parsed?.total ?? effectiveAttack.damage ?? dmg.total;
+          dmg = { ...dmg, total: raw, multiplier: 1, flat: 0, resistance: 0 };
+        }
 
         if (rulesState.enabled) {
           const stadiumBonus = getStadiumAttackDamageBonus(active, user);
@@ -543,7 +595,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           currentDmg =
             parseInt(oppActive.image.damageCounter.textContent || '0', 10) || 0;
         }
-        const totalDmg = currentDmg + dmg.total;
+        totalDmg = currentDmg + dmg.total;
 
         // Place damage counters
         placeSelfDamage(oppPlayer, 'active', 0, dmg.total);
@@ -559,7 +611,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         }
 
         // KO check → prizes (effective HP includes stadium +/−HP modifiers)
-        const oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
+        oppHp = effectiveHp(oppActive.hp ?? 0, oppPlayer, oppActive);
         if (oppHp > 0 && totalDmg >= oppHp) {
           const koResult = handleKO({
             attackerPlayer: user,
@@ -615,15 +667,107 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
 
-        // Conditional KO (taxonomy §D conditional-ko family): if the defender's
-        // Active has a Special Condition, it is KO'd (Abyss Eye). Skipped when
-        // already KO'd by damage this attack.
+        const selfSt = parseSelfStatusFromAttackText(atk.text);
+        if (selfSt && active) {
+          const selfKey = active.image?.dataset?.cardId || active.name;
+          if (applyStatus(user, selfKey, selfSt)) {
+            appendMessage(
+              user,
+              `💫 ${active?.name || 'Your Pokémon'} is now ${selfSt}!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Hand-scaling counter placement on opponent Active.
+        const handScale = handScalingDamage(atk.text);
+        if (handScale > 0) {
+          const handCards = getZone(user, 'hand').getCount();
+          const extra = handScale * handCards;
+          if (extra > 0) {
+            placeSelfDamage(oppPlayer, 'active', 0, extra);
+            appendMessage(
+              user,
+              `💥 ${extra} damage (${handScale} × ${handCards} cards in hand)!`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Conditional KO (taxonomy §D conditional-ko family): Special Condition
+        // (Abyss Eye), exact damage-counter threshold, or lowest remaining HP.
         if (conditionalKoClause(atk.text)) {
           const oppKey = oppActive.image?.dataset?.cardId || oppActive.name;
           const alreadyKO = oppHp > 0 && totalDmg >= oppHp;
+          const exactThreshold = exactCounterKoThreshold(atk.text);
+          const lowestHpKo = /least hp remaining/i.test(String(atk.text || ''));
+
+          if (!alreadyKO && exactThreshold !== null && totalDmg === exactThreshold) {
+            const koResult = handleKO({
+              attackerPlayer: user,
+              defender: oppActive,
+              defenderBoard: getZone(oppPlayer, 'active'),
+            });
+            if (koResult.won) {
+              appendMessage(user, '🏆 Victory!', 'announcement', false);
+            } else {
+              appendMessage(
+                user,
+                `🎯 Conditional KO! ${oppActive?.name || 'The active'} had exactly ${exactThreshold} damage counters — ${koResult.prizeCount} prize${koResult.prizeCount !== 1 ? 's' : ''} taken.`,
+                'announcement',
+                false
+              );
+              await _takePrizesWithPicker(user, koResult.prizeCount);
+            }
+          } else if (!alreadyKO && lowestHpKo) {
+            const candidates = [];
+            const addCandidate = (player, zoneId, index, card) => {
+              if (!card || card.type !== 'Pokémon') return;
+              if (player === user && zoneId === 'active' && card === active) return;
+              candidates.push({
+                player,
+                zoneId,
+                index,
+                card,
+                remaining: remainingHp(player, card, zoneId, index),
+              });
+            };
+            addCandidate(oppPlayer, 'active', 0, oppActive);
+            getZone(oppPlayer, 'bench').array.forEach((c, i) =>
+              addCandidate(oppPlayer, 'bench', i, c)
+            );
+            getZone(user, 'active').array.forEach((c, i) =>
+              addCandidate(user, 'active', i, c)
+            );
+            getZone(user, 'bench').array.forEach((c, i) =>
+              addCandidate(user, 'bench', i, c)
+            );
+            candidates.sort((a, b) => a.remaining - b.remaining);
+            const pick = candidates[0];
+            if (pick && pick.remaining > 0) {
+              appendMessage(
+                user,
+                `🎯 ${atk.name} KOs ${pick.card.name || 'the lowest-HP Pokémon'} (${pick.remaining} HP left).`,
+                'announcement',
+                false
+              );
+              if (pick.zoneId === 'active') {
+                const koResult = handleKO({
+                  attackerPlayer: user,
+                  defender: pick.card,
+                  defenderBoard: getZone(pick.player, 'active'),
+                });
+                if (!koResult.won) await _takePrizesWithPicker(user, koResult.prizeCount);
+              } else {
+                placeSelfDamage(pick.player, pick.zoneId, pick.index, pick.remaining || 999);
+              }
+            }
+          } else if (!alreadyKO) {
           const status = getStatus(oppPlayer, oppKey);
           const hasCondition = status && Object.values(status).some(Boolean);
-          if (!alreadyKO && hasCondition) {
+          if (hasCondition) {
             const koResult = handleKO({
               attackerPlayer: user,
               defender: oppActive,
@@ -655,6 +799,7 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               }
             }
           }
+          }
         }
         }
 
@@ -666,6 +811,17 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           appendMessage(
             user,
             `🩸 ${parsed.selfDamage} damage to ${active?.name || 'your Pokémon'} instead!`,
+            'announcement',
+            false
+          );
+        }
+
+        const redirectDmg = redirectDamageCount(atk.text);
+        if (redirectDmg > 0) {
+          placeSelfDamage(user, 'active', 0, redirectDmg);
+          appendMessage(
+            user,
+            `🩸 ${redirectDmg} damage placed on ${active?.name || 'the Attacking Pokémon'}!`,
             'announcement',
             false
           );
@@ -1025,6 +1181,36 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             appendMessage(
               user,
               `⚡ ${atk.name} moves ${energyName} to ${benchTarget.name || 'the benched Pokémon'}.`,
+              'announcement',
+              false
+            );
+          }
+        }
+
+        // Return attached Energy to hand (Put N Energy … into your hand).
+        if (returnEnergyClause(atk.text)) {
+          const returnN = returnEnergyCount(atk.text);
+          const activeZoneObj = getZone(user, 'active');
+          let returned = 0;
+          for (let i = 0; i < returnN; i++) {
+            const energyIdx = activeZoneObj.array.findIndex(
+              (c) => c.type === 'Energy' && c.image?.relative === active.image
+            );
+            if (energyIdx === -1) break;
+            moveCard(user, user, 'active', 'hand', energyIdx);
+            returned++;
+          }
+          if (returned === 0) {
+            appendMessage(
+              user,
+              `⚡ ${atk.name}'s return fizzles — no Energy to put into your hand.`,
+              'announcement',
+              false
+            );
+          } else {
+            appendMessage(
+              user,
+              `⚡ ${atk.name} returns ${returned} Energy to your hand.`,
               'announcement',
               false
             );

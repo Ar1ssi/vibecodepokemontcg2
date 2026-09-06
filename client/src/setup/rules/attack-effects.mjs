@@ -217,7 +217,11 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   if (/flip a coin|flip \d+ coins?|a coin/.test(t)) return 'coin-flip';
 
   // Scaling damage.
-  if (/number of energy|× the number|\* the number|for each (?:[a-z]+ )?energy attached/.test(t)) {
+  if (
+    /number of energy|× the number|\* the number|for each damage counter|does \d+(?: more)? damage for each .*energy attached|for each (\{[a-zA-Z]\}|[a-zA-Z]+ )?energy attached/.test(
+      t,
+    )
+  ) {
     return 'per-energy';
   }
   if (/for each (of )?(your opponent's )?prize|each prize card|prize card/.test(t)) return 'per-prize';
@@ -268,6 +272,16 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
 
   // Turn-locked one-shot.
   if (/once (during your turn|per turn|during the game)/.test(t)) return 'once-per-turn';
+
+  // Hand-scaling counter placement, return-energy, lowest-HP KO — before flat.
+  if (/place \d+ damage counters? on your opponent's active.*for each card in your hand/.test(t)) {
+    return 'bench-damage';
+  }
+  if (/put (?:\d+|an?) .*energy .* into your hand/.test(t)) return 'move-energy';
+  if (/exactly \d+ damage counters/.test(t) && /knocked out/.test(t)) return 'conditional-ko';
+  if (/least hp remaining/.test(t) && /knocked out/.test(t)) return 'conditional-ko';
+  if (/for each damage counter/.test(t)) return 'per-energy';
+  if (/this attack can be used for/.test(t)) return 'conditional-damage';
 
   return hasDamage ? 'flat' : 'unknown';
 }

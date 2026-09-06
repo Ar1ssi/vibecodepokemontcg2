@@ -4,13 +4,13 @@ import test from 'node:test';
     const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
-    const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
+    const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
-    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
+    const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
@@ -1065,6 +1065,86 @@ import test from 'node:test';
       );
       assert.equal(conditionalKoClause('Do 30 damage to the Defending Pokémon.'), false);
       assert.equal(conditionalKoClause(''), false);
+
+      assert.equal(
+        conditionalKoClause(
+          "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+        ),
+        true,
+      );
+      assert.equal(exactCounterKoThreshold(
+        "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+      ), 6);
+      assert.equal(redirectDamageCount('Place 2 damage counters on the Attacking Pokémon.'), 2);
+      assert.equal(
+        handScalingDamage(
+          "Place 2 damage counters on your opponent's Active Pokémon for each card in your hand.",
+        ),
+        2,
+      );
+      assert.equal(
+        returnEnergyClause('Put 2 Fire Energy attached to this Pokémon into your hand.'),
+        true,
+      );
+      assert.equal(returnEnergyCount('Put 2 Fire Energy attached to this Pokémon into your hand.'), 2);
+      assert.equal(
+        immunityClause("This attack's damage isn't affected by Weakness or Resistance."),
+        true,
+      );
+    });
+
+    test('classifyAttackEffect: bracket Energy and backlog flat patterns', () => {
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Symphonia',
+          damage: 50,
+          text: 'This attack does 50 damage for each {P} Energy attached to all of your Pokémon.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Growth',
+          damage: 30,
+          text: 'This attack does 30 more damage for each {G} Energy attached to this Pokémon.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Damage Beat',
+          damage: 20,
+          text: "This attack does 20 damage for each damage counter on your opponent's Active Pokémon.",
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          name: 'Exact KO',
+          damage: 0,
+          text: "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+        }),
+        'conditional-ko',
+      );
+    });
+
+    test('parseSelfStatusFromAttackText', () => {
+      assert.equal(
+        parseSelfStatusFromAttackText('This Pokémon is now Confused.'),
+        'confused',
+      );
+      assert.equal(parseSelfStatusFromAttackText('The Defending Pokémon is now Asleep.'), null);
+    });
+
+    test('parseAttackDamage: per-each cards in your hand (with ctx)', () => {
+      const atk = {
+        name: 'Hand Scale',
+        damage: 10,
+        text: 'This attack does 10 more damage for each card in your hand.',
+      };
+      const p = parseAttackDamage(atk, {}, {}, { ownHandCount: 4 });
+      assert.equal(p.total, 50);
+      assert.ok(p.components.includes('per-each'));
     });
 
     test('ATTACK_FAMILIES: includes move-energy, reveal-hand, conditional-ko', () => {

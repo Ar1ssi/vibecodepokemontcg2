@@ -136,6 +136,7 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
   const attackerDamage = ctx.attackerDamage; // damage counters on this Pokémon
   const defenderDamage = ctx.defenderDamage; // damage counters on opponent's Active
   const headsCount = ctx.headsCount; // heads from a "flip … for each heads" coin
+  const ownHandCount = ctx.ownHandCount; // cards in your hand
 
   let total = base;
 
@@ -181,6 +182,9 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     } else if (/beedrill/.test(unit)) {
       count = speciesCount;
       label = 'Beedrill/Beedrill ex in play';
+    } else if (/card in your hand/.test(unit)) {
+      count = ownHandCount;
+      label = 'cards in your hand';
     } else if (/card in your opponent's hand/.test(unit)) {
       count = opponentHandCount;
       label = "cards in opponent's hand";
@@ -441,9 +445,62 @@ export function revealHandClause(attackText) {
 // Condition (taxonomy §D conditional-ko family). Matches Abyss Eye. Pure.
 export function conditionalKoClause(attackText) {
   const text = String(attackText || '');
-  return (
+  if (
     /if your opponent's active pok[ée]mon is affected by a special condition/i.test(text) &&
     /knocked out/i.test(text)
+  ) {
+    return true;
+  }
+  if (/exactly \d+ damage counters?/.test(text) && /knocked out/i.test(text)) {
+    return true;
+  }
+  if (/least hp remaining/.test(text) && /knocked out/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+/** Exact damage-counter threshold for conditional KO (e.g. exactly 6 counters). */
+export function exactCounterKoThreshold(attackText) {
+  const m = /exactly (\d+) damage counters?/i.exec(String(attackText || ''));
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
+}
+
+/** Place N damage counters on the Attacking Pokémon (redirect-damage family). */
+export function redirectDamageCount(attackText) {
+  const m = /place (\d+) damage counters? on the attacking pok[ée]mon/i.exec(
+    String(attackText || '')
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Place N counters on opponent Active per card in your hand (hand-scaling). */
+export function handScalingDamage(attackText) {
+  const m =
+    /place (\d+) damage counters? on your opponent's active pok[ée]mon for each card in your hand/i.exec(
+      String(attackText || '')
+    );
+  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+/** Put attached Energy from this Pokémon into your hand (return-energy). */
+export function returnEnergyClause(attackText) {
+  return /put (?:\d+|an?) [^.]*energy[^.]*attached to this pok[ée]mon into your hand/i.test(
+    String(attackText || '')
+  );
+}
+
+export function returnEnergyCount(attackText) {
+  const text = String(attackText || '');
+  const m = /put (\d+)/i.exec(text);
+  if (m) return Math.max(1, parseInt(m[1], 10));
+  return /put an energy/i.test(text) ? 1 : 1;
+}
+
+/** Damage ignores Weakness and Resistance (immunity family). */
+export function immunityClause(attackText) {
+  return /isn't affected by|is not affected by|not affected by (?:any )?(?:weakness|resistance)/i.test(
+    String(attackText || '')
   );
 }
 
