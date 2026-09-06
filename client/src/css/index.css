@@ -1724,6 +1724,145 @@ ul, li {
   object-fit: cover;
 }
 
+/* Discard pile viewer — PTCG Live-style swipe carousel on double-click. */
+.discard-pile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2350;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+}
+.discard-pile-header {
+  position: absolute;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.discard-pile-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 1rem;
+  z-index: 2;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.discard-pile-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.discard-pile-viewport {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  align-items: center;
+  padding: 0 max(7.5vw, calc((100vw - 560px) / 2));
+  cursor: grab;
+  touch-action: pan-x;
+}
+.discard-pile-viewport:active {
+  cursor: grabbing;
+}
+.discard-pile-viewport::-webkit-scrollbar {
+  display: none;
+}
+.discard-pile-track {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2rem);
+  min-height: min(72vh, calc(560px * 1.397));
+}
+.discard-pile-slide {
+  flex: 0 0 min(85vw, 560px);
+  scroll-snap-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  transform: scale(0.88);
+  opacity: 0.55;
+}
+.discard-pile-slide.is-active {
+  transform: scale(1);
+  opacity: 1;
+}
+.discard-pile-card {
+  display: block;
+  height: min(72vh, calc(min(85vw, 560px) * 1.397));
+  width: auto;
+  max-width: min(85vw, 560px);
+  border-radius: 0.3rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  user-select: none;
+}
+.discard-pile-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.discard-pile-nav:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.discard-pile-nav--prev {
+  left: max(0.5rem, env(safe-area-inset-left));
+}
+.discard-pile-nav--next {
+  right: max(0.5rem, env(safe-area-inset-right));
+}
+.discard-pile-footer {
+  position: absolute;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  color: rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+  text-align: center;
+  max-width: min(92vw, 640px);
+}
+.discard-pile-count {
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+.discard-pile-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
 /* Custom card modal */
 .native-deck-builder-modal {
   position: absolute;

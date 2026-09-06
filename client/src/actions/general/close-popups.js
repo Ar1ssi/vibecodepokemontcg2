@@ -14,6 +14,9 @@ import {
   closeCardPreview,
   isCardPreviewOpen,
 } from '../../setup/image-logic/full-view.js';
+import {
+  closeDiscardPileViewer,
+} from '../../setup/image-logic/discard-pile-viewer.js';
 
 export const hideZoneElements = () => {
   const zonesToHide = [
@@ -38,6 +41,11 @@ const isOutsideZoneClick = (event, zone) => {
   } else if (zone.elementCover && zone.elementCover.contains(event.target)) {
     return false;
   } else if (event.target.id && event.target.id === 'fullImage') {
+    return false;
+  } else if (
+    event.target.id === 'discardPileViewer' ||
+    event.target.closest?.('#discardPileViewer')
+  ) {
     return false;
   } else if (
     event.target.parentElement &&
@@ -159,6 +167,7 @@ export const closeFullView = (event) => {
 export const closePopups = (event) => {
   deselectCard();
   closeCardPreview(event);
+  closeDiscardPileViewer();
   closeFullView(event);
   hideZoneElementsIfEmpty(event);
   document.getElementById('cardContextMenu').style.display = 'none';

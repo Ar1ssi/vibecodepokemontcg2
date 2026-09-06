@@ -23,6 +23,7 @@ import {
   closeCardPreview,
   openCardPreview,
 } from './full-view.js';
+import { openDiscardPileViewer } from './discard-pile-viewer.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -41,6 +42,16 @@ export const identifyCard = (event) => {
       mouseClick.zoneId
     ).array.findIndex((card) => card.image === event.target);
   }
+};
+
+export const coverDoubleClick = (event) => {
+  event.stopPropagation();
+  const user = event.target.user === 'self' ? 'self' : 'opp';
+  if (event.target.id !== 'discardCover') return;
+
+  const zone = getZone(user, 'discard');
+  if (zone.getCount() === 0) return;
+  openDiscardPileViewer(user, zone.getCount() - 1);
 };
 
 export const coverClick = (event) => {
@@ -260,6 +271,14 @@ export const doubleClick = (event) => {
     if (!host?.classList.contains('full-view')) {
       openCardPreview(targetImage, mouseClick.card);
     }
+  } else if (mouseClick.zoneId === 'discard') {
+    openDiscardPileViewer(mouseClick.cardUser, mouseClick.cardIndex);
+  } else if (mouseClick.zoneId === 'discardCover') {
+    const zone = getZone(mouseClick.cardUser, 'discard');
+    openDiscardPileViewer(
+      mouseClick.cardUser,
+      Math.max(0, zone.getCount() - 1)
+    );
   } else {
     let overlay = document.createElement('div');
     overlay.id = 'fullImage';
