@@ -65,66 +65,29 @@ const buildSlideContent = async (card) => {
   return { node: img, holoWrapper: null };
 };
 
-/** Clamp drag at pile ends so cards rubber-band instead of sliding off-screen. */
-const clampDragPx = (index, dragPx, slideCount) => {
-  if (dragPx > 0 && index >= slideCount - 1) return 0;
-  if (dragPx < 0 && index <= 0) return 0;
-  return dragPx;
+/** Fractional focus index: drag shifts the whole stack in peek-sized steps. */
+const computeVirtualIndex = (index, dragPx, peekPx, slideCount) => {
+  const progress = dragPx / peekPx;
+  return Math.max(0, Math.min(slideCount - 1, index + progress));
 };
 
-/**
- * PTCG Live-style stack layout.
- * At rest each slide sits at (index - slideIndex) peek steps from center.
- * During a horizontal drag only the active card and its immediate neighbor
- * interpolate; deeper peeks stay anchored.
- *
- * Drag right  → older card (index + 1). Drag left → newer (index - 1).
- */
-const computeSlideLayout = (slideIndex, index, dragPx, peekPx) => {
-  const basePeek = index - slideIndex;
-
-  if (dragPx === 0) {
-    return {
-      peekOffset: basePeek,
-      px: 0,
-      role:
-        basePeek === 0 ? 'active' : basePeek < 0 ? 'ahead' : 'behind',
-    };
-  }
-
-  if (dragPx > 0) {
-    if (slideIndex === index) {
-      return { peekOffset: 0, px: dragPx, role: 'active' };
-    }
-    if (slideIndex === index + 1) {
-      return { peekOffset: -1, px: dragPx, role: 'ahead' };
-    }
-    return {
-      peekOffset: basePeek,
-      px: 0,
-      role: basePeek < 0 ? 'ahead' : 'behind',
-    };
-  }
-
-  if (slideIndex === index) {
-    return { peekOffset: 0, px: dragPx, role: 'active' };
-  }
-  if (slideIndex === index - 1) {
-    return { peekOffset: 1, px: dragPx, role: 'behind' };
-  }
+/** Every slide shares the same virtual index — the full stack moves together. */
+const computeSlideLayout = (slideIndex, virtualIndex) => {
+  const peekOffset = virtualIndex - slideIndex;
+  const absPeek = Math.abs(peekOffset);
   return {
-    peekOffset: basePeek,
+    peekOffset,
     px: 0,
-    role: basePeek < 0 ? 'ahead' : 'behind',
+    role: absPeek < 0.05 ? 'active' : peekOffset < 0 ? 'ahead' : 'behind',
   };
 };
 
-const isSlideOnScreen = (stackRect, stackWidth, peekOffset, px) => {
+const isSlideOnScreen = (stackRect, stackWidth, peekOffset) => {
   const peekPx = (PEEK_PERCENT / 100) * stackWidth;
   const centerX = stackRect.left + stackRect.width / 2;
   const scale = 1 - Math.abs(peekOffset) * 0.035;
   const cardWidth = stackWidth * scale;
-  const cardCenterX = centerX + peekOffset * peekPx + px;
+  const cardCenterX = centerX + peekOffset * peekPx;
   return (
     cardCenterX + cardWidth / 2 >= -SCREEN_EDGE_MARGIN &&
     cardCenterX - cardWidth / 2 <= window.innerWidth + SCREEN_EDGE_MARGIN
@@ -156,14 +119,19 @@ const syncHoloAnimations = (state) => {
 };
 
 const layoutStack = (state) => {
-  const { slides, stack, index, dragPx: rawDragPx } = state;
+  const { slides, stack, index, dragPx } = state;
   const stackWidth = stack.clientWidth || 380;
   const stackRect = stack.getBoundingClientRect();
   const peekPx = (PEEK_PERCENT / 100) * stackWidth;
-  const dragPx = clampDragPx(index, rawDragPx, slides.length);
+  const virtualIndex = computeVirtualIndex(
+    index,
+    dragPx,
+    peekPx,
+    slides.length
+  );
 
   slides.forEach((slide, i) => {
-    const layout = computeSlideLayout(i, index, dragPx, peekPx);
+    const layout = computeSlideLayout(i, virtualIndex);
     const absPeek = Math.abs(layout.peekOffset);
 
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
@@ -171,10 +139,10 @@ const layoutStack = (state) => {
     slide.style.zIndex = String(300 - Math.round(absPeek * 10));
 
     const scale = 1 - absPeek * 0.035;
-    slide.style.transform = `translateX(calc(${layout.peekOffset * PEEK_PERCENT}% + ${layout.px}px)) scale(${scale})`;
+    slide.style.transform = `translateX(${layout.peekOffset * PEEK_PERCENT}%) scale(${scale})`;
     slide.style.opacity = '1';
 
-    if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset, layout.px)) {
+    if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset)) {
       slide.classList.add('is-hidden');
     }
   });
