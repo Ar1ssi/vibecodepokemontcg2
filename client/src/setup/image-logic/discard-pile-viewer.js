@@ -13,8 +13,8 @@ let viewerState = null;
 
 const MAX_BEHIND = 2;
 const PEEK_PERCENT = 24;
-const SWIPE_THRESHOLD = 56;
-const SWIPE_START_PX = 14;
+const SWIPE_THRESHOLD = 40;
+const SWIPE_START_PX = 8;
 
 export const isDiscardPileViewerOpen = () => viewerState != null;
 
@@ -64,7 +64,7 @@ const syncHoloAnimations = (state) => {
   });
 };
 
-const layoutStack = (state) => {
+const layoutStack = (state, dragOffsetX = 0) => {
   const { slides, index } = state;
   slides.forEach((slide, i) => {
     const behind = index - i;
@@ -79,7 +79,9 @@ const layoutStack = (state) => {
     slide.style.zIndex = String(300 - behind);
     if (behind === 0) {
       slide.classList.add('is-active');
-      slide.style.transform = 'translateX(0) scale(1)';
+      slide.style.transform = dragOffsetX
+        ? `translateX(${dragOffsetX}px) scale(1)`
+        : 'translateX(0) scale(1)';
       slide.style.opacity = '1';
     } else {
       slide.classList.add('is-behind');
@@ -87,7 +89,7 @@ const layoutStack = (state) => {
       slide.style.opacity = String(Math.max(0.45, 0.9 - behind * 0.2));
     }
   });
-  syncHoloAnimations(state);
+  if (!dragOffsetX) syncHoloAnimations(state);
 };
 
 const updateFooter = (state) => {
@@ -139,10 +141,13 @@ const attachSwipe = (state) => {
     if (
       !dragging &&
       Math.abs(dx) >= SWIPE_START_PX &&
-      Math.abs(dx) > Math.abs(dy) * 1.35
+      Math.abs(dx) > Math.abs(dy) * 1.2
     ) {
       dragging = true;
       stack.classList.add('is-dragging');
+    }
+    if (dragging) {
+      layoutStack(state, dx);
     }
   };
 
@@ -151,12 +156,17 @@ const attachSwipe = (state) => {
     tracking = false;
     stack.classList.remove('is-dragging');
     const dx = event.clientX - startX;
-    if (dragging) {
-      if (dx <= -SWIPE_THRESHOLD) {
+    const dy = event.clientY - startY;
+    const horizontal =
+      Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy);
+    if (horizontal) {
+      if (dx > 0) {
         goToIndex(state, state.index + 1);
-      } else if (dx >= SWIPE_THRESHOLD) {
+      } else {
         goToIndex(state, state.index - 1);
       }
+    } else {
+      layoutStack(state);
     }
     dragging = false;
     state.pointerId = null;

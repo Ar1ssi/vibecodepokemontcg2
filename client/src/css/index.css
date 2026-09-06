@@ -1827,6 +1827,9 @@ ul, li {
   height: 100%;
   object-fit: cover;
 }
+.discard-pile-stack.is-dragging .discard-pile-slide.is-active {
+  transition: none;
+}
 .discard-pile-card {
   display: block;
   height: 100%;
