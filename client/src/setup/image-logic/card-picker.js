@@ -244,46 +244,69 @@ const updateSelectionUI = (state) => {
 const CARD_ASPECT = 1.397;
 const CHOOSE_TOP_GAP = 16;
 
+const getPlaymatBounds = () => {
+  if (document.body.classList.contains('side-menu-collapsed')) {
+    return { left: 0, right: window.innerWidth, width: window.innerWidth };
+  }
+  const sidebox = [...document.querySelectorAll('.sidebox')].find(
+    (el) => getComputedStyle(el).display !== 'none'
+  );
+  const sideboxLeft = sidebox?.getBoundingClientRect().left;
+  const right = Number.isFinite(sideboxLeft)
+    ? sideboxLeft
+    : window.innerWidth * 0.76;
+  return { left: 0, right, width: Math.max(0, right) };
+};
+
 const syncChooseLayout = (state) => {
   if (state.mode === 'browse' || !state.overlay) return;
 
   const hasTrigger = Boolean(state.triggerSlot?.childElementCount);
   const cardCount = Math.max(1, state.cards?.length || 1);
-  const vw = window.innerWidth;
+  const playmat = getPlaymatBounds();
   const vh = window.innerHeight;
 
-  const slotRowReserve = 110;
-  const reservedY = 230 + slotRowReserve;
-  const maxCardH = Math.max(200, vh - reservedY);
+  const reservedY = 320;
+  const maxCardH = Math.max(180, vh - reservedY);
   const cardWFromH = maxCardH / CARD_ASPECT;
-  const cardW = Math.min(vw * 0.34, 240, cardWFromH);
+  const cardW = Math.min(playmat.width * 0.28, 220, cardWFromH);
   const cardH = cardW * CARD_ASPECT;
 
   const peekSlots = Math.min(Math.max(cardCount - 1, 1), 3);
   const leftPeek = cardW * (PEEK_PERCENT / 100) * peekSlots;
   const carouselW = cardW + leftPeek;
+  const topRowW = carouselW + (hasTrigger ? CHOOSE_TOP_GAP + cardW : 0);
+
+  const playmatPad = 16;
+  let cardGroupLeft = playmatPad;
+  if (hasTrigger) {
+    const desiredTriggerRight = playmat.left + playmat.width * 0.72;
+    cardGroupLeft = desiredTriggerRight - topRowW;
+    const minLeft = playmatPad;
+    const maxLeft = playmat.width - playmatPad - topRowW;
+    cardGroupLeft = Math.max(minLeft, Math.min(cardGroupLeft, maxLeft));
+  } else {
+    cardGroupLeft = Math.max(playmatPad, (playmat.width - topRowW) / 2);
+  }
 
   state.overlay.style.setProperty('--card-picker-card-w', `${Math.round(cardW)}px`);
   state.overlay.style.setProperty('--card-picker-card-h', `${Math.round(cardH)}px`);
   state.overlay.style.setProperty('--card-picker-carousel-w', `${Math.round(carouselW)}px`);
   state.overlay.style.setProperty('--card-picker-top-gap', `${CHOOSE_TOP_GAP}px`);
+  state.overlay.style.setProperty('--card-picker-playmat-w', `${Math.round(playmat.width)}px`);
+  state.overlay.style.setProperty('--card-picker-playmat-right', `${Math.round(window.innerWidth - playmat.right)}px`);
 
-  const sideboxW = vw * 0.24;
-  const boardW = vw - sideboxW;
-  const anchorRightPx = hasTrigger
-    ? Math.round(sideboxW + boardW * 0.2)
-    : 0;
-  state.overlay.style.setProperty(
-    '--card-picker-anchor-right',
-    anchorRightPx > 0 ? `${anchorRightPx}px` : '0px'
-  );
-
-  if (state.scene) {
-    state.scene.style.transform = '';
+  if (state.cardsZone) {
+    state.cardsZone.style.width = `${Math.round(topRowW)}px`;
+    state.cardsZone.style.marginLeft = `${Math.round(cardGroupLeft)}px`;
+    state.cardsZone.style.marginRight = '0';
+    state.cardsZone.style.transform = '';
+    state.cardsZone.style.alignSelf = 'flex-start';
   }
 
   state.scene?.classList.toggle('has-trigger', hasTrigger);
   state.topRow?.classList.toggle('has-trigger', hasTrigger);
+  state.cardsZone?.classList.toggle('has-trigger', hasTrigger);
   state.main?.classList.toggle('has-trigger', hasTrigger);
 };
 
@@ -293,7 +316,8 @@ const syncDropSlotLayout = (state) => {
   const slotCount = state.slotElements.length;
   const gap = 6;
   const minSlotW = 84;
-  const maxRowW = Math.min(window.innerWidth * 0.96, 980);
+  const playmat = getPlaymatBounds();
+  const maxRowW = Math.min(playmat.width * 0.92, 860);
   const preferredW = Math.max(
     minSlotW,
     Math.round(state.stack.clientWidth * 0.94) || 160
@@ -923,6 +947,7 @@ export const openCardPicker = async ({
   let actionBar = null;
   let meta = null;
   let topRow = null;
+  let cardsZone = null;
 
   if (isBrowse) {
     main = document.createElement('div');
@@ -956,12 +981,15 @@ export const openCardPicker = async ({
     triggerSlot.className = 'card-picker-trigger-slot';
 
     topRow.append(carouselWrap, triggerSlot);
-    scene.appendChild(topRow);
 
     meta = document.createElement('div');
     meta.className = 'card-picker-meta card-picker-meta--choose';
     meta.append(countEl, nameEl);
-    scene.appendChild(meta);
+
+    cardsZone = document.createElement('div');
+    cardsZone.className = 'card-picker-cards-zone';
+    cardsZone.append(topRow, meta);
+    scene.appendChild(cardsZone);
 
     slotRow = document.createElement('div');
     slotRow.className = 'card-picker-slot-row';
@@ -1020,6 +1048,7 @@ export const openCardPicker = async ({
     scene,
     carouselWrap,
     triggerSlot,
+    cardsZone,
     slotRow,
     slotElements,
     slotCard: null,
