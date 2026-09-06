@@ -872,6 +872,7 @@ export const openCardPicker = async ({
   let bottomBar = null;
   let actionBar = null;
   let meta = null;
+  let topRow = null;
 
   if (isBrowse) {
     main = document.createElement('div');
@@ -894,7 +895,7 @@ export const openCardPicker = async ({
     scene = document.createElement('div');
     scene.className = 'card-picker-scene';
 
-    const topRow = document.createElement('div');
+    topRow = document.createElement('div');
     topRow.className = 'card-picker-top-row';
 
     carouselWrap = document.createElement('div');
@@ -973,7 +974,7 @@ export const openCardPicker = async ({
     slotElements,
     slotCard: null,
     draggingToSlotIndex: null,
-    topRow: topRow ?? null,
+    topRow: topRow,
     onKeyDown: null,
     allCandidates,
     filteredCandidates: candidates,
