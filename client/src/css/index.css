@@ -3548,10 +3548,12 @@ a:hover {
        Persistent coin tokens on the battle mat: each player's chosen
        coin stays visible all game (self on the blue side, opp on the
        red side), so both coins are always visible. Reuses the .coin-3d
-       / .coin-face / .coin-mat-* coin-picker CSS; sized down and static.
+       / .coin-face / .coin-mat-* coin-picker CSS; sized down with the
+       same pointer-tracked specular as the Customize preview.
        Rendered as a top-level body child (not inside #battleMat) so it
-       isn't clipped by the mat's overflow/clip-path; pointer-events none
-       so it never blocks zone interaction. */
+       isn't clipped by the mat's overflow/clip-path; the slot itself
+       ignores pointer events so empty space never blocks zones, but the
+       coin disc re-enables them for hover lighting. */
     .mat-coin-slot {
       /* Rendered at the right-side reference spots (top + bottom circles),
          fixed to the viewport so they sit beside the button cluster. */
@@ -3568,8 +3570,9 @@ a:hover {
     .mat-coin-slot .coin-3d {
       width: 100%;
       height: 100%;
-      transform: none;
-      transition: none;
+      pointer-events: auto;
+      transform: perspective(700px) rotateX(var(--coin-rx)) rotateY(var(--coin-ry));
+      transition: transform 0.18s ease-out;
       cursor: default;
     }
     #matCoinSlotSelf { top: 36%; transform: translate(0, -50%); }

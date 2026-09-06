@@ -58,6 +58,24 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
       opp: () => document.getElementById('matCoinSlotOpp'),
     };
     const MAT_COIN_BACK_URL = 'assets/coins/coin-back.png';
+    const wireMatCoinLighting = (coinEl) => {
+      if (!coinEl) return;
+      coinEl.addEventListener('pointermove', (e) => {
+        const r = coinEl.getBoundingClientRect();
+        const px = ((e.clientX - r.left) / r.width) * 100;
+        const py = ((e.clientY - r.top) / r.height) * 100;
+        coinEl.style.setProperty('--coin-x', px.toFixed(1) + '%');
+        coinEl.style.setProperty('--coin-y', py.toFixed(1) + '%');
+        coinEl.style.setProperty('--coin-rx', ((py - 50) * -0.14).toFixed(2) + 'deg');
+        coinEl.style.setProperty('--coin-ry', ((px - 50) * 0.16).toFixed(2) + 'deg');
+      });
+      coinEl.addEventListener('pointerleave', () => {
+        coinEl.style.setProperty('--coin-x', '50%');
+        coinEl.style.setProperty('--coin-y', '50%');
+        coinEl.style.setProperty('--coin-rx', '0deg');
+        coinEl.style.setProperty('--coin-ry', '0deg');
+      });
+    };
     const renderMatCoinSlot = (target) => {
       const slot = MAT_COIN_SLOTS[target]?.();
       if (!slot) return;
@@ -73,6 +91,7 @@ import { getCoins, getCoinById } from '../deck-builder/core/coins.mjs';
         `<div class="coin-face"><img src="${coin.thumb}" alt="${coin.name || 'coin'}"></div>` +
         `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt=""></div>` +
         `</div>`;
+      wireMatCoinLighting(slot.querySelector('.coin-3d'));
     };
     const renderMatCoins = () => { renderMatCoinSlot('self'); renderMatCoinSlot('opp'); };
 
