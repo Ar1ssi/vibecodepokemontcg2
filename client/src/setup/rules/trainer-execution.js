@@ -10,7 +10,7 @@ import { applyStatus } from './status.mjs';
 import { ensureCardData, getStadium } from './rules-state.mjs';
 import { normalizeStage, isRareCandyJump } from './evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
-import { filterSearchMatches } from './search-match.mjs';
+import { filterSearchMatches, searchPickerAllCandidates } from './search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
 
 const STATUS_KEY = {
@@ -430,7 +430,7 @@ async function runSearchStep(card, searchStep, done) {
         ? `${card.name} — choose up to ${count} cards`
         : `${card.name} — choose ${count} cards`,
       candidates: pool,
-      allCandidates: usingFallback ? null : deck.array,
+      allCandidates: searchPickerAllCandidates(pool, deck.array),
       triggerCard: card,
       zoneFrom: 'deck',
       destination: toBench ? 'bench' : 'hand',
@@ -468,7 +468,7 @@ async function runSearchStep(card, searchStep, done) {
   _openChoicePicker({
     title: `${card.name} — ${toBench ? 'put a card on Bench' : toAttach ? 'choose Energy to attach' : 'take a card to hand'}`,
     candidates: pool,
-    allCandidates: usingFallback ? null : deck.array,
+    allCandidates: searchPickerAllCandidates(pool, deck.array),
     triggerCard: card,
     zoneFrom: 'deck',
     destination: toBench ? 'bench' : 'hand',

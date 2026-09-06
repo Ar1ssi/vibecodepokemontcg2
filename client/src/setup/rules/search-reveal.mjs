@@ -1,5 +1,14 @@
 // Chat announcements when a search/look effect reveals picked cards to the opponent.
 
+import {
+  closeDeckSearchAccess,
+  deckSearchAccessReason,
+  sourceNameFromDeckSearchReason,
+} from './deck-search-access.mjs';
+
+let lastSearchShuffleAt = 0;
+const SEARCH_SHUFFLE_DEDUPE_MS = 400;
+
 /** Post a broadcast chat line naming revealed card(s). */
 export function announceSearchReveal(user, sourceName, picked, appendMessage) {
   const cards = (Array.isArray(picked) ? picked : [picked]).filter(Boolean);
@@ -25,11 +34,18 @@ export function shuffleDeckAfterSearch(
   shuffleZone,
   { sourceName, message } = {}
 ) {
+  const now = Date.now();
+  if (now - lastSearchShuffleAt < SEARCH_SHUFFLE_DEDUPE_MS) return;
+  lastSearchShuffleAt = now;
+
+  const label = sourceName || sourceNameFromDeckSearchReason(deckSearchAccessReason());
+
   shuffleZone(user, user, 'deck', undefined, false);
+  closeDeckSearchAccess();
   if (message === null) return;
   const text =
     message ??
-    (sourceName ? `  🔀 ${sourceName} — deck shuffled` : '  🔀 deck shuffled');
+    (label ? `  🔀 ${label} — deck shuffled` : '  🔀 deck shuffled');
   appendMessage(user, text, 'announcement', false);
 }
 

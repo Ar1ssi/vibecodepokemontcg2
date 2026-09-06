@@ -36,7 +36,7 @@ import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay, combinedHandProtected } from './ability-executors.mjs';
 import { isStadiumCard, isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
-import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat } from './search-match.mjs';
+import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from './search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
 import {
   describeTypedSpecialEnergy,
@@ -1480,7 +1480,7 @@ import {
             ? `${card.name} — choose up to ${count} cards to ${toBench ? 'Bench' : 'your hand'}`
             : `${card.name} — choose ${count} cards to ${toBench ? 'Bench' : 'your hand'}`,
           candidates: pool,
-          allCandidates: usingFallback ? null : deck.array,
+          allCandidates: searchPickerAllCandidates(pool, deck.array),
           triggerCard: card,
           zoneFrom: 'deck',
           destination: dest,
@@ -1511,7 +1511,7 @@ import {
       const result = await awaitChoicePicker({
         title: `${card.name} — ${toBench ? 'put a card on Bench' : 'take a card to hand'}`,
         candidates: pool,
-        allCandidates: usingFallback ? null : deck.array,
+        allCandidates: searchPickerAllCandidates(pool, deck.array),
         triggerCard: card,
         zoneFrom: 'deck',
         destination: dest,

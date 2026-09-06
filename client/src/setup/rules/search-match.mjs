@@ -107,3 +107,9 @@ export function filterSearchMatches(cards, what, { onNoMatches } = {}) {
   }
   return matches;
 }
+
+/** Deck search picker: show VALID/ALL toggle when the filter hides some deck cards. */
+export function searchPickerAllCandidates(pool, deckCards) {
+  if (!pool?.length || !deckCards?.length) return null;
+  return pool.length < deckCards.length ? deckCards : null;
+}

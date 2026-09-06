@@ -64,7 +64,7 @@ import {
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch } from '../../setup/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
-import { matchesSearch, filterSearchMatches, energySearchWhat } from '../../setup/rules/search-match.mjs';
+import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '../../setup/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '../../setup/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
@@ -2683,7 +2683,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         user,
         title: `${atk.name} — choose ${pickLabel} for ${destLabel}`,
         candidates: pool,
-        allCandidates: usingFallback ? null : deck.array,
+        allCandidates: searchPickerAllCandidates(pool, deck.array),
         triggerCard,
         zoneFrom: 'deck',
         destination: destZone,
@@ -2729,7 +2729,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       user,
       title: `${atk.name} — take a card to ${destLabel}`,
       candidates: pool,
-      allCandidates: usingFallback ? null : deck.array,
+      allCandidates: searchPickerAllCandidates(pool, deck.array),
       triggerCard,
       zoneFrom: 'deck',
       destination: destZone,
@@ -2818,7 +2818,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
       user,
       title: `${target.name} — choose ${upTo ? `up to ${effectiveMax}` : count} cards for ${destLabel}`,
       candidates: pool,
-      allCandidates: usingFallback ? null : deck.array,
+      allCandidates: searchPickerAllCandidates(pool, deck.array),
       triggerCard: target,
       zoneFrom: 'deck',
       destination: destZone,
@@ -2860,7 +2860,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     user,
     title: `${target.name} — take a card to ${destLabel}`,
     candidates: pool,
-    allCandidates: usingFallback ? null : deck.array,
+    allCandidates: searchPickerAllCandidates(pool, deck.array),
     triggerCard: target,
     zoneFrom: 'deck',
     destination: destZone,
