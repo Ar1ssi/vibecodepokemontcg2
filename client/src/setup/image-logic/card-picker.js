@@ -79,7 +79,7 @@ const buildSlideContent = async (card) => {
 
 const computeVirtualIndex = (index, dragPx, peekPx, slideCount) => {
   const cardStepPx = peekPx * DRAG_CARD_SCALE;
-  const progress = dragPx / cardStepPx;
+  const progress = -dragPx / cardStepPx;
   return Math.max(0, Math.min(slideCount - 1, index + progress));
 };
 
@@ -99,7 +99,7 @@ const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
   if (dragPx !== 0) {
     const progress = virtualIndex - index;
     const absProgress = Math.abs(progress);
-    const incoming = dragPx > 0 ? index + 1 : index - 1;
+    const incoming = dragPx > 0 ? index - 1 : index + 1;
     const handoffSpan = 1 - Z_HANDOFF_START;
     const t =
       handoffSpan > 0
@@ -814,7 +814,7 @@ const attachSwipe = (state) => {
       Math.abs(dx) > Math.abs(dy);
 
     if (horizontal) {
-      goToIndex(state, state.index + (dx > 0 ? 1 : -1));
+      goToIndex(state, state.index + (dx > 0 ? -1 : 1));
     } else if (!wasDragging && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
       if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
