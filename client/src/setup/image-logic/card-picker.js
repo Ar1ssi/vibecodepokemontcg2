@@ -1129,17 +1129,6 @@ export const openCardPicker = async ({
 
   pickerState = state;
 
-  if (triggerCard) {
-    const { node, holoWrapper } = await buildSlideContent(triggerCard);
-    node.classList.add('card-picker-trigger-card');
-    triggerSlot.appendChild(node);
-    if (holoWrapper) {
-      holoWrapper.classList.add('card-picker-trigger-holo');
-      state.triggerHoloWrapper = holoWrapper;
-      startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
-    }
-  }
-
   if (!isBrowse) {
     syncChooseLayout(state);
     state.onResize = () => syncChooseLayout(state);
@@ -1208,6 +1197,20 @@ export const openCardPicker = async ({
 
   setCandidateList(state, candidates);
   if (!isBrowse) renderSlotCards(state);
+
+  if (triggerCard) {
+    void buildSlideContent(triggerCard).then(({ node, holoWrapper }) => {
+      if (pickerState !== state) return;
+      node.classList.add('card-picker-trigger-card');
+      triggerSlot.appendChild(node);
+      if (holoWrapper) {
+        holoWrapper.classList.add('card-picker-trigger-holo');
+        state.triggerHoloWrapper = holoWrapper;
+        startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
+        if (!isBrowse) syncChooseLayout(state);
+      }
+    });
+  }
 };
 
 /** Browse-only wrapper (discard pile viewer). */

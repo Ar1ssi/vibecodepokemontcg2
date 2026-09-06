@@ -328,7 +328,7 @@ async function runSearchStep(card, searchStep, done) {
   }
   const sourceText = card.text || card.effect || '';
   const revealPicked = (picked) =>
-    maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+    maybeAnnounceSearchReveal(_effectOwner, card.name, picked, _appendMessage, {
       step: searchStep,
       sourceText,
     });
@@ -336,8 +336,8 @@ async function runSearchStep(card, searchStep, done) {
   if (searchStep.destination === 'bench' && searchStep.what === 'Basic Pokémon' && (searchStep.count || 1) === 1) {
     const deck = zone(_effectOwner, 'deck');
     const basics = [];
+    await Promise.all(deck.array.map((c) => ensureCardData(c)));
     for (const c of deck.array) {
-      await ensureCardData(c);
       if ((c.stage || 'Basic') === 'Basic' && _isPokemonCard(c)) basics.push(c);
     }
     if (basics.length === 1) {
@@ -345,13 +345,13 @@ async function runSearchStep(card, searchStep, done) {
       revealPicked(basics[0]);
       moveCardBundle(_effectOwner, _effectOwner, 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
-      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
       return;
     }
     if (basics.length === 0) {
       msg('  no Basic Pokémon in deck');
-      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
       return;
     }
@@ -359,20 +359,19 @@ async function runSearchStep(card, searchStep, done) {
   _openDeckSearchWindow(`${card.name} lets you search your deck`);
   msg(`  ${card.name} — opening card select…`);
   const deck = zone(_effectOwner, 'deck');
-  for (const c of deck.array) {
-    await ensureCardData(c);
-  }
+  // Match ability search: open the picker on deck data we already have.
+  // matchesSearch keeps unknown-HP basics in HP-cap pools; enrich slides async.
   const pool = filterSearchMatches(deck.array, searchStep.what, {
     onNoMatches: (what) => msg(`  no cards in deck match "${what}"`),
   });
   if (pool.length === 0) {
     msg('  no cards left in deck');
-    shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
+    shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
     done?.();
     return;
   }
   const shuffleAfter = (opts) =>
-    shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, {
+    shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
       sourceName: card.name,
       ...opts,
     });
@@ -522,16 +521,16 @@ async function runLookStep(card, step, fromBottom, done) {
     zoneFrom: 'deck',
     destination: step.destination === 'bench' ? 'bench' : 'hand',
     onPick: (picked) => {
-      maybeAnnounceSearchReveal('self', card.name, picked, _appendMessage, {
+      maybeAnnounceSearchReveal(_effectOwner, card.name, picked, _appendMessage, {
         step,
         sourceText: card.text || card.effect || '',
       });
-      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name });
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
     },
     onCancel: () => {
       msg('  kept all looked-at cards in deck order — shuffle your deck');
-      shuffleDeckAfterSearch('self', _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
       done?.();
     },
   });
