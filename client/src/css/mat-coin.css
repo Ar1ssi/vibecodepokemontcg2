@@ -120,7 +120,7 @@
   position: fixed;
   bottom: calc(var(--active-bottom) + var(--active-height) / 2);
   left: calc(var(--active-left) + var(--active-width) + 0.6%);
-  width: calc(var(--active-height) * 0.24);
+  width: calc(var(--active-height) * 0.12);
   aspect-ratio: 1;
   height: auto;
   transform: translateY(50%);
