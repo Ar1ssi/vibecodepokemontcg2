@@ -51,16 +51,29 @@ import {
       const activeDeckIds = { self: null, opp: null };
     
       // Seed premade starter/battle decks so every player has playable lists.
-      // Adds any catalog deck missing from the library (new players get all six;
-      // returning players pick up newly added decks without overwriting saves).
+      // Adds any catalog deck missing from the library; backfills sleeve/coin on
+      // existing premade decks that were seeded before cosmetics were added.
       const seedStarterDecks = () => {
         const starters = getStarterDecks();
-        const existingNames = new Set(listDecks(library).map((d) => d.name));
+        const decksByName = new Map(listDecks(library).map((d) => [d.name, d.id]));
         let nextLibrary = library;
-        let seeded = false;
+        let changed = false;
 
         for (const entry of STARTER_DECK_CATALOG) {
-          if (existingNames.has(entry.name)) continue;
+          const existingId = decksByName.get(entry.name);
+          if (existingId) {
+            const deck = nextLibrary.decks[existingId];
+            if (entry.sleeveId && !deck.sleeveId) {
+              nextLibrary = setDeckSleeve(nextLibrary, existingId, entry.sleeveId);
+              changed = true;
+            }
+            if (entry.coinId && !deck.coinId) {
+              nextLibrary = setDeckCoin(nextLibrary, existingId, entry.coinId);
+              changed = true;
+            }
+            continue;
+          }
+
           const cards = starters[entry.key];
           if (!cards?.length) continue;
 
@@ -79,13 +92,14 @@ import {
             nextLibrary,
             entry.name,
             grouped,
-            Date.now()
+            Date.now(),
+            { sleeveId: entry.sleeveId || null, coinId: entry.coinId || null }
           );
           nextLibrary = created.library;
-          seeded = true;
+          changed = true;
         }
 
-        if (seeded) {
+        if (changed) {
           library = nextLibrary;
           saveLibraryToStorage(window.localStorage, library);
         }
