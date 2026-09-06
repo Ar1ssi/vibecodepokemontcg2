@@ -1809,7 +1809,6 @@ ul, li {
   display: flex;
   align-items: center;
   justify-content: center;
-  isolation: isolate;
   overflow: visible;
   transition: transform 0.22s ease;
   transform-origin: center center;

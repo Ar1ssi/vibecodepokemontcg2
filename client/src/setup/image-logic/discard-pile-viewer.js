@@ -77,9 +77,31 @@ const computeSlideLayout = (slideIndex, virtualIndex) => {
   const absPeek = Math.abs(peekOffset);
   return {
     peekOffset,
-    px: 0,
     role: absPeek < 0.05 ? 'active' : peekOffset < 0 ? 'ahead' : 'behind',
   };
+};
+
+/**
+ * Crossfade stacking during drag so the incoming card rises above the outgoing
+ * one past halfway — avoids a mid-swipe pop where the old front clips on top.
+ */
+const computeSlideZIndex = (slideIndex, virtualIndex, index, dragPx) => {
+  const dist = Math.abs(slideIndex - virtualIndex);
+  let z = 300 - dist * 10;
+
+  if (dragPx !== 0) {
+    const progress = virtualIndex - index;
+    const handoff = Math.min(1, Math.abs(progress)) * 6;
+    const incoming = dragPx > 0 ? index + 1 : index - 1;
+
+    if (slideIndex === index) {
+      z -= handoff;
+    } else if (slideIndex === incoming) {
+      z += handoff;
+    }
+  }
+
+  return Math.round(z);
 };
 
 const isSlideOnScreen = (stackRect, stackWidth, peekOffset) => {
@@ -136,10 +158,12 @@ const layoutStack = (state) => {
 
     slide.classList.remove('is-active', 'is-ahead', 'is-behind', 'is-hidden');
     slide.classList.add(`is-${layout.role}`);
-    slide.style.zIndex = String(300 - Math.round(absPeek * 10));
+    slide.style.zIndex = String(
+      computeSlideZIndex(i, virtualIndex, index, dragPx)
+    );
 
     const scale = 1 - absPeek * 0.035;
-    slide.style.transform = `translateX(${layout.peekOffset * PEEK_PERCENT}%) scale(${scale})`;
+    slide.style.transform = `translate3d(${layout.peekOffset * PEEK_PERCENT}%, 0, 0) scale(${scale})`;
     slide.style.opacity = '1';
 
     if (!isSlideOnScreen(stackRect, stackWidth, layout.peekOffset)) {
