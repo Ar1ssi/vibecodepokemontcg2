@@ -1921,6 +1921,144 @@ ul, li {
   font-weight: 600;
 }
 
+/* Unified card picker — PTCG Live-style choose UI */
+.card-picker-overlay {
+  cursor: default;
+}
+.card-picker-filters {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  z-index: 410;
+  display: flex;
+  gap: 0.35rem;
+}
+.card-picker-filter {
+  border: none;
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.82);
+}
+.card-picker-filter.is-active {
+  background: #f5d547;
+  color: #1a1a1a;
+}
+.card-picker-main {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: min(6vw, 3rem);
+  width: 100%;
+  min-height: 0;
+  padding: 0 1rem;
+}
+.card-picker-stage {
+  flex: 0 1 auto;
+}
+.card-picker-trigger-slot {
+  flex: 0 0 auto;
+  width: min(22vw, 150px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 900px;
+}
+.card-picker-trigger-card,
+.card-picker-trigger-holo {
+  width: 100%;
+  aspect-ratio: var(--card-aspect);
+  border-radius: 0.35rem;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+  animation: card-picker-float 3.2s ease-in-out infinite;
+  transform-origin: center center;
+}
+.card-picker-trigger-holo {
+  overflow: hidden;
+}
+@keyframes card-picker-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2.5deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(2deg);
+  }
+}
+.card-picker-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(4.5rem, calc(env(safe-area-inset-bottom) + 3rem));
+  transform: translateX(-50%);
+  z-index: 420;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: min(92vw, 760px);
+  padding: 0.85rem 1rem 0.85rem 1.25rem;
+  border-radius: 0.2rem;
+  background: linear-gradient(180deg, #2f8fd4 0%, #2575b0 100%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.card-picker-instruction {
+  flex: 1;
+  color: #fff;
+  font-size: clamp(0.85rem, 2.2vw, 1.05rem);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.card-picker-done {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 0.15rem;
+  padding: 0.55rem 1.35rem;
+  background: #f5d547;
+  color: #1a1a1a;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.card-picker-done:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.card-picker-slide.is-selected .discard-pile-card,
+.card-picker-slide.is-selected .mat-holo.discard-pile-holo {
+  outline: 3px solid #5eead4;
+  outline-offset: 2px;
+  border-radius: 0.35rem;
+}
+.card-picker-select-badge {
+  position: absolute;
+  bottom: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.card-picker-meta {
+  bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
 /* Custom card modal */
 .native-deck-builder-modal {
   position: absolute;

@@ -31,6 +31,7 @@ import { markRetreated } from '../../setup/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { openCardPicker } from '../../setup/image-logic/card-picker.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import {
   canAct,
@@ -1602,12 +1603,12 @@ const openAbilityChoicePicker = ({
   minCount,
   maxCount,
   upTo = false,
+  triggerCard = null,
+  allCandidates = null,
   onPick,
   onConfirm,
   onCancel,
 }) => {
-  document.getElementById('rulesChoicePicker')?.remove();
-
   const maxSel = maxCount ?? requiredCount;
   const minSel = minCount ?? (upTo ? 0 : requiredCount);
   const cappedMax = Math.min(maxSel, candidates.length);
@@ -1622,77 +1623,22 @@ const openAbilityChoicePicker = ({
     return;
   }
 
-  const overlay = document.createElement('div');
-  overlay.id = 'rulesChoicePicker';
-  overlay.innerHTML = `
-    <div class="choice-picker-card">
-      <div class="choice-picker-title"></div>
-      <div class="choice-picker-grid"></div>
-      ${multiSelect ? '<button class="choice-picker-confirm" disabled>Confirm</button>' : ''}
-      <button class="choice-picker-cancel">Cancel</button>
-    </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('.choice-picker-title').textContent = title;
-
-  const selected = new Set();
-  const grid = overlay.querySelector('.choice-picker-grid');
-  const confirmBtn = overlay.querySelector('.choice-picker-confirm');
-  if (confirmBtn && upTo && minSel === 0) {
-    confirmBtn.disabled = false;
-  }
-
-  for (const cand of candidates) {
-    const btn = document.createElement('button');
-    btn.className = 'choice-picker-item';
-    const thumb =
-      cand.images?.small ||
-      (typeof cand.image === 'string' ? cand.image : cand.image?.src) ||
-      '';
-    btn.innerHTML = thumb
-      ? `<img src="${thumb}" alt="" loading="lazy" /><span>${cand.name || 'Card'}</span>`
-      : `<span>${cand.name || 'Card'}</span>`;
-    btn.addEventListener('click', () => {
-      if (multiSelect) {
-        if (selected.has(cand)) {
-          selected.delete(cand);
-          btn.classList.remove('selected');
-        } else if (selected.size < cappedMax) {
-          selected.add(cand);
-          btn.classList.add('selected');
-        }
-        if (confirmBtn) {
-          confirmBtn.disabled = selected.size < minSel || selected.size > cappedMax;
-        }
-        return;
-      }
-      try {
-        const zone = getZone(user, zoneFrom);
-        const idx = zone.array.indexOf(cand);
-        if (idx >= 0 && destination) {
-          moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move', true);
-        }
-      } catch {}
-      onPick?.(cand);
-      overlay.remove();
-    });
-    grid.appendChild(btn);
-  }
-
-  if (confirmBtn) {
-    confirmBtn.addEventListener('click', () => {
-      onConfirm?.(Array.from(selected));
-      overlay.remove();
-    });
-  }
-  overlay.querySelector('.choice-picker-cancel').addEventListener('click', () => {
-    onCancel?.();
-    overlay.remove();
-  });
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      onCancel?.();
-      overlay.remove();
-    }
+  openCardPicker({
+    title,
+    candidates,
+    allCandidates,
+    triggerCard,
+    multiSelect,
+    requiredCount,
+    minCount: minSel,
+    maxCount: cappedMax,
+    upTo,
+    zoneFrom,
+    destination,
+    user,
+    onPick,
+    onConfirm,
+    onCancel,
   });
 };
 
@@ -1752,6 +1698,7 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
   }
 
   const finishSearch = () => shuffleZone(user, user, 'deck');
+  const triggerCard = getZone(user, 'active').array[0] || null;
 
   const useMulti = upTo ? effectiveMax >= 1 : effectiveMax > 1;
   const minPick = upTo ? 0 : effectiveMax;
@@ -1765,6 +1712,8 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         user,
         title: `${atk.name} — choose ${pickLabel} for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
         candidates: pool,
+        allCandidates: usingFallback ? null : deck.array,
+        triggerCard,
         zoneFrom: 'deck',
         destination: destZone,
         multiSelect: true,
@@ -1807,6 +1756,8 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
       user,
       title: `${atk.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
       candidates: pool,
+      allCandidates: usingFallback ? null : deck.array,
+      triggerCard,
       zoneFrom: 'deck',
       destination: destZone,
       onPick: (picked) => {
@@ -1880,6 +1831,8 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
       user,
       title: `${target.name} — choose ${count} cards for ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
       candidates: pool,
+      allCandidates: usingFallback ? null : deck.array,
+      triggerCard: target,
       zoneFrom: 'deck',
       destination: destZone,
       multiSelect: true,
@@ -1915,6 +1868,8 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     user,
     title: `${target.name} — take a card to ${destLabel}${usingFallback ? ' (full deck)' : ''}`,
     candidates: pool,
+    allCandidates: usingFallback ? null : deck.array,
+    triggerCard: target,
     zoneFrom: 'deck',
     destination: destZone,
     onPick: (picked) => {
@@ -2141,6 +2096,7 @@ export const lookAtTopAbility = async (user, emit = true, targetCard = null) => 
       user,
       title: `${target.name} — take a top card to hand`,
       candidates: topCards,
+      triggerCard: target,
       zoneFrom: 'deck',
       destination: 'hand',
       onPick: (picked) => {
@@ -2164,6 +2120,7 @@ export const lookAtTopAbility = async (user, emit = true, targetCard = null) => 
     user,
     title: `${target.name} — top ${topCards.length} card${topCards.length !== 1 ? 's' : ''} (view only)`,
     candidates: topCards,
+    triggerCard: target,
     zoneFrom: 'deck',
     destination: null,
     onPick: () => {
@@ -2213,6 +2170,7 @@ export const recursionAbility = async (user, emit = true, targetCard = null) => 
     user,
     title: `${target.name} — take a card from discard`,
     candidates: discard.array,
+    triggerCard: target,
     zoneFrom: 'discard',
     destination: 'hand',
     onPick: (picked) => {

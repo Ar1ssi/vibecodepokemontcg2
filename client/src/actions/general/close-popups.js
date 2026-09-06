@@ -15,6 +15,9 @@ import {
   isCardPreviewOpen,
 } from '../../setup/image-logic/full-view.js';
 import {
+  closeCardPicker,
+} from '../../setup/image-logic/card-picker.js';
+import {
   closeDiscardPileViewer,
 } from '../../setup/image-logic/discard-pile-viewer.js';
 
@@ -44,7 +47,9 @@ const isOutsideZoneClick = (event, zone) => {
     return false;
   } else if (
     event.target.id === 'discardPileViewer' ||
-    event.target.closest?.('#discardPileViewer')
+    event.target.closest?.('#discardPileViewer') ||
+    event.target.id === 'cardPickerOverlay' ||
+    event.target.closest?.('#cardPickerOverlay')
   ) {
     return false;
   } else if (
