@@ -90,8 +90,9 @@ export const draw = (user, initiator, drawAmount, emit = true) => {
   }
 
   if (!isNaN(drawAmount) && drawAmount > 0) {
+    const moveOpts = systemState.syncReplaying ? { syncReplay: true } : {};
     for (let i = 0; i < drawAmount; i++) {
-      moveCard(user, initiator, 'deck', 'hand', 0);
+      moveCard(user, initiator, 'deck', 'hand', 0, false, moveOpts);
     }
     let message;
     if (drawAmount > 1) {

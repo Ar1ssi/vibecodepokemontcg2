@@ -12,12 +12,13 @@ import { setupDealPlan } from '../general/setup-deal.mjs';
 // moveCard is async (ensureCardData). Firing the loop without await raced
 // every deal off deck[0]; the sync log sometimes showed only 3 prize moves.
 export const drawHand = async (user, initiator) => {
+  const moveOpts = systemState.syncReplaying ? { syncReplay: true } : {};
   const plan = setupDealPlan(getZone(user, 'deck').getCount());
   for (let i = 0; i < plan.hand; i++) {
-    await moveCard(user, initiator, 'deck', 'hand', 0);
+    await moveCard(user, initiator, 'deck', 'hand', 0, false, moveOpts);
   }
   for (let i = 0; i < plan.prizes; i++) {
-    await moveCard(user, initiator, 'deck', 'prizes', 0);
+    await moveCard(user, initiator, 'deck', 'prizes', 0, false, moveOpts);
   }
 };
 

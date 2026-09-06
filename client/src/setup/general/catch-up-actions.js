@@ -7,7 +7,9 @@ import { acceptAction } from './accept-action.js';
  * does not).
  */
 export const catchUpActions = async (actionData, fullReplay = false) => {
+  const wasReplaying = systemState.syncReplaying;
   systemState.isCatchingUp = true;
+  systemState.syncReplaying = true;
   try {
     if (fullReplay) {
       systemState.oppCounter = 0;
@@ -32,5 +34,6 @@ export const catchUpActions = async (actionData, fullReplay = false) => {
     }
   } finally {
     systemState.isCatchingUp = false;
+    systemState.syncReplaying = wasReplaying;
   }
 };
