@@ -95,7 +95,11 @@ const isDraw = (t) =>
   t.includes('draw') && (t.includes('card') || t.includes('until you have'));
 
 const isSwitch = (t) =>
-  t.includes('bring in') || (t.includes('switch') && !t.includes('retreat'));
+  t.includes('bring in') ||
+  (t.includes('switch') && !t.includes('retreat')) ||
+  (t.includes('switch') &&
+    (t.includes('benched') || t.includes('bench')) &&
+    t.includes('active'));
 
 const isHeal = (t) =>
   (t.includes('remove') && t.includes('damage counter')) || t.includes('heal');
@@ -188,14 +192,24 @@ const isHandProtect = (t) =>
     (t.includes("can't be affected") || t.includes('cannot be affected'))) ||
   (t.includes('in hand') && t.includes('immune'));
 
-const isStatus = (t) =>
-  t.includes('confused') ||
-  t.includes('burned') ||
-  t.includes('poisoned') ||
-  t.includes('asleep') ||
-  t.includes('now poisoned') ||
-  (t.includes('make') && t.includes('opponent')) ||
-  (t.includes('special condition') && !t.includes('recover'));
+const isStatus = (t) => {
+  const conditionalPoisonOnSwitch =
+    t.includes('switch') &&
+    (t.includes('benched') || t.includes('bench')) &&
+    t.includes('active') &&
+    t.includes('if you do') &&
+    t.includes('poisoned');
+  if (conditionalPoisonOnSwitch) return false;
+  return (
+    t.includes('confused') ||
+    t.includes('burned') ||
+    t.includes('poisoned') ||
+    t.includes('asleep') ||
+    t.includes('now poisoned') ||
+    (t.includes('make') && t.includes('opponent')) ||
+    (t.includes('special condition') && !t.includes('recover'))
+  );
+};
 
 const isKoPrevention = (t) =>
   t.includes('knocked out') && (t.includes('prevent') || t.includes("can't") || t.includes('coin') || t.includes('flip'));
@@ -227,7 +241,12 @@ const isToolCap = (t) =>
 const isPrizeModify = (t) =>
   t.includes('prize card') && (t.includes('less') || t.includes('fewer') || t.includes('more') || t.includes('extra'));
 
+const isAbilityUsageLimit = (t) =>
+  /can't use more than \d+/.test(t) ||
+  /cannot use more than \d+/.test(t);
+
 const isEffectPrevent = (t) =>
+  !isAbilityUsageLimit(t) &&
   (t.includes('prevent') || t.includes("can't") || t.includes('have no effect') || t.includes('have no abilities')) &&
   (t.includes('effect') || t.includes('ability') || t.includes('attack'));
 
@@ -288,6 +307,8 @@ const FAMILY_ORDER = [
   ['recursion', isRecursion],
   ['ko-prevention', isKoPrevention],
   ['damage-prevent', isDamagePrevent],
+  // Bench↔Active switch before status (Pecharunt ex: switch + conditional Poison)
+  ['switch', isSwitch],
   // Active actions before hand-protect (avoids "your hand" + "can't use" false positives)
   ['search', isSearch],
   ['status', isStatus],
@@ -313,7 +334,6 @@ const FAMILY_ORDER = [
   ['weakness', isWeakness],
   ['damage-reduce', isDamageReduce],
   ['damage-bonus', isDamageBonus],
-  ['switch', isSwitch],
   ['attach', isAttach],
   // 'when-played' is a trigger, not an effect: it loses to any more
   // specific action (draw/search/…) and only wins when no action matched.

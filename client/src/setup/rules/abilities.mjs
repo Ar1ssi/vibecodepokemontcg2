@@ -38,6 +38,17 @@ const hasDamageCounterPlacement = (t) =>
   /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
   /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
 
+// Bench ↔ Active swap wording ("switch … Benched … with your Active …").
+export const isBenchActiveSwitchText = (t) =>
+  t.includes('switch') &&
+  (t.includes('benched') || t.includes('bench')) &&
+  t.includes('active');
+
+// Printed once-per-turn usage cap — not effect prevention.
+export const isAbilityUsageLimitText = (t) =>
+  /can't use more than \d+/.test(t) ||
+  /cannot use more than \d+/.test(t);
+
 // Discard-from-your-hand costs that affect the opponent are NOT opponent-disrupt.
 const isSelfHandDiscardCost = (t) =>
   t.includes('discard') &&
@@ -229,19 +240,29 @@ export function parseAbility(text = '') {
   }
 
   // ── 3. Switch / bring in ────────────────────────────────────────────────
+  const isOpponentBenchSwitch = lower.includes("opponent's benched");
   if (
-    (lower.includes('switch your active') ||
+    isBenchActiveSwitchText(lower) ||
+    ((lower.includes('switch your active') ||
       lower.includes('switch in 1 of') ||
       lower.includes('bring in 1 of')) &&
-    (lower.includes('benched') || lower.includes('bench'))
+      (lower.includes('benched') || lower.includes('bench')))
   ) {
-    const isOpponent = lower.includes("opponent's benched") || lower.includes('opponent\'s benched');
+    const typedBench = lower.match(/benched\s+\{([a-z])\}\s+pok/);
+    const poisonNewActive =
+      lower.includes('if you do') &&
+      (lower.includes('now poisoned') || lower.includes('is now poisoned'));
     steps.push({
       type: 'switchAbility',
-      target: isOpponent ? 'opponent' : 'self',
-      guidance: isOpponent
+      target: isOpponentBenchSwitch ? 'opponent' : 'self',
+      pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
+      exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
+      poisonNewActive,
+      guidance: isOpponentBenchSwitch
         ? 'Once during your turn: switch in 1 of your opponent\'s Benched Pokémon.'
-        : 'Once during your turn: switch your Active with 1 of your Benched Pokémon.',
+        : poisonNewActive
+          ? 'Once during your turn: switch your Active with 1 of your Benched Pokémon; the new Active is Poisoned.'
+          : 'Once during your turn: switch your Active with 1 of your Benched Pokémon.',
     });
   }
 
@@ -442,12 +463,17 @@ export function parseAbility(text = '') {
     lower.includes('poisoned') ||
     lower.includes('asleep') ||
     lower.includes('paralyzed');
+  const conditionalPoisonOnSwitch =
+    isBenchActiveSwitchText(lower) &&
+    lower.includes('if you do') &&
+    lower.includes('poisoned');
   if (
-    namesStatus ||
-    (lower.includes('make') &&
-      lower.includes('opponent') &&
-      namesStatus) ||
-    (lower.includes('special condition') && namesStatus && !lower.includes('recover'))
+    !conditionalPoisonOnSwitch &&
+    (namesStatus ||
+      (lower.includes('make') &&
+        lower.includes('opponent') &&
+        namesStatus) ||
+      (lower.includes('special condition') && namesStatus && !lower.includes('recover')))
   ) {
     const target = lower.includes('opponent') ? 'opponent' : 'attacker';
     steps.push({
@@ -599,13 +625,14 @@ export function parseAbility(text = '') {
 
   // ── 27. Effect prevention / negation ────────────────────────────────────
   if (
-    ((lower.includes('prevent') ||
+    !isAbilityUsageLimitText(lower) &&
+    (((lower.includes('prevent') ||
       lower.includes("can't") ||
       lower.includes('have no effect') ||
       lower.includes('have no abilities') ||
       lower.includes('has no abilities')) &&
       (lower.includes('effect') || lower.includes('ability') || lower.includes('attack'))) ||
-    (lower.includes('active spot') && lower.includes('no abilities'))
+    (lower.includes('active spot') && lower.includes('no abilities')))
   ) {
     steps.push({
       type: 'effectPreventAbility',

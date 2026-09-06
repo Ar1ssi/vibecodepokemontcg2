@@ -25,6 +25,7 @@ import {
   combinedDamagePrevention,
   combinedPassiveCostDiscount,
   parseStatusInflict,
+  parseSwitchAbility,
   parseMoveDamage,
   parseLookAtTop,
   parseRecursionFromDiscard,
@@ -2210,8 +2211,89 @@ export const switchAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
+  const abilityText =
+    target.ability?.text ?? target.abilityText ?? target.text ?? '';
+  const switchParsed = parseSwitchAbility({ ability: { text: abilityText } });
+
   const switcherName = target.name || 'This Pokémon';
-  // Free swap: move the target to active; autoMoveActiveBenchCard handles
+
+  const benchMatchesSwitchFilter = async (card) => {
+    if (card.type !== 'Pokémon') return false;
+    await ensureCardData(card);
+    if (switchParsed.pokemonType && !pokemonMatchesType(card, switchParsed.pokemonType)) {
+      return false;
+    }
+    if (
+      switchParsed.exceptName &&
+      String(card.name || '').toLowerCase().includes(switchParsed.exceptName)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  const performSwap = (benchCard) => {
+    if (targetIsBench) {
+      const idx = getZone(user, 'bench').array.indexOf(benchCard);
+      if (idx >= 0) moveCard(user, user, 'bench', 'active', idx);
+    } else {
+      moveCard(user, user, 'active', 'bench', 0);
+      const idxAfter = getZone(user, 'bench').array.indexOf(benchCard);
+      if (idxAfter >= 0) moveCard(user, user, 'bench', 'active', idxAfter);
+    }
+
+    if (rulesState.enabled) markAbilityUsed(user, target);
+
+    const newActive = getZone(user, 'active').array[0];
+    if (switchParsed.poisonNewActive && newActive) {
+      const key = newActive.image?.dataset?.cardId || newActive.name;
+      applyStatus(user, key, 'poisoned');
+    }
+
+    const poisonNote =
+      switchParsed.poisonNewActive && newActive ? ' (now Poisoned)' : '';
+    appendMessage(
+      user,
+      `🔁 ${switcherName} switches with ${newActive?.name || 'the other Pokémon'}${poisonNote}.`,
+      'announcement',
+      false
+    );
+  };
+
+  if (switchParsed.benchToActive && !targetIsBench) {
+    const candidates = [];
+    for (let i = 0; i < bench.array.length; i++) {
+      const card = bench.array[i];
+      if (await benchMatchesSwitchFilter(card)) {
+        candidates.push({ card, idx: i });
+      }
+    }
+    if (candidates.length === 0) {
+      appendMessage(
+        user,
+        '⛔ No eligible Benched Pokémon to switch with.',
+        'announcement',
+        false
+      );
+      return;
+    }
+    if (candidates.length === 1) {
+      performSwap(candidates[0].card);
+      return;
+    }
+    const pick = await _pickFromList(
+      `${switcherName} — switch with which Benched Pokémon?`,
+      candidates.map(({ card }, i) => ({ label: card.name || 'Pokémon', idx: i }))
+    );
+    if (pick === null) {
+      appendMessage(user, 'Switch canceled.', 'announcement', false);
+      return;
+    }
+    performSwap(candidates[pick].card);
+    return;
+  }
+
+  // Generic swap: move the target to active; autoMoveActiveBenchCard handles
   // pushing the old active to bench. For active source, move active→bench first
   // then bench→active (two-step since active can't hold two cards).
   if (targetIsBench) {
