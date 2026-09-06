@@ -3675,3 +3675,133 @@ import test from 'node:test';
     });
 
     // ── card identity resolution (name collisions across sets) ──
+
+    // ── pending attack effects (next-turn-lock, damage-prevention, discard-opponent) ──
+    test('parsePendingAttackEffects: defender locks and self damage reduction', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+        pendingCantRetreat,
+        pendingDamagePrevention,
+        combinedPendingDamagePrevention,
+        expirePendingEffectsForTurnEnd,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, beginTurn, endTurn } = await import('../rules-state.mjs');
+
+      const text =
+        "During your opponent's next turn, the Defending Pokémon can't retreat. This Pokémon takes 30 less damage from attacks.";
+      const parsed = parsePendingAttackEffects(text);
+      assert.equal(parsed.length, 2);
+      assert.ok(parsed.some((e) => e.kind === 'cant-retreat'));
+      assert.ok(parsed.some((e) => e.kind === 'damage-reduce' && e.value === 30));
+
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', parsed, 'Test Lock');
+      assert.equal(pendingCantRetreat(rulesState, 'opp'), false);
+      assert.equal(pendingDamagePrevention(rulesState, 'self').reduce, 0);
+
+      endTurn('self');
+      beginTurn('opp');
+      assert.equal(pendingCantRetreat(rulesState, 'opp'), true);
+      assert.equal(pendingDamagePrevention(rulesState, 'self').reduce, 30);
+
+      const merged = combinedPendingDamagePrevention(
+        rulesState,
+        'self',
+        { preventAll: false, reduce: 0 },
+        { stage: 'Basic', name: 'Pikachu' }
+      );
+      assert.equal(merged.reduce, 30);
+
+      endTurn('opp');
+      expirePendingEffectsForTurnEnd(rulesState, 'opp');
+      assert.equal(pendingCantRetreat(rulesState, 'opp'), false);
+      assert.equal(pendingDamagePrevention(rulesState, 'self').reduce, 0);
+    });
+
+    test('parsePendingAttackEffects: until-leaves-active and self-next-turn', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+        pendingCantUseAttack,
+        pendingCantAttack,
+        clearActiveSpotPendingEffects,
+        expirePendingEffectsForTurnEnd,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, beginTurn, endTurn } = await import('../rules-state.mjs');
+
+      const untilText =
+        "This Pokémon can't use Hyper Beam again until it leaves the Active Spot.";
+      const untilParsed = parsePendingAttackEffects(untilText);
+      assert.equal(untilParsed.length, 1);
+      assert.equal(untilParsed[0].window, 'until-leaves-active');
+
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', untilParsed, 'Hyper Beam');
+      assert.equal(pendingCantUseAttack(rulesState, 'self', 'Hyper Beam'), true);
+
+      clearActiveSpotPendingEffects(rulesState, 'self');
+      assert.equal(pendingCantUseAttack(rulesState, 'self', 'Hyper Beam'), false);
+
+      const selfTurnText = "During your next turn, this Pokémon can't attack.";
+      const selfParsed = parsePendingAttackEffects(selfTurnText);
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', selfParsed, 'Rest');
+      assert.equal(pendingCantAttack(rulesState, 'self'), false);
+      endTurn('self');
+      beginTurn('opp');
+      assert.equal(pendingCantAttack(rulesState, 'self'), false);
+      endTurn('opp');
+      beginTurn('self');
+      assert.equal(pendingCantAttack(rulesState, 'self'), true);
+      endTurn('self');
+      expirePendingEffectsForTurnEnd(rulesState, 'self');
+      assert.equal(pendingCantAttack(rulesState, 'self'), false);
+    });
+
+    test('parseDiscardOpponentEffect: deck, energy, hand, tools', async () => {
+      const { parseDiscardOpponentEffect } = await import('../attack-pending-effects.mjs');
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard the top 2 cards of your opponent's deck."),
+        { deckTop: 2, energyActive: 0, handRandom: 0, discardTools: false }
+      );
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard an Energy from your opponent's Active Pokémon."),
+        { deckTop: 0, energyActive: 1, handRandom: 0, discardTools: false }
+      );
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard a random card from your opponent's hand."),
+        { deckTop: 0, energyActive: 0, handRandom: 1, discardTools: false }
+      );
+      assert.deepEqual(
+        parseDiscardOpponentEffect("Discard all Pokémon Tools from your opponent's Active Pokémon."),
+        { deckTop: 0, energyActive: 0, handRandom: 0, discardTools: true }
+      );
+      assert.deepEqual(parseDiscardOpponentEffect('No discard here.'), {
+        deckTop: 0,
+        energyActive: 0,
+        handRandom: 0,
+        discardTools: false,
+      });
+    });
+
+    test('pending gates: cant play Item/Supporter/evolve/attach during opponent-turn lock', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, canPerformAction, beginTurn, endTurn } =
+        await import('../rules-state.mjs');
+
+      const text =
+        "During your opponent's next turn, they can't play any Item cards from their hand. Your opponent can't play any Supporter cards. They can't play any Pokémon from their hand to evolve their Pokémon. Energy can't be attached from your opponent's hand to the Defending Pokémon.";
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', parsePendingAttackEffects(text), 'Lockdown');
+      endTurn('self');
+      beginTurn('opp');
+
+      assert.equal(canPerformAction({ user: 'opp', action: 'playItem' }).allowed, false);
+      assert.equal(canPerformAction({ user: 'opp', action: 'playSupporter' }).allowed, false);
+      assert.equal(canPerformAction({ user: 'opp', action: 'evolve' }).allowed, false);
+      assert.equal(canPerformAction({ user: 'opp', action: 'attachEnergy' }).allowed, false);
+    });

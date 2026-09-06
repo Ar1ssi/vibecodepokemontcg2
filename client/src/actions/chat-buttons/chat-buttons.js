@@ -7,7 +7,16 @@ import { discardBoard } from '../general/board-actions.js';
 import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium } from '../../setup/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '../../setup/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
-import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap } from '../../setup/rules/energy-effects.mjs';
+import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '../../setup/rules/energy-effects.mjs';
+import {
+  parsePendingAttackEffects,
+  parseDiscardOpponentEffect,
+  queuePendingAttackEffects,
+  combinedPendingDamagePrevention,
+  pendingDamageVulnerability,
+  pendingCantUseAttack,
+  pendingRetreatCostDelta,
+} from '../../setup/rules/attack-pending-effects.mjs';
 import {
   parseDamagePrevention,
   applyDamagePrevention,
@@ -19,6 +28,8 @@ import {
   parseMoveDamage,
   parseLookAtTop,
   parseRecursionFromDiscard,
+  isPokemonToolCard,
+  attachedTools,
 } from '../../setup/rules/ability-executors.mjs';
 import { parseAbility } from '../../setup/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
@@ -64,6 +75,127 @@ const abilityBlockedByStadium = (user, target) => {
 
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
+const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, emit) => {
+  if (!discardSpec) return;
+  const { deckTop, energyActive, handRandom, discardTools } = discardSpec;
+  if (!(deckTop > 0 || energyActive > 0 || handRandom > 0 || discardTools)) return;
+
+  if (deckTop > 0) {
+    let discarded = 0;
+    for (let i = 0; i < deckTop; i++) {
+      if (getZone(oppPlayer, 'deck').getCount() === 0) break;
+      moveCard(oppPlayer, user, 'deck', 'discard', 0);
+      discarded++;
+    }
+    if (discarded > 0) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: discarded ${discarded} card${discarded !== 1 ? 's' : ''} from opponent's deck.`,
+        'announcement',
+        false
+      );
+    } else {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: deck discard fizzles — opponent's deck is empty.`,
+        'announcement',
+        false
+      );
+    }
+  }
+
+  if (energyActive > 0) {
+    const oppActiveZone = getZone(oppPlayer, 'active');
+    const oppActive = oppActiveZone.array[0];
+    if (!oppActive) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: energy discard fizzles — no opponent Active.`,
+        'announcement',
+        false
+      );
+    } else {
+      const energyIdx = oppActiveZone.array.findIndex(
+        (c) => c.type === 'Energy' && c.image?.relative === oppActive.image
+      );
+      if (energyIdx === -1) {
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: energy discard fizzles — no Energy on opponent Active.`,
+          'announcement',
+          false
+        );
+      } else {
+        const energy = oppActiveZone.array[energyIdx];
+        moveCard(oppPlayer, user, 'active', 'discard', energyIdx);
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: discarded ${energy.name || 'Energy'} from opponent Active.`,
+          'announcement',
+          false
+        );
+      }
+    }
+  }
+
+  if (handRandom > 0) {
+    const hand = getZone(oppPlayer, 'hand');
+    const count = hand.getCount();
+    if (count === 0) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: hand discard fizzles — opponent's hand is empty.`,
+        'announcement',
+        false
+      );
+    } else {
+      const idx = Math.floor(Math.random() * count);
+      const card = hand.array[idx];
+      moveCard(oppPlayer, user, 'hand', 'discard', idx);
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: discarded a random card (${card?.name || 'card'}) from opponent's hand.`,
+        'announcement',
+        false
+      );
+    }
+  }
+
+  if (discardTools) {
+    const oppActiveZone = getZone(oppPlayer, 'active');
+    const oppActive = oppActiveZone.array[0];
+    if (!oppActive) {
+      appendMessage(
+        user,
+        `🗑️ ${attackName}: tool discard fizzles — no opponent Active.`,
+        'announcement',
+        false
+      );
+    } else {
+      const tools = attachedTools(oppActive, oppActiveZone.array);
+      if (!tools.length) {
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: tool discard fizzles — no Tools on opponent Active.`,
+          'announcement',
+          false
+        );
+      } else {
+        for (const tool of [...tools]) {
+          const idx = oppActiveZone.array.indexOf(tool);
+          if (idx >= 0) moveCard(oppPlayer, user, 'active', 'discard', idx);
+        }
+        appendMessage(
+          user,
+          `🗑️ ${attackName}: discarded ${tools.length} Pokémon Tool${tools.length !== 1 ? 's' : ''} from opponent Active.`,
+          'announcement',
+          false
+        );
+      }
+    }
+  }
+};
+
 const placeSelfDamage = (user, zoneId, index, damage) => {
   if (!(damage > 0)) return;
   const target = getZone(user, zoneId).array[index];
@@ -300,6 +432,15 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
             );
             return; // turn does NOT end; player can retry or pass
           }
+        }
+        if (rulesState.enabled && pendingCantUseAttack(user, user, atk.name)) {
+          appendMessage(
+            user,
+            `⛔ ${active?.name || 'This Pokémon'} can't use ${atk.name} (attack effect).`,
+            'announcement',
+            false
+          );
+          return;
         }
 
         // Energy cost check
@@ -622,9 +763,14 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
         // Defender-side damage prevention (ability family: damage-prevent)
         if (rulesState.enabled) {
           const oppActiveZone = getZone(oppPlayer, 'active');
-          const prevention = combinedDamagePrevention(oppActive, oppActiveZone.array, {
-            blockTools: stadiumBlocksToolEffects(),
-          });
+          const prevention = combinedPendingDamagePrevention(
+            rulesState,
+            oppPlayer,
+            combinedDamagePrevention(oppActive, oppActiveZone.array, {
+              blockTools: stadiumBlocksToolEffects(),
+            }),
+            active
+          );
           const prevented = applyDamagePrevention(dmg.total, prevention);
           if (prevented !== dmg.total) {
             appendMessage(
@@ -686,6 +832,17 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
               dmg = { ...dmg, total: capped };
             }
           }
+        }
+
+        const vulnExtra = rulesState.enabled ? pendingDamageVulnerability(rulesState, oppPlayer) : 0;
+        if (vulnExtra > 0) {
+          dmg = { ...dmg, total: dmg.total + vulnExtra };
+          appendMessage(
+            user,
+            `📈 +${vulnExtra} damage (Defending is vulnerable to attacks)!`,
+            'announcement',
+            false
+          );
         }
 
         // Read current damage on opponent's active (for KO check)
@@ -1762,6 +1919,16 @@ export const attack = async (user, emit = true, attackIndex = 0) => {
           }
         }
 
+        // Pending next-turn locks / damage windows (taxonomy partial families).
+        if (rulesState.enabled) {
+          const pending = parsePendingAttackEffects(atk.text, atk.name);
+          if (pending.length) {
+            queuePendingAttackEffects(rulesState, user, pending, atk.name);
+          }
+          const discardSpec = parseDiscardOpponentEffect(atk.text);
+          executeDiscardOpponentEffect(user, oppPlayer, discardSpec, atk.name, emit);
+        }
+
         // Record the once-per-turn attack as used this turn (only reached on
         // a successful attack — the fizzle path returns early above). Reuses
         // the shared abilitiesUsed flag map, cleared by resetTurnFlags().
@@ -1846,9 +2013,12 @@ export const retreat = (user, emit = true) => {
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
     const baseRetreatCost = active?.retreatCost ?? 0;
-    const retreatCost = rulesState.enabled
+    let retreatCost = rulesState.enabled
       ? getStadiumRetreatCost(baseRetreatCost, active, user)
       : baseRetreatCost;
+    if (rulesState.enabled) {
+      retreatCost += pendingRetreatCostDelta(rulesState, user);
+    }
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
       if (attachedEnergies.length < retreatCost) {

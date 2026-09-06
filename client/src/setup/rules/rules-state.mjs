@@ -7,6 +7,16 @@
       extractTcgdexIdFromImageUrl,
       resolveTcgdexSetId,
     } from '../shared/legacy-set-ids.mjs';
+    import {
+      activatePendingEffectsForTurn,
+      expirePendingEffectsForTurnEnd,
+      pendingCantAttack,
+      pendingCantRetreat,
+      pendingCantPlayItem,
+      pendingCantPlaySupporter,
+      pendingCantEvolveFromHand,
+      pendingCantAttachEnergyFromHand,
+    } from './attack-pending-effects.mjs';
     
     export const RULES_STORAGE_KEY = 'ptcg-sim.rules-enforced.v1';
     
@@ -19,6 +29,8 @@
       stadium: null,
       mulligansResolved: false, // guard: mulligan execution runs at most once per game
       attackExecuting: false, // true while an attack's damage/effects are resolving (Nitro recycle)
+      // Pending attack effects (next-turn locks, damage windows) keyed by affected player.
+      pendingEffects: { self: [], opp: [] },
       // per-player per-turn facts
       flags: {
         self: { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {} },
@@ -345,6 +357,7 @@
       rulesState.stadium = null;
       rulesState.mulligansResolved = false;
       rulesState.attackExecuting = false;
+      rulesState.pendingEffects = { self: [], opp: [] };
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -358,6 +371,7 @@
       rulesState.phase = 'draw';
       rulesState.stadium = null; // new game: nothing on the stadium field
       rulesState.mulligansResolved = false;
+      rulesState.pendingEffects = { self: [], opp: [] };
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -367,14 +381,17 @@
       rulesState.turnNumber += 1;
       rulesState.phase = 'main';
       resetTurnFlags(player);
+      activatePendingEffectsForTurn(rulesState, player);
     }
     
     export function endTurn(player) {
+      expirePendingEffectsForTurnEnd(rulesState, player);
       const next = player === 'self' ? 'opp' : 'self';
       rulesState.turnPlayer = next;
       rulesState.turnNumber += 1;
       rulesState.phase = 'main';
       resetTurnFlags(next);
+      activatePendingEffectsForTurn(rulesState, next);
       return next;
     }
     
@@ -542,6 +559,9 @@
           if (S.flags[user]?.energyAttached) {
             return { allowed: false, reason: 'Energy already attached this turn.' };
           }
+          if (pendingCantAttachEnergyFromHand(S, user)) {
+            return { allowed: false, reason: "Energy can't be attached from hand to the Defending Pokémon (attack effect)." };
+          }
           return { allowed: true };
     
         case 'playSupporter':
@@ -549,12 +569,25 @@
           if (S.flags[user]?.supporterPlayed) {
             return { allowed: false, reason: 'You already played a Supporter this turn (one per turn).' };
           }
+          if (pendingCantPlaySupporter(S, user)) {
+            return { allowed: false, reason: "You can't play Supporter cards during this turn (attack effect)." };
+          }
+          return { allowed: true };
+
+        case 'playItem':
+          if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
+          if (pendingCantPlayItem(S, user)) {
+            return { allowed: false, reason: "You can't play Item cards during this turn (attack effect)." };
+          }
           return { allowed: true };
     
         case 'evolve':
           if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
           if (S.turnNumber <= 1) {
             return { allowed: false, reason: "Can't evolve on the first turn." };
+          }
+          if (pendingCantEvolveFromHand(S, user)) {
+            return { allowed: false, reason: "You can't play Pokémon from your hand to evolve (attack effect)." };
           }
           return { allowed: true };
     
@@ -566,12 +599,18 @@
           if (S.flags[user]?.attackerAttacked) {
             return { allowed: false, reason: 'Already attacked this turn.' };
           }
+          if (pendingCantAttack(S, user)) {
+            return { allowed: false, reason: "This Pokémon can't attack during this turn (attack effect)." };
+          }
           return { allowed: true };
     
         case 'retreat':
           if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
           if (S.flags[user]?.attackerAttacked) {
             return { allowed: false, reason: "Can't retreat after attacking." };
+          }
+          if (pendingCantRetreat(S, user)) {
+            return { allowed: false, reason: "The Active Pokémon can't retreat during this turn (attack effect)." };
           }
           return { allowed: true };
     

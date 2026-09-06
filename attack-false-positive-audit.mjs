@@ -54,13 +54,13 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
   'hp-cap-damage',
   'return-opponent-energy',
   'look-own-deck',
+  'next-turn-lock',
+  'damage-prevention',
+  'discard-opponent',
 ]);
 
 /** Partial / heuristic execution — still flagged but lower priority. */
 export const PARTIAL_ATTACK_FAMILIES = new Set([
-  'discard-opponent',
-  'damage-prevention',
-  'next-turn-lock',
 ]);
 
 function main() {

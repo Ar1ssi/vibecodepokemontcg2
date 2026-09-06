@@ -17,8 +17,9 @@ import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium } from '../../setup/rules/rules-state.mjs';
+import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction } from '../../setup/rules/rules-state.mjs';
 import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
+import { clearUntilLeavesActive, clearActiveSpotPendingEffects } from '../../setup/rules/attack-pending-effects.mjs';
 import { clearStatuses, getStatus, applyStatus } from '../../setup/rules/status.mjs';
 import {
   describeStadiumEffect,
@@ -108,6 +109,11 @@ export const moveCard = async (
       String(movingCard.type || '').toLowerCase() === 'item' ||
       subtypes.includes('item');
     if (isItem) {
+      const itemGate = canPerformAction({ user, action: 'playItem' });
+      if (!itemGate.allowed) {
+        appendMessage(user, `⛔ ${itemGate.reason}`, 'announcement', false);
+        return;
+      }
       const oppPlayer = user === 'self' ? 'opp' : 'self';
       const oppActive = getZone(oppPlayer, 'active').array[0];
       if (oppActive) {
@@ -136,6 +142,17 @@ export const moveCard = async (
     oZoneId === 'hand' &&
     dZoneId === 'board'
   ) {
+    const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
+    const isSupporter =
+      String(movingCard.type || '').toLowerCase() === 'supporter' ||
+      subtypes.includes('supporter');
+    if (isSupporter) {
+      const supporterGate = canPerformAction({ user, action: 'playSupporter' });
+      if (!supporterGate.allowed) {
+        appendMessage(user, `⛔ ${supporterGate.reason}`, 'announcement', false);
+        return;
+      }
+    }
     const gate = supporterPlayGate({
       cardType: movingCard.type,
       subtypes: movingCard.subtypes || [],
@@ -241,9 +258,29 @@ export const moveCard = async (
     activeOrBenchZones.includes(dZoneId) &&
     targetCard
   ) {
+    const evolveGate = canPerformAction({ user, action: 'evolve' });
+    if (!evolveGate.allowed) {
+      appendMessage(user, `⛔ ${evolveGate.reason}`, 'announcement', false);
+      return;
+    }
     const evoCheck = await canEvolve(user, targetCard, movingCard, false);
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
+      return;
+    }
+  }
+
+  // ── rules: attach Energy from hand (once per turn + pending attack locks) ─
+  if (
+    rulesState.enabled &&
+    !syncReplay &&
+    movingCard.type === 'Energy' &&
+    oZoneId === 'hand' &&
+    (dZoneId === 'active' || dZoneId === 'bench')
+  ) {
+    const attachGate = canPerformAction({ user, action: 'attachEnergy' });
+    if (!attachGate.allowed) {
+      appendMessage(user, `⛔ ${attachGate.reason}`, 'announcement', false);
       return;
     }
   }
@@ -299,6 +336,16 @@ export const moveCard = async (
 
   // move card from origin array to destination array
   dZone.array.push(...oZone.array.splice(index, 1));
+
+  if (
+    rulesState.enabled &&
+    !syncReplay &&
+    oZoneId === 'active' &&
+    dZoneId !== 'active' &&
+    movingCard.type === 'Pokémon'
+  ) {
+    clearActiveSpotPendingEffects(rulesState, user);
+  }
 
   // update the cover of deck/discard/lostzone, if necessary
   updateOriginCover(user, oZoneId, index);
