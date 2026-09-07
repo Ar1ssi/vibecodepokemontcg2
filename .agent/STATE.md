@@ -9,11 +9,14 @@ Focus: server-authoritative netcode — kill multiplayer desyncs at the architec
 Active: none (design drafted, not started building)
 Next: USER APPROVAL GATE on `.agent/designs/001-server-authoritative-netcode.md`.
       On approval → feature.md phase 3, slice 1 (create `shared/`, move pure engine modules).
+      Both open questions are now answered (S1): crash-loss accepted, no optimistic animation in v1.
 Blocked: design 001 needs user approval before any build work starts (feature.md § 2 GATE).
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Harness never bootstrapped: PROJECT.md and MAP.md are mostly empty. Design 001's constraints
-  were derived by reading code this session, not from PROJECT.md. Bootstrap is still owed.
+- Harness never bootstrapped: PROJECT.md and MAP.md are only partly filled (S1 added the scale
+  constraints and the netcode map). Bootstrap is still owed for the remaining subtrees.
+- Scale is small and private — see PROJECT.md. Prefer the simple mechanism; durable persistence,
+  clustering, auth, and anti-cheat are explicit non-goals.
 - No bundler anywhere. Browser loads native ESM (`client/index.ejs:20`); Render runs
   `node server/server.js` after `pnpm install` only. Shared code must resolve under both the
   browser and Node loaders with relative/absolute paths — never bare specifiers.
