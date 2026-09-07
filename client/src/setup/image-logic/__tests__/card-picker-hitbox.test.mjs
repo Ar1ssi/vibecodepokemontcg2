@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   computeDropSlotHitboxes,
   findDropSlotIndex,
+  shouldSuppressClickAfterDrag,
 } from '../card-picker-hitbox.mjs';
 
 test('computeDropSlotHitboxes: returns empty array for empty inputs', () => {
@@ -128,4 +129,21 @@ test('computeDropSlotHitboxes: preserves original indices even if slots are unor
   // slotB is index 1 in array, but physically on the left
   assert.equal(findDropSlotIndex([slotA, slotB], { x: 140, y: 250 }), 1);
   assert.equal(findDropSlotIndex([slotA, slotB], { x: 320, y: 250 }), 0);
+});
+
+test('shouldSuppressClickAfterDrag: suppresses clicks within threshold, allows outside', () => {
+  const baseTime = 10000;
+  // No drag recorded: never suppress
+  assert.equal(shouldSuppressClickAfterDrag(null, baseTime), false);
+  assert.equal(shouldSuppressClickAfterDrag(undefined, baseTime), false);
+  assert.equal(shouldSuppressClickAfterDrag(0, baseTime), false);
+
+  // Click 50ms after drag: suppress
+  assert.equal(shouldSuppressClickAfterDrag(baseTime, baseTime + 50), true);
+  // Click 399ms after drag: suppress
+  assert.equal(shouldSuppressClickAfterDrag(baseTime, baseTime + 399), true);
+  // Click 400ms after drag: allowed
+  assert.equal(shouldSuppressClickAfterDrag(baseTime, baseTime + 400), false);
+  // Click 1000ms after drag: allowed
+  assert.equal(shouldSuppressClickAfterDrag(baseTime, baseTime + 1000), false);
 });

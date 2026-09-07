@@ -1293,11 +1293,11 @@ import {
     // ── heal a specific card (shared by the direct heal + the heal picker) ─
     // Finds the card's zone/index, removes up to `amount` damage counters,
     // optionally cures its Special Condition, and announces the result.
-    const applyHealToCard = (cand, amount, cure) => {
+    const applyHealToCard = (cand, amount, cure, user = 'self') => {
       import('../../actions/counters/damage-counter.js').then(({ updateDamageCounter, removeDamageCounter }) => {
         let zoneId = null, idx = -1;
         for (const z of ['active', 'bench']) {
-          const zone = getZone('self', z);
+          const zone = getZone(user, z);
           const i = zone.array.indexOf(cand);
           if (i >= 0) { zoneId = z; idx = i; break; }
         }
@@ -1307,24 +1307,25 @@ import {
           return;
         }
         const healed = Math.min(amount, current);
-        if (current - amount <= 0) removeDamageCounter('self', zoneId, idx);
-        else updateDamageCounter('self', zoneId, idx, current - amount);
+        if (current - amount <= 0) removeDamageCounter(user, zoneId, idx);
+        else updateDamageCounter(user, zoneId, idx, current - amount);
         if (cure) {
           const key = cand.image?.dataset?.cardId || cand.name;
-          clearStatuses('self', key);
+          clearStatuses(user, key);
         }
         appendMessage('', `  healed ${healed} damage counter${healed === 1 ? '' : 's'}${cure ? ' + cured Special Condition' : ''} from ${cand.name}`, 'announcement', false);
       });
     };
 
     // ── guided heal picker: choose which of your Pokémon to heal ──────────
-    const openHealPicker = ({ title, candidates, amount, cure, triggerCard = null }) => {
+    const openHealPicker = ({ title, candidates, amount, cure, triggerCard = null, user = 'self' }) => {
       openCardPicker({
         title,
         candidates,
         triggerCard,
         pickOnly: true,
-        onPick: (cand) => applyHealToCard(cand, amount, cure),
+        user,
+        onPick: (cand) => applyHealToCard(cand, amount, cure, user),
         onCancel: () => {
           appendMessage('', '  heal canceled', 'announcement', false);
         },
@@ -1998,7 +1999,7 @@ if (!isTrainer) {
 
                         if (parseSetupFaceDown(card) && !img.__rulesSetupFaceDown) {
                           img.__rulesSetupFaceDown = true;
-                          hideCard('self', card);
+                          hideCard(ownerUser, card);
                           appendMessage(
                             '',
                             `🎭 ${card.name}: placed face-down (setup ability).`,
@@ -2013,26 +2014,27 @@ if (!isTrainer) {
                         const oppDiscardN = parseOpponentDiscard(card);
                         if (oppDiscardN > 0 && !img.__rulesOppDiscardFired) {
                           img.__rulesOppDiscardFired = true;
+                          const oppSide = ownerUser === 'self' ? 'opp' : 'self';
                           const oppPokemons = [
-                            ...getZone('opp', 'active').array,
-                            ...getZone('opp', 'bench').array,
+                            ...getZone(oppSide, 'active').array,
+                            ...getZone(oppSide, 'bench').array,
                           ];
                           const blockTools = stadiumBlocksToolEffects();
                           const protector = oppPokemons.find((c) => {
                             if (!c.image) return false;
-                            const zoneId = getZone('opp', 'active').array.includes(c) ? 'active' : 'bench';
-                            return combinedHandProtected(c, getZone('opp', zoneId).array, { blockTools });
+                            const zoneId = getZone(oppSide, 'active').array.includes(c) ? 'active' : 'bench';
+                            return combinedHandProtected(c, getZone(oppSide, zoneId).array, { blockTools });
                           });
                           // Stadium hand protection: a Stadium owned by the
                           // discarding target can shield their hand as well
                           // (e.g. "Cards in your hand can't be discarded").
                           const stadium = getStadium();
-                          const stadiumProtect = stadium && stadium.user === 'opp' && isStadiumHandProtect(stadium.card);
+                          const stadiumProtect = stadium && stadium.user === oppSide && isStadiumHandProtect(stadium.card);
                           if (protector || stadiumProtect) {
                             const by = protector ? protector.name : (stadium.card.name || 'Stadium');
                             appendMessage('', `  \u{1f6e1}\ufe0f ${by} protects the hand — discard blocked.`, 'announcement', false);
                           } else {
-                            const handCards = getZone('opp', 'hand').array;
+                            const handCards = getZone(oppSide, 'hand').array;
                             if (handCards.length === 0) {
                               appendMessage('', `  opponent's hand is empty — nothing to discard.`, 'announcement', false);
                             } else if (handCards.length < oppDiscardN) {
@@ -2044,15 +2046,16 @@ if (!isTrainer) {
                                 candidates: handCards,
                                 zoneFrom: 'hand',
                                 destination: 'discard',
+                                user: oppSide,
                                 multiSelect: true,
                                 requiredCount: oppDiscardN,
                                 onConfirm: (picks) => {
                                   import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                                    const zone = getZone('opp', 'hand');
+                                    const zone = getZone(oppSide, 'hand');
                                     for (const pick of picks) {
                                       const idx = zone.array.indexOf(pick);
                                       if (idx >= 0) {
-                                        try { moveCardBundle('opp', 'opp', 'hand', 'discard', idx, false, 'move'); } catch {}
+                                        try { moveCardBundle(oppSide, oppSide, 'hand', 'discard', idx, false, 'move'); } catch {}
                                       }
                                     }
                                     appendMessage('', `  auto: opponent discarded ${picks.length} card(s).`, 'announcement', false);

@@ -7,7 +7,10 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
-import { findDropSlotIndex } from './card-picker-hitbox.mjs';
+import {
+  findDropSlotIndex,
+  shouldSuppressClickAfterDrag,
+} from './card-picker-hitbox.mjs';
 
 /** @type {object | null} */
 let pickerState = null;
@@ -744,6 +747,7 @@ const attachSwipe = (state) => {
 
   const onDocPointerEnd = (event) => {
     if (activePointerId !== event.pointerId) return;
+    state.lastDragEndTime = Date.now();
     const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
     state.draggingToSlotIndex = null;
     if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
@@ -875,6 +879,7 @@ const attachSwipe = (state) => {
       startDragLoop(state);
     }
 
+    state.lastDragEndTime = Date.now();
     state.pointerId = null;
     if (wasDragging) event.preventDefault();
     event.stopPropagation();
@@ -1059,6 +1064,7 @@ export const openCardPicker = async ({
       slot.dataset.slotIndex = String(i);
       slot.addEventListener('click', (event) => {
         event.stopPropagation();
+        if (shouldSuppressClickAfterDrag(state.lastDragEndTime)) return;
         if (state.slotAssignments[i]) {
           state.slotAssignments[i] = null;
           if (!state.multiSelect) state.slotCard = null;
@@ -1193,9 +1199,9 @@ export const openCardPicker = async ({
 
   overlay.addEventListener('click', (event) => {
     event.stopPropagation();
+    if (shouldSuppressClickAfterDrag(state.lastDragEndTime)) return;
     if (event.target === overlay) {
       if (isBrowse) closeCardPicker();
-      else cancelPicker(state);
     }
   });
 
