@@ -1,9 +1,9 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
+    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail, parseRetreatCost, canPerformAction } = await import('../rules-state.mjs');
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
-    const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
+    const { canRetreat, markRetreated, energiesToDiscardForRetreat, getEffectiveRetreatCost, getEnergyValue } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
@@ -140,6 +140,95 @@ import test from 'node:test';
       const r = canRetreat('self', { retreatCost: 2 }, ['Water']);
       assert.equal(r.allowed, false);
       assert.ok(r.reason.includes('energy'));
+    });
+
+    test('parseRetreatCost handles numbers, arrays, and alternate schemas', () => {
+      assert.equal(parseRetreatCost({ retreat: 2 }), 2);
+      assert.equal(parseRetreatCost({ retreat: 0 }), 0);
+      assert.equal(parseRetreatCost({ retreat: ['Colorless', 'Colorless', 'Colorless'] }), 3);
+      assert.equal(parseRetreatCost({ convertedRetreatCost: 4 }), 4);
+      assert.equal(parseRetreatCost({ retreatCost: ['Colorless'] }), 1);
+      assert.equal(parseRetreatCost({ retreatCost: 2 }), 2);
+      assert.equal(parseRetreatCost({ retreat: '3' }), 3);
+      assert.equal(parseRetreatCost({}), 0);
+      assert.equal(parseRetreatCost(null), 0);
+    });
+
+    test('canPerformAction enforces once-per-turn retreat', () => {
+      startGame();
+      beginTurn('self');
+      rulesState.flags.self.attackerAttacked = false;
+      rulesState.flags.self.retreatedThisTurn = false;
+      assert.equal(canPerformAction({ user: 'self', action: 'retreat' }).allowed, true);
+
+      rulesState.flags.self.retreatedThisTurn = true;
+      const res = canPerformAction({ user: 'self', action: 'retreat' });
+      assert.equal(res.allowed, false);
+      assert.ok(res.reason.includes('Already retreated'));
+    });
+
+    test('canRetreat handles Double Colorless Energy', () => {
+      startGame();
+      beginTurn('self');
+      rulesState.enabled = true;
+      rulesState.flags.self.attackerAttacked = false;
+      rulesState.flags.self.retreatedThisTurn = false;
+
+      // 2 retreat cost with 1 DCE (provides 2 energy) -> allowed
+      const dce = { name: 'Double Colorless Energy', type: 'Energy', family: 'double-colorless' };
+      const res = canRetreat('self', { retreatCost: 2 }, [dce]);
+      assert.equal(res.allowed, true);
+
+      // 3 retreat cost with 1 DCE + 1 basic Water -> allowed
+      const res3 = canRetreat('self', { retreatCost: 3 }, [dce, 'Water']);
+      assert.equal(res3.allowed, true);
+
+      // 3 retreat cost with 1 DCE only -> not allowed
+      const resFail = canRetreat('self', { retreatCost: 3 }, [dce]);
+      assert.equal(resFail.allowed, false);
+      assert.ok(resFail.reason.includes('costs 3'));
+    });
+
+    test('getEffectiveRetreatCost respects Switching Energy free switch', () => {
+      rulesState.enabled = true;
+      const active = { name: 'Snorlax', retreatCost: 4, image: {} };
+      const switchingEnergy = {
+        name: 'Switching Energy',
+        type: 'Energy',
+        subtypes: ['special'],
+        image: { relative: active.image },
+      };
+      // Normal without switching energy
+      assert.equal(getEffectiveRetreatCost(active, 'self', []), 4);
+      // With switching energy attached
+      assert.equal(getEffectiveRetreatCost(active, 'self', [switchingEnergy]), 0);
+    });
+
+    test('energiesToDiscardForRetreat prioritizes single energy over double energy', () => {
+      const dce = { name: 'Double Colorless Energy', family: 'double-colorless' };
+      const water = { name: 'Water Energy', family: 'basic' };
+
+      // Cost 0 -> no discards
+      assert.deepEqual(energiesToDiscardForRetreat([water, dce], 0), []);
+
+      // Cost 1 with [water, dce] -> discards water, preserves DCE
+      const discard1 = energiesToDiscardForRetreat([dce, water], 1);
+      assert.equal(discard1.length, 1);
+      assert.equal(discard1[0].name, 'Water Energy');
+
+      // Cost 2 with [water, dce] -> discards water (1) then DCE (2) = pays 3
+      const discard2 = energiesToDiscardForRetreat([water, dce], 2);
+      assert.equal(discard2.length, 2);
+
+      // Cost 2 with only DCE -> discards 1 DCE card
+      const discardDce = energiesToDiscardForRetreat([dce], 2);
+      assert.equal(discardDce.length, 1);
+      assert.equal(discardDce[0].name, 'Double Colorless Energy');
+
+      // Cost 2 with 2 basic energies -> discards both
+      const fire = { name: 'Fire Energy', family: 'basic' };
+      const discardBasics = energiesToDiscardForRetreat([water, fire], 2);
+      assert.equal(discardBasics.length, 2);
     });
     
     // ── statuses ──
