@@ -3,14 +3,18 @@
 Status: draft
 Date: 2026-09-07 · Session: S1
 
+<!-- Per user instruction (S1), this design omits the template's Options section: it records only
+     the chosen approach, not the alternatives weighed. Rejected alternatives are in the S1 chat
+     transcript and PR #69 discussion if a future session needs to relitigate a pick. -->
+
 ## Problem
 
 Multiplayer runs two independent simulations of the same game and hopes they agree. They routinely
 don't: 54 of the last 200 commits touch sync/desync/replay/RNG, spanning setup order, hand ordering,
 index drift, and duplicated rules side effects — and each fix adds another reconciliation layer
-rather than removing the cause. Desyncs are unfixable in this architecture because divergence is the default state and
-detection is best-effort. Hidden information is also fully replicated to both clients, so "the deck
-is private" is a UI convention, not a fact.
+rather than removing the cause. Desyncs are unfixable in this architecture because divergence is the
+default state and detection is best-effort. Hidden information is also fully replicated to both
+clients, so "the deck is private" is a UI convention, not a fact.
 
 ## Constraints
 
@@ -41,7 +45,7 @@ table for exported games. It stores **no game state and validates no game logic*
 `processAction()` (`client/src/setup/general/process-action.js`) appends to `selfActionData`,
 increments `selfCounter`, and emits `pushAction`. The peer's `socket.on('pushAction')` checks
 `counter === oppCounter + 1` and calls `acceptAction('opp', ...)`, which dispatches through a
-~60-entry table in `client/src/setup/general/accept-action.js:71` onto its **mirror** copy of the
+59-entry table in `client/src/setup/general/accept-action.js:71` onto its **mirror** copy of the
 board. Same handler functions, different `user` argument, `emit=false`.
 
 **Reconciliation stack** (all client-side, all reactive):
@@ -75,83 +79,27 @@ identity is an `HTMLImageElement`: `Card.image` carries the attachment graph (`i
 
 **Root causes, ranked.** (1) Two simulations, no arbiter. (2) `Math.random()` called locally in
 paths that never record the result — `trainer-execution.js:1412`, `reveal-and-hide.js:462`,
-`rules-bridge.js:507`, `rules-bridge.js:846-851`. (3) Choice points resolve in UI callbacks, so the two clients resolve them
-at different times and in different orders. (4) Recovery paths (`fullReplay`, snapshot) can
-themselves diverge. (5) Silently dropped actions on counter mismatch
-(`socket-event-listeners.js:272`) leave both sides "in sync" with a move missing.
-
-## Options
-
-### A. Authority model
-
-- **A1 — Deterministic lockstep; server orders commands, clients simulate.** Keeps the existing
-  simulation code; the server becomes a sequencer. Cheapest to reach, but correctness still rests on
-  bit-identical determinism across two browsers, which is precisely what has failed ~20 times. Any
-  new `Math.random()` or map-iteration-order difference reintroduces the bug class.
-- **A2 — Server-authoritative simulation, clients render.** One simulation. Divergence becomes
-  structurally impossible because the client has no state to diverge *with*. Costs a rewrite of the
-  action layer and a choice protocol.
-- **A3 — A2 plus client-side prediction and rollback.** Hides round-trip latency. Reintroduces a
-  second speculative simulation and rollback bugs.
-
-**Pick: A2.** This is a turn-based card game — a 50–200 ms round trip per click is imperceptible,
-so the entire reason prediction exists does not apply. A2 is the only option that removes the bug
-class rather than tightening the tolerance on it, and skipping prediction (A3) keeps exactly one
-simulation in the system. Optimistic *animation* (visual only, discarded on response) is deferred;
-see Rollout.
-
-### B. Where shared engine code lives
-
-- **B1 — `shared/` directory served at `/shared`.** Browser imports `/shared/engine/x.mjs`
-  (absolute URL, native ESM); Node imports `../shared/engine/x.mjs` (fs path). Internal imports
-  between shared modules stay relative and resolve correctly under both loaders. One line of
-  `express.static` on the server; no package.json, no bundler, no dependency.
-- **B2 — Server imports from `client/src/setup/rules/`.** Zero client churn, but permanently
-  encodes "the server's engine lives in the client" and guarantees future confusion about which
-  direction dependencies flow.
-- **B3 — Add a bundler and a real workspace package.** Cleanest import ergonomics; adds a build
-  step to a repo that deliberately has none, plus a new dependency.
-
-**Pick: B1.** It satisfies the no-build-step constraint exactly, keeps the dependency direction
-honest (`client → shared`, `server → shared`, never `server → client`), and the client-side import
-rewrite is mechanical and greppable.
-
-### C. What the server sends
-
-- **C1 — Deltas/patches only.** Least bandwidth; ordering and gap bugs return through the back door,
-  which is the failure mode we are eliminating.
-- **C2 — Full per-player view snapshot per update.** Idempotent and order-independent: a client can
-  drop, duplicate, or reorder messages and still converge. A board is small (~60–120 cards of thin
-  JSON, single-digit KB); at a few updates per turn this is irrelevant on any modern link.
-- **C3 — C2, plus an advisory event list for animation.** Snapshot is truth; events describe the
-  transition so the UI can animate rather than snap.
-
-**Pick: C3**, with the cardinal rule that **the client never derives state from events**. If events
-are missing, late, or duplicated, the client snaps to the snapshot and is still correct. This is
-what makes the design robust rather than merely relocated.
-
-### D. Effect choice points
-
-- **D1 — Server enumerates legal options; client picks.** Server suspends the effect on a
-  `PendingChoice`, sends the option list to the deciding player, and resumes on `resolveChoice`.
-  Requires converting synchronous executors into a resumable state machine.
-- **D2 — Client resolves the choice and reports it.** Much less rewriting; hands legality back to
-  the client, which reopens both cheating and the "two clients resolved differently" desync.
-
-**Pick: D1.** D2 preserves the exact defect being removed. `planAbilitySteps()` already produces the
-ordered step list, so the executor has a natural resume point (`stepIndex`).
-
-### E. Card identity
-
-- **E1 — Server-assigned integer `instanceId`, unique per game.** Identity independent of zone
-  position, DOM, and deck contents; the client keeps a `Map<instanceId, HTMLElement>`.
-- **E2 — Keep `syncInstance`.** Already exists, but is assigned at client deck-build time, so the
-  two clients mint it independently — a shared-identity scheme that isn't actually shared.
-
-**Pick: E1.** The server mints identity when it builds the decks, so both clients receive the same
-ids by construction. Retire `syncInstance` and the hint machinery built to compensate for it.
+`rules-bridge.js:507`, `rules-bridge.js:846-851`. (3) Choice points resolve in UI callbacks, so the
+two clients resolve them at different times and in different orders. (4) Recovery paths
+(`fullReplay`, snapshot) can themselves diverge. (5) Silently dropped actions on counter mismatch
+(`socket-event-listeners.js:274`) leave both sides "in sync" with a move missing.
 
 ## Design
+
+### Decisions
+
+Each line becomes a DECISIONS.md entry at close.
+
+| # | Decision | Why |
+|---|---|---|
+| 1 | The server simulates; clients render and hold no game state | Divergence becomes structurally impossible — the client has no state to diverge *with* |
+| 2 | No client prediction or rollback | Turn-based game; a 50–200 ms round trip per click is imperceptible, so exactly one simulation exists in the system |
+| 3 | Shared engine lives in `shared/`, served at `/shared` | Loads under both the browser and Node loaders with no build step, no bare specifiers, no new dependency |
+| 4 | Server sends a full redacted view snapshot per update | Idempotent and order-independent: drop, duplicate, or reorder messages and the client still converges |
+| 5 | Events are advisory, for animation only | The client never derives state from events, so missing or late events degrade to a snap, never to a desync |
+| 6 | Effect choices suspend server-side as a `PendingChoice` | Serializes choice resolution across both clients by construction; `planAbilitySteps()` supplies the resume point |
+| 7 | Card identity is a server-minted `instanceId` | Both clients receive the same ids by construction, retiring `syncInstance` and the hint machinery built to compensate for it |
+| 8 | One seeded PRNG per game, server-side, recorded | `(seed, commandLog)` replays a game exactly — the regression net this architecture currently cannot have |
 
 ### Topology
 
@@ -186,6 +134,9 @@ shared/engine/
 Server: `import { applyCommand } from '../shared/engine/reduce.mjs'`.
 Client: `import { describeCard } from '/shared/engine/cards.mjs'`.
 Server adds `app.use('/shared', express.static(sharedDir))`.
+
+Shared modules import each other with relative paths, which resolve correctly under both loaders.
+Dependency direction is `client → shared` and `server → shared`, never `server → client`.
 
 ### State model
 
@@ -263,20 +214,18 @@ PendingChoice = { choiceId, player, prompt, source,
 
 `resumeToken` carries `{ effectId, stepIndex }` from `planAbilitySteps()`. The executor runs steps
 until one needs input, returns the choice, and the game blocks. Only the named player may resolve
-it; every other command is rejected with `reason: 'waiting_for_choice'`. This serializes effect
-resolution across both clients by construction.
+it; every other command is rejected with `reason: 'waiting_for_choice'`.
 
 ### Randomness
 
 One seeded `mulberry32` PRNG per game, seeded at creation and recorded. All shuffles, coin flips,
-random discards, and prize assignment draw from it server-side. `(seed, commandLog)` replays a game
-exactly — which becomes the regression-test mechanism and the debugging tool. The `rng` argument is
-injectable so shadow mode can feed client-supplied values instead (see Rollout).
+random discards, and prize assignment draw from it server-side. The `rng` argument is injectable so
+shadow mode can feed client-supplied values instead (see Migration).
 
 ### Reconnection
 
-Trivial: `requestView` returns the current view. There is no log to catch up, no gap to detect, no
-snapshot negotiation. The reconnect path and the first-load path are the same code.
+`requestView` returns the current view. There is no log to catch up, no gap to detect, no snapshot
+negotiation. The reconnect path and the first-load path are the same code.
 
 ### Client changes
 
@@ -291,7 +240,7 @@ UI handlers stop mutating zone arrays and instead emit `cmd`. The rules engine s
 client-side only for *affordance hints* (grey out an illegal button before the round trip); the
 server re-validates everything and the client's opinion is never authoritative.
 
-## Edge cases & failure modes
+## Edge cases & failure modes — the completeness contract; Builder ticks every row
 
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
@@ -320,8 +269,7 @@ server re-validates everything and the client's opinion is never authoritative.
   reasons. `viewFor` redaction — assert opponent hand/deck faces are *absent from the serialized
   payload*, not merely unrendered. RNG determinism: same seed → same sequence.
 - **Property/replay.** `(seed, commandLog) → state` replayed twice yields an identical
-  `hashState()`. Recorded real games become CI fixtures; this is the regression net that the current
-  architecture cannot have.
+  `hashState()`. Recorded real games become CI fixtures.
 - **Integration.** Scripted two-player games driven directly against the engine (no browser):
   full setup → mulligan → turn order → attack → KO → prize → win. Assert both player views agree on
   every public zone at every step.
