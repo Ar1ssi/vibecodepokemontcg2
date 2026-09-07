@@ -4,7 +4,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
-import { buildCardHint, resolveCardIndex } from '../../setup/zones/resolve-card-index.mjs';
+import { buildCardHint, resolveCardIndex } from '/shared/engine/zones/resolve-card-index.mjs';
 import { addAbilityCounter } from './ability-counter.js';
 
 export const useAbility = (

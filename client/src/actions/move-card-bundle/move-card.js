@@ -22,10 +22,10 @@ import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { discardStadiumCardFromField, updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction } from '../../setup/rules/rules-state.mjs';
-import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '../../setup/rules/evolution.mjs';
-import { clearUntilLeavesActive, clearActiveSpotPendingEffects } from '../../setup/rules/attack-pending-effects.mjs';
-import { clearStatuses, getStatus, applyStatus } from '../../setup/rules/status.mjs';
+import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
+import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
+import { clearUntilLeavesActive, clearActiveSpotPendingEffects } from '/shared/engine/rules/attack-pending-effects.mjs';
+import { clearStatuses, getStatus, applyStatus } from '/shared/engine/rules/status.mjs';
 import {
   describeStadiumEffect,
   isStadiumCard,
@@ -38,12 +38,12 @@ import {
   isTeraCard,
   parseStadiumBenchLimit,
   stadiumBlocksStatusApplication,
-} from '../../setup/rules/stadium-effects.mjs';
-import { canAddToBench } from '../../setup/rules/ko-flow.mjs';
-import { countBenchPokemon, isBoardPokemon } from '../../setup/zones/active-pokemon.mjs';
-import { pokemonHasLockedEnergy } from '../../setup/rules/energy-effects.mjs';
-import { blocksItemPlay } from '../../setup/rules/ability-executors.mjs';
-import { shouldNitroReturnToHand } from '../../setup/rules/special-energy-effects.mjs';
+} from '/shared/engine/rules/stadium-effects.mjs';
+import { canAddToBench } from '/shared/engine/rules/ko-flow.mjs';
+import { countBenchPokemon, isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import { pokemonHasLockedEnergy } from '/shared/engine/rules/energy-effects.mjs';
+import { blocksItemPlay } from '/shared/engine/rules/ability-executors.mjs';
+import { shouldNitroReturnToHand } from '/shared/engine/rules/special-energy-effects.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 

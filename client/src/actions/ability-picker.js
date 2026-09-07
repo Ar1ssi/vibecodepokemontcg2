@@ -6,14 +6,14 @@
 // If 0 are usable, it shows a "no usable abilities" message.
 
 import { getZone } from '../setup/zones/get-zone.js';
-import { rulesState, abilityUsed, ensureCardData } from '../setup/rules/rules-state.mjs';
+import { rulesState, abilityUsed, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { appendMessage } from '../setup/chatbox/append-message.js';
 import { selfContainer, oppContainer } from '../state.js';
 import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
-} from '../setup/rules/collect-usable-abilities.mjs';
+} from '/shared/engine/rules/collect-usable-abilities.mjs';
 
 // Human-readable labels for each family
 const FAMILY_LABELS = {

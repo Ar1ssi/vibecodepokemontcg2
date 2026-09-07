@@ -25,48 +25,48 @@
       markMulligansResolved,
       markAttacked,
       resetRulesSessionState,
-    } from './rules-state.mjs';
-    import { executeAttack, canPayAttackCost } from './attack-engine.mjs';
-    import { handleKO, checkWinConditions, resetPrizes, prizeState } from './ko-flow.mjs';
-    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from './status.mjs';
-import { statusState } from './status.mjs';
+    } from '/shared/engine/rules/rules-state.mjs';
+    import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
+    import { handleKO, checkWinConditions, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
+    import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from '/shared/engine/rules/status.mjs';
+import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
-import { parseTrainerEffect, describeStep } from './trainer-effects.mjs';
+import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
 import {
   shouldExecuteLocalRulesEffect,
   shouldEmitTurnStartDraw,
-} from './rules-local-effects.mjs';
-import { canEvolve, markEvolvedThisTurn } from './evolution.mjs';
-import { parseAbility } from './abilities.mjs';
+} from '/shared/engine/rules/rules-local-effects.mjs';
+import { canEvolve, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
+import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
-import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay, combinedHandProtected } from './ability-executors.mjs';
-import { isStadiumCard, isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from './stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from './energy-effects.mjs';
-import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from './search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
+import { isStadiumCard, isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from '/shared/engine/rules/stadium-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
+import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
   describeTypedSpecialEnergy,
   getTelepathicOnAttachSearch,
   matchesBasicPokemonType,
   parseTypedSpecialEnergy,
   pokemonMatchesEnergyType,
-} from './special-energy-effects.mjs';
-import { classifyAbility, describeAbilityFamily } from './ability-effects.mjs';
+} from '/shared/engine/rules/special-energy-effects.mjs';
+import { classifyAbility, describeAbilityFamily } from '/shared/engine/rules/ability-effects.mjs';
 import {
   planAbilitySteps,
   actionableAbilityPlan,
   markAbilityUseAfterSearchStep,
-} from './ability-step-plan.mjs';
-import { decideTurnOrder, resolveTurnOrderCaller } from './rules-turnorder.mjs';
-import { listUsableActions } from './attack-window.mjs';
+} from '/shared/engine/rules/ability-step-plan.mjs';
+import { decideTurnOrder, resolveTurnOrderCaller } from '/shared/engine/rules/rules-turnorder.mjs';
+import { listUsableActions } from '/shared/engine/rules/attack-window.mjs';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
-} from './collect-usable-abilities.mjs';
+} from '/shared/engine/rules/collect-usable-abilities.mjs';
 import { attack, healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
-import { evaluateMulligans, bonusDrawsOwed } from './mulligan.mjs';
+import { evaluateMulligans, bonusDrawsOwed } from '/shared/engine/rules/mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
 import { e2eDelayMs, isE2eMode } from '../general/e2e-mode.mjs';

@@ -190,10 +190,10 @@ const BROWSER_AUDIT_FN = async (entry) => {
     { getZone },
   ] = await Promise.all([
     import('/src/setup/deck-constructor/card.js'),
-    import('/src/setup/rules/rules-state.mjs'),
-    import('/src/setup/rules/attack-effects.mjs'),
-    import('/src/setup/rules/damage-parser.mjs'),
-    import('/src/setup/rules/attack-engine.mjs'),
+    import('/shared/engine/rules/rules-state.mjs'),
+    import('/shared/engine/rules/attack-effects.mjs'),
+    import('/shared/engine/rules/damage-parser.mjs'),
+    import('/shared/engine/rules/attack-engine.mjs'),
     import('/src/setup/zones/get-zone.js'),
   ]);
 

@@ -8,7 +8,7 @@ import {
   buildCardHint,
   hintMatchesAtIndex,
   resolveCardIndex,
-} from '../../setup/zones/resolve-card-index.mjs';
+} from '/shared/engine/zones/resolve-card-index.mjs';
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
 import { logSync } from '../../setup/general/sync-logger-bridge.js';

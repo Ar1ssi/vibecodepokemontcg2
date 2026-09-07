@@ -5,7 +5,7 @@ import {
   SNAPSHOT_ZONES,
   orderSnapshotCards,
   serializeBoardZones,
-} from '../zones/board-snapshot.mjs';
+} from '/shared/engine/zones/board-snapshot.mjs';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { initializeActiveBenchCard } from '../../actions/move-card-bundle/initialize-active-bench-card.js';
 import { attachCard } from '../../actions/move-card-bundle/attach-card.js';

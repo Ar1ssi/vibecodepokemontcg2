@@ -6,7 +6,7 @@
       buildSetCardIdCandidates,
       extractTcgdexIdFromImageUrl,
       resolveTcgdexSetId,
-    } from '../shared/legacy-set-ids.mjs';
+    } from './legacy-set-ids.mjs';
     import {
       activatePendingEffectsForTurn,
       expirePendingEffectsForTurnEnd,
@@ -737,14 +737,18 @@
     // persistence for the toggle
     export function persistRulesEnabled() {
       try {
-        localStorage.setItem(RULES_STORAGE_KEY, rulesState.enabled ? '1' : '0');
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(RULES_STORAGE_KEY, rulesState.enabled ? '1' : '0');
+        }
       } catch {}
     }
     export function loadRulesEnabled() {
       try {
-        const stored = localStorage.getItem(RULES_STORAGE_KEY);
-        // Rules mode is ON by default; only an explicitly stored '0' keeps it off.
-        rulesState.enabled = stored === null ? true : stored === '1';
+        if (typeof localStorage !== 'undefined') {
+          const stored = localStorage.getItem(RULES_STORAGE_KEY);
+          // Rules mode is ON by default; only an explicitly stored '0' keeps it off.
+          rulesState.enabled = stored === null ? true : stored === '1';
+        }
       } catch {}
       return rulesState.enabled;
     }

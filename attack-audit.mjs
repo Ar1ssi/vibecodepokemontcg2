@@ -7,8 +7,8 @@
  * Usage: node attack-audit.mjs [--json] [--sets=me01,sv08]
  */
 import { getLegalSetRegistry, fetchSetCards } from './client/src/setup/deck-builder/core/set-browser.mjs';
-import { classifyAttackEffect, ATTACK_FAMILIES } from './client/src/setup/rules/attack-effects.mjs';
-import { parseAttackDamage } from './client/src/setup/rules/damage-parser.mjs';
+import { classifyAttackEffect, ATTACK_FAMILIES } from './shared/engine/rules/attack-effects.mjs';
+import { parseAttackDamage } from './shared/engine/rules/damage-parser.mjs';
 
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 const detailCache = new Map();

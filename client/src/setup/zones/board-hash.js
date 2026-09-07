@@ -1,5 +1,5 @@
 import { getZone } from './get-zone.js';
-import { hashBoardSnapshot, SYNC_HASH_ZONES } from './zone-hash.mjs';
+import { hashBoardSnapshot, SYNC_HASH_ZONES } from '/shared/engine/zones/zone-hash.mjs';
 
 /** Fingerprint of one client's view of `user` zones (self or opp). */
 export function hashUserBoard(user) {

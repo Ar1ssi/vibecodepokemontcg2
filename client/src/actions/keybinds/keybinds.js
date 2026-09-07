@@ -1,6 +1,6 @@
 import { mouseClick, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { manualDeckActionAllowed } from '../../setup/rules/rules-state.mjs';
+import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 
 // Gate a manual (keybind-triggered) deck action through the rules layer.
 function gate(actionKey, initiator) {

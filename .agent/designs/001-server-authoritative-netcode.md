@@ -1,6 +1,6 @@
 # 001: Server-authoritative netcode
 
-Status: draft
+Status: approved
 Date: 2026-09-07 · Session: S2
 
 <!-- Per user instruction (S2), this design omits the template's Options section: it records only
@@ -679,3 +679,5 @@ depends on it.
   ISSUES.md line rather than being left in place silently.
 
 ## Deviations (Builder appends here during build)
+
+- **Slice 1**: Moved `client/src/setup/shared/legacy-set-ids.mjs` and its test to `shared/engine/rules/legacy-set-ids.mjs`. `rules-state.mjs` was importing this table via `../shared/legacy-set-ids.mjs`; relocating it into `shared/engine/rules/` ensures `shared/engine/` maintains zero imports from `client/`, upholding Invariant 8.

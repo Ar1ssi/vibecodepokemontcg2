@@ -10,7 +10,7 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { processAction } from '../general/process-action.js';
 import { show } from '../home-header/header-toggle.js';
-import { buildPreferredCardId } from '../shared/legacy-set-ids.mjs';
+import { buildPreferredCardId } from '/shared/engine/rules/legacy-set-ids.mjs';
 import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { getCardType } from './find-type.js';
 import { getOldCardType } from './find-old-type.js';
@@ -56,7 +56,7 @@ const cardDataToID = (card, formatHint) => {
     return null;
   }
 
-  // Shared with the rules engine (see setup/shared/legacy-set-ids.mjs) — it
+  // Shared with the rules engine (see shared/engine/rules/legacy-set-ids.mjs) — it
   // needs the same code→set-id mapping to pin a board card to one printing.
   if (!isPocketSet(set, formatHint)) {
     const preferred = buildPreferredCardId(set, number);

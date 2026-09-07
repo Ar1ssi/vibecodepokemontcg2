@@ -86,10 +86,10 @@ function toolStatus(row) {
 }
 
 const BROWSER_AUDIT_FN = async ({ stadiumMetas, toolMetas }) => {
-  const { ensureCardData } = await import('/src/setup/rules/rules-state.mjs');
-  const stadiumFx = await import('/src/setup/rules/stadium-effects.mjs');
-  const executors = await import('/src/setup/rules/ability-executors.mjs');
-  const { rulesState, markStadiumPlayed, startGame } = await import('/src/setup/rules/rules-state.mjs');
+  const { ensureCardData } = await import('/shared/engine/rules/rules-state.mjs');
+  const stadiumFx = await import('/shared/engine/rules/stadium-effects.mjs');
+  const executors = await import('/shared/engine/rules/ability-executors.mjs');
+  const { rulesState, markStadiumPlayed, startGame } = await import('/shared/engine/rules/rules-state.mjs');
 
   const simReadable = (card) =>
     Boolean(
@@ -231,8 +231,8 @@ async function tryBrowserPlay(page, card, kind) {
     const { Card } = await import('/src/setup/deck-constructor/card.js');
     const { getZone } = await import('/src/setup/zones/get-zone.js');
     const { moveCardBundle } = await import('/src/actions/move-card-bundle/move-card-bundle.js');
-    const { ensureCardData } = await import('/src/setup/rules/rules-state.mjs');
-    const { rulesState, startGame, beginTurn } = await import('/src/setup/rules/rules-state.mjs');
+    const { ensureCardData } = await import('/shared/engine/rules/rules-state.mjs');
+    const { rulesState, startGame, beginTurn } = await import('/shared/engine/rules/rules-state.mjs');
 
     rulesState.enabled = true;
     startGame('self');
@@ -289,10 +289,10 @@ async function main() {
 
   // Node-side sanity (pre-browser): realistic deck card before enrichment
   const { classifyStadiumEffect, isStadiumCard, hasRecognizedPassiveStadiumEffect } = await import(
-    './client/src/setup/rules/stadium-effects.mjs'
+    './shared/engine/rules/stadium-effects.mjs'
   );
   const { isPokemonToolCard, parseDamagePrevention } = await import(
-    './client/src/setup/rules/ability-executors.mjs'
+    './shared/engine/rules/ability-executors.mjs'
   );
 
   let nodeBrokenStadium = 0;

@@ -7,7 +7,7 @@
  *   node attack-false-positive-audit.mjs [--json] [--sets=me01,sv08]
  */
 import { spawnSync } from 'node:child_process';
-import { classifyAttackEffect } from './client/src/setup/rules/attack-effects.mjs';
+import { classifyAttackEffect } from './shared/engine/rules/attack-effects.mjs';
 
 /** Families with live execution in attack() (chat-buttons.js) as of backlog pass. */
 export const EXECUTED_ATTACK_FAMILIES = new Set([

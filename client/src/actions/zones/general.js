@@ -15,7 +15,7 @@ import { addAbilityCounter } from '../counters/ability-counter.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
-import { sortCardsByDeckList } from '../../setup/zones/hand-sort.mjs';
+import { sortCardsByDeckList } from '/shared/engine/zones/hand-sort.mjs';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';

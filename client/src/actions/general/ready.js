@@ -3,7 +3,7 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { hasDeckLoaded } from '../../setup/general/has-deck-loaded.js';
 import { processAction } from '../../setup/general/process-action.js';
-import { rulesState } from '../../setup/rules/rules-state.mjs';
+import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { setup, setupPrizes } from './setup.js';
 
 const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
