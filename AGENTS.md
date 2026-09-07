@@ -453,8 +453,15 @@ To prevent file collision and allow concurrent agents to work safely:
    - Direct all subsequent edits, builds, terminal commands, and test runs to that worktree directory.
 2. **Subagent Spawning**:
    - Whenever invoking subagents (`invoke_subagent`), ALWAYS set `"Workspace": "share"`. Never use `"Workspace": "inherit"` when multiple subagents are active, ensuring each subagent operates in an independent branch.
-3. **Completion & Verification**:
+3. **Completion & Pull Request Automation**:
    - Verify code and run tests inside the worktree (`pnpm test`).
-   - Commit changes to the feature branch.
-   - Report the worktree branch name and commit hash so changes can be cleanly merged.
+   - Commit all changes to the task branch cleanly with a descriptive message.
+   - Push the task branch to the remote repository (`git push -u origin <branch-name>`).
+   - Automatically create a Pull Request against `main` (using `gh pr create` or GitHub MCP tools) with a summary of the changes and test results.
+   - Report the PR URL, branch name, and commit hash.
+
+4. **Syncing Main to Local Repository**:
+   - Whenever changes are pushed, merged, or fast-forwarded to `main` on the remote repository (by an agent or a PR), the agent MUST immediately update the primary local repository on `main` (e.g., `git checkout main && git pull origin main`).
+   - Never leave the primary local working tree out of sync with remote `main`.
+
 
