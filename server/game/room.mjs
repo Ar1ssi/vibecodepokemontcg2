@@ -4,7 +4,10 @@
  * handles clientSeq deduplication (Edge Case 4), and dispatches to applyCommand.
  */
 
-import { createGameState, createPlayerZones } from '../../shared/engine/state.mjs';
+import {
+  createGameState,
+  createPlayerZones,
+} from '../../shared/engine/state.mjs';
 import { createRng } from '../../shared/engine/rng.mjs';
 import { viewFor } from '../../shared/engine/view.mjs';
 import { applyCommand } from '../../shared/engine/reduce.mjs';
@@ -17,11 +20,17 @@ export class GameRoom {
    * @param {string|number} [options.seed] PRNG seed
    * @param {object} [options.initialState] Optional pre-configured GameState
    */
-  constructor({ roomId, rulesEnabled = true, seed = 0, initialState = null }) {
+  constructor({
+    roomId,
+    rulesEnabled = true,
+    seed = 0,
+    initialState = null,
+    rng = null,
+  }) {
     this.roomId = roomId;
     this.rulesEnabled = Boolean(rulesEnabled);
     this.seed = seed ?? 0;
-    this.rng = createRng(this.seed);
+    this.rng = rng || createRng(this.seed);
 
     this.state =
       initialState ||
