@@ -94,6 +94,8 @@ const abilityBlockedByStadium = (user, target) => {
 // already on the card, so accumulate textContent when a counter exists.
 const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, emit, rngBundle = {}) => {
   if (!discardSpec) return;
+  // Mirror replay: the originator's moveCardBundle actions arrive separately over the socket
+  if (!emit) return;
   const { deckTop, energyActive, handRandom, discardTools } = discardSpec;
   if (!(deckTop > 0 || energyActive > 0 || handRandom > 0 || discardTools)) return;
 
@@ -648,22 +650,27 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             const cap = Math.min(scaling.max, attachedEnergies.length);
             let chosen = 0;
             if (cap > 0) {
-              const options = [];
-              for (let k = 0; k <= cap; k++) {
-                options.push({
-                  label: `Discard ${k} Energy → ${(atk.damage || 0) * k} damage`,
-                  idx: k,
-                });
+              if (typeof rngBundle.energyDiscarded === 'number') {
+                chosen = Math.min(cap, Math.max(0, rngBundle.energyDiscarded));
+              } else if (emit !== false) {
+                const options = [];
+                for (let k = 0; k <= cap; k++) {
+                  options.push({
+                    label: `Discard ${k} Energy → ${(atk.damage || 0) * k} damage`,
+                    idx: k,
+                  });
+                }
+                const pick = await _pickFromList(
+                  `${atk.name}: how many Energy to discard?`,
+                  options
+                );
+                if (pick === null) {
+                  appendMessage(user, 'Attack cancelled.', 'announcement', false);
+                  return;
+                }
+                chosen = pick;
+                rngBundle.energyDiscarded = chosen;
               }
-              const pick = await _pickFromList(
-                `${atk.name}: how many Energy to discard?`,
-                options
-              );
-              if (pick === null) {
-                appendMessage(user, 'Attack cancelled.', 'announcement', false);
-                return;
-              }
-              chosen = pick;
               for (let k = 0; k < chosen; k++) {
                 const z = getZone(user, 'active');
                 const idx = z.array.findIndex((c) => c.type === 'Energy');
@@ -1056,10 +1063,11 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               isActive: true,
             })) {
               if (eff.searchDeckOnKo > 0) {
+                if (!emit) continue;
                 const deck = getZone(oppPlayer, 'deck');
                 let moved = 0;
                 for (let i = 0; i < deck.array.length && moved < eff.searchDeckOnKo; ) {
-                  moveCardBundle(oppPlayer, oppPlayer, 'deck', 'hand', i, false, 'move');
+                  moveCardBundle(oppPlayer, oppPlayer, 'deck', 'hand', i, false, 'move', emit);
                   moved++;
                 }
                 shuffleZone(oppPlayer, oppPlayer, 'deck');
@@ -2532,7 +2540,7 @@ export const attachAbility = async (user, emit = true, targetCard = null) => {
   const energy = hand.array[energyIndex];
 
   // Attach: hand → target. targetIndex triggers attachCard path.
-  moveCard(user, user, 'hand', targetZone, energyIndex, targetIdx);
+  await moveCardBundle(user, user, 'hand', targetZone, energyIndex, targetIdx, 'move', emit);
 
   if (rulesState.enabled) markAbilityUsed(user, target);
   appendMessage(
@@ -2638,7 +2646,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
   if (energies.length === 1 && targets.length === 1) {
     const { card: energy, idx: energyIdx } = energies[0];
     const { card: destTarget, idx: targetIdx, zone: targetZone } = targets[0];
-    moveCard(user, user, sourceZone, targetZone, energyIdx, targetIdx);
+    await moveCardBundle(user, user, sourceZone, targetZone, energyIdx, targetIdx, 'move', emit);
     if (rulesState.enabled) markAbilityUsed(user, source);
     appendMessage(
       user,
@@ -2672,7 +2680,7 @@ export const energyRedirectAbility = async (user, emit = true, targetCard = null
   }
   const destTarget = targets[targetPick];
 
-  moveCard(user, user, sourceZone, destTarget.zone, energyPick, destTarget.idx);
+  await moveCardBundle(user, user, sourceZone, destTarget.zone, energyPick, destTarget.idx, 'move', emit);
   if (rulesState.enabled) markAbilityUsed(user, source);
   appendMessage(
     user,
@@ -3309,7 +3317,7 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null, op
     }
     if (candidates.length === 1) {
       const idx = hand.array.indexOf(candidates[0]);
-      moveCard(user, user, 'hand', 'discard', idx);
+      await moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move', emit);
     } else {
       const pick = await _pickFromList(
         `${target.name} — discard ${whatFilter} (cost)`,
@@ -3320,7 +3328,7 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null, op
         return;
       }
       const idx = hand.array.indexOf(candidates[pick]);
-      if (idx >= 0) moveCard(user, user, 'hand', 'discard', idx);
+      if (idx >= 0) await moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move', emit);
     }
   }
 

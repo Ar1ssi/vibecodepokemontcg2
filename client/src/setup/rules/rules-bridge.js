@@ -674,7 +674,15 @@ import {
 
               const selfHand = getZone('self', 'hand').array;
               const oppHand = getZone('opp', 'hand').array;
-              const steps = await evaluateMulligans({ selfHand, oppHand });
+              let steps = await evaluateMulligans({ selfHand, oppHand });
+              if (systemState.isTwoPlayer) {
+                // In 2P, each peer evaluates its own hand authoritatively;
+                // opponent mulligans arrive via the 'mulliganBonus' socket event.
+                steps = steps.filter((s) => s.player === 'self');
+                if (steps.length === 0) {
+                  steps = [{ player: 'self', mulligan: false, guidance: 'Your hand contains a Basic Pokémon.' }];
+                }
+              }
 
               // No mulligans needed
               if (steps.length === 1 && steps[0].mulligan === false) {
@@ -691,7 +699,7 @@ import {
               markMulligansResolved();
 
               const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
-              const oppMulliganned = steps.some(s => s.player === 'opp' && s.mulligan);
+              const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
 
               // Execute self mulligan
               if (selfMulliganned) {

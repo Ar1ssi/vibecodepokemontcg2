@@ -255,8 +255,18 @@ export const initializeSocketEventListeners = () => {
     // stale. Other action types have no such verification yet, so a
     // mismatch there is still dropped rather than risk applying it against
     // the wrong card — but now it's logged instead of silent.
+    const isCounterOrStatusAction =
+      data.action === 'updateDamageCounter' ||
+      data.action === 'addDamageCounter' ||
+      data.action === 'removeDamageCounter' ||
+      data.action === 'addSpecialCondition' ||
+      data.action === 'updateSpecialCondition' ||
+      data.action === 'removeSpecialCondition';
     const canAttempt =
-      isImporting || counterMatches || data.action === 'moveCardBundle';
+      isImporting ||
+      counterMatches ||
+      data.action === 'moveCardBundle' ||
+      isCounterOrStatusAction;
     if (!canAttempt) {
       logSync(
         'requestAction.drop',

@@ -10,19 +10,29 @@ export const rotateCard = (
   zoneId,
   index,
   single = false,
+  rotationAngle = null,
   emit = true
 ) => {
+  if (typeof rotationAngle === 'boolean') {
+    emit = rotationAngle;
+    rotationAngle = null;
+  }
+  const zone = getZone(user, zoneId);
+  const rotatingImage = zone?.array?.[index]?.image;
+  if (!rotatingImage) return;
+
+  const currentRotation =
+    parseInt(rotatingImage.style.transform.replace(/[^0-9-]/g, '')) || 0;
+  const newRotation =
+    typeof rotationAngle === 'number'
+      ? rotationAngle
+      : (currentRotation + 90) % 360;
+
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
-    processAction(user, emit, 'rotateCard', [zoneId, index, single]);
+    processAction(user, emit, 'rotateCard', [zoneId, index, single, newRotation]);
     return;
   }
 
-  const zone = getZone(user, zoneId);
-
-  const rotatingImage = zone.array[index].image;
-  const currentRotation =
-    parseInt(rotatingImage.style.transform.replace(/[^0-9-]/g, '')) || 0;
-  const newRotation = (currentRotation + 90) % 360;
   rotatingImage.style.transform = `rotate(${newRotation}deg)`;
 
   if (['bench'].includes(zoneId)) {
@@ -64,7 +74,7 @@ export const rotateCard = (
     }
   }
 
-  processAction(user, emit, 'rotateCard', [zoneId, index, single]);
+  processAction(user, emit, 'rotateCard', [zoneId, index, single, newRotation]);
 };
 
 export const resetRotation = (targetImage) => {

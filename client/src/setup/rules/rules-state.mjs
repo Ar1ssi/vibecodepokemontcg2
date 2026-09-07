@@ -514,6 +514,8 @@
     // across client mirrors, maps to one slot.
     export function abilityKey(card) {
       if (!card) return 'unknown';
+      if (card.cardId != null && card.cardId !== '') return `cardId:${card.cardId}`;
+      if (card.syncInstance != null) return `sync:${card.user ?? ''}_${card.syncInstance}`;
       if (card.id != null && card.id !== '') return `id:${card.id}`;
       const setNumber = card.number ?? card.set?.number ?? '';
       return `name:${card.name ?? 'unknown'}#${setNumber}`;
