@@ -137,6 +137,7 @@ export const playDrawToHand = (user, card, { fromRect } = {}) => {
   if (
     !shouldAnimateDrawFlight({
       syncReplaying: !!systemState.syncReplaying,
+      hidden: typeof document !== 'undefined' && !!document.hidden,
     })
   ) {
     return;

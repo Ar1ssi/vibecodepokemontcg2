@@ -128,11 +128,13 @@ export const initializeSocketEventListeners = () => {
       data: { socketId: socket.id },
     });
 
-    // Heartbeat backstop: slow 30s check, and only if an action occurred since last check
+    // Heartbeat backstop: 30s check during 2P games to keep socket alive and catch silent drift
     syncCheckInterval = setInterval(() => {
       if (
         systemState.isTwoPlayer &&
-        systemState.selfCounter !== lastSyncedSelfCounter
+        systemState.roomId &&
+        !systemState.syncReplaying &&
+        !systemState.isCatchingUp
       ) {
         emitSyncCheck();
       }
@@ -620,6 +622,37 @@ export const initializeSocketEventListeners = () => {
     document.addEventListener('rules-turn-began', () => {
       if (systemState.isTwoPlayer) {
         triggerSyncCheck(100);
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (
+        document.visibilityState === 'visible' &&
+        systemState.isTwoPlayer &&
+        systemState.roomId
+      ) {
+        if (!socket.connected) {
+          logSync('visibility.reconnect', {}, 'local');
+          socket.connect();
+        } else {
+          logSync('visibility.sync_check', {}, 'local');
+          triggerSyncCheck(50);
+        }
+      }
+    });
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('focus', () => {
+      if (
+        systemState.isTwoPlayer &&
+        systemState.roomId
+      ) {
+        if (!socket.connected) {
+          logSync('focus.reconnect', {}, 'local');
+          socket.connect();
+        } else {
+          triggerSyncCheck(100);
+        }
       }
     });
   }

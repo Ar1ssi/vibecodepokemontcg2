@@ -93,7 +93,7 @@ const buildCard = (deckRect, sleeveSrc) => {
 };
 
 export const playShuffleFlight = (user, zoneId, zoneCount) => {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined' || document.hidden) return;
   const count = visualCardCount(zoneCount);
   const originEl = zoneOriginEl(user, zoneId);
   if (!count || !originEl) return;

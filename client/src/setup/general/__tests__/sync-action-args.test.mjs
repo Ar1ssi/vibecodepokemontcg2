@@ -93,12 +93,14 @@ test('zone hash is order-sensitive and identity-based', () => {
   );
 });
 
-test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay do not', () => {
+test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay / hidden do not', () => {
   assert.equal(shouldAnimateDrawFlight({}), true);
   assert.equal(shouldAnimateDrawFlight({ syncReplay: false, syncReplaying: false }), true);
   assert.equal(shouldAnimateDrawFlight({ syncReplay: true }), false);
   assert.equal(shouldAnimateDrawFlight({ syncReplaying: true }), false);
   assert.equal(shouldAnimateDrawFlight({ syncReplay: true, syncReplaying: true }), false);
+  assert.equal(shouldAnimateDrawFlight({ hidden: true }), false);
+  assert.equal(shouldAnimateDrawFlight({ syncReplay: false, hidden: true }), false);
 });
 
 test('shouldRequestHashResync: one fullReplay per matching counter pair', () => {
@@ -319,5 +321,24 @@ test('requestAction accepts counter and status actions', () => {
   const src = readFileSync(path, 'utf8');
   assert.match(src, /isCounterOrStatusAction/);
 });
+
+test('socket-event-listeners registers visibilitychange and focus listeners', () => {
+  const path = fileURLToPath(
+    new URL('../../../initialization/socket-event-listeners/socket-event-listeners.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  assert.match(src, /document\.addEventListener\('visibilitychange'/);
+  assert.match(src, /window\.addEventListener\('focus'/);
+  assert.match(src, /triggerSyncCheck\(50\)/);
+});
+
+test('shuffle flight animation skips when document is hidden', () => {
+  const path = fileURLToPath(
+    new URL('../../image-logic/shuffle-flight.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  assert.match(src, /typeof document === 'undefined' \|\| document\.hidden/);
+});
+
 
 

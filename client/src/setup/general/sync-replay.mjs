@@ -15,12 +15,13 @@
  * so a single pair only full-replays once.
  */
 
-/** Live pushAction should still animate; only catch-up / explicit replay skip. */
+/** Live pushAction should still animate; only catch-up / explicit replay / background tab skip. */
 export function shouldAnimateDrawFlight({
   syncReplay = false,
   syncReplaying = false,
+  hidden = false,
 } = {}) {
-  return !syncReplay && !syncReplaying;
+  return !syncReplay && !syncReplaying && !hidden;
 }
 
 export function hashResyncKey(peerSelfCounter, localOppCounter) {
