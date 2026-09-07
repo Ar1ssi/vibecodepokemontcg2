@@ -11,6 +11,10 @@ import { setupGame } from './setup.mjs';
 import { createRng } from './rng.mjs';
 import { computeAttackDamage, expandEnergyEntries, canPayAttackCost } from './rules/attack-engine.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
+import { executeTrainer } from './effects/trainer.mjs';
+import { executeAbility } from './effects/ability.mjs';
+import { executeStadium } from './effects/stadium.mjs';
+import { parseTrainerEffect } from './rules/trainer-effects.mjs';
 
 /**
  * Handles Knockout resolution for a Pokemon:
@@ -147,8 +151,18 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     attackerAttacked: false,
     retreatedThisTurn: false,
     supporterPlayed: false,
+    stadiumUsedThisTurn: false,
     abilitiesUsed: {},
   };
+
+  // Reset once-per-turn ability markers on in-play Pokemon
+  const inPlay = [
+    ...(draft.players[nextPlayerId].zones?.active || []),
+    ...(draft.players[nextPlayerId].zones?.bench || []),
+  ];
+  for (const card of inPlay) {
+    card.abilityUsed = false;
+  }
 
   const deck = draft.players[nextPlayerId].zones.deck;
   const hand = draft.players[nextPlayerId].zones.hand;
@@ -346,6 +360,43 @@ function validateReferences(state, command) {
       return { valid: true };
     }
 
+    case 'playTrainer': {
+      const cardRef = findCard(state, payload?.instanceId);
+      if (!cardRef || cardRef.zoneId !== 'hand' || cardRef.playerId !== playerId) {
+        return { valid: false, error: 'stale_view' };
+      }
+      if (payload.targetInstanceId != null) {
+        const targetRef = findCard(state, payload.targetInstanceId);
+        if (!targetRef || !['active', 'bench'].includes(targetRef.zoneId) || targetRef.playerId !== playerId) {
+          return { valid: false, error: 'stale_view' };
+        }
+      }
+      return { valid: true };
+    }
+
+    case 'useAbility':
+    case 'useVStarGX': {
+      const cardRef = findCard(state, payload?.instanceId);
+      if (!cardRef || !['active', 'bench'].includes(cardRef.zoneId) || cardRef.playerId !== playerId) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    case 'stadium-effect': {
+      if (!state.stadium) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    case 'resolveChoice': {
+      if (!state.pendingChoice) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
     default:
       return { valid: true };
   }
@@ -391,14 +442,14 @@ function validateLegality(state, command) {
   }
 
   // Turn player validation
-  if (['attack', 'retreat', 'pass', 'takeTurn', 'moveCard', 'attachCard', 'draw'].includes(type)) {
+  if (['attack', 'retreat', 'pass', 'takeTurn', 'moveCard', 'attachCard', 'draw', 'playTrainer', 'useAbility', 'stadium-effect', 'useVStarGX'].includes(type)) {
     if (state.turn?.player && state.turn.player !== playerId) {
       return { allowed: false, reason: "It's not your turn." };
     }
   }
 
   if (state.turn?.phase === 'attack') {
-    if (['moveCard', 'attachCard', 'draw', 'retreat', 'attack'].includes(type)) {
+    if (['moveCard', 'attachCard', 'draw', 'retreat', 'attack', 'playTrainer', 'useAbility', 'stadium-effect', 'useVStarGX'].includes(type)) {
       return { allowed: false, reason: 'You already attacked — end your turn.' };
     }
   }
@@ -526,6 +577,56 @@ function validateLegality(state, command) {
       return { allowed: true };
     }
 
+    case 'playTrainer': {
+      const cardRef = findCard(state, payload.instanceId);
+      if (cardRef) {
+        const typeStr = String(cardRef.card.type || '').toLowerCase();
+        const subStr = String(cardRef.card.subtypes || '').toLowerCase();
+        const isSupporter = typeStr.includes('supporter') || subStr.includes('supporter');
+        if (isSupporter && player.flags?.supporterPlayed) {
+          return { allowed: false, reason: 'Supporter already played this turn.' };
+        }
+
+        const text = cardRef.card.text || cardRef.card.effect || cardRef.card.cardText || '';
+        const parsed = parseTrainerEffect(text);
+        if (parsed?.steps?.[0]?.type === 'discardCost') {
+          const cost = parsed.steps[0].count || 1;
+          const otherHandCards = (player.zones?.hand || []).filter((c) => c.instanceId !== payload.instanceId);
+          if (otherHandCards.length < cost) {
+            return { allowed: false, reason: 'Not enough cards in hand to pay discard cost.' };
+          }
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'useAbility': {
+      const cardRef = findCard(state, payload.instanceId);
+      if (cardRef) {
+        if (
+          cardRef.card.abilityUsed ||
+          player.flags?.abilitiesUsed?.[cardRef.card.name] ||
+          player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
+        ) {
+          return { allowed: false, reason: 'Ability already used this turn.' };
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'stadium-effect': {
+      if (player.flags?.stadiumUsedThisTurn) {
+        return { allowed: false, reason: 'Stadium effect already used this turn.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'useVStarGX': {
+      if (player.flags?.vstarUsed || player.flags?.gxUsed) {
+        return { allowed: false, reason: 'VSTAR / GX attack or ability already used this game.' };
+      }
+      return { allowed: true };
+    }
 
     default:
       return { allowed: true };
@@ -576,7 +677,7 @@ export function applyCommand(state, command, rng = null) {
 
   // Step 2: Turn gate / PendingChoice gate
   if (state.pendingChoice) {
-    if (state.pendingChoice.player !== playerId) {
+    if (type !== 'resolveChoice') {
       return {
         state,
         events: [],
@@ -584,6 +685,61 @@ export function applyCommand(state, command, rng = null) {
         error: 'waiting_for_choice',
         reason: `Waiting for choice from player ${state.pendingChoice.player}`,
       };
+    }
+    // Edge Case 11: Choice resolved by wrong player -> rejected not_your_choice
+    if (state.pendingChoice.player !== playerId) {
+      return {
+        state,
+        events: [],
+        pendingChoice: state.pendingChoice,
+        error: 'not_your_choice',
+        reason: `Choice must be resolved by player ${state.pendingChoice.player}`,
+      };
+    }
+    if (payload.choiceId && state.pendingChoice.choiceId !== payload.choiceId) {
+      return {
+        state,
+        events: [],
+        pendingChoice: state.pendingChoice,
+        error: 'stale_choice',
+        reason: 'Choice ID does not match current pending choice',
+      };
+    }
+  } else if (type === 'resolveChoice') {
+    return {
+      state,
+      events: [],
+      pendingChoice: null,
+      error: 'no_pending_choice',
+      reason: 'There is no pending choice to resolve',
+    };
+  }
+
+  // Edge Case 12: Selection validation for resolveChoice
+  if (type === 'resolveChoice') {
+    const selection = payload.selection || [];
+    const min = state.pendingChoice.min ?? 0;
+    const max = state.pendingChoice.max ?? Infinity;
+    if (selection.length < min || selection.length > max) {
+      return {
+        state,
+        events: [],
+        pendingChoice: state.pendingChoice,
+        error: 'invalid_selection',
+        reason: `Selection count (${selection.length}) must be between ${min} and ${max}`,
+      };
+    }
+    const optionIds = new Set((state.pendingChoice.options || []).map((o) => o.instanceId));
+    for (const sId of selection) {
+      if (!optionIds.has(sId)) {
+        return {
+          state,
+          events: [],
+          pendingChoice: state.pendingChoice,
+          error: 'invalid_selection',
+          reason: `Selected card ${sId} is not in choice options`,
+        };
+      }
     }
   }
 
@@ -1102,6 +1258,92 @@ export function applyCommand(state, command, rng = null) {
           }
         }
         events.push({ type: 'pokemonPromoted', instanceId: payload.instanceId, playerId });
+      }
+      break;
+    }
+
+    case 'playTrainer': {
+      const cardRef = findCard(draft, payload.instanceId);
+      if (cardRef) {
+        executeTrainer(draft, {
+          card: cardRef.card,
+          playerId,
+          activeRng,
+          events,
+          targetInstanceId: payload.targetInstanceId,
+        });
+      }
+      break;
+    }
+
+    case 'useAbility': {
+      const cardRef = findCard(draft, payload.instanceId);
+      if (cardRef) {
+        executeAbility(draft, {
+          card: cardRef.card,
+          abilityIndex: payload.abilityIndex ?? 0,
+          playerId,
+          activeRng,
+          events,
+        });
+      }
+      break;
+    }
+
+    case 'stadium-effect': {
+      executeStadium(draft, {
+        playerId,
+        activeRng,
+        events,
+      });
+      break;
+    }
+
+    case 'useVStarGX': {
+      if (!draft.players[playerId].flags) draft.players[playerId].flags = {};
+      draft.players[playerId].flags.vstarUsed = true;
+      draft.players[playerId].flags.gxUsed = true;
+      events.push({ type: 'vstarUsed', playerId, instanceId: payload.instanceId });
+      break;
+    }
+
+    case 'resolveChoice': {
+      const choice = draft.pendingChoice;
+      const token = choice?.resumeToken || {};
+      let resumeCard = null;
+      if (token.sourceInstanceId != null) {
+        const cardRef = findCard(draft, token.sourceInstanceId);
+        resumeCard = cardRef?.card || null;
+      }
+
+      if (token.effectType === 'trainer') {
+        executeTrainer(draft, {
+          card: resumeCard,
+          playerId,
+          activeRng,
+          events,
+          selection: payload.selection,
+          resumeToken: token,
+        });
+      } else if (token.effectType === 'ability') {
+        executeAbility(draft, {
+          card: resumeCard,
+          playerId,
+          activeRng,
+          events,
+          selection: payload.selection,
+          resumeToken: token,
+        });
+      } else if (token.effectType === 'stadium') {
+        executeStadium(draft, {
+          playerId,
+          activeRng,
+          events,
+          selection: payload.selection,
+          resumeToken: token,
+        });
+      } else {
+        draft.pendingChoice = null;
       }
       break;
     }

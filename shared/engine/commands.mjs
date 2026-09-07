@@ -311,6 +311,80 @@ export const COMMAND_SCHEMAS = {
       return { valid: true };
     },
   },
+
+  playTrainer: {
+    type: 'playTrainer',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+        return { valid: false, reason: 'instanceId must be an integer' };
+      }
+      if (payload.targetInstanceId != null && (!Number.isInteger(payload.targetInstanceId))) {
+        return { valid: false, reason: 'targetInstanceId must be an integer when provided' };
+      }
+      return { valid: true };
+    },
+  },
+
+  useAbility: {
+    type: 'useAbility',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+        return { valid: false, reason: 'instanceId must be an integer' };
+      }
+      if (payload.abilityIndex != null && (!Number.isInteger(payload.abilityIndex) || payload.abilityIndex < 0)) {
+        return { valid: false, reason: 'abilityIndex must be a non-negative integer when provided' };
+      }
+      return { valid: true };
+    },
+  },
+
+  'stadium-effect': {
+    type: 'stadium-effect',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  resolveChoice: {
+    type: 'resolveChoice',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (typeof payload.choiceId !== 'string' || !payload.choiceId.trim()) {
+        return { valid: false, reason: 'choiceId must be a non-empty string' };
+      }
+      if (!Array.isArray(payload.selection)) {
+        return { valid: false, reason: 'selection must be an array' };
+      }
+      if (payload.selection.some((id) => !Number.isInteger(id))) {
+        return { valid: false, reason: 'selection must contain only integer instanceIds' };
+      }
+      return { valid: true };
+    },
+  },
+
+  useVStarGX: {
+    type: 'useVStarGX',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+        return { valid: false, reason: 'instanceId must be an integer' };
+      }
+      return { valid: true };
+    },
+  },
 };
 
 
