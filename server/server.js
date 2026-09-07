@@ -10,6 +10,11 @@ import dotenv from 'dotenv';
 import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { GameRoom } from './game/room.mjs';
+
+const SERVER_AUTHORITATIVE =
+  process.env.SERVER_AUTHORITATIVE === '1' ||
+  process.env.SERVER_AUTHORITATIVE === 'true';
 
 // Handle __dirname in ES modules and adjust for client folder
 const __filename = fileURLToPath(import.meta.url);
@@ -209,6 +214,8 @@ async function main() {
   });
 
   const roomInfo = new Map();
+  const gameRooms = new Map();
+
   // Function to periodically clean up empty rooms
   const cleanUpEmptyRooms = () => {
     roomInfo.forEach((room, roomId) => {
@@ -216,6 +223,13 @@ async function main() {
         roomInfo.delete(roomId);
       }
     });
+    if (SERVER_AUTHORITATIVE) {
+      gameRooms.forEach((room, roomId) => {
+        if (room.playerToSocket.size === 0 && room.spectatorSockets.size === 0) {
+          gameRooms.delete(roomId);
+        }
+      });
+    }
   };
   // Set up a timer to clean up empty rooms every 5 minutes (adjust as needed)
   setInterval(cleanUpEmptyRooms, 5 * 60 * 1000);
@@ -225,6 +239,9 @@ async function main() {
     const disconnectHandler = (roomId, username) => {
       if (!socket.data.leaveRoom) {
         socket.to(roomId).emit('userDisconnected', username);
+      }
+      if (SERVER_AUTHORITATIVE && gameRooms.has(roomId)) {
+        gameRooms.get(roomId).removeSocket(socket.id);
       }
       // Remove the disconnected user from the roomInfo map
       if (roomInfo.has(roomId)) {
@@ -324,6 +341,20 @@ async function main() {
 
       if (room.players.size < 2 || isSpectator) {
         socket.join(roomId);
+        if (SERVER_AUTHORITATIVE) {
+          let gameRoom = gameRooms.get(roomId);
+          if (!gameRoom) {
+            gameRoom = new GameRoom({ roomId });
+            gameRooms.set(roomId, gameRoom);
+          }
+          if (isSpectator) {
+            gameRoom.addSpectator(socket.id);
+          } else {
+            const existingPids = [...gameRoom.playerToSocket.keys()];
+            const nextPid = existingPids.includes('p1') ? 'p2' : 'p1';
+            gameRoom.addPlayer(socket.id, nextPid, username);
+          }
+        }
         // Check if the user is a spectator or there are fewer than 2 players
         if (isSpectator) {
           room.spectators.add(username);
@@ -354,6 +385,29 @@ async function main() {
       }
       const room = roomInfo.get(data.roomId);
       socket.join(data.roomId);
+      if (SERVER_AUTHORITATIVE) {
+        let gameRoom = gameRooms.get(data.roomId);
+        if (!gameRoom) {
+          gameRoom = new GameRoom({ roomId: data.roomId });
+          gameRooms.set(data.roomId, gameRoom);
+        }
+        if (!data.notSpectator) {
+          gameRoom.addSpectator(socket.id);
+        } else {
+          let existingPid = null;
+          for (const [pId, pData] of Object.entries(gameRoom.state.players)) {
+            if (pData.username === data.username) {
+              existingPid = pId;
+              break;
+            }
+          }
+          if (!existingPid) {
+            const existingPids = [...gameRoom.playerToSocket.keys()];
+            existingPid = existingPids.includes('p1') ? 'p2' : 'p1';
+          }
+          gameRoom.addPlayer(socket.id, existingPid, data.username);
+        }
+      }
       if (!data.notSpectator) {
         room.spectators.add(data.username);
         socket.to(data.roomId).emit('requestSpectatorData', { roomId: data.roomId });
@@ -402,6 +456,66 @@ async function main() {
     for (const event of events) {
       socket.on(event, (data) => {
         emitToRoom(event, data);
+      });
+    }
+
+    if (SERVER_AUTHORITATIVE) {
+      socket.on('cmd', (cmd) => {
+        const roomId =
+          cmd?.roomId ||
+          [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (!gameRoom) {
+          socket.emit('cmdRejected', {
+            clientSeq: cmd?.clientSeq,
+            reason: 'room_not_found',
+          });
+          return;
+        }
+
+        const result = gameRoom.handleCommand(socket.id, cmd);
+        if (!result.success) {
+          socket.emit('cmdRejected', {
+            clientSeq: cmd?.clientSeq,
+            reason: result.error,
+            details: result.reason,
+          });
+        } else if (result.dedupe) {
+          socket.emit('view', {
+            gameId: gameRoom.roomId,
+            stateVersion: result.stateVersion,
+            view: result.view,
+            events: [],
+            pendingChoice: null,
+          });
+        } else {
+          for (const broadcast of result.broadcasts || []) {
+            io.to(broadcast.socketId).emit('view', {
+              gameId: gameRoom.roomId,
+              stateVersion: result.stateVersion,
+              view: broadcast.view,
+              events: result.events,
+              pendingChoice: result.pendingChoice,
+            });
+          }
+        }
+      });
+
+      socket.on('requestView', (data) => {
+        const roomId =
+          data?.roomId ||
+          [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (gameRoom) {
+          const view = gameRoom.getViewForSocket(socket.id);
+          socket.emit('view', {
+            gameId: gameRoom.roomId,
+            stateVersion: gameRoom.state.stateVersion,
+            view,
+            events: [],
+            pendingChoice: gameRoom.state.pendingChoice,
+          });
+        }
       });
     }
   });
