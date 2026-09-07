@@ -3,6 +3,9 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
-- (none yet)
+- D1 2026-09-07 [stack] Node.js ES modules with native node --test runner used across workspaces. (observed)
+- D2 2026-09-07 [architecture] Express + Socket.IO server with SQLite3 for 2P real-time multiplayer state sync. (observed)
+- D3 2026-09-07 [rules] Rules engine uses modular JS with JSDOM for testing pure card logic and guided turn flows. (observed)
+
 
 ## Archive (dead decisions — kept greppable, never loaded into working context)

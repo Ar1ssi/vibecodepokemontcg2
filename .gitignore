@@ -6,3 +6,8 @@ client/src/assets/playmats/original/
 client/src/assets/playmats/png/
 client/src/assets/playmats/upscaled/
 .cache/
+
+# Agent scratch directory (keep .gitkeep)
+.agent/scratch/*
+!.agent/scratch/.gitkeep
+

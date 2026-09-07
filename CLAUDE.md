@@ -97,8 +97,9 @@ Unattended (oneshot, CI): question budget spent up front; the `(assumed)` ledger
 - Data-touching changes (migrations, deletions) need a written revert path in their design.
 
 ## Project facts  <!-- filled by bootstrap; keep ≤20 lines -->
-- What: <fill: one sentence>
-- Stack: <fill: languages, frameworks, versions>
-- Commands — run: `<fill>` · test: `<fill>` · lint: `<fill>` · build: `<fill>`
-- Entry points: <fill: main files>
+- What: Web-based 2-player Pokémon TCG simulator with interactive board mats, deck builder, rules mode engine, multiplayer Socket.IO sync, and SQLite backend.
+- Stack: Node.js (ES modules), Express 4, Socket.IO 4, SQLite3, EJS, Playwright, native node --test runner, ESLint 9 + Prettier.
+- Commands — run: `pnpm start` (or `node server/server.js`) · test: `pnpm test` (797 tests) · lint: `pnpm lint` (failing: CRLF/no-undef issues) · build: n/a
+- Entry points: `server/server.js` (backend server & Socket.IO), `client/index.ejs` (frontend UI markup), `client/src/front-end.js` (frontend JS boot script)
 - Deeper facts: `.agent/PROJECT.md` (architecture, constraints, glossary, landmines)
+
