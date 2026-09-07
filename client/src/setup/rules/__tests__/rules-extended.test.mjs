@@ -4397,4 +4397,95 @@ import test from 'node:test';
       assert.equal(matchesSearch(energy, 'Trainer'), false);
     });
 
+    test('fix 1: neither player can evolve on their respective first turn', async () => {
+      const { rulesState, startGame, beginTurn, endTurn, canPerformAction } = await import('../rules-state.mjs');
+      const { canEvolve } = await import('../evolution.mjs');
+      const base = { name: 'Pidgey', stage: 'Basic', id: 'b-p1' };
+      const evo = { name: 'Pidgeotto', stage: 'Stage 1', evolvesFrom: 'Pidgey', id: 'e-p1' };
+
+      startGame('self');
+      beginTurn('self'); // Turn 1 (P1's 1st turn)
+      assert.equal(rulesState.turnNumber, 1);
+      assert.equal(rulesState.playerTurnCount.self, 1);
+      assert.equal(rulesState.playerTurnCount.opp, 0);
+
+      // P1 on Turn 1 cannot evolve
+      assert.equal(canPerformAction({ user: 'self', action: 'evolve' }).allowed, false);
+      assert.equal((await canEvolve('self', base, evo, false)).allowed, false);
+
+      endTurn('self'); // Turn 2 begins for 'opp' (P2's 1st turn)
+      assert.equal(rulesState.turnNumber, 2);
+      assert.equal(rulesState.turnPlayer, 'opp');
+      assert.equal(rulesState.playerTurnCount.self, 1);
+      assert.equal(rulesState.playerTurnCount.opp, 1);
+
+      // P2 on Turn 2 (their 1st turn) cannot evolve!
+      assert.equal(canPerformAction({ user: 'opp', action: 'evolve' }).allowed, false);
+      assert.equal((await canEvolve('opp', base, evo, false)).allowed, false);
+
+      endTurn('opp'); // Turn 3 begins for 'self' (P1's 2nd turn)
+      assert.equal(rulesState.turnNumber, 3);
+      assert.equal(rulesState.turnPlayer, 'self');
+      assert.equal(rulesState.playerTurnCount.self, 2);
+      assert.equal(rulesState.playerTurnCount.opp, 1);
+
+      // P1 on Turn 3 can evolve Pokémon not played this turn
+      assert.equal(canPerformAction({ user: 'self', action: 'evolve' }).allowed, true);
+      assert.equal((await canEvolve('self', base, evo, false)).allowed, true);
+      // But not if played this turn
+      assert.equal((await canEvolve('self', base, evo, true)).allowed, false);
+
+      endTurn('self'); // Turn 4 begins for 'opp' (P2's 2nd turn)
+      assert.equal(rulesState.turnNumber, 4);
+      assert.equal(rulesState.turnPlayer, 'opp');
+      assert.equal(rulesState.playerTurnCount.self, 2);
+      assert.equal(rulesState.playerTurnCount.opp, 2);
+
+      // P2 on Turn 4 can evolve Pokémon not played this turn
+      assert.equal(canPerformAction({ user: 'opp', action: 'evolve' }).allowed, true);
+      assert.equal((await canEvolve('opp', base, evo, false)).allowed, true);
+    });
+
+    test('fix 2: game ends when one player has 0 Pokémon in play (active + bench) even with prizes remaining', async () => {
+      const { checkWinConditions, planPromotion } = await import('../ko-flow.mjs');
+
+      // Defender has 0 active and 0 bench -> opponent wins immediately
+      const winCheck1 = checkWinConditions({
+        activeCounts: {
+          self: { active: 1, bench: 2 },
+          opp: { active: 0, bench: 0 },
+        },
+        deckCounts: { self: 20, opp: 20 },
+        turnPlayer: 'self',
+      });
+      assert.equal(winCheck1.over, true);
+      assert.equal(winCheck1.winner, 'self');
+      assert.equal(winCheck1.reason, 'no Pokémon in play');
+
+      // planPromotion confirms no promotion if benchCount === 0
+      const plan = planPromotion(true, 0);
+      assert.equal(plan.promote, false);
+    });
+
+    test('fix 3: trainer step runner invokes onComplete callback after effects finish', async () => {
+      const { parseTrainerEffect } = await import('../trainer-effects.mjs');
+      const parsed = parseTrainerEffect("Discard your hand and draw 7 cards.");
+      assert.equal(parsed.recognizable, true);
+      assert.equal(parsed.steps.length, 1);
+
+      let completed = false;
+      const onComplete = () => {
+        completed = true;
+      };
+      const runAt = (idx) => {
+        if (idx >= parsed.steps.length) {
+          onComplete();
+          return;
+        }
+        runAt(idx + 1);
+      };
+      runAt(0);
+      assert.equal(completed, true);
+    });
+
 

@@ -48,7 +48,7 @@ import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
-import { handleKO, promotionGuidance, planPromotion, koOutcome } from '../../setup/rules/ko-flow.mjs';
+import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions } from '../../setup/rules/ko-flow.mjs';
 import { markRetreated } from '../../setup/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
@@ -373,9 +373,48 @@ const syncAttackFromCard = (card, attackIndex, prev) => {
   return text ? { ...latest, text } : latest;
 };
 
+export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
+  if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
+    return false;
+  }
+  if (rulesState.turnNumber < 1) return false;
+  try {
+    const counts = {};
+    for (const p of ['self', 'opp']) {
+      counts[p] = {
+        active: getZone(p, 'active').getCount(),
+        bench: getZone(p, 'bench').getCount(),
+      };
+    }
+    const inGame = {
+      self: getZone('self', 'deck').getCount() + getZone('self', 'hand').getCount() + counts.self.active + counts.self.bench > 0,
+      opp: getZone('opp', 'deck').getCount() + getZone('opp', 'hand').getCount() + counts.opp.active + counts.opp.bench > 0,
+    };
+    const win = checkWinConditions({
+      activeCounts: inGame.self && inGame.opp ? counts : null,
+      deckCounts: {
+        self: inGame.self ? getZone('self', 'deck').getCount() : 1,
+        opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
+      },
+      turnPlayer,
+    });
+    if (win.over) {
+      rulesState.phase = 'ended';
+      const reason = `Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`;
+      appendMessage('', `🏆 ${reason}`, 'announcement', false);
+      document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 // Rules mode: an attack (or pass) ends the turn — advance rulesState and
 // refresh the HUD/panel via the same event updateTurnBanner() uses.
 const endTurnWithBanner = (user, rngBundle = {}) => {
+  if (evaluateWinCondition(user)) {
+    return;
+  }
   // SOLO turn-boundary: resolve this player's active status (poison/burn
   // damage, asleep/paralyzed clear) BEFORE the turn advances. Shared by both
   // attack() and pass(), so pass is covered too. Mirrors the +Turn button
@@ -395,14 +434,22 @@ const endTurnWithBanner = (user, rngBundle = {}) => {
   const next = endTurn(user);
   appendMessage('', `Turn passes to ${next === 'self' ? 'P1' : 'P2'}`, 'announcement', false);
   document.dispatchEvent(new CustomEvent('rules-turn-began', { detail: { player: rulesState.turnPlayer } }));
+  evaluateWinCondition(next);
 };
 
 export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, maybeEmit) => {
-  const { attackIndex, rngBundle, emit } = parseAttackArgs(
+  let actingUser = user;
+  if (rulesState.enabled && !systemState.isTwoPlayer && rulesState.turnPlayer) {
+    actingUser = rulesState.turnPlayer;
+  }
+  user = actingUser;
+
+  const { attackIndex: parsedAttackIndex, rngBundle, emit } = parseAttackArgs(
     emitOrIndex,
     attackIndexOrRng,
     maybeEmit
   );
+  let attackIndex = parsedAttackIndex;
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'attack', [attackIndex, rngBundle]);
     return;
@@ -562,8 +609,32 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           }
         }
         if (!canPayAttackCost(energyTypes, effectiveCost)) {
-          appendMessage(user, `⛔ Not enough energy for ${atk.name}.`, 'announcement', false);
-          return; // turn does NOT end
+          if (attackIndex === 0 && Array.isArray(active.attacks) && active.attacks.length > 1) {
+            for (let i = 1; i < active.attacks.length; i++) {
+              const altAtk = active.attacks[i];
+              let altCost = altAtk.cost || [];
+              if (rulesState.enabled) {
+                let altDiscount = combinedPassiveCostDiscount(active, activeZone.array, {
+                  blockTools: stadiumBlocksToolEffects(),
+                });
+                const altStadiumCard = getStadium()?.card;
+                if (altStadiumCard) altDiscount += parseStadiumCostModifier(altStadiumCard);
+                if (altDiscount > 0 && altCost.length > 0) altCost = applyCostDiscount(altCost, altDiscount);
+                const altIncrease = getStadiumAttackCostIncrease(active, user);
+                if (altIncrease > 0) altCost = [...altCost, ...Array(altIncrease).fill('Colorless')];
+              }
+              if (canPayAttackCost(energyTypes, altCost)) {
+                attackIndex = i;
+                atk = altAtk;
+                effectiveCost = altCost;
+                break;
+              }
+            }
+          }
+          if (!canPayAttackCost(energyTypes, effectiveCost)) {
+            appendMessage(user, `⛔ Not enough energy for ${atk.name}.`, 'announcement', false);
+            return; // turn does NOT end
+          }
         }
 
         // Discard-cost (taxonomy §D discard-cost family): the attack's
@@ -1093,7 +1164,17 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 'announcement',
                 false
               );
+            } else {
+              const oldActiveName = oppActive.name || 'The active Pokémon';
+              moveCard(oppPlayer, user, 'active', 'discard', 0);
+              appendMessage(
+                user,
+                `💀 ${oldActiveName} was Knocked Out!`,
+                'announcement',
+                false
+              );
             }
+            evaluateWinCondition(user);
           }
         }
 
@@ -2112,6 +2193,10 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
 
   if (rulesState.enabled) {
     endTurnWithBanner(user, rngBundle);
+  } else {
+    import('../general/take-turn.js').then(({ takeTurn }) => {
+      takeTurn(user, systemState.initiator, emit);
+    });
   }
 };
 

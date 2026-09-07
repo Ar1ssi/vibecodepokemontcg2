@@ -302,7 +302,8 @@ export const moveCard = async (
       appendMessage(user, `⛔ ${evolveGate.reason}`, 'announcement', false);
       return;
     }
-    const evoCheck = await canEvolve(user, targetCard, movingCard, false, { isRareCandy });
+    const wasPlayedThisTurn = targetCard.enteredPlayTurn === rulesState.turnNumber;
+    const evoCheck = await canEvolve(user, targetCard, movingCard, wasPlayedThisTurn, { isRareCandy });
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
       return { destZoneId, ok: false };
@@ -452,6 +453,7 @@ export const moveCard = async (
   if (isTargetCardValid && isAttachAllowed) {
     if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
       evolveCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
+      movingCard.enteredPlayTurn = rulesState.turnNumber;
       if (!syncReplay) {
         markEvolvedThisTurn(user, targetCard);
         markEvolvedThisTurn(user, movingCard);
@@ -495,6 +497,9 @@ export const moveCard = async (
     //special initialization is needed for cards in the active and bench since pokemon has its own container with its attached cards
     if (activeOrBenchZone.includes(dZoneId)) {
       initializeActiveBenchCard(user, movingCard, dZoneId, dZone);
+      if (movingCard.type === 'Pokémon') {
+        movingCard.enteredPlayTurn = rulesState.turnNumber;
+      }
       // give the card its holofoil wrapper now that initializeActiveBenchCard
       // has settled the <img> into its .play-container (clientWidth/Height are
       // valid). No-op for common/non-holo cards.

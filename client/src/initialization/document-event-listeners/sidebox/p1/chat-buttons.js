@@ -7,7 +7,9 @@ import { determineUsername } from '../../../../setup/general/determine-username.
 
 export const initializeP1ChatButtons = () => {
   const attackButton = document.getElementById('attackButton');
-  attackButton.addEventListener('click', () => attack(systemState.initiator));
+  attackButton.addEventListener('click', () =>
+    attack(systemState.isTwoPlayer ? systemState.initiator : 'self')
+  );
 
   const retreatButton = document.getElementById('retreatButton');
   retreatButton.addEventListener('click', () => retreat(systemState.initiator));

@@ -135,7 +135,13 @@ export async function canEvolve(
 ) {
   if (!rulesState.enabled) return { allowed: true };
 
-  if (rulesState.turnNumber <= 1) {
+  const isFirstTurnForPlayer =
+    rulesState.turnNumber <= 1 ||
+    (rulesState.playerTurnCount &&
+      (rulesState.playerTurnCount[player] < 1 ||
+        (rulesState.turnPlayer === player && rulesState.playerTurnCount[player] <= 1)));
+
+  if (isFirstTurnForPlayer) {
     return { allowed: false, reason: "Can't evolve on the first turn." };
   }
 

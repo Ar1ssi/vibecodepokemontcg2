@@ -4,7 +4,7 @@
  * helpers can import them without creating a circular import through
  * `front-end.js` (which deadlocks module initialization in the browser).
  */
-export const selfContainer = document.getElementById('selfContainer');
-export const selfContainerDocument = selfContainer.contentWindow.document;
-export const oppContainer = document.getElementById('oppContainer');
-export const oppContainerDocument = oppContainer.contentWindow.document;
+export const selfContainer = typeof document !== 'undefined' ? document.getElementById('selfContainer') : null;
+export const selfContainerDocument = selfContainer?.contentWindow?.document ?? null;
+export const oppContainer = typeof document !== 'undefined' ? document.getElementById('oppContainer') : null;
+export const oppContainerDocument = oppContainer?.contentWindow?.document ?? null;

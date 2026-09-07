@@ -323,7 +323,7 @@ import {
           if (!row.classList.contains('rules-aw-clickable')) return;
           row.addEventListener('click', () => {
             const idx = parseInt(row.dataset.attackIdx, 10);
-            attack('self', true, idx);
+            attack(rulesState.turnPlayer, true, idx);
           });
         });
         body.querySelectorAll('[data-ability-key]').forEach((row) => {
@@ -398,7 +398,43 @@ import {
       document.body.classList.toggle('rules-mode', true);
       syncRulesToggleUI();
     };
-    
+
+    export function evaluateAndApplyWinConditions(turnPlayer = rulesState.turnPlayer) {
+      if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
+        return false;
+      }
+      if (rulesState.turnNumber < 1) return false;
+      try {
+        const counts = {};
+        for (const p of ['self', 'opp']) {
+          counts[p] = {
+            active: getZone(p, 'active').getCount(),
+            bench: getZone(p, 'bench').getCount(),
+          };
+        }
+        const inGame = {
+          self: getZone('self', 'deck').getCount() + getZone('self', 'hand').getCount() + counts.self.active + counts.self.bench > 0,
+          opp: getZone('opp', 'deck').getCount() + getZone('opp', 'hand').getCount() + counts.opp.active + counts.opp.bench > 0,
+        };
+        const win = checkWinConditions({
+          activeCounts: inGame.self && inGame.opp ? counts : null,
+          deckCounts: {
+            self: inGame.self ? getZone('self', 'deck').getCount() : 1,
+            opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
+          },
+          turnPlayer,
+        });
+        if (win.over) {
+          rulesState.phase = 'ended';
+          const reason = `Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`;
+          appendMessage('', `🏆 ${reason}`, 'announcement', false);
+          document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+
     // ── turn flow: attack ends turn; +Turn advances ──────────────────────
     const hookTurnButton = () => {
       const handlePassClick = async (event) => {
@@ -523,39 +559,9 @@ import {
           }
         }
     
-        // win-condition sweep before passing — only once the game is truly
-        // underway (turn 2+), never during setup/mulligan
-        if (rulesState.turnNumber >= 2) {
-        try {
-          const counts = {};
-          for (const p of ['self', 'opp']) {
-            counts[p] = {
-              active: getZone(p, 'active').getCount(),
-              bench: getZone(p, 'bench').getCount(),
-            };
-          }
-          // deck-out + no-Pokemon only apply to players actually in the game:
-          // a player with no deck loaded (solo testing) can't lose by them
-          const inGame = {
-            self: getZone('self', 'deck').getCount() + getZone('self', 'hand').getCount() > 0,
-            opp: getZone('opp', 'deck').getCount() + getZone('opp', 'hand').getCount() > 0,
-          };
-          const win = checkWinConditions({
-            activeCounts: inGame.self && inGame.opp ? counts : null,
-            deckCounts: {
-              self: inGame.self ? getZone('self', 'deck').getCount() : 1,
-              opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
-            },
-            turnPlayer: endingPlayer,
-          });
-          if (win.over) {
-            rulesState.phase = 'ended';
-            const reason = `Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`;
-            appendMessage('', `🏆 ${reason}`, 'announcement', false);
-            document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
-            return;
-          }
-        } catch {}
+        // win-condition sweep before passing
+        if (evaluateAndApplyWinConditions(endingPlayer)) {
+          return;
         }
     
         // This is the only path that actually ends the turn (the three
@@ -2077,7 +2083,20 @@ if (!isTrainer) {
               for (const step of parsed.steps) {
                 appendMessage('', '  ' + describeStep(step), 'announcement', false);
               }
-              runTrainerSteps(card, parsed.steps, 0, undefined, ownerUser);
+              const discardTrainerFromBoard = async () => {
+                try {
+                  const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+                  for (const side of [ownerUser, 'self', 'opp']) {
+                    const board = getZone(side, 'board');
+                    const idx = board.array.indexOf(card);
+                    if (idx >= 0) {
+                      moveCardBundle(side, side, 'board', 'discard', idx, false, 'move');
+                      break;
+                    }
+                  }
+                } catch {}
+              };
+              runTrainerSteps(card, parsed.steps, 0, discardTrainerFromBoard, ownerUser);
             });
       } catch {}
     };
@@ -2180,9 +2199,9 @@ if (!isTrainer) {
       if (!systemState.isTwoPlayer) {
         const checkBoardCards = () => {
           if (rulesState.phase === 'ended') return;
-          if (rulesState.enabled && rulesState.turnPlayer !== 'self') return;
           try {
             for (const side of ['self', 'opp']) {
+              if (rulesState.enabled && rulesState.turnPlayer !== side) continue;
               const board = getZone(side, 'board');
               if (!board?.array) continue;
               for (const card of board.array) processBoardCard(card, side);
@@ -2192,6 +2211,11 @@ if (!isTrainer) {
         document.addEventListener('rules-card-moved', checkBoardCards);
         document.addEventListener('action-processed', checkBoardCards);
       }
+      document.addEventListener('rules-card-moved', () => {
+        if (rulesState.enabled && rulesState.phase !== 'setup' && rulesState.phase !== 'ended') {
+          evaluateAndApplyWinConditions();
+        }
+      });
     };
     
     // ── move gating ──────────────────────────────────────────────────────
