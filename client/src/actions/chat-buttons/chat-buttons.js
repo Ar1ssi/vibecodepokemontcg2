@@ -4020,7 +4020,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     return;
   }
 
-  const stadium = getStadium();
+  const stadium = getStadium() || (getZone(user, 'stadium')?.array?.[0] ? { user, card: getZone(user, 'stadium').array[0] } : null);
   if (!stadium || !stadium.card) {
     appendMessage(user, '⛔ No Stadium is in play.', 'announcement', false);
     return;
@@ -4199,15 +4199,24 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
         appendMessage(user, '⛔ Your deck is empty.', 'announcement', false);
         return;
       }
-      const topCard = deck.array[0];
-      // If it's a Pokémon, put it in hand; otherwise deck unchanged
-      const isPokemon = (topCard.type || '').toLowerCase().includes('pokemon') || (topCard.subtypes || []).some(s => s.toLowerCase() === 'pokemon');
-      if (isPokemon) {
-        moveCardBundle(user, user, 'deck', 'hand', 0, 0, 'move');
-        appendMessage(user, `🔍 ${card.name} searches: found ${topCard.name || 'a Pokémon'} → hand.`, 'announcement', false);
-      } else {
-        appendMessage(user, `🔍 ${card.name} searches: top card was ${topCard.name || 'a card'} (not a Pokémon). Deck unchanged.`, 'announcement', false);
+      let found = -1;
+      for (let i = 0; i < deck.array.length; i++) {
+        await ensureCardData(deck.array[i]);
+        if (matchesStadiumSearch(deck.array[i], action)) {
+          found = i;
+          break;
+        }
       }
+      if (found < 0) {
+        appendMessage(user, `🔍 ${card.name}: no matching card found in deck.`, 'announcement', false);
+        shuffleZone(user, user, 'deck');
+        finishStadiumAction(user, card, emit, { action: 'search', found: false });
+        return;
+      }
+      const foundCard = deck.array[found];
+      moveCardBundle(user, user, 'deck', 'hand', found, false, 'move');
+      appendMessage(user, `🔍 ${card.name} searches: found ${foundCard.name || 'a card'} → hand.`, 'announcement', false);
+      shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search' });
       break;
     }
@@ -4253,7 +4262,69 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       appendMessage(user, `◈ ${card.name}: Your hand is protected while this Stadium is in play.`, 'announcement', false);
       break;
     }
+    case 'damage-reduction': {
+      appendMessage(user, `◈ ${card.name}: Damage reduction (${action.amount} less damage) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'hp-modifier': {
+      const sign = action.amount > 0 ? '+' : '';
+      appendMessage(user, `◈ ${card.name}: HP modifier (${sign}${action.amount} HP) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'evolution-speed': {
+      appendMessage(user, `◈ ${card.name}: Evolution modifier is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'retreat-modifier': {
+      const sign = action.delta > 0 ? '+' : '';
+      appendMessage(user, `◈ ${card.name}: Retreat cost modifier (${sign}${action.delta}) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'bench-damage-on-play': {
+      appendMessage(user, `◈ ${card.name}: Bench damage modifier (${action.amount} damage) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'attack-damage-bonus': {
+      appendMessage(user, `◈ ${card.name}: Attack damage bonus (+${action.amount}) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'status-immunity': {
+      appendMessage(user, `◈ ${card.name}: Special Condition immunity is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'confused-persist': {
+      appendMessage(user, `◈ ${card.name}: Confusion persists through evolution while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'bench-limit': {
+      appendMessage(user, `◈ ${card.name}: Bench limit modifier (${action.limit} Bench Pokémon) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'cost-modifier': {
+      appendMessage(user, `◈ ${card.name}: Attack cost discount (-${action.amount}) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'tool-negation': {
+      appendMessage(user, `◈ ${card.name}: Pokémon Tools have no effect while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'ability-negation': {
+      appendMessage(user, `◈ ${card.name}: Abilities are suppressed while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'checkup-poison': {
+      appendMessage(user, `◈ ${card.name}: Extra Poison damage during Checkup is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'attack-cost-increase': {
+      appendMessage(user, `◈ ${card.name}: Attack cost increase (+${action.amount}) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
     default:
-      appendMessage(user, `⚠️ ${card.name || 'Stadium'}: unrecognized effect "${action.action}".`, 'announcement', false);
+      if (result.family === 'continuous-both' || result.family === 'opponent-affected') {
+        appendMessage(user, `◈ ${card.name}: This Stadium's continuous effect is active.`, 'announcement', false);
+      } else {
+        appendMessage(user, `⚠️ ${card.name || 'Stadium'}: unrecognized effect "${action.action}".`, 'announcement', false);
+      }
   }
 };

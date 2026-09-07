@@ -197,7 +197,7 @@ export const dragEnd = (event) => {
     document.getElementById('stadium').style.zIndex = mouseClick.playContainer
       .parentElement
       ? '-1'
-      : '0'; //crucial line to bring stadium z-index back to 0 if the pokemon is completely put out of play
+      : '3'; //crucial line to bring stadium z-index back to 3 if the pokemon is completely put out of play
     mouseClick.playContainer = false;
     mouseClick.playContainerParent = false;
   }

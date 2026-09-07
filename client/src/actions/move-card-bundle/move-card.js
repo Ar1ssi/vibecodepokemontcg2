@@ -11,7 +11,7 @@ import { updateCount } from '../general/count.js';
 import { hideCard, revealCard } from '../general/reveal-and-hide.js';
 import { sort } from '../zones/general.js';
 import { attachCard } from './attach-card.js';
-import { hydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { autoMoveActiveBenchCard } from './auto-move-active-bench-card.js';
 import { decreaseCardLayer } from './decrease-card-layer.js';
 import { evolveCard } from './evolve-card.js';
@@ -217,33 +217,35 @@ export const moveCard = async (
   // hand → stadium is the play path (board drops are redirected above).
   // discardStadiumCardFromField() clears the displaced card before the
   // splice; updateStadiumCard() (below) is a safety net + orients the slot.
-  if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'stadium') {
+  if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'stadium') {
     await ensureCardData(movingCard);
     if (isStadiumCard(movingCard)) {
       const displaced = markStadiumPlayed(user, movingCard);
-      if (displaced?.card) {
-        appendMessage(
-          user,
-          `${movingCard.name} is placed on the field; ${displaced.card.name} goes to discard.`,
-          'announcement',
-          false
-        );
-        await discardStadiumCardFromField(displaced.user, displaced.card, initiator);
-        if (parseStadiumBenchLimit(displaced.card)) {
-          await enforceBenchLimit(user);
-          await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
+      if (!syncReplay) {
+        if (displaced?.card) {
+          appendMessage(
+            user,
+            `${movingCard.name} is placed on the field; ${displaced.card.name} goes to discard.`,
+            'announcement',
+            false
+          );
+          await discardStadiumCardFromField(displaced.user, displaced.card, initiator);
+          if (parseStadiumBenchLimit(displaced.card)) {
+            await enforceBenchLimit(user);
+            await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
+          }
         }
-      }
-      appendMessage(user, describeStadiumEffect(movingCard), 'announcement', false);
-      const drawN = parseStadiumSetupDraw(movingCard);
-      if (drawN && classifyStadiumEffect(movingCard) === 'setup-once') {
-        draw(user, user, drawN, true);
-        appendMessage(
-          user,
-          `◈ ${movingCard.name}: Drew ${drawN} card(s) (when-you-play effect).`,
-          'announcement',
-          false
-        );
+        appendMessage(user, describeStadiumEffect(movingCard), 'announcement', false);
+        const drawN = parseStadiumSetupDraw(movingCard);
+        if (drawN && classifyStadiumEffect(movingCard) === 'setup-once') {
+          draw(user, user, drawN, true);
+          appendMessage(
+            user,
+            `◈ ${movingCard.name}: Drew ${drawN} card(s) (when-you-play effect).`,
+            'announcement',
+            false
+          );
+        }
       }
     }
   }
@@ -510,6 +512,7 @@ export const moveCard = async (
       const flightOrigin = handFlight
         ? originRectForHandFlight(user, oZoneId, movingCard)
         : null;
+      if (dZoneId === 'stadium') unhydrateHolo(movingCard);
       dZone.element.appendChild(movingCard.image);
       if (['hand', 'prizes', 'discard', 'lostZone'].includes(dZoneId)) hydrateHolo(movingCard);
       if (
