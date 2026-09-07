@@ -494,25 +494,25 @@ to agree afterwards via relayed indices.
 
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Empty deck: draw with 0 cards | Command rejected `deck_empty`; deck-out loss checked at turn start per rules | [ ] |
-| 2 | Malformed command (unknown `type`, missing `payload`) | `cmdRejected` `bad_command`; state untouched, `stateVersion` unchanged | [ ] |
-| 3 | `instanceId` not in claimed zone (stale client view) | `cmdRejected` `stale_view`; server re-sends current view; client self-heals | [ ] |
-| 4 | Same command sent twice (double-click, retry) | `clientSeq` dedupe per player; second is a no-op returning the same `stateVersion` | [ ] |
+| 1 | Empty deck: draw with 0 cards | Command rejected `deck_empty`; deck-out loss checked at turn start per rules | [x] covered: shared/engine/__tests__/reduce.test.mjs |
+| 2 | Malformed command (unknown `type`, missing `payload`) | `cmdRejected` `bad_command`; state untouched, `stateVersion` unchanged | [x] covered: shared/engine/__tests__/commands.test.mjs, reduce.test.mjs |
+| 3 | `instanceId` not in claimed zone (stale client view) | `cmdRejected` `stale_view`; server re-sends current view; client self-heals | [x] covered: shared/engine/__tests__/reduce.test.mjs |
+| 4 | Same command sent twice (double-click, retry) | `clientSeq` dedupe per player; second is a no-op returning the same `stateVersion` | [x] covered: server/game/__tests__/room.test.mjs |
 | 5 | Both players send a command in the same tick | Server applies in arrival order; the non-turn player's command fails `canPerformAction` | [ ] |
 | 6 | Client disconnects mid-choice | Choice stays pending; game blocks; on `requestView` the choice is re-sent verbatim | [ ] |
 | 7 | Server crash / restart | In-memory game lost by design (decision 9). Both clients get `gameEnded` `server_restart` and return to the room screen cleanly — no half-dead board, no silent hang | [ ] |
 | 8 | `view` arrives out of order / duplicated | `stateVersion <= lastRendered` ignored; snapshot semantics make this safe | [ ] |
-| 9 | Bench full (5) / max prizes / hand size 0 | Rejected with a specific reason; boundary tests at 0, 1, max, max+1 | [ ] |
+| 9 | Bench full (5) / max prizes / hand size 0 | Rejected with a specific reason; boundary tests at 0, 1, max, max+1 | [x] covered: shared/engine/__tests__/reduce.test.mjs (bench full) |
 | 10 | Attachment target removed by a prior command in the same effect | Executor re-resolves targets from live state each step; unresolvable step is skipped and announced | [ ] |
 | 11 | Choice resolved by the wrong player | Rejected `not_your_choice`; no state change | [ ] |
 | 12 | Choice `selection` violates `min`/`max` or contains ids not in `options` | Rejected `invalid_selection`; choice remains pending | [ ] |
-| 13 | Spectator sends a command | Rejected `spectator_readonly` | [ ] |
+| 13 | Spectator sends a command | Rejected `spectator_readonly` | [x] covered: server/game/__tests__/room.test.mjs |
 | 14 | Third player joins a full room | Existing `roomReject` preserved | [ ] |
 | 15 | Effect loops (recursive ability chains) | Step budget per command (e.g. 200); exceeding aborts the effect, logs, announces — no infinite server loop | [ ] |
 | 16 | TCGdex `fetch` for card data fails/times out | Card DB preloaded and cached server-side at game start; a failed lookup degrades to decklist data, never blocks a command | [ ] |
 | 17 | Legacy client connects to new server (or vice versa) | Protocol version in `joinGame`; mismatch → explicit "reload the page" message, not a silent desync | [ ] |
 | 18 | Solo (single-player) mode | Runs the same engine in-process client-side; must not regress | [ ] |
-| 19 | Sandbox mode (`rulesEnabled === false`) | Reference checks still enforced, legality skipped; free movement works and both clients stay identical (H6) | [ ] |
+| 19 | Sandbox mode (`rulesEnabled === false`) | Reference checks still enforced, legality skipped; free movement works and both clients stay identical (H6) | [x] covered: shared/engine/__tests__/reduce.test.mjs |
 | 20 | Duplicate card names in one zone | `instanceId` disambiguates; no name-based lookup anywhere in the engine (H2) | [x] covered: shared/engine/__tests__/state.test.mjs |
 
 ## Test plan
@@ -682,3 +682,4 @@ depends on it.
 
 - **Slice 1**: Moved `client/src/setup/shared/legacy-set-ids.mjs` and its test to `shared/engine/rules/legacy-set-ids.mjs`. `rules-state.mjs` was importing this table via `../shared/legacy-set-ids.mjs`; relocating it into `shared/engine/rules/` ensures `shared/engine/` maintains zero imports from `client/`, upholding Invariant 8.
 - **Slice 2**: Replaced legacy `rng = Math.random` default parameter in `shared/engine/rules/status.mjs` with deterministic `() => 0.5` fallback, ensuring Invariant 6 (no `Math.random` in `shared/engine/`) is strictly enforced mechanically without regressions to existing callers.
+- **Slice 3**: Defined `undo` architectural disposition as deterministic rewind via replaying `commandLog` minus tail from initial `seed`. Full catalog of all 59 legacy actions exported in `shared/engine/commands.mjs:DISPOSITION_TABLE`.
