@@ -11,7 +11,7 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
-import { ShadowSession } from './game/shadow.mjs';
+import { ShadowSession, initializePlayerDeck } from './game/shadow.mjs';
 
 const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE?.trim() === '1' ||
@@ -564,6 +564,27 @@ async function main() {
             }
           }
         }
+
+        if (SERVER_AUTHORITATIVE && data) {
+          const roomId =
+            data.roomId || [...socket.rooms].find((r) => r !== socket.id);
+          const gameRoom = gameRooms.get(roomId);
+          if (gameRoom && event === 'pushAction') {
+            const playerId = gameRoom.socketToPlayer.get(socket.id);
+            if (
+              playerId &&
+              (data.action === 'exchangeData' || data.action === 'loadDeckData')
+            ) {
+              const deckData =
+                data.action === 'exchangeData'
+                  ? data.parameters?.[2]
+                  : data.parameters?.[1];
+              if (Array.isArray(deckData)) {
+                initializePlayerDeck(gameRoom.state, playerId, deckData);
+              }
+            }
+          }
+        }
       });
     }
 
@@ -594,6 +615,40 @@ async function main() {
             view: result.view,
             events: [],
             pendingChoice: null,
+          });
+        } else {
+          for (const broadcast of result.broadcasts || []) {
+            io.to(broadcast.socketId).emit('view', {
+              gameId: gameRoom.roomId,
+              stateVersion: result.stateVersion,
+              view: broadcast.view,
+              events: result.events,
+              pendingChoice: result.pendingChoice,
+            });
+          }
+        }
+      });
+
+      socket.on('resolveChoice', (data) => {
+        const roomId =
+          data?.roomId ||
+          data?.gameId ||
+          [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (!gameRoom) {
+          socket.emit('cmdRejected', {
+            clientSeq: data?.clientSeq,
+            reason: 'room_not_found',
+          });
+          return;
+        }
+
+        const result = gameRoom.resolveChoice(socket.id, data, data?.clientSeq);
+        if (!result.success) {
+          socket.emit('cmdRejected', {
+            clientSeq: data?.clientSeq,
+            reason: result.error,
+            details: result.reason,
           });
         } else {
           for (const broadcast of result.broadcasts || []) {
