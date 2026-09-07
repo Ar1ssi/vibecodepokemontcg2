@@ -39,15 +39,25 @@
     }
 
     // How many prizes does knocking out this card award?
-    // Mega (including Mega ex) = 3; VMAX = 3; ex / Double Rare = 2;
-    // V / VSTAR = 2; standard = 1. (GX doesn't award prizes — see `koOutcome`.)
+    // Mega (including Mega ex) = 3; VMAX = 3; ex / GX / Double Rare = 2;
+    // V / VSTAR = 2; standard = 1. (GX matchLoss handled in `koOutcome`.)
     export function prizesForKO(card = {}) {
       const rarity = String(card.rarity || '').toLowerCase();
       const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(s => String(s).toLowerCase()) : [];
-      if (isMegaCard(card) || subtypes.includes('vmax')) return 3;
-      if (isExCard(card) || rarity.includes('double rare')) return 2;
-      if (subtypes.includes('vstar') || subtypes.includes('v')) return 2;
+      const name = String(card.name || '').toLowerCase().trim();
+      const isVmax = subtypes.includes('vmax') || /(?:^|\s)vmax$/i.test(name);
+      const isVstar = subtypes.includes('vstar') || /(?:^|\s)vstar$/i.test(name);
+      const isV = subtypes.includes('v') || /(?:^|\s)v$/i.test(name);
+      if (isMegaCard(card) || isVmax) return 3;
+      if (isExCard(card) || isGxCard(card) || rarity.includes('double rare')) return 2;
+      if (isVstar || isV) return 2;
       return 1;
+    }
+
+    // A simple check for rule box pokemon is if they give more than 1 prize card.
+    export function cardHasRuleBox(card = {}) {
+      if (!card) return false;
+      return prizesForKO(card) > 1;
     }
 
     // Special KO outcome for a card, per official rules.

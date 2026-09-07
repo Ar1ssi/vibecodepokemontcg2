@@ -274,6 +274,14 @@ export function parseSearchDeckParams(lower) {
     const evoMatch = lower.match(/search your deck for (?:an?|up to\s+(\d+))\s+evolution pok[ée]mon/i);
     what = 'Evolution Pokémon';
     if (evoMatch && evoMatch[1]) count = Number(evoMatch[1]);
+  } else if (
+    /pok[ée]mon (?:that (?:doesn't|does not|don't|do not) have a rule box|without a rule box)/i.test(lower) ||
+    (/(?:doesn't|does not|don't|do not) have a rule box|without a rule box/i.test(lower) && /pok[ée]mon/i.test(lower))
+  ) {
+    const isBasic = /\bbasic\b/i.test(lower);
+    what = isBasic ? 'Basic Pokémon without a Rule Box' : 'Pokémon without a Rule Box';
+    const m = lower.match(/up to\s+(\d+)/);
+    if (m) count = Number(m[1]);
   }
   else if (lower.includes('supporter card')) what = 'Supporter';
   else if (lower.includes('trainer card')) what = 'Trainer';
@@ -495,10 +503,16 @@ export function parseTrainerEffect(text = '') {
     return { steps, recognizable: true };
   }
 
-  // recursion from discard (Night Stretcher)
+  // recursion from discard (Night Stretcher, Lana's Aid)
   if (lower.includes('from your discard pile into your hand')) {
     let what = 'card';
     if (lower.includes('pokémon or a basic energy')) what = 'Pokémon or Basic Energy';
+    else if (
+      (lower.includes("doesn't have a rule box") || lower.includes("don't have a rule box") || lower.includes('without a rule box')) &&
+      lower.includes('basic energy')
+    ) {
+      what = 'Pokémon without a Rule Box or Basic Energy';
+    }
     steps.push({ type: 'recursion', what, from: 'discard' });
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
