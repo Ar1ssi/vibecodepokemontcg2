@@ -595,7 +595,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           msg(`  cost paid: discarded ${selected.map((s) => s.name).join(', ')}`);
           runAt(idx + 1);
         },
-        onCancel: () => msg('  cost not paid — effect canceled'),
+        onCancel: () => {
+          msg('  cost not paid — effect canceled');
+          onComplete?.();
+        },
       });
       return;
     }
@@ -608,7 +611,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           runAt(idx + 1);
           return;
         }
-        runTrainerSteps(card, branch, 0, () => runAt(idx + 1));
+        runTrainerSteps(card, branch, 0, () => runAt(idx + 1), _effectOwner);
       });
       return;
     }
@@ -714,7 +717,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               msg(`  put ${picks.length} on bottom`);
               runAt(idx + 1);
             },
-            onCancel: () => msg('  canceled'),
+            onCancel: () => {
+              msg('  canceled');
+              onComplete?.();
+            },
           });
           return;
         }

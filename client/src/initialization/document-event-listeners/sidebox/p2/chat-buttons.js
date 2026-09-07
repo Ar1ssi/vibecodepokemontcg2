@@ -5,37 +5,39 @@ import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
 
 export const initializeP2ChatButtons = () => {
+  const getP2User = () => (systemState.isTwoPlayer ? systemState.initiator : 'opp');
+
   const p2AttackButton = document.getElementById('p2AttackButton');
-  p2AttackButton.addEventListener('click', () => attack(systemState.initiator));
+  p2AttackButton.addEventListener('click', () => attack(getP2User()));
 
   const p2RetreatButton = document.getElementById('p2RetreatButton');
-  p2RetreatButton.addEventListener('click', () => retreat(systemState.initiator));
+  p2RetreatButton.addEventListener('click', () => retreat(getP2User()));
 
   const p2HealButton = document.getElementById('p2HealButton');
-  p2HealButton.addEventListener('click', () => healAbility(systemState.initiator));
+  p2HealButton.addEventListener('click', () => healAbility(getP2User()));
 
   const p2SwitchButton = document.getElementById('p2SwitchButton');
-  p2SwitchButton.addEventListener('click', () => switchAbility(systemState.initiator));
+  p2SwitchButton.addEventListener('click', () => switchAbility(getP2User()));
 
   const p2AttachButton = document.getElementById('p2AttachButton');
-  p2AttachButton.addEventListener('click', () => attachAbility(systemState.initiator));
+  p2AttachButton.addEventListener('click', () => attachAbility(getP2User()));
 
   const p2SearchButton = document.getElementById('p2SearchButton');
-  p2SearchButton.addEventListener('click', () => searchAbility(systemState.initiator));
+  p2SearchButton.addEventListener('click', () => searchAbility(getP2User()));
 
   const p2AbilityButton = document.getElementById('p2AbilityButton');
-  p2AbilityButton.addEventListener('click', () => abilityPicker(systemState.initiator));
+  p2AbilityButton.addEventListener('click', () => abilityPicker(getP2User()));
 
   const p2StadiumButton = document.getElementById('p2StadiumButton');
-  p2StadiumButton.addEventListener('click', () => stadiumEffect(systemState.initiator));
+  p2StadiumButton.addEventListener('click', () => stadiumEffect(getP2User()));
 
   const p2EnergyRedirectButton = document.getElementById('p2EnergyRedirectButton');
   p2EnergyRedirectButton.addEventListener('click', () =>
-    energyRedirectAbility(systemState.initiator)
+    energyRedirectAbility(getP2User())
   );
 
   const p2PassButton = document.getElementById('p2PassButton');
-  p2PassButton.addEventListener('click', () => pass(systemState.initiator));
+  p2PassButton.addEventListener('click', () => pass(getP2User()));
 
   const p2MessageInput = document.getElementById('p2MessageInput');
   p2MessageInput.addEventListener('keydown', (event) => {

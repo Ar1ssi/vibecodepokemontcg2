@@ -39,6 +39,8 @@
       // Survives resetTurnFlags: a second endTurn on the same turn used to
       // clear drewThisTurn and let hookTurnStartDraw deal another card.
       lastAutoDrawTurn: { self: 0, opp: 0 },
+      // Count of turns each player has taken in the current match.
+      playerTurnCount: { self: 0, opp: 0 },
     };
     
     // ── card data enrichment: type chart data from TCGdex card details ──
@@ -387,6 +389,7 @@
       rulesState.attackExecuting = false;
       rulesState.pendingEffects = { self: [], opp: [] };
       rulesState.lastAutoDrawTurn = { self: 0, opp: 0 };
+      rulesState.playerTurnCount = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -402,6 +405,7 @@
       rulesState.mulligansResolved = false;
       rulesState.pendingEffects = { self: [], opp: [] };
       rulesState.lastAutoDrawTurn = { self: 0, opp: 0 };
+      rulesState.playerTurnCount = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
     }
@@ -409,6 +413,10 @@
     export function beginTurn(player) {
       rulesState.turnPlayer = player;
       rulesState.turnNumber += 1;
+      if (!rulesState.playerTurnCount) {
+        rulesState.playerTurnCount = { self: 0, opp: 0 };
+      }
+      rulesState.playerTurnCount[player] = (rulesState.playerTurnCount[player] || 0) + 1;
       rulesState.phase = 'main';
       resetTurnFlags(player);
       activatePendingEffectsForTurn(rulesState, player);
@@ -425,6 +433,10 @@
       const next = player === 'self' ? 'opp' : 'self';
       rulesState.turnPlayer = next;
       rulesState.turnNumber += 1;
+      if (!rulesState.playerTurnCount) {
+        rulesState.playerTurnCount = { self: 0, opp: 0 };
+      }
+      rulesState.playerTurnCount[next] = (rulesState.playerTurnCount[next] || 0) + 1;
       rulesState.phase = 'main';
       resetTurnFlags(next);
       activatePendingEffectsForTurn(rulesState, next);
@@ -649,7 +661,7 @@
     
         case 'evolve':
           if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
-          if (S.turnNumber <= 1) {
+          if (S.turnNumber <= 1 || (S.playerTurnCount && S.playerTurnCount[user] <= 1)) {
             return { allowed: false, reason: "Can't evolve on the first turn." };
           }
           if (pendingCantEvolveFromHand(S, user)) {
