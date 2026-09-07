@@ -1,3 +1,4 @@
+import { systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { cardBackSrcForUser, cardNode } from '../../setup/deck-constructor/hydrate-holo.js';
 import {
@@ -162,6 +163,9 @@ export const cancelPrizeTake = () => {
 // TCG Live prize pick: every remaining prize flies up sleeve-forward.
 // The player clicks as many as they earned; the rest drop back.
 export const promptPrizeTake = (user, count) => {
+  if (systemState.isTwoPlayer && user !== 'self') {
+    return Promise.resolve(0);
+  }
   cancelPrizeTake();
   const zone = getZone(user, 'prizes');
   const needed = Math.min(Math.max(0, count), zone.getCount());

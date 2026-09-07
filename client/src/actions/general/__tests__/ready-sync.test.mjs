@@ -114,3 +114,37 @@ test('rules setup order: prizes before coin flip before hands', () => {
   }
   assert.deepEqual(steps, ['prizes', 'coinFlip', 'hands']);
 });
+
+// Mirrors _takePrizesWithPicker and promptPrizeTake ownership gating in multiplayer.
+function shouldPromptPrizeTake({ isTwoPlayer, user }) {
+  if (isTwoPlayer && user !== 'self') {
+    return false;
+  }
+  return true;
+}
+
+test('prize picker contract: remote opponent KO does NOT prompt local player in 2P mode', () => {
+  assert.equal(
+    shouldPromptPrizeTake({ isTwoPlayer: true, user: 'opp' }),
+    false
+  );
+});
+
+test('prize picker contract: local player KO prompts local player in 2P mode', () => {
+  assert.equal(
+    shouldPromptPrizeTake({ isTwoPlayer: true, user: 'self' }),
+    true
+  );
+});
+
+test('prize picker contract: solo mode prompts for both players on shared board', () => {
+  assert.equal(
+    shouldPromptPrizeTake({ isTwoPlayer: false, user: 'self' }),
+    true
+  );
+  assert.equal(
+    shouldPromptPrizeTake({ isTwoPlayer: false, user: 'opp' }),
+    true
+  );
+});
+

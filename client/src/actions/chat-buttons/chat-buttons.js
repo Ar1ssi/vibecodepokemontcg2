@@ -2721,6 +2721,11 @@ function _pickFromList(title, items) {
 // TCG Live prize pick: remaining prizes fly up sleeve-forward. The
 // player clicks as many as they earned; those fly into the hand.
 async function _takePrizesWithPicker(user, count) {
+  if (systemState.isTwoPlayer && user !== 'self') {
+    // In multiplayer, the remote player picks their own prizes on their client.
+    // Their choice will arrive as a 'takePrizesByIndex' action over the socket.
+    return;
+  }
   if (getZone(user, 'prizes').getCount() === 0) {
     takePrizes(user, user, count);
     return;
