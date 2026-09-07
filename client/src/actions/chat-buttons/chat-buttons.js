@@ -49,7 +49,7 @@ import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion, koOutcome } from '../../setup/rules/ko-flow.mjs';
-import { markRetreated } from '../../setup/rules/retreat.mjs';
+import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '../../setup/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
@@ -2115,7 +2115,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
   }
 };
 
-export const retreat = (user, emit = true) => {
+export const retreat = async (user, emit = true) => {
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'retreat', []);
     return;
@@ -2143,14 +2143,17 @@ export const retreat = (user, emit = true) => {
     // Only Paralyzed blocks retreating. Retreating also clears Confused.
     const activeZone = getZone(user, 'active');
     const active = getActivePokemonCard(activeZone);
-    let activeKey = null;
-    if (active) {
-      activeKey = active.image?.dataset?.cardId || active.name;
-      const gate = statusAllowsRetreat(user, activeKey);
-      if (!gate.can) {
-        appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
-        return;
-      }
+    if (!active) {
+      appendMessage(user, '⛔ No active Pokémon to retreat.', 'announcement', false);
+      return;
+    }
+    await ensureCardData(active);
+
+    let activeKey = active.image?.dataset?.cardId || active.name;
+    const gate = statusAllowsRetreat(user, activeKey);
+    if (!gate.can) {
+      appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
+      return;
     }
 
     // Must have at least one bench card to retreat to
@@ -2160,11 +2163,15 @@ export const retreat = (user, emit = true) => {
       return;
     }
 
+    // Attached energies check
+    const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
+    for (const e of attachedEnergies) {
+      await ensureCardData(e);
+    }
+
     // Switching Energy (taxonomy §F, family 3): a free switch — skip the
     // retreat-cost energy-discard step when the active has one attached.
-    const activeZoneForCheck = getZone(user, 'active');
-    const hasRedirectEnergy =
-      active && pokemonHasRedirectEnergy(active, activeZoneForCheck.array);
+    const hasRedirectEnergy = pokemonHasRedirectEnergy(active, activeZone.array);
     if (hasRedirectEnergy) {
       appendMessage(
         user,
@@ -2175,23 +2182,18 @@ export const retreat = (user, emit = true) => {
     }
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
-    const baseRetreatCost = active?.retreatCost ?? 0;
-    const activeZoneForRetreat = getZone(user, 'active');
-    let retreatCost = rulesState.enabled
-      ? getStadiumRetreatCost(baseRetreatCost, active, user)
-      : baseRetreatCost;
-    if (rulesState.enabled) {
-      retreatCost = combinedToolRetreatCost(
-        retreatCost,
-        active,
-        activeZoneForRetreat.array,
-        { blockTools: stadiumBlocksToolEffects() }
-      );
-      retreatCost += pendingRetreatCostDelta(rulesState, user);
-    }
+    const retreatCost = getEffectiveRetreatCost(active, user, activeZone.array);
+
     if (retreatCost > 0 && !hasRedirectEnergy) {
-      const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
-      if (attachedEnergies.length < retreatCost) {
+      const energyTypes = [];
+      for (const e of attachedEnergies) {
+        const type = e.types?.[0] || 'Colorless';
+        const family = classifyEnergyEffect(e);
+        const override = effectiveEnergyType(e);
+        energyTypes.push({ type: override || type, family });
+      }
+      const costSymbols = new Array(retreatCost).fill('Colorless');
+      if (!canPayAttackCost(energyTypes, costSymbols)) {
         appendMessage(
           user,
           `⛔ Not enough energy to retreat (need ${retreatCost}).`,
@@ -2200,21 +2202,32 @@ export const retreat = (user, emit = true) => {
         );
         return;
       }
-      // Discard the required number of energies
-      for (let i = 0; i < retreatCost; i++) {
+
+      // Determine which cards to discard to pay retreatCost
+      const toDiscard = energiesToDiscardForRetreat(attachedEnergies, retreatCost);
+      for (const cardToDiscard of toDiscard) {
         const z = getZone(user, 'active');
-        const idx = z.array.findIndex(
-          (c) =>
-            c.type === 'Energy' && c.image?.relative === active.image
-        );
-        if (idx === -1) break;
-        moveCard(user, user, 'active', 'discard', idx);
+        const idx = z.array.indexOf(cardToDiscard);
+        if (idx !== -1) {
+          await moveCard(user, user, 'active', 'discard', idx);
+        }
       }
+      appendMessage(
+        user,
+        `Discarded ${toDiscard.length} Energy card${toDiscard.length === 1 ? '' : 's'} to pay retreat cost (${retreatCost}).`,
+        'announcement',
+        false
+      );
     }
 
-    // Swap: active → bench, first bench → active
-    moveCard(user, user, 'active', 'bench', 0);
-    moveCard(user, user, 'bench', 'active', 0);
+    // Swap: active → bench, first bench Pokémon → active
+    const activeIdx = activeZone.array.indexOf(active);
+    await moveCard(user, user, 'active', 'bench', activeIdx !== -1 ? activeIdx : 0);
+
+    const updatedBench = getZone(user, 'bench');
+    const benchPokemon = updatedBench.array.find(isBoardPokemon);
+    const benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
+    await moveCard(user, user, 'bench', 'active', benchIdx !== -1 ? benchIdx : 0);
 
     markRetreated(user);
     // Retreating clears Confused (and other statuses) on the old active.

@@ -333,7 +333,7 @@
           types: detail.types || [],
           weakness: parseTypeValue(detail.weaknesses?.[0]),
           resistance: parseTypeValue(detail.resistances?.[0]),
-          retreatCost: detail.retreat ? detail.retreat.length : 0,
+          retreatCost: parseRetreatCost(detail),
           attacks: mapDetailAttacks(detail.attacks),
           stage: detail.stage || null,
           evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
@@ -353,6 +353,17 @@
       return card;
     }
     
+    export const parseRetreatCost = (detail) => {
+      if (!detail) return 0;
+      if (typeof detail.retreat === 'number') return detail.retreat;
+      if (Array.isArray(detail.retreat)) return detail.retreat.length;
+      if (typeof detail.convertedRetreatCost === 'number') return detail.convertedRetreatCost;
+      if (Array.isArray(detail.retreatCost)) return detail.retreatCost.length;
+      if (typeof detail.retreatCost === 'number') return detail.retreatCost;
+      const n = Number(detail.retreat);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
+
     const parseTypeValue = (wr) => {
       if (!wr) return null;
       return { type: wr.type, value: Number(String(wr.value).replace(/[^0-9-]/g, '')) || 0 };
@@ -661,6 +672,9 @@
     
         case 'retreat':
           if (!isYourTurn) return { allowed: false, reason: "It's not your turn." };
+          if (S.flags[user]?.retreatedThisTurn) {
+            return { allowed: false, reason: 'Already retreated this turn.' };
+          }
           if (S.flags[user]?.attackerAttacked) {
             return { allowed: false, reason: "Can't retreat after attacking." };
           }
