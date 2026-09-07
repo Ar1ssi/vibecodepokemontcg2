@@ -26,6 +26,11 @@ Pulled from code this session (PROJECT.md is unfilled — bootstrap has not run)
   browser (via URL) and Node (via fs path) with no build step and no bare specifiers.
 - **Single Node process, free tier.** One `web` service in `render.yaml`; no Redis, no horizontal
   scaling. Game state lives in process memory.
+- **Small scale, mostly private use.** A handful of concurrent games at most, players known to each
+  other. Losing in-progress games on a server restart is acceptable (confirmed S1). This is a
+  standing licence to prefer the simple mechanism: no durable game log, no clustering, no auth,
+  no rate limiting, no anti-cheat hardening. View redaction is kept because it fixes a real
+  gameplay bug, not because an adversary is assumed.
 - **Socket.IO 4.7.4 both ends** — server dep and the CDN tag in `index.ejs:19` must stay in step.
 - **Existing pure tests must keep passing.** `package.json` runs `node --test` over 41 `.mjs` test
   files with no jsdom; the pure engine modules are already headless.
@@ -100,6 +105,8 @@ Each line becomes a DECISIONS.md entry at close.
 | 6 | Effect choices suspend server-side as a `PendingChoice` | Serializes choice resolution across both clients by construction; `planAbilitySteps()` supplies the resume point |
 | 7 | Card identity is a server-minted `instanceId` | Both clients receive the same ids by construction, retiring `syncInstance` and the hint machinery built to compensate for it |
 | 8 | One seeded PRNG per game, server-side, recorded | `(seed, commandLog)` replays a game exactly — the regression net this architecture currently cannot have |
+| 9 | Game state is in-memory only; a restart ends live games | Accepted by the user at this scale; buys us no persistence layer, no crash-recovery path, no rehydration bugs |
+| 10 | No optimistic animation in v1 — an in-flight affordance instead | One round trip is imperceptible on a private server; a pending style on the card communicates responsiveness for a fraction of the complexity |
 
 ### Topology
 
@@ -240,6 +247,12 @@ UI handlers stop mutating zone arrays and instead emit `cmd`. The rules engine s
 client-side only for *affordance hints* (grey out an illegal button before the round trip); the
 server re-validates everything and the client's opinion is never authoritative.
 
+**In-flight affordance.** The instant a command is emitted, the originating element gets a
+`.cmd-pending` class (subtle lift and reduced opacity) and input on it is ignored. The class clears
+when the next `view` lands or `cmdRejected` arrives. The card does not move until the server says
+where it went, so there is no speculative position to reconcile and no snap-back. This is the whole
+of the responsiveness story in v1; see Deferred for the case that would justify more.
+
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 
 | # | Case | Expected behavior | Covered by |
@@ -250,7 +263,7 @@ server re-validates everything and the client's opinion is never authoritative.
 | 4 | Same command sent twice (double-click, retry) | `clientSeq` dedupe per player; second is a no-op returning the same `stateVersion` | [ ] |
 | 5 | Both players send a command in the same tick | Server applies in arrival order; the non-turn player's command fails `canPerformAction` | [ ] |
 | 6 | Client disconnects mid-choice | Choice stays pending; game blocks; on `requestView` the choice is re-sent verbatim | [ ] |
-| 7 | Server crash | In-memory game lost. v1: game over, both clients see `gameEnded` `server_restart`. Durable log deferred — see Migration | [ ] |
+| 7 | Server crash / restart | In-memory game lost by design (decision 9). Both clients get `gameEnded` `server_restart` and return to the room screen cleanly — no half-dead board, no silent hang | [ ] |
 | 8 | `view` arrives out of order / duplicated | `stateVersion <= lastRendered` ignored; snapshot semantics make this safe | [ ] |
 | 9 | Bench full (5) / max prizes / hand size 0 | Rejected with a specific reason; boundary tests at 0, 1, max, max+1 | [ ] |
 | 10 | Attachment target removed by a prior command in the same effect | Executor re-resolves targets from live state each step; unresolvable step is skipped and announced | [ ] |
@@ -312,8 +325,16 @@ return and happens only after Phase 3 has been stable in production.
 is repointed at the server view. Spectators become read-only `view` subscribers, which is simpler
 than today's `spectatorActionData` designation dance.
 
-**Deferred.** Durable game log for crash recovery (edge case 7), and optimistic animation. Both are
-additive once authority is in one place.
+**Out of scope.** Durable game log, crash recovery, clustering, auth, rate limiting, anti-cheat
+hardening — all ruled out by the scale constraint. Do not add them back without a new decision.
+
+**Deferred, with a trigger.** Optimistic animation — moving the card locally the moment you release
+it, while the command is in flight, then reconciling against the authoritative view. It only becomes
+worth its complexity (double-animation, snap-back on rejection, animations racing an inbound view)
+if the in-flight affordance measurably feels sluggish in real play. The trigger is a measured
+command→view round trip consistently above ~150 ms between the actual players. Below that, don't
+build it. Note it is purely visual either way: it never touches client state, so it stays compatible
+with decision 1.
 
 ## Work plan — slices ≤1 session, each leaving the repo green
 
