@@ -7,6 +7,7 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import { ensureCardData } from '../rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
+import { findDropSlotIndex } from './card-picker-hitbox.mjs';
 
 /** @type {object | null} */
 let pickerState = null;
@@ -423,15 +424,25 @@ const renderSlotCards = (state) => {
   });
 };
 
-const findDropSlotAt = (state, x, y) => {
+export const findDropSlotAt = (state, x, y) => {
   if (!state.slotElements?.length) return -1;
-  for (let i = 0; i < state.slotElements.length; i += 1) {
-    const rect = state.slotElements[i].getBoundingClientRect();
-    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-      return i;
+  const slotRects = state.slotElements.map((el) => el.getBoundingClientRect());
+  const topRowRect = state.topRow?.getBoundingClientRect();
+  const bottomBar =
+    state.bottomBar ?? state.overlay?.querySelector('.card-picker-bottom-bar');
+  const bottomBarRect = bottomBar?.getBoundingClientRect();
+  const playmat = getPlaymatBounds();
+
+  return findDropSlotIndex(
+    slotRects,
+    { x, y },
+    {
+      topLimit: topRowRect ? topRowRect.bottom + 6 : null,
+      bottomLimit: bottomBarRect ? bottomBarRect.top - 6 : null,
+      leftLimit: playmat?.left != null ? playmat.left + 4 : null,
+      rightLimit: playmat?.right != null ? playmat.right - 4 : null,
     }
-  }
-  return -1;
+  );
 };
 
 const assignCardToSlot = (state, card, slotIndex) => {
@@ -1046,6 +1057,17 @@ export const openCardPicker = async ({
       const slot = document.createElement('div');
       slot.className = 'card-picker-drop-slot is-empty';
       slot.dataset.slotIndex = String(i);
+      slot.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (state.slotAssignments[i]) {
+          state.slotAssignments[i] = null;
+          if (!state.multiSelect) state.slotCard = null;
+          updateSelectionUI(state);
+          layoutStack(state);
+        } else {
+          addFocusedCardToSlot(state, i);
+        }
+      });
       slotRow.appendChild(slot);
       slotElements.push(slot);
     }
@@ -1104,6 +1126,7 @@ export const openCardPicker = async ({
     slotCard: null,
     draggingToSlotIndex: null,
     topRow: topRow,
+    bottomBar,
     main,
     onResize: null,
     onKeyDown: null,

@@ -2297,6 +2297,7 @@ ul, li {
   background: rgba(110, 110, 110, 0.45);
   border-radius: 0.35rem;
   pointer-events: auto;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
