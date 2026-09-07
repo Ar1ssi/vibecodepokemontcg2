@@ -147,3 +147,17 @@ export const findDropSlotIndex = (slotRects, { x, y }, bounds = {}) => {
 
   return -1;
 };
+
+/**
+ * Check if a click event should be suppressed because a drag/swipe interaction
+ * completed recently (e.g. mouse release over overlay or slot).
+ *
+ * @param {number | null | undefined} lastDragEndTime Timestamp of drag end
+ * @param {number} [now] Current timestamp (defaults to Date.now())
+ * @param {number} [thresholdMs=400] Suppression window in milliseconds
+ * @returns {boolean}
+ */
+export const shouldSuppressClickAfterDrag = (lastDragEndTime, now = Date.now(), thresholdMs = 400) => {
+  if (!lastDragEndTime) return false;
+  return now - lastDragEndTime < thresholdMs;
+};
