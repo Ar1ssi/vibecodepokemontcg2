@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRng } from '../rng.mjs';
+import { createRng, createRelayedRng } from '../rng.mjs';
 
 test('createRng is deterministic: same seed produces identical sequences', () => {
   const rng1 = createRng(123456);
@@ -83,4 +83,32 @@ test('rng.advance reproduces skipping to the same cursor point', () => {
   const skippedValue = rngSkipped.next();
 
   assert.equal(skippedValue, directValue);
+});
+
+test('createRelayedRng consumes queued shuffle indices when available', () => {
+  const rng = createRelayedRng(100);
+  const cards = ['a', 'b', 'c', 'd'];
+
+  // Queued shuffle
+  rng.queueShuffle([3, 0, 2, 1]);
+  const shuffled = rng.shuffle(cards);
+  assert.deepEqual(shuffled, ['d', 'a', 'c', 'b']);
+
+  // Next shuffle without queue falls back to base PRNG
+  const fallback = rng.shuffle(cards);
+  assert.equal(fallback.length, cards.length);
+  assert.deepEqual([...fallback].sort(), [...cards].sort());
+});
+
+test('createRelayedRng consumes queued coin values', () => {
+  const rng = createRelayedRng(100);
+
+  rng.queueCoin('heads');
+  assert.ok(rng.next() < 0.5); // heads
+
+  rng.queueCoin('tails');
+  assert.ok(rng.next() >= 0.5); // tails
+
+  // Fallback to deterministic PRNG
+  assert.equal(typeof rng.next(), 'number');
 });

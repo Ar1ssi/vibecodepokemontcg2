@@ -11,10 +11,16 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
+import { ShadowSession } from './game/shadow.mjs';
 
 const SERVER_AUTHORITATIVE =
-  process.env.SERVER_AUTHORITATIVE === '1' ||
-  process.env.SERVER_AUTHORITATIVE === 'true';
+  process.env.SERVER_AUTHORITATIVE?.trim() === '1' ||
+  process.env.SERVER_AUTHORITATIVE?.trim() === 'true';
+
+const SHADOW_MODE =
+  process.env.SHADOW_MODE?.trim() === '1' ||
+  process.env.SHADOW_MODE?.trim() === 'true' ||
+  SERVER_AUTHORITATIVE;
 
 // Handle __dirname in ES modules and adjust for client folder
 const __filename = fileURLToPath(import.meta.url);
@@ -81,22 +87,25 @@ async function main() {
   // Create a table to store key-value pairs (with TTL support)
   db.serialize(() => {
     db.run(
-      'CREATE TABLE IF NOT EXISTS KeyValuePairs (key TEXT PRIMARY KEY, value TEXT, created_at TEXT DEFAULT (datetime(\'now\')))'
+      "CREATE TABLE IF NOT EXISTS KeyValuePairs (key TEXT PRIMARY KEY, value TEXT, created_at TEXT DEFAULT (datetime('now')))"
     );
   });
 
   // Evict saved game states older than 30 days (runs once per day)
   const EVICTION_DAYS = 30;
-  setInterval(() => {
-    db.run(
-      `DELETE FROM KeyValuePairs WHERE created_at < datetime('now', '-${EVICTION_DAYS} days')`,
-      (err) => {
-        if (!err) {
-          isDatabaseCapacityReached = false; // Re-enable saves after cleanup
+  setInterval(
+    () => {
+      db.run(
+        `DELETE FROM KeyValuePairs WHERE created_at < datetime('now', '-${EVICTION_DAYS} days')`,
+        (err) => {
+          if (!err) {
+            isDatabaseCapacityReached = false; // Re-enable saves after cleanup
+          }
         }
-      }
-    );
-  }, 1000 * 60 * 60 * 24);
+      );
+    },
+    1000 * 60 * 60 * 24
+  );
 
   // Bcrypt Configuration
   const saltRounds = 10;
@@ -117,10 +126,10 @@ async function main() {
   app.set('views', clientDir);
   app.use(cors());
   // demo: never cache static assets so tunnel visitors always get fresh builds
-      app.use((req, res, next) => {
-        res.setHeader('Cache-Control', 'no-store');
-        next();
-      });
+  app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
 
   const MAT_IMAGE_REMOTE_HOSTS = new Set(['cdn.artofpkm.com']);
 
@@ -186,8 +195,8 @@ async function main() {
     }
   });
 
-      app.use('/shared', express.static(sharedDir));
-      app.use(express.static(clientDir));
+  app.use('/shared', express.static(sharedDir));
+  app.use(express.static(clientDir));
   app.get('/', (_, res) => {
     res.render('index', { importDataJSON: null });
   });
@@ -215,6 +224,28 @@ async function main() {
 
   const roomInfo = new Map();
   const gameRooms = new Map();
+  const shadowSessions = new Map();
+  const completedShadowReports = [];
+
+  app.get('/debug/shadow-report', (req, res) => {
+    const roomId = req.query.roomId;
+    if (roomId) {
+      if (shadowSessions.has(roomId)) {
+        return res.json(shadowSessions.get(roomId).getReport());
+      }
+      const finished = completedShadowReports.find((r) => r.roomId === roomId);
+      if (finished) return res.json(finished);
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    const allReports = [];
+    for (const shadow of shadowSessions.values()) {
+      allReports.push(shadow.getReport());
+    }
+    res.json({
+      activeShadowSessions: shadowSessions.size,
+      reports: [...allReports, ...completedShadowReports],
+    });
+  });
 
   // Function to periodically clean up empty rooms
   const cleanUpEmptyRooms = () => {
@@ -225,8 +256,25 @@ async function main() {
     });
     if (SERVER_AUTHORITATIVE) {
       gameRooms.forEach((room, roomId) => {
-        if (room.playerToSocket.size === 0 && room.spectatorSockets.size === 0) {
+        if (
+          room.playerToSocket.size === 0 &&
+          room.spectatorSockets.size === 0
+        ) {
           gameRooms.delete(roomId);
+        }
+      });
+    }
+    if (SHADOW_MODE) {
+      shadowSessions.forEach((shadow, roomId) => {
+        if (
+          shadow.gameRoom.playerToSocket.size === 0 &&
+          shadow.gameRoom.spectatorSockets.size === 0
+        ) {
+          completedShadowReports.push(shadow.getReport());
+          if (completedShadowReports.length > 50) {
+            completedShadowReports.shift();
+          }
+          shadowSessions.delete(roomId);
         }
       });
     }
@@ -242,6 +290,9 @@ async function main() {
       }
       if (SERVER_AUTHORITATIVE && gameRooms.has(roomId)) {
         gameRooms.get(roomId).removeSocket(socket.id);
+      }
+      if (SHADOW_MODE && shadowSessions.has(roomId)) {
+        shadowSessions.get(roomId).removeSocket(socket.id);
       }
       // Remove the disconnected user from the roomInfo map
       if (roomInfo.has(roomId)) {
@@ -273,14 +324,14 @@ async function main() {
       }
     };
     // rules-engine events: relay to the opponent in the same room
-        socket.on('rulesEvent', (payload) => {
-          const rooms = [...socket.rooms].filter((r) => r !== socket.id);
-          for (const room of rooms) {
-            socket.to(room).emit('rulesEvent', payload);
-          }
-        });
-    
-        socket.on('storeGameState', (exportData) => {
+    socket.on('rulesEvent', (payload) => {
+      const rooms = [...socket.rooms].filter((r) => r !== socket.id);
+      for (const room of rooms) {
+        socket.to(room).emit('rulesEvent', payload);
+      }
+    });
+
+    socket.on('storeGameState', (exportData) => {
       if (isDatabaseCapacityReached) {
         socket.emit(
           'exportGameStateFailed',
@@ -355,6 +406,20 @@ async function main() {
             gameRoom.addPlayer(socket.id, nextPid, username);
           }
         }
+        if (SHADOW_MODE) {
+          let shadow = shadowSessions.get(roomId);
+          if (!shadow) {
+            shadow = new ShadowSession({ roomId });
+            shadowSessions.set(roomId, shadow);
+          }
+          if (isSpectator) {
+            shadow.gameRoom.addSpectator(socket.id);
+          } else {
+            const existingPids = [...shadow.gameRoom.playerToSocket.keys()];
+            const nextPid = existingPids.includes('p1') ? 'p2' : 'p1';
+            shadow.addPlayer(socket.id, nextPid, username);
+          }
+        }
         // Check if the user is a spectator or there are fewer than 2 players
         if (isSpectator) {
           room.spectators.add(username);
@@ -362,7 +427,10 @@ async function main() {
           socket.to(roomId).emit('requestSpectatorData', { roomId });
         } else {
           room.players.add(username);
-          socket.emit('joinGame');
+          socket.emit('joinGame', {
+            serverAuthoritative: SERVER_AUTHORITATIVE,
+            shadowMode: SHADOW_MODE,
+          });
           // Remove any existing disconnect listener to prevent leak on rejoin
           if (socket.data.disconnectListener) {
             socket.removeListener('disconnect', socket.data.disconnectListener);
@@ -408,9 +476,36 @@ async function main() {
           gameRoom.addPlayer(socket.id, existingPid, data.username);
         }
       }
+      if (SHADOW_MODE) {
+        let shadow = shadowSessions.get(data.roomId);
+        if (!shadow) {
+          shadow = new ShadowSession({ roomId: data.roomId });
+          shadowSessions.set(data.roomId, shadow);
+        }
+        if (!data.notSpectator) {
+          shadow.gameRoom.addSpectator(socket.id);
+        } else {
+          let existingPid = null;
+          for (const [pId, pData] of Object.entries(
+            shadow.gameRoom.state.players
+          )) {
+            if (pData.username === data.username) {
+              existingPid = pId;
+              break;
+            }
+          }
+          if (!existingPid) {
+            const existingPids = [...shadow.gameRoom.playerToSocket.keys()];
+            existingPid = existingPids.includes('p1') ? 'p2' : 'p1';
+          }
+          shadow.addPlayer(socket.id, existingPid, data.username);
+        }
+      }
       if (!data.notSpectator) {
         room.spectators.add(data.username);
-        socket.to(data.roomId).emit('requestSpectatorData', { roomId: data.roomId });
+        socket
+          .to(data.roomId)
+          .emit('requestSpectatorData', { roomId: data.roomId });
       } else {
         room.players.add(data.username);
         // Remove any existing disconnect listener to prevent leak on reconnect
@@ -456,14 +551,26 @@ async function main() {
     for (const event of events) {
       socket.on(event, (data) => {
         emitToRoom(event, data);
+
+        if (SHADOW_MODE && data) {
+          const roomId =
+            data.roomId || [...socket.rooms].find((r) => r !== socket.id);
+          const shadow = shadowSessions.get(roomId);
+          if (shadow) {
+            if (event === 'pushAction') {
+              shadow.ingestAction(socket.id, data);
+            } else if (event === 'syncCheck') {
+              shadow.checkSync(socket.id, data);
+            }
+          }
+        }
       });
     }
 
     if (SERVER_AUTHORITATIVE) {
       socket.on('cmd', (cmd) => {
         const roomId =
-          cmd?.roomId ||
-          [...socket.rooms].find((r) => r !== socket.id);
+          cmd?.roomId || [...socket.rooms].find((r) => r !== socket.id);
         const gameRoom = gameRooms.get(roomId);
         if (!gameRoom) {
           socket.emit('cmdRejected', {
@@ -503,8 +610,7 @@ async function main() {
 
       socket.on('requestView', (data) => {
         const roomId =
-          data?.roomId ||
-          [...socket.rooms].find((r) => r !== socket.id);
+          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
         const gameRoom = gameRooms.get(roomId);
         if (gameRoom) {
           const view = gameRoom.getViewForSocket(socket.id);
