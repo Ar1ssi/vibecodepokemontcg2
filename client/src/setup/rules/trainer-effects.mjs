@@ -208,7 +208,34 @@ export function parseSearchDeckParams(lower) {
     };
   }
 
-  // up to N Basic Pokémon → bench WITH an HP cap (trainers e.g. Nest Ball-style)
+  const pkmnHpHand = lower.match(
+    /search your deck for (?:a|an|up to\s+(\d+))\s+pok[ée]mon(?:\s+cards?)?\s+with\s+(\d+)\s+hp\s+or\s+less/
+  );
+  if (pkmnHpHand && (lower.includes('into your hand') || lower.includes('put it into your hand') || lower.includes('put them into your hand'))) {
+    const cnt = pkmnHpHand[1] ? Number(pkmnHpHand[1]) : 1;
+    const hp = pkmnHpHand[2];
+    return {
+      what: `Pokémon ≤${hp} HP`,
+      count: cnt,
+      destination: 'hand',
+      ...(pkmnHpHand[1] ? { upTo: true } : {}),
+      ...(reveal ? { reveal: true } : {}),
+    };
+  }
+
+  // up to N Basic Pokémon → bench WITH an HP cap (Buddy-Buddy Poffin, etc.)
+  const basicHpBench = lower.match(
+    /search your deck for (?:up to\s+)?(\d+)\s+basic pok[ée]mon(?:\s+cards?)?\s+with\s+(\d+)\s+hp\s+or\s+less/
+  );
+  if (basicHpBench && lower.includes('onto your bench')) {
+    return {
+      what: `Basic Pokémon ≤${basicHpBench[2]} HP`,
+      count: Number(basicHpBench[1]),
+      destination: 'bench',
+      upTo: true,
+    };
+  }
+
   if (
     lower.includes('up to 2 basic pokémon') &&
     (lower.includes('70 hp or less') || lower.includes('hp or less'))
@@ -243,6 +270,11 @@ export function parseSearchDeckParams(lower) {
     what = 'Basic Pokémon';
     count = 3;
   } else if (lower.includes('mega evolution pokémon ex')) what = 'Mega Evolution Pokémon ex';
+  else if (/search your deck for (?:an?|up to\s+(\d+))\s+evolution pok[ée]mon/i.test(lower) && !lower.includes('mega evolution')) {
+    const evoMatch = lower.match(/search your deck for (?:an?|up to\s+(\d+))\s+evolution pok[ée]mon/i);
+    what = 'Evolution Pokémon';
+    if (evoMatch && evoMatch[1]) count = Number(evoMatch[1]);
+  }
   else if (lower.includes('supporter card')) what = 'Supporter';
   else if (lower.includes('trainer card')) what = 'Trainer';
   // Energy before generic Pokémon fallback (Misty's Vitality, etc.)

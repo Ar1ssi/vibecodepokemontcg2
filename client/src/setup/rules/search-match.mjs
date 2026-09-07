@@ -85,6 +85,10 @@ export function matchesSearch(card, what = '') {
       if (stage === 'Basic') return false;
       return pokemonMatchesEnergyType(card, typeName);
     }
+    if (w.includes('evolution') && !w.includes('mega')) {
+      const stage = card.stage || 'Basic';
+      if (stage === 'Basic') return false;
+    }
     const typedBasic = what.match(/basic\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedBasic) {
       const typeName = SYMBOL_TO_TYPE[typedBasic[1].toLowerCase()];

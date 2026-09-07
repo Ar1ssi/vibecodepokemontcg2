@@ -138,6 +138,20 @@ import test, { describe } from 'node:test';
       assert.equal(r.steps[0].what, 'Basic Pokémon ≤70 HP');
       assert.equal(r.steps[0].count, 2);
     });
+
+    test('Level Ball: search for Pokémon with 90 HP or less', () => {
+      const r = parseTrainerEffect("Search your deck for a Pokémon with 90 HP or less, reveal it, and put it into your hand. Then, shuffle your deck.");
+      assert.equal(r.steps[0].what, 'Pokémon ≤90 HP');
+      assert.equal(r.steps[0].count, 1);
+      assert.equal(r.steps[0].destination, 'hand');
+    });
+
+    test('Evolution Incense: search for Evolution Pokémon', () => {
+      const r = parseTrainerEffect("Search your deck for an Evolution Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.");
+      assert.equal(r.steps[0].what, 'Evolution Pokémon');
+      assert.equal(r.steps[0].count, 1);
+      assert.equal(r.steps[0].destination, 'hand');
+    });
     
     test('Air Balloon: passive tool', () => {
       const r = parseTrainerEffect("The Retreat Cost of the Pokémon this card is attached to is {C}{C} less.");
@@ -474,6 +488,42 @@ import test, { describe } from 'node:test';
       assert.equal(matchesSearch(overCap, what), false);
       const pool = filterSearchMatches([stub, overCap, underCap], what);
       assert.deepEqual(pool.map((c) => c.name), ['Pikachu', 'Clefairy']);
+    });
+
+    test('Buddy-Buddy Poffin filter: excludes Stage 1 and Stage 2 Pokémon even with low HP', () => {
+      const basicUnderCap = { name: 'Charmander', type: 'Pokémon', stage: 'Basic', hp: 70 };
+      const stage1UnderCap = { name: 'Magikarp-evo', type: 'Pokémon', stage: 'Stage 1', hp: 60 };
+      const stage2 = { name: 'Charizard ex', type: 'Pokémon', stage: 'Stage 2', hp: 330 };
+      const what = 'Basic Pokémon ≤70 HP';
+      assert.equal(matchesSearch(basicUnderCap, what), true);
+      assert.equal(matchesSearch(stage1UnderCap, what), false);
+      assert.equal(matchesSearch(stage2, what), false);
+    });
+
+    test('Level Ball filter: includes Evolutions and Basics ≤90 HP, excludes >90 HP', () => {
+      const basicUnderCap = { name: 'Clefairy', type: 'Pokémon', stage: 'Basic', hp: 60 };
+      const evoUnderCap = { name: 'Pidgeotto', type: 'Pokémon', stage: 'Stage 1', hp: 80 };
+      const overCap = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', hp: 150 };
+      const evoOverCap = { name: 'Charizard ex', type: 'Pokémon', stage: 'Stage 2', hp: 330 };
+      const what = 'Pokémon ≤90 HP';
+      assert.equal(matchesSearch(basicUnderCap, what), true);
+      assert.equal(matchesSearch(evoUnderCap, what), true);
+      assert.equal(matchesSearch(overCap, what), false);
+      assert.equal(matchesSearch(evoOverCap, what), false);
+      const pool = filterSearchMatches([basicUnderCap, evoUnderCap, overCap, evoOverCap], what);
+      assert.deepEqual(pool.map((c) => c.name), ['Clefairy', 'Pidgeotto']);
+    });
+
+    test('Evolution Pokémon filter: includes Stage 1 and Stage 2, excludes Basic', () => {
+      const basic = { name: 'Pidgey', type: 'Pokémon', stage: 'Basic', hp: 60 };
+      const stage1 = { name: 'Pidgeotto', type: 'Pokémon', stage: 'Stage 1', hp: 80 };
+      const stage2 = { name: 'Pidgeot', type: 'Pokémon', stage: 'Stage 2', hp: 130 };
+      const what = 'Evolution Pokémon';
+      assert.equal(matchesSearch(basic, what), false);
+      assert.equal(matchesSearch(stage1, what), true);
+      assert.equal(matchesSearch(stage2, what), true);
+      const pool = filterSearchMatches([basic, stage1, stage2], what);
+      assert.deepEqual(pool.map((c) => c.name), ['Pidgeotto', 'Pidgeot']);
     });
 
     test('Ultra Ball filter: any Pokémon in deck (type on image fallback)', () => {

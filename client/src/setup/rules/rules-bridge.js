@@ -1545,6 +1545,9 @@ import {
       openDeckSearchWindow(`${card.name} ability — search your deck`);
       appendMessage('', `  ${card.name} — opening card select…`, 'announcement', false);
       const deck = getZone(user, 'deck');
+      if (deck?.array?.length) {
+        await Promise.all(deck.array.map((c) => ensureCardData(c)));
+      }
       const pool = filterSearchMatches(deck.array, step.what, {
         onNoMatches: (what) =>
           appendMessage('', `  no cards in deck match "${what}"`, 'announcement', false),

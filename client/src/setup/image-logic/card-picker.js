@@ -54,14 +54,8 @@ const buildSlideContent = async (card) => {
     return { node: wrapper, holoWrapper: wrapper };
   }
 
-  const data = await ensureCardData({
-    name: card?.name,
-    type: card?.type,
-    number: card?.number,
-    set: card?.set,
-    id: card?.id,
-  });
-  const effect = resolveHoloEffect(data);
+  const data = await ensureCardData(card);
+  const effect = resolveHoloEffect(data || card);
   if (effect && src) {
     const wrapper = buildHoloCard(src, effect);
     wrapper.classList.add('mat-holo', 'discard-pile-holo');

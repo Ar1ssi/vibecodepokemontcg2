@@ -4,6 +4,7 @@ import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
 import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
+import { ensureCardData } from '../rules/rules-state.mjs';
 
 
 export const buildDeck = (user) => {
@@ -39,4 +40,7 @@ export const buildDeck = (user) => {
     document.body.appendChild(img);
     document.body.removeChild(img);
   });
+
+  // Pre-warm card metadata in the background so deck searches don't incur network latency
+  Promise.all(deck.array.map((card) => ensureCardData(card))).catch(() => {});
 };

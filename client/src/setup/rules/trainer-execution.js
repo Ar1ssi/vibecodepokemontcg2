@@ -333,11 +333,13 @@ async function runSearchStep(card, searchStep, done) {
       step: searchStep,
       sourceText,
     });
+  const deck = zone(_effectOwner, 'deck');
+  if (deck?.array?.length) {
+    await Promise.all(deck.array.map((c) => ensureCardData(c)));
+  }
   // Nest Ball: single Basic → bench
   if (searchStep.destination === 'bench' && searchStep.what === 'Basic Pokémon' && (searchStep.count || 1) === 1) {
-    const deck = zone(_effectOwner, 'deck');
     const basics = [];
-    await Promise.all(deck.array.map((c) => ensureCardData(c)));
     for (const c of deck.array) {
       if ((c.stage || 'Basic') === 'Basic' && _isPokemonCard(c)) basics.push(c);
     }
@@ -359,9 +361,6 @@ async function runSearchStep(card, searchStep, done) {
   }
   _openDeckSearchWindow(`${card.name} lets you search your deck`);
   msg(`  ${card.name} — opening card select…`);
-  const deck = zone(_effectOwner, 'deck');
-  // Match ability search: open the picker on deck data we already have.
-  // matchesSearch keeps unknown-HP basics in HP-cap pools; enrich slides async.
   const pool = filterSearchMatches(deck.array, searchStep.what, {
     onNoMatches: (what) => msg(`  no cards in deck match "${what}"`),
   });
