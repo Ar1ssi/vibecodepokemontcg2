@@ -2787,6 +2787,7 @@ const openAbilityChoicePicker = ({
   minCount,
   maxCount,
   upTo = false,
+  pickOnly = false,
   triggerCard = null,
   allCandidates = null,
   onPick,
@@ -2817,6 +2818,7 @@ const openAbilityChoicePicker = ({
     minCount: minSel,
     maxCount: cappedMax,
     upTo,
+    pickOnly,
     zoneFrom,
     destination,
     user,
@@ -2985,8 +2987,24 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
 // Search ability (taxonomy C, once-per-turn): full-deck filtered search via
 // choice picker (Trainer-style). Does NOT end the turn.
 export const searchAbility = async (user, emit = true, targetCard = null) => {
-  const { target } = resolveAbilityTarget(user, targetCard);
-  await ensureCardData(target);
+  let { target } = resolveAbilityTarget(user, targetCard);
+  if (target) await ensureCardData(target);
+
+  if (!targetCard && (!target || classifyAbility(target) !== 'search')) {
+    const benchCards = getZone(user, 'bench').array;
+    for (const b of benchCards) {
+      await ensureCardData(b);
+      if (classifyAbility(b) === 'search') {
+        if (!rulesState.enabled || !abilityUsed(user, b)) {
+          target = b;
+          break;
+        } else if (!target || classifyAbility(target) !== 'search') {
+          target = b;
+        }
+      }
+    }
+  }
+
   if (!abilityTurnAndUsageGuard(user, target, 'search')) return;
 
   const deck = getZone(user, 'deck');
@@ -3051,6 +3069,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
       triggerCard: target,
       zoneFrom: 'deck',
       destination: destZone,
+      pickOnly: true,
       multiSelect: true,
       requiredCount: effectiveMax,
       minCount: upTo ? 0 : count,
@@ -3093,8 +3112,13 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     triggerCard: target,
     zoneFrom: 'deck',
     destination: destZone,
+    pickOnly: true,
     onPick: (picked) => {
       revealPicked(picked);
+      const idx = getZone(user, 'deck').array.indexOf(picked);
+      if (idx >= 0) {
+        moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
+      }
       appendMessage(
         user,
         `🔍 ${target.name} searches: ${picked.name || 'a card'} → ${destLabel}.`,

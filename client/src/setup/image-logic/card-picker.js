@@ -40,7 +40,7 @@ const disableNativeDrag = (node) => {
   });
 };
 
-const buildSlideContent = async (card) => {
+const buildSlideContent = (card) => {
   const src =
     card?.image?.src ||
     (typeof card?.image === 'string' ? card.image : '') ||
@@ -54,14 +54,7 @@ const buildSlideContent = async (card) => {
     return { node: wrapper, holoWrapper: wrapper };
   }
 
-  const data = await ensureCardData({
-    name: card?.name,
-    type: card?.type,
-    number: card?.number,
-    set: card?.set,
-    id: card?.id,
-  });
-  const effect = resolveHoloEffect(data);
+  const effect = resolveHoloEffect(card);
   if (effect && src) {
     const wrapper = buildHoloCard(src, effect);
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
@@ -681,23 +674,16 @@ const setCandidateList = (state, candidates) => {
     badge.hidden = true;
     slide.appendChild(badge);
 
+    const { node, holoWrapper } = buildSlideContent(card);
+    slide.appendChild(node);
+    if (holoWrapper) slide.holoWrapper = holoWrapper;
+
     state.stack.appendChild(slide);
     state.slides.push(slide);
   });
 
-  Promise.all(
-    candidates.map(async (card, i) => {
-      const { node, holoWrapper } = await buildSlideContent(card);
-      const slide = state.slides[i];
-      slide.appendChild(node);
-      if (holoWrapper) slide.holoWrapper = holoWrapper;
-    })
-  ).then(() => {
-      if (pickerState === state) {
-      goToIndex(state, clampIndex(state.index, candidates.length - 1));
-      if (state.slotElements?.length) renderSlotCards(state);
-    }
-  });
+  goToIndex(state, clampIndex(state.index, candidates.length - 1));
+  if (state.slotElements?.length) renderSlotCards(state);
 };
 
 const isSwipeBlockedTarget = (target) =>
@@ -1199,17 +1185,15 @@ export const openCardPicker = async ({
   if (!isBrowse) renderSlotCards(state);
 
   if (triggerCard) {
-    void buildSlideContent(triggerCard).then(({ node, holoWrapper }) => {
-      if (pickerState !== state) return;
-      node.classList.add('card-picker-trigger-card');
-      triggerSlot.appendChild(node);
-      if (holoWrapper) {
-        holoWrapper.classList.add('card-picker-trigger-holo');
-        state.triggerHoloWrapper = holoWrapper;
-        startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
-        if (!isBrowse) syncChooseLayout(state);
-      }
-    });
+    const { node, holoWrapper } = buildSlideContent(triggerCard);
+    node.classList.add('card-picker-trigger-card');
+    triggerSlot.appendChild(node);
+    if (holoWrapper) {
+      holoWrapper.classList.add('card-picker-trigger-holo');
+      state.triggerHoloWrapper = holoWrapper;
+      startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
+      if (!isBrowse) syncChooseLayout(state);
+    }
   }
 };
 
