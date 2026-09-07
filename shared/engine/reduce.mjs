@@ -5,8 +5,214 @@
  */
 
 import { cloneGameState, findCard } from './state.mjs';
-import { isEnergy } from './cards.mjs';
+import { isEnergy, getRetreatCostCount } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
+import { setupGame } from './setup.mjs';
+import { createRng } from './rng.mjs';
+import { computeAttackDamage, expandEnergyEntries, canPayAttackCost } from './rules/attack-engine.mjs';
+import { prizesForKO } from './rules/ko-flow.mjs';
+
+/**
+ * Handles Knockout resolution for a Pokemon:
+ * - Awards prize cards to attacker
+ * - Discards victim and its attached cards
+ * - Auto-promotes first benched Pokemon to active (if any)
+ * - Checks win conditions
+ */
+function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, events }) {
+  const prizeCount = prizesForKO(victim);
+  const attackerPrizes = draft.players[attackerPlayerId]?.zones?.prizes || [];
+  const attackerHand = draft.players[attackerPlayerId]?.zones?.hand || [];
+  const actualPrizes = Math.min(prizeCount, attackerPrizes.length);
+  const taken = attackerPrizes.splice(0, actualPrizes);
+  attackerHand.push(...taken);
+
+  events.push({
+    type: 'prizesTaken',
+    playerId: attackerPlayerId,
+    count: actualPrizes,
+    cards: taken.map((c) => ({ instanceId: c.instanceId })),
+  });
+
+  // Discard victim and attached cards
+  const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
+  const victimDiscard = draft.players[victimPlayerId]?.zones?.discard || [];
+  for (let i = victimActive.length - 1; i >= 0; i--) {
+    const c = victimActive[i];
+    if (c.instanceId === victim.instanceId || c.attachedTo === victim.instanceId) {
+      victimActive.splice(i, 1);
+      c.damage = 0;
+      c.specialCondition = null;
+      c.attachedTo = null;
+      victimDiscard.push(c);
+    }
+  }
+
+  events.push({
+    type: 'pokemonKnockedOut',
+    instanceId: victim.instanceId,
+    playerId: victimPlayerId,
+    attackerPlayerId,
+    prizeCount,
+  });
+
+  // Auto-promote first bench Pokemon if any
+  const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
+  const benchPokemon = victimBench.find((c) => !c.attachedTo);
+  if (benchPokemon) {
+    for (let i = victimBench.length - 1; i >= 0; i--) {
+      const c = victimBench[i];
+      if (c.instanceId === benchPokemon.instanceId || c.attachedTo === benchPokemon.instanceId) {
+        victimBench.splice(i, 1);
+        victimActive.push(c);
+      }
+    }
+    events.push({
+      type: 'pokemonPromoted',
+      instanceId: benchPokemon.instanceId,
+      playerId: victimPlayerId,
+    });
+  }
+
+  // Win condition checks
+  if (attackerPrizes.length === 0) {
+    setGameEnded(draft, { winner: attackerPlayerId, reason: 'all prize cards taken', events });
+  } else {
+    const remainingActive = victimActive.filter((c) => !c.attachedTo);
+    const remainingBench = victimBench.filter((c) => !c.attachedTo);
+    if (remainingActive.length === 0 && remainingBench.length === 0) {
+      setGameEnded(draft, { winner: attackerPlayerId, reason: 'no Pokémon in play', events });
+    }
+  }
+}
+
+/**
+ * Resolves Pokémon Checkup between turns:
+ * - Poison: 10 damage
+ * - Burn: 20 damage + 50% cure flip
+ * - Asleep: 50% cure flip
+ * - Paralyzed: cured
+ */
+function resolveCheckup(draft, { rng, events }) {
+  for (const pid of Object.keys(draft.players || {})) {
+    const player = draft.players[pid];
+    const active = player.zones?.active?.find((c) => !c.attachedTo);
+    if (!active || !active.specialCondition) continue;
+
+    if (active.specialCondition === 'Poisoned') {
+      active.damage = (active.damage || 0) + 10;
+      events.push({ type: 'checkupDamage', instanceId: active.instanceId, condition: 'Poisoned', damage: 10, playerId: pid });
+      if (active.hp && active.damage >= active.hp) {
+        const oppId = Object.keys(draft.players).find((id) => id !== pid);
+        handleKnockout(draft, { victimPlayerId: pid, attackerPlayerId: oppId, victim: active, events });
+      }
+    } else if (active.specialCondition === 'Burned') {
+      active.damage = (active.damage || 0) + 20;
+      events.push({ type: 'checkupDamage', instanceId: active.instanceId, condition: 'Burned', damage: 20, playerId: pid });
+      const coin = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+      if (coin === 'heads') {
+        active.specialCondition = null;
+        events.push({ type: 'statusCleared', condition: 'Burned', instanceId: active.instanceId, playerId: pid });
+      }
+      if (active.hp && active.damage >= active.hp) {
+        const oppId = Object.keys(draft.players).find((id) => id !== pid);
+        handleKnockout(draft, { victimPlayerId: pid, attackerPlayerId: oppId, victim: active, events });
+      }
+    } else if (active.specialCondition === 'Asleep') {
+      const coin = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+      if (coin === 'heads') {
+        active.specialCondition = null;
+        events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId: pid });
+      }
+    } else if (active.specialCondition === 'Paralyzed') {
+      active.specialCondition = null;
+      events.push({ type: 'statusCleared', condition: 'Paralyzed', instanceId: active.instanceId, playerId: pid });
+    }
+  }
+}
+
+/**
+ * Advances the turn to the next player, reset flags, and performs start-of-turn draw.
+ */
+function advanceTurn(draft, { nextPlayerId, events }) {
+  draft.turn.player = nextPlayerId;
+  draft.turn.number = (draft.turn.number || 1) + 1;
+  draft.turn.phase = 'main';
+
+  if (!draft.players[nextPlayerId].flags) {
+    draft.players[nextPlayerId].flags = {};
+  }
+  draft.players[nextPlayerId].flags = {
+    energyAttached: false,
+    attackerAttacked: false,
+    retreatedThisTurn: false,
+    supporterPlayed: false,
+    abilitiesUsed: {},
+  };
+
+  const deck = draft.players[nextPlayerId].zones.deck;
+  const hand = draft.players[nextPlayerId].zones.hand;
+  if (deck.length === 0) {
+    const oppId = Object.keys(draft.players).find((id) => id !== nextPlayerId);
+    setGameEnded(draft, { winner: oppId, reason: 'deck-out', events });
+  } else {
+    const [card] = deck.splice(0, 1);
+    hand.push(card);
+    events.push({
+      type: 'cardsDrawn',
+      playerId: nextPlayerId,
+      count: 1,
+      cards: [{ instanceId: card.instanceId }],
+    });
+  }
+
+  events.push({
+    type: 'turnStarted',
+    player: nextPlayerId,
+    number: draft.turn.number,
+  });
+}
+
+/**
+ * Normalizes an Energy Card object to a { type, family } descriptor for canPayAttackCost.
+ */
+function getEnergyDescriptor(card) {
+  if (!card) return { type: 'Colorless', family: 'basic' };
+  if (typeof card === 'string') return { type: card, family: 'basic' };
+
+  const name = String(card.name || '').toLowerCase();
+  const type = card.types?.[0] ||
+    (/fire/.test(name) ? 'Fire'
+    : /water/.test(name) ? 'Water'
+    : /grass/.test(name) ? 'Grass'
+    : /lightning/.test(name) ? 'Lightning'
+    : /psychic/.test(name) ? 'Psychic'
+    : /fighting/.test(name) ? 'Fighting'
+    : /metal/.test(name) ? 'Metal'
+    : /dark/.test(name) ? 'Dark'
+    : /dragon/.test(name) ? 'Dragon'
+    : 'Colorless');
+
+  let family = 'basic';
+  if (/double colorless/.test(name)) {
+    family = 'double-colorless';
+  } else if (/double/.test(name)) {
+    family = 'double';
+  }
+
+  return { type, family };
+}
+
+/**
+ * Marks game as ended with winner and reason.
+ */
+function setGameEnded(draft, { winner, reason, events }) {
+  draft.turn.phase = 'ended';
+  draft.winner = winner;
+  draft.winReason = reason;
+  events.push({ type: 'gameEnded', winner, reason });
+}
+
 
 /**
  * Validates reference integrity of instanceIds in command payload (Step 3).
@@ -17,6 +223,7 @@ import { validateCommandShape } from './commands.mjs';
  */
 function validateReferences(state, command) {
   const { type, payload, playerId } = command;
+
 
   switch (type) {
     case 'moveCard': {
@@ -79,10 +286,71 @@ function validateReferences(state, command) {
       return { valid: true };
     }
 
+    case 'attack': {
+      const active = state.players?.[playerId]?.zones?.active?.find((c) => !c.attachedTo);
+      if (!active) {
+        return { valid: false, error: 'stale_view' };
+      }
+      if (payload?.targetInstanceId != null) {
+        const targetRef = findCard(state, payload.targetInstanceId);
+        if (!targetRef) {
+          return { valid: false, error: 'stale_view' };
+        }
+      }
+      return { valid: true };
+    }
+
+    case 'retreat': {
+      const active = state.players?.[playerId]?.zones?.active?.find((c) => !c.attachedTo);
+      if (!active) {
+        return { valid: false, error: 'stale_view' };
+      }
+      if (payload?.benchInstanceId != null) {
+        const benchCard = state.players?.[playerId]?.zones?.bench?.find((c) => c.instanceId === payload.benchInstanceId);
+        if (!benchCard) {
+          return { valid: false, error: 'stale_view' };
+        }
+      }
+      if (Array.isArray(payload?.discardEnergyIds)) {
+        const activeZone = state.players?.[playerId]?.zones?.active || [];
+        for (const id of payload.discardEnergyIds) {
+          const card = activeZone.find((c) => c.instanceId === id && c.attachedTo === active.instanceId);
+          if (!card) {
+            return { valid: false, error: 'stale_view' };
+          }
+        }
+      }
+      return { valid: true };
+    }
+
+    case 'promote': {
+      const benchCard = state.players?.[playerId]?.zones?.bench?.find((c) => c.instanceId === payload?.instanceId);
+      if (!benchCard) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    case 'takePrizes': {
+      if (!state.players?.[playerId]) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    case 'takePrizesByIndex': {
+      const prizes = state.players?.[playerId]?.zones?.prizes || [];
+      if (!Array.isArray(payload?.indices) || payload.indices.some((idx) => idx >= prizes.length)) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
     default:
       return { valid: true };
   }
 }
+
 
 /**
  * Validates gameplay legality when rulesEnabled is true (Step 4).
@@ -109,14 +377,28 @@ function validateLegality(state, command) {
   }
 
   // Turn phase validation
-  if (state.turn?.phase === 'setup') {
-    return { allowed: false, reason: 'Set up the game first (Set Up button).' };
-  }
   if (state.turn?.phase === 'ended') {
     return { allowed: false, reason: 'Game is over.' };
   }
+  if (type === 'setup') {
+    if (state.turn?.phase !== 'setup') {
+      return { allowed: false, reason: 'Game is already set up.' };
+    }
+    return { allowed: true };
+  }
+  if (state.turn?.phase === 'setup') {
+    return { allowed: false, reason: 'Set up the game first (Set Up button).' };
+  }
+
+  // Turn player validation
+  if (['attack', 'retreat', 'pass', 'takeTurn', 'moveCard', 'attachCard', 'draw'].includes(type)) {
+    if (state.turn?.player && state.turn.player !== playerId) {
+      return { allowed: false, reason: "It's not your turn." };
+    }
+  }
+
   if (state.turn?.phase === 'attack') {
-    if (['moveCard', 'attachCard', 'draw'].includes(type)) {
+    if (['moveCard', 'attachCard', 'draw', 'retreat', 'attack'].includes(type)) {
       return { allowed: false, reason: 'You already attacked — end your turn.' };
     }
   }
@@ -162,6 +444,88 @@ function validateLegality(state, command) {
       }
       return { allowed: true };
     }
+
+    case 'attack': {
+      if (state.turn?.number === 1) {
+        return { allowed: false, reason: "The player going first can't attack on turn 1." };
+      }
+      if (player.flags?.attackerAttacked) {
+        return { allowed: false, reason: 'Already attacked this turn.' };
+      }
+      const active = player.zones?.active?.find((c) => !c.attachedTo);
+      if (!active) {
+        return { allowed: false, reason: 'No active Pokémon to attack with.' };
+      }
+      if (active.specialCondition === 'Paralyzed') {
+        return { allowed: false, reason: "Paralyzed — this Pokémon can't attack or retreat." };
+      }
+      const atkIdx = payload?.attackIndex ?? 0;
+      const attack = active.attacks?.[atkIdx];
+      if (attack && attack.cost?.length > 0) {
+        const attached = (player.zones?.active || []).filter((c) => c.attachedTo === active.instanceId && isEnergy(c));
+        if (!canPayAttackCost(expandEnergyEntries(attached.map(getEnergyDescriptor)), attack.cost)) {
+          return { allowed: false, reason: 'Not enough energy attached.' };
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'retreat': {
+      if (player.flags?.attackerAttacked) {
+        return { allowed: false, reason: "Can't retreat after attacking." };
+      }
+      if (player.flags?.retreatedThisTurn) {
+        return { allowed: false, reason: 'Already retreated this turn.' };
+      }
+      const active = player.zones?.active?.find((c) => !c.attachedTo);
+      if (!active) {
+        return { allowed: false, reason: 'No active Pokémon to retreat.' };
+      }
+      if (active.specialCondition === 'Paralyzed') {
+        return { allowed: false, reason: "Paralyzed — this Pokémon can't retreat." };
+      }
+      if (active.specialCondition === 'Asleep') {
+        return { allowed: false, reason: "Asleep — this Pokémon can't retreat." };
+      }
+      const benchPokemon = (player.zones?.bench || []).filter((c) => !c.attachedTo);
+      if (benchPokemon.length === 0) {
+        return { allowed: false, reason: 'No bench Pokémon to retreat to.' };
+      }
+      const retreatCostN = getRetreatCostCount(active);
+      if (retreatCostN > 0) {
+        const attached = (player.zones?.active || []).filter((c) => c.attachedTo === active.instanceId && isEnergy(c));
+        const costSymbols = new Array(retreatCostN).fill('Colorless');
+        if (!canPayAttackCost(expandEnergyEntries(attached.map(getEnergyDescriptor)), costSymbols)) {
+          return { allowed: false, reason: `Not enough energy to retreat (costs ${retreatCostN}).` };
+        }
+      }
+      return { allowed: true };
+    }
+
+
+    case 'promote': {
+      const activePokemon = (player.zones?.active || []).filter((c) => !c.attachedTo);
+      if (activePokemon.length > 0) {
+        return { allowed: false, reason: 'Active position is already occupied.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'takePrizes': {
+      const count = payload?.count ?? 1;
+      if ((player.zones?.prizes?.length || 0) < count) {
+        return { allowed: false, reason: 'Not enough prize cards left.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'takePrizesByIndex': {
+      if ((player.zones?.prizes?.length || 0) < (payload?.indices?.length || 0)) {
+        return { allowed: false, reason: 'Not enough prize cards left.' };
+      }
+      return { allowed: true };
+    }
+
 
     default:
       return { allowed: true };
@@ -247,7 +611,14 @@ export function applyCommand(state, command, rng = null) {
 
   // Step 5: Apply to cloned draft
   const draft = cloneGameState(state);
+  const activeRng = rng || createRng(state.seed || 0);
+  if (state.rngCursor && !rng) {
+    while (activeRng.cursor < state.rngCursor) {
+      activeRng.next();
+    }
+  }
   const events = [];
+
 
   switch (type) {
     case 'moveCard': {
@@ -472,6 +843,269 @@ export function applyCommand(state, command, rng = null) {
       break;
     }
 
+    case 'setup': {
+      const setupResult = setupGame(draft, { firstPlayerId: payload?.firstPlayerId, rng: activeRng });
+      events.push(...setupResult.events);
+      break;
+    }
+
+    case 'attack': {
+      const attackerPlayer = draft.players[playerId];
+      const attacker = attackerPlayer?.zones?.active?.find((c) => !c.attachedTo);
+      const atkIdx = payload?.attackIndex ?? 0;
+      const attack = attacker?.attacks?.[atkIdx] || { name: 'Attack', damage: 10 };
+
+      const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+      const defenderPlayer = draft.players[oppId];
+      let defender = null;
+      if (payload?.targetInstanceId != null) {
+        defender = findCard(draft, payload.targetInstanceId)?.card;
+      } else {
+        defender = defenderPlayer?.zones?.active?.find((c) => !c.attachedTo);
+      }
+
+      // Check confused condition
+      if (attacker && attacker.specialCondition === 'Confused') {
+        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        if (coin === 'tails') {
+          attacker.damage = (attacker.damage || 0) + 30;
+          events.push({
+            type: 'damageUpdated',
+            instanceId: attacker.instanceId,
+            damage: attacker.damage,
+            dealt: 30,
+          });
+          events.push({
+            type: 'attackConfusedFizzle',
+            attackerId: attacker.instanceId,
+            damage: 30,
+            playerId,
+          });
+
+          // Check if confused self-damage KO'd attacker
+          if (attacker.hp && attacker.damage >= attacker.hp) {
+            handleKnockout(draft, {
+              victimPlayerId: playerId,
+              attackerPlayerId: oppId,
+              victim: attacker,
+              events,
+            });
+          }
+
+          if (!attackerPlayer.flags) attackerPlayer.flags = {};
+          attackerPlayer.flags.attackerAttacked = true;
+
+          if (draft.turn.phase !== 'ended') {
+            resolveCheckup(draft, { rng: activeRng, events });
+            if (draft.turn.phase !== 'ended') {
+              advanceTurn(draft, { nextPlayerId: oppId, events });
+            }
+          }
+          break;
+        }
+      }
+
+      // Check asleep condition (wake coin flip)
+      if (attacker && attacker.specialCondition === 'Asleep') {
+        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        if (coin === 'heads') {
+          attacker.specialCondition = null;
+          events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: attacker.instanceId, playerId });
+        } else {
+          events.push({ type: 'attackCancelledAsleep', instanceId: attacker.instanceId, playerId });
+          break;
+        }
+      }
+
+      let dmgDealt = 0;
+      if (attacker && defender) {
+        const dmgResult = computeAttackDamage(attacker, defender, attack);
+        dmgDealt = dmgResult.total;
+        defender.damage = (defender.damage || 0) + dmgDealt;
+        events.push({
+          type: 'damageUpdated',
+          instanceId: defender.instanceId,
+          damage: defender.damage,
+          dealt: dmgDealt,
+        });
+
+        // KO check
+        const koHp = defender.hp || 0;
+        if (koHp > 0 && defender.damage >= koHp) {
+          handleKnockout(draft, {
+            victimPlayerId: oppId,
+            attackerPlayerId: playerId,
+            victim: defender,
+            events,
+          });
+        }
+      }
+
+      events.push({
+        type: 'attackExecuted',
+        attackerId: attacker?.instanceId,
+        attackName: attack.name,
+        damage: dmgDealt,
+        playerId,
+      });
+
+      if (!attackerPlayer.flags) attackerPlayer.flags = {};
+      attackerPlayer.flags.attackerAttacked = true;
+
+      // Auto-end turn after attacking
+      if (draft.turn.phase !== 'ended') {
+        resolveCheckup(draft, { rng: activeRng, events });
+        if (draft.turn.phase !== 'ended') {
+          advanceTurn(draft, { nextPlayerId: oppId, events });
+        }
+      }
+      break;
+    }
+
+    case 'retreat': {
+      const player = draft.players[playerId];
+      const active = player?.zones?.active?.find((c) => !c.attachedTo);
+      const costN = getRetreatCostCount(active);
+
+      // Discard energy cost
+      if (Array.isArray(payload?.discardEnergyIds) && payload.discardEnergyIds.length > 0) {
+        for (const id of payload.discardEnergyIds) {
+          const idx = player.zones.active.findIndex((c) => c.instanceId === id);
+          if (idx >= 0) {
+            const [discarded] = player.zones.active.splice(idx, 1);
+            discarded.attachedTo = null;
+            player.zones.discard.push(discarded);
+            events.push({ type: 'cardMoved', instanceId: id, from: 'active', to: 'discard', playerId });
+          }
+        }
+      } else if (costN > 0) {
+        let discardedCount = 0;
+        for (let i = player.zones.active.length - 1; i >= 0 && discardedCount < costN; i--) {
+          const card = player.zones.active[i];
+          if (card.attachedTo === active.instanceId && isEnergy(card)) {
+            player.zones.active.splice(i, 1);
+            card.attachedTo = null;
+            player.zones.discard.push(card);
+            discardedCount++;
+            events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'active', to: 'discard', playerId });
+          }
+        }
+      }
+
+      // Bench swap
+      let benchPokemon = null;
+      if (payload?.benchInstanceId != null) {
+        benchPokemon = player.zones.bench.find((c) => c.instanceId === payload.benchInstanceId);
+      } else {
+        benchPokemon = player.zones.bench.find((c) => !c.attachedTo);
+      }
+
+      if (active && benchPokemon) {
+        // Move active + attachments to bench
+        for (let i = player.zones.active.length - 1; i >= 0; i--) {
+          const c = player.zones.active[i];
+          if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
+            player.zones.active.splice(i, 1);
+            player.zones.bench.push(c);
+          }
+        }
+        // Move benchPokemon + attachments to active
+        for (let i = player.zones.bench.length - 1; i >= 0; i--) {
+          const c = player.zones.bench[i];
+          if (c.instanceId === benchPokemon.instanceId || c.attachedTo === benchPokemon.instanceId) {
+            player.zones.bench.splice(i, 1);
+            player.zones.active.push(c);
+          }
+        }
+
+        active.specialCondition = null;
+        if (!player.flags) player.flags = {};
+        player.flags.retreatedThisTurn = true;
+
+        events.push({
+          type: 'cardRetreated',
+          activeId: active.instanceId,
+          promotedId: benchPokemon.instanceId,
+          playerId,
+        });
+      }
+      break;
+    }
+
+    case 'pass':
+    case 'takeTurn': {
+      const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+      resolveCheckup(draft, { rng: activeRng, events });
+      if (draft.turn.phase !== 'ended') {
+        advanceTurn(draft, { nextPlayerId: oppId, events });
+      }
+      break;
+    }
+
+    case 'takePrizes': {
+      const count = payload?.count ?? 1;
+      const prizes = draft.players[playerId].zones.prizes;
+      const hand = draft.players[playerId].zones.hand;
+      const actualCount = Math.min(count, prizes.length);
+      const drawnPrizes = prizes.splice(0, actualCount);
+      hand.push(...drawnPrizes);
+
+      events.push({
+        type: 'prizesTaken',
+        playerId,
+        count: actualCount,
+        cards: drawnPrizes.map((c) => ({ instanceId: c.instanceId })),
+      });
+
+      if (prizes.length === 0) {
+        setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
+      }
+      break;
+    }
+
+    case 'takePrizesByIndex': {
+      const indices = [...payload.indices].sort((a, b) => b - a);
+      const prizes = draft.players[playerId].zones.prizes;
+      const hand = draft.players[playerId].zones.hand;
+      const taken = [];
+
+      for (const idx of indices) {
+        if (idx < prizes.length) {
+          const [card] = prizes.splice(idx, 1);
+          taken.push(card);
+          hand.push(card);
+        }
+      }
+
+      events.push({
+        type: 'prizesTaken',
+        playerId,
+        count: taken.length,
+        cards: taken.map((c) => ({ instanceId: c.instanceId })),
+      });
+
+      if (prizes.length === 0) {
+        setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
+      }
+      break;
+    }
+
+    case 'promote': {
+      const player = draft.players[playerId];
+      const benchIdx = player.zones.bench.findIndex((c) => c.instanceId === payload.instanceId);
+      if (benchIdx >= 0) {
+        for (let i = player.zones.bench.length - 1; i >= 0; i--) {
+          const c = player.zones.bench[i];
+          if (c.instanceId === payload.instanceId || c.attachedTo === payload.instanceId) {
+            player.zones.bench.splice(i, 1);
+            player.zones.active.push(c);
+          }
+        }
+        events.push({ type: 'pokemonPromoted', instanceId: payload.instanceId, playerId });
+      }
+      break;
+    }
+
     default:
       break;
   }
@@ -483,8 +1117,8 @@ export function applyCommand(state, command, rng = null) {
     stateVersion: draft.stateVersion,
   });
 
-  if (rng && typeof rng.cursor === 'number') {
-    draft.rngCursor = rng.cursor;
+  if (activeRng && typeof activeRng.cursor === 'number') {
+    draft.rngCursor = activeRng.cursor;
   }
 
   return {
@@ -494,3 +1128,4 @@ export function applyCommand(state, command, rng = null) {
     error: null,
   };
 }
+

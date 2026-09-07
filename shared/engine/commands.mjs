@@ -212,7 +212,107 @@ export const COMMAND_SCHEMAS = {
       return { valid: true };
     },
   },
+
+  attack: {
+    type: 'attack',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (payload?.attackIndex != null && (!Number.isInteger(payload.attackIndex) || payload.attackIndex < 0)) {
+        return { valid: false, reason: 'attackIndex must be a non-negative integer' };
+      }
+      if (payload?.targetInstanceId != null && (!Number.isInteger(payload.targetInstanceId))) {
+        return { valid: false, reason: 'targetInstanceId must be an integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  retreat: {
+    type: 'retreat',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (payload?.benchInstanceId != null && !Number.isInteger(payload.benchInstanceId)) {
+        return { valid: false, reason: 'benchInstanceId must be an integer' };
+      }
+      if (payload?.discardEnergyIds != null) {
+        if (!Array.isArray(payload.discardEnergyIds) || payload.discardEnergyIds.some((id) => !Number.isInteger(id))) {
+          return { valid: false, reason: 'discardEnergyIds must be an array of integers' };
+        }
+      }
+      return { valid: true };
+    },
+  },
+
+  pass: {
+    type: 'pass',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  takePrizes: {
+    type: 'takePrizes',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (payload?.count != null && (!Number.isInteger(payload.count) || payload.count <= 0)) {
+        return { valid: false, reason: 'count must be a positive integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  takePrizesByIndex: {
+    type: 'takePrizesByIndex',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (!Array.isArray(payload.indices) || payload.indices.length === 0) {
+        return { valid: false, reason: 'indices must be a non-empty array' };
+      }
+      if (payload.indices.some((idx) => !Number.isInteger(idx) || idx < 0)) {
+        return { valid: false, reason: 'indices must contain only non-negative integers' };
+      }
+      return { valid: true };
+    },
+  },
+
+  setup: {
+    type: 'setup',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (payload?.firstPlayerId != null && typeof payload.firstPlayerId !== 'string') {
+        return { valid: false, reason: 'firstPlayerId must be a string' };
+      }
+      return { valid: true };
+    },
+  },
+
+  promote: {
+    type: 'promote',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+        return { valid: false, reason: 'instanceId must be an integer' };
+      }
+      return { valid: true };
+    },
+  },
 };
+
 
 /**
  * Validates the shape and envelope of a command.

@@ -111,3 +111,24 @@ export function isTrainer(card) {
     ['Trainer', 'Item', 'Supporter', 'Stadium', 'Tool', 'Pokémon Tool'].includes(card.type)
   );
 }
+
+export function isBasicPokemon(card) {
+  if (!isPokemon(card)) return false;
+  const stage = String(card.stage || card.subtypes?.[0] || 'Basic').toLowerCase();
+  if (['stage 1', 'stage 2', 'vmax', 'vstar', 'mega'].includes(stage)) {
+    return false;
+  }
+  const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map((s) => String(s).toLowerCase()) : [];
+  if (subtypes.some((s) => ['stage 1', 'stage 2', 'vmax', 'vstar', 'mega'].includes(s))) {
+    return false;
+  }
+  return true;
+}
+
+export function getRetreatCostCount(card) {
+  if (!card) return 0;
+  if (typeof card.retreatCost === 'number') return Math.max(0, card.retreatCost);
+  if (Array.isArray(card.retreatCost)) return card.retreatCost.length;
+  return 0;
+}
+

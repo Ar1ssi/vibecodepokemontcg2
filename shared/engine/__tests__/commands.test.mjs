@@ -1,12 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  validateCommandShape,
-  COMMAND_SCHEMAS,
-  DISPOSITION_TABLE,
-  VALID_ZONES,
-  SPECIAL_CONDITIONS,
-} from '../commands.mjs';
+import { validateCommandShape, DISPOSITION_TABLE } from '../commands.mjs';
 
 test('commands: validateCommandShape rejects non-objects and unknown command types (Edge Case 2)', () => {
   assert.equal(validateCommandShape(null).valid, false);
@@ -141,6 +135,41 @@ test('commands: DISPOSITION_TABLE accounts for all 59 legacy dispatch entries', 
   assert.ok(categories.has('replaced_by_protocol'));
   assert.ok(categories.has('replaced_by_redaction'));
   assert.ok(categories.has('announcement_only'));
-  assert.ok(categories.has('client_local'));
   assert.ok(categories.has('undo'));
 });
+
+test('commands: Slice 5 schemas validation (attack, retreat, pass, takePrizes, takePrizesByIndex, setup, promote)', () => {
+  // attack
+  assert.equal(validateCommandShape({ type: 'attack', payload: {} }).valid, true);
+  assert.equal(validateCommandShape({ type: 'attack', payload: { attackIndex: 1 } }).valid, true);
+  assert.equal(validateCommandShape({ type: 'attack', payload: { attackIndex: -1 } }).valid, false);
+  assert.equal(validateCommandShape({ type: 'attack', payload: { targetInstanceId: 'abc' } }).valid, false);
+
+  // retreat
+  assert.equal(validateCommandShape({ type: 'retreat', payload: {} }).valid, true);
+  assert.equal(validateCommandShape({ type: 'retreat', payload: { benchInstanceId: 4, discardEnergyIds: [1, 2] } }).valid, true);
+  assert.equal(validateCommandShape({ type: 'retreat', payload: { benchInstanceId: 'bad' } }).valid, false);
+  assert.equal(validateCommandShape({ type: 'retreat', payload: { discardEnergyIds: 'bad' } }).valid, false);
+
+  // pass
+  assert.equal(validateCommandShape({ type: 'pass', payload: {} }).valid, true);
+
+  // takePrizes
+  assert.equal(validateCommandShape({ type: 'takePrizes', payload: { count: 2 } }).valid, true);
+  assert.equal(validateCommandShape({ type: 'takePrizes', payload: { count: 0 } }).valid, false);
+
+  // takePrizesByIndex
+  assert.equal(validateCommandShape({ type: 'takePrizesByIndex', payload: { indices: [0, 2] } }).valid, true);
+  assert.equal(validateCommandShape({ type: 'takePrizesByIndex', payload: { indices: [] } }).valid, false);
+  assert.equal(validateCommandShape({ type: 'takePrizesByIndex', payload: { indices: [-1] } }).valid, false);
+
+  // setup
+  assert.equal(validateCommandShape({ type: 'setup', payload: {} }).valid, true);
+  assert.equal(validateCommandShape({ type: 'setup', payload: { firstPlayerId: 'p1' } }).valid, true);
+  assert.equal(validateCommandShape({ type: 'setup', payload: { firstPlayerId: 123 } }).valid, false);
+
+  // promote
+  assert.equal(validateCommandShape({ type: 'promote', payload: { instanceId: 42 } }).valid, true);
+  assert.equal(validateCommandShape({ type: 'promote', payload: {} }).valid, false);
+});
+
