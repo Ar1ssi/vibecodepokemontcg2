@@ -43,6 +43,10 @@ client/src/setup/rules/trainer-execution.js — 1465 lines; resolves effects thr
 client/src/actions/chat-buttons/chat-buttons.js — 4330 lines; attack/pass/retreat monolith
 
 ## State / zones
+shared/engine/cards.mjs — pure `Card` model, `mintInstanceId`, DOM-free (replaces DOM-based Card identity)
+shared/engine/state.mjs — pure `GameState` model (8 zones/player, neutral stadium), zone accessors, `hashState`
+shared/engine/rng.mjs — seeded `mulberry32` PRNG, deterministic replay source (Invariant 6)
+shared/engine/view.mjs — `viewFor(state, playerId)` authoritative redacted view per player/spectator (H1, Invariant 5)
 client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, element, ... }; 10 zones/player, stadium neutral
 shared/engine/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)
 shared/engine/zones/*.mjs — pure: board-snapshot, card-state, hand-sort, resolve-card-index, active-pokemon

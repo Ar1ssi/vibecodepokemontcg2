@@ -79,7 +79,7 @@ export function statusAllowsRetreat(player, cardId) {
 
 // ── Mutation: resolve the asleep coin flip ─────────────────────────
 // Heads → wakes (asleep cleared). Tails → stays asleep.
-export function resolveWake(player, cardId, rng = Math.random) {
+export function resolveWake(player, cardId, rng = () => 0.5) {
   const s = statusState[player][cardId];
   if (!s || !s.asleep) return { woke: false, applied: false };
   const woke = rng() < 0.5;
@@ -93,7 +93,7 @@ export function resolveWake(player, cardId, rng = Math.random) {
 // ── Mutation: resolve the confused pre-attack coin flip ────────────
 // Heads → attack proceeds. Tails → attack does NOT happen; 3 damage
 // counters (30 HP) placed on self. Confusion PERSISTS in either case.
-export function resolveConfusedAttack(player, cardId, rng = Math.random) {
+export function resolveConfusedAttack(player, cardId, rng = () => 0.5) {
   const s = statusState[player][cardId];
   if (!s || !s.confused) return { proceeds: true, applied: false, damage: 0 };
   const heads = rng() < 0.5;
@@ -106,7 +106,7 @@ export function resolveConfusedAttack(player, cardId, rng = Math.random) {
 // Burn:   coin flip — heads heals, tails 20 damage (persists either way).
 // Asleep / Paralyzed: cleared at end of the player's turn.
 // Confused: NOT cleared (permanent until retreat / evolve / Trainer).
-export function resolveTurnBoundary(player, cardId, rng = Math.random, opts = {}) {
+export function resolveTurnBoundary(player, cardId, rng = () => 0.5, opts = {}) {
   const s = statusState[player][cardId];
   if (!s) return { damage: 0, notes: [] };
   const notes = [];
@@ -186,7 +186,7 @@ export function parseSelfStatusFromAttackText(text = '') {
 // Old API: single call that both queried and (side-effectfully) flipped the
 // asleep coin. New code should call canAct() then resolveWake() /
 // resolveConfusedAttack() explicitly. Kept so any stale callers keep working.
-export function canActThroughStatuses(player, cardId, rng = Math.random) {
+export function canActThroughStatuses(player, cardId, rng = () => 0.5) {
   const q = canAct(player, cardId);
   if (q.can) return { can: true };
   if (q.reason && q.reason.includes('Asleep')) {
