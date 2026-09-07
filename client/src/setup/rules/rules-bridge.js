@@ -450,9 +450,9 @@ import {
                         10
                       ) || 0;
                       if (target.image?.damageCounter) {
-                        target.image.damageCounter.textContent = existing + checkup.count;
+                        updateDamageCounter(targetPlayer, targetZone, tIdx, existing + checkup.count, true);
                       } else {
-                        addDamageCounter(targetPlayer, targetZone, tIdx, checkup.count);
+                        addDamageCounter(targetPlayer, targetZone, tIdx, checkup.count, true);
                       }
                     }
                   }
@@ -471,9 +471,13 @@ import {
             const boundary = resolveTurnBoundary(endingPlayer, key, Math.random, {
               checkupPoisonBonus: getStadiumCheckupPoisonBonus(active, endingPlayer),
             });
-            if (boundary.damage > 0 && active.image?.damageCounter) {
-              const current = parseInt(active.image.damageCounter.textContent || '0', 10) || 0;
-              active.image.damageCounter.textContent = current + boundary.damage;
+            if (boundary.damage > 0) {
+              const current = parseInt(active.image?.damageCounter?.textContent || '0', 10) || 0;
+              if (active.image?.damageCounter) {
+                updateDamageCounter(endingPlayer, 'active', 0, current + boundary.damage, true);
+              } else {
+                addDamageCounter(endingPlayer, 'active', 0, boundary.damage, true);
+              }
             }
             for (const note of boundary.notes) {
               appendMessage('', note, 'announcement', false);
@@ -497,7 +501,7 @@ import {
                 import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
                   for (let k = 0; k < effect.n; k++) {
                     if (getZone(endingPlayer, 'deck').getCount() > 0) {
-                      moveCardBundle(endingPlayer, endingPlayer, 'deck', 'hand', 0, false, 'move');
+                      moveCardBundle(endingPlayer, endingPlayer, 'deck', 'hand', 0, false, 'move', true);
                     }
                   }
                 });

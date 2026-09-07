@@ -92,7 +92,7 @@ const abilityBlockedByStadium = (user, target) => {
 
 // Safe self-damage accumulation: addDamageCounter would clobber any damage
 // already on the card, so accumulate textContent when a counter exists.
-const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, emit) => {
+const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, emit, rngBundle = {}) => {
   if (!discardSpec) return;
   const { deckTop, energyActive, handRandom, discardTools } = discardSpec;
   if (!(deckTop > 0 || energyActive > 0 || handRandom > 0 || discardTools)) return;
@@ -101,7 +101,7 @@ const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, 
     let discarded = 0;
     for (let i = 0; i < deckTop; i++) {
       if (getZone(oppPlayer, 'deck').getCount() === 0) break;
-      moveCard(oppPlayer, user, 'deck', 'discard', 0);
+      moveCardBundle(oppPlayer, user, 'deck', 'discard', 0, false, 'move', emit);
       discarded++;
     }
     if (discarded > 0) {
@@ -144,7 +144,7 @@ const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, 
         );
       } else {
         const energy = oppActiveZone.array[energyIdx];
-        moveCard(oppPlayer, user, 'active', 'discard', energyIdx);
+        moveCardBundle(oppPlayer, user, 'active', 'discard', energyIdx, false, 'move', emit);
         appendMessage(
           user,
           `🗑️ ${attackName}: discarded ${energy.name || 'Energy'} from opponent Active.`,
@@ -166,9 +166,15 @@ const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, 
         false
       );
     } else {
-      const idx = Math.floor(Math.random() * count);
+      let idx;
+      if (typeof rngBundle.randomHandIndex === 'number' && rngBundle.randomHandIndex >= 0 && rngBundle.randomHandIndex < count) {
+        idx = rngBundle.randomHandIndex;
+      } else {
+        idx = Math.floor(Math.random() * count);
+        rngBundle.randomHandIndex = idx;
+      }
       const card = hand.array[idx];
-      moveCard(oppPlayer, user, 'hand', 'discard', idx);
+      moveCardBundle(oppPlayer, user, 'hand', 'discard', idx, false, 'move', emit);
       appendMessage(
         user,
         `🗑️ ${attackName}: discarded a random card (${card?.name || 'card'}) from opponent's hand.`,
@@ -200,7 +206,7 @@ const executeDiscardOpponentEffect = (user, oppPlayer, discardSpec, attackName, 
       } else {
         for (const tool of [...tools]) {
           const idx = oppActiveZone.array.indexOf(tool);
-          if (idx >= 0) moveCard(oppPlayer, user, 'active', 'discard', idx);
+          if (idx >= 0) moveCardBundle(oppPlayer, user, 'active', 'discard', idx, false, 'move', emit);
         }
         appendMessage(
           user,
@@ -713,9 +719,16 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           const multiFlip = atkLower.match(/flip (\d+) coins?/);
           if (multiFlip && /for each heads/.test(atkText)) {
             const flips = parseInt(multiFlip[1], 10);
-            headsCount = 0;
-            for (let i = 0; i < flips; i++) {
-              if (Math.random() < 0.5) headsCount++;
+            if (Array.isArray(rngBundle.multiFlips) && rngBundle.multiFlips.length === flips) {
+              headsCount = rngBundle.multiFlips.filter((f) => f === 'heads').length;
+            } else {
+              rngBundle.multiFlips = [];
+              headsCount = 0;
+              for (let i = 0; i < flips; i++) {
+                const face = Math.random() < 0.5 ? 'heads' : 'tails';
+                rngBundle.multiFlips.push(face);
+                if (face === 'heads') headsCount++;
+              }
             }
             appendMessage(
               user,
@@ -2068,7 +2081,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             queuePendingAttackEffects(rulesState, user, pending, atk.name);
           }
           const discardSpec = parseDiscardOpponentEffect(atk.text);
-          executeDiscardOpponentEffect(user, oppPlayer, discardSpec, atk.name, emit);
+          executeDiscardOpponentEffect(user, oppPlayer, discardSpec, atk.name, emit, rngBundle);
         }
 
         // Record the once-per-turn attack as used this turn (only reached on

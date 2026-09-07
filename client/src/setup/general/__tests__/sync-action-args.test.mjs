@@ -214,3 +214,51 @@ test('switchAbility relays active/bench swaps via moveCardBundle', () => {
     'switchAbility must not call raw moveCard (local-only, never emitted)'
   );
 });
+
+test('trainer-execution must not call raw moveCard (local-only, never emitted)', () => {
+  const path = fileURLToPath(
+    new URL('../../rules/trainer-execution.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  const rawMoveMatches = [...src.matchAll(/(?<![\w])moveCard\(/g)];
+  assert.equal(
+    rawMoveMatches.length,
+    0,
+    'trainer-execution must not call raw moveCard directly — all moves must use moveCardBundle'
+  );
+});
+
+test('catchUpActions does not wipe self board on fullReplay', () => {
+  const path = fileURLToPath(
+    new URL('../catch-up-actions.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  assert.match(src, /reset\('opp', true, true, false, false\)/);
+  assert.equal(
+    src.includes("reset('self'"),
+    false,
+    'catchUpActions must never call reset(\'self\') during opponent catch-up'
+  );
+});
+
+test('undoAsync executes sequentially rather than Promise.all concurrent race', () => {
+  const path = fileURLToPath(
+    new URL('../../../actions/general/undo.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  assert.equal(
+    src.includes('Promise.all'),
+    false,
+    'undoAsync must not use Promise.all for action replay'
+  );
+  assert.match(src, /for \(const data of replay\)/);
+});
+
+test('server events whitelist includes resetCounter', () => {
+  const path = fileURLToPath(
+    new URL('../../../../../server/server.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  assert.match(src, /'resetCounter'/);
+});
+

@@ -287,6 +287,9 @@ export const initializeSocketEventListeners = () => {
   socket.on('endImport', () => {
     isImporting = false;
   });
+  socket.on('resetCounter', () => {
+    cleanActionData('opp');
+  });
   socket.on('pushAction', (data) => {
     const notSpectator = !(
       document.getElementById('spectatorModeCheckbox').checked &&

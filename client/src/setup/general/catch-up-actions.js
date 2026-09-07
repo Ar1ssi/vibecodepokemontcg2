@@ -14,12 +14,12 @@ export const catchUpActions = async (actionData, fullReplay = false) => {
   try {
     if (fullReplay) {
       systemState.oppCounter = 0;
-      // Force a clean board reset before replaying the full action history.
+      // Force a clean board reset on opponent zones before replaying the full action history.
       // Without this, exchangeData may skip reset() because the opponent data
       // hasn't changed, causing actions to replay on top of existing state
-      // (doubled cards, corrupted zones).
+      // (doubled cards, corrupted zones). Do NOT reset 'self', as actionData
+      // only contains opponent actions.
       reset('opp', true, true, false, false);
-      reset('self', true, true, false, false);
     }
     const missingData = (actionData || []).slice(systemState.oppCounter);
 

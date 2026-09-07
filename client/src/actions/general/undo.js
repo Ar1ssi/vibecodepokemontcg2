@@ -58,17 +58,20 @@ const undoAsync = async (user, filteredActionData, emit = true) => {
           : 0;
 
       const replay = mostRecentResetAndAfterEntries || filteredActionData;
-      Promise.all(
-        replay.map((data) =>
-          acceptAction(
+      (async () => {
+        for (const data of replay) {
+          await acceptAction(
             user,
             data.action,
             data.parameters,
             false,
             systemState.isReplay
-          )
-        )
-      ).then(() => resolve());
+          );
+        }
+      })()
+        .then(() => resolve())
+        .catch(reject);
+      return;
     }
     reject('No action data to undo');
   });

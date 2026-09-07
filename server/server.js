@@ -393,6 +393,7 @@ async function main() {
       'hideShortcut',
       'lookShortcut',
       'stopLookingShortcut',
+      'resetCounter',
     ];
 
     // Register event listeners using the common function

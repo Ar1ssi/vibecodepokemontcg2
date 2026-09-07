@@ -3,7 +3,6 @@
 
 import { moveToDeckBottom } from '../../actions/zones/deck-actions.js';
 import { flipCoin } from '../../actions/general/flip-coin.js';
-import { moveCard } from '../../actions/move-card-bundle/move-card.js';
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus } from './status.mjs';
@@ -245,7 +244,7 @@ function attachEnergyCard(user, energy, target) {
   for (const zoneId of ['active', 'bench', 'discard', 'hand', 'deck']) {
     const idx = zone(user, zoneId).array.indexOf(energy);
     if (idx >= 0) {
-      moveCard(user, user, zoneId, loc.zoneId, idx, loc.index);
+      moveCardBundle(user, user, zoneId, loc.zoneId, idx, loc.index, 'move', true);
       return;
     }
   }
@@ -393,7 +392,7 @@ async function runSearchStep(card, searchStep, done) {
       const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
       const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
       const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCard(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex);
+      if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
       msg(`  auto: attached ${energyCard.name} to ${target.name}`);
       shuffleAfter();
       done?.();
@@ -409,7 +408,7 @@ async function runSearchStep(card, searchStep, done) {
         const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
         const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
         const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-        if (idx >= 0) moveCard(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex);
+        if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
         msg(`  auto: attached ${energyCard.name} to ${target.name}`);
         shuffleAfter();
         done?.();
@@ -904,7 +903,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                 const zoneId = zone(_effectOwner, 'active').array.includes(t) ? 'active' : 'bench';
                 const ti = zone(_effectOwner, zoneId).array.indexOf(t);
                 const ei = zone(_effectOwner, 'discard').array.indexOf(energy);
-                if (ei >= 0) moveCard(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti);
+                if (ei >= 0) moveCardBundle(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti, 'move', true);
               } else {
                 _openChoicePicker({
                   title: 'Choose Pokémon to attach to',
@@ -915,7 +914,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                     const zoneId = zone(_effectOwner, 'active').array.includes(t) ? 'active' : 'bench';
                     const ti = zone(_effectOwner, zoneId).array.indexOf(t);
                     const ei = zone(_effectOwner, 'discard').array.indexOf(energy);
-                    if (ei >= 0) moveCard(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti);
+                    if (ei >= 0) moveCardBundle(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti, 'move', true);
                   },
                 });
               }
@@ -1329,7 +1328,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           for (let i = 0; i < n; i++) moveToDeckBottom('self', 'self', 'prizes', 0);
           _shuffleZone('self', 'self', 'deck');
           for (let i = 0; i < n; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCard(_effectOwner, _effectOwner, 'deck', 'prizes', 0);
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'prizes', 0, false, 'move', true);
           }
           msg(`  auto: reshuffled ${n} Prize cards`);
           break;
@@ -1383,8 +1382,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                   const pi = zone('opp', 'prizes').array.indexOf(prize);
                   const hi = zone('opp', 'hand').array.indexOf(randomHand);
                   if (pi < 0 || hi < 0) return;
-                  moveCard('opp', 'opp', 'prizes', 'hand', pi);
-                  moveCard('opp', 'opp', 'hand', 'prizes', hi);
+                  moveCardBundle('opp', 'opp', 'prizes', 'hand', pi, false, 'move', true);
+                  moveCardBundle('opp', 'opp', 'hand', 'prizes', hi, false, 'move', true);
                   msg('  auto: swapped Prize and hand card');
                 },
                 onCancel: () => msg('  kept cards — no swap'),
