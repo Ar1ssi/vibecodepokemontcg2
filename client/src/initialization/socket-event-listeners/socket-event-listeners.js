@@ -33,6 +33,11 @@ import {
   emitSelfBoardSnapshot,
   requestBoardSnapshot,
 } from '../../setup/general/request-board-snapshot.js';
+import { applyView } from '../../setup/netcode/apply-view.js';
+import {
+  handleCmdRejected,
+  emitRequestView,
+} from '../../setup/netcode/cmd-emitter.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -90,7 +95,8 @@ export const removeSyncIntervals = () => {
   if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
 };
 export const initializeSocketEventListeners = () => {
-  socket.on('joinGame', () => {
+  socket.on('joinGame', (data) => {
+    systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
     const connectedRoom = document.getElementById('connectedRoom');
     const lobby = document.getElementById('lobby');
     const roomHeaderText = document.getElementById('roomHeaderText');
@@ -202,10 +208,14 @@ export const initializeSocketEventListeners = () => {
       // Trigger immediate resync to recover any actions missed during disconnect
       if (notSpectator) {
         logSync('resync.request.emit', { reason: 'connect' }, 'out');
-        socket.emit('resyncActions', {
-          roomId: systemState.roomId,
-          reason: 'reconnect',
-        });
+        if (systemState.serverAuthoritative) {
+          emitRequestView({ socket, roomId: systemState.roomId });
+        } else {
+          socket.emit('resyncActions', {
+            roomId: systemState.roomId,
+            reason: 'reconnect',
+          });
+        }
       }
     }
   });
@@ -237,6 +247,25 @@ export const initializeSocketEventListeners = () => {
       data.user = data.user === 'self' ? 'opp' : 'self';
     }
     appendMessage(data.user, data.message, data.type, data.emit);
+  });
+
+  socket.on('view', (data) => {
+    if (data?.view) {
+      applyView(data.view, data.events || []);
+    }
+  });
+
+  socket.on('cmdRejected', (data) => {
+    handleCmdRejected(data, {
+      onRejected: ({ reason, details }) => {
+        appendMessage(
+          '',
+          `Command rejected: ${reason}${details ? ` (${details})` : ''}`,
+          'announcement',
+          false
+        );
+      },
+    });
   });
   socket.on('requestAction', (data) => {
     const notSpectator = !(

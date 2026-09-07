@@ -1,6 +1,8 @@
 import { socket, systemState } from '../../state.js';
 import { logSyncAction } from './sync-logger-bridge.js';
 import { createAction } from './action-event.mjs';
+import { translateActionToCmd } from '../netcode/dual-run-bridge.js';
+import { emitCmd } from '../netcode/cmd-emitter.js';
 
 export const processAction = (user, emit, action, parameters) => {
   const notSpectator = !(
@@ -33,6 +35,17 @@ export const processAction = (user, emit, action, parameters) => {
         counter: systemState.selfCounter,
         transport: 'pushAction',
       });
+      if (systemState.serverAuthoritative) {
+        const cmdSpec = translateActionToCmd(action, parameters);
+        if (cmdSpec) {
+          emitCmd({
+            socket,
+            roomId: systemState.roomId,
+            type: cmdSpec.type,
+            payload: cmdSpec.payload,
+          }).catch(() => {});
+        }
+      }
     } else if (systemState.isTwoPlayer) {
       //if it's two player and you're moving an opponent's card, request the action before implementing
       const data = {

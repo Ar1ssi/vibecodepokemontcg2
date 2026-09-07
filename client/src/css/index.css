@@ -4532,3 +4532,136 @@ a:hover {
       padding: 3vh 0;
       font-style: italic;
     }
+
+/* Netcode: In-flight command affordance (Slice 7) */
+.cmd-pending {
+  opacity: 0.6 !important;
+  transform: translateY(-4px) !important;
+  filter: brightness(0.9) !important;
+  pointer-events: none !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+/* Attached cards stacking */
+.attached-card {
+  position: absolute !important;
+  top: 15% !important;
+  left: 10% !important;
+  z-index: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Netcode: PendingChoice modal and waiting banner */
+.choice-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  backdrop-filter: blur(4px);
+}
+
+.choice-modal-container {
+  background: #1e1e24;
+  border: 1px solid #3a3a4c;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 80vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.choice-modal-title {
+  margin: 0 0 16px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.choice-modal-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 55vh;
+  padding: 8px;
+}
+
+.choice-option-card {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 4px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.choice-option-card:hover {
+  transform: scale(1.04);
+  border-color: #60a5fa;
+}
+
+.choice-option-card.selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.2);
+  transform: scale(1.04);
+}
+
+.choice-option-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  display: block;
+}
+
+.choice-modal-footer {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.choice-confirm-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.choice-confirm-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.choice-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.choice-waiting-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  padding: 12px 24px;
+  border-radius: 9999px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+  pointer-events: none;
+}
