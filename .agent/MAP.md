@@ -10,3 +10,51 @@ docs/ — project documentation (card types taxonomy, rule specs); entry: docs/c
 scripts/ — admin and asset utility scripts (stadium audit, mat generator, scraper)
 tools/ — internal dev tools, sync log comparison, asset mappings
 
+<!-- Netcode/rules detail below verified S2 while designing 001. Deck-builder, image-logic,
+     sizing, and initialization subtrees remain unmapped at this depth. -->
+
+## Transport / netcode (client-authoritative today — design 001 replaces this)
+server/server.js — pure relay: `emitToRoom()` broadcasts to room; holds room membership only, NO game state
+client/src/initialization/socket-event-listeners/socket-event-listeners.js — all inbound socket handlers; sync orchestration
+client/src/setup/general/process-action.js — appends to action log, increments counter, emits pushAction/requestAction
+client/src/setup/general/accept-action.js — 59-entry action→function dispatch table; the command vocabulary
+client/src/initialization/global-variables/global-variables.js — `socket` + `systemState`; note `initiator` getter reads a CSS class
+
+## Reconciliation stack (band-aids; design 001 slice 8 deletes these)
+client/src/setup/general/catch-up-actions.js — replay peer action log
+client/src/setup/general/resync-actions.js — send own log to peer
+client/src/setup/general/sync-replay.mjs — dedupe fullReplay/snapshot to stop recovery loops
+client/src/setup/general/request-board-snapshot.js + apply-board-snapshot.js — full board overwrite path
+client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diagnostics ring buffer
+client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
+
+## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
+client/src/setup/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
+client/src/setup/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
+client/src/setup/rules/trainer-effects.mjs — text → structured trainer step parser
+client/src/setup/rules/abilities.mjs + ability-step-plan.mjs — ability parse + ordered step plan (resume seam)
+client/src/setup/rules/damage-parser.mjs — attack text → damage math
+client/src/setup/rules/rules-turnorder.mjs — deterministic coin-flip caller selection
+
+## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
+client/src/setup/rules/rules-bridge.js — 2291 lines; orchestrates rules via document.dispatchEvent + HUD
+client/src/setup/rules/trainer-execution.js — 1465 lines; resolves effects through synchronous UI pickers
+client/src/actions/chat-buttons/chat-buttons.js — 4330 lines; attack/pass/retreat monolith
+
+## State / zones
+client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, element, ... }; 10 zones/player, stadium neutral
+client/src/setup/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)
+client/src/setup/zones/*.mjs — also pure: board-snapshot, card-state, hand-sort, resolve-card-index, active-pokemon
+client/src/setup/deck-constructor/card.js — `Card` class; identity is `card.image` (HTMLImageElement)
+
+## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)
+client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary mutation path
+client/src/actions/zones/ — deck/hand/prize/shuffle operations
+client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
+client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
+
+## Tests & tooling
+client/src/**/__tests__/*.mjs — 41 files, plain `node --test`, no jsdom; `pnpm test` (797 tests)
+two-player-sync-test.mjs — Playwright two-browser sync harness
+*-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
+

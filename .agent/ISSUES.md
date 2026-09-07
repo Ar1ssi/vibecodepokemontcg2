@@ -16,7 +16,9 @@
 - I2 2026-09-07 P2 [rules] End Turn button logic: +Turn needs rework to end active player's turn (ref: ISSUES.txt)
 - I3 2026-09-07 P2 [rules] Garland Ray energy discard parsing fail on multiplier attacks (ref: ISSUES.txt)
 - I4 2026-09-07 P2 [rules] Prize card selection on KO fails (ref: ISSUES.txt)
+- I6 2026-09-07 P2 [netcode] Multiplayer desyncs are architectural: two client simulations, no arbiter — 54 of last 200 commits are sync/replay/RNG patches (refs: design 001)
 - I5 2026-09-07 P2 [rules] Deck inspection allowed during rules mode (ref: ISSUES.txt)
+    Root cause is data, not UI: both clients hold the full opponent deck. Design 001 closes it by redacting the view server-side — don't fix separately.
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
