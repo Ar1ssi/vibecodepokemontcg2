@@ -1,6 +1,7 @@
 // Shared deck/discard search filtering (trainers, abilities, attacks).
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
+import { cardHasRuleBox } from './ko-flow.mjs';
 
 const SYMBOL_TO_TYPE = {
   c: 'Colorless',
@@ -85,6 +86,23 @@ export function matchesSearch(card, what = '') {
   }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
+    const noRuleBox =
+      w.includes("doesn't have a rule box") ||
+      w.includes("does not have a rule box") ||
+      w.includes("don't have a rule box") ||
+      w.includes("do not have a rule box") ||
+      w.includes("without a rule box") ||
+      w.includes("no rule box") ||
+      w.includes("non-rule box");
+    if (noRuleBox && cardHasRuleBox(card)) return false;
+
+    const withRuleBox =
+      !noRuleBox &&
+      (w.includes("with a rule box") ||
+        w.includes("has a rule box") ||
+        w.includes("rule box"));
+    if (withRuleBox && !cardHasRuleBox(card)) return false;
+
     if (w.includes('evolution') && (card.stage || 'Basic') === 'Basic') return false;
     const typedEvolution = what.match(/evolution\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedEvolution) {

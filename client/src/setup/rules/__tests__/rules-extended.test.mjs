@@ -2,7 +2,7 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail } = await import('../rules-state.mjs');
-    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
+    const { prizesForKO, cardHasRuleBox, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
@@ -30,6 +30,22 @@ import test from 'node:test';
       assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 3);
       assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 3);
       assert.equal(prizesForKO({ name: 'Yanmega' }), 1);
+      assert.equal(prizesForKO({ name: 'Pikachu V' }), 2);
+      assert.equal(prizesForKO({ name: 'Lugia VSTAR' }), 2);
+      assert.equal(prizesForKO({ name: 'Mew VMAX' }), 3);
+      assert.equal(prizesForKO({ name: 'Mewtwo GX' }), 2);
+    });
+
+    test('cardHasRuleBox: true if awards > 1 prize card', () => {
+      assert.equal(cardHasRuleBox({ name: 'Cetitan ex' }), true);
+      assert.equal(cardHasRuleBox({ name: 'Pikachu V' }), true);
+      assert.equal(cardHasRuleBox({ name: 'Lugia VSTAR' }), true);
+      assert.equal(cardHasRuleBox({ name: 'Mew VMAX' }), true);
+      assert.equal(cardHasRuleBox({ name: 'Mewtwo GX' }), true);
+      assert.equal(cardHasRuleBox({ name: 'Mega Charizard ex' }), true);
+      assert.equal(cardHasRuleBox({ name: 'Pikachu' }), false);
+      assert.equal(cardHasRuleBox({ name: 'Yanmega' }), false);
+      assert.equal(cardHasRuleBox({ name: 'Eevee', rarity: 'Common' }), false);
     });
 
     test('isMegaCard: rarity, subtype, or Mega name — not Yanmega', () => {

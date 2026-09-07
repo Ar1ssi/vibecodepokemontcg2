@@ -17,7 +17,7 @@ import {
   mergeDamagePrevention,
   applyDamagePrevention,
 } from './ability-executors.mjs';
-import { isExCard, isGxCard, isMegaCard } from './ko-flow.mjs';
+import { isExCard, isGxCard, isMegaCard, cardHasRuleBox as baseCardHasRuleBox } from './ko-flow.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 
 const lower = (v) =>
@@ -44,7 +44,7 @@ const TYPE_LETTER = {
 
 export function cardHasRuleBox(card) {
   if (!card) return false;
-  return isExCard(card) || isGxCard(card) || isMegaCard(card);
+  return baseCardHasRuleBox(card);
 }
 
 export function attackerTypes(attacker) {

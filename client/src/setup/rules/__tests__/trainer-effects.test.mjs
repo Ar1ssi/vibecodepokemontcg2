@@ -561,6 +561,44 @@ import test, { describe } from 'node:test';
       assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === "Basic Team Rocket's Pokémon" && s.count === 3));
     });
 
+    test("Poké Pad: search deck for a Pokémon that doesn't have a Rule Box", () => {
+      const r = parseTrainerEffect("Search your deck for a Pokémon that doesn't have a Rule Box, reveal it, and put it into your hand. Then, shuffle your deck. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)");
+      assert.equal(r.recognizable, true);
+      const search = r.steps.find((s) => s.type === 'searchDeck');
+      assert.ok(search);
+      assert.equal(search.what, 'Pokémon without a Rule Box');
+      assert.equal(search.count, 1);
+      assert.equal(search.destination, 'hand');
+      assert.equal(search.reveal, true);
+    });
+
+    test("Poké Pad filter: matchesSearch only matches Pokémon without a Rule Box", () => {
+      const standardBasic = { name: 'Pikachu', type: 'Pokémon', hp: 70 };
+      const standardStage1 = { name: 'Bibarel', type: 'Pokémon', stage: 'Stage 1', hp: 120 };
+      const pokemonEx = { name: 'Charizard ex', type: 'Pokémon', hp: 330 };
+      const pokemonV = { name: 'Raikou V', type: 'Pokémon', hp: 200 };
+      const pokemonVmax = { name: 'Mew VMAX', type: 'Pokémon', hp: 310 };
+      const pokemonMega = { name: 'Mega Lucario ex', type: 'Pokémon', hp: 220 };
+      const trainer = { name: 'Nest Ball', type: 'Trainer' };
+      const energy = { name: 'Basic Fire Energy', type: 'Energy' };
+
+      const what = 'Pokémon without a Rule Box';
+      assert.equal(matchesSearch(standardBasic, what), true);
+      assert.equal(matchesSearch(standardStage1, what), true);
+      assert.equal(matchesSearch(pokemonEx, what), false);
+      assert.equal(matchesSearch(pokemonV, what), false);
+      assert.equal(matchesSearch(pokemonVmax, what), false);
+      assert.equal(matchesSearch(pokemonMega, what), false);
+      assert.equal(matchesSearch(trainer, what), false);
+      assert.equal(matchesSearch(energy, what), false);
+
+      const pool = filterSearchMatches(
+        [standardBasic, pokemonEx, standardStage1, pokemonV, pokemonVmax, pokemonMega, trainer, energy],
+        what
+      );
+      assert.deepEqual(pool.map((c) => c.name), ['Pikachu', 'Bibarel']);
+    });
+
     test('describeStep: drawUntil and opponentRead wording', () => {
       assert.ok(describeStep({ type: 'drawUntil', target: 6 }).includes('6'));
       assert.ok(describeStep({ type: 'opponentDraw', count: 3 }).includes('3'));
