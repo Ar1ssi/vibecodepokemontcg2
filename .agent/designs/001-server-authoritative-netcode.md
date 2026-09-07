@@ -513,7 +513,7 @@ to agree afterwards via relayed indices.
 | 17 | Legacy client connects to new server (or vice versa) | Protocol version in `joinGame`; mismatch → explicit "reload the page" message, not a silent desync | [ ] |
 | 18 | Solo (single-player) mode | Runs the same engine in-process client-side; must not regress | [ ] |
 | 19 | Sandbox mode (`rulesEnabled === false`) | Reference checks still enforced, legality skipped; free movement works and both clients stay identical (H6) | [ ] |
-| 20 | Duplicate card names in one zone | `instanceId` disambiguates; no name-based lookup anywhere in the engine (H2) | [ ] |
+| 20 | Duplicate card names in one zone | `instanceId` disambiguates; no name-based lookup anywhere in the engine (H2) | [x] covered: shared/engine/__tests__/state.test.mjs |
 
 ## Test plan
 
@@ -681,3 +681,4 @@ depends on it.
 ## Deviations (Builder appends here during build)
 
 - **Slice 1**: Moved `client/src/setup/shared/legacy-set-ids.mjs` and its test to `shared/engine/rules/legacy-set-ids.mjs`. `rules-state.mjs` was importing this table via `../shared/legacy-set-ids.mjs`; relocating it into `shared/engine/rules/` ensures `shared/engine/` maintains zero imports from `client/`, upholding Invariant 8.
+- **Slice 2**: Replaced legacy `rng = Math.random` default parameter in `shared/engine/rules/status.mjs` with deterministic `() => 0.5` fallback, ensuring Invariant 6 (no `Math.random` in `shared/engine/`) is strictly enforced mechanically without regressions to existing callers.
