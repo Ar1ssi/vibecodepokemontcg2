@@ -7,7 +7,7 @@
  */
 
 import { getLegalSetRegistry } from './client/src/setup/deck-builder/core/set-browser.mjs';
-import { parseTrainerEffect } from './client/src/setup/rules/trainer-effects.mjs';
+import { parseTrainerEffect } from './shared/engine/rules/trainer-effects.mjs';
 
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 const TARGET_TYPES = new Set(['Supporter', 'Item', 'Tool']);

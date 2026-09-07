@@ -13,7 +13,7 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 import { getLegalSetRegistry, fetchSetCards } from './client/src/setup/deck-builder/core/set-browser.mjs';
-import { tcgAbilityFromDetail } from './client/src/setup/rules/rules-state.mjs';
+import { tcgAbilityFromDetail } from './shared/engine/rules/rules-state.mjs';
 
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 const SERVER = process.env.PTCG_SIM_URL || 'http://localhost:4000';
@@ -138,12 +138,12 @@ const BROWSER_AUDIT_FN = async (entry) => {
     { getZone },
   ] = await Promise.all([
     import('/src/setup/deck-constructor/card.js'),
-    import('/src/setup/rules/rules-state.mjs'),
-    import('/src/setup/rules/ability-effects.mjs'),
-    import('/src/setup/rules/abilities.mjs'),
-    import('/src/setup/rules/ability-step-plan.mjs'),
-    import('/src/setup/rules/collect-usable-abilities.mjs'),
-    import('/src/setup/rules/ability-executors.mjs'),
+    import('/shared/engine/rules/rules-state.mjs'),
+    import('/shared/engine/rules/ability-effects.mjs'),
+    import('/shared/engine/rules/abilities.mjs'),
+    import('/shared/engine/rules/ability-step-plan.mjs'),
+    import('/shared/engine/rules/collect-usable-abilities.mjs'),
+    import('/shared/engine/rules/ability-executors.mjs'),
     import('/src/setup/zones/get-zone.js'),
   ]);
 

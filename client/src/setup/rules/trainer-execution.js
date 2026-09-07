@@ -5,13 +5,13 @@ import { moveToDeckBottom } from '../../actions/zones/deck-actions.js';
 import { flipCoin } from '../../actions/general/flip-coin.js';
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
-import { applyStatus } from './status.mjs';
-import { ensureCardData, getStadium } from './rules-state.mjs';
-import { normalizeStage, isRareCandyJump, canEvolve } from './evolution.mjs';
-import { isEnergyCard, classifyEnergyEffect } from './energy-effects.mjs';
-import { filterSearchMatches, searchPickerAllCandidates } from './search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from './search-reveal.mjs';
-import { countBenchPokemon } from '../zones/active-pokemon.mjs';
+import { applyStatus } from '/shared/engine/rules/status.mjs';
+import { ensureCardData, getStadium } from '/shared/engine/rules/rules-state.mjs';
+import { normalizeStage, isRareCandyJump, canEvolve } from '/shared/engine/rules/evolution.mjs';
+import { isEnergyCard, classifyEnergyEffect } from '/shared/engine/rules/energy-effects.mjs';
+import { filterSearchMatches, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
+import { countBenchPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',

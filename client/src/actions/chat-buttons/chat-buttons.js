@@ -4,10 +4,10 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { resetAbilityCounters } from '../counters/reset-counters.js';
 import { discardBoard } from '../general/board-actions.js';
-import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus } from '../../setup/rules/rules-state.mjs';
-import { classifyAbility, searchTargetType } from '../../setup/rules/ability-effects.mjs';
-import { computeAttackDamage, canPayAttackCost } from '../../setup/rules/attack-engine.mjs';
-import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '../../setup/rules/energy-effects.mjs';
+import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus } from '/shared/engine/rules/rules-state.mjs';
+import { classifyAbility, searchTargetType } from '/shared/engine/rules/ability-effects.mjs';
+import { computeAttackDamage, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
+import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
 import {
   parsePendingAttackEffects,
   parseDiscardOpponentEffect,
@@ -16,7 +16,7 @@ import {
   pendingDamageVulnerability,
   pendingCantUseAttack,
   pendingRetreatCostDelta,
-} from '../../setup/rules/attack-pending-effects.mjs';
+} from '/shared/engine/rules/attack-pending-effects.mjs';
 import {
   parseDamagePrevention,
   applyDamagePrevention,
@@ -31,7 +31,7 @@ import {
   parseRecursionFromDiscard,
   isPokemonToolCard,
   attachedTools,
-} from '../../setup/rules/ability-executors.mjs';
+} from '/shared/engine/rules/ability-executors.mjs';
 import {
   combinedToolDamagePrevention,
   applyToolDamageReduction,
@@ -40,16 +40,16 @@ import {
   toolPrizeCountAdjust,
   attachedToolOnDamageEffects,
   combinedToolRetreatCost,
-} from '../../setup/rules/tool-combat.mjs';
-import { parseAbility } from '../../setup/rules/abilities.mjs';
-import { canEvolve, markEvolvedThisTurn, normalizeStage } from '../../setup/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '../../setup/rules/damage-parser.mjs';
+} from '/shared/engine/rules/tool-combat.mjs';
+import { parseAbility } from '/shared/engine/rules/abilities.mjs';
+import { canEvolve, markEvolvedThisTurn, normalizeStage } from '/shared/engine/rules/evolution.mjs';
+import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
-import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions } from '../../setup/rules/ko-flow.mjs';
-import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '../../setup/rules/retreat.mjs';
+import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions } from '/shared/engine/rules/ko-flow.mjs';
+import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '/shared/engine/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
@@ -58,7 +58,7 @@ import {
   energiesAttachedToPokemon,
   getActivePokemonCard,
   isBoardPokemon,
-} from '../../setup/zones/active-pokemon.mjs';
+} from '/shared/engine/zones/active-pokemon.mjs';
 import { openCardPicker } from '../../setup/image-logic/card-picker.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import {
@@ -72,12 +72,12 @@ import {
   parseStatusFromAttackText,
   parseSelfStatusFromAttackText,
   resolveTurnBoundary,
-} from '../../setup/rules/status.mjs';
+} from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '../../setup/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
-import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '../../setup/rules/search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '../../setup/rules/search-reveal.mjs';
+import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
   if (!stadiumAbilityBlocked(target)) return false;
@@ -4089,8 +4089,8 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     case 'discard-to-bench': {
       const discard = getZone(user, 'discard');
       const bench = getZone(user, 'bench');
-      const { canAddToBench } = await import('../../setup/rules/ko-flow.mjs');
-      const { getEffectiveBenchLimit, playerHasTeraInPlay } = await import('../../setup/rules/stadium-effects.mjs');
+      const { canAddToBench } = await import('/shared/engine/rules/ko-flow.mjs');
+      const { getEffectiveBenchLimit, playerHasTeraInPlay } = await import('/shared/engine/rules/stadium-effects.mjs');
       const inPlay = [...getZone(user, 'active').array, ...bench.array].filter((c) => c.type === 'Pokémon');
       const limit = getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));
       let moved = 0;
@@ -4130,8 +4130,8 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     }
     case 'search-bench': {
       const deck = getZone(user, 'deck');
-      const { canAddToBench } = await import('../../setup/rules/ko-flow.mjs');
-      const { getEffectiveBenchLimit, playerHasTeraInPlay } = await import('../../setup/rules/stadium-effects.mjs');
+      const { canAddToBench } = await import('/shared/engine/rules/ko-flow.mjs');
+      const { getEffectiveBenchLimit, playerHasTeraInPlay } = await import('/shared/engine/rules/stadium-effects.mjs');
       const bench = getZone(user, 'bench');
       const inPlay = [...getZone(user, 'active').array, ...bench.array].filter((c) => c.type === 'Pokémon');
       const limit = getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));

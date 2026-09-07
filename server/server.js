@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientDir = path.join(__dirname, '../client');
+const sharedDir = path.join(__dirname, '../shared');
 
 const envFilePath = path.join(__dirname, 'socket-admin-password.env');
 dotenv.config({ path: envFilePath });
@@ -180,6 +181,7 @@ async function main() {
     }
   });
 
+      app.use('/shared', express.static(sharedDir));
       app.use(express.static(clientDir));
   app.get('/', (_, res) => {
     res.render('index', { importDataJSON: null });

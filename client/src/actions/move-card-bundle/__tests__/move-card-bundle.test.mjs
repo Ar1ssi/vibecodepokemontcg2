@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCardHint } from '../../../setup/zones/resolve-card-index.mjs';
+import { buildCardHint } from '../../../../../shared/engine/zones/resolve-card-index.mjs';
 import { splitEmitAndTail } from '../../../setup/general/sync-action-args.mjs';
 
 // Mirrors buildMoveCardHints origin-zone lookup (must run before splice).

@@ -29,12 +29,13 @@ client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diag
 client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
-client/src/setup/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
-client/src/setup/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
-client/src/setup/rules/trainer-effects.mjs — text → structured trainer step parser
-client/src/setup/rules/abilities.mjs + ability-step-plan.mjs — ability parse + ordered step plan (resume seam)
-client/src/setup/rules/damage-parser.mjs — attack text → damage math
-client/src/setup/rules/rules-turnorder.mjs — deterministic coin-flip caller selection
+shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
+shared/engine/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
+shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
+shared/engine/rules/abilities.mjs + ability-step-plan.mjs — ability parse + ordered step plan (resume seam)
+shared/engine/rules/damage-parser.mjs — attack text → damage math
+shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection
+shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping
 
 ## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
 client/src/setup/rules/rules-bridge.js — 2291 lines; orchestrates rules via document.dispatchEvent + HUD
@@ -43,8 +44,8 @@ client/src/actions/chat-buttons/chat-buttons.js — 4330 lines; attack/pass/retr
 
 ## State / zones
 client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, element, ... }; 10 zones/player, stadium neutral
-client/src/setup/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)
-client/src/setup/zones/*.mjs — also pure: board-snapshot, card-state, hand-sort, resolve-card-index, active-pokemon
+shared/engine/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)
+shared/engine/zones/*.mjs — pure: board-snapshot, card-state, hand-sort, resolve-card-index, active-pokemon
 client/src/setup/deck-constructor/card.js — `Card` class; identity is `card.image` (HTMLImageElement)
 
 ## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)

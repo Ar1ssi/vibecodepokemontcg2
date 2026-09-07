@@ -67,7 +67,7 @@ const deckToSimRows = (deck = {}) => {
         // Collector number (TCGdex localId). Decks built here know exactly
         // which printing was picked; carrying the number keeps the rules
         // engine from re-guessing it by name later — see resolveCardId() in
-        // setup/rules/rules-state.mjs.
+        // shared/engine/rules/rules-state.mjs.
         variant?.data?.number || variant?.data?.localId || null,
         variant?.data?.set?.id || null,
         variant?.data?.id || null,

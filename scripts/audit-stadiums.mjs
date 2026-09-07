@@ -25,7 +25,7 @@ import {
   parseStadiumCheckupPoisonBonus,
   parseStadiumAttackCostIncrease,
   parseStadiumDamageReduction,
-} from '../client/src/setup/rules/stadium-effects.mjs';
+} from '../shared/engine/rules/stadium-effects.mjs';
 
 const BASE = 'https://api.tcgdex.net/v2/en';
 

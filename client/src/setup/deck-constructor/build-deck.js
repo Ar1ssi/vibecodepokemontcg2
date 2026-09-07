@@ -4,7 +4,7 @@ import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
 import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
-import { ensureCardData } from '../rules/rules-state.mjs';
+import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 
 
 export const buildDeck = (user) => {

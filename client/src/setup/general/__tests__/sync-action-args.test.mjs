@@ -7,7 +7,7 @@ import {
   rngFromCoin,
   splitEmitAndTail,
 } from '../sync-action-args.mjs';
-import { hashBoardSnapshot, hashCardList } from '../../zones/zone-hash.mjs';
+import { hashBoardSnapshot, hashCardList } from '../../../../../shared/engine/zones/zone-hash.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -265,7 +265,7 @@ test('server events whitelist includes resetCounter', () => {
 });
 
 test('abilityKey differentiates duplicate cards when cardId or syncInstance differ', async () => {
-  const { abilityKey } = await import('../../rules/rules-state.mjs');
+  const { abilityKey } = await import('../../../../../shared/engine/rules/rules-state.mjs');
   const cardA = { name: 'Bibarel', id: 'swsh9-121', cardId: 'bibarel-1', syncInstance: 1 };
   const cardB = { name: 'Bibarel', id: 'swsh9-121', cardId: 'bibarel-2', syncInstance: 2 };
   assert.notEqual(abilityKey(cardA), abilityKey(cardB));

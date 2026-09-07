@@ -2,7 +2,7 @@ import { socket, systemState } from '../../state.js';
 import { readyUp } from '../../actions/general/ready.js';
 import { loadDeckData } from '../deck-constructor/import.js';
 import { getZone } from '../zones/get-zone.js';
-import { rulesState } from '../rules/rules-state.mjs';
+import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 
 function zoneSnapshot(user, zoneId) {

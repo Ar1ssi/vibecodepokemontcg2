@@ -5,7 +5,7 @@ import {
   startHoloAnimation,
   stopHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
-import { ensureCardData } from '../rules/rules-state.mjs';
+import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 import {
   findDropSlotIndex,

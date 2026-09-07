@@ -5,12 +5,12 @@
  * tcgAbilityFromDetail() mapper that ensureCardData() applies after the fix.
  */
 import { getLegalSetRegistry, fetchSetCards } from './client/src/setup/deck-builder/core/set-browser.mjs';
-import { parseAbility } from './client/src/setup/rules/abilities.mjs';
+import { parseAbility } from './shared/engine/rules/abilities.mjs';
 import {
   classifyAbility,
   classifyAbilityFamilies,
-} from './client/src/setup/rules/ability-effects.mjs';
-import { tcgAbilityFromDetail } from './client/src/setup/rules/rules-state.mjs';
+} from './shared/engine/rules/ability-effects.mjs';
+import { tcgAbilityFromDetail } from './shared/engine/rules/rules-state.mjs';
 
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 const detailCache = new Map();
