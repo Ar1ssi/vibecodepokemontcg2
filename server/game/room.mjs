@@ -233,4 +233,20 @@ export class GameRoom {
     const playerId = this.socketToPlayer.get(socketId) || null;
     return viewFor(this.state, playerId);
   }
+
+  /**
+   * Resolves a pending choice for a player socket.
+   *
+   * @param {string} socketId
+   * @param {object} payload { choiceId, selection }
+   * @param {number} [clientSeq]
+   * @returns {object}
+   */
+  resolveChoice(socketId, payload = {}, clientSeq = null) {
+    return this.handleCommand(socketId, {
+      type: 'resolveChoice',
+      payload,
+      clientSeq,
+    });
+  }
 }

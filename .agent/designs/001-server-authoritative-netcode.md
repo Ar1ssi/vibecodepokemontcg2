@@ -499,16 +499,16 @@ to agree afterwards via relayed indices.
 | 3 | `instanceId` not in claimed zone (stale client view) | `cmdRejected` `stale_view`; server re-sends current view; client self-heals | [x] covered: shared/engine/__tests__/reduce.test.mjs |
 | 4 | Same command sent twice (double-click, retry) | `clientSeq` dedupe per player; second is a no-op returning the same `stateVersion` | [x] covered: server/game/__tests__/room.test.mjs |
 | 5 | Both players send a command in the same tick | Server applies in arrival order; the non-turn player's command fails `canPerformAction` | [x] covered: shared/engine/__tests__/turn-loop.test.mjs |
-| 6 | Client disconnects mid-choice | Choice stays pending; game blocks; on `requestView` the choice is re-sent verbatim | [ ] |
+| 6 | Client disconnects mid-choice | Choice stays pending; game blocks; on `requestView` the choice is re-sent verbatim | [x] covered: shared/engine/__tests__/edge-cases-slice6.test.mjs |
 | 7 | Server crash / restart | In-memory game lost by design (decision 9). Both clients get `gameEnded` `server_restart` and return to the room screen cleanly — no half-dead board, no silent hang | [ ] |
 | 8 | `view` arrives out of order / duplicated | `stateVersion <= lastRendered` ignored; snapshot semantics make this safe | [ ] |
 | 9 | Bench full (5) / max prizes / hand size 0 | Rejected with a specific reason; boundary tests at 0, 1, max, max+1 | [x] covered: shared/engine/__tests__/reduce.test.mjs (bench full) |
-| 10 | Attachment target removed by a prior command in the same effect | Executor re-resolves targets from live state each step; unresolvable step is skipped and announced | [ ] |
-| 11 | Choice resolved by the wrong player | Rejected `not_your_choice`; no state change | [ ] |
-| 12 | Choice `selection` violates `min`/`max` or contains ids not in `options` | Rejected `invalid_selection`; choice remains pending | [ ] |
+| 10 | Attachment target removed by a prior command in the same effect | Executor re-resolves targets from live state each step; unresolvable step is skipped and announced | [x] covered: shared/engine/__tests__/edge-cases-slice6.test.mjs |
+| 11 | Choice resolved by the wrong player | Rejected `not_your_choice`; no state change | [x] covered: shared/engine/__tests__/pending-choice.test.mjs, edge-cases-slice6.test.mjs |
+| 12 | Choice `selection` violates `min`/`max` or contains ids not in `options` | Rejected `invalid_selection`; choice remains pending | [x] covered: shared/engine/__tests__/pending-choice.test.mjs, edge-cases-slice6.test.mjs |
 | 13 | Spectator sends a command | Rejected `spectator_readonly` | [x] covered: server/game/__tests__/room.test.mjs |
 | 14 | Third player joins a full room | Existing `roomReject` preserved | [ ] |
-| 15 | Effect loops (recursive ability chains) | Step budget per command (e.g. 200); exceeding aborts the effect, logs, announces — no infinite server loop | [ ] |
+| 15 | Effect loops (recursive ability chains) | Step budget per command (e.g. 200); exceeding aborts the effect, logs, announces — no infinite server loop | [x] covered: shared/engine/__tests__/edge-cases-slice6.test.mjs |
 | 16 | TCGdex `fetch` for card data fails/times out | Card DB preloaded and cached server-side at game start; a failed lookup degrades to decklist data, never blocks a command | [ ] |
 | 17 | Legacy client connects to new server (or vice versa) | Protocol version in `joinGame`; mismatch → explicit "reload the page" message, not a silent desync | [ ] |
 | 18 | Solo (single-player) mode | Runs the same engine in-process client-side; must not regress | [ ] |
@@ -685,3 +685,5 @@ depends on it.
 - **Slice 3**: Defined `undo` architectural disposition as deterministic rewind via replaying `commandLog` minus tail from initial `seed`. Full catalog of all 59 legacy actions exported in `shared/engine/commands.mjs:DISPOSITION_TABLE`.
 - **Slice 4**: Implemented `createRelayedRng` to queue and consume relayed randomness (shuffle indices, coin flips) from client actions. In passive shadow mode (`ShadowSession`), `GameRoom` is constructed with `rulesEnabled: false` so that reference integrity and zone fingerprints are verified without gating on turn phases enforced client-side by legacy clients. Shadow telemetry is exposed via `/debug/shadow-report` and retained across session cleanup.
 - **Slice 5**: Implemented pure deterministic `setupGame` module (`shared/engine/setup.mjs`) handling initial shuffle, hand/prize dealing, mulligan redraws, opponent bonus draws, and turn order determination without modifying the base state reducer signature. Attack declaration automatically triggers turn transition, status checkup, and start-of-turn draw for the defending player matching official PTCG/Live rules. Energy card instances are mapped through `getEnergyDescriptor` to support `canPayAttackCost` compatibility.
+- **Slice 6**: Implemented `PendingChoice` protocol with resumable effect executors in `shared/engine/effects/` (`executor.mjs`, `trainer.mjs`, `ability.mjs`, `stadium.mjs`). Handled multi-step interaction chains (Worked Example B Ultra Ball), dynamic target re-resolution (Edge Case 10), mid-choice disconnect/reconnect persistence (Edge Case 6), non-actor and invalid selection rejections (Edge Cases 11 & 12), and step budget limits for recursive effect loops (Edge Case 15). Choice IDs are minted deterministically without `Math.random` upholding Invariant 6.
+
