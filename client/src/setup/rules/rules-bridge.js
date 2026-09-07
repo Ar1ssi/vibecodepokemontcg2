@@ -1553,7 +1553,9 @@ import {
           appendMessage('', `  no cards in deck match "${what}"`, 'announcement', false),
       });
       if (pool.length === 0) {
-        appendMessage('', '  no cards left in deck', 'announcement', false);
+        if (deck.array.length === 0) {
+          appendMessage('', '  no cards left in deck', 'announcement', false);
+        }
         shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: card.name });
         return false;
       }
@@ -1583,6 +1585,7 @@ import {
           triggerCard: card,
           zoneFrom: 'deck',
           destination: dest,
+          user,
           multiSelect: true,
           requiredCount: Math.min(count, pool.length),
           minCount: upTo ? 0 : count,
@@ -1614,8 +1617,10 @@ import {
         triggerCard: card,
         zoneFrom: 'deck',
         destination: dest,
+        user,
         onPick: (picked) => {
           revealPicked(picked);
+          appendMessage('', `  ${picked.name} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
           shuffleAfter();
         },
         onCancel: () => {
@@ -1652,7 +1657,7 @@ import {
         ran = true;
       }
 
-      const searchStep = steps.slice(stepIndex + 1).find((s) => s.type === 'searchAbility');
+      const searchStep = steps.find((s) => s.type === 'searchAbility');
       if (searchStep || effect?.kind === 'search') {
         const step = searchStep || { what: 'a card', count: effect?.n || 1, destination: 'hand' };
         await runAbilitySearchPicker(user, card, step);

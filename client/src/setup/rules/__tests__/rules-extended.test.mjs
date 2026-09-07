@@ -4351,6 +4351,50 @@ import test from 'node:test';
       const d2 = parseAttackDamage(atk, { hp: 340 }, { hp: 100 }, { stage2BenchCount: 2 });
       assert.equal(d2.total, 260);
       assert.equal(d2.resolved, true);
+      assert.ok(d2.notes.some((n) => n.includes('+ 40 × 1 (Stage 2 Pokémon on your Bench)')) === false);
       assert.ok(d2.notes.some((n) => n.includes('+ 40 × 2 (Stage 2 Pokémon on your Bench)')));
     });
+
+    test('ability search filter: raw Basic Fire Energy matches Basic {R} Energy and Basic Energy', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const { classifyEnergyEffect } = await import('../energy-effects.mjs');
+      const rawFire = { name: 'Basic Fire Energy', type: 'Energy' };
+      const rawWater = { name: 'Basic Water Energy', type: 'Energy' };
+      assert.equal(classifyEnergyEffect(rawFire), 'basic');
+      assert.equal(matchesSearch(rawFire, 'Basic {R} Energy'), true);
+      assert.equal(matchesSearch(rawWater, 'Basic {R} Energy'), false);
+      assert.equal(matchesSearch(rawFire, 'Basic Energy'), true);
+      assert.equal(matchesSearch(rawWater, 'Basic Energy'), true);
+    });
+
+    test('ability search filter: generic Evolution Pokémon excludes Basic Pokémon', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const basicMon = { name: 'Charmander', type: 'Pokémon', stage: 'Basic', types: ['Fire'] };
+      const stage1Mon = { name: 'Charmeleon', type: 'Pokémon', stage: 'Stage 1', types: ['Fire'] };
+      const stage2Mon = { name: 'Charizard', type: 'Pokémon', stage: 'Stage 2', types: ['Fire'] };
+      assert.equal(matchesSearch(basicMon, 'Evolution Pokémon'), false);
+      assert.equal(matchesSearch(stage1Mon, 'Evolution Pokémon'), true);
+      assert.equal(matchesSearch(stage2Mon, 'Evolution Pokémon'), true);
+    });
+
+    test('ability search filter: Supporter and Trainer filtering', async () => {
+      const { matchesSearch } = await import('../search-match.mjs');
+      const supporter = { name: 'Professor Research', type: 'Trainer', trainerType: 'Supporter' };
+      const item = { name: 'Ultra Ball', type: 'Trainer', trainerType: 'Item' };
+      const stadium = { name: 'Artazon', type: 'Trainer', trainerType: 'Stadium' };
+      const mon = { name: 'Pikachu', type: 'Pokémon', stage: 'Basic' };
+      const energy = { name: 'Basic Lightning Energy', type: 'Energy' };
+
+      assert.equal(matchesSearch(supporter, 'Supporter'), true);
+      assert.equal(matchesSearch(item, 'Supporter'), false);
+      assert.equal(matchesSearch(mon, 'Supporter'), false);
+      assert.equal(matchesSearch(energy, 'Supporter'), false);
+
+      assert.equal(matchesSearch(supporter, 'Trainer'), true);
+      assert.equal(matchesSearch(item, 'Trainer'), true);
+      assert.equal(matchesSearch(stadium, 'Trainer'), true);
+      assert.equal(matchesSearch(mon, 'Trainer'), false);
+      assert.equal(matchesSearch(energy, 'Trainer'), false);
+    });
+
 

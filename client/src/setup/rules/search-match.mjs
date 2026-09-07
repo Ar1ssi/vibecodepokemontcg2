@@ -56,6 +56,14 @@ export function matchesSearch(card, what = '') {
     const tt = String(card.trainerType || card.type || '').toLowerCase();
     return tt.includes('item') || (isTrainer && tt.includes('item'));
   }
+  if (w.includes('supporter')) {
+    const tt = String(card.trainerType || card.type || '').toLowerCase();
+    const st = Array.isArray(card.subtypes) ? card.subtypes.map((s) => String(s).toLowerCase()) : [];
+    return tt.includes('supporter') || st.includes('supporter');
+  }
+  if (w.includes('trainer')) {
+    return isTrainer;
+  }
   if (w.includes('stadium') && w.includes('energy')) {
     const isEnergy =
       String(card.type || '').toLowerCase().includes('energy') ||
@@ -77,6 +85,7 @@ export function matchesSearch(card, what = '') {
   }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
+    if (w.includes('evolution') && (card.stage || 'Basic') === 'Basic') return false;
     const typedEvolution = what.match(/evolution\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedEvolution) {
       const typeName = SYMBOL_TO_TYPE[typedEvolution[1].toLowerCase()];

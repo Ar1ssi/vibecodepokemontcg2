@@ -36,7 +36,7 @@ const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
 // Single-word basic names TCGdex sometimes omits subtypes for.
-const BASIC_ENERGY_NAME = /^(colorless|grass|fire|water|lightning|psychic|fighting|metal|darkness|dragon|fairy) energy$/;
+const BASIC_ENERGY_NAME = /^(?:basic\s+)?(colorless|grass|fire|water|lightning|psychic|fighting|metal|darkness|dragon|fairy) energy$/i;
 
 const isBasicNamedEnergy = (name) => BASIC_ENERGY_NAME.test(lower(name).trim());
 
