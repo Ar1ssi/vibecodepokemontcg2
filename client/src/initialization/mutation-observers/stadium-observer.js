@@ -23,9 +23,9 @@ const checkDisplayAndUpdateZIndex = () => {
       return; // Exit the function if a element is displayed
     }
   }
-  // If none of the elements are displayed, set the z-index to 0
-  stadiumElement.style.zIndex = '0';
-  boardButtonContainer.style.zIndex = '0';
+  // If none of the elements are displayed, set the z-index to 3
+  stadiumElement.style.zIndex = '3';
+  boardButtonContainer.style.zIndex = '3';
 };
 
 export const initializeStadiumObserver = () => {
