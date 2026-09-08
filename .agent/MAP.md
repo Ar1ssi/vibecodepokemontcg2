@@ -24,6 +24,8 @@ client/src/initialization/global-variables/global-variables.js — `socket` + `s
 ## sync-replay.mjs, request/apply-board-snapshot.js without replacement; design 002 slice 1.1
 ## restored reconnect recovery via a new, smaller mechanism)
 client/src/setup/netcode/peer-log-catchup.js — DOM-free peer-log request/response/replay logic
+client/src/setup/netcode/request-action-queue.js — counter-ordered requestAction buffer (design 002
+slice 1.2); gap open past 2s falls through to peer-log-catchup instead of misapplying
 client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diagnostics ring buffer
 client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
 
