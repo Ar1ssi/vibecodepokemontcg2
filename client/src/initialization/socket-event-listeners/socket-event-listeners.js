@@ -47,9 +47,7 @@ import {
 } from '../../setup/netcode/request-action-queue.js';
 
 let isImporting = false;
-let syncCheckInterval;
 let spectatorDebounceTimer = null;
-let syncCheckDebounceTimer = null;
 let pushActionQueue = Promise.resolve();
 let peerLogTimeout = null;
 const requestActionQueue = createRequestActionQueue();
@@ -78,14 +76,8 @@ export const emitSpectatorDataDebounced = (delay = 200) => {
   }, delay);
 };
 
-export const emitSyncCheck = () => {};
-
-export const triggerSyncCheck = () => {};
-
 export const removeSyncIntervals = () => {
-  clearInterval(syncCheckInterval);
   if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
-  if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
   if (peerLogTimeout) {
     clearTimeout(peerLogTimeout);
     peerLogTimeout = null;
@@ -236,20 +228,6 @@ export const initializeSocketEventListeners = () => {
       type: 'peerSocketId',
       data: { socketId: socket.id },
     });
-
-    if (!systemState.serverAuthoritative) {
-      // Heartbeat backstop: 30s check during legacy 2P games
-      syncCheckInterval = setInterval(() => {
-        if (
-          systemState.isTwoPlayer &&
-          systemState.roomId &&
-          !systemState.syncReplaying &&
-          !systemState.isCatchingUp
-        ) {
-          emitSyncCheck();
-        }
-      }, 30000);
-    }
   });
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
@@ -639,13 +617,7 @@ export const initializeSocketEventListeners = () => {
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('action-processed', () => {
       if (systemState.isTwoPlayer) {
-        triggerSyncCheck();
         emitSpectatorDataDebounced();
-      }
-    });
-    document.addEventListener('rules-turn-began', () => {
-      if (systemState.isTwoPlayer) {
-        triggerSyncCheck(100);
       }
     });
     document.addEventListener('visibilitychange', () => {
