@@ -14,9 +14,7 @@ import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { exchangeData } from '../../setup/deck-constructor/exchange-data.js';
 import { acceptAction } from '../../setup/general/accept-action.js';
-import { catchUpActions } from '../../setup/general/catch-up-actions.js';
 import { cleanActionData } from '../../setup/general/clean-action-data.js';
-import { resyncActions } from '../../setup/general/resync-actions.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
@@ -26,13 +24,6 @@ import {
   enableSyncLogForMultiplayer,
   logSync,
 } from '../../setup/general/sync-logger-bridge.js';
-import { hashUserBoard } from '../../setup/zones/board-hash.js';
-import { shouldEmitBoardResync } from '../../setup/general/sync-replay.mjs';
-import { applyOppBoardSnapshot } from '../../setup/general/apply-board-snapshot.js';
-import {
-  emitSelfBoardSnapshot,
-  requestBoardSnapshot,
-} from '../../setup/general/request-board-snapshot.js';
 import { applyView } from '../../setup/netcode/apply-view.js';
 import {
   handleCmdRejected,
@@ -43,7 +34,6 @@ let isImporting = false;
 let syncCheckInterval;
 let spectatorDebounceTimer = null;
 let syncCheckDebounceTimer = null;
-let lastSyncedSelfCounter = -1;
 let pushActionQueue = Promise.resolve();
 
 export const sendSpectatorData = () => {
@@ -69,25 +59,9 @@ export const emitSpectatorDataDebounced = (delay = 200) => {
   }, delay);
 };
 
-export const emitSyncCheck = () => {
-  if (!systemState.isTwoPlayer || !systemState.roomId) return;
-  if (systemState.syncReplaying || systemState.isCatchingUp) return;
-  lastSyncedSelfCounter = systemState.selfCounter;
-  const data = {
-    roomId: systemState.roomId,
-    counter: systemState.selfCounter,
-    boardHash: hashUserBoard('self'),
-  };
-  socket.emit('syncCheck', data);
-};
+export const emitSyncCheck = () => {};
 
-export const triggerSyncCheck = (delay = 300) => {
-  if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
-  syncCheckDebounceTimer = setTimeout(() => {
-    syncCheckDebounceTimer = null;
-    emitSyncCheck();
-  }, delay);
-};
+export const triggerSyncCheck = () => {};
 
 export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
@@ -97,6 +71,15 @@ export const removeSyncIntervals = () => {
 export const initializeSocketEventListeners = () => {
   socket.on('joinGame', (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
+    if (systemState.serverAuthoritative && data?.protocolVersion && data.protocolVersion !== '2.0.0') {
+      appendMessage(
+        '',
+        'A new version of the game is available. Please reload the page.',
+        'announcement',
+        false
+      );
+      return;
+    }
     const connectedRoom = document.getElementById('connectedRoom');
     const lobby = document.getElementById('lobby');
     const roomHeaderText = document.getElementById('roomHeaderText');
@@ -134,17 +117,19 @@ export const initializeSocketEventListeners = () => {
       data: { socketId: socket.id },
     });
 
-    // Heartbeat backstop: 30s check during 2P games to keep socket alive and catch silent drift
-    syncCheckInterval = setInterval(() => {
-      if (
-        systemState.isTwoPlayer &&
-        systemState.roomId &&
-        !systemState.syncReplaying &&
-        !systemState.isCatchingUp
-      ) {
-        emitSyncCheck();
-      }
-    }, 30000);
+    if (!systemState.serverAuthoritative) {
+      // Heartbeat backstop: 30s check during legacy 2P games
+      syncCheckInterval = setInterval(() => {
+        if (
+          systemState.isTwoPlayer &&
+          systemState.roomId &&
+          !systemState.syncReplaying &&
+          !systemState.isCatchingUp
+        ) {
+          emitSyncCheck();
+        }
+      }, 30000);
+    }
   });
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
@@ -267,25 +252,33 @@ export const initializeSocketEventListeners = () => {
       },
     });
   });
+  socket.on('gameEnded', (data) => {
+    const reason = data?.reason;
+    const msg =
+      data?.message ||
+      (reason === 'server_restart'
+        ? 'Game session terminated due to server restart.'
+        : 'The game has ended.');
+    appendMessage('', msg, 'announcement', false);
+    if (reason === 'server_restart') {
+      const connectedRoom = document.getElementById('connectedRoom');
+      const lobby = document.getElementById('lobby');
+      if (connectedRoom) connectedRoom.style.display = 'none';
+      if (lobby) lobby.style.display = 'flex';
+      systemState.isTwoPlayer = false;
+      systemState.roomId = null;
+      removeSyncIntervals();
+    }
+  });
+
   socket.on('requestAction', (data) => {
+    if (systemState.serverAuthoritative) return;
     const notSpectator = !(
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
     if (!notSpectator) return;
     const counterMatches = data.counter === systemState.selfCounter;
-    // The counter check guards against applying a request built against a
-    // stale view of our board (e.g. the opponent's effect raced one of our
-    // own actions). On a mismatch this used to drop the request with zero
-    // feedback — no log, no resync — silently losing the action forever
-    // (both sides end up "in sync" since neither ever applied it, so the
-    // periodic board-hash check can't catch it either). moveCardBundle now
-    // carries identity hints (see move-card-bundle.js) that let it verify
-    // the relayed index and safely abort + request a resync instead of
-    // corrupting our board, so it's safe to still attempt it even when
-    // stale. Other action types have no such verification yet, so a
-    // mismatch there is still dropped rather than risk applying it against
-    // the wrong card — but now it's logged instead of silent.
     const isCounterOrStatusAction =
       data.action === 'updateDamageCounter' ||
       data.action === 'addDamageCounter' ||
@@ -318,6 +311,7 @@ export const initializeSocketEventListeners = () => {
       acceptAction('self', data.action, data.parameters)
     );
   });
+
   // reset counter when importing game state
   socket.on('initiateImport', () => {
     systemState.spectatorCounter = 0; //reset spectator counter to make sure it catches all of the actions
@@ -325,206 +319,35 @@ export const initializeSocketEventListeners = () => {
     cleanActionData('self');
     cleanActionData('opp');
   });
+
   socket.on('endImport', () => {
     isImporting = false;
   });
+
   socket.on('resetCounter', () => {
     cleanActionData('opp');
   });
+
   socket.on('pushAction', (data) => {
+    if (systemState.serverAuthoritative) return;
     const notSpectator = !(
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
     if (!notSpectator) return;
     pushActionQueue = pushActionQueue.then(async () => {
-      if (data.counter === parseInt(systemState.oppCounter) + 1) {
-        startKeybindsSleep();
-        const ok = await acceptAction('opp', data.action, data.parameters);
-        if (ok === false) {
-          logSync(
-            'pushAction.apply_failed',
-            { counter: data.counter, action: data.action },
-            'in'
-          );
-          const { request, skipped } = shouldEmitBoardResync({
-            selfCounter: systemState.selfCounter,
-            oppCounter: systemState.oppCounter,
-            syncReplaying: systemState.syncReplaying,
-            isCatchingUp: systemState.isCatchingUp,
-          });
-          if (!request) {
-            logSync(
-              'pushAction.apply_failed.repeat',
-              {
-                counter: data.counter,
-                action: data.action,
-                skipped,
-              },
-              'in'
-            );
-            requestBoardSnapshot();
-            return;
-          }
-          socket.emit('resyncActions', {
-            roomId: systemState.roomId,
-            reason: 'apply_failed',
-            selfCounter: systemState.selfCounter,
-            oppCounter: systemState.oppCounter,
-          });
-          return;
-        }
-        systemState.oppCounter++;
-        if (data.action !== 'exchangeData' && data.action !== 'loadDeckData') {
-          systemState.exportActionData.push({
-            user: 'opp',
-            emit: true,
-            action: data.action,
-            parameters: data.parameters,
-          });
-        }
-        triggerSyncCheck();
-        emitSpectatorDataDebounced();
-      } else if (data.counter > parseInt(systemState.oppCounter) + 1) {
-        logSync('pushAction.gap', {
-          expected: systemState.oppCounter + 1,
-          received: data.counter,
+      startKeybindsSleep();
+      await acceptAction('opp', data.action, data.parameters);
+      systemState.oppCounter++;
+      if (data.action !== 'exchangeData' && data.action !== 'loadDeckData') {
+        systemState.exportActionData.push({
+          user: 'opp',
+          emit: true,
           action: data.action,
-        }, 'in');
-        socket.emit('resyncActions', {
-          roomId: systemState.roomId,
-          counter: systemState.oppCounter,
-          reason: 'gap',
-        });
-      } else if (data.counter <= parseInt(systemState.oppCounter)) {
-        logSync('pushAction.stale', {
-          oppCounter: systemState.oppCounter,
-          received: data.counter,
-          action: data.action,
-        }, 'in');
-      }
-    });
-  });
-  socket.on('resyncActions', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (notSpectator) {
-      const fullReplay =
-        data?.reason === 'hash' ||
-        data?.reason === 'hint_mismatch' ||
-        data?.reason === 'apply_failed' ||
-        data?.reason === 'reconnect';
-      if (fullReplay && data?.reason !== 'reconnect') {
-        const { request, skipped } = shouldEmitBoardResync({
-          selfCounter: systemState.selfCounter,
-          oppCounter: systemState.oppCounter,
-          syncReplaying: systemState.syncReplaying,
-          isCatchingUp: systemState.isCatchingUp,
-        });
-        if (!request) {
-          logSync(
-            'resync.request.recv.repeat',
-            { reason: data?.reason, skipped },
-            'in'
-          );
-          return;
-        }
-      }
-      logSync('resync.request.recv', { reason: data?.reason, fullReplay }, 'in');
-      resyncActions({ fullReplay });
-    }
-  });
-  socket.on('catchUpActions', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (notSpectator) {
-      logSync('catchUp.recv', {
-        count: data.actionData?.length ?? 0,
-        fullReplay: !!data.fullReplay,
-      }, 'in');
-      pushActionQueue = pushActionQueue.then(async () => {
-        const ok = await catchUpActions(data.actionData, !!data.fullReplay);
-        if (!ok) requestBoardSnapshot();
-      });
-    }
-  });
-  socket.on('requestBoardSnapshot', () => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (!notSpectator) return;
-    logSync('snapshot.request.recv', {}, 'in');
-    void emitSelfBoardSnapshot();
-  });
-  socket.on('applyBoardSnapshot', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (!notSpectator) return;
-    pushActionQueue = pushActionQueue.then(() => {
-      applyOppBoardSnapshot(data);
-      if (typeof data.counter === 'number') {
-        systemState.oppCounter = data.counter;
-      }
-    });
-  });
-  socket.on('syncCheck', (data) => {
-    const notSpectator = !(
-      document.getElementById('spectatorModeCheckbox').checked &&
-      systemState.isTwoPlayer
-    );
-    if (!notSpectator) return;
-    // Wait for in-flight pushAction / catch-up applies so we don't hash a
-    // half-updated opp board (that race requested a looping fullReplay).
-    pushActionQueue = pushActionQueue.then(() => {
-      if (systemState.syncReplaying || systemState.isCatchingUp) return;
-      if (data.counter >= parseInt(systemState.oppCounter) + 1) {
-        logSync('syncCheck.gap', {
-          peerSelfCounter: data.counter,
-          localOppCounter: systemState.oppCounter,
-        }, 'in');
-        socket.emit('resyncActions', {
-          roomId: systemState.roomId,
-          counter: systemState.oppCounter,
-          reason: 'gap',
-        });
-        return;
-      }
-      if (data.boardHash && data.boardHash !== hashUserBoard('opp')) {
-        const { request, skipped } = shouldEmitBoardResync({
-          selfCounter: data.counter,
-          oppCounter: systemState.oppCounter,
-          syncReplaying: systemState.syncReplaying,
-          isCatchingUp: systemState.isCatchingUp,
-        });
-        if (!request) {
-          logSync(
-            'syncCheck.hash.repeat',
-            {
-              peerSelfCounter: data.counter,
-              localOppCounter: systemState.oppCounter,
-              skipped,
-            },
-            'in'
-          );
-          return;
-        }
-        logSync('syncCheck.hash', {
-          peerSelfCounter: data.counter,
-          localOppCounter: systemState.oppCounter,
-        }, 'in');
-        socket.emit('resyncActions', {
-          roomId: systemState.roomId,
-          counter: systemState.oppCounter,
-          reason: 'hash',
+          parameters: data.parameters,
         });
       }
+      emitSpectatorDataDebounced();
     });
   });
   socket.on('lookAtCards', (data) => {
@@ -662,9 +485,8 @@ export const initializeSocketEventListeners = () => {
         if (!socket.connected) {
           logSync('visibility.reconnect', {}, 'local');
           socket.connect();
-        } else {
-          logSync('visibility.sync_check', {}, 'local');
-          triggerSyncCheck(50);
+        } else if (systemState.serverAuthoritative) {
+          emitRequestView({ socket, roomId: systemState.roomId });
         }
       }
     });
@@ -679,8 +501,8 @@ export const initializeSocketEventListeners = () => {
         if (!socket.connected) {
           logSync('focus.reconnect', {}, 'local');
           socket.connect();
-        } else {
-          triggerSyncCheck(100);
+        } else if (systemState.serverAuthoritative) {
+          emitRequestView({ socket, roomId: systemState.roomId });
         }
       }
     });

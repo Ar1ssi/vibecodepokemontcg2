@@ -3,7 +3,8 @@ import {
   selfContainerDocument,
   systemState,
 } from '../../state.js';
-import { shouldAnimateDrawFlight } from '../general/sync-replay.mjs';
+import { shouldAnimateDrawFlight } from './draw-flight-predicate.mjs';
+export { shouldAnimateDrawFlight };
 import {
   cardBackSrcForUser,
   cardNode,

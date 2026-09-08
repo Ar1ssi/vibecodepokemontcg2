@@ -16,6 +16,8 @@ export const SPECIAL_CONDITIONS = [
   'Poisoned',
 ];
 
+export const PROTOCOL_VERSION = '2.0.0';
+
 /**
  * Command schema definitions.
  * Each command type defines required and optional fields along with validator functions.
