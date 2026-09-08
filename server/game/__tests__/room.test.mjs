@@ -260,3 +260,34 @@ test('Finding 5: sweep grace distinguishes a brief double-disconnect from an aba
   );
 });
 
+test('Finding 12: clientSeqByPlayer is cleared on removeSocket, not just on re-addPlayer', () => {
+  const room = new GameRoom({ roomId: 'room-clientseq', rulesEnabled: false });
+  room.addPlayer('socket-ash', 'p1', 'Ash');
+
+  room.handleCommand('socket-ash', { type: 'draw', payload: {}, clientSeq: 5 });
+  assert.equal(room.getClientSeq('p1'), 5, 'clientSeq recorded from the command');
+
+  // Player disconnects (socket removed) without a new socket taking the seat yet.
+  room.removeSocket('socket-ash');
+  assert.equal(
+    room.clientSeqByPlayer.has('p1'),
+    false,
+    'removeSocket must clear the stale clientSeq entry, or a reconnecting client that ' +
+      'restarts its own counter from 0 gets every command deduped as already-seen'
+  );
+
+  // Reconnect on a fresh socket: a low clientSeq must not be treated as a dedupe replay.
+  room.addPlayer('socket-ash-2', 'p1', 'Ash');
+  const result = room.handleCommand('socket-ash-2', {
+    type: 'draw',
+    payload: {},
+    clientSeq: 1,
+  });
+  assert.equal(result.success, true, 'command applies after reconnect');
+  assert.equal(
+    result.dedupe,
+    false,
+    'a fresh clientSeq counter after reconnect must be applied, not deduped against the old seq'
+  );
+});
+

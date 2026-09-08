@@ -10,7 +10,9 @@ import {
   seedClientSeq,
   addInFlightAffordance,
   clearInFlightAffordances,
+  getProtocolVersion,
 } from '../cmd-emitter.js';
+import { PROTOCOL_VERSION } from '../../../../../shared/engine/commands.mjs';
 
 class MockSocket {
   constructor() {
@@ -62,6 +64,7 @@ test('emitCmd increments monotonic clientSeq and formats command envelope', asyn
       clientSeq: 1,
       type: 'moveCard',
       payload: { instanceId: 10, from: 'hand', to: 'bench' },
+      protocolVersion: PROTOCOL_VERSION,
     },
   });
 
@@ -195,5 +198,25 @@ test('seedClientSeq advances clientSeq from server and preserves monotonicity', 
   assert.equal(res.clientSeq, 43);
   assert.equal(getClientSeq(), 43);
   assert.equal(socket.emitted[0].data.clientSeq, 43);
+});
+
+test('getProtocolVersion resolves the shared PROTOCOL_VERSION constant (Finding #7/#8)', async () => {
+  const version = await getProtocolVersion();
+  assert.equal(version, PROTOCOL_VERSION);
+  // Cached on the second call: still the same value, not re-resolved from a stale import.
+  assert.equal(await getProtocolVersion(), PROTOCOL_VERSION);
+});
+
+test('emitResolveChoice does not stamp protocolVersion (server negotiates it only on cmd)', async () => {
+  const socket = new MockSocket();
+
+  await emitResolveChoice({
+    socket,
+    roomId: 'room-1',
+    choiceId: 'choice-1',
+    selection: [1],
+  });
+
+  assert.equal('protocolVersion' in socket.emitted[0].data, false);
 });
 
