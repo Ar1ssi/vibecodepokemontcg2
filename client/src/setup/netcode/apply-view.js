@@ -2,6 +2,10 @@
  * @file Authoritative client DOM renderer for server-authoritative netcode (Slice 7).
  * Reconciles browser DOM directly from authoritative redacted GameState views.
  * Enforces Invariants 1, 4, 5 and Edge Cases 6, 8, 11, 12, 18.
+ *
+ * Invariant (design 002 §0.2): a renderer that cannot see the whole board writes to no
+ * part of it. `applyView` probes render targets before any mutation and bails out
+ * without touching `lastRenderedVersion` or the DOM when a zone cannot be resolved.
  */
 
 import { diffViews } from './view-diff.mjs';
@@ -108,6 +112,25 @@ function resolveZone(side, zoneId, options = {}) {
 
   const element = doc.getElementById ? doc.getElementById(zoneId) : null;
   return { element, array: [] };
+}
+
+/**
+ * Probes one render target per side before any mutation. A blind renderer (no resolvable
+ * zone element on one or both sides — e.g. `window.__getZone` unset and no injected
+ * `options.getZone`) must not write to the DOM at all: see file header invariant.
+ *
+ * @param {object} options Renderer options (forwarded to resolveZone)
+ * @returns {{ ok: boolean, reason?: string }}
+ */
+function resolveRenderTargets(options = {}) {
+  const sides = ['you', 'them'];
+  for (const side of sides) {
+    const zone = resolveZone(side, 'active', options);
+    if (!zone.element) {
+      return { ok: false, reason: 'no_render_target' };
+    }
+  }
+  return { ok: true };
 }
 
 /**
@@ -573,6 +596,14 @@ async function resolveNetcodeContext(options = {}) {
 export function applyView(view, events = [], options = {}) {
   if (!view || typeof view !== 'object') {
     return { applied: false, reason: 'invalid_view' };
+  }
+
+  // §0.2 guard: a renderer that cannot see the whole board writes to no part of it.
+  // Must run before the monotonic version guard so a blind view never advances
+  // lastRenderedVersion and is never mistaken for "already applied".
+  const renderTargets = resolveRenderTargets(options);
+  if (!renderTargets.ok) {
+    return { applied: false, reason: renderTargets.reason };
   }
 
   // Edge Case 8: Monotonic stateVersion guard (ignore out-of-order or duplicate views)

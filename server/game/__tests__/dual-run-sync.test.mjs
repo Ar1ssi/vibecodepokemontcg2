@@ -4,6 +4,44 @@ import { GameRoom } from '../room.mjs';
 import { applyView, resetRenderState, getCardRegistry } from '../../../client/src/setup/netcode/apply-view.js';
 import { createCard } from '../../../shared/engine/cards.mjs';
 
+// Minimal DOM stand-ins so applyView's §0.2 render-target guard (design 002) sees
+// resolvable zones. This test does not assert on DOM structure, only that applyView
+// reconciles without error, so the stubs need only support the calls apply-view.js makes.
+class StubElement {
+  constructor() {
+    this.children = [];
+    this.classList = { add() {}, remove() {} };
+    this.dataset = {};
+    this.parentNode = null;
+  }
+  appendChild(child) {
+    if (child.parentNode) {
+      const idx = child.parentNode.children.indexOf(child);
+      if (idx >= 0) child.parentNode.children.splice(idx, 1);
+    }
+    child.parentNode = this;
+    this.children.push(child);
+    return child;
+  }
+  setAttribute() {}
+  removeAttribute() {}
+}
+
+class StubDocument {
+  createElement() {
+    return new StubElement();
+  }
+}
+
+function makeGetZone() {
+  const zones = new Map();
+  return (side, zoneId) => {
+    const key = `${side}:${zoneId}`;
+    if (!zones.has(key)) zones.set(key, new StubElement());
+    return { element: zones.get(key), array: [] };
+  };
+}
+
 function buildPlayerDeck(prefix, basicName) {
   const deck = [];
   for (let i = 1; i <= 5; i++) {
@@ -118,11 +156,13 @@ test('dual-run integration: two clients receive views, applyView reconciles, boa
   assert.equal(reconnectedView.them.zones.active[0].instanceId, 101);
 
   // 4. Verify applyView applies both views without errors
-  const app1 = applyView(p1View2, res2.events);
+  const renderOptions1 = { document: new StubDocument(), getZone: makeGetZone() };
+  const app1 = applyView(p1View2, res2.events, renderOptions1);
   assert.equal(app1.applied, true);
 
   resetRenderState();
-  const app2 = applyView(p2View2, res2.events);
+  const renderOptions2 = { document: new StubDocument(), getZone: makeGetZone() };
+  const app2 = applyView(p2View2, res2.events, renderOptions2);
   assert.equal(app2.applied, true);
   assert.ok(getCardRegistry());
 });
