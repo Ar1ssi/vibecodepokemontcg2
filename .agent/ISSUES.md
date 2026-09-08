@@ -12,6 +12,11 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I10 2026-09-09 P1 [netcode] Stadium is wiped from both boards on any successful server command: applyView's reconcileStadium clears #stadium when view.stadium is null, and #stadium is the only zone its DOM fallback can reach (apply-view.js:259-281) — repro: play a Stadium, then draw (refs: design 002, S32)
+- I11 2026-09-09 P1 [netcode] Client syncInstance (0-based per player) is sent as the server's instanceId (1-based global), so every authoritative card command targets the wrong card or the wrong player's card (build-deck.js:13-19 vs shadow.mjs:29-68; dual-run-bridge.js:205-208) (refs: design 002, S32)
+- I12 2026-09-09 P1 [netcode] Reconnect recovery is dead in both modes: slice 8 deleted the replay stack but left the emitters — no client listener exists for resyncActions/catchUpActions/requestBoardSnapshot, and requestView returns a view the renderer cannot paint (socket-event-listeners.js:211) (refs: design 002, S32)
+- I13 2026-09-09 P2 [netcode] applyView renders nothing in production: zones live in iframes, window.__getZone is never assigned, and only tests inject options.getZone — so the renderer has never run against the real DOM (apply-view.js:91-111) (refs: design 002, S32)
+- I14 2026-09-09 P2 [netcode] SERVER_AUTHORITATIVE defaults on (server.js:21-23) though design 001 slice 8's flip was never completed: 14 of 58 actions translate, IDs do not match, renderer is blind (refs: design 002, I11, I13, S32)
 - I1 2026-09-07 P2 [rules] Turn start auto-draw: both players draw a card when turn is started (ref: ISSUES.txt)
 - I2 2026-09-07 P2 [rules] End Turn button logic: +Turn needs rework to end active player's turn (ref: ISSUES.txt)
 - I3 2026-09-07 P2 [rules] Garland Ray energy discard parsing fail on multiplier attacks (ref: ISSUES.txt)
