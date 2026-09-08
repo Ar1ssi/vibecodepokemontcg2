@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MAX_TAP_DURATION_MS,
   computeDropSlotHitboxes,
   findDropSlotIndex,
   findSelectedSlotIndex,
+  isTapGesture,
   resolveTargetSlotIndex,
   shouldSuppressClickAfterDrag,
 } from '../card-picker-hitbox.mjs';
@@ -207,10 +209,27 @@ test('resolveTargetSlotIndex: resolves target slot prioritizing leftmost open sl
   );
 });
 
-test('DOM: slot assignment and is-selected-slot class behavior', async () => {
-  const { JSDOM } = await import('jsdom');
-  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-  const { document } = dom.window;
+test('slot assignment and is-selected-slot class behavior', () => {
+  const createMockElement = () => {
+    const classes = new Set(['card-picker-drop-slot', 'is-empty']);
+    return {
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        toggle: (c, force) => {
+          if (force === undefined) {
+            if (classes.has(c)) classes.delete(c);
+            else classes.add(c);
+          } else if (force) {
+            classes.add(c);
+          } else {
+            classes.delete(c);
+          }
+        },
+        contains: (c) => classes.has(c),
+      },
+    };
+  };
 
   // Set up drop slots
   const slotElements = [];
@@ -218,9 +237,7 @@ test('DOM: slot assignment and is-selected-slot class behavior', async () => {
   const maxSel = 2;
 
   for (let i = 0; i < maxSel; i += 1) {
-    const slot = document.createElement('div');
-    slot.className = 'card-picker-drop-slot is-empty';
-    slot.dataset.slotIndex = String(i);
+    const slot = createMockElement();
     slotElements.push(slot);
   }
 
@@ -267,4 +284,122 @@ test('DOM: slot assignment and is-selected-slot class behavior', async () => {
   renderSlots();
   assert.ok(slotElements[0].classList.contains('is-selected-slot'));
   assert.ok(!slotElements[1].classList.contains('is-selected-slot'));
+});
+
+test('isTapGesture: accepts clean taps within duration and movement thresholds', () => {
+  assert.equal(MAX_TAP_DURATION_MS, 300);
+  const baseTime = 10000;
+  // Quick stationary click (120ms, 0px movement)
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 120,
+      startX: 100,
+      startY: 100,
+      endX: 100,
+      endY: 100,
+    }),
+    true
+  );
+
+  // Slight drift (4px <= 8px) within 250ms
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 250,
+      startX: 100,
+      startY: 100,
+      endX: 103,
+      endY: 102,
+    }),
+    true
+  );
+
+  // Exactly at boundary (300ms, 8px)
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 300,
+      startX: 100,
+      startY: 100,
+      endX: 108,
+      endY: 100,
+    }),
+    true
+  );
+
+  // Missing time inputs -> false
+  assert.equal(isTapGesture(), false);
+  assert.equal(isTapGesture({ downTime: null, upTime: baseTime }), false);
+  assert.equal(isTapGesture({ downTime: baseTime, upTime: null }), false);
+});
+
+test('isTapGesture: rejects drags, swipes, and long press holds', () => {
+  const baseTime = 10000;
+  // Long press / hold (e.g. 400ms > 300ms)
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 301,
+      startX: 100,
+      startY: 100,
+      endX: 100,
+      endY: 100,
+    }),
+    false,
+    'rejects press exceeding max duration'
+  );
+
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 600,
+      startX: 100,
+      startY: 100,
+      endX: 100,
+      endY: 100,
+    }),
+    false,
+    'rejects long hold'
+  );
+
+  // Drag movement (> 8px) even if fast (e.g. swipe gesture)
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 100,
+      startX: 100,
+      startY: 100,
+      endX: 115,
+      endY: 100,
+    }),
+    false,
+    'rejects horizontal swipe movement'
+  );
+
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime,
+      upTime: baseTime + 100,
+      startX: 100,
+      startY: 100,
+      endX: 100,
+      endY: 115,
+    }),
+    false,
+    'rejects vertical drag movement'
+  );
+
+  // Negative duration
+  assert.equal(
+    isTapGesture({
+      downTime: baseTime + 100,
+      upTime: baseTime,
+      startX: 100,
+      startY: 100,
+      endX: 100,
+      endY: 100,
+    }),
+    false
+  );
 });
