@@ -223,7 +223,7 @@ export function parseStadiumOncePerTurn(card) {
       chainStage2: /stage 2/.test(t),
     };
   }
-  if (/search.*basic pokémon.*bench/.test(t)) {
+  if (/search.*basic.*pok[ée]mon.*bench/.test(t)) {
     return { ...base, kind: 'search-bench', n: 1, searchWhat: 'basic pokemon' };
   }
   const fusion = t.match(/search.*up to (\d+) item cards that have "([^"]+)"/);
@@ -708,7 +708,7 @@ export function stadiumBlocksStatusApplication(pokemon, zoneCards = []) {
   return attached.length > 0;
 }
 
-export function getStadiumDamageReduction(defender, targetPlayer, zoneId = 'active') {
+export function getStadiumDamageReduction(defender, targetPlayer) {
   if (!rulesState.enabled || !defender) return 0;
   const stadium = getStadium();
   if (!stadium?.card) return 0;

@@ -182,6 +182,14 @@ export function executeSteps(draft, {
           const deck = player.zones.deck || [];
           const pickedCards = [];
           for (const sId of stepSelection) {
+            if (dest === 'bench') {
+              const currentBench = player.zones.bench || [];
+              const benchCount = currentBench.filter((b) => !b.attachedTo).length;
+              if (benchCount >= 5) {
+                // Hard limit: bench is full, do not overfill bench
+                continue;
+              }
+            }
             const dIdx = deck.findIndex((c) => c.instanceId === sId);
             if (dIdx >= 0) {
               const [c] = deck.splice(dIdx, 1);
@@ -217,6 +225,21 @@ export function executeSteps(draft, {
           break;
         }
 
+        // Bench limit check for deck-to-bench search (Edge Case 9)
+        if (dest === 'bench') {
+          const bench = player.zones.bench || [];
+          const benchCount = bench.filter((c) => !c.attachedTo).length;
+          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          if (availableBenchSlots <= 0) {
+            events.push({
+              type: 'effectStepSkipped',
+              reason: 'bench_full',
+              playerId,
+            });
+            break;
+          }
+        }
+
         // Needs input: filter deck candidates
         const deck = player.zones.deck || [];
         const matches = deck.filter((c) => matchesSearch(c, what));
@@ -230,13 +253,21 @@ export function executeSteps(draft, {
           break;
         }
 
+        let effectiveMaxCount = maxCount;
+        if (dest === 'bench') {
+          const bench = player.zones.bench || [];
+          const benchCount = bench.filter((c) => !c.attachedTo).length;
+          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          effectiveMaxCount = Math.min(maxCount, availableBenchSlots);
+        }
+
         const choice = createPendingChoice({
           player: playerId,
-          prompt: `${sourceCard?.name || 'Search'}: Select up to ${maxCount} card${maxCount > 1 ? 's' : ''} (${what}) from your deck`,
+          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
           source: sourceCard?.name || '',
           options: matches,
           min: 0, // In PTCG, private zone searches can fail to find
-          max: Math.min(maxCount, matches.length),
+          max: Math.min(effectiveMaxCount, matches.length),
           cancellable: true,
           stateVersion: draft.stateVersion,
           stepIndex: idx,

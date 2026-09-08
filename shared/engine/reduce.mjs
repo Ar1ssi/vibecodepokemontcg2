@@ -15,6 +15,7 @@ import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { executeStadium } from './effects/stadium.mjs';
 import { parseTrainerEffect } from './rules/trainer-effects.mjs';
+import { parseStadiumOncePerTurn } from './rules/stadium-effects.mjs';
 
 /**
  * Handles Knockout resolution for a Pokemon:
@@ -623,6 +624,21 @@ export function validateLegality(state, command) {
             return { allowed: false, reason: 'Not enough cards in hand to pay discard cost.' };
           }
         }
+
+        // Edge Case 9: Cannot play search-to-bench trainers when bench is full
+        if (parsed?.steps && parsed.steps.length > 0) {
+          const nonCostSteps = parsed.steps.filter((s) => s.type !== 'discardCost');
+          if (
+            nonCostSteps.length > 0 &&
+            nonCostSteps.every((s) => s.destination === 'bench')
+          ) {
+            const bench = player.zones?.bench || [];
+            const benchPokemonCount = bench.filter((c) => !c.attachedTo).length;
+            if (benchPokemonCount >= 5) {
+              return { allowed: false, reason: 'bench_full' };
+            }
+          }
+        }
       }
       return { allowed: true };
     }
@@ -644,6 +660,16 @@ export function validateLegality(state, command) {
     case 'stadium-effect': {
       if (player.flags?.stadiumUsedThisTurn) {
         return { allowed: false, reason: 'Stadium effect already used this turn.' };
+      }
+      if (state.stadium) {
+        const opt = parseStadiumOncePerTurn(state.stadium);
+        if (opt?.kind === 'search-bench') {
+          const bench = player.zones?.bench || [];
+          const benchPokemonCount = bench.filter((c) => !c.attachedTo).length;
+          if (benchPokemonCount >= 5) {
+            return { allowed: false, reason: 'bench_full' };
+          }
+        }
       }
       return { allowed: true };
     }

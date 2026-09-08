@@ -153,9 +153,18 @@ While the core pure state models and unit test coverage are broad (912 passing t
   4. Added legality check in `validateLegality` in [`shared/engine/reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs) preventing a player from playing a Stadium card if a Stadium card with the same name is already in play.
   5. Updated `createCard`, `createGameState`, and `initializePlayerDeck` to tag `ownerId` on player cards, and updated `findCard` to return the stadium card's `ownerId` as `playerId`. Verified by `shared/engine/__tests__/stadium-overwrite.test.mjs`.
 
-#### 15. Bench Limit (Edge Case 9) Bypassed by Deck-to-Bench Searches
-* **Location**: [`shared/engine/effects/executor.mjs:183-187`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/effects/executor.mjs#L183-L187)
-* **Root Cause**: In `searchDeck` when `dest === 'bench'`, cards are pushed to `bench` without verifying `bench.length < 5`, allowing searches like Nest Ball to overfill the bench past the 5-card maximum.
+#### 15. Bench Limit (Edge Case 9) Bypassed by Deck-to-Bench Searches — [RESOLVED]
+* **Location**: [`shared/engine/effects/executor.mjs:183-255`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/effects/executor.mjs#L183-L255), [`shared/engine/reduce.mjs:628-640, 665-675`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L628-L640), [`shared/engine/rules/stadium-effects.mjs:226`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/rules/stadium-effects.mjs#L226)
+* **Root Cause**: In `searchDeck` when `dest === 'bench'`, cards were pushed to `bench` without verifying `bench.length < 5`, allowing searches like Nest Ball to overfill the bench past the 5-card maximum. Furthermore, `playTrainer` and `stadium-effect` legality checks did not verify whether the bench had available capacity before attempting bench-exclusive searches.
+* **Fix**:
+  1. Updated `searchDeck` in [`shared/engine/effects/executor.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/effects/executor.mjs):
+     - Pre-choice validation checks available bench slots (`5 - benchPokemonCount`). If 0, gracefully skips the step (`effectStepSkipped` with `reason: 'bench_full'`) without searching or shuffling.
+     - Clamps `choice.max` and prompt wording to available bench slots when bench space is limited (e.g. 1 open slot restricts Buddy-Buddy Poffin to 1 card).
+     - Hard capacity guard during `stepSelection` choice resumption prevents pushing cards exceeding the 5-card bench limit, leaving excess cards safely in the deck.
+  2. Updated `validateLegality` in [`shared/engine/reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs):
+     - `playTrainer`: Rejects playing trainer cards whose non-cost effects solely place Pokémon on the bench (e.g., Nest Ball, Buddy-Buddy Poffin) with `bench_full` when the player's bench is at max capacity (5 Pokémon).
+     - `stadium-effect`: Rejects activating once-per-turn `search-bench` stadiums (e.g., Brooklet Hill, Artazon) with `bench_full` when the player's bench is at capacity.
+  3. Broadened regex in [`shared/engine/rules/stadium-effects.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/rules/stadium-effects.mjs) to parse typed basic Pokémon bench searches. Verified by `shared/engine/__tests__/bench-limit-search.test.mjs`.
 
 #### 16. Asleep Attacker Infinite Attack Reroll Exploit
 * **Location**: [`shared/engine/reduce.mjs:509-512`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L509-L512), [`shared/engine/reduce.mjs:1064-1074`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L1064-L1074)
@@ -180,3 +189,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 12. [x] Implement `gameEnded` socket notification broadcast and client win/loss reconciliation (Finding 12).
 13. [x] Fix premature paralysis clearing between turns so paralysis cures only at the end of the paralyzed player's turn (Finding 13).
 14. [x] Discard overwritten stadium cards to their owner's discard zone and block duplicate stadium plays (Finding 14).
+15. [x] Enforce bench limit (5 max) on deck-to-bench searches, playTrainer validation, and stadium effects (Finding 15).
