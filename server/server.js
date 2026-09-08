@@ -402,6 +402,8 @@ async function main() {
       }
     });
     socket.on('joinGame', (roomId, username, isSpectator) => {
+      if (typeof roomId === 'string') roomId = roomId.trim();
+      if (typeof username === 'string') username = username.trim();
       if (!roomInfo.has(roomId)) {
         roomInfo.set(roomId, { players: new Set(), spectators: new Set() });
       }

@@ -81,8 +81,8 @@ export const initializeRoomButtons = () => {
     ];
     const randomIndex = Math.floor(Math.random() * names.length);
     systemState.p2SelfUsername =
-      nameInput.value.trim() !== '' ? nameInput.value : names[randomIndex];
-    systemState.roomId = roomIdInput.value;
+      nameInput.value.trim() !== '' ? nameInput.value.trim() : names[randomIndex];
+    systemState.roomId = roomIdInput.value.trim();
     socket.emit(
       'joinGame',
       systemState.roomId,
