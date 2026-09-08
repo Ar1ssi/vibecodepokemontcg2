@@ -647,7 +647,7 @@ async function main() {
               stateVersion: result.stateVersion,
               view: broadcast.view,
               events: result.events,
-              pendingChoice: result.pendingChoice,
+              pendingChoice: broadcast.view?.pendingChoice || null,
             });
           }
         }
@@ -686,7 +686,7 @@ async function main() {
               stateVersion: result.stateVersion,
               view: broadcast.view,
               events: result.events,
-              pendingChoice: result.pendingChoice,
+              pendingChoice: broadcast.view?.pendingChoice || null,
             });
           }
         }
@@ -703,7 +703,7 @@ async function main() {
             stateVersion: gameRoom.state.stateVersion,
             view,
             events: [],
-            pendingChoice: gameRoom.state.pendingChoice,
+            pendingChoice: view?.pendingChoice || null,
           });
         } else if (roomId) {
           socket.emit('gameEnded', {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createGameState, hashState } from '../../../shared/engine/state.mjs';
+import { createGameState, findCard, hashState } from '../../../shared/engine/state.mjs';
 import { createCard } from '../../../shared/engine/cards.mjs';
 import { createRelayedRng } from '../../../shared/engine/rng.mjs';
 import {
@@ -53,11 +53,49 @@ test('initializePlayerDeck: populates player deck with sequential syncInstance I
   const playerDeck = state.players.p1.zones.deck;
   assert.equal(playerDeck.length, 20);
   assert.equal(playerDeck[0].syncInstance, 0);
-  assert.equal(playerDeck[0].instanceId, 0);
+  assert.equal(playerDeck[0].instanceId, 1);
   assert.equal(playerDeck[0].name, 'Alpha A');
   assert.equal(playerDeck[19].syncInstance, 19);
-  assert.equal(playerDeck[19].instanceId, 19);
+  assert.equal(playerDeck[19].instanceId, 20);
   assert.equal(playerDeck[19].name, 'Alpha Basic');
+});
+
+test('Finding 3: initializePlayerDeck mints globally unique instanceIds across players', () => {
+  const state = createGameState({
+    gameId: 'g-finding3',
+    players: {
+      p1: { username: 'Alice' },
+      p2: { username: 'Bob' },
+    },
+  });
+
+  initializePlayerDeck(state, 'p1', fixtureDeck('Alpha'));
+  initializePlayerDeck(state, 'p2', fixtureDeck('Beta'));
+
+  const p1Deck = state.players.p1.zones.deck;
+  const p2Deck = state.players.p2.zones.deck;
+
+  assert.equal(p1Deck.length, 20);
+  assert.equal(p2Deck.length, 20);
+
+  // All 40 instanceIds must be unique
+  const allInstanceIds = new Set([
+    ...p1Deck.map((c) => c.instanceId),
+    ...p2Deck.map((c) => c.instanceId),
+  ]);
+  assert.equal(allInstanceIds.size, 40, 'All 40 cards must have distinct instanceIds');
+
+  // Verify p2 cards do not collide with p1
+  for (const card of p2Deck) {
+    assert.ok(card.instanceId > 20, `P2 card ${card.name} must have instanceId > 20`);
+  }
+
+  // Verify findCard correctly resolves P2 card to P2
+  const p2Card = p2Deck[0];
+  const resolved = findCard(state, p2Card.instanceId);
+  assert.ok(resolved);
+  assert.equal(resolved.playerId, 'p2');
+  assert.equal(resolved.card.instanceId, p2Card.instanceId);
 });
 
 test('translateLegacyAction: setup deals 7 cards to hand and 6 to prizes after shuffle', () => {

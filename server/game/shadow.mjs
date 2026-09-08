@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { hashState, PLAYER_ZONES } from '../../shared/engine/state.mjs';
-import { createCard, isEnergy } from '../../shared/engine/cards.mjs';
+import { createCard, isEnergy, mintInstanceId } from '../../shared/engine/cards.mjs';
 import { createRelayedRng } from '../../shared/engine/rng.mjs';
 import { GameRoom } from './room.mjs';
 
@@ -19,7 +19,8 @@ const __dirname = path.dirname(__filename);
 /**
  * Initializes a player's deck zone from serialized deckData tuples.
  * Follows client buildDeck sequencing so that syncInstance numbers 0..N-1
- * match client card identities bit-for-bit.
+ * match client card identities bit-for-bit, while minting globally unique
+ * instanceId values across all players in GameState.
  *
  * @param {object} state GameState
  * @param {string} playerId
@@ -51,7 +52,7 @@ export function initializePlayerDeck(state, playerId, deckData = []) {
       typeof quantity === 'number' && quantity > 0 ? quantity : 1;
     for (let i = 0; i < cardCount; i++) {
       const card = createCard({
-        instanceId: syncInstance,
+        instanceId: mintInstanceId(state),
         syncInstance,
         name: name || '',
         type: type || '',
