@@ -11,6 +11,7 @@ import {
 import { createRng } from '../../shared/engine/rng.mjs';
 import { viewFor } from '../../shared/engine/view.mjs';
 import { applyCommand } from '../../shared/engine/reduce.mjs';
+import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 
 export class GameRoom {
   /**
@@ -58,7 +59,13 @@ export class GameRoom {
    * @param {object[]} [deckList]
    */
   addPlayer(socketId, playerId, username = '', deckList = []) {
-    if (!socketId || !playerId) return;
+    if (!socketId || !playerId) return false;
+
+    // Edge Case 14 & Hazard H1: Only 2 active players allowed per game room
+    const registeredPids = [...this.playerToSocket.keys()];
+    if (!registeredPids.includes(playerId) && registeredPids.length >= 2) {
+      return false;
+    }
 
     this.socketToPlayer.set(socketId, playerId);
     this.playerToSocket.set(playerId, socketId);
@@ -79,6 +86,7 @@ export class GameRoom {
     } else if (username) {
       this.state.players[playerId].username = username;
     }
+    return true;
   }
 
   /**
@@ -145,6 +153,17 @@ export class GameRoom {
         error: 'unauthorized',
         reason: 'Socket not registered as player',
         clientSeq: cmd.clientSeq,
+      };
+    }
+
+    // Edge Case 17: Protocol version negotiation
+    if (cmd.protocolVersion && cmd.protocolVersion !== PROTOCOL_VERSION) {
+      return {
+        success: false,
+        error: 'version_mismatch',
+        reason: `Protocol version mismatch: client ${cmd.protocolVersion} vs server ${PROTOCOL_VERSION}`,
+        clientSeq: cmd.clientSeq,
+        expectedVersion: PROTOCOL_VERSION,
       };
     }
 

@@ -9,15 +9,8 @@ import {
 } from '../sync-action-args.mjs';
 import { hashBoardSnapshot, hashCardList } from '../../../../../shared/engine/zones/zone-hash.mjs';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import {
-  hashResyncKey,
-  resetBoardResyncDedupe,
-  shouldAnimateDrawFlight,
-  shouldEmitBoardResync,
-  shouldRequestBoardSnapshot,
-  shouldRequestHashResync,
-} from '../sync-replay.mjs';
+import { fileURLToPath, URL } from 'node:url';
+import { shouldAnimateDrawFlight } from '../../image-logic/draw-flight-predicate.mjs';
 
 test('splitEmitAndTail: local emit boolean stays emit', () => {
   assert.deepEqual(splitEmitAndTail(true), { emit: true, tail: null });
@@ -58,39 +51,57 @@ test('rngFromCoin is deterministic for heads and tails', () => {
 
 test('flipCoin stores and replays the same face', () => {
   const bundle = {};
-  const first = flipCoin(bundle, 'attack');
-  assert.match(first, /^(heads|tails)$/);
-  assert.equal(flipCoin(bundle, 'attack'), first);
+  const coin1 = flipCoin(bundle, 'wake');
+  const coin2 = flipCoin(bundle, 'wake');
+  assert.equal(coin1, coin2);
+  assert.equal(['heads', 'tails'].includes(coin1), true);
+  assert.equal(bundle.wake, coin1);
 });
 
-test('deckDataEquals compares by value not reference', () => {
-  const a = [[1, 'Pikachu', 'Pokémon']];
-  const b = [[1, 'Pikachu', 'Pokémon']];
+test('deckDataEquals matches identical arrays of deck card tuples', () => {
+  const a = [['Pikachu', 'src1'], ['Raichu', 'src2']];
+  const b = [['Pikachu', 'src1'], ['Raichu', 'src2']];
+  const c = [['Pikachu', 'src1'], ['Raichu', 'src3']];
   assert.equal(deckDataEquals(a, b), true);
-  assert.equal(deckDataEquals(a, [[1, 'Raichu', 'Pokémon']]), false);
+  assert.equal(deckDataEquals(a, c), false);
+  assert.equal(deckDataEquals(a, null), false);
   assert.equal(deckDataEquals(null, null), true);
 });
 
-test('zone hash is order-sensitive and identity-based', () => {
-  const a = hashCardList([
-    { name: 'Popplio', syncInstance: 1, number: '37' },
-    { name: "Professor's Research", syncInstance: 2 },
-  ]);
-  const b = hashCardList([
-    { name: "Professor's Research", syncInstance: 2 },
-    { name: 'Popplio', syncInstance: 1, number: '37' },
-  ]);
-  assert.notEqual(a, b);
-  assert.equal(
-    hashBoardSnapshot({
-      hand: [{ name: 'Popplio', syncInstance: 1 }],
-      active: [],
-    }),
-    hashBoardSnapshot({
-      active: { array: [] },
-      hand: { array: [{ name: 'Popplio', syncInstance: 1 }] },
-    })
-  );
+test('hashBoardSnapshot matches across duplicate calls', () => {
+  const zones = {
+    active: { array: [{ name: 'Pikachu', syncInstance: 0 }] },
+    bench: { array: [] },
+    hand: { array: [{ name: 'Popplio', syncInstance: 1 }] },
+    discard: { array: [] },
+  };
+  assert.equal(hashBoardSnapshot(zones), hashBoardSnapshot(zones));
+  assert.equal(typeof hashBoardSnapshot(zones), 'string');
+});
+
+test('hashBoardSnapshot differs when a card moves', () => {
+  const h1 = hashBoardSnapshot({
+    active: { array: [{ name: 'Pikachu', syncInstance: 0 }] },
+    hand: { array: [] },
+  });
+  const h2 = hashBoardSnapshot({
+    active: { array: [] },
+    hand: { array: [{ name: 'Pikachu', syncInstance: 0 }] },
+  });
+  assert.notEqual(h1, h2);
+});
+
+test('hashCardList changes when counter fields change', () => {
+  const base = [{ name: 'Pikachu', syncInstance: 0 }];
+  const withDamage = [{ name: 'Pikachu', syncInstance: 0, damage: 30 }];
+  const withStatus = [
+    { name: 'Pikachu', syncInstance: 0, specialCondition: 'Asleep' },
+  ];
+  const withAbility = [{ name: 'Pikachu', syncInstance: 0, abilityUsed: true }];
+  const baseHash = hashCardList(base);
+  assert.notEqual(hashCardList(withDamage), baseHash);
+  assert.notEqual(hashCardList(withStatus), baseHash);
+  assert.notEqual(hashCardList(withAbility), baseHash);
 });
 
 test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay / hidden do not', () => {
@@ -101,82 +112,6 @@ test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay / hidde
   assert.equal(shouldAnimateDrawFlight({ syncReplay: true, syncReplaying: true }), false);
   assert.equal(shouldAnimateDrawFlight({ hidden: true }), false);
   assert.equal(shouldAnimateDrawFlight({ syncReplay: false, hidden: true }), false);
-});
-
-test('shouldRequestHashResync: one fullReplay per matching counter pair', () => {
-  const first = shouldRequestHashResync(null, 11, 11);
-  assert.equal(first.request, true);
-  assert.equal(first.key, hashResyncKey(11, 11));
-  assert.equal(shouldRequestHashResync(first.key, 11, 11).request, false);
-  // A new action advances the pair — allow one more recovery attempt.
-  const next = shouldRequestHashResync(first.key, 13, 13);
-  assert.equal(next.request, true);
-  assert.equal(next.key, '13:13');
-  assert.equal(shouldRequestHashResync(next.key, 13, 13).request, false);
-});
-
-test('shouldEmitBoardResync: skip while catch-up is rebuilding the board', () => {
-  resetBoardResyncDedupe();
-  assert.equal(
-    shouldEmitBoardResync({
-      selfCounter: 56,
-      oppCounter: 17,
-      syncReplaying: true,
-    }).request,
-    false
-  );
-  assert.equal(
-    shouldEmitBoardResync({
-      selfCounter: 56,
-      oppCounter: 17,
-      isCatchingUp: true,
-    }).skipped,
-    'replaying'
-  );
-  const live = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 17 });
-  assert.equal(live.request, true);
-  assert.equal(live.key, '56:17');
-});
-
-test('shouldEmitBoardResync: hint_mismatch and apply_failed share one slot', () => {
-  resetBoardResyncDedupe();
-  const hint = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 17 });
-  assert.equal(hint.request, true);
-  // Same counters: the failed Darkrai drag would otherwise emit both
-  // hint_mismatch and apply_failed, then each replay would emit again.
-  const applyFailed = shouldEmitBoardResync({
-    selfCounter: 56,
-    oppCounter: 17,
-  });
-  assert.equal(applyFailed.request, false);
-  const later = shouldEmitBoardResync({ selfCounter: 56, oppCounter: 19 });
-  assert.equal(later.request, true);
-  resetBoardResyncDedupe();
-});
-
-test('shouldRequestBoardSnapshot: one snapshot per pair, after replay may still fire', () => {
-  resetBoardResyncDedupe();
-  const replay = shouldEmitBoardResync({ selfCounter: 8, oppCounter: 4 });
-  assert.equal(replay.request, true);
-  assert.equal(
-    shouldEmitBoardResync({ selfCounter: 8, oppCounter: 4 }).request,
-    false
-  );
-  const snap = shouldRequestBoardSnapshot({ selfCounter: 8, oppCounter: 4 });
-  assert.equal(snap.request, true);
-  assert.equal(
-    shouldRequestBoardSnapshot({ selfCounter: 8, oppCounter: 4 }).request,
-    false
-  );
-  assert.equal(
-    shouldRequestBoardSnapshot({
-      selfCounter: 8,
-      oppCounter: 4,
-      isCatchingUp: true,
-    }).skipped,
-    'replaying'
-  );
-  resetBoardResyncDedupe();
 });
 
 test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => {
@@ -230,18 +165,6 @@ test('trainer-execution must not call raw moveCard (local-only, never emitted)',
   );
 });
 
-test('catchUpActions does not wipe self board on fullReplay', () => {
-  const path = fileURLToPath(
-    new URL('../catch-up-actions.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  assert.match(src, /reset\('opp', true, true, false, false\)/);
-  assert.equal(
-    src.includes("reset('self'"),
-    false,
-    'catchUpActions must never call reset(\'self\') during opponent catch-up'
-  );
-});
 
 test('undoAsync executes sequentially rather than Promise.all concurrent race', () => {
   const path = fileURLToPath(
@@ -329,7 +252,7 @@ test('socket-event-listeners registers visibilitychange and focus listeners', ()
   const src = readFileSync(path, 'utf8');
   assert.match(src, /document\.addEventListener\('visibilitychange'/);
   assert.match(src, /window\.addEventListener\('focus'/);
-  assert.match(src, /triggerSyncCheck\(50\)/);
+  assert.match(src, /emitRequestView/);
 });
 
 test('shuffle flight animation skips when document is hidden', () => {

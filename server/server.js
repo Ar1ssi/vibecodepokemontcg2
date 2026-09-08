@@ -12,10 +12,11 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
 import { ShadowSession, initializePlayerDeck } from './game/shadow.mjs';
+import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
 
 const SERVER_AUTHORITATIVE =
-  process.env.SERVER_AUTHORITATIVE?.trim() === '1' ||
-  process.env.SERVER_AUTHORITATIVE?.trim() === 'true';
+  process.env.SERVER_AUTHORITATIVE !== '0' &&
+  process.env.SERVER_AUTHORITATIVE !== 'false';
 
 const SHADOW_MODE =
   process.env.SHADOW_MODE?.trim() === '1' ||
@@ -430,6 +431,7 @@ async function main() {
           socket.emit('joinGame', {
             serverAuthoritative: SERVER_AUTHORITATIVE,
             shadowMode: SHADOW_MODE,
+            protocolVersion: PROTOCOL_VERSION,
           });
           // Remove any existing disconnect listener to prevent leak on rejoin
           if (socket.data.disconnectListener) {
@@ -446,6 +448,14 @@ async function main() {
 
     socket.on('userReconnected', (data) => {
       if (!roomInfo.has(data.roomId)) {
+        if (SERVER_AUTHORITATIVE) {
+          socket.emit('gameEnded', {
+            winner: null,
+            reason: 'server_restart',
+            message: 'Game session terminated due to server restart.',
+          });
+          return;
+        }
         roomInfo.set(data.roomId, {
           players: new Set(),
           spectators: new Set(),
@@ -598,6 +608,20 @@ async function main() {
             clientSeq: cmd?.clientSeq,
             reason: 'room_not_found',
           });
+          socket.emit('gameEnded', {
+            winner: null,
+            reason: 'server_restart',
+            message: 'Game session terminated due to server restart.',
+          });
+          return;
+        }
+
+        if (cmd?.protocolVersion && cmd.protocolVersion !== PROTOCOL_VERSION) {
+          socket.emit('cmdRejected', {
+            clientSeq: cmd?.clientSeq,
+            reason: 'version_mismatch',
+            details: `Server protocol is ${PROTOCOL_VERSION}, client sent ${cmd.protocolVersion}`,
+          });
           return;
         }
 
@@ -640,6 +664,11 @@ async function main() {
             clientSeq: data?.clientSeq,
             reason: 'room_not_found',
           });
+          socket.emit('gameEnded', {
+            winner: null,
+            reason: 'server_restart',
+            message: 'Game session terminated due to server restart.',
+          });
           return;
         }
 
@@ -675,6 +704,12 @@ async function main() {
             view,
             events: [],
             pendingChoice: gameRoom.state.pendingChoice,
+          });
+        } else if (roomId) {
+          socket.emit('gameEnded', {
+            winner: null,
+            reason: 'server_restart',
+            message: 'Game session terminated due to server restart.',
           });
         }
       });

@@ -32,10 +32,20 @@
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
-import {
-  shouldExecuteLocalRulesEffect,
-  shouldEmitTurnStartDraw,
-} from '/shared/engine/rules/rules-local-effects.mjs';
+function shouldExecuteLocalRulesEffect({
+  isTwoPlayer = false,
+  localPlay = false,
+  owner = 'self',
+} = {}) {
+  if (!localPlay) return false;
+  if (!isTwoPlayer) return true;
+  return owner === 'self';
+}
+
+function shouldEmitTurnStartDraw({ isTwoPlayer = false, turnPlayer = 'self' } = {}) {
+  if (!isTwoPlayer) return true;
+  return turnPlayer === 'self';
+}
 import { canEvolve, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';

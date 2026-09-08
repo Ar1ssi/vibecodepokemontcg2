@@ -4,7 +4,7 @@ import {
   originRectForHandFlight,
   playDrawToHand,
 } from '../../setup/image-logic/draw-flight.js';
-import { shouldAnimateDrawFlight } from '../../setup/general/sync-replay.mjs';
+import { shouldAnimateDrawFlight } from '../../setup/image-logic/draw-flight.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { closePopups, deselectCard } from '../general/close-popups.js';
 import { updateCount } from '../general/count.js';
