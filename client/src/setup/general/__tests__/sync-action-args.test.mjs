@@ -237,12 +237,14 @@ test('rotateCard broadcasts newRotation in action payload', () => {
   assert.match(src, /processAction\(user, emit, 'rotateCard', \[zoneId, index, single, newRotation\]\)/);
 });
 
-test('requestAction accepts counter and status actions', () => {
+test('requestAction routes counter mismatches through the ordered queue, not a bypass', () => {
   const path = fileURLToPath(
     new URL('../../../initialization/socket-event-listeners/socket-event-listeners.js', import.meta.url)
   );
   const src = readFileSync(path, 'utf8');
-  assert.match(src, /isCounterOrStatusAction/);
+  assert.doesNotMatch(src, /isCounterOrStatusAction/);
+  assert.match(src, /admitRequestAction/);
+  assert.match(src, /requestActionQueue\.buffer/);
 });
 
 test('socket-event-listeners registers visibilitychange and focus listeners', () => {
