@@ -11,7 +11,11 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
-import { ShadowSession, initializePlayerDeck } from './game/shadow.mjs';
+import {
+  ShadowSession,
+  initializePlayerDeck,
+  extractDeckData,
+} from './game/shadow.mjs';
 import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
 
 const SERVER_AUTHORITATIVE =
@@ -585,10 +589,7 @@ async function main() {
               playerId &&
               (data.action === 'exchangeData' || data.action === 'loadDeckData')
             ) {
-              const deckData =
-                data.action === 'exchangeData'
-                  ? data.parameters?.[2]
-                  : data.parameters?.[1];
+              const deckData = extractDeckData(data.action, data.parameters);
               if (Array.isArray(deckData)) {
                 initializePlayerDeck(gameRoom.state, playerId, deckData);
               }

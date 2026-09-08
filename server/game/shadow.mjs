@@ -70,6 +70,27 @@ export function initializePlayerDeck(state, playerId, deckData = []) {
 }
 
 /**
+ * Extracts deckData array from legacy action parameters.
+ * - exchangeData: parameters are [username, deckData, cardBack, coachingMode, callback, matId]
+ * - loadDeckData: parameters are [deckData] (or legacy [user, deckData])
+ * @param {string} action
+ * @param {any[]} parameters
+ * @returns {any[] | null}
+ */
+export function extractDeckData(action, parameters) {
+  if (!Array.isArray(parameters)) return null;
+  if (action === 'exchangeData') {
+    return Array.isArray(parameters[1]) ? parameters[1] : null;
+  }
+  if (action === 'loadDeckData') {
+    if (Array.isArray(parameters[0])) return parameters[0];
+    if (Array.isArray(parameters[1])) return parameters[1];
+    return null;
+  }
+  return null;
+}
+
+/**
  * Translates a legacy action + positional parameters into either:
  * - Direct state adjustments (deck initialization, setup deals, shuffles)
  * - A pure command object: `{ command: { type, payload, playerId } }`
@@ -98,17 +119,12 @@ export function translateLegacyAction(
   }
 
   switch (action) {
-    case 'exchangeData': {
-      // parameters: [username, deckData, cardBack, coachingMode, callback, matId]
-      const [, deckData] = parameters;
-      initializePlayerDeck(state, playerId, deckData);
-      return { handled: true };
-    }
-
+    case 'exchangeData':
     case 'loadDeckData': {
-      // parameters: [deckData]
-      const [deckData] = parameters;
-      initializePlayerDeck(state, playerId, deckData);
+      const deckData = extractDeckData(action, parameters);
+      if (deckData) {
+        initializePlayerDeck(state, playerId, deckData);
+      }
       return { handled: true };
     }
 
