@@ -529,6 +529,9 @@ export function validateLegality(state, command) {
       if (active.specialCondition === 'Paralyzed') {
         return { allowed: false, reason: "Paralyzed — this Pokémon can't attack or retreat." };
       }
+      if (active.specialCondition === 'Asleep') {
+        return { allowed: false, reason: "Asleep — this Pokémon can't attack or retreat." };
+      }
       const atkIdx = payload?.attackIndex ?? 0;
       const attack = active.attacks?.[atkIdx];
       if (attack && attack.cost?.length > 0) {
@@ -1126,17 +1129,6 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
-      // Check asleep condition (wake coin flip)
-      if (attacker && attacker.specialCondition === 'Asleep') {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
-        if (coin === 'heads') {
-          attacker.specialCondition = null;
-          events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: attacker.instanceId, playerId });
-        } else {
-          events.push({ type: 'attackCancelledAsleep', instanceId: attacker.instanceId, playerId });
-          break;
-        }
-      }
 
       let dmgDealt = 0;
       if (attacker && defender) {

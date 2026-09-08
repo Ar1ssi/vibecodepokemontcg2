@@ -166,9 +166,13 @@ While the core pure state models and unit test coverage are broad (912 passing t
      - `stadium-effect`: Rejects activating once-per-turn `search-bench` stadiums (e.g., Brooklet Hill, Artazon) with `bench_full` when the player's bench is at capacity.
   3. Broadened regex in [`shared/engine/rules/stadium-effects.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/rules/stadium-effects.mjs) to parse typed basic Pokémon bench searches. Verified by `shared/engine/__tests__/bench-limit-search.test.mjs`.
 
-#### 16. Asleep Attacker Infinite Attack Reroll Exploit
-* **Location**: [`shared/engine/reduce.mjs:509-512`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L509-L512), [`shared/engine/reduce.mjs:1064-1074`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L1064-L1074)
-* **Root Cause**: [`validateLegality`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L499) checks `Paralyzed` for `attack`, but not `Asleep`. When an asleep Pokémon attacks, it flips a coin to wake up; on tails, it executes `break;` before marking `attackerAttacked = true` or ending the turn, allowing the player to repeatedly click Attack until they roll heads.
+#### 16. Asleep Attacker Infinite Attack Reroll Exploit — [RESOLVED]
+* **Location**: [`shared/engine/reduce.mjs:529-535`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L529-L535), [`shared/engine/reduce.mjs:1125-1140`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L1125-L1140)
+* **Root Cause**: `validateLegality` checked `Paralyzed` for `attack`, but not `Asleep`. When an asleep Pokémon attacked, it attempted a coin flip to wake up; on tails, it executed `break;` without marking `attackerAttacked = true` or ending the turn, allowing the player to repeatedly click Attack until they rolled heads. Furthermore, under official Pokémon TCG rules, an Asleep Pokémon cannot declare an attack at all; wake-up flips occur exclusively between turns during Pokémon Checkup.
+* **Fix**:
+  1. Updated `validateLegality` in [`shared/engine/reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs) under `case 'attack':` to verify `active.specialCondition === 'Asleep'` and reject with `"Asleep — this Pokémon can't attack or retreat."`, aligning with `Paralyzed` attack validation and the existing `retreat` check.
+  2. Removed the erroneous asleep wake-flip block from `case 'attack':` in [`shared/engine/reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs), eliminating the infinite reroll exploit. Official checkup wake flips remain properly handled in `resolveCheckup`.
+  3. Added comprehensive unit tests in [`shared/engine/__tests__/asleep-attack.test.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/__tests__/asleep-attack.test.mjs) verifying attack/retreat legality rejection, repeated attack command deduplication/blocking, and Pokémon Checkup wake-up coin flip behavior.
 
 ---
 
@@ -190,3 +194,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 13. [x] Fix premature paralysis clearing between turns so paralysis cures only at the end of the paralyzed player's turn (Finding 13).
 14. [x] Discard overwritten stadium cards to their owner's discard zone and block duplicate stadium plays (Finding 14).
 15. [x] Enforce bench limit (5 max) on deck-to-bench searches, playTrainer validation, and stadium effects (Finding 15).
+16. [x] Block Asleep active Pokémon from attacking and eliminate infinite attack reroll exploit (Finding 16).
