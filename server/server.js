@@ -603,13 +603,8 @@ async function main() {
       'leaveRoom',
       'requestAction',
       'pushAction',
-      'resyncActions',
-      'catchUpActions',
-      'requestBoardSnapshot',
-      'applyBoardSnapshot',
       'requestPeerLog',
       'peerLog',
-      'syncCheck',
       'requestSyncLogBundle',
       'syncLogBundle',
       'appendMessage',
@@ -650,12 +645,8 @@ async function main() {
           const roomId =
             data.roomId || [...socket.rooms].find((r) => r !== socket.id);
           const shadow = shadowSessions.get(roomId);
-          if (shadow) {
-            if (event === 'pushAction') {
-              shadow.ingestAction(socket.id, data);
-            } else if (event === 'syncCheck') {
-              shadow.checkSync(socket.id, data);
-            }
+          if (shadow && event === 'pushAction') {
+            shadow.ingestAction(socket.id, data);
           }
         }
 
