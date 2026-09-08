@@ -2311,6 +2311,10 @@ ul, li {
   border-color: rgba(245, 213, 71, 0.95);
   background: rgba(130, 130, 130, 0.5);
 }
+.card-picker-choose .card-picker-drop-slot.is-selected-slot {
+  border-color: rgba(245, 213, 71, 0.95);
+  box-shadow: 0 0 8px rgba(245, 213, 71, 0.45), inset 0 0 0 1px rgba(245, 213, 71, 0.3);
+}
 .card-picker-choose .card-picker-drop-slot.has-card {
   background: rgba(90, 90, 90, 0.35);
 }
@@ -2331,7 +2335,15 @@ ul, li {
   object-fit: contain;
   border-radius: 0.18rem;
 }
-.card-picker-choose .discard-pile-slide.is-in-slot {
+.card-picker-choose .card-picker-slide {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.card-picker-choose .card-picker-slide * {
+  pointer-events: none;
+}
+.card-picker-choose .discard-pile-slide.is-in-slot,
+.card-picker-choose .card-picker-slide.is-in-slot {
   transition: none !important;
   opacity: 0 !important;
   visibility: hidden !important;

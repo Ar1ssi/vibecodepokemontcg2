@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   computeDropSlotHitboxes,
   findDropSlotIndex,
+  findSelectedSlotIndex,
+  resolveTargetSlotIndex,
   shouldSuppressClickAfterDrag,
 } from '../card-picker-hitbox.mjs';
 
@@ -146,4 +148,123 @@ test('shouldSuppressClickAfterDrag: suppresses clicks within threshold, allows o
   assert.equal(shouldSuppressClickAfterDrag(baseTime, baseTime + 400), false);
   // Click 1000ms after drag: allowed
   assert.equal(shouldSuppressClickAfterDrag(baseTime, baseTime + 1000), false);
+});
+
+test('findSelectedSlotIndex: prioritizes open slot from the left', () => {
+  assert.equal(findSelectedSlotIndex([]), -1);
+  assert.equal(findSelectedSlotIndex(null), -1);
+  assert.equal(findSelectedSlotIndex([null]), 0);
+  assert.equal(findSelectedSlotIndex([null, null, null]), 0);
+  assert.equal(findSelectedSlotIndex(['card1', null, null]), 1);
+  assert.equal(findSelectedSlotIndex(['card1', 'card2', null]), 2);
+  assert.equal(findSelectedSlotIndex(['card1', 'card2', 'card3']), -1);
+  assert.equal(findSelectedSlotIndex([null, 'card2', null]), 0, 'prioritizes left even with gaps');
+});
+
+test('resolveTargetSlotIndex: resolves target slot prioritizing leftmost open slot', () => {
+  // Empty inputs
+  assert.equal(resolveTargetSlotIndex({ slotAssignments: [] }), -1);
+  assert.equal(resolveTargetSlotIndex(), -1);
+
+  // Explicit slot requested
+  assert.equal(
+    resolveTargetSlotIndex({
+      slotAssignments: [null, null],
+      requestedSlotIndex: 1,
+    }),
+    1
+  );
+
+  // Multi-select mode: fills from left to right, stops when full
+  const multiSlots = [null, null];
+  assert.equal(
+    resolveTargetSlotIndex({ slotAssignments: multiSlots, multiSelect: true, maxCount: 2 }),
+    0
+  );
+  multiSlots[0] = 'card1';
+  assert.equal(
+    resolveTargetSlotIndex({ slotAssignments: multiSlots, multiSelect: true, maxCount: 2 }),
+    1
+  );
+  multiSlots[1] = 'card2';
+  assert.equal(
+    resolveTargetSlotIndex({ slotAssignments: multiSlots, multiSelect: true, maxCount: 2 }),
+    -1,
+    'full in multi-select returns -1'
+  );
+
+  // Single-select mode: fills slot 0, and replaces slot 0 when full
+  const singleSlot = [null];
+  assert.equal(
+    resolveTargetSlotIndex({ slotAssignments: singleSlot, multiSelect: false, maxCount: 1 }),
+    0
+  );
+  singleSlot[0] = 'cardA';
+  assert.equal(
+    resolveTargetSlotIndex({ slotAssignments: singleSlot, multiSelect: false, maxCount: 1 }),
+    0,
+    'replaces slot 0 in single-select when already filled'
+  );
+});
+
+test('DOM: slot assignment and is-selected-slot class behavior', async () => {
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+  const { document } = dom.window;
+
+  // Set up drop slots
+  const slotElements = [];
+  const slotAssignments = [null, null];
+  const maxSel = 2;
+
+  for (let i = 0; i < maxSel; i += 1) {
+    const slot = document.createElement('div');
+    slot.className = 'card-picker-drop-slot is-empty';
+    slot.dataset.slotIndex = String(i);
+    slotElements.push(slot);
+  }
+
+  const renderSlots = () => {
+    const selectedIdx = findSelectedSlotIndex(slotAssignments);
+    slotElements.forEach((el, i) => {
+      const card = slotAssignments[i];
+      el.classList.toggle('has-card', Boolean(card));
+      el.classList.toggle('is-empty', !card);
+      el.classList.toggle('is-selected-slot', i === selectedIdx);
+    });
+  };
+
+  // Initial render: slot 0 is the selected slot (open, prioritizing left)
+  renderSlots();
+  assert.ok(slotElements[0].classList.contains('is-selected-slot'));
+  assert.ok(!slotElements[1].classList.contains('is-selected-slot'));
+
+  // Put card 1 in slot 0
+  const card1 = { name: 'Pikachu' };
+  const target0 = resolveTargetSlotIndex({ slotAssignments, multiSelect: true, maxCount: 2 });
+  assert.equal(target0, 0);
+  slotAssignments[target0] = card1;
+  renderSlots();
+
+  // Slot 1 is now the selected slot
+  assert.ok(!slotElements[0].classList.contains('is-selected-slot'));
+  assert.ok(slotElements[0].classList.contains('has-card'));
+  assert.ok(slotElements[1].classList.contains('is-selected-slot'));
+
+  // Put card 2 in slot 1
+  const card2 = { name: 'Raichu' };
+  const target1 = resolveTargetSlotIndex({ slotAssignments, multiSelect: true, maxCount: 2 });
+  assert.equal(target1, 1);
+  slotAssignments[target1] = card2;
+  renderSlots();
+
+  // Both slots full: neither is selected-slot
+  assert.ok(!slotElements[0].classList.contains('is-selected-slot'));
+  assert.ok(!slotElements[1].classList.contains('is-selected-slot'));
+
+  // Unslot slot 0 -> slot 0 becomes selected slot again
+  slotAssignments[0] = null;
+  renderSlots();
+  assert.ok(slotElements[0].classList.contains('is-selected-slot'));
+  assert.ok(!slotElements[1].classList.contains('is-selected-slot'));
 });

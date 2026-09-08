@@ -5,10 +5,11 @@ import {
   startHoloAnimation,
   stopHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
-import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { closeCardPreview } from './full-view.js';
 import {
   findDropSlotIndex,
+  findSelectedSlotIndex,
+  resolveTargetSlotIndex,
   shouldSuppressClickAfterDrag,
 } from './card-picker-hitbox.mjs';
 
@@ -406,11 +407,13 @@ const syncDropSlotLayout = (state) => {
 const renderSlotCards = (state) => {
   if (!state.slotElements?.length) return;
   syncDropSlotLayout(state);
+  const selectedSlotIndex = findSelectedSlotIndex(state.slotAssignments);
   state.slotElements.forEach((slotEl, i) => {
     slotEl.replaceChildren();
     const card = state.slotAssignments[i];
     slotEl.classList.toggle('has-card', Boolean(card));
     slotEl.classList.toggle('is-empty', !card);
+    slotEl.classList.toggle('is-selected-slot', i === selectedSlotIndex);
     if (card) {
       const inner = document.createElement('div');
       inner.className = 'card-picker-slot-card-inner';
@@ -448,15 +451,17 @@ export const findDropSlotAt = (state, x, y) => {
   );
 };
 
-const assignCardToSlot = (state, card, slotIndex) => {
+export const assignCardToSlot = (state, card, slotIndex = -1) => {
   if (!card || !state.slotAssignments?.length) return;
   for (let i = 0; i < state.slotAssignments.length; i += 1) {
     if (state.slotAssignments[i] === card) state.slotAssignments[i] = null;
   }
-  let target = slotIndex;
-  if (target < 0) {
-    target = state.slotAssignments.findIndex((entry) => entry == null);
-  }
+  const target = resolveTargetSlotIndex({
+    slotAssignments: state.slotAssignments,
+    multiSelect: state.multiSelect,
+    maxCount: state.maxCount,
+    requestedSlotIndex: slotIndex,
+  });
   if (target < 0 || target >= state.slotAssignments.length) return;
   state.slotAssignments[target] = card;
   if (!state.multiSelect) state.slotCard = card;
@@ -692,6 +697,15 @@ const setCandidateList = (state, candidates) => {
     slide.appendChild(node);
     if (holoWrapper) slide.holoWrapper = holoWrapper;
 
+    slide.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (shouldSuppressClickAfterDrag(state.lastDragEndTime)) return;
+      if (state.mode === 'browse') return;
+      if (!isCardSlotted(state, card)) {
+        assignCardToSlot(state, card);
+      }
+    });
+
     state.stack.appendChild(slide);
     state.slides.push(slide);
   });
@@ -714,6 +728,7 @@ const attachSwipe = (state) => {
   let gesture = 'pending';
   let ghost = null;
   let activePointerId = null;
+  let downSlideIndex = null;
 
   const blockNativeDrag = (event) => event.preventDefault();
 
@@ -806,6 +821,8 @@ const attachSwipe = (state) => {
     startX = event.clientX;
     startY = event.clientY;
     state.pointerId = event.pointerId;
+    const slideEl = event.target?.closest?.('.card-picker-slide');
+    downSlideIndex = slideEl ? parseInt(slideEl.dataset.index, 10) : null;
     stage.setPointerCapture(event.pointerId);
   };
 
@@ -871,7 +888,18 @@ const attachSwipe = (state) => {
       goToIndex(state, resolveSwipeIndex(state, dx));
     } else if (!wasDragging && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
-      if (slotIdx >= 0) addFocusedCardToSlot(state, slotIdx);
+      if (slotIdx >= 0) {
+        addFocusedCardToSlot(state, slotIdx);
+      } else {
+        const cardIndex =
+          downSlideIndex != null && !Number.isNaN(downSlideIndex)
+            ? downSlideIndex
+            : state.index;
+        const card = state.cards[cardIndex];
+        if (card && !isCardSlotted(state, card)) {
+          assignCardToSlot(state, card);
+        }
+      }
     } else if (wasDragging) {
       state.targetDragPx = 0;
       stack.classList.add('is-dragging');
@@ -879,8 +907,9 @@ const attachSwipe = (state) => {
       startDragLoop(state);
     }
 
-    state.lastDragEndTime = Date.now();
+    if (wasDragging) state.lastDragEndTime = Date.now();
     state.pointerId = null;
+    downSlideIndex = null;
     if (wasDragging) event.preventDefault();
     event.stopPropagation();
     try {

@@ -161,3 +161,47 @@ export const shouldSuppressClickAfterDrag = (lastDragEndTime, now = Date.now(), 
   if (!lastDragEndTime) return false;
   return now - lastDragEndTime < thresholdMs;
 };
+
+/**
+ * Find the selected slot index, defined as the first open (null) slot prioritizing from the left.
+ *
+ * @param {Array<any>} slotAssignments Array of slotted card assignments
+ * @returns {number} 0-based index of the first open slot, or -1 if all slots are filled.
+ */
+export const findSelectedSlotIndex = (slotAssignments) => {
+  if (!slotAssignments || !slotAssignments.length) return -1;
+  return slotAssignments.findIndex((card) => card == null);
+};
+
+/**
+ * Determine which slot index should receive a card.
+ * If a valid slot index is requested, returns that slot.
+ * Otherwise, prioritizes the first open slot from the left.
+ * In single-select mode (!multiSelect or maxCount === 1), if all slots are full,
+ * returns slot 0 to replace the single existing card.
+ *
+ * @param {object} params
+ * @param {Array<any>} params.slotAssignments
+ * @param {boolean} [params.multiSelect=false]
+ * @param {number} [params.maxCount=1]
+ * @param {number} [params.requestedSlotIndex=-1]
+ * @returns {number} Target slot index, or -1 if no slot available.
+ */
+export const resolveTargetSlotIndex = ({
+  slotAssignments,
+  multiSelect = false,
+  maxCount = 1,
+  requestedSlotIndex = -1,
+} = {}) => {
+  if (!slotAssignments || !slotAssignments.length) return -1;
+  if (
+    requestedSlotIndex >= 0 &&
+    requestedSlotIndex < slotAssignments.length
+  ) {
+    return requestedSlotIndex;
+  }
+  const openIdx = slotAssignments.findIndex((entry) => entry == null);
+  if (openIdx >= 0) return openIdx;
+  if (!multiSelect || maxCount === 1) return 0;
+  return -1;
+};
