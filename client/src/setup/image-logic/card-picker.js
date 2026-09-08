@@ -7,9 +7,11 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import { closeCardPreview } from './full-view.js';
 import {
+  MAX_TAP_DURATION_MS,
   canCloseCardPicker,
   findDropSlotIndex,
   findSelectedSlotIndex,
+  isTapGesture,
   resolveTargetSlotIndex,
   shouldSuppressClickAfterDrag,
 } from './card-picker-hitbox.mjs';
@@ -699,6 +701,12 @@ const setCandidateList = (state, candidates) => {
       event.stopPropagation();
       if (shouldSuppressClickAfterDrag(state.lastDragEndTime)) return;
       if (state.mode === 'browse') return;
+      if (
+        state.lastPointerDownTime &&
+        Date.now() - state.lastPointerDownTime > MAX_TAP_DURATION_MS
+      ) {
+        return;
+      }
       if (!isCardSlotted(state, card)) {
         assignCardToSlot(state, card);
       }
@@ -727,6 +735,7 @@ const attachSwipe = (state) => {
   let ghost = null;
   let activePointerId = null;
   let downSlideIndex = null;
+  let downTime = 0;
 
   const blockNativeDrag = (event) => event.preventDefault();
 
@@ -818,6 +827,8 @@ const attachSwipe = (state) => {
     gesture = 'pending';
     startX = event.clientX;
     startY = event.clientY;
+    downTime = Date.now();
+    state.lastPointerDownTime = downTime;
     state.pointerId = event.pointerId;
     const slideEl = event.target?.closest?.('.card-picker-slide');
     downSlideIndex = slideEl ? parseInt(slideEl.dataset.index, 10) : null;
@@ -873,6 +884,20 @@ const attachSwipe = (state) => {
       return;
     }
     const wasDragging = dragging;
+    const isCancelled = event.type === 'pointercancel';
+    const upTime = Date.now();
+    const isTap =
+      !isCancelled &&
+      !wasDragging &&
+      isTapGesture({
+        downTime,
+        upTime,
+        startX,
+        startY,
+        endX: event.clientX,
+        endY: event.clientY,
+      });
+
     tracking = false;
     state.tracking = false;
     dragging = false;
@@ -881,10 +906,9 @@ const attachSwipe = (state) => {
     stack.classList.remove('is-dragging');
 
     const dx = event.clientX - startX;
-    const dy = event.clientY - startY;
-    if (wasDragging && Math.abs(dx) >= SWIPE_LOCK_PX) {
+    if (!isCancelled && wasDragging && Math.abs(dx) >= SWIPE_LOCK_PX) {
       goToIndex(state, resolveSwipeIndex(state, dx));
-    } else if (!wasDragging && state.mode !== 'browse') {
+    } else if (isTap && state.mode !== 'browse') {
       const slotIdx = findDropSlotAt(state, event.clientX, event.clientY);
       if (slotIdx >= 0) {
         addFocusedCardToSlot(state, slotIdx);
@@ -898,16 +922,19 @@ const attachSwipe = (state) => {
           assignCardToSlot(state, card);
         }
       }
-    } else if (wasDragging) {
+    } else if (wasDragging && !isCancelled) {
       state.targetDragPx = 0;
       stack.classList.add('is-dragging');
       stage.classList.add('is-dragging');
       startDragLoop(state);
     }
 
-    if (wasDragging) state.lastDragEndTime = Date.now();
+    if (wasDragging || !isTap) {
+      state.lastDragEndTime = Date.now();
+    }
     state.pointerId = null;
     downSlideIndex = null;
+    downTime = 0;
     if (wasDragging) event.preventDefault();
     event.stopPropagation();
     try {

@@ -218,3 +218,41 @@ export const resolveTargetSlotIndex = ({
  */
 export const canCloseCardPicker = ({ mode, force = false } = {}) =>
   Boolean(force || mode === 'browse');
+
+export const MAX_TAP_DURATION_MS = 300;
+export const MAX_TAP_MOVE_PX = 8;
+
+/**
+ * Check if a pointer interaction qualifies as a clean tap/click
+ * rather than a drag, swipe, or long-press hold.
+ *
+ * @param {object} params
+ * @param {number} params.downTime Timestamp of pointer down
+ * @param {number} params.upTime Timestamp of pointer up
+ * @param {number} [params.startX] Starting X coordinate
+ * @param {number} [params.startY] Starting Y coordinate
+ * @param {number} [params.endX] Ending X coordinate
+ * @param {number} [params.endY] Ending Y coordinate
+ * @param {number} [params.maxDurationMs=300] Maximum allowed press duration
+ * @param {number} [params.maxDistancePx=8] Maximum allowed pointer drift
+ * @returns {boolean} True if the gesture is a valid tap/click
+ */
+export const isTapGesture = ({
+  downTime,
+  upTime,
+  startX,
+  startY,
+  endX,
+  endY,
+  maxDurationMs = MAX_TAP_DURATION_MS,
+  maxDistancePx = MAX_TAP_MOVE_PX,
+} = {}) => {
+  if (downTime == null || upTime == null) return false;
+  const duration = upTime - downTime;
+  if (duration < 0 || duration > maxDurationMs) return false;
+  if (startX != null && startY != null && endX != null && endY != null) {
+    const dist = Math.hypot(endX - startX, endY - startY);
+    if (dist > maxDistancePx) return false;
+  }
+  return true;
+};
