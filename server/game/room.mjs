@@ -326,10 +326,16 @@ export class GameRoom {
    * @returns {object}
    */
   resolveChoice(socketId, payload = {}, clientSeq = null) {
+    const seq =
+      typeof clientSeq === 'number'
+        ? clientSeq
+        : typeof payload?.clientSeq === 'number'
+          ? payload.clientSeq
+          : null;
     return this.handleCommand(socketId, {
       type: 'resolveChoice',
       payload,
-      clientSeq,
+      clientSeq: seq,
     });
   }
 }

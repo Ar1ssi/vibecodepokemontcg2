@@ -680,7 +680,7 @@ async function main() {
             stateVersion: result.stateVersion,
             view: result.view,
             events: [],
-            pendingChoice: null,
+            pendingChoice: result.view?.pendingChoice || null,
             lastClientSeq: result.lastClientSeq ?? result.clientSeq,
           });
         } else {
@@ -729,7 +729,7 @@ async function main() {
             stateVersion: result.stateVersion,
             view: result.view,
             events: [],
-            pendingChoice: null,
+            pendingChoice: result.view?.pendingChoice || null,
             lastClientSeq: result.lastClientSeq ?? result.clientSeq,
           });
         } else {

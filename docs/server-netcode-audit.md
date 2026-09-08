@@ -115,9 +115,13 @@ While the core pure state models and unit test coverage are broad (912 passing t
   3. Updated `executeTrainer`, `executeAbility`, and `executeStadium` to respect `resumeToken.initiatorPlayerId` as `actingPlayerId`.
   4. Added fallback search in `executeTrainer` to ensure trainer cards on board are accurately located and moved to the initiator's discard zone upon effect completion. Verified by `shared/engine/__tests__/pending-choice.test.mjs`.
 
-#### 11. Missing Deduplication Handling in Socket `resolveChoice`
-* **Location**: [`server/server.js:646-664`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L646-L664)
-* **Root Cause**: `socket.on('cmd')` handles `else if (result.dedupe)` by echoing the current view back to the socket. In `socket.on('resolveChoice')`, there is no check for `result.dedupe`. When `result.dedupe === true`, `result.broadcasts` is `undefined`, sending no response back to the client.
+#### 11. Missing Deduplication Handling in Socket `resolveChoice` — [RESOLVED]
+* **Location**: [`server/server.js:726-735`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L726-L735), [`server/game/room.mjs:328-335`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/room.mjs#L328-L335)
+* **Root Cause**: In `socket.on('resolveChoice')`, deduplication responses were previously unhandled or hardcoded `pendingChoice: null`. In addition, `GameRoom.prototype.resolveChoice` defaulted `clientSeq` to `null` if omitted as a separate 3rd argument, failing to extract `payload.clientSeq`.
+* **Fix**:
+  1. Updated `GameRoom.prototype.resolveChoice` in [`server/game/room.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/room.mjs) to extract `clientSeq` from either the 3rd argument or `payload.clientSeq`.
+  2. Updated `result.dedupe` handling in both `socket.on('cmd')` and `socket.on('resolveChoice')` in [`server/server.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js) to preserve `pendingChoice: result.view?.pendingChoice || null` instead of clearing it to `null`.
+  3. Added comprehensive unit and socket tests in [`server/game/__tests__/resolve-choice-dedupe.test.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/__tests__/resolve-choice-dedupe.test.mjs) verifying deduplication across both `GameRoom` and Socket.IO handler layers.
 
 #### 12. Missing `gameEnded` Socket Notification & Client Win/Loss Handling
 * **Location**: [`server/server.js:619-629`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L619-L629), [`client/src/setup/netcode/apply-view.js:378-463`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js#L378-L463)
@@ -159,3 +163,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 8. [x] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).
 9. [x] Fix bench knockout discarding and illegal auto-promotion in [`handleKnockout`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L26) (Finding 9).
 10. [x] Preserve initiator attribution in `PendingChoice.resumeToken` and route choice resumption to initiator (Finding 10).
+11. [x] Implement robust deduplication handling for socket `resolveChoice` and `GameRoom.prototype.resolveChoice` with active choice preservation (Finding 11).
