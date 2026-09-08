@@ -1427,10 +1427,8 @@ import {
             } else if (type === 'peerSocketId') {
               const peerId = data?.socketId;
               if (peerId && peerId !== rulesSocket?.id) {
-                const alreadyKnown = systemState.opponentSocketId === peerId;
                 systemState.opponentSocketId = peerId;
                 if (
-                  !alreadyKnown &&
                   openingSetupReadyForCoinFlip &&
                   rulesState.enabled &&
                   rulesState.phase === 'setup' &&
@@ -1440,10 +1438,10 @@ import {
                 ) {
                   handleSetupClick();
                 }
-                if (!alreadyKnown) {
+                if (!data?.isReply) {
                   rulesSocket.emit('rulesEvent', {
                     type: 'peerSocketId',
-                    data: { socketId: rulesSocket.id },
+                    data: { socketId: rulesSocket.id, isReply: true },
                   });
                 }
               }
@@ -1457,10 +1455,13 @@ import {
                 appendMessage('', 'Bonus draw: you drew 1 card (opponent mulliganed).', 'announcement', false);
               }
             }
-          } catch {}
+          } catch (_err) {
+            // ignore malformed socket payload
+          }
         });
         return true;
       };
+      if (checkSocket()) return;
       // socket may init after us — retry briefly
       let tries = 0;
       const timer = setInterval(() => {

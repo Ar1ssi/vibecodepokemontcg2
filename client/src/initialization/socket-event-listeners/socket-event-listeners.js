@@ -308,7 +308,6 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('requestAction', (data) => {
-    if (systemState.serverAuthoritative) return;
     const notSpectator = !(
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
@@ -365,7 +364,6 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('pushAction', (data) => {
-    if (systemState.serverAuthoritative) return;
     const notSpectator = !(
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
