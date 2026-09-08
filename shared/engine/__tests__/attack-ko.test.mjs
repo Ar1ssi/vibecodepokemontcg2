@@ -342,3 +342,53 @@ test('attack & KO: bench knockout taking last prize ends the game', () => {
   assert.equal(res.state.winner, 'p1');
   assert.equal(res.state.winReason, 'all prize cards taken');
 });
+
+test('attack: Collect attack draws a card for the user then ends turn', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash' },
+      p2: { username: 'Gary' },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  const eevee = createCard({
+    instanceId: 1,
+    name: 'Eevee',
+    hp: 60,
+    attacks: [{ name: 'Collect', cost: [], damage: 0, text: 'Draw a card.' }],
+  });
+  state.players.p1.zones.active.push(eevee);
+
+  const defender = createCard({
+    instanceId: 2,
+    name: 'Pikachu',
+    hp: 60,
+  });
+  state.players.p2.zones.active.push(defender);
+
+  const deckCard = createCard({
+    instanceId: 99,
+    name: 'Potion',
+  });
+  state.players.p1.zones.deck.push(deckCard);
+
+  assert.equal(state.players.p1.zones.hand.length, 0);
+  assert.equal(state.players.p1.zones.deck.length, 1);
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 1);
+  assert.equal(res.state.players.p1.zones.hand[0].instanceId, 99);
+  assert.equal(res.state.players.p1.zones.deck.length, 0);
+  assert.equal(res.state.turn.player, 'p2');
+  assert.equal(res.state.turn.number, 3);
+  assert.equal(res.events.some((e) => e.type === 'cardsDrawn' && e.playerId === 'p1' && e.count === 1), true);
+});
+

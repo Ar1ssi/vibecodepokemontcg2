@@ -1664,7 +1664,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           /shuffle\s+(?:your\s+)?hand\s+into\s+(?:your\s+|the\s+)?deck/i.test(
             String(atk.text || '')
           );
-        const drawN = drawCount(atk.text);
+        const drawN = drawCount(atk.text || atk);
         if (drawN > 0 && shuffledHandDraw === 0 && !shuffleHandDrawText) {
           const deckLeft = getZone(user, 'deck').getCount();
           const actual = Math.min(drawN, deckLeft);

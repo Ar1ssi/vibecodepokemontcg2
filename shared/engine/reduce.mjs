@@ -10,6 +10,7 @@ import { validateCommandShape } from './commands.mjs';
 import { setupGame } from './setup.mjs';
 import { createRng } from './rng.mjs';
 import { computeAttackDamage, expandEnergyEntries, canPayAttackCost } from './rules/attack-engine.mjs';
+import { drawCount } from './rules/damage-parser.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -1150,6 +1151,24 @@ export function applyCommand(state, command, rng = null) {
             attackerPlayerId: playerId,
             victim: defender,
             events,
+          });
+        }
+      }
+
+      // Attack effects: draw cards (e.g. Collect)
+      const drawN = drawCount(attack);
+      if (drawN > 0) {
+        const deck = attackerPlayer?.zones?.deck || [];
+        const hand = attackerPlayer?.zones?.hand || [];
+        const actual = Math.min(drawN, deck.length);
+        if (actual > 0) {
+          const drawn = deck.splice(0, actual);
+          hand.push(...drawn);
+          events.push({
+            type: 'cardsDrawn',
+            playerId,
+            count: actual,
+            cards: drawn.map((c) => ({ instanceId: c.instanceId })),
           });
         }
       }

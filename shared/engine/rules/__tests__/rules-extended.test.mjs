@@ -1164,6 +1164,18 @@ import test from 'node:test';
         'draw-attach',
       );
       assert.equal(
+        classifyAttackEffect({ name: 'Collect', text: 'Draw a card.' }),
+        'draw-attach',
+      );
+      assert.equal(
+        classifyAttackEffect({ name: 'Collect' }),
+        'draw-attach',
+      );
+      assert.equal(
+        classifyAttackEffect({ name: 'Collect', text: 'Collect' }),
+        'draw-attach',
+      );
+      assert.equal(
         classifyAttackEffect({
           damage: 30,
           text: 'Flip a coin. If heads, this attack does 30 more damage. If tails, do 10 damage to yourself.',
@@ -1563,6 +1575,13 @@ import test from 'node:test';
       const stub = { name: 'Call for Family', cost: ['Colorless'], damage: 0 };
       assert.match(resolveAttackText(card, stub), /search your deck for/i);
       assert.ok(parseAttackSearchClause(resolveAttackText(card, stub)));
+    });
+
+    test('resolveAttackText: defaults to "Draw a card." for Collect when text is missing', () => {
+      const card = { attacks: [{ name: 'Collect', cost: ['Colorless'] }] };
+      const stub = { name: 'Collect', cost: ['Colorless'] };
+      assert.equal(resolveAttackText(card, stub), 'Draw a card.');
+      assert.equal(resolveAttackText(null, stub), 'Draw a card.');
     });
 
     test('ATTACK_FAMILIES: includes search-deck', () => {
@@ -2415,6 +2434,12 @@ import test from 'node:test';
       assert.equal(drawCount('You may draw 1 card.'), 1);
       assert.equal(drawCount('Draw 5 cards, then attack.'), 5);
       assert.equal(drawCount('draws 3 cards'), 3);
+      assert.equal(drawCount('Draw a card.'), 1);
+      assert.equal(drawCount('Draw a card from your deck.'), 1);
+      assert.equal(drawCount('You may draw a card.'), 1);
+      assert.equal(drawCount('Collect'), 1);
+      assert.equal(drawCount({ name: 'Collect' }), 1);
+      assert.equal(drawCount({ name: 'Collect', text: 'Draw a card.' }), 1);
       assert.equal(drawCount('No draw clause here.'), 0);
       assert.equal(drawCount(''), 0);
       assert.equal(drawCount(undefined), 0);
