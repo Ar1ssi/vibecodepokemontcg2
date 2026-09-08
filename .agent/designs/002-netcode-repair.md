@@ -330,8 +330,8 @@ per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` chan
 
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | `applyView` with no resolvable zones | returns `no_render_target`; no DOM write; `lastRenderedVersion` unchanged | [ ] |
-| 2 | `applyView` with `view.stadium === null` while renderer inactive | `#stadium` untouched | [ ] |
+| 1 | `applyView` with no resolvable zones | returns `no_render_target`; no DOM write; `lastRenderedVersion` unchanged | [x] apply-view.test.mjs §0.2 guard tests |
+| 2 | `applyView` with `view.stadium === null` while renderer inactive | `#stadium` untouched | [x] apply-view.test.mjs stadium-wipe repro |
 | 3 | `resolveInstanceId` called with an unmapped `syncInstance` | returns `null`; command not emitted; logged | [ ] |
 | 4 | `instanceMap` arrives after the first action | action is dropped with a surfaced message, not sent with a guessed id | [ ] |
 | 5 | Both players disconnect simultaneously; sweep fires | room survives `ROOM_GRACE_MS`; reconnect resumes | [ ] |
@@ -403,3 +403,10 @@ Phases 0–2 are seven slices of small, reversible work against the path that is
 production. Phase 3 is the real migration tail and should be re-scoped after Phase 2 lands.
 
 ## Deviations (Builder appends here during build)
+
+- 0.2: `dual-run-sync.test.mjs`'s `applyView` calls previously had no injected zone
+  resolver, so they were unknowingly exercising the blind-renderer bug (returned
+  `applied: true` while rendering nothing). Not in the original slice scope, but the
+  guard correctly turned it into a failing assertion (`false !== true`), so it needed a
+  fix, not a design change: added minimal `StubElement`/`StubDocument`/`makeGetZone`
+  helpers local to that test file so the integration assertion stays meaningful.
