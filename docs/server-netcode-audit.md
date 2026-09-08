@@ -82,12 +82,18 @@ While the core pure state models and unit test coverage are broad (912 passing t
 
 ### High Severity Issues
 
-#### 8. Parameter Offset Scrambling in `dual-run-bridge.js` for Damage and Status Commands
+#### 8. Parameter Offset Scrambling in `dual-run-bridge.js` for Damage and Status Commands — [RESOLVED]
 * **Location**: [`client/src/setup/netcode/dual-run-bridge.js:110-163`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js#L110-L163)
-* **Root Cause**: [`dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js#L112) assumes `parameters` starts with `user`, destructuring `const [, , index, amount] = parameters`. However, [`processAction`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/general/process-action.js) passes `[zoneId, resolvedIndex, amount, hint]`.
-  - In `updateDamageCounter`: `instanceId` receives `damageAmount` and `amount` receives the `hint` object (`NaN` -> 0).
-  - In `addSpecialCondition`: `instanceId` receives `condition` (`NaN` -> 0) and `condition` receives `hint` (`"[object Object]"`), which [`COMMAND_SCHEMAS`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/commands.mjs#L135) rejects as an invalid special condition.
-  - In `retreat`: [`dual-run-bridge.js:87`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js#L87) emits `{ targetBenchInstanceId }`, while the schema and [`reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L322) expect `{ benchInstanceId }`. Retreat clicks always fall back to retreating into the first benched Pokémon.
+* **Root Cause**: [`dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js#L112) assumed `parameters` starts with `user`, destructuring `const [, , index, amount] = parameters`. However, [`processAction`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/general/process-action.js) passes `[zoneId, resolvedIndex, amount, hint]`.
+  - In `updateDamageCounter`: `instanceId` received `damageAmount` and `amount` received the `hint` object (`NaN` -> 0).
+  - In `addSpecialCondition`: `instanceId` received `condition` (`NaN` -> 0) and `condition` received `hint` (`"[object Object]"`), which [`COMMAND_SCHEMAS`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/commands.mjs#L135) rejects as an invalid special condition.
+  - In `retreat`: [`dual-run-bridge.js:87`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js#L87) emitted `{ targetBenchInstanceId }`, while the schema and [`reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L322) expect `{ benchInstanceId }`. Retreat clicks always fell back to retreating into the first benched Pokémon.
+* **Fix**:
+  1. Implemented `unpackTargetAndAmount` and `unpackTargetAndCondition` in [`dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js) supporting both legacy positional formats (`[zoneId, resolved, amount/condition, hint]`), prefixed user formats, and direct command payload shapes while extracting `instanceId` from `hint.syncInstance` / `hint.instanceId` / index.
+  2. Implemented `normalizeSpecialCondition` to map legacy codes (`'P'`, `'B'`, `'A'`, `'PA'`, `'C'`) and aliases to canonical engine condition strings, properly mapping empty/zero conditions to `null`.
+  3. Added `updateSpecialCondition` translation support.
+  4. Updated `retreat` to emit `{ benchInstanceId }` when a target is provided, and empty `{}` when omitted (preserving auto-fallback to first benched Pokémon).
+  5. Updated `useAbility` to parse `[oInitiator, zoneId, resolved, hint]` legacy arrays alongside direct `[instanceId, abilityIndex]`. Verified by `client/src/setup/netcode/__tests__/dual-run-bridge.test.mjs`.
 
 #### 9. Bench Knockouts Do Not Discard Victim and Auto-Promote Illegally
 * **Location**: [`shared/engine/reduce.mjs:41-79`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L41-L79)
@@ -140,4 +146,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 5. [x] Provide default `socket` and `roomId` fallbacks in [`client/src/setup/netcode/apply-view.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js).
 6. [x] Synchronize client sequence (`clientSeq`) tracking on reconnect/refresh and in view snapshots (Finding 6).
 7. [x] Resolve identity preservation and seat hijacking on reconnect via `state.players` matching and seat reservation (Finding 7).
-8. [ ] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).
+8. [x] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).
