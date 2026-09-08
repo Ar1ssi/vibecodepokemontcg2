@@ -68,16 +68,15 @@ While the core pure state models and unit test coverage are broad (912 passing t
   4. Implemented and exported `seedClientSeq(serverSeq)` in [`client/src/setup/netcode/cmd-emitter.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/cmd-emitter.js) to advance client-side sequence tracking from server responses without regression.
   5. Wired `socket.on('view')` in [`client/src/initialization/socket-event-listeners/socket-event-listeners.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/initialization/socket-event-listeners/socket-event-listeners.js) to seed sequence tracking upon receiving authoritative view snapshots. Verified by `server/game/__tests__/client-seq-resync.test.mjs`, `server/game/__tests__/room.test.mjs`, and `client/src/setup/netcode/__tests__/cmd-emitter.test.mjs`.
 
-#### 7. Identity Swap & Seat Hijacking Vulnerability on Reconnect
-* **Location**: [`server/server.js:404-407`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L404-L407), [`server/server.js:291-305`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L291-L305)
-* **Root Cause**: In `socket.on('joinGame')`, the next player ID is computed strictly from active sockets:
-  ```javascript
-  const existingPids = [...gameRoom.playerToSocket.keys()];
-  const nextPid = existingPids.includes('p1') ? 'p2' : 'p1';
-  ```
-  Unlike `userReconnected`, `joinGame` does not check if `username` already exists in `gameRoom.state.players`.
-* **Impact**: If Player 1 temporarily drops and Player 2 reconnects via `joinGame`, Player 2 is assigned `p1` (stealing Player 1's cards and board). Furthermore, when Player 1 drops, `room.players.delete(username)` runs, allowing a third player to join as a player, take over Player 1's seat, and permanently lock Player 1 out.
-* **Fix**: Match `username` against `gameRoom.state.players` in `joinGame` before allocating a new `nextPid`.
+#### 7. Identity Swap & Seat Hijacking Vulnerability on Reconnect — [RESOLVED]
+* **Location**: [`server/server.js:404-450`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L404-L450), [`server/server.js:470-520`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L470-L520), [`server/server.js:292-317`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L292-L317), [`server/game/room.mjs:60-95`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/room.mjs#L60-L95)
+* **Root Cause**: In `socket.on('joinGame')`, player ID allocation was computed strictly from active connected sockets (`const existingPids = [...gameRoom.playerToSocket.keys()]`), causing a reconnecting player to be assigned `p1` if Player 1 had dropped. Furthermore, unintended socket drop removed users from `room.players`, leaving the room open for 3rd-party players to hijack Player 1's seat and permanently lock them out.
+* **Impact**: Disconnected players had their identities and game state swapped with their opponent upon reconnect, or had their seat completely stolen by a new visitor.
+* **Fix**:
+  1. Implemented `getPlayerIdByUsername(username)` and `getNextAvailablePlayerId()` on `GameRoom` and `ShadowSession`.
+  2. Guarded `GameRoom.prototype.addPlayer` against username mismatch on existing player seats (preventing seat hijacking at the engine authority level).
+  3. Updated `joinGame` and `userReconnected` to match `username` against `gameRoom.state.players` before allocating a seat; unauthorized 3rd-party players attempting to join a full 2-player game are rejected with `roomReject` (spectator joins remain allowed).
+  4. Preserved seated players in `room.players` on unintended disconnections in `disconnectHandler` (clearing only on explicit `leaveRoom` or when empty rooms expire via `cleanUpEmptyRooms`). Verified by `server/game/__tests__/identity-reconnect.test.mjs`.
 
 ---
 
@@ -139,4 +138,6 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 3. [x] Update [`initializePlayerDeck`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/shadow.mjs#L28) to use [`mintInstanceId`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/cards.mjs#L12).
 4. [x] Fix parameter offset from index 2 to index 1 for `exchangeData` in [`server.js:583`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L583).
 5. [x] Provide default `socket` and `roomId` fallbacks in [`client/src/setup/netcode/apply-view.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js).
-6. [ ] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).
+6. [x] Synchronize client sequence (`clientSeq`) tracking on reconnect/refresh and in view snapshots (Finding 6).
+7. [x] Resolve identity preservation and seat hijacking on reconnect via `state.players` matching and seat reservation (Finding 7).
+8. [ ] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).

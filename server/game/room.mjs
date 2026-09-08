@@ -67,6 +67,17 @@ export class GameRoom {
       return false;
     }
 
+    // Identity protection (Finding 7): Seat cannot be hijacked by a different username
+    if (
+      this.state.players[playerId] &&
+      this.state.players[playerId].username &&
+      this.state.players[playerId].username !== playerId &&
+      username &&
+      this.state.players[playerId].username !== username
+    ) {
+      return false;
+    }
+
     const prevSocketId = this.playerToSocket.get(playerId);
     if (prevSocketId && prevSocketId !== socketId) {
       this.socketToPlayer.delete(prevSocketId);
@@ -93,6 +104,33 @@ export class GameRoom {
       this.state.players[playerId].username = username;
     }
     return true;
+  }
+
+  /**
+   * Returns playerId matching username in GameState, or null if not found.
+   *
+   * @param {string} username
+   * @returns {string|null}
+   */
+  getPlayerIdByUsername(username) {
+    if (!username || typeof username !== 'string') return null;
+    for (const [pId, pData] of Object.entries(this.state.players)) {
+      if (pData?.username === username) {
+        return pId;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns the next available playerId ('p1' or 'p2'), or null if room is full.
+   *
+   * @returns {'p1'|'p2'|null}
+   */
+  getNextAvailablePlayerId() {
+    if (!this.state.players.p1) return 'p1';
+    if (!this.state.players.p2) return 'p2';
+    return null;
   }
 
   /**

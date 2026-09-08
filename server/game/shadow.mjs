@@ -437,7 +437,26 @@ export class ShadowSession {
    * @param {object[]} [deckList]
    */
   addPlayer(socketId, playerId, username, deckList) {
-    this.gameRoom.addPlayer(socketId, playerId, username, deckList);
+    return this.gameRoom.addPlayer(socketId, playerId, username, deckList);
+  }
+
+  /**
+   * Returns playerId matching username from internal GameRoom.
+   *
+   * @param {string} username
+   * @returns {string|null}
+   */
+  getPlayerIdByUsername(username) {
+    return this.gameRoom.getPlayerIdByUsername(username);
+  }
+
+  /**
+   * Returns next available playerId from internal GameRoom, or null if full.
+   *
+   * @returns {'p1'|'p2'|null}
+   */
+  getNextAvailablePlayerId() {
+    return this.gameRoom.getNextAvailablePlayerId();
   }
 
   /**

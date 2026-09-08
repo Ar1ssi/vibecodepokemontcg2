@@ -266,6 +266,7 @@ async function main() {
           room.spectatorSockets.size === 0
         ) {
           gameRooms.delete(roomId);
+          roomInfo.delete(roomId);
         }
       });
     }
@@ -280,6 +281,7 @@ async function main() {
             completedShadowReports.shift();
           }
           shadowSessions.delete(roomId);
+          roomInfo.delete(roomId);
         }
       });
     }
@@ -303,15 +305,25 @@ async function main() {
       if (roomInfo.has(roomId)) {
         const room = roomInfo.get(roomId);
 
-        if (room.players.has(username)) {
-          room.players.delete(username);
-        } else if (room.spectators.has(username)) {
-          room.spectators.delete(username);
-        }
+        if (socket.data.leaveRoom) {
+          if (room.players.has(username)) {
+            room.players.delete(username);
+          } else if (room.spectators.has(username)) {
+            room.spectators.delete(username);
+          }
 
-        // If both players and spectators are empty, remove the roomInfo entry
-        if (room.players.size === 0 && room.spectators.size === 0) {
-          roomInfo.delete(roomId);
+          // If both players and spectators are empty, remove the roomInfo entry
+          if (room.players.size === 0 && room.spectators.size === 0) {
+            roomInfo.delete(roomId);
+            if (SERVER_AUTHORITATIVE) gameRooms.delete(roomId);
+            if (SHADOW_MODE) shadowSessions.delete(roomId);
+          }
+        } else {
+          // For unintended disconnections, remove from spectators, but retain seated players
+          // so temporary drops do not allow seat hijacking or premature room deletion (Finding 7)
+          if (room.spectators.has(username)) {
+            room.spectators.delete(username);
+          }
         }
       }
     };
@@ -395,34 +407,69 @@ async function main() {
       }
       const room = roomInfo.get(roomId);
 
-      if (room.players.size < 2 || isSpectator) {
+      const gameRoom = SERVER_AUTHORITATIVE ? gameRooms.get(roomId) : null;
+      const shadow = SHADOW_MODE ? shadowSessions.get(roomId) : null;
+
+      // Identity protection & seat management (Finding 7)
+      let isExistingPlayer = false;
+      let roomIsFull = false;
+
+      if (gameRoom) {
+        if (gameRoom.getPlayerIdByUsername(username)) {
+          isExistingPlayer = true;
+        } else if (!gameRoom.getNextAvailablePlayerId()) {
+          roomIsFull = true;
+        }
+      } else if (shadow) {
+        if (shadow.getPlayerIdByUsername(username)) {
+          isExistingPlayer = true;
+        } else if (!shadow.getNextAvailablePlayerId()) {
+          roomIsFull = true;
+        }
+      } else {
+        if (room.players.has(username)) {
+          isExistingPlayer = true;
+        } else if (room.players.size >= 2) {
+          roomIsFull = true;
+        }
+      }
+
+      if (isSpectator || isExistingPlayer || !roomIsFull) {
         socket.join(roomId);
         if (SERVER_AUTHORITATIVE) {
-          let gameRoom = gameRooms.get(roomId);
-          if (!gameRoom) {
-            gameRoom = new GameRoom({ roomId });
-            gameRooms.set(roomId, gameRoom);
+          let activeGameRoom = gameRoom;
+          if (!activeGameRoom) {
+            activeGameRoom = new GameRoom({ roomId });
+            gameRooms.set(roomId, activeGameRoom);
           }
           if (isSpectator) {
-            gameRoom.addSpectator(socket.id);
+            activeGameRoom.addSpectator(socket.id);
           } else {
-            const existingPids = [...gameRoom.playerToSocket.keys()];
-            const nextPid = existingPids.includes('p1') ? 'p2' : 'p1';
-            gameRoom.addPlayer(socket.id, nextPid, username);
+            const targetPid =
+              activeGameRoom.getPlayerIdByUsername(username) ||
+              activeGameRoom.getNextAvailablePlayerId() ||
+              'p1';
+            const added = activeGameRoom.addPlayer(socket.id, targetPid, username);
+            if (!added) {
+              socket.emit('roomReject');
+              return;
+            }
           }
         }
         if (SHADOW_MODE) {
-          let shadow = shadowSessions.get(roomId);
-          if (!shadow) {
-            shadow = new ShadowSession({ roomId });
-            shadowSessions.set(roomId, shadow);
+          let activeShadow = shadow;
+          if (!activeShadow) {
+            activeShadow = new ShadowSession({ roomId });
+            shadowSessions.set(roomId, activeShadow);
           }
           if (isSpectator) {
-            shadow.gameRoom.addSpectator(socket.id);
+            activeShadow.gameRoom.addSpectator(socket.id);
           } else {
-            const existingPids = [...shadow.gameRoom.playerToSocket.keys()];
-            const nextPid = existingPids.includes('p1') ? 'p2' : 'p1';
-            shadow.addPlayer(socket.id, nextPid, username);
+            const targetPid =
+              activeShadow.getPlayerIdByUsername(username) ||
+              activeShadow.getNextAvailablePlayerId() ||
+              'p1';
+            activeShadow.addPlayer(socket.id, targetPid, username);
           }
         }
         // Check if the user is a spectator or there are fewer than 2 players
@@ -476,18 +523,18 @@ async function main() {
         if (!data.notSpectator) {
           gameRoom.addSpectator(socket.id);
         } else {
-          let existingPid = null;
-          for (const [pId, pData] of Object.entries(gameRoom.state.players)) {
-            if (pData.username === data.username) {
-              existingPid = pId;
-              break;
-            }
-          }
+          const existingPid =
+            gameRoom.getPlayerIdByUsername(data.username) ||
+            gameRoom.getNextAvailablePlayerId();
           if (!existingPid) {
-            const existingPids = [...gameRoom.playerToSocket.keys()];
-            existingPid = existingPids.includes('p1') ? 'p2' : 'p1';
+            socket.emit('roomReject');
+            return;
           }
-          gameRoom.addPlayer(socket.id, existingPid, data.username);
+          const added = gameRoom.addPlayer(socket.id, existingPid, data.username);
+          if (!added) {
+            socket.emit('roomReject');
+            return;
+          }
         }
       }
       if (SHADOW_MODE) {
@@ -499,18 +546,12 @@ async function main() {
         if (!data.notSpectator) {
           shadow.gameRoom.addSpectator(socket.id);
         } else {
-          let existingPid = null;
-          for (const [pId, pData] of Object.entries(
-            shadow.gameRoom.state.players
-          )) {
-            if (pData.username === data.username) {
-              existingPid = pId;
-              break;
-            }
-          }
+          const existingPid =
+            shadow.getPlayerIdByUsername(data.username) ||
+            shadow.getNextAvailablePlayerId();
           if (!existingPid) {
-            const existingPids = [...shadow.gameRoom.playerToSocket.keys()];
-            existingPid = existingPids.includes('p1') ? 'p2' : 'p1';
+            socket.emit('roomReject');
+            return;
           }
           shadow.addPlayer(socket.id, existingPid, data.username);
         }
