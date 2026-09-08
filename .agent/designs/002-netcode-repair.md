@@ -410,6 +410,13 @@ production. Phase 3 is the real migration tail and should be re-scoped after Pha
   guard correctly turned it into a failing assertion (`false !== true`), so it needed a
   fix, not a design change: added minimal `StubElement`/`StubDocument`/`makeGetZone`
   helpers local to that test file so the integration assertion stays meaningful.
+- 1.3: `requestSyncLogBundle`/`syncLogBundle` were on the design's dead-scaffolding list, but
+  grepping (as the slice instructs) found real listeners in `sync-logger-bridge.js`, wired into
+  `front-end.js` and backing the sync-log export/debug tool — kept, not deleted. Also removed the
+  now-unreachable `else if (event === 'syncCheck') shadow.checkSync(...)` branch in `server.js`
+  (client-side `emitSyncCheck` was already a no-op, so this SHADOW_MODE consumer never fired for
+  real traffic; `shadow.checkSync` itself is untouched and still unit-tested in `shadow.test.mjs`/
+  `shadow-e2e.test.mjs`).
 - 1.1: extracted the peer-log request/response/replay logic into a new pure module
   `client/src/setup/netcode/peer-log-catchup.js` (no DOM/socket globals), following the
   existing `cmd-emitter.js` pattern — `socket-event-listeners.js` alone can't be unit

@@ -9,7 +9,7 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | 0.2 | done | 843f13b | `resolveRenderTargets` guard in `apply-view.js`; stadium-wipe repro fixed |
 | 1.1 | done | f8f22a2 | Peer-log reconnect catch-up + O2-C fallback |
 | 1.2 | done | (pending) | Counter-ordered `requestAction` queue |
-| 1.3 | next | | Dead-scaffolding deletion (grep each event for a live listener first) |
+| 1.3 | done | 57865a0 | Dead-scaffolding deletion; kept requestSyncLogBundle/syncLogBundle (live) |
 | 2.1 | | | Sweep grace + `roomInfo` decoupling |
 | 2.2 | | | `clientSeq` clearing, protocol version, `emitCmd` surfacing |
 | 3.1 | | | `instanceMap` round-trip; index fallbacks deleted |

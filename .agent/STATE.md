@@ -4,19 +4,17 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 35
-Focus: Netcode repair — design 002, slice 1.2 (counter-ordered requestAction queue) built and merged
+Session: 36
+Focus: Netcode repair — design 002, slice 1.3 (dead-scaffolding deletion) built and merged
 Active: none
-Next: build slice 1.3 (dead-scaffolding deletion) — see NEXTSTEPS.md ledger
+Next: build slice 2.1 (sweep grace + roomInfo decoupling) — see NEXTSTEPS.md ledger
 Blocked: none
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- The `../vibecodepokemontcg2-netcode-repair` worktree (branch `feature/netcode-repair`) is
-  still checked out elsewhere and holds an older tip — do not assume it is current; treat
-  the primary checkout (`main`, up to date) as source of truth. S35 worked directly in the
-  primary checkout per explicit user instruction (no new worktree), branching briefly as
-  `feature/netcode-repair-1-2` off `main`, merging back, then deleting the temp branch.
-  Reconcile or delete the stale worktree before slice 1.3 if it's not otherwise in use.
+- The stale `../vibecodepokemontcg2-netcode-repair` worktree was removed in S36 (clean, behind
+  main). All netcode work now happens directly in the primary checkout (`main`) on short-lived
+  `feature/netcode-repair-<slice>` branches, merged back and deleted — per explicit user
+  instruction, no new worktree per slice.
 - `pushAction` and `requestAction` must not be dropped: the server's own deck init is fed from
   the pushAction relay (server.js:658-674), and setup actions rely on it.
 - Reconnect recovery: peer-log catch-up (1.1) for stale opponent-action gaps, and the
@@ -31,9 +29,10 @@ Blocked: none
   background-subshell `node` isn't visible to `pkill` on Windows/git-bash.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S36 2026-09-09 feature(netcode slice 1.3): deleted dead sync-check scaffolding (emitSyncCheck/
+  triggerSyncCheck stubs, heartbeat, dead relay entries); kept requestSyncLogBundle/syncLogBundle
+  (design was wrong — live listeners found); removed stale worktree; 1009 tests & test:2p green.
 - S35 2026-09-09 feature(netcode slice 1.2): counter-ordered requestAction queue replaces the
   moveCardBundle/counter-status exemptions; 1009 tests & test:2p green.
 - S34 2026-09-09 feature(netcode slice 1.1): peer-log reconnect catch-up (requestPeerLog/
   peerLog, capped+timed-out, O2-C fallback); 1004 tests & test:2p green.
-- S33 2026-09-09 feature(netcode slices 0.1-0.2): SERVER_AUTHORITATIVE defaults off,
-  render-target guard stops the stadium-wipe and blind-renderer writes; 993 tests green.
