@@ -35,7 +35,7 @@ While the core pure state models and unit test coverage are broad (912 passing t
   2. The client DOM reconciler [`apply-view.js:11, 99`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js#L11) stores cards in a single `cardRegistry = new Map<instanceId, record>()`, causing Player 1's and Player 2's DOM card elements to overwrite each other.
 * **Fix**: Imported and utilized [`mintInstanceId(state)`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/cards.mjs#L12) in [`initializePlayerDeck`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/shadow.mjs#L28), ensuring all card instances are monotonically unique across the entire `GameState` while maintaining `syncInstance` for client sequencing. Verified by `server/game/__tests__/shadow.test.mjs`.
 
-#### 4. Parameter Offset Bug in `exchangeData` Leaving Decks Empty on Authoritative Server
+#### 4. Parameter Offset Bug in `exchangeData` Leaving Decks Empty on Authoritative Server — [RESOLVED]
 * **Location**: [`server/server.js:578-584`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L578-L584)
 * **Root Cause**: In [`server.js:580`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L580):
   ```javascript
@@ -46,7 +46,7 @@ While the core pure state models and unit test coverage are broad (912 passing t
   ```
   In [`client/src/setup/deck-constructor/exchange-data.js:64-71`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/deck-constructor/exchange-data.js#L64-L71), `parameters` are `[username, deckData, cardBack, ...]`. Index 1 is `deckData`, while index 2 is `cardBack` (a string URL).
 * **Impact**: `Array.isArray(data.parameters[2])` evaluates to `false`. [`initializePlayerDeck`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/shadow.mjs#L28) is never called for `exchangeData`. Players' decks on the authoritative server remain completely empty `[]`, causing immediate 0-card opening hands and deck-out losses.
-* **Fix**: Change `data.parameters?.[2]` to `data.parameters?.[1]`.
+* **Fix**: Implemented and exported [`extractDeckData(action, parameters)`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/shadow.mjs) which properly extracts `parameters[1]` for `exchangeData` and `parameters[0]` (with legacy `parameters[1]` fallback) for `loadDeckData`. Used in both [`server/server.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js) and `shadow.mjs`. Verified by `server/game/__tests__/exchange-data-params.test.mjs`.
 
 #### 5. Missing Socket/Room Context in `applyView` Choice Resolver Breaking Modal Confirm
 * **Location**: [`client/src/setup/netcode/apply-view.js:353-364`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js#L353-L364), [`client/src/initialization/socket-event-listeners/socket-event-listeners.js:252-256`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/initialization/socket-event-listeners/socket-event-listeners.js#L252-L256)
@@ -129,6 +129,6 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 1. [x] Patch the **redaction leak** in [`server/server.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js) so `broadcast.view.pendingChoice` is the sole choice payload emitted.
 2. [x] Fix the **turn-player check** in [`shared/engine/reduce.mjs:426`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L426) to allow `resolveChoice` from the non-turn player.
 3. [x] Update [`initializePlayerDeck`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/shadow.mjs#L28) to use [`mintInstanceId`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/cards.mjs#L12).
-4. [ ] Fix parameter offset from index 2 to index 1 for `exchangeData` in [`server.js:583`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L583).
+4. [x] Fix parameter offset from index 2 to index 1 for `exchangeData` in [`server.js:583`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L583).
 5. [ ] Provide default `socket` and `roomId` fallbacks in [`client/src/setup/netcode/apply-view.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js).
 6. [ ] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).
