@@ -205,3 +205,16 @@ export const resolveTargetSlotIndex = ({
   if (!multiSelect || maxCount === 1) return 0;
   return -1;
 };
+
+/**
+ * Test whether the card picker is permitted to close for a given mode and force flag.
+ * The pick card menu (mode !== 'browse') can only close via user clicking the Done button,
+ * or programmatically when force is true (e.g. opening a new picker).
+ *
+ * @param {object} [params]
+ * @param {string | null} [params.mode]
+ * @param {boolean} [params.force=false]
+ * @returns {boolean}
+ */
+export const canCloseCardPicker = ({ mode, force = false } = {}) =>
+  Boolean(force || mode === 'browse');

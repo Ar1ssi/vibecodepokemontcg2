@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  canCloseCardPicker,
   computeDropSlotHitboxes,
   findDropSlotIndex,
   findSelectedSlotIndex,
@@ -268,3 +269,123 @@ test('DOM: slot assignment and is-selected-slot class behavior', async () => {
   assert.ok(slotElements[0].classList.contains('is-selected-slot'));
   assert.ok(!slotElements[1].classList.contains('is-selected-slot'));
 });
+
+test('canCloseCardPicker: only permits closing in browse mode unless force=true', () => {
+  // Browse mode: permitted to close
+  assert.equal(canCloseCardPicker({ mode: 'browse' }), true);
+  assert.equal(canCloseCardPicker({ mode: 'browse', force: false }), true);
+  assert.equal(canCloseCardPicker({ mode: 'browse', force: true }), true);
+
+  // Choose mode (pick card menu): cannot close unless forced
+  assert.equal(canCloseCardPicker({ mode: 'choose' }), false);
+  assert.equal(canCloseCardPicker({ mode: 'choose', force: false }), false);
+  assert.equal(canCloseCardPicker({ mode: 'choose', force: true }), true);
+
+  // Multi mode: cannot close unless forced
+  assert.equal(canCloseCardPicker({ mode: 'multi' }), false);
+  assert.equal(canCloseCardPicker({ mode: 'multi', force: false }), false);
+  assert.equal(canCloseCardPicker({ mode: 'multi', force: true }), true);
+
+  // Null/undefined mode: cannot close unless forced
+  assert.equal(canCloseCardPicker(), false);
+  assert.equal(canCloseCardPicker({ mode: null, force: false }), false);
+  assert.equal(canCloseCardPicker({ mode: null, force: true }), true);
+});
+
+test('DOM: pick card menu only closes via Done button', async () => {
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+  const { document, KeyboardEvent, MouseEvent } = dom.window;
+
+  let closed = false;
+  let pickedCard = null;
+
+  const teardown = () => {
+    closed = true;
+    overlay.remove();
+  };
+
+  const overlay = document.createElement('div');
+  overlay.className = 'card-picker-overlay card-picker-choose';
+  const doneBtn = document.createElement('button');
+  doneBtn.className = 'card-picker-done';
+  doneBtn.textContent = 'Done';
+  overlay.appendChild(doneBtn);
+  document.body.appendChild(overlay);
+
+  const mode = 'choose';
+  const candidate = { name: 'Pikachu' };
+
+  // Keydown listener simulating pick card menu
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      if (mode === 'browse') {
+        if (canCloseCardPicker({ mode })) teardown();
+      } else {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+  };
+
+  overlay.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (event.target === overlay) {
+      if (mode === 'browse' && canCloseCardPicker({ mode })) teardown();
+    }
+  });
+
+  overlay.addEventListener('contextmenu', (event) => {
+    event.stopPropagation();
+  });
+
+  doneBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    pickedCard = candidate;
+    teardown();
+  });
+
+  document.addEventListener('keydown', onKeyDown);
+
+  // 1. Pressing Escape does NOT close the menu
+  let escDefaultPrevented = false;
+  let escPropagationStopped = false;
+  const escEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  // Intercept preventDefault & stopPropagation
+  const origPreventDefault = escEvent.preventDefault.bind(escEvent);
+  const origStopPropagation = escEvent.stopPropagation.bind(escEvent);
+  escEvent.preventDefault = () => {
+    escDefaultPrevented = true;
+    origPreventDefault();
+  };
+  escEvent.stopPropagation = () => {
+    escPropagationStopped = true;
+    origStopPropagation();
+  };
+  document.dispatchEvent(escEvent);
+
+  assert.equal(closed, false, 'Escape did not close pick card menu');
+  assert.equal(escDefaultPrevented, true, 'Escape prevented default');
+  assert.equal(escPropagationStopped, true, 'Escape stopped propagation');
+
+  // 2. Pressing Enter does NOT close the menu
+  const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+  document.dispatchEvent(enterEvent);
+  assert.equal(closed, false, 'Enter did not close pick card menu');
+
+  // 3. Clicking overlay backdrop does NOT close the menu
+  overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  assert.equal(closed, false, 'Overlay click did not close pick card menu');
+
+  // 4. Calling close without force does NOT close
+  if (canCloseCardPicker({ mode, force: false })) {
+    teardown();
+  }
+  assert.equal(closed, false, 'Unforced closeCardPicker did not close pick card menu');
+
+  // 5. Clicking Done button DOES close the menu and confirms selection
+  doneBtn.click();
+  assert.equal(closed, true, 'Clicking Done closed the menu');
+  assert.equal(pickedCard?.name, 'Pikachu', 'Picked card was assigned');
+});
+

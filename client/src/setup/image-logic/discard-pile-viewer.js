@@ -1,14 +1,18 @@
 import { getZone } from '../zones/get-zone.js';
 import {
   closeCardPicker,
+  getCardPickerMode,
   isCardPickerOpen,
   openCarouselViewer,
 } from './card-picker.js';
 
-export const isDiscardPileViewerOpen = isCardPickerOpen;
+export const isDiscardPileViewerOpen = () =>
+  isCardPickerOpen() && getCardPickerMode() === 'browse';
 
 export const closeDiscardPileViewer = (event) => {
-  closeCardPicker(event);
+  if (getCardPickerMode() === 'browse') {
+    closeCardPicker(event);
+  }
 };
 
 export const openDiscardPileViewer = async (user, startIndex = null) => {
