@@ -12,6 +12,7 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I15 2026-09-09 P2 [netcode] Authoritative renderer has no interaction or overlay parity: createOrUpdateCardElement emits a bare <img class="card-image"> while legacy Card.buildImage attaches seven listeners (click/dblclick/drag x4/contextmenu), damage counters are sibling <div>s (damage-counter.js:182-203) and Cover is a separate image — wiring getZone in as-is yields a non-interactive board (refs: design 002 Phase 3B, S39)
 - I10 2026-09-09 P1 [netcode] Stadium is wiped from both boards on any successful server command: applyView's reconcileStadium clears #stadium when view.stadium is null, and #stadium is the only zone its DOM fallback can reach (apply-view.js:259-281) — repro: play a Stadium, then draw (refs: design 002, S32)
 - I11 2026-09-09 P1 [netcode] Client syncInstance (0-based per player) is sent as the server's instanceId (1-based global), so every authoritative card command targets the wrong card or the wrong player's card (build-deck.js:13-19 vs shadow.mjs:29-68; dual-run-bridge.js:205-208) (refs: design 002, S32)
 - I12 2026-09-09 P1 [netcode] Reconnect recovery is dead in both modes: slice 8 deleted the replay stack but left the emitters — no client listener exists for resyncActions/catchUpActions/requestBoardSnapshot, and requestView returns a view the renderer cannot paint (socket-event-listeners.js:211) (refs: design 002, S32)

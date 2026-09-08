@@ -1,6 +1,7 @@
 # 002: Netcode repair — retire the unearned flip, then earn it
 
-Status: approved (user delegated the picks to the session, 2026-09-09 S32) — O1-A, O2-B/C, O3-C
+Status: building — Phases 0-2 shipped (slices 0.1-2.2). Picks O1-A, O2-B/C, O3-C (D8-D10).
+Phase 3 re-scoped S39 into 3A/3B/3C; O4 (end state) is OPEN and gated at the end of 3A.
 Date: 2026-09-09 · Session: S32
 Supersedes nothing. Completes the unfinished tail of `001-server-authoritative-netcode.md` slice 8.
 
@@ -11,7 +12,9 @@ Supersedes nothing. Completes the unfinished tail of `001-server-authoritative-n
 | Deciding whether to approve | Problem → Verification results → Options → Work plan |
 | Building Phase 0 | Problem → Design §0 → Work plan slices 0.1–0.2 |
 | Building Phase 1 or 2 | Design §1/§2 + the edge-case rows named in your slice |
-| Building Phase 3 | Verification results N1 → Design §3 in full → Options O3 |
+| Building Phase 3A | Verification results N1 → Design §3 preamble + Phase 3A → Options O3 |
+| Ruling on the O4 gate | Design §3 preamble → slice 3.5 evidence → Options O4 |
+| Building Phase 3B or 3C | Options O4 (must be decided) → Design §3 preamble → your sub-phase |
 | Reviewing a diff | Verification results, then the edge-case table |
 
 ---
@@ -221,6 +224,29 @@ branch is how the original stack grew into the thing slice 8 deleted.
 currently-implicit assumption ("these two integers are the same integer") into a data structure
 that can be asserted on.
 
+
+### O4 — How far to take the migration (OPEN; gated at the end of Phase 3A)
+
+Added S39 during the Phase 3 re-scope. **Deliberately not decided now.** Phase 3A ends with a
+server that is provably right and still invisible (slice 3.5), and that is the first moment this
+choice can be made on evidence rather than on estimate. Deciding it earlier would repeat design
+001 slice 8's mistake — committing to an end state before the preconditions were checked.
+
+| | Option | Tradeoff |
+|---|---|---|
+| A | **Full authoritative rendering** — the original design 001 goal. Client renders only from views; legacy DOM mutation deleted | Closes I6 *and* I5 (deck secrecy: the client stops holding the opponent's deck, because `viewFor` redaction becomes the only source). Costs all of Phase 3B — renderer parity is a rewrite of the interactive board, not a wiring change. |
+| B | **Server as arbiter only** — server keeps authoritative state, validates commands and detects divergence; legacy DOM keeps rendering; `applyView` stays behind the §0.2 guard forever | Closes I6 (an arbiter now exists) at the cost of ~5 slices instead of ~11. Skips Phase 3B entirely. **Leaves I5 open**: both clients still hold the full opponent deck, so deck secrecy remains unenforceable and a modified client can still cheat. Renderer code becomes dead weight and should be deleted, not left dormant. |
+| C | **B now, A later behind its own gate** — ship the arbiter, keep `applyView` and its tests alive, revisit 3B as a separate design | Gets I6 closed at B's cost while keeping A reachable. Risk: a dormant renderer rots, exactly as it did between design 001 slice 7 and this document. Mitigated only if 3B is scheduled, not merely "kept possible". |
+
+**Leaning: C, conditional on 3.5's evidence** — but this is a product call, not a technical one.
+It trades cheating-resistance (I5, A only) against roughly six slices of renderer work, and the
+answer depends on whether this simulator is played between trusted opponents or strangers. That is
+the user's call, and it should be asked at the gate, not before.
+
+Whoever rules on this gate: record it as D11, and if the answer is B, file the renderer deletion
+as its own ISSUES.md line rather than leaving `apply-view.js` dormant.
+
+
 ---
 
 ## Design
@@ -291,38 +317,121 @@ player stays seated server-side while parked in the lobby.
 **2.4 Surface `emitCmd` failures (#9).** `process-action.js` awaits the result and routes
 `{success:false}` to `appendMessage` + `logSync`. No `.catch(() => {})`.
 
-### §3 — Earn the flip (gated; do not start before Phases 0–2 are green)
+### §3 — Earn the flip (RE-SCOPED S39, after Phases 0–2 shipped)
 
-**3.1 ID map (O3-C).** After `initializePlayerDeck`, the server emits to that player only:
+Phases 0–2 are merged and green (ledger in `NEXTSTEPS.md`; slices 0.1–2.2). Three facts changed
+since this section was first written, and they change its shape:
+
+1. **The flag is off and the §0.2 guard is in.** Phase 3 therefore has **zero production
+   exposure** — nothing here can reach a player until slice 3.12 flips `render.yaml`. Phase 3 can
+   be sequenced by value instead of by risk, which the original ordering did not exploit.
+2. **The legacy path is now whole.** Reconnect recovery (1.1), counter-ordered application (1.2)
+   and sweep grace (2.1) shipped. The *urgency* argument for finishing the migration is spent; the
+   *correctness* argument (I6 — two simulations, no arbiter) is untouched and still the reason to
+   continue.
+3. **Old slice 3.2 was not a slice.** Verified S39: `createOrUpdateCardElement`
+   (`apply-view.js:145`) produces a bare `<img class="card-image">` carrying dataset attributes and
+   **nothing else**. The legacy `Card` (`client/src/setup/deck-constructor/card.js:76-90`) builds
+   its `<img>` with seven live listeners — `imageClick`, `doubleClick`, `dragStart`, `dragOver`,
+   `dragLeave`, `dragEnd`, `contextmenu` — plus `user`/`type` properties. Damage counters are
+   *sibling* `<div class="damage-counter">` nodes appended to the zone
+   (`damage-counter.js:182-203`), not dataset fields. `Cover` (deck/discard/lost-zone backs) is a
+   separate `<img>` with its own handlers. None of that is modelled.
+   **Wiring `getZone` in today would replace a working interactive board with a dead picture of
+   one.** Renderer parity is the migration's real cost centre and gets its own sub-phase.
+
+The tail therefore splits into 3A (server correctness, no renderer needed), 3B (renderer parity),
+3C (flip). **3A alone resolves I6** if O4-B is chosen — see the O4 gate below.
+
+#### Phase 3A — make the server actually right (renderer not involved)
+
+Everything here is verifiable server-side with unit and replay tests. No DOM.
+
+**3.1 ID map (O3-C / D10).** After `initializePlayerDeck`, the server emits to that player only:
 `socket.emit('instanceMap', { roomId, map: { [syncInstance]: instanceId } })`. The client stores it
 in a module-scoped `Map` in `dual-run-bridge.js` with `setInstanceMap` /
 `resolveInstanceId(syncInstance)`. Every translator resolves through it. **Delete all three
-positional-index fallbacks** — an unresolvable hint returns `null` (command not sent) and logs,
-rather than guessing.
+positional-index fallbacks** (`dual-run-bridge.js:85-87, 167-169, 306-307`) — an unresolvable hint
+returns `null` (command not sent) and logs, rather than guessing. Re-verified S39: still 14
+translated cases, still no `instanceMap` anywhere in the repo.
 
-**3.2 Wire the renderer.** Pass `getZone` into the renderer via
-`setDefaultNetcodeContext({ getZone })` rather than the `window.__getZone` global that nothing
-sets; keep `options.getZone` as the test seam. Then the §0.2 guard starts passing and the renderer
-goes live — which is also when findings #10 and #11 (intra-zone order, `attached-card` class)
-become real and must be fixed in the same slice.
+**3.2 Disposition map.** Replace `default: return null` with an explicit disposition over all 58
+`accept-action` keys: `'command' | 'relay-only' | 'ui-local'`. A key absent from the map throws in
+development and logs in production. `shared/engine/commands.mjs:DISPOSITION_TABLE` already
+catalogues the legacy actions (design 001 slice 3 deviation) — drive the check from it so the two
+cannot drift. This slice **classifies**; it does not implement. Its output is the work list for 3.4.
 
-**3.3 Translation completeness.** Replace `default: return null` with an explicit disposition map
-over all 58 `accept-action` keys: `'command' | 'relay-only' | 'ui-local'`. A key absent from the map
-throws in development and logs in production. `shared/engine/commands.mjs:DISPOSITION_TABLE` already
-catalogues the legacy actions (slice 3 deviation) — drive the check from it so the two cannot drift.
+**3.3 `normalizeSpecialCondition`** returns `null` for unrecognised input instead of `'Poisoned'`
+(`dual-run-bridge.js:25`); callers reject rather than mislabel.
 
-**3.4 `normalizeSpecialCondition`** returns `null` for unrecognised input instead of `'Poisoned'`;
-callers reject rather than mislabel.
+**3.4 Close the translation gap — split by family, one slice each.** This was hidden inside the old
+3.3 and is the bulk of 3A. Implement the translations 3.2 marked `command`, in these groups, each
+independently green:
 
-**3.5 Room-change reset and real desync detection.** Call `resetRenderState()` **and then**
-re-invoke `setDefaultNetcodeContext(...)` in the `leaveRoom` click handler and on `joinGame`; also
-`resetClientSeq(0)`. Note the trap in `apply-view.js:67-71`. Then implement `emitSyncCheck` to send
-`hashState`-comparable zone hashes; the server compares against `hashState(gameRoom.state)` and
-emits a `desync` event naming the first divergent zone. Only now is the heartbeat worth re-arming.
+- **3.4a zone ops** — `shuffleIntoDeck`, `moveToDeckTop`, `switchWithDeckTop`, `shuffleZone`,
+  `shuffleBottom`, `discardAll`, `lostZoneAll`, `handAll`, `leaveAll`, `shuffleAll`,
+  `discardAndDraw`, `shuffleAndDraw`, `shuffleBottomAndDraw`, `shufflePrizesToDeckBottom`.
+- **3.4b prizes & board** — `takePrizes`, `takePrizesByIndex`, `discardBoard`, `handBoard`,
+  `shuffleBoard`, `lostZoneBoard`.
+- **3.4c setup & turn** — `setup`, `setupPrizes`, `drawOpeningHand`, `readyUp`, `takeTurn`,
+  `reset`, `restartGame`, `changeCardBack`, `changePlaymat`.
+- **3.4d reveal/look family** — `lookAtCards`, `stopLookingAtCards`, `revealCards`, `hideCards`,
+  `revealShortcut`, `hideShortcut`, `lookShortcut`, `stopLookingShortcut`. Most are visibility,
+  not state; expect several to land as `relay-only` and be struck here with a written reason.
+- **3.4e `undo`** — design 001 D6 defines it as deterministic `commandLog` replay minus tail.
+  Confirm that still holds against the current reducer before building; if not, STOP and re-gate.
 
-**3.6 Flip gate.** The flip is not a code change; it is passing this: a two-browser Playwright game
+**3.5 Server-truth replay harness — the 3A exit test.** Record legacy 2P traffic
+(`exportActionData` from a real `test:2p` run), replay it through a `GameRoom`, and assert
+`hashState(room.state)` agrees with the clients' zone hashes at every step. This proves the server
+models the game correctly **without a single line of renderer work**, and it is the evidence the O4
+gate needs. Structural mismatch here means 3A is not done — do not proceed on a claim.
+
+#### O4 GATE — decide the end state here, not before
+
+3A ends with a server that is provably right and still invisible. That is the correct moment to
+choose how far to go, because it is the first moment the choice can be made on evidence. See
+Options § O4. **Do not start 3B before this gate is ruled on.**
+
+#### Phase 3B — renderer parity (only if O4-A or O4-C)
+
+Sequenced so the board is never half-built; the §0.2 guard stays as the safety net throughout.
+
+**3.6 Interactive elements.** The renderer must **reuse** the legacy image-building path rather
+than grow a parallel one — extract `Card.buildImage`'s attribute/listener table into a shared
+helper and call it from both. A second, subtly-different `<img>` factory is how the two-identity
+bug (N1) happened in the first place. Then wire `getZone` in via
+`setDefaultNetcodeContext({ getZone })` — not the `window.__getZone` global that nothing sets
+(re-verified S39) — keeping `options.getZone` as the test seam.
+
+**3.7 Counters and status overlays.** Damage-counter and special-condition sibling `<div>`s and
+ability-used markers, positioned per `damage-counter.js` / `special-condition.js`.
+
+**3.8 Covers, order and attachment.** `Cover` images for deck/discard/lost-zone, sleeves, hand
+sort, plus findings **#10** (intra-zone order never reconciled — `apply-view.js:248` appends only
+when the parent differs) and **#11** (`attached-card` class not removed on the play-zone branch).
+
+**3.9 Reveal / look overlays.** Whatever 3.4d classified as renderable view state.
+
+**3.10 Room-change reset.** Call `resetRenderState()` **and then** re-invoke
+`setDefaultNetcodeContext(...)` in the `leaveRoom` handler and on `joinGame`; also
+`resetClientSeq(0)`. Note the trap at `apply-view.js:67-71`: `resetRenderState` nulls the netcode
+context, so resetting without re-seeding breaks choice resolution. Re-verified S39: still no
+production caller.
+
+#### Phase 3C — flip
+
+**3.11 Desync detection.** Implement `emitSyncCheck` to send `hashState`-comparable zone hashes;
+the server compares against `hashState(gameRoom.state)` and emits a `desync` event naming the first
+divergent zone. Recovery routes into the **existing** slice-1.1 peer-log path
+(`client/src/setup/netcode/peer-log-catchup.js`) — do not build a second recovery mechanism.
+Slice 1.3 deleted the old stubs and heartbeat; re-arm the heartbeat only here, once it calls
+something real.
+
+**3.12 Flip gate.** The flip is not a code change; it is passing this: a two-browser Playwright game
 (`two-player-sync-test.mjs` extended) that plays to a win condition with the flag on, asserting
-per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` change back.
+per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` change back, reversing
+D8.
 
 ---
 
@@ -346,6 +455,14 @@ per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` chan
 | 14 | New action added to `accept-action` without a disposition | throws in dev, logs in prod — cannot silently no-op | [ ] |
 | 15 | Spectator during any of the above | read-only; never emits `cmd` or peer-log replies | [ ] |
 | 16 | Solo (1P) mode | untouched by every slice — `isTwoPlayer` guards all new paths | [ ] |
+| 17 | A newly translated action is replayed twice (dedupe path) | `clientSeq` dedupe returns the current view; state advances once | [ ] |
+| 18 | `undo` requested past the start of the command log | rejected with a reason; never rewinds into another game's log | [ ] |
+| 19 | Replay harness hits a command the server cannot model | harness fails loudly naming the action; 3A is not done | [ ] |
+| 20 | Renderer-built card is clicked / dragged / right-clicked | same handlers fire as a legacy-built card — one shared image factory, not two | [ ] |
+| 21 | Damage counter present in view but no sibling overlay node yet | overlay created; removed when the view drops it to 0 | [ ] |
+| 22 | Zone order differs between view and DOM with identical membership | reordered in place; no flicker, no duplicate nodes | [ ] |
+| 23 | Opponent reveals cards mid-choice | overlay renders from the view; clears when the view clears it | [ ] |
+| 24 | Desync detected with the peer-log path already mid-catch-up | one recovery attempt, not two; detection defers to the in-flight catch-up | [ ] |
 
 ## Test plan
 
@@ -363,8 +480,13 @@ per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` chan
 
 ## Migration / rollout
 
-Phases 0–2 ship with the flag **off**; they change only the path already in production, so each is
-verifiable by `pnpm test` + `pnpm test:2p` + one manual two-browser game.
+Phases 0–2 shipped with the flag **off**; they changed only the path already in production, so each
+was verifiable by `pnpm test` + `pnpm test:2p` + one manual two-browser game.
+
+Phase 3 has **zero production exposure**: the flag is off and the §0.2 guard makes `applyView` a
+no-op until a real zone resolver is wired in (slice 3.6). Nothing in 3A can reach a player at all.
+The revert path for every 3A slice is therefore `git revert <commit>` with no deploy consideration;
+the first slice that carries real user risk is 3.12, the flip itself.
 
 Revert paths. Each slice is one commit on `feature/netcode-repair`, so the primary undo is
 `git revert <slice commit>`. The per-slice notes below are the *operational* undo — the change you
@@ -392,12 +514,23 @@ Data: none of this touches SQLite. No migration.
 | 1.3 | Dead-scaffolding deletion | Full suite green; grep proves each removed event had no listener |
 | 2.1 | Sweep grace + `roomInfo` decoupling | Row 5 |
 | 2.2 | `clientSeq` clearing, protocol version, `emitCmd` surfacing | Rows 11–12 |
-| 3.1 | `instanceMap` round-trip; index fallbacks deleted | Rows 3–4, ownership-correct integration test |
-| 3.2 | Renderer wired to iframes; findings #10, #11 fixed | §0.2 guard passes; board renders from views |
-| 3.3 | Disposition-map exhaustiveness over all 58 actions | Row 14 |
-| 3.4 | Condition normalisation rejects unknowns | Row 13 |
-| 3.5 | Room-change reset + `hashState` desync detection | Row 10; divergence test names the first bad zone |
-| 3.6 | **Flip gate**: full two-browser game, flag on | Exit test passes; only then does `render.yaml` flip |
+| 3.1 | **3A** `instanceMap` round-trip; index fallbacks deleted | Rows 3–4, ownership-correct integration test |
+| 3.2 | **3A** Disposition map classifies all 58 actions | Row 14; the map is the work list for 3.4 |
+| 3.3 | **3A** Condition normalisation rejects unknowns | Row 13 |
+| 3.4a | **3A** Zone-op translations | Row 17; each op round-trips through `GameRoom` |
+| 3.4b | **3A** Prize & board translations | Row 17 |
+| 3.4c | **3A** Setup & turn translations | Row 17 |
+| 3.4d | **3A** Reveal/look family classified and translated | Row 17; `relay-only` entries struck with a reason |
+| 3.4e | **3A** `undo` per D6, or re-gate | Row 18 |
+| 3.5 | **3A exit** Server-truth replay harness | Row 19; recorded 2P traffic replays with `hashState` agreement at every step |
+| — | **O4 GATE** — rule on the end state; record as D11 | Decision recorded; 3B not started before it |
+| 3.6 | **3B** Interactive elements via a shared image factory | Row 20; board renders and is clickable/draggable |
+| 3.7 | **3B** Counters and status overlays | Row 21 |
+| 3.8 | **3B** Covers, hand sort, intra-zone order (#10), attachment class (#11) | Row 22 |
+| 3.9 | **3B** Reveal/look overlays | Row 23 |
+| 3.10 | **3B** Room-change reset + context re-seed | Row 10 |
+| 3.11 | **3C** Desync detection routed into the 1.1 peer-log path | Row 24; divergence test names the first bad zone |
+| 3.12 | **3C** **Flip gate**: full two-browser game, flag on | Exit test passes; only then does `render.yaml` flip, reversing D8 |
 
 Phases 0–2 are seven slices of small, reversible work against the path that is actually in
 production. Phase 3 is the real migration tail and should be re-scoped after Phase 2 lands.

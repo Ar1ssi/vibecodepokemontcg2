@@ -4,40 +4,34 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 38
-Focus: Netcode repair — design 002, slice 2.2 (clientSeq clearing, protocol version, emitCmd surfacing) built and merged
+Session: 39
+Focus: Netcode repair — design 002 Phase 3 re-scoped into 3A/3B/3C after Phases 0-2 shipped
 Active: none
-Next: build slice 3.1 (instanceMap round-trip; index fallbacks deleted) — see NEXTSTEPS.md ledger; Phase 3 re-scope note in design applies
-Blocked: none
+Next: build slice 3.1 (instanceMap round-trip; index fallbacks deleted) — first slice of Phase 3A
+Blocked: O4 (migration end state) is OPEN and gates Phase 3B — rule on it with slice 3.5 evidence,
+  not before. Phase 3A (3.1-3.5) is unblocked and can start now.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- All netcode work happens directly in the primary checkout (`main`) on short-lived
-  `feature/netcode-repair-<slice>` branches, merged back and deleted — per explicit user
-  instruction, no new worktree per slice.
-- `pushAction` and `requestAction` must not be dropped: the server's own deck init is fed from
-  the pushAction relay (server.js), and setup actions rely on it.
-- Client-side imports of `shared/engine/*` from non-test files use the dual dynamic-import
-  pattern (`/shared/...` absolute for the browser, relative as Node-test fallback) — a static
-  relative `import` from a non-test client file breaks in the browser because `client/` is
-  stripped from the served URL (express serves `clientDir` at `/`, `sharedDir` at `/shared`).
-  See `cmd-emitter.js`'s `loadCommandsModule()`.
-- `pnpm lint` fails on Windows CRLF across the codebase; lint changed files with
-  `npx eslint --rule "prettier/prettier: off" <files>`.
-- `pnpm test:2p` needs a running server first (`node server/server.js`, localhost:4000) —
-  it does not boot one itself; kill it by PID after (`netstat -ano | grep :4000` then
-  `taskkill //PID <pid> //F`) since background-subshell `node` isn't visible to `pkill` on
-  Windows/git-bash.
+- Phase 3 has ZERO production exposure: flag is off (D8) and the §0.2 `resolveRenderTargets` guard
+  makes `applyView` a no-op until a real zone resolver is wired (slice 3.6). Do not treat 3A slices
+  as risky, and do not wire `getZone` in early — that is slice 3.6, gated behind O4.
+- The authoritative renderer is NOT one wiring change from working: it emits a bare
+  `<img class="card-image">` with no listeners, while legacy `Card.buildImage` attaches seven
+  (click/dblclick/drag×4/contextmenu), damage counters are sibling `<div>`s, and `Cover` is a
+  separate image. That gap is Phase 3B, ~5 slices.
+- All netcode work happens in the primary checkout (`main`) on short-lived
+  `feature/netcode-repair-<slice>` branches, merged back and deleted — per explicit user instruction.
+- Client-side imports of `shared/engine/*` from non-test files use the dual dynamic-import pattern
+  (`/shared/...` absolute for the browser, relative as Node-test fallback) — see `cmd-emitter.js`'s
+  `loadCommandsModule()`. A static relative import from a non-test client file breaks in the browser.
+- `pnpm test:2p` needs a running server first (`node server/server.js`, localhost:4000); it does not
+  boot one. Kill by PID after (`netstat -ano | grep :4000`, then `taskkill //PID <pid> //F`).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S38 2026-09-09 feature(netcode slice 2.2): `room.mjs` removeSocket clears `clientSeqByPlayer`
-  (Finding #12); `cmd-emitter.js` resolves `PROTOCOL_VERSION` from the shared module and stamps
-  it on the `cmd` envelope (Finding #7/#8); `joinGame` mismatch now emits `leaveRoom` so the
-  server releases the seat (edge row 11); `process-action.js` routes `emitCmd` failures to
-  `appendMessage`/`logSync` instead of a silent `.catch` (edge row 12); 1014 tests & test:2p green.
-- S37 2026-09-09 feature(netcode slice 2.1): GameRoom.lastActivityAt (touched by addPlayer/
-  handleCommand/pushAction ingest); empty-room sweep now requires ROOM_GRACE_MS (30 min) idle
-  past empty sockets, and no longer deletes roomInfo from the authoritative branch; 1013 tests
-  & test:2p green.
-- S36 2026-09-09 feature(netcode slice 1.3): deleted dead sync-check scaffolding (emitSyncCheck/
-  triggerSyncCheck stubs, heartbeat, dead relay entries); kept requestSyncLogBundle/syncLogBundle
-  (design was wrong — live listeners found); removed stale worktree; 1009 tests & test:2p green.
+- S39 2026-09-09 feature(design): re-scoped design 002 Phase 3 into 3A (server correctness, 9 slices)
+  / O4 gate / 3B (renderer parity, 5 slices) / 3C (flip); added Options O4, edge rows 17-24, filed I15.
+- S38 2026-09-09 feature(netcode slice 2.2): `room.mjs` removeSocket clears `clientSeqByPlayer`;
+  `cmd-emitter.js` stamps `PROTOCOL_VERSION`; `joinGame` mismatch emits `leaveRoom` to release the
+  seat; `process-action.js` surfaces `emitCmd` failures; 1014 tests & test:2p green.
+- S37 2026-09-09 feature(netcode slice 2.1): GameRoom.lastActivityAt; empty-room sweep requires
+  ROOM_GRACE_MS (30 min) idle and no longer deletes roomInfo from the authoritative branch.
