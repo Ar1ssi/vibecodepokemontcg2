@@ -415,6 +415,124 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
 }
 
 /**
+ * Renders or removes the Game Ended modal and dispatches win/loss announcements.
+ *
+ * @param {object} view Authoritative redacted view
+ * @param {object} [options={}]
+ */
+export function reconcileGameEnded(view, options = {}) {
+  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return;
+
+  const existingModal = doc.getElementById ? doc.getElementById('netcodeEndModal') : null;
+  const rulesEndScreen = doc.getElementById ? doc.getElementById('rulesEndScreen') : null;
+
+  if (!view || view.turn?.phase !== 'ended') {
+    if (existingModal?.parentNode) {
+      existingModal.parentNode.removeChild(existingModal);
+    }
+    if (rulesEndScreen) {
+      rulesEndScreen.hidden = true;
+    }
+    return;
+  }
+
+  // Phase is ended: ensure pending choice overlays are cleared
+  const existingChoiceModal = doc.getElementById ? doc.getElementById('netcodeChoiceModal') : null;
+  const existingChoiceBanner = doc.getElementById ? doc.getElementById('netcodeChoiceBanner') : null;
+  if (existingChoiceModal?.parentNode) existingChoiceModal.parentNode.removeChild(existingChoiceModal);
+  if (existingChoiceBanner?.parentNode) existingChoiceBanner.parentNode.removeChild(existingChoiceBanner);
+
+  const localPlayerId = view.you?.playerId || null;
+  const isWinner = Boolean(view.winner && localPlayerId && view.winner === localPlayerId);
+  const isLoser = Boolean(view.winner && localPlayerId && view.winner !== localPlayerId);
+
+  let titleText = 'Game Over';
+  if (isWinner) {
+    titleText = 'Victory!';
+  } else if (isLoser) {
+    titleText = 'Defeat';
+  } else if (view.winner) {
+    const oppName = view.them?.username || view.winner;
+    titleText = `${oppName} Wins!`;
+  }
+
+  const reasonText = view.winReason ? `Reason: ${view.winReason}` : 'The game has ended.';
+
+  // If rulesEndScreen exists from HTML/EJS, synchronize and display it
+  if (rulesEndScreen) {
+    const title = rulesEndScreen.querySelector?.('.rules-end-title');
+    const reason = rulesEndScreen.querySelector?.('.rules-end-reason');
+    if (title) title.textContent = titleText;
+    if (reason) reason.textContent = reasonText;
+    rulesEndScreen.hidden = false;
+  }
+
+  // Mount or update netcodeEndModal
+  let modal = existingModal;
+  if (!modal) {
+    modal = doc.createElement('div');
+    modal.id = 'netcodeEndModal';
+    modal.className = 'game-end-modal-overlay';
+    doc.body?.appendChild(modal);
+  } else if (modal.children) {
+    while (modal.children.length > 0) {
+      modal.removeChild(modal.children[0]);
+    }
+  }
+
+  const container = doc.createElement('div');
+  container.className = 'game-end-modal-container';
+  modal.appendChild(container);
+
+  const titleEl = doc.createElement('h2');
+  titleEl.className = `game-end-modal-title ${isWinner ? 'winner' : isLoser ? 'loser' : ''}`.trim();
+  titleEl.textContent = titleText;
+  container.appendChild(titleEl);
+
+  const reasonEl = doc.createElement('p');
+  reasonEl.className = 'game-end-modal-reason';
+  reasonEl.textContent = reasonText;
+  container.appendChild(reasonEl);
+
+  const closeBtn = doc.createElement('button');
+  closeBtn.id = 'netcodeEndCloseBtn';
+  closeBtn.className = 'game-end-close-btn';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener?.('click', () => {
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
+  });
+  container.appendChild(closeBtn);
+
+  // Dispatch custom event for DOM / client listeners
+  if (typeof doc.dispatchEvent === 'function') {
+    try {
+      doc.dispatchEvent(
+        new CustomEvent('rules-game-ended', {
+          detail: {
+            winner: view.winner,
+            reason: view.winReason,
+            isWinner,
+            title: titleText,
+          },
+        })
+      );
+    } catch {
+      // CustomEvent dispatch ignored if environment does not support it
+    }
+  }
+
+  if (typeof options.onGameEnded === 'function') {
+    options.onGameEnded({
+      winner: view.winner,
+      reason: view.winReason,
+      isWinner,
+      title: titleText,
+    });
+  }
+}
+
+/**
  * Resolves netcode socket and roomId context from options, defaults, or dynamic state import.
  *
  * @param {object} [options={}]
@@ -524,6 +642,9 @@ export function applyView(view, events = [], options = {}) {
   // Reconcile PendingChoice modal / banner
   const localPlayerId = view.you?.playerId || null;
   reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
+
+  // Reconcile Game Ended modal / banner (Finding 12)
+  reconcileGameEnded(view, options);
 
   // Play advisory events for UI animations/logs (Invariant 4: deletion leaves client correct)
   if (Array.isArray(events) && typeof options.onAdvisoryEvent === 'function') {

@@ -338,4 +338,31 @@ export class GameRoom {
       clientSeq: seq,
     });
   }
+
+  /**
+   * Generates tailored gameEnded notification payload for a given player or spectator.
+   *
+   * @param {string|null} [playerId=null]
+   * @returns {{ winner: string|null, reason: string, message: string } | null}
+   */
+  getGameEndedPayload(playerId = null) {
+    if (this.state.turn?.phase !== 'ended') return null;
+    const winner = this.state.winner || null;
+    const reason = this.state.winReason || 'Game completed';
+    const isWinner = playerId && playerId === winner;
+    const winnerPlayer = winner ? this.state.players?.[winner] : null;
+    const winnerName = winnerPlayer?.username || winner;
+    const message = isWinner
+      ? `🏆 Game over — you win! (${reason})`
+      : playerId
+        ? `🏆 Game over — opponent wins! (${reason})`
+        : `🏆 Game over — ${winnerName || 'Unknown'} wins! (${reason})`;
+
+    return {
+      winner,
+      reason,
+      message,
+    };
+  }
 }
+

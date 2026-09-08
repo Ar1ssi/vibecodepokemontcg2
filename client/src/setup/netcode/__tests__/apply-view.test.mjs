@@ -8,6 +8,7 @@ import {
   getCardRegistry,
   setDefaultNetcodeContext,
   getDefaultNetcodeContext,
+  reconcileGameEnded,
 } from '../apply-view.js';
 
 class MockClassList {
@@ -600,3 +601,135 @@ test('Finding 5: choice resolver uses setDefaultNetcodeContext fallback when opt
   assert.deepEqual(emitted[0].payload.selection, [201]);
   assert.equal(doc.getElementById('netcodeChoiceModal'), null, 'Modal removed on confirm');
 });
+
+test('Finding 12: applyView mounts Victory modal and dispatches rules-game-ended when local player wins', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const eventsDispatched = [];
+  doc.dispatchEvent = (event) => {
+    eventsDispatched.push(event);
+    return true;
+  };
+
+  const endedView = {
+    gameId: 'game-ended-test-1',
+    stateVersion: 10,
+    turn: { phase: 'ended', player: 'p1' },
+    winner: 'p1',
+    winReason: 'all prize cards taken',
+    you: { playerId: 'p1', username: 'Ash', zones: {} },
+    them: { playerId: 'p2', username: 'Gary', zones: {} },
+  };
+
+  let callbackResult = null;
+  const res = applyView(endedView, [], {
+    document: doc,
+    getZone: mockGetZone,
+    onGameEnded: (detail) => {
+      callbackResult = detail;
+    },
+  });
+
+  assert.equal(res.applied, true);
+
+  const modal = doc.getElementById('netcodeEndModal');
+  assert.ok(modal, 'Game end modal should be mounted in DOM');
+
+  const title = modal.querySelector('.game-end-modal-title');
+  assert.ok(title);
+  assert.equal(title.textContent, 'Victory!');
+  assert.ok(title.classList.contains('winner'));
+
+  const reason = modal.querySelector('.game-end-modal-reason');
+  assert.ok(reason);
+  assert.equal(reason.textContent, 'Reason: all prize cards taken');
+
+  assert.equal(eventsDispatched.length, 1);
+  assert.equal(eventsDispatched[0].type, 'rules-game-ended');
+  assert.equal(eventsDispatched[0].detail.isWinner, true);
+  assert.equal(eventsDispatched[0].detail.winner, 'p1');
+
+  assert.ok(callbackResult);
+  assert.equal(callbackResult.isWinner, true);
+  assert.equal(callbackResult.title, 'Victory!');
+
+  // Clicking close button removes the modal
+  const closeBtn = modal.querySelector('#netcodeEndCloseBtn');
+  assert.ok(closeBtn);
+  closeBtn.dispatchEvent({ type: 'click' });
+  assert.equal(doc.getElementById('netcodeEndModal'), null);
+});
+
+test('Finding 12: applyView mounts Defeat modal and synchronizes rulesEndScreen when opponent wins', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const rulesEndScreen = doc.registerElement('rulesEndScreen', doc.createElement('div'));
+  rulesEndScreen.hidden = true;
+  const rulesTitle = doc.createElement('div');
+  rulesTitle.className = 'rules-end-title';
+  const rulesReason = doc.createElement('div');
+  rulesReason.className = 'rules-end-reason';
+  rulesEndScreen.appendChild(rulesTitle);
+  rulesEndScreen.appendChild(rulesReason);
+
+  const endedView = {
+    gameId: 'game-ended-test-2',
+    stateVersion: 12,
+    turn: { phase: 'ended', player: 'p1' },
+    winner: 'p2',
+    winReason: 'deck-out',
+    you: { playerId: 'p1', username: 'Ash', zones: {} },
+    them: { playerId: 'p2', username: 'Gary', zones: {} },
+  };
+
+  applyView(endedView, [], {
+    document: doc,
+    getZone: mockGetZone,
+  });
+
+  const modal = doc.getElementById('netcodeEndModal');
+  assert.ok(modal);
+  const title = modal.querySelector('.game-end-modal-title');
+  assert.equal(title.textContent, 'Defeat');
+  assert.ok(title.classList.contains('loser'));
+
+  // Existing rulesEndScreen should also be synchronized
+  assert.equal(rulesEndScreen.hidden, false);
+  assert.equal(rulesTitle.textContent, 'Defeat');
+  assert.equal(rulesReason.textContent, 'Reason: deck-out');
+
+  // Next non-ended view should clean up the end modals
+  const activeView = {
+    gameId: 'game-ended-test-2',
+    stateVersion: 13,
+    turn: { phase: 'main', player: 'p1' },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(activeView, [], {
+    document: doc,
+    getZone: mockGetZone,
+  });
+
+  assert.equal(doc.getElementById('netcodeEndModal'), null);
+  assert.equal(rulesEndScreen.hidden, true);
+});
+
+test('Finding 12: reconcileGameEnded export directly handles spectator view', () => {
+  const { doc } = setupMockDom();
+
+  const spectatorEndedView = {
+    turn: { phase: 'ended' },
+    isSpectator: true,
+    winner: 'p1',
+    winReason: 'all prize cards taken',
+    them: { playerId: 'p1', username: 'Ash' },
+  };
+
+  reconcileGameEnded(spectatorEndedView, { document: doc });
+
+  const modal = doc.getElementById('netcodeEndModal');
+  assert.ok(modal);
+  const title = modal.querySelector('.game-end-modal-title');
+  assert.equal(title.textContent, 'Ash Wins!');
+});
+
+

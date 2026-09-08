@@ -286,6 +286,24 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer = false;
       systemState.roomId = null;
       removeSyncIntervals();
+    } else {
+      const rulesEndScreen = document.getElementById('rulesEndScreen');
+      if (rulesEndScreen) {
+        const titleEl = rulesEndScreen.querySelector('.rules-end-title');
+        const reasonEl = rulesEndScreen.querySelector('.rules-end-reason');
+        if (titleEl) titleEl.textContent = 'Game Over';
+        if (reasonEl) reasonEl.textContent = reason || msg;
+        rulesEndScreen.hidden = false;
+      }
+      document.dispatchEvent(
+        new CustomEvent('rules-game-ended', {
+          detail: {
+            winner: data?.winner,
+            reason: data?.reason,
+            message: msg,
+          },
+        })
+      );
     }
   });
 

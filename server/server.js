@@ -641,6 +641,32 @@ async function main() {
     }
 
     if (SERVER_AUTHORITATIVE) {
+      const broadcastGameResult = (gameRoom, result) => {
+        for (const broadcast of result.broadcasts || []) {
+          io.to(broadcast.socketId).emit('view', {
+            gameId: gameRoom.roomId,
+            stateVersion: result.stateVersion,
+            view: broadcast.view,
+            events: result.events,
+            pendingChoice: broadcast.view?.pendingChoice || null,
+            lastClientSeq: broadcast.lastClientSeq,
+          });
+        }
+
+        const gameEndedEvent =
+          (result.events || []).find((e) => e.type === 'gameEnded') ||
+          gameRoom.state.turn?.phase === 'ended';
+
+        if (gameEndedEvent) {
+          for (const broadcast of result.broadcasts || []) {
+            const payload = gameRoom.getGameEndedPayload(broadcast.playerId);
+            if (payload) {
+              io.to(broadcast.socketId).emit('gameEnded', payload);
+            }
+          }
+        }
+      };
+
       socket.on('cmd', (cmd) => {
         const roomId =
           cmd?.roomId || [...socket.rooms].find((r) => r !== socket.id);
@@ -683,17 +709,14 @@ async function main() {
             pendingChoice: result.view?.pendingChoice || null,
             lastClientSeq: result.lastClientSeq ?? result.clientSeq,
           });
-        } else {
-          for (const broadcast of result.broadcasts || []) {
-            io.to(broadcast.socketId).emit('view', {
-              gameId: gameRoom.roomId,
-              stateVersion: result.stateVersion,
-              view: broadcast.view,
-              events: result.events,
-              pendingChoice: broadcast.view?.pendingChoice || null,
-              lastClientSeq: broadcast.lastClientSeq,
-            });
+          const gameEndedPayload = gameRoom.getGameEndedPayload(
+            gameRoom.socketToPlayer.get(socket.id) || null
+          );
+          if (gameEndedPayload) {
+            socket.emit('gameEnded', gameEndedPayload);
           }
+        } else {
+          broadcastGameResult(gameRoom, result);
         }
       });
 
@@ -732,17 +755,14 @@ async function main() {
             pendingChoice: result.view?.pendingChoice || null,
             lastClientSeq: result.lastClientSeq ?? result.clientSeq,
           });
-        } else {
-          for (const broadcast of result.broadcasts || []) {
-            io.to(broadcast.socketId).emit('view', {
-              gameId: gameRoom.roomId,
-              stateVersion: result.stateVersion,
-              view: broadcast.view,
-              events: result.events,
-              pendingChoice: broadcast.view?.pendingChoice || null,
-              lastClientSeq: broadcast.lastClientSeq,
-            });
+          const gameEndedPayload = gameRoom.getGameEndedPayload(
+            gameRoom.socketToPlayer.get(socket.id) || null
+          );
+          if (gameEndedPayload) {
+            socket.emit('gameEnded', gameEndedPayload);
           }
+        } else {
+          broadcastGameResult(gameRoom, result);
         }
       });
 
@@ -762,6 +782,10 @@ async function main() {
             pendingChoice: view?.pendingChoice || null,
             lastClientSeq,
           });
+          const gameEndedPayload = gameRoom.getGameEndedPayload(playerId);
+          if (gameEndedPayload) {
+            socket.emit('gameEnded', gameEndedPayload);
+          }
         } else if (roomId) {
           socket.emit('gameEnded', {
             winner: null,

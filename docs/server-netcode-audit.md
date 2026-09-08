@@ -123,10 +123,16 @@ While the core pure state models and unit test coverage are broad (912 passing t
   2. Updated `result.dedupe` handling in both `socket.on('cmd')` and `socket.on('resolveChoice')` in [`server/server.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js) to preserve `pendingChoice: result.view?.pendingChoice || null` instead of clearing it to `null`.
   3. Added comprehensive unit and socket tests in [`server/game/__tests__/resolve-choice-dedupe.test.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/__tests__/resolve-choice-dedupe.test.mjs) verifying deduplication across both `GameRoom` and Socket.IO handler layers.
 
-#### 12. Missing `gameEnded` Socket Notification & Client Win/Loss Handling
+#### 12. Missing `gameEnded` Socket Notification & Client Win/Loss Handling — [RESOLVED]
 * **Location**: [`server/server.js:619-629`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js#L619-L629), [`client/src/setup/netcode/apply-view.js:378-463`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js#L378-L463)
 * **Root Cause**: When a player takes all prizes or a deck-out occurs, [`setGameEnded`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L223) pushes an event to `events`. However, the server never emits the specified `gameEnded` socket event, and [`applyView`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js#L378) has no handling for `view.turn.phase === 'ended'`.
 * **Impact**: Players receive no end-game announcement, and further actions fail with a raw `"Game is over."` rejection.
+* **Fix**:
+  1. Exposed authoritative `winner` and `winReason` in [`shared/engine/state.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/state.mjs) and [`shared/engine/view.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/view.mjs) so all client view snapshots reliably reflect game completion state.
+  2. Implemented `GameRoom.prototype.getGameEndedPayload(playerId)` in [`server/game/room.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/game/room.mjs) generating tailored `gameEnded` payloads (`{ winner, reason, message }`) for winners, losers, and spectators.
+  3. Updated [`server/server.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/server/server.js) to emit `gameEnded` notifications to all room sockets in `broadcastGameResult` on game-ending commands or choices, on command deduplication, and in `requestView` responses.
+  4. Implemented `reconcileGameEnded` in [`client/src/setup/netcode/apply-view.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/apply-view.js) to mount a styled modal (`#netcodeEndModal`) displaying Victory or Defeat, synchronize existing `#rulesEndScreen` markup, and dispatch `rules-game-ended` events with cleanup when active games continue.
+  5. Enhanced `socket.on('gameEnded')` in [`client/src/initialization/socket-event-listeners/socket-event-listeners.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/initialization/socket-event-listeners/socket-event-listeners.js) to display end-game announcements and synchronize `#rulesEndScreen`. Verified by `server/game/__tests__/game-ended-notification.test.mjs` and `client/src/setup/netcode/__tests__/apply-view.test.mjs`.
 
 ---
 
@@ -164,3 +170,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 9. [x] Fix bench knockout discarding and illegal auto-promotion in [`handleKnockout`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L26) (Finding 9).
 10. [x] Preserve initiator attribution in `PendingChoice.resumeToken` and route choice resumption to initiator (Finding 10).
 11. [x] Implement robust deduplication handling for socket `resolveChoice` and `GameRoom.prototype.resolveChoice` with active choice preservation (Finding 11).
+12. [x] Implement `gameEnded` socket notification broadcast and client win/loss reconciliation (Finding 12).

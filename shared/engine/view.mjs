@@ -137,6 +137,8 @@ export function viewFor(state, playerId) {
       number: state.turn.number,
       phase: state.turn.phase,
     },
+    winner: state.winner || null,
+    winReason: state.winReason || null,
     stadium: sanitizeCard(state.stadium),
     pendingChoice,
   };

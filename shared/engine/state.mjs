@@ -55,6 +55,8 @@ export function createGameState({
     nextInstanceId: 0,
     players: {},
     stadium: null,
+    winner: null,
+    winReason: null,
     turn: {
       player: null,
       number: 1,
