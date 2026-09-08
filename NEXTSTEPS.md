@@ -7,8 +7,8 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 |---|---|---|---|
 | 0.1 | done | 8a79f12 | `SERVER_AUTHORITATIVE` defaults off; `render.yaml` explicit |
 | 0.2 | done | 843f13b | `resolveRenderTargets` guard in `apply-view.js`; stadium-wipe repro fixed |
-| 1.1 | next | | Peer-log reconnect catch-up + O2-C fallback |
-| 1.2 | | | Counter-ordered `requestAction` queue |
+| 1.1 | done | f8f22a2 | Peer-log reconnect catch-up + O2-C fallback |
+| 1.2 | next | | Counter-ordered `requestAction` queue |
 | 1.3 | | | Dead-scaffolding deletion (grep each event for a live listener first) |
 | 2.1 | | | Sweep grace + `roomInfo` decoupling |
 | 2.2 | | | `clientSeq` clearing, protocol version, `emitCmd` surfacing |

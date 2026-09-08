@@ -20,11 +20,10 @@ client/src/setup/general/process-action.js — appends to action log, increments
 client/src/setup/general/accept-action.js — 59-entry action→function dispatch table; the command vocabulary
 client/src/initialization/global-variables/global-variables.js — `socket` + `systemState`; note `initiator` getter reads a CSS class
 
-## Reconciliation stack (band-aids; design 001 slice 8 deletes these)
-client/src/setup/general/catch-up-actions.js — replay peer action log
-client/src/setup/general/resync-actions.js — send own log to peer
-client/src/setup/general/sync-replay.mjs — dedupe fullReplay/snapshot to stop recovery loops
-client/src/setup/general/request-board-snapshot.js + apply-board-snapshot.js — full board overwrite path
+## Reconciliation stack (design 001 slice 8 deleted catch-up-actions.js, resync-actions.js,
+## sync-replay.mjs, request/apply-board-snapshot.js without replacement; design 002 slice 1.1
+## restored reconnect recovery via a new, smaller mechanism)
+client/src/setup/netcode/peer-log-catchup.js — DOM-free peer-log request/response/replay logic
 client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diagnostics ring buffer
 client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
 

@@ -335,8 +335,8 @@ per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` chan
 | 3 | `resolveInstanceId` called with an unmapped `syncInstance` | returns `null`; command not emitted; logged | [ ] |
 | 4 | `instanceMap` arrives after the first action | action is dropped with a surfaced message, not sent with a guessed id | [ ] |
 | 5 | Both players disconnect simultaneously; sweep fires | room survives `ROOM_GRACE_MS`; reconnect resumes | [ ] |
-| 6 | Peer log requested past the 200-action cap | falls through to the O2-C "reload and rejoin" announcement | [ ] |
-| 7 | Peer never answers `requestPeerLog` | 5s timeout → O2-C announcement; no silent partial state | [ ] |
+| 6 | Peer log requested past the 200-action cap | falls through to the O2-C "reload and rejoin" announcement | [x] covered: `peer-log-catchup.test.mjs` "caps at PEER_LOG_MAX"; `peerLog` handler's `capped` branch |
+| 7 | Peer never answers `requestPeerLog` | 5s timeout → O2-C announcement; no silent partial state | [x] `peerLogTimeout` in `requestPeerLogCatchup` (socket-event-listeners.js) — no test harness for socket timers, verified by reading the guard |
 | 8 | Out-of-order `requestAction` arrives, gap closes within 2s | queued, then applied in counter order | [ ] |
 | 9 | Out-of-order `requestAction`, gap never closes | 1.1 catch-up triggered once, not per action | [ ] |
 | 10 | Reload → new room in the same tab | `resetRenderState` + context re-seed + `resetClientSeq`; first view applies | [ ] |
@@ -410,3 +410,10 @@ production. Phase 3 is the real migration tail and should be re-scoped after Pha
   guard correctly turned it into a failing assertion (`false !== true`), so it needed a
   fix, not a design change: added minimal `StubElement`/`StubDocument`/`makeGetZone`
   helpers local to that test file so the integration assertion stays meaningful.
+- 1.1: extracted the peer-log request/response/replay logic into a new pure module
+  `client/src/setup/netcode/peer-log-catchup.js` (no DOM/socket globals), following the
+  existing `cmd-emitter.js` pattern — `socket-event-listeners.js` alone can't be unit
+  tested without heavy DOM mocking. Also refactored the `pushAction` handler's inline
+  apply-and-log body into a shared `applyPeerAction` so live traffic and catch-up replay
+  run identical code, per the design's "replays through the existing pushActionQueue
+  chain" requirement. Both are implementation detail, not scope changes.
