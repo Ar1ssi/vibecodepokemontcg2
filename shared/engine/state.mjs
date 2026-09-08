@@ -85,7 +85,7 @@ export function createGameState({
       for (const zone of PLAYER_ZONES) {
         if (Array.isArray(pData.zones[zone])) {
           state.players[playerId].zones[zone] = pData.zones[zone].map((c) =>
-            createCard(c)
+            createCard({ ownerId: playerId, ...c })
           );
         }
       }
@@ -134,9 +134,11 @@ export function findCard(state, instanceId) {
   if (!state || instanceId == null) return null;
 
   if (state.stadium && state.stadium.instanceId === instanceId) {
+    const ownerId = state.stadium.ownerId || state.stadium.playerId || null;
+    const player = ownerId && state.players ? state.players[ownerId] : null;
     return {
-      player: null,
-      playerId: null,
+      player,
+      playerId: ownerId,
       zoneId: 'stadium',
       index: 0,
       card: state.stadium,

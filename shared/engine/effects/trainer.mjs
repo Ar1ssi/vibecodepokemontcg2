@@ -21,6 +21,72 @@ function isStadium(card) {
 }
 
 /**
+ * Discards the currently active stadium card, moving it to its owner's discard zone.
+ *
+ * @param {object} draft Cloned GameState
+ * @param {Array} [events=[]]
+ * @param {string} [initiatorPlayerId=null]
+ * @returns {object|null} The discarded stadium card or null
+ */
+export function discardCurrentStadium(draft, events = [], initiatorPlayerId = null) {
+  if (!draft?.stadium) return null;
+
+  const oldStadium = draft.stadium;
+  draft.stadium = null;
+
+  // Resolve owner of the stadium card
+  let owner = null;
+  const candidateOwnerId = oldStadium.ownerId || oldStadium.playerId;
+  if (candidateOwnerId && draft.players?.[candidateOwnerId]) {
+    owner = draft.players[candidateOwnerId];
+  } else {
+    for (const p of Object.values(draft.players || {})) {
+      if (
+        Array.isArray(p.deckList) &&
+        p.deckList.some(
+          (c) =>
+            (c?.instanceId != null && c.instanceId === oldStadium.instanceId) ||
+            (c?.syncInstance != null && c.syncInstance === oldStadium.syncInstance)
+        )
+      ) {
+        owner = p;
+        break;
+      }
+    }
+  }
+
+  if (!owner) {
+    const playerIds = Object.keys(draft.players || {});
+    if (playerIds.length === 1) {
+      owner = draft.players[playerIds[0]];
+    } else if (initiatorPlayerId && playerIds.length === 2) {
+      const opponentId = playerIds.find((id) => id !== initiatorPlayerId);
+      owner = draft.players[opponentId] || draft.players[initiatorPlayerId];
+    } else if (draft.turn?.player && draft.players?.[draft.turn.player]) {
+      owner = draft.players[draft.turn.player];
+    } else if (playerIds.length > 0) {
+      owner = draft.players[playerIds[0]];
+    }
+  }
+
+  if (owner) {
+    oldStadium.attachedTo = null;
+    owner.zones.discard.push(oldStadium);
+    if (Array.isArray(events)) {
+      events.push({
+        type: 'cardMoved',
+        instanceId: oldStadium.instanceId,
+        from: 'stadium',
+        to: 'discard',
+        playerId: owner.playerId,
+      });
+    }
+  }
+
+  return oldStadium;
+}
+
+/**
  * Executes a trainer card effect from hand or resumes a suspended trainer choice.
  *
  * @param {object} draft Cloned GameState
@@ -89,9 +155,17 @@ export function executeTrainer(draft, {
         }
       }
 
+
       if (foundBoardCard) {
         if (isStadium(foundBoardCard)) {
+          if (draft.stadium && draft.stadium.instanceId !== foundBoardCard.instanceId) {
+            discardCurrentStadium(draft, events, actingPlayerId);
+          }
+          foundBoardCard.ownerId = foundBoardCard.ownerId || actingPlayerId;
           draft.stadium = foundBoardCard;
+          for (const p of Object.values(draft.players || {})) {
+            if (p.flags) p.flags.stadiumUsedThisTurn = false;
+          }
         } else {
           ownerPlayer.zones.discard.push(foundBoardCard);
         }
@@ -107,7 +181,14 @@ export function executeTrainer(draft, {
   if (handIdx >= 0) {
     const [played] = player.zones.hand.splice(handIdx, 1);
     if (isStadium(played)) {
+      if (draft.stadium && draft.stadium.instanceId !== played.instanceId) {
+        discardCurrentStadium(draft, events, playerId);
+      }
+      played.ownerId = played.ownerId || playerId;
       draft.stadium = played;
+      for (const p of Object.values(draft.players || {})) {
+        if (p.flags) p.flags.stadiumUsedThisTurn = false;
+      }
     } else {
       player.zones.board.push(played);
     }

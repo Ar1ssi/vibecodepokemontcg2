@@ -28,6 +28,7 @@ export function createCard(props = {}) {
   const card = {
     instanceId,
     syncInstance: props.syncInstance ?? instanceId,
+    ownerId: props.ownerId ?? null,
     name: props.name ?? '',
     set: props.set ?? '',
     number: props.number != null ? String(props.number) : '',

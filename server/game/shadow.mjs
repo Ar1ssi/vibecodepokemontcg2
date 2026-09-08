@@ -54,6 +54,7 @@ export function initializePlayerDeck(state, playerId, deckData = []) {
       const card = createCard({
         instanceId: mintInstanceId(state),
         syncInstance,
+        ownerId: playerId,
         name: name || '',
         type: type || '',
         src: imageURL || '',

@@ -11,7 +11,7 @@ import { setupGame } from './setup.mjs';
 import { createRng } from './rng.mjs';
 import { computeAttackDamage, expandEnergyEntries, canPayAttackCost } from './rules/attack-engine.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
-import { executeTrainer } from './effects/trainer.mjs';
+import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { executeStadium } from './effects/stadium.mjs';
 import { parseTrainerEffect } from './rules/trainer-effects.mjs';
@@ -434,7 +434,7 @@ function validateReferences(state, command) {
  * @param {object} command
  * @returns {{ allowed: boolean, reason?: string }}
  */
-function validateLegality(state, command) {
+export function validateLegality(state, command) {
   if (!state.rulesEnabled) {
     return { allowed: true };
   }
@@ -603,6 +603,15 @@ function validateLegality(state, command) {
         const isSupporter = typeStr.includes('supporter') || subStr.includes('supporter');
         if (isSupporter && player.flags?.supporterPlayed) {
           return { allowed: false, reason: 'Supporter already played this turn.' };
+        }
+
+        const isStadiumCard = subStr.includes('stadium') || typeStr.includes('stadium');
+        if (isStadiumCard && state.stadium) {
+          const currentStadiumName = String(state.stadium.name || '').trim().toLowerCase();
+          const newStadiumName = String(cardRef.card.name || '').trim().toLowerCase();
+          if (currentStadiumName && newStadiumName && currentStadiumName === newStadiumName) {
+            return { allowed: false, reason: 'A Stadium card with the same name is already in play.' };
+          }
         }
 
         const text = cardRef.card.text || cardRef.card.effect || cardRef.card.cardText || '';
@@ -810,8 +819,15 @@ export function applyCommand(state, command, rng = null) {
 
       if (card) {
         if (payload.to === 'stadium') {
+          if (draft.stadium && draft.stadium.instanceId !== card.instanceId) {
+            discardCurrentStadium(draft, events, playerId);
+          }
+          card.ownerId = card.ownerId || playerId;
           draft.stadium = card;
           card.attachedTo = null;
+          for (const p of Object.values(draft.players || {})) {
+            if (p.flags) p.flags.stadiumUsedThisTurn = false;
+          }
         } else {
           const destZone = draft.players[playerId].zones[payload.to];
           if (payload.targetIndex != null && payload.targetIndex >= 0 && payload.targetIndex <= destZone.length) {
