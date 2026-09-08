@@ -184,6 +184,27 @@ beforeEach(() => {
   resetRenderState();
 });
 
+test('§0.2 guard: a renderer with no resolvable zone (real resolveZone fallback, not injected) writes nothing', () => {
+  // No options.getZone, no options.document, and no window/window.__getZone in this
+  // Node test environment: resolveZone's real fallback chain has nothing to resolve
+  // against, so it must return a null element and applyView must refuse to render.
+  const view = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: { hand: [{ instanceId: 101, name: 'Pikachu', src: 'pikachu.png' }] },
+    },
+    them: { playerId: 'p2', zones: { hand: [{ instanceId: 201 }] } },
+  };
+
+  const res = applyView(view, []);
+
+  assert.equal(res.applied, false);
+  assert.equal(res.reason, 'no_render_target');
+  assert.equal(getLastRenderedVersion(), -1);
+  assert.equal(getCardRegistry().size, 0);
+});
+
 test('Edge Case 8: monotonic stateVersion drops out-of-order and duplicate views', () => {
   const { doc, mockGetZone } = setupMockDom();
 
@@ -344,6 +365,32 @@ test('Neutral Stadium: reconciles top-level stadium element', () => {
 
   applyView(v2, [], { document: doc, getZone: mockGetZone });
   assert.equal(stadiumEl.querySelectorAll('img').length, 0);
+});
+
+test('§0.2 guard: stadium-wipe repro no longer reproduces when the renderer is blind', () => {
+  // Production shape: #stadium lives in the top-level document, but there is no
+  // resolvable 'active' zone (the real board zones live inside iframes). Legacy has
+  // already rendered a played Stadium into #stadium. A blind authoritative view whose
+  // stadium is null (the untranslated-action case from design 002) must not wipe it.
+  const doc = new MockDocument();
+  const legacyStadiumEl = doc.registerElement('stadium', doc.createElement('div'));
+  const legacyStadiumImg = doc.createElement('img');
+  legacyStadiumImg.setAttribute('src', 'artazon.png');
+  legacyStadiumEl.appendChild(legacyStadiumImg);
+
+  const view = {
+    stateVersion: 1,
+    stadium: null,
+    you: { zones: { hand: [] } },
+    them: { zones: { hand: [] } },
+  };
+
+  const res = applyView(view, [], { document: doc });
+
+  assert.equal(res.applied, false);
+  assert.equal(res.reason, 'no_render_target');
+  assert.equal(legacyStadiumEl.querySelectorAll('img').length, 1);
+  assert.equal(getLastRenderedVersion(), -1);
 });
 
 test('PendingChoice: mounts modal for owner and waiting banner for opponent', () => {

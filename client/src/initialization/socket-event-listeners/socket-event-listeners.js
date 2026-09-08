@@ -33,12 +33,20 @@ import {
   emitRequestView,
   seedClientSeq,
 } from '../../setup/netcode/cmd-emitter.js';
+import {
+  buildPeerLogResponse,
+  emitRequestPeerLog,
+  isPeerLogForMe,
+  scheduleReplay,
+  PEER_LOG_TIMEOUT_MS,
+} from '../../setup/netcode/peer-log-catchup.js';
 
 let isImporting = false;
 let syncCheckInterval;
 let spectatorDebounceTimer = null;
 let syncCheckDebounceTimer = null;
 let pushActionQueue = Promise.resolve();
+let peerLogTimeout = null;
 
 export const sendSpectatorData = () => {
   if (systemState.isTwoPlayer && systemState.roomId) {
@@ -71,7 +79,59 @@ export const removeSyncIntervals = () => {
   clearInterval(syncCheckInterval);
   if (spectatorDebounceTimer) clearTimeout(spectatorDebounceTimer);
   if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
+  if (peerLogTimeout) {
+    clearTimeout(peerLogTimeout);
+    peerLogTimeout = null;
+  }
 };
+
+// O2-C: the mandatory failure branch for O2-B. No recovery is attempted past
+// this point — silent partial state is worse than telling the players to reload.
+const announceDesync = () => {
+  appendMessage(
+    '',
+    'The game may be out of sync. Please reload the page and rejoin the room.',
+    'announcement',
+    false
+  );
+};
+
+// Applies one opponent action, whether it arrived live via `pushAction` or as
+// part of a peer-log catch-up replay. Shared so both paths stay identical.
+const applyPeerAction = async (action, parameters) => {
+  startKeybindsSleep();
+  await acceptAction('opp', action, parameters);
+  systemState.oppCounter++;
+  if (action !== 'exchangeData' && action !== 'loadDeckData') {
+    systemState.exportActionData.push({
+      user: 'opp',
+      emit: true,
+      action,
+      parameters,
+    });
+  }
+  emitSpectatorDataDebounced();
+};
+
+// O2-B: ask the peer for the tail of its action log past what we've already
+// applied, then replay it through the live pushActionQueue chain.
+const requestPeerLogCatchup = () => {
+  if (peerLogTimeout) clearTimeout(peerLogTimeout);
+  const fromCounter = systemState.oppCounter;
+  logSync('peerLog.request.emit', { fromCounter }, 'out');
+  emitRequestPeerLog({
+    socket,
+    roomId: systemState.roomId,
+    fromCounter,
+    requesterSocketId: socket.id,
+  });
+  peerLogTimeout = setTimeout(() => {
+    peerLogTimeout = null;
+    logSync('peerLog.timeout', { fromCounter }, 'local');
+    announceDesync();
+  }, PEER_LOG_TIMEOUT_MS);
+};
+
 export const initializeSocketEventListeners = () => {
   setDefaultNetcodeContext({
     socket,
@@ -208,10 +268,7 @@ export const initializeSocketEventListeners = () => {
         if (systemState.serverAuthoritative) {
           emitRequestView({ socket, roomId: systemState.roomId });
         } else {
-          socket.emit('resyncActions', {
-            roomId: systemState.roomId,
-            reason: 'reconnect',
-          });
+          requestPeerLogCatchup();
         }
       }
     }
@@ -369,19 +426,56 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (!notSpectator) return;
-    pushActionQueue = pushActionQueue.then(async () => {
-      startKeybindsSleep();
-      await acceptAction('opp', data.action, data.parameters);
-      systemState.oppCounter++;
-      if (data.action !== 'exchangeData' && data.action !== 'loadDeckData') {
-        systemState.exportActionData.push({
-          user: 'opp',
-          emit: true,
-          action: data.action,
-          parameters: data.parameters,
-        });
-      }
-      emitSpectatorDataDebounced();
+    pushActionQueue = pushActionQueue.then(() =>
+      applyPeerAction(data.action, data.parameters)
+    );
+  });
+
+  // A peer reconnected and is asking for the tail of our action log (O2-B).
+  socket.on('requestPeerLog', (data) => {
+    const notSpectator = !(
+      document.getElementById('spectatorModeCheckbox').checked &&
+      systemState.isTwoPlayer
+    );
+    if (!notSpectator || !systemState.isTwoPlayer || !systemState.roomId) return;
+    const response = buildPeerLogResponse({
+      selfActionData: systemState.selfActionData,
+      fromCounter: data?.fromCounter,
+      requesterSocketId: data?.requesterSocketId,
+      roomId: systemState.roomId,
+    });
+    logSync(
+      'peerLog.respond.emit',
+      { count: response.actions.length, capped: response.capped },
+      'out'
+    );
+    socket.emit('peerLog', response);
+  });
+
+  // Our peer's reply to a requestPeerLog we sent on reconnect.
+  socket.on('peerLog', (data) => {
+    if (!isPeerLogForMe({ toSocketId: data?.toSocketId, mySocketId: socket.id })) {
+      return;
+    }
+    if (peerLogTimeout) {
+      clearTimeout(peerLogTimeout);
+      peerLogTimeout = null;
+    }
+    if (data.capped || !Array.isArray(data.actions)) {
+      logSync('peerLog.capped', {}, 'in');
+      announceDesync();
+      return;
+    }
+    if (data.actions.length === 0) return;
+    logSync('peerLog.receive', { count: data.actions.length }, 'in');
+    systemState.isCatchingUp = true;
+    pushActionQueue = scheduleReplay({
+      actions: data.actions,
+      currentQueue: pushActionQueue,
+      applyAction: applyPeerAction,
+      onSettled: () => {
+        systemState.isCatchingUp = false;
+      },
     });
   });
   socket.on('lookAtCards', (data) => {

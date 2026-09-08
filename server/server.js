@@ -19,8 +19,8 @@ import {
 import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
 
 const SERVER_AUTHORITATIVE =
-  process.env.SERVER_AUTHORITATIVE !== '0' &&
-  process.env.SERVER_AUTHORITATIVE !== 'false';
+  process.env.SERVER_AUTHORITATIVE === '1' ||
+  process.env.SERVER_AUTHORITATIVE === 'true';
 
 const SHADOW_MODE =
   process.env.SHADOW_MODE?.trim() === '1' ||
@@ -607,6 +607,8 @@ async function main() {
       'catchUpActions',
       'requestBoardSnapshot',
       'applyBoardSnapshot',
+      'requestPeerLog',
+      'peerLog',
       'syncCheck',
       'requestSyncLogBundle',
       'syncLogBundle',
@@ -839,6 +841,10 @@ async function main() {
   server.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`Server is running at http://localhost:${port}`);
+    // eslint-disable-next-line no-console
+    console.log(
+      `Netcode mode: ${SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy'}`
+    );
   });
 }
 main();
