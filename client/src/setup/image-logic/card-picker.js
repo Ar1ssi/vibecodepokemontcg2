@@ -8,6 +8,7 @@ import {
 import { closeCardPreview } from './full-view.js';
 import {
   MAX_TAP_DURATION_MS,
+  canCloseCardPicker,
   findDropSlotIndex,
   findSelectedSlotIndex,
   isTapGesture,
@@ -33,6 +34,7 @@ const smoothstep = (t) => {
 };
 
 export const isCardPickerOpen = () => pickerState != null;
+export const getCardPickerMode = () => pickerState?.mode ?? null;
 
 const clampIndex = (index, max) => Math.max(0, Math.min(index, max));
 
@@ -596,8 +598,9 @@ const teardownPicker = (state) => {
   pickerState = null;
 };
 
-export const closeCardPicker = (event) => {
+export const closeCardPicker = (event, force = false) => {
   if (!pickerState) return;
+  if (!canCloseCardPicker({ mode: pickerState.mode, force })) return;
   if (event?.target) {
     const { overlay } = pickerState;
     if (overlay.contains(event.target) && event.target !== overlay) return;
@@ -623,7 +626,6 @@ const confirmPicker = async (state) => {
   const {
     mode,
     multiSelect,
-    selected,
     cards,
     index,
     pickOnly,
@@ -670,10 +672,6 @@ const confirmPicker = async (state) => {
   teardownPicker(state);
 };
 
-const cancelPicker = (state) => {
-  state.onCancel?.();
-  teardownPicker(state);
-};
 
 const setCandidateList = (state, candidates) => {
   state.cards = candidates;
@@ -978,7 +976,7 @@ export const openCardPicker = async ({
   onCancel,
 }) => {
   closeCardPreview(null, true);
-  closeCardPicker();
+  closeCardPicker(null, true);
   document.getElementById('rulesChoicePicker')?.remove();
 
   if (!candidates.length) {
@@ -1209,10 +1207,12 @@ export const openCardPicker = async ({
   state.onKeyDown = (event) => {
     if (!pickerState) return;
     if (event.key === 'Escape') {
-      if (isBrowse) closeCardPicker();
-      else cancelPicker(state);
-    } else if (event.key === 'Enter' && !isBrowse) {
-      confirmPicker(state);
+      if (isBrowse) {
+        closeCardPicker();
+      } else {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     } else if (event.key === ' ' && isMulti) {
       event.preventDefault();
       toggleSelection(state);
@@ -1259,6 +1259,10 @@ export const openCardPicker = async ({
     if (event.target === overlay) {
       if (isBrowse) closeCardPicker();
     }
+  });
+
+  overlay.addEventListener('contextmenu', (event) => {
+    event.stopPropagation();
   });
 
   document.addEventListener('keydown', state.onKeyDown);

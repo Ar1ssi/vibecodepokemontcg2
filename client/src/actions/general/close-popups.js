@@ -15,9 +15,6 @@ import {
   isCardPreviewOpen,
 } from '../../setup/image-logic/full-view.js';
 import {
-  closeCardPicker,
-} from '../../setup/image-logic/card-picker.js';
-import {
   closeDiscardPileViewer,
 } from '../../setup/image-logic/discard-pile-viewer.js';
 
