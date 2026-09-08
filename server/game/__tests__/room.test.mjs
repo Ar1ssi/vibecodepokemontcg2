@@ -197,3 +197,66 @@ test('GameRoom: Finding 6 - re-registering player socket (page refresh) resets c
   assert.equal(res2Dup.lastClientSeq, 1);
 });
 
+test('Finding 5: GameRoom sets lastActivityAt on construction and touches it on addPlayer/handleCommand', () => {
+  const before = Date.now();
+  const room = new GameRoom({ roomId: 'room-activity', rulesEnabled: false });
+  assert.ok(room.lastActivityAt >= before, 'constructor stamps lastActivityAt');
+
+  // Simulate the room having gone idle
+  room.lastActivityAt = before - 60 * 60 * 1000;
+  room.addPlayer('socket-ash', 'p1', 'Ash');
+  assert.ok(
+    room.lastActivityAt > before - 60 * 60 * 1000,
+    'addPlayer refreshes lastActivityAt'
+  );
+
+  room.lastActivityAt = before - 60 * 60 * 1000;
+  room.handleCommand('socket-ash', {
+    type: 'draw',
+    payload: {},
+    clientSeq: 1,
+  });
+  assert.ok(
+    room.lastActivityAt > before - 60 * 60 * 1000,
+    'handleCommand refreshes lastActivityAt, even on a failed command'
+  );
+});
+
+test('Finding 5: sweep grace distinguishes a brief double-disconnect from an abandoned room', () => {
+  const ROOM_GRACE_MS = 30 * 60 * 1000;
+  const isSweepEligible = (room) =>
+    room.playerToSocket.size === 0 &&
+    room.spectatorSockets.size === 0 &&
+    Date.now() - room.lastActivityAt > ROOM_GRACE_MS;
+
+  const room = new GameRoom({ roomId: 'room-sweep', rulesEnabled: false });
+  room.addPlayer('socket-ash', 'p1', 'Ash');
+  room.addPlayer('socket-gary', 'p2', 'Gary');
+
+  // Both players briefly disconnect (e.g. reload) — sockets empty, but recent activity.
+  room.removeSocket('socket-ash');
+  room.removeSocket('socket-gary');
+  assert.equal(
+    isSweepEligible(room),
+    false,
+    'a room with empty sockets but recent activity must survive the sweep'
+  );
+
+  // Same empty-socket room, but idle well past the grace window.
+  room.lastActivityAt = Date.now() - ROOM_GRACE_MS - 1;
+  assert.equal(
+    isSweepEligible(room),
+    true,
+    'a room with empty sockets and no activity for longer than the grace window is sweep-eligible'
+  );
+
+  // A room with a connected socket is never sweep-eligible, no matter how idle.
+  room.addPlayer('socket-ash-2', 'p1', 'Ash');
+  room.lastActivityAt = Date.now() - ROOM_GRACE_MS - 1;
+  assert.equal(
+    isSweepEligible(room),
+    false,
+    'a room with a connected socket must never be swept'
+  );
+});
+
