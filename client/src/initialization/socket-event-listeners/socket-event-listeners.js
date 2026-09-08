@@ -40,6 +40,11 @@ import {
   scheduleReplay,
   PEER_LOG_TIMEOUT_MS,
 } from '../../setup/netcode/peer-log-catchup.js';
+import {
+  admitRequestAction,
+  createRequestActionQueue,
+  STALE_ACTION_TIMEOUT_MS,
+} from '../../setup/netcode/request-action-queue.js';
 
 let isImporting = false;
 let syncCheckInterval;
@@ -47,6 +52,8 @@ let spectatorDebounceTimer = null;
 let syncCheckDebounceTimer = null;
 let pushActionQueue = Promise.resolve();
 let peerLogTimeout = null;
+const requestActionQueue = createRequestActionQueue();
+let requestActionStaleTimer = null;
 
 export const sendSpectatorData = () => {
   if (systemState.isTwoPlayer && systemState.roomId) {
@@ -83,6 +90,8 @@ export const removeSyncIntervals = () => {
     clearTimeout(peerLogTimeout);
     peerLogTimeout = null;
   }
+  clearRequestActionStaleTimer();
+  requestActionQueue.clear();
 };
 
 // O2-C: the mandatory failure branch for O2-B. No recovery is attempted past
@@ -130,6 +139,45 @@ const requestPeerLogCatchup = () => {
     logSync('peerLog.timeout', { fromCounter }, 'local');
     announceDesync();
   }, PEER_LOG_TIMEOUT_MS);
+};
+
+const clearRequestActionStaleTimer = () => {
+  if (requestActionStaleTimer) {
+    clearTimeout(requestActionStaleTimer);
+    requestActionStaleTimer = null;
+  }
+};
+
+// A gap in requestAction counters that never closes means we're missing an
+// action the peer thinks it sent. Fall through to the 1.1 catch-up rather
+// than misapply the buffered actions out of order.
+const armRequestActionStaleTimer = () => {
+  if (requestActionStaleTimer) return;
+  requestActionStaleTimer = setTimeout(() => {
+    requestActionStaleTimer = null;
+    requestActionQueue.clear();
+    logSync('requestAction.stale_gap', {}, 'local');
+    requestPeerLogCatchup();
+  }, STALE_ACTION_TIMEOUT_MS);
+};
+
+// Applies one requestAction payload, then drains any buffered actions that
+// are now contiguous with the updated selfCounter.
+const applyRequestAction = (action, parameters) => {
+  startKeybindsSleep();
+  pushActionQueue = pushActionQueue
+    .then(() => acceptAction('self', action, parameters))
+    .then(drainRequestActionQueue);
+};
+
+const drainRequestActionQueue = () => {
+  const ready = requestActionQueue.takeReady(systemState.selfCounter);
+  for (const entry of ready) {
+    applyRequestAction(entry.action, entry.parameters);
+  }
+  if (!requestActionQueue.hasPending()) {
+    clearRequestActionStaleTimer();
+  }
 };
 
 export const initializeSocketEventListeners = () => {
@@ -370,38 +418,34 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer
     );
     if (!notSpectator) return;
-    const counterMatches = data.counter === systemState.selfCounter;
-    const isCounterOrStatusAction =
-      data.action === 'updateDamageCounter' ||
-      data.action === 'addDamageCounter' ||
-      data.action === 'removeDamageCounter' ||
-      data.action === 'addSpecialCondition' ||
-      data.action === 'updateSpecialCondition' ||
-      data.action === 'removeSpecialCondition';
-    const canAttempt =
-      isImporting ||
-      counterMatches ||
-      data.action === 'moveCardBundle' ||
-      isCounterOrStatusAction;
-    if (!canAttempt) {
+    if (isImporting) {
+      applyRequestAction(data.action, data.parameters);
+      return;
+    }
+    const expected = systemState.selfCounter;
+    const admission = admitRequestAction(data.counter, expected);
+    if (admission === 'stale') {
       logSync(
         'requestAction.drop',
-        { action: data.action, expected: systemState.selfCounter, received: data.counter },
+        { action: data.action, expected, received: data.counter },
         'in'
       );
       return;
     }
-    if (!counterMatches && !isImporting) {
-      logSync(
-        'requestAction.stale_counter',
-        { action: data.action, expected: systemState.selfCounter, received: data.counter },
-        'in'
-      );
+    if (admission === 'apply') {
+      applyRequestAction(data.action, data.parameters);
+      return;
     }
-    startKeybindsSleep();
-    pushActionQueue = pushActionQueue.then(() =>
-      acceptAction('self', data.action, data.parameters)
+    logSync(
+      'requestAction.buffer',
+      { action: data.action, expected, received: data.counter },
+      'in'
     );
+    requestActionQueue.buffer(data.counter, {
+      action: data.action,
+      parameters: data.parameters,
+    });
+    armRequestActionStaleTimer();
   });
 
   // reset counter when importing game state
