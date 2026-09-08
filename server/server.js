@@ -607,6 +607,8 @@ async function main() {
       'catchUpActions',
       'requestBoardSnapshot',
       'applyBoardSnapshot',
+      'requestPeerLog',
+      'peerLog',
       'syncCheck',
       'requestSyncLogBundle',
       'syncLogBundle',
