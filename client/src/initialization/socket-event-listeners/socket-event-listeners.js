@@ -24,7 +24,10 @@ import {
   enableSyncLogForMultiplayer,
   logSync,
 } from '../../setup/general/sync-logger-bridge.js';
-import { applyView } from '../../setup/netcode/apply-view.js';
+import {
+  applyView,
+  setDefaultNetcodeContext,
+} from '../../setup/netcode/apply-view.js';
 import {
   handleCmdRejected,
   emitRequestView,
@@ -69,6 +72,14 @@ export const removeSyncIntervals = () => {
   if (syncCheckDebounceTimer) clearTimeout(syncCheckDebounceTimer);
 };
 export const initializeSocketEventListeners = () => {
+  setDefaultNetcodeContext({
+    socket,
+    get roomId() {
+      return systemState.roomId;
+    },
+    systemState,
+  });
+
   socket.on('joinGame', (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
     if (systemState.serverAuthoritative && data?.protocolVersion && data.protocolVersion !== '2.0.0') {
@@ -236,7 +247,10 @@ export const initializeSocketEventListeners = () => {
 
   socket.on('view', (data) => {
     if (data?.view) {
-      applyView(data.view, data.events || []);
+      applyView(data.view, data.events || [], {
+        socket,
+        roomId: systemState.roomId,
+      });
     }
   });
 

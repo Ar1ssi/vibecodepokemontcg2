@@ -1,10 +1,13 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { setImmediate } from 'node:timers';
 import {
   applyView,
   getLastRenderedVersion,
   resetRenderState,
   getCardRegistry,
+  setDefaultNetcodeContext,
+  getDefaultNetcodeContext,
 } from '../apply-view.js';
 
 class MockClassList {
@@ -476,4 +479,124 @@ test('Invariant 4: Deleting events array leaves client DOM state completely corr
   assert.ok(activeImg2);
   assert.equal(activeImg1.dataset.damage, activeImg2.dataset.damage);
   assert.equal(activeImg1.getAttribute('src'), activeImg2.getAttribute('src'));
+});
+
+test('Finding 5: choice resolver emits resolveChoice over socket when options.socket and options.roomId provided', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+
+  const view = {
+    stateVersion: 1,
+    pendingChoice: {
+      choiceId: 'choice_audit_5a',
+      player: 'p1',
+      prompt: 'Select 1 card to attach',
+      options: [
+        { instanceId: 101, name: 'Fire Energy', src: 'fire.png' },
+        { instanceId: 102, name: 'Water Energy', src: 'water.png' },
+      ],
+      min: 1,
+      max: 1,
+    },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  };
+
+  const emitted = [];
+  const mockSocket = {
+    emit(event, payload) {
+      emitted.push({ event, payload });
+    },
+  };
+
+  applyView(view, [], {
+    document: doc,
+    getZone: mockGetZone,
+    socket: mockSocket,
+    roomId: 'room_audit_5a',
+  });
+
+  const modal = doc.getElementById('netcodeChoiceModal');
+  assert.ok(modal, 'Modal mounted');
+
+  const optionCards = modal.querySelectorAll('.choice-option-card');
+  const confirmBtn = modal.querySelector('#choiceConfirmBtn');
+
+  // Select card 101 and confirm
+  optionCards[0].dispatchEvent({ type: 'click' });
+  assert.equal(confirmBtn.disabled, false);
+
+  confirmBtn.dispatchEvent({ type: 'click' });
+
+  // Await microtasks for async resolver
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(emitted.length, 1, 'Socket resolveChoice was emitted');
+  assert.equal(emitted[0].event, 'resolveChoice');
+  assert.equal(emitted[0].payload.roomId, 'room_audit_5a');
+  assert.equal(emitted[0].payload.choiceId, 'choice_audit_5a');
+  assert.deepEqual(emitted[0].payload.selection, [101]);
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null, 'Modal removed on confirm');
+});
+
+test('Finding 5: choice resolver uses setDefaultNetcodeContext fallback when options omit socket and roomId', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+
+  const view = {
+    stateVersion: 1,
+    pendingChoice: {
+      choiceId: 'choice_audit_5b',
+      player: 'p1',
+      prompt: 'Select 1 card to search',
+      options: [
+        { instanceId: 201, name: 'Ultra Ball', src: 'ub.png' },
+      ],
+      min: 1,
+      max: 1,
+    },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  };
+
+  const emitted = [];
+  const mockSocket = {
+    emit(event, payload) {
+      emitted.push({ event, payload });
+    },
+  };
+
+  let dynamicRoomId = 'room_audit_5b_initial';
+  setDefaultNetcodeContext({
+    socket: mockSocket,
+    roomId: () => dynamicRoomId,
+  });
+
+  assert.equal(getDefaultNetcodeContext().socket, mockSocket);
+  assert.equal(getDefaultNetcodeContext().roomId, 'room_audit_5b_initial');
+
+  // Call applyView WITHOUT socket or roomId in options
+  applyView(view, [], {
+    document: doc,
+    getZone: mockGetZone,
+  });
+
+  const modal = doc.getElementById('netcodeChoiceModal');
+  assert.ok(modal, 'Modal mounted');
+
+  const optionCards = modal.querySelectorAll('.choice-option-card');
+  const confirmBtn = modal.querySelector('#choiceConfirmBtn');
+
+  // Update dynamic room id to verify getter evaluation
+  dynamicRoomId = 'room_audit_5b_updated';
+
+  optionCards[0].dispatchEvent({ type: 'click' });
+  confirmBtn.dispatchEvent({ type: 'click' });
+
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(emitted.length, 1, 'Socket resolveChoice was emitted using fallback context');
+  assert.equal(emitted[0].event, 'resolveChoice');
+  assert.equal(emitted[0].payload.roomId, 'room_audit_5b_updated');
+  assert.equal(emitted[0].payload.choiceId, 'choice_audit_5b');
+  assert.deepEqual(emitted[0].payload.selection, [201]);
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null, 'Modal removed on confirm');
 });

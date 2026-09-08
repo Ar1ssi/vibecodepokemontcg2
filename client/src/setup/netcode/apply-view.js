@@ -10,6 +10,12 @@ import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
 
+let defaultNetcodeContext = {
+  socket: null,
+  roomId: null,
+  systemState: null,
+};
+
 const PLAY_ZONES = ['active', 'bench'];
 
 /**
@@ -22,12 +28,47 @@ export function getLastRenderedVersion() {
 }
 
 /**
+ * Sets default socket and roomId context for choice resolution.
+ *
+ * @param {object} [ctx={}]
+ * @param {object} [ctx.socket]
+ * @param {string|Function} [ctx.roomId]
+ * @param {object} [ctx.systemState]
+ */
+export function setDefaultNetcodeContext(ctx = {}) {
+  if (ctx.socket !== undefined) defaultNetcodeContext.socket = ctx.socket;
+  if (ctx.roomId !== undefined) defaultNetcodeContext.roomId = ctx.roomId;
+  if (ctx.systemState !== undefined) defaultNetcodeContext.systemState = ctx.systemState;
+}
+
+/**
+ * Returns default netcode context.
+ *
+ * @returns {{ socket: any, roomId: string|null, systemState: any }}
+ */
+export function getDefaultNetcodeContext() {
+  return {
+    socket: defaultNetcodeContext.socket,
+    roomId:
+      typeof defaultNetcodeContext.roomId === 'function'
+        ? defaultNetcodeContext.roomId()
+        : defaultNetcodeContext.roomId || defaultNetcodeContext.systemState?.roomId || null,
+    systemState: defaultNetcodeContext.systemState,
+  };
+}
+
+/**
  * Resets renderer state and clears cached registries (used for room teardown or test suites).
  */
 export function resetRenderState() {
   lastRenderedVersion = -1;
   cardRegistry.clear();
   clearInFlightAffordances();
+  defaultNetcodeContext = {
+    socket: null,
+    roomId: null,
+    systemState: null,
+  };
 }
 
 /**
@@ -350,20 +391,56 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     optionsContainer?.appendChild(optDiv);
   }
 
-  confirmBtn?.addEventListener?.('click', () => {
+  confirmBtn?.addEventListener?.('click', async () => {
+    confirmBtn.disabled = true;
     const selection = Array.from(selectedIds);
-    if (typeof options.onResolveChoice === 'function') {
-      options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
-    } else if (options.socket && options.roomId) {
-      emitResolveChoice({
-        socket: options.socket,
-        roomId: options.roomId,
-        choiceId: pendingChoice.choiceId,
-        selection,
-      });
+    try {
+      if (typeof options.onResolveChoice === 'function') {
+        options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
+      } else {
+        const { socket, roomId } = await resolveNetcodeContext(options);
+        if (socket && roomId) {
+          emitResolveChoice({
+            socket,
+            roomId,
+            choiceId: pendingChoice.choiceId,
+            selection,
+          });
+        }
+      }
+    } finally {
+      if (modal.parentNode) modal.parentNode.removeChild(modal);
     }
-    if (modal.parentNode) modal.parentNode.removeChild(modal);
   });
+}
+
+/**
+ * Resolves netcode socket and roomId context from options, defaults, or dynamic state import.
+ *
+ * @param {object} [options={}]
+ * @returns {Promise<{ socket: any, roomId: string|null }>}
+ */
+async function resolveNetcodeContext(options = {}) {
+  const defaultCtx = getDefaultNetcodeContext();
+  let socket = options.socket || defaultCtx.socket;
+  let roomId = options.roomId || defaultCtx.roomId;
+
+  if (typeof window !== 'undefined') {
+    if (!socket && window.socket) socket = window.socket;
+    if (!roomId && window.systemState?.roomId) roomId = window.systemState.roomId;
+  }
+
+  if ((!socket || !roomId) && typeof window !== 'undefined') {
+    try {
+      const state = await import('../../state.js');
+      if (!socket && state.socket) socket = state.socket;
+      if (!roomId && state.systemState?.roomId) roomId = state.systemState.roomId;
+    } catch {
+      // dynamic import fallback ignored if unavailable
+    }
+  }
+
+  return { socket, roomId };
 }
 
 /**
