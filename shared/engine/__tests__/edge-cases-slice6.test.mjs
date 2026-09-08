@@ -213,3 +213,31 @@ test('Edge Case 15: Effect loop aborted when exceeding step budget', () => {
   assert.equal(loopEvt.reason, 'step_budget_exceeded');
   assert.ok(loopEvt.stepCount > MAX_EFFECT_STEPS);
 });
+
+test('Finding 2: Opponent can resolve pendingChoice on active player turn without "not your turn" rejection', () => {
+  const { state, rng } = setupGame();
+  assert.equal(state.turn.player, 'p1');
+  assert.equal(state.rulesEnabled, true);
+
+  // An effect prompts Bob (p2) for a choice during Alice (p1)\'s turn
+  state.pendingChoice = {
+    choiceId: 'choice-p2-turn-p1',
+    player: 'p2',
+    prompt: 'Choose a Benched Pokemon to switch in',
+    options: [{ instanceId: 20 }, { instanceId: 21 }],
+    min: 1,
+    max: 1,
+  };
+
+  // Bob (p2) resolves the choice
+  const res = applyCommand(state, {
+    type: 'resolveChoice',
+    payload: { choiceId: 'choice-p2-turn-p1', selection: [20] },
+    playerId: 'p2',
+  }, rng);
+
+  assert.equal(res.error, null, `Expected no error but got: ${res.error} (${res.reason})`);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.pendingChoice, null);
+});
+

@@ -422,11 +422,6 @@ function validateLegality(state, command) {
     return { allowed: false, reason: 'Player not found in game' };
   }
 
-  // Turn player validation
-  if (state.turn?.player && state.turn.player !== playerId) {
-    return { allowed: false, reason: "It's not your turn." };
-  }
-
   // Turn phase validation
   if (state.turn?.phase === 'ended') {
     return { allowed: false, reason: 'Game is over.' };
