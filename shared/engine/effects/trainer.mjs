@@ -43,7 +43,8 @@ export function executeTrainer(draft, {
   resumeToken = null,
   targetInstanceId = null,
 }) {
-  const player = draft.players[playerId];
+  const actingPlayerId = resumeToken?.initiatorPlayerId || playerId;
+  const player = draft.players[actingPlayerId];
   if (!player) return { pendingChoice: null, completed: true };
 
   if (resumeToken) {
@@ -57,7 +58,7 @@ export function executeTrainer(draft, {
       fromStepIndex: stepIndex,
       effectType: 'trainer',
       sourceCard: card,
-      playerId,
+      playerId: actingPlayerId,
       activeRng,
       events,
       selection,
@@ -70,13 +71,30 @@ export function executeTrainer(draft, {
     }
 
     // Effect completed: clean up trainer card from board to discard (unless tool/stadium)
-    const boardIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);
-    if (boardIdx >= 0) {
-      const [boardCard] = player.zones.board.splice(boardIdx, 1);
-      if (isStadium(boardCard)) {
-        draft.stadium = boardCard;
+    if (card?.instanceId != null) {
+      let foundBoardCard = null;
+      let ownerPlayer = player;
+      const boardIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);
+      if (boardIdx >= 0) {
+        [foundBoardCard] = player.zones.board.splice(boardIdx, 1);
       } else {
-        player.zones.discard.push(boardCard);
+        // Fallback: locate card across player boards in case of mismatch
+        const cardRef = findCard(draft, card.instanceId);
+        if (cardRef && cardRef.zoneId === 'board' && draft.players[cardRef.playerId]) {
+          ownerPlayer = draft.players[cardRef.playerId];
+          const bIdx = ownerPlayer.zones.board.findIndex((c) => c.instanceId === card.instanceId);
+          if (bIdx >= 0) {
+            [foundBoardCard] = ownerPlayer.zones.board.splice(bIdx, 1);
+          }
+        }
+      }
+
+      if (foundBoardCard) {
+        if (isStadium(foundBoardCard)) {
+          draft.stadium = foundBoardCard;
+        } else {
+          ownerPlayer.zones.discard.push(foundBoardCard);
+        }
       }
     }
 

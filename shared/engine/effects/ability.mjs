@@ -30,7 +30,8 @@ export function executeAbility(draft, {
   selection = null,
   resumeToken = null,
 }) {
-  const player = draft.players[playerId];
+  const actingPlayerId = resumeToken?.initiatorPlayerId || playerId;
+  const player = draft.players[actingPlayerId];
   if (!player) return { pendingChoice: null, completed: true };
 
   if (resumeToken) {
@@ -44,7 +45,7 @@ export function executeAbility(draft, {
       fromStepIndex: stepIndex,
       effectType: 'ability',
       sourceCard: card,
-      playerId,
+      playerId: actingPlayerId,
       activeRng,
       events,
       selection,

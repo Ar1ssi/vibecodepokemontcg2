@@ -31,6 +31,10 @@ export function createPendingChoice({
   stateVersion = 0,
   stepIndex = 0,
 }) {
+  const token = resumeToken ? { ...resumeToken } : {};
+  if (token && !token.initiatorPlayerId && player) {
+    token.initiatorPlayerId = player;
+  }
   return {
     choiceId: choiceId || `choice_${player}_${stateVersion}_${stepIndex}`,
     player,
@@ -45,7 +49,7 @@ export function createPendingChoice({
     min,
     max,
     cancellable: Boolean(cancellable),
-    resumeToken,
+    resumeToken: token,
   };
 }
 
@@ -156,6 +160,7 @@ export function executeSteps(draft, {
           resumeToken: {
             effectType,
             sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
             stepIndex: idx,
             steps,
             context,
@@ -238,6 +243,7 @@ export function executeSteps(draft, {
           resumeToken: {
             effectType,
             sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
             stepIndex: idx,
             steps,
             context,
@@ -375,6 +381,7 @@ export function executeSteps(draft, {
             resumeToken: {
               effectType,
               sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
               stepIndex: idx,
               steps,
               context,
@@ -445,6 +452,7 @@ export function executeSteps(draft, {
             resumeToken: {
               effectType,
               sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
               stepIndex: idx,
               steps,
               context,
@@ -530,6 +538,7 @@ export function executeSteps(draft, {
           resumeToken: {
             effectType,
             sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
             stepIndex: idx,
             steps,
             context,
@@ -573,6 +582,7 @@ export function executeSteps(draft, {
             resumeToken: {
               effectType,
               sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
               stepIndex: idx,
               steps,
               context,
@@ -690,6 +700,7 @@ export function executeSteps(draft, {
           resumeToken: {
             effectType,
             sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
             stepIndex: idx,
             steps,
             context,

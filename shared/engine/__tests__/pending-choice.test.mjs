@@ -217,3 +217,142 @@ test('pendingChoice: rejected stale_choice or no_pending_choice', () => {
   });
   assert.equal(staleRes.error, 'stale_choice');
 });
+
+test('Finding 10: Opponent choice resolution preserves initiator attribution and cleans up trainer card to initiator discard', () => {
+  const state = setupTwoPlayerState();
+
+  // Setup p1 with Repel in hand
+  const repelCard = createCard({
+    instanceId: 50,
+    name: 'Repel',
+    supertype: 'Trainer',
+    type: 'Item',
+    text: "Switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)",
+  });
+  state.players.p1.zones.hand.push(repelCard);
+
+  // Setup p2 with Active Pokemon and 2 Benched Pokemon
+  const p2Active = createCard({ instanceId: 60, name: 'Pidgey', supertype: 'Pokémon' });
+  const p2Bench1 = createCard({ instanceId: 61, name: 'Rattata', supertype: 'Pokémon' });
+  const p2Bench2 = createCard({ instanceId: 62, name: 'Spearow', supertype: 'Pokémon' });
+  state.players.p2.zones.active.push(p2Active);
+  state.players.p2.zones.bench.push(p2Bench1, p2Bench2);
+
+  // P1 plays Repel
+  const playRes = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 50 },
+    playerId: 'p1',
+  });
+
+  assert.equal(playRes.error, null);
+  // Repel is moved to p1's board during execution
+  assert.equal(playRes.state.players.p1.zones.board.length, 1);
+  assert.equal(playRes.state.players.p1.zones.board[0].instanceId, 50);
+
+  // Pending choice must be prompted to P2, with initiator attribution to P1
+  assert.ok(playRes.pendingChoice);
+  assert.equal(playRes.pendingChoice.player, 'p2');
+  assert.equal(playRes.pendingChoice.resumeToken.initiatorPlayerId, 'p1');
+  assert.equal(playRes.pendingChoice.resumeToken.sourceInstanceId, 50);
+
+  // P2 resolves choice selecting Spearow (instanceId 62)
+  const resolveRes = applyCommand(playRes.state, {
+    type: 'resolveChoice',
+    payload: {
+      choiceId: playRes.pendingChoice.choiceId,
+      selection: [62],
+    },
+    playerId: 'p2',
+  });
+
+  assert.equal(resolveRes.error, null);
+  // P2's active is now Spearow (62) and Pidgey (60) is benched
+  assert.equal(resolveRes.state.players.p2.zones.active[0].instanceId, 62);
+  const p2BenchIds = resolveRes.state.players.p2.zones.bench.map((c) => c.instanceId);
+  assert.ok(p2BenchIds.includes(60));
+  assert.ok(p2BenchIds.includes(61));
+
+  // Crucial Finding 10: Repel is removed from P1's board and placed in P1's discard
+  assert.equal(resolveRes.state.players.p1.zones.board.length, 0);
+  assert.equal(resolveRes.state.players.p1.zones.discard.length, 1);
+  assert.equal(resolveRes.state.players.p1.zones.discard[0].instanceId, 50);
+
+  // P2's board and discard are untouched by P1's trainer cleanup
+  assert.equal(resolveRes.state.players.p2.zones.board.length, 0);
+  assert.equal(resolveRes.state.players.p2.zones.discard.length, 0);
+  assert.equal(resolveRes.pendingChoice, null);
+});
+
+test('Finding 10: Multi-step trainer preserves initiatorPlayerId across sequential choices', () => {
+  const state = setupTwoPlayerState();
+  const customTrainer = createCard({
+    instanceId: 70,
+    name: 'Custom Swapper',
+    supertype: 'Trainer',
+    type: 'Item',
+  });
+  state.players.p1.zones.board.push(customTrainer);
+
+  // P2 Active & Bench
+  state.players.p2.zones.active.push(createCard({ instanceId: 80, name: 'Active Mon' }));
+  state.players.p2.zones.bench.push(
+    createCard({ instanceId: 81, name: 'Bench Mon 1' }),
+    createCard({ instanceId: 82, name: 'Bench Mon 2' })
+  );
+
+  // A 2-step effect: step 0 prompts opponent to switch, step 1 prompts initiator to heal
+  const steps = [
+    { type: 'switchOpponentOut' },
+    { type: 'heal', amount: 30 },
+  ];
+
+  state.players.p1.zones.active.push(createCard({ instanceId: 75, name: 'Injured Mon', damage: 40 }));
+  state.players.p1.zones.bench.push(createCard({ instanceId: 76, name: 'Injured Bench', damage: 30 }));
+
+  // Simulate pending choice at step 0 directed to p2
+  state.pendingChoice = createPendingChoice({
+    choiceId: 'choice-step0',
+    player: 'p2',
+    prompt: 'Choose bench',
+    options: state.players.p2.zones.bench,
+    resumeToken: {
+      effectType: 'trainer',
+      sourceInstanceId: 70,
+      initiatorPlayerId: 'p1',
+      stepIndex: 0,
+      steps,
+    },
+  });
+
+  // P2 resolves step 0
+  const step1Res = applyCommand(state, {
+    type: 'resolveChoice',
+    payload: { choiceId: 'choice-step0', selection: [81] },
+    playerId: 'p2',
+  });
+
+  assert.equal(step1Res.error, null);
+  // P2's active switched to 81
+  assert.equal(step1Res.state.players.p2.zones.active[0].instanceId, 81);
+
+  // Step 1 now prompts P1 (initiator) to heal one of P1's damaged Pokemon
+  assert.ok(step1Res.pendingChoice);
+  assert.equal(step1Res.pendingChoice.player, 'p1');
+  assert.equal(step1Res.pendingChoice.resumeToken.initiatorPlayerId, 'p1');
+  assert.equal(step1Res.pendingChoice.resumeToken.stepIndex, 1);
+
+  // P1 resolves step 1, selecting card 75
+  const step2Res = applyCommand(step1Res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: step1Res.pendingChoice.choiceId, selection: [75] },
+    playerId: 'p1',
+  });
+
+  assert.equal(step2Res.error, null);
+  assert.equal(step2Res.state.players.p1.zones.active[0].damage, 10);
+  // Trainer card 70 cleaned up to p1 discard
+  assert.equal(step2Res.state.players.p1.zones.board.length, 0);
+  assert.equal(step2Res.state.players.p1.zones.discard.find((c) => c.instanceId === 70)?.name, 'Custom Swapper');
+  assert.equal(step2Res.pendingChoice, null);
+});

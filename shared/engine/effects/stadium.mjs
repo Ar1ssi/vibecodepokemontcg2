@@ -26,7 +26,8 @@ export function executeStadium(draft, {
   selection = null,
   resumeToken = null,
 }) {
-  const player = draft.players[playerId];
+  const actingPlayerId = resumeToken?.initiatorPlayerId || playerId;
+  const player = draft.players[actingPlayerId];
   if (!player || !draft.stadium) return { pendingChoice: null, completed: true };
 
   const stadium = draft.stadium;
@@ -42,7 +43,7 @@ export function executeStadium(draft, {
       fromStepIndex: stepIndex,
       effectType: 'stadium',
       sourceCard: stadium,
-      playerId,
+      playerId: actingPlayerId,
       activeRng,
       events,
       selection,

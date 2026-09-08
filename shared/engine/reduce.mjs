@@ -1331,15 +1331,18 @@ export function applyCommand(state, command, rng = null) {
       const choice = draft.pendingChoice;
       const token = choice?.resumeToken || {};
       let resumeCard = null;
+      let resumeCardOwnerId = null;
       if (token.sourceInstanceId != null) {
         const cardRef = findCard(draft, token.sourceInstanceId);
         resumeCard = cardRef?.card || null;
+        resumeCardOwnerId = cardRef?.playerId || null;
       }
+      const initiatorPlayerId = token.initiatorPlayerId || resumeCardOwnerId || playerId;
 
       if (token.effectType === 'trainer') {
         executeTrainer(draft, {
           card: resumeCard,
-          playerId,
+          playerId: initiatorPlayerId,
           activeRng,
           events,
           selection: payload.selection,
@@ -1348,7 +1351,7 @@ export function applyCommand(state, command, rng = null) {
       } else if (token.effectType === 'ability') {
         executeAbility(draft, {
           card: resumeCard,
-          playerId,
+          playerId: initiatorPlayerId,
           activeRng,
           events,
           selection: payload.selection,
@@ -1356,7 +1359,7 @@ export function applyCommand(state, command, rng = null) {
         });
       } else if (token.effectType === 'stadium') {
         executeStadium(draft, {
-          playerId,
+          playerId: initiatorPlayerId,
           activeRng,
           events,
           selection: payload.selection,
