@@ -309,31 +309,17 @@ test('canCloseCardPicker: only permits closing in browse mode unless force=true'
   assert.equal(canCloseCardPicker({ mode: null, force: true }), true);
 });
 
-test('DOM: pick card menu only closes via Done button', async () => {
-  const { JSDOM } = await import('jsdom');
-  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-  const { document, KeyboardEvent, MouseEvent } = dom.window;
-
+test('pick card menu only closes via Done button', () => {
   let closed = false;
   let pickedCard = null;
 
   const teardown = () => {
     closed = true;
-    overlay.remove();
   };
-
-  const overlay = document.createElement('div');
-  overlay.className = 'card-picker-overlay card-picker-choose';
-  const doneBtn = document.createElement('button');
-  doneBtn.className = 'card-picker-done';
-  doneBtn.textContent = 'Done';
-  overlay.appendChild(doneBtn);
-  document.body.appendChild(overlay);
 
   const mode = 'choose';
   const candidate = { name: 'Pikachu' };
 
-  // Keydown listener simulating pick card menu
   const onKeyDown = (event) => {
     if (event.key === 'Escape') {
       if (mode === 'browse') {
@@ -345,53 +331,50 @@ test('DOM: pick card menu only closes via Done button', async () => {
     }
   };
 
-  overlay.addEventListener('click', (event) => {
+  const overlay = { id: 'cardPickerOverlay' };
+
+  const onOverlayClick = (event) => {
     event.stopPropagation();
     if (event.target === overlay) {
       if (mode === 'browse' && canCloseCardPicker({ mode })) teardown();
     }
-  });
+  };
 
-  overlay.addEventListener('contextmenu', (event) => {
-    event.stopPropagation();
-  });
-
-  doneBtn.addEventListener('click', (event) => {
+  const onDoneClick = (event) => {
     event.stopPropagation();
     pickedCard = candidate;
     teardown();
-  });
-
-  document.addEventListener('keydown', onKeyDown);
+  };
 
   // 1. Pressing Escape does NOT close the menu
   let escDefaultPrevented = false;
   let escPropagationStopped = false;
-  const escEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-  // Intercept preventDefault & stopPropagation
-  const origPreventDefault = escEvent.preventDefault.bind(escEvent);
-  const origStopPropagation = escEvent.stopPropagation.bind(escEvent);
-  escEvent.preventDefault = () => {
-    escDefaultPrevented = true;
-    origPreventDefault();
+  const escEvent = {
+    key: 'Escape',
+    preventDefault: () => {
+      escDefaultPrevented = true;
+    },
+    stopPropagation: () => {
+      escPropagationStopped = true;
+    },
   };
-  escEvent.stopPropagation = () => {
-    escPropagationStopped = true;
-    origStopPropagation();
-  };
-  document.dispatchEvent(escEvent);
+  onKeyDown(escEvent);
 
   assert.equal(closed, false, 'Escape did not close pick card menu');
   assert.equal(escDefaultPrevented, true, 'Escape prevented default');
   assert.equal(escPropagationStopped, true, 'Escape stopped propagation');
 
   // 2. Pressing Enter does NOT close the menu
-  const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
-  document.dispatchEvent(enterEvent);
+  const enterEvent = {
+    key: 'Enter',
+    preventDefault: () => {},
+    stopPropagation: () => {},
+  };
+  onKeyDown(enterEvent);
   assert.equal(closed, false, 'Enter did not close pick card menu');
 
   // 3. Clicking overlay backdrop does NOT close the menu
-  overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  onOverlayClick({ target: overlay, stopPropagation: () => {} });
   assert.equal(closed, false, 'Overlay click did not close pick card menu');
 
   // 4. Calling close without force does NOT close
@@ -400,8 +383,15 @@ test('DOM: pick card menu only closes via Done button', async () => {
   }
   assert.equal(closed, false, 'Unforced closeCardPicker did not close pick card menu');
 
-  // 5. Clicking Done button DOES close the menu and confirms selection
-  doneBtn.click();
+  // 5. Calling close with force DOES close
+  let forceClosed = false;
+  if (canCloseCardPicker({ mode, force: true })) {
+    forceClosed = true;
+  }
+  assert.equal(forceClosed, true, 'Forced closeCardPicker permitted teardown');
+
+  // 6. Clicking Done button DOES close the menu and confirms selection
+  onDoneClick({ stopPropagation: () => {} });
   assert.equal(closed, true, 'Clicking Done closed the menu');
   assert.equal(pickedCard?.name, 'Pikachu', 'Picked card was assigned');
 });
