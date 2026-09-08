@@ -115,9 +115,9 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
  * - Poison: 10 damage
  * - Burn: 20 damage + 50% cure flip
  * - Asleep: 50% cure flip
- * - Paralyzed: cured
+ * - Paralyzed: cured at the end of the paralyzed player's turn
  */
-function resolveCheckup(draft, { rng, events }) {
+function resolveCheckup(draft, { rng, events, endingPlayerId = draft.turn?.player }) {
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
     const active = player.zones?.active?.find((c) => !c.attachedTo);
@@ -149,8 +149,11 @@ function resolveCheckup(draft, { rng, events }) {
         events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId: pid });
       }
     } else if (active.specialCondition === 'Paralyzed') {
-      active.specialCondition = null;
-      events.push({ type: 'statusCleared', condition: 'Paralyzed', instanceId: active.instanceId, playerId: pid });
+      // Under official Pokémon TCG rules, Paralysis is only cured at the end of that player's turn.
+      if (!endingPlayerId || pid === endingPlayerId) {
+        active.specialCondition = null;
+        events.push({ type: 'statusCleared', condition: 'Paralyzed', instanceId: active.instanceId, playerId: pid });
+      }
     }
   }
 }
@@ -1072,7 +1075,7 @@ export function applyCommand(state, command, rng = null) {
           attackerPlayer.flags.attackerAttacked = true;
 
           if (draft.turn.phase !== 'ended') {
-            resolveCheckup(draft, { rng: activeRng, events });
+            resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
             if (draft.turn.phase !== 'ended') {
               advanceTurn(draft, { nextPlayerId: oppId, events });
             }
@@ -1130,7 +1133,7 @@ export function applyCommand(state, command, rng = null) {
 
       // Auto-end turn after attacking
       if (draft.turn.phase !== 'ended') {
-        resolveCheckup(draft, { rng: activeRng, events });
+        resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
         if (draft.turn.phase !== 'ended') {
           advanceTurn(draft, { nextPlayerId: oppId, events });
         }
@@ -1211,7 +1214,7 @@ export function applyCommand(state, command, rng = null) {
     case 'pass':
     case 'takeTurn': {
       const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
-      resolveCheckup(draft, { rng: activeRng, events });
+      resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
       if (draft.turn.phase !== 'ended') {
         advanceTurn(draft, { nextPlayerId: oppId, events });
       }

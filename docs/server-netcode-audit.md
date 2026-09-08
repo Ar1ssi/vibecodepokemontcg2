@@ -138,9 +138,10 @@ While the core pure state models and unit test coverage are broad (912 passing t
 
 ### Medium Severity Issues
 
-#### 13. Paralysis Cured Prematurely Between Turns
+#### 13. Paralysis Cured Prematurely Between Turns — [RESOLVED]
 * **Location**: [`shared/engine/reduce.mjs:131-134`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L131-L134)
-* **Root Cause**: In [`resolveCheckup`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L100), Paralysis is cleared for both players at the end of every turn. Under official PTCG rules, Paralysis is only cured at the end of the paralyzed player's turn. Because checkup runs when the attacker finishes their attack, the defender's paralysis is cleared before their turn even starts.
+* **Root Cause**: In [`resolveCheckup`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L100), Paralysis was cleared for both players at the end of every turn. Under official PTCG rules, Paralysis is only cured at the end of the paralyzed player's turn. Because checkup runs when the attacker finishes their attack, the defender's paralysis was cleared before their turn even started.
+* **Fix**: Updated `resolveCheckup` in [`shared/engine/reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs) to accept `endingPlayerId = draft.turn?.player` and enforce `if (!endingPlayerId || pid === endingPlayerId)` before curing Paralysis and emitting `statusCleared`. Explicitly passed `endingPlayerId: playerId` across all turn-ending checkup call sites (`attack` resolution, confused self-KO, and `pass`/`takeTurn`). Defending Pokémon now remain paralyzed through the opponent's checkup into their own turn (where attack and retreat legality checks block actions), curing only when the paralyzed player's turn ends. Verified by `shared/engine/__tests__/paralysis-checkup.test.mjs`.
 
 #### 14. Overwritten Stadium Cards Erased Without Discarding
 * **Location**: [`shared/engine/effects/trainer.mjs:92-93`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/effects/trainer.mjs#L92-L93)
@@ -171,3 +172,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 10. [x] Preserve initiator attribution in `PendingChoice.resumeToken` and route choice resumption to initiator (Finding 10).
 11. [x] Implement robust deduplication handling for socket `resolveChoice` and `GameRoom.prototype.resolveChoice` with active choice preservation (Finding 11).
 12. [x] Implement `gameEnded` socket notification broadcast and client win/loss reconciliation (Finding 12).
+13. [x] Fix premature paralysis clearing between turns so paralysis cures only at the end of the paralyzed player's turn (Finding 13).
