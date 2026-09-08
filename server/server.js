@@ -405,7 +405,16 @@ async function main() {
       if (typeof roomId === 'string') roomId = roomId.trim();
       if (typeof username === 'string') username = username.trim();
       if (!roomInfo.has(roomId)) {
-        roomInfo.set(roomId, { players: new Set(), spectators: new Set() });
+        roomInfo.set(roomId, {
+          players: new Set(),
+          spectators: new Set(),
+          // Caches the most recent exchangeData/loadDeckData pushAction from
+          // each socket so a peer who joins the Socket.IO room *after* those
+          // one-time setup broadcasts were sent still receives them (Finding:
+          // socket.broadcast.to(roomId) only reaches sockets already joined
+          // at emit time, so a late joiner otherwise misses them forever).
+          setupActionCache: new Map(),
+        });
       }
       const room = roomInfo.get(roomId);
 
@@ -486,6 +495,19 @@ async function main() {
             shadowMode: SHADOW_MODE,
             protocolVersion: PROTOCOL_VERSION,
           });
+          // Replay any setup pushAction packets (exchangeData/loadDeckData)
+          // that other sockets in this room already sent before this socket
+          // joined. Without this, a player who connects late never receives
+          // their opponent's one-time handshake/deck broadcasts, since
+          // socket.broadcast.to(roomId) does not reach sockets that weren't
+          // in the room yet at emit time.
+          if (room.setupActionCache) {
+            for (const [senderSocketId, cached] of room.setupActionCache) {
+              if (senderSocketId === socket.id) continue;
+              if (cached.exchangeData) socket.emit('pushAction', cached.exchangeData);
+              if (cached.loadDeckData) socket.emit('pushAction', cached.loadDeckData);
+            }
+          }
           // Remove any existing disconnect listener to prevent leak on rejoin
           if (socket.data.disconnectListener) {
             socket.removeListener('disconnect', socket.data.disconnectListener);
@@ -608,6 +630,19 @@ async function main() {
     for (const event of events) {
       socket.on(event, (data) => {
         emitToRoom(event, data);
+
+        if (
+          event === 'pushAction' &&
+          data &&
+          (data.action === 'exchangeData' || data.action === 'loadDeckData')
+        ) {
+          const room = roomInfo.get(data.roomId);
+          if (room && room.setupActionCache) {
+            const existing = room.setupActionCache.get(socket.id) || {};
+            existing[data.action] = data;
+            room.setupActionCache.set(socket.id, existing);
+          }
+        }
 
         if (SHADOW_MODE && data) {
           const roomId =
