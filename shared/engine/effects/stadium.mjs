@@ -102,6 +102,17 @@ export function executeStadium(draft, {
   }
 
   if (steps.length === 0) {
+    if (String(stadium.name || '').toLowerCase().trim() === 'grand tree') {
+      steps.push({
+        type: 'searchDeck',
+        what: 'Evolution Pokémon',
+        destination: 'hand',
+        count: 1,
+      });
+    }
+  }
+
+  if (steps.length === 0) {
     const parsed = parseTrainerEffect(text);
     steps = (parsed?.steps || []).filter((s) => s.type !== 'passive');
   }

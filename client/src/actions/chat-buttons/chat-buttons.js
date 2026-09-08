@@ -3998,6 +3998,153 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
   });
 }
 
+// Special rule for Grand Tree stadium activation
+async function executeGrandTreeSpecialRule(user, card, emit) {
+  if (rulesState.enabled && stadiumUsed(user)) {
+    appendMessage(user, `⛔ ${card.name || 'Grand Tree'}'s effect was already used this turn.`, 'announcement', false);
+    return;
+  }
+
+  const deck = getZone(user, 'deck');
+  if (!deck || deck.array.length === 0) {
+    appendMessage(user, '⛔ Your deck is empty.', 'announcement', false);
+    return;
+  }
+
+  const inPlay = [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
+    (c) => c && (c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok')) && !c.image?.attached
+  );
+  if (inPlay.length === 0) {
+    appendMessage(user, '⛔ No Pokémon in play to evolve.', 'announcement', false);
+    return;
+  }
+
+  await Promise.all([...inPlay, ...deck.array].map((c) => ensureCardData(c)));
+
+  const getEvolvesFrom = (c) => String(c?.evolvesFrom || c?.evolveFrom || '').trim().toLowerCase();
+  const isEvolvesFromHost = (c, hostList) => {
+    const from = getEvolvesFrom(c);
+    if (!from) return false;
+    return hostList.some((h) => String(h?.name || '').trim().toLowerCase() === from);
+  };
+
+  const basicHosts = inPlay.filter((p) => {
+    const stage = normalizeStage(p.stage || 'Basic');
+    return stage === 'Basic';
+  });
+  const eligibleHosts = basicHosts.length > 0 ? basicHosts : inPlay;
+
+  const stage1Matches = deck.array.filter((c) => {
+    if (!c) return false;
+    const isPoke = c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok');
+    if (!isPoke) return false;
+    const stg = normalizeStage(c.stage || '');
+    const isStage1 = stg === 'Stage 1' || String(c.stage || '').toLowerCase().includes('stage 1') || String(c.stage || '').toLowerCase().includes('stage1');
+    return (isStage1 || !stg || stg === 'Unknown') && isEvolvesFromHost(c, eligibleHosts);
+  });
+
+  let candidates = stage1Matches;
+  if (candidates.length === 0) {
+    const fallbackStage1 = deck.array.filter((c) => {
+      const isPoke = c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok');
+      const stg = normalizeStage(c.stage || '');
+      return isPoke && (stg === 'Stage 1' || String(c.stage || '').toLowerCase().includes('stage 1') || String(c.stage || '').toLowerCase().includes('stage1') || getEvolvesFrom(c));
+    });
+    candidates = fallbackStage1.length > 0 ? fallbackStage1 : deck.array.filter((c) => c.type === 'Pokémon' || c.type === 'Pokemon');
+    if (candidates.length === 0) candidates = deck.array;
+  }
+
+  const finishGrandTree = (actionPayload = { action: 'search-evolve' }) => {
+    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: card.name || 'Grand Tree' });
+    if (rulesState.enabled) markStadiumUsed(user);
+    processAction(user, emit, 'stadium-effect', [actionPayload]);
+  };
+
+  openAbilityChoicePicker({
+    user,
+    title: `${card.name || 'Grand Tree'} — choose a Stage 1 Pokémon to evolve`,
+    candidates,
+    allCandidates: searchPickerAllCandidates(candidates, deck.array) || deck.array,
+    triggerCard: card,
+    zoneFrom: 'deck',
+    destination: 'bench',
+    upTo: true,
+    minCount: 0,
+    maxCount: 1,
+    onPick: async (picked) => {
+      if (!picked) {
+        finishGrandTree();
+        return;
+      }
+      const fromName = getEvolvesFrom(picked);
+      const host = eligibleHosts.find((p) => String(p?.name || '').trim().toLowerCase() === fromName) ||
+                   inPlay.find((p) => String(p?.name || '').trim().toLowerCase() === fromName) ||
+                   eligibleHosts[0] || inPlay[0];
+
+      if (!host) {
+        appendMessage(user, `⛔ No matching in-play Pokémon for ${picked.name} to evolve onto.`, 'announcement', false);
+        finishGrandTree();
+        return;
+      }
+
+      const inActive = getZone(user, 'active').array.includes(host);
+      const zoneId = inActive ? 'active' : 'bench';
+      const hostZone = getZone(user, zoneId);
+      const hostIdx = hostZone.array.indexOf(host);
+      const deckIdx = deck.array.indexOf(picked);
+
+      if (deckIdx < 0 || hostIdx < 0) {
+        finishGrandTree();
+        return;
+      }
+
+      await moveCardBundle(user, user, 'deck', zoneId, deckIdx, hostIdx, 'evolve');
+      appendMessage(user, `🌳 Grand Tree: ${picked.name} evolves onto ${host.name}.`, 'announcement', false);
+
+      // Stage 2 chain
+      const pickedName = String(picked.name || '').trim().toLowerCase();
+      const stage2Candidates = deck.array.filter((c) => {
+        if (!c) return false;
+        const isPoke = c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok');
+        if (!isPoke) return false;
+        return getEvolvesFrom(c) === pickedName;
+      });
+
+      if (stage2Candidates.length > 0) {
+        openAbilityChoicePicker({
+          user,
+          title: `${card.name || 'Grand Tree'} — evolve ${picked.name} to Stage 2`,
+          candidates: stage2Candidates,
+          allCandidates: searchPickerAllCandidates(stage2Candidates, deck.array) || deck.array,
+          triggerCard: card,
+          zoneFrom: 'deck',
+          destination: zoneId,
+          upTo: true,
+          minCount: 0,
+          maxCount: 1,
+          onPick: async (nextPicked) => {
+            if (nextPicked) {
+              const nextHost = hostZone.array.find((c) => c === picked) || hostZone.array[hostIdx] || host;
+              const nextHostIdx = hostZone.array.indexOf(nextHost);
+              const nextDeckIdx = deck.array.indexOf(nextPicked);
+              if (nextDeckIdx >= 0 && nextHostIdx >= 0) {
+                await moveCardBundle(user, user, 'deck', zoneId, nextDeckIdx, nextHostIdx, 'evolve');
+                appendMessage(user, `🌳 Grand Tree: ${nextPicked.name} evolves onto ${picked.name}.`, 'announcement', false);
+              }
+            }
+            finishGrandTree();
+          },
+          onCancel: () => finishGrandTree(),
+        });
+        return;
+      }
+
+      finishGrandTree();
+    },
+    onCancel: () => finishGrandTree(),
+  });
+}
+
 const lowerName = (name) => String(name || '').toLowerCase();
 
 // ── Stadium effect (taxonomy E, once-per-turn / setup-once) ──────────
@@ -4028,6 +4175,13 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
 
   const card = stadium.card;
   await ensureCardData(card);
+
+  // Special rule for Grand Tree stadium activation
+  if (String(card?.name || '').toLowerCase().trim() === 'grand tree') {
+    await executeGrandTreeSpecialRule(user, card, emit);
+    return;
+  }
+
   const result = applyStadiumEffect(card);
 
   if (!result.executed || result.results.length === 0) {
