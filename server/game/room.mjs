@@ -67,6 +67,12 @@ export class GameRoom {
       return false;
     }
 
+    const prevSocketId = this.playerToSocket.get(playerId);
+    if (prevSocketId && prevSocketId !== socketId) {
+      this.socketToPlayer.delete(prevSocketId);
+      this.clientSeqByPlayer.delete(playerId);
+    }
+
     this.socketToPlayer.set(socketId, playerId);
     this.playerToSocket.set(playerId, socketId);
     this.spectatorSockets.delete(socketId);
@@ -177,6 +183,7 @@ export class GameRoom {
           stateVersion: this.state.stateVersion,
           view: viewFor(this.state, playerId),
           clientSeq: cmd.clientSeq,
+          lastClientSeq: lastSeq,
         };
       }
     }
@@ -211,6 +218,7 @@ export class GameRoom {
         socketId: sockId,
         playerId: pId,
         view: viewFor(this.state, pId),
+        lastClientSeq: this.clientSeqByPlayer.get(pId) ?? 0,
       });
     }
     for (const sSockId of this.spectatorSockets) {
@@ -218,6 +226,7 @@ export class GameRoom {
         socketId: sSockId,
         playerId: null,
         view: viewFor(this.state, null),
+        lastClientSeq: 0,
       });
     }
 
@@ -251,6 +260,23 @@ export class GameRoom {
   getViewForSocket(socketId) {
     const playerId = this.socketToPlayer.get(socketId) || null;
     return viewFor(this.state, playerId);
+  }
+
+  /**
+   * Resets or deletes clientSeq tracking for a player (e.g. on new socket / page reload).
+   * @param {string} playerId
+   */
+  resetClientSeq(playerId) {
+    this.clientSeqByPlayer.delete(playerId);
+  }
+
+  /**
+   * Gets the last processed clientSeq for a player.
+   * @param {string} playerId
+   * @returns {number}
+   */
+  getClientSeq(playerId) {
+    return this.clientSeqByPlayer.get(playerId) ?? 0;
   }
 
   /**

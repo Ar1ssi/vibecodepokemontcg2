@@ -134,4 +134,66 @@ test('GameRoom: successful command produces broadcasts for all players with reda
 
   // Spectator sees hand count
   assert.equal(specBroadcast.view.players.p1.zones.hand.count, 1);
+
+  // Broadcasts contain recipient-specific lastClientSeq
+  assert.equal(p1Broadcast.lastClientSeq, 10);
+  assert.equal(p2Broadcast.lastClientSeq, 0);
+  assert.equal(specBroadcast.lastClientSeq, 0);
 });
+
+test('GameRoom: Finding 6 - re-registering player socket (page refresh) resets clientSeq tracking and accepts fresh sequence', () => {
+  const room = new GameRoom({ roomId: 'test-room-refresh', rulesEnabled: false });
+  room.addPlayer('socket-ash-1', 'p1', 'Ash');
+
+  const card1 = createCard({ instanceId: 201, name: 'Pikachu' });
+  const card2 = createCard({ instanceId: 202, name: 'Raichu' });
+  room.state.players.p1.zones.hand.push(card1, card2);
+
+  // Ash plays command with clientSeq: 20
+  const res1 = room.handleCommand('socket-ash-1', {
+    type: 'moveCard',
+    payload: { instanceId: 201, from: 'hand', to: 'bench' },
+    clientSeq: 20,
+  });
+
+  assert.equal(res1.success, true);
+  assert.equal(res1.dedupe, false);
+  assert.equal(room.getClientSeq('p1'), 20);
+
+  // Old socket duplicate is properly deduplicated
+  const dup = room.handleCommand('socket-ash-1', {
+    type: 'moveCard',
+    payload: { instanceId: 201, from: 'hand', to: 'bench' },
+    clientSeq: 15,
+  });
+  assert.equal(dup.dedupe, true);
+  assert.equal(dup.lastClientSeq, 20);
+
+  // Ash refreshes the page: new socket connects and registers via addPlayer
+  room.addPlayer('socket-ash-2', 'p1', 'Ash');
+
+  // Sequence tracking is reset for the new socket session
+  assert.equal(room.getClientSeq('p1'), 0);
+
+  // Ash emits command with clientSeq: 1 from new page session
+  const res2 = room.handleCommand('socket-ash-2', {
+    type: 'moveCard',
+    payload: { instanceId: 202, from: 'hand', to: 'bench' },
+    clientSeq: 1,
+  });
+
+  // Must NOT be treated as dedupe/dropped!
+  assert.equal(res2.success, true);
+  assert.equal(res2.dedupe, false);
+  assert.equal(room.getClientSeq('p1'), 1);
+
+  // Duplicate from new socket is deduplicated
+  const res2Dup = room.handleCommand('socket-ash-2', {
+    type: 'moveCard',
+    payload: { instanceId: 202, from: 'hand', to: 'bench' },
+    clientSeq: 1,
+  });
+  assert.equal(res2Dup.dedupe, true);
+  assert.equal(res2Dup.lastClientSeq, 1);
+});
+

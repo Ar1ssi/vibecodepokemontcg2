@@ -31,6 +31,7 @@ import {
 import {
   handleCmdRejected,
   emitRequestView,
+  seedClientSeq,
 } from '../../setup/netcode/cmd-emitter.js';
 
 let isImporting = false;
@@ -246,6 +247,9 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('view', (data) => {
+    if (typeof data?.lastClientSeq === 'number') {
+      seedClientSeq(data.lastClientSeq);
+    }
     if (data?.view) {
       applyView(data.view, data.events || [], {
         socket,

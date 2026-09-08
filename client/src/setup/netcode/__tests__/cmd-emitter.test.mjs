@@ -7,6 +7,7 @@ import {
   handleCmdRejected,
   getClientSeq,
   resetClientSeq,
+  seedClientSeq,
   addInFlightAffordance,
   clearInFlightAffordances,
 } from '../cmd-emitter.js';
@@ -160,3 +161,39 @@ test('clearInFlightAffordances and handleCmdRejected remove cmd-pending', () => 
     clientSeq: 1,
   });
 });
+
+test('seedClientSeq advances clientSeq from server and preserves monotonicity', async () => {
+  const socket = new MockSocket();
+
+  assert.equal(getClientSeq(), 0);
+
+  // Seed with server lastClientSeq: 42
+  const updated = seedClientSeq(42);
+  assert.equal(updated, 42);
+  assert.equal(getClientSeq(), 42);
+
+  // Lower or equal sequence does not regress
+  seedClientSeq(20);
+  assert.equal(getClientSeq(), 42);
+
+  // Invalid values ignored
+  seedClientSeq(null);
+  seedClientSeq(undefined);
+  seedClientSeq(NaN);
+  seedClientSeq('100');
+  assert.equal(getClientSeq(), 42);
+
+  // Next emitCmd increments past 42 to 43
+  const res = await emitCmd({
+    socket,
+    roomId: 'room-1',
+    type: 'draw',
+    payload: { count: 1 },
+  });
+
+  assert.equal(res.success, true);
+  assert.equal(res.clientSeq, 43);
+  assert.equal(getClientSeq(), 43);
+  assert.equal(socket.emitted[0].data.clientSeq, 43);
+});
+

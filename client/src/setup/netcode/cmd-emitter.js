@@ -52,6 +52,20 @@ export function resetClientSeq(initialSeq = 0) {
 }
 
 /**
+ * Seeds or advances client sequence counter from server's last processed sequence.
+ * Ensures subsequent emitted commands have clientSeq > lastClientSeq (Edge Case 4).
+ *
+ * @param {number} serverSeq
+ * @returns {number}
+ */
+export function seedClientSeq(serverSeq) {
+  if (typeof serverSeq === 'number' && Number.isFinite(serverSeq)) {
+    clientSeq = Math.max(clientSeq, serverSeq);
+  }
+  return clientSeq;
+}
+
+/**
  * Adds .cmd-pending affordance to an element while command is in flight.
  *
  * @param {HTMLElement|null} element

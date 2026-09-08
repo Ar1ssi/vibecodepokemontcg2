@@ -640,6 +640,7 @@ async function main() {
             view: result.view,
             events: [],
             pendingChoice: null,
+            lastClientSeq: result.lastClientSeq ?? result.clientSeq,
           });
         } else {
           for (const broadcast of result.broadcasts || []) {
@@ -649,6 +650,7 @@ async function main() {
               view: broadcast.view,
               events: result.events,
               pendingChoice: broadcast.view?.pendingChoice || null,
+              lastClientSeq: broadcast.lastClientSeq,
             });
           }
         }
@@ -680,6 +682,15 @@ async function main() {
             reason: result.error,
             details: result.reason,
           });
+        } else if (result.dedupe) {
+          socket.emit('view', {
+            gameId: gameRoom.roomId,
+            stateVersion: result.stateVersion,
+            view: result.view,
+            events: [],
+            pendingChoice: null,
+            lastClientSeq: result.lastClientSeq ?? result.clientSeq,
+          });
         } else {
           for (const broadcast of result.broadcasts || []) {
             io.to(broadcast.socketId).emit('view', {
@@ -688,6 +699,7 @@ async function main() {
               view: broadcast.view,
               events: result.events,
               pendingChoice: broadcast.view?.pendingChoice || null,
+              lastClientSeq: broadcast.lastClientSeq,
             });
           }
         }
@@ -699,12 +711,15 @@ async function main() {
         const gameRoom = gameRooms.get(roomId);
         if (gameRoom) {
           const view = gameRoom.getViewForSocket(socket.id);
+          const playerId = gameRoom.socketToPlayer.get(socket.id) || null;
+          const lastClientSeq = playerId ? gameRoom.getClientSeq(playerId) : 0;
           socket.emit('view', {
             gameId: gameRoom.roomId,
             stateVersion: gameRoom.state.stateVersion,
             view,
             events: [],
             pendingChoice: view?.pendingChoice || null,
+            lastClientSeq,
           });
         } else if (roomId) {
           socket.emit('gameEnded', {
