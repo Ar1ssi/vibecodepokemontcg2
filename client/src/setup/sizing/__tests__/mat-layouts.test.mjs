@@ -273,3 +273,23 @@ test('zone rectangles stay inside their own half of the board', () => {
     }
   }
 });
+
+test('board zone hides scrollbars across both container stylesheets', () => {
+  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
+    const boardRuleMatch = css.match(/#board\s*\{([^}]*)\}/);
+    assert.ok(boardRuleMatch, `${file} missing #board rule`);
+    const boardRule = boardRuleMatch[1];
+    assert.ok(
+      boardRule.includes('scrollbar-width: none'),
+      `${file} #board should set scrollbar-width: none`
+    );
+    assert.ok(
+      boardRule.includes('-ms-overflow-style: none'),
+      `${file} #board should set -ms-overflow-style: none`
+    );
+    assert.ok(
+      css.includes('#board::-webkit-scrollbar'),
+      `${file} should define #board::-webkit-scrollbar to hide scrollbar`
+    );
+  }
+});

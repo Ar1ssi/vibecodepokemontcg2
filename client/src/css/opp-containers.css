@@ -353,6 +353,11 @@ img.draw-flight-source,
   align-items: flex-end;
   padding: 5px;
   z-index: -1;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#board::-webkit-scrollbar {
+  display: none;
 }
 #board img {
   box-sizing: border-box;
