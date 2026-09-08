@@ -95,10 +95,15 @@ While the core pure state models and unit test coverage are broad (912 passing t
   4. Updated `retreat` to emit `{ benchInstanceId }` when a target is provided, and empty `{}` when omitted (preserving auto-fallback to first benched Pokémon).
   5. Updated `useAbility` to parse `[oInitiator, zoneId, resolved, hint]` legacy arrays alongside direct `[instanceId, abilityIndex]`. Verified by `client/src/setup/netcode/__tests__/dual-run-bridge.test.mjs`.
 
-#### 9. Bench Knockouts Do Not Discard Victim and Auto-Promote Illegally
-* **Location**: [`shared/engine/reduce.mjs:41-79`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L41-L79)
-* **Root Cause**: [`handleKnockout`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L26) searches for `victim` only in `draft.players[victimPlayerId].zones.active`.
-* **Impact**: If a benched Pokémon is knocked out by bench snipe damage, it is never removed from `bench` or moved to `discard`. Furthermore, line 65 unconditionally auto-promotes a benched Pokémon to active, resulting in the defending player having two active Pokémon simultaneously.
+#### 9. Bench Knockouts Do Not Discard Victim and Auto-Promote Illegally — [RESOLVED]
+* **Location**: [`shared/engine/reduce.mjs:41-80`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L41-L80), [`shared/engine/reduce.mjs:1030-1037, 1109-1116`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L1030-L1037)
+* **Root Cause**: [`handleKnockout`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L26) searched for `victim` only in `draft.players[victimPlayerId].zones.active`. Furthermore, it unconditionally executed the bench auto-promotion block regardless of whether the victim was active or benched.
+* **Impact**: If a benched Pokémon was knocked out by bench snipe damage, it was never removed from `bench` or moved to `discard`. In addition, a benched Pokémon was auto-promoted into `active`, resulting in the defending player having two active Pokémon simultaneously.
+* **Fix**:
+  1. Updated `handleKnockout` in [`shared/engine/reduce.mjs`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs) to determine whether the victim was in `active` or `bench` (with a fallback via `findCard`).
+  2. Discarded the victim and any cards attached to it (`c.instanceId === victim.instanceId || c.attachedTo === victim.instanceId`) from its respective zone into `victimDiscard`, resetting damage, special conditions, and attachments.
+  3. Guarded auto-promotion with `if (wasActive)` so auto-promotion only triggers when the active Pokémon is knocked out, leaving the defending player's active spot untouched on bench knockouts.
+  4. Derived `defenderPlayerId` from `targetRef?.playerId` in the `attack` command reducer so attacks targeting benched Pokémon pass the correct owner ID to `handleKnockout`. Verified by `shared/engine/__tests__/attack-ko.test.mjs`.
 
 #### 10. Missing Initiator Attribution in `PendingChoice.resumeToken`
 * **Location**: [`shared/engine/effects/executor.mjs:156-164`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/effects/executor.mjs#L156-L164), [`shared/engine/reduce.mjs:1319-1327`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L1319-L1327)
@@ -147,3 +152,4 @@ Before proceeding to Slice 8 (Phase 3 flip & deletion pass):
 6. [x] Synchronize client sequence (`clientSeq`) tracking on reconnect/refresh and in view snapshots (Finding 6).
 7. [x] Resolve identity preservation and seat hijacking on reconnect via `state.players` matching and seat reservation (Finding 7).
 8. [x] Fix parameter unpacking in [`client/src/setup/netcode/dual-run-bridge.js`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/client/src/setup/netcode/dual-run-bridge.js).
+9. [x] Fix bench knockout discarding and illegal auto-promotion in [`handleKnockout`](file:///c:/Users/SMG26/.gemini/antigravity/scratch/vibecodepokemontcg2/shared/engine/reduce.mjs#L26) (Finding 9).

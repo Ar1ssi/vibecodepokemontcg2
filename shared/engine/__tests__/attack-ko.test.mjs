@@ -224,3 +224,121 @@ test('takePrizes: taking all prizes reaches gameEnded win condition', () => {
   assert.equal(res.state.winner, 'p1');
   assert.equal(res.state.winReason, 'all prize cards taken');
 });
+
+test('attack & KO: bench knockout discards victim and attached cards, awards prizes, and does NOT auto-promote', () => {
+  const state = createGameState({
+    players: {
+      p1: {
+        username: 'Ash',
+        zones: {
+          prizes: [
+            createCard({ instanceId: 101, name: 'Prize 1' }),
+            createCard({ instanceId: 102, name: 'Prize 2' }),
+            createCard({ instanceId: 103, name: 'Prize 3' }),
+          ],
+        },
+      },
+      p2: {
+        username: 'Gary',
+        zones: {
+          active: [createCard({ instanceId: 20, name: 'Active Blastoise', hp: 120 })],
+          bench: [
+            createCard({ instanceId: 30, name: 'Benched Pikachu', hp: 60 }),
+            createCard({ instanceId: 31, name: 'Lightning Energy', supertype: 'Energy', type: 'Energy', attachedTo: 30 }),
+            createCard({ instanceId: 40, name: 'Benched Charmander', hp: 70 }),
+          ],
+          deck: [createCard({ instanceId: 99, name: 'Deck' })],
+        },
+      },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  const attacker = createCard({
+    instanceId: 1,
+    name: 'Mewtwo',
+    attacks: [{ name: 'Bench Snipe', cost: [], damage: 80 }],
+  });
+  state.players.p1.zones.active.push(attacker);
+
+  // Attack targeting Benched Pikachu (instanceId 30)
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0, targetInstanceId: 30 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+
+  // 1. Attacker took 1 prize card into hand
+  assert.equal(res.state.players.p1.zones.hand.length, 1);
+  assert.equal(res.state.players.p1.zones.prizes.length, 2);
+
+  // 2. Benched Pikachu (30) and its attached Energy (31) discarded
+  const p2DiscardIds = res.state.players.p2.zones.discard.map((c) => c.instanceId);
+  assert.ok(p2DiscardIds.includes(30), 'Benched Pikachu must be moved to discard');
+  assert.ok(p2DiscardIds.includes(31), 'Attached energy must be moved to discard');
+
+  // 3. Bench now only contains Charmander (40)
+  const p2BenchIds = res.state.players.p2.zones.bench.map((c) => c.instanceId);
+  assert.deepEqual(p2BenchIds, [40], 'Charmander should remain on bench');
+
+  // 4. Active must REMAIN Blastoise (20) — NO extra promotion
+  assert.equal(res.state.players.p2.zones.active.length, 1);
+  assert.equal(res.state.players.p2.zones.active[0].instanceId, 20);
+
+  // 5. Events check: pokemonKnockedOut fired, but pokemonPromoted did NOT
+  const koEvent = res.events.find((e) => e.type === 'pokemonKnockedOut');
+  assert.ok(koEvent, 'pokemonKnockedOut event must be emitted');
+  assert.equal(koEvent.instanceId, 30);
+  assert.equal(koEvent.playerId, 'p2');
+
+  const promoteEvent = res.events.find((e) => e.type === 'pokemonPromoted');
+  assert.equal(promoteEvent, undefined, 'pokemonPromoted must NOT be emitted for bench KO');
+
+  // 6. Game continues (Active Blastoise is still alive)
+  assert.notEqual(res.state.turn.phase, 'ended');
+});
+
+test('attack & KO: bench knockout taking last prize ends the game', () => {
+  const state = createGameState({
+    players: {
+      p1: {
+        username: 'Ash',
+        zones: {
+          prizes: [createCard({ instanceId: 101, name: 'Last Prize' })],
+        },
+      },
+      p2: {
+        username: 'Gary',
+        zones: {
+          active: [createCard({ instanceId: 20, name: 'Active Blastoise', hp: 120 })],
+          bench: [createCard({ instanceId: 30, name: 'Benched Pikachu', hp: 50 })],
+          deck: [createCard({ instanceId: 99, name: 'Deck' })],
+        },
+      },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  const attacker = createCard({
+    instanceId: 1,
+    name: 'Mewtwo',
+    attacks: [{ name: 'Bench Snipe', cost: [], damage: 60 }],
+  });
+  state.players.p1.zones.active.push(attacker);
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0, targetInstanceId: 30 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.prizes.length, 0);
+  assert.equal(res.state.turn.phase, 'ended');
+  assert.equal(res.state.winner, 'p1');
+  assert.equal(res.state.winReason, 'all prize cards taken');
+});

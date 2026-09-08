@@ -38,17 +38,36 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
   });
 
-  // Discard victim and attached cards
+  // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
+  const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
   const victimDiscard = draft.players[victimPlayerId]?.zones?.discard || [];
-  for (let i = victimActive.length - 1; i >= 0; i--) {
-    const c = victimActive[i];
-    if (c.instanceId === victim.instanceId || c.attachedTo === victim.instanceId) {
-      victimActive.splice(i, 1);
-      c.damage = 0;
-      c.specialCondition = null;
-      c.attachedTo = null;
-      victimDiscard.push(c);
+
+  const wasActive = victimActive.some((c) => c.instanceId === victim.instanceId);
+  const wasBench = victimBench.some((c) => c.instanceId === victim.instanceId);
+
+  let targetZone = null;
+  if (wasActive) {
+    targetZone = victimActive;
+  } else if (wasBench) {
+    targetZone = victimBench;
+  } else {
+    const ref = findCard(draft, victim.instanceId);
+    if (ref?.playerId === victimPlayerId && draft.players[victimPlayerId]?.zones?.[ref.zoneId]) {
+      targetZone = draft.players[victimPlayerId].zones[ref.zoneId];
+    }
+  }
+
+  if (targetZone) {
+    for (let i = targetZone.length - 1; i >= 0; i--) {
+      const c = targetZone[i];
+      if (c.instanceId === victim.instanceId || c.attachedTo === victim.instanceId) {
+        targetZone.splice(i, 1);
+        c.damage = 0;
+        c.specialCondition = null;
+        c.attachedTo = null;
+        victimDiscard.push(c);
+      }
     }
   }
 
@@ -60,22 +79,23 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
     prizeCount,
   });
 
-  // Auto-promote first bench Pokemon if any
-  const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
-  const benchPokemon = victimBench.find((c) => !c.attachedTo);
-  if (benchPokemon) {
-    for (let i = victimBench.length - 1; i >= 0; i--) {
-      const c = victimBench[i];
-      if (c.instanceId === benchPokemon.instanceId || c.attachedTo === benchPokemon.instanceId) {
-        victimBench.splice(i, 1);
-        victimActive.push(c);
+  // Auto-promote first bench Pokemon ONLY if active Pokemon was knocked out
+  if (wasActive) {
+    const benchPokemon = victimBench.find((c) => !c.attachedTo);
+    if (benchPokemon) {
+      for (let i = victimBench.length - 1; i >= 0; i--) {
+        const c = victimBench[i];
+        if (c.instanceId === benchPokemon.instanceId || c.attachedTo === benchPokemon.instanceId) {
+          victimBench.splice(i, 1);
+          victimActive.push(c);
+        }
       }
+      events.push({
+        type: 'pokemonPromoted',
+        instanceId: benchPokemon.instanceId,
+        playerId: victimPlayerId,
+      });
     }
-    events.push({
-      type: 'pokemonPromoted',
-      instanceId: benchPokemon.instanceId,
-      playerId: victimPlayerId,
-    });
   }
 
   // Win condition checks
@@ -1009,8 +1029,13 @@ export function applyCommand(state, command, rng = null) {
       const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
       const defenderPlayer = draft.players[oppId];
       let defender = null;
+      let defenderPlayerId = oppId;
       if (payload?.targetInstanceId != null) {
-        defender = findCard(draft, payload.targetInstanceId)?.card;
+        const targetRef = findCard(draft, payload.targetInstanceId);
+        defender = targetRef?.card;
+        if (targetRef?.playerId) {
+          defenderPlayerId = targetRef.playerId;
+        }
       } else {
         defender = defenderPlayer?.zones?.active?.find((c) => !c.attachedTo);
       }
@@ -1084,7 +1109,7 @@ export function applyCommand(state, command, rng = null) {
         const koHp = defender.hp || 0;
         if (koHp > 0 && defender.damage >= koHp) {
           handleKnockout(draft, {
-            victimPlayerId: oppId,
+            victimPlayerId: defenderPlayerId,
             attackerPlayerId: playerId,
             victim: defender,
             events,
