@@ -11,3 +11,5 @@ client/src/assets/playmats/upscaled/
 .agent/scratch/*
 !.agent/scratch/.gitkeep
 
+# archex project state
+.archex/

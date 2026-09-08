@@ -103,3 +103,22 @@ Unattended (oneshot, CI): question budget spent up front; the `(assumed)` ledger
 - Entry points: `server/server.js` (backend server & Socket.IO), `client/index.ejs` (frontend UI markup), `client/src/front-end.js` (frontend JS boot script)
 - Deeper facts: `.agent/PROJECT.md` (architecture, constraints, glossary, landmines)
 
+## Token / model policy
+
+- Implementation grunt work (boilerplate, test writing, content entry): delegate to subagents on \model: sonnet\ or `haiku` (.claude/agents/). Delegate an increment, never a whole feature — the unit must be bounded with its contract already pinned (rule 8), so the brief can be exhaustive (files, signatures, data, test cases) and leave no design judgment. If the integration point isn't pinned yet, scout it inline first, then delegate the wiring. Always verify independently — don't trust the agent's self-report.``
+
+- Orchestrator reviews diffs against the spec's acceptance criteria — not against taste.
+
+- Hooks run linter + tests after edits; do not spend orchestrator review on anything the hooks can catch.
+
+- Periodic architecture audit (ultracode/x-high effort): only on explicit request, roughly once per phase.
+
+**High-complexity specs ship in increments on ONE branch.** When a spec has ~4+ independent acceptance criteria, or spans state + UI + cross-system coupling, do NOT build it in one session. First pin a *schema/naming contract* in the spec (data field names, sub-object API, signals — the stable surface other specs reuse). Then build one criterion-cluster per commit on a single \feature/<spec>\ branch, each green before the next, `/clear` between. Keep the increment ledger (what's done / what's next) in NEXTSTEPS.md so any session can resume.``
+
+## Worktrees & syncing main
+- Unless the user explicitly instructs otherwise, do all work in a git worktree (not directly in
+  the primary checkout) — create one per task/branch so the main working copy stays clean and
+  multiple sessions can run without colliding.
+- After pushing to `main` (from a worktree or otherwise), always sync the primary project folder
+  so it matches the remote: switch it to `main` and pull/fast-forward before ending the session.
+  Never leave the primary folder stale relative to what was just pushed.
