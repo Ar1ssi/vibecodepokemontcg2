@@ -163,7 +163,10 @@ function appliesStatus(t, status) {
 export function classifyAttackEffect(attack, attackerCard = {}) {
   const text = lower(attack?.text ?? '');
   const hasDamage = Number.isFinite(attack?.damage);
-  if (!text) return hasDamage ? 'flat' : 'unknown';
+  if (!text) {
+    if (/^collect$/i.test(attack?.name ?? '')) return 'draw-attach';
+    return hasDamage ? 'flat' : 'unknown';
+  }
   const t = text;
 
   // Dual-status application (two statuses at once) — most specific status form.
@@ -259,7 +262,7 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   if (/switch/.test(t)) return 'switch';
   if (/draw cards until you have \d+ cards/.test(t)) return 'draw-until';
   if (/each player draws \d+ cards?/.test(t)) return 'draw-attach';
-  if (/draw (a |the )?card|draw \d+|attach [^.]*energy/.test(t)) return 'draw-attach';
+  if (/draw (a |the )?card|draw \d+|attach [^.]*energy|\bcollect\b/.test(t) || /^collect$/i.test(attack?.name ?? '')) return 'draw-attach';
 
   // Coin-flip branching (per-heads scaling is the more specific form).
   if (/for each heads/.test(t) && /flip/.test(t)) return 'per-heads-coin';

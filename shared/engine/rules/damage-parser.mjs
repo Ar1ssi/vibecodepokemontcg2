@@ -458,13 +458,23 @@ export function planBenchTarget(benchCount) {
 }
 
 // Number of cards to draw from attack text (taxonomy §D draw family).
-// Matches "draw/draws N card(s)"; returns 0 when the text has no such
-// clause. Pure.
+// Matches "draw/draws N card(s)", singular "draw a card", or attack named "Collect";
+// returns 0 when the text has no such clause. Pure.
 export function drawCount(attackText) {
-  const text = String(attackText || '');
+  let text = '';
+  let name = '';
+  if (typeof attackText === 'object' && attackText !== null) {
+    text = String(attackText.text || attackText.effect || '');
+    name = String(attackText.name || '');
+  } else {
+    text = String(attackText || '');
+  }
   if (/draw\s+cards\s+until\s+you have\s+\d+\s+cards?/i.test(text)) return 0;
-  const m = /draws? (\d+) cards?/i.exec(text);
-  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+  const m = /draws?\s+(\d+)\s+cards?/i.exec(text);
+  if (m) return Math.max(0, parseInt(m[1], 10));
+  if (/draws?\s+(?:a|an|the|1)\s+cards?/i.test(text) || /draws?\s+(?:a|an)\s+card\b/i.test(text)) return 1;
+  if (/^collect$/i.test(text.trim()) || /^collect$/i.test(name.trim()) || /\bcollect\b/i.test(text)) return 1;
+  return 0;
 }
 
 // Draw-until target hand size (taxonomy §D draw-until family). Pure.
@@ -849,7 +859,10 @@ export function resolveAttackText(card, attack) {
   const direct = attack.text || attack.effect || '';
   if (direct) return direct;
   const match = card?.attacks?.find((a) => a?.name && a.name === attack.name);
-  return match?.text || match?.effect || '';
+  const matched = match?.text || match?.effect || '';
+  if (matched) return matched;
+  if (/^collect$/i.test(attack.name || '')) return 'Draw a card.';
+  return '';
 }
 
 // One-line human summary of the parsed damage (for announcements).
