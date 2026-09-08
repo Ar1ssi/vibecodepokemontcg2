@@ -27,6 +27,15 @@ const SHADOW_MODE =
   process.env.SHADOW_MODE?.trim() === 'true' ||
   SERVER_AUTHORITATIVE;
 
+// Sweep grace (Finding 5): a GameRoom with no connected sockets is only swept
+// once it has also been idle this long, so a brief double-disconnect during
+// reconnection does not get mistaken for an abandoned room. `0` restores the
+// pre-slice-2.1 immediate-sweep behavior (operational revert).
+const ROOM_GRACE_MS =
+  process.env.ROOM_GRACE_MS !== undefined
+    ? Number(process.env.ROOM_GRACE_MS)
+    : 30 * 60 * 1000;
+
 // Handle __dirname in ES modules and adjust for client folder
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -263,10 +272,13 @@ async function main() {
       gameRooms.forEach((room, roomId) => {
         if (
           room.playerToSocket.size === 0 &&
-          room.spectatorSockets.size === 0
+          room.spectatorSockets.size === 0 &&
+          Date.now() - room.lastActivityAt > ROOM_GRACE_MS
         ) {
           gameRooms.delete(roomId);
-          roomInfo.delete(roomId);
+          // roomInfo is not deleted here: it has its own username-keyed
+          // lifecycle (line ~316 above), and deleting it here is what turned
+          // a brief double-disconnect into a false server_restart (Finding 5).
         }
       });
     }
@@ -655,6 +667,7 @@ async function main() {
             data.roomId || [...socket.rooms].find((r) => r !== socket.id);
           const gameRoom = gameRooms.get(roomId);
           if (gameRoom && event === 'pushAction') {
+            gameRoom.touchActivity();
             const playerId = gameRoom.socketToPlayer.get(socket.id);
             if (
               playerId &&

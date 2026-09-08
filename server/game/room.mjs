@@ -48,6 +48,16 @@ export class GameRoom {
 
     // Monotonic sequence tracking per player for deduplication (Edge Case 4)
     this.clientSeqByPlayer = new Map(); // playerId -> lastSeenClientSeq
+
+    // Sweep grace (Finding 5): touched on any join or command traffic so the
+    // periodic empty-socket sweep can distinguish a brief double-disconnect
+    // from an actually-abandoned room.
+    this.lastActivityAt = Date.now();
+  }
+
+  /** Marks the room as active now (Finding 5 — sweep grace). */
+  touchActivity() {
+    this.lastActivityAt = Date.now();
   }
 
   /**
@@ -60,6 +70,7 @@ export class GameRoom {
    */
   addPlayer(socketId, playerId, username = '', deckList = []) {
     if (!socketId || !playerId) return false;
+    this.touchActivity();
 
     // Edge Case 14 & Hazard H1: Only 2 active players allowed per game room
     const registeredPids = [...this.playerToSocket.keys()];
@@ -180,6 +191,7 @@ export class GameRoom {
    * }}
    */
   handleCommand(socketId, cmd = {}) {
+    this.touchActivity();
     const playerId = this.socketToPlayer.get(socketId);
 
     if (!playerId) {
