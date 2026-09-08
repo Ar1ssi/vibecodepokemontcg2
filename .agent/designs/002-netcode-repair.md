@@ -334,7 +334,7 @@ per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` chan
 | 2 | `applyView` with `view.stadium === null` while renderer inactive | `#stadium` untouched | [x] apply-view.test.mjs stadium-wipe repro |
 | 3 | `resolveInstanceId` called with an unmapped `syncInstance` | returns `null`; command not emitted; logged | [ ] |
 | 4 | `instanceMap` arrives after the first action | action is dropped with a surfaced message, not sent with a guessed id | [ ] |
-| 5 | Both players disconnect simultaneously; sweep fires | room survives `ROOM_GRACE_MS`; reconnect resumes | [ ] |
+| 5 | Both players disconnect simultaneously; sweep fires | room survives `ROOM_GRACE_MS`; reconnect resumes | [x] `room.test.mjs` "Finding 5: sweep grace distinguishes a brief double-disconnect from an abandoned room" |
 | 6 | Peer log requested past the 200-action cap | falls through to the O2-C "reload and rejoin" announcement | [x] covered: `peer-log-catchup.test.mjs` "caps at PEER_LOG_MAX"; `peerLog` handler's `capped` branch |
 | 7 | Peer never answers `requestPeerLog` | 5s timeout → O2-C announcement; no silent partial state | [x] `peerLogTimeout` in `requestPeerLogCatchup` (socket-event-listeners.js) — no test harness for socket timers, verified by reading the guard |
 | 8 | Out-of-order `requestAction` arrives, gap closes within 2s | queued, then applied in counter order | [ ] |

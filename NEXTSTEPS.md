@@ -10,7 +10,7 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | 1.1 | done | f8f22a2 | Peer-log reconnect catch-up + O2-C fallback |
 | 1.2 | done | (pending) | Counter-ordered `requestAction` queue |
 | 1.3 | done | 57865a0 | Dead-scaffolding deletion; kept requestSyncLogBundle/syncLogBundle (live) |
-| 2.1 | | | Sweep grace + `roomInfo` decoupling |
+| 2.1 | done | fc12f49 | Sweep grace + `roomInfo` decoupling |
 | 2.2 | | | `clientSeq` clearing, protocol version, `emitCmd` surfacing |
 | 3.1 | | | `instanceMap` round-trip; index fallbacks deleted |
 | 3.2 | | | Renderer wired to iframes; findings #10, #11 fixed |
