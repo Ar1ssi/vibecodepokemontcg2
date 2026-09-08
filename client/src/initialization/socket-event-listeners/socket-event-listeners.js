@@ -32,6 +32,7 @@ import {
   handleCmdRejected,
   emitRequestView,
   seedClientSeq,
+  getProtocolVersion,
 } from '../../setup/netcode/cmd-emitter.js';
 import {
   buildPeerLogResponse,
@@ -181,15 +182,29 @@ export const initializeSocketEventListeners = () => {
     systemState,
   });
 
-  socket.on('joinGame', (data) => {
+  socket.on('joinGame', async (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
-    if (systemState.serverAuthoritative && data?.protocolVersion && data.protocolVersion !== '2.0.0') {
+    const protocolVersion = await getProtocolVersion();
+    if (
+      systemState.serverAuthoritative &&
+      data?.protocolVersion &&
+      protocolVersion &&
+      data.protocolVersion !== protocolVersion
+    ) {
       appendMessage(
         '',
         'A new version of the game is available. Please reload the page.',
         'announcement',
         false
       );
+      // The client never reaches `systemState.isTwoPlayer = true` below, so
+      // without this the player stays seated server-side while parked in the
+      // lobby (Finding #7/#8, edge case row 11).
+      socket.emit('leaveRoom', {
+        roomId: systemState.roomId,
+        username: systemState.p2SelfUsername,
+        isSpectator: false,
+      });
       return;
     }
     const connectedRoom = document.getElementById('connectedRoom');

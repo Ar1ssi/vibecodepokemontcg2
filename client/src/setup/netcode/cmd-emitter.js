@@ -8,6 +8,24 @@ let clientSeq = 0;
 const pendingElements = new Set();
 
 let cachedValidateShape = null;
+let cachedProtocolVersion = null;
+
+/**
+ * Resolves the shared engine commands module across browser and Node.js loaders.
+ *
+ * @returns {Promise<object|null>}
+ */
+async function loadCommandsModule() {
+  try {
+    return await import('/shared/engine/commands.mjs');
+  } catch {
+    try {
+      return await import('../../../../shared/engine/commands.mjs');
+    } catch {
+      return null;
+    }
+  }
+}
 
 /**
  * Resolves validateCommandShape across browser and Node.js loaders.
@@ -16,20 +34,22 @@ let cachedValidateShape = null;
  */
 export async function getShapeValidator() {
   if (cachedValidateShape) return cachedValidateShape;
-
-  try {
-    const mod = await import('/shared/engine/commands.mjs');
-    cachedValidateShape = mod.validateCommandShape;
-  } catch {
-    try {
-      const mod = await import('../../../../shared/engine/commands.mjs');
-      cachedValidateShape = mod.validateCommandShape;
-    } catch {
-      cachedValidateShape = null;
-    }
-  }
-
+  const mod = await loadCommandsModule();
+  cachedValidateShape = mod?.validateCommandShape || null;
   return cachedValidateShape;
+}
+
+/**
+ * Resolves the shared PROTOCOL_VERSION constant so client and server negotiate
+ * from the same source of truth instead of a hardcoded copy (Finding #7/#8).
+ *
+ * @returns {Promise<string|null>}
+ */
+export async function getProtocolVersion() {
+  if (cachedProtocolVersion) return cachedProtocolVersion;
+  const mod = await loadCommandsModule();
+  cachedProtocolVersion = mod?.PROTOCOL_VERSION || null;
+  return cachedProtocolVersion;
 }
 
 /**
@@ -169,12 +189,15 @@ export async function emitCmd({
 
   addInFlightAffordance(element);
 
+  const protocolVersion = await getProtocolVersion();
+
   const command = {
     gameId: roomId,
     roomId,
     clientSeq: currentSeq,
     type,
     payload,
+    ...(protocolVersion ? { protocolVersion } : {}),
   };
 
   socket.emit('cmd', command);

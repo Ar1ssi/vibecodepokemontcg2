@@ -1,8 +1,9 @@
 import { socket, systemState } from '../../state.js';
-import { logSyncAction } from './sync-logger-bridge.js';
+import { logSyncAction, logSync } from './sync-logger-bridge.js';
 import { createAction } from './action-event.mjs';
 import { translateActionToCmd } from '../netcode/dual-run-bridge.js';
 import { emitCmd } from '../netcode/cmd-emitter.js';
+import { appendMessage } from '../chatbox/append-message.js';
 
 export const processAction = (user, emit, action, parameters) => {
   const notSpectator = !(
@@ -43,7 +44,17 @@ export const processAction = (user, emit, action, parameters) => {
             roomId: systemState.roomId,
             type: cmdSpec.type,
             payload: cmdSpec.payload,
-          }).catch(() => {});
+          }).then((result) => {
+            if (!result.success) {
+              logSync('emitCmd.rejected', { action, error: result.error, reason: result.reason }, 'local');
+              appendMessage(
+                '',
+                `Command failed to send: ${result.reason || result.error}`,
+                'announcement',
+                false
+              );
+            }
+          });
         }
       }
     } else if (systemState.isTwoPlayer) {

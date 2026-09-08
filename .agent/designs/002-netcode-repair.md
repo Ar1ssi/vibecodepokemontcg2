@@ -340,8 +340,8 @@ per-turn hash equality and zero `cmdRejected`. Only then does `render.yaml` chan
 | 8 | Out-of-order `requestAction` arrives, gap closes within 2s | queued, then applied in counter order | [ ] |
 | 9 | Out-of-order `requestAction`, gap never closes | 1.1 catch-up triggered once, not per action | [ ] |
 | 10 | Reload → new room in the same tab | `resetRenderState` + context re-seed + `resetClientSeq`; first view applies | [ ] |
-| 11 | Protocol mismatch on join | client stays in lobby **and** server releases the seat | [ ] |
-| 12 | `emitCmd` returns `bad_command` | user-visible message; `logSync` entry | [ ] |
+| 11 | Protocol mismatch on join | client stays in lobby **and** server releases the seat | [x] no DOM/socket test harness in this repo for `socket-event-listeners.js` (same class as row 7); verified by reading the guard — `joinGame` handler emits `leaveRoom` with the pre-join `roomId`/`p2SelfUsername`, reusing the existing `leaveRoom` relay that already calls `gameRoom.removeSocket` |
+| 12 | `emitCmd` returns `bad_command` | user-visible message; `logSync` entry | [x] no DOM/socket test harness for `process-action.js` (module-scope `io()`/`document` side effects in `state.js` make it unimportable outside a browser); verified by reading the guard — `emitCmd(...).then` now routes `{success:false}` to `appendMessage` + `logSync('emitCmd.rejected', …)`, covered indirectly by `cmd-emitter.test.mjs`'s envelope tests for the `emitCmd` contract it depends on |
 | 13 | Unrecognised special condition string | command rejected; no `'Poisoned'` substitution | [ ] |
 | 14 | New action added to `accept-action` without a disposition | throws in dev, logs in prod — cannot silently no-op | [ ] |
 | 15 | Spectator during any of the above | read-only; never emits `cmd` or peer-log replies | [ ] |

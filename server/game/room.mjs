@@ -170,6 +170,7 @@ export class GameRoom {
     if (playerId) {
       this.socketToPlayer.delete(socketId);
       this.playerToSocket.delete(playerId);
+      this.clientSeqByPlayer.delete(playerId);
     }
   }
 
