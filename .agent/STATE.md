@@ -4,17 +4,22 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 68
-Focus: Closed I19, then flipped SERVER_AUTHORITATIVE (D17) on user's explicit go-ahead.
-Active: I19 — `revealCards`/`hideCards`/`revealShortcut`/`hideShortcut` reclassified
-  'server_command' in DISPOSITION_TABLE; new COMMAND_SCHEMAS + reduce.mjs cases flip
-  `card.revealed` on the sender's OWN zone only (`draft.players[playerId]`, position-addressed
-  like takePrizesByIndex — D16). Opponent-triggered reveal (legacy honor-system path)
-  intentionally left ungated. Then D17: `render.yaml`'s `SERVER_AUTHORITATIVE` set `'0' -> '1'`.
-  `server.js`'s own default (no env var) is still OFF — only the prod deploy config changed.
-Next: production now boots server-authoritative on next deploy. Watch for I25-class display
-  staleness or anything the flip-gate's synthetic play didn't cover, once real games run against
-  it. Everything is uncommitted, no branch, per standing instruction — render.yaml included.
+Session: 69
+Focus: Added an "Energy" tab to the native deck builder's Browse Sets panel (unrelated to
+  netcode work above — user-requested UI feature).
+Active: done. `client/src/setup/deck-builder/core/set-browser.mjs` gained `ENERGY_SET_ID`,
+  `fetchLegalEnergyCards()` (cross-references global `/cards?category=Energy` TCGdex summaries
+  against each Standard-legal set's cached full record to get images — see D18) and
+  `fetchSetCards()` special-cases it. `fetchLegalStandardSets()` appends it last (39 cards at
+  test time: 8 modern basics + 8 gold secret rares + 23 special/rare variants like
+  Ignition/Spiky/Mist/Shadowy Darkness/Bubbly Water Energy). The 8 modern basics (Grass..Metal)
+  are hardcoded in `getModernBasicEnergyCards()` with art hotlinked from pkmncards.com — TCGdex
+  has zero image data for the "mee" (Mega Evolution Energy) support set (D18). Tab icon is the
+  user-supplied colorless-energy image, saved to `client/src/assets/energy/colorless.png`,
+  served statically at `/src/assets/energy/colorless.png`. Verified live: pnpm start + browser
+  click-through, tab renders last in the Standard 2026-27 row, expands, images load, filter/
+  add-to-deck work.
+Next: nothing pending on this thread. Netcode Next (S68) still applies — see journal S68b.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -36,9 +41,8 @@ Blocked: nothing.
   `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js` then `PTCG_URL=http://localhost:4100`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S69 2026-09-10 feat(deck-builder): Energy tab added to Browse Sets (D18). See Focus above.
 - S68b 2026-09-10 chore(002 D17): SERVER_AUTHORITATIVE flipped on in render.yaml. User's call,
   3.12 exit test passing, all known flip-time gaps (I25/I27/I19) closed.
 - S68 2026-09-10 fix(002 I19): closed I19. Reveal/hide now real server_commands, own-zone-only
   (D16). 1208/1208 pnpm test, pnpm test:2p ALL PASS (flag off).
-- S67 2026-09-09 fix(002 I27): closed I27. `dealOrder` broadcast now carries the authoritative
-  starter; client's coin flip (and its peer mirror) use it instead of guessing. 1197/1197 pnpm test.

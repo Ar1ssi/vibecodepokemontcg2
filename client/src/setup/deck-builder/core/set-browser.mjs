@@ -102,6 +102,12 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
   ];
     
     const setRecordCache = new Map();
+
+    // Synthetic "set" id for the Energy tab — aggregates every Energy card
+    // (basic + special + rarer variants) printed in a Standard-legal set.
+    export const ENERGY_SET_ID = '__energy__';
+    const ENERGY_SET_LOGO = 'src/assets/energy/colorless.png';
+    let energySummaryCache = null;
     
     async function fetchJson(url, options = {}) {
       const response = await fetch(url, options);
@@ -174,15 +180,166 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
           }
         })
       );
-    
-      return entries
+
+      const sets = entries
         .filter(Boolean)
         .filter((entry) => entry.cardCount > 0)
         .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+
+      try {
+        const energyCards = await fetchLegalEnergyCards();
+        if (energyCards.length > 0) {
+          sets.push({
+            setId: ENERGY_SET_ID,
+            name: 'Energy',
+            seriesId: '',
+            releaseDate: '',
+            logo: ENERGY_SET_LOGO,
+            symbol: '',
+            cardCount: energyCards.length,
+            category: 'standard',
+          });
+        }
+      } catch {
+        // Energy tab is additive — a lookup failure shouldn't break the rest of the browser.
+      }
+
+      return sets;
+    }
+
+    // Every Energy card (id + localId + name) across all TCGdex sets.
+    async function fetchEnergyCardSummaries() {
+      if (energySummaryCache) return energySummaryCache;
+      const url = new URL(`${TCGDEX_BASE}/cards`);
+      url.searchParams.set('category', 'Energy');
+      energySummaryCache = fetchJson(url.toString()).catch((error) => {
+        energySummaryCache = null;
+        throw error;
+      });
+      return energySummaryCache;
+    }
+
+    // The Mega Evolution Energy (MEE) support product — the modern-standard basic
+    // energy reprint for the current era — has no `image` in TCGdex at all (its
+    // /sets/mee and /cards/mee-* records both omit the field), so it's hardcoded here
+    // with art hotlinked from pkmncards.com, the same way every other card here is
+    // hotlinked from TCGdex's own asset CDN.
+    const MODERN_BASIC_ENERGY_TYPES = [
+      { localId: '001', type: 'Grass' },
+      { localId: '002', type: 'Fire' },
+      { localId: '003', type: 'Water' },
+      { localId: '004', type: 'Lightning' },
+      { localId: '005', type: 'Psychic' },
+      { localId: '006', type: 'Fighting' },
+      { localId: '007', type: 'Darkness' },
+      { localId: '008', type: 'Metal' },
+    ];
+    const MEE_SET = { id: 'mee', name: 'Mega Evolution Energy', releaseDate: '' };
+
+    function getModernBasicEnergyCards() {
+      return MODERN_BASIC_ENERGY_TYPES.map(({ localId, type }) => {
+        const image = `https://pkmncards.com/wp-content/uploads/mee_en_${localId}_std.jpg`;
+        return {
+          id: `mee-${localId}`,
+          name: `${type} Energy`,
+          localId,
+          image,
+          images: { small: image, large: image },
+          set: MEE_SET,
+          _provider: 'pkmncards-set-browser',
+        };
+      });
+    }
+
+    // The gold secret rare "Basic {Type} Energy" cards are each a one-off print in a
+    // set that has since rotated out of Standard (sv01/sv02/sv03/151); the Standard-
+    // legal sv06.5 (Shrouded Fable) already has its own Darkness/Metal gold prints,
+    // which the normal registry sweep below picks up without help.
+    const EXTRA_ENERGY_CARD_REFS = [
+      { id: 'sv01-257', setId: 'sv01', series: 'sv' }, // Basic Lightning Energy (gold)
+      { id: 'sv01-258', setId: 'sv01', series: 'sv' }, // Basic Fighting Energy (gold)
+      { id: 'sv02-278', setId: 'sv02', series: 'sv' }, // Basic Grass Energy (gold)
+      { id: 'sv02-279', setId: 'sv02', series: 'sv' }, // Basic Water Energy (gold)
+      { id: 'sv03-230', setId: 'sv03', series: 'sv' }, // Basic Fire Energy (gold)
+      { id: 'sv03.5-207', setId: 'sv03.5', series: 'sv' }, // Basic Psychic Energy (gold)
+    ];
+
+    async function fetchExtraEnergyCards() {
+      const refsBySetId = new Map();
+      for (const ref of EXTRA_ENERGY_CARD_REFS) {
+        if (!refsBySetId.has(ref.setId)) refsBySetId.set(ref.setId, { series: ref.series, ids: [] });
+        refsBySetId.get(ref.setId).ids.push(ref.id);
+      }
+
+      const cardGroups = await Promise.all(
+        [...refsBySetId.entries()].map(async ([setId, { series, ids }]) => {
+          try {
+            const record = await fetchSetRecord(setId, series);
+            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
+            const cardsById = new Map((record.cards || []).map((card) => [card.id, card]));
+            return ids
+              .map((id) => cardsById.get(id))
+              .filter((card) => card?.id && card?.name && card.image)
+              .map((card) => normalizeSetCard(card, set));
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      return [...getModernBasicEnergyCards(), ...cardGroups.flat()];
+    }
+
+    // Fetch every Energy card (basic, special, and rarer variants) printed in a
+    // Standard-legal set, plus the modern basic-energy reprints and gold secret
+    // rares in EXTRA_ENERGY_CARD_REFS. The /cards?category=Energy summary has no
+    // image, so once we know which sets contain a match we hydrate images from
+    // each set's already-cached full record.
+    export async function fetchLegalEnergyCards() {
+      const summaries = await fetchEnergyCardSummaries();
+      const legalSetEntries = LEGAL_SET_REGISTRY.filter((entry) => (entry.category || 'standard') !== 'other');
+
+      const summariesBySetId = new Map();
+      for (const summary of summaries) {
+        const entry = legalSetEntries.find((candidate) => String(summary.id || '').startsWith(`${candidate.setId}-`));
+        if (!entry) continue;
+        if (!summariesBySetId.has(entry.setId)) summariesBySetId.set(entry.setId, { entry, summaries: [] });
+        summariesBySetId.get(entry.setId).summaries.push(summary);
+      }
+
+      const [cardGroups, extraCards] = await Promise.all([
+        Promise.all(
+          [...summariesBySetId.values()].map(async ({ entry, summaries: setSummaries }) => {
+            try {
+              const record = await fetchSetRecord(entry.setId, entry.series);
+              const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
+              const cardsById = new Map((record.cards || []).map((card) => [card.id, card]));
+              return setSummaries
+                .map((summary) => cardsById.get(summary.id))
+                .filter((card) => card?.id && card?.name && card.image)
+                .map((card) => normalizeSetCard(card, set));
+            } catch {
+              return [];
+            }
+          })
+        ),
+        fetchExtraEnergyCards(),
+      ]);
+
+      const seenIds = new Set();
+      const allCards = [...cardGroups.flat(), ...extraCards].filter((card) => {
+        if (seenIds.has(card.id)) return false;
+        seenIds.add(card.id);
+        return true;
+      });
+
+      return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
     
     // Fetch all cards of one legal set (only those with images).
     export async function fetchSetCards(setId) {
+      if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
+
       const record = await fetchSetRecord(setId);
       const set = {
         id: record.id,
