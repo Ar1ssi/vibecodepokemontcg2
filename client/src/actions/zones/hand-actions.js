@@ -7,6 +7,7 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { setupDealPlan } from '../general/setup-deal.mjs';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 const dealMoveOpts = () => (systemState.syncReplaying ? { syncReplay: true } : {});
 
@@ -60,6 +61,15 @@ export const discardAndDraw = async (user, initiator, drawAmount, emit = true) =
     processAction(user, emit, 'discardAndDraw', [oInitiator, drawAmount]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('discardAndDraw', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [drawAmount],
+    })
+  )
+    return;
 
   if (!isNaN(drawAmount) && drawAmount >= 0) {
     for (let i = 0; i < discardAmount; i++) {
@@ -112,6 +122,15 @@ export const shuffleAndDraw = async (
     ]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('shuffleAndDraw', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [drawAmount, indices],
+    })
+  )
+    return;
 
   if (!isNaN(drawAmount) && drawAmount >= 0) {
     for (let i = 0; i < shuffleAmount; i++) {
@@ -170,6 +189,15 @@ export const shuffleBottomAndDraw = async (
     ]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('shuffleBottomAndDraw', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [drawAmount, indices],
+    })
+  )
+    return;
 
   if (!isNaN(drawAmount) && drawAmount >= 0) {
     indices = indices ? indices : shuffleIndices(shuffleAmount);

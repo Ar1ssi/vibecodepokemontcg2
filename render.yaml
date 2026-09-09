@@ -10,4 +10,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: SERVER_AUTHORITATIVE
-        value: '0'
+        value: '1'

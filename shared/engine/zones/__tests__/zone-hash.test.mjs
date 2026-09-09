@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hashCardList, hashBoardSnapshot } from '../zone-hash.mjs';
+import { hashCardList, hashBoardSnapshot, hashZoneMap } from '../zone-hash.mjs';
 
 // Regression test for the sync-check blind spot: damage counters, special
 // conditions, and ability-used markers live only on card.image (a DOM
@@ -64,4 +64,43 @@ test('hashBoardSnapshot catches a single divergent Pokémon buried in a full boa
     bench: { array: [makeCard({ name: 'Eevee', number: '133' })] },
   };
   assert.notEqual(hashBoardSnapshot(selfZones), hashBoardSnapshot(oppView));
+});
+
+// Design 002 slice 3.11: a sync check needs to name the specific zone that
+// diverged, not just "the board", so hashZoneMap keeps per-zone hashes apart
+// instead of joining them into one string like hashBoardSnapshot does.
+
+test('hashZoneMap returns one hash per zone key', () => {
+  const zones = {
+    active: { array: [makeCard({ damage: 30 })] },
+    bench: { array: [makeCard({ name: 'Eevee', number: '133' })] },
+  };
+  const map = hashZoneMap(zones);
+  assert.deepEqual(Object.keys(map).sort(), ['active', 'bench']);
+  assert.equal(map.active, hashCardList([makeCard({ damage: 30 })]));
+});
+
+test('hashZoneMap matches the per-zone breakdown hashBoardSnapshot joins together', () => {
+  const zones = {
+    active: { array: [makeCard({ damage: 30 })] },
+    bench: { array: [makeCard({ name: 'Eevee', number: '133' })] },
+  };
+  const map = hashZoneMap(zones);
+  const joined = Object.keys(map)
+    .map((id) => `${id}:${map[id]}`)
+    .join(';');
+  assert.equal(joined, hashBoardSnapshot(zones));
+});
+
+test('hashZoneMap isolates a divergence to one zone', () => {
+  const before = hashZoneMap({
+    active: { array: [makeCard({ damage: 30 })] },
+    bench: { array: [makeCard({ name: 'Eevee', number: '133' })] },
+  });
+  const after = hashZoneMap({
+    active: { array: [makeCard({ damage: 60 })] },
+    bench: { array: [makeCard({ name: 'Eevee', number: '133' })] },
+  });
+  assert.notEqual(before.active, after.active);
+  assert.equal(before.bench, after.bench);
 });

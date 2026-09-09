@@ -3,11 +3,24 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { acceptAction } from '../../setup/general/accept-action.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
+import { isAuthoritativeDispatchActive } from '../../setup/netcode/authoritative-dispatch.js';
 
 const undoAsync = async (user, filteredActionData, emit = true) => {
   return new Promise((resolve, reject) => {
     if (user === 'opp' && emit && systemState.isTwoPlayer) {
       processAction(user, emit, 'undo', [filteredActionData]);
+      return;
+    }
+
+    // Design 003 slice 6: under serverAuthoritative, the server's own commandLog-minus-tail
+    // replay (002 slice 3.4e) is the sole undo mechanism. Replaying locally through
+    // acceptAction here would re-enter every gated action's own dispatch gate — each one
+    // would call processAction, which is a no-op while isUndoInProgress is true, so the
+    // local replay would silently do nothing anyway. Skip it outright instead of relying on
+    // that guard interaction; the trailing processAction('undo') call below sends the real
+    // server command once isUndoInProgress is cleared.
+    if (isAuthoritativeDispatchActive() && user === 'self' && emit) {
+      resolve();
       return;
     }
     if (!filteredActionData) {

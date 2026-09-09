@@ -28,6 +28,18 @@ client/src/setup/netcode/request-action-queue.js — counter-ordered requestActi
 slice 1.2); gap open past 2s falls through to peer-log-catchup instead of misapplying
 client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diagnostics ring buffer
 client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
+client/src/setup/netcode/sync-check.js + server/game/sync-check.mjs — desync detection (design 002
+slice 3.11): client heartbeat sends per-zone hashes, server names first divergent zone, recovery
+routes into peer-log-catchup.js above (no second recovery mechanism). `viewBackedGetZone`
+(client) and `excludeOwnerSecretZones` (server) added S64/I24: hashes read through
+`apply-view.js`'s view cache, not legacy `zoneArrays` (never populated), and `deck` is dropped
+from the comparison (owner-secret, O4-A/I5)
+client/src/setup/netcode/authoritative-dispatch.js — gated-action dispatch primitive (design 003
+slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAction injected, not
+imported. Fails open to the legacy body when a command cannot be translated (D12)
+client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
+resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
+server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
@@ -61,6 +73,8 @@ client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
 
 ## Tests & tooling
 client/src/**/__tests__/*.mjs — 41 files, plain `node --test`, no jsdom; `pnpm test` (797 tests)
-two-player-sync-test.mjs — Playwright two-browser sync harness
+two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
+flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
+  3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
 *-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
 

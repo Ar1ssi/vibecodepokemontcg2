@@ -6,6 +6,7 @@ import {
   findCard,
   getAttachedCards,
   hashState,
+  hashStateZones,
   cloneGameState,
   PLAYER_ZONES,
 } from '../state.mjs';
@@ -145,6 +146,42 @@ test('hashState produces identical fingerprints for identical states and detects
   pikaB.damage = 30;
   assert.notEqual(hashState(stateA, 'p1'), hashState(stateB, 'p1'));
   assert.notEqual(hashState(stateA), hashState(stateB));
+});
+
+test('hashStateZones names the one zone that diverges, matching hashState for the whole player', () => {
+  const stateA = createGameState({
+    players: { p1: { username: 'Ash' } },
+  });
+  const stateB = createGameState({
+    players: { p1: { username: 'Ash' } },
+  });
+
+  const pikaA = createCard({ instanceId: 1, name: 'Pikachu', set: 'base1', number: '25' });
+  const pikaB = createCard({ instanceId: 1, name: 'Pikachu', set: 'base1', number: '25' });
+  const eeveeA = createCard({ instanceId: 2, name: 'Eevee', set: 'base1', number: '51' });
+  const eeveeB = createCard({ instanceId: 2, name: 'Eevee', set: 'base1', number: '51' });
+
+  stateA.players.p1.zones.active.push(pikaA);
+  stateB.players.p1.zones.active.push(pikaB);
+  stateA.players.p1.zones.bench.push(eeveeA);
+  stateB.players.p1.zones.bench.push(eeveeB);
+
+  // Identical boards: every zone hash matches.
+  assert.deepEqual(hashStateZones(stateA, 'p1'), hashStateZones(stateB, 'p1'));
+
+  // Diverge only the bench.
+  eeveeB.damage = 30;
+  const zonesA = hashStateZones(stateA, 'p1');
+  const zonesB = hashStateZones(stateB, 'p1');
+  assert.equal(zonesA.active, zonesB.active);
+  assert.notEqual(zonesA.bench, zonesB.bench);
+  assert.notEqual(hashState(stateA, 'p1'), hashState(stateB, 'p1'));
+});
+
+test('hashStateZones returns null for an unknown player', () => {
+  const state = createGameState({ players: { p1: { username: 'Ash' } } });
+  assert.equal(hashStateZones(state, 'p2'), null);
+  assert.equal(hashStateZones(null, 'p1'), null);
 });
 
 test('cloneGameState creates deep copy without shared references', () => {

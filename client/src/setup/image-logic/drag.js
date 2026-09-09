@@ -11,6 +11,7 @@ import { getZone } from '../zones/get-zone.js';
 import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { identifyCard } from './click-events.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
+import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
 
 const popupContainers = [
@@ -247,6 +248,7 @@ export const drop = (event) => {
   ) {
     let dZoneId;
     let targetIndex;
+    let targetInstanceId = null;
     // if target image exists and it isn't itself
     if (
       event.target.tagName === 'IMG' &&
@@ -258,6 +260,10 @@ export const drop = (event) => {
         getZone(event.target.user, dZoneId),
         event.target
       );
+      // Design 003 slice 1: the authoritative gate addresses the evolve/attach target
+      // by server identity, not by `targetIndex` (which resolves against the legacy
+      // zone array and is empty once rendering comes from server views).
+      targetInstanceId = readCardInstanceId(event.target);
     } else if (event.target.tagName === 'IMG') {
       dZoneId = zoneOf(event.target)?.id;
     } else {
@@ -313,7 +319,13 @@ export const drop = (event) => {
           dZoneId,
           mouseClick.cardIndex,
           targetIndex,
-          'move'
+          'move',
+          true,
+          null,
+          {
+            moving: readCardInstanceId(draggedImage) ?? mouseClick.cardInstanceId,
+            target: targetInstanceId,
+          }
         );
       }
     }

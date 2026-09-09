@@ -9,7 +9,11 @@ import { convertZoneName } from '../move-card-bundle/move-card-message.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { sort } from '../zones/general.js';
 import { deselectCard } from './close-popups.js';
-import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import {
+  hydrateHolo,
+  unhydrateHolo,
+} from '../../setup/deck-constructor/hydrate-holo.js';
+import { dispatchAuthoritativeAction } from '../../setup/netcode/authoritative-dispatch.js';
 
 const toggleCard = (card, targetCardBackSrc) => {
   if (card.image.src !== targetCardBackSrc) {
@@ -151,6 +155,15 @@ export const stopLookingAtCards = (
 };
 
 export const revealCards = (user, initiator, zoneId, emit = true) => {
+  if (
+    dispatchAuthoritativeAction('revealCards', {
+      user,
+      emit,
+      commandArgs: [zoneId],
+    })
+  )
+    return;
+
   const prizesCount = getZone(user, 'prizes').getCount();
   for (let i = 0; i < prizesCount; i++) {
     revealShortcut(user, initiator, zoneId, i, false, false);
@@ -182,6 +195,15 @@ export const revealCards = (user, initiator, zoneId, emit = true) => {
 };
 
 export const hideCards = (user, initiator, zoneId, emit = true) => {
+  if (
+    dispatchAuthoritativeAction('hideCards', {
+      user,
+      emit,
+      commandArgs: [zoneId],
+    })
+  )
+    return;
+
   const prizesCount = getZone(user, 'prizes').getCount();
   for (let i = 0; i < prizesCount; i++) {
     hideShortcut(user, initiator, zoneId, i, false, false);
@@ -220,6 +242,15 @@ export const revealShortcut = (
   message = true,
   emit = true
 ) => {
+  if (
+    dispatchAuthoritativeAction('revealShortcut', {
+      user,
+      emit,
+      commandArgs: [zoneId, index],
+    })
+  )
+    return;
+
   const zone = getZone(user, zoneId);
   const card = zone.array[index];
   card.image.faceDown = false;
@@ -295,6 +326,15 @@ export const hideShortcut = (
   message = true,
   emit = true
 ) => {
+  if (
+    dispatchAuthoritativeAction('hideShortcut', {
+      user,
+      emit,
+      commandArgs: [zoneId, index],
+    })
+  )
+    return;
+
   const zone = getZone(user, zoneId);
   const card = zone.array[index];
 

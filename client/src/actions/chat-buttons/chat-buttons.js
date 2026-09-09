@@ -76,6 +76,7 @@ import {
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { dispatchAuthoritativeAction } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 
@@ -454,6 +455,18 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
     processAction(user, emit, 'attack', [attackIndex, rngBundle]);
     return;
   }
+
+  // design 003 slice 5: under server authority the whole legacy attack body (damage math,
+  // status coins, KO flow, local turn end) belongs to the server; the returned view is the
+  // only thing that renders the result.
+  if (
+    dispatchAuthoritativeAction('attack', {
+      user,
+      emit,
+      commandArgs: [attackIndex, rngBundle],
+    })
+  )
+    return;
 
   if (rulesState.enabled) {
     const check = canPerformAction({ user, action: 'attack' });
@@ -2206,6 +2219,11 @@ export const retreat = async (user, emit = true) => {
     return;
   }
 
+  // design 003 slice 5: the server pays the retreat cost and swaps active/bench itself
+  // (reduce.mjs `retreat`), so the legacy energy-discard and moveCard swap are skipped.
+  if (dispatchAuthoritativeAction('retreat', { user, emit, commandArgs: [] }))
+    return;
+
   if (rulesState.enabled) {
     const check = canPerformAction({ user, action: 'retreat' });
     if (!check.allowed) {
@@ -3833,6 +3851,13 @@ export const pass = (user, rngOrEmit = true, maybeEmit) => {
     return;
   }
 
+  // design 003 gap found in S65: pass is DISPOSITION_TABLE's slice-5 family
+  // (same as attack/retreat/stadium-effect) but was never gated — under
+  // server authority the local body below (discardBoard, endTurnWithBanner)
+  // must not run; the server's own pass reducer owns turn advance.
+  if (dispatchAuthoritativeAction('pass', { user, emit, commandArgs: [rngBundle] }))
+    return;
+
   if (rulesState.enabled) {
     const check = canPerformAction({ user, action: 'pass' });
     if (!check.allowed) {
@@ -4157,6 +4182,18 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     processAction(user, emit, 'stadium-effect', [payload]);
     return;
   }
+
+  // design 003 slice 5: the server's resumable stadium executor (`executeStadium`) resolves
+  // the effect, including any pick, so the legacy search/draw/heal body is skipped.
+  if (
+    dispatchAuthoritativeAction('stadium-effect', {
+      user,
+      emit,
+      commandArgs: [payload],
+    })
+  )
+    return;
+
   // Mirror: card moves already arrived via moveCardBundle. Only mark used.
   if (!emit) {
     if (rulesState.enabled) markStadiumUsed(user);

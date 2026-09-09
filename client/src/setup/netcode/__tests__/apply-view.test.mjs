@@ -9,6 +9,10 @@ import {
   setDefaultNetcodeContext,
   getDefaultNetcodeContext,
   reconcileGameEnded,
+  reconcileTurnState,
+  hasAuthoritativeView,
+  getAuthoritativeZoneArray,
+  getAuthoritativeStadiumArray,
 } from '../apply-view.js';
 
 class MockClassList {
@@ -40,6 +44,7 @@ class MockElement {
     this.listeners = new Map();
     this.textContent = '';
     this.disabled = false;
+    this.style = {};
   }
 
   get className() {
@@ -88,6 +93,10 @@ class MockElement {
     return child;
   }
 
+  append(...nodes) {
+    nodes.forEach((n) => this.appendChild(n));
+  }
+
   addEventListener(type, fn) {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, []);
@@ -133,6 +142,20 @@ class MockDocument {
   constructor() {
     this.body = new MockElement('body', this);
     this.elementsById = new Map();
+    this.listeners = new Map();
+  }
+
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
+    }
+    this.listeners.get(type).push(fn);
+  }
+
+  dispatchEvent(event) {
+    const fns = this.listeners.get(event.type) || [];
+    fns.forEach((fn) => fn(event));
+    return true;
   }
 
   createElement(tagName) {
@@ -154,12 +177,17 @@ class MockDocument {
   }
 }
 
+const COVER_ZONE_IDS = ['deck', 'discard', 'lostZone'];
+
 function setupMockDom() {
   const doc = new MockDocument();
   doc.registerElement('stadium', doc.createElement('div'));
 
   const selfMat = doc.registerElement('selfMat', doc.createElement('div'));
   const oppMat = doc.registerElement('oppMat', doc.createElement('div'));
+
+  const selfCovers = {};
+  const oppCovers = {};
 
   ['hand', 'active', 'bench', 'discard', 'prizes', 'lostZone', 'deck'].forEach((zid) => {
     const sEl = doc.createElement('div');
@@ -169,15 +197,28 @@ function setupMockDom() {
     const oEl = doc.createElement('div');
     oEl.id = zid;
     oppMat.appendChild(oEl);
+
+    if (COVER_ZONE_IDS.includes(zid)) {
+      const sCover = doc.createElement('div');
+      sCover.id = `${zid}Cover`;
+      selfMat.appendChild(sCover);
+      selfCovers[zid] = sCover;
+
+      const oCover = doc.createElement('div');
+      oCover.id = `${zid}Cover`;
+      oppMat.appendChild(oCover);
+      oppCovers[zid] = oCover;
+    }
   });
 
   const mockGetZone = (side, zoneId) => {
     const root = side === 'you' ? selfMat : oppMat;
+    const covers = side === 'you' ? selfCovers : oppCovers;
     const element = root.querySelector(`#${zoneId}`);
-    return { element, array: [] };
+    return { element, array: [], elementCover: covers[zoneId] || null };
   };
 
-  return { doc, mockGetZone };
+  return { doc, mockGetZone, selfCovers, oppCovers };
 }
 
 beforeEach(() => {
@@ -690,10 +731,10 @@ test('Finding 12: applyView mounts Victory modal and dispatches rules-game-ended
   assert.ok(reason);
   assert.equal(reason.textContent, 'Reason: all prize cards taken');
 
-  assert.equal(eventsDispatched.length, 1);
-  assert.equal(eventsDispatched[0].type, 'rules-game-ended');
-  assert.equal(eventsDispatched[0].detail.isWinner, true);
-  assert.equal(eventsDispatched[0].detail.winner, 'p1');
+  const gameEndedEvents = eventsDispatched.filter((e) => e.type === 'rules-game-ended');
+  assert.equal(gameEndedEvents.length, 1);
+  assert.equal(gameEndedEvents[0].detail.isWinner, true);
+  assert.equal(gameEndedEvents[0].detail.winner, 'p1');
 
   assert.ok(callbackResult);
   assert.equal(callbackResult.isWinner, true);
@@ -779,4 +820,714 @@ test('Finding 12: reconcileGameEnded export directly handles spectator view', ()
   assert.equal(title.textContent, 'Ash Wins!');
 });
 
+// --- Design 002 slice 3.6: shared image factory + real getZone wiring ---
 
+test('Row 20: without injected cardListeners, authoritative card stays a bare non-interactive <img> (unchanged pre-3.6 behavior)', () => {
+  const { doc, mockGetZone } = setupMockDom();
+
+  const view = {
+    gameId: 'g-3.6-bare',
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { hand: [{ instanceId: 1, name: 'Pikachu', src: '/a.png' }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(view, [], { document: doc, getZone: mockGetZone });
+
+  const img = getCardRegistry().get(1).element;
+  assert.equal(img.listeners.size, 0);
+  assert.equal(img.card, undefined);
+});
+
+test('Row 20: with cardListeners injected, authoritative card gets the exact same listener table as legacy Card', () => {
+  const { doc, mockGetZone } = setupMockDom();
+
+  const fired = [];
+  const cardListeners = {
+    click: () => fired.push('click'),
+    dblclick: () => fired.push('dblclick'),
+    dragstart: () => fired.push('dragstart'),
+    dragover: () => fired.push('dragover'),
+    dragleave: () => fired.push('dragleave'),
+    dragend: () => fired.push('dragend'),
+    contextmenu: () => fired.push('contextmenu'),
+  };
+
+  const view = {
+    gameId: 'g-3.6-listeners',
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { hand: [{ instanceId: 1, name: 'Pikachu', src: '/a.png' }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(view, [], { document: doc, getZone: mockGetZone, cardListeners });
+
+  const img = getCardRegistry().get(1).element;
+  for (const type of Object.keys(cardListeners)) {
+    img.dispatchEvent({ type, target: img });
+  }
+  assert.deepEqual(fired.sort(), Object.keys(cardListeners).sort());
+
+  // Read-shim for identifyCard/findZoneCardIndex, not a legacy Card instance.
+  assert.equal(img.card.instanceId, 1);
+  assert.equal(img.attached, false);
+  assert.equal(img.user, 'self');
+  assert.equal(img.getAttribute('draggable'), 'true');
+});
+
+test('Row 20: listeners are attached exactly once per element across repeated views (no double-registration)', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  let clicks = 0;
+  const cardListeners = { click: () => clicks++ };
+
+  const v1 = {
+    gameId: 'g-3.6-once',
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { hand: [{ instanceId: 1, name: 'Pikachu', src: '/a.png' }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  const v2 = { ...v1, stateVersion: 2 };
+
+  applyView(v1, [], { document: doc, getZone: mockGetZone, cardListeners });
+  applyView(v2, [], { document: doc, getZone: mockGetZone, cardListeners });
+
+  const img = getCardRegistry().get(1).element;
+  img.dispatchEvent({ type: 'click', target: img });
+  assert.equal(clicks, 1);
+});
+
+test('getZone wiring: resolveZone prefers injected defaultNetcodeContext.getZone over the doc.getElementById fallback, adapting you/them to self/opp', () => {
+  const { doc } = setupMockDom();
+  const calls = [];
+  const realGetZone = (user, zoneId) => {
+    calls.push([user, zoneId]);
+    const el = doc.createElement('div');
+    el.id = zoneId;
+    return { element: el, array: [] };
+  };
+
+  setDefaultNetcodeContext({ getZone: realGetZone });
+
+  const view = {
+    gameId: 'g-3.6-getzone',
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { hand: [{ instanceId: 1, name: 'Pikachu', src: '/a.png' }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  const res = applyView(view, [], { document: doc });
+
+  assert.equal(res.applied, true);
+  assert.ok(calls.some(([user, zoneId]) => user === 'self' && zoneId === 'active'));
+  assert.ok(calls.some(([user, zoneId]) => user === 'opp' && zoneId === 'active'));
+  assert.ok(calls.some(([user, zoneId]) => user === 'self' && zoneId === 'hand'));
+  assert.ok(calls.every(([user]) => user === 'self' || user === 'opp'));
+
+  resetRenderState();
+});
+
+test('getZone wiring: an explicit options.getZone test seam still overrides the injected default', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  setDefaultNetcodeContext({
+    getZone: () => {
+      throw new Error('default getZone must not be called when options.getZone is provided');
+    },
+  });
+
+  const view = {
+    gameId: 'g-3.6-seam',
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  };
+  const res = applyView(view, [], { document: doc, getZone: mockGetZone });
+  assert.equal(res.applied, true);
+
+  resetRenderState();
+});
+
+// --- Design 002 slice 3.7: counter and status overlays ---
+
+test('Row 21: damage-counter overlay created when view reports damage, removed when it drops to 0', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfActive = doc.getElementById('selfMat').querySelector('#active');
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: { active: [{ instanceId: 10, name: 'Pikachu', src: '/a.png', damage: 20 }] },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+
+  const img = getCardRegistry().get(10).element;
+  assert.ok(img.damageCounter, 'damage-counter div created');
+  assert.equal(img.damageCounter.textContent, '20');
+  assert.equal(img.damageCounter.classList.contains('damage-counter'), true);
+  assert.equal(img.damageCounter.classList.contains('dmg-tier-10'), true);
+  assert.equal(img.damageCounter.parentNode, selfActive);
+
+  // Damage rises: same node, tier and text updated in place, no duplicate
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: { active: [{ instanceId: 10, name: 'Pikachu', src: '/a.png', damage: 60 }] },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+  assert.equal(img.damageCounter.textContent, '60');
+  assert.equal(img.damageCounter.classList.contains('dmg-tier-50'), true);
+  assert.equal(selfActive.children.filter((c) => c === img.damageCounter).length, 1);
+
+  // Damage cleared: overlay removed
+  const v3 = {
+    stateVersion: 3,
+    you: {
+      playerId: 'p1',
+      zones: { active: [{ instanceId: 10, name: 'Pikachu', src: '/a.png', damage: 0 }] },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v3, [], { document: doc, getZone: mockGetZone });
+  assert.equal(img.damageCounter, null);
+  // 'active' is a play-zone: the card image lives inside a .play-container, not
+  // directly in the zone element (unlike the damage-counter overlay above).
+  assert.equal(img.parentNode?.parentNode, selfActive);
+});
+
+test('Row 21: special-condition overlay created from server condition word, removed when cleared', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfActive = doc.getElementById('selfMat').querySelector('#active');
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        active: [
+          { instanceId: 20, name: 'Pikachu', src: '/a.png', specialCondition: 'Poisoned' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+
+  const img = getCardRegistry().get(20).element;
+  assert.ok(img.specialCondition, 'special-condition div created');
+  assert.equal(img.specialCondition.classList.contains('status-poison'), true);
+  assert.equal(img.specialCondition.parentNode, selfActive);
+
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: {
+        active: [{ instanceId: 20, name: 'Pikachu', src: '/a.png', specialCondition: null }],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+  assert.equal(img.specialCondition, null);
+});
+
+test('Row 21: overlays removed from the zone element when the card itself leaves the registry', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfActive = doc.getElementById('selfMat').querySelector('#active');
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        active: [
+          {
+            instanceId: 30,
+            name: 'Pikachu',
+            src: '/a.png',
+            damage: 30,
+            specialCondition: 'Burned',
+          },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+
+  const img = getCardRegistry().get(30).element;
+  const damageCounter = img.damageCounter;
+  const specialCondition = img.specialCondition;
+  assert.equal(selfActive.children.includes(damageCounter), true);
+  assert.equal(selfActive.children.includes(specialCondition), true);
+
+  // Card discarded: leaves the view entirely
+  const v2 = {
+    stateVersion: 2,
+    you: { playerId: 'p1', zones: { active: [], discard: [] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+
+  assert.equal(selfActive.children.includes(damageCounter), false);
+  assert.equal(selfActive.children.includes(specialCondition), false);
+  assert.equal(getCardRegistry().has(30), false);
+});
+
+test('Row 22 / Cover: discard/lostZone cover mirrors the real top card and updates as it changes', () => {
+  const { doc, mockGetZone, selfCovers } = setupMockDom();
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        discard: [
+          { instanceId: 1, name: 'Bulbasaur', src: '/bulbasaur.png' },
+          { instanceId: 2, name: 'Charmander', src: '/charmander.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+
+  assert.equal(selfCovers.discard.children.length, 1);
+  const coverImg = selfCovers.discard.children[0];
+  assert.equal(coverImg.id, 'discardCover');
+  assert.equal(coverImg.getAttribute('src'), '/charmander.png');
+  assert.equal(coverImg.getAttribute('alt'), 'Charmander');
+
+  // A third card discarded on top: cover follows the new top card, same
+  // element reused (not a second competing node).
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: {
+        discard: [
+          { instanceId: 1, name: 'Bulbasaur', src: '/bulbasaur.png' },
+          { instanceId: 2, name: 'Charmander', src: '/charmander.png' },
+          { instanceId: 3, name: 'Squirtle', src: '/squirtle.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+
+  assert.equal(selfCovers.discard.children.length, 1);
+  assert.equal(selfCovers.discard.children[0], coverImg);
+  assert.equal(coverImg.getAttribute('src'), '/squirtle.png');
+});
+
+test('Cover: deck cover shows only the back skin (never a face) and clears when the deck empties', () => {
+  const { doc, mockGetZone, selfCovers } = setupMockDom();
+
+  const v1 = {
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { deck: { count: 40 } } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone, cardBackSrc: 'my-back.png' });
+
+  assert.equal(selfCovers.deck.children.length, 1);
+  assert.equal(selfCovers.deck.children[0].getAttribute('src'), 'my-back.png');
+
+  const v2 = {
+    stateVersion: 2,
+    you: { playerId: 'p1', zones: { deck: { count: 0 } } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone, cardBackSrc: 'my-back.png' });
+
+  assert.equal(selfCovers.deck.children.length, 0);
+});
+
+test('Cover: discard cover is removed once the zone is emptied', () => {
+  const { doc, mockGetZone, selfCovers } = setupMockDom();
+
+  const v1 = {
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { discard: [{ instanceId: 1, name: 'Bulbasaur', src: '/b.png' }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+  assert.equal(selfCovers.discard.children.length, 1);
+
+  const v2 = {
+    stateVersion: 2,
+    you: { playerId: 'p1', zones: { discard: [] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+  assert.equal(selfCovers.discard.children.length, 0);
+});
+
+test('Finding #10: intra-zone order is reconciled to match the view array, not frozen at first placement', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfDiscard = doc.getElementById('selfMat').querySelector('#discard');
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        discard: [
+          { instanceId: 1, name: 'A', src: '/a.png' },
+          { instanceId: 2, name: 'B', src: '/b.png' },
+          { instanceId: 3, name: 'C', src: '/c.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(
+    selfDiscard.children.map((c) => c.dataset.instanceId),
+    ['1', '2', '3']
+  );
+
+  // Same membership, different order (e.g. a reveal/reorder command): the
+  // DOM must follow, not keep the stale first-seen order.
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: {
+        discard: [
+          { instanceId: 3, name: 'C', src: '/c.png' },
+          { instanceId: 1, name: 'A', src: '/a.png' },
+          { instanceId: 2, name: 'B', src: '/b.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(
+    selfDiscard.children.map((c) => c.dataset.instanceId),
+    ['3', '1', '2']
+  );
+});
+
+test('Finding #10: bench play-container order follows the view array across views', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfBench = doc.getElementById('selfMat').querySelector('#bench');
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        bench: [
+          { instanceId: 10, name: 'Pikachu', src: '/p.png' },
+          { instanceId: 11, name: 'Eevee', src: '/e.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(
+    selfBench.children.map((c) => c.dataset.instanceId),
+    ['10', '11']
+  );
+
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: {
+        bench: [
+          { instanceId: 11, name: 'Eevee', src: '/e.png' },
+          { instanceId: 10, name: 'Pikachu', src: '/p.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(
+    selfBench.children.map((c) => c.dataset.instanceId),
+    ['11', '10']
+  );
+});
+
+test('Finding #11: attached-card class is removed when a card moves from attached to top-level within a play zone', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfBench = doc.getElementById('selfMat').querySelector('#bench');
+
+  const v1 = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        bench: [
+          { instanceId: 10, name: 'Pikachu', src: '/p.png' },
+          { instanceId: 11, name: 'Energy', src: '/en.png', attachedTo: 10 },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+
+  const energyImg = getCardRegistry().get(11).element;
+  assert.equal(energyImg.classList.contains('attached-card'), true);
+
+  // Energy discarded from being attached and re-benched as its own top-level
+  // card (contrived, but exercises the code path): attachedTo cleared while
+  // the card stays in the same PLAY_ZONES zone.
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: {
+        bench: [
+          { instanceId: 10, name: 'Pikachu', src: '/p.png' },
+          { instanceId: 11, name: 'Energy', src: '/en.png' },
+        ],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone });
+
+  assert.equal(energyImg.classList.contains('attached-card'), false);
+  const playContainers = selfBench.querySelectorAll('.play-container');
+  assert.equal(playContainers.length, 2);
+});
+
+test('Hand sort hook: sortZoneCards reorders rendering without mutating the view, falls back to array order when absent', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfHand = doc.getElementById('selfMat').querySelector('#hand');
+
+  const cards = [
+    { instanceId: 1, name: 'A', src: '/a.png' },
+    { instanceId: 2, name: 'B', src: '/b.png' },
+    { instanceId: 3, name: 'C', src: '/c.png' },
+  ];
+  const view = {
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { hand: cards } },
+    them: { playerId: 'p2', zones: {} },
+  };
+
+  // No hook wired: renders in the view's own array order (unchanged behavior).
+  applyView(view, [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(
+    selfHand.children.map((c) => c.dataset.instanceId),
+    ['1', '2', '3']
+  );
+
+  // Hook wired: rendering follows the hook's order; the underlying view array
+  // is untouched (no mutation leaks back into game state).
+  const reverseSort = (side, zoneId, zoneCards) =>
+    zoneId === 'hand' ? [...zoneCards].reverse() : zoneCards;
+
+  const view2 = {
+    stateVersion: 2,
+    you: { playerId: 'p1', zones: { hand: cards } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(view2, [], { document: doc, getZone: mockGetZone, sortZoneCards: reverseSort });
+
+  assert.deepEqual(
+    selfHand.children.map((c) => c.dataset.instanceId),
+    ['3', '2', '1']
+  );
+  assert.deepEqual(
+    cards.map((c) => c.instanceId),
+    [1, 2, 3]
+  );
+});
+
+test('Row 23: reveal/look — prize card renders real art once view.mjs reveals it, reverts to cardback when re-redacted', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfPrizes = doc.getElementById('selfMat').querySelector('#prizes');
+
+  // v1: opponent's prize card is redacted (view.mjs's card.revealed === false path
+  // — see shared/engine/view.mjs redactOwnerZones/redactOpponentZones), so the
+  // stub carries only instanceId. createOrUpdateCardElement's isRedacted check
+  // (no name/src) renders the shared card-back — same mechanism Invariant 5's
+  // test above exercises, here for the prizes zone.
+  const v1 = {
+    stateVersion: 1,
+    you: { playerId: 'p1', zones: { prizes: [{ instanceId: 301 }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone, cardBackSrc: 'cardback.png' });
+
+  const prizeImg = getCardRegistry().get(301).element;
+  assert.equal(prizeImg.getAttribute('src'), 'cardback.png');
+  assert.equal(selfPrizes.querySelectorAll('img').length, 1);
+
+  // v2: card.revealed flips true server-side, so view.mjs now sends the full
+  // sanitized card (name + src) for instanceId 301 — same registry entry, no
+  // new node, src swaps to the real art. This is the "overlay renders from
+  // the view" half of edge case row 23.
+  const v2 = {
+    stateVersion: 2,
+    you: {
+      playerId: 'p1',
+      zones: { prizes: [{ instanceId: 301, name: 'Boss Orders', src: 'boss.png' }] },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v2, [], { document: doc, getZone: mockGetZone, cardBackSrc: 'cardback.png' });
+
+  assert.equal(prizeImg.getAttribute('src'), 'boss.png');
+  assert.equal(prizeImg.getAttribute('alt'), 'Boss Orders');
+
+  // v3: card.revealed flips back false, view.mjs redacts it again — the "clears
+  // when the view clears it" half. Same element, reverts to card-back rather
+  // than being torn down and rebuilt (registry entry unchanged, one node total).
+  const v3 = {
+    stateVersion: 3,
+    you: { playerId: 'p1', zones: { prizes: [{ instanceId: 301 }] } },
+    them: { playerId: 'p2', zones: {} },
+  };
+  applyView(v3, [], { document: doc, getZone: mockGetZone, cardBackSrc: 'cardback.png' });
+
+  assert.equal(prizeImg.getAttribute('src'), 'cardback.png');
+  assert.equal(selfPrizes.querySelectorAll('img').length, 1);
+  assert.equal(getCardRegistry().get(301).element, prizeImg);
+});
+
+// Design 002 I24: legacy's own zoneArrays (get-zone.js) are never populated
+// under server-authoritative rendering — sync-check.js and e2e-api.js need a
+// real live zone source instead, backed by the last view this renderer
+// actually applied.
+test('I24: hasAuthoritativeView/getAuthoritativeZoneArray/getAuthoritativeStadiumArray track the last applied view', () => {
+  const { doc, mockGetZone } = setupMockDom();
+
+  assert.equal(hasAuthoritativeView(), false);
+  assert.deepEqual(getAuthoritativeZoneArray('you', 'active'), []);
+  assert.deepEqual(getAuthoritativeStadiumArray(), []);
+
+  const v1 = {
+    stateVersion: 1,
+    stadium: { instanceId: 900, name: 'Lost City' },
+    you: {
+      playerId: 'p1',
+      zones: { active: [{ instanceId: 1, name: 'Pikachu' }], hand: [] },
+    },
+    them: { playerId: 'p2', zones: { active: [], hand: [] } },
+  };
+  applyView(v1, [], { document: doc, getZone: mockGetZone });
+
+  assert.equal(hasAuthoritativeView(), true);
+  assert.deepEqual(getAuthoritativeZoneArray('you', 'active'), [
+    { instanceId: 1, name: 'Pikachu' },
+  ]);
+  assert.deepEqual(getAuthoritativeZoneArray('them', 'active'), []);
+  assert.deepEqual(getAuthoritativeStadiumArray(), [{ instanceId: 900, name: 'Lost City' }]);
+
+  // deck is redacted to { count } even for its own owner (O4-A / I5) — never
+  // a card array in the view — must resolve to [], not throw.
+  assert.deepEqual(getAuthoritativeZoneArray('you', 'deck'), []);
+
+  resetRenderState();
+  assert.equal(hasAuthoritativeView(), false);
+  assert.deepEqual(getAuthoritativeZoneArray('you', 'active'), []);
+  assert.deepEqual(getAuthoritativeStadiumArray(), []);
+});
+
+
+// Design 002 slice 3.12: the flip gate found that nothing applied view.turn — the server
+// advanced its own turn while the client's rulesState.turnPlayer stayed frozen, so the
+// client's next command came back rejected with "It's not your turn."
+test('3.12: reconcileTurnState syncs turnPlayer/turnNumber/phase from the view', () => {
+  const local = { turnPlayer: 'self', turnNumber: 0, phase: 'setup' };
+
+  const yours = reconcileTurnState(
+    {
+      you: { playerId: 'p1' },
+      them: { playerId: 'p2' },
+      turn: { player: 'p1', isYourTurn: true, number: 3, phase: 'main' },
+    },
+    { rulesState: local }
+  );
+  assert.equal(yours.applied, true);
+  assert.equal(yours.turnPlayer, 'self');
+  assert.equal(yours.changed, false);
+  assert.equal(local.turnNumber, 3);
+  assert.equal(local.phase, 'main');
+
+  const theirs = reconcileTurnState(
+    {
+      you: { playerId: 'p1' },
+      them: { playerId: 'p2' },
+      turn: { player: 'p2', isYourTurn: false, number: 4, phase: 'main' },
+    },
+    { rulesState: local }
+  );
+  assert.equal(theirs.applied, true);
+  assert.equal(theirs.turnPlayer, 'opp');
+  assert.equal(theirs.changed, true);
+  assert.equal(local.turnPlayer, 'opp');
+  assert.equal(local.turnNumber, 4);
+});
+
+test('3.12: reconcileTurnState leaves a spectator and a turn-less view alone', () => {
+  const local = { turnPlayer: 'self', turnNumber: 7, phase: 'main' };
+
+  const spectator = reconcileTurnState(
+    {
+      isSpectator: true,
+      you: null,
+      turn: { player: 'p2', isYourTurn: false, number: 9, phase: 'main' },
+    },
+    { rulesState: local }
+  );
+  assert.equal(spectator.applied, false);
+  assert.equal(spectator.reason, 'spectator');
+
+  const noTurn = reconcileTurnState({ you: { playerId: 'p1' } }, { rulesState: local });
+  assert.equal(noTurn.applied, false);
+  assert.equal(noTurn.reason, 'no_turn');
+
+  assert.deepEqual(local, { turnPlayer: 'self', turnNumber: 7, phase: 'main' });
+});
+
+test('I25: reconcileTurnState dispatches rules-turn-view-applied, not rules-turn-began', () => {
+  const { doc } = setupMockDom();
+  const seen = [];
+  doc.addEventListener('rules-turn-view-applied', (e) => seen.push(e.detail));
+  doc.addEventListener('rules-turn-began', () => seen.push('rules-turn-began'));
+  const local = { turnPlayer: 'self', turnNumber: 0, phase: 'setup' };
+
+  reconcileTurnState(
+    {
+      you: { playerId: 'p1' },
+      them: { playerId: 'p2' },
+      turn: { player: 'p2', isYourTurn: false, number: 2, phase: 'main' },
+    },
+    { rulesState: local, document: doc }
+  );
+
+  assert.deepEqual(seen, [{ player: 'opp' }]);
+});
+
+test('3.12: applyView syncs turn state as part of a normal view apply', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const local = { turnPlayer: 'self', turnNumber: 0, phase: 'setup' };
+
+  applyView(
+    {
+      stateVersion: 1,
+      turn: { player: 'p2', isYourTurn: false, number: 2, phase: 'main' },
+      you: { playerId: 'p1', zones: { active: [], hand: [] } },
+      them: { playerId: 'p2', zones: { active: [], hand: [] } },
+    },
+    [],
+    { document: doc, getZone: mockGetZone, rulesState: local }
+  );
+
+  assert.equal(local.turnPlayer, 'opp');
+  assert.equal(local.turnNumber, 2);
+  assert.equal(local.phase, 'main');
+});

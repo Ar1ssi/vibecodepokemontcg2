@@ -10,6 +10,7 @@ import {
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
 import { logSync } from '../../setup/general/sync-logger-bridge.js';
+import { dispatchAuthoritativeMoveCardBundle } from '../../setup/netcode/authoritative-dispatch.js';
 
 function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
   const oZone = getZone(user, oZoneId);
@@ -62,10 +63,33 @@ export const moveCardBundle = async (
   targetIndex,
   action,
   emitOrHints = true,
-  maybeHintsOrEmit
+  maybeHintsOrEmit,
+  authoritativeIds
 ) => {
   const { emit, tail: cardHints } = splitEmitAndTail(emitOrHints, maybeHintsOrEmit);
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
+
+  // Design 003 slice 1: under server authority this client must not run the legacy
+  // engine at all — the server adjudicates the move and its view is the only thing
+  // that renders it. A true return means the command went out, so every legacy side
+  // effect below (moveCardMessage, moveCard, the rules-bridge dispatch) is skipped.
+  // Any false — flag off, relayed mirror-apply, an unidentifiable card, an
+  // untranslatable action — falls straight through to the unchanged legacy body.
+  if (
+    dispatchAuthoritativeMoveCardBundle({
+      user,
+      emit,
+      cardHints,
+      oZoneId,
+      dZoneId,
+      index,
+      targetIndex,
+      action,
+      authoritativeIds,
+    })
+  ) {
+    return true;
+  }
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     // This client is acting on its (possibly stale) mirror of the
     // opponent's zone and asking the real owner to apply the move via

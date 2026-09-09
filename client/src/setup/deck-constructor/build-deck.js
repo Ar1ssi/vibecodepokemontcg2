@@ -1,9 +1,10 @@
-import { systemState } from '../../state.js';
+import { socket, systemState } from '../../state.js';
 import { determineDeckData } from '../general/determine-deckdata.js';
 import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
 import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
+import { emitCardStats } from '../netcode/card-stats.js';
 import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 
 
@@ -41,6 +42,31 @@ export const buildDeck = (user) => {
     document.body.removeChild(img);
   });
 
+  // Every card built here, captured before anything is dealt. `deck.array` is mutated as
+  // setup deals prizes and the opening hand, so reading it later would only ever see the
+  // undealt remainder — and the cards that matter most (the ones actually in play) would
+  // be the ones left out.
+  const builtCards = [...deck.array];
+
   // Pre-warm card metadata in the background so deck searches don't incur network latency
-  Promise.all(deck.array.map((card) => ensureCardData(card))).catch(() => {});
+  const enriched = Promise.all(builtCards.map((card) => ensureCardData(card)));
+
+  // Design 002 I26: the server's cards are built from deck rows, which carry no hp or
+  // attacks — without this it can never adjudicate a knockout. Enrichment is what resolves
+  // that data, so the send waits on it; only the local player's own deck is sent, since the
+  // opponent's client sends its own.
+  // Sends whatever resolved, even if enrichment failed: a card can carry usable data
+  // without a successful lookup (the e2e fixture stamps its own), and a network failure
+  // for one card must not suppress the stats for every other card in the deck.
+  enriched
+    .catch(() => {})
+    .then(() => {
+      if (!systemState.serverAuthoritative || user !== 'self') return;
+      return emitCardStats({
+        socket,
+        roomId: systemState.roomId,
+        cards: builtCards,
+      });
+    })
+    .catch(() => {});
 };

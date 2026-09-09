@@ -4,12 +4,22 @@
  * Enforces Invariants 2, 3, 6, 7, 8.
  */
 
-import { cloneGameState, findCard } from './state.mjs';
-import { isEnergy, getRetreatCostCount } from './cards.mjs';
+import { cloneGameState, findCard, createGameState } from './state.mjs';
+import {
+  isEnergy,
+  isPokemon,
+  getRetreatCostCount,
+  createCard,
+  mintInstanceId,
+} from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { setupGame } from './setup.mjs';
 import { createRng } from './rng.mjs';
-import { computeAttackDamage, expandEnergyEntries, canPayAttackCost } from './rules/attack-engine.mjs';
+import {
+  computeAttackDamage,
+  expandEnergyEntries,
+  canPayAttackCost,
+} from './rules/attack-engine.mjs';
 import { drawCount } from './rules/damage-parser.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
@@ -25,7 +35,10 @@ import { parseStadiumOncePerTurn } from './rules/stadium-effects.mjs';
  * - Auto-promotes first benched Pokemon to active (if any)
  * - Checks win conditions
  */
-function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, events }) {
+function handleKnockout(
+  draft,
+  { victimPlayerId, attackerPlayerId, victim, events }
+) {
   const prizeCount = prizesForKO(victim);
   const attackerPrizes = draft.players[attackerPlayerId]?.zones?.prizes || [];
   const attackerHand = draft.players[attackerPlayerId]?.zones?.hand || [];
@@ -45,7 +58,9 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
   const victimDiscard = draft.players[victimPlayerId]?.zones?.discard || [];
 
-  const wasActive = victimActive.some((c) => c.instanceId === victim.instanceId);
+  const wasActive = victimActive.some(
+    (c) => c.instanceId === victim.instanceId
+  );
   const wasBench = victimBench.some((c) => c.instanceId === victim.instanceId);
 
   let targetZone = null;
@@ -55,7 +70,10 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
     targetZone = victimBench;
   } else {
     const ref = findCard(draft, victim.instanceId);
-    if (ref?.playerId === victimPlayerId && draft.players[victimPlayerId]?.zones?.[ref.zoneId]) {
+    if (
+      ref?.playerId === victimPlayerId &&
+      draft.players[victimPlayerId]?.zones?.[ref.zoneId]
+    ) {
       targetZone = draft.players[victimPlayerId].zones[ref.zoneId];
     }
   }
@@ -63,7 +81,10 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
   if (targetZone) {
     for (let i = targetZone.length - 1; i >= 0; i--) {
       const c = targetZone[i];
-      if (c.instanceId === victim.instanceId || c.attachedTo === victim.instanceId) {
+      if (
+        c.instanceId === victim.instanceId ||
+        c.attachedTo === victim.instanceId
+      ) {
         targetZone.splice(i, 1);
         c.damage = 0;
         c.specialCondition = null;
@@ -87,7 +108,10 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
     if (benchPokemon) {
       for (let i = victimBench.length - 1; i >= 0; i--) {
         const c = victimBench[i];
-        if (c.instanceId === benchPokemon.instanceId || c.attachedTo === benchPokemon.instanceId) {
+        if (
+          c.instanceId === benchPokemon.instanceId ||
+          c.attachedTo === benchPokemon.instanceId
+        ) {
           victimBench.splice(i, 1);
           victimActive.push(c);
         }
@@ -102,12 +126,20 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
 
   // Win condition checks
   if (attackerPrizes.length === 0) {
-    setGameEnded(draft, { winner: attackerPlayerId, reason: 'all prize cards taken', events });
+    setGameEnded(draft, {
+      winner: attackerPlayerId,
+      reason: 'all prize cards taken',
+      events,
+    });
   } else {
     const remainingActive = victimActive.filter((c) => !c.attachedTo);
     const remainingBench = victimBench.filter((c) => !c.attachedTo);
     if (remainingActive.length === 0 && remainingBench.length === 0) {
-      setGameEnded(draft, { winner: attackerPlayerId, reason: 'no Pokémon in play', events });
+      setGameEnded(draft, {
+        winner: attackerPlayerId,
+        reason: 'no Pokémon in play',
+        events,
+      });
     }
   }
 }
@@ -119,7 +151,10 @@ function handleKnockout(draft, { victimPlayerId, attackerPlayerId, victim, event
  * - Asleep: 50% cure flip
  * - Paralyzed: cured at the end of the paralyzed player's turn
  */
-function resolveCheckup(draft, { rng, events, endingPlayerId = draft.turn?.player }) {
+function resolveCheckup(
+  draft,
+  { rng, events, endingPlayerId = draft.turn?.player }
+) {
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
     const active = player.zones?.active?.find((c) => !c.attachedTo);
@@ -127,34 +162,71 @@ function resolveCheckup(draft, { rng, events, endingPlayerId = draft.turn?.playe
 
     if (active.specialCondition === 'Poisoned') {
       active.damage = (active.damage || 0) + 10;
-      events.push({ type: 'checkupDamage', instanceId: active.instanceId, condition: 'Poisoned', damage: 10, playerId: pid });
+      events.push({
+        type: 'checkupDamage',
+        instanceId: active.instanceId,
+        condition: 'Poisoned',
+        damage: 10,
+        playerId: pid,
+      });
       if (active.hp && active.damage >= active.hp) {
         const oppId = Object.keys(draft.players).find((id) => id !== pid);
-        handleKnockout(draft, { victimPlayerId: pid, attackerPlayerId: oppId, victim: active, events });
+        handleKnockout(draft, {
+          victimPlayerId: pid,
+          attackerPlayerId: oppId,
+          victim: active,
+          events,
+        });
       }
     } else if (active.specialCondition === 'Burned') {
       active.damage = (active.damage || 0) + 20;
-      events.push({ type: 'checkupDamage', instanceId: active.instanceId, condition: 'Burned', damage: 20, playerId: pid });
+      events.push({
+        type: 'checkupDamage',
+        instanceId: active.instanceId,
+        condition: 'Burned',
+        damage: 20,
+        playerId: pid,
+      });
       const coin = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
       if (coin === 'heads') {
         active.specialCondition = null;
-        events.push({ type: 'statusCleared', condition: 'Burned', instanceId: active.instanceId, playerId: pid });
+        events.push({
+          type: 'statusCleared',
+          condition: 'Burned',
+          instanceId: active.instanceId,
+          playerId: pid,
+        });
       }
       if (active.hp && active.damage >= active.hp) {
         const oppId = Object.keys(draft.players).find((id) => id !== pid);
-        handleKnockout(draft, { victimPlayerId: pid, attackerPlayerId: oppId, victim: active, events });
+        handleKnockout(draft, {
+          victimPlayerId: pid,
+          attackerPlayerId: oppId,
+          victim: active,
+          events,
+        });
       }
     } else if (active.specialCondition === 'Asleep') {
       const coin = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
       if (coin === 'heads') {
         active.specialCondition = null;
-        events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId: pid });
+        events.push({
+          type: 'statusCleared',
+          condition: 'Asleep',
+          instanceId: active.instanceId,
+          playerId: pid,
+        });
       }
     } else if (active.specialCondition === 'Paralyzed') {
       // Under official Pokémon TCG rules, Paralysis is only cured at the end of that player's turn.
       if (!endingPlayerId || pid === endingPlayerId) {
         active.specialCondition = null;
-        events.push({ type: 'statusCleared', condition: 'Paralyzed', instanceId: active.instanceId, playerId: pid });
+        events.push({
+          type: 'statusCleared',
+          condition: 'Paralyzed',
+          instanceId: active.instanceId,
+          playerId: pid,
+        });
       }
     }
   }
@@ -220,17 +292,27 @@ function getEnergyDescriptor(card) {
   if (typeof card === 'string') return { type: card, family: 'basic' };
 
   const name = String(card.name || '').toLowerCase();
-  const type = card.types?.[0] ||
-    (/fire/.test(name) ? 'Fire'
-    : /water/.test(name) ? 'Water'
-    : /grass/.test(name) ? 'Grass'
-    : /lightning/.test(name) ? 'Lightning'
-    : /psychic/.test(name) ? 'Psychic'
-    : /fighting/.test(name) ? 'Fighting'
-    : /metal/.test(name) ? 'Metal'
-    : /dark/.test(name) ? 'Dark'
-    : /dragon/.test(name) ? 'Dragon'
-    : 'Colorless');
+  const type =
+    card.types?.[0] ||
+    (/fire/.test(name)
+      ? 'Fire'
+      : /water/.test(name)
+        ? 'Water'
+        : /grass/.test(name)
+          ? 'Grass'
+          : /lightning/.test(name)
+            ? 'Lightning'
+            : /psychic/.test(name)
+              ? 'Psychic'
+              : /fighting/.test(name)
+                ? 'Fighting'
+                : /metal/.test(name)
+                  ? 'Metal'
+                  : /dark/.test(name)
+                    ? 'Dark'
+                    : /dragon/.test(name)
+                      ? 'Dragon'
+                      : 'Colorless');
 
   let family = 'basic';
   if (/double colorless/.test(name)) {
@@ -252,7 +334,6 @@ function setGameEnded(draft, { winner, reason, events }) {
   events.push({ type: 'gameEnded', winner, reason });
 }
 
-
 /**
  * Validates reference integrity of instanceIds in command payload (Step 3).
  *
@@ -262,7 +343,6 @@ function setGameEnded(draft, { winner, reason, events }) {
  */
 function validateReferences(state, command) {
   const { type, payload, playerId } = command;
-
 
   switch (type) {
     case 'moveCard': {
@@ -312,7 +392,17 @@ function validateReferences(state, command) {
         return { valid: false, error: 'stale_view' };
       }
       // In sandbox / manual mode, counter updates on opponent's cards are only allowed on public in-play zones
-      if (cardRef.playerId !== playerId && !['active', 'bench', 'board', 'stadium', 'discard', 'lostZone'].includes(cardRef.zoneId)) {
+      if (
+        cardRef.playerId !== playerId &&
+        ![
+          'active',
+          'bench',
+          'board',
+          'stadium',
+          'discard',
+          'lostZone',
+        ].includes(cardRef.zoneId)
+      ) {
         return { valid: false, error: 'stale_view' };
       }
       return { valid: true };
@@ -326,7 +416,9 @@ function validateReferences(state, command) {
     }
 
     case 'attack': {
-      const active = state.players?.[playerId]?.zones?.active?.find((c) => !c.attachedTo);
+      const active = state.players?.[playerId]?.zones?.active?.find(
+        (c) => !c.attachedTo
+      );
       if (!active) {
         return { valid: false, error: 'stale_view' };
       }
@@ -340,12 +432,16 @@ function validateReferences(state, command) {
     }
 
     case 'retreat': {
-      const active = state.players?.[playerId]?.zones?.active?.find((c) => !c.attachedTo);
+      const active = state.players?.[playerId]?.zones?.active?.find(
+        (c) => !c.attachedTo
+      );
       if (!active) {
         return { valid: false, error: 'stale_view' };
       }
       if (payload?.benchInstanceId != null) {
-        const benchCard = state.players?.[playerId]?.zones?.bench?.find((c) => c.instanceId === payload.benchInstanceId);
+        const benchCard = state.players?.[playerId]?.zones?.bench?.find(
+          (c) => c.instanceId === payload.benchInstanceId
+        );
         if (!benchCard) {
           return { valid: false, error: 'stale_view' };
         }
@@ -353,7 +449,9 @@ function validateReferences(state, command) {
       if (Array.isArray(payload?.discardEnergyIds)) {
         const activeZone = state.players?.[playerId]?.zones?.active || [];
         for (const id of payload.discardEnergyIds) {
-          const card = activeZone.find((c) => c.instanceId === id && c.attachedTo === active.instanceId);
+          const card = activeZone.find(
+            (c) => c.instanceId === id && c.attachedTo === active.instanceId
+          );
           if (!card) {
             return { valid: false, error: 'stale_view' };
           }
@@ -363,7 +461,9 @@ function validateReferences(state, command) {
     }
 
     case 'promote': {
-      const benchCard = state.players?.[playerId]?.zones?.bench?.find((c) => c.instanceId === payload?.instanceId);
+      const benchCard = state.players?.[playerId]?.zones?.bench?.find(
+        (c) => c.instanceId === payload?.instanceId
+      );
       if (!benchCard) {
         return { valid: false, error: 'stale_view' };
       }
@@ -379,7 +479,10 @@ function validateReferences(state, command) {
 
     case 'takePrizesByIndex': {
       const prizes = state.players?.[playerId]?.zones?.prizes || [];
-      if (!Array.isArray(payload?.indices) || payload.indices.some((idx) => idx >= prizes.length)) {
+      if (
+        !Array.isArray(payload?.indices) ||
+        payload.indices.some((idx) => idx >= prizes.length)
+      ) {
         return { valid: false, error: 'stale_view' };
       }
       return { valid: true };
@@ -387,12 +490,20 @@ function validateReferences(state, command) {
 
     case 'playTrainer': {
       const cardRef = findCard(state, payload?.instanceId);
-      if (!cardRef || cardRef.zoneId !== 'hand' || cardRef.playerId !== playerId) {
+      if (
+        !cardRef ||
+        cardRef.zoneId !== 'hand' ||
+        cardRef.playerId !== playerId
+      ) {
         return { valid: false, error: 'stale_view' };
       }
       if (payload.targetInstanceId != null) {
         const targetRef = findCard(state, payload.targetInstanceId);
-        if (!targetRef || !['active', 'bench'].includes(targetRef.zoneId) || targetRef.playerId !== playerId) {
+        if (
+          !targetRef ||
+          !['active', 'bench'].includes(targetRef.zoneId) ||
+          targetRef.playerId !== playerId
+        ) {
           return { valid: false, error: 'stale_view' };
         }
       }
@@ -402,7 +513,11 @@ function validateReferences(state, command) {
     case 'useAbility':
     case 'useVStarGX': {
       const cardRef = findCard(state, payload?.instanceId);
-      if (!cardRef || !['active', 'bench'].includes(cardRef.zoneId) || cardRef.playerId !== playerId) {
+      if (
+        !cardRef ||
+        !['active', 'bench'].includes(cardRef.zoneId) ||
+        cardRef.playerId !== playerId
+      ) {
         return { valid: false, error: 'stale_view' };
       }
       return { valid: true };
@@ -422,11 +537,42 @@ function validateReferences(state, command) {
       return { valid: true };
     }
 
+    // Zone ops (design 002 slice 3.4a): none of these carry a card instanceId (the legacy
+    // actions never attached a cardHint), so position-addressed ops are bounds-checked
+    // against the server's own zone array, the same pattern takePrizesByIndex already uses.
+    case 'shuffleIntoDeck':
+    case 'moveToDeckTop':
+    case 'switchWithDeckTop': {
+      const zone = state.players?.[playerId]?.zones?.[payload.from];
+      if (!Array.isArray(zone) || payload.index >= zone.length) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    // I19: reveal/hide only ever touches the sender's own zone (draft.players[playerId]).
+    case 'revealShortcut':
+    case 'hideShortcut': {
+      const zone = state.players?.[playerId]?.zones?.[payload?.zoneId];
+      if (!Array.isArray(zone) || payload.index >= zone.length) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    case 'revealCards':
+    case 'hideCards': {
+      const zone = state.players?.[playerId]?.zones?.[payload?.zoneId];
+      if (!Array.isArray(zone)) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
     default:
       return { valid: true };
   }
 }
-
 
 /**
  * Validates gameplay legality when rulesEnabled is true (Step 4).
@@ -457,20 +603,64 @@ export function validateLegality(state, command) {
     }
     return { allowed: true };
   }
+  if (type === 'loadDeck') {
+    if (state.turn?.phase !== 'setup') {
+      return {
+        allowed: false,
+        reason: 'Cannot load a deck after the game has started.',
+      };
+    }
+    return { allowed: true };
+  }
+  // I26: card stats are reference data about the player's own cards, not a game action —
+  // legal in any phase and on either player's turn, since TCGdex enrichment resolves
+  // asynchronously and may land well after the game has started.
+  if (type === 'cardStats') {
+    return { allowed: true };
+  }
   if (state.turn?.phase === 'setup') {
     return { allowed: false, reason: 'Set up the game first (Set Up button).' };
   }
 
   // Turn player validation
-  if (['attack', 'retreat', 'pass', 'takeTurn', 'moveCard', 'attachCard', 'draw', 'playTrainer', 'useAbility', 'stadium-effect', 'useVStarGX'].includes(type)) {
+  if (
+    [
+      'attack',
+      'retreat',
+      'pass',
+      'takeTurn',
+      'moveCard',
+      'attachCard',
+      'draw',
+      'playTrainer',
+      'useAbility',
+      'stadium-effect',
+      'useVStarGX',
+    ].includes(type)
+  ) {
     if (state.turn?.player && state.turn.player !== playerId) {
       return { allowed: false, reason: "It's not your turn." };
     }
   }
 
   if (state.turn?.phase === 'attack') {
-    if (['moveCard', 'attachCard', 'draw', 'retreat', 'attack', 'playTrainer', 'useAbility', 'stadium-effect', 'useVStarGX'].includes(type)) {
-      return { allowed: false, reason: 'You already attacked — end your turn.' };
+    if (
+      [
+        'moveCard',
+        'attachCard',
+        'draw',
+        'retreat',
+        'attack',
+        'playTrainer',
+        'useAbility',
+        'stadium-effect',
+        'useVStarGX',
+      ].includes(type)
+    ) {
+      return {
+        allowed: false,
+        reason: 'You already attacked — end your turn.',
+      };
     }
   }
 
@@ -510,7 +700,10 @@ export function validateLegality(state, command) {
       const cardRef = findCard(state, payload.instanceId);
       if (cardRef && isEnergy(cardRef.card)) {
         if (player.flags?.energyAttached) {
-          return { allowed: false, reason: 'Energy already attached this turn.' };
+          return {
+            allowed: false,
+            reason: 'Energy already attached this turn.',
+          };
         }
       }
       return { allowed: true };
@@ -518,7 +711,10 @@ export function validateLegality(state, command) {
 
     case 'attack': {
       if (state.turn?.number === 1) {
-        return { allowed: false, reason: "The player going first can't attack on turn 1." };
+        return {
+          allowed: false,
+          reason: "The player going first can't attack on turn 1.",
+        };
       }
       if (player.flags?.attackerAttacked) {
         return { allowed: false, reason: 'Already attacked this turn.' };
@@ -528,16 +724,29 @@ export function validateLegality(state, command) {
         return { allowed: false, reason: 'No active Pokémon to attack with.' };
       }
       if (active.specialCondition === 'Paralyzed') {
-        return { allowed: false, reason: "Paralyzed — this Pokémon can't attack or retreat." };
+        return {
+          allowed: false,
+          reason: "Paralyzed — this Pokémon can't attack or retreat.",
+        };
       }
       if (active.specialCondition === 'Asleep') {
-        return { allowed: false, reason: "Asleep — this Pokémon can't attack or retreat." };
+        return {
+          allowed: false,
+          reason: "Asleep — this Pokémon can't attack or retreat.",
+        };
       }
       const atkIdx = payload?.attackIndex ?? 0;
       const attack = active.attacks?.[atkIdx];
       if (attack && attack.cost?.length > 0) {
-        const attached = (player.zones?.active || []).filter((c) => c.attachedTo === active.instanceId && isEnergy(c));
-        if (!canPayAttackCost(expandEnergyEntries(attached.map(getEnergyDescriptor)), attack.cost)) {
+        const attached = (player.zones?.active || []).filter(
+          (c) => c.attachedTo === active.instanceId && isEnergy(c)
+        );
+        if (
+          !canPayAttackCost(
+            expandEnergyEntries(attached.map(getEnergyDescriptor)),
+            attack.cost
+          )
+        ) {
           return { allowed: false, reason: 'Not enough energy attached.' };
         }
       }
@@ -556,31 +765,53 @@ export function validateLegality(state, command) {
         return { allowed: false, reason: 'No active Pokémon to retreat.' };
       }
       if (active.specialCondition === 'Paralyzed') {
-        return { allowed: false, reason: "Paralyzed — this Pokémon can't retreat." };
+        return {
+          allowed: false,
+          reason: "Paralyzed — this Pokémon can't retreat.",
+        };
       }
       if (active.specialCondition === 'Asleep') {
-        return { allowed: false, reason: "Asleep — this Pokémon can't retreat." };
+        return {
+          allowed: false,
+          reason: "Asleep — this Pokémon can't retreat.",
+        };
       }
-      const benchPokemon = (player.zones?.bench || []).filter((c) => !c.attachedTo);
+      const benchPokemon = (player.zones?.bench || []).filter(
+        (c) => !c.attachedTo
+      );
       if (benchPokemon.length === 0) {
         return { allowed: false, reason: 'No bench Pokémon to retreat to.' };
       }
       const retreatCostN = getRetreatCostCount(active);
       if (retreatCostN > 0) {
-        const attached = (player.zones?.active || []).filter((c) => c.attachedTo === active.instanceId && isEnergy(c));
+        const attached = (player.zones?.active || []).filter(
+          (c) => c.attachedTo === active.instanceId && isEnergy(c)
+        );
         const costSymbols = new Array(retreatCostN).fill('Colorless');
-        if (!canPayAttackCost(expandEnergyEntries(attached.map(getEnergyDescriptor)), costSymbols)) {
-          return { allowed: false, reason: `Not enough energy to retreat (costs ${retreatCostN}).` };
+        if (
+          !canPayAttackCost(
+            expandEnergyEntries(attached.map(getEnergyDescriptor)),
+            costSymbols
+          )
+        ) {
+          return {
+            allowed: false,
+            reason: `Not enough energy to retreat (costs ${retreatCostN}).`,
+          };
         }
       }
       return { allowed: true };
     }
 
-
     case 'promote': {
-      const activePokemon = (player.zones?.active || []).filter((c) => !c.attachedTo);
+      const activePokemon = (player.zones?.active || []).filter(
+        (c) => !c.attachedTo
+      );
       if (activePokemon.length > 0) {
-        return { allowed: false, reason: 'Active position is already occupied.' };
+        return {
+          allowed: false,
+          reason: 'Active position is already occupied.',
+        };
       }
       return { allowed: true };
     }
@@ -594,7 +825,9 @@ export function validateLegality(state, command) {
     }
 
     case 'takePrizesByIndex': {
-      if ((player.zones?.prizes?.length || 0) < (payload?.indices?.length || 0)) {
+      if (
+        (player.zones?.prizes?.length || 0) < (payload?.indices?.length || 0)
+      ) {
         return { allowed: false, reason: 'Not enough prize cards left.' };
       }
       return { allowed: true };
@@ -605,33 +838,60 @@ export function validateLegality(state, command) {
       if (cardRef) {
         const typeStr = String(cardRef.card.type || '').toLowerCase();
         const subStr = String(cardRef.card.subtypes || '').toLowerCase();
-        const isSupporter = typeStr.includes('supporter') || subStr.includes('supporter');
+        const isSupporter =
+          typeStr.includes('supporter') || subStr.includes('supporter');
         if (isSupporter && player.flags?.supporterPlayed) {
-          return { allowed: false, reason: 'Supporter already played this turn.' };
+          return {
+            allowed: false,
+            reason: 'Supporter already played this turn.',
+          };
         }
 
-        const isStadiumCard = subStr.includes('stadium') || typeStr.includes('stadium');
+        const isStadiumCard =
+          subStr.includes('stadium') || typeStr.includes('stadium');
         if (isStadiumCard && state.stadium) {
-          const currentStadiumName = String(state.stadium.name || '').trim().toLowerCase();
-          const newStadiumName = String(cardRef.card.name || '').trim().toLowerCase();
-          if (currentStadiumName && newStadiumName && currentStadiumName === newStadiumName) {
-            return { allowed: false, reason: 'A Stadium card with the same name is already in play.' };
+          const currentStadiumName = String(state.stadium.name || '')
+            .trim()
+            .toLowerCase();
+          const newStadiumName = String(cardRef.card.name || '')
+            .trim()
+            .toLowerCase();
+          if (
+            currentStadiumName &&
+            newStadiumName &&
+            currentStadiumName === newStadiumName
+          ) {
+            return {
+              allowed: false,
+              reason: 'A Stadium card with the same name is already in play.',
+            };
           }
         }
 
-        const text = cardRef.card.text || cardRef.card.effect || cardRef.card.cardText || '';
+        const text =
+          cardRef.card.text ||
+          cardRef.card.effect ||
+          cardRef.card.cardText ||
+          '';
         const parsed = parseTrainerEffect(text);
         if (parsed?.steps?.[0]?.type === 'discardCost') {
           const cost = parsed.steps[0].count || 1;
-          const otherHandCards = (player.zones?.hand || []).filter((c) => c.instanceId !== payload.instanceId);
+          const otherHandCards = (player.zones?.hand || []).filter(
+            (c) => c.instanceId !== payload.instanceId
+          );
           if (otherHandCards.length < cost) {
-            return { allowed: false, reason: 'Not enough cards in hand to pay discard cost.' };
+            return {
+              allowed: false,
+              reason: 'Not enough cards in hand to pay discard cost.',
+            };
           }
         }
 
         // Edge Case 9: Cannot play search-to-bench trainers when bench is full
         if (parsed?.steps && parsed.steps.length > 0) {
-          const nonCostSteps = parsed.steps.filter((s) => s.type !== 'discardCost');
+          const nonCostSteps = parsed.steps.filter(
+            (s) => s.type !== 'discardCost'
+          );
           if (
             nonCostSteps.length > 0 &&
             nonCostSteps.every((s) => s.destination === 'bench')
@@ -663,7 +923,10 @@ export function validateLegality(state, command) {
 
     case 'stadium-effect': {
       if (player.flags?.stadiumUsedThisTurn) {
-        return { allowed: false, reason: 'Stadium effect already used this turn.' };
+        return {
+          allowed: false,
+          reason: 'Stadium effect already used this turn.',
+        };
       }
       if (state.stadium) {
         const opt = parseStadiumOncePerTurn(state.stadium);
@@ -680,7 +943,10 @@ export function validateLegality(state, command) {
 
     case 'useVStarGX': {
       if (player.flags?.vstarUsed || player.flags?.gxUsed) {
-        return { allowed: false, reason: 'VSTAR / GX attack or ability already used this game.' };
+        return {
+          allowed: false,
+          reason: 'VSTAR / GX attack or ability already used this game.',
+        };
       }
       return { allowed: true };
     }
@@ -706,7 +972,13 @@ export function validateLegality(state, command) {
  */
 export function applyCommand(state, command, rng = null) {
   if (!state || typeof state !== 'object') {
-    return { state: null, events: [], pendingChoice: null, error: 'bad_command', reason: 'Invalid state' };
+    return {
+      state: null,
+      events: [],
+      pendingChoice: null,
+      error: 'bad_command',
+      reason: 'Invalid state',
+    };
   }
 
   // Step 1: Shape check
@@ -786,7 +1058,9 @@ export function applyCommand(state, command, rng = null) {
         reason: `Selection count (${selection.length}) must be between ${min} and ${max}`,
       };
     }
-    const optionIds = new Set((state.pendingChoice.options || []).map((o) => o.instanceId));
+    const optionIds = new Set(
+      (state.pendingChoice.options || []).map((o) => o.instanceId)
+    );
     for (const sId of selection) {
       if (!optionIds.has(sId)) {
         return {
@@ -832,7 +1106,6 @@ export function applyCommand(state, command, rng = null) {
   }
   const events = [];
 
-
   switch (type) {
     case 'moveCard': {
       let card = null;
@@ -841,7 +1114,9 @@ export function applyCommand(state, command, rng = null) {
         draft.stadium = null;
       } else {
         const srcZone = draft.players[playerId].zones[payload.from];
-        const idx = srcZone.findIndex((c) => c.instanceId === payload.instanceId);
+        const idx = srcZone.findIndex(
+          (c) => c.instanceId === payload.instanceId
+        );
         if (idx >= 0) {
           [card] = srcZone.splice(idx, 1);
         }
@@ -860,14 +1135,21 @@ export function applyCommand(state, command, rng = null) {
           }
         } else {
           const destZone = draft.players[playerId].zones[payload.to];
-          if (payload.targetIndex != null && payload.targetIndex >= 0 && payload.targetIndex <= destZone.length) {
+          if (
+            payload.targetIndex != null &&
+            payload.targetIndex >= 0 &&
+            payload.targetIndex <= destZone.length
+          ) {
             destZone.splice(payload.targetIndex, 0, card);
           } else {
             destZone.push(card);
           }
 
           // If moving between active and bench, bring along all attached cards
-          if (['active', 'bench'].includes(payload.from) && ['active', 'bench'].includes(payload.to)) {
+          if (
+            ['active', 'bench'].includes(payload.from) &&
+            ['active', 'bench'].includes(payload.to)
+          ) {
             const srcZone = draft.players[playerId].zones[payload.from];
             for (let i = srcZone.length - 1; i >= 0; i--) {
               if (srcZone[i].attachedTo === card.instanceId) {
@@ -914,7 +1196,9 @@ export function applyCommand(state, command, rng = null) {
       if (cardRef && targetRef) {
         // Splice card out of its origin zone
         const srcZone = draft.players[playerId].zones[cardRef.zoneId];
-        const idx = srcZone.findIndex((c) => c.instanceId === payload.instanceId);
+        const idx = srcZone.findIndex(
+          (c) => c.instanceId === payload.instanceId
+        );
         if (idx >= 0) {
           srcZone.splice(idx, 1);
         }
@@ -1064,18 +1348,28 @@ export function applyCommand(state, command, rng = null) {
     }
 
     case 'setup': {
-      const setupResult = setupGame(draft, { firstPlayerId: payload?.firstPlayerId, rng: activeRng });
+      const setupResult = setupGame(draft, {
+        firstPlayerId: payload?.firstPlayerId,
+        rng: activeRng,
+      });
       events.push(...setupResult.events);
       break;
     }
 
     case 'attack': {
       const attackerPlayer = draft.players[playerId];
-      const attacker = attackerPlayer?.zones?.active?.find((c) => !c.attachedTo);
+      const attacker = attackerPlayer?.zones?.active?.find(
+        (c) => !c.attachedTo
+      );
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = attacker?.attacks?.[atkIdx] || { name: 'Attack', damage: 10 };
+      const attack = attacker?.attacks?.[atkIdx] || {
+        name: 'Attack',
+        damage: 10,
+      };
 
-      const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+      const oppId = Object.keys(draft.players || {}).find(
+        (id) => id !== playerId
+      );
       const defenderPlayer = draft.players[oppId];
       let defender = null;
       let defenderPlayerId = oppId;
@@ -1121,7 +1415,11 @@ export function applyCommand(state, command, rng = null) {
           attackerPlayer.flags.attackerAttacked = true;
 
           if (draft.turn.phase !== 'ended') {
-            resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+            resolveCheckup(draft, {
+              rng: activeRng,
+              events,
+              endingPlayerId: playerId,
+            });
             if (draft.turn.phase !== 'ended') {
               advanceTurn(draft, { nextPlayerId: oppId, events });
             }
@@ -1129,7 +1427,6 @@ export function applyCommand(state, command, rng = null) {
           break;
         }
       }
-
 
       let dmgDealt = 0;
       if (attacker && defender) {
@@ -1186,7 +1483,11 @@ export function applyCommand(state, command, rng = null) {
 
       // Auto-end turn after attacking
       if (draft.turn.phase !== 'ended') {
-        resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+        resolveCheckup(draft, {
+          rng: activeRng,
+          events,
+          endingPlayerId: playerId,
+        });
         if (draft.turn.phase !== 'ended') {
           advanceTurn(draft, { nextPlayerId: oppId, events });
         }
@@ -1200,26 +1501,45 @@ export function applyCommand(state, command, rng = null) {
       const costN = getRetreatCostCount(active);
 
       // Discard energy cost
-      if (Array.isArray(payload?.discardEnergyIds) && payload.discardEnergyIds.length > 0) {
+      if (
+        Array.isArray(payload?.discardEnergyIds) &&
+        payload.discardEnergyIds.length > 0
+      ) {
         for (const id of payload.discardEnergyIds) {
           const idx = player.zones.active.findIndex((c) => c.instanceId === id);
           if (idx >= 0) {
             const [discarded] = player.zones.active.splice(idx, 1);
             discarded.attachedTo = null;
             player.zones.discard.push(discarded);
-            events.push({ type: 'cardMoved', instanceId: id, from: 'active', to: 'discard', playerId });
+            events.push({
+              type: 'cardMoved',
+              instanceId: id,
+              from: 'active',
+              to: 'discard',
+              playerId,
+            });
           }
         }
       } else if (costN > 0) {
         let discardedCount = 0;
-        for (let i = player.zones.active.length - 1; i >= 0 && discardedCount < costN; i--) {
+        for (
+          let i = player.zones.active.length - 1;
+          i >= 0 && discardedCount < costN;
+          i--
+        ) {
           const card = player.zones.active[i];
           if (card.attachedTo === active.instanceId && isEnergy(card)) {
             player.zones.active.splice(i, 1);
             card.attachedTo = null;
             player.zones.discard.push(card);
             discardedCount++;
-            events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'active', to: 'discard', playerId });
+            events.push({
+              type: 'cardMoved',
+              instanceId: card.instanceId,
+              from: 'active',
+              to: 'discard',
+              playerId,
+            });
           }
         }
       }
@@ -1227,7 +1547,9 @@ export function applyCommand(state, command, rng = null) {
       // Bench swap
       let benchPokemon = null;
       if (payload?.benchInstanceId != null) {
-        benchPokemon = player.zones.bench.find((c) => c.instanceId === payload.benchInstanceId);
+        benchPokemon = player.zones.bench.find(
+          (c) => c.instanceId === payload.benchInstanceId
+        );
       } else {
         benchPokemon = player.zones.bench.find((c) => !c.attachedTo);
       }
@@ -1236,7 +1558,10 @@ export function applyCommand(state, command, rng = null) {
         // Move active + attachments to bench
         for (let i = player.zones.active.length - 1; i >= 0; i--) {
           const c = player.zones.active[i];
-          if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
+          if (
+            c.instanceId === active.instanceId ||
+            c.attachedTo === active.instanceId
+          ) {
             player.zones.active.splice(i, 1);
             player.zones.bench.push(c);
           }
@@ -1244,7 +1569,10 @@ export function applyCommand(state, command, rng = null) {
         // Move benchPokemon + attachments to active
         for (let i = player.zones.bench.length - 1; i >= 0; i--) {
           const c = player.zones.bench[i];
-          if (c.instanceId === benchPokemon.instanceId || c.attachedTo === benchPokemon.instanceId) {
+          if (
+            c.instanceId === benchPokemon.instanceId ||
+            c.attachedTo === benchPokemon.instanceId
+          ) {
             player.zones.bench.splice(i, 1);
             player.zones.active.push(c);
           }
@@ -1266,8 +1594,14 @@ export function applyCommand(state, command, rng = null) {
 
     case 'pass':
     case 'takeTurn': {
-      const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
-      resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+      const oppId = Object.keys(draft.players || {}).find(
+        (id) => id !== playerId
+      );
+      resolveCheckup(draft, {
+        rng: activeRng,
+        events,
+        endingPlayerId: playerId,
+      });
       if (draft.turn.phase !== 'ended') {
         advanceTurn(draft, { nextPlayerId: oppId, events });
       }
@@ -1290,7 +1624,11 @@ export function applyCommand(state, command, rng = null) {
       });
 
       if (prizes.length === 0) {
-        setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
+        setGameEnded(draft, {
+          winner: playerId,
+          reason: 'all prize cards taken',
+          events,
+        });
       }
       break;
     }
@@ -1317,23 +1655,36 @@ export function applyCommand(state, command, rng = null) {
       });
 
       if (prizes.length === 0) {
-        setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
+        setGameEnded(draft, {
+          winner: playerId,
+          reason: 'all prize cards taken',
+          events,
+        });
       }
       break;
     }
 
     case 'promote': {
       const player = draft.players[playerId];
-      const benchIdx = player.zones.bench.findIndex((c) => c.instanceId === payload.instanceId);
+      const benchIdx = player.zones.bench.findIndex(
+        (c) => c.instanceId === payload.instanceId
+      );
       if (benchIdx >= 0) {
         for (let i = player.zones.bench.length - 1; i >= 0; i--) {
           const c = player.zones.bench[i];
-          if (c.instanceId === payload.instanceId || c.attachedTo === payload.instanceId) {
+          if (
+            c.instanceId === payload.instanceId ||
+            c.attachedTo === payload.instanceId
+          ) {
             player.zones.bench.splice(i, 1);
             player.zones.active.push(c);
           }
         }
-        events.push({ type: 'pokemonPromoted', instanceId: payload.instanceId, playerId });
+        events.push({
+          type: 'pokemonPromoted',
+          instanceId: payload.instanceId,
+          playerId,
+        });
       }
       break;
     }
@@ -1379,7 +1730,11 @@ export function applyCommand(state, command, rng = null) {
       if (!draft.players[playerId].flags) draft.players[playerId].flags = {};
       draft.players[playerId].flags.vstarUsed = true;
       draft.players[playerId].flags.gxUsed = true;
-      events.push({ type: 'vstarUsed', playerId, instanceId: payload.instanceId });
+      events.push({
+        type: 'vstarUsed',
+        playerId,
+        instanceId: payload.instanceId,
+      });
       break;
     }
 
@@ -1393,7 +1748,8 @@ export function applyCommand(state, command, rng = null) {
         resumeCard = cardRef?.card || null;
         resumeCardOwnerId = cardRef?.playerId || null;
       }
-      const initiatorPlayerId = token.initiatorPlayerId || resumeCardOwnerId || playerId;
+      const initiatorPlayerId =
+        token.initiatorPlayerId || resumeCardOwnerId || playerId;
 
       if (token.effectType === 'trainer') {
         executeTrainer(draft, {
@@ -1427,6 +1783,507 @@ export function applyCommand(state, command, rng = null) {
       break;
     }
 
+    // --- Zone ops (design 002 slice 3.4a). Shuffles always use the server's own
+    // activeRng (Fisher-Yates), never a client-supplied order — a client picking its own
+    // shuffle would be able to stack its own deck. ---
+
+    case 'shuffleIntoDeck': {
+      const player = draft.players[playerId];
+      const srcZone = player.zones[payload.from];
+      if (payload.index >= 0 && payload.index < srcZone.length) {
+        const [card] = srcZone.splice(payload.index, 1);
+        player.zones.deck.push(card);
+        player.zones.deck = activeRng.shuffle(player.zones.deck);
+        events.push({
+          type: 'cardMoved',
+          instanceId: card.instanceId,
+          from: payload.from,
+          to: 'deck',
+          playerId,
+        });
+        events.push({ type: 'zoneShuffled', zoneId: 'deck', playerId });
+      }
+      break;
+    }
+
+    case 'moveToDeckTop': {
+      const player = draft.players[playerId];
+      const srcZone = player.zones[payload.from];
+      if (payload.index >= 0 && payload.index < srcZone.length) {
+        const [card] = srcZone.splice(payload.index, 1);
+        player.zones.deck.unshift(card);
+        events.push({
+          type: 'cardMoved',
+          instanceId: card.instanceId,
+          from: payload.from,
+          to: 'deck',
+          targetIndex: 0,
+          playerId,
+        });
+      }
+      break;
+    }
+
+    case 'switchWithDeckTop': {
+      const player = draft.players[playerId];
+      const srcZone = player.zones[payload.from];
+      const deck = player.zones.deck;
+      if (
+        payload.index >= 0 &&
+        payload.index < srcZone.length &&
+        deck.length > 0
+      ) {
+        const [card] = srcZone.splice(payload.index, 1);
+        const [topCard] = deck.splice(0, 1);
+        deck.unshift(card);
+        srcZone.splice(payload.index, 0, topCard);
+        events.push({
+          type: 'cardsSwapped',
+          deckInstanceId: card.instanceId,
+          zoneInstanceId: topCard.instanceId,
+          zoneId: payload.from,
+          playerId,
+        });
+      }
+      break;
+    }
+
+    case 'shuffleZone': {
+      const player = draft.players[playerId];
+      player.zones[payload.zoneId] = activeRng.shuffle(
+        player.zones[payload.zoneId]
+      );
+      events.push({ type: 'zoneShuffled', zoneId: payload.zoneId, playerId });
+      break;
+    }
+
+    case 'shuffleBottom': {
+      const player = draft.players[playerId];
+      const moved = activeRng.shuffle(player.zones[payload.zoneId].splice(0));
+      player.zones.deck.push(...moved);
+      events.push({
+        type: 'zoneMovedToDeckBottom',
+        zoneId: payload.zoneId,
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'shuffleAll': {
+      const player = draft.players[playerId];
+      const moved = player.zones[payload.zoneId].splice(0);
+      player.zones.deck.push(...moved);
+      player.zones.deck = activeRng.shuffle(player.zones.deck);
+      events.push({
+        type: 'zoneShuffledIntoDeck',
+        zoneId: payload.zoneId,
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'discardAll': {
+      const player = draft.players[playerId];
+      const moved = player.zones[payload.zoneId].splice(0);
+      player.zones.discard.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: payload.zoneId,
+        to: 'discard',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'lostZoneAll': {
+      const player = draft.players[playerId];
+      const moved = player.zones[payload.zoneId].splice(0);
+      player.zones.lostZone.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: payload.zoneId,
+        to: 'lostZone',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'handAll': {
+      const player = draft.players[playerId];
+      const moved = player.zones[payload.zoneId].splice(0);
+      player.zones.hand.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: payload.zoneId,
+        to: 'hand',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'leaveAll': {
+      const player = draft.players[playerId];
+      const srcZone = player.zones[payload.from];
+      const destZone = player.zones[payload.to];
+      const moved = [];
+      for (let i = srcZone.length - 1; i >= 0; i--) {
+        if (isPokemon(srcZone[i])) {
+          const [card] = srcZone.splice(i, 1);
+          moved.unshift(card);
+        }
+      }
+      destZone.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: payload.from,
+        to: payload.to,
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'discardAndDraw': {
+      const player = draft.players[playerId];
+      const hand = player.zones.hand;
+      const discarded = hand.splice(0);
+      player.zones.discard.push(...discarded);
+      const count = Math.min(payload.count ?? 0, player.zones.deck.length);
+      const drawn = player.zones.deck.splice(0, count);
+      hand.push(...drawn);
+      events.push({
+        type: 'handDiscardedAndDrawn',
+        discarded: discarded.length,
+        drawn: drawn.map((c) => ({ instanceId: c.instanceId })),
+        playerId,
+      });
+      break;
+    }
+
+    case 'shuffleAndDraw': {
+      const player = draft.players[playerId];
+      const hand = player.zones.hand;
+      const returned = hand.splice(0);
+      player.zones.deck.push(...returned);
+      player.zones.deck = activeRng.shuffle(player.zones.deck);
+      const count = Math.min(payload.count ?? 0, player.zones.deck.length);
+      const drawn = player.zones.deck.splice(0, count);
+      hand.push(...drawn);
+      events.push({
+        type: 'handShuffledIntoDeckAndDrawn',
+        returned: returned.length,
+        drawn: drawn.map((c) => ({ instanceId: c.instanceId })),
+        playerId,
+      });
+      break;
+    }
+
+    case 'shuffleBottomAndDraw': {
+      const player = draft.players[playerId];
+      const hand = player.zones.hand;
+      const returned = activeRng.shuffle(hand.splice(0));
+      player.zones.deck.push(...returned);
+      const count = Math.min(payload.count ?? 0, player.zones.deck.length);
+      const drawn = player.zones.deck.splice(0, count);
+      hand.push(...drawn);
+      events.push({
+        type: 'handShuffledToDeckBottomAndDrawn',
+        returned: returned.length,
+        drawn: drawn.map((c) => ({ instanceId: c.instanceId })),
+        playerId,
+      });
+      break;
+    }
+
+    case 'shufflePrizesToDeckBottom': {
+      const player = draft.players[playerId];
+      const prizes = player.zones.prizes;
+      const shuffled = activeRng.shuffle(prizes.splice(0));
+      player.zones.deck.push(...shuffled);
+      events.push({
+        type: 'prizesShuffledToDeckBottom',
+        count: shuffled.length,
+        playerId,
+      });
+      break;
+    }
+
+    // --- Reveal/hide (I19). A player may only flip `card.revealed` on their own
+    // zone (draft.players[playerId] is always the sender's own state, never the
+    // opponent's) — the flag is symmetric in view.mjs's redaction, so setting it
+    // here is enough to unhide the card in both players' views. ---
+
+    case 'revealShortcut': {
+      const player = draft.players[playerId];
+      const zone = player.zones[payload.zoneId];
+      const card = zone?.[payload.index];
+      if (card) {
+        card.revealed = true;
+        events.push({
+          type: 'cardRevealed',
+          instanceId: card.instanceId,
+          zoneId: payload.zoneId,
+          playerId,
+        });
+      }
+      break;
+    }
+
+    case 'hideShortcut': {
+      const player = draft.players[playerId];
+      const zone = player.zones[payload.zoneId];
+      const card = zone?.[payload.index];
+      if (card) {
+        card.revealed = false;
+        events.push({
+          type: 'cardHidden',
+          instanceId: card.instanceId,
+          zoneId: payload.zoneId,
+          playerId,
+        });
+      }
+      break;
+    }
+
+    case 'revealCards': {
+      const player = draft.players[playerId];
+      const zone = player.zones[payload.zoneId] || [];
+      for (const card of zone) card.revealed = true;
+      events.push({
+        type: 'zoneRevealed',
+        zoneId: payload.zoneId,
+        count: zone.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'hideCards': {
+      const player = draft.players[playerId];
+      const zone = player.zones[payload.zoneId] || [];
+      for (const card of zone) card.revealed = false;
+      events.push({
+        type: 'zoneHidden',
+        zoneId: payload.zoneId,
+        count: zone.length,
+        playerId,
+      });
+      break;
+    }
+
+    // --- Board ops (design 002 slice 3.4b). Legacy targets the literal 'board' zone. ---
+
+    case 'discardBoard': {
+      const player = draft.players[playerId];
+      const moved = player.zones.board.splice(0);
+      player.zones.discard.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: 'board',
+        to: 'discard',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'handBoard': {
+      const player = draft.players[playerId];
+      const moved = player.zones.board.splice(0);
+      player.zones.hand.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: 'board',
+        to: 'hand',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'shuffleBoard': {
+      const player = draft.players[playerId];
+      const moved = player.zones.board.splice(0);
+      player.zones.deck.push(...moved);
+      player.zones.deck = activeRng.shuffle(player.zones.deck);
+      events.push({
+        type: 'zoneShuffledIntoDeck',
+        zoneId: 'board',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    case 'lostZoneBoard': {
+      const player = draft.players[playerId];
+      const moved = player.zones.board.splice(0);
+      player.zones.lostZone.push(...moved);
+      events.push({
+        type: 'zoneMoved',
+        from: 'board',
+        to: 'lostZone',
+        count: moved.length,
+        playerId,
+      });
+      break;
+    }
+
+    // Deck bootstrap (design 002 slice 3.4e / I16). Mints instanceId through the same
+    // draft.nextInstanceId counter every other card-creating command uses, and — critically —
+    // runs through applyCommand so it lands in commandLog. Undo's replay depends on this: before
+    // this command existed, deck loading was a direct mutation on gameRoom.state outside the
+    // log, so replaying commandLog from a fresh seeded state reconstructed empty decks.
+    case 'loadDeck': {
+      const player = draft.players[playerId];
+      const deckData = Array.isArray(payload.deckData) ? payload.deckData : [];
+      player.zones.deck = [];
+      let syncInstance = 0;
+      for (const item of deckData) {
+        const [quantity, cardName, cardType, imageURL, number, set, tcgId] =
+          Array.isArray(item)
+            ? item
+            : [
+                item.quantity,
+                item.name,
+                item.type,
+                item.imageURL,
+                item.number,
+                item.set,
+                item.tcgId,
+              ];
+        const cardCount =
+          typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+        for (let i = 0; i < cardCount; i++) {
+          const card = createCard({
+            instanceId: mintInstanceId(draft),
+            syncInstance,
+            ownerId: playerId,
+            name: cardName || '',
+            type: cardType || '',
+            src: imageURL || '',
+            number: number != null ? String(number) : '',
+            set: set || '',
+            id: tcgId || '',
+          });
+          syncInstance++;
+          player.zones.deck.push(card);
+        }
+      }
+      if (deckData.length > 0) {
+        player.deckList = [...deckData];
+      }
+      events.push({
+        type: 'deckLoaded',
+        playerId,
+        count: player.zones.deck.length,
+      });
+      break;
+    }
+
+    // Design 002 I26: applies printed card data the deck rows never carried. Addresses by
+    // syncInstance across every zone (cards have usually been dealt into hand/prizes by the
+    // time TCGdex enrichment resolves) and updates in place — it must never rebuild a zone,
+    // since it can legally arrive mid-game.
+    case 'cardStats': {
+      const player = draft.players[playerId];
+      const stats = Array.isArray(payload?.stats) ? payload.stats : [];
+      const bySyncInstance = new Map();
+      for (const zone of Object.values(player?.zones || {})) {
+        if (!Array.isArray(zone)) continue;
+        for (const card of zone) {
+          if (card?.syncInstance != null)
+            bySyncInstance.set(card.syncInstance, card);
+        }
+      }
+
+      let updated = 0;
+      for (const entry of stats) {
+        const card = bySyncInstance.get(entry.syncInstance);
+        if (!card) continue;
+        if (entry.hp != null) card.hp = Number(entry.hp);
+        if (Array.isArray(entry.attacks))
+          card.attacks = entry.attacks.map((a) => ({ ...a }));
+        if (Array.isArray(entry.types)) card.types = [...entry.types];
+        if (entry.weakness !== undefined) card.weakness = entry.weakness;
+        if (entry.resistance !== undefined) card.resistance = entry.resistance;
+        if (Array.isArray(entry.retreatCost))
+          card.retreatCost = [...entry.retreatCost];
+        if (entry.stage != null) card.stage = entry.stage;
+        updated += 1;
+      }
+
+      events.push({ type: 'cardStatsApplied', playerId, count: updated });
+      break;
+    }
+
+    // undo (design 002 slice 3.4e / D6, I16): deterministic commandLog replay minus tail,
+    // rebuilt from a fresh seeded state. Returns directly — the replayed state already carries
+    // its own correct commandLog/stateVersion/rngCursor, so the common tail below (which would
+    // append this 'undo' command itself) must not run. Undo commands are therefore never
+    // themselves present in commandLog — only real game actions are, which is what keeps replay
+    // well-defined (no undo-of-undo bookkeeping to unwind).
+    case 'undo': {
+      const removeCount =
+        Number.isInteger(payload?.count) && payload.count > 0
+          ? payload.count
+          : 1;
+      const log = state.commandLog;
+      // Edge Case 18: never rewind past the start of this game's log.
+      if (log.length < removeCount) {
+        return {
+          state,
+          events: [],
+          pendingChoice: state.pendingChoice,
+          error: 'nothing_to_undo',
+          reason: `Cannot undo ${removeCount} action(s); command log only has ${log.length}`,
+        };
+      }
+
+      const keptLog = log.slice(0, log.length - removeCount);
+
+      let replayState = createGameState({
+        gameId: state.gameId,
+        seed: state.seed,
+        rulesEnabled: state.rulesEnabled,
+        players: Object.fromEntries(
+          Object.entries(state.players).map(([pid, p]) => [
+            pid,
+            { playerId: pid, username: p.username },
+          ])
+        ),
+      });
+
+      const replayRng = createRng(state.seed);
+      for (const loggedCommand of keptLog) {
+        const result = applyCommand(replayState, loggedCommand, replayRng);
+        if (result.error) {
+          return {
+            state,
+            events: [],
+            pendingChoice: state.pendingChoice,
+            error: 'undo_replay_failed',
+            reason: `Replay diverged at logged command "${loggedCommand.type}": ${result.reason || result.error}`,
+          };
+        }
+        replayState = result.state;
+      }
+
+      return {
+        state: replayState,
+        events: [
+          { type: 'undo', count: removeCount, remaining: keptLog.length },
+        ],
+        pendingChoice: replayState.pendingChoice,
+        error: null,
+      };
+    }
+
     default:
       break;
   }
@@ -1449,4 +2306,3 @@ export function applyCommand(state, command, rng = null) {
     error: null,
   };
 }
-

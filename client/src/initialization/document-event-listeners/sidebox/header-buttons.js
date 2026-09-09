@@ -4,7 +4,10 @@ import { cleanActionData } from '../../../setup/general/clean-action-data.js';
 import { processAction } from '../../../setup/general/process-action.js';
 import { show } from '../../../setup/home-header/header-toggle.js';
 import { handleSpectatorButtons } from '../../../setup/spectator/handle-spectator-buttons.js';
-import { removeSyncIntervals } from '../../socket-event-listeners/socket-event-listeners.js';
+import {
+  removeSyncIntervals,
+  resetNetcodeForRoomChange,
+} from '../../socket-event-listeners/socket-event-listeners.js';
 
 export const initializeHeaderButtons = () => {
   const connectedRoom = document.getElementById('connectedRoom');
@@ -78,6 +81,10 @@ export const initializeHeaderButtons = () => {
       show('p1Box', p1Button);
       handleSpectatorButtons();
       removeSyncIntervals();
+      // Design 002 slice 3.10: leaving must clear the renderer's registries
+      // and client-seq counter, not just the sync intervals, so the next
+      // room starts clean.
+      resetNetcodeForRoomChange();
       systemState.spectatorId = '';
       if (systemState.selfDeckData) {
         processAction('self', true, 'loadDeckData', [systemState.selfDeckData]);

@@ -3,7 +3,10 @@ import { socket, systemState } from '../../../../state.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { processAction } from '../../../../setup/general/process-action.js';
 import { handleSpectatorButtons } from '../../../../setup/spectator/handle-spectator-buttons.js';
-import { removeSyncIntervals } from '../../../socket-event-listeners/socket-event-listeners.js';
+import {
+  removeSyncIntervals,
+  resetNetcodeForRoomChange,
+} from '../../../socket-event-listeners/socket-event-listeners.js';
 
 export const initializeRoomButtons = () => {
   const roomIdInput = document.getElementById('roomIdInput');
@@ -158,6 +161,10 @@ export const initializeRoomButtons = () => {
       systemState.coachingMode = false;
       handleSpectatorButtons();
       removeSyncIntervals();
+      // Design 002 slice 3.10: leaving must clear the renderer's registries
+      // and client-seq counter, not just the sync intervals, so the next
+      // room starts clean.
+      resetNetcodeForRoomChange();
       systemState.spectatorId = '';
       // add the deck data back to the actiondata list
       if (systemState.selfDeckData) {

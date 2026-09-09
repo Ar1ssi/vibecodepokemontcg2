@@ -67,6 +67,7 @@ import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
 import { logSyncAction } from './sync-logger-bridge.js';
 import { systemState } from '../../state.js';
+import { isMirrorSuppressedAction } from '../netcode/authoritative-dispatch.js';
 
 const functions = {
   exchangeData: exchangeData,
@@ -164,6 +165,14 @@ export const acceptAction = async (
   const emit = user === 'self' || isStateImport ? true : false;
   if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
     logSyncAction(actionName, actionParams, 'in');
+  }
+  if (
+    user === 'opp' &&
+    !isStateImport &&
+    systemState.serverAuthoritative &&
+    isMirrorSuppressedAction(actionName)
+  ) {
+    return true;
   }
   try {
     const result = actionParams

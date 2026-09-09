@@ -8,6 +8,7 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { sort } from './general.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { playShuffleFlight } from '../../setup/image-logic/shuffle-flight.js';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 export const shuffleZone = (
   user,
@@ -27,6 +28,15 @@ export const shuffleZone = (
     ]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('shuffleZone', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId, indices, message],
+    })
+  )
+    return;
 
   const zone = getZone(user, zoneId);
   // Originator plays the flight; the mirror only applies the new order.

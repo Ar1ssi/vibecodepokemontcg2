@@ -16,6 +16,7 @@ import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { sortCardsByDeckList } from '/shared/engine/zones/hand-sort.mjs';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
@@ -23,6 +24,15 @@ export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
     processAction(user, emit, 'shuffleAll', [oInitiator, zoneId, indices]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('shuffleAll', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId, indices],
+    })
+  )
+    return;
 
   const zone = getZone(user, zoneId);
   const count = zone.getCount();
@@ -74,6 +84,15 @@ export const shuffleBottom = (
     processAction(user, emit, 'shuffleBottom', [oInitiator, zoneId, indices]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('shuffleBottom', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId, indices],
+    })
+  )
+    return;
 
   const zone = getZone(user, zoneId);
   const count = zone.getCount();
@@ -104,6 +123,15 @@ export const discardAll = (user, initiator, zoneId, emit = true) => {
     processAction(user, emit, 'discardAll', [oInitiator, zoneId]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('discardAll', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId],
+    })
+  )
+    return;
 
   const zone = getZone(user, zoneId);
   const count = zone.getCount();
@@ -138,6 +166,15 @@ export const lostZoneAll = (user, initiator, zoneId, emit = true) => {
     processAction(user, emit, 'lostZoneAll', [oInitiator, zoneId]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('lostZoneAll', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId],
+    })
+  )
+    return;
 
   const zone = getZone(user, zoneId);
   const count = zone.getCount();
@@ -172,6 +209,15 @@ export const handAll = (user, initiator, zoneId, emit = true) => {
     processAction(user, emit, 'handAll', [oInitiator, zoneId]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('handAll', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId],
+    })
+  )
+    return;
 
   const zone = getZone(user, zoneId);
   const count = zone.getCount();
@@ -216,6 +262,15 @@ export const leaveAll = (user, initiator, oZoneId, dZoneIdParam, emit = true) =>
     processAction(user, emit, 'leaveAll', [oInitiator, oZoneId, dZoneId]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('leaveAll', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [oZoneId, dZoneId],
+    })
+  )
+    return;
 
   const oZone = getZone(user, oZoneId);
   const dZone = getZone(user, dZoneId);

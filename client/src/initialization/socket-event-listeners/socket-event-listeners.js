@@ -14,6 +14,8 @@ import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { exchangeData } from '../../setup/deck-constructor/exchange-data.js';
 import { acceptAction } from '../../setup/general/accept-action.js';
+import { processAction } from '../../setup/general/process-action.js';
+import { setAuthoritativeDispatchContext } from '../../setup/netcode/authoritative-dispatch.js';
 import { cleanActionData } from '../../setup/general/clean-action-data.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
@@ -27,12 +29,20 @@ import {
 import {
   applyView,
   setDefaultNetcodeContext,
+  resetRenderState,
 } from '../../setup/netcode/apply-view.js';
+import { getZone } from '../../setup/zones/get-zone.js';
+import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-table.js';
+import { COVER_IMAGE_LISTENERS } from '../../setup/image-logic/cover-listener-table.js';
+import { sortZoneCardsForRender } from '../../setup/netcode/hand-sort-context.js';
+import { setInstanceMap } from '../../setup/netcode/dual-run-bridge.js';
+import { setDealOrder } from '../../setup/netcode/deal-order.js';
 import {
   handleCmdRejected,
   emitRequestView,
   seedClientSeq,
   getProtocolVersion,
+  resetClientSeq,
 } from '../../setup/netcode/cmd-emitter.js';
 import {
   buildPeerLogResponse,
@@ -46,11 +56,19 @@ import {
   createRequestActionQueue,
   STALE_ACTION_TIMEOUT_MS,
 } from '../../setup/netcode/request-action-queue.js';
+import {
+  computeSyncCheckZones,
+  emitSyncCheck,
+  shouldTriggerDesyncRecovery,
+  viewBackedGetZone,
+  SYNC_CHECK_INTERVAL_MS,
+} from '../../setup/netcode/sync-check.js';
 
 let isImporting = false;
 let spectatorDebounceTimer = null;
 let pushActionQueue = Promise.resolve();
 let peerLogTimeout = null;
+let syncCheckIntervalId = null;
 const requestActionQueue = createRequestActionQueue();
 let requestActionStaleTimer = null;
 
@@ -83,8 +101,45 @@ export const removeSyncIntervals = () => {
     clearTimeout(peerLogTimeout);
     peerLogTimeout = null;
   }
+  stopSyncCheckHeartbeat();
   clearRequestActionStaleTimer();
   requestActionQueue.clear();
+};
+
+// Design 002 slice 3.11: re-arms the heartbeat finding #4 named dead
+// (slice 1.3 deleted it as scaffolding that detected nothing) — this one
+// calls something real. Only meaningful once a GameRoom exists server-side.
+const startSyncCheckHeartbeat = () => {
+  if (syncCheckIntervalId || !systemState.serverAuthoritative) return;
+  syncCheckIntervalId = setInterval(() => {
+    const isSpectator = document.getElementById(
+      'spectatorModeCheckbox'
+    ).checked;
+    if (
+      isSpectator ||
+      !systemState.isTwoPlayer ||
+      !systemState.roomId ||
+      !socket.connected
+    ) {
+      return;
+    }
+    emitSyncCheck({
+      socket,
+      roomId: systemState.roomId,
+      // I24: legacy getZone's zoneArrays are never populated under
+      // server-authoritative rendering — this heartbeat only fires when the
+      // flag is on (guard above), so the renderer's own view cache is
+      // always the live source here.
+      zones: computeSyncCheckZones('self', viewBackedGetZone),
+    });
+  }, SYNC_CHECK_INTERVAL_MS);
+};
+
+const stopSyncCheckHeartbeat = () => {
+  if (syncCheckIntervalId) {
+    clearInterval(syncCheckIntervalId);
+    syncCheckIntervalId = null;
+  }
 };
 
 // O2-C: the mandatory failure branch for O2-B. No recovery is attempted past
@@ -173,14 +228,39 @@ const drainRequestActionQueue = () => {
   }
 };
 
-export const initializeSocketEventListeners = () => {
+// Production netcode context (design 002 slice 3.6+). Re-invoked by
+// `resetNetcodeForRoomChange` because `resetRenderState()` nulls it
+// (apply-view.js's defaultNetcodeContext) — skipping the re-seed after a
+// reset breaks choice resolution for the next room.
+const seedNetcodeContext = () => {
   setDefaultNetcodeContext({
     socket,
     get roomId() {
       return systemState.roomId;
     },
     systemState,
+    getZone,
+    cardListeners: CARD_IMAGE_LISTENERS,
+    coverListeners: COVER_IMAGE_LISTENERS,
+    sortZoneCards: sortZoneCardsForRender,
   });
+  // Design 003 slice 1: the authoritative gate needs the same two browser-only
+  // dependencies `apply-view.js` does, injected for the same reason
+  // (`process-action.js` reaches `state.js`'s module-scope `io()`/`document`).
+  setAuthoritativeDispatchContext({ processAction, systemState });
+};
+
+// Design 002 slice 3.10: room teardown/re-entry must clear the renderer's
+// registries and the client-seq counter so a new room starts from a clean
+// slate, then immediately re-seed the netcode context.
+export const resetNetcodeForRoomChange = () => {
+  resetRenderState();
+  seedNetcodeContext();
+  resetClientSeq(0);
+};
+
+export const initializeSocketEventListeners = () => {
+  seedNetcodeContext();
 
   socket.on('joinGame', async (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
@@ -207,6 +287,9 @@ export const initializeSocketEventListeners = () => {
       });
       return;
     }
+    // Design 002 slice 3.10: a fresh room must not inherit the previous
+    // room's renderer registries or client-seq counter.
+    resetNetcodeForRoomChange();
     const connectedRoom = document.getElementById('connectedRoom');
     const lobby = document.getElementById('lobby');
     const roomHeaderText = document.getElementById('roomHeaderText');
@@ -223,6 +306,7 @@ export const initializeSocketEventListeners = () => {
       flipBoard();
     }
     systemState.isTwoPlayer = true;
+    startSyncCheckHeartbeat();
     forceRulesEnabledForMultiplayer();
     enableSyncLogForMultiplayer();
     cleanActionData('self');
@@ -354,6 +438,17 @@ export const initializeSocketEventListeners = () => {
         roomId: systemState.roomId,
       });
     }
+  });
+
+  socket.on('instanceMap', (data) => {
+    if (data?.map) setInstanceMap(data.map);
+  });
+
+  // Design 002 I17: the server's authoritative opening-deal order, so this client's
+  // setupPrizes() shuffles into the same hand/prizes/deck the server actually dealt
+  // instead of an independent local shuffle.
+  socket.on('dealOrder', (data) => {
+    if (Array.isArray(data?.order)) setDealOrder(data.order, data?.starter ?? null);
   });
 
   socket.on('cmdRejected', (data) => {
@@ -514,6 +609,20 @@ export const initializeSocketEventListeners = () => {
         systemState.isCatchingUp = false;
       },
     });
+  });
+  // Design 002 slice 3.11: server named a zone that disagrees with its own
+  // state. Recovery reuses the existing slice-1.1 peer-log catch-up rather
+  // than a second mechanism (edge row 24: defer to an in-flight catch-up).
+  socket.on('desync', (data) => {
+    logSync('desync.detected', { zoneId: data?.zoneId }, 'in');
+    if (
+      shouldTriggerDesyncRecovery({
+        isCatchingUp: systemState.isCatchingUp,
+        peerLogRequestPending: Boolean(peerLogTimeout),
+      })
+    ) {
+      requestPeerLogCatchup();
+    }
   });
   socket.on('lookAtCards', (data) => {
     if (data.socketId === systemState.spectatorId) {

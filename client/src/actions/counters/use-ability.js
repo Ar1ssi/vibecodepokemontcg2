@@ -6,6 +6,7 @@ import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { buildCardHint, resolveCardIndex } from '/shared/engine/zones/resolve-card-index.mjs';
 import { addAbilityCounter } from './ability-counter.js';
+import { dispatchAuthoritativeUseAbility } from '../../setup/netcode/authoritative-dispatch.js';
 
 export const useAbility = (
   user,
@@ -13,7 +14,8 @@ export const useAbility = (
   zoneId,
   index,
   emitOrHint = true,
-  maybeEmit
+  maybeEmit,
+  authoritativeId = null
 ) => {
   const { emit, tail: hintIn } = splitEmitAndTail(emitOrHint, maybeEmit);
   const zone = getZone(user, zoneId);
@@ -25,6 +27,22 @@ export const useAbility = (
     processAction(user, emit, 'useAbility', [oInitiator, zoneId, resolved, hint]);
     return;
   }
+
+  // design 003 slice 5: the legacy hint is built from the legacy zone array, which is empty
+  // under authoritative rendering — identity comes from the interaction site instead
+  // (`mouseClick.cardInstanceId`) and is resolved against the authoritative registry.
+  if (
+    dispatchAuthoritativeUseAbility({
+      user,
+      emit,
+      incomingHint: hintIn,
+      oInitiator,
+      zoneId,
+      index: resolved,
+      authoritativeId,
+    })
+  )
+    return;
 
   if (!card) return;
   const cardName = card.name;

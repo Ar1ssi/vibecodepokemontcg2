@@ -39,17 +39,33 @@ export function hashCardList(cards = []) {
 }
 
 /**
+ * Per-zone fingerprint map (zoneId -> hash) — the same data `hashBoardSnapshot`
+ * joins into one string, kept separate so a sync check can name the first
+ * *specific* zone that diverged instead of only "somewhere on the board"
+ * (design 002 slice 3.11).
+ *
+ * @param {Record<string, { array?: object[] }|object[]>} zones
+ *   Map of zoneId → zone object or raw card array.
+ * @returns {Record<string, string>}
+ */
+export function hashZoneMap(zones = {}) {
+  const map = {};
+  for (const id of Object.keys(zones).sort()) {
+    const value = zones[id];
+    const cards = Array.isArray(value) ? value : value?.array;
+    map[id] = hashCardList(cards);
+  }
+  return map;
+}
+
+/**
  * @param {Record<string, { array?: object[] }|object[]>} zones
  *   Map of zoneId → zone object or raw card array.
  */
 export function hashBoardSnapshot(zones = {}) {
-  return Object.keys(zones)
-    .sort()
-    .map((id) => {
-      const value = zones[id];
-      const cards = Array.isArray(value) ? value : value?.array;
-      return `${id}:${hashCardList(cards)}`;
-    })
+  const map = hashZoneMap(zones);
+  return Object.keys(map)
+    .map((id) => `${id}:${map[id]}`)
     .join(';');
 }
 

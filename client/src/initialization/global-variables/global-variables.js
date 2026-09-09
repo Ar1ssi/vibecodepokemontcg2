@@ -70,6 +70,12 @@ document.body.style.backgroundPosition = '-200px 0';
 // create global variable that holds the information of a selected card, i.e., the card that has been clicked and highlighted and can trigger keybinds
 export const mouseClick = {
   cardIndex: '',
+  // Server instanceId of the last identified card, stamped by the authoritative
+  // renderer (`apply-view.js`). Null for a legacy-rendered card. Design 003 slice 1:
+  // the authoritative gate addresses cards by identity, never by `cardIndex`, which
+  // is resolved against the legacy zone arrays and is meaningless once rendering is
+  // driven by server views.
+  cardInstanceId: null,
   zoneId: '',
   cardUser: '',
   playContainer: '',

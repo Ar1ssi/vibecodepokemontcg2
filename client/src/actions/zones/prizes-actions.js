@@ -6,6 +6,7 @@ import { shuffleIndices } from '../../setup/general/shuffle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 /**
  * Take N prize cards into the player's hand (face-down).
@@ -23,6 +24,16 @@ export const takePrizes = (
     processAction(user, emit, 'takePrizes', [oInitiator, count]);
     return;
   }
+
+  if (
+    dispatchAuthoritativeZoneOp('takePrizes', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [count],
+    })
+  )
+    return;
 
   const prizeZone = getZone(user, 'prizes');
   count = Math.min(count, prizeZone.getCount());
@@ -63,6 +74,16 @@ export const takePrizesByIndex = (
     processAction(user, emit, 'takePrizesByIndex', [oInitiator, indices]);
     return;
   }
+
+  if (
+    dispatchAuthoritativeZoneOp('takePrizesByIndex', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [indices],
+    })
+  )
+    return;
 
   if (!Array.isArray(indices)) indices = [0];
   indices = indices
@@ -105,6 +126,16 @@ export const shufflePrizesToDeckBottom = (
     ]);
     return;
   }
+
+  if (
+    dispatchAuthoritativeZoneOp('shufflePrizesToDeckBottom', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [indices],
+    })
+  )
+    return;
 
   const prizeCount = getZone(user, 'prizes').getCount();
   if (prizeCount === 0) return;

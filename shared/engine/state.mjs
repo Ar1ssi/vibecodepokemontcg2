@@ -3,7 +3,7 @@
  * Absolutely no DOM dependencies. Absolute player IDs only (never 'self'/'opp' - H1).
  */
 
-import { hashBoardSnapshot } from './zones/zone-hash.mjs';
+import { hashBoardSnapshot, hashZoneMap } from './zones/zone-hash.mjs';
 import { cloneCard, createCard } from './cards.mjs';
 
 export const PLAYER_ZONES = [
@@ -201,16 +201,21 @@ export function getAttachedCards(state, targetInstanceId) {
  * @param {string} [playerId]
  * @returns {string}
  */
+function playerHashZones(state, playerId) {
+  const player = state.players?.[playerId];
+  if (!player) return null;
+  return {
+    ...player.zones,
+    stadium: state.stadium ? [state.stadium] : [],
+  };
+}
+
 export function hashState(state, playerId) {
   if (!state) return '';
 
   if (playerId) {
-    const player = state.players?.[playerId];
-    if (!player) return '';
-    const zones = {
-      ...player.zones,
-      stadium: state.stadium ? [state.stadium] : [],
-    };
+    const zones = playerHashZones(state, playerId);
+    if (!zones) return '';
     return hashBoardSnapshot(zones);
   }
 
@@ -222,6 +227,21 @@ export function hashState(state, playerId) {
     : 'stadium:none';
 
   return `v:${state.stateVersion}|turn:${state.turn?.player},${state.turn?.number},${state.turn?.phase}|stadium:${stadiumHash}|players:${playerHashes}`;
+}
+
+/**
+ * Per-zone hash map for one player — the same zones `hashState(state, playerId)`
+ * joins into one string, kept separate so a sync check can name exactly which
+ * zone diverged (design 002 slice 3.11).
+ *
+ * @param {object} state
+ * @param {string} playerId
+ * @returns {Record<string, string>|null} null when the player doesn't exist.
+ */
+export function hashStateZones(state, playerId) {
+  if (!state) return null;
+  const zones = playerHashZones(state, playerId);
+  return zones ? hashZoneMap(zones) : null;
 }
 
 /**

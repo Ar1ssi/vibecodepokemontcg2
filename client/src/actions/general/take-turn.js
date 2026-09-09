@@ -6,11 +6,23 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { resetAbilityCounters } from '../counters/reset-counters.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { discardBoard } from './board-actions.js';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 export const takeTurn = (user, initiator, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'takeTurn', [oInitiator]);
+    return;
+  }
+
+  if (
+    dispatchAuthoritativeZoneOp('takeTurn', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [],
+    })
+  ) {
     return;
   }
 

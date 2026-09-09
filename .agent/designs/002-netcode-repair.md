@@ -238,13 +238,9 @@ choice can be made on evidence rather than on estimate. Deciding it earlier woul
 | B | **Server as arbiter only** — server keeps authoritative state, validates commands and detects divergence; legacy DOM keeps rendering; `applyView` stays behind the §0.2 guard forever | Closes I6 (an arbiter now exists) at the cost of ~5 slices instead of ~11. Skips Phase 3B entirely. **Leaves I5 open**: both clients still hold the full opponent deck, so deck secrecy remains unenforceable and a modified client can still cheat. Renderer code becomes dead weight and should be deleted, not left dormant. |
 | C | **B now, A later behind its own gate** — ship the arbiter, keep `applyView` and its tests alive, revisit 3B as a separate design | Gets I6 closed at B's cost while keeping A reachable. Risk: a dormant renderer rots, exactly as it did between design 001 slice 7 and this document. Mitigated only if 3B is scheduled, not merely "kept possible". |
 
-**Leaning: C, conditional on 3.5's evidence** — but this is a product call, not a technical one.
-It trades cheating-resistance (I5, A only) against roughly six slices of renderer work, and the
-answer depends on whether this simulator is played between trusted opponents or strangers. That is
-the user's call, and it should be asked at the gate, not before.
-
-Whoever rules on this gate: record it as D11, and if the answer is B, file the renderer deletion
-as its own ISSUES.md line rather than leaving `apply-view.js` dormant.
+**Ruled A (D11, 2026-09-09, S47/S48).** Asked at the gate per this section's own instruction, with
+3.5's evidence in hand (replay harness green, 1089/1089 `pnpm test`). Full authoritative rendering:
+Phase 3B is in scope, `applyView`/legacy DOM mutation converges toward views-only over 3.6-3.10.
 
 
 ---
@@ -448,7 +444,7 @@ D8.
 | 7 | Peer never answers `requestPeerLog` | 5s timeout → O2-C announcement; no silent partial state | [x] `peerLogTimeout` in `requestPeerLogCatchup` (socket-event-listeners.js) — no test harness for socket timers, verified by reading the guard |
 | 8 | Out-of-order `requestAction` arrives, gap closes within 2s | queued, then applied in counter order | [ ] |
 | 9 | Out-of-order `requestAction`, gap never closes | 1.1 catch-up triggered once, not per action | [ ] |
-| 10 | Reload → new room in the same tab | `resetRenderState` + context re-seed + `resetClientSeq`; first view applies | [ ] |
+| 10 | Reload → new room in the same tab | `resetRenderState` + context re-seed + `resetClientSeq`; first view applies | [x] no DOM/socket test harness for `socket-event-listeners.js`/`room-buttons.js`/`header-buttons.js` (same class as rows 7/11/12); verified by reading the guard — `resetNetcodeForRoomChange()` wired into `joinGame`, `leaveRoomButton`, and `p1Button`'s leave handler; underlying reset-then-reseed primitive unit-covered by `apply-view.test.mjs` "Finding 5" |
 | 11 | Protocol mismatch on join | client stays in lobby **and** server releases the seat | [x] no DOM/socket test harness in this repo for `socket-event-listeners.js` (same class as row 7); verified by reading the guard — `joinGame` handler emits `leaveRoom` with the pre-join `roomId`/`p2SelfUsername`, reusing the existing `leaveRoom` relay that already calls `gameRoom.removeSocket` |
 | 12 | `emitCmd` returns `bad_command` | user-visible message; `logSync` entry | [x] no DOM/socket test harness for `process-action.js` (module-scope `io()`/`document` side effects in `state.js` make it unimportable outside a browser); verified by reading the guard — `emitCmd(...).then` now routes `{success:false}` to `appendMessage` + `logSync('emitCmd.rejected', …)`, covered indirectly by `cmd-emitter.test.mjs`'s envelope tests for the `emitCmd` contract it depends on |
 | 13 | Unrecognised special condition string | command rejected; no `'Poisoned'` substitution | [ ] |
@@ -458,11 +454,11 @@ D8.
 | 17 | A newly translated action is replayed twice (dedupe path) | `clientSeq` dedupe returns the current view; state advances once | [ ] |
 | 18 | `undo` requested past the start of the command log | rejected with a reason; never rewinds into another game's log | [ ] |
 | 19 | Replay harness hits a command the server cannot model | harness fails loudly naming the action; 3A is not done | [ ] |
-| 20 | Renderer-built card is clicked / dragged / right-clicked | same handlers fire as a legacy-built card — one shared image factory, not two | [ ] |
-| 21 | Damage counter present in view but no sibling overlay node yet | overlay created; removed when the view drops it to 0 | [ ] |
-| 22 | Zone order differs between view and DOM with identical membership | reordered in place; no flicker, no duplicate nodes | [ ] |
-| 23 | Opponent reveals cards mid-choice | overlay renders from the view; clears when the view clears it | [ ] |
-| 24 | Desync detected with the peer-log path already mid-catch-up | one recovery attempt, not two; detection defers to the in-flight catch-up | [ ] |
+| 20 | Renderer-built card is clicked / dragged / right-clicked | same handlers fire as a legacy-built card — one shared image factory, not two | [x] structural: `apply-view.test.mjs` "Row 20" tests. Functional zone-array parity (drag actually completing a move) is open — see 3.6 deviation note |
+| 21 | Damage counter present in view but no sibling overlay node yet | overlay created; removed when the view drops it to 0 | [x] `apply-view.test.mjs` "Row 21: damage-counter overlay…", "Row 21: special-condition overlay…", "Row 21: overlays removed from the zone element…" |
+| 22 | Zone order differs between view and DOM with identical membership | reordered in place; no flicker, no duplicate nodes | [x] `apply-view.test.mjs` "Finding #10: intra-zone order…", "Finding #10: bench play-container order…" |
+| 23 | Opponent reveals cards mid-choice | overlay renders from the view; clears when the view clears it | [x] `apply-view.test.mjs` "Row 23: reveal/look — prize card renders real art once view.mjs reveals it, reverts to cardback when re-redacted". Mechanism only — nothing server-side currently flips `card.revealed` (I19) |
+| 24 | Desync detected with the peer-log path already mid-catch-up | one recovery attempt, not two; detection defers to the in-flight catch-up | [x] `sync-check.test.mjs` "shouldTriggerDesyncRecovery allows recovery only when nothing is already in flight" |
 
 ## Test plan
 
@@ -537,6 +533,49 @@ production. Phase 3 is the real migration tail and should be re-scoped after Pha
 
 ## Deviations (Builder appends here during build)
 
+- 3.11: `hashState`/`hashBoardSnapshot` only ever returned one joined string, so
+  "name the first divergent zone" had nothing to split on — added
+  `hashZoneMap` (zone-hash.mjs) and `hashStateZones` (state.mjs) returning the
+  same data as a `{zoneId: hash}` map instead, with `hashBoardSnapshot`/
+  `hashState` rebuilt on top so their existing output is unchanged. The
+  server-side comparison itself (`findFirstDivergentZone`) is a pure function
+  in a new `server/game/sync-check.mjs` rather than inline in the
+  `socket.on('syncCheck', ...)` handler, since `server.js` runs `main()` at
+  import time and can't be unit-tested directly — same reasoning already
+  applied to `resolve-choice-dedupe.test.mjs`/`client-seq-resync.test.mjs`
+  etc. Client-side heartbeat scheduling (`startSyncCheckHeartbeat`/
+  `stopSyncCheckHeartbeat`) stays inline in `socket-event-listeners.js`
+  (same module-scoped-interval pattern as `peerLogTimeout`), but the hash
+  computation, the emit, and the recovery-gate check
+  (`shouldTriggerDesyncRecovery`, row 24) are pure exports in a new
+  `client/src/setup/netcode/sync-check.js` so they're unit-testable without
+  DOM — the same split `peer-log-catchup.js` already established for slice 1.1.
+
+- 3.10: the design names "the `leaveRoom` handler" as a wiring point, but there are two distinct
+  things called that: `socket.on('leaveRoom', ...)` (`socket-event-listeners.js:344`) only
+  appends a "left the room" chat message for the *other* player — it never touches this client's
+  own room state. The real client-side teardown is the `leaveRoomButton` click handler in
+  `room-buttons.js`, which is where `resetNetcodeForRoomChange()` was wired. Investigating that
+  handler surfaced a second, independent leave-room entry point with the identical teardown body
+  duplicated: `header-buttons.js`'s `p1Button` click handler. Not in the design's slice text, but
+  leaving it unwired would mean the renderer registry survives a room leave taken through that
+  button — wired the same fix there rather than leaving an asymmetric gap.
+- 3.9: no production code — the "overlay" this slice names doesn't exist as a separate
+  concept. `createOrUpdateCardElement`'s existing `isRedacted = !cardData.name && !cardData.src`
+  check (apply-view.js:215) already picks card-back vs real art purely from whatever fields
+  `view.mjs` put on the card, and it runs generically for every zone in the `applyView` loop —
+  so a card that flips from `redactCard` to `sanitizeCard` output between two views (view.mjs's
+  `card.revealed` branch) already re-renders correctly with zero reveal-specific code. Added
+  a dedicated test (`apply-view.test.mjs` Row 23) proving that transition across three
+  successive views on the same registry entry, since the existing redaction test (Invariant 5)
+  only ever compared two different cards in one static view. Investigating this surfaced a real
+  gap: nothing in `shared/engine` ever sets `card.revealed = true` (grep confirms), so the
+  mechanism this slice tests is currently unreachable in production — the reveal/hide legacy
+  actions are `replaced_by_redaction` per 3.4d but nothing replaces them. That's a scope
+  decision already made in 3.4d (relay-only, struck with a reason), not a bug introduced here,
+  so left as-is rather than building a `revealCard`/`hideCard` command unprompted — filed I19
+  instead so it's visible at the 3.12 flip gate.
+
 - 0.2: `dual-run-sync.test.mjs`'s `applyView` calls previously had no injected zone
   resolver, so they were unknowingly exercising the blind-renderer bug (returned
   `applied: true` while rendering nothing). Not in the original slice scope, but the
@@ -550,6 +589,133 @@ production. Phase 3 is the real migration tail and should be re-scoped after Pha
   (client-side `emitSyncCheck` was already a no-op, so this SHADOW_MODE consumer never fired for
   real traffic; `shadow.checkSync` itself is untouched and still unit-tested in `shadow.test.mjs`/
   `shadow-e2e.test.mjs`).
+- 3.4a: none of the 14 zone-op legacy actions attach a cardHint (unlike moveCardBundle etc.),
+  so there is no syncInstance to resolve for them. Position-addressed ops (`shuffleIntoDeck`,
+  `moveToDeckTop`, `switchWithDeckTop`) send `{ from: zoneId, index }` and let the server
+  resolve against its own zone array at apply time — the same pattern `takePrizesByIndex`
+  already used, not a new invention. Whole-zone ops (`shuffleZone`, `shuffleBottom`,
+  `shuffleAll`, `discardAll`, `lostZoneAll`, `handAll`, `leaveAll`, `discardAndDraw`,
+  `shuffleAndDraw`, `shuffleBottomAndDraw`, `shufflePrizesToDeckBottom`) need no addressing:
+  the server acts on the whole zone. Every shuffle is server-rolled via `activeRng`; the
+  client's own shuffle `indices` are read by `translateActionToCmd` but dropped — sending them
+  to the server would let a client dictate its own deck order. Changed `moveToDeckTop`'s
+  DISPOSITION_TABLE `commandType` from `moveCard` to its own `moveToDeckTop` (3.2's note assumed
+  an instanceId-addressed `moveCard`, which doesn't fit — no hint exists). Updated the existing
+  `dual-run-bridge.test.mjs` "no case yet" disposition-gate test to use `takePrizes` instead of
+  `moveToDeckTop`, since the latter now has a case. New test file
+  `server/game/__tests__/zone-op-commands.test.mjs` (added to `pnpm test`) round-trips all 14
+  ops through `GameRoom`, plus a dedupe-replay case (edge row 17).
+- 3.4b: `discardBoard`/`handBoard`/`shuffleBoard`/`lostZoneBoard` target the literal `board` zone
+  (`getZone(user, 'board')`), not a computed active+bench union as 3.4's bullet list described —
+  corrected DISPOSITION_TABLE notes to match. `takePrizes`/`takePrizesByIndex` already had
+  COMMAND_SCHEMAS + reducer cases from the original scaffold; only the `translateActionToCmd`
+  case and a GameRoom round-trip test were missing. Updated the "no case yet" disposition-gate
+  test again (now `takeTurn`, since `takePrizes` has a case). Board-op payloads are `{}`: the
+  legacy `message` param is a chat-toggle cosmetic with no server-side meaning.
+- 3.4c: of the 9 legacy actions in this group only `takeTurn` needed a translator case — it
+  was already `server_command` in DISPOSITION_TABLE but had no case (fell through to the
+  default warn-and-null branch). `setup`/`setupPrizes`/`drawOpeningHand`/`readyUp`/`reset`/
+  `restartGame` were already correctly classified `server_lifecycle` (server runs these
+  itself; there is nothing for a client-sent command to do) and `changeCardBack`/
+  `changePlaymat` already `client_local` — both stay relay-only, confirmed rather than
+  changed, with new disposition-gate tests asserting it. `takeTurn`'s reducer case
+  (`reduce.mjs:1281`) already existed, shared with `pass` (same advanceTurn/resolveCheckup
+  path) — only the COMMAND_SCHEMAS entry and the translator case were missing. Updated the
+  "no case yet" disposition-gate test again, from `takeTurn` (now cased) to
+  `playRandomCardFaceDown` (slice 5, still uncased — the last remaining `server_command`
+  entry with no case). New test file `server/game/__tests__/setup-turn-commands.test.mjs`
+  (added to `pnpm test`) round-trips `takeTurn` through `GameRoom`, plus a dedupe-replay case.
+- 3.6: `apply-view.js` cannot statically import the legacy listener functions
+  (`click-events.js`/`drag.js`) itself — they import `state.js`, which runs `io()` and touches
+  `document`/`window` at module scope and is unimportable outside a browser (same landmine noted
+  for `process-action.js` in the verification section). Adapted the design's "extract into a
+  shared helper and call it from both" instruction: split into two pieces. (1)
+  `image-logic/build-card-image.js` — a pure `<img>`-building factory with no game-state imports,
+  used by **both** legacy `Card.buildImage` and `apply-view.js`'s `createOrUpdateCardElement`, so
+  the actual element-construction logic can never drift into two versions again (N1's mechanism).
+  (2) `image-logic/card-listener-table.js` — the `{click, dblclick, dragstart, ...}` table itself,
+  which does import the browser-only modules; `apply-view.js` never imports it — it's injected via
+  `setDefaultNetcodeContext({ cardListeners })`, wired for real only in
+  `socket-event-listeners.js` (never executed by `node --test`, confirmed by grep — one test reads
+  it as text via `readFileSync`, not `import`). Unwired (all current tests, and any future path
+  that hasn't called `setDefaultNetcodeContext`), the authoritative card stays the pre-3.6 bare
+  non-interactive `<img>` — zero behavior change for anything not explicitly wired.
+  `getZone` wired the same way: `resolveZone` now tries `options.getZone` (test seam, unchanged),
+  then `defaultNetcodeContext.getZone` (new; adapts `'you'|'them'` to the legacy module's
+  `'self'|'opp'`), then the `doc.getElementById` last resort. Deleted the dead `window.__getZone`
+  branch (re-verified S39/S47: nothing sets it).
+  **What this slice does not close:** when `cardListeners` is wired, the authoritative image
+  gets a `.card` shim (the pure view `cardData`, not a legacy `Card` instance — no
+  `.attachedCards`, no evolve/attach behavior) and the same drag-state fields `reset-image.js`
+  seeds (`.attached`, `.layer`, ...), which is enough for `identifyCard`/`findZoneCardIndex` to
+  read identity off a click. It is **not** enough for a drag to actually complete a move: legacy
+  zone-mutation (`moveCard.js` and friends) reads/writes the per-player `zoneArrays` in
+  `get-zone.js`, and the authoritative renderer does not populate them from views. That parity
+  gap is real, tracked as open in edge case row 20, and is exactly what slices 3.7-3.10 build
+  toward — not silently closed here.
+- 3.7: display-only reconciliation, not full click-to-edit interactivity. The overlay divs
+  (`img.damageCounter`/`img.specialCondition`) are created/positioned/removed purely from
+  `cardData.damage`/`cardData.specialCondition` on every `applyView` — no `contentEditable`,
+  no `input`/`blur`/`resize` listeners. Full interactive editing on an authoritative card
+  (typing a new value, right-click "add counter") routes through the existing legacy
+  functions in `client/src/actions/counters/*.js`, which resolve their target via
+  `getZone(user, zoneId).array[index]` — the real `getZone` is wired since 3.6, but its
+  `zoneArrays` are still not populated from views for authoritative cards (same open gap
+  3.6 documented for drag-completing-a-move). So editing an authoritative card's counter is
+  not yet functional; this slice only closes the *rendering* half (row 21), matching the
+  design bullet's wording ("positioned per damage-counter.js / special-condition.js").
+  Reuses `img.damageCounter`/`img.specialCondition` as the storage slot so a future legacy
+  edit and this reconciliation never build two competing divs (N1's mechanism, applied to
+  overlays) once zoneArray population closes the remaining gap.
+  Server stores special conditions as full words (`normalizeSpecialCondition` in
+  `dual-run-bridge.js` → 'Poisoned'/'Burned'/'Asleep'/'Paralyzed'/'Confused'), but
+  `getSpecialConditionClass` (shared with legacy, untouched) keys off the short editable
+  codes ('P'/'B'/'A'/'PA'/'C') — added a small word→code map at the render boundary
+  (`CONDITION_WORD_TO_CODE` in `apply-view.js`) rather than changing the shared styling
+  helper. Overlay divs are appended as direct children of the zone element (matching
+  legacy's `zone.element.appendChild`), not of the card's `.play-container`, so the
+  registry cleanup pass now removes them explicitly — removing the container/image alone
+  left them orphaned. Test-mock gap found and fixed: `apply-view.test.mjs`'s `MockElement`
+  had no `.style` object and no `.append()` (only `appendChild`), so it silently passed
+  despite the renderer being unable to run this code — added both, local to the test file.
+- 3.8: `Cover` (deck/discard/lostZone top-card preview) and `Card` had the same
+  attribute-application loop duplicated (N1's mechanism); refactored `Cover.buildImage`
+  onto the shared `buildCardImage` factory and extracted its listener set into
+  `image-logic/cover-listener-table.js` (`COVER_IMAGE_LISTENERS`), mirroring
+  `card-listener-table.js` — legacy `Cover` uses it directly, the authoritative renderer
+  receives it only by injection (`setDefaultNetcodeContext({ coverListeners })`), same
+  absent-until-wired fallback as `cardListeners`. `deck`'s cover needed no per-card list:
+  `view.mjs`'s `redactOwnerZones`/`redactOpponentZones` already reduce `deck` to
+  `{ count }` (order is secret from both players, including the owner — O4-A/I5), so the
+  authoritative deck zone never receives a browsable image list the way legacy's does;
+  the cover there is count-gated back-skin only, and that's a deliberate authoritative-mode
+  difference from legacy's public deck browsing, not a gap. Discovered and fixed in passing:
+  `createOrUpdateCardElement`'s redacted-card back image used a single hardcoded default
+  regardless of the side's chosen skin, ignoring `systemState.cardBackSrc`/
+  `p1OppCardBackSrc`/`p2OppCardBackSrc` the way legacy's `updateDestinationCover` does —
+  extracted `resolveCardBackSrc(side, options)` and used it for both redacted cards and
+  deck covers so a customized sleeve renders consistently in both places.
+  Finding #10 (intra-zone order) and #11 (attached-card class) were both one-line fixes
+  once traced: `placeCardInZone`'s non-play-zone branch and the play-zone top-level branch
+  only called `appendChild` conditionally (`if (x.parentNode !== y)`), so a card kept its
+  first-seen DOM position forever; `appendChild` on an existing child moves it to the end
+  in both real DOM and the test's `MockElement`, so calling it unconditionally on every
+  `applyView` reconciles order for free. #11 needed `classList.remove('attached-card')`
+  added to the play-zone top-level branch (it already existed on the leaves-play-zones
+  branch) so a card that stops being an attachment but stays in the same zone loses the
+  class instead of carrying it forward.
+  Hand sort: legacy forces deck-list order for hand/discard/lostZone in 2P regardless of
+  the "Sort" checkbox specifically because two independently-mutated legacy DOMs could
+  otherwise diverge (`client/src/actions/zones/general.js`'s `sort()` comment) — that
+  reason doesn't apply to the authoritative renderer (both clients render from the one
+  server-owned view array), but the *visual* grouped-by-decklist ordering is still real
+  user-facing behavior worth keeping for parity. Added one render-order hook,
+  `sortZoneCards: (side, zoneId, cards) => cards`, injected the same way as `getZone`/
+  `cardListeners` (`setDefaultNetcodeContext`, wired for real only in
+  `socket-event-listeners.js` via the new `hand-sort-context.js`, which reuses the
+  existing DOM-free `sortCardsByDeckList` from `shared/engine/zones/hand-sort.mjs` —
+  no new sorting algorithm). Absent (all current tests), rendering order is unchanged
+  (the view's own array order) — zero behavior change for anything not explicitly wired.
 - 1.1: extracted the peer-log request/response/replay logic into a new pure module
   `client/src/setup/netcode/peer-log-catchup.js` (no DOM/socket globals), following the
   existing `cmd-emitter.js` pattern — `socket-event-listeners.js` alone can't be unit

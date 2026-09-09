@@ -32,6 +32,7 @@
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
+import { getDealOrderStarter } from '../netcode/deal-order.js';
 function shouldExecuteLocalRulesEffect({
   isTwoPlayer = false,
   localPlay = false,
@@ -189,6 +190,7 @@ import {
       };
     
       document.addEventListener('rules-turn-began', refresh);
+      document.addEventListener('rules-turn-view-applied', refresh);
       document.addEventListener('rules-mode-changed', refresh);
       document.addEventListener('rules-session-reset', refresh);
       document.addEventListener('rules-energy-attached', refresh);
@@ -860,8 +862,19 @@ import {
         const chosenCall = call || (Math.random() < 0.5 ? 'heads' : 'tails');
         const result = Math.random() < 0.5 ? 'heads' : 'tails';
         // Caller goes first iff the coin lands on the face they called.
-        const turnPlayer = decideTurnOrder({ caller, call: chosenCall, result });
-    
+        let turnPlayer = decideTurnOrder({ caller, call: chosenCall, result });
+
+        // Design 002 I27: this flip is a peer-to-peer RNG stream, unrelated to the
+        // server's own starter pick (setupGame(), shared/engine/setup.mjs) — they
+        // agree only by chance. When the server's answer is already known (it
+        // arrives on 'dealOrder', which setupPrizes() awaits before this flip ever
+        // runs), use it instead of the local guess so this client's turn-order
+        // belief always matches the server's.
+        if (systemState.isTwoPlayer && systemState.serverAuthoritative) {
+          const authoritativeStarter = getDealOrderStarter();
+          if (authoritativeStarter) turnPlayer = authoritativeStarter;
+        }
+
         playTurnOrderCoinAnimation({ coin, result, coinOwner, turnPlayer, isRemote: false });
     
         if (systemState.isTwoPlayer && rulesSocket) {
@@ -1254,6 +1267,7 @@ import {
 
       document.addEventListener('rules-status-changed', updateBadges);
       document.addEventListener('rules-turn-began', updateBadges);
+      document.addEventListener('rules-turn-view-applied', updateBadges);
       document.addEventListener('rules-card-moved', updateBadges);
       document.addEventListener('rules-session-reset', updateBadges);
       document.addEventListener('action-processed', updateBadges);
@@ -1378,12 +1392,11 @@ import {
               // caller + coinOwner so it's correct from ours, then recompute
               // turn order deterministically from the caller's call + result.
               const localCoinOwner = data.coinOwner === 'self' ? 'opp' : 'self';
-              const localCaller = data.caller === 'self' ? 'opp' : 'self';
-              const localTurnPlayer = decideTurnOrder({
-                caller: localCaller,
-                call: data.call,
-                result: data.result,
-              });
+              // Design 002 I27: trust the sender's own turnPlayer (inverted to our
+              // perspective) instead of recomputing from call+result — the sender
+              // may have overridden its local flip with the server's authoritative
+              // starter (getDealOrderStarter()), which this recompute could not see.
+              const localTurnPlayer = data.turnPlayer === 'self' ? 'opp' : 'self';
               const coin = data.coinId ? getCoinById(data.coinId) : null;
               playTurnOrderCoinAnimation({
                 coin,

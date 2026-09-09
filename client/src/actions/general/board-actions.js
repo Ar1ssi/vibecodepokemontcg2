@@ -6,6 +6,7 @@ import { shuffleIndices } from '../../setup/general/shuffle.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 export const discardBoard = (user, initiator, message = true, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
@@ -13,6 +14,16 @@ export const discardBoard = (user, initiator, message = true, emit = true) => {
     processAction(user, emit, 'discardBoard', [oInitiator, message]);
     return;
   }
+
+  if (
+    dispatchAuthoritativeZoneOp('discardBoard', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [message],
+    })
+  )
+    return;
 
   const selectedBoardCount = getZone(user, 'board').getCount();
   if (selectedBoardCount > 0) {
@@ -41,6 +52,16 @@ export const handBoard = (user, initiator, message = true, emit = true) => {
     processAction(user, emit, 'handBoard', [oInitiator, message]);
     return;
   }
+
+  if (
+    dispatchAuthoritativeZoneOp('handBoard', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [message],
+    })
+  )
+    return;
 
   const selectedBoardCount = getZone(user, 'board').getCount();
   if (selectedBoardCount > 0) {
@@ -76,6 +97,16 @@ export const shuffleBoard = (
     return;
   }
 
+  if (
+    dispatchAuthoritativeZoneOp('shuffleBoard', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [message, indices],
+    })
+  )
+    return;
+
   const selectedBoardCount = getZone(user, 'board').getCount();
   const deck = getZone(user, 'deck');
 
@@ -107,6 +138,16 @@ export const lostZoneBoard = (user, initiator, message = true, emit = true) => {
     processAction(user, emit, 'lostZoneBoard', [oInitiator, message]);
     return;
   }
+
+  if (
+    dispatchAuthoritativeZoneOp('lostZoneBoard', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [message],
+    })
+  )
+    return;
 
   const selectedBoardCount = getZone(user, 'board').getCount();
   if (selectedBoardCount > 0) {

@@ -29,17 +29,35 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (typeof payload.from !== 'string' || !VALID_ZONES.includes(payload.from)) {
-        return { valid: false, reason: `from must be a valid zone (${VALID_ZONES.join(', ')})` };
+      if (
+        typeof payload.from !== 'string' ||
+        !VALID_ZONES.includes(payload.from)
+      ) {
+        return {
+          valid: false,
+          reason: `from must be a valid zone (${VALID_ZONES.join(', ')})`,
+        };
       }
       if (typeof payload.to !== 'string' || !VALID_ZONES.includes(payload.to)) {
-        return { valid: false, reason: `to must be a valid zone (${VALID_ZONES.join(', ')})` };
+        return {
+          valid: false,
+          reason: `to must be a valid zone (${VALID_ZONES.join(', ')})`,
+        };
       }
-      if (payload.targetIndex != null && (!Number.isInteger(payload.targetIndex) || payload.targetIndex < 0)) {
-        return { valid: false, reason: 'targetIndex must be a non-negative integer when provided' };
+      if (
+        payload.targetIndex != null &&
+        (!Number.isInteger(payload.targetIndex) || payload.targetIndex < 0)
+      ) {
+        return {
+          valid: false,
+          reason: 'targetIndex must be a non-negative integer when provided',
+        };
       }
       return { valid: true };
     },
@@ -51,7 +69,10 @@ export const COMMAND_SCHEMAS = {
       if (payload && typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (payload.count != null && (!Number.isInteger(payload.count) || payload.count <= 0)) {
+      if (
+        payload.count != null &&
+        (!Number.isInteger(payload.count) || payload.count <= 0)
+      ) {
         return { valid: false, reason: 'count must be a positive integer' };
       }
       return { valid: true };
@@ -64,10 +85,16 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (typeof payload.targetInstanceId !== 'number' || !Number.isInteger(payload.targetInstanceId)) {
+      if (
+        typeof payload.targetInstanceId !== 'number' ||
+        !Number.isInteger(payload.targetInstanceId)
+      ) {
         return { valid: false, reason: 'targetInstanceId must be an integer' };
       }
       if (payload.instanceId === payload.targetInstanceId) {
@@ -83,10 +110,16 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (payload.amount != null && (typeof payload.amount !== 'number' || payload.amount <= 0)) {
+      if (
+        payload.amount != null &&
+        (typeof payload.amount !== 'number' || payload.amount <= 0)
+      ) {
         return { valid: false, reason: 'amount must be a positive number' };
       }
       return { valid: true };
@@ -99,7 +132,10 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       if (typeof payload.amount !== 'number' || payload.amount < 0) {
@@ -115,10 +151,16 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (payload.amount != null && (typeof payload.amount !== 'number' || payload.amount <= 0)) {
+      if (
+        payload.amount != null &&
+        (typeof payload.amount !== 'number' || payload.amount <= 0)
+      ) {
         return { valid: false, reason: 'amount must be a positive number' };
       }
       return { valid: true };
@@ -131,11 +173,20 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (typeof payload.condition !== 'string' || !SPECIAL_CONDITIONS.includes(payload.condition)) {
-        return { valid: false, reason: `condition must be one of: ${SPECIAL_CONDITIONS.join(', ')}` };
+      if (
+        typeof payload.condition !== 'string' ||
+        !SPECIAL_CONDITIONS.includes(payload.condition)
+      ) {
+        return {
+          valid: false,
+          reason: `condition must be one of: ${SPECIAL_CONDITIONS.join(', ')}`,
+        };
       }
       return { valid: true };
     },
@@ -147,11 +198,21 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (payload.condition !== null && (typeof payload.condition !== 'string' || !SPECIAL_CONDITIONS.includes(payload.condition))) {
-        return { valid: false, reason: `condition must be null or one of: ${SPECIAL_CONDITIONS.join(', ')}` };
+      if (
+        payload.condition !== null &&
+        (typeof payload.condition !== 'string' ||
+          !SPECIAL_CONDITIONS.includes(payload.condition))
+      ) {
+        return {
+          valid: false,
+          reason: `condition must be null or one of: ${SPECIAL_CONDITIONS.join(', ')}`,
+        };
       }
       return { valid: true };
     },
@@ -163,7 +224,10 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       return { valid: true };
@@ -176,7 +240,10 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       return { valid: true };
@@ -189,7 +256,10 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       if (typeof payload.type !== 'string' || !payload.type.trim()) {
@@ -205,7 +275,10 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       if (payload.rotation == null) {
@@ -221,10 +294,19 @@ export const COMMAND_SCHEMAS = {
       if (payload && typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (payload?.attackIndex != null && (!Number.isInteger(payload.attackIndex) || payload.attackIndex < 0)) {
-        return { valid: false, reason: 'attackIndex must be a non-negative integer' };
+      if (
+        payload?.attackIndex != null &&
+        (!Number.isInteger(payload.attackIndex) || payload.attackIndex < 0)
+      ) {
+        return {
+          valid: false,
+          reason: 'attackIndex must be a non-negative integer',
+        };
       }
-      if (payload?.targetInstanceId != null && (!Number.isInteger(payload.targetInstanceId))) {
+      if (
+        payload?.targetInstanceId != null &&
+        !Number.isInteger(payload.targetInstanceId)
+      ) {
         return { valid: false, reason: 'targetInstanceId must be an integer' };
       }
       return { valid: true };
@@ -237,12 +319,21 @@ export const COMMAND_SCHEMAS = {
       if (payload && typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (payload?.benchInstanceId != null && !Number.isInteger(payload.benchInstanceId)) {
+      if (
+        payload?.benchInstanceId != null &&
+        !Number.isInteger(payload.benchInstanceId)
+      ) {
         return { valid: false, reason: 'benchInstanceId must be an integer' };
       }
       if (payload?.discardEnergyIds != null) {
-        if (!Array.isArray(payload.discardEnergyIds) || payload.discardEnergyIds.some((id) => !Number.isInteger(id))) {
-          return { valid: false, reason: 'discardEnergyIds must be an array of integers' };
+        if (
+          !Array.isArray(payload.discardEnergyIds) ||
+          payload.discardEnergyIds.some((id) => !Number.isInteger(id))
+        ) {
+          return {
+            valid: false,
+            reason: 'discardEnergyIds must be an array of integers',
+          };
         }
       }
       return { valid: true };
@@ -259,13 +350,26 @@ export const COMMAND_SCHEMAS = {
     },
   },
 
+  takeTurn: {
+    type: 'takeTurn',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
   takePrizes: {
     type: 'takePrizes',
     validate(payload = {}) {
       if (payload && typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (payload?.count != null && (!Number.isInteger(payload.count) || payload.count <= 0)) {
+      if (
+        payload?.count != null &&
+        (!Number.isInteger(payload.count) || payload.count <= 0)
+      ) {
         return { valid: false, reason: 'count must be a positive integer' };
       }
       return { valid: true };
@@ -282,7 +386,10 @@ export const COMMAND_SCHEMAS = {
         return { valid: false, reason: 'indices must be a non-empty array' };
       }
       if (payload.indices.some((idx) => !Number.isInteger(idx) || idx < 0)) {
-        return { valid: false, reason: 'indices must contain only non-negative integers' };
+        return {
+          valid: false,
+          reason: 'indices must contain only non-negative integers',
+        };
       }
       return { valid: true };
     },
@@ -294,7 +401,10 @@ export const COMMAND_SCHEMAS = {
       if (payload && typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (payload?.firstPlayerId != null && typeof payload.firstPlayerId !== 'string') {
+      if (
+        payload?.firstPlayerId != null &&
+        typeof payload.firstPlayerId !== 'string'
+      ) {
         return { valid: false, reason: 'firstPlayerId must be a string' };
       }
       return { valid: true };
@@ -307,7 +417,10 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       return { valid: true };
@@ -320,11 +433,20 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (payload.targetInstanceId != null && (!Number.isInteger(payload.targetInstanceId))) {
-        return { valid: false, reason: 'targetInstanceId must be an integer when provided' };
+      if (
+        payload.targetInstanceId != null &&
+        !Number.isInteger(payload.targetInstanceId)
+      ) {
+        return {
+          valid: false,
+          reason: 'targetInstanceId must be an integer when provided',
+        };
       }
       return { valid: true };
     },
@@ -336,11 +458,20 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
-      if (payload.abilityIndex != null && (!Number.isInteger(payload.abilityIndex) || payload.abilityIndex < 0)) {
-        return { valid: false, reason: 'abilityIndex must be a non-negative integer when provided' };
+      if (
+        payload.abilityIndex != null &&
+        (!Number.isInteger(payload.abilityIndex) || payload.abilityIndex < 0)
+      ) {
+        return {
+          valid: false,
+          reason: 'abilityIndex must be a non-negative integer when provided',
+        };
       }
       return { valid: true };
     },
@@ -369,7 +500,10 @@ export const COMMAND_SCHEMAS = {
         return { valid: false, reason: 'selection must be an array' };
       }
       if (payload.selection.some((id) => !Number.isInteger(id))) {
-        return { valid: false, reason: 'selection must contain only integer instanceIds' };
+        return {
+          valid: false,
+          reason: 'selection must contain only integer instanceIds',
+        };
       }
       return { valid: true };
     },
@@ -381,14 +515,478 @@ export const COMMAND_SCHEMAS = {
       if (!payload || typeof payload !== 'object') {
         return { valid: false, reason: 'Payload must be an object' };
       }
-      if (typeof payload.instanceId !== 'number' || !Number.isInteger(payload.instanceId)) {
+      if (
+        typeof payload.instanceId !== 'number' ||
+        !Number.isInteger(payload.instanceId)
+      ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
       return { valid: true };
     },
   },
-};
 
+  // --- Zone ops (design 002 slice 3.4a). None of these carry a card instanceId: the
+  // legacy actions never attached a cardHint to them, so — like the existing
+  // takePrizesByIndex — position-addressed ops resolve against the SERVER's own zone
+  // array at apply time rather than guessing an identity. Whole-zone ops need no
+  // addressing at all; shuffles are server-rolled (activeRng), never the client's indices,
+  // since trusting client-supplied shuffle order would let a client rig its own deck.
+
+  shuffleZone: {
+    type: 'shuffleZone',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  shuffleBottom: {
+    type: 'shuffleBottom',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  shuffleAll: {
+    type: 'shuffleAll',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  discardAll: {
+    type: 'discardAll',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  lostZoneAll: {
+    type: 'lostZoneAll',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  handAll: {
+    type: 'handAll',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  leaveAll: {
+    type: 'leaveAll',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.from !== 'string' ||
+        !PLAYER_ZONES.includes(payload.from)
+      ) {
+        return {
+          valid: false,
+          reason: `from must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      if (
+        typeof payload.to !== 'string' ||
+        !PLAYER_ZONES.includes(payload.to)
+      ) {
+        return {
+          valid: false,
+          reason: `to must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  discardAndDraw: {
+    type: 'discardAndDraw',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        payload.count != null &&
+        (!Number.isInteger(payload.count) || payload.count < 0)
+      ) {
+        return { valid: false, reason: 'count must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  shuffleAndDraw: {
+    type: 'shuffleAndDraw',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        payload.count != null &&
+        (!Number.isInteger(payload.count) || payload.count < 0)
+      ) {
+        return { valid: false, reason: 'count must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  shuffleBottomAndDraw: {
+    type: 'shuffleBottomAndDraw',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        payload.count != null &&
+        (!Number.isInteger(payload.count) || payload.count < 0)
+      ) {
+        return { valid: false, reason: 'count must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  shufflePrizesToDeckBottom: {
+    type: 'shufflePrizesToDeckBottom',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  shuffleIntoDeck: {
+    type: 'shuffleIntoDeck',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.from !== 'string' ||
+        !PLAYER_ZONES.includes(payload.from)
+      ) {
+        return {
+          valid: false,
+          reason: `from must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      if (!Number.isInteger(payload.index) || payload.index < 0) {
+        return { valid: false, reason: 'index must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  moveToDeckTop: {
+    type: 'moveToDeckTop',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.from !== 'string' ||
+        !PLAYER_ZONES.includes(payload.from)
+      ) {
+        return {
+          valid: false,
+          reason: `from must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      if (!Number.isInteger(payload.index) || payload.index < 0) {
+        return { valid: false, reason: 'index must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  switchWithDeckTop: {
+    type: 'switchWithDeckTop',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.from !== 'string' ||
+        !PLAYER_ZONES.includes(payload.from)
+      ) {
+        return {
+          valid: false,
+          reason: `from must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      if (!Number.isInteger(payload.index) || payload.index < 0) {
+        return { valid: false, reason: 'index must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  // --- Reveal/hide (I19). Position-addressed into the sender's OWN zone, same reasoning
+  // as takePrizesByIndex/shuffleZone: no cardHint exists to resolve an instanceId, so the
+  // server resolves by position against its own zone array.
+
+  revealShortcut: {
+    type: 'revealShortcut',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      if (!Number.isInteger(payload.index) || payload.index < 0) {
+        return { valid: false, reason: 'index must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  hideShortcut: {
+    type: 'hideShortcut',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      if (!Number.isInteger(payload.index) || payload.index < 0) {
+        return { valid: false, reason: 'index must be a non-negative integer' };
+      }
+      return { valid: true };
+    },
+  },
+
+  revealCards: {
+    type: 'revealCards',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  hideCards: {
+    type: 'hideCards',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        typeof payload.zoneId !== 'string' ||
+        !PLAYER_ZONES.includes(payload.zoneId)
+      ) {
+        return {
+          valid: false,
+          reason: `zoneId must be one of: ${PLAYER_ZONES.join(', ')}`,
+        };
+      }
+      return { valid: true };
+    },
+  },
+
+  // --- Board ops (design 002 slice 3.4b). Legacy targets the literal 'board' zone
+  // (getZone(user, 'board')), not a computed active+bench union — no zoneId parameter needed.
+
+  discardBoard: {
+    type: 'discardBoard',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  handBoard: {
+    type: 'handBoard',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  shuffleBoard: {
+    type: 'shuffleBoard',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  lostZoneBoard: {
+    type: 'lostZoneBoard',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
+  // Deck bootstrap (design 002 slice 3.4e / I16) — logged so undo's replay can reconstruct it.
+  loadDeck: {
+    type: 'loadDeck',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (!Array.isArray(payload.deckData)) {
+        return { valid: false, reason: 'deckData must be an array' };
+      }
+      return { valid: true };
+    },
+  },
+
+  // Design 002 I26: printed card data (hp, attacks, weakness, ...) never reaches the
+  // server through loadDeck, whose deck rows carry only identity. Without it the server
+  // cannot adjudicate a knockout (`hp` is null) or compute real attack damage. The client
+  // resolves this data from TCGdex asynchronously, so it arrives as its own command,
+  // addressed by syncInstance and applied in place — never rebuilding a zone.
+  cardStats: {
+    type: 'cardStats',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (!Array.isArray(payload.stats)) {
+        return { valid: false, reason: 'stats must be an array' };
+      }
+      for (const entry of payload.stats) {
+        if (!entry || typeof entry !== 'object') {
+          return { valid: false, reason: 'each stats entry must be an object' };
+        }
+        if (!Number.isInteger(entry.syncInstance) || entry.syncInstance < 0) {
+          return {
+            valid: false,
+            reason:
+              'each stats entry needs a non-negative integer syncInstance',
+          };
+        }
+      }
+      return { valid: true };
+    },
+  },
+
+  undo: {
+    type: 'undo',
+    validate(payload = {}) {
+      if (payload && typeof payload !== 'object') {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      if (
+        payload.count != null &&
+        (!Number.isInteger(payload.count) || payload.count <= 0)
+      ) {
+        return { valid: false, reason: 'count must be a positive integer' };
+      }
+      return { valid: true };
+    },
+  },
+};
 
 /**
  * Validates the shape and envelope of a command.
@@ -421,81 +1019,364 @@ export function validateCommandShape(command) {
  */
 export const DISPOSITION_TABLE = {
   // --- Server commands: gameplay (30 actions) ---
-  moveCardBundle: { disposition: 'server_command', commandType: 'moveCard', slice: 3, notes: 'Direct moveCard between zones' },
-  draw: { disposition: 'server_command', commandType: 'draw', slice: 3, notes: 'Draw cards from deck' },
-  moveToDeckTop: { disposition: 'server_command', commandType: 'moveCard', slice: 3, notes: 'moveCard with to: deck, targetIndex: 0' },
-  attack: { disposition: 'server_command', commandType: 'attack', slice: 5, notes: 'Attack declaration and resolution' },
-  pass: { disposition: 'server_command', commandType: 'pass', slice: 5, notes: 'Pass / end turn' },
-  retreat: { disposition: 'server_command', commandType: 'retreat', slice: 5, notes: 'Retreat active Pokemon' },
-  takeTurn: { disposition: 'server_command', commandType: 'takeTurn', slice: 5, notes: 'Turn start progression' },
-  useAbility: { disposition: 'server_command', commandType: 'useAbility', slice: 6, notes: 'Resumable ability executor' },
-  'stadium-effect': { disposition: 'server_command', commandType: 'stadium-effect', slice: 6, notes: 'Resumable stadium executor' },
-  VSTARGXFunction: { disposition: 'server_command', commandType: 'useVStarGX', slice: 6, notes: 'Once-per-game mechanic' },
-  takePrizes: { disposition: 'server_command', commandType: 'takePrizes', slice: 5, notes: 'Prizes to hand' },
-  takePrizesByIndex: { disposition: 'server_command', commandType: 'takePrizesByIndex', slice: 5, notes: 'Selected prizes to hand' },
-  shufflePrizesToDeckBottom: { disposition: 'server_command', commandType: 'shufflePrizesToDeckBottom', slice: 5, notes: 'Prize shuffle' },
-  shuffleZone: { disposition: 'server_command', commandType: 'shuffleZone', slice: 5, notes: 'Fisher-Yates server shuffle' },
-  shuffleIntoDeck: { disposition: 'server_command', commandType: 'shuffleIntoDeck', slice: 5, notes: 'Card to deck and shuffle' },
-  switchWithDeckTop: { disposition: 'server_command', commandType: 'switchWithDeckTop', slice: 5, notes: 'Swap with deck top' },
-  shuffleAll: { disposition: 'server_command', commandType: 'shuffleAll', slice: 5, notes: 'Board/hand shuffle' },
-  shuffleBottom: { disposition: 'server_command', commandType: 'shuffleBottom', slice: 5, notes: 'Deck bottom shuffle' },
-  discardAll: { disposition: 'server_command', commandType: 'discardAll', slice: 5, notes: 'Mass discard zone' },
-  lostZoneAll: { disposition: 'server_command', commandType: 'lostZoneAll', slice: 5, notes: 'Mass lost zone' },
-  handAll: { disposition: 'server_command', commandType: 'handAll', slice: 5, notes: 'Mass return to hand' },
-  leaveAll: { disposition: 'server_command', commandType: 'leaveAll', slice: 5, notes: 'Mass leave board' },
-  discardAndDraw: { disposition: 'server_command', commandType: 'discardAndDraw', slice: 5, notes: 'Discard and draw N cards' },
-  shuffleAndDraw: { disposition: 'server_command', commandType: 'shuffleAndDraw', slice: 5, notes: 'Shuffle hand and draw N cards' },
-  shuffleBottomAndDraw: { disposition: 'server_command', commandType: 'shuffleBottomAndDraw', slice: 5, notes: 'Put on bottom and draw N cards' },
-  discardBoard: { disposition: 'server_command', commandType: 'discardBoard', slice: 5, notes: 'Discard active/bench' },
-  handBoard: { disposition: 'server_command', commandType: 'handBoard', slice: 5, notes: 'Return active/bench to hand' },
-  shuffleBoard: { disposition: 'server_command', commandType: 'shuffleBoard', slice: 5, notes: 'Shuffle active/bench into deck' },
-  lostZoneBoard: { disposition: 'server_command', commandType: 'lostZoneBoard', slice: 5, notes: 'Lost zone active/bench' },
-  playRandomCardFaceDown: { disposition: 'server_command', commandType: 'playRandomCardFaceDown', slice: 5, notes: 'Random card played face-down' },
+  moveCardBundle: {
+    disposition: 'server_command',
+    commandType: 'moveCard',
+    slice: 3,
+    notes: 'Direct moveCard between zones',
+  },
+  draw: {
+    disposition: 'server_command',
+    commandType: 'draw',
+    slice: 3,
+    notes: 'Draw cards from deck',
+  },
+  moveToDeckTop: {
+    disposition: 'server_command',
+    commandType: 'moveToDeckTop',
+    slice: 3,
+    notes:
+      "Own commandType (slice 3.4a): no cardHint exists to resolve an instanceId, so it addresses by position into the server's own zone array, like takePrizesByIndex",
+  },
+  attack: {
+    disposition: 'server_command',
+    commandType: 'attack',
+    slice: 5,
+    notes: 'Attack declaration and resolution',
+  },
+  pass: {
+    disposition: 'server_command',
+    commandType: 'pass',
+    slice: 5,
+    notes: 'Pass / end turn',
+  },
+  retreat: {
+    disposition: 'server_command',
+    commandType: 'retreat',
+    slice: 5,
+    notes: 'Retreat active Pokemon',
+  },
+  takeTurn: {
+    disposition: 'server_command',
+    commandType: 'takeTurn',
+    slice: 3,
+    notes:
+      'Turn start progression: same advanceTurn/resolveCheckup path as pass (slice 3.4c)',
+  },
+  useAbility: {
+    disposition: 'server_command',
+    commandType: 'useAbility',
+    slice: 6,
+    notes: 'Resumable ability executor',
+  },
+  'stadium-effect': {
+    disposition: 'server_command',
+    commandType: 'stadium-effect',
+    slice: 6,
+    notes: 'Resumable stadium executor',
+  },
+  VSTARGXFunction: {
+    disposition: 'server_command',
+    commandType: 'useVStarGX',
+    slice: 6,
+    notes: 'Once-per-game mechanic',
+  },
+  takePrizes: {
+    disposition: 'server_command',
+    commandType: 'takePrizes',
+    slice: 5,
+    notes: 'Prizes to hand',
+  },
+  takePrizesByIndex: {
+    disposition: 'server_command',
+    commandType: 'takePrizesByIndex',
+    slice: 5,
+    notes: 'Selected prizes to hand',
+  },
+  shufflePrizesToDeckBottom: {
+    disposition: 'server_command',
+    commandType: 'shufflePrizesToDeckBottom',
+    slice: 5,
+    notes: 'Prize shuffle',
+  },
+  shuffleZone: {
+    disposition: 'server_command',
+    commandType: 'shuffleZone',
+    slice: 5,
+    notes: 'Fisher-Yates server shuffle',
+  },
+  shuffleIntoDeck: {
+    disposition: 'server_command',
+    commandType: 'shuffleIntoDeck',
+    slice: 5,
+    notes: 'Card to deck and shuffle',
+  },
+  switchWithDeckTop: {
+    disposition: 'server_command',
+    commandType: 'switchWithDeckTop',
+    slice: 5,
+    notes: 'Swap with deck top',
+  },
+  shuffleAll: {
+    disposition: 'server_command',
+    commandType: 'shuffleAll',
+    slice: 5,
+    notes: 'Board/hand shuffle',
+  },
+  shuffleBottom: {
+    disposition: 'server_command',
+    commandType: 'shuffleBottom',
+    slice: 5,
+    notes: 'Deck bottom shuffle',
+  },
+  discardAll: {
+    disposition: 'server_command',
+    commandType: 'discardAll',
+    slice: 5,
+    notes: 'Mass discard zone',
+  },
+  lostZoneAll: {
+    disposition: 'server_command',
+    commandType: 'lostZoneAll',
+    slice: 5,
+    notes: 'Mass lost zone',
+  },
+  handAll: {
+    disposition: 'server_command',
+    commandType: 'handAll',
+    slice: 5,
+    notes: 'Mass return to hand',
+  },
+  leaveAll: {
+    disposition: 'server_command',
+    commandType: 'leaveAll',
+    slice: 5,
+    notes: 'Mass leave board',
+  },
+  discardAndDraw: {
+    disposition: 'server_command',
+    commandType: 'discardAndDraw',
+    slice: 5,
+    notes: 'Discard and draw N cards',
+  },
+  shuffleAndDraw: {
+    disposition: 'server_command',
+    commandType: 'shuffleAndDraw',
+    slice: 5,
+    notes: 'Shuffle hand and draw N cards',
+  },
+  shuffleBottomAndDraw: {
+    disposition: 'server_command',
+    commandType: 'shuffleBottomAndDraw',
+    slice: 5,
+    notes: 'Put on bottom and draw N cards',
+  },
+  discardBoard: {
+    disposition: 'server_command',
+    commandType: 'discardBoard',
+    slice: 5,
+    notes:
+      'Discard the literal board zone (verified S41: not a computed active+bench union)',
+  },
+  handBoard: {
+    disposition: 'server_command',
+    commandType: 'handBoard',
+    slice: 5,
+    notes: 'Return board zone to hand',
+  },
+  shuffleBoard: {
+    disposition: 'server_command',
+    commandType: 'shuffleBoard',
+    slice: 5,
+    notes: 'Shuffle board zone into deck',
+  },
+  lostZoneBoard: {
+    disposition: 'server_command',
+    commandType: 'lostZoneBoard',
+    slice: 5,
+    notes: 'Lost zone the board zone',
+  },
+  playRandomCardFaceDown: {
+    disposition: 'server_command',
+    commandType: 'playRandomCardFaceDown',
+    slice: 5,
+    notes: 'Random card played face-down',
+  },
 
   // --- Server commands: manual override (9 actions) ---
-  addDamageCounter: { disposition: 'manual_override', commandType: 'addDamageCounter', slice: 3, notes: 'Manual counter override' },
-  updateDamageCounter: { disposition: 'manual_override', commandType: 'updateDamageCounter', slice: 3, notes: 'Manual counter override' },
-  removeDamageCounter: { disposition: 'manual_override', commandType: 'removeDamageCounter', slice: 3, notes: 'Manual counter override' },
-  addSpecialCondition: { disposition: 'manual_override', commandType: 'addSpecialCondition', slice: 3, notes: 'Manual condition override' },
-  updateSpecialCondition: { disposition: 'manual_override', commandType: 'updateSpecialCondition', slice: 3, notes: 'Manual condition override' },
-  removeSpecialCondition: { disposition: 'manual_override', commandType: 'removeSpecialCondition', slice: 3, notes: 'Manual condition override' },
-  removeAbilityCounter: { disposition: 'manual_override', commandType: 'removeAbilityCounter', slice: 3, notes: 'Manual ability marker clear' },
-  changeType: { disposition: 'manual_override', commandType: 'changeType', slice: 3, notes: 'Manual card type override' },
-  rotateCard: { disposition: 'manual_override', commandType: 'rotateCard', slice: 3, notes: 'Manual card orientation override' },
+  addDamageCounter: {
+    disposition: 'manual_override',
+    commandType: 'addDamageCounter',
+    slice: 3,
+    notes: 'Manual counter override',
+  },
+  updateDamageCounter: {
+    disposition: 'manual_override',
+    commandType: 'updateDamageCounter',
+    slice: 3,
+    notes: 'Manual counter override',
+  },
+  removeDamageCounter: {
+    disposition: 'manual_override',
+    commandType: 'removeDamageCounter',
+    slice: 3,
+    notes: 'Manual counter override',
+  },
+  addSpecialCondition: {
+    disposition: 'manual_override',
+    commandType: 'addSpecialCondition',
+    slice: 3,
+    notes: 'Manual condition override',
+  },
+  updateSpecialCondition: {
+    disposition: 'manual_override',
+    commandType: 'updateSpecialCondition',
+    slice: 3,
+    notes: 'Manual condition override',
+  },
+  removeSpecialCondition: {
+    disposition: 'manual_override',
+    commandType: 'removeSpecialCondition',
+    slice: 3,
+    notes: 'Manual condition override',
+  },
+  removeAbilityCounter: {
+    disposition: 'manual_override',
+    commandType: 'removeAbilityCounter',
+    slice: 3,
+    notes: 'Manual ability marker clear',
+  },
+  changeType: {
+    disposition: 'manual_override',
+    commandType: 'changeType',
+    slice: 3,
+    notes: 'Manual card type override',
+  },
+  rotateCard: {
+    disposition: 'manual_override',
+    commandType: 'rotateCard',
+    slice: 3,
+    notes: 'Manual card orientation override',
+  },
 
   // --- Server lifecycle (6 actions) ---
-  setup: { disposition: 'server_lifecycle', slice: 5, notes: 'Server executes full initial setup sequence' },
-  setupPrizes: { disposition: 'server_lifecycle', slice: 5, notes: 'Server deals 6 prize cards' },
-  drawOpeningHand: { disposition: 'server_lifecycle', slice: 5, notes: 'Server deals 7 cards to hand' },
-  readyUp: { disposition: 'server_lifecycle', slice: 5, notes: 'Client emits readyUp handshake' },
-  reset: { disposition: 'server_lifecycle', slice: 5, notes: 'Server resets game state' },
-  restartGame: { disposition: 'server_lifecycle', slice: 5, notes: 'Server restarts game' },
+  setup: {
+    disposition: 'server_lifecycle',
+    slice: 5,
+    notes: 'Server executes full initial setup sequence',
+  },
+  setupPrizes: {
+    disposition: 'server_lifecycle',
+    slice: 5,
+    notes: 'Server deals 6 prize cards',
+  },
+  drawOpeningHand: {
+    disposition: 'server_lifecycle',
+    slice: 5,
+    notes: 'Server deals 7 cards to hand',
+  },
+  readyUp: {
+    disposition: 'server_lifecycle',
+    slice: 5,
+    notes: 'Client emits readyUp handshake',
+  },
+  reset: {
+    disposition: 'server_lifecycle',
+    slice: 5,
+    notes: 'Server resets game state',
+  },
+  restartGame: {
+    disposition: 'server_lifecycle',
+    slice: 5,
+    notes: 'Server restarts game',
+  },
 
   // --- Replaced by protocol (2 actions) ---
-  exchangeData: { disposition: 'replaced_by_protocol', slice: 3, notes: 'Decks register server-side on joinGame' },
-  loadDeckData: { disposition: 'replaced_by_protocol', slice: 3, notes: 'Decks register server-side on joinGame' },
+  exchangeData: {
+    disposition: 'replaced_by_protocol',
+    slice: 3,
+    notes: 'Decks register server-side on joinGame',
+  },
+  loadDeckData: {
+    disposition: 'replaced_by_protocol',
+    slice: 3,
+    notes: 'Decks register server-side on joinGame',
+  },
 
   // --- Replaced by view redaction (7 actions) ---
-  viewDeck: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Deck contents hidden; provided via PendingChoice only when search is legal' },
-  revealCards: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Server-owned card.revealed flag in view' },
-  hideCards: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Server-owned card.revealed flag in view' },
-  revealShortcut: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Server-owned card.revealed flag in view' },
-  hideShortcut: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Server-owned card.revealed flag in view' },
-  lookShortcut: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Server-owned card.revealed flag in view' },
-  stopLookingShortcut: { disposition: 'replaced_by_redaction', slice: 3, notes: 'Server-owned card.revealed flag in view' },
+  viewDeck: {
+    disposition: 'replaced_by_redaction',
+    slice: 3,
+    notes:
+      'Deck contents hidden; provided via PendingChoice only when search is legal',
+  },
+  revealCards: {
+    disposition: 'server_command',
+    commandType: 'revealCards',
+    slice: 5,
+    notes:
+      "I19: sets card.revealed=true for every card in the sender's own zone",
+  },
+  hideCards: {
+    disposition: 'server_command',
+    commandType: 'hideCards',
+    slice: 5,
+    notes:
+      "I19: sets card.revealed=false for every card in the sender's own zone",
+  },
+  revealShortcut: {
+    disposition: 'server_command',
+    commandType: 'revealShortcut',
+    slice: 5,
+    notes: 'I19: sets card.revealed=true for one card, position-addressed',
+  },
+  hideShortcut: {
+    disposition: 'server_command',
+    commandType: 'hideShortcut',
+    slice: 5,
+    notes: 'I19: sets card.revealed=false for one card, position-addressed',
+  },
+  lookShortcut: {
+    disposition: 'replaced_by_redaction',
+    slice: 3,
+    notes: 'Server-owned card.revealed flag in view',
+  },
+  stopLookingShortcut: {
+    disposition: 'replaced_by_redaction',
+    slice: 3,
+    notes: 'Server-owned card.revealed flag in view',
+  },
 
   // --- Announcement only (2 actions) ---
-  lookAtCards: { disposition: 'announcement_only', slice: 3, notes: 'Advisory chat event, no state mutation' },
-  stopLookingAtCards: { disposition: 'announcement_only', slice: 3, notes: 'Advisory chat event, no state mutation' },
+  lookAtCards: {
+    disposition: 'announcement_only',
+    slice: 3,
+    notes: 'Advisory chat event, no state mutation',
+  },
+  stopLookingAtCards: {
+    disposition: 'announcement_only',
+    slice: 3,
+    notes: 'Advisory chat event, no state mutation',
+  },
 
   // --- Client-local, never sent (2 actions) ---
-  changeCardBack: { disposition: 'client_local', slice: 3, notes: 'Local UI cosmetic preference only' },
-  changePlaymat: { disposition: 'client_local', slice: 3, notes: 'Local UI cosmetic preference only' },
+  changeCardBack: {
+    disposition: 'client_local',
+    slice: 3,
+    notes: 'Local UI cosmetic preference only',
+  },
+  changePlaymat: {
+    disposition: 'client_local',
+    slice: 3,
+    notes: 'Local UI cosmetic preference only',
+  },
 
   // --- Undo (1 action) ---
   undo: {
-    disposition: 'undo',
+    disposition: 'server_command',
+    commandType: 'undo',
     slice: 3,
-    notes: 'Server authority enables undo by rewinding commandLog minus tail against seed; deferred out of critical path',
+    notes:
+      'Rewinds commandLog minus tail against seed, replayed from a fresh state (design 002 slice 3.4e / I16)',
   },
 };

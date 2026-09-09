@@ -284,7 +284,10 @@ export const keyDown = (event) => {
           mouseClick.cardUser,
           systemState.initiator,
           mouseClick.zoneId,
-          mouseClick.cardIndex
+          mouseClick.cardIndex,
+          true,
+          undefined,
+          mouseClick.cardInstanceId
         );
       }
     }

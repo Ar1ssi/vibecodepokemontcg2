@@ -31,6 +31,9 @@ class StubDocument {
   createElement() {
     return new StubElement();
   }
+  dispatchEvent() {
+    return true;
+  }
 }
 
 function makeGetZone() {

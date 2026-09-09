@@ -1,0 +1,519 @@
+{
+  "roomId": "e2e-record-1788946202713",
+  "players": {
+    "A": {
+      "stepLog": [
+        {
+          "action": "exchangeData",
+          "parameters": [
+            "E2E-A",
+            "",
+            "http://localhost:4000/src/assets/cardback.png",
+            false,
+            false,
+            null
+          ],
+          "hash": "active:;bench:;board:;deck:;discard:;hand:;lostZone:;prizes:;stadium:"
+        },
+        {
+          "action": "loadDeckData",
+          "parameters": [
+            [
+              [
+                "1",
+                "Alpha 1",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "001",
+                "e2e",
+                "e2e-Alpha-1"
+              ],
+              [
+                "1",
+                "Alpha 2",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "002",
+                "e2e",
+                "e2e-Alpha-2"
+              ],
+              [
+                "1",
+                "Alpha 3",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "003",
+                "e2e",
+                "e2e-Alpha-3"
+              ],
+              [
+                "1",
+                "Alpha 4",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "004",
+                "e2e",
+                "e2e-Alpha-4"
+              ],
+              [
+                "1",
+                "Alpha 5",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "005",
+                "e2e",
+                "e2e-Alpha-5"
+              ],
+              [
+                "1",
+                "Alpha 6",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "006",
+                "e2e",
+                "e2e-Alpha-6"
+              ],
+              [
+                "1",
+                "Alpha 7",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "007",
+                "e2e",
+                "e2e-Alpha-7"
+              ],
+              [
+                "1",
+                "Alpha 8",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "008",
+                "e2e",
+                "e2e-Alpha-8"
+              ],
+              [
+                "1",
+                "Alpha 9",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "009",
+                "e2e",
+                "e2e-Alpha-9"
+              ],
+              [
+                "1",
+                "Alpha 10",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "010",
+                "e2e",
+                "e2e-Alpha-10"
+              ],
+              [
+                "1",
+                "Alpha 11",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "011",
+                "e2e",
+                "e2e-Alpha-11"
+              ],
+              [
+                "1",
+                "Alpha 12",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "012",
+                "e2e",
+                "e2e-Alpha-12"
+              ],
+              [
+                "1",
+                "Alpha 13",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "013",
+                "e2e",
+                "e2e-Alpha-13"
+              ],
+              [
+                "1",
+                "Alpha 14",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "014",
+                "e2e",
+                "e2e-Alpha-14"
+              ],
+              [
+                "1",
+                "Alpha 15",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "015",
+                "e2e",
+                "e2e-Alpha-15"
+              ],
+              [
+                "1",
+                "Alpha 16",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "016",
+                "e2e",
+                "e2e-Alpha-16"
+              ],
+              [
+                "1",
+                "Alpha 17",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "017",
+                "e2e",
+                "e2e-Alpha-17"
+              ],
+              [
+                "1",
+                "Alpha 18",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "018",
+                "e2e",
+                "e2e-Alpha-18"
+              ],
+              [
+                "1",
+                "Alpha 19",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "019",
+                "e2e",
+                "e2e-Alpha-19"
+              ],
+              [
+                "1",
+                "Alpha 20",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "020",
+                "e2e",
+                "e2e-Alpha-20"
+              ]
+            ]
+          ],
+          "hash": "active:;bench:;board:;deck:0|Alpha 1|001|e2e|||0,1|Alpha 2|002|e2e|||0,2|Alpha 3|003|e2e|||0,3|Alpha 4|004|e2e|||0,4|Alpha 5|005|e2e|||0,5|Alpha 6|006|e2e|||0,6|Alpha 7|007|e2e|||0,7|Alpha 8|008|e2e|||0,8|Alpha 9|009|e2e|||0,9|Alpha 10|010|e2e|||0,10|Alpha 11|011|e2e|||0,11|Alpha 12|012|e2e|||0,12|Alpha 13|013|e2e|||0,13|Alpha 14|014|e2e|||0,14|Alpha 15|015|e2e|||0,15|Alpha 16|016|e2e|||0,16|Alpha 17|017|e2e|||0,17|Alpha 18|018|e2e|||0,18|Alpha 19|019|e2e|||0,19|Alpha 20|020|e2e|||0;discard:;hand:;lostZone:;prizes:;stadium:"
+        },
+        {
+          "action": "readyUp",
+          "parameters": [],
+          "hash": "active:;bench:;board:;deck:0|Alpha 1|001|e2e|||0,1|Alpha 2|002|e2e|||0,2|Alpha 3|003|e2e|||0,3|Alpha 4|004|e2e|||0,4|Alpha 5|005|e2e|||0,5|Alpha 6|006|e2e|||0,6|Alpha 7|007|e2e|||0,7|Alpha 8|008|e2e|||0,8|Alpha 9|009|e2e|||0,9|Alpha 10|010|e2e|||0,10|Alpha 11|011|e2e|||0,11|Alpha 12|012|e2e|||0,12|Alpha 13|013|e2e|||0,13|Alpha 14|014|e2e|||0,14|Alpha 15|015|e2e|||0,15|Alpha 16|016|e2e|||0,16|Alpha 17|017|e2e|||0,17|Alpha 18|018|e2e|||0,18|Alpha 19|019|e2e|||0,19|Alpha 20|020|e2e|||0;discard:;hand:;lostZone:;prizes:;stadium:"
+        },
+        {
+          "action": "setupPrizes",
+          "parameters": [
+            [
+              1,
+              19,
+              14,
+              10,
+              5,
+              17,
+              3,
+              6,
+              13,
+              11,
+              18,
+              7,
+              2,
+              8,
+              4,
+              15,
+              16,
+              9,
+              0,
+              12
+            ]
+          ],
+          "hash": "active:;bench:;board:;deck:3|Alpha 4|004|e2e|||0,6|Alpha 7|007|e2e|||0,13|Alpha 14|014|e2e|||0,11|Alpha 12|012|e2e|||0,18|Alpha 19|019|e2e|||0,7|Alpha 8|008|e2e|||0,2|Alpha 3|003|e2e|||0,8|Alpha 9|009|e2e|||0,4|Alpha 5|005|e2e|||0,15|Alpha 16|016|e2e|||0,16|Alpha 17|017|e2e|||0,9|Alpha 10|010|e2e|||0,0|Alpha 1|001|e2e|||0,12|Alpha 13|013|e2e|||0;discard:;hand:;lostZone:;prizes:1|Alpha 2|002|e2e|||0,19|Alpha 20|020|e2e|||0,14|Alpha 15|015|e2e|||0,10|Alpha 11|011|e2e|||0,5|Alpha 6|006|e2e|||0,17|Alpha 18|018|e2e|||0;stadium:"
+        },
+        {
+          "action": "drawOpeningHand",
+          "parameters": [
+            "opp"
+          ],
+          "hash": "active:;bench:;board:;deck:8|Alpha 9|009|e2e|||0,4|Alpha 5|005|e2e|||0,15|Alpha 16|016|e2e|||0,16|Alpha 17|017|e2e|||0,9|Alpha 10|010|e2e|||0,0|Alpha 1|001|e2e|||0,12|Alpha 13|013|e2e|||0;discard:;hand:2|Alpha 3|003|e2e|||0,3|Alpha 4|004|e2e|||0,6|Alpha 7|007|e2e|||0,7|Alpha 8|008|e2e|||0,11|Alpha 12|012|e2e|||0,13|Alpha 14|014|e2e|||0,18|Alpha 19|019|e2e|||0;lostZone:;prizes:1|Alpha 2|002|e2e|||0,19|Alpha 20|020|e2e|||0,14|Alpha 15|015|e2e|||0,10|Alpha 11|011|e2e|||0,5|Alpha 6|006|e2e|||0,17|Alpha 18|018|e2e|||0;stadium:"
+        }
+      ],
+      "finalHash": "active:;bench:;board:;deck:8|Alpha 9|009|e2e|||0,4|Alpha 5|005|e2e|||0,15|Alpha 16|016|e2e|||0,16|Alpha 17|017|e2e|||0,9|Alpha 10|010|e2e|||0,0|Alpha 1|001|e2e|||0,12|Alpha 13|013|e2e|||0;discard:;hand:2|Alpha 3|003|e2e|||0,3|Alpha 4|004|e2e|||0,6|Alpha 7|007|e2e|||0,7|Alpha 8|008|e2e|||0,11|Alpha 12|012|e2e|||0,13|Alpha 14|014|e2e|||0,18|Alpha 19|019|e2e|||0;lostZone:;prizes:1|Alpha 2|002|e2e|||0,19|Alpha 20|020|e2e|||0,14|Alpha 15|015|e2e|||0,10|Alpha 11|011|e2e|||0,5|Alpha 6|006|e2e|||0,17|Alpha 18|018|e2e|||0;stadium:"
+    },
+    "B": {
+      "stepLog": [
+        {
+          "action": "exchangeData",
+          "parameters": [
+            "E2E-B",
+            "",
+            "http://localhost:4000/src/assets/cardback.png",
+            false,
+            false,
+            null
+          ],
+          "hash": "active:;bench:;board:;deck:;discard:;hand:;lostZone:;prizes:;stadium:"
+        },
+        {
+          "action": "loadDeckData",
+          "parameters": [
+            [
+              [
+                "1",
+                "Bravo 1",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "001",
+                "e2e",
+                "e2e-Bravo-1"
+              ],
+              [
+                "1",
+                "Bravo 2",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "002",
+                "e2e",
+                "e2e-Bravo-2"
+              ],
+              [
+                "1",
+                "Bravo 3",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "003",
+                "e2e",
+                "e2e-Bravo-3"
+              ],
+              [
+                "1",
+                "Bravo 4",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "004",
+                "e2e",
+                "e2e-Bravo-4"
+              ],
+              [
+                "1",
+                "Bravo 5",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "005",
+                "e2e",
+                "e2e-Bravo-5"
+              ],
+              [
+                "1",
+                "Bravo 6",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "006",
+                "e2e",
+                "e2e-Bravo-6"
+              ],
+              [
+                "1",
+                "Bravo 7",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "007",
+                "e2e",
+                "e2e-Bravo-7"
+              ],
+              [
+                "1",
+                "Bravo 8",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "008",
+                "e2e",
+                "e2e-Bravo-8"
+              ],
+              [
+                "1",
+                "Bravo 9",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "009",
+                "e2e",
+                "e2e-Bravo-9"
+              ],
+              [
+                "1",
+                "Bravo 10",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "010",
+                "e2e",
+                "e2e-Bravo-10"
+              ],
+              [
+                "1",
+                "Bravo 11",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "011",
+                "e2e",
+                "e2e-Bravo-11"
+              ],
+              [
+                "1",
+                "Bravo 12",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "012",
+                "e2e",
+                "e2e-Bravo-12"
+              ],
+              [
+                "1",
+                "Bravo 13",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "013",
+                "e2e",
+                "e2e-Bravo-13"
+              ],
+              [
+                "1",
+                "Bravo 14",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "014",
+                "e2e",
+                "e2e-Bravo-14"
+              ],
+              [
+                "1",
+                "Bravo 15",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "015",
+                "e2e",
+                "e2e-Bravo-15"
+              ],
+              [
+                "1",
+                "Bravo 16",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "016",
+                "e2e",
+                "e2e-Bravo-16"
+              ],
+              [
+                "1",
+                "Bravo 17",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "017",
+                "e2e",
+                "e2e-Bravo-17"
+              ],
+              [
+                "1",
+                "Bravo 18",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "018",
+                "e2e",
+                "e2e-Bravo-18"
+              ],
+              [
+                "1",
+                "Bravo 19",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "019",
+                "e2e",
+                "e2e-Bravo-19"
+              ],
+              [
+                "1",
+                "Bravo 20",
+                "Pokémon",
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "020",
+                "e2e",
+                "e2e-Bravo-20"
+              ]
+            ]
+          ],
+          "hash": "active:;bench:;board:;deck:0|Bravo 1|001|e2e|||0,1|Bravo 2|002|e2e|||0,2|Bravo 3|003|e2e|||0,3|Bravo 4|004|e2e|||0,4|Bravo 5|005|e2e|||0,5|Bravo 6|006|e2e|||0,6|Bravo 7|007|e2e|||0,7|Bravo 8|008|e2e|||0,8|Bravo 9|009|e2e|||0,9|Bravo 10|010|e2e|||0,10|Bravo 11|011|e2e|||0,11|Bravo 12|012|e2e|||0,12|Bravo 13|013|e2e|||0,13|Bravo 14|014|e2e|||0,14|Bravo 15|015|e2e|||0,15|Bravo 16|016|e2e|||0,16|Bravo 17|017|e2e|||0,17|Bravo 18|018|e2e|||0,18|Bravo 19|019|e2e|||0,19|Bravo 20|020|e2e|||0;discard:;hand:;lostZone:;prizes:;stadium:"
+        },
+        {
+          "action": "readyUp",
+          "parameters": [],
+          "hash": "active:;bench:;board:;deck:0|Bravo 1|001|e2e|||0,1|Bravo 2|002|e2e|||0,2|Bravo 3|003|e2e|||0,3|Bravo 4|004|e2e|||0,4|Bravo 5|005|e2e|||0,5|Bravo 6|006|e2e|||0,6|Bravo 7|007|e2e|||0,7|Bravo 8|008|e2e|||0,8|Bravo 9|009|e2e|||0,9|Bravo 10|010|e2e|||0,10|Bravo 11|011|e2e|||0,11|Bravo 12|012|e2e|||0,12|Bravo 13|013|e2e|||0,13|Bravo 14|014|e2e|||0,14|Bravo 15|015|e2e|||0,15|Bravo 16|016|e2e|||0,16|Bravo 17|017|e2e|||0,17|Bravo 18|018|e2e|||0,18|Bravo 19|019|e2e|||0,19|Bravo 20|020|e2e|||0;discard:;hand:;lostZone:;prizes:;stadium:"
+        },
+        {
+          "action": "setupPrizes",
+          "parameters": [
+            [
+              1,
+              19,
+              18,
+              7,
+              2,
+              17,
+              14,
+              10,
+              16,
+              4,
+              12,
+              13,
+              9,
+              11,
+              8,
+              6,
+              0,
+              3,
+              5,
+              15
+            ]
+          ],
+          "hash": "active:;bench:;board:;deck:14|Bravo 15|015|e2e|||0,10|Bravo 11|011|e2e|||0,16|Bravo 17|017|e2e|||0,4|Bravo 5|005|e2e|||0,12|Bravo 13|013|e2e|||0,13|Bravo 14|014|e2e|||0,9|Bravo 10|010|e2e|||0,11|Bravo 12|012|e2e|||0,8|Bravo 9|009|e2e|||0,6|Bravo 7|007|e2e|||0,0|Bravo 1|001|e2e|||0,3|Bravo 4|004|e2e|||0,5|Bravo 6|006|e2e|||0,15|Bravo 16|016|e2e|||0;discard:;hand:;lostZone:;prizes:1|Bravo 2|002|e2e|||0,19|Bravo 20|020|e2e|||0,18|Bravo 19|019|e2e|||0,7|Bravo 8|008|e2e|||0,2|Bravo 3|003|e2e|||0,17|Bravo 18|018|e2e|||0;stadium:"
+        },
+        {
+          "action": "drawOpeningHand",
+          "parameters": [
+            "opp"
+          ],
+          "hash": "active:;bench:;board:;deck:11|Bravo 12|012|e2e|||0,8|Bravo 9|009|e2e|||0,6|Bravo 7|007|e2e|||0,0|Bravo 1|001|e2e|||0,3|Bravo 4|004|e2e|||0,5|Bravo 6|006|e2e|||0,15|Bravo 16|016|e2e|||0;discard:;hand:4|Bravo 5|005|e2e|||0,9|Bravo 10|010|e2e|||0,10|Bravo 11|011|e2e|||0,12|Bravo 13|013|e2e|||0,13|Bravo 14|014|e2e|||0,14|Bravo 15|015|e2e|||0,16|Bravo 17|017|e2e|||0;lostZone:;prizes:1|Bravo 2|002|e2e|||0,19|Bravo 20|020|e2e|||0,18|Bravo 19|019|e2e|||0,7|Bravo 8|008|e2e|||0,2|Bravo 3|003|e2e|||0,17|Bravo 18|018|e2e|||0;stadium:"
+        },
+        {
+          "action": "moveCardBundle",
+          "parameters": [
+            "opp",
+            "hand",
+            "active",
+            0,
+            false,
+            "move",
+            {
+              "moving": {
+                "src": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "name": "Bravo 5",
+                "number": "005",
+                "set": "e2e",
+                "id": "e2e-Bravo-5",
+                "cardId": "c_4",
+                "syncInstance": 4
+              },
+              "isEvolution": false
+            }
+          ],
+          "hash": "active:4|Bravo 5|005|e2e|||0;bench:;board:;deck:11|Bravo 12|012|e2e|||0,8|Bravo 9|009|e2e|||0,6|Bravo 7|007|e2e|||0,0|Bravo 1|001|e2e|||0,3|Bravo 4|004|e2e|||0,5|Bravo 6|006|e2e|||0,15|Bravo 16|016|e2e|||0;discard:;hand:9|Bravo 10|010|e2e|||0,10|Bravo 11|011|e2e|||0,12|Bravo 13|013|e2e|||0,13|Bravo 14|014|e2e|||0,14|Bravo 15|015|e2e|||0,16|Bravo 17|017|e2e|||0;lostZone:;prizes:1|Bravo 2|002|e2e|||0,19|Bravo 20|020|e2e|||0,18|Bravo 19|019|e2e|||0,7|Bravo 8|008|e2e|||0,2|Bravo 3|003|e2e|||0,17|Bravo 18|018|e2e|||0;stadium:"
+        }
+      ],
+      "finalHash": "active:4|Bravo 5|005|e2e|||0;bench:;board:;deck:11|Bravo 12|012|e2e|||0,8|Bravo 9|009|e2e|||0,6|Bravo 7|007|e2e|||0,0|Bravo 1|001|e2e|||0,3|Bravo 4|004|e2e|||0,5|Bravo 6|006|e2e|||0,15|Bravo 16|016|e2e|||0;discard:;hand:9|Bravo 10|010|e2e|||0,10|Bravo 11|011|e2e|||0,12|Bravo 13|013|e2e|||0,13|Bravo 14|014|e2e|||0,14|Bravo 15|015|e2e|||0,16|Bravo 17|017|e2e|||0;lostZone:;prizes:1|Bravo 2|002|e2e|||0,19|Bravo 20|020|e2e|||0,18|Bravo 19|019|e2e|||0,7|Bravo 8|008|e2e|||0,2|Bravo 3|003|e2e|||0,17|Bravo 18|018|e2e|||0;stadium:"
+    }
+  }
+}

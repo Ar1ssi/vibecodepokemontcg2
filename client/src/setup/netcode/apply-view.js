@@ -10,14 +10,35 @@
 
 import { diffViews } from './view-diff.mjs';
 import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
+import { buildCardImage } from '../image-logic/build-card-image.js';
+import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
+import {
+  DAMAGE_COUNTER_TIERS,
+  getDamageCounterTier,
+} from '../counters/damage-counter-style.mjs';
+import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
+const coverRegistry = new Map(); // "side:zoneId" -> HTMLImageElement
+
+// Design 002 I24: the last view this renderer actually applied. Legacy's own
+// per-player `zoneArrays` (get-zone.js) are never populated from server views
+// (I15) — nothing under authoritative dispatch writes to them (design 003
+// gates local mutation too) — so callers that need a real live zone array
+// under server-authoritative rendering (the 3.11 desync heartbeat, the e2e
+// API) read through `getAuthoritativeZoneArray`/`getAuthoritativeStadiumArray`
+// below instead, which are backed by this cache.
+let lastAppliedView = null;
 
 let defaultNetcodeContext = {
   socket: null,
   roomId: null,
   systemState: null,
+  getZone: null,
+  cardListeners: null,
+  coverListeners: null,
+  sortZoneCards: null,
 };
 
 const PLAY_ZONES = ['active', 'bench'];
@@ -38,11 +59,29 @@ export function getLastRenderedVersion() {
  * @param {object} [ctx.socket]
  * @param {string|Function} [ctx.roomId]
  * @param {object} [ctx.systemState]
+ * @param {Function} [ctx.getZone] Real legacy zone resolver: `(user, zoneId) => { element, array, ... }`
+ *   with `user` in `'self' | 'opp'`. `resolveZone` adapts its own `'you' | 'them'` side
+ *   terminology into this before calling it (design 002 slice 3.6).
+ * @param {object} [ctx.cardListeners] Interaction listener table (design 002 slice 3.6,
+ *   `card-listener-table.js`'s `CARD_IMAGE_LISTENERS`) applied to authoritative-rendered
+ *   card images via the shared `buildCardImage` factory. Left null in tests / until wired
+ *   in production: renderer falls back to a bare, non-interactive `<img>` (unchanged
+ *   pre-3.6 behavior) when absent.
+ * @param {object} [ctx.coverListeners] Interaction listener table for deck/discard/lostZone
+ *   cover images (design 002 slice 3.8, `cover-listener-table.js`'s `COVER_IMAGE_LISTENERS`).
+ *   Same absent-until-wired fallback as `cardListeners`.
+ * @param {Function} [ctx.sortZoneCards] `(side, zoneId, cards) => cards` render-order hook
+ *   (design 002 slice 3.8) mirroring legacy's `sort()` deck-list ordering. Left null in
+ *   tests / until wired: cards render in the view's own array order, unchanged.
  */
 export function setDefaultNetcodeContext(ctx = {}) {
   if (ctx.socket !== undefined) defaultNetcodeContext.socket = ctx.socket;
   if (ctx.roomId !== undefined) defaultNetcodeContext.roomId = ctx.roomId;
   if (ctx.systemState !== undefined) defaultNetcodeContext.systemState = ctx.systemState;
+  if (ctx.getZone !== undefined) defaultNetcodeContext.getZone = ctx.getZone;
+  if (ctx.cardListeners !== undefined) defaultNetcodeContext.cardListeners = ctx.cardListeners;
+  if (ctx.coverListeners !== undefined) defaultNetcodeContext.coverListeners = ctx.coverListeners;
+  if (ctx.sortZoneCards !== undefined) defaultNetcodeContext.sortZoneCards = ctx.sortZoneCards;
 }
 
 /**
@@ -67,11 +106,17 @@ export function getDefaultNetcodeContext() {
 export function resetRenderState() {
   lastRenderedVersion = -1;
   cardRegistry.clear();
+  coverRegistry.clear();
+  lastAppliedView = null;
   clearInFlightAffordances();
   defaultNetcodeContext = {
     socket: null,
     roomId: null,
     systemState: null,
+    getZone: null,
+    cardListeners: null,
+    coverListeners: null,
+    sortZoneCards: null,
   };
 }
 
@@ -82,6 +127,47 @@ export function resetRenderState() {
  */
 export function getCardRegistry() {
   return cardRegistry;
+}
+
+/**
+ * True once this renderer has applied at least one authoritative view (i.e.
+ * server-authoritative rendering is actually active for this session), false
+ * before that or after `resetRenderState()`. Callers use this to decide
+ * whether `getAuthoritativeZoneArray`/`getAuthoritativeStadiumArray` have
+ * anything real to return, versus legacy mode where they never will.
+ *
+ * @returns {boolean}
+ */
+export function hasAuthoritativeView() {
+  return lastAppliedView !== null;
+}
+
+/**
+ * Returns one side's live card array for one zone, sourced from the last
+ * view this renderer applied (design 002 I24). `deck` never has a card
+ * array here — the view redacts it to `{ count }` even for its own owner
+ * (design O4-A / I5) — callers must not treat an empty result for `deck` as
+ * "the deck is empty".
+ *
+ * @param {string} side 'you' | 'them'
+ * @param {string} zoneId
+ * @returns {object[]}
+ */
+export function getAuthoritativeZoneArray(side, zoneId) {
+  const cards = lastAppliedView?.[side]?.zones?.[zoneId];
+  return Array.isArray(cards) ? cards : [];
+}
+
+/**
+ * Returns the neutral Stadium card as a single-element array, matching the
+ * shape `hashState`'s `playerHashZones` builds server-side
+ * (`state.stadium ? [state.stadium] : []`), or an empty array when there is
+ * no Stadium in play or no view has been applied yet.
+ *
+ * @returns {object[]}
+ */
+export function getAuthoritativeStadiumArray() {
+  return lastAppliedView?.stadium ? [lastAppliedView.stadium] : [];
 }
 
 /**
@@ -97,14 +183,14 @@ function resolveZone(side, zoneId, options = {}) {
     return options.getZone(side, zoneId);
   }
 
-  // Fallback to client getZone module if available
-  try {
+  // Production wiring (design 002 slice 3.6): the real legacy zone resolver,
+  // injected via setDefaultNetcodeContext({ getZone }) in
+  // socket-event-listeners.js. Its `user` terminology ('self' | 'opp') is
+  // adapted from this renderer's `side` terminology ('you' | 'them') here so
+  // the injected module itself stays untouched.
+  if (typeof defaultNetcodeContext.getZone === 'function') {
     const user = side === 'you' ? 'self' : 'opp';
-    if (typeof window !== 'undefined' && window.__getZone) {
-      return window.__getZone(user, zoneId);
-    }
-  } catch {
-    // Ignore
+    return defaultNetcodeContext.getZone(user, zoneId);
   }
 
   const doc = options.document || (typeof document !== 'undefined' ? document : null);
@@ -134,6 +220,28 @@ function resolveRenderTargets(options = {}) {
 }
 
 /**
+ * Resolves the per-player card-back skin ("sleeve") a redacted card or a deck
+ * cover should display, mirroring `updateDestinationCover`'s inline choice
+ * (`client/src/actions/move-card-bundle/update-cover.js`): the owner's own
+ * chosen back for 'you', the matching opponent back (`p1OppCardBackSrc` in 1P,
+ * `p2OppCardBackSrc` in 2P) for 'them'. Falls back to `options.cardBackSrc` or
+ * the bundled default when `systemState` isn't wired (tests, or before
+ * `setDefaultNetcodeContext` has run).
+ *
+ * @param {string} side 'you' | 'them'
+ * @param {object} options
+ * @returns {string}
+ */
+function resolveCardBackSrc(side, options = {}) {
+  const fallback = options.cardBackSrc || '/src/assets/cardback.png';
+  const systemState = options.systemState || defaultNetcodeContext.systemState;
+  if (!systemState) return fallback;
+
+  if (side === 'you') return systemState.cardBackSrc || fallback;
+  return (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc) || fallback;
+}
+
+/**
  * Creates or updates an image element for a card representation.
  *
  * @param {object} cardData Pure card data from view
@@ -157,15 +265,48 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
 
   const instanceId = cardData.instanceId;
   const isRedacted = !cardData.name && !cardData.src;
-  const cardBackSrc = options.cardBackSrc || '/src/assets/cardback.png';
+  const cardBackSrc = resolveCardBackSrc(side, options);
   const displaySrc = isRedacted ? cardBackSrc : (cardData.src || cardBackSrc);
 
   let record = cardRegistry.get(instanceId);
   let img = record?.element;
 
   if (!img) {
-    img = doc.createElement('img');
+    // Design 002 slice 3.6: build through the same factory as the legacy
+    // `Card` class (`buildCardImage`) so the two renderers never diverge
+    // into subtly-different <img> construction again (N1's root cause).
+    // The interaction listeners themselves are only attached once the
+    // production wiring has injected them (setDefaultNetcodeContext in
+    // socket-event-listeners.js) — apply-view.js cannot statically import
+    // them itself (they pull in state.js, which is unimportable outside a
+    // browser). Unwired (tests, or before that wiring lands) the card is a
+    // bare, non-interactive <img> — identical to pre-3.6 behavior.
+    const cardListeners = options.cardListeners || defaultNetcodeContext.cardListeners;
+    const user = side === 'you' ? 'self' : side === 'them' ? 'opp' : side;
+    img = buildCardImage(doc, {
+      user,
+      type: cardData.type,
+      draggable: true,
+      ...(cardListeners || {}),
+    });
     img.className = 'card-image';
+    if (cardListeners) {
+      // Seed the drag-state fields legacy listeners read directly off the
+      // element (`.attached`, `.layer`, ...; see reset-image.js), and give
+      // them a `.card` to read identity off of via identifyCard/
+      // findZoneCardIndex. This is a read-oriented shim, not a legacy Card
+      // instance: it has no `.attachedCards`, no evolve/attach behavior.
+      // Zone-mutating interactions (drag completing a move, evolve, attach)
+      // still route through the legacy per-player zoneArrays, which the
+      // authoritative renderer does not populate — that gap is real and is
+      // the rest of Phase 3B's job (slices 3.7-3.10), not closed here.
+      img.attached = false;
+      img.layer = 0;
+      img.energyLayer = 0;
+      img.relative = 0;
+      img.target = 'off';
+      img.card = cardData;
+    }
   }
 
   img.setAttribute('src', displaySrc);
@@ -216,6 +357,186 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
 }
 
 /**
+ * Server-side special conditions are stored as full words (`normalizeSpecialCondition`
+ * in dual-run-bridge.js); the legacy overlay styling helpers (`getSpecialConditionClass`)
+ * key off the short editable codes ('P', 'B', 'A', 'PA', 'C'). Translate at the render
+ * boundary so `special-condition-style-apply.js` stays untouched and shared with legacy.
+ */
+const CONDITION_WORD_TO_CODE = {
+  Poisoned: 'P',
+  Burned: 'B',
+  Asleep: 'A',
+  Paralyzed: 'PA',
+  Confused: 'C',
+};
+
+function getRect(el) {
+  if (el && typeof el.getBoundingClientRect === 'function') {
+    return el.getBoundingClientRect();
+  }
+  return { left: 0, top: 0, width: 0, height: 0 };
+}
+
+/**
+ * Positions a counter/status overlay relative to its card image, replicating the
+ * absolute-positioning scheme `damage-counter.js`/`special-condition.js` use.
+ *
+ * @param {object} overlay
+ * @param {object} targetRect Card image's bounding rect
+ * @param {object} zoneRect Zone element's bounding rect
+ * @param {{ leftOffset: number, size: number, fontSize: number }} spec
+ */
+function positionOverlay(overlay, targetRect, zoneRect, { leftOffset, size, fontSize }) {
+  overlay.style.display = 'inline-block';
+  overlay.style.left = `${targetRect.left - zoneRect.left + leftOffset}px`;
+  overlay.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 4}px`;
+  overlay.style.width = `${size}px`;
+  overlay.style.height = `${size}px`;
+  overlay.style.lineHeight = `${size}px`;
+  overlay.style.fontSize = `${fontSize}px`;
+  overlay.style.zIndex = '1';
+}
+
+/**
+ * Same self/opp-circle side class legacy counters use, keyed off `systemState.initiator`
+ * instead of the browser-only `initiator` getter (`global-variables.js`) apply-view.js
+ * cannot import.
+ *
+ * @param {string} side 'you' | 'them'
+ * @param {object} options
+ * @returns {string}
+ */
+function overlaySideClass(side, options = {}) {
+  const systemState = options.systemState || defaultNetcodeContext.systemState;
+  const initiatorIsSelf = systemState?.initiator === 'self';
+  const user = side === 'you' ? 'self' : 'opp';
+  if (user === 'self') return initiatorIsSelf ? 'self-circle' : 'opp-circle';
+  return initiatorIsSelf ? 'opp-circle' : 'self-circle';
+}
+
+/**
+ * Creates, updates or removes the damage-counter sibling `<div>` for a card, mirroring
+ * `addDamageCounter`/`updateDamageCounter`/`removeDamageCounter`
+ * (`client/src/actions/counters/damage-counter.js`) but display-only: this reconciles
+ * from the authoritative view, it never emits a command. Reuses `img.damageCounter` as
+ * the storage slot so a legacy-built counter (reached via `cardListeners`' contextmenu
+ * handler once zoneArrays support authoritative cards) and this reconciliation never
+ * fight over two different nodes (design 002's N1 mechanism, applied to overlays).
+ *
+ * @param {object} cardData
+ * @param {object} img
+ * @param {object|null} zoneElement
+ * @param {string} side
+ * @param {object} options
+ */
+function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}) {
+  const damage = typeof cardData.damage === 'number' && cardData.damage > 0 ? cardData.damage : 0;
+
+  if (damage <= 0) {
+    if (img.damageCounter) {
+      if (img.damageCounter.parentNode) {
+        img.damageCounter.parentNode.removeChild(img.damageCounter);
+      }
+      img.damageCounter = null;
+    }
+    return;
+  }
+
+  const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
+  let counter = img.damageCounter;
+  if (!counter) {
+    if (!doc || typeof doc.createElement !== 'function') return;
+    counter = doc.createElement('div');
+    counter.contentEditable = 'false';
+    counter.className = overlaySideClass(side, options);
+    img.damageCounter = counter;
+  }
+
+  counter.textContent = String(damage);
+  counter.classList.add('damage-counter');
+  counter.classList.remove(...DAMAGE_COUNTER_TIERS);
+  counter.classList.add(getDamageCounterTier(damage));
+
+  if (zoneElement && counter.parentNode !== zoneElement) {
+    zoneElement.appendChild(counter);
+  }
+
+  const targetRect = getRect(img);
+  const zoneRect = getRect(zoneElement);
+  positionOverlay(counter, targetRect, zoneRect, {
+    leftOffset: targetRect.width / 1.5,
+    size: targetRect.width / 3,
+    fontSize: targetRect.width / 6,
+  });
+}
+
+/**
+ * Creates, updates or removes the special-condition sibling `<div>` for a card, mirroring
+ * `addSpecialCondition`/`updateSpecialCondition`/`removeSpecialCondition`
+ * (`client/src/actions/counters/special-condition.js`) but display-only — see
+ * `reconcileDamageOverlay`'s header for why.
+ *
+ * @param {object} cardData
+ * @param {object} img
+ * @param {object|null} zoneElement
+ * @param {string} side
+ * @param {object} options
+ */
+function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options = {}) {
+  const condition = cardData.specialCondition || null;
+
+  if (!condition) {
+    if (img.specialCondition) {
+      if (img.specialCondition.parentNode) {
+        img.specialCondition.parentNode.removeChild(img.specialCondition);
+      }
+      img.specialCondition = null;
+    }
+    return;
+  }
+
+  const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
+  let marker = img.specialCondition;
+  if (!marker) {
+    if (!doc || typeof doc.createElement !== 'function') return;
+    marker = doc.createElement('div');
+    marker.contentEditable = 'false';
+    marker.className = overlaySideClass(side, options);
+    img.specialCondition = marker;
+  }
+
+  const code = CONDITION_WORD_TO_CODE[condition] || condition;
+  applySpecialConditionStyle(marker, code);
+
+  if (zoneElement && marker.parentNode !== zoneElement) {
+    zoneElement.appendChild(marker);
+  }
+
+  const targetRect = getRect(img);
+  const zoneRect = getRect(zoneElement);
+  positionOverlay(marker, targetRect, zoneRect, {
+    leftOffset: 0,
+    size: targetRect.width / 3,
+    fontSize: targetRect.width / 4,
+  });
+}
+
+/**
+ * Reconciles both counter overlays for one card. Called after `placeCardInZone` so the
+ * image has already been inserted into its final zone (position math reads the live rect).
+ *
+ * @param {object} cardData
+ * @param {object} img
+ * @param {object|null} zoneElement
+ * @param {string} side
+ * @param {object} options
+ */
+function reconcileCardOverlays(cardData, img, zoneElement, side, options = {}) {
+  reconcileDamageOverlay(cardData, img, zoneElement, side, options);
+  reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options);
+}
+
+/**
  * Places a card element into its target zone, handling play-containers and attachments.
  *
  * @param {object} cardData
@@ -237,14 +558,24 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
     if (cardData.attachedTo != null) {
       const parentRecord = cardRegistry.get(cardData.attachedTo);
       if (parentRecord && parentRecord.container) {
-        // Append attached card under parent container with attached style
+        // Append attached card under parent container with attached style.
+        // Always appendChild (not just when the parent differs): appendChild
+        // on an existing child moves it to the end, so re-appending every
+        // card in view order each applyView reconciles sibling order among
+        // a parent's attachments (finding #10) instead of only placing a
+        // card the first time it arrives.
         img.classList.add('attached-card');
         parentRecord.container.appendChild(img);
         return;
       }
     }
 
-    // Top-level active/bench Pokemon: wrap in .play-container
+    // Top-level active/bench Pokemon: wrap in .play-container. A card that
+    // was attached last view and is top-level this view must lose the
+    // 'attached-card' class here too, not only on the leaves-play-zones
+    // branch below (finding #11).
+    img.classList.remove('attached-card');
+
     let container = record.container;
     if (!container || !container.parentNode) {
       container = doc.createElement('div');
@@ -252,12 +583,10 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
       container.dataset.instanceId = String(cardData.instanceId);
       record.container = container;
     }
-    if (img.parentNode !== container) {
-      container.appendChild(img);
-    }
-    if (container.parentNode !== zone.element) {
-      zone.element.appendChild(container);
-    }
+    // Always appendChild: reconciles both the image-within-container order
+    // and the container-within-zone order (finding #10) on every view.
+    container.appendChild(img);
+    zone.element.appendChild(container);
     return;
   }
 
@@ -268,8 +597,80 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
   }
 
   img.classList.remove('attached-card');
-  if (img.parentNode !== zone.element) {
-    zone.element.appendChild(img);
+  // Always appendChild (not just when the parent differs): reconciles
+  // intra-zone order to match the view's array order on every applyView
+  // (finding #10) instead of freezing the first-seen DOM position.
+  zone.element.appendChild(img);
+}
+
+const COVER_ZONES = ['deck', 'discard', 'lostZone'];
+
+/**
+ * Reconciles the top-card "Cover" preview image for deck/discard/lostZone
+ * (design 002 slice 3.8, mirrors `updateOriginCover`/`updateDestinationCover`
+ * in `client/src/actions/move-card-bundle/update-cover.js`), but display-only:
+ * this reconciles from the authoritative view on every applyView, it never
+ * emits a command, and it recomputes from scratch rather than reacting to a
+ * single move.
+ *
+ * `deck` carries no card array in the view (`view.mjs`'s `redactOwnerZones`/
+ * `redactOpponentZones` reduce it to `{ count }` — deck order is secret from
+ * both players, including its own owner, by design; see design 002 O4-A /
+ * I5). So the deck cover only ever shows the side's chosen card-back skin
+ * when `count > 0`, never a card face. `discard`/`lostZone` are public
+ * zones (full card arrays), so their cover mirrors the real top card — the
+ * last entry, matching legacy's `array[array.length - 1]` convention.
+ *
+ * @param {string} side 'you' | 'them'
+ * @param {string} zoneId 'deck' | 'discard' | 'lostZone'
+ * @param {object[]|{count:number}|undefined} zoneData
+ * @param {object} options
+ */
+function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
+  const zone = resolveZone(side, zoneId, options);
+  if (!zone.elementCover) return;
+
+  const key = `${side}:${zoneId}`;
+  const isDeck = zoneId === 'deck';
+  const topCard = isDeck ? null : Array.isArray(zoneData) && zoneData.length > 0 ? zoneData[zoneData.length - 1] : null;
+  const hasCards = isDeck ? Boolean(zoneData && zoneData.count > 0) : Boolean(topCard);
+
+  if (!hasCards) {
+    const existing = coverRegistry.get(key);
+    if (existing?.parentNode) existing.parentNode.removeChild(existing);
+    coverRegistry.delete(key);
+    return;
+  }
+
+  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  if (!doc || typeof doc.createElement !== 'function') return;
+
+  const coverListeners = options.coverListeners || defaultNetcodeContext.coverListeners;
+  const user = side === 'you' ? 'self' : 'opp';
+  const id = `${zoneId}Cover`;
+
+  let img = coverRegistry.get(key);
+  if (!img) {
+    img = buildCardImage(doc, {
+      user,
+      id,
+      draggable: true,
+      ...(coverListeners || {}),
+    });
+    coverRegistry.set(key, img);
+  }
+
+  const src = isDeck ? resolveCardBackSrc(side, options) : topCard.src || resolveCardBackSrc(side, options);
+  img.setAttribute('src', src);
+  img.setAttribute('alt', isDeck ? id : topCard.name || id);
+
+  // Legacy keeps exactly one child in elementCover, replacing it on every
+  // update (`update-cover.js`'s removeChild-then-appendChild pattern).
+  if (img.parentNode !== zone.elementCover) {
+    while (zone.elementCover.children && zone.elementCover.children.length > 0) {
+      zone.elementCover.removeChild(zone.elementCover.children[0]);
+    }
+    zone.elementCover.appendChild(img);
   }
 }
 
@@ -435,6 +836,53 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
       if (modal.parentNode) modal.parentNode.removeChild(modal);
     }
   });
+}
+
+/**
+ * Syncs the client's local rules turn state from the authoritative view.
+ *
+ * Design 002 slice 3.12: views have always carried turn.player/isYourTurn/number/phase,
+ * but nothing ever applied them. Under the flag every legacy turn-advancing body is
+ * skipped (design 003 gates attack/pass/takeTurn), so `rulesState.turnPlayer` stayed
+ * frozen at whatever the local coin flip produced while the server advanced its own turn
+ * — the next command from the client was then rejected with "It's not your turn."
+ *
+ * Deliberately does not dispatch `rules-turn-began`: rules-bridge.js hangs legacy
+ * knockout/deck-out adjudication off that event, which the server now owns (I25). Instead
+ * it dispatches `rules-turn-view-applied` — a display-only signal the HUD banner and status
+ * badges listen for so they stop going stale, without re-arming any local adjudication.
+ *
+ * @param {object} view Authoritative redacted view
+ * @param {object} [options={}]
+ * @param {object} [options.rulesState] Test seam; defaults to the shared rulesState
+ * @param {Document} [options.document] Test seam; defaults to the global document
+ * @returns {{applied: boolean, reason?: string, turnPlayer?: string, changed?: boolean}}
+ */
+export function reconcileTurnState(view, options = {}) {
+  const turn = view?.turn;
+  if (!turn) return { applied: false, reason: 'no_turn' };
+  // A spectator's view reports isYourTurn:false for both players (view.mjs), so there is
+  // no honest self/opp mapping to make — leave a spectator's local state untouched.
+  if (view.isSpectator || !view.you?.playerId) {
+    return { applied: false, reason: 'spectator' };
+  }
+
+  const state = options.rulesState || rulesState;
+  const turnPlayer = turn.isYourTurn ? 'self' : 'opp';
+  const changed = state.turnPlayer !== turnPlayer;
+
+  state.turnPlayer = turnPlayer;
+  if (typeof turn.number === 'number') state.turnNumber = turn.number;
+  if (typeof turn.phase === 'string') state.phase = turn.phase;
+
+  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  if (doc) {
+    doc.dispatchEvent(
+      new CustomEvent('rules-turn-view-applied', { detail: { player: turnPlayer } })
+    );
+  }
+
+  return { applied: true, turnPlayer, changed };
 }
 
 /**
@@ -631,11 +1079,19 @@ export function applyView(view, events = [], options = {}) {
     if (!playerView || !playerView.zones) continue;
 
     for (const [zoneId, cards] of Object.entries(playerView.zones)) {
+      if (COVER_ZONES.includes(zoneId)) {
+        reconcileZoneCover(side, zoneId, cards, options);
+      }
       if (!Array.isArray(cards)) continue;
 
-      for (const cardData of cards) {
-        createOrUpdateCardElement(cardData, side, zoneId, options);
+      const sortFn = options.sortZoneCards || defaultNetcodeContext.sortZoneCards;
+      const orderedCards = typeof sortFn === 'function' ? sortFn(side, zoneId, cards) || cards : cards;
+
+      for (const cardData of orderedCards) {
+        const img = createOrUpdateCardElement(cardData, side, zoneId, options);
         placeCardInZone(cardData, side, zoneId, options);
+        const zone = resolveZone(side, zoneId, options);
+        reconcileCardOverlays(cardData, img, zone.element, side, options);
       }
     }
   }
@@ -658,6 +1114,14 @@ export function applyView(view, events = [], options = {}) {
 
   for (const [id, record] of cardRegistry.entries()) {
     if (!liveInstanceIds.has(id)) {
+      // Counter overlays are siblings of the image in the zone element, not children of
+      // it or its play-container — removing the image/container leaves them orphaned.
+      if (record.element?.damageCounter?.parentNode) {
+        record.element.damageCounter.parentNode.removeChild(record.element.damageCounter);
+      }
+      if (record.element?.specialCondition?.parentNode) {
+        record.element.specialCondition.parentNode.removeChild(record.element.specialCondition);
+      }
       if (record.container && record.container.parentNode) {
         record.container.parentNode.removeChild(record.container);
       } else if (record.element && record.element.parentNode) {
@@ -674,6 +1138,9 @@ export function applyView(view, events = [], options = {}) {
   const localPlayerId = view.you?.playerId || null;
   reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
 
+  // Sync local turn state — the server is the only turn authority under the flag
+  reconcileTurnState(view, options);
+
   // Reconcile Game Ended modal / banner (Finding 12)
   reconcileGameEnded(view, options);
 
@@ -683,6 +1150,8 @@ export function applyView(view, events = [], options = {}) {
       options.onAdvisoryEvent(ev);
     }
   }
+
+  lastAppliedView = view;
 
   return {
     applied: true,

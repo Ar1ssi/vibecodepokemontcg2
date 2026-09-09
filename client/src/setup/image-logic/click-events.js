@@ -20,6 +20,7 @@ import {
   fullViewHost,
 } from '../deck-constructor/hydrate-holo.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
+import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import {
   closeCardPreview,
   openCardPreview,
@@ -28,6 +29,9 @@ import { openDiscardPileViewer } from './discard-pile-viewer.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
+  // Design 003 slice 1: capture the authoritative renderer's identity stamp alongside
+  // the legacy index. Null for a legacy-rendered card, which keeps the gate fail-open.
+  mouseClick.cardInstanceId = readCardInstanceId(event.target);
   //closest() handles plain cards, play-container cards, and holo-wrapper cards
   mouseClick.zoneId = event.target.closest(
     '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone, #attachedCards, #viewCards, #stadium, #board, #deckCover, #discardCover, #lostZoneCover'

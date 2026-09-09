@@ -11,12 +11,13 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
+import { ShadowSession, extractDeckData } from './game/shadow.mjs';
 import {
-  ShadowSession,
-  initializePlayerDeck,
-  extractDeckData,
-} from './game/shadow.mjs';
+  findFirstDivergentZone,
+  excludeOwnerSecretZones,
+} from './game/sync-check.mjs';
 import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
+import { hashStateZones } from '../shared/engine/state.mjs';
 
 const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE === '1' ||
@@ -472,7 +473,11 @@ async function main() {
               activeGameRoom.getPlayerIdByUsername(username) ||
               activeGameRoom.getNextAvailablePlayerId() ||
               'p1';
-            const added = activeGameRoom.addPlayer(socket.id, targetPid, username);
+            const added = activeGameRoom.addPlayer(
+              socket.id,
+              targetPid,
+              username
+            );
             if (!added) {
               socket.emit('roomReject');
               return;
@@ -516,8 +521,10 @@ async function main() {
           if (room.setupActionCache) {
             for (const [senderSocketId, cached] of room.setupActionCache) {
               if (senderSocketId === socket.id) continue;
-              if (cached.exchangeData) socket.emit('pushAction', cached.exchangeData);
-              if (cached.loadDeckData) socket.emit('pushAction', cached.loadDeckData);
+              if (cached.exchangeData)
+                socket.emit('pushAction', cached.exchangeData);
+              if (cached.loadDeckData)
+                socket.emit('pushAction', cached.loadDeckData);
             }
           }
           // Remove any existing disconnect listener to prevent leak on rejoin
@@ -566,7 +573,11 @@ async function main() {
             socket.emit('roomReject');
             return;
           }
-          const added = gameRoom.addPlayer(socket.id, existingPid, data.username);
+          const added = gameRoom.addPlayer(
+            socket.id,
+            existingPid,
+            data.username
+          );
           if (!added) {
             socket.emit('roomReject');
             return;
@@ -675,7 +686,91 @@ async function main() {
             ) {
               const deckData = extractDeckData(data.action, data.parameters);
               if (Array.isArray(deckData)) {
-                initializePlayerDeck(gameRoom.state, playerId, deckData);
+                // Routed through handleCommand (design 002 slice 3.4e / I16), not a direct
+                // state mutation: this is the only way deck loading lands in commandLog, which
+                // undo's replay depends on to reconstruct the pre-game state.
+                const result = gameRoom.handleCommand(socket.id, {
+                  type: 'loadDeck',
+                  payload: { deckData },
+                });
+
+                if (result.success) {
+                  // Server is the sole minter of instanceId (design 002 §3.1 / D10).
+                  // Hand this player their own syncInstance -> instanceId lookup so the
+                  // client can translate outgoing command hints; never broadcast this,
+                  // it would leak the opponent's ids.
+                  const deckZone =
+                    gameRoom.state.players[playerId]?.zones?.deck || [];
+                  const map = {};
+                  for (const card of deckZone) {
+                    if (
+                      card?.syncInstance != null &&
+                      card?.instanceId != null
+                    ) {
+                      map[card.syncInstance] = card.instanceId;
+                    }
+                  }
+                  const targetSocketId = gameRoom.playerToSocket.get(playerId);
+                  if (targetSocketId) {
+                    io.to(targetSocketId).emit('instanceMap', { roomId, map });
+                  }
+
+                  // Design 002 slice 3.5 finding: nothing else ever calls the 'setup'
+                  // command, so without this the server never deals hands/prizes and
+                  // stays permanently out of sync with any client. Deals both players
+                  // at once (setupGame() shuffles/deals for every registered player),
+                  // so it only needs to fire once both decks are loaded. A second call
+                  // for the other player's loadDeck is a harmless no-op — 'setup' is
+                  // only 'allowed' while turn.phase === 'setup', which this flips to
+                  // 'main'.
+                  //
+                  // Both playerIds exist in gameRoom.state.players as soon as each
+                  // socket joins (addPlayer), well before either has loaded a deck —
+                  // checking Object.keys(...).length === 2 alone fired this on the
+                  // FIRST loadDeck, dealing an empty hand for whoever hadn't loaded
+                  // yet (design 002 I17 fix regression, found while verifying it).
+                  // Require every registered player to actually have cards.
+                  const allDecksLoaded = Object.values(
+                    gameRoom.state.players
+                  ).every((p) => p.zones.deck.length > 0);
+                  if (allDecksLoaded) {
+                    const setupResult = gameRoom.handleCommand(socket.id, {
+                      type: 'setup',
+                      payload: {},
+                    });
+
+                    // Design 002 I17: the server never trusts a client-supplied
+                    // shuffle (D10), so the client can't roll its own opening deal
+                    // and expect it to match GameRoom's. Hand each player their own
+                    // syncInstance deal order — [prizes(6), hand(7), rest(deck)],
+                    // matching the client's rules-mode setupPrizes()-then-
+                    // drawOpeningHand() split — so its local shuffle reproduces
+                    // exactly what the server already dealt.
+                    if (setupResult.success) {
+                      // Design 002 I27: setupGame() (shared/engine/setup.mjs) also picked the
+                      // starter here, from its own activeRng, with no client input — the
+                      // client's separate peer-to-peer coin flip (rules-bridge.js) is an
+                      // unrelated RNG stream and agrees with this one only by chance. Include
+                      // the real starter, relative to each recipient, alongside the deal order
+                      // so the client can use it instead of guessing.
+                      const starterId = gameRoom.state.turn?.player ?? null;
+                      for (const pid of Object.keys(gameRoom.state.players)) {
+                        const p = gameRoom.state.players[pid];
+                        const order = [
+                          ...p.zones.prizes,
+                          ...p.zones.hand,
+                          ...p.zones.deck,
+                        ].map((card) => card.syncInstance);
+                        const starter =
+                          starterId == null ? null : starterId === pid ? 'self' : 'opp';
+                        const pSocketId = gameRoom.playerToSocket.get(pid);
+                        if (pSocketId) {
+                          io.to(pSocketId).emit('dealOrder', { roomId, order, starter });
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -835,6 +930,31 @@ async function main() {
             reason: 'server_restart',
             message: 'Game session terminated due to server restart.',
           });
+        }
+      });
+
+      // Design 002 slice 3.11: the client's periodic self-reported per-zone
+      // board hashes. Compared against this room's own authoritative state;
+      // the first zone that disagrees is named back so the client's existing
+      // slice-1.1 peer-log catch-up has something concrete to recover.
+      // Spectators have no personal authoritative state to compare against.
+      socket.on('syncCheck', (data) => {
+        const roomId =
+          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (!gameRoom) return;
+        const playerId = gameRoom.socketToPlayer.get(socket.id);
+        if (!playerId) return;
+        gameRoom.touchActivity();
+        // I24: deck is owner-secret even in this player's own hand (O4-A / I5),
+        // so the client never reports it — drop it here too or it always reads
+        // as a false-positive divergence.
+        const serverZones = excludeOwnerSecretZones(
+          hashStateZones(gameRoom.state, playerId)
+        );
+        const zoneId = findFirstDivergentZone(serverZones, data?.zones);
+        if (zoneId) {
+          socket.emit('desync', { roomId, zoneId });
         }
       });
     }

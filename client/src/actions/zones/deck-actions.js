@@ -10,6 +10,7 @@ import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 export const shuffleIntoDeck = (
   user,
@@ -29,6 +30,15 @@ export const shuffleIntoDeck = (
     ]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('shuffleIntoDeck', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [zoneId, index, indices],
+    })
+  )
+    return;
 
   moveCardBundle(
     user,
@@ -58,6 +68,15 @@ export const moveToDeckTop = (user, initiator, oZoneId, index, emit = true) => {
     processAction(user, emit, 'moveToDeckTop', [oInitiator, oZoneId, index]);
     return;
   }
+  if (
+    dispatchAuthoritativeZoneOp('moveToDeckTop', {
+      user,
+      emit,
+      oInitiator,
+      commandArgs: [oZoneId, index],
+    })
+  )
+    return;
   moveCardBundle(user, initiator, oZoneId, 'deck', index, false, 'top', false);
   //since card is appended to bottom, move all existing cards in deck to the bottom afterwards
   const selectedDeckCount = getZone(user, 'deck').getCount();
@@ -217,6 +236,15 @@ export const switchWithDeckTop = (
   }
 
   if (oZoneId !== 'deck' && oZoneId !== 'deckCover') {
+    if (
+      dispatchAuthoritativeZoneOp('switchWithDeckTop', {
+        user,
+        emit,
+        oInitiator,
+        commandArgs: [oZoneId, index],
+      })
+    )
+      return;
     moveCardBundle(
       user,
       initiator,

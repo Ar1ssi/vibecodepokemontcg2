@@ -1,14 +1,5 @@
-import {
-  dragEnd,
-  dragLeave,
-  dragOver,
-  dragStart,
-  drop,
-} from '../../setup/image-logic/drag.js';
-import {
-  coverClick,
-  openCardContextMenu,
-} from '../image-logic/click-events.js';
+import { buildCardImage } from '../image-logic/build-card-image.js';
+import { COVER_IMAGE_LISTENERS } from '../image-logic/cover-listener-table.js';
 import { resetImage } from '../image-logic/reset-image.js';
 
 export class Cover {
@@ -23,28 +14,13 @@ export class Cover {
       src: imageURL,
       alt: id,
       draggable: true,
-      click: coverClick,
-      dragstart: dragStart,
-      dragover: dragOver,
-      dragleave: dragLeave,
-      dragend: dragEnd,
-      drop: drop,
-      contextmenu: openCardContextMenu,
+      ...COVER_IMAGE_LISTENERS,
     };
     this.buildImage(this.imageAttributes);
   }
 
   buildImage(imageAttributes) {
-    this.image = new Image();
-    for (const attr in imageAttributes) {
-      if (typeof imageAttributes[attr] === 'function') {
-        this.image.addEventListener(attr, imageAttributes[attr]);
-      } else if (attr === 'user') {
-        this.image.user = imageAttributes[attr];
-      } else {
-        this.image.setAttribute(attr, imageAttributes[attr]);
-      }
-    }
+    this.image = buildCardImage(document, imageAttributes);
     resetImage(this.image);
   }
 }
