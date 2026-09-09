@@ -139,6 +139,30 @@ export const moveCard = async (
 
   if (!movingCard) return { destZoneId, ok: false };
 
+  // ── structural: Item/Supporter cards can't sit on an empty Bench slot ──
+  // Attaching a Pokémon Tool to a Pokémon already on the Bench still goes
+  // through the `targetCard` attach path below, so only block the case
+  // where the card would occupy a slot on its own.
+  if (dZoneId === 'bench' && !targetCard) {
+    await ensureCardData(movingCard);
+    const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
+    const cardType = String(movingCard.type || '').toLowerCase();
+    const isItemOrSupporter =
+      cardType === 'item' ||
+      cardType === 'supporter' ||
+      subtypes.includes('item') ||
+      subtypes.includes('supporter');
+    if (isItemOrSupporter) {
+      appendMessage(
+        user,
+        `⛔ ${movingCard.name}: Item and Supporter cards can't be placed on the Bench.`,
+        'announcement',
+        false
+      );
+      return { destZoneId, ok: false };
+    }
+  }
+
   // Stadium Trainers belong on the dedicated left-side field, not the play board.
   if (oZoneId === 'hand' && dZoneId === 'board') {
     await ensureCardData(movingCard);
@@ -499,7 +523,10 @@ export const moveCard = async (
     //special initialization is needed for cards in the active and bench since pokemon has its own container with its attached cards
     if (activeOrBenchZone.includes(dZoneId)) {
       initializeActiveBenchCard(user, movingCard, dZoneId, dZone);
-      if (movingCard.type === 'Pokémon') {
+      if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
+        // Moving active<->bench (swap, promotion after knockout) isn't a
+        // fresh play — the Pokémon was already in play, so it stays
+        // evolve-eligible instead of re-triggering the just-played gate.
         movingCard.enteredPlayTurn = rulesState.turnNumber;
       }
       // give the card its holofoil wrapper now that initializeActiveBenchCard
