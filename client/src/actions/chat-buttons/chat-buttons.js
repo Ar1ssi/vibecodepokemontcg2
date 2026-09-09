@@ -796,6 +796,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // Falls back to the flat printed damage when rules are off or the text
         // carries no recognized scaling — the flat-damage path stays intact.
         let effectiveAttack = atk;
+        let coin = null;
         if (rulesState.enabled) {
           const atkText = String(atk.text || '');
           const atkLower = atkText.toLowerCase();
@@ -803,7 +804,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           // resolve the coin here in the live path. Heads bonus is added to
           // the effective damage total by the parser; tails self-damage is
           // executed after the KO check (below).
-          const coin = /flip a coin/.test(atkLower)
+          coin = /flip a coin/.test(atkLower)
             ? flipCoin(rngBundle, 'attack')
             : null;
           let headsCount;
