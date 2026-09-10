@@ -104,16 +104,24 @@ Emits a flat array of tagged options:
 `attach` after the turn's energy is used; no `evolve` on a Pokémon played this turn; `pass` is
 always present outside setup.
 
-### Slice 3 — `act(option)`: the write path
+### Slice 3 — `act(option)`: the write path — SHIPPED S78
 **File:** `e2e-api.js`. One `switch` mapping option → the existing client action, awaited, returning
 `{ ok, error }`. Never throws.
-- `playBasic`/`attach`/`evolve` → `moveCardBundle('self','self','hand', dest, index, targetIndex, action)`
-  where `action` is `'move'` / `'attach'` / `'evolve'` — **confirm the exact vocabulary against
-  `client/src/setup/general/accept-action.js` before writing the call** (rule 4).
-- `attack` → existing `__ptcg.attack(i)`. `pass` → `__ptcg.passTurn()`. `retreat` → the retreat
-  action in `chat-buttons.js`.
+- `playBasic`/`attach`/`evolve`/`playTrainer` → `moveCardBundle('self','self','hand', dest, index,
+  targetIndex, 'move', true)`. **Deviation from the draft above:** the action string is always the
+  literal `'move'` — read `move-card.js` before writing this switch; it classifies attach vs.
+  evolve itself from whether `targetIndex` resolves to an existing card in the destination zone,
+  not from an `'attach'`/`'evolve'` string (no such strings exist at any real call site).
+  `playTrainer` targets `'board'`, not a Trainer-specific zone — move-card.js redirects Stadiums to
+  `'stadium'` itself, and rules-bridge.js's board-zone watcher fires Supporter/Item effects once
+  the card lands there.
+- `ability` → `useAbility('self','self', zone, index, true)`.
+- `attack` → existing `__ptcg.attack(i)`. `pass` → `__ptcg.passTurn()`. `retreat` → chat-buttons'
+  `retreat('self', true, benchCard.image)` — `card.image` is the identity token on both render
+  paths (legacy `image.relative` match, authoritative `readCardInstanceId` off the same DOM node).
 **Acceptance:** each option kind, driven once via `act()` in a scripted two-page game, changes the
-board as expected and adds zero entries to `cmdRejections`.
+board as expected and adds zero entries to `cmdRejections`. **Not yet run** — no live two-page
+exercise of observe()/options()/act() together exists yet (tracked in STATE.md).
 
 ### Slice 4 — `picker()` / `pick()`: answering the modals
 **File:** `e2e-api.js`. The legacy rules path resolves trainer/ability effects through synchronous

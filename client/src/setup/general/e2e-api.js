@@ -187,6 +187,80 @@ export function installE2eApi() {
           attachedCardsFor(user, card === active ? 'active' : 'bench', card),
       });
     },
+    // Design 004 slice 3: drives a single option (as returned by options()) through the
+    // real client action path — never throws, always resolves to { ok, error }. Every
+    // branch below reuses the exact call the live UI makes for that move (see design 004
+    // § slice 3): playBasic/attach/evolve/playTrainer all go through moveCardBundle with
+    // action 'move' — despite the name, every UI call site (drag.js, click-events.js,
+    // trainer-execution.js) passes the literal string 'move' regardless of whether the
+    // move is a plain play, an attach, or an evolution; move-card.js itself classifies
+    // attach vs. evolve from whether `targetIndex` resolves to an existing card in the
+    // destination zone, not from the action string. Playing a Trainer is hand → 'board'
+    // (move-card.js redirects Stadiums to 'stadium' and dispatches Supporter/Item effects
+    // itself once the card lands there — see rules-bridge.js's 'board' zone watcher).
+    async act(option) {
+      try {
+        const kind = option?.kind;
+        if (kind === 'playBasic') {
+          const { moveCardBundle } = await import(
+            '../../actions/move-card-bundle/move-card-bundle.js'
+          );
+          const ok = await moveCardBundle(
+            'self', 'self', 'hand', option.targetZone, option.handIndex, false, 'move', true
+          );
+          return { ok: ok !== false };
+        }
+        if (kind === 'attach' || kind === 'evolve') {
+          const { moveCardBundle } = await import(
+            '../../actions/move-card-bundle/move-card-bundle.js'
+          );
+          const ok = await moveCardBundle(
+            'self', 'self', 'hand', option.targetZone, option.handIndex,
+            option.targetIndex, 'move', true
+          );
+          return { ok: ok !== false };
+        }
+        if (kind === 'playTrainer') {
+          const { moveCardBundle } = await import(
+            '../../actions/move-card-bundle/move-card-bundle.js'
+          );
+          const ok = await moveCardBundle(
+            'self', 'self', 'hand', 'board', option.handIndex, false, 'move', true
+          );
+          return { ok: ok !== false };
+        }
+        if (kind === 'ability') {
+          const { useAbility } = await import('../../actions/counters/use-ability.js');
+          const ok = await useAbility('self', 'self', option.zone, option.index, true);
+          return { ok: ok !== false };
+        }
+        if (kind === 'attack') {
+          const { attack: attackAction } = await import(
+            '../../actions/chat-buttons/chat-buttons.js'
+          );
+          const ok = await attackAction('self', true, option.attackIndex);
+          return { ok: ok !== false };
+        }
+        if (kind === 'retreat') {
+          const benchCard = boardPokemon('self', 'bench')[option.benchIndex] || null;
+          const { retreat: retreatAction } = await import(
+            '../../actions/chat-buttons/chat-buttons.js'
+          );
+          const ok = await retreatAction('self', true, benchCard?.image || null);
+          return { ok: ok !== false };
+        }
+        if (kind === 'pass') {
+          const { pass: passAction } = await import(
+            '../../actions/chat-buttons/chat-buttons.js'
+          );
+          const ok = await passAction('self', true);
+          return { ok: ok !== false };
+        }
+        return { ok: false, error: `unknown option kind: ${kind}` };
+      } catch (err) {
+        return { ok: false, error: String(err?.message || err) };
+      }
+    },
     turnState() {
       return {
         turnPlayer: rulesState.turnPlayer,
