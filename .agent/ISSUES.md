@@ -16,11 +16,18 @@
   game purely through `__ptcg` (observe/options/act, no scripted calls) past I28's fix, both
   clients eventually reported `turnState().turnPlayer === 'opp'` *simultaneously* — neither
   side believed it was their own turn, and `options()` correctly returned `[]` for both
-  (not a bridge bug), wedging the game with no `cmdRejected` and no thrown error. Likely the
-  same family as I24 (legacy client-side turn mirroring over `rulesEvent`, not the server).
-  Repro: `.agent/scratch/smoke-004-slice1-4.mjs` against a fresh legacy-mode server, ~16
-  loop iterations in (2+ real turns each side, including an attack). Not investigated further
-  — out of scope for I28's fix (refs: I24, design 004, S80).
+  (not a bridge bug), wedging the game with no `cmdRejected` and no thrown error.
+  Not pass-button-specific: re-ran with the real `#passButton` DOM element clicked instead of
+  `__ptcg.act({kind:'pass'})` (`.agent/scratch/smoke-i29-realpass.mjs`) — same desync, same
+  point, byte-for-byte. Both runs break right after two attacks in a row (B attacks, then A
+  attacks) — B's page never flips its local `turnPlayer` back to `'self'` after mirroring A's
+  `attack`, even though A's own side correctly flipped to `'opp'`. Points at `attack()`'s
+  mirror/`endTurnWithBanner` path on the *receiving* side, not `pass()` — worth checking
+  whether the receiving client's `attack()` call (`user:'opp'`) hits an early return (a status
+  gate, `canPerformAction`, or a caught exception in the coin/search-effect steps) before
+  reaching `endTurnWithBanner`. Likely still the same family as I24 (legacy client-side
+  mirroring over `rulesEvent`/`pushAction`, not the server) but the discriminating check narrows
+  it to the attack path specifically. Not investigated further (refs: I24, design 004, S80-S81).
 - I24 2026-09-10 P1 [netcode] Legacy (non-authoritative) `moveCardBundle` mirror desync: a `deck`→`bench` move (Piloswine #7, room test1) reached the receiver with no `cardHints` attached, so `needsHintVerification` never triggers (move-card-bundle.js:125-129) and the move applies via raw relay `index` against the receiver's own zone array unchecked (move-card-bundle.js:118,209-227) — grabbing the wrong card. Every later hint-verified move touching that slot then aborts on `hint_mismatch` (move-card-bundle.js:141-159) with no resync (I12), permanently diverging `bench`; ended with Mamoswine ex #23 invisible to ARISSI after a bench→active→bench abort pair. Repro: `ptcg-sync-log_combined_test1_1788985695598.json` seq 108-159 (ARISSI client) (refs: I12, S70).
   Hypothesized cause found and patched UNVERIFIED (no live test done): `openChoicePicker`'s `confirmPicker` (card-picker.js:652-667) already auto-moves every picked card when `zoneFrom`/`destination` are set (rules-bridge.js:1277-1278), but `runSearchStep`'s multi-select `onConfirm` (trainer-execution.js, was ~443-449) *also* called `moveCardBundle` per pick — double-move raced the picker's own splice, and the second call's stale index made `buildMoveCardHints` find no card, dropping the hint. Removed the duplicate manual move. Added a `console.warn` at move-card-bundle.js:20 (buildMoveCardHints null-card path) to catch any remaining case live. Same double-move pattern likely also exists in Grand Tree's evolve pickers (chat-buttons.js:4014-4024/4089-4099) and the attach-energy single-pick path (trainer-execution.js:469-488) — not touched, needs a live repro before patching those.
 - I23 2026-09-09 P2 [netcode] `VSTARGXFunction` has no UI caller and no DOM element: nothing in client markup or JS defines `GXButton`/`VSTARButton`, so the legacy body would throw on `button.classList` if it were ever reached locally; the action is reachable only via the `acceptAction` relay. Left ungated by design 003 slice 5 (a gate on a dead local path adds risk without behavior). Either restore the buttons or delete the action (refs: design 003, S60).
