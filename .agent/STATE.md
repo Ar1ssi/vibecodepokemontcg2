@@ -4,31 +4,29 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 94
-Focus: merging concurrently-opened PRs into main (#97 Grand Tree fix, #98 Trainer/turn rules,
-  #99 e2e debug mode, now #100 legacy 2P mirror desync fix).
-Active: done. PR #100 (design 007): benched Pokémon from a deck search (Buddy-Buddy Poffin)
-  never appeared on the peer in legacy (non-authoritative) 2P. Root cause: search effects
-  relayed `shuffleZone` before the un-awaited `moveCardBundle`, so the peer's mirror applied a
-  permutation of the wrong length; the old `rearrangeArray` dropped a card or left an undefined
-  hole, and `resolveCardIndex` threw on the hole (swallowed by acceptAction). Fix: picker awaits
-  moves before confirm (card-picker-moves.mjs); move→shuffle sites await; moveCard re-resolves
-  its index before the splice; rearrangeArray keeps every card and returns an exact-permutation
-  flag; shuffleZone logs `shuffleZone.indices_mismatch` instead of silently corrupting; 3
-  duplicate picker move loops removed. D28 records the rationale. 1295/1295 pass. Full detail
-  in journal S91(orig)/S94.
-Next: user live-checks a 2P legacy game: play Buddy-Buddy Poffin / Ultra Ball / Nest Ball; peer
-  must show every benched Pokémon and the sync log must show each move before its `shuffleZone`,
-  with no `indices_mismatch`. Open follow-ups from that PR: I37 (hand→deck-then-shuffle paths
-  unaudited), I36 (promote-abort, unexplained). Also still open: confirm on localhost with
-  `?e2e=1` that a bot can `loadDeckList`+`debugMode(true)` to bypass rules (S93, not
-  live-verified — needs a two-page harness run). Also smoke-check S92's Trainer/turn fixes: play
-  an Item then a Supporter in the same turn (Supporter should still be allowed), confirm the
-  first player draws on turn 1. Also retest Grand Tree's Stage-2 chain against PR #97 (S91-main):
-  if it still fails with NO message and the card vanishes for both players, check whether
-  `evolveCard.js` ever sets `targetCard.image.attached` on the Stage-1 base (it currently
-  doesn't, only `targetCard.attached`). Still open from S82/S88: I34 (turn-desync residual,
-  1/10 soak failures). Still open from S71/S73: mat-click pick/cancel/Escape flow, stray-click
+Session: 95
+Focus: live-verifying PR #100 (design 007, legacy 2P search-shuffle desync) per user request,
+  then closing I24.
+Active: done. Live 2P legacy check (SERVER_AUTHORITATIVE unset) via a 2-client Playwright
+  harness (`manual-verify-i24.mjs`, new — uses shipped `?e2e=1` debug mode: `loadDeckList` with
+  real Buddy-Buddy Poffin/Ultra Ball/Nest Ball + `debugMode(true)` to bypass turn order). Played
+  all three; confirmed the peer sees every benched Pokémon (matches A's own bench exactly), the
+  sync log's `move` (deck→bench) emit precedes its `shuffleZone` emit on every search, and zero
+  `shuffleZone.indices_mismatch` entries. Closed I24 (moved to ISSUES.md Closed). Found & fixed
+  in passing: a stale `node server/server.js` process from another session was already listening
+  on :4000 without the debugMode commit (`pnpm -C server start` is the correct launch — plain
+  `node server/server.js` fails with ERR_MODULE_NOT_FOUND outside the server workspace).
+Next: I37 (hand→deck-then-shuffle paths unaudited) and I36 (promote-abort, unexplained) still
+  open from design 007 — this session only exercised the deck-search family. Still open: confirm
+  on localhost with `?e2e=1` that a bot can `loadDeckList`+`debugMode(true)` to bypass rules for
+  card-isolation testing generally (S93's own use case, distinct from this session's search-sync
+  check). Also smoke-check S92's Trainer/turn fixes: play an Item then a Supporter in the same
+  turn (Supporter should still be allowed), confirm the first player draws on turn 1. Also retest
+  Grand Tree's Stage-2 chain against PR #97 (S91-main): if it still fails with NO message and the
+  card vanishes for both players, check whether `evolveCard.js` ever sets
+  `targetCard.image.attached` on the Stage-1 base (it currently doesn't, only
+  `targetCard.attached`). Still open from S82/S88: I34 (turn-desync residual, 1/10 soak
+  failures). Still open from S71/S73: mat-click pick/cancel/Escape flow, stray-click
   leak-through, opponent-side highlighting in local 2P, drag active→bench retreat live-verify —
   none browser-verified. Design 005/006 smoke-check still open. Maintenance due S96.
 Blocked: nothing.
@@ -40,8 +38,11 @@ Blocked: nothing.
   capture-phase click listener outrunning click-events.js/drag.js's own listeners; if a future
   refactor moves those to Shadow DOM or a different capture root this will silently stop gating.
 - CSS/visual verification in this repo: don't drive the Browser pane yourself — user checks
-  localhost manually. See project memory `feedback_css_preview.md`. Same applies to anything
-  needing a live 2P/e2e harness run (single-tab preview can't exercise it).
+  localhost manually (project memory `feedback_css_preview.md`). Functional/netcode live checks
+  are different: drive them via a Playwright script (see `manual-verify-i24.mjs`), not the
+  Browser pane, and launch the server with `pnpm -C server start`, not `node server/server.js`
+  directly (ERR_MODULE_NOT_FOUND outside the server workspace) — also check `tasklist` for a
+  stale node process already on :4000 from another worktree/session before trusting a 200.
 - `pnpm lint` fails repo-wide on pre-existing CRLF line endings + `no-undef` globals on `.mjs`
   files (eslint.config only targets `**/*.js`, so `.mjs` gets no `globals` and no `endOfLine:
   'auto'`) — known baseline since S1. Verify a diff's own files with a targeted `npx eslint
@@ -61,8 +62,7 @@ Blocked: nothing.
   incoming side, don't just pick one.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S95 2026-09-11 verify: live 2P legacy check of design 007's fix — closed I24.
 - S94 2026-09-11 fix(netcode): legacy 2P mirror desync on benched Pokémon from deck search —
-  see Active above (D28, design 007).
+  design 007, closed live by S95.
 - S93 2026-09-11 feature: e2e/debug mode for bot card testing (D27).
-- S92 2026-09-11 patch: Item plays no longer trip the Supporter-per-turn gate; turn 1 now draws
-  (user override of the official skip-first-draw rule).
