@@ -123,18 +123,30 @@ always present outside setup.
 board as expected and adds zero entries to `cmdRejections`. **Not yet run** — no live two-page
 exercise of observe()/options()/act() together exists yet (tracked in STATE.md).
 
-### Slice 4 — `picker()` / `pick()`: answering the modals
-**File:** `e2e-api.js`. The legacy rules path resolves trainer/ability effects through synchronous
-UI pickers, so a bot that ignores them wedges the game. Two overlays to bridge:
-- `.card-picker-overlay` (`client/src/setup/image-logic/card-picker.js`) — `picker()` returns
-  `{ open:true, title, min, max, candidates:[{index,name,type}] }`; `pick(indices)` selects those
-  cards and clicks `.card-picker-done`.
-- `#rulesCoinCallOverlay` / `#rulesCoinEffectOverlay` — already covered by `callCoin()`; extend it
-  to the effect overlay.
-**Acceptance:** with a deck containing a search Supporter (e.g. a Poké Ball / Professor's line),
-the bot plays it, `picker()` reports the candidates, `pick()` resolves it, and the turn continues.
-**This slice is the highest-risk one — build it third, not last, and stop for a decision if the
-picker set turns out to be larger than these two.**
+### Slice 4 — `picker()` / `pick()`: answering the modals — SHIPPED S79
+**Files:** `e2e-api.js`, `client/src/setup/image-logic/card-picker.js` (two small exports added).
+The overlay set turned out to be **three**, not two — the risk gate this section called out.
+Found a third kind: `openMatPick` (`client/src/setup/rules/trainer-execution.js`) resolves
+"pick an in-play Pokémon" effects (heal target, damage-counter target, switch, evolve-jump, move
+Energy) by highlighting the card's live DOM node on the mat and resolving on a document click, not
+via `.card-picker-overlay`. Per the watch-out already in STATE.md, `openMatPick` is the pattern to
+reuse for this case and keeps no exported state — so rather than exporting internals from
+trainer-execution.js (a rules/gameplay file, out of scope per this spec's non-goals), `picker()`
+reads the same signal a human eye reads (the `4px solid #ffd23f` outline `openMatPick` sets on
+each candidate's `card.image` node) and `pick()` resolves it with `img.click()`, exactly the click
+`openMatPick`'s own listener expects. No gameplay file was touched.
+- `.card-picker-overlay` (`client/src/setup/image-logic/card-picker.js`) — new exports
+  `getCardPickerSnapshot()` (`{title, min, max, candidates:[{index,name,type}]}`, or `null` when
+  the open picker is browse-mode/none) and `pickCardPickerIndices(indices)` (assigns each index to
+  a slot via the existing `assignCardToSlot`, then calls the existing `confirmPicker` — the same
+  path the Done button click handler uses).
+- `openMatPick` overlay — no file changed outside `e2e-api.js`; see above.
+- `#rulesCoinCallOverlay` / `#rulesCoinEffectOverlay` — `callCoin(face)` extended to match either
+  overlay's button (`[data-coin-call]` vs. `[data-face]` — the two never coexist).
+`picker()` returns `{ open:false }` or `{ open:true, type:'cardPicker'|'matPick'|'coinEffect'|
+'coinCall', ... }`; `pick(indices, face)` dispatches on the same check. Never throws.
+**Acceptance:** unexercised live (same open item as slice 3 — no two-page run has driven
+observe()/options()/act()/picker() together yet, tracked in STATE.md since S76).
 
 ### Slice 5 — the bot
 **Files:** `bot/bot.mjs` (scaffold + `legalFallback`), `bot/heuristic-scorer.mjs`.

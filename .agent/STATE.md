@@ -4,26 +4,23 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 78
-Focus: implement design 004 slice 3 (`act(option)` write path).
-Active: done. `e2e-api.js` gained `async act(option) -> {ok, error}`, never throws. Confirmed
-  (by reading move-card.js/authoritative-dispatch.js, not assumed) that every real UI call site
-  passes the literal action string `'move'` for playBasic/attach/evolve/playTrainer alike —
-  move-card.js itself classifies attach vs. evolve from whether `targetIndex` resolves to an
-  existing card in the destination zone, not from the action string, so the design's
-  'move'/'attach'/'evolve' vocabulary note was aspirational, not real. playBasic/attach/evolve
-  route through `moveCardBundle('self','self','hand', targetZone, handIndex, targetIndex, 'move',
-  true)`; playTrainer targets 'board' (move-card.js redirects Stadiums to 'stadium' itself, and
-  rules-bridge.js's board-zone watcher fires Supporter/Item effects once the card lands there).
-  ability -> useAbility(zone,index); attack -> chat-buttons attack(); retreat -> chat-buttons
-  retreat('self', true, benchCard.image) (image works as the identity token on both render paths
-  — legacy `.image.relative` match and authoritative `readCardInstanceId` read the same DOM node);
-  pass -> chat-buttons pass().
-Next: design 004 slice 4 (`picker()`/`pick()` — the risk-gate slice; stop and decide if the
-  overlay set is bigger than card-picker + coin overlays). Still unverified: no live two-page run
-  has exercised observe()/options()/act() together (open since S76). Also open from S73:
-  (1) live-verify drag active→bench retreat, (2) mat click-to-select pickers + Grand Tree fix.
-  Maintenance due at S80 (2 sessions away).
+Session: 79
+Focus: implement design 004 slice 4 (`picker()`/`pick()` — the risk-gate slice).
+Active: done. Risk gate fired as flagged: the overlay set is three kinds, not two. Added
+  `getCardPickerSnapshot()`/`pickCardPickerIndices()` to card-picker.js and `picker()`/`pick()`
+  to e2e-api.js. The third kind, `openMatPick` (trainer-execution.js — heal/damage-counter/
+  switch/evolve-jump/move-Energy targeting), keeps no exported state and lives in a rules file
+  out of this spec's scope, so it's bridged by reading the outline style `openMatPick` already
+  paints on the candidate's `card.image` DOM node and resolving with `img.click()` — no gameplay
+  file touched. `callCoin(face)` extended to also match `#rulesCoinEffectOverlay`'s `[data-face]`
+  buttons (was `#rulesCoinCallOverlay`'s `[data-coin-call]` only).
+Next: design 004 slice 5 (`bot/bot.mjs` scaffold + heuristic scorer) — pure Node, no Playwright,
+  can be built and unit-tested without a live browser. Still unverified end-to-end: no live
+  two-page run has exercised observe()/options()/act()/picker() together (open since S76) —
+  slice 6's runner will be the first thing that actually proves slices 1-4 work live, so treat
+  early runner failures there as likely bugs in 1-4, not just the runner.
+  Also open from S73: (1) live-verify drag active→bench retreat, (2) mat click-to-select pickers
+  + Grand Tree fix. Maintenance due at S80 (1 session away).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -34,17 +31,18 @@ Blocked: nothing.
   regardless of whether the move is a play/attach/evolve — move-card.js infers attach vs. evolve
   from `targetIndex` resolving to an existing target card, and from `movingCard.type`. Don't
   reintroduce literal 'attach'/'evolve' strings without re-reading move-card.js first.
-- `openMatPick()` in client/src/setup/rules/trainer-execution.js is the pattern for any future
-  "pick an in-play Pokémon" step — reuse it, don't re-add a modal picker for that case. It relies
-  on `card.image` already being the live DOM node and on a document-level capture-phase click
-  listener outrunning click-events.js/drag.js; a move to Shadow DOM would silently break it.
+- Three distinct "picker" overlays exist, not one: `.card-picker-overlay` (card-picker.js,
+  bridged via `getCardPickerSnapshot`/`pickCardPickerIndices`), `openMatPick`'s DOM-outline
+  highlight (trainer-execution.js, bridged by reading the outline + `img.click()`, no file
+  changed there), and `#rulesCoinCallOverlay`/`#rulesCoinEffectOverlay` (bridged via `callCoin`).
+  `__ptcg.picker()`/`pick()` dispatch across all three — extend those, don't add a fourth path.
 - CSS/visual verification in this repo: don't drive the Browser pane yourself — user checks
   localhost manually. See project memory `feedback_css_preview.md`.
 - Cross-client parity may only be asserted over public zones (D14). Owner-secret zones
   (hand/prizes/deck) are redacted per recipient — compare counts instead, never `deck`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S79 2026-09-10 feature: design 004 slice 4 — `__ptcg.picker()`/`pick()`, bridging all three
+  modal kinds (card-picker, mat-pick, coin overlays) from e2e-api.js only.
 - S78 2026-09-10 feature: design 004 slice 3 — `__ptcg.act(option)` write path in e2e-api.js.
 - S77 2026-09-10 feature: design 004 slice 2 — `__ptcg.options()` + pure e2e-options.mjs (11 tests).
-- S76 2026-09-10 feature: design 004 slice 1 — `__ptcg.observe()` read model added to
-  e2e-api.js. No gameplay files touched.

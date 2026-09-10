@@ -15,6 +15,10 @@ import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
+import {
+  getCardPickerSnapshot,
+  pickCardPickerIndices,
+} from '../image-logic/card-picker.js';
 
 // Same zone set the server hashes in shared/engine/state.mjs hashState() minus
 // stadium (neutral zone, not per-player) — design 002 slice 3.5 replay harness.
@@ -123,6 +127,30 @@ function attachedCardsFor(user, zoneId, card) {
       : cards.filter((other) => other.attachedTo === instanceId);
   }
   return cards.filter((other) => other.image && other.image.relative === card.image);
+}
+
+// Design 004 slice 4: the third overlay kind (§ risk gate) — trainer-execution.js's
+// openMatPick highlights in-play Pokémon on the mat itself instead of opening a modal,
+// styling their live `card.image` DOM node with a yellow outline and resolving on a
+// document-level click on that node (see openMatPick, client/src/setup/rules/
+// trainer-execution.js). It keeps no exported state, so this reads the same signal the
+// human eye reads (the outline) rather than touching that gameplay file, and resolves a
+// pick the same way a human would (`img.click()`), never a synthetic engine call.
+const MAT_PICK_OUTLINE = 'ffd23f';
+
+function matPickCandidates() {
+  const found = [];
+  for (const user of ['self', 'opp']) {
+    for (const zoneId of ['active', 'bench']) {
+      for (const card of boardPokemon(user, zoneId)) {
+        const img = card?.image;
+        if (img?.style?.outline?.includes(MAT_PICK_OUTLINE)) {
+          found.push({ name: card.name || '', img });
+        }
+      }
+    }
+  }
+  return found;
 }
 
 function serializePlayerObservation(user) {
@@ -261,6 +289,51 @@ export function installE2eApi() {
         return { ok: false, error: String(err?.message || err) };
       }
     },
+    // Design 004 slice 4: reports whichever modal the legacy rules path is currently
+    // blocked on, so the bot can answer it instead of wedging. Only one of these is ever
+    // open at a time in practice; card-picker is checked first since it is the highest-
+    // volume case (every search/discard Trainer effect).
+    picker() {
+      const cardPicker = getCardPickerSnapshot();
+      if (cardPicker) return { type: 'cardPicker', open: true, ...cardPicker };
+      const matCandidates = matPickCandidates();
+      if (matCandidates.length) {
+        return {
+          type: 'matPick',
+          open: true,
+          title: document.querySelector('.mat-pick-banner span')?.textContent || '',
+          candidates: matCandidates.map((c, index) => ({ index, name: c.name })),
+        };
+      }
+      if (document.getElementById('rulesCoinEffectOverlay')) {
+        return { type: 'coinEffect', open: true };
+      }
+      if (document.getElementById('rulesCoinCallOverlay')) {
+        return { type: 'coinCall', open: true };
+      }
+      return { open: false };
+    },
+    // Design 004 slice 4: resolves whichever modal picker() reported. `face` answers
+    // coinEffect/coinCall (see callCoin); `indices` answers cardPicker/matPick — matPick
+    // only ever resolves its first index since openMatPick takes one click and closes.
+    pick(indices = [], face = 'heads') {
+      const cardPicker = getCardPickerSnapshot();
+      if (cardPicker) return pickCardPickerIndices(indices);
+      const matCandidates = matPickCandidates();
+      if (matCandidates.length) {
+        const target = matCandidates[indices[0] ?? 0];
+        if (!target) return false;
+        target.img.click();
+        return true;
+      }
+      if (document.getElementById('rulesCoinEffectOverlay')) {
+        return this.callCoin(face);
+      }
+      if (document.getElementById('rulesCoinCallOverlay')) {
+        return this.callCoin(face);
+      }
+      return false;
+    },
     turnState() {
       return {
         turnPlayer: rulesState.turnPlayer,
@@ -332,9 +405,14 @@ export function installE2eApi() {
         overlay: !!document.getElementById('rulesCoinCallOverlay'),
       };
     },
+    // Design 004 slice 4: extended to the mid-effect coin-flip overlay
+    // (`#rulesCoinEffectOverlay`, e.g. Team Rocket's Mars — see openCoinFlipOverlay in
+    // trainer-execution.js), which uses `data-face` buttons rather than the turn-order
+    // call overlay's `data-coin-call` — the two overlays never coexist.
     callCoin(face = 'heads') {
       const btn = document.querySelector(
-        `#rulesCoinCallOverlay button[data-coin-call="${face}"]`
+        `#rulesCoinCallOverlay button[data-coin-call="${face}"], ` +
+          `#rulesCoinEffectOverlay button[data-face="${face}"]`
       );
       if (btn) btn.click();
       return !!btn;
