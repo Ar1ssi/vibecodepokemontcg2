@@ -3,6 +3,7 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
+- D26 2026-09-11 [netcode] Legacy search effects must finish (await) every card move before shuffling the deck, and a mirror that receives a permutation of the wrong length keeps every card (skips bad indices, appends unreferenced cards) and logs `shuffleZone.indices_mismatch` — never drops or leaves holes — why: relaying in local execution order is the only way permutation lengths match; the tolerance is a safety net, not a resync (legacy has none, I12). (design 007)
 - D25 2026-09-10 [deck-builder] Each generation pill also gets a synthetic Energy tab
   (`__energy_gen<N>__`), same colorless-energy logo and aggregation idea as the Standard view's
   `ENERGY_SET_ID` tab (D18), but without D18's `MODERN_BASIC_ENERGY_TYPES`/`EXTRA_ENERGY_CARD_REFS`

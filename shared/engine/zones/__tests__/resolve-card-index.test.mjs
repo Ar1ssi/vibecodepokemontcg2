@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildCardHint,
   cardFaceSrc,
+  hintMatchesAtIndex,
   resolveCardIndex,
 } from '../resolve-card-index.mjs';
 
@@ -93,4 +94,32 @@ test('resolveCardIndex resolves by Card object fallbackIndex', () => {
   const cardB = { name: 'Ivysaur', cardId: 'c_21' };
   const zone = { array: [cardA, cardB] };
   assert.equal(resolveCardIndex(zone, null, cardB), 1);
+});
+
+// A drifted mirror zone once held an undefined slot (sync log room "test",
+// Buddy-Buddy Poffin); the cardId scan threw on it and the relayed move was lost.
+test('resolveCardIndex finds a card past an undefined slot by cardId', () => {
+  const tynamo = { name: 'Tynamo', cardId: 'c_11', syncInstance: 11 };
+  const dratini = { name: 'Dratini', cardId: 'c_6', syncInstance: 6 };
+  const zone = { array: [tynamo, undefined, dratini] };
+  assert.equal(resolveCardIndex(zone, buildCardHint(dratini), 34), 2);
+});
+
+test('resolveCardIndex finds a card past an undefined slot by syncInstance', () => {
+  const dratini = { name: 'Dratini', syncInstance: 6 };
+  const zone = { array: [null, dratini] };
+  assert.equal(resolveCardIndex(zone, { syncInstance: 6 }, 0), 1);
+});
+
+test('resolveCardIndex finds a card past an undefined slot by id string', () => {
+  const dratini = { name: 'Dratini', cardId: 'c_6' };
+  const zone = { array: [undefined, dratini] };
+  assert.equal(resolveCardIndex(zone, null, 'c_6'), 1);
+  assert.equal(resolveCardIndex(zone, 'c_6', 0), 1);
+});
+
+test('hintMatchesAtIndex tolerates undefined slots for id-string indices', () => {
+  const dratini = { name: 'Dratini', cardId: 'c_6' };
+  const zone = { array: [undefined, dratini] };
+  assert.equal(hintMatchesAtIndex(zone, 'c_6', buildCardHint(dratini)), true);
 });

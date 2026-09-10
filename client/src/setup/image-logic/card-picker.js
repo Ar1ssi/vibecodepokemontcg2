@@ -15,6 +15,7 @@ import {
   resolveTargetSlotIndex,
   shouldSuppressClickAfterDrag,
 } from './card-picker-hitbox.mjs';
+import { movePicksInOrder } from './card-picker-moves.mjs';
 
 /** @type {object | null} */
 let pickerState = null;
@@ -680,21 +681,20 @@ const confirmPicker = async (state) => {
     picks = [state.slotAssignments[0] ?? state.slotCard ?? cards[index]];
   }
 
+  // The moves below are awaited, so a second confirm click could land while
+  // they run and move the same picks twice.
+  if (state.confirming) return;
+  state.confirming = true;
+
   if (!pickOnly && zoneFrom && destination) {
     const { moveCardBundle } = await import(
       '../../actions/move-card-bundle/move-card-bundle.js'
     );
-    for (const cand of picks) {
-      try {
-        const z = getZone(user, zoneFrom);
-        const idx = z.array.indexOf(cand);
-        if (idx >= 0) {
-          moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
-        }
-      } catch {
-        // move failed — still invoke callbacks
-      }
-    }
+    await movePicksInOrder(picks, (cand) => {
+      const idx = getZone(user, zoneFrom).array.indexOf(cand);
+      if (idx < 0) return undefined;
+      return moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
+    });
   }
 
   if (multiSelect) onConfirm?.(picks);

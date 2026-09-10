@@ -3151,14 +3151,10 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         minCount: minPick,
         maxCount: effectiveMax,
         upTo,
+        // openCardPicker's confirm already moved (and relayed) every pick via
+        // zoneFrom/destination before calling this.
         onConfirm: (selected) => {
           revealPicked(selected);
-          for (const s of selected) {
-            const idx = getZone(user, 'deck').array.indexOf(s);
-            if (idx >= 0) {
-              moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
-            }
-          }
           if (selected.length === 0) {
             appendMessage(user, `🔍 ${atk.name}: no cards taken — deck shuffled.`, 'announcement', false);
             finishSearch({ message: null });
@@ -3303,12 +3299,12 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
       minCount: upTo ? 0 : count,
       maxCount: effectiveMax,
       upTo,
-      onConfirm: (selected) => {
+      onConfirm: async (selected) => {
         revealPicked(selected);
         for (const s of selected) {
           const idx = getZone(user, 'deck').array.indexOf(s);
           if (idx >= 0) {
-            moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
+            await moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
           }
         }
         appendMessage(
@@ -3341,11 +3337,11 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     zoneFrom: 'deck',
     destination: destZone,
     pickOnly: true,
-    onPick: (picked) => {
+    onPick: async (picked) => {
       revealPicked(picked);
       const idx = getZone(user, 'deck').array.indexOf(picked);
       if (idx >= 0) {
-        moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
+        await moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
       }
       appendMessage(
         user,
@@ -4435,7 +4431,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
         return;
       }
       const foundName = deck.array[found]?.name || 'Basic Pokémon';
-      moveCardBundle(user, user, 'deck', 'bench', found, false, 'move');
+      await moveCardBundle(user, user, 'deck', 'bench', found, false, 'move');
       appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search-bench' });
@@ -4448,7 +4444,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       for (let i = 0; i < deck.array.length && moved < want; ) {
         await ensureCardData(deck.array[i]);
         if (matchesStadiumSearch(deck.array[i], action)) {
-          moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
+          await moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
           moved++;
         } else {
           i++;
@@ -4495,7 +4491,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
         return;
       }
       const foundCard = deck.array[found];
-      moveCardBundle(user, user, 'deck', 'hand', found, false, 'move');
+      await moveCardBundle(user, user, 'deck', 'hand', found, false, 'move');
       appendMessage(user, `🔍 ${card.name} searches: found ${foundCard.name || 'a card'} → hand.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search' });

@@ -9,6 +9,7 @@ import { sort } from './general.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { playShuffleFlight } from '../../setup/image-logic/shuffle-flight.js';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
+import { logSync } from '../../setup/general/sync-logger-bridge.js';
 
 export const shuffleZone = (
   user,
@@ -47,7 +48,25 @@ export const shuffleZone = (
   removeImages(zone.element);
   indices = indices ? indices : shuffleIndices(zone.getCount());
 
-  rearrangeArray(zone.array, indices);
+  const zoneLength = zone.getCount();
+  if (!rearrangeArray(zone.array, indices)) {
+    // Only a relayed permutation can mismatch: this zone's mirror has already
+    // drifted from the owner's. rearrangeArray kept every card; record it so
+    // the drift is visible in the sync log instead of surfacing later as a
+    // move that silently fails.
+    console.warn('shuffleZone: permutation does not match zone length', {
+      user,
+      zoneId,
+      zoneLength,
+      indicesLength: indices.length,
+    });
+    logSync('shuffleZone.indices_mismatch', {
+      user,
+      zoneId,
+      zoneLength,
+      indicesLength: indices.length,
+    });
+  }
   for (let i = 0; i < zone.getCount(); i++) {
     unhydrateHolo(zone.array[i]);
     zone.element.appendChild(zone.array[i].image);
