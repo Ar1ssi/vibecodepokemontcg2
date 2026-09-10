@@ -380,6 +380,18 @@ export function installE2eApi() {
     loadDeckList(deckRows) {
       loadDeckData('self', deckRows, true);
     },
+    // Design 004 slice 6: resolves once build-deck.js's bulk ensureCardData() pass has
+    // settled, so the runner can hold off the first turn until hp/attacks/stage/subtypes
+    // are real. Resolves `false` (never rejects, never hangs) when enrichment failed or
+    // no deck has been built — a caller must still bound its own wait, since the
+    // underlying fetches are network-bound.
+    async cardDataReady() {
+      try {
+        return (await systemState.cardDataReady) ?? false;
+      } catch {
+        return false;
+      }
+    },
     readyUp() {
       return readyUp('self');
     },

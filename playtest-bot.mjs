@@ -19,7 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decide } from './bot/bot.mjs';
-import { createHeuristicScorer } from './bot/heuristic-scorer.mjs';
+import { createHeuristicScorer, optionKey } from './bot/heuristic-scorer.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';
@@ -140,6 +140,29 @@ async function setupGame(browser, room, deckRows, pageErrors) {
   }
   await waitFor(a.page, () => window.__ptcg.zone('self', 'deck').count >= 1);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'deck').count >= 1);
+
+  // Hold off the first turn until TCGdex enrichment has settled. Without this the bot can
+  // act on cards with no hp/attacks/stage/subtypes, and options() silently under-reports —
+  // no attack, no evolve, no Trainer classification — so it passes its way to the turn cap.
+  // Bounded: enrichment is network-bound and the fixture deck stamps its own stats (so it
+  // needs none). A timeout is not fatal; play proceeds on whatever resolved, matching
+  // build-deck.js's own "partial data beats none" handling.
+  await Promise.all(
+    [a, b].map(async (client) => {
+      const ready = await client.page
+        .evaluate(
+          () =>
+            Promise.race([
+              window.__ptcg.cardDataReady(),
+              new Promise((resolve) => setTimeout(() => resolve('timeout'), 60000)),
+            ]),
+        )
+        .catch(() => 'error');
+      if (ready !== true) {
+        console.log(`  note: ${client.name} card data not fully enriched (${ready})`);
+      }
+    })
+  );
 
   await a.page.evaluate(() => window.__ptcg.readyUp());
   await b.page.evaluate(() => window.__ptcg.readyUp());
@@ -298,12 +321,20 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
     let lastTurnNumber = 0;
     let turnActionCount = 0;
     let steps = 0;
+    // Kept so the failure paths that have no observation of their own in hand (pageerror,
+    // both softlocks, the in-turn wedge) still dump the last board the bot actually saw —
+    // a dump without one is not replayable, which is this slice's acceptance bar.
+    let lastObservation = null;
+    let lastChosen = null;
+    // Guard 3 (heuristic-scorer.mjs): Trainers that resolved to no state change this turn.
+    // Cleared on every turn change, so a card blocked by a once-per-turn rule gets retried.
+    let triedThisTurn = new Set();
     const maxSteps = Math.max(maxTurns, 1) * MAX_ACTIONS_PER_TURN;
 
     while (true) {
       steps += 1;
       if (pageErrors.length) {
-        return await fail('pageerror', pageErrors.join('; '), null, null, lastTurnNumber);
+        return await fail('pageerror', pageErrors.join('; '), lastObservation, lastChosen, lastTurnNumber);
       }
       const ended = await a.page.evaluate(() => window.__ptcg.gameEndedInfo);
       if (ended) {
@@ -314,8 +345,8 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
         return await fail(
           'softlock',
           `exceeded ${maxSteps} total actions without the game ending`,
-          null,
-          null,
+          lastObservation,
+          lastChosen,
           lastTurnNumber
         );
       }
@@ -324,8 +355,15 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       if (aTurnState.turnNumber !== lastTurnNumber) {
         lastTurnNumber = aTurnState.turnNumber;
         turnActionCount = 0;
+        triedThisTurn = new Set();
         if (lastTurnNumber > maxTurns) {
-          return await fail('softlock', `exceeded --max-turns=${maxTurns}`, null, null, lastTurnNumber);
+          return await fail(
+            'softlock',
+            `exceeded --max-turns=${maxTurns}`,
+            lastObservation,
+            lastChosen,
+            lastTurnNumber
+          );
         }
       }
       turnActionCount += 1;
@@ -333,8 +371,8 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
         return await fail(
           'wedge',
           `no turn progress after ${MAX_ACTIONS_PER_TURN} actions within turn ${lastTurnNumber}`,
-          null,
-          null,
+          lastObservation,
+          lastChosen,
           lastTurnNumber
         );
       }
@@ -345,11 +383,27 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       const scorer = isA ? scorers.a : scorers.b;
 
       const observation = await getObservation(active.page);
+      observation.triedThisTurn = [...triedThisTurn];
+      lastObservation = observation;
       const chosen = decide(observation, scorer, {
         onFallback: (why, detail) => fallbacks.push({ turn: lastTurnNumber, why, detail: String(detail ?? '') }),
       });
+      lastChosen = chosen;
       const actResult = await active.page.evaluate((option) => window.__ptcg.act(option), chosen);
       stepLog.push({ turn: lastTurnNumber, player: isA ? 'a' : 'b', chosen, actResult });
+
+      // A Trainer still in hand after act() reported success resolved to nothing this client
+      // can execute (an unimplemented effect). Mark it so the scorer stops re-picking it —
+      // otherwise one inert card eats the turn's whole action budget and the run reports a
+      // wedge that says nothing about the game.
+      if (chosen.kind === 'playTrainer') {
+        const handAfter = await active.page.evaluate(
+          () => window.__ptcg.zone('self', 'hand').count
+        );
+        if (handAfter === (observation.self?.hand || []).length) {
+          triedThisTurn.add(optionKey(chosen, observation));
+        }
+      }
       if (!actResult.ok) {
         return await fail('act-failed', actResult.error, observation, chosen, lastTurnNumber);
       }
@@ -386,7 +440,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       }
     }
   } catch (err) {
-    return await fail('exception', err.message, null, null, undefined);
+    return await fail('exception', err.message, lastObservation, lastChosen, lastTurnNumber);
   }
 }
 

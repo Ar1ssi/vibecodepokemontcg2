@@ -51,6 +51,16 @@ export const buildDeck = (user) => {
   // Pre-warm card metadata in the background so deck searches don't incur network latency
   const enriched = Promise.all(builtCards.map((card) => ensureCardData(card)));
 
+  // Design 004 slice 6: the playtest bot must not start acting on cards whose hp/attacks/
+  // stage/subtypes haven't resolved yet — unenriched cards make options() under-report
+  // (no attack, no evolve) and the bot passes instead. Parked here for __ptcg.cardDataReady()
+  // to await; read by nothing else, so live play is unchanged. Already-settled swallow of
+  // rejections matches the two consumers below: partial data still beats none.
+  systemState.cardDataReady = enriched.then(
+    () => true,
+    () => false
+  );
+
   // Design 002 I26: the server's cards are built from deck rows, which carry no hp or
   // attacks — without this it can never adjudicate a knockout. Enrichment is what resolves
   // that data, so the send waits on it; only the local player's own deck is sent, since the

@@ -1,7 +1,9 @@
 # 004: Playwright playtest bot — a CPU opponent that soaks the real UI
 
 Status: shipped — all 6 slices built (S78-S84). I30 (the rules bug slice 6 found) fixed S85;
-slice 6's "zero failures" acceptance now holds (11/11 live games since).
+slice 6's "zero failures" acceptance holds on the fixture deck (11/11 live games, plus 3/3 after
+S86's patch). S86 closed three real-deck gaps found by running it against an actual 60-card list —
+see "S86 corrections" below. Real 60-card decks now reach I31 (ISSUES.md), a genuine divergence.
 Date: 2026-09-10 · Session: S75
 Related: `.agent/designs/003-authoritative-interaction-routing.md` (the `__ptcg` bridge this extends).
 Prior art: `TomBombadyl/kaggle_pokemon` (`agent/agent.py`) — the never-crash scaffold + pluggable
@@ -160,7 +162,7 @@ real once I28 (ISSUES.md) no longer ends the game before any Trainer could be dr
 **Files:** `bot/bot.mjs` (scaffold + `legalFallback`), `bot/heuristic-scorer.mjs`.
 Policy, in priority order (ported from the Kaggle repo's measured ordering; their note records that
 attack-first scored 7.5% vs random because it under-developed the board):
-`evolve → playBasic → attach → ability → attack → retreat → pass`, with two guards:
+`evolve → playBasic → playTrainer → attach → ability → attack → retreat → pass`, with three guards:
 1. **Never pass or attack with an empty bench** if a Basic can be benched.
 2. Among `attack` options pick highest expected damage; among `attach` prefer the active Pokémon's
    unmet attack cost.
@@ -209,6 +211,35 @@ disagree (one `self`, one `opp`) before treating turn order as settled, since ea
 briefly agrees with itself before the peer's coin-flip broadcast lands; (2) a cross-client divergence
 check right after `act()` can race a real in-flight broadcast (S82's I29 pattern) — retried for up to
 3s before treating it as a finding.
+
+## S86 corrections (found by running slice 6 against a real 60-card deck)
+
+The fixture deck is 20 all-Basics with no Energy and no Trainers, so every acceptance run before
+S86 exercised roughly a third of the option vocabulary. One run against a real list
+(18 Pokémon / 32 Trainer / 10 Energy) exposed three gaps — 264 of 291 actions were `pass`:
+
+1. **The scorer had no `playTrainer` tier.** `options()` enumerated it and `act()` executed it,
+   but `heuristic-scorer.mjs` never picked it, so half the deck was unplayable. **This spec's own
+   fault** — the priority list above originally omitted `playTrainer`; the implementing session
+   built exactly what was written. Fixed: Trainers now rank above `attach` (draw/search Supporters
+   are what find the Energy an attach would otherwise guess at).
+2. **Guard 3, the inert-Trainer guard.** A Trainer whose effect this client can't execute stays in
+   hand, and a priority-ordered scorer would replay it until the turn's 60-action budget ran out,
+   reporting a `wedge` that says nothing. The runner now marks any `playTrainer` that left the hand
+   count unchanged and feeds it back as `observation.triedThisTurn` (keyed by card *name*, since
+   hand indices shift); the scorer skips those for the rest of the turn. `pass` is never excluded,
+   so the exclusion can never strand the bot.
+3. **No wait for card-data enrichment.** Slice 6 step 1 required it and the runner never did it —
+   it waited only for `deck.count >= 1`. Unenriched cards have no hp/attacks/stage/subtypes, so
+   `options()` silently under-reports. `build-deck.js` already bulk-warms via `ensureCardData`
+   fire-and-forget; that promise is now parked on `systemState.cardDataReady` and awaited through
+   the new `__ptcg.cardDataReady()`, bounded at 60s. **Caveat:** it resolves `true` when the
+   enrichment *pass* settled, not when data actually arrived — `ensureCardData` swallows its own
+   fetch failures. On a network-blocked machine the wait is a no-op, by design (partial data beats
+   none, matching build-deck.js's existing handling).
+4. **Failure dumps dropped the observation.** `pageerror`, both softlock paths and the in-turn
+   wedge all passed `observation: null`, so the dump wasn't replayable — the slice's own acceptance
+   bar. The runner now carries `lastObservation`/`lastChosen` into every failure path.
 
 ## Risks
 

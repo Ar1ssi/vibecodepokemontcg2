@@ -5,14 +5,33 @@
 //
 // Priority order (ported from the Kaggle repo's measured ordering — attack-first
 // scored 7.5% vs random because it under-developed the board):
-//   evolve → playBasic → attach → ability → attack → retreat → pass
-// plus two guards:
+//   evolve → playBasic → playTrainer → attach → ability → attack → retreat → pass
+// plus three guards:
 //   1. Never pass or attack with an empty bench if a Basic can be benched.
 //      (Satisfied by the order itself: playBasic-to-bench always outranks
 //      attack/pass, so this tier is never skipped over while such an option
 //      exists — no special-casing needed. Covered by a regression test below.)
 //   2. Among attack options pick highest expected damage; among attach options
 //      prefer the active Pokémon's unmet attack cost.
+//   3. A Trainer that stayed in hand after being played resolved to nothing this
+//      client can execute. Replaying it would burn the turn's whole action budget
+//      and drown out real findings, so the runner feeds those back in
+//      `observation.triedThisTurn` (see optionKey) and they are skipped until the
+//      turn ends. Trainers rank above `attach` because draw/search Supporters are
+//      what find the Energy an attach would otherwise be guessing at.
+
+/**
+ * Stable identity for an option across a single turn, used by the runner to mark a
+ * `playTrainer` that produced no state change (guard 3). Keyed by card NAME, not
+ * handIndex: a hand index shifts as other cards leave the hand, a name does not.
+ * Every other kind gets a key that is never excluded, so this narrows nothing else.
+ * @returns {string}
+ */
+export function optionKey(option, observation) {
+  if (option?.kind !== 'playTrainer') return `${option?.kind}`;
+  const hand = observation?.self?.hand || [];
+  return `playTrainer:${hand[option.handIndex]?.name || option.handIndex}`;
+}
 
 function pickRandom(list, rng) {
   if (list.length === 1) return list[0];
@@ -52,7 +71,14 @@ function activeHasUnmetCost(active) {
 export function createHeuristicScorer({ rng = Math.random } = {}) {
   return {
     choose(observation) {
-      const options = observation?.options || [];
+      const allOptions = observation?.options || [];
+      if (!allOptions.length) return null;
+      // Guard 3: skip Trainers already shown to be inert this turn. `pass` is never
+      // excluded, so this can never empty the list of every terminating option.
+      const tried = new Set(observation?.triedThisTurn || []);
+      const options = allOptions.filter(
+        (option) => !tried.has(optionKey(option, observation))
+      );
       if (!options.length) return null;
       const byKind = (kind) => options.filter((option) => option.kind === kind);
 
@@ -61,6 +87,9 @@ export function createHeuristicScorer({ rng = Math.random } = {}) {
 
       const playBasics = byKind('playBasic');
       if (playBasics.length) return pickRandom(playBasics, rng);
+
+      const trainers = byKind('playTrainer');
+      if (trainers.length) return pickRandom(trainers, rng);
 
       const attaches = byKind('attach');
       if (attaches.length) {
