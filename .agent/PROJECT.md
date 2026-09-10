@@ -8,7 +8,7 @@
 
 ## Constraints & non-goals (hard requirements; things deliberately unsupported)
 - Server must be able to boot and create database directory dynamically for ephemeral host compatibility (e.g. Render).
-- Pure logic / rules tests run via native Node.js test runner (`node --test`) on plain `.mjs` modules with **no jsdom** — they use stub card objects. `jsdom` is a devDependency used only by `integration-test.mjs`. (Corrected S2; D3 still says otherwise.)
+- Pure logic / rules tests run via native Node.js test runner (`node --test`) on plain `.mjs` modules with **no jsdom** — they use stub card objects. `jsdom` is a devDependency used only by `integration-test.mjs`.
 - Decks stored in `localStorage` detach session editor state upon page reload to prevent accidental overwrites.
 - No build step. Browser loads native ESM (`client/index.ejs:20`); deploy is `pnpm install` then `node server/server.js` (`render.yaml`). A proposal needing a bundler must justify itself in DECISIONS.md first. (S2)
 - Scale: small, mostly private. A handful of concurrent games, players known to each other. Prefer the simple mechanism over the scalable one whenever they conflict. (S2)

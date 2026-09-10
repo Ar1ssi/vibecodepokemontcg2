@@ -51,9 +51,9 @@ shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selec
 shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping
 
 ## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
-client/src/setup/rules/rules-bridge.js — 2291 lines; orchestrates rules via document.dispatchEvent + HUD
-client/src/setup/rules/trainer-execution.js — 1465 lines; resolves effects through synchronous UI pickers
-client/src/actions/chat-buttons/chat-buttons.js — 4330 lines; attack/pass/retreat monolith
+client/src/setup/rules/rules-bridge.js — 2324 lines; orchestrates rules via document.dispatchEvent + HUD
+client/src/setup/rules/trainer-execution.js — 1549 lines; resolves effects through synchronous UI pickers
+client/src/actions/chat-buttons/chat-buttons.js — 4573 lines; attack/pass/retreat monolith
 
 ## State / zones
 shared/engine/cards.mjs — pure `Card` model, `mintInstanceId`, DOM-free (replaces DOM-based Card identity)
@@ -72,7 +72,7 @@ client/src/actions/counters/ — damage, special condition, ability counters (DO
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
 
 ## Tests & tooling
-client/src/**/__tests__/*.mjs — 41 files, plain `node --test`, no jsdom; `pnpm test` (797 tests)
+client/src/**/__tests__/*.mjs — plain `node --test`, no jsdom; `pnpm test` (1223 tests, S85)
 two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
