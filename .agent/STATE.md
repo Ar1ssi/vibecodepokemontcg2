@@ -47,6 +47,7 @@ Blocked: nothing.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S75 2026-09-10 docs: design 004 drafted (Playwright playtest bot). No code changed.
+- main PR #93 (merged, not authored by a numbered session): player going first now draws on
+  turn 1; bench→hand, deck→hand and deck→bench manual drags disabled.
 - S74 2026-09-10 fix: energy cards not auto-discarding on KO + false "already attached this
   turn" on manual discard (legacy rules-mode).
-- S73 2026-09-10 fix(bench,retreat): drag active→bench now runs the retreat flow.
