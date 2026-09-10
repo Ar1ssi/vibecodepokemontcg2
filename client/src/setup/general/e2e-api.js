@@ -11,6 +11,9 @@ import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
 import { getCardDamage, getCardSpecialCondition } from '/shared/engine/zones/card-state.mjs';
 import { resolveAttachedEnergyType } from '/shared/engine/rules/energy-effects.mjs';
+import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import { isEnergy } from '/shared/engine/cards.mjs';
+import { enumerateOptions } from './e2e-options.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 
 // Same zone set the server hashes in shared/engine/state.mjs hashState() minus
@@ -62,9 +65,8 @@ function zoneSnapshot(user, zoneId) {
 // card references — every field is a primitive or a plain object so `observe()` can cross
 // the Playwright page boundary as JSON. Card stats (hp/attacks/types) only exist once
 // cardStats enrichment has landed (see card-stats.js); before that they read as null/[].
-function serializePokemonCard(card) {
+function serializePokemonCard(card, attachedCards = []) {
   if (!card) return null;
-  const attachedCards = Array.isArray(card.attachedCards) ? card.attachedCards : [];
   return {
     name: card.name || '',
     hp: card.hp ?? null,
@@ -72,7 +74,11 @@ function serializePokemonCard(card) {
     stage: card.stage || null,
     types: Array.isArray(card.types) ? [...card.types] : [],
     specialCondition: getCardSpecialCondition(card),
-    attachedEnergy: attachedCards.map((energy) => resolveAttachedEnergyType(energy)),
+    // Tools attach the same way Energy does; resolveAttachedEnergyType would
+    // report them as 'Colorless', so filter to real Energy first.
+    attachedEnergy: attachedCards
+      .filter(isEnergy)
+      .map((energy) => resolveAttachedEnergyType(energy)),
     attacks: Array.isArray(card.attacks)
       ? card.attacks.map((attack, index) => ({
           index,
@@ -93,11 +99,40 @@ function serializeHandCard(card, index) {
   };
 }
 
+// Top-level Pokémon in a play zone. Both render paths keep attachments in the
+// same flat zone array as their host — the authoritative view links them by
+// `attachedTo` (apply-view.js placeCardInZone), the legacy path by
+// `image.relative` (isBoardPokemon) — so an unfiltered array would report
+// attached Energy as benched Pokémon.
+function boardPokemon(user, zoneId) {
+  const cards = liveZoneArray(user, zoneId);
+  return hasAuthoritativeView()
+    ? cards.filter((card) => card.attachedTo == null)
+    : cards.filter(isBoardPokemon);
+}
+
+// The cards attached to one in-play Pokémon, from whichever link the active
+// render path uses (see boardPokemon).
+function attachedCardsFor(user, zoneId, card) {
+  if (!card) return [];
+  const cards = liveZoneArray(user, zoneId);
+  if (hasAuthoritativeView()) {
+    const instanceId = card.instanceId;
+    return instanceId == null
+      ? []
+      : cards.filter((other) => other.attachedTo === instanceId);
+  }
+  return cards.filter((other) => other.image && other.image.relative === card.image);
+}
+
 function serializePlayerObservation(user) {
-  const bench = liveZoneArray(user, 'bench').map(serializePokemonCard);
+  const bench = boardPokemon(user, 'bench').map((card) =>
+    serializePokemonCard(card, attachedCardsFor(user, 'bench', card))
+  );
+  const active = boardPokemon(user, 'active')[0] || null;
   return {
     hand: liveZoneArray(user, 'hand').map((card, index) => serializeHandCard(card, index)),
-    active: serializePokemonCard(liveZoneArray(user, 'active')[0]),
+    active: serializePokemonCard(active, attachedCardsFor(user, 'active', active)),
     bench,
     prizeCount: liveZoneArray(user, 'prizes').length,
     deckCount: liveZoneArray(user, 'deck').length,
@@ -136,6 +171,21 @@ export function installE2eApi() {
         stadium: liveZoneArray('self', 'stadium')[0]?.name || null,
         pickerOpen: !!document.querySelector('.card-picker-overlay'),
       };
+    },
+    // Design 004 slice 2: every action this client may legally take right now,
+    // as tagged options (see e2e-options.mjs). Async — evolution legality is.
+    // Returns [] when it isn't this client's move.
+    async options(user = 'self') {
+      const active = boardPokemon(user, 'active')[0] || null;
+      return enumerateOptions({
+        user,
+        hand: liveZoneArray(user, 'hand'),
+        active,
+        bench: boardPokemon(user, 'bench'),
+        activeZoneCards: liveZoneArray(user, 'active'),
+        attachedCardsOf: (card) =>
+          attachedCardsFor(user, card === active ? 'active' : 'bench', card),
+      });
     },
     turnState() {
       return {
