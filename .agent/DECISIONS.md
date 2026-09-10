@@ -27,3 +27,12 @@
 
 
 ## Archive (dead decisions — kept greppable, never loaded into working context)
+- D21 2026-09-10 (S88): the `?e2e=1` test bridge is gated server-side. It exposes a scripting
+  API over the local player's own board (act/attack/passTurn/loadDeckList), and the query flag
+  is typeable by any visitor, so the client half must not be sufficient to arm it. Chose
+  `PTCG_E2E=1 || NODE_ENV !== 'production'` over pure explicit opt-in so local dev and the
+  Playwright harness keep working with no extra flags while the deploy is closed by default;
+  the cost is that a deployment which forgets NODE_ENV=production would arm it, which the boot
+  log now states explicitly. Not anti-cheat hardening (a non-goal): everything the bridge does
+  is reachable from devtools anyway. This only stops it being five characters in the URL.
+

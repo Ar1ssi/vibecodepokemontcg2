@@ -20,6 +20,13 @@
 - My Decks: Local browser deck storage and management library (`ptcg-sim.deck-library.v1`).
 - SyncInstance / CardHint: Unique identifiers and fallback mechanisms to resolve card identity across 2P socket synchronization. (Both exist to patch client-authoritative index drift; design 001 retires them for a server-minted `instanceId`.)
 
+- The `?e2e=1` test bridge (`window.__ptcg`, installed by `e2e-api.js`) is shipped to every
+  browser but only ARMS when the server says so: `E2E_ENABLED` (server/server.js) templates
+  `window.__PTCG_E2E_ALLOWED` into the page, and `isE2eMode()` requires both. Opt in with
+  `PTCG_E2E=1`; it is also on whenever `NODE_ENV !== 'production'`, so local dev needs no flag
+  and the Render deploy (which sets NODE_ENV=production) is closed. The boot log states which.
+  Any harness that needs the bridge against a production-mode server must set `PTCG_E2E=1`. (S88)
+
 ## Landmines (cross-cutting gotchas, ≤15; area-specific ones belong in .agent/areas/)
 <!-- format: symptom → actual cause → what to do instead -->
 - ESLint fails with thousands of errors → Windows CRLF line endings (`\r\n`) trigger Prettier Delete `\r` rule errors → convert files to LF or format via Prettier before linting.

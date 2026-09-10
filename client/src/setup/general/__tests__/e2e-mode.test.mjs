@@ -7,11 +7,22 @@ import {
   stampE2eCard,
 } from '../e2e-mode.mjs';
 
-test('isE2eMode reads the query flag and localStorage key', () => {
-  assert.equal(isE2eMode('?e2e=1'), true);
-  assert.equal(isE2eMode('?foo=1'), false);
+test('isE2eMode reads the query flag and localStorage key once the server arms it', () => {
+  assert.equal(isE2eMode('?e2e=1', null, true), true);
+  assert.equal(isE2eMode('?foo=1', null, true), false);
   const storage = { getItem: (key) => (key === 'ptcg-sim.e2e' ? '1' : null) };
-  assert.equal(isE2eMode('', storage), true);
+  assert.equal(isE2eMode('', storage, true), true);
+});
+
+// The bridge is a scripting API over the local player's own board, and `?e2e=1` is typeable
+// by any visitor, so the server decides whether it may arm at all. Without that, the client
+// half is inert no matter what the URL or localStorage says.
+test('isE2eMode is inert unless the server armed the bridge', () => {
+  assert.equal(isE2eMode('?e2e=1', null, false), false);
+  const storage = { getItem: (key) => (key === 'ptcg-sim.e2e' ? '1' : null) };
+  assert.equal(isE2eMode('', storage, false), false);
+  // No window and no explicit flag (the Node test environment) must not arm it either.
+  assert.equal(isE2eMode('?e2e=1'), false);
 });
 
 test('e2eFixtureDeck is 20 uniquely named Basics', () => {

@@ -23,6 +23,16 @@ const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE === '1' ||
   process.env.SERVER_AUTHORITATIVE === 'true';
 
+// The `?e2e=1` test bridge (window.__ptcg) is a scripting API over the local player's own
+// board. It is shipped to every browser but must only ARM where a harness is meant to run:
+// without this, any visitor could enable it from the address bar. Opt in explicitly with
+// PTCG_E2E=1, or implicitly outside production (Render sets NODE_ENV=production, so the
+// deployed site is closed by default while local dev keeps working with no extra flags).
+const E2E_ENABLED =
+  process.env.PTCG_E2E === '1' ||
+  process.env.PTCG_E2E === 'true' ||
+  process.env.NODE_ENV !== 'production';
+
 const SHADOW_MODE =
   process.env.SHADOW_MODE?.trim() === '1' ||
   process.env.SHADOW_MODE?.trim() === 'true' ||
@@ -213,7 +223,7 @@ async function main() {
   app.use('/shared', express.static(sharedDir));
   app.use(express.static(clientDir));
   app.get('/', (_, res) => {
-    res.render('index', { importDataJSON: null });
+    res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED });
   });
   app.get('/import', (req, res) => {
     const key = req.query.key;
@@ -229,7 +239,7 @@ async function main() {
           return res.status(500).json({ error: 'Internal server error' });
         }
         if (row) {
-          res.render('index', { importDataJSON: row.value });
+          res.render('index', { importDataJSON: row.value, e2eAllowed: E2E_ENABLED });
         } else {
           res.status(404).json({ error: 'Key not found' });
         }
@@ -967,7 +977,8 @@ async function main() {
     console.log(`Server is running at http://localhost:${port}`);
     // eslint-disable-next-line no-console
     console.log(
-      `Netcode mode: ${SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy'}`
+      `Netcode mode: ${SERVER_AUTHORITATIVE ? 'server-authoritative' : 'legacy'}` +
+        ` | e2e bridge: ${E2E_ENABLED ? 'ARMED (?e2e=1 works)' : 'disabled'}`
     );
   });
 }

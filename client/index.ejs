@@ -17,6 +17,11 @@
     <link rel="icon" href="src/assets/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="src/css/index.css">
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script>
+        // Server-side gate for the ?e2e=1 test bridge (see E2E_ENABLED in server/server.js).
+        // Classic inline script: runs before the deferred module below, which reads this.
+        window.__PTCG_E2E_ALLOWED = <%- JSON.stringify(Boolean(typeof e2eAllowed !== 'undefined' && e2eAllowed)) %>;
+    </script>
     <script type="module" src="src/front-end.js"></script>
     <script>
         window.onload = () => {
