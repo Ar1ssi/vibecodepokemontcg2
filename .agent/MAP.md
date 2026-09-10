@@ -77,4 +77,6 @@ two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
 *-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
+bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
+  scaffold + greedy scorer) consumed by the still-unbuilt slice 6 runner via __ptcg observe/options/act
 

@@ -155,7 +155,7 @@ mat-pick target, coin effect) is still unverified live, since none of those over
 the current all-Basics fixture deck. Needs a fixture deck with a search Supporter to verify for
 real once I28 (ISSUES.md) no longer ends the game before any Trainer could be drawn/played.
 
-### Slice 5 — the bot
+### Slice 5 — the bot — SHIPPED S83
 **Files:** `bot/bot.mjs` (scaffold + `legalFallback`), `bot/heuristic-scorer.mjs`.
 Policy, in priority order (ported from the Kaggle repo's measured ordering; their note records that
 attack-first scored 7.5% vs random because it under-developed the board):
@@ -164,8 +164,16 @@ attack-first scored 7.5% vs random because it under-developed the board):
 2. Among `attack` options pick highest expected damage; among `attach` prefer the active Pokémon's
    unmet attack cost.
 Deterministic given a seed; the RNG is only for tie-breaks.
-**Acceptance:** unit tests over recorded `observe()` fixtures — empty bench ⇒ benches a Basic;
-lethal attack available ⇒ attacks; no legal option ⇒ `pass`, never a throw.
+**Acceptance:** unit tests over recorded `observe()`+`options()` fixtures — empty bench ⇒ benches
+a Basic; lethal attack available ⇒ attacks (highest-damage among attack options); no legal option ⇒
+`pass`, never a throw. 14 tests, `bot/__tests__/bot.test.mjs` +
+`bot/__tests__/heuristic-scorer.test.mjs`, wired into `pnpm test`. `decide()` also guards against a
+scorer returning an option not present in `options` (treated as `scorer-invalid`, same fallback
+path) — not in the original contract sketch but needed since nothing else enforces "the scorer's
+choice really is one of the legal options" before the runner calls `act()` on it. Guard 1 is
+satisfied by the priority order itself (playBasic-to-bench always outranks attack/pass) rather than
+a separate check — see the comment in `heuristic-scorer.mjs`. Not live-verified against a real game
+yet (needs slice 6's runner); acceptance here is the unit-test contract only.
 
 ### Slice 6 — the runner
 **File:** `playtest-bot.mjs` (root, mirrors `flip-gate-test.mjs`).
