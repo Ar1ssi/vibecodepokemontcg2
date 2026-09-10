@@ -3,6 +3,19 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
+- D26 2026-09-11 [testing] "Debug mode" for testers/bots to summon arbitrary cards and break all
+  rules turns out to already be ~fully built, gated behind the existing `?e2e=1` bridge (Archive
+  D21): `window.__ptcg.loadDeckList(rows)` already loads any card list of any size (no 20-card
+  minimum exists client or server side to bypass), and `rules-state.mjs`'s `canPerformAction`
+  already short-circuits to `{allowed:true}` for everything when `rulesState.enabled` is false.
+  The one real gap: `forceRulesEnabledForMultiplayer` (rules-bridge.js) snaps rules back on at
+  every 2P room join, which would fight a bot that disables them for a bot-vs-bot debug game —
+  closed by exempting e2e mode via a new pure `multiplayerLocksRulesEnabled(isTwoPlayer, e2eMode)`
+  helper (e2e-mode.mjs), applied at both the settings-checkbox guard and the force-on call. Added
+  `window.__ptcg.debugMode(enabled)` as the discoverable one-call toggle (sets `rulesState.enabled`
+  + persists) rather than requiring bots to poke the already-exposed `window.__ptcg.rulesState`
+  object directly. No new server surface, no change to E2E_ENABLED's arming — same security
+  posture as Archive D21 (tester-only, dev/PTCG_E2E-gated).
 - D25 2026-09-10 [deck-builder] Each generation pill also gets a synthetic Energy tab
   (`__energy_gen<N>__`), same colorless-energy logo and aggregation idea as the Standard view's
   `ENERGY_SET_ID` tab (D18), but without D18's `MODERN_BASIC_ENERGY_TYPES`/`EXTRA_ENERGY_CARD_REFS`
