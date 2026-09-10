@@ -4,32 +4,33 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 96
-Focus: read-only investigation of I37/I36 (leftover follow-ups from design 007), then push branch.
-Active: done. Read-only code audit of I37 and I36 (no live repro run, no fix — user asked to
-  investigate then push). I37 narrowed: the 4 hand-into-deck trainer effects
-  (trainer-execution.js:717-758) never call `_shuffleZone` (design 007's race literally cannot
-  happen there), but they DO fire un-awaited `moveCardBundle` in a loop — same defect class as
-  the picker bug design 007 fixed, causing stale `cardHints.moving` on iterations after the
-  first. Also found they never actually randomize the deck (unlike the authoritative engine).
-  I36: found the KO auto-promotion call site (chat-buttons.js:1184, direct `moveCard`, no
-  relay, inside the replayed `attack()`) and concluded the reported hint_mismatch is very
-  likely a stale-but-safely-aborted relay racing an already-converged independent replay, not a
-  real desync — downgraded confidence to "likely benign". Both left open in ISSUES.md with
-  these findings recorded; pushed the branch (commit 341c60f + this session's, see journal S96).
-Next: I37's fix (sequential-await rewrite of the 4 hand-shuffle effect loops, matching
-  `movePicksInOrder`'s pattern) is unstarted — real bug, worth a `feature`/`patch` session. I36
-  has no repro available; only revisit if it recurs live. Still open: confirm on localhost with
-  `?e2e=1` that a bot can `loadDeckList`+`debugMode(true)` to bypass rules for card-isolation
-  testing generally (S93's own use case). Also smoke-check S92's Trainer/turn fixes: play an
-  Item then a Supporter in the same turn (Supporter should still be allowed), confirm the first
-  player draws on turn 1. Also retest Grand Tree's Stage-2 chain against PR #97 (S91-main): if
-  it still fails with NO message and the card vanishes for both players, check whether
-  `evolveCard.js` ever sets `targetCard.image.attached` on the Stage-1 base (it currently
-  doesn't, only `targetCard.attached`). Still open from S82/S88: I34 (turn-desync residual,
-  1/10 soak failures). Still open from S71/S73: mat-click pick/cancel/Escape flow, stray-click
-  leak-through, opponent-side highlighting in local 2P, drag active→bench retreat live-verify —
-  none browser-verified. Design 005/006 smoke-check still open. Maintenance due S100.
+Session: 97
+Focus: fix I37, resolve I36, open a PR for this branch (pokemon-multiplayer-test-bef06f).
+Active: done. I37 FIXED: added `await` to every `moveCardBundle` call across the 4 hand-shuffle
+  trainer-effect loops (trainer-execution.js — shuffleHandThenDraw/countShuffleDrawPlus/
+  ionoShuffle/discardHandThenDraw) so each move's splice lands before the next iteration's
+  synchronous hint-build reads the zone, and added a real `shuffleDeckAfterSearch` shuffle call
+  for the three that move the hand into the deck (discardHandThenDraw discards, needs none).
+  1297/1297 pnpm test; targeted eslint clean (CRLF/prettier noise only, baseline). Not live-2P
+  verified — no harness yet for these specific card effects; the fix mirrors design 007's
+  already-verified pattern. I36 CLOSED without a code change: traced the mirror-abort's blast
+  radius (`applyPeerAction` increments `oppCounter` unconditionally regardless of the abort) and
+  confirmed no desync/side-effect follows it — working as intended. Both moved to ISSUES.md
+  Closed. Branch pushed; PR not opened by this session (no `gh` CLI or GH token in this
+  environment) — compare URL handed to the user.
+Next: live-verify I37's fix in a real 2P game (play Judge/Iono/N/Professor's-Research-style
+  cards, check the sync log for zero `hint_mismatch`/wrong-card entries) — same shape as
+  manual-verify-i24.mjs but for the hand-shuffle family, not yet built. Still open: confirm on
+  localhost with `?e2e=1` that a bot can `loadDeckList`+`debugMode(true)` to bypass rules for
+  card-isolation testing generally (S93's own use case). Also smoke-check S92's Trainer/turn
+  fixes: play an Item then a Supporter in the same turn (Supporter should still be allowed),
+  confirm the first player draws on turn 1. Also retest Grand Tree's Stage-2 chain against PR
+  #97 (S91-main): if it still fails with NO message and the card vanishes for both players,
+  check whether `evolveCard.js` ever sets `targetCard.image.attached` on the Stage-1 base (it
+  currently doesn't, only `targetCard.attached`). Still open from S82/S88: I34 (turn-desync
+  residual, 1/10 soak failures). Still open from S71/S73: mat-click pick/cancel/Escape flow,
+  stray-click leak-through, opponent-side highlighting in local 2P, drag active→bench retreat
+  live-verify — none browser-verified. Design 005/006 smoke-check still open. Maintenance due S100.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -63,8 +64,7 @@ Blocked: nothing.
   incoming side, don't just pick one.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S96 2026-09-11 debug: audited I37/I36, found and recorded I37's real root cause
-  (un-awaited moveCardBundle loop in hand-shuffle effects) — no fix, pushed branch.
+- S97 2026-09-11 fix(netcode): I37 — awaited moveCardBundle + real shuffle in the 4
+  hand-shuffle trainer effects; I36 closed as working-as-intended (no code change).
+- S96 2026-09-11 debug: audited I37/I36, found and recorded I37's real root cause.
 - S95 2026-09-11 verify: live 2P legacy check of design 007's fix — closed I24.
-- S94 2026-09-11 fix(netcode): legacy 2P mirror desync on benched Pokémon from deck search —
-  design 007, closed live by S95.

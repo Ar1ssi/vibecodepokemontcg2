@@ -715,35 +715,58 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
     try {
       switch (step.type) {
         case 'discardHandThenDraw': {
+          // I37: each move must land (and relay) before the next one reads the zone —
+          // moveCardBundle captures its cardHints synchronously at call time, so firing
+          // these un-awaited raced a stale hand/deck snapshot into the peer's hints.
           while (zone(_effectOwner, 'hand').getCount() > 0) {
-            moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', 0, false, 'move');
+            await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', 0, false, 'move');
           }
           for (let i = 0; i < step.count; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            }
           }
           msg(`  auto: discarded hand, drew ${step.count}`);
           break;
         }
         case 'shuffleHandThenDraw': {
           const handCount0 = zone(_effectOwner, 'hand').getCount();
-          for (let i = 0; i < handCount0; i++) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          for (let i = 0; i < handCount0; i++) {
+            await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          }
+          // I37: these effects moved the hand into the deck but never actually
+          // shuffled it — draws came back in the exact order they went in.
+          shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
+            sourceName: card.name,
+            message: null,
+          });
           let drawCount = step.count;
           const prizesRemaining = Math.max(0, 6 - (_prizeState?.self?.taken || 0));
           if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
             drawCount = step.bonusCount;
           }
           for (let i = 0; i < drawCount; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            }
           }
           msg(`  auto: shuffled hand in, drew ${drawCount}`);
           break;
         }
         case 'countShuffleDrawPlus': {
           const n = zone(_effectOwner, 'hand').getCount();
-          for (let i = 0; i < n; i++) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          for (let i = 0; i < n; i++) {
+            await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          }
+          shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
+            sourceName: card.name,
+            message: null,
+          });
           const drawCount = n + 1;
           for (let i = 0; i < drawCount; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            }
           }
           msg(`  auto: shuffled ${n} cards in, drew ${drawCount}`);
           break;
@@ -751,7 +774,13 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         case 'ionoShuffle': {
           for (const who of ['self', 'opp']) {
             const n = zone(who, 'hand').getCount();
-            for (let i = 0; i < n; i++) moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
+            for (let i = 0; i < n; i++) {
+              await moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
+            }
+            shuffleDeckAfterSearch(who, _appendMessage, _shuffleZone, {
+              sourceName: card.name,
+              message: null,
+            });
           }
           msg('  auto: both players shuffled hands into decks');
           break;
