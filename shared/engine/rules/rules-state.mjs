@@ -478,8 +478,8 @@
     // card? True only when rules are enabled, the draw hasn't happened yet this
     // turn, and there is at least one card left in the deck. The UI layer
     // (rules-bridge.js) calls the real draw() when this returns true.
-    // Turn 1 is skipped: the player who goes first does not draw at the start
-    // of their opening turn (bonus mulligan draws are handled separately).
+    // Every turn draws, including turn 1 for the player going first (bonus
+    // mulligan draws are handled separately).
     export function shouldAutoDrawAtTurnStart({
       enabled = true,
       drewThisTurn = false,
@@ -487,7 +487,6 @@
       turnNumber = 0,
       lastDrawnTurn = 0,
     } = {}) {
-      if (Number(turnNumber) === 1) return false;
       if (lastDrawnTurn && Number(lastDrawnTurn) === Number(turnNumber)) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }

@@ -3176,8 +3176,8 @@ import test from 'node:test';
       assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), false);
     });
 
-    test('shouldAutoDrawAtTurnStart: turn 1 skipped (first player does not draw)', () => {
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), false);
+    test('shouldAutoDrawAtTurnStart: turn 1 draws too (first player draws on their opening turn)', () => {
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), true);
     });
 
     test('shouldAutoDrawAtTurnStart: lastDrawnTurn blocks a second draw on the same turn', () => {
