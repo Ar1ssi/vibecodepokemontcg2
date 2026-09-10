@@ -3,6 +3,7 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
+- D26 2026-09-10 [rules] Grand Tree's Stage-2-chain step re-resolves the Stage 1 host's live zone/index via `zoneOfInPlay(user, picked)` at pick time instead of reusing the pre-evolve `hostZone`/`hostIdx` closure vars — `evolveCard.js` keeps the base card in the zone array (marked `attached: true`) and inserts the evolution as a separate array entry, so a captured index/array-of-one snapshot from before the first evolve is not guaranteed to still describe where the Stage 1 card now lives. Both Grand Tree evolve-guard failure paths (deckIdx/hostIdx invalid) now `appendMessage` a reason instead of silently calling `finishGrandTree()` — the prior silent skip is indistinguishable from the user's report of a stage-2 card "disappearing". Root cause on the live PR96 (server-authoritative) repro is not 100% pinned from static reading alone; this is the concrete fragility found and the fix that removes it, plus gives a visible signal if it recurs. (Renumbered from D21 on merge — collided with the 3D-energy-tokens D21 from a concurrent session.)
 - D25 2026-09-10 [deck-builder] Each generation pill also gets a synthetic Energy tab
   (`__energy_gen<N>__`), same colorless-energy logo and aggregation idea as the Standard view's
   `ENERGY_SET_ID` tab (D18), but without D18's `MODERN_BASIC_ENERGY_TYPES`/`EXTRA_ENERGY_CARD_REFS`
