@@ -159,6 +159,21 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     };
   }
 
+  if (starter) {
+    const starterDeck = state.players[starter].zones.deck;
+    const starterHand = state.players[starter].zones.hand;
+    if (starterDeck.length > 0) {
+      const [card] = starterDeck.splice(0, 1);
+      starterHand.push(card);
+      events.push({
+        type: 'cardsDrawn',
+        playerId: starter,
+        count: 1,
+        cards: [{ instanceId: card.instanceId }],
+      });
+    }
+  }
+
   events.push({
     type: 'gameSetupCompleted',
     starter,

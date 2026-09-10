@@ -43,13 +43,17 @@ test('setupGame: deals 7 cards to hand and 6 cards to prizes', () => {
   const { events, mulligans } = setupGame(state);
   assert.ok(Array.isArray(events));
 
-  assert.equal(state.players.p1.zones.hand.length, 7);
-  assert.equal(state.players.p1.zones.prizes.length, 6);
-  assert.equal(state.players.p1.zones.deck.length, 30 - 7 - 6);
+  const starter = state.turn.player;
+  const p1Bonus = starter === 'p1' ? 1 : 0;
+  const p2Bonus = starter === 'p2' ? 1 : 0;
 
-  assert.equal(state.players.p2.zones.hand.length, 7);
+  assert.equal(state.players.p1.zones.hand.length, 7 + p1Bonus);
+  assert.equal(state.players.p1.zones.prizes.length, 6);
+  assert.equal(state.players.p1.zones.deck.length, 30 - 7 - 6 - p1Bonus);
+
+  assert.equal(state.players.p2.zones.hand.length, 7 + p2Bonus);
   assert.equal(state.players.p2.zones.prizes.length, 6);
-  assert.equal(state.players.p2.zones.deck.length, 30 - 7 - 6);
+  assert.equal(state.players.p2.zones.deck.length, 30 - 7 - 6 - p2Bonus);
 
   assert.equal(mulligans.p1, 0);
   assert.equal(mulligans.p2, 0);
@@ -74,7 +78,8 @@ test('setupGame: evaluates mulligans when player has no basic Pokemon and awards
   assert.ok(mulligans.p1 > 0, 'p1 should have taken mulligans');
   assert.equal(mulligans.p2, 0, 'p2 should have 0 mulligans');
   // p2 should have received bonus draws equal to p1 mulligan count
-  assert.equal(state.players.p2.zones.hand.length, 7 + mulligans.p1);
+  const starterBonus = state.turn.player === 'p2' ? 1 : 0;
+  assert.equal(state.players.p2.zones.hand.length, 7 + mulligans.p1 + starterBonus);
 
   const mulliganEvents = events.filter((e) => e.type === 'mulliganTaken');
   assert.equal(mulliganEvents.length, mulligans.p1);

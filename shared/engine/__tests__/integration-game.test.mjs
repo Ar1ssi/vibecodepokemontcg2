@@ -71,7 +71,7 @@ test('integration: scripted two-player game reaches server-side win condition vi
   assert.equal(state.turn.phase, 'main');
   assert.equal(state.turn.player, 'p1');
   assert.equal(state.turn.number, 1);
-  assert.equal(state.players.p1.zones.hand.length, 7);
+  assert.equal(state.players.p1.zones.hand.length, 8);
   assert.equal(state.players.p1.zones.prizes.length, 6);
   assert.equal(state.players.p2.zones.hand.length, 7);
   assert.equal(state.players.p2.zones.prizes.length, 6);
