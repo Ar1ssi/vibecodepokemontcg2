@@ -148,8 +148,16 @@ export async function canEvolve(
   // Stadium evolution-speed modifier ("as if it had been in play for 1
   // more turn") relaxes the just-played gate; "costs N less Energy" is
   // surfaced as `costReduce` for the cost layer (no live charge site yet).
+  // `bypassJustEvolvedGate` is Grand Tree's own printed exception: "If that
+  // Pokémon was evolved in this way, [you] may search... evolve it [again]"
+  // — the card explicitly allows chaining a Stage 2 evolve onto a Pokémon
+  // that evolved into Stage 1 earlier THIS SAME activation, skipping both
+  // the just-played and already-evolved-this-turn gates for that one
+  // chained step. It does NOT relax the Basic's own "put into play this
+  // turn" gate (still enforced above via wasPlayedThisTurn on the Basic).
   const evoSpeed = getStadiumEvolutionSpeed(player, baseCardInPlay);
-  if (wasPlayedThisTurn && !evoSpeed.relaxTurnGate) {
+  const bypassJustEvolvedGate = Boolean(options.bypassJustEvolvedGate);
+  if (wasPlayedThisTurn && !evoSpeed.relaxTurnGate && !bypassJustEvolvedGate) {
     return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
   }
 
@@ -219,19 +227,22 @@ export async function canEvolve(
     }
   }
 
-  // once per turn per card instance
-  const instanceId = getCardInstanceId(baseCardInPlay);
-  if (instanceId && rulesState.flags[player]?.evolved?.[instanceId]) {
-    return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
-  }
-  if (!instanceId && rulesState.flags[player]?.evolved?.[baseName]) {
-    return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
-  }
-  if (Array.isArray(baseCardInPlay.attachedCards)) {
-    for (const sub of baseCardInPlay.attachedCards) {
-      const subId = getCardInstanceId(sub);
-      if (subId && rulesState.flags[player]?.evolved?.[subId]) {
-        return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
+  // once per turn per card instance — Grand Tree's chained Stage 2 step is
+  // the one printed exception (see bypassJustEvolvedGate above).
+  if (!bypassJustEvolvedGate) {
+    const instanceId = getCardInstanceId(baseCardInPlay);
+    if (instanceId && rulesState.flags[player]?.evolved?.[instanceId]) {
+      return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
+    }
+    if (!instanceId && rulesState.flags[player]?.evolved?.[baseName]) {
+      return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
+    }
+    if (Array.isArray(baseCardInPlay.attachedCards)) {
+      for (const sub of baseCardInPlay.attachedCards) {
+        const subId = getCardInstanceId(sub);
+        if (subId && rulesState.flags[player]?.evolved?.[subId]) {
+          return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
+        }
       }
     }
   }
