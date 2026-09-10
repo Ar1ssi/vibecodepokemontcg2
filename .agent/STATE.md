@@ -4,37 +4,62 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 87
-Focus: patch — real-deck gaps in design 004's playtest bot (found by running it against an
-  actual 60-card list instead of the 20-card fixture) + a maintenance sweep in parallel.
-Active: done. Fixture deck (20 all-Basics, no Trainers/Energy) meant prior runs exercised ~1/3
-  of the option vocabulary. Fixed: (1) `heuristic-scorer.mjs` had no `playTrainer` tier at all;
-  (2) a Trainer the client can't execute now stays in hand instead of being replayed all turn
-  (`observation.triedThisTurn`); (3) the runner now awaits `__ptcg.cardDataReady()` instead of
-  just `deck.count`. Added `bot/coverage-scorer.mjs` (`--scorer=coverage`, ranks by
-  least-exercised mechanic) — found I31/I32 on first run. +14 tests (1250/1253, same 3
-  pre-existing network failures). Maintenance sweep also ran (logged as S86): design 004
-  archived, stale MAP.md/DECISIONS.md lines fixed, 2 scratch files deleted, I33 filed.
-Next: I31 (Trainer play → board divergence, likely I24's family) and I32 (retreat from high
-  bench index breaks the peer — start from I30's `parseRetreatArgs`), both filed, neither fixed.
-  `--scorer=coverage` is RED until I32 is fixed. Still open from S73: live-verify drag
-  active→bench retreat, mat pickers + Grand Tree fix. Maintenance next due S96.
+Session: 88
+Focus: debug — I32, I31 and I33 all root-caused and closed (took over from two subagents stopped
+  mid-investigation on usage grounds), then every branch consolidated onto `main`.
+Note: two sessions independently numbered themselves S87 on branches that had not met — the S86
+  maintenance sweep and this debug run — and each independently filed an issue as I33. Merged in
+  S88: the sweep's issue was renumbered I35 (the pass-wedge I33 is the one three pushed commit
+  messages reference), and both sessions' journal entries are kept.
+Active: done, three issues closed. I32 (retreat) was two bugs: `retreat()` did two untargeted
+  moves so a FULL bench made move-card.js:279 reject the first leg and strand two Pokémon in
+  active; and the peer re-ran `canPerformAction` when REPLAYING the retreat, silently returning
+  when its per-turn state disagreed, so it never applied it at all. I31 (Trainer divergence) was
+  the SAME replay defect in `attack()`, which skipped the `discardBoard()` sweep — that sweep is
+  emit=false, so the peer must run its own copy during the replay, and a blocked replay loses it,
+  stranding every played Trainer in the peer's `board` zone forever. Both fixed with
+  `isMirrorReplayCall` (sync-action-args.mjs, +4 tests): a replayed action is never
+  re-adjudicated — the acting client already decided. I33 was three HARNESS defects and no engine
+  bug: `act()` read a client action's undefined return as success (a refusal is only ever a chat
+  `⛔` line); the runner asked only client A whether the game had ended, though a deck-out is
+  detected by whichever client fails to draw; and `gameEndedInfo` missed clients reaching
+  `phase: 'ended'` without the event firing. Dump chat capture was also reading `#chatbox` while
+  2P writes to `#p2Chatbox`, which is why the first attempt had nothing to go on.
+  Verified: fixture coverage 9/10 on a 10-game soak and 3/3 on each of seeds 42/99/123 (was
+  wedging routinely), heuristic 5/5, pnpm test 1254/1257 (3 = card-identity-live, network, red on
+  main too). Real-deck runs still hit the turn cap HERE ONLY: this sandbox blocks api.tcgdex.net,
+  so cards never enrich, attacks deal 0 damage and no win condition can be met.
+Next: I34 (filed, NOT fixed) — the residual 1/10: both clients report `turnPlayer: 'opp'`
+  simultaneously, each thinking it is the other's turn, with turnNumber drifted 13 vs 8. A real
+  client-state divergence, and the same signature I29 was closed under in S82 as "a harness
+  race" — that closure now looks premature. Start from the I31/I32 defect class: turn advance
+  runs in `endTurn()` inside `endTurnWithBanner`, reached from both `pass()` and `attack()`, and a
+  replayed action that returns early skips it. AUDIT EVERY acceptAction TARGET in chat-buttons.js
+  for `canPerformAction`-on-mirror — three actions have now been caught with it. Still open from
+  S73: drag active→bench retreat live-verify; mat pickers + Grand Tree. Maintenance was DONE by
+  the S86 sweep (next due S96) — the earlier "due since S80" line was superseded by that merge.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- `window.__ptcg` (client/src/setup/general/e2e-api.js, `?e2e=1` only) is the supported
-  programmatic seam into a live game; `playtest-bot.mjs` (root, `--scorer=heuristic|coverage`)
-  is the permanent two-browser soak harness — prefer it over a new ad-hoc smoke script.
+- `playtest-bot.mjs --games=N` is now a real regression gate for legacy-mode multiplayer
+  desyncs, not just a bug-finder — a clean run used to be blocked on I30, now it isn't. Treat
+  a new failure from it as a real finding again, not "known I30 noise."
+- The `(user, ...parameters, emit)` acceptAction calling convention is easy to get wrong when
+  a parameter can look like a boolean or overlap emit's position — see `parseAttackArgs` and
+  the new `parseRetreatArgs` (sync-action-args.mjs) for the established disambiguation pattern
+  before adding a parameter to any other legacy action.
 - This sandbox blocks the socket.io CDN and TCGdex API by egress policy — any local 2-page
   Playwright run needs a `context.route('https://cdn.socket.io/**', ...)` shim to the server's
   own `/socket.io/socket.io.js`, `chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })`.
   Server runs on port 4000 by default (`node server/server.js`), not 4100.
-- When a two-browser harness reports a "desync"/"wedge", check its own polling logic first —
-  I29 (closed) was a harness bug; I31/I32 (open) were checked and look like real engine bugs.
-- CSS/visual checks: don't drive the Browser pane yourself — user checks localhost manually.
+- `turnState().fromServer` is meaningless in legacy mode (SERVER_AUTHORITATIVE unset, this
+  repo's default) — it only ever becomes true under flip-gate-test.mjs's authoritative mode.
+- CSS/visual verification in this repo: don't drive the Browser pane yourself — user checks
+  localhost manually. See project memory `feedback_css_preview.md`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S87 2026-09-10 patch: real-deck bot fixes (playTrainer tier, inert-Trainer guard, enrichment
-  wait) + coverage-scorer brain; found I31/I32 (neither fixed).
-- S86 2026-09-10 maintain: harness sweep (design 004 archived, stale docs fixed, I33 filed).
-- S85 2026-09-10 patch: closed I30 (legacy retreat desync).
+- S85 2026-09-10 patch: closed I30 (legacy retreat desync) — see Active above.
+- S84 2026-09-10 feature: shipped design 004 slice 6 (`playtest-bot.mjs`), the design's final
+  slice. Live-verified; found I30 (fixed this session).
+- S83 2026-09-10 feature: shipped design 004 slice 5 (`bot/bot.mjs`, `bot/heuristic-scorer.mjs`),
+  14 unit tests green, wired into `pnpm test`.

@@ -503,6 +503,34 @@ export function installE2eApi() {
     },
   };
 
+  // I33: every client action signals "refused" only by appendMessage'ing a ⛔ line and
+  // returning undefined, and act()'s `ok: ok !== false` reads undefined as success. A pass
+  // the rules gate rejected was therefore indistinguishable from one that ended the turn,
+  // and the bot re-picked it until the turn budget ran out — reported as a wedge that said
+  // nothing about why. Wrap act() once, here, rather than threading a return value through
+  // every client action: watch the chat this client actually writes to (2P uses #p2Chatbox,
+  // solo uses #chatbox) and report any ⛔ the action produced.
+  const activeChatEl = () =>
+    document.getElementById(systemState.isTwoPlayer ? 'p2Chatbox' : 'chatbox');
+  // Exposed so failure dumps read the chat this client actually writes to. A dump that
+  // silently read the wrong element (#chatbox in a 2P game) reported an empty log and hid
+  // the ⛔ that explained the failure.
+  window.__ptcg.chatTail = (count = 12) =>
+    [...(activeChatEl()?.children || [])].slice(-count).map((n) => n.textContent || '');
+  const rawAct = window.__ptcg.act.bind(window.__ptcg);
+  window.__ptcg.act = async (option) => {
+    const before = activeChatEl()?.childElementCount ?? 0;
+    const result = await rawAct(option);
+    if (result && result.ok === false) return result;
+    const chat = activeChatEl();
+    if (!chat) return result;
+    const refusal = [...chat.children]
+      .slice(before)
+      .map((node) => node.textContent || '')
+      .find((text) => text.includes('⛔'));
+    return refusal ? { ok: false, error: refusal.trim(), blocked: true } : result;
+  };
+
   document.addEventListener('action-processed', (evt) => {
     const { action, user } = evt.detail || {};
     if (user !== 'self') return;

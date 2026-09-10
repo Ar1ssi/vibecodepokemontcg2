@@ -114,3 +114,21 @@ export function deckDataEquals(a, b) {
     return false;
   }
 }
+
+/**
+ * True when a call is this client REPLAYING the other client's action on its mirror
+ * of their board, rather than a locally-initiated one.
+ *
+ * A mirror replay must not re-adjudicate legality: the acting client already decided,
+ * and the rules gate reads per-turn state (turnPlayer, retreatedThisTurn,
+ * attackerAttacked) that the mirror is not guaranteed to hold identically. When the two
+ * disagree the mirror silently returns and the action is never applied on this side,
+ * which shows up as a board divergence with zero cmdRejected (I32).
+ *
+ * Both conditions matter: `emit === false` distinguishes a replay from a local action,
+ * and `user === 'opp'` from this client acting on its own board. In one-player mode a
+ * human driving the opponent's board emits, so it is not matched.
+ */
+export function isMirrorReplayCall({ emit, user, isTwoPlayer } = {}) {
+  return emit === false && user === 'opp' && isTwoPlayer === true;
+}
