@@ -8,6 +8,12 @@
 // Usage:
 //   node server/server.js &
 //   node playtest-bot.mjs --games=50 --seed=1 [--max-turns=60] [--deck=<path.json>] [--headed]
+//                          [--scorer=heuristic|coverage]
+//
+// --scorer picks the brain behind the never-crash scaffold (bot.mjs's OptionScorer seam):
+//   heuristic (default) plays a plausible game; coverage plays a thorough one, holding back
+//   turn-ending moves and preferring the least-exercised mechanic so Stadiums, abilities and
+//   evolution chains actually get reached. Use coverage when the goal is finding bugs.
 //
 // Default deck is the built-in 20-card all-Basic fixture (client/src/setup/general/
 // e2e-mode.mjs's e2eFixtureDeck) — no network fetch, so it runs anywhere `?e2e=1` does.
@@ -19,14 +25,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decide } from './bot/bot.mjs';
-import { createHeuristicScorer } from './bot/heuristic-scorer.mjs';
+import { createHeuristicScorer, optionKey } from './bot/heuristic-scorer.mjs';
+import { createCoverageScorer, coverageKey } from './bot/coverage-scorer.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';
 const OUT_DIR = path.join(__dirname, 'out', 'playtest');
 
 function parseArgs(argv) {
-  const opts = { games: 1, seed: 1, maxTurns: 60, deck: null, headed: false };
+  const opts = { games: 1, seed: 1, maxTurns: 60, deck: null, headed: false, scorer: 'heuristic' };
   for (const arg of argv) {
     const [key, value] = arg.replace(/^--/, '').split('=');
     if (key === 'games') opts.games = Number(value);
@@ -34,6 +41,7 @@ function parseArgs(argv) {
     else if (key === 'max-turns') opts.maxTurns = Number(value);
     else if (key === 'deck') opts.deck = value;
     else if (key === 'headed') opts.headed = true;
+    else if (key === 'scorer') opts.scorer = value;
   }
   return opts;
 }
@@ -140,6 +148,29 @@ async function setupGame(browser, room, deckRows, pageErrors) {
   }
   await waitFor(a.page, () => window.__ptcg.zone('self', 'deck').count >= 1);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'deck').count >= 1);
+
+  // Hold off the first turn until TCGdex enrichment has settled. Without this the bot can
+  // act on cards with no hp/attacks/stage/subtypes, and options() silently under-reports —
+  // no attack, no evolve, no Trainer classification — so it passes its way to the turn cap.
+  // Bounded: enrichment is network-bound and the fixture deck stamps its own stats (so it
+  // needs none). A timeout is not fatal; play proceeds on whatever resolved, matching
+  // build-deck.js's own "partial data beats none" handling.
+  await Promise.all(
+    [a, b].map(async (client) => {
+      const ready = await client.page
+        .evaluate(
+          () =>
+            Promise.race([
+              window.__ptcg.cardDataReady(),
+              new Promise((resolve) => setTimeout(() => resolve('timeout'), 60000)),
+            ]),
+        )
+        .catch(() => 'error');
+      if (ready !== true) {
+        console.log(`  note: ${client.name} card data not fully enriched (${ready})`);
+      }
+    })
+  );
 
   await a.page.evaluate(() => window.__ptcg.readyUp());
   await b.page.evaluate(() => window.__ptcg.readyUp());
@@ -256,14 +287,33 @@ async function closeGame({ a, b }) {
 
 const MAX_ACTIONS_PER_TURN = 60;
 
-async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
+// What one game actually exercised: distinct mechanics (coverageKey) and a per-kind
+// histogram across both sides. Printed per game so a "coverage" run is readable at a
+// glance — an all-PASS run that only ever played Basics is not a meaningful soak.
+function summarizeCoverage(exercised) {
+  const keys = [...exercised.a, ...exercised.b];
+  const kinds = {};
+  for (const key of keys) {
+    const kind = key.split(':')[0];
+    kinds[kind] = (kinds[kind] ?? 0) + 1;
+  }
+  return { distinct: new Set(keys).size, actions: keys.length, kinds };
+}
+
+async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, scorerName }) {
   const room = `e2e-playtest-${seed}-${gameIndex}-${Date.now()}`;
   const pageErrors = [];
   const stepLog = [];
+  const makeScorer =
+    scorerName === 'coverage' ? createCoverageScorer : createHeuristicScorer;
   const scorers = {
-    a: createHeuristicScorer({ rng: mulberry32(seed * 1000003 + gameIndex * 2 + 1) }),
-    b: createHeuristicScorer({ rng: mulberry32(seed * 1000003 + gameIndex * 2 + 2) }),
+    a: makeScorer({ rng: mulberry32(seed * 1000003 + gameIndex * 2 + 1) }),
+    b: makeScorer({ rng: mulberry32(seed * 1000003 + gameIndex * 2 + 2) }),
   };
+  // Mechanics already exercised THIS GAME, per side — the coverage scorer ranks on these.
+  // Per-side, not shared: each bot only ever sees its own board, so a key from the other
+  // side's hand would be meaningless to it.
+  const exercised = { a: [], b: [] };
   const fallbacks = [];
 
   let clients;
@@ -291,31 +341,53 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       cmdRejections: { a: rejections[0], b: rejections[1] },
     });
     await closeGame({ a, b });
-    return { result: 'fail', reason, detail, gameIndex, turn, dump: file };
+    return {
+      result: 'fail',
+      reason,
+      detail,
+      gameIndex,
+      turn,
+      dump: file,
+      coverage: summarizeCoverage(exercised),
+    };
   };
 
   try {
     let lastTurnNumber = 0;
     let turnActionCount = 0;
     let steps = 0;
+    // Kept so the failure paths that have no observation of their own in hand (pageerror,
+    // both softlocks, the in-turn wedge) still dump the last board the bot actually saw —
+    // a dump without one is not replayable, which is this slice's acceptance bar.
+    let lastObservation = null;
+    let lastChosen = null;
+    // Guard 3 (heuristic-scorer.mjs): Trainers that resolved to no state change this turn.
+    // Cleared on every turn change, so a card blocked by a once-per-turn rule gets retried.
+    let triedThisTurn = new Set();
     const maxSteps = Math.max(maxTurns, 1) * MAX_ACTIONS_PER_TURN;
 
     while (true) {
       steps += 1;
       if (pageErrors.length) {
-        return await fail('pageerror', pageErrors.join('; '), null, null, lastTurnNumber);
+        return await fail('pageerror', pageErrors.join('; '), lastObservation, lastChosen, lastTurnNumber);
       }
       const ended = await a.page.evaluate(() => window.__ptcg.gameEndedInfo);
       if (ended) {
         await closeGame({ a, b });
-        return { result: 'pass', gameIndex, turns: lastTurnNumber, winner: ended.winner };
+        return {
+          result: 'pass',
+          gameIndex,
+          turns: lastTurnNumber,
+          winner: ended.winner,
+          coverage: summarizeCoverage(exercised),
+        };
       }
       if (steps > maxSteps) {
         return await fail(
           'softlock',
           `exceeded ${maxSteps} total actions without the game ending`,
-          null,
-          null,
+          lastObservation,
+          lastChosen,
           lastTurnNumber
         );
       }
@@ -324,8 +396,15 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       if (aTurnState.turnNumber !== lastTurnNumber) {
         lastTurnNumber = aTurnState.turnNumber;
         turnActionCount = 0;
+        triedThisTurn = new Set();
         if (lastTurnNumber > maxTurns) {
-          return await fail('softlock', `exceeded --max-turns=${maxTurns}`, null, null, lastTurnNumber);
+          return await fail(
+            'softlock',
+            `exceeded --max-turns=${maxTurns}`,
+            lastObservation,
+            lastChosen,
+            lastTurnNumber
+          );
         }
       }
       turnActionCount += 1;
@@ -333,8 +412,8 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
         return await fail(
           'wedge',
           `no turn progress after ${MAX_ACTIONS_PER_TURN} actions within turn ${lastTurnNumber}`,
-          null,
-          null,
+          lastObservation,
+          lastChosen,
           lastTurnNumber
         );
       }
@@ -345,13 +424,42 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       const scorer = isA ? scorers.a : scorers.b;
 
       const observation = await getObservation(active.page);
+      observation.triedThisTurn = [...triedThisTurn];
+      observation.exercised = isA ? exercised.a : exercised.b;
+      lastObservation = observation;
       const chosen = decide(observation, scorer, {
         onFallback: (why, detail) => fallbacks.push({ turn: lastTurnNumber, why, detail: String(detail ?? '') }),
       });
+      lastChosen = chosen;
       const actResult = await active.page.evaluate((option) => window.__ptcg.act(option), chosen);
+      if (actResult.ok) {
+        (isA ? exercised.a : exercised.b).push(coverageKey(chosen, observation));
+      }
       stepLog.push({ turn: lastTurnNumber, player: isA ? 'a' : 'b', chosen, actResult });
+
+      // A Trainer still in hand after act() reported success resolved to nothing this client
+      // can execute (an unimplemented effect). Mark it so the scorer stops re-picking it —
+      // otherwise one inert card eats the turn's whole action budget and the run reports a
+      // wedge that says nothing about the game.
+      if (chosen.kind === 'playTrainer') {
+        const handAfter = await active.page.evaluate(
+          () => window.__ptcg.zone('self', 'hand').count
+        );
+        if (handAfter === (observation.self?.hand || []).length) {
+          triedThisTurn.add(optionKey(chosen, observation));
+        }
+      }
       if (!actResult.ok) {
-        return await fail('act-failed', actResult.error, observation, chosen, lastTurnNumber);
+        // act() reports { ok: false } with no error whenever the underlying client action
+        // simply returned false (e2e-api.js), so `detail` would otherwise be undefined and
+        // the dump would not say which move failed.
+        return await fail(
+          'act-failed',
+          actResult.error || `${chosen.kind} returned false (no error reported)`,
+          observation,
+          chosen,
+          lastTurnNumber
+        );
       }
 
       for (const client of [active, idle]) {
@@ -386,7 +494,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows }) {
       }
     }
   } catch (err) {
-    return await fail('exception', err.message, null, null, undefined);
+    return await fail('exception', err.message, lastObservation, lastChosen, lastTurnNumber);
   }
 }
 
@@ -407,10 +515,21 @@ async function main() {
         gameIndex,
         maxTurns: opts.maxTurns,
         deckRows,
+        scorerName: opts.scorer,
       });
       results.push(result);
       const label = result.result === 'pass' ? 'PASS' : `FAIL (${result.reason})`;
       console.log(`game ${gameIndex + 1}/${opts.games}: ${label}${result.dump ? ` -> ${result.dump}` : ''}`);
+      if (result.coverage) {
+        const { distinct, actions, kinds } = result.coverage;
+        console.log(
+          `  coverage: ${distinct} distinct mechanics over ${actions} actions — ` +
+            Object.entries(kinds)
+              .sort((x, y) => y[1] - x[1])
+              .map(([kind, count]) => `${kind}:${count}`)
+              .join(' ')
+        );
+      }
     }
   } finally {
     await browser.close();

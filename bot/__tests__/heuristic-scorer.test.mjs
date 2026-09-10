@@ -103,3 +103,118 @@ test('falls back to pass when only pass is legal', () => {
   const scorer = createHeuristicScorer({ rng: deterministicRng });
   assert.deepEqual(decide(observation, scorer), { kind: 'pass' });
 });
+
+// ── S86: playTrainer tier + the inert-Trainer guard ──────────────────────────
+// The scorer shipped with no `playTrainer` branch at all (the priority list in
+// design 004 omitted it), so a real 60-card deck — half of it Trainers — passed
+// instead of playing them: 264 passes / 0 Trainers across 25 turns.
+
+test('plays a Trainer over attaching, attacking or passing', () => {
+  const observation = {
+    self: {
+      active: activePokemon(),
+      bench: [activePokemon({ name: 'Pikachu' })],
+      hand: [
+        { index: 0, name: "Professor's Research", supertype: 'Trainer' },
+        { index: 1, name: 'Water Energy', supertype: 'Energy' },
+      ],
+    },
+    opp: { active: activePokemon() },
+    options: [
+      { kind: 'attach', handIndex: 1, targetZone: 'active', targetIndex: 0 },
+      { kind: 'playTrainer', handIndex: 0 },
+      { kind: 'attack', attackIndex: 0 },
+      { kind: 'pass' },
+    ],
+  };
+  const scorer = createHeuristicScorer({ rng: deterministicRng });
+  assert.deepEqual(decide(observation, scorer), { kind: 'playTrainer', handIndex: 0 });
+});
+
+test('playBasic still outranks playTrainer (board development first)', () => {
+  const observation = {
+    self: {
+      active: activePokemon(),
+      bench: [],
+      hand: [
+        { index: 0, name: "Professor's Research", supertype: 'Trainer' },
+        { index: 1, name: 'Charmander', supertype: 'Pokémon' },
+      ],
+    },
+    opp: { active: activePokemon() },
+    options: [
+      { kind: 'playTrainer', handIndex: 0 },
+      { kind: 'playBasic', handIndex: 1, targetZone: 'bench' },
+      { kind: 'pass' },
+    ],
+  };
+  const scorer = createHeuristicScorer({ rng: deterministicRng });
+  assert.equal(decide(observation, scorer).kind, 'playBasic');
+});
+
+test('skips a Trainer the runner marked inert this turn, and still acts', () => {
+  const observation = {
+    self: {
+      active: activePokemon(),
+      bench: [activePokemon({ name: 'Pikachu' })],
+      hand: [
+        { index: 0, name: 'Unimplemented Stadium', supertype: 'Trainer' },
+        { index: 1, name: 'Water Energy', supertype: 'Energy' },
+      ],
+    },
+    opp: { active: activePokemon() },
+    options: [
+      { kind: 'playTrainer', handIndex: 0 },
+      { kind: 'attach', handIndex: 1, targetZone: 'active', targetIndex: 0 },
+      { kind: 'pass' },
+    ],
+    triedThisTurn: ['playTrainer:Unimplemented Stadium'],
+  };
+  const scorer = createHeuristicScorer({ rng: deterministicRng });
+  assert.equal(decide(observation, scorer).kind, 'attach');
+});
+
+test('an inert Trainer keyed by name survives the hand index shifting under it', () => {
+  const observation = {
+    self: {
+      active: activePokemon(),
+      bench: [activePokemon({ name: 'Pikachu' })],
+      // The card that was at index 0 last action is now at index 2.
+      hand: [
+        { index: 0, name: 'Water Energy', supertype: 'Energy' },
+        { index: 1, name: 'Charmander', supertype: 'Pokémon' },
+        { index: 2, name: 'Unimplemented Stadium', supertype: 'Trainer' },
+      ],
+    },
+    opp: { active: activePokemon() },
+    options: [
+      { kind: 'playTrainer', handIndex: 2 },
+      { kind: 'pass' },
+    ],
+    triedThisTurn: ['playTrainer:Unimplemented Stadium'],
+  };
+  const scorer = createHeuristicScorer({ rng: deterministicRng });
+  assert.equal(decide(observation, scorer).kind, 'pass');
+});
+
+test('exclusions never strand the bot: pass survives even when everything is tried', () => {
+  const observation = {
+    self: { active: activePokemon(), bench: [], hand: [{ index: 0, name: 'Judge', supertype: 'Trainer' }] },
+    opp: { active: activePokemon() },
+    options: [{ kind: 'playTrainer', handIndex: 0 }, { kind: 'pass' }],
+    triedThisTurn: ['playTrainer:Judge'],
+  };
+  const scorer = createHeuristicScorer({ rng: deterministicRng });
+  const choice = decide(observation, scorer);
+  assert.equal(choice.kind, 'pass');
+});
+
+test('optionKey is name-keyed for Trainers and kind-keyed for everything else', async () => {
+  const { optionKey } = await import('../heuristic-scorer.mjs');
+  const observation = { self: { hand: [{ index: 0, name: 'Boss’s Orders', supertype: 'Trainer' }] } };
+  assert.equal(
+    optionKey({ kind: 'playTrainer', handIndex: 0 }, observation),
+    'playTrainer:Boss’s Orders'
+  );
+  assert.equal(optionKey({ kind: 'attack', attackIndex: 0 }, observation), 'attack');
+});
