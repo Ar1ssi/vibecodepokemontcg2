@@ -3,7 +3,22 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
-- D26 2026-09-11 [netcode] Legacy search effects must finish (await) every card move before shuffling the deck, and a mirror that receives a permutation of the wrong length keeps every card (skips bad indices, appends unreferenced cards) and logs `shuffleZone.indices_mismatch` — never drops or leaves holes — why: relaying in local execution order is the only way permutation lengths match; the tolerance is a safety net, not a resync (legacy has none, I12). (design 007)
+- D28 2026-09-11 [netcode] Legacy search effects must finish (await) every card move before shuffling the deck, and a mirror that receives a permutation of the wrong length keeps every card (skips bad indices, appends unreferenced cards) and logs `shuffleZone.indices_mismatch` — never drops or leaves holes — why: relaying in local execution order is the only way permutation lengths match; the tolerance is a safety net, not a resync (legacy has none, I12). (design 007) (Renumbered from D26 on merge — collided with the concurrent debug-mode/Grand Tree D26/D27 below.)
+- D27 2026-09-11 [testing] "Debug mode" for testers/bots to summon arbitrary cards and break all
+  rules turns out to already be ~fully built, gated behind the existing `?e2e=1` bridge (Archive
+  D21): `window.__ptcg.loadDeckList(rows)` already loads any card list of any size (no 20-card
+  minimum exists client or server side to bypass), and `rules-state.mjs`'s `canPerformAction`
+  already short-circuits to `{allowed:true}` for everything when `rulesState.enabled` is false.
+  The one real gap: `forceRulesEnabledForMultiplayer` (rules-bridge.js) snaps rules back on at
+  every 2P room join, which would fight a bot that disables them for a bot-vs-bot debug game —
+  closed by exempting e2e mode via a new pure `multiplayerLocksRulesEnabled(isTwoPlayer, e2eMode)`
+  helper (e2e-mode.mjs), applied at both the settings-checkbox guard and the force-on call. Added
+  `window.__ptcg.debugMode(enabled)` as the discoverable one-call toggle (sets `rulesState.enabled`
+  + persists) rather than requiring bots to poke the already-exposed `window.__ptcg.rulesState`
+  object directly. No new server surface, no change to E2E_ENABLED's arming — same security
+  posture as Archive D21 (tester-only, dev/PTCG_E2E-gated). (Renumbered from D26 on merge —
+  collided with the concurrent Grand Tree D26 below.)
+- D26 2026-09-10 [rules] Grand Tree's Stage-2-chain step re-resolves the Stage 1 host's live zone/index via `zoneOfInPlay(user, picked)` at pick time instead of reusing the pre-evolve `hostZone`/`hostIdx` closure vars — `evolveCard.js` keeps the base card in the zone array (marked `attached: true`) and inserts the evolution as a separate array entry, so a captured index/array-of-one snapshot from before the first evolve is not guaranteed to still describe where the Stage 1 card now lives. Both Grand Tree evolve-guard failure paths (deckIdx/hostIdx invalid) now `appendMessage` a reason instead of silently calling `finishGrandTree()` — the prior silent skip is indistinguishable from the user's report of a stage-2 card "disappearing". Root cause on the live PR96 (server-authoritative) repro is not 100% pinned from static reading alone; this is the concrete fragility found and the fix that removes it, plus gives a visible signal if it recurs. (Renumbered from D21 on merge — collided with the 3D-energy-tokens D21 from a concurrent session.)
 - D25 2026-09-10 [deck-builder] Each generation pill also gets a synthetic Energy tab
   (`__energy_gen<N>__`), same colorless-energy logo and aggregation idea as the Standard view's
   `ENERGY_SET_ID` tab (D18), but without D18's `MODERN_BASIC_ENERGY_TYPES`/`EXTRA_ENERGY_CARD_REFS`

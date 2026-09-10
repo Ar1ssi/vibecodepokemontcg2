@@ -33,6 +33,7 @@ import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
 import { getDealOrderStarter } from '../netcode/deal-order.js';
+import { multiplayerLocksRulesEnabled } from '../general/e2e-mode.mjs';
 function shouldExecuteLocalRulesEffect({
   isTwoPlayer = false,
   localPlay = false,
@@ -375,9 +376,11 @@ import {
       settings.appendChild(row);
     
       document.getElementById('rulesEnforcedCheckbox').addEventListener('change', (e) => {
-        if (systemState.isTwoPlayer && !e.target.checked) {
+        if (multiplayerLocksRulesEnabled(systemState.isTwoPlayer) && !e.target.checked) {
           // Multiplayer games always run with rules enforced: snap the
-          // checkbox back instead of letting it be unticked.
+          // checkbox back instead of letting it be unticked. The e2e bridge
+          // is exempt (multiplayerLocksRulesEnabled) — bot-vs-bot debug
+          // testing needs to break rules mid-game on purpose.
           e.target.checked = true;
           appendMessage('', 'Rules enforcement is always on in multiplayer.', 'announcement', false);
           return;
@@ -397,9 +400,11 @@ import {
     
     // Multiplayer games always run with rules enforced. Called when
     // systemState.isTwoPlayer becomes true (joinGame / spectatorJoin) so a
-    // solo "off" preference can't carry into a shared game.
+    // solo "off" preference can't carry into a shared game. The e2e bridge is
+    // exempt — always called with isTwoPlayer already true, so exemption
+    // reduces to isE2eMode() itself (multiplayerLocksRulesEnabled(true)).
     export const forceRulesEnabledForMultiplayer = () => {
-      if (rulesState.enabled) {
+      if (!multiplayerLocksRulesEnabled(true) || rulesState.enabled) {
         syncRulesToggleUI();
         return;
       }

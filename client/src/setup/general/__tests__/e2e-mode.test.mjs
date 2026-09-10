@@ -4,6 +4,7 @@ import {
   e2eDelayMs,
   e2eFixtureDeck,
   isE2eMode,
+  multiplayerLocksRulesEnabled,
   stampE2eCard,
 } from '../e2e-mode.mjs';
 
@@ -43,4 +44,11 @@ test('stampE2eCard makes ensureCardData / mulligan treat the card as a Basic', (
 
 test('e2eDelayMs collapses live waits only in e2e mode', () => {
   assert.equal(e2eDelayMs(2700), 2700);
+});
+
+test('multiplayerLocksRulesEnabled forces rules on for real multiplayer, exempts e2e', () => {
+  assert.equal(multiplayerLocksRulesEnabled(true, false), true);
+  assert.equal(multiplayerLocksRulesEnabled(true, true), false);
+  assert.equal(multiplayerLocksRulesEnabled(false, false), false);
+  assert.equal(multiplayerLocksRulesEnabled(false, true), false);
 });

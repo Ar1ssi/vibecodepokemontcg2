@@ -4204,6 +4204,12 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
       const deckIdx = deck.array.indexOf(picked);
 
       if (deckIdx < 0 || hostIdx < 0) {
+        appendMessage(
+          user,
+          `⛔ Grand Tree: could not evolve ${picked.name} onto ${host.name} — ${deckIdx < 0 ? `${picked.name} is no longer in your deck` : `${host.name} is no longer in play`}.`,
+          'announcement',
+          false
+        );
         finishGrandTree();
         return;
       }
@@ -4235,12 +4241,23 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
           maxCount: 1,
           onPick: async (nextPicked) => {
             if (nextPicked) {
-              const nextHost = hostZone.array.find((c) => c === picked) || hostZone.array[hostIdx] || host;
-              const nextHostIdx = hostZone.array.indexOf(nextHost);
+              // Re-resolve the Stage 1's zone/index fresh instead of trusting the
+              // pre-evolve `hostZone`/`hostIdx` captured above — evolveCard.js keeps
+              // the base card in the array (marked attached) and inserts the
+              // evolution as a new entry, so the live index has moved.
+              const { zoneId: nextZoneId, zone: nextHostZone } = zoneOfInPlay(user, picked);
+              const nextHostIdx = nextHostZone.array.indexOf(picked);
               const nextDeckIdx = deck.array.indexOf(nextPicked);
               if (nextDeckIdx >= 0 && nextHostIdx >= 0) {
-                await moveCardBundle(user, user, 'deck', zoneId, nextDeckIdx, nextHostIdx, 'evolve');
+                await moveCardBundle(user, user, 'deck', nextZoneId, nextDeckIdx, nextHostIdx, 'evolve');
                 appendMessage(user, `🌳 Grand Tree: ${nextPicked.name} evolves onto ${picked.name}.`, 'announcement', false);
+              } else {
+                appendMessage(
+                  user,
+                  `⛔ Grand Tree: could not evolve ${nextPicked.name} onto ${picked.name} — ${nextDeckIdx < 0 ? `${nextPicked.name} is no longer in your deck` : `${picked.name} is no longer in play`}.`,
+                  'announcement',
+                  false
+                );
               }
             }
             finishGrandTree();
