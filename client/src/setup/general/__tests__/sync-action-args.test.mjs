@@ -4,6 +4,7 @@ import {
   deckDataEquals,
   flipCoin,
   parseAttackArgs,
+  parseRetreatArgs,
   rngFromCoin,
   splitEmitAndTail,
 } from '../sync-action-args.mjs';
@@ -42,6 +43,17 @@ test('parseAttackArgs: local (emit, index) and acceptAction (index, rng, emit)',
     rngBundle: rng,
     emit: false,
   });
+});
+
+test('parseRetreatArgs: local (emit, image) and acceptAction (benchIndex, emit)', () => {
+  const image = { tagName: 'IMG' };
+  assert.deepEqual(parseRetreatArgs(true, image), { target: image, emit: true });
+  assert.deepEqual(parseRetreatArgs(true, null), { target: null, emit: true });
+  assert.deepEqual(parseRetreatArgs(undefined, undefined), { target: null, emit: true });
+  // I30: acceptAction calls fn(user, ...parameters, emit) — a bench index parameter must
+  // not be mistaken for the emit flag, and must survive the peer replay intact.
+  assert.deepEqual(parseRetreatArgs(3, true), { target: 3, emit: true });
+  assert.deepEqual(parseRetreatArgs(0, false), { target: 0, emit: false });
 });
 
 test('rngFromCoin is deterministic for heads and tails', () => {
@@ -227,6 +239,23 @@ test('discardEnergyScaling uses rngBundle.energyDiscarded on replay', () => {
   );
   const src = readFileSync(path, 'utf8');
   assert.match(src, /typeof rngBundle\.energyDiscarded === 'number'/);
+});
+
+test('I30: retreat broadcasts the resolved bench index instead of an empty parameter list', () => {
+  const path = fileURLToPath(
+    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  const start = src.indexOf('export const retreat =');
+  assert.ok(start >= 0, 'retreat export');
+  const next = src.indexOf('\nexport const ', start + 1);
+  const body = src.slice(start, next === -1 ? undefined : next);
+  assert.match(
+    body,
+    /processAction\(user, emit, 'retreat', \[resolvedBenchIdx\]\)/,
+    "retreat's final processAction call must send the chosen bench index, or the peer's " +
+      'replay always defaults to the first bench Pokémon (I30)'
+  );
 });
 
 test('rotateCard broadcasts newRotation in action payload', () => {
