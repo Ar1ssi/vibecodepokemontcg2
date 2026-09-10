@@ -1,6 +1,9 @@
-# 005: Generation pills in Browse Sets
+# 006: Generation pills in Browse Sets
 Status: shipped
 Date: 2026-09-10 · Session: S89
+Renumbered from 005: a concurrent session shipped an unrelated "005: 3D energy tokens" design
+and merged to main first — see `005-3d-energy-tokens.md`. D22/D23 below are likewise renumbered
+D24/D25 in DECISIONS.md for the same reason.
 
 ## Problem
 Browse Sets panel (native-deck-builder-set-browser.js) only shows the current Standard-legal

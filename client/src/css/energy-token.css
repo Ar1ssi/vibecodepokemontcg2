@@ -1,0 +1,27 @@
+/* Energy tokens: attached Energy renders as a small round type-symbol token
+   (colored circle, black glyph, shine baked into the source art) along the
+   bottom edge of the Pokémon, instead of a full flat card. Same <img> element
+   used by drag/discard/sync — size/position are set inline per-attach
+   (attach-card.js); this file only adds shape/shadow. No transform, so the
+   drag hit-box stays the element's normal rectangle. */
+
+/* `.play-container img` (self/opp-containers.css) sets its own generic
+   border-radius/box-shadow at equal (0,0,1,1) specificity but later in the
+   cascade, so it would otherwise win outright — outrank it explicitly rather
+   than relying on import order. */
+.play-container img.energy-token-3d,
+img.energy-token-3d {
+  border-radius: 50%;
+  object-fit: cover;
+  background: transparent;
+  background-color: transparent;
+  box-shadow:
+    /* lift off the card */
+    0 0.16em 0.3em rgba(0, 0, 0, 0.55),
+    /* raised-edge highlight */
+    inset 0 0.09em 0.1em rgba(255, 255, 255, 0.45),
+    /* base shading for roundness */
+    inset 0 -0.11em 0.14em rgba(0, 0, 0, 0.4),
+    /* crisp dark rim so the disc reads as a solid object, not a glow */
+    inset 0 0 0 0.05em rgba(0, 0, 0, 0.35);
+}
