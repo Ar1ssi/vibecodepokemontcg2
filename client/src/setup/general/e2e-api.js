@@ -15,6 +15,7 @@ import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
+import { persistRulesEnabled } from '/shared/engine/rules/rules-state.mjs';
 import {
   getCardPickerSnapshot,
   pickCardPickerIndices,
@@ -373,6 +374,21 @@ export function installE2eApi() {
     },
     loadFixtureDeck(prefix = 'E2E') {
       loadDeckData('self', e2eFixtureDeck(prefix), true);
+    },
+    // Debug mode: turns off every legality gate canPerformAction checks (turn
+    // order, once-per-turn limits, evolve/attack/retreat restrictions, phase
+    // locks — see rules-state.mjs canPerformAction's `if (!rulesState.enabled)
+    // return { allowed: true }` short-circuit) so a tester or bot can force
+    // any card into play to test its behavior in isolation. Safe to flip
+    // mid-2P-game: rules-bridge.js's forceRulesEnabledForMultiplayer, which
+    // would otherwise snap this back to `true` on room join, exempts the e2e
+    // bridge (multiplayerLocksRulesEnabled). loadDeckList/loadFixtureDeck
+    // already accept any card list of any size — there is no separate
+    // minimum-deck-size check to bypass.
+    debugMode(enabled = true) {
+      rulesState.enabled = !enabled;
+      persistRulesEnabled();
+      return !rulesState.enabled;
     },
     // Design 004 slice 6: loads an arbitrary deck (the same 7-field row shape
     // e2eFixtureDeck produces — [quantity, name, type, imageURL, number, set, tcgId]) for
