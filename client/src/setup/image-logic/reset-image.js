@@ -1,4 +1,11 @@
 export const resetImage = (image, zoneId = '') => {
+  if (image.dataset?.energyCardSrc) {
+    image.src = image.dataset.energyCardSrc;
+    delete image.dataset.energyCardSrc;
+    image.classList.remove('energy-token-3d');
+    image.style.width = '';
+    image.style.height = '';
+  }
   image.style.opacity = 1;
   image.style.position = 'relative';
   image.style.bottom = '0%';

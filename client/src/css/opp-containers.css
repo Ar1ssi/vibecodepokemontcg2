@@ -13,6 +13,7 @@
 @import url('./holo/reverse-holo.css');
 @import url('./damage-counter.css');
 @import url('./status-marker.css');
+@import url('./energy-token.css');
 
 /* ── Modular zone geometry ────────────────────────────────────────────
    Mirror of the block in `self-containers.css`; see the comment there.

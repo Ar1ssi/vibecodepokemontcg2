@@ -12,6 +12,7 @@
 @import url('./holo/reverse-holo.css');
 @import url('./damage-counter.css');
 @import url('./status-marker.css');
+@import url('./energy-token.css');
 
 /* ── Modular zone geometry ────────────────────────────────────────────
    Every board zone below is positioned from these custom properties
