@@ -75,7 +75,7 @@ import {
 } from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
-import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail, isMirrorReplayCall } from '../../setup/general/sync-action-args.mjs';
 import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
@@ -2257,9 +2257,24 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
   // outgoing processAction call and reach the peer's replay.
   let resolvedBenchIdx = targetBenchIndexHint;
 
+  // I32 (mirror half): when this call is the peer REPLAYING the other client's
+  // retreat, the acting client has already adjudicated legality — re-adjudicating it
+  // here can only disagree, and when it does, the mirror silently returns and the
+  // retreat is never applied on this side. That is precisely the observed failure:
+  // dumps out/playtest/42-0-{4,5}.json show the acting client's board correctly
+  // swapped while the peer's view of it is the untouched pre-retreat state, with zero
+  // cmdRejected. The gate reads per-turn state (turnPlayer, retreatedThisTurn,
+  // attackerAttacked) that the mirror is not guaranteed to hold identically, so it
+  // must not decide whether a replayed action happens — only the acting client does.
+  const isMirrorReplay = isMirrorReplayCall({
+    emit,
+    user,
+    isTwoPlayer: systemState.isTwoPlayer,
+  });
+
   if (rulesState.enabled) {
     const check = canPerformAction({ user, action: 'retreat' });
-    if (!check.allowed) {
+    if (!check.allowed && !isMirrorReplay) {
       appendMessage(user, `⛔ ${check.reason}`, 'announcement', false);
       return;
     }

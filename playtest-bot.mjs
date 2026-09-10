@@ -267,13 +267,13 @@ async function readCmdRejectedCounts(a, b) {
   return { a: aCount, b: bCount };
 }
 
-function dumpFailure({ seed, gameIndex, turn, reason, detail, observation, chosen, stepLog, cmdRejections }) {
+function dumpFailure({ seed, gameIndex, turn, reason, detail, observation, chosen, stepLog, cmdRejections, boards }) {
   mkdirSync(OUT_DIR, { recursive: true });
   const file = path.join(OUT_DIR, `${seed}-${gameIndex}-${turn}.json`);
   writeFileSync(
     file,
     JSON.stringify(
-      { seed, gameIndex, turn, reason, detail, observation, chosen, stepLog, cmdRejections },
+      { seed, gameIndex, turn, reason, detail, observation, chosen, stepLog, cmdRejections, boards },
       null,
       2
     )
@@ -329,6 +329,29 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
       a.page.evaluate(() => window.__ptcg.cmdRejections),
       b.page.evaluate(() => window.__ptcg.cmdRejections),
     ]);
+    // Both sides' public zones as each client sees them. A divergence dump without
+    // these says only THAT the boards disagree, never HOW — which is most of the
+    // diagnosis. Cheap, and only read on the failure path.
+    const boards = {};
+    try {
+      const [aSelf, aOpp, bSelf, bOpp] = await Promise.all([
+        a.page.evaluate(() => window.__ptcg.publicZones('self')),
+        a.page.evaluate(() => window.__ptcg.publicZones('opp')),
+        b.page.evaluate(() => window.__ptcg.publicZones('self')),
+        b.page.evaluate(() => window.__ptcg.publicZones('opp')),
+      ]);
+      Object.assign(boards, { aSelf, aOpp, bSelf, bOpp });
+      // Last chat lines from both clients. A mirror action silently rejected by the
+      // rules gate leaves a ⛔ line here and nowhere else, so without this a no-op
+      // replay is indistinguishable from one that never ran.
+      const [aChat, bChat] = await Promise.all([
+        a.page.evaluate(() => [...document.querySelectorAll('#chatbox p')].slice(-12).map((n) => n.textContent)),
+        b.page.evaluate(() => [...document.querySelectorAll('#chatbox p')].slice(-12).map((n) => n.textContent)),
+      ]);
+      Object.assign(boards, { aChat, bChat });
+    } catch (err) {
+      boards.error = String(err?.message || err);
+    }
     const file = dumpFailure({
       seed,
       gameIndex,
@@ -339,6 +362,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
       chosen: chosen || null,
       stepLog,
       cmdRejections: { a: rejections[0], b: rejections[1] },
+      boards,
     });
     await closeGame({ a, b });
     return {

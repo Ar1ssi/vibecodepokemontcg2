@@ -4,43 +4,33 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 86
-Focus: patch — three real-deck gaps in design 004's playtest bot, found by running it against
-  an actual 60-card list instead of the 20-card fixture.
-Active: done. The fixture deck (20 all-Basics, no Energy, no Trainers) meant every prior
-  acceptance run exercised about a third of the option vocabulary. One run on a real deck
-  (18 Pokémon / 32 Trainer / 10 Energy) was 264 passes out of 291 actions. Three fixes:
-  (1) `heuristic-scorer.mjs` had NO `playTrainer` tier — `options()` enumerated it and `act()`
-  executed it, but the scorer never picked it, so half the deck was unplayable. Design 004's own
-  priority list omitted it; the implementing session built what was written. Trainers now rank
-  above `attach`. (2) New guard 3: a Trainer whose effect this client can't execute stays in
-  hand, and priority ordering would replay it until the 60-action turn budget ran out; the runner
-  now marks any `playTrainer` that left the hand count unchanged and feeds it back as
-  `observation.triedThisTurn` (keyed by card NAME — hand indices shift), which the scorer skips
-  for the rest of that turn. `pass` is never excluded, so the bot can't be stranded. (3) The
-  runner never waited for TCGdex enrichment (slice 6 required it, it only waited for
-  `deck.count >= 1`); `build-deck.js`'s existing fire-and-forget `ensureCardData` pass is now
-  parked on `systemState.cardDataReady` and awaited via the new `__ptcg.cardDataReady()`, bounded
-  at 60s. Also: failure dumps for pageerror/softlock/wedge carried `observation: null`, so they
-  weren't replayable — they now carry `lastObservation`/`lastChosen`. +6 scorer tests (1242/1245
-  green; the 3 failures are `card-identity-live.test.mjs`, network tests that fail on `main` too
-  in a no-egress sandbox). Fixture deck still 3/3 live.
-Then (same session): added `bot/coverage-scorer.mjs`, a second brain on bot.mjs's OptionScorer
-  seam, selected with `--scorer=coverage` (heuristic stays default). It ranks by least-exercised
-  mechanic this game rather than by plausible play, holds back `attack`/`pass` (both end the turn,
-  so taking either early caps the turn at one action), and keeps the empty-bench and inert-Trainer
-  guards. Abilities and Stadiums sit at count 0 so they get taken the moment they are legal. Every
-  run now prints what it exercised (distinct mechanics + per-kind histogram). +8 tests (1250/1253).
-  It found I32 on its first run.
-Next: I32 and I31 (both filed this session, NEITHER fixed) — a real 60-card deck now reaches a legacy 2P public-
-  board divergence after a Trainer is played, reproduced twice from `--seed=7`, identical
-  signature both times (playTrainer succeeds → next attack trips the check → zero cmdRejected).
-  Check I31 against I24 (same suspected family, still UNVERIFIED live) before opening a fresh
-  investigation. I32 is the more tractable of the two and has a concrete lead: retreat from bench
-  index 3/4 breaks the peer 5/5 across two seeds, while index 0 is fine — start from I30's
-  `parseRetreatArgs` index threading rather than from scratch. `--scorer=coverage` is RED on the
-  fixture deck until I32 is fixed; `--scorer=heuristic` is still 3/3. Still open from S73: (1) live-verify drag active→bench retreat flow, (2) mat
-  click-to-select pickers + Grand Tree fix. Maintenance has been due since S80.
+Session: 87
+Focus: debug — I32 (retreat desync) root-caused and CLOSED, both halves. Took over from two
+  subagents that were stopped mid-investigation on usage grounds.
+Active: done. Two distinct bugs under one issue. (1) LOCAL: `retreat()` did two untargeted moves
+  (active→bench, bench→active); with 5 on the bench the first leg asks for a 6th, so the
+  bench-limit gate at move-card.js:279-292 (which only applies when no `targetCard` was named)
+  rejected it and left the retreating Pokémon in active beside the promoted one. Fixed with ONE
+  targeted move — the gate skips targeted moves and autoMoveActiveBenchCard case 3 does the swap.
+  (2) MIRROR: the peer re-ran `canPerformAction` when REPLAYING the other client's retreat; the
+  gate reads per-turn state (turnPlayer, retreatedThisTurn, attackerAttacked) the mirror need not
+  hold identically, so on disagreement it hit the ⛔ branch and returned — never applying the
+  retreat. Proven from dumps: the peer's board was the exact pre-retreat state, not a mis-targeted
+  swap. Fixed with `isMirrorReplayCall` (sync-action-args.mjs, +4 unit tests): a replayed action is
+  not re-adjudicated — the acting client already decided. Also added both clients' publicZones and
+  chat to failure dumps, which is what made the diagnosis possible in two runs instead of guesswork.
+  Verified: coverage seed42 0/3 → 3/3 (retreats 3→11/game, actions 18→190), heuristic 3/3,
+  pnpm test 1254/1257 (3 = card-identity-live, network, red on main too).
+Next: I33 (filed, NOT fixed) — with I32 gone, games reach turn 10-14 and then wedge: the joiner
+  passes 60x in one turn, every act reporting ok, both boards agreeing. START by fixing
+  `__ptcg.act()`, which maps a client action's `undefined` return to `ok: true`, so a pass the
+  rules gate BLOCKED is indistinguishable from one that worked — the dumps cannot tell you why
+  until that reports honestly. Only then decide whether it is a real gate disagreement or the
+  harness's own turn detection (I29's shape, closed S82 as a harness race). I31 (Trainer
+  divergence, real 60-card deck) is still open and untouched; its one lead, from an abandoned
+  subagent, is the `board` staging zone + `discardBoard(user, user, false, false)` on attack.
+  Still open from S73: drag active→bench retreat live-verify; mat pickers + Grand Tree.
+  Maintenance has been due since S80.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

@@ -7,6 +7,7 @@ import {
   parseRetreatArgs,
   rngFromCoin,
   splitEmitAndTail,
+  isMirrorReplayCall,
 } from '../sync-action-args.mjs';
 import { hashBoardSnapshot, hashCardList } from '../../../../../shared/engine/zones/zone-hash.mjs';
 import { readFileSync } from 'node:fs';
@@ -296,3 +297,34 @@ test('shuffle flight animation skips when document is hidden', () => {
 
 
 
+
+// ── I32 (mirror half), S87 ───────────────────────────────────────────────────
+// A peer replaying the other client's retreat must not re-adjudicate legality.
+// When it did, a gate disagreement made the mirror silently return, leaving the
+// peer's board on the pre-retreat state with zero cmdRejected.
+test('isMirrorReplayCall: a peer replaying the other client is a mirror replay', () => {
+  assert.equal(
+    isMirrorReplayCall({ emit: false, user: 'opp', isTwoPlayer: true }),
+    true
+  );
+});
+
+test('isMirrorReplayCall: a locally-initiated action is never a mirror replay', () => {
+  // Own board, emitting.
+  assert.equal(isMirrorReplayCall({ emit: true, user: 'self', isTwoPlayer: true }), false);
+  // Own board, not emitting (e.g. an internal re-entrant call).
+  assert.equal(isMirrorReplayCall({ emit: false, user: 'self', isTwoPlayer: true }), false);
+  // Driving the opponent's board in 2P emits a requestAction — not a replay.
+  assert.equal(isMirrorReplayCall({ emit: true, user: 'opp', isTwoPlayer: true }), false);
+});
+
+test('isMirrorReplayCall: one-player mode has no mirror to replay onto', () => {
+  assert.equal(isMirrorReplayCall({ emit: false, user: 'opp', isTwoPlayer: false }), false);
+});
+
+test('isMirrorReplayCall: missing/garbage input is not a mirror replay', () => {
+  assert.equal(isMirrorReplayCall(), false);
+  assert.equal(isMirrorReplayCall({}), false);
+  // Truthiness is not enough - only an explicit false/true pair counts.
+  assert.equal(isMirrorReplayCall({ emit: 0, user: 'opp', isTwoPlayer: 1 }), false);
+});
