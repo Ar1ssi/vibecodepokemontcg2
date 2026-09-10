@@ -12,22 +12,6 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
-- I29 2026-09-10 P2 [netcode] Legacy 2P turn-state desync after several turns: driving a real
-  game purely through `__ptcg` (observe/options/act, no scripted calls) past I28's fix, both
-  clients eventually reported `turnState().turnPlayer === 'opp'` *simultaneously* — neither
-  side believed it was their own turn, and `options()` correctly returned `[]` for both
-  (not a bridge bug), wedging the game with no `cmdRejected` and no thrown error.
-  Not pass-button-specific: re-ran with the real `#passButton` DOM element clicked instead of
-  `__ptcg.act({kind:'pass'})` (`.agent/scratch/smoke-i29-realpass.mjs`) — same desync, same
-  point, byte-for-byte. Both runs break right after two attacks in a row (B attacks, then A
-  attacks) — B's page never flips its local `turnPlayer` back to `'self'` after mirroring A's
-  `attack`, even though A's own side correctly flipped to `'opp'`. Points at `attack()`'s
-  mirror/`endTurnWithBanner` path on the *receiving* side, not `pass()` — worth checking
-  whether the receiving client's `attack()` call (`user:'opp'`) hits an early return (a status
-  gate, `canPerformAction`, or a caught exception in the coin/search-effect steps) before
-  reaching `endTurnWithBanner`. Likely still the same family as I24 (legacy client-side
-  mirroring over `rulesEvent`/`pushAction`, not the server) but the discriminating check narrows
-  it to the attack path specifically. Not investigated further (refs: I24, design 004, S80-S81).
 - I24 2026-09-10 P1 [netcode] Legacy (non-authoritative) `moveCardBundle` mirror desync: a `deck`→`bench` move (Piloswine #7, room test1) reached the receiver with no `cardHints` attached, so `needsHintVerification` never triggers (move-card-bundle.js:125-129) and the move applies via raw relay `index` against the receiver's own zone array unchecked (move-card-bundle.js:118,209-227) — grabbing the wrong card. Every later hint-verified move touching that slot then aborts on `hint_mismatch` (move-card-bundle.js:141-159) with no resync (I12), permanently diverging `bench`; ended with Mamoswine ex #23 invisible to ARISSI after a bench→active→bench abort pair. Repro: `ptcg-sync-log_combined_test1_1788985695598.json` seq 108-159 (ARISSI client) (refs: I12, S70).
   Hypothesized cause found and patched UNVERIFIED (no live test done): `openChoicePicker`'s `confirmPicker` (card-picker.js:652-667) already auto-moves every picked card when `zoneFrom`/`destination` are set (rules-bridge.js:1277-1278), but `runSearchStep`'s multi-select `onConfirm` (trainer-execution.js, was ~443-449) *also* called `moveCardBundle` per pick — double-move raced the picker's own splice, and the second call's stale index made `buildMoveCardHints` find no card, dropping the hint. Removed the duplicate manual move. Added a `console.warn` at move-card-bundle.js:20 (buildMoveCardHints null-card path) to catch any remaining case live. Same double-move pattern likely also exists in Grand Tree's evolve pickers (chat-buttons.js:4014-4024/4089-4099) and the attach-energy single-pick path (trainer-execution.js:469-488) — not touched, needs a live repro before patching those.
 - I23 2026-09-09 P2 [netcode] `VSTARGXFunction` has no UI caller and no DOM element: nothing in client markup or JS defines `GXButton`/`VSTARButton`, so the legacy body would throw on `button.classList` if it were ever reached locally; the action is reachable only via the `acceptAction` relay. Left ungated by design 003 slice 5 (a gate on a dead local path adds risk without behavior). Either restore the buttons or delete the action (refs: design 003, S60).
@@ -55,6 +39,24 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I29 2026-09-10 P2 [netcode] Legacy 2P turn-state desync after several turns: driving a real
+    game purely through `__ptcg` past I28's fix, both clients eventually appeared to report
+    `turnState().turnPlayer === 'opp'` simultaneously, wedging the game with zero `cmdRejected`.
+    Narrowed to the attack path (not `pass()`) across S81's two runs (refs: I24, design 004,
+    S80-S81) → closed 2026-09-10 S82: **not an engine bug — a smoke-harness race.**
+    `.agent/scratch/smoke-i29-realpass.mjs`'s stall-detection re-poll always re-read `a.page`'s
+    `turnState()` regardless of which side (`active`) had just been queried for `options()`; when
+    B was the active side, the harness polled A (whose state had already correctly flipped and
+    would never change again) for up to 3s, concluded "no legal option, nothing changed", and
+    stopped the drive loop — while B's own mirrored `attack()` → `endTurnWithBanner` → `endTurn`
+    was still completing over the socket round trip. Fixed the harness to poll `active.page`
+    itself (whichever side was just checked) with a 6s window instead. Re-ran twice: a fresh
+    legacy 2P game now plays 15+ real attacks alternating cleanly (zero `cmdRejected`) through to
+    a legitimate deck-out win, both times. No `attack()`/`endTurn()` engine code was touched —
+    temporary instrumentation added to `chat-buttons.js`'s `attack()`/`endTurnWithBanner()`
+    confirmed the receiving side's mirror (`attack('opp', emit:false, ...)`) always reaches
+    `endTurnWithBanner` and flips `turnPlayer` correctly; instrumentation removed before close
+    (repo diff is harness-file-only: `.agent/scratch/smoke-i29-realpass.mjs`).
 - I28 2026-09-10 P1 [rules] Legacy mode's local win check ends the game after turn 1, every
     game: `evaluateWinCondition`'s `checkWinConditions` (shared/engine/rules/ko-flow.mjs:86-93)
     treats "0 active + 0 bench" as an instant loss for *either* side the moment a turn ends
