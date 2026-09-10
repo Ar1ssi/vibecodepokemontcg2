@@ -12,6 +12,9 @@
 // can show during the spin without fighting holo's inner --rotate-x/y.
 
 const POPOVER_SPRING = { stiffness: 0.033, damping: 0.45, precision: 0.01 };
+// Retreat keeps the same spring feel as the open pop but settles fast, so the
+// card doesn't sit mid-flight blocking the board for seconds after closing.
+const RETREAT_SPRING = { stiffness: 0.12, damping: 0.62, precision: 0.01 };
 const DRAW_SPRING = { stiffness: 0.09, damping: 0.68, precision: 0.02 };
 const PREVIEW_MAX_WIDTH = 780;
 const PREVIEW_WIDTH_FIT = 0.94;
@@ -317,9 +320,9 @@ export const createPopoverMotion = (host, { homeScale = 1 } = {}) => {
     },
     retreat() {
       return Promise.all([
-        scale.set(homeScale, POPOVER_SPRING),
-        translate.set({ x: 0, y: 0 }, POPOVER_SPRING),
-        rotateDelta.set(0, POPOVER_SPRING),
+        scale.set(homeScale, RETREAT_SPRING),
+        translate.set({ x: 0, y: 0 }, RETREAT_SPRING),
+        rotateDelta.set(0, RETREAT_SPRING),
       ]);
     },
     reset() {
