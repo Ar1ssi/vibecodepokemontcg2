@@ -1,7 +1,7 @@
 # 004: Playwright playtest bot — a CPU opponent that soaks the real UI
 
-Status: shipped — all 6 slices built (S78-S84). Slice 6's "zero failures" acceptance is blocked on
-I30 (a real pre-existing rules bug the bot found), not on the runner itself.
+Status: shipped — all 6 slices built (S78-S84). I30 (the rules bug slice 6 found) fixed S85;
+slice 6's "zero failures" acceptance now holds (11/11 live games since).
 Date: 2026-09-10 · Session: S75
 Related: `.agent/designs/003-authoritative-interaction-routing.md` (the `__ptcg` bridge this extends).
 Prior art: `TomBombadyl/kaggle_pokemon` (`agent/agent.py`) — the never-crash scaffold + pluggable
@@ -199,13 +199,10 @@ clean pass/fail reporting, and reproducible dumps naming the exact turn and chos
 immediately found a **real, pre-existing bug**, not a harness flake: `retreat()`'s
 `processAction(user, emit, 'retreat', [])` (chat-buttons.js:2367) sends no target identity, so the
 peer's replay always swaps in the *first* bench Pokémon (chat-buttons.js:2354-2356) regardless of
-which one the acting client chose. Filed as I30 (ISSUES.md) rather than fixed here — chat-buttons.js
-is a gameplay file, out of this spec's non-goals. Since the heuristic scorer picks a random legal
-retreat target (`heuristic-scorer.mjs`'s `pickRandom(retreats, rng)`), roughly 4/5 fixture games hit
-a non-first bench index and diverge — so "50 games, zero failures" will not hold until I30 is fixed
-in its own patch/debug workflow; that is expected and correct behavior for a bug-finding tool, not a
-regression in the runner. Two runner-side fixes were needed along the way, both now folded into the
-shipped file: (1) `turnState().fromServer` never becomes true in the legacy path this design
+which one the acting client chose. Filed as I30 (ISSUES.md) rather than fixed here in the moment — chat-buttons.js is a gameplay file,
+out of this spec's non-goals — and fixed separately in S85 (threaded the resolved bench index
+through `processAction` instead of a DOM image; see ISSUES.md's Closed section). Two runner-side
+fixes were needed along the way, both now folded into the shipped file: (1) `turnState().fromServer` never becomes true in the legacy path this design
 targets by default (that field only means something under `SERVER_AUTHORITATIVE=1`, flip-gate-
 test.mjs's mode) — the runner instead waits for the two pages' `turnState().turnPlayer` to actually
 disagree (one `self`, one `opp`) before treating turn order as settled, since each page's own default
