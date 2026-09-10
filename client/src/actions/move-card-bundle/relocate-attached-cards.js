@@ -3,6 +3,7 @@ import { resetImage } from '../../setup/image-logic/reset-image.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import { moveCard } from './move-card.js';
+import { resolveDetachedCardDestination } from './resolve-detached-card-destination.js';
 
 export const relocateAttachedCards = (
   user,
@@ -42,8 +43,11 @@ export const relocateAttachedCards = (
             image.damageCounter.textContent = String(dmg);
           }
         }
-        getZone(user, 'attachedCards').element.style.display = 'block';
-        moveCard(user, initiator, oZoneId, 'attachedCards', i);
+        const forcedDestination = resolveDetachedCardDestination(dZoneId);
+        if (forcedDestination === 'attachedCards') {
+          getZone(user, 'attachedCards').element.style.display = 'block';
+        }
+        moveCard(user, initiator, oZoneId, forcedDestination, i);
         mouseClick.isActiveZone = oZoneId === 'active';
       }
       i--;

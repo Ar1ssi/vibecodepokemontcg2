@@ -4,34 +4,32 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 73
-Focus: patch — dragging active Pokémon onto bench now triggers a real retreat (energy-cost
-  discard, gates, swap) instead of a raw zone move.
-Active: closed. Root cause: `drag.js`'s `drop()` always routed active↔bench drags through
-  `moveCardBundle(..., 'move', ...)`, which just splices zones (see `moveCard.js`
-  `autoMoveActiveBenchCard`) — no retreat-cost check, no energy discard, no
-  paralysis/asleep/stadium gating. `chat-buttons.js` already had a full `retreat()` (button
-  path) but it always auto-picked "first free bench Pokémon", with no way to say which bench
-  card the swap targets.
-  Fix: gave `retreat(user, emit, targetBenchImage)` an optional third param — resolves to a
-  server `benchInstanceId` for the authoritative dispatch path
-  (`dispatchAuthoritativeAction('retreat', {commandArgs: [id]})`, already supported server-side
-  and by `dual-run-bridge.js`'s translator, just never called with an id before) and to the
-  matching zone-array entry for the legacy swap path. In `drag.js`, added a branch in `drop()`
-  ahead of the generic move logic: `mouseClick.zoneId === 'active' && dZoneId === 'bench' &&
-  !draggedImage.attached` now calls `retreat(mouseClick.cardUser, true, event.target)` instead
-  of falling into `moveCardBundle`.
-  Files: `client/src/actions/chat-buttons/chat-buttons.js`, `client/src/setup/image-logic/drag.js`.
-  Verified: `pnpm test` — 1208/1208 pass, no regressions. Server-side retreat-with-benchInstanceId
-  behavior was already covered by existing tests (commands.test.mjs, dual-run-bridge.test.mjs).
-  NOT verified live in-browser — this repo's convention is the user checks localhost manually
-  (see watch-outs); no DOM/drag test harness exists in this repo to add an automated
-  drag-and-drop regression test for the client glue itself (chat-buttons.js/drag.js have zero
-  existing tests, both being DOM-coupled).
-Next: user should manually drag active→bench in localhost and confirm the energy-discard
-  prompt/behavior fires and the correct bench card is promoted. Also still open from S71/S72
-  (mat click-to-select pickers + Grand Tree fix): user does a live check in the browser for
-  those changes too (see journal S71/S72 for what to verify).
+Session: 74
+Focus: fixed energy cards not auto-discarding on KO, and a false "already attached this turn"
+  warning when manually discarding them (legacy client-side rules-mode only; SERVER_AUTHORITATIVE
+  path was already correct — see below).
+Active: done. Root cause: `relocateAttachedCards` (client/src/actions/move-card-bundle/
+  relocate-attached-cards.js) sent a Pokémon's attached cards to the generic `attachedCards`
+  staging zone whenever the host left active/bench for ANY destination — including discard/KO,
+  where real TCG rules say attachments go straight to discard with no manual step. Two symptoms:
+  (1) KO'd Pokémon auto-discarded itself but stranded its energy in `attachedCards`; (2) that
+  energy's arrival in `attachedCards` was misread by rules-bridge.js's `hookEnergyAttach`/
+  `checkEnergyAdds` (which watches that zone for "new" attaches, since real hand→active/bench
+  attaches never populate it) as a fresh attach, throwing "energy already attached this turn"
+  once the real per-turn flag was already set. Fix: extracted `resolveDetachedCardDestination`
+  (new file `resolve-detached-card-destination.js`, DOM-free/pure — `state.js` reaches
+  browser-only `io()`/`document` at module scope so it can't be pulled into a `node --test` file)
+  — routes to `discard`/`lostZone` directly when that's the host's destination, `attachedCards`
+  otherwise (hand/deck unchanged). 3 new tests. 1211/1211 pnpm test green (was 1208 baseline +
+  the Energy-tab session's own tests not yet counted — verified full suite green after the fix).
+  Confirmed server-authoritative `handleKnockout` (shared/engine/reduce.mjs:38) already discards
+  attached cards correctly — this bug only affects local/dev play with the flag off (repo default).
+  Landmine recorded in PROJECT.md (the once-per-turn energy-attach flag was never actually set by
+  real attaches, only by this misrouted-detach path — pre-existing, out of scope here).
+Next: previous session (S73) left two live-verification items open: (1) drag active→bench
+  retreat flow, (2) mat click-to-select pickers + Grand Tree fix (see journal S71/S72/S73).
+  Also: maintenance due (a session number crossed a multiple of 10 — run
+  .agent/workflows/maintain.md next session).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -52,9 +50,9 @@ Blocked: nothing.
   `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js` then `PTCG_URL=http://localhost:4100`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S74 2026-09-10 fix: energy cards not auto-discarding on KO + false "already attached this
+  turn" on manual discard (legacy rules-mode). See Focus above.
 - S73 2026-09-10 fix(bench,retreat): drag active→bench now runs the retreat flow (energy
   cost, gates) instead of a raw move.
 - S72 2026-09-10 fix(rules): Grand Tree evolve-onto-host + Stage 2 chain fixed (D20). Not yet
   browser-verified.
-- S71 2026-09-10 feat(rules-ui): mat click-to-select replaces modal picker for all
-  in-play-Pokémon trainer-effect targets (D19). Not yet browser-verified.
