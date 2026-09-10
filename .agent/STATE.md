@@ -5,41 +5,34 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 87
-Focus: debug — I32 (retreat desync) root-caused and CLOSED, both halves. Took over from two
-  subagents that were stopped mid-investigation on usage grounds.
-Active: done. Two distinct bugs under one issue. (1) LOCAL: `retreat()` did two untargeted moves
-  (active→bench, bench→active); with 5 on the bench the first leg asks for a 6th, so the
-  bench-limit gate at move-card.js:279-292 (which only applies when no `targetCard` was named)
-  rejected it and left the retreating Pokémon in active beside the promoted one. Fixed with ONE
-  targeted move — the gate skips targeted moves and autoMoveActiveBenchCard case 3 does the swap.
-  (2) MIRROR: the peer re-ran `canPerformAction` when REPLAYING the other client's retreat; the
-  gate reads per-turn state (turnPlayer, retreatedThisTurn, attackerAttacked) the mirror need not
-  hold identically, so on disagreement it hit the ⛔ branch and returned — never applying the
-  retreat. Proven from dumps: the peer's board was the exact pre-retreat state, not a mis-targeted
-  swap. Fixed with `isMirrorReplayCall` (sync-action-args.mjs, +4 unit tests): a replayed action is
-  not re-adjudicated — the acting client already decided. Also added both clients' publicZones and
-  chat to failure dumps, which is what made the diagnosis possible in two runs instead of guesswork.
-  Verified: coverage seed42 0/3 → 3/3 (retreats 3→11/game, actions 18→190), heuristic 3/3,
-  pnpm test 1254/1257 (3 = card-identity-live, network, red on main too).
-Also this session: I31 CLOSED — the same defect as I32's mirror half, in `attack()`. The peer
-  re-adjudicated legality on the replay and returned early, skipping the
-  `discardBoard(user, user, false, false)` sweep. That sweep is emit=false, so the acting client
-  never relays it and the peer must run its own during the attack replay; a blocked replay loses
-  it silently, stranding every played Trainer in the peer's `board` zone. Same `isMirrorReplayCall`
-  guard. Real-deck seed 7: divergence gone, 27 → 507 actions, 16 → 25 distinct mechanics.
-  THE PATTERN IS THE HEADLINE: two actions found re-adjudicating replayed actions, and `pass()`
-  has the same shape. Audit every acceptAction target in chat-buttons.js for
-  canPerformAction-on-mirror before treating the next desync as novel.
-Next: I33 (filed, NOT fixed) — with I32 gone, games reach turn 10-14 and then wedge: the joiner
-  passes 60x in one turn, every act reporting ok, both boards agreeing. START by fixing
-  `__ptcg.act()`, which maps a client action's `undefined` return to `ok: true`, so a pass the
-  rules gate BLOCKED is indistinguishable from one that worked — the dumps cannot tell you why
-  until that reports honestly. Only then decide whether it is a real gate disagreement or the
-  harness's own turn detection (I29's shape, closed S82 as a harness race). I31 (Trainer
-  divergence, real 60-card deck) is still open and untouched; its one lead, from an abandoned
-  subagent, is the `board` staging zone + `discardBoard(user, user, false, false)` on attack.
-  Still open from S73: drag active→bench retreat live-verify; mat pickers + Grand Tree.
-  Maintenance has been due since S80.
+Focus: debug — I32, I31 and I33 all root-caused and closed. Took over from two subagents that
+  were stopped mid-investigation on usage grounds.
+Active: done, three issues closed. I32 (retreat) was two bugs: `retreat()` did two untargeted
+  moves so a FULL bench made move-card.js:279 reject the first leg and strand two Pokémon in
+  active; and the peer re-ran `canPerformAction` when REPLAYING the retreat, silently returning
+  when its per-turn state disagreed, so it never applied it at all. I31 (Trainer divergence) was
+  the SAME replay defect in `attack()`, which skipped the `discardBoard()` sweep — that sweep is
+  emit=false, so the peer must run its own copy during the replay, and a blocked replay loses it,
+  stranding every played Trainer in the peer's `board` zone forever. Both fixed with
+  `isMirrorReplayCall` (sync-action-args.mjs, +4 tests): a replayed action is never
+  re-adjudicated — the acting client already decided. I33 was three HARNESS defects and no engine
+  bug: `act()` read a client action's undefined return as success (a refusal is only ever a chat
+  `⛔` line); the runner asked only client A whether the game had ended, though a deck-out is
+  detected by whichever client fails to draw; and `gameEndedInfo` missed clients reaching
+  `phase: 'ended'` without the event firing. Dump chat capture was also reading `#chatbox` while
+  2P writes to `#p2Chatbox`, which is why the first attempt had nothing to go on.
+  Verified: fixture coverage 9/10 on a 10-game soak and 3/3 on each of seeds 42/99/123 (was
+  wedging routinely), heuristic 5/5, pnpm test 1254/1257 (3 = card-identity-live, network, red on
+  main too). Real-deck runs still hit the turn cap HERE ONLY: this sandbox blocks api.tcgdex.net,
+  so cards never enrich, attacks deal 0 damage and no win condition can be met.
+Next: I34 (filed, NOT fixed) — the residual 1/10: both clients report `turnPlayer: 'opp'`
+  simultaneously, each thinking it is the other's turn, with turnNumber drifted 13 vs 8. A real
+  client-state divergence, and the same signature I29 was closed under in S82 as "a harness
+  race" — that closure now looks premature. Start from the I31/I32 defect class: turn advance
+  runs in `endTurn()` inside `endTurnWithBanner`, reached from both `pass()` and `attack()`, and a
+  replayed action that returns early skips it. AUDIT EVERY acceptAction TARGET in chat-buttons.js
+  for `canPerformAction`-on-mirror — three actions have now been caught with it. Still open from
+  S73: drag active→bench retreat live-verify; mat pickers + Grand Tree. Maintenance due since S80.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

@@ -345,10 +345,16 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
       // rules gate leaves a ⛔ line here and nowhere else, so without this a no-op
       // replay is indistinguishable from one that never ran.
       const [aChat, bChat] = await Promise.all([
-        a.page.evaluate(() => [...document.querySelectorAll('#chatbox p')].slice(-12).map((n) => n.textContent)),
-        b.page.evaluate(() => [...document.querySelectorAll('#chatbox p')].slice(-12).map((n) => n.textContent)),
+        a.page.evaluate(() => window.__ptcg.chatTail(12)),
+        b.page.evaluate(() => window.__ptcg.chatTail(12)),
       ]);
-      Object.assign(boards, { aChat, bChat });
+      const [aTs, bTs, aEnded, bEnded] = await Promise.all([
+        a.page.evaluate(() => window.__ptcg.turnState()),
+        b.page.evaluate(() => window.__ptcg.turnState()),
+        a.page.evaluate(() => window.__ptcg.gameEndedInfo),
+        b.page.evaluate(() => window.__ptcg.gameEndedInfo),
+      ]);
+      Object.assign(boards, { aChat, bChat, aTurnState: aTs, bTurnState: bTs, aEnded, bEnded });
     } catch (err) {
       boards.error = String(err?.message || err);
     }
@@ -395,7 +401,28 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
       if (pageErrors.length) {
         return await fail('pageerror', pageErrors.join('; '), lastObservation, lastChosen, lastTurnNumber);
       }
-      const ended = await a.page.evaluate(() => window.__ptcg.gameEndedInfo);
+      // I33: the game can legitimately end on EITHER client (a deck-out is detected by
+      // whoever fails to draw), and this only ever asked A. When B's client ended the game,
+      // the runner kept driving it: B's own pass then refused with "Game is over." while
+      // reporting success, and the run died as a meaningless 60-action wedge. Ask both.
+      const [endedA, endedB] = await Promise.all([
+        a.page.evaluate(() => window.__ptcg.gameEndedInfo),
+        b.page.evaluate(() => window.__ptcg.gameEndedInfo),
+      ]);
+      // gameEndedInfo is populated from the 'rules-game-ended' event, which is not always
+      // what puts a client into the ended phase — a client can reach phase 'ended' with the
+      // event never having fired, and then refuses every action with "Game is over." while
+      // the runner keeps driving it. The phase is the durable fact; the event is a
+      // notification. Trust the phase too, on both clients.
+      const [phaseA, phaseB] = await Promise.all([
+        a.page.evaluate(() => window.__ptcg.turnState().phase),
+        b.page.evaluate(() => window.__ptcg.turnState().phase),
+      ]);
+      const ended =
+        endedA ||
+        endedB ||
+        (phaseA === 'ended' ? { winner: null, via: 'phase:a' } : null) ||
+        (phaseB === 'ended' ? { winner: null, via: 'phase:b' } : null);
       if (ended) {
         await closeGame({ a, b });
         return {
