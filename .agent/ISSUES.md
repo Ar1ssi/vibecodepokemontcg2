@@ -12,18 +12,15 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
-- I28 2026-09-10 P1 [rules] Legacy mode's local win check ends the game after turn 1, every
-  game: `evaluateWinCondition`'s `checkWinConditions` (shared/engine/rules/ko-flow.mjs:86-93)
-  treats "0 active + 0 bench" as an instant loss for *either* side the moment a turn ends
-  (chat-buttons.js:415 `endTurnWithBanner` → `endTurn`), but the side that hasn't had its own
-  first turn yet legitimately has 0 Pokémon in play — Basic placement is an ordinary turn-1
-  action in this client (no separate "setup" placement phase precedes it). So player A's very
-  first `pass` reports "you win (no Pokémon in play)" against B, who simply hasn't moved yet.
-  Found live via design 004's slice 1-4 smoke run (`.agent/scratch/smoke-004-slice1-4.mjs`) —
-  exactly the class of rule hole the design's playtest bot exists to catch. Needs a live check
-  before fixing (does normal 2-player human play never hit this because both players place
-  during a real "setup" UI step this harness skipped, or is this reachable by any legacy 2P
-  game today?) (refs: design 004, S79).
+- I29 2026-09-10 P2 [netcode] Legacy 2P turn-state desync after several turns: driving a real
+  game purely through `__ptcg` (observe/options/act, no scripted calls) past I28's fix, both
+  clients eventually reported `turnState().turnPlayer === 'opp'` *simultaneously* — neither
+  side believed it was their own turn, and `options()` correctly returned `[]` for both
+  (not a bridge bug), wedging the game with no `cmdRejected` and no thrown error. Likely the
+  same family as I24 (legacy client-side turn mirroring over `rulesEvent`, not the server).
+  Repro: `.agent/scratch/smoke-004-slice1-4.mjs` against a fresh legacy-mode server, ~16
+  loop iterations in (2+ real turns each side, including an attack). Not investigated further
+  — out of scope for I28's fix (refs: I24, design 004, S80).
 - I24 2026-09-10 P1 [netcode] Legacy (non-authoritative) `moveCardBundle` mirror desync: a `deck`→`bench` move (Piloswine #7, room test1) reached the receiver with no `cardHints` attached, so `needsHintVerification` never triggers (move-card-bundle.js:125-129) and the move applies via raw relay `index` against the receiver's own zone array unchecked (move-card-bundle.js:118,209-227) — grabbing the wrong card. Every later hint-verified move touching that slot then aborts on `hint_mismatch` (move-card-bundle.js:141-159) with no resync (I12), permanently diverging `bench`; ended with Mamoswine ex #23 invisible to ARISSI after a bench→active→bench abort pair. Repro: `ptcg-sync-log_combined_test1_1788985695598.json` seq 108-159 (ARISSI client) (refs: I12, S70).
   Hypothesized cause found and patched UNVERIFIED (no live test done): `openChoicePicker`'s `confirmPicker` (card-picker.js:652-667) already auto-moves every picked card when `zoneFrom`/`destination` are set (rules-bridge.js:1277-1278), but `runSearchStep`'s multi-select `onConfirm` (trainer-execution.js, was ~443-449) *also* called `moveCardBundle` per pick — double-move raced the picker's own splice, and the second call's stale index made `buildMoveCardHints` find no card, dropping the hint. Removed the duplicate manual move. Added a `console.warn` at move-card-bundle.js:20 (buildMoveCardHints null-card path) to catch any remaining case live. Same double-move pattern likely also exists in Grand Tree's evolve pickers (chat-buttons.js:4014-4024/4089-4099) and the attach-energy single-pick path (trainer-execution.js:469-488) — not touched, needs a live repro before patching those.
 - I23 2026-09-09 P2 [netcode] `VSTARGXFunction` has no UI caller and no DOM element: nothing in client markup or JS defines `GXButton`/`VSTARButton`, so the legacy body would throw on `button.classList` if it were ever reached locally; the action is reachable only via the `acceptAction` relay. Left ungated by design 003 slice 5 (a gate on a dead local path adds risk without behavior). Either restore the buttons or delete the action (refs: design 003, S60).
@@ -51,6 +48,20 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I28 2026-09-10 P1 [rules] Legacy mode's local win check ends the game after turn 1, every
+    game: `evaluateWinCondition`'s `checkWinConditions` (shared/engine/rules/ko-flow.mjs:86-93)
+    treats "0 active + 0 bench" as an instant loss for *either* side the moment a turn ends
+    (chat-buttons.js:415 `endTurnWithBanner` → `endTurn`), but the side that hasn't had its own
+    first turn yet legitimately has 0 Pokémon in play — Basic placement is an ordinary turn-1
+    action in this client, no separate "setup" placement phase precedes it. Found live via
+    design 004's slice 1-4 smoke run (refs: design 004, S79) → closed 2026-09-10 S81: gated the
+    `activeCounts` check in both copies of this logic (chat-buttons.js's `evaluateWinCondition`,
+    rules-bridge.js's `evaluateAndApplyWinConditions`) behind `rulesState.turnNumber >= 3` — a
+    global ply counter that only reaches 3 once each side has completed one turn.
+    `playerTurnCount` doesn't work for this: `endTurn` bumps the *incoming* player's count
+    immediately, before they've acted. Live-verified: a fresh 2-page run now plays past turn 1,
+    both sides place Pokémon and attack (`.agent/scratch/smoke-004-slice1-4.mjs`). Surfaced a
+    separate, unrelated desync further into the game — filed as I29, not fixed here.
 - I19 2026-09-09 P3 [netcode] Reveal/hide family (revealCards/hideCards/revealShortcut/hideShortcut)
     has no server-side driver: shared/engine never sets card.revealed=true, so view.mjs's
     revealed-branch rendering is correct but unreachable (refs: design 002 §3.4d, S51) → closed

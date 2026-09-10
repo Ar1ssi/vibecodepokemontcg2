@@ -428,8 +428,17 @@ import {
           self: getZone('self', 'deck').getCount() + getZone('self', 'hand').getCount() + counts.self.active + counts.self.bench > 0,
           opp: getZone('opp', 'deck').getCount() + getZone('opp', 'hand').getCount() + counts.opp.active + counts.opp.bench > 0,
         };
+        // I28: placing your opening Active is an ordinary turn-1 action here (no separate
+        // setup placement step), so a player who simply hasn't had their first turn yet
+        // legitimately has 0 Pokémon in play. rulesState.turnNumber is a global ply counter
+        // (endTurn/beginTurn each += 1, starting at 1 for the very first turn), so it only
+        // reaches 3 once each side has completed exactly one turn — playerTurnCount can't be
+        // used here since endTurn bumps the *incoming* player's count immediately, before
+        // they've acted. Withhold the check until then — otherwise the very first pass ends
+        // the game.
+        const bothHaveStarted = rulesState.turnNumber >= 3;
         const win = checkWinConditions({
-          activeCounts: inGame.self && inGame.opp ? counts : null,
+          activeCounts: bothHaveStarted && inGame.self && inGame.opp ? counts : null,
           deckCounts: {
             self: inGame.self ? getZone('self', 'deck').getCount() : 1,
             opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
