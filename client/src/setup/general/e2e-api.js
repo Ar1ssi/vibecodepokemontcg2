@@ -9,6 +9,8 @@ import {
 } from '../netcode/apply-view.js';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
+import { getCardDamage, getCardSpecialCondition } from '/shared/engine/zones/card-state.mjs';
+import { resolveAttachedEnergyType } from '/shared/engine/rules/energy-effects.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 
 // Same zone set the server hashes in shared/engine/state.mjs hashState() minus
@@ -56,6 +58,53 @@ function zoneSnapshot(user, zoneId) {
   };
 }
 
+// Design 004 slice 1: plain-JSON read model for the playtest bot. No DOM nodes, no live
+// card references — every field is a primitive or a plain object so `observe()` can cross
+// the Playwright page boundary as JSON. Card stats (hp/attacks/types) only exist once
+// cardStats enrichment has landed (see card-stats.js); before that they read as null/[].
+function serializePokemonCard(card) {
+  if (!card) return null;
+  const attachedCards = Array.isArray(card.attachedCards) ? card.attachedCards : [];
+  return {
+    name: card.name || '',
+    hp: card.hp ?? null,
+    damage: getCardDamage(card),
+    stage: card.stage || null,
+    types: Array.isArray(card.types) ? [...card.types] : [],
+    specialCondition: getCardSpecialCondition(card),
+    attachedEnergy: attachedCards.map((energy) => resolveAttachedEnergyType(energy)),
+    attacks: Array.isArray(card.attacks)
+      ? card.attacks.map((attack, index) => ({
+          index,
+          name: attack?.name || '',
+          cost: Array.isArray(attack?.cost) ? [...attack.cost] : [],
+          damage: attack?.damage ?? '',
+        }))
+      : [],
+  };
+}
+
+function serializeHandCard(card, index) {
+  return {
+    index,
+    name: card?.name || '',
+    supertype: card?.supertype || '',
+    type: card?.type || '',
+  };
+}
+
+function serializePlayerObservation(user) {
+  const bench = liveZoneArray(user, 'bench').map(serializePokemonCard);
+  return {
+    hand: liveZoneArray(user, 'hand').map((card, index) => serializeHandCard(card, index)),
+    active: serializePokemonCard(liveZoneArray(user, 'active')[0]),
+    bench,
+    prizeCount: liveZoneArray(user, 'prizes').length,
+    deckCount: liveZoneArray(user, 'deck').length,
+    discardCount: liveZoneArray(user, 'discard').length,
+  };
+}
+
 export function installE2eApi() {
   if (typeof window === 'undefined' || !isE2eMode()) return;
   window.__ptcg = {
@@ -75,6 +124,19 @@ export function installE2eApi() {
     cmdLog: [],
     cmdRejections: [],
     gameEndedInfo: null,
+    // Design 004 slice 1: plain-JSON read model the playtest bot decides moves from.
+    observe() {
+      return {
+        turnPlayer: rulesState.turnPlayer,
+        turnNumber: rulesState.turnNumber,
+        phase: rulesState.phase,
+        fromServer: hasAuthoritativeView(),
+        self: serializePlayerObservation('self'),
+        opp: serializePlayerObservation('opp'),
+        stadium: liveZoneArray('self', 'stadium')[0]?.name || null,
+        pickerOpen: !!document.querySelector('.card-picker-overlay'),
+      };
+    },
     turnState() {
       return {
         turnPlayer: rulesState.turnPlayer,
