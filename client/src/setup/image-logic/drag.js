@@ -13,6 +13,7 @@ import { identifyCard } from './click-events.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
 import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
+import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 
 const popupContainers = [
   'lostZone',
@@ -268,6 +269,23 @@ export const drop = (event) => {
       dZoneId = zoneOf(event.target)?.id;
     } else {
       dZoneId = event.target.id;
+    }
+
+    // Dragging the active Pokémon onto the bench is a retreat, not a plain move:
+    // it must pay the retreat cost (discard energy) and swap with the dropped-on
+    // bench Pokémon, the same as clicking the Retreat button.
+    if (
+      mouseClick.zoneId === 'active' &&
+      dZoneId === 'bench' &&
+      !draggedImage.attached
+    ) {
+      retreat(
+        mouseClick.cardUser,
+        true,
+        event.target.tagName === 'IMG' ? event.target : null
+      );
+      event.stopPropagation();
+      return;
     }
 
     if (
