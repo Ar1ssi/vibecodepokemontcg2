@@ -120,8 +120,12 @@ always present outside setup.
   `retreat('self', true, benchCard.image)` — `card.image` is the identity token on both render
   paths (legacy `image.relative` match, authoritative `readCardInstanceId` off the same DOM node).
 **Acceptance:** each option kind, driven once via `act()` in a scripted two-page game, changes the
-board as expected and adds zero entries to `cmdRejections`. **Not yet run** — no live two-page
-exercise of observe()/options()/act() together exists yet (tracked in STATE.md).
+board as expected and adds zero entries to `cmdRejections`. **Live-verified S80** for
+`playBasic`/`retreat`/`pass` (`.agent/scratch/smoke-004-slice1-4.mjs`, legacy mode, zero
+`cmdRejections`); `attach`/`evolve`/`playTrainer`/`ability`/`attack` still unverified live — the
+fixture deck has no Energy/Trainers, and `attack` is unreachable before turn 2, which S80's run
+never reached (see I28 in ISSUES.md — a real, separate rules-engine bug that ends every legacy
+game after turn 1, found by this same run).
 
 ### Slice 4 — `picker()` / `pick()`: answering the modals — SHIPPED S79
 **Files:** `e2e-api.js`, `client/src/setup/image-logic/card-picker.js` (two small exports added).
@@ -145,8 +149,11 @@ each candidate's `card.image` node) and `pick()` resolves it with `img.click()`,
   overlay's button (`[data-coin-call]` vs. `[data-face]` — the two never coexist).
 `picker()` returns `{ open:false }` or `{ open:true, type:'cardPicker'|'matPick'|'coinEffect'|
 'coinCall', ... }`; `pick(indices, face)` dispatches on the same check. Never throws.
-**Acceptance:** unexercised live (same open item as slice 3 — no two-page run has driven
-observe()/options()/act()/picker() together yet, tracked in STATE.md since S76).
+**Acceptance:** `picker()` **live-verified S80** to never false-positive across a full real turn
+(7 actions) on a Trainer-free deck — the actual "answer an open picker" path (search Supporter,
+mat-pick target, coin effect) is still unverified live, since none of those overlays can open on
+the current all-Basics fixture deck. Needs a fixture deck with a search Supporter to verify for
+real once I28 (ISSUES.md) no longer ends the game before any Trainer could be drawn/played.
 
 ### Slice 5 — the bot
 **Files:** `bot/bot.mjs` (scaffold + `legalFallback`), `bot/heuristic-scorer.mjs`.
