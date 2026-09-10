@@ -4,53 +4,32 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 70
-Focus: Fixed dead Secret/Gold Rare holo overlay (data-rarity="rare holo vmax" had no CSS
-  rule firing — see S70 journal), rebuilt it grain-free per user's video reference.
-Active: not yet closed, 4th iteration. `client/src/css/holo/gold-secret-rare.css` (imported
-  in index.css after rainbow-alt.css) targets [data-rarity="rare holo vmax"] directly instead
-  of piggybacking on rainbow-alt.css's dead [data-trainer-gallery="true"]-gated rule.
-  Attempts 1-2 were wrong-theory rewrites (see journal S70). After attempt 2 user reported
-  "no pillars still, and the grain is too strong" — switched from guessing to real DOM
-  inspection (dynamic-imported holo.mjs in-page against a synthetic canvas test card, since
-  live image URLs 404 in the sandboxed browser). Found two repo-wide undefined-CSS-var bugs
-  (same species as --rotate-delta, S70a): `--card-opacity` used unfallbacked in every rarity
-  CSS file's calc(), pinning opacity to 1 (permanent max) instead of the intended pointer fade
-  — fixed with `--card-opacity: 1;` in base.css. And confirmed by opening the raw asset that
-  iri-9.webp (the "glitter" texture) is dense TV-static noise, not discrete sparkle stars —
-  retuned gold-secret-rare.css's glitter tile size (150px->480px) and contrast, and the beam
-  layer's blend mode (overlay->color-dodge) for more visible bands. Verified in the synthetic
-  test: real shifting band, not solid static. NOT verified against real card art — user
-  checks localhost.
-User then said bands weren't vertical. Rotated shine:before to 90deg and added a 90deg base
-  offset to shine:after (it sits on top at z-index 3 and was still horizontal, masking the
-  fix). Self-check said fixed; user's annotated screenshot proved still horizontal — real
-  cause was a stale cached <link> stylesheet (CSS file edits need a forced page reload in this
-  browser sandbox; a cache-busted dynamic import of the .mjs only refreshes the JS, not the
-  already-loaded CSS — cost real time twice this session, see journal flag). Re-verified for
-  real after reload: bands read correctly oriented, checked against real card art (the actual
-  PAL 279/193 reference card, once user supplied its URL) rather than a synthetic flat-color
-  test (which gives false negatives under color-dodge blending).
-User then said still just a horizontal line. Real cause: card__shine:after (a secondary
-  black/gray "exclusion cross-hatch" layer copied from hyper-rare.css, z-index 3, on top) was
-  angled ~90deg but still positioned via --background-y — the axis a 90deg (vertically-banded)
-  pattern is UNIFORM along, so it never visibly moved and sat there as a static artifact
-  masking the real vertical bars underneath. Deleted that layer outright instead of continuing
-  to patch two interacting ones. card__shine:before (kept, the actual bars) now: position
-  driven by --background-x (the axis that varies), background-size narrowed 240%->33% width so
-  ~3 full color cycles show across the card (240%/70% both read as one soft wash, not distinct
-  bands). Verified against real PAL 279/193 card art (images.pokemontcg.io) after confirming
-  the served CSS bytes were fresh — two screenshots at different pointer positions show a real
-  shifting teal/cyan vertical band pattern, not a static horizontal artifact.
-Next: user does a live check in the actual app — this is the 3rd "fixed, still wrong" round,
-  so treat my sandbox confirmation as promising, not certain, until they confirm. If still
-  off: consider that .mat-holo (the class the real full-view popup adds, per
-  full-view.js:196) has aspect-ratio/sizing overrides in base.css that my flat 350px-wide test
-  div didn't reproduce — check whether card__rotator's real dimensions in that context somehow
-  interact with the 33% background-size differently than my isolated test. Also note: the
-  other rarity CSS files (hyper-rare, regular-holo, etc.) share the same --card-opacity bug/
-  iri-noise-asset and were NOT retuned (only gold-secret-rare.css was, scoped to this task).
-  Any further CSS edit: hard-reload AND confirm served bytes before re-testing, every time.
+Session: 71
+Focus: patch — dragging active Pokémon onto bench now triggers a real retreat (energy-cost
+  discard, gates, swap) instead of a raw zone move.
+Active: closed. Root cause: `drag.js`'s `drop()` always routed active↔bench drags through
+  `moveCardBundle(..., 'move', ...)`, which just splices zones (see `moveCard.js`
+  `autoMoveActiveBenchCard`) — no retreat-cost check, no energy discard, no
+  paralysis/asleep/stadium gating. `chat-buttons.js` already had a full `retreat()` (button
+  path) but it always auto-picked "first free bench Pokémon", with no way to say which bench
+  card the swap targets.
+  Fix: gave `retreat(user, emit, targetBenchImage)` an optional third param — resolves to a
+  server `benchInstanceId` for the authoritative dispatch path
+  (`dispatchAuthoritativeAction('retreat', {commandArgs: [id]})`, already supported server-side
+  and by `dual-run-bridge.js`'s translator, just never called with an id before) and to the
+  matching zone-array entry for the legacy swap path. In `drag.js`, added a branch in `drop()`
+  ahead of the generic move logic: `mouseClick.zoneId === 'active' && dZoneId === 'bench' &&
+  !draggedImage.attached` now calls `retreat(mouseClick.cardUser, true, event.target)` instead
+  of falling into `moveCardBundle`.
+  Files: `client/src/actions/chat-buttons/chat-buttons.js`, `client/src/setup/image-logic/drag.js`.
+  Verified: `pnpm test` — 1208/1208 pass, no regressions. Server-side retreat-with-benchInstanceId
+  behavior was already covered by existing tests (commands.test.mjs, dual-run-bridge.test.mjs).
+  NOT verified live in-browser — this repo's convention is the user checks localhost manually
+  (see watch-outs); no DOM/drag test harness exists in this repo to add an automated
+  drag-and-drop regression test for the client glue itself (chat-buttons.js/drag.js have zero
+  existing tests, both being DOM-coupled).
+Next: user should manually drag active→bench in localhost and confirm the energy-discard
+  prompt/behavior fires and the correct bench card is promoted.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -70,7 +49,8 @@ Blocked: nothing.
   `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js` then `PTCG_URL=http://localhost:4100`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S71 2026-09-10 fix(bench,retreat): drag active→bench now runs the retreat flow (energy
+  cost, gates) instead of a raw move.
 - S70 2026-09-10 patch(holo): Secret/Gold Rare holo overlay was dead (CSS rule gated behind
-  an attribute nothing sets); rebuilt grain-free. See Focus above — not yet re-verified.
+  an attribute nothing sets); rebuilt grain-free. See journal — not yet re-verified.
 - S69 2026-09-10 feat(deck-builder): Energy tab added to Browse Sets (D18).
-- S68b 2026-09-10 chore(002 D17): SERVER_AUTHORITATIVE flipped on in render.yaml.
