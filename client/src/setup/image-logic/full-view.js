@@ -141,6 +141,15 @@ export const openCardPreview = (targetImage, card) => {
   const anchor = cardNode(card) ?? imageAnchor(targetImage);
   if (!anchor) return;
   hideCardCounters(targetImage);
+  // Attached Energy/Tool tokens are small and bottom-anchored on the mat card,
+  // so they sit outside the enlarged popup's footprint and would otherwise
+  // peek out from behind it — hide them for the duration of the zoom.
+  const attachedImages = (card?.attachedCards ?? [])
+    .map((attached) => attached.image)
+    .filter(Boolean);
+  attachedImages.forEach((image) => {
+    image.style.visibility = 'hidden';
+  });
   openFloatingCardPreview({
     sourceEl: anchor,
     imageUrl: toHighResCardImageUrl(targetImage.currentSrc || targetImage.src),
@@ -151,6 +160,9 @@ export const openCardPreview = (targetImage, card) => {
     onClosed: () => {
       anchor.style.visibility = '';
       showCardCounters(targetImage);
+      attachedImages.forEach((image) => {
+        image.style.visibility = '';
+      });
     },
   });
 };

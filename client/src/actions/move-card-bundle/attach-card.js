@@ -5,6 +5,7 @@ import {
 } from '../../setup/deck-constructor/hydrate-holo.js';
 import { syncRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
+import { getEnergyTokenFront } from './energy-token-assets.mjs';
 
 export const attachCard = (
   user,
@@ -34,28 +35,58 @@ export const attachCard = (
   if (!targetCard.attachedCards.includes(movingCard)) targetCard.attachedCards.push(movingCard);
 
   let layer;
+  let tokenFront = null;
   if (movingCard.type !== 'Pokémon') {
     // hostParent is the element that owns the target card in the zone DOM
     // (`.play-container`) — the `.mat-holo` wrapper if the Pokémon is
     // holo-hydrated, otherwise the bare <img>. Sizing siblings against this
     // keeps the target card's holofoil intact (it is NOT de-wrapped).
     const hostParent = imageAnchor(targetCard.image).parentElement;
-    const adjustment = targetCard.image.clientWidth / 6;
     targetCard.image.energyLayer += 1;
     layer = targetCard.image.energyLayer;
-    movingCard.image.style.left = `${layer * adjustment}px`;
 
-    //adjust width of container
-    const currentWidth = parseFloat(hostParent.clientWidth);
-    const newWidth = currentWidth + adjustment;
-    hostParent.style.width = newWidth + 'px';
+    tokenFront =
+      movingCard.type === 'Energy' ? getEnergyTokenFront(movingCard) : null;
+
+    if (tokenFront) {
+      // Small round token row along the bottom edge of the target card,
+      // instead of a full-height card cascading to the side.
+      const cardWidth = targetCard.image.clientWidth;
+      const cardHeight = targetCard.image.clientHeight;
+      const tokenSize = cardWidth * 0.24;
+      const spacing = tokenSize * 1.15; // > tokenSize so discs don't overlap
+      movingCard.image.style.width = `${tokenSize}px`;
+      movingCard.image.style.height = `${tokenSize}px`;
+      movingCard.image.style.left = `${(layer - 1) * spacing}px`;
+      movingCard.image.style.bottom = `${cardHeight * 0.03}px`;
+
+      if (!movingCard.image.dataset.energyCardSrc) {
+        movingCard.image.dataset.energyCardSrc = movingCard.image.src;
+      }
+      movingCard.image.src = tokenFront;
+      movingCard.image.classList.add('energy-token-3d');
+      // Token sits ON the card's face (unlike the old side-cascading flat
+      // card), so it must outrank the target Pokémon's own z-index instead
+      // of being decremented below it.
+      movingCard.image.style.zIndex = 100 + layer;
+    } else {
+      const adjustment = targetCard.image.clientWidth / 6;
+      movingCard.image.style.left = `${layer * adjustment}px`;
+
+      //adjust width of container
+      const currentWidth = parseFloat(hostParent.clientWidth);
+      const newWidth = currentWidth + adjustment;
+      hostParent.style.width = newWidth + 'px';
+    }
   } else {
     const adjustment = targetCard.image.clientWidth / 15;
     targetCard.image.layer += 1;
     layer = targetCard.image.layer;
     movingCard.image.style.bottom = `${layer * adjustment}px`;
   }
-  movingCard.image.style.zIndex -= layer;
+  if (!tokenFront) {
+    movingCard.image.style.zIndex -= layer;
+  }
 
   unhydrateHolo(movingCard);
   // insert as a sibling of the target's anchor (the wrapper if holo-hydrated)
