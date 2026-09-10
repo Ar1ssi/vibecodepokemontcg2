@@ -25,11 +25,21 @@ Active: done. The fixture deck (20 all-Basics, no Energy, no Trainers) meant eve
   weren't replayable — they now carry `lastObservation`/`lastChosen`. +6 scorer tests (1242/1245
   green; the 3 failures are `card-identity-live.test.mjs`, network tests that fail on `main` too
   in a no-egress sandbox). Fixture deck still 3/3 live.
-Next: I31 (filed this session, NOT fixed) — a real 60-card deck now reaches a legacy 2P public-
+Then (same session): added `bot/coverage-scorer.mjs`, a second brain on bot.mjs's OptionScorer
+  seam, selected with `--scorer=coverage` (heuristic stays default). It ranks by least-exercised
+  mechanic this game rather than by plausible play, holds back `attack`/`pass` (both end the turn,
+  so taking either early caps the turn at one action), and keeps the empty-bench and inert-Trainer
+  guards. Abilities and Stadiums sit at count 0 so they get taken the moment they are legal. Every
+  run now prints what it exercised (distinct mechanics + per-kind histogram). +8 tests (1250/1253).
+  It found I32 on its first run.
+Next: I32 and I31 (both filed this session, NEITHER fixed) — a real 60-card deck now reaches a legacy 2P public-
   board divergence after a Trainer is played, reproduced twice from `--seed=7`, identical
   signature both times (playTrainer succeeds → next attack trips the check → zero cmdRejected).
-  Check it against I24 (same suspected family, still UNVERIFIED live) before opening a fresh
-  investigation. Still open from S73: (1) live-verify drag active→bench retreat flow, (2) mat
+  Check I31 against I24 (same suspected family, still UNVERIFIED live) before opening a fresh
+  investigation. I32 is the more tractable of the two and has a concrete lead: retreat from bench
+  index 3/4 breaks the peer 5/5 across two seeds, while index 0 is fine — start from I30's
+  `parseRetreatArgs` index threading rather than from scratch. `--scorer=coverage` is RED on the
+  fixture deck until I32 is fixed; `--scorer=heuristic` is still 3/3. Still open from S73: (1) live-verify drag active→bench retreat flow, (2) mat
   click-to-select pickers + Grand Tree fix. Maintenance has been due since S80.
 Blocked: nothing.
 

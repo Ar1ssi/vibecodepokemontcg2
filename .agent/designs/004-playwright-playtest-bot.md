@@ -241,6 +241,30 @@ S86 exercised roughly a third of the option vocabulary. One run against a real l
    wedge all passed `observation: null`, so the dump wasn't replayable — the slice's own acceptance
    bar. The runner now carries `lastObservation`/`lastChosen` into every failure path.
 
+## S86 addendum — the coverage scorer
+
+Tuning request: orient the bot for *testing*, not plausible play — play Stadiums, use abilities
+whenever possible. That is a different objective function, so it ships as a second brain on
+bot.mjs's existing OptionScorer seam rather than as changes to the heuristic one. Pick with
+`--scorer=heuristic|coverage` (heuristic stays the default).
+
+`bot/coverage-scorer.mjs` ranks by **least-exercised mechanic this game** (`coverageKey`: card
+name for hand plays, zone+index for abilities, attackIndex for attacks), with the empty-bench
+guard and the inert-Trainer guard retained, and `attack`/`pass` held back until every developing
+option is spent — both end the turn in this client, so taking either early caps the turn at one
+action. Abilities and Stadiums sit at count 0 and get taken the moment they are legal; "use
+abilities whenever possible" falls out of the ranking instead of needing a special case.
+
+Every run now prints what it actually exercised (`coverage: N distinct mechanics over M actions`
+plus a per-kind histogram) — an all-PASS run that only played Basics is not a meaningful soak,
+and that line is what makes the difference visible.
+
+**It found a bug on its first run.** On the fixture deck the heuristic scorer retreats about once
+per game, effectively only from bench index 0; the coverage scorer retreats ~3x per game across
+the whole bench and fails within 4 turns, 5/5 across two seeds — filed as **I32** (retreat to a
+high bench index still breaks the peer after I30's fix). So `--scorer=coverage` is currently RED
+on the fixture deck. That is the finding, not a regression: `--scorer=heuristic` is still 3/3.
+
 ## Risks
 
 | Risk | Mitigation |
