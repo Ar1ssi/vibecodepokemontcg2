@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCardHint } from '../../../../../shared/engine/zones/resolve-card-index.mjs';
 import { splitEmitAndTail } from '../../../setup/general/sync-action-args.mjs';
+import { resolveDetachedCardDestination } from '../resolve-detached-card-destination.js';
 
 // Mirrors buildMoveCardHints origin-zone lookup (must run before splice).
 function hintForHandIndex(handArray, index) {
@@ -77,4 +78,23 @@ test('mirror autoMove bench swap inherits syncReplay from parent move', () => {
   // to nested moveCard so opponent mirror replay reveals active/bench cards.
   const syncOptions = { syncReplay: true };
   assert.equal(syncOptions.syncReplay, true);
+});
+
+test('resolveDetachedCardDestination: KO/manual discard takes attached Energy along', () => {
+  // Regression: a knocked-out (or manually discarded) Pokémon's attached
+  // Energy used to strand in the 'attachedCards' staging zone instead of
+  // following it to discard — never auto-discarded, and its arrival there
+  // falsely tripped the rules engine's "energy already attached this turn"
+  // check (rules-bridge.js hookEnergyAttach watches that zone for new
+  // attaches).
+  assert.equal(resolveDetachedCardDestination('discard'), 'discard');
+});
+
+test('resolveDetachedCardDestination: Lost Zone also takes attached Energy along', () => {
+  assert.equal(resolveDetachedCardDestination('lostZone'), 'lostZone');
+});
+
+test('resolveDetachedCardDestination: hand/deck still stage in attachedCards', () => {
+  assert.equal(resolveDetachedCardDestination('hand'), 'attachedCards');
+  assert.equal(resolveDetachedCardDestination('deck'), 'attachedCards');
 });

@@ -4,22 +4,31 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 69
-Focus: Added an "Energy" tab to the native deck builder's Browse Sets panel (unrelated to
-  netcode work above — user-requested UI feature).
-Active: done. `client/src/setup/deck-builder/core/set-browser.mjs` gained `ENERGY_SET_ID`,
-  `fetchLegalEnergyCards()` (cross-references global `/cards?category=Energy` TCGdex summaries
-  against each Standard-legal set's cached full record to get images — see D18) and
-  `fetchSetCards()` special-cases it. `fetchLegalStandardSets()` appends it last (39 cards at
-  test time: 8 modern basics + 8 gold secret rares + 23 special/rare variants like
-  Ignition/Spiky/Mist/Shadowy Darkness/Bubbly Water Energy). The 8 modern basics (Grass..Metal)
-  are hardcoded in `getModernBasicEnergyCards()` with art hotlinked from pkmncards.com — TCGdex
-  has zero image data for the "mee" (Mega Evolution Energy) support set (D18). Tab icon is the
-  user-supplied colorless-energy image, saved to `client/src/assets/energy/colorless.png`,
-  served statically at `/src/assets/energy/colorless.png`. Verified live: pnpm start + browser
-  click-through, tab renders last in the Standard 2026-27 row, expands, images load, filter/
-  add-to-deck work.
-Next: nothing pending on this thread. Netcode Next (S68) still applies — see journal S68b.
+Session: 70
+Focus: fixed energy cards not auto-discarding on KO, and a false "already attached this turn"
+  warning when manually discarding them (legacy client-side rules-mode only; SERVER_AUTHORITATIVE
+  path was already correct — see below).
+Active: done. Root cause: `relocateAttachedCards` (client/src/actions/move-card-bundle/
+  relocate-attached-cards.js) sent a Pokémon's attached cards to the generic `attachedCards`
+  staging zone whenever the host left active/bench for ANY destination — including discard/KO,
+  where real TCG rules say attachments go straight to discard with no manual step. Two symptoms:
+  (1) KO'd Pokémon auto-discarded itself but stranded its energy in `attachedCards`; (2) that
+  energy's arrival in `attachedCards` was misread by rules-bridge.js's `hookEnergyAttach`/
+  `checkEnergyAdds` (which watches that zone for "new" attaches, since real hand→active/bench
+  attaches never populate it) as a fresh attach, throwing "energy already attached this turn"
+  once the real per-turn flag was already set. Fix: extracted `resolveDetachedCardDestination`
+  (new file `resolve-detached-card-destination.js`, DOM-free/pure — `state.js` reaches
+  browser-only `io()`/`document` at module scope so it can't be pulled into a `node --test` file)
+  — routes to `discard`/`lostZone` directly when that's the host's destination, `attachedCards`
+  otherwise (hand/deck unchanged). 3 new tests. 1211/1211 pnpm test green (was 1208 baseline +
+  the Energy-tab session's own tests not yet counted — verified full suite green after the fix).
+  Confirmed server-authoritative `handleKnockout` (shared/engine/reduce.mjs:38) already discards
+  attached cards correctly — this bug only affects local/dev play with the flag off (repo default).
+  Landmine recorded in PROJECT.md (the once-per-turn energy-attach flag was never actually set by
+  real attaches, only by this misrouted-detach path — pre-existing, out of scope here).
+  Branch/PR: not yet opened this session — next step.
+Next: open PR for this fix (branch off main, push, gh pr create). Also: maintenance due
+  (Session 70 is a multiple of 10 — run .agent/workflows/maintain.md next session).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -41,8 +50,8 @@ Blocked: nothing.
   `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js` then `PTCG_URL=http://localhost:4100`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S69 2026-09-10 feat(deck-builder): Energy tab added to Browse Sets (D18). See Focus above.
+- S70 2026-09-10 fix: energy cards not auto-discarding on KO + false "already attached this
+  turn" on manual discard (legacy rules-mode). See Focus above.
+- S69 2026-09-10 feat(deck-builder): Energy tab added to Browse Sets (D18).
 - S68b 2026-09-10 chore(002 D17): SERVER_AUTHORITATIVE flipped on in render.yaml. User's call,
   3.12 exit test passing, all known flip-time gaps (I25/I27/I19) closed.
-- S68 2026-09-10 fix(002 I19): closed I19. Reveal/hide now real server_commands, own-zone-only
-  (D16). 1208/1208 pnpm test, pnpm test:2p ALL PASS (flag off).
