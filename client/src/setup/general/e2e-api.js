@@ -374,6 +374,12 @@ export function installE2eApi() {
     loadFixtureDeck(prefix = 'E2E') {
       loadDeckData('self', e2eFixtureDeck(prefix), true);
     },
+    // Design 004 slice 6: loads an arbitrary deck (the same 7-field row shape
+    // e2eFixtureDeck produces — [quantity, name, type, imageURL, number, set, tcgId]) for
+    // the playtest runner's `--deck` option, instead of the built-in all-Basic fixture.
+    loadDeckList(deckRows) {
+      loadDeckData('self', deckRows, true);
+    },
     readyUp() {
       return readyUp('self');
     },

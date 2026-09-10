@@ -78,5 +78,9 @@ flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATI
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
 *-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
 bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
-  scaffold + greedy scorer) consumed by the still-unbuilt slice 6 runner via __ptcg observe/options/act
+  scaffold + greedy scorer), driven by playtest-bot.mjs via __ptcg observe/options/act
+playtest-bot.mjs (root) — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
+  bot, legacy mode by default (`node server/server.js` on :4000, then `node playtest-bot.mjs
+  --games=N --seed=S`); dumps a replayable trace to out/playtest/ on any failure. Found a real bug
+  on first live run (I30, ISSUES.md) — see design 004 slice 6's Acceptance note.
 

@@ -1,6 +1,7 @@
 # 004: Playwright playtest bot — a CPU opponent that soaks the real UI
 
-Status: draft — awaiting user approval.
+Status: shipped — all 6 slices built (S78-S84). Slice 6's "zero failures" acceptance is blocked on
+I30 (a real pre-existing rules bug the bot found), not on the runner itself.
 Date: 2026-09-10 · Session: S75
 Related: `.agent/designs/003-authoritative-interaction-routing.md` (the `__ptcg` bridge this extends).
 Prior art: `TomBombadyl/kaggle_pokemon` (`agent/agent.py`) — the never-crash scaffold + pluggable
@@ -175,8 +176,10 @@ satisfied by the priority order itself (playBasic-to-bench always outranks attac
 a separate check — see the comment in `heuristic-scorer.mjs`. Not live-verified against a real game
 yet (needs slice 6's runner); acceptance here is the unit-test contract only.
 
-### Slice 6 — the runner
-**File:** `playtest-bot.mjs` (root, mirrors `flip-gate-test.mjs`).
+### Slice 6 — the runner — SHIPPED S84
+**File:** `playtest-bot.mjs` (root, mirrors `flip-gate-test.mjs`). Also added
+`window.__ptcg.loadDeckList(deckRows)` (`e2e-api.js`) for the `--deck` option — same 7-field
+row shape `e2eFixtureDeck` produces, no gameplay file touched.
 `node playtest-bot.mjs --games=50 --deck=<path.json> --seed=1 [--max-turns=60] [--headed]`
 1. Boot two pages at `/?e2e=1`, join a room, `loadDeckList()` both sides with the 60-card deck,
    **wait for card-stat enrichment to settle** (`ensureCardData`) before the first turn — without
@@ -190,6 +193,25 @@ yet (needs slice 6's runner); acceptance here is the unit-test contract only.
    `out/playtest/<seed>-<turn>.json` — a failing seed must be replayable.
 **Acceptance:** 50 games on the fixture deck finish with zero failures; deliberately breaking one
 rule file makes a run fail with a dump that names the turn.
+**Live-verified S84**, with one deviation from "zero failures": the runner itself is solid — a
+dozen live games showed clean turn-order settling (see below), zero false-positive divergences,
+clean pass/fail reporting, and reproducible dumps naming the exact turn and chosen option — but it
+immediately found a **real, pre-existing bug**, not a harness flake: `retreat()`'s
+`processAction(user, emit, 'retreat', [])` (chat-buttons.js:2367) sends no target identity, so the
+peer's replay always swaps in the *first* bench Pokémon (chat-buttons.js:2354-2356) regardless of
+which one the acting client chose. Filed as I30 (ISSUES.md) rather than fixed here — chat-buttons.js
+is a gameplay file, out of this spec's non-goals. Since the heuristic scorer picks a random legal
+retreat target (`heuristic-scorer.mjs`'s `pickRandom(retreats, rng)`), roughly 4/5 fixture games hit
+a non-first bench index and diverge — so "50 games, zero failures" will not hold until I30 is fixed
+in its own patch/debug workflow; that is expected and correct behavior for a bug-finding tool, not a
+regression in the runner. Two runner-side fixes were needed along the way, both now folded into the
+shipped file: (1) `turnState().fromServer` never becomes true in the legacy path this design
+targets by default (that field only means something under `SERVER_AUTHORITATIVE=1`, flip-gate-
+test.mjs's mode) — the runner instead waits for the two pages' `turnState().turnPlayer` to actually
+disagree (one `self`, one `opp`) before treating turn order as settled, since each page's own default
+briefly agrees with itself before the peer's coin-flip broadcast lands; (2) a cross-client divergence
+check right after `act()` can race a real in-flight broadcast (S82's I29 pattern) — retried for up to
+3s before treating it as a finding.
 
 ## Risks
 

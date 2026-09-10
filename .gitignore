@@ -13,3 +13,6 @@ client/src/assets/playmats/upscaled/
 
 # archex project state
 .archex/
+
+# design 004 slice 6: playtest-bot.mjs failure dumps (replayable traces, not source)
+out/playtest/
