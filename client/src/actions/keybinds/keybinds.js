@@ -592,7 +592,7 @@ export const keyDown = (event) => {
       // turn and suppresses the legacy takeTurn bubble handler. In
       // non-rules mode the capture hook no-ops and the button's bubble
       // handler runs takeTurn as before.
-      const turnButton = document.getElementById('passButton');
+      const turnButton = document.getElementById('p2PassButton');
       if (turnButton) turnButton.click();
     }
     if (event.key === 'm' || event.code === 'KeyM') {
