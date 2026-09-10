@@ -37,6 +37,19 @@
   --space: 5%;
   --angle: 133deg;
   --imgsize: cover;
+  /* Referenced by hyper-rare.css/regular-holo.css/ex-special-illustration-rare.css/
+     gold-secret-rare.css as calc(var(--rotate-x) - var(--rotate-delta)) but holo.mjs never
+     sets it — an undefined var() with no fallback invalidates the whole calc(), silently
+     killing those beam layers. Define it so the beams render; 0deg (no extra parallax lag)
+     since we don't track a separate lagged rotation value. */
+  --rotate-delta: 0deg;
+  /* Same bug, different variable: hyper-rare.css/regular-holo.css/rainbow-alt.css/
+     ex-full-art.css/illustration-rare.css/ex-regular.css/reverse-holo.css/
+     gold-secret-rare.css all reference var(--card-opacity) inside calc() with no fallback.
+     Undefined -> invalid calc() -> opacity silently pins to its initial value (1) instead of
+     the intended pointer-driven fade — every one of those layers was rendering at permanent
+     max intensity. Defining it here (matches the old pre-port value) restores the fade. */
+  --card-opacity: 1;
 
   --red: #f80e35;
   --yellow: #eedf10;

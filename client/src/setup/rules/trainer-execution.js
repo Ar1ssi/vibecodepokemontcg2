@@ -190,6 +190,103 @@ function openPickOnly({ title, candidates, onPick, onCancel, user = _effectOwner
   });
 }
 
+// Pick target is a Pokémon already in play: highlight its card image directly
+// on the mat and resolve on click, instead of opening a modal card picker.
+function openMatPick({ title, candidates, onPick, onCancel }) {
+  const entries = candidates
+    .map((c) => ({ card: c, img: c.image }))
+    .filter((e) => e.img);
+  if (!entries.length) {
+    onCancel?.();
+    return;
+  }
+
+  const banner = document.createElement('div');
+  banner.className = 'mat-pick-banner';
+  Object.assign(banner.style, {
+    position: 'fixed',
+    top: '12px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: '10000',
+    background: 'rgba(20, 20, 24, 0.92)',
+    color: '#fff',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '14px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+  });
+  const label = document.createElement('span');
+  label.textContent = title;
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  Object.assign(cancelBtn.style, {
+    background: '#3a3a42',
+    color: '#fff',
+    border: '1px solid #55555f',
+    borderRadius: '5px',
+    padding: '3px 10px',
+    cursor: 'pointer',
+  });
+  banner.append(label, cancelBtn);
+  document.body.appendChild(banner);
+
+  const restore = entries.map(({ img }) => [img, img.style.outline, img.style.outlineOffset, img.style.cursor, img.draggable]);
+  for (const { img } of entries) {
+    img.style.outline = '4px solid #ffd23f';
+    img.style.outlineOffset = '2px';
+    img.style.cursor = 'pointer';
+    img.draggable = false;
+  }
+
+  const cleanup = () => {
+    document.removeEventListener('click', onDocClick, true);
+    document.removeEventListener('keydown', onKeyDown, true);
+    banner.remove();
+    for (const [img, outline, outlineOffset, cursor, draggable] of restore) {
+      img.style.outline = outline;
+      img.style.outlineOffset = outlineOffset;
+      img.style.cursor = cursor;
+      img.draggable = draggable;
+    }
+  };
+
+  const finish = (card) => {
+    cleanup();
+    onPick(card);
+  };
+  const cancel = () => {
+    cleanup();
+    onCancel?.();
+  };
+
+  const onDocClick = (event) => {
+    if (banner.contains(event.target)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.target === cancelBtn) cancel();
+      return;
+    }
+    const hit = entries.find((e) => e.img === event.target || e.img.contains?.(event.target));
+    event.preventDefault();
+    event.stopPropagation();
+    if (hit) finish(hit.card);
+  };
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancel();
+    }
+  };
+
+  document.addEventListener('click', onDocClick, true);
+  document.addEventListener('keydown', onKeyDown, true);
+}
+
 function openMultiPickOnly({ title, candidates, count, onConfirm, onCancel, user = _effectOwner || 'self', triggerCard = null, allCandidates = null, upTo = false }) {
   _openChoicePicker({
     title,
@@ -441,13 +538,12 @@ async function runSearchStep(card, searchStep, done) {
       maxCount: count,
       upTo,
       onConfirm: (selected) => {
+        // openChoicePicker (rules-bridge.js) already moves every picked card
+        // itself via zoneFrom/destination — a second manual moveCardBundle
+        // here raced it, reading `deck.array` after the picker's own splice
+        // had already shifted it, and silently dropped the sync hint
+        // (buildMoveCardHints found no card at the stale index).
         revealPicked(selected);
-        for (const s of selected) {
-          const idx = zone(_effectOwner, 'deck').array.indexOf(s);
-          if (idx >= 0) {
-            moveCardBundle(_effectOwner, _effectOwner, 'deck', toBench ? 'bench' : 'hand', idx, false, 'move');
-          }
-        }
         if (selected.length === 0) {
           msg('  no cards taken — deck shuffled');
           shuffleAfter({ message: null });
@@ -784,8 +880,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           };
           if (candidates.length === 1) doFullHeal(candidates[0]);
           else {
-            openPickOnly({
-              title: `${card.name} — choose Pokémon to heal`,
+            openMatPick({
+              title: `${card.name} — click a Pokémon to heal`,
               candidates,
               onPick: doFullHeal,
             });
@@ -813,10 +909,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               const zoneId = zone(oppSide, 'active').array.includes(targets[0]) ? 'active' : 'bench';
               placeDamageCounters(oppSide, zoneId, zone(oppSide, zoneId).array.indexOf(targets[0]), step.count);
             } else if (targets.length > 1) {
-              openPickOnly({
-                title: `Choose opponent's Pokémon (${step.count} damage)`,
+              openMatPick({
+                title: `Click opponent's Pokémon (${step.count} damage)`,
                 candidates: targets,
-                user: oppSide,
                 onPick: (t) => {
                   const zoneId = zone(oppSide, 'active').array.includes(t) ? 'active' : 'bench';
                   placeDamageCounters(oppSide, zoneId, zone(oppSide, zoneId).array.indexOf(t), step.count);
@@ -919,12 +1014,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                 const ei = zone(_effectOwner, 'discard').array.indexOf(energy);
                 if (ei >= 0) moveCardBundle(_effectOwner, _effectOwner, 'discard', zoneId, ei, ti, 'move', true);
               } else {
-                _openChoicePicker({
-                  title: 'Choose Pokémon to attach to',
+                openMatPick({
+                  title: 'Click a Pokémon to attach to',
                   candidates: targets,
-                  user: _effectOwner,
-                  zoneFrom: 'active',
-                  destination: 'hand',
                   onPick: (t) => {
                     const zoneId = zone(_effectOwner, 'active').array.includes(t) ? 'active' : 'bench';
                     const ti = zone(_effectOwner, zoneId).array.indexOf(t);
@@ -943,10 +1035,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           if (bench.length === 1) {
             switchBenchToActive(oppSide, bench[0]);
           } else if (bench.length > 1) {
-            openPickOnly({
-              title: `${card.name} — choose Benched Pokémon to switch in`,
+            openMatPick({
+              title: `${card.name} — click a Benched Pokémon to switch in`,
               candidates: bench,
-              user: oppSide,
               onPick: (b) => switchBenchToActive(oppSide, b),
             });
           }
@@ -957,10 +1048,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           if (bench.length === 1) {
             switchBenchToActive(_effectOwner, bench[0]);
           } else if (bench.length > 1) {
-            openPickOnly({
-              title: `${card.name} — choose Benched Pokémon to switch with`,
+            openMatPick({
+              title: `${card.name} — click a Benched Pokémon to switch with`,
               candidates: bench,
-              user: _effectOwner,
               onPick: (b) => switchBenchToActive(_effectOwner, b),
             });
           }
@@ -1118,10 +1208,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               const src = energies.find((e) => e.card === energy);
               const targets = getInPlayPokemon(_effectOwner).filter((p) => p !== src?.parent);
               if (!targets.length) return;
-              openPickOnly({
-                title: `${card.name} — attach ${energy.name} to which Pokémon?`,
+              openMatPick({
+                title: `${card.name} — click a Pokémon to attach ${energy.name}`,
                 candidates: targets,
-                user: _effectOwner,
                 onPick: (target) => {
                   attachEnergyCard(_effectOwner, energy, target);
                   msg(`  auto: moved ${energy.name} to ${target.name}`);
@@ -1164,10 +1253,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
             msg('  no Basic Pokémon in play');
             break;
           }
-          openPickOnly({
-            title: `${card.name} — choose Basic to evolve`,
+          openMatPick({
+            title: `${card.name} — click a Basic Pokémon on your mat to evolve`,
             candidates: basics,
-            user: _effectOwner,
             onPick: async (base) => {
               const hand = zone(_effectOwner, 'hand');
               const options = [];
@@ -1219,10 +1307,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               msg('  no evolved Pokémon to devolve');
               return;
             }
-            openPickOnly({
-              title: `${card.name} — choose Pokémon to devolve`,
+            openMatPick({
+              title: `${card.name} — click a Pokémon to devolve`,
               candidates: targets,
-              user: _effectOwner,
               onPick: (t) => devolvePokemon(_effectOwner, t),
             });
           });
@@ -1301,10 +1388,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               msg('  no opponent Pokémon with both Tool and Special Energy');
               return;
             }
-            openPickOnly({
-              title: `${card.name} — choose opponent's Pokémon`,
+            openMatPick({
+              title: `${card.name} — click opponent's Pokémon`,
               candidates: candidates.map((c) => c.parent),
-              user: _effectOwner,
               onPick: (parent) => {
                 const bucket = candidates.find((c) => c.parent === parent);
                 if (!bucket) return;
@@ -1333,10 +1419,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         }
         case 'swapWithDiscard': {
           const inPlay = getInPlayPokemon(_effectOwner).filter((c) => matchesSwapFilter(c, step.filter));
-          openPickOnly({
-            title: `${card.name} — choose in-play Pokémon`,
+          openMatPick({
+            title: `${card.name} — click an in-play Pokémon`,
             candidates: inPlay,
-            user: _effectOwner,
             onPick: (play) => {
               const disc = zone(_effectOwner, 'discard').array.filter((c) => matchesSwapFilter(c, step.filter));
               if (!disc.length) {
@@ -1441,10 +1526,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           if (benchAfter.length === 1) {
             switchBenchToActive(oppSide, benchAfter[0]);
           } else {
-            openPickOnly({
-              title: `${card.name} — opponent chooses new Active`,
+            openMatPick({
+              title: `${card.name} — opponent clicks new Active`,
               candidates: benchAfter,
-              user: oppSide,
               onPick: (b) => switchBenchToActive(oppSide, b),
             });
           }

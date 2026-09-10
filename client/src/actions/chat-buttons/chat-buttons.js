@@ -76,7 +76,7 @@ import {
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
-import { dispatchAuthoritativeAction } from '../../setup/netcode/authoritative-dispatch.js';
+import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 
@@ -2214,15 +2214,28 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
   }
 };
 
-export const retreat = async (user, emit = true) => {
+// targetBenchImage: optional bench <img> the player dragged the active Pokémon onto
+// (drag-to-retreat). When omitted (button-triggered retreat), the server/legacy path
+// picks the first free bench Pokémon, same as before.
+export const retreat = async (user, emit = true, targetBenchImage = null) => {
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'retreat', []);
     return;
   }
 
+  const targetBenchInstanceId = targetBenchImage
+    ? readCardInstanceId(targetBenchImage)
+    : null;
+
   // design 003 slice 5: the server pays the retreat cost and swaps active/bench itself
   // (reduce.mjs `retreat`), so the legacy energy-discard and moveCard swap are skipped.
-  if (dispatchAuthoritativeAction('retreat', { user, emit, commandArgs: [] }))
+  if (
+    dispatchAuthoritativeAction('retreat', {
+      user,
+      emit,
+      commandArgs: targetBenchInstanceId != null ? [targetBenchInstanceId] : [],
+    })
+  )
     return;
 
   if (rulesState.enabled) {
@@ -2329,7 +2342,9 @@ export const retreat = async (user, emit = true) => {
     await moveCard(user, user, 'active', 'bench', activeIdx !== -1 ? activeIdx : 0);
 
     const updatedBench = getZone(user, 'bench');
-    const benchPokemon = updatedBench.array.find(isBoardPokemon);
+    const benchPokemon = targetBenchImage
+      ? updatedBench.array.find((c) => c.image === targetBenchImage)
+      : updatedBench.array.find(isBoardPokemon);
     const benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
     await moveCard(user, user, 'bench', 'active', benchIdx !== -1 ? benchIdx : 0);
 
@@ -3989,6 +4004,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
           triggerCard: card,
           zoneFrom: 'deck',
           destination: zoneId,
+          pickOnly: true,
           onPick: async (next) => {
             const nextIdx = deck.array.indexOf(next);
             const nextHostIdx = zone.array.indexOf(nextHost);
@@ -4019,6 +4035,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
     triggerCard: card,
     zoneFrom: 'deck',
     destination: 'bench',
+    pickOnly: true,
     onPick: evolvePicked,
     onCancel: () => finish(),
   });
@@ -4094,6 +4111,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
     triggerCard: card,
     zoneFrom: 'deck',
     destination: 'bench',
+    pickOnly: true,
     upTo: true,
     minCount: 0,
     maxCount: 1,
@@ -4145,6 +4163,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
           triggerCard: card,
           zoneFrom: 'deck',
           destination: zoneId,
+          pickOnly: true,
           upTo: true,
           minCount: 0,
           maxCount: 1,

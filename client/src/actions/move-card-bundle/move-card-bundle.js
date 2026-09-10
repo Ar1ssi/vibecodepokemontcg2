@@ -17,7 +17,17 @@ function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
   const dZone = getZone(user, dZoneId);
   const resolvedIdx = resolveCardIndex(oZone, null, index);
   const movingCard = oZone?.array?.[resolvedIdx];
-  if (!movingCard) return null;
+  if (!movingCard) {
+    console.warn('buildMoveCardHints: no card at index — hint dropped', {
+      user,
+      oZoneId,
+      dZoneId,
+      index,
+      resolvedIdx,
+      arrLen: oZone?.array?.length ?? -1,
+    });
+    return null;
+  }
 
   const hints = { moving: buildCardHint(movingCard) };
   if (targetIndex != null && targetIndex !== false) {
