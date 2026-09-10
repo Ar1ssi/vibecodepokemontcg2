@@ -36,6 +36,37 @@ const smoothstep = (t) => {
 export const isCardPickerOpen = () => pickerState != null;
 export const getCardPickerMode = () => pickerState?.mode ?? null;
 
+// Design 004 slice 4: plain-JSON snapshot of the open picker for the playtest bot's
+// picker() bridge. Browse mode (discard-pile viewer) has no picks to make, so it
+// reports closed — the bot should never try to resolve it.
+export const getCardPickerSnapshot = () => {
+  if (!pickerState || pickerState.mode === 'browse') return null;
+  return {
+    title: pickerState.title,
+    min: pickerState.minCount,
+    max: pickerState.maxCount,
+    candidates: pickerState.cards.map((card, index) => ({
+      index,
+      name: card?.name || '',
+      type: card?.type || card?.supertype || '',
+    })),
+  };
+};
+
+// Design 004 slice 4: resolves the open picker the same way a real click would —
+// assign each requested candidate to a slot, then invoke Done. Returns false if no
+// choosable picker is open or a requested index is out of range.
+export const pickCardPickerIndices = (indices) => {
+  if (!pickerState || pickerState.mode === 'browse') return false;
+  for (const i of indices) {
+    const card = pickerState.cards[i];
+    if (!card) return false;
+    assignCardToSlot(pickerState, card, pickerState.multiSelect ? -1 : 0);
+  }
+  confirmPicker(pickerState);
+  return true;
+};
+
 const clampIndex = (index, max) => Math.max(0, Math.min(index, max));
 
 const slideWrapper = (slide) =>

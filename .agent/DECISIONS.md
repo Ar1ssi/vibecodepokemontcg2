@@ -21,7 +21,9 @@
 - D4 2026-09-07 [netcode] Shared engine lives in shared/ served at /shared without bundler or new dependencies (design 001).
 - D1 2026-09-07 [stack] Node.js ES modules with native node --test runner used across workspaces. (observed)
 - D2 2026-09-07 [architecture] Express + Socket.IO server with SQLite3 for 2P real-time multiplayer state sync. (observed)
-- D3 2026-09-07 [rules] Rules engine uses modular JS with JSDOM for testing pure card logic and guided turn flows. (observed)
+- D3 2026-09-07 [rules] Rules engine uses modular JS; pure card logic tests run on plain stub
+  objects via native `node --test`, no jsdom (jsdom is a devDependency used only by
+  `integration-test.mjs`) — corrected S2, see PROJECT.md. (observed)
 
 
 ## Archive (dead decisions — kept greppable, never loaded into working context)

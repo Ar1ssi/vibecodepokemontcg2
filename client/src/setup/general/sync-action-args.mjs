@@ -67,6 +67,29 @@ export function parseAttackArgs(a, b, c) {
   return { attackIndex: 0, rngBundle: {}, emit: true };
 }
 
+/**
+ * retreat() local: (user, emit=true, targetBenchImage=null) — targetBenchImage is a live
+ * <img> element, only meaningful on the client that owns it.
+ * retreat() acceptAction: (user, benchIndex, emit) — I30: the bench index survives the
+ * wire (both clients mirror the same sequence of actions onto that player's own bench, so
+ * the index the actor swapped into agrees with the peer's), where the DOM element cannot.
+ */
+export function parseRetreatArgs(a, b, c) {
+  if (typeof c === 'boolean') {
+    return { target: isHintLike(b) || typeof b === 'number' ? b : null, emit: c };
+  }
+  if (typeof a === 'boolean' || a === undefined) {
+    return { target: isHintLike(b) || typeof b === 'number' ? b : null, emit: a !== false };
+  }
+  if (typeof a === 'number') {
+    return { target: a, emit: typeof b === 'boolean' ? b : true };
+  }
+  if (isHintLike(a)) {
+    return { target: a, emit: typeof b === 'boolean' ? b : true };
+  }
+  return { target: null, emit: true };
+}
+
 /** rng() < 0.5 is heads in status.mjs / attack coin flips. */
 export function rngFromCoin(result) {
   if (result === true || result === 'heads') return () => 0;

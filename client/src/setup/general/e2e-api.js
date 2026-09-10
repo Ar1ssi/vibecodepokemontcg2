@@ -9,7 +9,16 @@ import {
 } from '../netcode/apply-view.js';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
+import { getCardDamage, getCardSpecialCondition } from '/shared/engine/zones/card-state.mjs';
+import { resolveAttachedEnergyType } from '/shared/engine/rules/energy-effects.mjs';
+import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import { isEnergy } from '/shared/engine/cards.mjs';
+import { enumerateOptions } from './e2e-options.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
+import {
+  getCardPickerSnapshot,
+  pickCardPickerIndices,
+} from '../image-logic/card-picker.js';
 
 // Same zone set the server hashes in shared/engine/state.mjs hashState() minus
 // stadium (neutral zone, not per-player) — design 002 slice 3.5 replay harness.
@@ -56,6 +65,109 @@ function zoneSnapshot(user, zoneId) {
   };
 }
 
+// Design 004 slice 1: plain-JSON read model for the playtest bot. No DOM nodes, no live
+// card references — every field is a primitive or a plain object so `observe()` can cross
+// the Playwright page boundary as JSON. Card stats (hp/attacks/types) only exist once
+// cardStats enrichment has landed (see card-stats.js); before that they read as null/[].
+function serializePokemonCard(card, attachedCards = []) {
+  if (!card) return null;
+  return {
+    name: card.name || '',
+    hp: card.hp ?? null,
+    damage: getCardDamage(card),
+    stage: card.stage || null,
+    types: Array.isArray(card.types) ? [...card.types] : [],
+    specialCondition: getCardSpecialCondition(card),
+    // Tools attach the same way Energy does; resolveAttachedEnergyType would
+    // report them as 'Colorless', so filter to real Energy first.
+    attachedEnergy: attachedCards
+      .filter(isEnergy)
+      .map((energy) => resolveAttachedEnergyType(energy)),
+    attacks: Array.isArray(card.attacks)
+      ? card.attacks.map((attack, index) => ({
+          index,
+          name: attack?.name || '',
+          cost: Array.isArray(attack?.cost) ? [...attack.cost] : [],
+          damage: attack?.damage ?? '',
+        }))
+      : [],
+  };
+}
+
+function serializeHandCard(card, index) {
+  return {
+    index,
+    name: card?.name || '',
+    supertype: card?.supertype || '',
+    type: card?.type || '',
+  };
+}
+
+// Top-level Pokémon in a play zone. Both render paths keep attachments in the
+// same flat zone array as their host — the authoritative view links them by
+// `attachedTo` (apply-view.js placeCardInZone), the legacy path by
+// `image.relative` (isBoardPokemon) — so an unfiltered array would report
+// attached Energy as benched Pokémon.
+function boardPokemon(user, zoneId) {
+  const cards = liveZoneArray(user, zoneId);
+  return hasAuthoritativeView()
+    ? cards.filter((card) => card.attachedTo == null)
+    : cards.filter(isBoardPokemon);
+}
+
+// The cards attached to one in-play Pokémon, from whichever link the active
+// render path uses (see boardPokemon).
+function attachedCardsFor(user, zoneId, card) {
+  if (!card) return [];
+  const cards = liveZoneArray(user, zoneId);
+  if (hasAuthoritativeView()) {
+    const instanceId = card.instanceId;
+    return instanceId == null
+      ? []
+      : cards.filter((other) => other.attachedTo === instanceId);
+  }
+  return cards.filter((other) => other.image && other.image.relative === card.image);
+}
+
+// Design 004 slice 4: the third overlay kind (§ risk gate) — trainer-execution.js's
+// openMatPick highlights in-play Pokémon on the mat itself instead of opening a modal,
+// styling their live `card.image` DOM node with a yellow outline and resolving on a
+// document-level click on that node (see openMatPick, client/src/setup/rules/
+// trainer-execution.js). It keeps no exported state, so this reads the same signal the
+// human eye reads (the outline) rather than touching that gameplay file, and resolves a
+// pick the same way a human would (`img.click()`), never a synthetic engine call.
+const MAT_PICK_OUTLINE = 'ffd23f';
+
+function matPickCandidates() {
+  const found = [];
+  for (const user of ['self', 'opp']) {
+    for (const zoneId of ['active', 'bench']) {
+      for (const card of boardPokemon(user, zoneId)) {
+        const img = card?.image;
+        if (img?.style?.outline?.includes(MAT_PICK_OUTLINE)) {
+          found.push({ name: card.name || '', img });
+        }
+      }
+    }
+  }
+  return found;
+}
+
+function serializePlayerObservation(user) {
+  const bench = boardPokemon(user, 'bench').map((card) =>
+    serializePokemonCard(card, attachedCardsFor(user, 'bench', card))
+  );
+  const active = boardPokemon(user, 'active')[0] || null;
+  return {
+    hand: liveZoneArray(user, 'hand').map((card, index) => serializeHandCard(card, index)),
+    active: serializePokemonCard(active, attachedCardsFor(user, 'active', active)),
+    bench,
+    prizeCount: liveZoneArray(user, 'prizes').length,
+    deckCount: liveZoneArray(user, 'deck').length,
+    discardCount: liveZoneArray(user, 'discard').length,
+  };
+}
+
 export function installE2eApi() {
   if (typeof window === 'undefined' || !isE2eMode()) return;
   window.__ptcg = {
@@ -75,6 +187,153 @@ export function installE2eApi() {
     cmdLog: [],
     cmdRejections: [],
     gameEndedInfo: null,
+    // Design 004 slice 1: plain-JSON read model the playtest bot decides moves from.
+    observe() {
+      return {
+        turnPlayer: rulesState.turnPlayer,
+        turnNumber: rulesState.turnNumber,
+        phase: rulesState.phase,
+        fromServer: hasAuthoritativeView(),
+        self: serializePlayerObservation('self'),
+        opp: serializePlayerObservation('opp'),
+        stadium: liveZoneArray('self', 'stadium')[0]?.name || null,
+        pickerOpen: !!document.querySelector('.card-picker-overlay'),
+      };
+    },
+    // Design 004 slice 2: every action this client may legally take right now,
+    // as tagged options (see e2e-options.mjs). Async — evolution legality is.
+    // Returns [] when it isn't this client's move.
+    async options(user = 'self') {
+      const active = boardPokemon(user, 'active')[0] || null;
+      return enumerateOptions({
+        user,
+        hand: liveZoneArray(user, 'hand'),
+        active,
+        bench: boardPokemon(user, 'bench'),
+        activeZoneCards: liveZoneArray(user, 'active'),
+        attachedCardsOf: (card) =>
+          attachedCardsFor(user, card === active ? 'active' : 'bench', card),
+      });
+    },
+    // Design 004 slice 3: drives a single option (as returned by options()) through the
+    // real client action path — never throws, always resolves to { ok, error }. Every
+    // branch below reuses the exact call the live UI makes for that move (see design 004
+    // § slice 3): playBasic/attach/evolve/playTrainer all go through moveCardBundle with
+    // action 'move' — despite the name, every UI call site (drag.js, click-events.js,
+    // trainer-execution.js) passes the literal string 'move' regardless of whether the
+    // move is a plain play, an attach, or an evolution; move-card.js itself classifies
+    // attach vs. evolve from whether `targetIndex` resolves to an existing card in the
+    // destination zone, not from the action string. Playing a Trainer is hand → 'board'
+    // (move-card.js redirects Stadiums to 'stadium' and dispatches Supporter/Item effects
+    // itself once the card lands there — see rules-bridge.js's 'board' zone watcher).
+    async act(option) {
+      try {
+        const kind = option?.kind;
+        if (kind === 'playBasic') {
+          const { moveCardBundle } = await import(
+            '../../actions/move-card-bundle/move-card-bundle.js'
+          );
+          const ok = await moveCardBundle(
+            'self', 'self', 'hand', option.targetZone, option.handIndex, false, 'move', true
+          );
+          return { ok: ok !== false };
+        }
+        if (kind === 'attach' || kind === 'evolve') {
+          const { moveCardBundle } = await import(
+            '../../actions/move-card-bundle/move-card-bundle.js'
+          );
+          const ok = await moveCardBundle(
+            'self', 'self', 'hand', option.targetZone, option.handIndex,
+            option.targetIndex, 'move', true
+          );
+          return { ok: ok !== false };
+        }
+        if (kind === 'playTrainer') {
+          const { moveCardBundle } = await import(
+            '../../actions/move-card-bundle/move-card-bundle.js'
+          );
+          const ok = await moveCardBundle(
+            'self', 'self', 'hand', 'board', option.handIndex, false, 'move', true
+          );
+          return { ok: ok !== false };
+        }
+        if (kind === 'ability') {
+          const { useAbility } = await import('../../actions/counters/use-ability.js');
+          const ok = await useAbility('self', 'self', option.zone, option.index, true);
+          return { ok: ok !== false };
+        }
+        if (kind === 'attack') {
+          const { attack: attackAction } = await import(
+            '../../actions/chat-buttons/chat-buttons.js'
+          );
+          const ok = await attackAction('self', true, option.attackIndex);
+          return { ok: ok !== false };
+        }
+        if (kind === 'retreat') {
+          const benchCard = boardPokemon('self', 'bench')[option.benchIndex] || null;
+          const { retreat: retreatAction } = await import(
+            '../../actions/chat-buttons/chat-buttons.js'
+          );
+          const ok = await retreatAction('self', true, benchCard?.image || null);
+          return { ok: ok !== false };
+        }
+        if (kind === 'pass') {
+          const { pass: passAction } = await import(
+            '../../actions/chat-buttons/chat-buttons.js'
+          );
+          const ok = await passAction('self', true);
+          return { ok: ok !== false };
+        }
+        return { ok: false, error: `unknown option kind: ${kind}` };
+      } catch (err) {
+        return { ok: false, error: String(err?.message || err) };
+      }
+    },
+    // Design 004 slice 4: reports whichever modal the legacy rules path is currently
+    // blocked on, so the bot can answer it instead of wedging. Only one of these is ever
+    // open at a time in practice; card-picker is checked first since it is the highest-
+    // volume case (every search/discard Trainer effect).
+    picker() {
+      const cardPicker = getCardPickerSnapshot();
+      if (cardPicker) return { type: 'cardPicker', open: true, ...cardPicker };
+      const matCandidates = matPickCandidates();
+      if (matCandidates.length) {
+        return {
+          type: 'matPick',
+          open: true,
+          title: document.querySelector('.mat-pick-banner span')?.textContent || '',
+          candidates: matCandidates.map((c, index) => ({ index, name: c.name })),
+        };
+      }
+      if (document.getElementById('rulesCoinEffectOverlay')) {
+        return { type: 'coinEffect', open: true };
+      }
+      if (document.getElementById('rulesCoinCallOverlay')) {
+        return { type: 'coinCall', open: true };
+      }
+      return { open: false };
+    },
+    // Design 004 slice 4: resolves whichever modal picker() reported. `face` answers
+    // coinEffect/coinCall (see callCoin); `indices` answers cardPicker/matPick — matPick
+    // only ever resolves its first index since openMatPick takes one click and closes.
+    pick(indices = [], face = 'heads') {
+      const cardPicker = getCardPickerSnapshot();
+      if (cardPicker) return pickCardPickerIndices(indices);
+      const matCandidates = matPickCandidates();
+      if (matCandidates.length) {
+        const target = matCandidates[indices[0] ?? 0];
+        if (!target) return false;
+        target.img.click();
+        return true;
+      }
+      if (document.getElementById('rulesCoinEffectOverlay')) {
+        return this.callCoin(face);
+      }
+      if (document.getElementById('rulesCoinCallOverlay')) {
+        return this.callCoin(face);
+      }
+      return false;
+    },
     turnState() {
       return {
         turnPlayer: rulesState.turnPlayer,
@@ -115,6 +374,24 @@ export function installE2eApi() {
     loadFixtureDeck(prefix = 'E2E') {
       loadDeckData('self', e2eFixtureDeck(prefix), true);
     },
+    // Design 004 slice 6: loads an arbitrary deck (the same 7-field row shape
+    // e2eFixtureDeck produces — [quantity, name, type, imageURL, number, set, tcgId]) for
+    // the playtest runner's `--deck` option, instead of the built-in all-Basic fixture.
+    loadDeckList(deckRows) {
+      loadDeckData('self', deckRows, true);
+    },
+    // Design 004 slice 6: resolves once build-deck.js's bulk ensureCardData() pass has
+    // settled, so the runner can hold off the first turn until hp/attacks/stage/subtypes
+    // are real. Resolves `false` (never rejects, never hangs) when enrichment failed or
+    // no deck has been built — a caller must still bound its own wait, since the
+    // underlying fetches are network-bound.
+    async cardDataReady() {
+      try {
+        return (await systemState.cardDataReady) ?? false;
+      } catch {
+        return false;
+      }
+    },
     readyUp() {
       return readyUp('self');
     },
@@ -146,9 +423,14 @@ export function installE2eApi() {
         overlay: !!document.getElementById('rulesCoinCallOverlay'),
       };
     },
+    // Design 004 slice 4: extended to the mid-effect coin-flip overlay
+    // (`#rulesCoinEffectOverlay`, e.g. Team Rocket's Mars — see openCoinFlipOverlay in
+    // trainer-execution.js), which uses `data-face` buttons rather than the turn-order
+    // call overlay's `data-coin-call` — the two overlays never coexist.
     callCoin(face = 'heads') {
       const btn = document.querySelector(
-        `#rulesCoinCallOverlay button[data-coin-call="${face}"]`
+        `#rulesCoinCallOverlay button[data-coin-call="${face}"], ` +
+          `#rulesCoinEffectOverlay button[data-face="${face}"]`
       );
       if (btn) btn.click();
       return !!btn;

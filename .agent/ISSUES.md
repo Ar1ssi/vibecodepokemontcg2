@@ -12,6 +12,16 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I32 2026-09-10 P1 [rules/netcode] Retreat to a HIGH bench index still breaks the peer, after I30's fix: on the 20-Basic fixture deck (no Trainers, so unrelated to I31) a `retreat` with `benchIndex` 3 or 4 is followed immediately by either a cross-client divergence ("A's own board != B's view of A") or the next `playBasic` to a non-full bench returning false with no error. Reproduced 5/5 across two seeds (`--seed=42`, `--seed=99`, both `--scorer=coverage`); dumps `out/playtest/42-{0,1,2}-3.json`, `99-{0,1}-4.json` (refs: I30, design 004, S86).
+    Why S85's 11/11 missed it: the heuristic scorer retreats about once per game and effectively only from bench index 0. The coverage scorer added this session retreats ~3x per game across the whole bench, and fails within 4 turns every time. Suspect I30's `parseRetreatArgs` index threading is right for index 0 and wrong (or incompletely applied) for higher indices — start there, not from scratch. NOT fixed in S86.
+- I31 2026-09-10 P1 [netcode] Legacy 2P public-board divergence after a Trainer is played: with a real 60-card deck (18 Pokémon / 32 Trainer / 10 Energy) the acting client's own board stops matching the peer's view of it — `crossClientDivergence` reports "A's own board != B's view of A" and never recovers within the harness's 3s retry window. Reproduced twice from `--seed=7 --deck=<lucario 60>` (failed turn 7 and turn 15); both runs show the identical signature — `playTrainer` succeeds, the next `attack` trips the check, zero `cmdRejected` on either side. Dumps: `out/playtest/7-0-7.json`, `7-0-15.json` (refs: I24, design 004 slice 6, S86).
+    Newly reachable, not new: the bot could not play Trainers at all before S86 added the `playTrainer` tier, so no run had ever exercised a Trainer's mirror path. Likely the same family as I24 (legacy `moveCardBundle` mirror losing card identity) — I24's patch is still UNVERIFIED live, and a Trainer's card movement is exactly the path it touches. Verify against I24 before opening a separate investigation. NOT fixed in S86: out of scope for that session's three-fix patch, and it needs its own repro-first debug pass.
+- I33 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed
+    trainer-effect step kinds from `trainer-effects.mjs` — an unimplemented effect silently
+    no-ops instead of erroring, so a headless harness (or `playtest-bot.mjs`'s legacy-mode runs,
+    which don't exercise this path but a future authoritative-mode run of it would) can report
+    false-green games where a played card did nothing. No coverage gate exists to catch the gap
+    (refs: design 004 investigation, S75).
 - I24 2026-09-10 P1 [netcode] Legacy (non-authoritative) `moveCardBundle` mirror desync: a `deck`→`bench` move (Piloswine #7, room test1) reached the receiver with no `cardHints` attached, so `needsHintVerification` never triggers (move-card-bundle.js:125-129) and the move applies via raw relay `index` against the receiver's own zone array unchecked (move-card-bundle.js:118,209-227) — grabbing the wrong card. Every later hint-verified move touching that slot then aborts on `hint_mismatch` (move-card-bundle.js:141-159) with no resync (I12), permanently diverging `bench`; ended with Mamoswine ex #23 invisible to ARISSI after a bench→active→bench abort pair. Repro: `ptcg-sync-log_combined_test1_1788985695598.json` seq 108-159 (ARISSI client) (refs: I12, S70).
   Hypothesized cause found and patched UNVERIFIED (no live test done): `openChoicePicker`'s `confirmPicker` (card-picker.js:652-667) already auto-moves every picked card when `zoneFrom`/`destination` are set (rules-bridge.js:1277-1278), but `runSearchStep`'s multi-select `onConfirm` (trainer-execution.js, was ~443-449) *also* called `moveCardBundle` per pick — double-move raced the picker's own splice, and the second call's stale index made `buildMoveCardHints` find no card, dropping the hint. Removed the duplicate manual move. Added a `console.warn` at move-card-bundle.js:20 (buildMoveCardHints null-card path) to catch any remaining case live. Same double-move pattern likely also exists in Grand Tree's evolve pickers (chat-buttons.js:4014-4024/4089-4099) and the attach-energy single-pick path (trainer-execution.js:469-488) — not touched, needs a live repro before patching those.
 - I23 2026-09-09 P2 [netcode] `VSTARGXFunction` has no UI caller and no DOM element: nothing in client markup or JS defines `GXButton`/`VSTARButton`, so the legacy body would throw on `button.classList` if it were ever reached locally; the action is reachable only via the `acceptAction` relay. Left ungated by design 003 slice 5 (a gate on a dead local path adds risk without behavior). Either restore the buttons or delete the action (refs: design 003, S60).
@@ -39,6 +49,39 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I30 2026-09-10 P1 [rules] Legacy retreat desync: `retreat()`'s `processAction(user, emit, 'retreat', [])` (chat-buttons.js:2367) sent no target identity, so the peer's replay always defaulted to the *first* `isBoardPokemon` bench card regardless of which bench Pokémon the acting client actually swapped in. Found by design 004's playtest bot (~4/5 fixture-deck games) (refs: design 004 slice 6, S84) → closed 2026-09-10 S85: threaded the resolved bench index through as the processAction parameter (`parseRetreatArgs`, sync-action-args.mjs, mirroring the existing `parseAttackArgs` pattern) instead of a live DOM image, which means nothing on the peer's own DOM. Live-verified: the same seed that previously failed 4/5 games (`--seed=10 --games=5`) now passes 5/5, plus a fresh 6/6 (`--seed=20`).
+- I29 2026-09-10 P2 [netcode] Legacy 2P turn-state desync after several turns: driving a real
+    game purely through `__ptcg` past I28's fix, both clients eventually appeared to report
+    `turnState().turnPlayer === 'opp'` simultaneously, wedging the game with zero `cmdRejected`.
+    Narrowed to the attack path (not `pass()`) across S81's two runs (refs: I24, design 004,
+    S80-S81) → closed 2026-09-10 S82: **not an engine bug — a smoke-harness race.**
+    `.agent/scratch/smoke-i29-realpass.mjs`'s stall-detection re-poll always re-read `a.page`'s
+    `turnState()` regardless of which side (`active`) had just been queried for `options()`; when
+    B was the active side, the harness polled A (whose state had already correctly flipped and
+    would never change again) for up to 3s, concluded "no legal option, nothing changed", and
+    stopped the drive loop — while B's own mirrored `attack()` → `endTurnWithBanner` → `endTurn`
+    was still completing over the socket round trip. Fixed the harness to poll `active.page`
+    itself (whichever side was just checked) with a 6s window instead. Re-ran twice: a fresh
+    legacy 2P game now plays 15+ real attacks alternating cleanly (zero `cmdRejected`) through to
+    a legitimate deck-out win, both times. No `attack()`/`endTurn()` engine code was touched —
+    temporary instrumentation added to `chat-buttons.js`'s `attack()`/`endTurnWithBanner()`
+    confirmed the receiving side's mirror (`attack('opp', emit:false, ...)`) always reaches
+    `endTurnWithBanner` and flips `turnPlayer` correctly; instrumentation removed before close
+    (repo diff is harness-file-only: `.agent/scratch/smoke-i29-realpass.mjs`).
+- I28 2026-09-10 P1 [rules] Legacy mode's local win check ends the game after turn 1, every
+    game: `evaluateWinCondition`'s `checkWinConditions` (shared/engine/rules/ko-flow.mjs:86-93)
+    treats "0 active + 0 bench" as an instant loss for *either* side the moment a turn ends
+    (chat-buttons.js:415 `endTurnWithBanner` → `endTurn`), but the side that hasn't had its own
+    first turn yet legitimately has 0 Pokémon in play — Basic placement is an ordinary turn-1
+    action in this client, no separate "setup" placement phase precedes it. Found live via
+    design 004's slice 1-4 smoke run (refs: design 004, S79) → closed 2026-09-10 S81: gated the
+    `activeCounts` check in both copies of this logic (chat-buttons.js's `evaluateWinCondition`,
+    rules-bridge.js's `evaluateAndApplyWinConditions`) behind `rulesState.turnNumber >= 3` — a
+    global ply counter that only reaches 3 once each side has completed one turn.
+    `playerTurnCount` doesn't work for this: `endTurn` bumps the *incoming* player's count
+    immediately, before they've acted. Live-verified: a fresh 2-page run now plays past turn 1,
+    both sides place Pokémon and attack (`.agent/scratch/smoke-004-slice1-4.mjs`). Surfaced a
+    separate, unrelated desync further into the game — filed as I29, not fixed here.
 - I19 2026-09-09 P3 [netcode] Reveal/hide family (revealCards/hideCards/revealShortcut/hideShortcut)
     has no server-side driver: shared/engine never sets card.revealed=true, so view.mjs's
     revealed-branch rendering is correct but unreachable (refs: design 002 §3.4d, S51) → closed

@@ -75,7 +75,7 @@ import {
 } from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
-import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
+import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
@@ -391,8 +391,16 @@ export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
       self: getZone('self', 'deck').getCount() + getZone('self', 'hand').getCount() + counts.self.active + counts.self.bench > 0,
       opp: getZone('opp', 'deck').getCount() + getZone('opp', 'hand').getCount() + counts.opp.active + counts.opp.bench > 0,
     };
+    // I28: placing your opening Active is an ordinary turn-1 action here (no separate setup
+    // placement step), so a player who simply hasn't had their first turn yet legitimately
+    // has 0 Pokémon in play. rulesState.turnNumber is a global ply counter (endTurn/beginTurn
+    // each += 1, starting at 1 for the very first turn), so it only reaches 3 once each side
+    // has completed exactly one turn — playerTurnCount can't be used here since endTurn bumps
+    // the *incoming* player's count immediately, before they've acted. Withhold the check
+    // until then — otherwise the very first pass ends the game.
+    const bothHaveStarted = rulesState.turnNumber >= 3;
     const win = checkWinConditions({
-      activeCounts: inGame.self && inGame.opp ? counts : null,
+      activeCounts: bothHaveStarted && inGame.self && inGame.opp ? counts : null,
       deckCounts: {
         self: inGame.self ? getZone('self', 'deck').getCount() : 1,
         opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
@@ -2217,7 +2225,14 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
 // targetBenchImage: optional bench <img> the player dragged the active Pokémon onto
 // (drag-to-retreat). When omitted (button-triggered retreat), the server/legacy path
 // picks the first free bench Pokémon, same as before.
-export const retreat = async (user, emit = true, targetBenchImage = null) => {
+// I30: acceptAction replays this as (user, benchIndex, emit) — a live <img> element
+// means nothing on the peer's own DOM, so the target that survives the wire is the
+// bench index the acting client actually swapped into (see parseRetreatArgs).
+export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) => {
+  const { target, emit } = parseRetreatArgs(emitOrTarget, targetOrEmit);
+  const targetBenchImage = target && typeof target === 'object' ? target : null;
+  const targetBenchIndexHint = typeof target === 'number' ? target : null;
+
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'retreat', []);
     return;
@@ -2237,6 +2252,10 @@ export const retreat = async (user, emit = true, targetBenchImage = null) => {
     })
   )
     return;
+
+  // I30: the bench index actually swapped into, so it can ride along on the
+  // outgoing processAction call and reach the peer's replay.
+  let resolvedBenchIdx = targetBenchIndexHint;
 
   if (rulesState.enabled) {
     const check = canPerformAction({ user, action: 'retreat' });
@@ -2337,15 +2356,28 @@ export const retreat = async (user, emit = true, targetBenchImage = null) => {
       );
     }
 
-    // Swap: active → bench, first bench Pokémon → active
+    // Swap: active → bench, chosen bench Pokémon → active
     const activeIdx = activeZone.array.indexOf(active);
     await moveCard(user, user, 'active', 'bench', activeIdx !== -1 ? activeIdx : 0);
 
     const updatedBench = getZone(user, 'bench');
-    const benchPokemon = targetBenchImage
-      ? updatedBench.array.find((c) => c.image === targetBenchImage)
-      : updatedBench.array.find(isBoardPokemon);
-    const benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
+    let benchIdx;
+    if (targetBenchImage) {
+      const benchPokemon = updatedBench.array.find((c) => c.image === targetBenchImage);
+      benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
+    } else if (
+      targetBenchIndexHint != null &&
+      isBoardPokemon(updatedBench.array[targetBenchIndexHint])
+    ) {
+      // I30: the peer replay's bench index, resolved against this client's own
+      // (mirrored) bench array — the same target the acting client actually chose,
+      // instead of always defaulting to the first board Pokémon.
+      benchIdx = targetBenchIndexHint;
+    } else {
+      const benchPokemon = updatedBench.array.find(isBoardPokemon);
+      benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
+    }
+    resolvedBenchIdx = benchIdx;
     await moveCard(user, user, 'bench', 'active', benchIdx !== -1 ? benchIdx : 0);
 
     markRetreated(user);
@@ -2357,7 +2389,7 @@ export const retreat = async (user, emit = true, targetBenchImage = null) => {
   const message = determineUsername(user) + ' retreated';
   appendMessage(user, message, 'player', false);
   discardBoard(user, user, false, false);
-  processAction(user, emit, 'retreat', []);
+  processAction(user, emit, 'retreat', [resolvedBenchIdx]);
 };
 
 // How many damage counters a heal ability removes: "remove all damage" →
