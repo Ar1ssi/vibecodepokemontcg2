@@ -2356,29 +2356,43 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
       );
     }
 
-    // Swap: active → bench, chosen bench Pokémon → active
-    const activeIdx = activeZone.array.indexOf(active);
-    await moveCard(user, user, 'active', 'bench', activeIdx !== -1 ? activeIdx : 0);
-
-    const updatedBench = getZone(user, 'bench');
-    let benchIdx;
+    // Swap: chosen bench Pokémon <-> active, as ONE targeted move.
+    // I32: this was two untargeted moves (active→bench, then bench→active). With a
+    // FULL bench the first move asks for a 6th bench Pokémon, so move-card.js's
+    // bench-limit gate (move-card.js:279-292, which only applies when no targetCard
+    // was named) rejects it and returns ok:false — leaving the retreating Pokémon in
+    // the active zone beside the one just promoted, on both clients. Every later bench
+    // play then fails and the public board hash diverges from the peer's view.
+    // Naming the bench Pokémon as the move's target makes this a switch instead: the
+    // gate skips targeted moves, and autoMoveActiveBenchCard's case 3
+    // (auto-move-active-bench-card.js:57-75) promotes that target within the same
+    // call, so the bench never exceeds its limit at any point.
+    const benchBeforeSwap = getZone(user, 'bench');
+    let benchIdx = -1;
     if (targetBenchImage) {
-      const benchPokemon = updatedBench.array.find((c) => c.image === targetBenchImage);
-      benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
+      benchIdx = benchBeforeSwap.array.findIndex((c) => c.image === targetBenchImage);
     } else if (
       targetBenchIndexHint != null &&
-      isBoardPokemon(updatedBench.array[targetBenchIndexHint])
+      isBoardPokemon(benchBeforeSwap.array[targetBenchIndexHint])
     ) {
       // I30: the peer replay's bench index, resolved against this client's own
       // (mirrored) bench array — the same target the acting client actually chose,
       // instead of always defaulting to the first board Pokémon.
       benchIdx = targetBenchIndexHint;
-    } else {
-      const benchPokemon = updatedBench.array.find(isBoardPokemon);
-      benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
     }
+    if (benchIdx < 0) benchIdx = benchBeforeSwap.array.findIndex(isBoardPokemon);
+    if (benchIdx < 0) benchIdx = 0;
     resolvedBenchIdx = benchIdx;
-    await moveCard(user, user, 'bench', 'active', benchIdx !== -1 ? benchIdx : 0);
+
+    const activeIdx = activeZone.array.indexOf(active);
+    await moveCard(
+      user,
+      user,
+      'active',
+      'bench',
+      activeIdx !== -1 ? activeIdx : 0,
+      benchIdx
+    );
 
     markRetreated(user);
     // Retreating clears Confused (and other statuses) on the old active.
