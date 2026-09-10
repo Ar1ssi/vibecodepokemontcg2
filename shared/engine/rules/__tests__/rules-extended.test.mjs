@@ -1839,6 +1839,19 @@ import test from 'node:test';
       assert.ok(!flat.components.includes('coin'));
     });
 
+    test('parseAttackDamage: "if tails, this attack does nothing" (Fly) zeroes damage on tails', () => {
+      const attack = { damage: 30, text: 'Flip a coin. If tails, this attack does nothing.' };
+      const heads = parseAttackDamage(attack, {}, {}, { coin: 'heads' });
+      assert.equal(heads.total, 30);
+      assert.equal(heads.resolved, true);
+      const tails = parseAttackDamage(attack, {}, {}, { coin: 'tails' });
+      assert.equal(tails.total, 0);
+      assert.equal(tails.resolved, true);
+      assert.ok(tails.components.includes('coin'));
+      const pending = parseAttackDamage(attack, {}, {});
+      assert.equal(pending.resolved, false);
+    });
+
     test('parseAttackDamage: bench bonus and heal are reported, never added to base', () => {
       const bench = parseAttackDamage({ damage: 40, text: 'You may also do 20 damage to 1 of your opponent’s benched Pokémon.' });
       assert.equal(bench.total, 40);

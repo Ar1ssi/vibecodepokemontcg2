@@ -351,8 +351,11 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
     : 0;
   const tailsSelfMatch = text.match(/(?:if tails|if both (?:of them )?are tails)[^.]*(?:also )?do(?:es)? (\d+) damage to (?:itself|yourself)/);
   const tailsSelf = tailsSelfMatch ? parseInt(tailsSelfMatch[1], 10) || 0 : 0;
+  // "If tails, this attack does nothing" (e.g. Fly): tails zeroes the whole
+  // attack, not just a bonus/self-damage component.
+  const tailsFizzles = /if tails, this attack does nothing/.test(text);
   let selfDamage = 0;
-  if ((headsBonus > 0 || tailsSelf > 0) && /flip a coin|flip \d+ coins?/.test(text)) {
+  if ((headsBonus > 0 || tailsSelf > 0 || tailsFizzles) && /flip a coin|flip \d+ coins?/.test(text)) {
     if (tailsSelf > 0 && !components.includes('self-damage')) {
       components.push('self-damage');
     }
@@ -361,9 +364,15 @@ export function parseAttackDamage(attack, attacker = {}, defender = {}, ctx = {}
       components.push('coin');
       notes.push(`coin: heads → +${headsBonus}`);
     } else if (ctx.coin === 'tails') {
-      selfDamage += tailsSelf || amount(text, /do (\d+) damage to yourself/);
-      components.push('coin');
-      notes.push(`coin: tails → ${selfDamage} to self`);
+      if (tailsFizzles) {
+        total = 0;
+        components.push('coin');
+        notes.push('coin: tails → attack does nothing');
+      } else {
+        selfDamage += tailsSelf || amount(text, /do (\d+) damage to yourself/);
+        components.push('coin');
+        notes.push(`coin: tails → ${selfDamage} to self`);
+      }
     } else {
       notes.push('coin flip pending — pass ctx.coin to resolve');
     }
