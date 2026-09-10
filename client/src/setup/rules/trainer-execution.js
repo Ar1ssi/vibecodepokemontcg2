@@ -443,7 +443,7 @@ async function runSearchStep(card, searchStep, done) {
     if (basics.length === 1) {
       const idx = deck.array.indexOf(basics[0]);
       revealPicked(basics[0]);
-      moveCardBundle(_effectOwner, _effectOwner, 'deck', 'bench', idx, false, 'move');
+      await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
       shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
@@ -475,12 +475,12 @@ async function runSearchStep(card, searchStep, done) {
   const toBench = searchStep.destination === 'bench';
   const toAttach = searchStep.destination === 'attach';
 
-  const attachEnergyToPokemon = (energyCard) => {
+  const attachEnergyToPokemon = async (energyCard) => {
     const targets = getInPlayPokemon(_effectOwner);
     if (targets.length === 0) {
       msg('  no Pokémon to attach to — put energy in hand instead');
       const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', idx, false, 'move');
+      if (idx >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', idx, false, 'move');
       shuffleAfter();
       done?.();
       return;
@@ -490,7 +490,7 @@ async function runSearchStep(card, searchStep, done) {
       const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
       const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
       const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
+      if (idx >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
       msg(`  auto: attached ${energyCard.name} to ${target.name}`);
       shuffleAfter();
       done?.();
@@ -502,11 +502,11 @@ async function runSearchStep(card, searchStep, done) {
       triggerCard: card,
       user: _effectOwner,
       pickOnly: true,
-      onPick: (target) => {
+      onPick: async (target) => {
         const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
         const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
         const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-        if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
+        if (idx >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
         msg(`  auto: attached ${energyCard.name} to ${target.name}`);
         shuffleAfter();
         done?.();

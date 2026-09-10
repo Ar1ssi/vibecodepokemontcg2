@@ -3,6 +3,7 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
+- D28 2026-09-11 [netcode] Legacy search effects must finish (await) every card move before shuffling the deck, and a mirror that receives a permutation of the wrong length keeps every card (skips bad indices, appends unreferenced cards) and logs `shuffleZone.indices_mismatch` — never drops or leaves holes — why: relaying in local execution order is the only way permutation lengths match; the tolerance is a safety net, not a resync (legacy has none, I12). (design 007) (Renumbered from D26 on merge — collided with the concurrent debug-mode/Grand Tree D26/D27 below.)
 - D27 2026-09-11 [testing] "Debug mode" for testers/bots to summon arbitrary cards and break all
   rules turns out to already be ~fully built, gated behind the existing `?e2e=1` bridge (Archive
   D21): `window.__ptcg.loadDeckList(rows)` already loads any card list of any size (no 20-card

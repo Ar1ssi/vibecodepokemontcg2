@@ -403,6 +403,12 @@ export const moveCard = async (
     }
   }
 
+  // The awaits above yield, and a caller that did not await this move (a
+  // search effect shuffling the deck right after) can reorder the origin zone
+  // meanwhile — so the index read on entry may name a different card by now.
+  index = oZone.array.indexOf(movingCard);
+  if (index < 0) return { destZoneId, ok: false };
+
   // move card from origin array to destination array
   dZone.array.push(...oZone.array.splice(index, 1));
 

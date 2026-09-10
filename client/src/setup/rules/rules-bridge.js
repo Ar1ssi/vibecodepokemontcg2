@@ -1098,22 +1098,16 @@ import {
               destination: 'bench',
               multiSelect: true,
               requiredCount: Math.min(search.count, pool.length),
+              // openCardPicker's confirm already moved (and relayed) every
+              // pick via zoneFrom/destination before calling this.
               onConfirm: (selected) => {
-                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                  for (const s of selected) {
-                    const idx = getZone(user, 'deck').array.indexOf(s);
-                    if (idx >= 0) {
-                      moveCardBundle(user, user, 'deck', 'bench', idx, false, 'move');
-                    }
-                  }
-                  appendMessage(
-                    '',
-                    `  ${selected.map((s) => s.name).join(', ')} → Bench`,
-                    'announcement',
-                    false,
-                  );
-                  shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
-                });
+                appendMessage(
+                  '',
+                  `  ${selected.map((s) => s.name).join(', ')} → Bench`,
+                  'announcement',
+                  false,
+                );
+                shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
               },
               onCancel: () => {
                 appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
@@ -1648,16 +1642,12 @@ import {
           minCount: upTo ? 0 : count,
           maxCount: count,
           upTo,
+          // openCardPicker's confirm already moved (and relayed) every pick
+          // via zoneFrom/destination before calling this.
           onConfirm: (selected) => {
             revealPicked(selected);
-            import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-              for (const s of selected) {
-                const idx = getZone(user, 'deck').array.indexOf(s);
-                if (idx >= 0) moveCardBundle(user, user, 'deck', dest, idx, false, 'move');
-              }
-              appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
-              shuffleAfter();
-            });
+            appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
+            shuffleAfter();
           },
           onCancel: () => {
             appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
