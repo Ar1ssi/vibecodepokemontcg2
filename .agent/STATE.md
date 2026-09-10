@@ -4,29 +4,21 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 90 (90b: same-session follow-up, no new session number)
-Focus: merge of two concurrent sessions' work onto main — S89/S89b (3D Energy tokens on attached
-  Energy cards, design 005) and S90/S90b (nine "Generation 9".."Generation 1" pills + per-
-  generation Energy tabs in the deck builder's Browse Sets panel, design 006 — drafted as 005,
-  renumbered on merge since S89 claimed that number first). Both sessions independently numbered
-  themselves S89 on branches that hadn't met (same collision pattern as the S87/S88 merge in
-  journal S88) — this session's renumbered to S90/S90b; DECISIONS D22/D23→D24/D25 for the same
-  reason. Full detail for each feature is in journal S89/S89b and S90/S90b respectively.
-Active: done for design 006 (this session's work): `fetchGenerationSets`/`fetchGenerationEnergyCards`/
-  `GENERATION_SERIES`/`GENERATIONS` in set-browser.mjs pull every set (and a synthetic Energy tab)
-  of a Pokémon generation live from TCGdex's `/v2/en/series/{id}` grouping — confirmed live that
-  TCGdex series ids match pkmncards.com/sets/'s era headers almost exactly. Panel state in
-  native-deck-builder-set-browser.js refactored to a per-category `categoryState` Map so pills
-  don't re-fetch on revisit. 14 tests in generation-sets.test.mjs, now wired into `pnpm test`.
-  Design 005 (3D Energy tokens, S89/S89b, merged from main) is unrelated pre-existing work from a
-  different session — not touched or re-verified this session beyond the merge itself.
-Next: user should smoke-check both features on localhost:4100 (worktree server; port 4000 was
-  already taken by another node process, likely the primary checkout's): generation pills + their
-  Energy tabs in Browse Sets (design 006), and the 3D Energy token render on attached Energy
-  (design 005, already live-verified by its own session per journal S89b). Still open from
-  S82/S88: I34 (turn-desync residual, 1/10 soak failures) — see journal S88 for the lead. Still
-  open from S73: drag active→bench retreat live-verify; mat pickers + Grand Tree. Maintenance due
-  S96 (S86 sweep was the last one).
+Session: 91
+Focus: two Trainer/turn rule bug reports from the user (patch workflow).
+Active: done. (1) move-card.js playTrainer branch called markSupporterPlayed() for every
+  hand->board Trainer play, not just Supporters — Items falsely tripped the one-Supporter-per-
+  turn gate on the next real Supporter. Fixed by gating the call on the existing isSupporter
+  check (move-card.js:237). (2) shouldAutoDrawAtTurnStart() (rules-state.mjs) skipped the draw
+  on turn 1 for the player going first. That is the actual official TCG rule and was covered by
+  a passing test — flagged this to the user before editing; user confirmed (AskUserQuestion) they
+  want it changed anyway, so the turnNumber===1 guard is removed and turn 1 now draws normally.
+  Updated the matching unit test. 1281/1281 tests pass. See journal S91.
+Next: user should smoke-check both fixes on localhost: play an Item then a Supporter in the same
+  turn (Supporter should still be allowed), and confirm the first player now draws on turn 1.
+  Still open from S82/S88: I34 (turn-desync residual, 1/10 soak failures) — see journal S88 for
+  the lead. Still open from S73: drag active->bench retreat live-verify; mat pickers + Grand Tree.
+  Maintenance due S96 (S86 sweep was the last one).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -46,8 +38,9 @@ Blocked: nothing.
   repo's default) — it only ever becomes true under flip-gate-test.mjs's authoritative mode.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S91 2026-09-11 patch: Item plays no longer trip the Supporter-per-turn gate; turn 1 now draws
+  (user override of the official skip-first-draw rule) — see Active above.
 - S90/S90b 2026-09-10 feature: design 006 — generation pills + per-generation Energy tabs in
-  Browse Sets — see Active above.
+  Browse Sets.
 - S89/S89b 2026-09-10 feature+patch: 3D energy tokens for attached Energy (design 005, a
   concurrent session, merged from main).
-- S88b 2026-09-10 patch(security): closed the `?e2e=1` bridge exposure.
