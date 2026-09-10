@@ -4004,6 +4004,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
           triggerCard: card,
           zoneFrom: 'deck',
           destination: zoneId,
+          pickOnly: true,
           onPick: async (next) => {
             const nextIdx = deck.array.indexOf(next);
             const nextHostIdx = zone.array.indexOf(nextHost);
@@ -4034,6 +4035,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
     triggerCard: card,
     zoneFrom: 'deck',
     destination: 'bench',
+    pickOnly: true,
     onPick: evolvePicked,
     onCancel: () => finish(),
   });
@@ -4109,6 +4111,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
     triggerCard: card,
     zoneFrom: 'deck',
     destination: 'bench',
+    pickOnly: true,
     upTo: true,
     minCount: 0,
     maxCount: 1,
@@ -4160,6 +4163,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
           triggerCard: card,
           zoneFrom: 'deck',
           destination: zoneId,
+          pickOnly: true,
           upTo: true,
           minCount: 0,
           maxCount: 1,

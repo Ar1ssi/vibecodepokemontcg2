@@ -4,7 +4,7 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 71
+Session: 73
 Focus: patch — dragging active Pokémon onto bench now triggers a real retreat (energy-cost
   discard, gates, swap) instead of a raw zone move.
 Active: closed. Root cause: `drag.js`'s `drop()` always routed active↔bench drags through
@@ -29,17 +29,20 @@ Active: closed. Root cause: `drag.js`'s `drop()` always routed active↔bench dr
   drag-and-drop regression test for the client glue itself (chat-buttons.js/drag.js have zero
   existing tests, both being DOM-coupled).
 Next: user should manually drag active→bench in localhost and confirm the energy-discard
-  prompt/behavior fires and the correct bench card is promoted.
+  prompt/behavior fires and the correct bench card is promoted. Also still open from S71/S72
+  (mat click-to-select pickers + Grand Tree fix): user does a live check in the browser for
+  those changes too (see journal S71/S72 for what to verify).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
+- New: `openMatPick()` in client/src/setup/rules/trainer-execution.js is the pattern for any
+  future "pick an in-play Pokémon" step — reuse it, don't re-add a modal picker for that case.
+  It relies on `card.image` already being the live DOM node and on a document-level
+  capture-phase click listener outrunning click-events.js/drag.js's own listeners; if a future
+  refactor moves those to Shadow DOM or a different capture root this will silently stop gating.
 - CSS/visual verification in this repo: don't drive the Browser pane yourself — user checks
   localhost manually. See project memory `feedback_css_preview.md` (outside this repo, in the
   agent's memory dir). Still fine to use the Browser pane for non-visual checks.
-- Repeating gradients in holo CSS (`.card[data-rarity=...] .card__shine` background-image:
-  `repeating-linear-gradient(...)`) alias into visible noise at small card render sizes
-  (deck-list thumbnails, hand). Prefer single non-repeating gradients for any new rarity CSS;
-  audit existing ones (hyper-rare.css, regular-holo.css, rainbow-alt.css) if this recurs there.
 - `apply-view.js`, `authoritative-dispatch.js` and `card-stats.js` must stay Node-importable.
   Never statically import `click-events.js`, `drag.js`, `process-action.js`, or anything
   reaching `state.js` — inject instead. `rules-state.mjs` IS safe and statically imported.
@@ -49,8 +52,9 @@ Blocked: nothing.
   `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js` then `PTCG_URL=http://localhost:4100`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S71 2026-09-10 fix(bench,retreat): drag active→bench now runs the retreat flow (energy
+- S73 2026-09-10 fix(bench,retreat): drag active→bench now runs the retreat flow (energy
   cost, gates) instead of a raw move.
-- S70 2026-09-10 patch(holo): Secret/Gold Rare holo overlay was dead (CSS rule gated behind
-  an attribute nothing sets); rebuilt grain-free. See journal — not yet re-verified.
-- S69 2026-09-10 feat(deck-builder): Energy tab added to Browse Sets (D18).
+- S72 2026-09-10 fix(rules): Grand Tree evolve-onto-host + Stage 2 chain fixed (D20). Not yet
+  browser-verified.
+- S71 2026-09-10 feat(rules-ui): mat click-to-select replaces modal picker for all
+  in-play-Pokémon trainer-effect targets (D19). Not yet browser-verified.
