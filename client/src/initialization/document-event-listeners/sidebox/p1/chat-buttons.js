@@ -1,4 +1,4 @@
-import { attack, attachAbility, healAbility, pass, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
+import { attack, attachAbility, healAbility, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
 import { abilityPicker } from '../../../../actions/ability-picker.js';
 import { undo } from '../../../../actions/general/undo.js';
 import { systemState } from '../../../../state.js';
@@ -34,9 +34,6 @@ export const initializeP1ChatButtons = () => {
 
   const energyRedirectButton = document.getElementById('energyRedirectButton');
   energyRedirectButton.addEventListener('click', () => energyRedirectAbility(systemState.initiator));
-
-  const passButton = document.getElementById('passButton');
-  passButton.addEventListener('click', () => pass(systemState.initiator));
 
   const messageInput = document.getElementById('messageInput');
   messageInput.addEventListener('keydown', (event) => {
