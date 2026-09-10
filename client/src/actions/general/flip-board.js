@@ -26,7 +26,6 @@ export const flipBoard = () => {
   const searchButton = document.getElementById('searchButton');
   const abilityButton = document.getElementById('abilityButton');
   const energyRedirectButton = document.getElementById('energyRedirectButton');
-  const passButton = document.getElementById('passButton');
   const undoButton = document.getElementById('undoButton');
   const FREEBUTTON = document.getElementById('FREEBUTTON');
   const setupButton = document.getElementById('setupButton');
@@ -101,7 +100,6 @@ export const flipBoard = () => {
   toggleClasses(searchButton, 'self-color', 'opp-color');
   toggleClasses(abilityButton, 'self-color', 'opp-color');
   toggleClasses(energyRedirectButton, 'self-color', 'opp-color');
-  toggleClasses(passButton, 'self-color', 'opp-color');
   toggleClasses(undoButton, 'self-color', 'opp-color');
   toggleClasses(FREEBUTTON, 'self-color', 'opp-color');
   toggleClasses(p2AttackButton, 'self-color', 'opp-color');

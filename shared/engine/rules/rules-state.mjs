@@ -725,6 +725,10 @@
           return { allowed: false, reason: 'The deck is locked — shuffling your hand in is only via card effects.' };
         case 'shuffleBottomAndDraw':
           return { allowed: false, reason: 'The deck is locked — shuffling your hand in is only via card effects.' };
+        case 'deckToBench':
+          return { allowed: false, reason: 'The deck is locked — only card effects may put a card onto your Bench.' };
+        case 'benchToHand':
+          return { allowed: false, reason: 'Bench Pokémon can only return to hand through a card effect.' };
         default:
           return { allowed: true };
       }

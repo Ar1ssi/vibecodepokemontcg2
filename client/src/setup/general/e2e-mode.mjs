@@ -1,5 +1,17 @@
-/** True when the page was opened for the two-player Playwright harness. */
-export function isE2eMode(search = '', storage = null) {
+/**
+ * True when the page was opened for the two-player Playwright harness.
+ *
+ * Requires BOTH the server to have armed the bridge (window.__PTCG_E2E_ALLOWED, templated in
+ * by server/server.js's E2E_ENABLED) and the caller to have asked for it. The client half
+ * alone is not enough: `?e2e=1` is typeable by any visitor, and the bridge it installs is a
+ * scripting API over that player's own board. `allowed` is injectable for tests.
+ */
+export function isE2eMode(search = '', storage = null, allowed = undefined) {
+  const armed =
+    allowed !== undefined
+      ? allowed === true
+      : typeof window !== 'undefined' && window.__PTCG_E2E_ALLOWED === true;
+  if (!armed) return false;
   try {
     const query = search || (typeof location !== 'undefined' ? location.search : '');
     if (new URLSearchParams(query).get('e2e') === '1') return true;

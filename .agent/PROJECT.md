@@ -8,7 +8,7 @@
 
 ## Constraints & non-goals (hard requirements; things deliberately unsupported)
 - Server must be able to boot and create database directory dynamically for ephemeral host compatibility (e.g. Render).
-- Pure logic / rules tests run via native Node.js test runner (`node --test`) on plain `.mjs` modules with **no jsdom** — they use stub card objects. `jsdom` is a devDependency used only by `integration-test.mjs`. (Corrected S2; D3 still says otherwise.)
+- Pure logic / rules tests run via native Node.js test runner (`node --test`) on plain `.mjs` modules with **no jsdom** — they use stub card objects. `jsdom` is a devDependency used only by `integration-test.mjs`.
 - Decks stored in `localStorage` detach session editor state upon page reload to prevent accidental overwrites.
 - No build step. Browser loads native ESM (`client/index.ejs:20`); deploy is `pnpm install` then `node server/server.js` (`render.yaml`). A proposal needing a bundler must justify itself in DECISIONS.md first. (S2)
 - Scale: small, mostly private. A handful of concurrent games, players known to each other. Prefer the simple mechanism over the scalable one whenever they conflict. (S2)
@@ -20,6 +20,13 @@
 - My Decks: Local browser deck storage and management library (`ptcg-sim.deck-library.v1`).
 - SyncInstance / CardHint: Unique identifiers and fallback mechanisms to resolve card identity across 2P socket synchronization. (Both exist to patch client-authoritative index drift; design 001 retires them for a server-minted `instanceId`.)
 
+- The `?e2e=1` test bridge (`window.__ptcg`, installed by `e2e-api.js`) is shipped to every
+  browser but only ARMS when the server says so: `E2E_ENABLED` (server/server.js) templates
+  `window.__PTCG_E2E_ALLOWED` into the page, and `isE2eMode()` requires both. Opt in with
+  `PTCG_E2E=1`; it is also on whenever `NODE_ENV !== 'production'`, so local dev needs no flag
+  and the Render deploy (which sets NODE_ENV=production) is closed. The boot log states which.
+  Any harness that needs the bridge against a production-mode server must set `PTCG_E2E=1`. (S88)
+
 ## Landmines (cross-cutting gotchas, ≤15; area-specific ones belong in .agent/areas/)
 <!-- format: symptom → actual cause → what to do instead -->
 - ESLint fails with thousands of errors → Windows CRLF line endings (`\r\n`) trigger Prettier Delete `\r` rule errors → convert files to LF or format via Prettier before linting.
@@ -28,4 +35,5 @@
 - Reloading page overwrites saved deck → editor binding remained attached → keep active deck selection session-only and detach on page load/clear.
 - Logic works for one player but mirrors wrong for the other → `'self'`/`'opp'` are point-of-view, not identity, and `systemState.initiator` is derived from a CSS class (`global-variables.js:44`) → never send either over the wire; convert to an absolute player id at the boundary.
 - Two boards differ in HP/status but `syncCheck` reports "in sync" → damage, special conditions, and ability-used markers are stored only on the DOM node (`card.image.damageCounter` etc.), so they were invisible to the hash → read them via `card-state.mjs` helpers, never straight off `card.image`.
+- "Energy already attached this turn" fires with no real second attach (S70) → `flags[user].energyAttached` is only ever set by `rules-bridge.js` `hookEnergyAttach`'s `checkEnergyAdds`, which watches the `attachedCards` staging zone — but a real hand→active/bench attach never populates that zone, so the flag is set (and its false-positive warning thrown) only when a Pokémon's Energy is *detached* into that zone (KO, hand/deck return, etc.), not on genuine new attaches → the once-per-turn attach limit is not actually gated off real attaches; treat any change here as touching dead/miswired enforcement, not a working gate.
 

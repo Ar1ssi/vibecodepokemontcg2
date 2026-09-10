@@ -4,8 +4,10 @@ import {
   deckDataEquals,
   flipCoin,
   parseAttackArgs,
+  parseRetreatArgs,
   rngFromCoin,
   splitEmitAndTail,
+  isMirrorReplayCall,
 } from '../sync-action-args.mjs';
 import { hashBoardSnapshot, hashCardList } from '../../../../../shared/engine/zones/zone-hash.mjs';
 import { readFileSync } from 'node:fs';
@@ -42,6 +44,17 @@ test('parseAttackArgs: local (emit, index) and acceptAction (index, rng, emit)',
     rngBundle: rng,
     emit: false,
   });
+});
+
+test('parseRetreatArgs: local (emit, image) and acceptAction (benchIndex, emit)', () => {
+  const image = { tagName: 'IMG' };
+  assert.deepEqual(parseRetreatArgs(true, image), { target: image, emit: true });
+  assert.deepEqual(parseRetreatArgs(true, null), { target: null, emit: true });
+  assert.deepEqual(parseRetreatArgs(undefined, undefined), { target: null, emit: true });
+  // I30: acceptAction calls fn(user, ...parameters, emit) — a bench index parameter must
+  // not be mistaken for the emit flag, and must survive the peer replay intact.
+  assert.deepEqual(parseRetreatArgs(3, true), { target: 3, emit: true });
+  assert.deepEqual(parseRetreatArgs(0, false), { target: 0, emit: false });
 });
 
 test('rngFromCoin is deterministic for heads and tails', () => {
@@ -229,6 +242,23 @@ test('discardEnergyScaling uses rngBundle.energyDiscarded on replay', () => {
   assert.match(src, /typeof rngBundle\.energyDiscarded === 'number'/);
 });
 
+test('I30: retreat broadcasts the resolved bench index instead of an empty parameter list', () => {
+  const path = fileURLToPath(
+    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
+  );
+  const src = readFileSync(path, 'utf8');
+  const start = src.indexOf('export const retreat =');
+  assert.ok(start >= 0, 'retreat export');
+  const next = src.indexOf('\nexport const ', start + 1);
+  const body = src.slice(start, next === -1 ? undefined : next);
+  assert.match(
+    body,
+    /processAction\(user, emit, 'retreat', \[resolvedBenchIdx\]\)/,
+    "retreat's final processAction call must send the chosen bench index, or the peer's " +
+      'replay always defaults to the first bench Pokémon (I30)'
+  );
+});
+
 test('rotateCard broadcasts newRotation in action payload', () => {
   const path = fileURLToPath(
     new URL('../../../actions/general/rotate-card.js', import.meta.url)
@@ -267,3 +297,34 @@ test('shuffle flight animation skips when document is hidden', () => {
 
 
 
+
+// ── I32 (mirror half), S87 ───────────────────────────────────────────────────
+// A peer replaying the other client's retreat must not re-adjudicate legality.
+// When it did, a gate disagreement made the mirror silently return, leaving the
+// peer's board on the pre-retreat state with zero cmdRejected.
+test('isMirrorReplayCall: a peer replaying the other client is a mirror replay', () => {
+  assert.equal(
+    isMirrorReplayCall({ emit: false, user: 'opp', isTwoPlayer: true }),
+    true
+  );
+});
+
+test('isMirrorReplayCall: a locally-initiated action is never a mirror replay', () => {
+  // Own board, emitting.
+  assert.equal(isMirrorReplayCall({ emit: true, user: 'self', isTwoPlayer: true }), false);
+  // Own board, not emitting (e.g. an internal re-entrant call).
+  assert.equal(isMirrorReplayCall({ emit: false, user: 'self', isTwoPlayer: true }), false);
+  // Driving the opponent's board in 2P emits a requestAction — not a replay.
+  assert.equal(isMirrorReplayCall({ emit: true, user: 'opp', isTwoPlayer: true }), false);
+});
+
+test('isMirrorReplayCall: one-player mode has no mirror to replay onto', () => {
+  assert.equal(isMirrorReplayCall({ emit: false, user: 'opp', isTwoPlayer: false }), false);
+});
+
+test('isMirrorReplayCall: missing/garbage input is not a mirror replay', () => {
+  assert.equal(isMirrorReplayCall(), false);
+  assert.equal(isMirrorReplayCall({}), false);
+  // Truthiness is not enough - only an explicit false/true pair counts.
+  assert.equal(isMirrorReplayCall({ emit: 0, user: 'opp', isTwoPlayer: 1 }), false);
+});

@@ -13,3 +13,9 @@ client/src/assets/playmats/upscaled/
 
 # archex project state
 .archex/
+
+# Claude Code subagent worktrees — transient, machine-local, and live while agents run.
+.claude/worktrees/
+
+# design 004 slice 6: playtest-bot.mjs failure dumps (replayable traces, not source)
+out/playtest/

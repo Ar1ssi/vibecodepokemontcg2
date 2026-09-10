@@ -13,6 +13,8 @@ import { identifyCard } from './click-events.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
 import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
+import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
+import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 
 const popupContainers = [
   'lostZone',
@@ -270,6 +272,23 @@ export const drop = (event) => {
       dZoneId = event.target.id;
     }
 
+    // Dragging the active Pokémon onto the bench is a retreat, not a plain move:
+    // it must pay the retreat cost (discard energy) and swap with the dropped-on
+    // bench Pokémon, the same as clicking the Retreat button.
+    if (
+      mouseClick.zoneId === 'active' &&
+      dZoneId === 'bench' &&
+      !draggedImage.attached
+    ) {
+      retreat(
+        mouseClick.cardUser,
+        true,
+        event.target.tagName === 'IMG' ? event.target : null
+      );
+      event.stopPropagation();
+      return;
+    }
+
     if (
       (mouseClick.zoneId !== dZoneId || draggedImage.attached) &&
       (!draggedImage.attached ||
@@ -305,6 +324,35 @@ export const drop = (event) => {
             appendMessage(
               systemState.initiator,
               '⛔ ' + drawCheck.reason,
+              'announcement',
+              false
+            );
+            event.stopPropagation();
+            return;
+          }
+        }
+        if (
+          dZoneId === 'bench' &&
+          (fromZone === 'deck' || fromZone === 'viewCards')
+        ) {
+          const deckToBenchCheck = manualDeckActionAllowed('deckToBench');
+          if (!deckToBenchCheck.allowed) {
+            appendMessage(
+              systemState.initiator,
+              '⛔ ' + deckToBenchCheck.reason,
+              'announcement',
+              false
+            );
+            event.stopPropagation();
+            return;
+          }
+        }
+        if (dZoneId === 'hand' && fromZone === 'bench') {
+          const benchToHandCheck = manualDeckActionAllowed('benchToHand');
+          if (!benchToHandCheck.allowed) {
+            appendMessage(
+              systemState.initiator,
+              '⛔ ' + benchToHandCheck.reason,
               'announcement',
               false
             );

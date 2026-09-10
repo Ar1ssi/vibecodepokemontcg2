@@ -75,8 +75,8 @@ import {
 } from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
-import { flipCoin, parseAttackArgs, rngFromCoin, splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
-import { dispatchAuthoritativeAction } from '../../setup/netcode/authoritative-dispatch.js';
+import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail, isMirrorReplayCall } from '../../setup/general/sync-action-args.mjs';
+import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 
@@ -391,8 +391,16 @@ export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
       self: getZone('self', 'deck').getCount() + getZone('self', 'hand').getCount() + counts.self.active + counts.self.bench > 0,
       opp: getZone('opp', 'deck').getCount() + getZone('opp', 'hand').getCount() + counts.opp.active + counts.opp.bench > 0,
     };
+    // I28: placing your opening Active is an ordinary turn-1 action here (no separate setup
+    // placement step), so a player who simply hasn't had their first turn yet legitimately
+    // has 0 Pokémon in play. rulesState.turnNumber is a global ply counter (endTurn/beginTurn
+    // each += 1, starting at 1 for the very first turn), so it only reaches 3 once each side
+    // has completed exactly one turn — playerTurnCount can't be used here since endTurn bumps
+    // the *incoming* player's count immediately, before they've acted. Withhold the check
+    // until then — otherwise the very first pass ends the game.
+    const bothHaveStarted = rulesState.turnNumber >= 3;
     const win = checkWinConditions({
-      activeCounts: inGame.self && inGame.opp ? counts : null,
+      activeCounts: bothHaveStarted && inGame.self && inGame.opp ? counts : null,
       deckCounts: {
         self: inGame.self ? getZone('self', 'deck').getCount() : 1,
         opp: inGame.opp ? getZone('opp', 'deck').getCount() : 1,
@@ -469,8 +477,17 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
     return;
 
   if (rulesState.enabled) {
+    // I31/I32: never re-adjudicate a REPLAYED action. The acting client already
+    // decided it was legal; this gate reads per-turn state the mirror need not hold
+    // identically, and a disagreement here returns early — skipping everything below,
+    // including the discardBoard() sweep that clears the `board` staging zone. That is
+    // exactly I31: a Tool played on the acting client reached its discard while the
+    // peer's copy stayed in `board` forever, diverging the public board with zero
+    // cmdRejected. Only the legality REJECTION is skipped; the status gating below
+    // (asleep/paralyzed/confused) still runs, since it replays the actor's own seeded
+    // coin flips from rngBundle and must stay in lockstep.
     const check = canPerformAction({ user, action: 'attack' });
-    if (!check.allowed) {
+    if (!check.allowed && !isMirrorReplayCall({ emit, user, isTwoPlayer: systemState.isTwoPlayer })) {
       appendMessage(user, `⛔ ${check.reason}`, 'announcement', false);
       return;
     }
@@ -2214,20 +2231,59 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
   }
 };
 
-export const retreat = async (user, emit = true) => {
+// targetBenchImage: optional bench <img> the player dragged the active Pokémon onto
+// (drag-to-retreat). When omitted (button-triggered retreat), the server/legacy path
+// picks the first free bench Pokémon, same as before.
+// I30: acceptAction replays this as (user, benchIndex, emit) — a live <img> element
+// means nothing on the peer's own DOM, so the target that survives the wire is the
+// bench index the acting client actually swapped into (see parseRetreatArgs).
+export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) => {
+  const { target, emit } = parseRetreatArgs(emitOrTarget, targetOrEmit);
+  const targetBenchImage = target && typeof target === 'object' ? target : null;
+  const targetBenchIndexHint = typeof target === 'number' ? target : null;
+
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'retreat', []);
     return;
   }
 
+  const targetBenchInstanceId = targetBenchImage
+    ? readCardInstanceId(targetBenchImage)
+    : null;
+
   // design 003 slice 5: the server pays the retreat cost and swaps active/bench itself
   // (reduce.mjs `retreat`), so the legacy energy-discard and moveCard swap are skipped.
-  if (dispatchAuthoritativeAction('retreat', { user, emit, commandArgs: [] }))
+  if (
+    dispatchAuthoritativeAction('retreat', {
+      user,
+      emit,
+      commandArgs: targetBenchInstanceId != null ? [targetBenchInstanceId] : [],
+    })
+  )
     return;
+
+  // I30: the bench index actually swapped into, so it can ride along on the
+  // outgoing processAction call and reach the peer's replay.
+  let resolvedBenchIdx = targetBenchIndexHint;
+
+  // I32 (mirror half): when this call is the peer REPLAYING the other client's
+  // retreat, the acting client has already adjudicated legality — re-adjudicating it
+  // here can only disagree, and when it does, the mirror silently returns and the
+  // retreat is never applied on this side. That is precisely the observed failure:
+  // dumps out/playtest/42-0-{4,5}.json show the acting client's board correctly
+  // swapped while the peer's view of it is the untouched pre-retreat state, with zero
+  // cmdRejected. The gate reads per-turn state (turnPlayer, retreatedThisTurn,
+  // attackerAttacked) that the mirror is not guaranteed to hold identically, so it
+  // must not decide whether a replayed action happens — only the acting client does.
+  const isMirrorReplay = isMirrorReplayCall({
+    emit,
+    user,
+    isTwoPlayer: systemState.isTwoPlayer,
+  });
 
   if (rulesState.enabled) {
     const check = canPerformAction({ user, action: 'retreat' });
-    if (!check.allowed) {
+    if (!check.allowed && !isMirrorReplay) {
       appendMessage(user, `⛔ ${check.reason}`, 'announcement', false);
       return;
     }
@@ -2324,14 +2380,43 @@ export const retreat = async (user, emit = true) => {
       );
     }
 
-    // Swap: active → bench, first bench Pokémon → active
-    const activeIdx = activeZone.array.indexOf(active);
-    await moveCard(user, user, 'active', 'bench', activeIdx !== -1 ? activeIdx : 0);
+    // Swap: chosen bench Pokémon <-> active, as ONE targeted move.
+    // I32: this was two untargeted moves (active→bench, then bench→active). With a
+    // FULL bench the first move asks for a 6th bench Pokémon, so move-card.js's
+    // bench-limit gate (move-card.js:279-292, which only applies when no targetCard
+    // was named) rejects it and returns ok:false — leaving the retreating Pokémon in
+    // the active zone beside the one just promoted, on both clients. Every later bench
+    // play then fails and the public board hash diverges from the peer's view.
+    // Naming the bench Pokémon as the move's target makes this a switch instead: the
+    // gate skips targeted moves, and autoMoveActiveBenchCard's case 3
+    // (auto-move-active-bench-card.js:57-75) promotes that target within the same
+    // call, so the bench never exceeds its limit at any point.
+    const benchBeforeSwap = getZone(user, 'bench');
+    let benchIdx = -1;
+    if (targetBenchImage) {
+      benchIdx = benchBeforeSwap.array.findIndex((c) => c.image === targetBenchImage);
+    } else if (
+      targetBenchIndexHint != null &&
+      isBoardPokemon(benchBeforeSwap.array[targetBenchIndexHint])
+    ) {
+      // I30: the peer replay's bench index, resolved against this client's own
+      // (mirrored) bench array — the same target the acting client actually chose,
+      // instead of always defaulting to the first board Pokémon.
+      benchIdx = targetBenchIndexHint;
+    }
+    if (benchIdx < 0) benchIdx = benchBeforeSwap.array.findIndex(isBoardPokemon);
+    if (benchIdx < 0) benchIdx = 0;
+    resolvedBenchIdx = benchIdx;
 
-    const updatedBench = getZone(user, 'bench');
-    const benchPokemon = updatedBench.array.find(isBoardPokemon);
-    const benchIdx = benchPokemon ? updatedBench.array.indexOf(benchPokemon) : 0;
-    await moveCard(user, user, 'bench', 'active', benchIdx !== -1 ? benchIdx : 0);
+    const activeIdx = activeZone.array.indexOf(active);
+    await moveCard(
+      user,
+      user,
+      'active',
+      'bench',
+      activeIdx !== -1 ? activeIdx : 0,
+      benchIdx
+    );
 
     markRetreated(user);
     // Retreating clears Confused (and other statuses) on the old active.
@@ -2342,7 +2427,7 @@ export const retreat = async (user, emit = true) => {
   const message = determineUsername(user) + ' retreated';
   appendMessage(user, message, 'player', false);
   discardBoard(user, user, false, false);
-  processAction(user, emit, 'retreat', []);
+  processAction(user, emit, 'retreat', [resolvedBenchIdx]);
 };
 
 // How many damage counters a heal ability removes: "remove all damage" →

@@ -3,7 +3,25 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
-- D21 2026-09-10 [rules] Grand Tree's Stage-2-chain step re-resolves the Stage 1 host's live zone/index via `zoneOfInPlay(user, picked)` at pick time instead of reusing the pre-evolve `hostZone`/`hostIdx` closure vars — `evolveCard.js` keeps the base card in the zone array (marked `attached: true`) and inserts the evolution as a separate array entry, so a captured index/array-of-one snapshot from before the first evolve is not guaranteed to still describe where the Stage 1 card now lives. Both Grand Tree evolve-guard failure paths (deckIdx/hostIdx invalid) now `appendMessage` a reason instead of silently calling `finishGrandTree()` — the prior silent skip is indistinguishable from the user's report of a stage-2 card "disappearing". Root cause on the live PR96 (server-authoritative) repro is not 100% pinned from static reading alone; this is the concrete fragility found and the fix that removes it, plus gives a visible signal if it recurs.
+- D26 2026-09-10 [rules] Grand Tree's Stage-2-chain step re-resolves the Stage 1 host's live zone/index via `zoneOfInPlay(user, picked)` at pick time instead of reusing the pre-evolve `hostZone`/`hostIdx` closure vars — `evolveCard.js` keeps the base card in the zone array (marked `attached: true`) and inserts the evolution as a separate array entry, so a captured index/array-of-one snapshot from before the first evolve is not guaranteed to still describe where the Stage 1 card now lives. Both Grand Tree evolve-guard failure paths (deckIdx/hostIdx invalid) now `appendMessage` a reason instead of silently calling `finishGrandTree()` — the prior silent skip is indistinguishable from the user's report of a stage-2 card "disappearing". Root cause on the live PR96 (server-authoritative) repro is not 100% pinned from static reading alone; this is the concrete fragility found and the fix that removes it, plus gives a visible signal if it recurs. (Renumbered from D21 on merge — collided with the 3D-energy-tokens D21 from a concurrent session.)
+- D25 2026-09-10 [deck-builder] Each generation pill also gets a synthetic Energy tab
+  (`__energy_gen<N>__`), same colorless-energy logo and aggregation idea as the Standard view's
+  `ENERGY_SET_ID` tab (D18), but without D18's `MODERN_BASIC_ENERGY_TYPES`/`EXTRA_ENERGY_CARD_REFS`
+  extras — those exist solely to backfill sets that rotated OUT of `LEGAL_SET_REGISTRY`; a
+  generation's own set list already includes every set it ever had (rotated or not), so the plain
+  per-set Energy-category sweep already surfaces rarer variants (gold secrets, alt arts) with no
+  hardcoded list needed. (design 006 — renumbered from 005, see that doc's header.)
+- D24 2026-09-10 [deck-builder] Generation pills (design 006, originally drafted as 005 — renumbered
+  on merge, see D22/D21 below which claimed 005 first) source their sets from TCGdex's own
+  `series` grouping (`GET /v2/en/series/{id}` → `{sets: [...]}`), not a hand-maintained registry —
+  verified live that TCGdex's series boundaries already match pkmncards.com/sets/'s era headers.
+  This makes "ignore POP/Other/Misc" free (those are separate series, `pop`/`mc`/`misc`, never
+  reachable from a generation pill) instead of needing per-set filtering. Generation→series map,
+  user's explicit call: 9=sv (Mega Evolution's `me` deliberately excluded), 8=swsh, 7=sm, 6=xy,
+  5=bw, 4=dp+pl (HeartGold&SoulSilver's `hgss` and Call of Legends' `col` deliberately excluded),
+  3=ecard+ex, 2=neo, 1=base+gym.
+- D22 2026-09-10 [board-ui] Energy-token front art is 11 user-provided PNGs (colored-circle/black-glyph symbols, cropped+alpha-masked from a reference sheet the user supplied) at `client/src/assets/energy/tokens/`, replacing the initial `151MT_*_Coin.jpg` photo-coin choice from D21 — user's explicit call after seeing both ("make it EXACTLY like the image"). `.energy-token-3d` had to be raised to `.play-container img.energy-token-3d` (specificity 0,0,2,1) because `.play-container img` (self/opp-containers.css:646-664) sets its own border-radius/box-shadow at the same specificity (0,0,1,1) but later in the cascade — confirmed by comparing computed styles in the live iframe before/after (design 005).
+- D21 2026-09-10 [board-ui] Attached-Energy 3D tokens swap `movingCard.image.src` in place (stashed in `dataset.energyCardSrc`, restored by `resetImage`) rather than a separate overlay element — nothing in game logic reads `.image.src` for identity (checked zones/move-card/sync), only cosmetic zoom/hi-res code does, which degrades harmlessly to showing the token there too. Reuses the existing `151MT_*_Coin.jpg` per-type assets and `coin-back-tm.png` already shipped for burn/poison status tokens (design 005).
 - D20 2026-09-10 [rules-ui] `openAbilityChoicePicker`/`openCardPicker` has two valid usage patterns: (a) no `pickOnly`, no manual move in `onPick` — rely on the picker's own `zoneFrom`→`destination` auto-move (card-picker.js:652-661); (b) `pickOnly: true` with a manual `moveCardBundle` in `onPick`. Mixing them (destination set, no `pickOnly`, but `onPick` also moves manually) double-moves the card — the auto-move fires first, so the manual move's own zone-index lookup comes up empty and the handler bails. Fixed 4 sites in chat-buttons.js that mixed the patterns (Grand Tree's two pickers, and the generic stadium-evolve-search's two pickers it was split from) by adding the missing `pickOnly: true`.
 - D19 2026-09-10 [rules-ui] Trainer-effect pickers whose candidate IS an in-play Pokémon (evolveStage2, devolve, switchOpponent/Own/Out, heal target, damageCounters target, attach-energy target, discardToolAndSpecialEnergy, swapWithDiscard host) now resolve via `openMatPick()` in trainer-execution.js — a click-on-the-real-mat-image picker (outline highlight + capture-phase document click/Escape to gate normal drag/click handling) — instead of the modal `openCardPicker` carousel. Hand/deck/discard/attached-item candidates (the Stage-2-from-hand step, search/discard pickers) are unchanged — they aren't rendered on the mat. User's explicit scope call: convert every in-play-Pokémon picker, not just Rare Candy's.
 - D18 2026-09-10 [deck-builder] Energy tab in Browse Sets is a synthetic entry (`ENERGY_SET_ID = '__energy__'`), not a real TCGdex set: `fetchLegalEnergyCards` cross-references the global `/cards?category=Energy` summary list (id/localId/name only, no image) against each Standard-legal set's already-cached full record (which has `image` but no category) to build normalized cards, since neither TCGdex endpoint alone carries both fields. Placed last via `releaseDate: ''` rather than resorted, matching the user's requested tab position. The modern basic-energy reprint (Mega Evolution Energy / "mee" set) has NO `image` field anywhere in TCGdex (set record, card detail, or CDN path all 404) — `getModernBasicEnergyCards()` hardcodes its 8 cards with art hotlinked from `pkmncards.com/wp-content/uploads/mee_en_{localId}_std.jpg` instead (user's explicit call after TCGdex was confirmed to have no usable asset; verified cross-origin loadable from the app's own origin). The 8 gold secret rare "Basic {Type} Energy" cards are pulled individually by exact id from their original (now non-Standard) sets via `EXTRA_ENERGY_CARD_REFS`, since a blanket per-set sweep would also pull unrelated rotated-out special energies from those same sets.
@@ -22,7 +40,18 @@
 - D4 2026-09-07 [netcode] Shared engine lives in shared/ served at /shared without bundler or new dependencies (design 001).
 - D1 2026-09-07 [stack] Node.js ES modules with native node --test runner used across workspaces. (observed)
 - D2 2026-09-07 [architecture] Express + Socket.IO server with SQLite3 for 2P real-time multiplayer state sync. (observed)
-- D3 2026-09-07 [rules] Rules engine uses modular JS with JSDOM for testing pure card logic and guided turn flows. (observed)
+- D3 2026-09-07 [rules] Rules engine uses modular JS; pure card logic tests run on plain stub
+  objects via native `node --test`, no jsdom (jsdom is a devDependency used only by
+  `integration-test.mjs`) — corrected S2, see PROJECT.md. (observed)
 
 
 ## Archive (dead decisions — kept greppable, never loaded into working context)
+- D21 2026-09-10 (S88): the `?e2e=1` test bridge is gated server-side. It exposes a scripting
+  API over the local player's own board (act/attack/passTurn/loadDeckList), and the query flag
+  is typeable by any visitor, so the client half must not be sufficient to arm it. Chose
+  `PTCG_E2E=1 || NODE_ENV !== 'production'` over pure explicit opt-in so local dev and the
+  Playwright harness keep working with no extra flags while the deploy is closed by default;
+  the cost is that a deployment which forgets NODE_ENV=production would arm it, which the boot
+  log now states explicitly. Not anti-cheat hardening (a non-goal): everything the bridge does
+  is reachable from devtools anyway. This only stops it being five characters in the URL.
+
