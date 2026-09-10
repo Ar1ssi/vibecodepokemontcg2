@@ -859,6 +859,10 @@ ul, li {
       background: rgba(60, 130, 90, 0.16);
       color: #1f5c3a;
     }
+    .native-deck-builder-set-browser-series-tag--generation {
+      background: rgba(168, 100, 65, 0.14);
+      color: #7a3d1a;
+    }
     button.native-deck-builder-set-browser-series-tag {
       display: inline-flex;
       align-items: center;
@@ -877,6 +881,9 @@ ul, li {
     }
     button.native-deck-builder-set-browser-series-tag--other.active {
       background: rgba(60, 130, 90, 0.38);
+    }
+    button.native-deck-builder-set-browser-series-tag--generation.active {
+      background: rgba(168, 100, 65, 0.4);
     }
     .native-deck-builder-set-browser-filter {
       flex: 0 0 auto;
@@ -1384,6 +1391,7 @@ ul, li {
 }
 .native-deck-builder-section-title-wrap {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4vw;
   min-width: 0;

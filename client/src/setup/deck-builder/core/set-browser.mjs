@@ -150,13 +150,134 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
     export function getLegalSetRegistry() {
       return LEGAL_SET_REGISTRY.map((entry) => ({ ...entry }));
     }
-    
+
     async function fetchSetRecord(setId, seriesId) {
       const cacheKey = `${seriesId}/${setId}`;
       if (setRecordCache.has(cacheKey)) return setRecordCache.get(cacheKey);
       const record = await fetchJson(`${TCGDEX_BASE}/sets/${setId}`);
       setRecordCache.set(cacheKey, record);
       return record;
+    }
+
+    // Generation → TCGdex series id(s). Gen 9 is Scarlet & Violet only (excludes
+    // the separate `me` Mega Evolution series, user's explicit call). Gen 4 is
+    // Diamond & Pearl + Platinum only (HeartGold & SoulSilver's `hgss` and Call
+    // of Legends' `col` are deliberately left out, user's explicit call). `pop`,
+    // `mc` (McDonald's), `tk` (trainer kits), `misc`, and `lc` (Legendary
+    // Collection) are never referenced here, so they're unreachable from any
+    // pill without needing their own filter (D5 doc: ignore POP/Other/Misc).
+    export const GENERATION_SERIES = {
+      9: ['sv'],
+      8: ['swsh'],
+      7: ['sm'],
+      6: ['xy'],
+      5: ['bw'],
+      4: ['dp', 'pl'],
+      3: ['ecard', 'ex'],
+      2: ['neo'],
+      1: ['base', 'gym'],
+    };
+    export const GENERATIONS = [9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+    const seriesRecordCache = new Map();
+    async function fetchSeriesRecord(seriesId) {
+      if (seriesRecordCache.has(seriesId)) return seriesRecordCache.get(seriesId);
+      const promise = fetchJson(`${TCGDEX_BASE}/series/${seriesId}`).catch((error) => {
+        seriesRecordCache.delete(seriesId);
+        throw error;
+      });
+      seriesRecordCache.set(seriesId, promise);
+      return promise;
+    }
+
+    const generationSetStubsCache = new Map(); // generation -> Promise<{setId, series}[]>
+
+    // Every {setId, series} pair belonging to a generation, deduped across its
+    // series (shared by fetchGenerationSets and fetchGenerationEnergyCards so
+    // both agree on exactly which sets a generation covers).
+    function fetchGenerationSetStubs(generation) {
+      if (generationSetStubsCache.has(generation)) return generationSetStubsCache.get(generation);
+
+      const promise = (async () => {
+        const seriesIds = GENERATION_SERIES[generation] || [];
+        const seriesRecords = await Promise.all(
+          seriesIds.map((seriesId) => fetchSeriesRecord(seriesId).catch(() => null))
+        );
+
+        const seenSetIds = new Set();
+        const setStubs = [];
+        for (const record of seriesRecords) {
+          if (!record) continue;
+          for (const set of record.sets || []) {
+            if (!set?.id || seenSetIds.has(set.id)) continue;
+            seenSetIds.add(set.id);
+            setStubs.push({ setId: set.id, series: record.id });
+          }
+        }
+        return setStubs;
+      })();
+
+      generationSetStubsCache.set(generation, promise);
+      return promise;
+    }
+
+    // Synthetic set id for a generation's Energy tab, e.g. `__energy_gen9__`.
+    export function generationEnergySetId(generation) {
+      return `__energy_gen${generation}__`;
+    }
+    const GENERATION_ENERGY_SET_ID_RE = /^__energy_gen(\d+)__$/;
+
+    // Fetch every set in a Pokémon generation (across all its TCGdex series),
+    // newest first, in the same shape fetchLegalStandardSets() returns, plus a
+    // synthetic Energy tab aggregating every Energy card (basic + special +
+    // rarer variants) printed across that generation's sets.
+    export async function fetchGenerationSets(generation) {
+      const setStubs = await fetchGenerationSetStubs(generation);
+
+      const entries = await Promise.all(
+        setStubs.map(async ({ setId, series }) => {
+          try {
+            const record = await fetchSetRecord(setId, series);
+            return {
+              setId: record.id,
+              name: record.name,
+              seriesId: series,
+              releaseDate: record.releaseDate || '',
+              logo: normalizeAssetUrl(record.logo),
+              symbol: normalizeAssetUrl(record.symbol),
+              cardCount: (record.cards || []).filter((c) => c.image).length,
+              category: 'generation',
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const sets = entries
+        .filter(Boolean)
+        .filter((entry) => entry.cardCount > 0)
+        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+
+      try {
+        const energyCards = await fetchGenerationEnergyCards(generation);
+        if (energyCards.length > 0) {
+          sets.push({
+            setId: generationEnergySetId(generation),
+            name: 'Energy',
+            seriesId: '',
+            releaseDate: '',
+            logo: ENERGY_SET_LOGO,
+            symbol: '',
+            cardCount: energyCards.length,
+            category: 'generation',
+          });
+        }
+      } catch {
+        // Energy tab is additive — a lookup failure shouldn't break the rest of the browser.
+      }
+
+      return sets;
     }
     
     // Fetch all legal Standard-format sets, newest first, with logo + release date.
@@ -290,44 +411,53 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       return [...getModernBasicEnergyCards(), ...cardGroups.flat()];
     }
 
-    // Fetch every Energy card (basic, special, and rarer variants) printed in a
-    // Standard-legal set, plus the modern basic-energy reprints and gold secret
-    // rares in EXTRA_ENERGY_CARD_REFS. The /cards?category=Energy summary has no
-    // image, so once we know which sets contain a match we hydrate images from
-    // each set's already-cached full record.
-    export async function fetchLegalEnergyCards() {
+    // Every Energy card (basic, special, and rarer variants) printed across a
+    // given list of {setId, series} entries. The /cards?category=Energy summary
+    // has no image, so once we know which sets contain a match we hydrate
+    // images from each set's already-cached full record.
+    async function fetchEnergyCardsForSetEntries(setEntries) {
       const summaries = await fetchEnergyCardSummaries();
-      const legalSetEntries = LEGAL_SET_REGISTRY.filter((entry) => (entry.category || 'standard') !== 'other');
 
       const summariesBySetId = new Map();
       for (const summary of summaries) {
-        const entry = legalSetEntries.find((candidate) => String(summary.id || '').startsWith(`${candidate.setId}-`));
+        const entry = setEntries.find((candidate) => String(summary.id || '').startsWith(`${candidate.setId}-`));
         if (!entry) continue;
         if (!summariesBySetId.has(entry.setId)) summariesBySetId.set(entry.setId, { entry, summaries: [] });
         summariesBySetId.get(entry.setId).summaries.push(summary);
       }
 
+      const cardGroups = await Promise.all(
+        [...summariesBySetId.values()].map(async ({ entry, summaries: setSummaries }) => {
+          try {
+            const record = await fetchSetRecord(entry.setId, entry.series);
+            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
+            const cardsById = new Map((record.cards || []).map((card) => [card.id, card]));
+            return setSummaries
+              .map((summary) => cardsById.get(summary.id))
+              .filter((card) => card?.id && card?.name && card.image)
+              .map((card) => normalizeSetCard(card, set));
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      return cardGroups.flat();
+    }
+
+    // Fetch every Energy card (basic, special, and rarer variants) printed in a
+    // Standard-legal set, plus the modern basic-energy reprints and gold secret
+    // rares in EXTRA_ENERGY_CARD_REFS.
+    export async function fetchLegalEnergyCards() {
+      const legalSetEntries = LEGAL_SET_REGISTRY.filter((entry) => (entry.category || 'standard') !== 'other');
+
       const [cardGroups, extraCards] = await Promise.all([
-        Promise.all(
-          [...summariesBySetId.values()].map(async ({ entry, summaries: setSummaries }) => {
-            try {
-              const record = await fetchSetRecord(entry.setId, entry.series);
-              const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
-              const cardsById = new Map((record.cards || []).map((card) => [card.id, card]));
-              return setSummaries
-                .map((summary) => cardsById.get(summary.id))
-                .filter((card) => card?.id && card?.name && card.image)
-                .map((card) => normalizeSetCard(card, set));
-            } catch {
-              return [];
-            }
-          })
-        ),
+        fetchEnergyCardsForSetEntries(legalSetEntries),
         fetchExtraEnergyCards(),
       ]);
 
       const seenIds = new Set();
-      const allCards = [...cardGroups.flat(), ...extraCards].filter((card) => {
+      const allCards = [...cardGroups, ...extraCards].filter((card) => {
         if (seenIds.has(card.id)) return false;
         seenIds.add(card.id);
         return true;
@@ -335,10 +465,24 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 
       return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
-    
+
+    // Fetch every Energy card (basic, special, and rarer variants) printed
+    // across every set in a Pokémon generation. No modern-basic/gold-secret
+    // extras here — those exist only to backfill Standard-legal sets that have
+    // since rotated out of LEGAL_SET_REGISTRY; a generation's own set list
+    // already includes every set it ever had, rotated or not.
+    export async function fetchGenerationEnergyCards(generation) {
+      const setEntries = await fetchGenerationSetStubs(generation);
+      const cards = await fetchEnergyCardsForSetEntries(setEntries);
+      return sortCardsWithinGroup(cards, { sortBy: 'name', sortDirection: 'asc' });
+    }
+
     // Fetch all cards of one legal set (only those with images).
     export async function fetchSetCards(setId) {
       if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
+
+      const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
+      if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));
 
       const record = await fetchSetRecord(setId);
       const set = {

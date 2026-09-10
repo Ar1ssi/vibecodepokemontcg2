@@ -3,6 +3,21 @@
 # Cap 50 active lines; maintain.md moves superseded/expired ones to the Archive section.
 # Format: `D<n> <YYYY-MM-DD> [scope] decision — why. (Supersedes D<m>.)`
 
+- D23 2026-09-10 [deck-builder] Each generation pill also gets a synthetic Energy tab
+  (`__energy_gen<N>__`), same colorless-energy logo and aggregation idea as the Standard view's
+  `ENERGY_SET_ID` tab (D18), but without D18's `MODERN_BASIC_ENERGY_TYPES`/`EXTRA_ENERGY_CARD_REFS`
+  extras — those exist solely to backfill sets that rotated OUT of `LEGAL_SET_REGISTRY`; a
+  generation's own set list already includes every set it ever had (rotated or not), so the plain
+  per-set Energy-category sweep already surfaces rarer variants (gold secrets, alt arts) with no
+  hardcoded list needed.
+- D22 2026-09-10 [deck-builder] Generation pills (design 005) source their sets from TCGdex's own
+  `series` grouping (`GET /v2/en/series/{id}` → `{sets: [...]}`), not a hand-maintained registry —
+  verified live that TCGdex's series boundaries already match pkmncards.com/sets/'s era headers.
+  This makes "ignore POP/Other/Misc" free (those are separate series, `pop`/`mc`/`misc`, never
+  reachable from a generation pill) instead of needing per-set filtering. Generation→series map,
+  user's explicit call: 9=sv (Mega Evolution's `me` deliberately excluded), 8=swsh, 7=sm, 6=xy,
+  5=bw, 4=dp+pl (HeartGold&SoulSilver's `hgss` and Call of Legends' `col` deliberately excluded),
+  3=ecard+ex, 2=neo, 1=base+gym.
 - D20 2026-09-10 [rules-ui] `openAbilityChoicePicker`/`openCardPicker` has two valid usage patterns: (a) no `pickOnly`, no manual move in `onPick` — rely on the picker's own `zoneFrom`→`destination` auto-move (card-picker.js:652-661); (b) `pickOnly: true` with a manual `moveCardBundle` in `onPick`. Mixing them (destination set, no `pickOnly`, but `onPick` also moves manually) double-moves the card — the auto-move fires first, so the manual move's own zone-index lookup comes up empty and the handler bails. Fixed 4 sites in chat-buttons.js that mixed the patterns (Grand Tree's two pickers, and the generic stadium-evolve-search's two pickers it was split from) by adding the missing `pickOnly: true`.
 - D19 2026-09-10 [rules-ui] Trainer-effect pickers whose candidate IS an in-play Pokémon (evolveStage2, devolve, switchOpponent/Own/Out, heal target, damageCounters target, attach-energy target, discardToolAndSpecialEnergy, swapWithDiscard host) now resolve via `openMatPick()` in trainer-execution.js — a click-on-the-real-mat-image picker (outline highlight + capture-phase document click/Escape to gate normal drag/click handling) — instead of the modal `openCardPicker` carousel. Hand/deck/discard/attached-item candidates (the Stage-2-from-hand step, search/discard pickers) are unchanged — they aren't rendered on the mat. User's explicit scope call: convert every in-play-Pokémon picker, not just Rare Candy's.
 - D18 2026-09-10 [deck-builder] Energy tab in Browse Sets is a synthetic entry (`ENERGY_SET_ID = '__energy__'`), not a real TCGdex set: `fetchLegalEnergyCards` cross-references the global `/cards?category=Energy` summary list (id/localId/name only, no image) against each Standard-legal set's already-cached full record (which has `image` but no category) to build normalized cards, since neither TCGdex endpoint alone carries both fields. Placed last via `releaseDate: ''` rather than resorted, matching the user's requested tab position. The modern basic-energy reprint (Mega Evolution Energy / "mee" set) has NO `image` field anywhere in TCGdex (set record, card detail, or CDN path all 404) — `getModernBasicEnergyCards()` hardcodes its 8 cards with art hotlinked from `pkmncards.com/wp-content/uploads/mee_en_{localId}_std.jpg` instead (user's explicit call after TCGdex was confirmed to have no usable asset; verified cross-origin loadable from the app's own origin). The 8 gold secret rare "Basic {Type} Energy" cards are pulled individually by exact id from their original (now non-Standard) sets via `EXTRA_ENERGY_CARD_REFS`, since a blanket per-set sweep would also pull unrelated rotated-out special energies from those same sets.

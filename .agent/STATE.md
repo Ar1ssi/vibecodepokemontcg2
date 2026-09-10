@@ -4,40 +4,32 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 88
-Focus: debug — I32, I31 and I33 all root-caused and closed (took over from two subagents stopped
-  mid-investigation on usage grounds), then every branch consolidated onto `main`.
-Note: two sessions independently numbered themselves S87 on branches that had not met — the S86
-  maintenance sweep and this debug run — and each independently filed an issue as I33. Merged in
-  S88: the sweep's issue was renumbered I35 (the pass-wedge I33 is the one three pushed commit
-  messages reference), and both sessions' journal entries are kept.
-Active: done, three issues closed. I32 (retreat) was two bugs: `retreat()` did two untargeted
-  moves so a FULL bench made move-card.js:279 reject the first leg and strand two Pokémon in
-  active; and the peer re-ran `canPerformAction` when REPLAYING the retreat, silently returning
-  when its per-turn state disagreed, so it never applied it at all. I31 (Trainer divergence) was
-  the SAME replay defect in `attack()`, which skipped the `discardBoard()` sweep — that sweep is
-  emit=false, so the peer must run its own copy during the replay, and a blocked replay loses it,
-  stranding every played Trainer in the peer's `board` zone forever. Both fixed with
-  `isMirrorReplayCall` (sync-action-args.mjs, +4 tests): a replayed action is never
-  re-adjudicated — the acting client already decided. I33 was three HARNESS defects and no engine
-  bug: `act()` read a client action's undefined return as success (a refusal is only ever a chat
-  `⛔` line); the runner asked only client A whether the game had ended, though a deck-out is
-  detected by whichever client fails to draw; and `gameEndedInfo` missed clients reaching
-  `phase: 'ended'` without the event firing. Dump chat capture was also reading `#chatbox` while
-  2P writes to `#p2Chatbox`, which is why the first attempt had nothing to go on.
-  Verified: fixture coverage 9/10 on a 10-game soak and 3/3 on each of seeds 42/99/123 (was
-  wedging routinely), heuristic 5/5, pnpm test 1254/1257 (3 = card-identity-live, network, red on
-  main too). Real-deck runs still hit the turn cap HERE ONLY: this sandbox blocks api.tcgdex.net,
-  so cards never enrich, attacks deal 0 damage and no win condition can be met.
-Next: I34 (filed, NOT fixed) — the residual 1/10: both clients report `turnPlayer: 'opp'`
-  simultaneously, each thinking it is the other's turn, with turnNumber drifted 13 vs 8. A real
-  client-state divergence, and the same signature I29 was closed under in S82 as "a harness
-  race" — that closure now looks premature. Start from the I31/I32 defect class: turn advance
-  runs in `endTurn()` inside `endTurnWithBanner`, reached from both `pass()` and `attack()`, and a
-  replayed action that returns early skips it. AUDIT EVERY acceptAction TARGET in chat-buttons.js
-  for `canPerformAction`-on-mirror — three actions have now been caught with it. Still open from
-  S73: drag active→bench retreat live-verify; mat pickers + Grand Tree. Maintenance was DONE by
-  the S86 sweep (next due S96) — the earlier "due since S80" line was superseded by that merge.
+Session: 89 (89b: same-session follow-up, no new session number)
+Focus: feature — design 005, nine "Generation 9".."Generation 1" pills in the native deck
+  builder's Browse Sets panel, each with its own Energy tab.
+Active: done. Added `fetchGenerationSets`/`GENERATION_SERIES`/`GENERATIONS` to
+  set-browser.mjs (client/src/setup/deck-builder/core/set-browser.mjs) — pulls every set of a
+  Pokémon generation live from TCGdex's `/v2/en/series/{id}` grouping (confirmed live this
+  session: TCGdex series ids match pkmncards.com/sets/'s era headers almost exactly). Refactored
+  native-deck-builder-set-browser.js's single `sets`/`loaded` state into a per-category
+  `categoryState` Map (`'standard'`, `'other'`, `'gen1'..'gen9'`) so pills don't re-fetch on
+  revisit; added the 9 generation pill buttons (`.native-deck-builder-set-browser-series-tag--
+  generation` CSS, index.css) and made the pill row wrap (was inline-flex, no wrap — now
+  overflows to a second line at 11 pills). Follow-up (89b): each generation now also gets a
+  synthetic "Energy" tab (`__energy_gen<N>__`, colorless.png logo, routed in `fetchSetCards`)
+  aggregating every Energy card — basics, special, rarer variants — across that generation's own
+  sets, mirroring the Standard view's existing `ENERGY_SET_ID` tab (D18). +10 tests total
+  (generation-sets.test.mjs, now wired into package.json's `pnpm test` — it wasn't in slice 1/2,
+  caught when the total didn't climb). 1268/1268 pass. See design 005 (Deviations section has the
+  Energy-tab addendum) for the full generation→TCGdex-series map and exclusions (Mega Evolution
+  out of Gen9; HeartGold&SoulSilver + Call of Legends out of Gen4; POP/McDonald's/Trainer-kits/
+  Misc unreachable from any pill by construction — see D22).
+Next: user should smoke-check on localhost:4100 (worktree server; port 4000 was already taken by
+  another node process, likely the primary checkout's) — see D22-era note: open deck builder →
+  Browse Sets → click a few generation pills + their Energy tabs, confirm no POP/McDonald's/
+  trainer-kit clutter. Still open from S82/S88: I34 (turn-desync residual, 1/10 soak failures) —
+  see journal S88 for the lead. Still open from S73: drag active→bench retreat live-verify; mat
+  pickers + Grand Tree. Maintenance due S96 (S86 sweep was the last one).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -52,14 +44,17 @@ Blocked: nothing.
   Playwright run needs a `context.route('https://cdn.socket.io/**', ...)` shim to the server's
   own `/socket.io/socket.io.js`, `chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })`.
   Server runs on port 4000 by default (`node server/server.js`), not 4100.
-- `turnState().fromServer` is meaningless in legacy mode (SERVER_AUTHORITATIVE unset, this
-  repo's default) — it only ever becomes true under flip-gate-test.mjs's authoritative mode.
+- `pnpm lint` fails repo-wide on pre-existing CRLF line endings + `no-undef` globals on `.mjs`
+  files (eslint.config only targets `**/*.js`, so `.mjs` gets no `globals` and no `endOfLine:
+  'auto'`) — known baseline since S1, not something any one session's diff should try to fix.
+  Verify a diff's own files with a targeted `npx eslint <files>` and read past the CRLF noise.
 - CSS/visual verification in this repo: don't drive the Browser pane yourself — user checks
   localhost manually. See project memory `feedback_css_preview.md`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S85 2026-09-10 patch: closed I30 (legacy retreat desync) — see Active above.
-- S84 2026-09-10 feature: shipped design 004 slice 6 (`playtest-bot.mjs`), the design's final
-  slice. Live-verified; found I30 (fixed this session).
-- S83 2026-09-10 feature: shipped design 004 slice 5 (`bot/bot.mjs`, `bot/heuristic-scorer.mjs`),
-  14 unit tests green, wired into `pnpm test`.
+- S89/89b 2026-09-10 feature: shipped design 005 (generation pills + per-generation Energy tabs
+  in Browse Sets) — see Active above.
+- S88b 2026-09-10 patch(security): closed the `?e2e=1` bridge exposure — gated server-side behind
+  E2E_ENABLED, armed only by `PTCG_E2E=1` or non-production `NODE_ENV`.
+- S88 2026-09-10 consolidate: merged every outstanding branch onto main (design 004 bot + S86
+  sweep, the I31/I32/I33 fix chain, pass-button consolidation).
