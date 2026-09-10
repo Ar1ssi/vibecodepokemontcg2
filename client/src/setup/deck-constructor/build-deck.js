@@ -21,7 +21,10 @@ export const buildDeck = (user) => {
         card.image.cardId = card.cardId;
         card.image.syncInstance = card.syncInstance;
       }
-      if (isE2eMode()) stampE2eCard(card);
+      // Only stamp the synthetic e2eFixtureDeck() rows (set === 'e2e') — a real
+      // decklist loaded via loadDeckList/loadDeckData while `?e2e=1` is active must
+      // still get its true stage/evolvesFrom from ensureCardData's TCGdex fetch.
+      if (isE2eMode() && set === 'e2e') stampE2eCard(card);
       deck.array.push(card);
       deck.element.appendChild(card.image);
     }

@@ -94,7 +94,12 @@ export const moveCard = async (
   targetIndex,
   options = {}
 ) => {
-  const { forceEvolution = false, syncReplay = false, isRareCandy = false } = options;
+  const {
+    forceEvolution = false,
+    syncReplay = false,
+    isRareCandy = false,
+    bypassJustEvolvedGate = false,
+  } = options;
   oZoneId = oZoneId.replace('Cover', '');
   dZoneId = dZoneId.replace('Cover', '');
 
@@ -329,7 +334,10 @@ export const moveCard = async (
       return;
     }
     const wasPlayedThisTurn = targetCard.enteredPlayTurn === rulesState.turnNumber;
-    const evoCheck = await canEvolve(user, targetCard, movingCard, wasPlayedThisTurn, { isRareCandy });
+    const evoCheck = await canEvolve(user, targetCard, movingCard, wasPlayedThisTurn, {
+      isRareCandy,
+      bypassJustEvolvedGate,
+    });
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
       return { destZoneId, ok: false };
