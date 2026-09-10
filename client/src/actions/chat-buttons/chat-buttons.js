@@ -477,8 +477,17 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
     return;
 
   if (rulesState.enabled) {
+    // I31/I32: never re-adjudicate a REPLAYED action. The acting client already
+    // decided it was legal; this gate reads per-turn state the mirror need not hold
+    // identically, and a disagreement here returns early — skipping everything below,
+    // including the discardBoard() sweep that clears the `board` staging zone. That is
+    // exactly I31: a Tool played on the acting client reached its discard while the
+    // peer's copy stayed in `board` forever, diverging the public board with zero
+    // cmdRejected. Only the legality REJECTION is skipped; the status gating below
+    // (asleep/paralyzed/confused) still runs, since it replays the actor's own seeded
+    // coin flips from rngBundle and must stay in lockstep.
     const check = canPerformAction({ user, action: 'attack' });
-    if (!check.allowed) {
+    if (!check.allowed && !isMirrorReplayCall({ emit, user, isTwoPlayer: systemState.isTwoPlayer })) {
       appendMessage(user, `⛔ ${check.reason}`, 'announcement', false);
       return;
     }

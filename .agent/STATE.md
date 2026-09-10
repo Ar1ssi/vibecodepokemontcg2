@@ -21,6 +21,15 @@ Active: done. Two distinct bugs under one issue. (1) LOCAL: `retreat()` did two 
   chat to failure dumps, which is what made the diagnosis possible in two runs instead of guesswork.
   Verified: coverage seed42 0/3 → 3/3 (retreats 3→11/game, actions 18→190), heuristic 3/3,
   pnpm test 1254/1257 (3 = card-identity-live, network, red on main too).
+Also this session: I31 CLOSED — the same defect as I32's mirror half, in `attack()`. The peer
+  re-adjudicated legality on the replay and returned early, skipping the
+  `discardBoard(user, user, false, false)` sweep. That sweep is emit=false, so the acting client
+  never relays it and the peer must run its own during the attack replay; a blocked replay loses
+  it silently, stranding every played Trainer in the peer's `board` zone. Same `isMirrorReplayCall`
+  guard. Real-deck seed 7: divergence gone, 27 → 507 actions, 16 → 25 distinct mechanics.
+  THE PATTERN IS THE HEADLINE: two actions found re-adjudicating replayed actions, and `pass()`
+  has the same shape. Audit every acceptAction target in chat-buttons.js for
+  canPerformAction-on-mirror before treating the next desync as novel.
 Next: I33 (filed, NOT fixed) — with I32 gone, games reach turn 10-14 and then wedge: the joiner
   passes 60x in one turn, every act reporting ok, both boards agreeing. START by fixing
   `__ptcg.act()`, which maps a client action's `undefined` return to `ok: true`, so a pass the
