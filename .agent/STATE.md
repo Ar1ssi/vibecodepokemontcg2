@@ -4,22 +4,25 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 72
+Session: 73
 Focus: S71 replaced the modal card-selection popup with mat click-to-select for every
   trainer-effect picker whose candidate is an in-play Pokémon (D19). S72 investigated + fixed a
   pre-existing Grand Tree bug the user reported separately (unrelated to S71's change, confirmed
   present before it): mixed auto-move/manual-move picker patterns caused the Stage 1 to evolve
   into a fresh bench slot instead of onto its host, and skipped the Stage 2 picker entirely (D20).
-Active: closed — both changes shipped, neither browser-verified yet.
+Active: closed — S73's Grand Tree stage-2 robustness/messaging fix (D21) shipped on top of S71/72,
+  none of the three browser-verified yet. User reported the S72 fix did NOT resolve the live
+  bug (fresh repro on a deployed PR96 instance, SERVER_AUTHORITATIVE=1, after D20 was live) —
+  S73 is a deeper fix, not yet confirmed to close it either.
 Next: user does a live check in the browser (memory: user checks localhost themselves, don't
-  drive the Browser pane for this). S71 to verify: (1) clicking a highlighted mat card resolves
-  the pick and clears the banner/outline; (2) Escape and Cancel both cancel cleanly; (3) a stray
-  click during picking doesn't leak to the normal drag/select handlers underneath (capture-phase
-  blocking in openMatPick, only reasoned from source, not run); (4) opponent-owned card
-  highlighting (switchOpponent/damageCounters/discardFromOpponent paths) targets the right DOM
-  node in local 2P. S72 to verify: play Grand Tree, evolve a Basic in play to Stage 1 via deck
-  search, confirm it evolves onto the host (not a new bench slot) and the Stage 2 picker opens
-  when a matching Stage 2 is in deck.
+  drive the Browser pane for this). Priority: replay the Grand Tree Stage-2-chain scenario again.
+  If it STILL silently fails, the new appendMessage in D21 will now name which side was invalid
+  (deck vs host) — report that message verbatim, it's the next debugging foothold. If it still
+  reproduces with no message at all, the failure is upstream of executeGrandTreeSpecialRule's
+  own guards (worth checking whether stage2Candidates.length was ever >0 — i.e. the picker may
+  not even be opening) rather than in the guard logic fixed here. Also still open from S71:
+  (1) mat-click pick/cancel/Escape flow, (2) stray-click leak-through, (3) opponent-side
+  highlighting in local 2P.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -40,9 +43,9 @@ Blocked: nothing.
   `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js` then `PTCG_URL=http://localhost:4100`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S72 2026-09-10 fix(rules): Grand Tree evolve-onto-host + Stage 2 chain fixed (D20). Not yet
-  browser-verified.
+- S73 2026-09-10 debug(rules): Grand Tree stage-2-chain re-resolves host zone/index live +
+  failure messaging instead of silent skip (D21). D20 alone did NOT fix the user's live repro.
+- S72 2026-09-10 fix(rules): Grand Tree evolve-onto-host + Stage 2 chain double-move bug (D20).
+  Insufficient alone per S73 — see above.
 - S71 2026-09-10 feat(rules-ui): mat click-to-select replaces modal picker for all
   in-play-Pokémon trainer-effect targets (D19). Not yet browser-verified.
-- S70 2026-09-10 fix(holo): Secret/Gold Rare holo overlay rebuilt grain-free after being dead;
-  verified against real card art after several false-fix rounds (see S70 journal for detail).
