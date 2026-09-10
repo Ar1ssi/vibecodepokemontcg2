@@ -234,7 +234,7 @@ export const moveCard = async (
       appendMessage(user, `⛔ ${movingCard.name}: ${gate.reason}`, 'announcement', false);
       return { destZoneId, ok: false };
     }
-    markSupporterPlayed(user, movingCard.name);
+    if (isSupporter) markSupporterPlayed(user, movingCard.name);
   }
 
   // ── rules: record a Stadium placed on the field (taxonomy E) ─────────

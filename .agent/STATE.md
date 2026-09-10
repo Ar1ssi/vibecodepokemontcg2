@@ -4,28 +4,30 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 91
-Focus: merged main (S90b — 3D Energy tokens design 005 + generation pills design 006) into the
-  evolution-ui-mat-selection branch and resolved the harness-file conflicts (renumbered this
-  branch's S73→S91, D21→D26 — both collided with a concurrent session's own S73/D21). This
-  session's own substance (S71 mat-click pickers D19, S72 Grand Tree double-move fix D20, S91
-  Grand Tree stage-2 re-resolve + failure messaging D26) predates the merge; see journal S71/72/91.
-Active: not yet re-verified. User reported the D20 fix did NOT resolve the live "Grand Tree
-  stage 2 disappears" bug on a fresh PR96 deploy, then clarified: the stage-2 card disappears
-  for BOTH players after "Done" is pressed in the picker — implying a real synced move that
-  lands nowhere visible, not a pure local no-op (the sync log read for D26 showed zero wire
-  activity, which doesn't fully square with "both players see it vanish" — root cause still
-  not 100% pinned). D26's fix (PR #97) is live-pushed but not yet retested.
-Next: user retests Grand Tree's Stage-2 chain against PR #97. If it still fails, check for the
-  new "⛔ Grand Tree: could not evolve..." chat message — report it verbatim, it names which
+Session: 92
+Focus: merging concurrently-opened PRs into main (#97 Grand Tree stage-2 fix landed first; this
+  merge brings in #98's Trainer/turn rule fixes on top).
+Active: done. (1) move-card.js playTrainer branch called markSupporterPlayed() for every
+  hand->board Trainer play, not just Supporters — Items falsely tripped the one-Supporter-per-
+  turn gate on the next real Supporter. Fixed by gating the call on the existing isSupporter
+  check (move-card.js:237). (2) shouldAutoDrawAtTurnStart() (rules-state.mjs) skipped the draw
+  on turn 1 for the player going first. That is the actual official TCG rule and was covered by
+  a passing test — flagged this to the user before editing; user confirmed (AskUserQuestion) they
+  want it changed anyway, so the turnNumber===1 guard is removed and turn 1 now draws normally.
+  Updated the matching unit test. 1281/1281 tests pass. See journal S91.
+Next: user should smoke-check both S91 fixes on localhost: play an Item then a Supporter in the
+  same turn (Supporter should still be allowed), and confirm the first player now draws on turn 1.
+  Also retest Grand Tree's Stage-2 chain against PR #97 (S91-main): if it still fails, check for
+  the new "⛔ Grand Tree: could not evolve..." chat message — report it verbatim, it names which
   side (deck card vs host) the guard rejected. If it fails with NO message and the card still
   vanishes for both players, the guard isn't the cause — get a fresh sync log from that exact
   run and check whether `evolveCard.js` ever sets `targetCard.image.attached` on the Stage-1
   base (it currently doesn't, only `targetCard.attached` — a card-level vs image-level flag
-  mismatch that's a plausible next lead). Also still open from S71: mat-click pick/cancel/
-  Escape flow, stray-click leak-through, opponent-side highlighting in local 2P — none
-  browser-verified. Also open from main: S82/S88 I34 (turn-desync residual), S73(main) drag
-  active→bench retreat live-verify, design 005/006 smoke-check. Maintenance due S96.
+  mismatch that's a plausible next lead). Still open from S82/S88: I34 (turn-desync residual,
+  1/10 soak failures) — see journal S88 for the lead. Still open from S71/S73: mat-click pick/
+  cancel/Escape flow, stray-click leak-through, opponent-side highlighting in local 2P, drag
+  active→bench retreat live-verify — none browser-verified. Design 005/006 smoke-check still
+  open. Maintenance due S96.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -48,9 +50,9 @@ Blocked: nothing.
   first and renumber the incoming side, don't just pick one.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S91 2026-09-10 debug(rules): Grand Tree stage-2-chain re-resolves host zone/index live +
+- S91 2026-09-11 patch: Item plays no longer trip the Supporter-per-turn gate; turn 1 now draws
+  (user override of the official skip-first-draw rule) — see Active above.
+- S91-main 2026-09-10 debug(rules): Grand Tree stage-2-chain re-resolves host zone/index live +
   failure messaging (D26, PR #97). Does not yet have a confirmed live fix — see Next above.
 - S90/S90b 2026-09-10 feature: design 006 — generation pills + per-generation Energy tabs in
-  Browse Sets (merged from main).
-- S89/S89b 2026-09-10 feature+patch: 3D energy tokens for attached Energy (design 005, merged
-  from main).
+  Browse Sets.
