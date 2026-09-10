@@ -441,13 +441,12 @@ async function runSearchStep(card, searchStep, done) {
       maxCount: count,
       upTo,
       onConfirm: (selected) => {
+        // openChoicePicker (rules-bridge.js) already moves every picked card
+        // itself via zoneFrom/destination — a second manual moveCardBundle
+        // here raced it, reading `deck.array` after the picker's own splice
+        // had already shifted it, and silently dropped the sync hint
+        // (buildMoveCardHints found no card at the stale index).
         revealPicked(selected);
-        for (const s of selected) {
-          const idx = zone(_effectOwner, 'deck').array.indexOf(s);
-          if (idx >= 0) {
-            moveCardBundle(_effectOwner, _effectOwner, 'deck', toBench ? 'bench' : 'hand', idx, false, 'move');
-          }
-        }
         if (selected.length === 0) {
           msg('  no cards taken — deck shuffled');
           shuffleAfter({ message: null });
