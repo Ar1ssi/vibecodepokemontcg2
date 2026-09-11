@@ -3,6 +3,7 @@ import {
       fetchGenerationSets,
       fetchSetCards,
       filterCardsByName,
+      filterCardsBySupertype,
       sortCardsWithinGroup,
       GENERATIONS,
     } from '../../../setup/deck-builder/core/set-browser.mjs';
@@ -52,6 +53,9 @@ import {
       };
 
       let filterTerm = '';
+      // Driven externally by the deck builder's Pokémon/Trainers/Energy
+      // summary-bar buttons (setSupertypeFilter) — null/'pokemon'/'trainer'/'energy'.
+      let supertypeFilter = null;
       let expandedSetId = null;
       let activeCategory = 'standard';
       const cardsBySet = new Map(); // setId -> Card[] (loaded lazily)
@@ -155,7 +159,8 @@ import {
           return;
         }
 
-        const isFiltering = String(filterTerm || '').trim() !== '';
+        const hasNameFilter = String(filterTerm || '').trim() !== '';
+        const isFiltering = hasNameFilter || Boolean(supertypeFilter);
         const dropdownSections = [];
 
         const buildTabsFor = (groupSets) => {
@@ -166,7 +171,7 @@ import {
             if (expanded || isFiltering) {
               const cards = cardsBySet.get(set.setId);
               if (cards) {
-                const filtered = filterCardsByName(cards, filterTerm);
+                const filtered = filterCardsBySupertype(filterCardsByName(cards, filterTerm), supertypeFilter);
                 if (isFiltering) {
                   expanded = filtered.length > 0;
                 }
@@ -364,6 +369,13 @@ import {
           categoryState.clear();
           cardsBySet.clear();
           load();
+        },
+        // Called by the deck builder when a summary-bar segment is
+        // clicked/toggled — null clears the filter.
+        setSupertypeFilter: (supertype) => {
+          if (supertypeFilter === supertype) return;
+          supertypeFilter = supertype;
+          render();
         },
       };
     };

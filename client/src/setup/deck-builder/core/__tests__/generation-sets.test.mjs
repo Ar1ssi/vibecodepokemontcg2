@@ -4,6 +4,7 @@ import {
   fetchGenerationSets,
   fetchGenerationEnergyCards,
   fetchSetCards,
+  filterCardsBySupertype,
   generationEnergySetId,
   GENERATION_SERIES,
   GENERATIONS,
@@ -201,5 +202,57 @@ describe('fetchSetCards routes a generation Energy tab id to fetchGenerationEner
       ['gte4a-005']
     );
     delete GENERATION_SERIES[91];
+  });
+});
+
+describe('filterCardsBySupertype', () => {
+  it('filters to just the requested supertype', () => {
+    const cards = [
+      { id: 'a', supertype: 'Pokémon' },
+      { id: 'b', supertype: 'Trainer' },
+      { id: 'c', supertype: 'Energy' },
+    ];
+    assert.deepEqual(filterCardsBySupertype(cards, 'pokemon').map((c) => c.id), ['a']);
+    assert.deepEqual(filterCardsBySupertype(cards, 'trainer').map((c) => c.id), ['b']);
+    assert.deepEqual(filterCardsBySupertype(cards, 'energy').map((c) => c.id), ['c']);
+  });
+
+  it('returns every card when no filter is given', () => {
+    const cards = [{ id: 'a' }, { id: 'b' }];
+    assert.deepEqual(filterCardsBySupertype(cards, null), cards);
+  });
+
+  it('matches the unaccented "Pokemon" spelling too', () => {
+    const cards = [{ id: 'a', supertype: 'Pokemon' }];
+    assert.deepEqual(filterCardsBySupertype(cards, 'pokemon').map((c) => c.id), ['a']);
+  });
+});
+
+describe('fetchSetCards tags each card with its TCGdex supertype', () => {
+  it('cross-references /cards?category=X to tag Pokémon/Trainer/Energy', async () => {
+    stubFetch([
+      ['/cards?category=Pokemon', [{ id: 'gts1-001' }]],
+      ['/cards?category=Trainer', [{ id: 'gts1-002' }]],
+      ['/cards?category=Energy', [{ id: 'gts1-003' }]],
+      [
+        '/sets/gts1',
+        {
+          id: 'gts1',
+          name: 'GTS Set',
+          cards: [
+            { id: 'gts1-001', name: 'Bulbasaur', localId: '001', image: 'x' },
+            { id: 'gts1-002', name: 'Poké Ball', localId: '002', image: 'y' },
+            { id: 'gts1-003', name: 'Basic Grass Energy', localId: '003', image: 'z' },
+          ],
+        },
+      ],
+    ]);
+    const cards = await fetchSetCards('gts1');
+    const byId = Object.fromEntries(cards.map((c) => [c.id, c.supertype]));
+    assert.deepEqual(byId, {
+      'gts1-001': 'Pokémon',
+      'gts1-002': 'Trainer',
+      'gts1-003': 'Energy',
+    });
   });
 });

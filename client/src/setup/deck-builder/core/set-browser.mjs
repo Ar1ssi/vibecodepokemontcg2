@@ -124,11 +124,11 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       return `${value}.png`;
     }
     
-    function normalizeSetCard(card = {}, set = {}) {
+    function normalizeSetCard(card = {}, set = {}, supertype) {
       const imageBase = card.image || '';
       const detailImage = imageBase ? `${imageBase}/high.webp` : '';
       const lowImage = imageBase ? `${imageBase}/low.webp` : '';
-    
+
       return {
         id: card.id,
         name: card.name,
@@ -143,8 +143,52 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
           name: set.name,
           releaseDate: set.releaseDate || '',
         },
+        supertype,
         _provider: 'tcgdex-set-browser',
       };
+    }
+
+    // TCGdex's `/sets/{id}` card list (used by fetchSetCards below) carries no
+    // category/supertype field — only the per-card detail endpoint does, and
+    // fetching that per card would be one request per card. `/cards?category=X`
+    // (already used for the Energy tab, D18) returns every card id in that
+    // category in one request, so build one id -> supertype map covering all
+    // three categories, lazily and once per session.
+    const CATEGORY_TO_SUPERTYPE = { Pokemon: 'Pokémon', Trainer: 'Trainer', Energy: 'Energy' };
+    let cardSupertypeIndexPromise = null;
+    function fetchCardSupertypeIndex() {
+      if (cardSupertypeIndexPromise) return cardSupertypeIndexPromise;
+      cardSupertypeIndexPromise = Promise.all(
+        Object.keys(CATEGORY_TO_SUPERTYPE).map(async (category) => {
+          const url = new URL(`${TCGDEX_BASE}/cards`);
+          url.searchParams.set('category', category);
+          const rows = await fetchJson(url.toString());
+          return rows.map((row) => [row.id, CATEGORY_TO_SUPERTYPE[category]]);
+        })
+      )
+        .then((groups) => new Map(groups.flat()))
+        .catch((error) => {
+          cardSupertypeIndexPromise = null;
+          throw error;
+        });
+      return cardSupertypeIndexPromise;
+    }
+
+    // Every Pokémon/Trainer/Energy card id in one flat filter — used to narrow
+    // a Browse Sets card grid to one supertype (deck builder's summary-bar
+    // click-to-filter). `supertype` is null/'pokemon'/'trainer'/'energy'.
+    export function filterCardsBySupertype(cards = [], supertype = null) {
+      if (!supertype) return [...cards];
+      const targets =
+        supertype === 'pokemon'
+          ? ['Pokémon', 'Pokemon']
+          : supertype === 'trainer'
+            ? ['Trainer']
+            : supertype === 'energy'
+              ? ['Energy']
+              : null;
+      if (!targets) return [...cards];
+      return cards.filter((card) => targets.includes(card?.supertype));
     }
     
     export function getLegalSetRegistry() {
@@ -367,6 +411,7 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
           image,
           images: { small: image, large: image },
           set: MEE_SET,
+          supertype: 'Energy',
           _provider: 'pkmncards-set-browser',
         };
       });
@@ -401,7 +446,7 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
             return ids
               .map((id) => cardsById.get(id))
               .filter((card) => card?.id && card?.name && card.image)
-              .map((card) => normalizeSetCard(card, set));
+              .map((card) => normalizeSetCard(card, set, 'Energy'));
           } catch {
             return [];
           }
@@ -435,7 +480,7 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
             return setSummaries
               .map((summary) => cardsById.get(summary.id))
               .filter((card) => card?.id && card?.name && card.image)
-              .map((card) => normalizeSetCard(card, set));
+              .map((card) => normalizeSetCard(card, set, 'Energy'));
           } catch {
             return [];
           }
@@ -490,9 +535,21 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
         name: record.name,
         releaseDate: record.releaseDate || '',
       };
-      return (record.cards || [])
+      const cards = (record.cards || [])
         .filter((card) => card?.id && card?.name && card.image)
         .map((card) => normalizeSetCard(card, set));
+
+      try {
+        const supertypeIndex = await fetchCardSupertypeIndex();
+        for (const card of cards) {
+          card.supertype = supertypeIndex.get(card.id);
+        }
+      } catch {
+        // Supertype tagging is additive for the summary-bar filter — a lookup
+        // failure shouldn't block browsing the set's cards.
+      }
+
+      return cards;
     }
     
     export function filterCardsByName(cards = [], term = '') {

@@ -916,6 +916,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         render();
       },
     });
+    // Keep the Browse Sets panel's own card grid in sync with the same
+    // filter — the summary bar drives both the deck list and Browse Sets.
+    setBrowser?.setSupertypeFilter?.(deckListFilter);
 
     if (validationDot) {
       const formatLabel = result.formatName;
