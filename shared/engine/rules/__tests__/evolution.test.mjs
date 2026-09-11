@@ -143,6 +143,15 @@ import test from 'node:test';
       assert.equal(steps[0].count, 2);
     });
     
+    test('ability parser: Last Ditch Catch (Meowth) targets Supporter, not Pokémon', () => {
+      const steps = parseAbility(
+        'Once during your turn, if this Pokémon is in the Active Spot, you may search your deck for a Supporter card, reveal it, and put it into your hand. Then shuffle your deck.'
+      );
+      const search = steps.find((s) => s.type === 'searchAbility');
+      assert.equal(search.what, 'Supporter');
+      assert.equal(search.destination, 'hand');
+    });
+
     test('ability parser: effect prevention', () => {
       const steps = parseAbility("Prevent all effects of your opponent's abilities.");
       assert.equal(steps[0].type, 'effectPreventAbility');
