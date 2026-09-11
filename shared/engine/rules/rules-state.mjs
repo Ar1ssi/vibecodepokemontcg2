@@ -41,6 +41,12 @@
       lastAutoDrawTurn: { self: 0, opp: 0 },
       // Count of turns each player has taken in the current match.
       playerTurnCount: { self: 0, opp: 0 },
+      // "When you play this Pokémon onto your Bench" trigger windows — NOT
+      // reset per turn (unlike `flags.*.abilitiesUsed`). A card gets a window
+      // the instant it's played from hand to Bench; the window is only valid
+      // during that same turn and only until consumed. It's deleted outright
+      // if the card ever returns to hand, so replaying it opens a fresh one.
+      whenPlayedWindows: { self: {}, opp: {} },
     };
     
     // ── card data enrichment: type chart data from TCGdex card details ──
@@ -392,6 +398,7 @@
       rulesState.playerTurnCount = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
+      rulesState.whenPlayedWindows = { self: {}, opp: {} };
     }
 
     // firstPlayer: who goes first ('self' | 'opp'). Defaults to 'self' so
@@ -408,8 +415,9 @@
       rulesState.playerTurnCount = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
+      rulesState.whenPlayedWindows = { self: {}, opp: {} };
     }
-    
+
     export function beginTurn(player) {
       rulesState.turnPlayer = player;
       rulesState.turnNumber += 1;
@@ -548,6 +556,27 @@
     }
     export function abilityUsed(player, card) {
       return !!rulesState.flags[player]?.abilitiesUsed?.[abilityKey(card)];
+    }
+
+    // ── "When you play this Pokémon onto your Bench" trigger windows ──────
+    // Distinct from abilitiesUsed: NOT cleared by resetTurnFlags, so it stays
+    // consumed across future turns instead of re-arming every turn. Opening a
+    // fresh window (played from hand again) and clearing on return-to-hand
+    // are the only ways to reset it.
+    export function openPlayedToBenchWindow(player, card) {
+      const key = abilityKey(card);
+      rulesState.whenPlayedWindows[player][key] = { turn: rulesState.turnNumber, used: false };
+    }
+    export function clearPlayedToBenchWindow(player, card) {
+      delete rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
+    }
+    export function canUsePlayedToBenchTrigger(player, card) {
+      const entry = rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
+      return !!entry && !entry.used && entry.turn === rulesState.turnNumber;
+    }
+    export function consumePlayedToBenchTrigger(player, card) {
+      const entry = rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
+      if (entry) entry.used = true;
     }
 
     /** Turn-scoped attack bonus from a once-per-turn ability (Torrential Heart, …). */

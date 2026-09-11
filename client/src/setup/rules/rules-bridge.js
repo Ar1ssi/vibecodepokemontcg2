@@ -25,6 +25,8 @@
       markMulligansResolved,
       markAttacked,
       resetRulesSessionState,
+      canUsePlayedToBenchTrigger,
+      consumePlayedToBenchTrigger,
     } from '/shared/engine/rules/rules-state.mjs';
     import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
     import { handleKO, checkWinConditions, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
@@ -1865,14 +1867,31 @@ import {
         appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
         return;
       }
-      if (rulesState.enabled && abilityUsed(user, card)) {
-        appendMessage(user, `⛔ ${card.name}'s ability was already used this turn.`, 'announcement', false);
-        return;
-      }
 
       await ensureCardData(card);
       const abilityText = card.ability?.text || card.abilityText || '';
       const steps = parseAbility(abilityText);
+      // "When you play this Pokémon onto your Bench" triggers (e.g. Meowth's
+      // Last Ditch Catch) aren't a recurring once-per-turn action — they're
+      // gated by the one-shot window opened when the card was played from
+      // hand to Bench, not the per-turn abilitiesUsed map.
+      const isPlayedToBenchTrigger = steps.some((s) => s.type === 'whenPlayedAbility');
+
+      if (isPlayedToBenchTrigger) {
+        if (rulesState.enabled && !canUsePlayedToBenchTrigger(user, card)) {
+          appendMessage(
+            user,
+            `⛔ ${card.name}'s ability only works the turn it's played from hand to the Bench.`,
+            'announcement',
+            false
+          );
+          return;
+        }
+      } else if (rulesState.enabled && abilityUsed(user, card)) {
+        appendMessage(user, `⛔ ${card.name}'s ability was already used this turn.`, 'announcement', false);
+        return;
+      }
+
       const plan = planAbilitySteps(steps, { mode: 'interactive' });
       const actionable = actionableAbilityPlan(plan, { mode: 'interactive' });
       if (actionable.length === 0) {
@@ -1894,6 +1913,10 @@ import {
           await executeAbilityDraw(user, item.step);
           executed = true;
         } else if (item.action === 'search') {
+          // A when-played + search combo (isPlayedToBenchTrigger) resolves
+          // its search entirely inside runWhenPlayedStep below — running it
+          // again here would pop the picker twice for one trigger.
+          if (isPlayedToBenchTrigger) continue;
           const completed = await runAbilitySearchPicker(user, card, item.step);
           if (markAbilityUseAfterSearchStep(completed)) {
             executed = true;
@@ -2010,7 +2033,8 @@ import {
       }
 
       if (executed && rulesState.enabled && !skipAbilityMark) {
-        markAbilityUsed(user, card);
+        if (isPlayedToBenchTrigger) consumePlayedToBenchTrigger(user, card);
+        else markAbilityUsed(user, card);
       }
     }
     

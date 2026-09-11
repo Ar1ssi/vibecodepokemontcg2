@@ -4,7 +4,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { resetAbilityCounters } from '../counters/reset-counters.js';
 import { discardBoard } from '../general/board-actions.js';
-import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } from '/shared/engine/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '/shared/engine/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
 import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
@@ -3229,7 +3229,32 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     }
   }
 
-  if (!abilityTurnAndUsageGuard(user, target, 'search')) return;
+  const abilityText =
+    target?.ability?.text ?? target?.abilityText ?? target?.text ?? '';
+  const abilitySteps = parseAbility(abilityText);
+  // "When you play this Pokémon onto your Bench" triggers (e.g. Meowth's
+  // Last Ditch Catch) aren't a recurring once-per-turn action: they only
+  // fire in the window opened the turn the card was played from hand to
+  // Bench, and never again until it returns to hand and is replayed.
+  const isPlayedToBenchTrigger = abilitySteps.some((s) => s.type === 'whenPlayedAbility');
+
+  if (isPlayedToBenchTrigger) {
+    if (rulesState.enabled && rulesState.turnPlayer !== user) {
+      appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
+      return;
+    }
+    if (!target || (rulesState.enabled && !canUsePlayedToBenchTrigger(user, target))) {
+      appendMessage(
+        user,
+        `⛔ ${target?.name || 'This Pokémon'}'s ability only works the turn it's played from hand to the Bench.`,
+        'announcement',
+        false
+      );
+      return;
+    }
+  } else if (!abilityTurnAndUsageGuard(user, target, 'search')) {
+    return;
+  }
 
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
@@ -3237,9 +3262,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  const abilityText =
-    target.ability?.text ?? target.abilityText ?? target.text ?? '';
-  const searchStep = parseAbility(abilityText).find(
+  const searchStep = abilitySteps.find(
     (s) => s.type === 'searchAbility'
   );
   const what =
@@ -3275,7 +3298,10 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
 
   const completeSearch = (opts) => {
     shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name, ...opts });
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled) {
+      if (isPlayedToBenchTrigger) consumePlayedToBenchTrigger(user, target);
+      else markAbilityUsed(user, target);
+    }
   };
   const revealPicked = (picked) =>
     maybeAnnounceSearchReveal(user, target.name, picked, appendMessage, {
