@@ -3527,6 +3527,15 @@ a:hover {
       padding: 0.5vh 0.2vw;
       background: rgba(65, 91, 168, 0.08);
       border: 1px solid rgba(65, 91, 168, 0.16);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .native-deck-builder-summary-segment:hover {
+      background: rgba(65, 91, 168, 0.16);
+    }
+    .native-deck-builder-summary-segment.active {
+      background: rgba(65, 91, 168, 0.32);
+      border-color: rgba(65, 91, 168, 0.5);
     }
     .native-deck-builder-summary-segment:first-child {
       border-radius: 4px 0 0 4px;
@@ -3638,6 +3647,10 @@ a:hover {
       background: rgba(120, 144, 214, 0.14);
       border-color: rgba(120, 144, 214, 0.22);
       color: #a0b0e0;
+    }
+    body.dark-mode-1 .native-deck-builder-summary-segment.active {
+      background: rgba(120, 144, 214, 0.34);
+      border-color: rgba(120, 144, 214, 0.5);
     }
     body.dark-mode-1 .native-deck-builder-summary-segment strong {
       color: #eef3ff;

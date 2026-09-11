@@ -23,6 +23,7 @@ import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   addCard,
   createEmptyDeck,
+  filterDeck,
   getDeckCounts,
   removeCard,
 } from '../../../setup/deck-builder/core/deck-state.mjs';
@@ -564,6 +565,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let currentHugeResultSet = false;
   let deckDirty = false;
   let flashFrame = null;
+  // null = show every card in the deck list; 'pokemon'|'trainer'|'energy'
+  // narrows it to that supertype, set by clicking a summary-bar segment.
+  let deckListFilter = null;
 
   const flashDeckStatus = () => {
     if (!deckStatus) return;
@@ -858,7 +862,16 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.saveActiveDeck(deck);
         const counts = getDeckCounts(deck);
     const result = validateDeck(deck, detectDeckFormat(deck));
-    const sortedCards = getSortedDeckCardArray(deck);
+    // The summary bar's counts always reflect the whole deck; only the list
+    // of cards below it narrows when a segment filter is active.
+    const deckForList = deckListFilter
+      ? filterDeck(deck, {
+          pokemon: deckListFilter === 'pokemon',
+          trainer: deckListFilter === 'trainer',
+          energy: deckListFilter === 'energy',
+        })
+      : deck;
+    const sortedCards = getSortedDeckCardArray(deckForList);
     const hasDeckCards = Object.keys(deck).length > 0;
 
     clearButton.style.display = hasDeckCards ? '' : 'none';
@@ -894,7 +907,15 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       el.classList.toggle('opp-color', !isSelf);
     }
 
-    renderDeckSummary({ summaryEl: summary, counts });
+    renderDeckSummary({
+      summaryEl: summary,
+      counts,
+      activeFilter: deckListFilter,
+      onFilterClick: (type) => {
+        deckListFilter = deckListFilter === type ? null : type;
+        render();
+      },
+    });
 
     if (validationDot) {
       const formatLabel = result.formatName;

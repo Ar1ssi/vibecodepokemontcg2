@@ -94,21 +94,32 @@ const escapeHtml = (value = '') => String(value)
     
     /**
      * Renders the segmented Pokémon / Trainers / Energy counts bar in the style
-     * of Pokémon TCG Live's deck sidebar.
+     * of Pokémon TCG Live's deck sidebar. Each segment is a toggle button:
+     * clicking one filters the deck list below to just that supertype;
+     * clicking the active one again (or passing the same `activeFilter`
+     * back) clears the filter. `onFilterClick` receives the segment's key
+     * ('pokemon' | 'trainer' | 'energy') — the caller owns the toggle state.
      */
-    export const renderDeckSummary = ({ summaryEl, counts }) => {
+    export const renderDeckSummary = ({ summaryEl, counts, activeFilter = null, onFilterClick }) => {
       if (!summaryEl) return;
-    
+
       const segments = [
-        { label: 'POKÉMON', value: counts.pokemon },
-        { label: 'TRAINERS', value: counts.trainer },
-        { label: 'ENERGY', value: counts.energy },
+        { key: 'pokemon', label: 'POKÉMON', value: counts.pokemon },
+        { key: 'trainer', label: 'TRAINERS', value: counts.trainer },
+        { key: 'energy', label: 'ENERGY', value: counts.energy },
       ];
-    
+
       summaryEl.innerHTML = segments
         .map((segment) => {
-          return `<div class="native-deck-builder-summary-segment">${escapeHtml(segment.label)}<strong>${segment.value}</strong></div>`;
+          const isActive = activeFilter === segment.key;
+          return `<button type="button" class="native-deck-builder-summary-segment${isActive ? ' active' : ''}" data-filter-type="${segment.key}" aria-pressed="${isActive}" title="Filter deck list to ${segment.label.toLowerCase()}">${escapeHtml(segment.label)}<strong>${segment.value}</strong></button>`;
         })
         .join('');
+
+      summaryEl.querySelectorAll('[data-filter-type]').forEach((button) => {
+        button.addEventListener('click', () => {
+          onFilterClick?.(button.dataset.filterType);
+        });
+      });
     };
     

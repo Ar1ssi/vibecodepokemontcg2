@@ -4,24 +4,24 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 104 (drafted as S91 on this branch — renumbered on merge; main's own journal had
-  already reused S91 twice by the time this branch caught up, see journal for both)
-Focus: merged this branch's patch — 3 bugs behind "old-set decklist imports show as Unknown, not
-  Pokémon" — onto main's current tip (which had moved through S91-S103 since this branch started).
-Active: done for this branch's patch: (1) import.js:548-566 — `getOldCardType(tcgId)` no longer
-  unconditionally overwrites a correct `getCardType(set, number)` result; gated behind
-  `!type || type === 'Unknown'`. (2) added Black & White / HeartGold&SoulSilver short codes to
-  `LEGACY_SET_CODE_TO_TCGDEX_ID` (legacy-set-ids.mjs) — were completely missing. (3)
-  `getCardType`/`getOldCardType` breakpoint loops (find-type.js, find-old-type.js) now continue
-  the last known type past a set's highest recorded breakpoint instead of 'Unknown'. +10 tests.
-  Everything else in this STATE (I40/I42/S103 netcode fixes, S91 Grand Tree investigation, the
-  cherry-picked section-2 fixes) is prior work from other sessions merged in unchanged — not
-  re-verified here beyond `pnpm test` passing post-merge.
-Next: user should re-import a Black & White era decklist on localhost to confirm cards now show
-  correct types (not independently browser-verified this session — DOM-coupled import screen).
-  Carried over: I41 (legacy rejoin, no opening hand, 1 sample, untriaged); I39 flip-gate-test
-  fails on current main (pre-existing); I37 live 2P check; I34 turn-desync residual; Grand Tree
-  cosmetic chat line. Maintenance due (carried from S100, still not done as of S103).
+Session: 105
+Focus: feature — deck builder's Pokémon/Trainers/Energy summary segments are now clickable
+  filters for the card list below them.
+Active: done. Reused the already-tested `filterDeck()` (deck-state.mjs) — it existed but had no
+  caller. `native-deck-builder.js`: new `deckListFilter` state (null|'pokemon'|'trainer'|
+  'energy'), `render()` narrows `sortedCards` through `filterDeck` when set; summary counts stay
+  unfiltered (whole-deck totals never change). `native-deck-builder-renderers.js`:
+  `renderDeckSummary` segments are now `<button>`s with an `active` class + `onFilterClick`
+  callback; clicking the active segment again clears the filter (toggle). CSS: button reset +
+  `.active`/dark-mode active styling in index.css. pnpm test 1316/1316 (unchanged — no new pure
+  logic, filterDeck already covered). Not unit-tested at this DOM-coupled UI-wiring layer itself
+  (no jsdom harness anywhere in native-deck-builder-*.js, pre-existing gap).
+Next: user should smoke-check on localhost — open deck builder, add a mixed deck, click each
+  summary segment to confirm the list filters and the click toggles off. Carried over: I41
+  (legacy rejoin, no opening hand, 1 sample, untriaged); I39 flip-gate-test fails on current main
+  (pre-existing); I37 live 2P check; I34 turn-desync residual; Grand Tree cosmetic chat line;
+  EX/e-Card era getCardType tables unaudited (S104 only covered Black & White/HGSS). Maintenance
+  due (carried from S100).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -34,14 +34,14 @@ Blocked: nothing.
 - `pnpm lint` fails repo-wide on pre-existing CRLF line endings + `no-undef` globals on `.mjs`
   files (eslint.config only targets `**/*.js`). Verify a diff's own files with targeted
   `npx eslint <files>` and read past the CRLF noise; don't fix the repo-wide config in passing.
-- `client/src/setup/deck-constructor/` (legacy decklist import/type-detection) is older and more
-  error-prone than `deck-builder/core/` — S104 fixed an "overwrite whichever ran last wins" bug
-  and a "no catch-all past the last breakpoint" bug there; EX/e-Card era short codes' getCardType
-  tables weren't audited, only Black & White/HGSS — worth re-checking on the next report.
+- `native-deck-builder-*.js` (the whole native deck builder UI-wiring layer) has zero unit tests
+  — no jsdom harness exists for it in this repo. Pure logic it calls into (deck-state.mjs,
+  card-sort.mjs, card-search.mjs, etc.) IS unit-tested; keep new deck-builder logic there and
+  keep the *.js UI files as thin callers, so behavior stays testable even though the wiring isn't.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S104 2026-09-12 patch: fixed 3 bugs behind "old-set imports show as Unknown" — see Active above.
+- S105 2026-09-12 feature: deck builder summary segments are now click-to-filter buttons — see
+  Active above.
+- S104 2026-09-12 patch: fixed 3 bugs behind "old-set imports show as Unknown".
 - S103 2026-09-11 fix(netcode): resetDealOrder wired to room-changed (I40); syncCheck skips the
   compare on a stale stateVersion instead of false-reporting a desync (I42).
-- S91 (main) 2026-09-11 chore(merge): cherry-picked section-2 fixes (TCGdex enrichment, Colorless
-  attack-cost rule correction) onto main.
