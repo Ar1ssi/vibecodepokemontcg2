@@ -210,6 +210,49 @@ import {
       win.innerHTML = `<h4 class="rules-aw-title">⚔️ Attack Window</h4><div class="rules-aw-body"></div>`;
       document.body.appendChild(win);
 
+      // ── drag by the title bar ──
+      const titleEl = win.querySelector('.rules-aw-title');
+      titleEl.classList.add('rules-aw-draggable');
+      let dragPointerId = null;
+      let dragOffsetX = 0;
+      let dragOffsetY = 0;
+
+      const onPointerMove = (e) => {
+        if (e.pointerId !== dragPointerId) return;
+        const maxLeft = window.innerWidth - win.offsetWidth;
+        const maxTop = window.innerHeight - win.offsetHeight;
+        const left = Math.min(Math.max(0, e.clientX - dragOffsetX), Math.max(0, maxLeft));
+        const top = Math.min(Math.max(0, e.clientY - dragOffsetY), Math.max(0, maxTop));
+        win.style.left = `${left}px`;
+        win.style.top = `${top}px`;
+        win.style.right = 'auto';
+        win.style.bottom = 'auto';
+      };
+
+      const onPointerUp = (e) => {
+        if (e.pointerId !== dragPointerId) return;
+        dragPointerId = null;
+        titleEl.releasePointerCapture(e.pointerId);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+      };
+
+      titleEl.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        const rect = win.getBoundingClientRect();
+        dragPointerId = e.pointerId;
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        win.style.left = `${rect.left}px`;
+        win.style.top = `${rect.top}px`;
+        win.style.right = 'auto';
+        win.style.bottom = 'auto';
+        titleEl.setPointerCapture(e.pointerId);
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+        e.preventDefault();
+      });
+
       const energySymbols = {
         Colorless: '⚪', Fire: '🔥', Water: '💧', Grass: '🌿',
         Lightning: '⚡', Psychic: '🔮', Fighting: '🥊', Metal: '⚙️',
