@@ -9,6 +9,7 @@
 //   node server/server.js &
 //   node playtest-bot.mjs --games=50 --seed=1 [--max-turns=60] [--deck=<path.json>] [--headed]
 //                          [--scorer=heuristic|coverage]
+//   node playtest-bot.mjs --deckA=<path.json> --deckB=<path.json>   # two different decks
 //
 // --scorer picks the brain behind the never-crash scaffold (bot.mjs's OptionScorer seam):
 //   heuristic (default) plays a plausible game; coverage plays a thorough one, holding back
@@ -17,11 +18,13 @@
 //
 // Default deck is the built-in 20-card all-Basic fixture (client/src/setup/general/
 // e2e-mode.mjs's e2eFixtureDeck) — no network fetch, so it runs anywhere `?e2e=1` does.
-// `--deck` loads a custom deck (same 7-field row JSON the deck importer produces:
-// [quantity, name, type, imageURL, number, set, tcgId]) via the new `loadDeckList()`
-// bridge method; per design's non-goal list this never changes a gameplay file.
+// `--deck` loads the same custom deck to both bots (7-field row JSON the deck importer
+// produces: [quantity, name, type, imageURL, number, set, tcgId]) via the `loadDeckList()`
+// bridge method. `--deckA`/`--deckB` load different decks per side instead — pass both
+// together (either alone falls back to the fixture deck for the missing side). Per design's
+// non-goal list this never changes a gameplay file.
 import { chromium } from 'playwright';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decide } from './bot/bot.mjs';
@@ -33,13 +36,24 @@ const BASE = process.env.PTCG_URL || 'http://localhost:4000';
 const OUT_DIR = path.join(__dirname, 'out', 'playtest');
 
 function parseArgs(argv) {
-  const opts = { games: 1, seed: 1, maxTurns: 60, deck: null, headed: false, scorer: 'heuristic' };
+  const opts = {
+    games: 1,
+    seed: 1,
+    maxTurns: 60,
+    deck: null,
+    deckA: null,
+    deckB: null,
+    headed: false,
+    scorer: 'heuristic',
+  };
   for (const arg of argv) {
     const [key, value] = arg.replace(/^--/, '').split('=');
     if (key === 'games') opts.games = Number(value);
     else if (key === 'seed') opts.seed = Number(value);
     else if (key === 'max-turns') opts.maxTurns = Number(value);
     else if (key === 'deck') opts.deck = value;
+    else if (key === 'deckA') opts.deckA = value;
+    else if (key === 'deckB') opts.deckB = value;
     else if (key === 'headed') opts.headed = true;
     else if (key === 'scorer') opts.scorer = value;
   }
@@ -130,7 +144,7 @@ async function crossClientDivergence(a, b) {
   return problems;
 }
 
-async function setupGame(browser, room, deckRows, pageErrors) {
+async function setupGame(browser, room, deckRowsA, deckRowsB, pageErrors) {
   const a = await openClient(browser, 'A', pageErrors);
   const b = await openClient(browser, 'B', pageErrors);
 
@@ -139,11 +153,23 @@ async function setupGame(browser, room, deckRows, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.counters().twoPlayer === true);
   await waitFor(b.page, () => window.__ptcg.counters().twoPlayer === true);
 
-  if (deckRows) {
-    await a.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRows);
-    await b.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRows);
+  // Slowly resolve every unique card up front, before build-deck.js's own per-instance
+  // warm-up ever fires — see warmDeckCache()'s comment in e2e-api.js. Run both sides'
+  // warm-ups concurrently with each other (each is already sequential internally) so a
+  // 2-deck game doesn't pay double the wall-clock time for no extra gentleness. A side
+  // using the fixture deck has nothing to warm (it stamps its own stats already).
+  await Promise.all([
+    deckRowsA ? a.page.evaluate((rows) => window.__ptcg.warmDeckCache(rows), deckRowsA) : null,
+    deckRowsB ? b.page.evaluate((rows) => window.__ptcg.warmDeckCache(rows), deckRowsB) : null,
+  ]);
+  if (deckRowsA) {
+    await a.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRowsA);
   } else {
     await a.page.evaluate(() => window.__ptcg.loadFixtureDeck('BotA'));
+  }
+  if (deckRowsB) {
+    await b.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRowsB);
+  } else {
     await b.page.evaluate(() => window.__ptcg.loadFixtureDeck('BotB'));
   }
   await waitFor(a.page, () => window.__ptcg.zone('self', 'deck').count >= 1);
@@ -178,9 +204,21 @@ async function setupGame(browser, room, deckRows, pageErrors) {
   await waitFor(b.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
 
   const callBtn = '#rulesCoinCallOverlay button[data-coin-call="heads"]';
-  const overlayDeadline = Date.now() + 15000;
+  // SERVER_AUTHORITATIVE deployments (e.g. Render prod) can resolve the coin flip
+  // server-side before or during this loop — there is then no overlay to click.
+  // Legacy peer-flip mode (local dev default) needs the overlay clicked below.
+  // Re-check phase every iteration rather than once up front: a single snapshot
+  // races with the server resolving the flip mid-loop.
+  const overlayDeadline = Date.now() + 30000;
   let called = false;
+  let attempts = 0;
   while (Date.now() < overlayDeadline && !called) {
+    attempts += 1;
+    const phase = await a.page.evaluate(() => window.__ptcg.turnState().phase);
+    if (phase !== 'setup') {
+      called = true;
+      break;
+    }
     await a.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
     await b.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
     for (const client of [a, b]) {
@@ -190,12 +228,23 @@ async function setupGame(browser, room, deckRows, pageErrors) {
         break;
       }
     }
-    if (!called) await a.page.waitForTimeout(200);
+    if (!called) await a.page.waitForTimeout(300);
   }
-  if (!called) throw new Error('coin call overlay never opened');
+  if (!called) {
+    const [aTs, bTs] = await Promise.all([
+      a.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
+      b.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
+    ]);
+    throw new Error(
+      `coin call overlay never opened after ${attempts} attempts; aTurnState=${JSON.stringify(aTs)} bTurnState=${JSON.stringify(bTs)}`
+    );
+  }
 
-  await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count === 7);
-  await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count === 7);
+  // A mulligan (no Basic Pokémon in the opening hand — real decks can draw this,
+  // unlike the guaranteed-Basic e2e fixture deck) redraws 7 and gives the opponent
+  // a bonus card, so a mulliganing side's final hand can legitimately exceed 7.
+  await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
+  await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
 
   // Design 004 targets the legacy client path by default (SERVER_AUTHORITATIVE unset),
   // where turnPlayer is decided by a peer-to-peer coin flip and broadcast directly
@@ -300,7 +349,7 @@ function summarizeCoverage(exercised) {
   return { distinct: new Set(keys).size, actions: keys.length, kinds };
 }
 
-async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, scorerName }) {
+async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRowsA, deckRowsB, scorerName }) {
   const room = `e2e-playtest-${seed}-${gameIndex}-${Date.now()}`;
   const pageErrors = [];
   const stepLog = [];
@@ -318,7 +367,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
 
   let clients;
   try {
-    clients = await setupGame(browser, room, deckRows, pageErrors);
+    clients = await setupGame(browser, room, deckRowsA, deckRowsB, pageErrors);
   } catch (err) {
     return { result: 'fail', reason: 'setup-error', detail: err.message, gameIndex };
   }
@@ -382,15 +431,17 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
     };
   };
 
+  // Declared outside the try below (not just inside it) so the catch — which runs on any
+  // exception the bot loop throws, not only the explicit fail() calls inside try — can
+  // still see the last state the bot observed. `let` inside `try {}` is a separate lexical
+  // block from `catch {}` in JS; referencing it there was a ReferenceError that replaced
+  // the real exception with "lastObservation is not defined" on this path.
+  let lastTurnNumber = 0;
+  let lastObservation = null;
+  let lastChosen = null;
   try {
-    let lastTurnNumber = 0;
     let turnActionCount = 0;
     let steps = 0;
-    // Kept so the failure paths that have no observation of their own in hand (pageerror,
-    // both softlocks, the in-turn wedge) still dump the last board the bot actually saw —
-    // a dump without one is not replayable, which is this slice's acceptance bar.
-    let lastObservation = null;
-    let lastChosen = null;
     // Guard 3 (heuristic-scorer.mjs): Trainers that resolved to no state change this turn.
     // Cleared on every turn change, so a card blocked by a once-per-turn rule gets retried.
     let triedThisTurn = new Set();
@@ -500,6 +551,16 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
           triedThisTurn.add(optionKey(chosen, observation));
         }
       }
+      // Abilities are once-per-turn by rule (the real client's abilityUsed() gate should
+      // already enforce this in enumerateOptions, but a card whose once-per-turn marking
+      // doesn't take — or one with no real effect to detect, e.g. a search ability that
+      // legitimately finds nothing — keeps getting re-offered and re-picked, spending the
+      // whole turn's action budget on a no-op loop the wedge report can't explain. Mark any
+      // ability as tried the moment it's attempted, regardless of outcome, matching the
+      // real rule rather than working around one card's specific behavior.
+      if (chosen.kind === 'ability') {
+        triedThisTurn.add(optionKey(chosen, observation));
+      }
       if (!actResult.ok) {
         // act() reports { ok: false } with no error whenever the underlying client action
         // simply returned false (e2e-api.js), so `detail` would otherwise be undefined and
@@ -551,10 +612,16 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const deckRows = opts.deck ? JSON.parse(readFileSync(path.resolve(opts.deck), 'utf8')) : null;
+  const loadDeck = (file) => (file ? JSON.parse(readFileSync(path.resolve(file), 'utf8')) : null);
+  const sharedDeck = loadDeck(opts.deck);
+  const deckRowsA = loadDeck(opts.deckA) || sharedDeck;
+  const deckRowsB = loadDeck(opts.deckB) || sharedDeck;
+  // CI sandbox pins a bundled Chromium at a fixed path; elsewhere (e.g. local dev)
+  // fall back to Playwright's own managed install.
+  const ciExecutablePath = '/opt/pw-browsers/chromium';
   const browser = await chromium.launch({
     headless: !opts.headed,
-    executablePath: '/opt/pw-browsers/chromium',
+    executablePath: existsSync(ciExecutablePath) ? ciExecutablePath : undefined,
   });
 
   const results = [];
@@ -565,12 +632,14 @@ async function main() {
         seed: opts.seed,
         gameIndex,
         maxTurns: opts.maxTurns,
-        deckRows,
+        deckRowsA,
+        deckRowsB,
         scorerName: opts.scorer,
       });
       results.push(result);
       const label = result.result === 'pass' ? 'PASS' : `FAIL (${result.reason})`;
       console.log(`game ${gameIndex + 1}/${opts.games}: ${label}${result.dump ? ` -> ${result.dump}` : ''}`);
+      if (result.detail) console.log(`  detail: ${result.detail}`);
       if (result.coverage) {
         const { distinct, actions, kinds } = result.coverage;
         console.log(

@@ -51,8 +51,24 @@ export const buildDeck = (user) => {
   // be the ones left out.
   const builtCards = [...deck.array];
 
-  // Pre-warm card metadata in the background so deck searches don't incur network latency
-  const enriched = Promise.all(builtCards.map((card) => ensureCardData(card)));
+  // Pre-warm card metadata in the background so deck searches don't incur network latency.
+  // Capped concurrency, not a bare Promise.all: a 60-card deck otherwise fires dozens of
+  // simultaneous TCGdex requests, and a burst that size gets bot-detection-blocked by
+  // TCGdex/Cloudflare (surfaces as every request failing CORS, not as a rate-limit error).
+  const ENRICHMENT_CONCURRENCY = 6;
+  async function enrichWithLimit(cards) {
+    let next = 0;
+    const worker = async () => {
+      while (next < cards.length) {
+        const card = cards[next++];
+        await ensureCardData(card);
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(ENRICHMENT_CONCURRENCY, cards.length) }, worker)
+    );
+  }
+  const enriched = enrichWithLimit(builtCards);
 
   // Design 004 slice 6: the playtest bot must not start acting on cards whose hp/attacks/
   // stage/subtypes haven't resolved yet — unenriched cards make options() under-report

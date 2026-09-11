@@ -11,3 +11,22 @@ services:
         value: production
       - key: SERVER_AUTHORITATIVE
         value: '1'
+
+  # Staging clone of ptcg-sim with the ?e2e=1 test bridge armed (PTCG_E2E=1), so the
+  # Playwright playtest bot (playtest-bot.mjs) can run against a real Render deploy without
+  # opening the bridge on the production service (server/server.js's E2E_ENABLED gate).
+  # Run the bot against this service with: PTCG_URL=https://ptcg-sim-staging.onrender.com node playtest-bot.mjs --games=10
+  - type: web
+    name: ptcg-sim-staging
+    runtime: node
+    plan: free
+    buildCommand: pnpm install --frozen-lockfile
+    startCommand: node server/server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVER_AUTHORITATIVE
+        value: '1'
+      - key: PTCG_E2E
+        value: '1'
