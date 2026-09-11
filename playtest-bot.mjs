@@ -9,6 +9,7 @@
 //   node server/server.js &
 //   node playtest-bot.mjs --games=50 --seed=1 [--max-turns=60] [--deck=<path.json>] [--headed]
 //                          [--scorer=heuristic|coverage]
+//   node playtest-bot.mjs --deckA=<path.json> --deckB=<path.json>   # two different decks
 //
 // --scorer picks the brain behind the never-crash scaffold (bot.mjs's OptionScorer seam):
 //   heuristic (default) plays a plausible game; coverage plays a thorough one, holding back
@@ -17,9 +18,11 @@
 //
 // Default deck is the built-in 20-card all-Basic fixture (client/src/setup/general/
 // e2e-mode.mjs's e2eFixtureDeck) — no network fetch, so it runs anywhere `?e2e=1` does.
-// `--deck` loads a custom deck (same 7-field row JSON the deck importer produces:
-// [quantity, name, type, imageURL, number, set, tcgId]) via the new `loadDeckList()`
-// bridge method; per design's non-goal list this never changes a gameplay file.
+// `--deck` loads the same custom deck to both bots (7-field row JSON the deck importer
+// produces: [quantity, name, type, imageURL, number, set, tcgId]) via the `loadDeckList()`
+// bridge method. `--deckA`/`--deckB` load different decks per side instead — pass both
+// together (either alone falls back to the fixture deck for the missing side). Per design's
+// non-goal list this never changes a gameplay file.
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -33,13 +36,24 @@ const BASE = process.env.PTCG_URL || 'http://localhost:4000';
 const OUT_DIR = path.join(__dirname, 'out', 'playtest');
 
 function parseArgs(argv) {
-  const opts = { games: 1, seed: 1, maxTurns: 60, deck: null, headed: false, scorer: 'heuristic' };
+  const opts = {
+    games: 1,
+    seed: 1,
+    maxTurns: 60,
+    deck: null,
+    deckA: null,
+    deckB: null,
+    headed: false,
+    scorer: 'heuristic',
+  };
   for (const arg of argv) {
     const [key, value] = arg.replace(/^--/, '').split('=');
     if (key === 'games') opts.games = Number(value);
     else if (key === 'seed') opts.seed = Number(value);
     else if (key === 'max-turns') opts.maxTurns = Number(value);
     else if (key === 'deck') opts.deck = value;
+    else if (key === 'deckA') opts.deckA = value;
+    else if (key === 'deckB') opts.deckB = value;
     else if (key === 'headed') opts.headed = true;
     else if (key === 'scorer') opts.scorer = value;
   }
@@ -130,7 +144,7 @@ async function crossClientDivergence(a, b) {
   return problems;
 }
 
-async function setupGame(browser, room, deckRows, pageErrors) {
+async function setupGame(browser, room, deckRowsA, deckRowsB, pageErrors) {
   const a = await openClient(browser, 'A', pageErrors);
   const b = await openClient(browser, 'B', pageErrors);
 
@@ -139,11 +153,14 @@ async function setupGame(browser, room, deckRows, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.counters().twoPlayer === true);
   await waitFor(b.page, () => window.__ptcg.counters().twoPlayer === true);
 
-  if (deckRows) {
-    await a.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRows);
-    await b.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRows);
+  if (deckRowsA) {
+    await a.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRowsA);
   } else {
     await a.page.evaluate(() => window.__ptcg.loadFixtureDeck('BotA'));
+  }
+  if (deckRowsB) {
+    await b.page.evaluate((rows) => window.__ptcg.loadDeckList(rows), deckRowsB);
+  } else {
     await b.page.evaluate(() => window.__ptcg.loadFixtureDeck('BotB'));
   }
   await waitFor(a.page, () => window.__ptcg.zone('self', 'deck').count >= 1);
@@ -300,7 +317,7 @@ function summarizeCoverage(exercised) {
   return { distinct: new Set(keys).size, actions: keys.length, kinds };
 }
 
-async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, scorerName }) {
+async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRowsA, deckRowsB, scorerName }) {
   const room = `e2e-playtest-${seed}-${gameIndex}-${Date.now()}`;
   const pageErrors = [];
   const stepLog = [];
@@ -318,7 +335,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
 
   let clients;
   try {
-    clients = await setupGame(browser, room, deckRows, pageErrors);
+    clients = await setupGame(browser, room, deckRowsA, deckRowsB, pageErrors);
   } catch (err) {
     return { result: 'fail', reason: 'setup-error', detail: err.message, gameIndex };
   }
@@ -551,7 +568,10 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const deckRows = opts.deck ? JSON.parse(readFileSync(path.resolve(opts.deck), 'utf8')) : null;
+  const loadDeck = (file) => (file ? JSON.parse(readFileSync(path.resolve(file), 'utf8')) : null);
+  const sharedDeck = loadDeck(opts.deck);
+  const deckRowsA = loadDeck(opts.deckA) || sharedDeck;
+  const deckRowsB = loadDeck(opts.deckB) || sharedDeck;
   const browser = await chromium.launch({
     headless: !opts.headed,
     executablePath: '/opt/pw-browsers/chromium',
@@ -565,7 +585,8 @@ async function main() {
         seed: opts.seed,
         gameIndex,
         maxTurns: opts.maxTurns,
-        deckRows,
+        deckRowsA,
+        deckRowsB,
         scorerName: opts.scorer,
       });
       results.push(result);
