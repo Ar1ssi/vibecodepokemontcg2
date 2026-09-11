@@ -67,7 +67,19 @@ test('emitSyncCheck sends roomId and zones on the syncCheck event', () => {
   const zones = { active: 'hash1' };
   const result = emitSyncCheck({ socket, roomId: 'room1', zones });
   assert.equal(result, true);
-  assert.deepEqual(calls, [['syncCheck', { roomId: 'room1', zones }]]);
+  assert.deepEqual(calls, [
+    ['syncCheck', { roomId: 'room1', zones, stateVersion: undefined }],
+  ]);
+});
+
+test('emitSyncCheck includes the stateVersion the zones were hashed from', () => {
+  const calls = [];
+  const socket = { emit: (...args) => calls.push(args) };
+  const zones = { active: 'hash1' };
+  emitSyncCheck({ socket, roomId: 'room1', zones, stateVersion: 7 });
+  assert.deepEqual(calls, [
+    ['syncCheck', { roomId: 'room1', zones, stateVersion: 7 }],
+  ]);
 });
 
 test('emitSyncCheck returns false without a usable socket or roomId', () => {

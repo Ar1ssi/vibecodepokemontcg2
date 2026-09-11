@@ -34,7 +34,7 @@
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
-import { getDealOrderStarter } from '../netcode/deal-order.js';
+import { getDealOrderStarter, resetDealOrder } from '../netcode/deal-order.js';
 import { multiplayerLocksRulesEnabled } from '../general/e2e-mode.mjs';
 function shouldExecuteLocalRulesEffect({
   isTwoPlayer = false,
@@ -681,6 +681,7 @@ import {
     const resetRulesSession = () => {
       rulesSessionGeneration += 1;
       resetRulesSessionState();
+      resetDealOrder();
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;

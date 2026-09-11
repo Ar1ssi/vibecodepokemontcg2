@@ -4,23 +4,22 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 102
-Focus: S101's fix did not fix Render (server-authoritative) — both symptoms reproduced and fixed.
-Active: done. S101 only covered legacy mode. In authoritative mode three separate server bugs:
-  (1) explicit Leave Room kept the GameRoom whenever the opponent stayed seated, so rejoining the
-  same room re-sent the old game (hand, prizes, "YOUR TURN — main phase"): GameRoom.resetGame now
-  frees the leaver's seat and restarts the game for whoever stays (deck reloaded from deckList,
-  printed cardStats carried by syncInstance, stateVersion kept monotonic). (2) The sync-check
-  heartbeat compared the client's view hashes with raw server state; owner views redact
-  unrevealed prizes, so `prizes` diverged every 30s in every game, and each false desync ran the
-  legacy peer-log catch-up whose 5s timeout posted "The game may be out of sync". Server now hashes
-  the owner's view (hashOwnerViewZones); a real desync recovers via requestView. (3) loadDeck
-  treated string quantities ("4", what real decklists send) as 1 card per row. Evidence:
-  room-rejoin-reset-test.mjs 8 FAIL on baseline -> 14/14; pnpm test 1307/1307.
-Next: user to verify on Render once this deploys (leave mid-game + rejoin same room; play past a
-  few 30s heartbeats with a real 60-card deck). Maintenance due (carried from S100). Open: I39
-  flip-gate-test fails on current main (pre-existing); I40-I42 filed below. Still open from
-  before: I37 live 2P check, I34 turn-desync residual, Grand Tree cosmetic chat line.
+Session: 103
+Focus: Fix I40 (resetDealOrder unwired) and I42 (syncCheck transient false desync); I41 left open.
+Active: done. I40: resetDealOrder() had no callers — wired it into rules-bridge.js's
+  resetRulesSession, which already fires on the 'room-changed' document event (leave/join) and
+  every Reset button, so a stale dealOrder/starter can no longer survive into the next game.
+  I42: syncCheck's heartbeat now tags its zone hashes with the view's stateVersion
+  (getLastRenderedVersion); server's 'syncCheck' handler in server.js skips the compare (no
+  desync emitted) when gameRoom.state.stateVersion has moved past that version — a command
+  landing mid-flight is a stale snapshot, not a divergence. Next 30s heartbeat re-checks against
+  settled state. Evidence: pnpm test 1308/1308 (was 1307/1307 + new stateVersion-forwarding
+  unit test); no regressions. Pushed to claude/fix-i40-i42-pi3x6i, PR opened.
+Next: user to verify on Render (leave/rejoin a room mid-setup; watch for desync warnings across
+  several 30s heartbeats while a real command lands). Maintenance due (carried from S100). Open:
+  I39 flip-gate-test fails on current main (pre-existing); I41 (legacy rejoin, no opening hand,
+  1 sample, untriaged). Still open from before: I37 live 2P check, I34 turn-desync residual,
+  Grand Tree cosmetic chat line.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -29,16 +28,18 @@ Blocked: nothing.
 - e2e fixture decks use quantity '1' on every row, which hides quantity bugs; real decklists send
   "2"-"4". room-rejoin-reset-test.mjs loads a '4'-quantity deck for this reason.
 - Sync-check must hash what the owner's view shows (hashOwnerViewZones), never raw state: any new
-  redacted zone or field otherwise becomes a permanent false desync on every heartbeat.
+  redacted zone or field otherwise becomes a permanent false desync on every heartbeat. Since
+  S103 it also skips the compare on a stateVersion mismatch — don't drop that guard, it's I42.
 - Room exit/entry must dispatch document 'room-changed' (S101); an explicit seated Leave in
   authoritative mode resets the server game (GameRoom.resetGame). A disconnect still resumes.
+  resetDealOrder() also hangs off 'room-changed' via rules-bridge.js's resetRulesSession (S103).
 - Playwright servers: if :4000 is the user's dev server, use PORT=41xx + PTCG_URL. context.setOffline
   does not drop a localhost websocket; use `(await import('/src/state.js')).socket.disconnect()`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S103 2026-09-11 fix(netcode): resetDealOrder wired to room-changed (I40); syncCheck skips the
+  compare on a stale stateVersion instead of false-reporting a desync (I42).
 - S102 2026-09-11 fix(netcode): authoritative mode — Leave Room resets the server game; sync-check
   hashes the owner's view (no more prize false-desyncs / reload warnings); string deck quantities.
 - S101 2026-09-11 fix(netcode/rules): room change resets the rules session; server answers a
   peer-log request itself when the requester is alone (legacy mode only in practice).
-- S100 2026-09-11 patch(fix): Dawn's combined Basic/Stage1/Stage2 search — 3 sequential
-  single-card searches, one shuffle at the end; matchesSearch gained exact stage filters.
