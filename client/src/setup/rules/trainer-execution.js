@@ -463,15 +463,17 @@ async function runSearchStep(card, searchStep, done) {
   });
   if (pool.length === 0) {
     msg('  no cards left in deck');
-    shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
+    if (!searchStep.suppressShuffle) shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
     done?.();
     return;
   }
-  const shuffleAfter = (opts) =>
+  const shuffleAfter = (opts) => {
+    if (searchStep.suppressShuffle) return;
     shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
       sourceName: card.name,
       ...opts,
     });
+  };
   const toBench = searchStep.destination === 'bench';
   const toAttach = searchStep.destination === 'attach';
 
@@ -582,6 +584,22 @@ async function runSearchStep(card, searchStep, done) {
       done?.();
     },
   });
+}
+
+// Dawn-style effect: search for one card per named stage, back to back
+// (each opens its own filtered picker for exactly 1 card), then shuffle once
+// at the end instead of after every stage.
+async function runSearchSequenceStep(card, step, done) {
+  const stages = step.stages || [];
+  const runStage = async (i) => {
+    if (i >= stages.length) {
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
+      done?.();
+      return;
+    }
+    await runSearchStep(card, { ...stages[i], suppressShuffle: true }, () => runStage(i + 1));
+  };
+  await runStage(0);
 }
 
 async function runLookStep(card, step, fromBottom, done) {
@@ -954,6 +972,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         }
         case 'searchDeck':
           await runSearchStep(card, step, () => runAt(idx + 1));
+          return;
+        case 'searchDeckSequence':
+          await runSearchSequenceStep(card, step, () => runAt(idx + 1));
           return;
         case 'lookAtTop':
           await runLookStep(card, step, false, () => runAt(idx + 1));
