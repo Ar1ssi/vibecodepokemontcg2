@@ -122,7 +122,16 @@ test('e2e options: no attach option once the turn energy is used', async () => {
   const before = await enumerateOptions(board);
   assert.deepEqual(
     before.filter((o) => o.kind === 'attach'),
-    [{ kind: 'attach', handIndex: 0, targetZone: 'active', targetIndex: 0 }]
+    [
+      {
+        kind: 'attach',
+        handIndex: 0,
+        targetZone: 'active',
+        targetIndex: 0,
+        instanceId: null,
+        targetInstanceId: null,
+      },
+    ]
   );
 
   rulesState.flags.self.energyAttached = true;
@@ -142,7 +151,16 @@ test('e2e options: no evolve onto a Pokémon played this turn', async () => {
   });
   assert.deepEqual(
     canEvolveNow.filter((o) => o.kind === 'evolve'),
-    [{ kind: 'evolve', handIndex: 0, targetZone: 'active', targetIndex: 0 }]
+    [
+      {
+        kind: 'evolve',
+        handIndex: 0,
+        targetZone: 'active',
+        targetIndex: 0,
+        instanceId: null,
+        targetInstanceId: null,
+      },
+    ]
   );
 
   const justPlayed = pokemon('Squirtle', { enteredPlayTurn: rulesState.turnNumber });
@@ -180,13 +198,13 @@ test('e2e options: a Basic goes Active when the Active slot is empty, else to th
   const empty = await enumerateOptions({ user: 'self', active: null, hand });
   assert.deepEqual(
     empty.filter((o) => o.kind === 'playBasic'),
-    [{ kind: 'playBasic', handIndex: 0, targetZone: 'active' }]
+    [{ kind: 'playBasic', handIndex: 0, targetZone: 'active', instanceId: null }]
   );
 
   const benched = await enumerateOptions({ user: 'self', active: pokemon('Psyduck'), hand });
   assert.deepEqual(
     benched.filter((o) => o.kind === 'playBasic'),
-    [{ kind: 'playBasic', handIndex: 0, targetZone: 'bench' }]
+    [{ kind: 'playBasic', handIndex: 0, targetZone: 'bench', instanceId: null }]
   );
 
   const full = await enumerateOptions({
@@ -218,8 +236,8 @@ test('e2e options: one Supporter per turn; Items stay available', async () => {
   assert.deepEqual(
     before.filter((o) => o.kind === 'playTrainer'),
     [
-      { kind: 'playTrainer', handIndex: 0 },
-      { kind: 'playTrainer', handIndex: 1 },
+      { kind: 'playTrainer', handIndex: 0, instanceId: null },
+      { kind: 'playTrainer', handIndex: 1, instanceId: null },
     ]
   );
 
@@ -227,7 +245,7 @@ test('e2e options: one Supporter per turn; Items stay available', async () => {
   const after = await enumerateOptions(board);
   assert.deepEqual(
     after.filter((o) => o.kind === 'playTrainer'),
-    [{ kind: 'playTrainer', handIndex: 1 }]
+    [{ kind: 'playTrainer', handIndex: 1, instanceId: null }]
   );
 });
 
@@ -278,4 +296,31 @@ test('e2e options: every option is plain JSON, as the page boundary requires', a
   });
   assert.deepEqual(JSON.parse(JSON.stringify(options)), options);
   assert.ok(options.length > 1);
+});
+
+// Under SERVER_AUTHORITATIVE the option's index addresses the SERVER view array, while
+// moveCardBundle's legacy fallback indexes the local DOM zone array — so an index alone
+// cannot address a card. Options therefore carry the server's instanceId when the cards
+// they were built from have one, which act() forwards as the authoritative dispatch's
+// { moving, target } bundle.
+test('e2e options: carry the server instanceId when the cards have one', async () => {
+  rulesState.enabled = true;
+  rulesState.turnPlayer = 'self';
+  rulesState.turnNumber = 3;
+  rulesState.flags = { self: {}, opp: {} };
+
+  const basic = { ...pokemon('Charmander'), instanceId: 77 };
+  const activeCard = { ...pokemon('Squirtle'), instanceId: 12 };
+  const energy = { name: 'Water Energy', type: 'Energy', supertype: 'Energy', instanceId: 99 };
+
+  const benchPlay = (
+    await enumerateOptions({ user: 'self', hand: [basic], active: activeCard, bench: [] })
+  ).find((o) => o.kind === 'playBasic');
+  assert.equal(benchPlay.instanceId, 77);
+
+  const attach = (
+    await enumerateOptions({ user: 'self', hand: [energy], active: activeCard, bench: [] })
+  ).find((o) => o.kind === 'attach');
+  assert.equal(attach.instanceId, 99);
+  assert.equal(attach.targetInstanceId, 12);
 });

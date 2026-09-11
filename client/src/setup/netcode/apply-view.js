@@ -875,6 +875,24 @@ export function reconcileTurnState(view, options = {}) {
   if (typeof turn.number === 'number') state.turnNumber = turn.number;
   if (typeof turn.phase === 'string') state.phase = turn.phase;
 
+  // Per-turn flags, for the same reason as the turn fields above: under the flag the legacy
+  // bodies that used to set them (markRetreated, markSupporterPlayed, the energy-attach and
+  // attack markers) are gated away, so `rulesState.flags` stays frozen while the SERVER
+  // tracks the real ones. `canPerformAction` reads these, so a stale set makes the client
+  // offer moves the server then rejects — "Already retreated this turn." after one retreat
+  // is the reproducible case. The view already carries them (view.mjs's you/them.flags);
+  // nothing applied them. Merged rather than replaced so any purely local flag the server
+  // does not model survives.
+  if (!state.flags || typeof state.flags !== 'object') state.flags = {};
+  const sides = [
+    ['self', view.you?.flags],
+    ['opp', view.them?.flags],
+  ];
+  for (const [side, flags] of sides) {
+    if (!flags || typeof flags !== 'object') continue;
+    state.flags[side] = { ...(state.flags[side] || {}), ...flags };
+  }
+
   const doc = options.document || (typeof document !== 'undefined' ? document : null);
   if (doc) {
     doc.dispatchEvent(

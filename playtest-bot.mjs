@@ -203,46 +203,54 @@ async function setupGame(browser, room, deckRowsA, deckRowsB, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
 
-  const callBtn = '#rulesCoinCallOverlay button[data-coin-call="heads"]';
-  // SERVER_AUTHORITATIVE deployments (e.g. Render prod) can resolve the coin flip
-  // server-side before or during this loop — there is then no overlay to click.
-  // Legacy peer-flip mode (local dev default) needs the overlay clicked below.
-  // Re-check phase every iteration rather than once up front: a single snapshot
-  // races with the server resolving the flip mid-loop.
-  const overlayDeadline = Date.now() + 30000;
-  let called = false;
-  let attempts = 0;
-  while (Date.now() < overlayDeadline && !called) {
-    attempts += 1;
-    const phase = await a.page.evaluate(() => window.__ptcg.turnState().phase);
-    if (phase !== 'setup') {
-      called = true;
-      break;
-    }
-    await a.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
-    await b.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
-    for (const client of [a, b]) {
-      if (await client.page.locator(callBtn).isVisible().catch(() => false)) {
-        await client.page.locator(callBtn).click();
+  // Under SERVER_AUTHORITATIVE the server owns setup: it deals, sets the prizes and picks
+  // the first player, and no #rulesCoinCallOverlay is ever shown. The coin ritual below is
+  // legacy-only, and waiting on it against an authoritative server fails every run with
+  // "coin call overlay never opened" before a single action is taken. Ask the client which
+  // netcode is live rather than inferring it from a phase poll, which races with the server
+  // resolving the flip mid-loop.
+  const authoritative = await a.page.evaluate(() => window.__ptcg.isAuthoritative());
+  if (!authoritative) {
+    const callBtn = '#rulesCoinCallOverlay button[data-coin-call="heads"]';
+    const overlayDeadline = Date.now() + 30000;
+    let called = false;
+    let attempts = 0;
+    while (Date.now() < overlayDeadline && !called) {
+      attempts += 1;
+      // Belt and braces: even in legacy mode the flip can be resolved out from under this
+      // loop, leaving no overlay to click.
+      const phase = await a.page.evaluate(() => window.__ptcg.turnState().phase);
+      if (phase !== 'setup') {
         called = true;
         break;
       }
+      await a.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
+      await b.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
+      for (const client of [a, b]) {
+        if (await client.page.locator(callBtn).isVisible().catch(() => false)) {
+          await client.page.locator(callBtn).click();
+          called = true;
+          break;
+        }
+      }
+      if (!called) await a.page.waitForTimeout(300);
     }
-    if (!called) await a.page.waitForTimeout(300);
-  }
-  if (!called) {
-    const [aTs, bTs] = await Promise.all([
-      a.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
-      b.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
-    ]);
-    throw new Error(
-      `coin call overlay never opened after ${attempts} attempts; aTurnState=${JSON.stringify(aTs)} bTurnState=${JSON.stringify(bTs)}`
-    );
+    if (!called) {
+      const [aTs, bTs] = await Promise.all([
+        a.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
+        b.page.evaluate(() => window.__ptcg.turnState()).catch((e) => String(e)),
+      ]);
+      throw new Error(
+        `coin call overlay never opened after ${attempts} attempts; aTurnState=${JSON.stringify(aTs)} bTurnState=${JSON.stringify(bTs)}`
+      );
+    }
   }
 
-  // A mulligan (no Basic Pokémon in the opening hand — real decks can draw this,
-  // unlike the guaranteed-Basic e2e fixture deck) redraws 7 and gives the opponent
-  // a bonus card, so a mulliganing side's final hand can legitimately exceed 7.
+  // A mulligan (no Basic Pokémon in the opening hand — real decks can draw this, unlike the
+  // guaranteed-Basic e2e fixture deck) redraws 7 and gives the opponent a bonus card, so a
+  // mulliganing side's final hand can legitimately exceed 7. Under server authority the
+  // server also deals 8 to the player going first (their turn-1 draw is already included),
+  // so neither mode pins a side to exactly 7.
   await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
 
@@ -372,6 +380,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRowsA, deck
     return { result: 'fail', reason: 'setup-error', detail: err.message, gameIndex };
   }
   const { a, b } = clients;
+  const authoritative = await a.page.evaluate(() => window.__ptcg.isAuthoritative());
 
   const fail = async (reason, detail, observation, chosen, turn) => {
     const rejections = await Promise.all([
@@ -533,11 +542,29 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRowsA, deck
         onFallback: (why, detail) => fallbacks.push({ turn: lastTurnNumber, why, detail: String(detail ?? '') }),
       });
       lastChosen = chosen;
+      const viewVersionBefore = authoritative
+        ? await active.page.evaluate(() => window.__ptcg.viewVersion())
+        : 0;
       const actResult = await active.page.evaluate((option) => window.__ptcg.act(option), chosen);
       if (actResult.ok) {
         (isA ? exercised.a : exercised.b).push(coverageKey(chosen, observation));
       }
       stepLog.push({ turn: lastTurnNumber, player: isA ? 'a' : 'b', chosen, actResult });
+
+      // Under server authority, options() is computed from the last applied view, so acting
+      // again before the next one lands means choosing against a stale board. Wait for the
+      // view to advance. Bounded and non-fatal: a command that legitimately produces no new
+      // view (or a slow round trip) must not stall the run, and the existing rejection and
+      // divergence checks still catch anything this misses.
+      if (authoritative && actResult.ok) {
+        const before = viewVersionBefore;
+        const deadline = Date.now() + 3000;
+        while (Date.now() < deadline) {
+          const now = await active.page.evaluate(() => window.__ptcg.viewVersion());
+          if (now > before) break;
+          await active.page.waitForTimeout(50);
+        }
+      }
 
       // A Trainer still in hand after act() reported success resolved to nothing this client
       // can execute (an unimplemented effect). Mark it so the scorer stops re-picking it —

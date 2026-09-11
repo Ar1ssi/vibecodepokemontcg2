@@ -12,6 +12,10 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I43 2026-09-11 P2 [netcode] Client per-turn rules flags were never synced from the authoritative view — FIXED S89, recorded because it affected real players, not only the bot. Under `SERVER_AUTHORITATIVE` the legacy bodies that set `rulesState.flags` (markRetreated, markSupporterPlayed, the energy-attach and attack markers) are gated away, so the flags stayed frozen while the server tracked the real ones; `canPerformAction` reads them, so the client offered moves the server then rejected ("Already retreated this turn." after one retreat). `reconcileTurnState` (apply-view.js) already existed for exactly this class of staleness and synced turn player/number/phase but not flags; it now merges `view.you/them.flags` too. Verified: bot 8/8 games in authoritative mode, was 0/8 (refs: design 002 slice 3.12, S89).
+    RENUMBERED from I36 on merge into this branch: the two sessions ran concurrently and both
+    claimed I36/S89. This branch's numbering is the incumbent; the fix/bot-authoritative commit
+    message still says I36.
 - I39 2026-09-11 P2 [netcode] flip-gate-test.mjs fails right after both hands are dealt (timeout waiting for a page predicate) on main fe0ad88 with S102's changes stashed — pre-existing; the server-authoritative exit gate is currently red. (refs: S102)
 - I40 2026-09-11 P3 [netcode] deal-order.js resetDealOrder() has no callers, so a game's dealOrder/starter survive into the next game in the same tab. Not shown harmful (second-game probe dealt correctly, zero desync after S102), but the documented reset is unwired. (refs: S102)
 - I41 2026-09-11 P3 [netcode] legacy mode: after both players leave and join a fresh room, the second player once stayed in setup with prizes but no opening hand (1 sample, S102 second-game probe). Untriaged. (refs: S102)
