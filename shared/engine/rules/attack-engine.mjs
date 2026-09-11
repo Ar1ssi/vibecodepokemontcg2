@@ -42,6 +42,15 @@ import { effectiveHp } from './stadium-effects.mjs';
     // Entries may be plain type strings (legacy) or `{ type, family }`
     // objects (taxonomy §F): a `double` family energy provides 2 of its
     // printed type; `double-colorless` provides 2 Colorless (any 2 symbols).
+    //
+    // 'Wildcard' is a distinct pool token from 'Colorless': it marks a genuine
+    // any-type special energy (Prism/Stellar Energy — real cards whose ruling is
+    // "provides any type of Energy"), which energy-effects.mjs's effectiveEnergyType
+    // represents as `{ type: 'Colorless', family: 'attach-type' }` since it has no
+    // fixed type of its own. That representation is otherwise indistinguishable
+    // from a plain Colorless Energy card, which — unlike Prism/Stellar — can only
+    // ever pay a Colorless cost symbol. Re-tag it here so canPayAttackCost can
+    // still tell the two apart.
     export function expandEnergyEntries(attachedEnergies = []) {
       const pool = [];
       for (const entry of attachedEnergies) {
@@ -52,6 +61,8 @@ import { effectiveHp } from './stadium-effects.mjs';
           pool.push('Colorless', 'Colorless');
         } else if (family === 'double') {
           pool.push(type, type);
+        } else if (family === 'attach-type' && type === 'Colorless') {
+          pool.push('Wildcard');
         } else {
           pool.push(type);
         }
@@ -61,8 +72,12 @@ import { effectiveHp } from './stadium-effects.mjs';
 
     // Energy check: does the attacker have enough attached energy for the cost?
     // `attachedEnergies` entries may be plain type strings or `{ type, family }`
-    // objects (see `expandEnergyEntries`). A Colorless entry satisfies any
-    // symbol; a Colorless cost symbol can be paid by any attached energy.
+    // objects (see `expandEnergyEntries`). The wildcard direction is one-way, per
+    // the real TCG rules: a Colorless cost symbol can be paid by any attached
+    // energy, but Colorless-*type* energy itself pays only Colorless cost symbols
+    // — it cannot cover a colored (e.g. Fire, Psychic) requirement. A 'Wildcard'
+    // pool entry (Prism/Stellar Energy) is the one genuine exception and pays any
+    // symbol, colored or Colorless.
     export function canPayAttackCost(attachedEnergies = [], cost = []) {
       const pool = expandEnergyEntries(attachedEnergies);
       for (const symbol of cost) {
@@ -70,15 +85,15 @@ import { effectiveHp } from './stadium-effects.mjs';
           const ci = pool.indexOf('Colorless');
           if (ci !== -1) pool.splice(ci, 1);
           else if (pool.length === 0) return false;
-          else pool.pop(); // any single energy pays a Colorless symbol
+          else pool.pop(); // any single energy (including Wildcard) pays a Colorless symbol
         } else {
           const idx = pool.indexOf(symbol);
           if (idx !== -1) {
             pool.splice(idx, 1);
           } else {
-            const ci = pool.indexOf('Colorless'); // Colorless is a wildcard
-            if (ci === -1) return false;
-            pool.splice(ci, 1);
+            const wi = pool.indexOf('Wildcard');
+            if (wi === -1) return false;
+            pool.splice(wi, 1);
           }
         }
       }

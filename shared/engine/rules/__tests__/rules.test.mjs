@@ -195,20 +195,26 @@ const { decideTurnOrder, resolveTurnOrderCaller } = await import('../rules-turno
       assert.equal(canPayAttackCost([{ type: 'Fire', family: 'double' }], ['Fire', 'Water']), false);
     });
 
-    test('double-colorless energy pays any two symbols', () => {
-      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Fire', 'Water']), true);
-      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Fire', 'Fire', 'Water']), false);
+    test('double-colorless energy pays 2 Colorless symbols, not colored ones', () => {
+      // Real rule: Colorless-type energy — including Double Colorless — pays only
+      // {C} Colorless cost slots. It cannot cover a colored requirement.
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Fire', 'Water']), false);
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Colorless', 'Colorless']), true);
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family: 'double-colorless' }], ['Colorless', 'Colorless', 'Colorless']), false);
     });
 
-    test('Colorless cost symbol is a wildcard (legacy strings)', () => {
-      assert.equal(canPayAttackCost(['Colorless', 'Colorless'], ['Fire', 'Water']), true);
-      assert.equal(canPayAttackCost(['Colorless'], ['Fire']), true);
+    test('any energy is a wildcard for a Colorless cost symbol (legacy strings)', () => {
+      assert.equal(canPayAttackCost(['Fire', 'Water'], ['Colorless', 'Colorless']), true);
+      assert.equal(canPayAttackCost(['Fire'], ['Colorless']), true);
+      // But plain Colorless-type energy cannot pay a colored symbol back.
+      assert.equal(canPayAttackCost(['Colorless', 'Colorless'], ['Fire', 'Water']), false);
     });
 
     test('classifyEnergyEffect feeds the correct family into cost payment', () => {
       const family = classifyEnergyEffect({ name: 'Double Colorless Energy', subtypes: ['Energy', 'Special'] });
       assert.equal(family, 'double-colorless');
-      assert.equal(canPayAttackCost([{ type: 'Colorless', family }], ['Grass', 'Metal']), true);
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family }], ['Grass', 'Metal']), false);
+      assert.equal(canPayAttackCost([{ type: 'Colorless', family }], ['Colorless', 'Colorless']), true);
       const dfamily = classifyEnergyEffect({ name: 'Double Fire Energy', subtypes: ['Energy', 'Special'] });
       assert.equal(dfamily, 'double');
       assert.equal(canPayAttackCost([{ type: 'Fire', family: dfamily }], ['Fire', 'Fire']), true);
