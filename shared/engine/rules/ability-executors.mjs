@@ -21,6 +21,7 @@ const textOf = (card) =>
 export function passiveCostDiscount(card) {
   const t = textOf(card);
   if (!t) return 0;
+  if (t.includes('retreat')) return 0;
   if (!/(cost|energy)/.test(t)) return 0;
   const by = t.match(/(?:by|less)\s*(\d+)/) || t.match(/(\d+)\s+less/);
   if (by) return parseInt(by[1], 10) || 1;

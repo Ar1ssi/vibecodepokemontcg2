@@ -2053,6 +2053,10 @@ import test from 'node:test';
       assert.equal(passiveCostDiscount({ ability: { text: 'This Pokémon’s attacks cost 2 less.' } }), 2);
       assert.equal(passiveCostDiscount({ ability: { text: 'This Pokémon’s attacks cost less.' } }), 1);
       assert.equal(passiveCostDiscount({ ability: { text: 'Draw a card.' } }), 0);
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'The Retreat Cost of the Pokémon this card is attached to is {C}{C} less.' } }),
+        0
+      );
       assert.equal(applyCostDiscount(['Psychic', 'Colorless', 'Colorless'], 1).length, 2);
       assert.equal(applyCostDiscount(['Psychic'], 2).length, 0);
     });
