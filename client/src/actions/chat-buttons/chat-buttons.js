@@ -4075,7 +4075,17 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
             const nextIdx = deck.array.indexOf(next);
             const nextHostIdx = zone.array.indexOf(nextHost);
             if (nextIdx >= 0 && nextHostIdx >= 0) {
-              await moveCardBundle(user, user, 'deck', zoneId, nextIdx, nextHostIdx, 'evolve');
+              await moveCardBundle(
+                user,
+                user,
+                'deck',
+                zoneId,
+                nextIdx,
+                nextHostIdx,
+                'evolve',
+                true,
+                { bypassJustEvolvedGate: true }
+              );
               appendMessage(
                 user,
                 `🔍 ${card.name}: ${next.name} evolves onto ${picked.name}.`,
@@ -4249,7 +4259,17 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
               const nextHostIdx = nextHostZone.array.indexOf(picked);
               const nextDeckIdx = deck.array.indexOf(nextPicked);
               if (nextDeckIdx >= 0 && nextHostIdx >= 0) {
-                await moveCardBundle(user, user, 'deck', nextZoneId, nextDeckIdx, nextHostIdx, 'evolve');
+                await moveCardBundle(
+                  user,
+                  user,
+                  'deck',
+                  nextZoneId,
+                  nextDeckIdx,
+                  nextHostIdx,
+                  'evolve',
+                  true,
+                  { bypassJustEvolvedGate: true }
+                );
                 appendMessage(user, `🌳 Grand Tree: ${nextPicked.name} evolves onto ${picked.name}.`, 'announcement', false);
               } else {
                 appendMessage(

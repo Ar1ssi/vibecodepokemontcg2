@@ -215,6 +215,13 @@ export const moveCardBundle = async (
       hintsToSend.isRareCandy = true;
     }
   }
+  // Grand Tree's printed exception: the chained Stage 2 evolve step (see
+  // evolution.mjs's bypassJustEvolvedGate) is local-legality-only — never
+  // sent to a peer, since the mirror-replay branch above already sets
+  // forceEvolution (skips the whole gate) for any relayed evolution.
+  if (cardHints?.bypassJustEvolvedGate) {
+    syncOptions.bypassJustEvolvedGate = true;
+  }
 
   moveCardMessage(
     user,
