@@ -135,19 +135,17 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
   const STIFFNESS = 0.18;
   const DAMPING = 0.42;
 
+  // simey binds this straight to the card element (`on:mousemove={interact}`), so it only
+  // ever fires while the pointer is actually over the card — no manual bounds-checking.
   const onPointerMove = (event) => {
     const rect = card.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
-    const withinBounds =
-      event.clientX >= rect.left &&
-      event.clientX <= rect.right &&
-      event.clientY >= rect.top &&
-      event.clientY <= rect.bottom;
-    targetOpacity = withinBounds ? 1 : 0;
-    if (!withinBounds) return;
+    targetOpacity = 1;
     targetX = clamp01((event.clientX - rect.left) / rect.width);
     targetY = clamp01((event.clientY - rect.top) / rect.height);
   };
+
+  const onPointerEnter = onPointerMove;
 
   const onPointerLeave = () => {
     targetX = 0.5;
@@ -166,11 +164,13 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
     card.style.setProperty('--pointer-from-center', (1 - Math.abs(px - 0.5) * 2).toFixed(3));
     card.style.setProperty('--pointer-from-left', px.toFixed(3));
     card.style.setProperty('--pointer-from-top', py.toFixed(3));
-    // simey's rotate math: rotate = -(center / 3.5)
-    const centerX = px - 0.5;
-    const centerY = py - 0.5;
-    card.style.setProperty('--rotate-x', (-(centerX / 3.5) * 100 * 0.35).toFixed(2) + 'deg');
-    card.style.setProperty('--rotate-y', ((centerY / 3.5) * 100 * 0.35).toFixed(2) + 'deg');
+    // simey's rotate math, exact divisors from Card.svelte's interact():
+    // rotate.x = -(center.x / 3.5), rotate.y = center.y / 2 — center is in
+    // percent units (-50..50), not the 0..1 fraction we track state in.
+    const centerXPercent = (px - 0.5) * 100;
+    const centerYPercent = (py - 0.5) * 100;
+    card.style.setProperty('--rotate-x', (-(centerXPercent / 3.5)).toFixed(2) + 'deg');
+    card.style.setProperty('--rotate-y', (centerYPercent / 2).toFixed(2) + 'deg');
     card.style.setProperty('--card-opacity', opacityState.toFixed(3));
   };
 
@@ -195,9 +195,16 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
     rafId = requestAnimationFrame(tick);
   };
 
+  // `.mat-holo` (used by mat cards AND floating previews alike) sets pointer-events:none on
+  // the wrapper/rotator/shine/glitter/glare, leaving only the inner <img> as the real hit
+  // target (base.css). pointerenter/pointerleave don't bubble, so listening on `card` itself
+  // would silently never fire in that case — bind to the <img> instead, which is always the
+  // actual hit-testable element whether or not `.mat-holo` is present.
+  const hitTarget = card.querySelector('img') || card;
   if (!auto) {
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    document.addEventListener('pointerleave', onPointerLeave);
+    hitTarget.addEventListener('pointerenter', onPointerEnter, { passive: true });
+    hitTarget.addEventListener('pointermove', onPointerMove, { passive: true });
+    hitTarget.addEventListener('pointerleave', onPointerLeave, { passive: true });
   }
   rafId = requestAnimationFrame(tick);
 
@@ -205,8 +212,9 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
     running = false;
     if (rafId != null) cancelAnimationFrame(rafId);
     if (!auto) {
-      window.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerleave', onPointerLeave);
+      hitTarget.removeEventListener('pointerenter', onPointerEnter);
+      hitTarget.removeEventListener('pointermove', onPointerMove);
+      hitTarget.removeEventListener('pointerleave', onPointerLeave);
     }
     activeAnimations.delete(card);
   };

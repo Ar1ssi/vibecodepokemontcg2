@@ -234,10 +234,9 @@ const syncHoloAnimations = (state) => {
     }
 
     if (!slide.holoRunning) {
-      startHoloAnimation(wrapper, {
-        auto: true,
-        phaseOffset: (i * 0.31) % 1,
-      });
+      // Picker slides have a real cursor over them — real pointer-tracked hover,
+      // not the auto-sweep (that's for mat/hand cards with no reliable cursor).
+      startHoloAnimation(wrapper);
       slide.holoRunning = true;
     }
   });
@@ -1311,7 +1310,7 @@ export const openCardPicker = async ({
     if (holoWrapper) {
       holoWrapper.classList.add('card-picker-trigger-holo');
       state.triggerHoloWrapper = holoWrapper;
-      startHoloAnimation(holoWrapper, { auto: true, phaseOffset: 0.15 });
+      startHoloAnimation(holoWrapper);
       if (!isBrowse) syncChooseLayout(state);
     }
   }

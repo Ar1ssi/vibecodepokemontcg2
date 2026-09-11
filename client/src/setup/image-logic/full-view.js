@@ -31,9 +31,11 @@ export const resolvePreviewSleeveSrc = (card, image) => {
   return cardBackSrcForUser(user) || DEFAULT_SLEEVE;
 };
 
+// Floating previews (deck-list/search zoom) have a real cursor to track, unlike
+// mat/hand cards — use real pointer-tracked hover, not the auto-sweep.
 const startPreviewHolo = (wrapper) => {
   if (!wrapper) return;
-  startHoloAnimation(wrapper, { auto: true });
+  startHoloAnimation(wrapper);
 };
 
 const hideCardCounters = (image) => {
