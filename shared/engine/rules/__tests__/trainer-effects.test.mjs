@@ -786,6 +786,39 @@ import test, { describe } from 'node:test';
         assert.equal(r.steps[0].heads.what, "Evolution Team Rocket's Pokémon");
         assert.equal(r.steps[0].tails.what, "Basic Team Rocket's Pokémon");
       });
+
+      // Regression: Dawn previously produced a single 3-pick step whose combined
+      // "Basic/Stage1/Stage2 Pokémon" filter let the player take 3 Basics — the
+      // real card requires one search per named stage, one card each.
+      test('Dawn: three separate single-card searches, one per stage', () => {
+        const r = parseTrainerEffect(
+          'Search your deck for a Basic Pokémon, a Stage 1 Pokémon, and a Stage 2 Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.'
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'searchDeckSequence');
+        assert.equal(r.steps[0].stages.length, 3);
+        assert.equal(r.steps[0].stages[0].what, 'Basic Pokémon');
+        assert.equal(r.steps[0].stages[0].count, 1);
+        assert.equal(r.steps[0].stages[1].what, 'Stage 1 Pokémon');
+        assert.equal(r.steps[0].stages[1].count, 1);
+        assert.equal(r.steps[0].stages[2].what, 'Stage 2 Pokémon');
+        assert.equal(r.steps[0].stages[2].count, 1);
+      });
+
+      test('Dawn: matchesSearch filters each stage exactly (no cross-stage matches)', () => {
+        const basic = { hp: 60, stage: 'Basic', name: 'Turtwig' };
+        const stage1 = { hp: 90, stage: 'Stage 1', name: 'Grotle' };
+        const stage2 = { hp: 140, stage: 'Stage 2', name: 'Torterra' };
+        assert.equal(matchesSearch(basic, 'Basic Pokémon'), true);
+        assert.equal(matchesSearch(stage1, 'Basic Pokémon'), false);
+        assert.equal(matchesSearch(stage2, 'Basic Pokémon'), false);
+        assert.equal(matchesSearch(stage1, 'Stage 1 Pokémon'), true);
+        assert.equal(matchesSearch(basic, 'Stage 1 Pokémon'), false);
+        assert.equal(matchesSearch(stage2, 'Stage 1 Pokémon'), false);
+        assert.equal(matchesSearch(stage2, 'Stage 2 Pokémon'), true);
+        assert.equal(matchesSearch(basic, 'Stage 2 Pokémon'), false);
+        assert.equal(matchesSearch(stage1, 'Stage 2 Pokémon'), false);
+      });
     });
     describe('draw shuffle status families', () => {
       test('Awakening Drum: variableDraw ancientInPlay', () => {

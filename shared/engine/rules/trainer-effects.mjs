@@ -161,7 +161,14 @@ export function parseSearchDeckParams(lower) {
     return { what: 'Stadium + Energy', count: 2, destination: 'hand' };
   }
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
-    return { what: 'Basic/Stage1/Stage2 Pokémon', count: 3, destination: 'hand' };
+    return {
+      type: 'searchDeckSequence',
+      stages: [
+        { what: 'Basic Pokémon', count: 1, destination: 'hand' },
+        { what: 'Stage 1 Pokémon', count: 1, destination: 'hand' },
+        { what: 'Stage 2 Pokémon', count: 1, destination: 'hand' },
+      ],
+    };
   }
   if (
     /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-\.]+?)\s+and put them onto your bench/.test(
@@ -941,6 +948,8 @@ export function describeStep(step) {
         : 'add to hand';
       return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what} → ${dest}, then shuffle.`;
     }
+    case 'searchDeckSequence':
+      return `Search your deck for ${step.stages.map((s) => s.what).join(', ')} (one at a time), reveal them, add to hand, then shuffle.`;
     case 'coinFlip': {
       const fmt = (branch) => {
         if (!branch) return 'nothing';
