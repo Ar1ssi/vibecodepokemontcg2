@@ -710,6 +710,12 @@ import {
         if (!rulesState.enabled) return;
         resetRulesSession();
       });
+      // Leaving or joining a room ends the previous game. Unlike the Reset
+      // buttons this is not gated on rulesState.enabled: a stale phase or a
+      // stale openingSetupReadyForCoinFlip carried into the next room shows
+      // the old turn HUD and lets the next peerSocketId/turnOrderCoinFlip
+      // auto-start a game nobody set up.
+      document.addEventListener('room-changed', resetRulesSession);
     };
     
     // Shared setup sequence once turn order is decided — used both by the

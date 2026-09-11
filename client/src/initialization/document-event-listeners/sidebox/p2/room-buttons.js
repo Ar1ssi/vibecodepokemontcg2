@@ -165,6 +165,7 @@ export const initializeRoomButtons = () => {
       // and client-seq counter, not just the sync intervals, so the next
       // room starts clean.
       resetNetcodeForRoomChange();
+      document.dispatchEvent(new CustomEvent('room-changed'));
       systemState.spectatorId = '';
       // add the deck data back to the actiondata list
       if (systemState.selfDeckData) {

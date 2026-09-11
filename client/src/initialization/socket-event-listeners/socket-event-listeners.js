@@ -299,6 +299,7 @@ export const initializeSocketEventListeners = () => {
     // Design 002 slice 3.10: a fresh room must not inherit the previous
     // room's renderer registries or client-seq counter.
     resetNetcodeForRoomChange();
+    document.dispatchEvent(new CustomEvent('room-changed'));
     const connectedRoom = document.getElementById('connectedRoom');
     const lobby = document.getElementById('lobby');
     const roomHeaderText = document.getElementById('roomHeaderText');
@@ -488,6 +489,7 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer = false;
       systemState.roomId = null;
       removeSyncIntervals();
+      document.dispatchEvent(new CustomEvent('room-changed'));
     } else {
       const rulesEndScreen = document.getElementById('rulesEndScreen');
       if (rulesEndScreen) {

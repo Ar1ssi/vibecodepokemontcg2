@@ -659,6 +659,19 @@ async function main() {
     // Register event listeners using the common function
     for (const event of events) {
       socket.on(event, (data) => {
+        if (event === 'requestPeerLog' && data?.roomId) {
+          const roomSockets = io.sockets.adapter.rooms.get(data.roomId);
+          const hasPeer = [...(roomSockets || [])].some((id) => id !== socket.id);
+          if (!hasPeer) {
+            socket.emit('peerLog', {
+              roomId: data.roomId,
+              toSocketId: data.requesterSocketId,
+              actions: [],
+              capped: false,
+            });
+            return;
+          }
+        }
         emitToRoom(event, data);
 
         if (
