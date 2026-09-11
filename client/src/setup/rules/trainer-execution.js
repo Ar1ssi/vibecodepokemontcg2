@@ -443,7 +443,7 @@ async function runSearchStep(card, searchStep, done) {
     if (basics.length === 1) {
       const idx = deck.array.indexOf(basics[0]);
       revealPicked(basics[0]);
-      moveCardBundle(_effectOwner, _effectOwner, 'deck', 'bench', idx, false, 'move');
+      await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'bench', idx, false, 'move');
       msg(`  auto: benched ${basics[0].name}`);
       shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
@@ -463,24 +463,26 @@ async function runSearchStep(card, searchStep, done) {
   });
   if (pool.length === 0) {
     msg('  no cards left in deck');
-    shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
+    if (!searchStep.suppressShuffle) shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
     done?.();
     return;
   }
-  const shuffleAfter = (opts) =>
+  const shuffleAfter = (opts) => {
+    if (searchStep.suppressShuffle) return;
     shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
       sourceName: card.name,
       ...opts,
     });
+  };
   const toBench = searchStep.destination === 'bench';
   const toAttach = searchStep.destination === 'attach';
 
-  const attachEnergyToPokemon = (energyCard) => {
+  const attachEnergyToPokemon = async (energyCard) => {
     const targets = getInPlayPokemon(_effectOwner);
     if (targets.length === 0) {
       msg('  no Pokémon to attach to — put energy in hand instead');
       const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', idx, false, 'move');
+      if (idx >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', idx, false, 'move');
       shuffleAfter();
       done?.();
       return;
@@ -490,7 +492,7 @@ async function runSearchStep(card, searchStep, done) {
       const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
       const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
       const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-      if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
+      if (idx >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
       msg(`  auto: attached ${energyCard.name} to ${target.name}`);
       shuffleAfter();
       done?.();
@@ -502,11 +504,11 @@ async function runSearchStep(card, searchStep, done) {
       triggerCard: card,
       user: _effectOwner,
       pickOnly: true,
-      onPick: (target) => {
+      onPick: async (target) => {
         const zoneId = zone(_effectOwner, 'active').array.includes(target) ? 'active' : 'bench';
         const targetIndex = zone(_effectOwner, zoneId).array.indexOf(target);
         const idx = zone(_effectOwner, 'deck').array.indexOf(energyCard);
-        if (idx >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
+        if (idx >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', zoneId, idx, targetIndex, 'move', true);
         msg(`  auto: attached ${energyCard.name} to ${target.name}`);
         shuffleAfter();
         done?.();
@@ -582,6 +584,22 @@ async function runSearchStep(card, searchStep, done) {
       done?.();
     },
   });
+}
+
+// Dawn-style effect: search for one card per named stage, back to back
+// (each opens its own filtered picker for exactly 1 card), then shuffle once
+// at the end instead of after every stage.
+async function runSearchSequenceStep(card, step, done) {
+  const stages = step.stages || [];
+  const runStage = async (i) => {
+    if (i >= stages.length) {
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
+      done?.();
+      return;
+    }
+    await runSearchStep(card, { ...stages[i], suppressShuffle: true }, () => runStage(i + 1));
+  };
+  await runStage(0);
 }
 
 async function runLookStep(card, step, fromBottom, done) {
@@ -715,35 +733,58 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
     try {
       switch (step.type) {
         case 'discardHandThenDraw': {
+          // I37: each move must land (and relay) before the next one reads the zone —
+          // moveCardBundle captures its cardHints synchronously at call time, so firing
+          // these un-awaited raced a stale hand/deck snapshot into the peer's hints.
           while (zone(_effectOwner, 'hand').getCount() > 0) {
-            moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', 0, false, 'move');
+            await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', 0, false, 'move');
           }
           for (let i = 0; i < step.count; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            }
           }
           msg(`  auto: discarded hand, drew ${step.count}`);
           break;
         }
         case 'shuffleHandThenDraw': {
           const handCount0 = zone(_effectOwner, 'hand').getCount();
-          for (let i = 0; i < handCount0; i++) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          for (let i = 0; i < handCount0; i++) {
+            await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          }
+          // I37: these effects moved the hand into the deck but never actually
+          // shuffled it — draws came back in the exact order they went in.
+          shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
+            sourceName: card.name,
+            message: null,
+          });
           let drawCount = step.count;
           const prizesRemaining = Math.max(0, 6 - (_prizeState?.self?.taken || 0));
           if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
             drawCount = step.bonusCount;
           }
           for (let i = 0; i < drawCount; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            }
           }
           msg(`  auto: shuffled hand in, drew ${drawCount}`);
           break;
         }
         case 'countShuffleDrawPlus': {
           const n = zone(_effectOwner, 'hand').getCount();
-          for (let i = 0; i < n; i++) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          for (let i = 0; i < n; i++) {
+            await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', 0, false, 'move');
+          }
+          shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, {
+            sourceName: card.name,
+            message: null,
+          });
           const drawCount = n + 1;
           for (let i = 0; i < drawCount; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            }
           }
           msg(`  auto: shuffled ${n} cards in, drew ${drawCount}`);
           break;
@@ -751,7 +792,13 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         case 'ionoShuffle': {
           for (const who of ['self', 'opp']) {
             const n = zone(who, 'hand').getCount();
-            for (let i = 0; i < n; i++) moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
+            for (let i = 0; i < n; i++) {
+              await moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
+            }
+            shuffleDeckAfterSearch(who, _appendMessage, _shuffleZone, {
+              sourceName: card.name,
+              message: null,
+            });
           }
           msg('  auto: both players shuffled hands into decks');
           break;
@@ -925,6 +972,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         }
         case 'searchDeck':
           await runSearchStep(card, step, () => runAt(idx + 1));
+          return;
+        case 'searchDeckSequence':
+          await runSearchSequenceStep(card, step, () => runAt(idx + 1));
           return;
         case 'lookAtTop':
           await runLookStep(card, step, false, () => runAt(idx + 1));

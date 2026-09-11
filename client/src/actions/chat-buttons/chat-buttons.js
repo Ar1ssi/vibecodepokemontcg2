@@ -4,7 +4,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { resetAbilityCounters } from '../counters/reset-counters.js';
 import { discardBoard } from '../general/board-actions.js';
-import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } from '/shared/engine/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '/shared/engine/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
 import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
@@ -3151,14 +3151,10 @@ async function _runAttackDeckSearch(user, atk, searchStep, emit) {
         minCount: minPick,
         maxCount: effectiveMax,
         upTo,
+        // openCardPicker's confirm already moved (and relayed) every pick via
+        // zoneFrom/destination before calling this.
         onConfirm: (selected) => {
           revealPicked(selected);
-          for (const s of selected) {
-            const idx = getZone(user, 'deck').array.indexOf(s);
-            if (idx >= 0) {
-              moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
-            }
-          }
           if (selected.length === 0) {
             appendMessage(user, `🔍 ${atk.name}: no cards taken — deck shuffled.`, 'announcement', false);
             finishSearch({ message: null });
@@ -3233,7 +3229,32 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     }
   }
 
-  if (!abilityTurnAndUsageGuard(user, target, 'search')) return;
+  const abilityText =
+    target?.ability?.text ?? target?.abilityText ?? target?.text ?? '';
+  const abilitySteps = parseAbility(abilityText);
+  // "When you play this Pokémon onto your Bench" triggers (e.g. Meowth's
+  // Last Ditch Catch) aren't a recurring once-per-turn action: they only
+  // fire in the window opened the turn the card was played from hand to
+  // Bench, and never again until it returns to hand and is replayed.
+  const isPlayedToBenchTrigger = abilitySteps.some((s) => s.type === 'whenPlayedAbility');
+
+  if (isPlayedToBenchTrigger) {
+    if (rulesState.enabled && rulesState.turnPlayer !== user) {
+      appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
+      return;
+    }
+    if (!target || (rulesState.enabled && !canUsePlayedToBenchTrigger(user, target))) {
+      appendMessage(
+        user,
+        `⛔ ${target?.name || 'This Pokémon'}'s ability only works the turn it's played from hand to the Bench.`,
+        'announcement',
+        false
+      );
+      return;
+    }
+  } else if (!abilityTurnAndUsageGuard(user, target, 'search')) {
+    return;
+  }
 
   const deck = getZone(user, 'deck');
   if (deck.array.length === 0) {
@@ -3241,9 +3262,7 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     return;
   }
 
-  const abilityText =
-    target.ability?.text ?? target.abilityText ?? target.text ?? '';
-  const searchStep = parseAbility(abilityText).find(
+  const searchStep = abilitySteps.find(
     (s) => s.type === 'searchAbility'
   );
   const what =
@@ -3279,7 +3298,10 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
 
   const completeSearch = (opts) => {
     shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name, ...opts });
-    if (rulesState.enabled) markAbilityUsed(user, target);
+    if (rulesState.enabled) {
+      if (isPlayedToBenchTrigger) consumePlayedToBenchTrigger(user, target);
+      else markAbilityUsed(user, target);
+    }
   };
   const revealPicked = (picked) =>
     maybeAnnounceSearchReveal(user, target.name, picked, appendMessage, {
@@ -3303,12 +3325,12 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
       minCount: upTo ? 0 : count,
       maxCount: effectiveMax,
       upTo,
-      onConfirm: (selected) => {
+      onConfirm: async (selected) => {
         revealPicked(selected);
         for (const s of selected) {
           const idx = getZone(user, 'deck').array.indexOf(s);
           if (idx >= 0) {
-            moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
+            await moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
           }
         }
         appendMessage(
@@ -3341,11 +3363,11 @@ export const searchAbility = async (user, emit = true, targetCard = null) => {
     zoneFrom: 'deck',
     destination: destZone,
     pickOnly: true,
-    onPick: (picked) => {
+    onPick: async (picked) => {
       revealPicked(picked);
       const idx = getZone(user, 'deck').array.indexOf(picked);
       if (idx >= 0) {
-        moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
+        await moveCardBundle(user, user, 'deck', destZone, idx, false, 'move', emit);
       }
       appendMessage(
         user,
@@ -4079,7 +4101,17 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
             const nextIdx = deck.array.indexOf(next);
             const nextHostIdx = zone.array.indexOf(nextHost);
             if (nextIdx >= 0 && nextHostIdx >= 0) {
-              await moveCardBundle(user, user, 'deck', zoneId, nextIdx, nextHostIdx, 'evolve');
+              await moveCardBundle(
+                user,
+                user,
+                'deck',
+                zoneId,
+                nextIdx,
+                nextHostIdx,
+                'evolve',
+                true,
+                { bypassJustEvolvedGate: true }
+              );
               appendMessage(
                 user,
                 `🔍 ${card.name}: ${next.name} evolves onto ${picked.name}.`,
@@ -4208,6 +4240,12 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
       const deckIdx = deck.array.indexOf(picked);
 
       if (deckIdx < 0 || hostIdx < 0) {
+        appendMessage(
+          user,
+          `⛔ Grand Tree: could not evolve ${picked.name} onto ${host.name} — ${deckIdx < 0 ? `${picked.name} is no longer in your deck` : `${host.name} is no longer in play`}.`,
+          'announcement',
+          false
+        );
         finishGrandTree();
         return;
       }
@@ -4239,12 +4277,33 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
           maxCount: 1,
           onPick: async (nextPicked) => {
             if (nextPicked) {
-              const nextHost = hostZone.array.find((c) => c === picked) || hostZone.array[hostIdx] || host;
-              const nextHostIdx = hostZone.array.indexOf(nextHost);
+              // Re-resolve the Stage 1's zone/index fresh instead of trusting the
+              // pre-evolve `hostZone`/`hostIdx` captured above — evolveCard.js keeps
+              // the base card in the array (marked attached) and inserts the
+              // evolution as a new entry, so the live index has moved.
+              const { zoneId: nextZoneId, zone: nextHostZone } = zoneOfInPlay(user, picked);
+              const nextHostIdx = nextHostZone.array.indexOf(picked);
               const nextDeckIdx = deck.array.indexOf(nextPicked);
               if (nextDeckIdx >= 0 && nextHostIdx >= 0) {
-                await moveCardBundle(user, user, 'deck', zoneId, nextDeckIdx, nextHostIdx, 'evolve');
+                await moveCardBundle(
+                  user,
+                  user,
+                  'deck',
+                  nextZoneId,
+                  nextDeckIdx,
+                  nextHostIdx,
+                  'evolve',
+                  true,
+                  { bypassJustEvolvedGate: true }
+                );
                 appendMessage(user, `🌳 Grand Tree: ${nextPicked.name} evolves onto ${picked.name}.`, 'announcement', false);
+              } else {
+                appendMessage(
+                  user,
+                  `⛔ Grand Tree: could not evolve ${nextPicked.name} onto ${picked.name} — ${nextDeckIdx < 0 ? `${nextPicked.name} is no longer in your deck` : `${picked.name} is no longer in play`}.`,
+                  'announcement',
+                  false
+                );
               }
             }
             finishGrandTree();
@@ -4435,7 +4494,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
         return;
       }
       const foundName = deck.array[found]?.name || 'Basic Pokémon';
-      moveCardBundle(user, user, 'deck', 'bench', found, false, 'move');
+      await moveCardBundle(user, user, 'deck', 'bench', found, false, 'move');
       appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search-bench' });
@@ -4448,7 +4507,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       for (let i = 0; i < deck.array.length && moved < want; ) {
         await ensureCardData(deck.array[i]);
         if (matchesStadiumSearch(deck.array[i], action)) {
-          moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
+          await moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
           moved++;
         } else {
           i++;
@@ -4495,7 +4554,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
         return;
       }
       const foundCard = deck.array[found];
-      moveCardBundle(user, user, 'deck', 'hand', found, false, 'move');
+      await moveCardBundle(user, user, 'deck', 'hand', found, false, 'move');
       appendMessage(user, `🔍 ${card.name} searches: found ${foundCard.name || 'a card'} → hand.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search' });

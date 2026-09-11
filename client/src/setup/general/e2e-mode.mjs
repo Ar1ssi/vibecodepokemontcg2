@@ -64,3 +64,15 @@ export function e2eFixtureDeck(prefix = 'E2E') {
 export function e2eDelayMs(liveMs) {
   return isE2eMode() ? 0 : liveMs;
 }
+
+/**
+ * Real 2P games always force rules enforcement back on at join (see
+ * rules-bridge.js's forceRulesEnabledForMultiplayer) so one client can't cheat
+ * the other. The e2e bridge is the one caller allowed to keep rules off in a
+ * two-player game — it's the same tester-only scripting surface `isE2eMode`
+ * already gates, used by bot-vs-bot debug testing that needs to break normal
+ * legality (turn order, once-per-turn limits, deck-size minimums) on purpose.
+ */
+export function multiplayerLocksRulesEnabled(isTwoPlayer, e2eMode = isE2eMode()) {
+  return Boolean(isTwoPlayer) && !e2eMode;
+}

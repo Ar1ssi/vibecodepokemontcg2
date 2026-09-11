@@ -84,6 +84,14 @@ export function matchesSearch(card, what = '') {
   if (w.includes('basic') && w.includes('stage 1') && w.includes('stage 2')) {
     return isPokemon;
   }
+  if (w.includes('stage 1') && !w.includes('stage 2')) {
+    if (!isPokemon) return false;
+    return String(card.stage || '').toLowerCase().replace(/\s+/g, '') === 'stage1';
+  }
+  if (w.includes('stage 2')) {
+    if (!isPokemon) return false;
+    return String(card.stage || '').toLowerCase().replace(/\s+/g, '') === 'stage2';
+  }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
     const noRuleBox =

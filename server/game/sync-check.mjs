@@ -1,3 +1,5 @@
+import { hashZoneMap, SYNC_HASH_ZONES } from '../../shared/engine/zones/zone-hash.mjs';
+
 /**
  * @file Pure desync-detection comparison (design 002 slice 3.11).
  * The client periodically sends its own per-zone board hashes; the server
@@ -40,4 +42,32 @@ export function findFirstDivergentZone(serverZones, clientZones) {
     }
   }
   return null;
+}
+
+// Zones the client hashes from its own view: everything in SYNC_HASH_ZONES
+// except deck (redacted to { count } even for its owner) — the exact set the
+// client's computeSyncCheckZones (client/src/setup/netcode/sync-check.js) builds.
+const VIEW_HASH_PLAYER_ZONES = SYNC_HASH_ZONES.filter(
+  (zoneId) => zoneId !== 'stadium' && zoneId !== 'deck'
+);
+
+/**
+ * Per-zone hashes of what the owner can actually see — `viewFor(state,
+ * playerId)`, not raw state. The client can only hash its own view, which
+ * redacts unrevealed prizes to `{ instanceId }`; hashing the server's real
+ * prize cards instead made `prizes` diverge on every heartbeat of every
+ * server-authoritative game, and each false desync started a peer-log
+ * catch-up whose 5s timeout posted "The game may be out of sync".
+ *
+ * @param {object|null} view `gameRoom.getView(playerId)`
+ * @returns {Record<string, string>|null}
+ */
+export function hashOwnerViewZones(view) {
+  if (!view?.you?.zones) return null;
+  const zones = { stadium: view.stadium ? [view.stadium] : [] };
+  for (const zoneId of VIEW_HASH_PLAYER_ZONES) {
+    const cards = view.you.zones[zoneId];
+    zones[zoneId] = Array.isArray(cards) ? cards : [];
+  }
+  return hashZoneMap(zones);
 }

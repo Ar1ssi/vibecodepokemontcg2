@@ -15,6 +15,7 @@ import {
   rulesState,
   canPerformAction,
   abilityUsed,
+  ensureCardData,
 } from '../../../../shared/engine/rules/rules-state.mjs';
 import { isPokemon, isEnergy, isTrainer, isBasicPokemon } from '../../../../shared/engine/cards.mjs';
 import { canEvolve, normalizeStage } from '../../../../shared/engine/rules/evolution.mjs';
@@ -127,14 +128,29 @@ export async function enumerateOptions({
 
   // ── play a Basic from hand ────────────────────────────────────────────
   if (canMove) {
-    handCards.forEach((card, handIndex) => {
-      if (!isPokemon(card) || !isBasicPokemon(card)) return;
+    for (let handIndex = 0; handIndex < handCards.length; handIndex += 1) {
+      const card = handCards[handIndex];
+      if (!isPokemon(card)) continue;
+      // isBasicPokemon() defaults an unresolved card.stage to 'Basic' (so a freshly
+      // drawn/unenriched card doesn't block legal-move enumeration) — that default is
+      // wrong for a Stage 1/2 card whose TCGdex data just hasn't arrived yet, and
+      // offering it as playBasic here only for the real move to then reject it once
+      // its true stage is known. Enrich before classifying so the two agree.
+      // eslint-disable-next-line no-await-in-loop -- legality is per hand card
+      await ensureCardData(card);
+      // TCGdex's own search endpoint is flakier than the card-detail endpoint (seen
+      // 503s under normal load, unrelated to request volume) — enrichment can still
+      // fail after a genuine attempt. Don't fall back to isBasicPokemon()'s permissive
+      // "assume Basic" default here: skip the card instead of misoffering it, since
+      // every real Pokémon card resolves an hp once actually enriched.
+      if (!card.hp) continue;
+      if (!isBasicPokemon(card)) continue;
       if (!active) {
         options.push({ kind: 'playBasic', handIndex, targetZone: 'active' });
       } else if (benchCards.length < BENCH_LIMIT) {
         options.push({ kind: 'playBasic', handIndex, targetZone: 'bench' });
       }
-    });
+    }
   }
 
   const targets = inPlayTargets(active, benchCards);

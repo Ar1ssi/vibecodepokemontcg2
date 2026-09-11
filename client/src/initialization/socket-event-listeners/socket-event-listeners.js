@@ -30,6 +30,7 @@ import {
   applyView,
   setDefaultNetcodeContext,
   resetRenderState,
+  getLastRenderedVersion,
 } from '../../setup/netcode/apply-view.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-table.js';
@@ -59,7 +60,6 @@ import {
 import {
   computeSyncCheckZones,
   emitSyncCheck,
-  shouldTriggerDesyncRecovery,
   viewBackedGetZone,
   SYNC_CHECK_INTERVAL_MS,
 } from '../../setup/netcode/sync-check.js';
@@ -131,6 +131,10 @@ const startSyncCheckHeartbeat = () => {
       // flag is on (guard above), so the renderer's own view cache is
       // always the live source here.
       zones: computeSyncCheckZones('self', viewBackedGetZone),
+      // I42: the version the zones above were hashed from, so the server can
+      // tell a command landing between hash and compare (stale by design)
+      // apart from a real divergence instead of reporting both as 'desync'.
+      stateVersion: getLastRenderedVersion(),
     });
   }, SYNC_CHECK_INTERVAL_MS);
 };
@@ -262,7 +266,16 @@ export const resetNetcodeForRoomChange = () => {
 export const initializeSocketEventListeners = () => {
   seedNetcodeContext();
 
-  socket.on('joinGame', async (data) => {
+  // The server replays the opponent's cached exchangeData/loadDeckData right
+  // after emitting joinGame. Room setup below awaits and then wipes opponent
+  // state, so it runs on pushActionQueue: those replays queue behind it
+  // instead of landing mid-setup (pre-isTwoPlayer) and being wiped.
+  socket.on('joinGame', (data) => {
+    pushActionQueue = pushActionQueue
+      .then(() => handleJoinGame(data))
+      .catch((err) => console.error('joinGame setup failed', err));
+  });
+  const handleJoinGame = async (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
     const protocolVersion = await getProtocolVersion();
     if (
@@ -290,6 +303,7 @@ export const initializeSocketEventListeners = () => {
     // Design 002 slice 3.10: a fresh room must not inherit the previous
     // room's renderer registries or client-seq counter.
     resetNetcodeForRoomChange();
+    document.dispatchEvent(new CustomEvent('room-changed'));
     const connectedRoom = document.getElementById('connectedRoom');
     const lobby = document.getElementById('lobby');
     const roomHeaderText = document.getElementById('roomHeaderText');
@@ -327,7 +341,7 @@ export const initializeSocketEventListeners = () => {
       type: 'peerSocketId',
       data: { socketId: socket.id },
     });
-  });
+  };
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
   });
@@ -418,6 +432,9 @@ export const initializeSocketEventListeners = () => {
   socket.on('leaveRoom', (data) => {
     if (!data.isSpectator) {
       cleanActionData('opp');
+      if (systemState.serverAuthoritative) {
+        document.dispatchEvent(new CustomEvent('game-restarted'));
+      }
     }
     appendMessage('', data.username + ' left the room', 'announcement', false);
   });
@@ -479,6 +496,7 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer = false;
       systemState.roomId = null;
       removeSyncIntervals();
+      document.dispatchEvent(new CustomEvent('room-changed'));
     } else {
       const rulesEndScreen = document.getElementById('rulesEndScreen');
       if (rulesEndScreen) {
@@ -610,19 +628,15 @@ export const initializeSocketEventListeners = () => {
       },
     });
   });
-  // Design 002 slice 3.11: server named a zone that disagrees with its own
-  // state. Recovery reuses the existing slice-1.1 peer-log catch-up rather
-  // than a second mechanism (edge row 24: defer to an in-flight catch-up).
+  // Design 002 slice 3.11: the server named a zone that disagrees with its
+  // own state. Only server-authoritative games send this, and there the server
+  // is the truth: pull a fresh view and let applyView reconcile. The legacy
+  // peer-log catch-up replays the opponent's action log instead, which does
+  // not repair server-rendered state and posts the reload warning whenever the
+  // peer takes over 5s to answer (e.g. a backgrounded tab).
   socket.on('desync', (data) => {
     logSync('desync.detected', { zoneId: data?.zoneId }, 'in');
-    if (
-      shouldTriggerDesyncRecovery({
-        isCatchingUp: systemState.isCatchingUp,
-        peerLogRequestPending: Boolean(peerLogTimeout),
-      })
-    ) {
-      requestPeerLogCatchup();
-    }
+    emitRequestView({ socket, roomId: systemState.roomId });
   });
   socket.on('lookAtCards', (data) => {
     if (data.socketId === systemState.spectatorId) {

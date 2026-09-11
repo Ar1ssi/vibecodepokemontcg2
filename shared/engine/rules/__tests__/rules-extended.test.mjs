@@ -1,7 +1,7 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
     
-    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail, parseRetreatCost, canPerformAction } = await import('../rules-state.mjs');
+    const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail, parseRetreatCost, canPerformAction, openPlayedToBenchWindow, clearPlayedToBenchWindow, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } = await import('../rules-state.mjs');
     const { prizesForKO, cardHasRuleBox, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat, getEffectiveRetreatCost, getEnergyValue } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
@@ -3103,13 +3103,17 @@ import test from 'node:test';
       assert.equal(res.abilities[0].usable, true);
     });
 
-    test('listAttacks: double-colorless energy pays any 2 symbols', () => {
-      const card = { name: 'T', types: [], attacks: [
+    test('listAttacks: double-colorless energy pays a Colorless cost, not a colored one', () => {
+      const coloredCard = { name: 'T', types: [], attacks: [
         { name: 'Blast', cost: ['Fire', 'Water'], damage: 50, text: '' },
       ] };
       const energyTypes = [{ type: 'Colorless', family: 'double-colorless' }];
-      const res = listAttacks(card, { energyTypes });
-      assert.equal(res[0].payable, true);
+      assert.equal(listAttacks(coloredCard, { energyTypes })[0].payable, false);
+
+      const colorlessCard = { name: 'T', types: [], attacks: [
+        { name: 'Slam', cost: ['Colorless', 'Colorless'], damage: 50, text: '' },
+      ] };
+      assert.equal(listAttacks(colorlessCard, { energyTypes })[0].payable, true);
     });
 
     // ── collect-usable-abilities (active + bench picker gate) ──
@@ -3176,8 +3180,8 @@ import test from 'node:test';
       assert.equal(shouldAutoDrawAtTurnStart({ enabled: false, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), false);
     });
 
-    test('shouldAutoDrawAtTurnStart: turn 1 skipped (first player does not draw)', () => {
-      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), false);
+    test('shouldAutoDrawAtTurnStart: turn 1 draws too (first player draws on their opening turn)', () => {
+      assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 1 }), true);
     });
 
     test('shouldAutoDrawAtTurnStart: lastDrawnTurn blocks a second draw on the same turn', () => {
@@ -4538,6 +4542,37 @@ import test from 'node:test';
       assert.equal(matchesSearch(stadium, 'Trainer'), true);
       assert.equal(matchesSearch(mon, 'Trainer'), false);
       assert.equal(matchesSearch(energy, 'Trainer'), false);
+    });
+
+    test('played-to-bench trigger window: one-shot the turn played, gone next turn, re-arms on return to hand', async () => {
+      const meowth = { name: 'Meowth', cardId: 'c_meowth-1' };
+
+      startGame('self');
+      beginTurn('self');
+
+      // Not played yet — no window.
+      assert.equal(canUsePlayedToBenchTrigger('self', meowth), false);
+
+      // Played from hand to Bench this turn — window opens.
+      openPlayedToBenchWindow('self', meowth);
+      assert.equal(canUsePlayedToBenchTrigger('self', meowth), true);
+
+      // Using it consumes the window; can't use again same turn.
+      consumePlayedToBenchTrigger('self', meowth);
+      assert.equal(canUsePlayedToBenchTrigger('self', meowth), false);
+
+      // Re-open (as if used) and confirm it does NOT survive into next turn,
+      // even if never consumed.
+      openPlayedToBenchWindow('self', meowth);
+      assert.equal(canUsePlayedToBenchTrigger('self', meowth), true);
+      endTurn('self'); // -> opp
+      endTurn('opp'); // -> self, next turn
+      assert.equal(canUsePlayedToBenchTrigger('self', meowth), false);
+
+      // Returning to hand and replaying opens a brand new window.
+      clearPlayedToBenchWindow('self', meowth);
+      openPlayedToBenchWindow('self', meowth);
+      assert.equal(canUsePlayedToBenchTrigger('self', meowth), true);
     });
 
     test('fix 1: neither player can evolve on their respective first turn', async () => {

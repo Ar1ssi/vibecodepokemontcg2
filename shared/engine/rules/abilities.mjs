@@ -153,38 +153,45 @@ export function parseAbilitySearchParams(lower) {
     };
   }
 
+  // Scope bare word-presence checks to the search target clause ("search your
+  // deck for a Supporter card, ..."), not the whole ability text — otherwise
+  // an unrelated "this Pokémon" earlier in the text (e.g. a usage condition
+  // like "if this Pokémon is in the Active Spot") falsely matches "pokémon"
+  // before the real target ("Supporter") is ever checked.
+  const scope = lower.match(/(?:search your deck|look through your deck) for ([^.]*)/)?.[1] || lower;
+
   const typedEnergy = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
   if (typedEnergy) {
     what = `Basic ${typedEnergy[1].toUpperCase()} Energy`;
-  } else if (/up to\s+(\d+)\s+basic energy/.test(lower)) {
-    const m = lower.match(/up to\s+(\d+)\s+basic energy/);
+  } else if (/up to\s+(\d+)\s+basic energy/.test(scope)) {
+    const m = scope.match(/up to\s+(\d+)\s+basic energy/);
     what = 'Basic Energy';
     count = Number(m[1]);
     upTo = true;
-  } else if (lower.includes('basic energy')) {
+  } else if (scope.includes('basic energy')) {
     what = 'Basic Energy';
-  } else if (lower.includes('energy')) {
-    what = 'Energy';
-  } else if (/up to\s+(\d+)\s+basic pok/.test(lower)) {
-    const m = lower.match(/up to\s+(\d+)\s+basic pok/);
-    what = 'a Basic Pokémon';
-    count = Number(m[1]);
-    upTo = true;
-  } else if (lower.includes('basic pokémon') || lower.includes('basic pokemon')) {
-    what = 'a Basic Pokémon';
-  } else if (/up to\s+(\d+)\s+pok/.test(lower)) {
-    const m = lower.match(/up to\s+(\d+)\s+pok/);
-    what = 'a Pokémon';
-    count = Number(m[1]);
-    upTo = true;
-  } else if (lower.includes('pokémon') || lower.includes('pokemon')) {
-    what = 'a Pokémon';
-  } else if (lower.includes('supporter')) {
+  } else if (scope.includes('supporter')) {
     what = 'Supporter';
-  } else if (lower.includes('item')) {
+  } else if (scope.includes('item')) {
     what = 'Item';
-  } else if (lower.includes('trainer')) {
+  } else if (scope.includes('trainer')) {
     what = 'Trainer';
+  } else if (scope.includes('energy')) {
+    what = 'Energy';
+  } else if (/up to\s+(\d+)\s+basic pok/.test(scope)) {
+    const m = scope.match(/up to\s+(\d+)\s+basic pok/);
+    what = 'a Basic Pokémon';
+    count = Number(m[1]);
+    upTo = true;
+  } else if (scope.includes('basic pokémon') || scope.includes('basic pokemon')) {
+    what = 'a Basic Pokémon';
+  } else if (/up to\s+(\d+)\s+pok/.test(scope)) {
+    const m = scope.match(/up to\s+(\d+)\s+pok/);
+    what = 'a Pokémon';
+    count = Number(m[1]);
+    upTo = true;
+  } else if (scope.includes('pokémon') || scope.includes('pokemon')) {
+    what = 'a Pokémon';
   }
 
   if (!upTo) {

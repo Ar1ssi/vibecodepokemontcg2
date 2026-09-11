@@ -79,24 +79,30 @@ export function resolveCardIndex(zone, hint, fallbackIndex) {
     hint = hint || buildCardHint(fallbackIndex);
   } else if (typeof fallbackIndex === 'string' && isNaN(Number(fallbackIndex))) {
     // fallbackIndex is a cardId/syncInstance string
-    const byId = arr.findIndex((c) => c.cardId === fallbackIndex || String(c.syncInstance) === fallbackIndex);
+    const byId = arr.findIndex(
+      (c) => c != null && (c.cardId === fallbackIndex || String(c.syncInstance) === fallbackIndex)
+    );
     if (byId >= 0) return byId;
   }
 
   // Support string or number ID passed directly as hint
   if (typeof hint === 'string' || typeof hint === 'number') {
-    const byId = arr.findIndex((c) => c.cardId === hint || String(c.syncInstance) === String(hint));
+    const byId = arr.findIndex(
+      (c) => c != null && (c.cardId === hint || String(c.syncInstance) === String(hint))
+    );
     if (byId >= 0) return byId;
   }
 
+  // `c?.` throughout: a drifted mirror zone can hold undefined slots, and a
+  // throw here would silently drop the whole relayed move.
   if (hint && hint.cardId != null) {
-    const byCardId = arr.findIndex((c) => c.cardId === hint.cardId);
+    const byCardId = arr.findIndex((c) => c?.cardId === hint.cardId);
     if (byCardId >= 0) return byCardId;
   }
 
   if (hint && hint.syncInstance != null) {
     const byInstance = arr.findIndex(
-      (c) => c.syncInstance != null && String(c.syncInstance) === String(hint.syncInstance)
+      (c) => c?.syncInstance != null && String(c.syncInstance) === String(hint.syncInstance)
     );
     if (byInstance >= 0) return byInstance;
   }
@@ -146,7 +152,9 @@ export function hintMatchesAtIndex(zone, index, hint) {
   if (typeof idx === 'object' && idx !== null) {
     idx = zone.array.indexOf(idx);
   } else if (typeof idx === 'string' && isNaN(Number(idx))) {
-    idx = zone.array.findIndex((c) => c.cardId === idx || String(c.syncInstance) === idx);
+    idx = zone.array.findIndex(
+      (c) => c != null && (c.cardId === idx || String(c.syncInstance) === idx)
+    );
   }
   if (typeof idx !== 'number' || idx < 0 || idx >= zone.array.length) {
     return false;

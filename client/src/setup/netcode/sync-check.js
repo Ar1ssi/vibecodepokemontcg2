@@ -70,11 +70,14 @@ export function computeSyncCheckZones(user, getZoneFn) {
  * @param {object} options.socket
  * @param {string} options.roomId
  * @param {Record<string, string>} options.zones
+ * @param {number} [options.stateVersion] The view version `zones` was hashed
+ *   from (I42): lets the server tell "state moved between hash and compare"
+ *   apart from a real divergence, instead of reporting both the same way.
  * @returns {boolean}
  */
-export function emitSyncCheck({ socket, roomId, zones }) {
+export function emitSyncCheck({ socket, roomId, zones, stateVersion }) {
   if (!socket || typeof socket.emit !== 'function' || !roomId) return false;
-  socket.emit('syncCheck', { roomId, zones });
+  socket.emit('syncCheck', { roomId, zones, stateVersion });
   return true;
 }
 

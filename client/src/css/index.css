@@ -4395,6 +4395,11 @@ a:hover {
       border-bottom: 1px solid rgba(100,140,220,0.25);
       padding-bottom: 4px;
     }
+    .rules-aw-title.rules-aw-draggable {
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
     .rules-aw-section {
       font-weight: 600;
       margin: 8px 0 3px;

@@ -317,6 +317,96 @@ export class GameRoom {
    * Resets or deletes clientSeq tracking for a player (e.g. on new socket / page reload).
    * @param {string} playerId
    */
+  /**
+   * This player's syncInstance -> instanceId lookup for their deck (design 002
+   * §3.1 / D10). Sent only to the owning socket: it would leak opponent ids.
+   *
+   * @param {string} playerId
+   * @returns {Record<number, number>}
+   */
+  getInstanceMap(playerId) {
+    const map = {};
+    for (const card of this.state.players[playerId]?.zones?.deck || []) {
+      if (card?.syncInstance != null && card?.instanceId != null) {
+        map[card.syncInstance] = card.instanceId;
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Starts a fresh game in this room after a seated player explicitly left.
+   * The leaver's seat is freed; every other seated player keeps their seat,
+   * socket and deck (reloaded from `deckList`, with the printed card stats the
+   * client sent once via `cardStats` carried across by syncInstance, since the
+   * client will not resend them). `stateVersion` keeps increasing so clients'
+   * monotonic view guard accepts the fresh view.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.removePlayerId] Seat to free
+   * @returns {Array<{ playerId: string, socketId: string|null }>} Players kept
+   */
+  resetGame({ removePlayerId = null } = {}) {
+    const kept = [];
+    for (const [playerId, player] of Object.entries(this.state.players)) {
+      if (!player || playerId === removePlayerId) continue;
+      kept.push({
+        playerId,
+        username: player.username || playerId,
+        deckList: Array.isArray(player.deckList) ? [...player.deckList] : [],
+        socketId: this.playerToSocket.get(playerId) || null,
+        printedStats: collectPrintedStats(player),
+      });
+    }
+
+    if (removePlayerId) {
+      const leaverSocketId = this.playerToSocket.get(removePlayerId);
+      if (leaverSocketId) this.socketToPlayer.delete(leaverSocketId);
+      this.playerToSocket.delete(removePlayerId);
+    }
+
+    const minimumVersion = (this.state.stateVersion || 0) + 1;
+    this.clientSeqByPlayer.clear();
+    this.rng = createRng(this.seed);
+    this.state = createGameState({
+      gameId: this.roomId,
+      seed: this.seed,
+      rulesEnabled: this.rulesEnabled,
+    });
+
+    for (const entry of kept) {
+      this.state.players[entry.playerId] = {
+        playerId: entry.playerId,
+        username: entry.username,
+        deckList: [],
+        zones: createPlayerZones(),
+        flags: {},
+      };
+      if (!this.state.turn.player) {
+        this.state.turn.player = entry.playerId;
+      }
+      if (entry.deckList.length > 0) {
+        const result = applyCommand(
+          this.state,
+          {
+            type: 'loadDeck',
+            payload: { deckData: entry.deckList },
+            playerId: entry.playerId,
+          },
+          this.rng
+        );
+        if (!result.error) {
+          this.state = result.state;
+        }
+      }
+      restorePrintedStats(this.state.players[entry.playerId], entry.printedStats);
+    }
+
+    this.state.stateVersion = Math.max(this.state.stateVersion || 0, minimumVersion);
+    this.touchActivity();
+    return kept.map(({ playerId, socketId }) => ({ playerId, socketId }));
+  }
+
   resetClientSeq(playerId) {
     this.clientSeqByPlayer.delete(playerId);
   }
@@ -379,3 +469,47 @@ export class GameRoom {
   }
 }
 
+// Printed card data the reducer reads for combat (see reduce.mjs 'cardStats').
+const PRINTED_STAT_FIELDS = [
+  'hp',
+  'attacks',
+  'types',
+  'weakness',
+  'resistance',
+  'retreatCost',
+  'stage',
+];
+
+// Printed stats are plain JSON (numbers, strings, arrays of plain objects).
+function cloneStat(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function collectPrintedStats(player) {
+  const bySyncInstance = new Map();
+  for (const zone of Object.values(player?.zones || {})) {
+    if (!Array.isArray(zone)) continue;
+    for (const card of zone) {
+      if (card?.syncInstance == null) continue;
+      const stats = {};
+      for (const field of PRINTED_STAT_FIELDS) {
+        if (card[field] !== undefined && card[field] !== null) {
+          stats[field] = cloneStat(card[field]);
+        }
+      }
+      bySyncInstance.set(card.syncInstance, stats);
+    }
+  }
+  return bySyncInstance;
+}
+
+function restorePrintedStats(player, bySyncInstance) {
+  if (!player || !bySyncInstance?.size) return;
+  for (const card of player.zones?.deck || []) {
+    const stats = bySyncInstance.get(card?.syncInstance);
+    if (!stats) continue;
+    for (const [field, value] of Object.entries(stats)) {
+      card[field] = cloneStat(value);
+    }
+  }
+}

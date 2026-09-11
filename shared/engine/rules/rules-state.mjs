@@ -41,6 +41,12 @@
       lastAutoDrawTurn: { self: 0, opp: 0 },
       // Count of turns each player has taken in the current match.
       playerTurnCount: { self: 0, opp: 0 },
+      // "When you play this Pokémon onto your Bench" trigger windows — NOT
+      // reset per turn (unlike `flags.*.abilitiesUsed`). A card gets a window
+      // the instant it's played from hand to Bench; the window is only valid
+      // during that same turn and only until consumed. It's deleted outright
+      // if the card ever returns to hand, so replaying it opens a fresh one.
+      whenPlayedWindows: { self: {}, opp: {} },
     };
     
     // ── card data enrichment: type chart data from TCGdex card details ──
@@ -124,34 +130,66 @@
       return scored[0].s.id;
     }
     
-    // Network: fetch TCGdex summary objects for a name (with EX/GX variant forms).
-    async function fetchSummariesByName(name) {
-      const queries = [name];
-      if (/-EX$/i.test(name)) queries.push(name.replace(/-EX$/i, ' EX'));
-      else if (/ EX$/i.test(name)) queries.push(name.replace(/ EX$/i, '-EX'));
-      if (/-GX$/i.test(name)) queries.push(name.replace(/-GX$/i, ' GX'));
-      else if (/ GX$/i.test(name)) queries.push(name.replace(/ GX$/i, '-GX'));
-      const seen = new Set();
-      const out = [];
-      for (const q of queries) {
+    // TCGdex's search endpoint returns occasional transient 503s ("no available server")
+    // under ordinary load, unrelated to our own request volume — a couple of short retries
+    // turns a one-off blip into a normal 200 instead of permanently unenriched card data.
+    async function fetchWithRetry(url, attempts = 3, delayMs = 250) {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
         try {
-          const url = `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q)}`;
           const res = await fetch(url);
-          if (!res.ok) continue;
-          const arr = await res.json();
-          if (Array.isArray(arr)) {
-            for (const s of arr) {
-              if (s && s.id && !seen.has(s.id)) {
-                seen.add(s.id);
-                out.push(s);
+          if (res.ok) return res;
+          if (attempt === attempts) return res;
+        } catch (err) {
+          if (attempt === attempts) throw err;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+      }
+      return null;
+    }
+
+    // Network: fetch TCGdex summary objects for a name (with EX/GX variant forms).
+    // A deck holds many duplicate-named cards (e.g. 4x N) whose enrichment all
+    // starts in the same tick (build-deck.js's bulk Promise.all warm) — without
+    // sharing one in-flight request per name, each duplicate fires its own
+    // parallel fetch, and a big enough burst gets bot-detection-blocked by
+    // TCGdex/Cloudflare (surfaces as a CORS failure, not a rate-limit response).
+    const summariesInFlight = new Map();
+    async function fetchSummariesByName(name) {
+      if (summariesInFlight.has(name)) return summariesInFlight.get(name);
+      const promise = (async () => {
+        const queries = [name];
+        if (/-EX$/i.test(name)) queries.push(name.replace(/-EX$/i, ' EX'));
+        else if (/ EX$/i.test(name)) queries.push(name.replace(/ EX$/i, '-EX'));
+        if (/-GX$/i.test(name)) queries.push(name.replace(/-GX$/i, ' GX'));
+        else if (/ GX$/i.test(name)) queries.push(name.replace(/ GX$/i, '-GX'));
+        const seen = new Set();
+        const out = [];
+        for (const q of queries) {
+          try {
+            const url = `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q)}`;
+            const res = await fetchWithRetry(url);
+            if (!res || !res.ok) continue;
+            const arr = await res.json();
+            if (Array.isArray(arr)) {
+              for (const s of arr) {
+                if (s && s.id && !seen.has(s.id)) {
+                  seen.add(s.id);
+                  out.push(s);
+                }
               }
             }
+          } catch {
+            /* ignore a failed variant query; others may still resolve */
           }
-        } catch {
-          /* ignore a failed variant query; others may still resolve */
         }
+        return out;
+      })();
+      summariesInFlight.set(name, promise);
+      try {
+        return await promise;
+      } finally {
+        summariesInFlight.delete(name);
       }
-      return out;
     }
     
     // Pure mapper: TCGdex v2 card detail → rules-engine ability shape.
@@ -171,17 +209,32 @@
     // candidate id doesn't cost a second round trip. `null` = fetch failed or
     // the id doesn't exist; failures are not memoized so a later call retries.
     const cardDetailCache = new Map();
+    // Same duplicate-name burst problem as fetchSummariesByName above: many card
+    // instances share one id (e.g. 4x N all resolve to the same TCGdex id), so
+    // dedupe concurrent detail fetches for that id via an in-flight promise —
+    // the completed-result cache above only helps calls that start after the
+    // first one has already resolved.
+    const detailInFlight = new Map();
     export async function fetchCardDetail(id) {
       if (cardDetailCache.has(id)) return cardDetailCache.get(id);
+      if (detailInFlight.has(id)) return detailInFlight.get(id);
+      const promise = (async () => {
+        try {
+          const res = await fetchWithRetry(`https://api.tcgdex.net/v2/en/cards/${id}`);
+          if (!res || !res.ok) return null;
+          const detail = await res.json();
+          if (!detail) return null;
+          cardDetailCache.set(id, detail);
+          return detail;
+        } catch {
+          return null;
+        }
+      })();
+      detailInFlight.set(id, promise);
       try {
-        const res = await fetch(`https://api.tcgdex.net/v2/en/cards/${id}`);
-        if (!res.ok) return null;
-        const detail = await res.json();
-        if (!detail) return null;
-        cardDetailCache.set(id, detail);
-        return detail;
-      } catch {
-        return null;
+        return await promise;
+      } finally {
+        detailInFlight.delete(id);
       }
     }
 
@@ -392,6 +445,7 @@
       rulesState.playerTurnCount = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
+      rulesState.whenPlayedWindows = { self: {}, opp: {} };
     }
 
     // firstPlayer: who goes first ('self' | 'opp'). Defaults to 'self' so
@@ -408,8 +462,9 @@
       rulesState.playerTurnCount = { self: 0, opp: 0 };
       resetTurnFlags('self');
       resetTurnFlags('opp');
+      rulesState.whenPlayedWindows = { self: {}, opp: {} };
     }
-    
+
     export function beginTurn(player) {
       rulesState.turnPlayer = player;
       rulesState.turnNumber += 1;
@@ -478,8 +533,8 @@
     // card? True only when rules are enabled, the draw hasn't happened yet this
     // turn, and there is at least one card left in the deck. The UI layer
     // (rules-bridge.js) calls the real draw() when this returns true.
-    // Turn 1 is skipped: the player who goes first does not draw at the start
-    // of their opening turn (bonus mulligan draws are handled separately).
+    // Every turn draws, including turn 1 for the player going first (bonus
+    // mulligan draws are handled separately).
     export function shouldAutoDrawAtTurnStart({
       enabled = true,
       drewThisTurn = false,
@@ -487,7 +542,6 @@
       turnNumber = 0,
       lastDrawnTurn = 0,
     } = {}) {
-      if (Number(turnNumber) === 1) return false;
       if (lastDrawnTurn && Number(lastDrawnTurn) === Number(turnNumber)) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }
@@ -549,6 +603,27 @@
     }
     export function abilityUsed(player, card) {
       return !!rulesState.flags[player]?.abilitiesUsed?.[abilityKey(card)];
+    }
+
+    // ── "When you play this Pokémon onto your Bench" trigger windows ──────
+    // Distinct from abilitiesUsed: NOT cleared by resetTurnFlags, so it stays
+    // consumed across future turns instead of re-arming every turn. Opening a
+    // fresh window (played from hand again) and clearing on return-to-hand
+    // are the only ways to reset it.
+    export function openPlayedToBenchWindow(player, card) {
+      const key = abilityKey(card);
+      rulesState.whenPlayedWindows[player][key] = { turn: rulesState.turnNumber, used: false };
+    }
+    export function clearPlayedToBenchWindow(player, card) {
+      delete rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
+    }
+    export function canUsePlayedToBenchTrigger(player, card) {
+      const entry = rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
+      return !!entry && !entry.used && entry.turn === rulesState.turnNumber;
+    }
+    export function consumePlayedToBenchTrigger(player, card) {
+      const entry = rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
+      if (entry) entry.used = true;
     }
 
     /** Turn-scoped attack bonus from a once-per-turn ability (Torrential Heart, …). */

@@ -25,6 +25,8 @@
       markMulligansResolved,
       markAttacked,
       resetRulesSessionState,
+      canUsePlayedToBenchTrigger,
+      consumePlayedToBenchTrigger,
     } from '/shared/engine/rules/rules-state.mjs';
     import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
     import { handleKO, checkWinConditions, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
@@ -32,7 +34,8 @@
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
-import { getDealOrderStarter } from '../netcode/deal-order.js';
+import { getDealOrderStarter, resetDealOrder } from '../netcode/deal-order.js';
+import { multiplayerLocksRulesEnabled } from '../general/e2e-mode.mjs';
 function shouldExecuteLocalRulesEffect({
   isTwoPlayer = false,
   localPlay = false,
@@ -209,6 +212,49 @@ import {
       win.innerHTML = `<h4 class="rules-aw-title">⚔️ Attack Window</h4><div class="rules-aw-body"></div>`;
       document.body.appendChild(win);
 
+      // ── drag by the title bar ──
+      const titleEl = win.querySelector('.rules-aw-title');
+      titleEl.classList.add('rules-aw-draggable');
+      let dragPointerId = null;
+      let dragOffsetX = 0;
+      let dragOffsetY = 0;
+
+      const onPointerMove = (e) => {
+        if (e.pointerId !== dragPointerId) return;
+        const maxLeft = window.innerWidth - win.offsetWidth;
+        const maxTop = window.innerHeight - win.offsetHeight;
+        const left = Math.min(Math.max(0, e.clientX - dragOffsetX), Math.max(0, maxLeft));
+        const top = Math.min(Math.max(0, e.clientY - dragOffsetY), Math.max(0, maxTop));
+        win.style.left = `${left}px`;
+        win.style.top = `${top}px`;
+        win.style.right = 'auto';
+        win.style.bottom = 'auto';
+      };
+
+      const onPointerUp = (e) => {
+        if (e.pointerId !== dragPointerId) return;
+        dragPointerId = null;
+        titleEl.releasePointerCapture(e.pointerId);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+      };
+
+      titleEl.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        const rect = win.getBoundingClientRect();
+        dragPointerId = e.pointerId;
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        win.style.left = `${rect.left}px`;
+        win.style.top = `${rect.top}px`;
+        win.style.right = 'auto';
+        win.style.bottom = 'auto';
+        titleEl.setPointerCapture(e.pointerId);
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+        e.preventDefault();
+      });
+
       const energySymbols = {
         Colorless: '⚪', Fire: '🔥', Water: '💧', Grass: '🌿',
         Lightning: '⚡', Psychic: '🔮', Fighting: '🥊', Metal: '⚙️',
@@ -375,9 +421,11 @@ import {
       settings.appendChild(row);
     
       document.getElementById('rulesEnforcedCheckbox').addEventListener('change', (e) => {
-        if (systemState.isTwoPlayer && !e.target.checked) {
+        if (multiplayerLocksRulesEnabled(systemState.isTwoPlayer) && !e.target.checked) {
           // Multiplayer games always run with rules enforced: snap the
-          // checkbox back instead of letting it be unticked.
+          // checkbox back instead of letting it be unticked. The e2e bridge
+          // is exempt (multiplayerLocksRulesEnabled) — bot-vs-bot debug
+          // testing needs to break rules mid-game on purpose.
           e.target.checked = true;
           appendMessage('', 'Rules enforcement is always on in multiplayer.', 'announcement', false);
           return;
@@ -397,9 +445,11 @@ import {
     
     // Multiplayer games always run with rules enforced. Called when
     // systemState.isTwoPlayer becomes true (joinGame / spectatorJoin) so a
-    // solo "off" preference can't carry into a shared game.
+    // solo "off" preference can't carry into a shared game. The e2e bridge is
+    // exempt — always called with isTwoPlayer already true, so exemption
+    // reduces to isE2eMode() itself (multiplayerLocksRulesEnabled(true)).
     export const forceRulesEnabledForMultiplayer = () => {
-      if (rulesState.enabled) {
+      if (!multiplayerLocksRulesEnabled(true) || rulesState.enabled) {
         syncRulesToggleUI();
         return;
       }
@@ -631,6 +681,7 @@ import {
     const resetRulesSession = () => {
       rulesSessionGeneration += 1;
       resetRulesSessionState();
+      resetDealOrder();
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;
@@ -662,6 +713,12 @@ import {
         if (!rulesState.enabled) return;
         resetRulesSession();
       });
+      // Leaving or joining a room ends the previous game. Unlike the Reset
+      // buttons this is not gated on rulesState.enabled: a stale phase or a
+      // stale openingSetupReadyForCoinFlip carried into the next room shows
+      // the old turn HUD and lets the next peerSocketId/turnOrderCoinFlip
+      // auto-start a game nobody set up.
+      document.addEventListener('room-changed', resetRulesSession);
     };
     
     // Shared setup sequence once turn order is decided — used both by the
@@ -1093,22 +1150,16 @@ import {
               destination: 'bench',
               multiSelect: true,
               requiredCount: Math.min(search.count, pool.length),
+              // openCardPicker's confirm already moved (and relayed) every
+              // pick via zoneFrom/destination before calling this.
               onConfirm: (selected) => {
-                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                  for (const s of selected) {
-                    const idx = getZone(user, 'deck').array.indexOf(s);
-                    if (idx >= 0) {
-                      moveCardBundle(user, user, 'deck', 'bench', idx, false, 'move');
-                    }
-                  }
-                  appendMessage(
-                    '',
-                    `  ${selected.map((s) => s.name).join(', ')} → Bench`,
-                    'announcement',
-                    false,
-                  );
-                  shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
-                });
+                appendMessage(
+                  '',
+                  `  ${selected.map((s) => s.name).join(', ')} → Bench`,
+                  'announcement',
+                  false,
+                );
+                shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
               },
               onCancel: () => {
                 appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
@@ -1643,16 +1694,12 @@ import {
           minCount: upTo ? 0 : count,
           maxCount: count,
           upTo,
+          // openCardPicker's confirm already moved (and relayed) every pick
+          // via zoneFrom/destination before calling this.
           onConfirm: (selected) => {
             revealPicked(selected);
-            import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-              for (const s of selected) {
-                const idx = getZone(user, 'deck').array.indexOf(s);
-                if (idx >= 0) moveCardBundle(user, user, 'deck', dest, idx, false, 'move');
-              }
-              appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
-              shuffleAfter();
-            });
+            appendMessage('', `  ${selected.map((s) => s.name).join(', ')} → ${toBench ? 'Bench' : 'hand'}`, 'announcement', false);
+            shuffleAfter();
           },
           onCancel: () => {
             appendMessage('', '  search canceled — ability not used (you may decline).', 'announcement', false);
@@ -1821,14 +1868,31 @@ import {
         appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
         return;
       }
-      if (rulesState.enabled && abilityUsed(user, card)) {
-        appendMessage(user, `⛔ ${card.name}'s ability was already used this turn.`, 'announcement', false);
-        return;
-      }
 
       await ensureCardData(card);
       const abilityText = card.ability?.text || card.abilityText || '';
       const steps = parseAbility(abilityText);
+      // "When you play this Pokémon onto your Bench" triggers (e.g. Meowth's
+      // Last Ditch Catch) aren't a recurring once-per-turn action — they're
+      // gated by the one-shot window opened when the card was played from
+      // hand to Bench, not the per-turn abilitiesUsed map.
+      const isPlayedToBenchTrigger = steps.some((s) => s.type === 'whenPlayedAbility');
+
+      if (isPlayedToBenchTrigger) {
+        if (rulesState.enabled && !canUsePlayedToBenchTrigger(user, card)) {
+          appendMessage(
+            user,
+            `⛔ ${card.name}'s ability only works the turn it's played from hand to the Bench.`,
+            'announcement',
+            false
+          );
+          return;
+        }
+      } else if (rulesState.enabled && abilityUsed(user, card)) {
+        appendMessage(user, `⛔ ${card.name}'s ability was already used this turn.`, 'announcement', false);
+        return;
+      }
+
       const plan = planAbilitySteps(steps, { mode: 'interactive' });
       const actionable = actionableAbilityPlan(plan, { mode: 'interactive' });
       if (actionable.length === 0) {
@@ -1850,6 +1914,10 @@ import {
           await executeAbilityDraw(user, item.step);
           executed = true;
         } else if (item.action === 'search') {
+          // A when-played + search combo (isPlayedToBenchTrigger) resolves
+          // its search entirely inside runWhenPlayedStep below — running it
+          // again here would pop the picker twice for one trigger.
+          if (isPlayedToBenchTrigger) continue;
           const completed = await runAbilitySearchPicker(user, card, item.step);
           if (markAbilityUseAfterSearchStep(completed)) {
             executed = true;
@@ -1966,7 +2034,8 @@ import {
       }
 
       if (executed && rulesState.enabled && !skipAbilityMark) {
-        markAbilityUsed(user, card);
+        if (isPlayedToBenchTrigger) consumePlayedToBenchTrigger(user, card);
+        else markAbilityUsed(user, card);
       }
     }
     

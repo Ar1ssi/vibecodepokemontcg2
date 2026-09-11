@@ -7,7 +7,7 @@ import {
   getAuthoritativeStadiumArray,
   hasAuthoritativeView,
 } from '../netcode/apply-view.js';
-import { rulesState } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
 import { getCardDamage, getCardSpecialCondition } from '/shared/engine/zones/card-state.mjs';
 import { resolveAttachedEnergyType } from '/shared/engine/rules/energy-effects.mjs';
@@ -15,6 +15,7 @@ import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
+import { persistRulesEnabled } from '/shared/engine/rules/rules-state.mjs';
 import {
   getCardPickerSnapshot,
   pickCardPickerIndices,
@@ -286,7 +287,7 @@ export function installE2eApi() {
         }
         return { ok: false, error: `unknown option kind: ${kind}` };
       } catch (err) {
-        return { ok: false, error: String(err?.message || err) };
+        return { ok: false, error: String(err?.stack || err?.message || err) };
       }
     },
     // Design 004 slice 4: reports whichever modal the legacy rules path is currently
@@ -374,11 +375,51 @@ export function installE2eApi() {
     loadFixtureDeck(prefix = 'E2E') {
       loadDeckData('self', e2eFixtureDeck(prefix), true);
     },
+    // Debug mode: turns off every legality gate canPerformAction checks (turn
+    // order, once-per-turn limits, evolve/attack/retreat restrictions, phase
+    // locks — see rules-state.mjs canPerformAction's `if (!rulesState.enabled)
+    // return { allowed: true }` short-circuit) so a tester or bot can force
+    // any card into play to test its behavior in isolation. Safe to flip
+    // mid-2P-game: rules-bridge.js's forceRulesEnabledForMultiplayer, which
+    // would otherwise snap this back to `true` on room join, exempts the e2e
+    // bridge (multiplayerLocksRulesEnabled). loadDeckList/loadFixtureDeck
+    // already accept any card list of any size — there is no separate
+    // minimum-deck-size check to bypass.
+    debugMode(enabled = true) {
+      rulesState.enabled = !enabled;
+      persistRulesEnabled();
+      return !rulesState.enabled;
+    },
     // Design 004 slice 6: loads an arbitrary deck (the same 7-field row shape
     // e2eFixtureDeck produces — [quantity, name, type, imageURL, number, set, tcgId]) for
     // the playtest runner's `--deck` option, instead of the built-in all-Basic fixture.
     loadDeckList(deckRows) {
       loadDeckData('self', deckRows, true);
+    },
+    // Pre-warms this page's TCGdex enrichment cache for a real (non-fixture) deck's
+    // unique cards, one at a time, before the deck is even built. build-deck.js's own
+    // warm-up (called from loadDeckList) still runs on every card instance, but a real
+    // deck repeats names many times over (e.g. 4x N) and its concurrent-batch fetches
+    // are the first thing to race the game's own setup steps; calling this first lets
+    // every duplicate resolve from the in-memory cache instead of hitting the network
+    // again, and going one at a time (rather than build-deck.js's already-throttled
+    // batch of 6) is the gentlest possible pace against TCGdex's flakier search
+    // endpoint. Resolves once every unique card has been attempted (success or not —
+    // a card that failed here just retries during the real per-instance warm-up).
+    async warmDeckCache(deckRows) {
+      const seen = new Set();
+      for (const [, name, type, , number, set] of deckRows) {
+        const key = `${name}|${type}|${number}|${set}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (isEnergy({ name, type })) continue;
+        try {
+          await ensureCardData({ name, type, number, set });
+        } catch {
+          /* best-effort warm; the real per-instance pass during loadDeckList retries */
+        }
+      }
+      return true;
     },
     // Design 004 slice 6: resolves once build-deck.js's bulk ensureCardData() pass has
     // settled, so the runner can hold off the first turn until hp/attacks/stage/subtypes

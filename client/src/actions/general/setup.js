@@ -68,7 +68,8 @@ export const setupPrizes = async (user, indices, emit = true) => {
     const serverOrder = await waitForDealOrder();
     // A 0-length order means the server dealt before this player's own deck had
     // loaded (see server.js's allDecksLoaded guard) — never usable as `indices`
-    // (an empty array is truthy but would wipe the deck via rearrangeArray).
+    // (an empty array is truthy but is not a deal order — rearrangeArray would
+    // leave the deck unshuffled and report a mismatch).
     if (Array.isArray(serverOrder) && serverOrder.length === deck.getCount()) {
       indices = serverOrder;
     } else {

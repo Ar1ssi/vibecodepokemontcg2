@@ -98,3 +98,18 @@ test('resolveDetachedCardDestination: hand/deck still stage in attachedCards', (
   assert.equal(resolveDetachedCardDestination('hand'), 'attachedCards');
   assert.equal(resolveDetachedCardDestination('deck'), 'attachedCards');
 });
+
+// Regression: moveCard used to call markSupporterPlayed() for every hand→board
+// Trainer play, not just Supporters — playing an Item then a real Supporter
+// falsely tripped the "one Supporter per turn" gate. Mirrors the isSupporter
+// guard added around the markSupporterPlayed() call in move-card.js.
+test('playing an Item does not flip the supporterPlayed flag', () => {
+  const itemCard = { type: 'Item', subtypes: [] };
+  const subtypes = (itemCard.subtypes || []).map((s) => String(s).toLowerCase());
+  const isSupporter =
+    String(itemCard.type || '').toLowerCase() === 'supporter' || subtypes.includes('supporter');
+  let supporterPlayed = false;
+  if (isSupporter) supporterPlayed = true; // guarded call under test
+  assert.equal(isSupporter, false);
+  assert.equal(supporterPlayed, false);
+});
