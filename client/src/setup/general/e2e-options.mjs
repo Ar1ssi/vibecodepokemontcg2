@@ -109,6 +109,13 @@ export async function enumerateOptions({
   attachedCardsOf = defaultAttachedCards,
 } = {}) {
   const options = [];
+  // Server card identity, when the authoritative view is what we are reading. Under that
+  // netcode an option's handIndex/targetIndex address the SERVER view array, while
+  // moveCardBundle's legacy fallback indexes the local DOM zone array — different arrays,
+  // no guaranteed agreement. Carrying the instanceId lets act() address the card itself
+  // (authoritative-dispatch.js's { moving, target } bundle) instead of a position. Null in
+  // legacy mode, where the index is the identity and the field is ignored.
+  const idOf = (card) => (card && card.instanceId != null ? card.instanceId : null);
   const handCards = Array.isArray(hand) ? hand : [];
   const benchCards = (Array.isArray(bench) ? bench : []).filter(Boolean);
 
@@ -130,9 +137,19 @@ export async function enumerateOptions({
     handCards.forEach((card, handIndex) => {
       if (!isPokemon(card) || !isBasicPokemon(card)) return;
       if (!active) {
-        options.push({ kind: 'playBasic', handIndex, targetZone: 'active' });
+        options.push({
+          kind: 'playBasic',
+          handIndex,
+          targetZone: 'active',
+          instanceId: idOf(card),
+        });
       } else if (benchCards.length < BENCH_LIMIT) {
-        options.push({ kind: 'playBasic', handIndex, targetZone: 'bench' });
+        options.push({
+          kind: 'playBasic',
+          handIndex,
+          targetZone: 'bench',
+          instanceId: idOf(card),
+        });
       }
     });
   }
@@ -157,6 +174,8 @@ export async function enumerateOptions({
           handIndex,
           targetZone: target.targetZone,
           targetIndex: target.targetIndex,
+          instanceId: idOf(card),
+          targetInstanceId: idOf(target.card),
         });
       }
     }
@@ -172,6 +191,8 @@ export async function enumerateOptions({
           handIndex,
           targetZone: target.targetZone,
           targetIndex: target.targetIndex,
+          instanceId: idOf(card),
+          targetInstanceId: idOf(target.card),
         });
       }
     });
@@ -186,7 +207,7 @@ export async function enumerateOptions({
         ? 'playItem'
         : 'moveCard';
     if (!canPerformAction({ user, action, initiator: user }).allowed) return;
-    options.push({ kind: 'playTrainer', handIndex });
+    options.push({ kind: 'playTrainer', handIndex, instanceId: idOf(card) });
   });
 
   // ── abilities (once per turn, interactive steps only) ─────────────────

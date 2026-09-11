@@ -177,25 +177,38 @@ async function setupGame(browser, room, deckRows, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'prizes').count === 6);
 
-  const callBtn = '#rulesCoinCallOverlay button[data-coin-call="heads"]';
-  const overlayDeadline = Date.now() + 15000;
-  let called = false;
-  while (Date.now() < overlayDeadline && !called) {
-    await a.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
-    await b.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
-    for (const client of [a, b]) {
-      if (await client.page.locator(callBtn).isVisible().catch(() => false)) {
-        await client.page.locator(callBtn).click();
-        called = true;
-        break;
+  // Under SERVER_AUTHORITATIVE the server owns setup: it deals, sets the prizes and picks
+  // the first player, and no #rulesCoinCallOverlay is ever shown. The coin ritual below is
+  // legacy-only, and waiting on it against an authoritative server fails every run with
+  // "coin call overlay never opened" before a single action is taken. Both modes are
+  // supported; which one is live is the server's choice, so ask the client.
+  const authoritative = await a.page.evaluate(() => window.__ptcg.isAuthoritative());
+  if (!authoritative) {
+    const callBtn = '#rulesCoinCallOverlay button[data-coin-call="heads"]';
+    const overlayDeadline = Date.now() + 15000;
+    let called = false;
+    while (Date.now() < overlayDeadline && !called) {
+      await a.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
+      await b.page.evaluate(() => window.__ptcg.nudgeCoinSetup());
+      for (const client of [a, b]) {
+        if (await client.page.locator(callBtn).isVisible().catch(() => false)) {
+          await client.page.locator(callBtn).click();
+          called = true;
+          break;
+        }
       }
+      if (!called) await a.page.waitForTimeout(200);
     }
-    if (!called) await a.page.waitForTimeout(200);
-  }
-  if (!called) throw new Error('coin call overlay never opened');
+    if (!called) throw new Error('coin call overlay never opened');
 
-  await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count === 7);
-  await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count === 7);
+    await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count === 7);
+    await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count === 7);
+  } else {
+    // The server deals 7 to the player going second and 8 to the one going first (their
+    // turn-1 draw is already included), so neither side is pinned to 7 here.
+    await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
+    await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
+  }
 
   // Design 004 targets the legacy client path by default (SERVER_AUTHORITATIVE unset),
   // where turnPlayer is decided by a peer-to-peer coin flip and broadcast directly
@@ -323,6 +336,7 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
     return { result: 'fail', reason: 'setup-error', detail: err.message, gameIndex };
   }
   const { a, b } = clients;
+  const authoritative = await a.page.evaluate(() => window.__ptcg.isAuthoritative());
 
   const fail = async (reason, detail, observation, chosen, turn) => {
     const rejections = await Promise.all([
@@ -482,11 +496,29 @@ async function playOneGame({ browser, seed, gameIndex, maxTurns, deckRows, score
         onFallback: (why, detail) => fallbacks.push({ turn: lastTurnNumber, why, detail: String(detail ?? '') }),
       });
       lastChosen = chosen;
+      const viewVersionBefore = authoritative
+        ? await active.page.evaluate(() => window.__ptcg.viewVersion())
+        : 0;
       const actResult = await active.page.evaluate((option) => window.__ptcg.act(option), chosen);
       if (actResult.ok) {
         (isA ? exercised.a : exercised.b).push(coverageKey(chosen, observation));
       }
       stepLog.push({ turn: lastTurnNumber, player: isA ? 'a' : 'b', chosen, actResult });
+
+      // Under server authority, options() is computed from the last applied view, so acting
+      // again before the next one lands means choosing against a stale board. Wait for the
+      // view to advance. Bounded and non-fatal: a command that legitimately produces no new
+      // view (or a slow round trip) must not stall the run, and the existing rejection and
+      // divergence checks still catch anything this misses.
+      if (authoritative && actResult.ok) {
+        const before = viewVersionBefore;
+        const deadline = Date.now() + 3000;
+        while (Date.now() < deadline) {
+          const now = await active.page.evaluate(() => window.__ptcg.viewVersion());
+          if (now > before) break;
+          await active.page.waitForTimeout(50);
+        }
+      }
 
       // A Trainer still in hand after act() reported success resolved to nothing this client
       // can execute (an unimplemented effect). Mark it so the scorer stops re-picking it —

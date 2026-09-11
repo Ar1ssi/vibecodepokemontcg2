@@ -12,6 +12,7 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I36 2026-09-11 P2 [netcode] Client per-turn rules flags were never synced from the authoritative view — FIXED S89, recorded because it affected real players, not only the bot. Under `SERVER_AUTHORITATIVE` the legacy bodies that set `rulesState.flags` (markRetreated, markSupporterPlayed, the energy-attach and attack markers) are gated away, so the flags stayed frozen while the server tracked the real ones; `canPerformAction` reads them, so the client offered moves the server then rejected ("Already retreated this turn." after one retreat). `reconcileTurnState` (apply-view.js) already existed for exactly this class of staleness and synced turn player/number/phase but not flags; it now merges `view.you/them.flags` too. Verified: bot 8/8 games in authoritative mode, was 0/8 (refs: design 002 slice 3.12, S89).
 - I35 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed
     trainer-effect step kinds from `trainer-effects.mjs` — an unimplemented effect silently
     no-ops instead of erroring, so a headless harness (or `playtest-bot.mjs`'s legacy-mode runs,
@@ -39,6 +40,13 @@
 - I11 2026-09-09 P1 [netcode] Client syncInstance (0-based per player) is sent as the server's instanceId (1-based global), so every authoritative card command targets the wrong card or the wrong player's card (build-deck.js:13-19 vs shadow.mjs:29-68; dual-run-bridge.js:205-208) (refs: design 002, S32)
 - I12 2026-09-09 P1 [netcode] Reconnect recovery is dead in both modes: slice 8 deleted the replay stack but left the emitters — no client listener exists for resyncActions/catchUpActions/requestBoardSnapshot, and requestView returns a view the renderer cannot paint (socket-event-listeners.js:211) (refs: design 002, S32)
 - I13 2026-09-09 P2 [netcode] applyView renders nothing in production: zones live in iframes, window.__getZone is never assigned, and only tests inject options.getZone — so the renderer has never run against the real DOM (apply-view.js:91-111) (refs: design 002, S32)
+    STALE as written, corrected S89: the authoritative renderer DOES run. Measured against a
+    local `SERVER_AUTHORITATIVE=1` server: 14 elements carrying `data-instance-id` inside the
+    `#selfContainer` iframe and 13 inside `#oppContainer`, so `cardRegistry` is populated and
+    `buildAuthoritativeCardHint` resolves. The original wording looked true only because a probe
+    of the TOP-LEVEL document finds nothing — the zones live in iframes. Whatever remains of this
+    issue needs re-scoping against that measurement before anyone acts on it.
+
 - I14 2026-09-09 P2 [netcode] SERVER_AUTHORITATIVE defaults on (server.js:21-23) though design 001 slice 8's flip was never completed: 14 of 58 actions translate, IDs do not match, renderer is blind (refs: design 002, I11, I13, S32)
 - I1 2026-09-07 P2 [rules] Turn start auto-draw: both players draw a card when turn is started (ref: ISSUES.txt)
 - I2 2026-09-07 P2 [rules] End Turn button logic: +Turn needs rework to end active player's turn (ref: ISSUES.txt)
