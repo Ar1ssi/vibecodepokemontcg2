@@ -262,7 +262,16 @@ export const resetNetcodeForRoomChange = () => {
 export const initializeSocketEventListeners = () => {
   seedNetcodeContext();
 
-  socket.on('joinGame', async (data) => {
+  // The server replays the opponent's cached exchangeData/loadDeckData right
+  // after emitting joinGame. Room setup below awaits and then wipes opponent
+  // state, so it runs on pushActionQueue: those replays queue behind it
+  // instead of landing mid-setup (pre-isTwoPlayer) and being wiped.
+  socket.on('joinGame', (data) => {
+    pushActionQueue = pushActionQueue
+      .then(() => handleJoinGame(data))
+      .catch((err) => console.error('joinGame setup failed', err));
+  });
+  const handleJoinGame = async (data) => {
     systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
     const protocolVersion = await getProtocolVersion();
     if (
@@ -327,7 +336,7 @@ export const initializeSocketEventListeners = () => {
       type: 'peerSocketId',
       data: { socketId: socket.id },
     });
-  });
+  };
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
   });
