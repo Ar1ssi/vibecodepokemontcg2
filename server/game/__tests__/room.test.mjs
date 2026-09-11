@@ -291,3 +291,73 @@ test('Finding 12: clientSeqByPlayer is cleared on removeSocket, not just on re-a
   );
 });
 
+
+test('resetGame: explicit leave frees the leaver seat and restarts the game for the player who stays', () => {
+  const room = new GameRoom({ roomId: 'reset-game-1', rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  const deck = [
+    [2, 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1'],
+    [1, 'Lightning Energy', 'Energy', 'u', '002', 'e2e', 'x-2'],
+  ];
+  assert.equal(room.handleCommand('sock-a', { type: 'loadDeck', payload: { deckData: deck } }).success, true);
+  assert.equal(room.handleCommand('sock-b', { type: 'loadDeck', payload: { deckData: deck } }).success, true);
+  // Printed stats arrive once from the client; the client never resends them.
+  const stats = room.handleCommand('sock-b', {
+    type: 'cardStats',
+    payload: { stats: [{ syncInstance: 0, hp: 60 }] },
+  });
+  assert.equal(stats.success, true, stats.reason);
+
+  // A game in progress: a card in hand, main phase, a client seq recorded.
+  const p2 = room.state.players.p2;
+  p2.zones.hand.push(p2.zones.deck.shift());
+  room.state.turn.phase = 'main';
+  room.clientSeqByPlayer.set('p2', 7);
+  const versionBefore = room.state.stateVersion;
+
+  const kept = room.resetGame({ removePlayerId: 'p1' });
+
+  assert.deepEqual(kept, [{ playerId: 'p2', socketId: 'sock-b' }]);
+  assert.equal(room.state.players.p1, undefined, 'leaver seat is freed');
+  assert.equal(room.socketToPlayer.has('sock-a'), false);
+  assert.equal(room.playerToSocket.has('p1'), false);
+  assert.equal(room.getNextAvailablePlayerId(), 'p1', 'rejoiner gets a fresh seat');
+  assert.equal(room.socketToPlayer.get('sock-b'), 'p2', 'stayer keeps seat and socket');
+  assert.equal(room.state.players.p2.username, 'Gary');
+  assert.equal(room.state.turn.phase, 'setup', 'game is back in setup');
+  assert.ok(room.state.stateVersion > versionBefore, 'stateVersion keeps increasing');
+  assert.equal(room.clientSeqByPlayer.size, 0);
+  assert.equal(room.state.players.p2.zones.hand.length, 0);
+  assert.equal(room.state.players.p2.zones.deck.length, 3, 'stayer deck reloaded in full');
+  const pikachu = room.state.players.p2.zones.deck.find((c) => c.syncInstance === 0);
+  assert.equal(pikachu.hp, 60, 'printed stats carried across the reset');
+
+  const map = room.getInstanceMap('p2');
+  assert.deepEqual(Object.keys(map).map(Number).sort((x, y) => x - y), [0, 1, 2]);
+  for (const card of room.state.players.p2.zones.deck) {
+    assert.equal(map[card.syncInstance], card.instanceId);
+  }
+});
+
+test('loadDeck: a string quantity from a real decklist loads that many cards', () => {
+  const room = new GameRoom({ roomId: 'load-deck-quantity', rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  const deck = [
+    ['4', 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1'],
+    ['2', 'Lightning Energy', 'Energy', 'u', '002', 'e2e', 'x-2'],
+  ];
+  const result = room.handleCommand('sock-a', { type: 'loadDeck', payload: { deckData: deck } });
+  assert.equal(result.success, true, result.reason);
+  const cards = room.state.players.p1.zones.deck;
+  assert.equal(cards.length, 6, 'the client builds 6 cards from this list; the server must too');
+  assert.deepEqual(cards.map((c) => c.syncInstance), [0, 1, 2, 3, 4, 5]);
+});
+
+test('initializePlayerDeck (shadow): a string quantity loads that many cards', async () => {
+  const { initializePlayerDeck } = await import('../shadow.mjs');
+  const room = new GameRoom({ roomId: 'shadow-quantity', rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  initializePlayerDeck(room.state, 'p1', [['3', 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1']]);
+  assert.equal(room.state.players.p1.zones.deck.length, 3);
+});

@@ -12,6 +12,10 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I39 2026-09-11 P2 [netcode] flip-gate-test.mjs fails right after both hands are dealt (timeout waiting for a page predicate) on main fe0ad88 with S102's changes stashed — pre-existing; the server-authoritative exit gate is currently red. (refs: S102)
+- I40 2026-09-11 P3 [netcode] deal-order.js resetDealOrder() has no callers, so a game's dealOrder/starter survive into the next game in the same tab. Not shown harmful (second-game probe dealt correctly, zero desync after S102), but the documented reset is unwired. (refs: S102)
+- I41 2026-09-11 P3 [netcode] legacy mode: after both players leave and join a fresh room, the second player once stayed in setup with prizes but no opening hand (1 sample, S102 second-game probe). Untriaged. (refs: S102)
+- I42 2026-09-11 P3 [netcode] syncCheck compares the client's last-applied view with current server state; a command landing in between can report a transient desync. Harmless since S102 (recovery is a silent requestView) but still a false signal. (refs: S102)
 - I35 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed
     trainer-effect step kinds from `trainer-effects.mjs` — an unimplemented effect silently
     no-ops instead of erroring, so a headless harness (or `playtest-bot.mjs`'s legacy-mode runs,

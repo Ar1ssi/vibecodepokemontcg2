@@ -2157,8 +2157,11 @@ export function applyCommand(state, command, rng = null) {
                 item.set,
                 item.tcgId,
               ];
+        // Real decklists send quantity as a string ("4"); build-deck.js's loop
+        // coerces it, so the server must count the same cards the client does.
+        const parsedQuantity = Number(quantity);
         const cardCount =
-          typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+          Number.isInteger(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
         for (let i = 0; i < cardCount; i++) {
           const card = createCard({
             instanceId: mintInstanceId(draft),

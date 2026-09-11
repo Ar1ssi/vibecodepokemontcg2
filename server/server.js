@@ -14,10 +14,9 @@ import { GameRoom } from './game/room.mjs';
 import { ShadowSession, extractDeckData } from './game/shadow.mjs';
 import {
   findFirstDivergentZone,
-  excludeOwnerSecretZones,
+  hashOwnerViewZones,
 } from './game/sync-check.mjs';
 import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
-import { hashStateZones } from '../shared/engine/state.mjs';
 
 const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE === '1' ||
@@ -311,6 +310,35 @@ async function main() {
   };
   // Set up a timer to clean up empty rooms every 5 minutes (adjust as needed)
   setInterval(cleanUpEmptyRooms, 5 * 60 * 1000);
+
+  // An explicit Leave Room by a seated player ends that game. Without this the
+  // GameRoom outlived the leave whenever the opponent stayed seated, and
+  // rejoining the same room re-sent the old game as a server view: old hand,
+  // prizes and turn, with no Set Up pressed. Players who stay keep their seat
+  // and deck; a disconnect (not a Leave) still resumes the game on reconnect.
+  const resetGameAfterPlayerLeft = (roomId, leaverUsername) => {
+    const gameRoom = gameRooms.get(roomId);
+    if (!gameRoom) return;
+    const leaverPlayerId = gameRoom.getPlayerIdByUsername(leaverUsername);
+    if (!leaverPlayerId) return;
+    const remaining = gameRoom.resetGame({ removePlayerId: leaverPlayerId });
+    for (const { playerId, socketId } of remaining) {
+      if (!socketId) continue;
+      io.to(socketId).emit('instanceMap', {
+        roomId,
+        map: gameRoom.getInstanceMap(playerId),
+      });
+      const view = gameRoom.getView(playerId);
+      io.to(socketId).emit('view', {
+        gameId: roomId,
+        stateVersion: gameRoom.state.stateVersion,
+        view,
+        events: [],
+        pendingChoice: view?.pendingChoice || null,
+        lastClientSeq: 0,
+      });
+    }
+  };
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
     // Function to handle disconnections (unintended)
@@ -329,8 +357,10 @@ async function main() {
         const room = roomInfo.get(roomId);
 
         if (socket.data.leaveRoom) {
-          if (room.players.has(username)) {
+          const leftAsPlayer = room.players.has(username);
+          if (leftAsPlayer) {
             room.players.delete(username);
+            room.setupActionCache?.delete(socket.id);
           } else if (room.spectators.has(username)) {
             room.spectators.delete(username);
           }
@@ -340,6 +370,8 @@ async function main() {
             roomInfo.delete(roomId);
             if (SERVER_AUTHORITATIVE) gameRooms.delete(roomId);
             if (SHADOW_MODE) shadowSessions.delete(roomId);
+          } else if (leftAsPlayer && SERVER_AUTHORITATIVE) {
+            resetGameAfterPlayerLeft(roomId, username);
           }
         } else {
           // For unintended disconnections, remove from spectators, but retain seated players
@@ -722,17 +754,7 @@ async function main() {
                   // Hand this player their own syncInstance -> instanceId lookup so the
                   // client can translate outgoing command hints; never broadcast this,
                   // it would leak the opponent's ids.
-                  const deckZone =
-                    gameRoom.state.players[playerId]?.zones?.deck || [];
-                  const map = {};
-                  for (const card of deckZone) {
-                    if (
-                      card?.syncInstance != null &&
-                      card?.instanceId != null
-                    ) {
-                      map[card.syncInstance] = card.instanceId;
-                    }
-                  }
+                  const map = gameRoom.getInstanceMap(playerId);
                   const targetSocketId = gameRoom.playerToSocket.get(playerId);
                   if (targetSocketId) {
                     io.to(targetSocketId).emit('instanceMap', { roomId, map });
@@ -969,12 +991,10 @@ async function main() {
         const playerId = gameRoom.socketToPlayer.get(socket.id);
         if (!playerId) return;
         gameRoom.touchActivity();
-        // I24: deck is owner-secret even in this player's own hand (O4-A / I5),
-        // so the client never reports it — drop it here too or it always reads
-        // as a false-positive divergence.
-        const serverZones = excludeOwnerSecretZones(
-          hashStateZones(gameRoom.state, playerId)
-        );
+        // Compare against what this player's view shows, not raw state: the
+        // client can only hash its own view, which redacts the deck (I24) and
+        // unrevealed prizes. Raw-state hashing made prizes diverge every beat.
+        const serverZones = hashOwnerViewZones(gameRoom.getView(playerId));
         const zoneId = findFirstDivergentZone(serverZones, data?.zones);
         if (zoneId) {
           socket.emit('desync', { roomId, zoneId });

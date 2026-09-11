@@ -48,8 +48,10 @@ export function initializePlayerDeck(state, playerId, deckData = []) {
           item.tcgId,
         ];
 
+    // Same coercion as reduce.mjs loadDeck: decklists send quantity as a string.
+    const parsedQuantity = Number(quantity);
     const cardCount =
-      typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+      Number.isInteger(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
     for (let i = 0; i < cardCount; i++) {
       const card = createCard({
         instanceId: mintInstanceId(state),

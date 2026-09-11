@@ -59,7 +59,6 @@ import {
 import {
   computeSyncCheckZones,
   emitSyncCheck,
-  shouldTriggerDesyncRecovery,
   viewBackedGetZone,
   SYNC_CHECK_INTERVAL_MS,
 } from '../../setup/netcode/sync-check.js';
@@ -428,6 +427,9 @@ export const initializeSocketEventListeners = () => {
   socket.on('leaveRoom', (data) => {
     if (!data.isSpectator) {
       cleanActionData('opp');
+      if (systemState.serverAuthoritative) {
+        document.dispatchEvent(new CustomEvent('game-restarted'));
+      }
     }
     appendMessage('', data.username + ' left the room', 'announcement', false);
   });
@@ -621,19 +623,15 @@ export const initializeSocketEventListeners = () => {
       },
     });
   });
-  // Design 002 slice 3.11: server named a zone that disagrees with its own
-  // state. Recovery reuses the existing slice-1.1 peer-log catch-up rather
-  // than a second mechanism (edge row 24: defer to an in-flight catch-up).
+  // Design 002 slice 3.11: the server named a zone that disagrees with its
+  // own state. Only server-authoritative games send this, and there the server
+  // is the truth: pull a fresh view and let applyView reconcile. The legacy
+  // peer-log catch-up replays the opponent's action log instead, which does
+  // not repair server-rendered state and posts the reload warning whenever the
+  // peer takes over 5s to answer (e.g. a backgrounded tab).
   socket.on('desync', (data) => {
     logSync('desync.detected', { zoneId: data?.zoneId }, 'in');
-    if (
-      shouldTriggerDesyncRecovery({
-        isCatchingUp: systemState.isCatchingUp,
-        peerLogRequestPending: Boolean(peerLogTimeout),
-      })
-    ) {
-      requestPeerLogCatchup();
-    }
+    emitRequestView({ socket, roomId: systemState.roomId });
   });
   socket.on('lookAtCards', (data) => {
     if (data.socketId === systemState.spectatorId) {
