@@ -12,14 +12,16 @@ import test from 'node:test';
       setDeckSleeve,
     } from '../core/deck-library.mjs';
     
-    test('sleeve catalog: all 107 Mega Evolution sleeves with data', () => {
+    test('sleeve catalog: all 109 Mega Evolution sleeves with data', () => {
       const sleeves = getSleeves();
-      assert.equal(sleeves.length, 107);
-    
+      assert.equal(sleeves.length, 109);
+
       for (const sleeve of sleeves) {
         assert.ok(sleeve.id, `missing id: ${sleeve.name}`);
         assert.ok(sleeve.name, `missing name: ${sleeve.id}`);
-        assert.ok(sleeve.image.startsWith('https://pokemon-sleeve-database.com/'), `bad image url: ${sleeve.id}`);
+        const isRemote = sleeve.image.startsWith('https://pokemon-sleeve-database.com/');
+        const isLocal = sleeve.image.startsWith('src/assets/sleeves/');
+        assert.ok(isRemote || isLocal, `bad image url: ${sleeve.id}`);
       }
     });
     
