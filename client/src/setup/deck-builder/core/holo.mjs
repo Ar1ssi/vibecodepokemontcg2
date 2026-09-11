@@ -23,9 +23,15 @@ const RARITY_EFFECTS = {
   'Mega Hyper Rare': 'hyper rare',
   'Rainbow Rare': 'rare rainbow alt',
   'Rainbow rare': 'rare rainbow alt',
-  'Gold Rare': 'rare holo vmax',
-  'Secret Rare': 'rare holo vmax',
-  'Shiny Rare': 'rare holo vmax',
+  // Gold-bordered cards get the same treatment as literal "Hyper Rare" — verified against
+  // the reference implementation (pokemon-cards-151, simeydotme's poke-holo): "rare holo vmax"
+  // is a DIFFERENT, narrower class that only renders when data-trainer-gallery="true"
+  // (rainbow-alt.css), an attribute this app never sets. Mapping gold cards to it left them
+  // with zero holo effect — this was the root cause of several rounds of "no pillars"/
+  // "grainy"/"horizontal" reports that looked like CSS bugs but were actually a wrong mapping.
+  'Gold Rare': 'hyper rare',
+  'Secret Rare': 'hyper rare',
+  'Shiny Rare': 'hyper rare',
   'Radiant Rare': 'radiant rare',
   'Reverse Holo': 'reverse holo',
 };
@@ -46,7 +52,7 @@ export function resolveHoloEffect(card = {}) {
   if (lower.includes('rainbow')) return 'rare rainbow alt';
   if (lower.includes('holo')) return 'rare holo';
   if (lower.includes('gold') || lower.includes('secret') || lower.includes('shiny')) {
-    return 'rare holo vmax';
+    return 'hyper rare';
   }
   return null;
 }
@@ -109,6 +115,15 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
   const state = { x: 0.5, y: 0.5, vx: 0, vy: 0 };
   let targetX = 0.5;
   let targetY = 0.5;
+  // simey's springGlare.o: the whole shine/glare/glitter stack is invisible (0) until the
+  // pointer is actually over THIS card, fading to fully visible (1) while hovering, back to 0
+  // on pointer-leave. Without this every card showed its glare "spotlight" sitting there at
+  // rest — base.css's --card-opacity:1 fallback (needed so the calc()s in every rarity file
+  // don't go invalid, see base.css) is a global default; this per-instance value overrides it
+  // whenever real pointer tracking is active. Auto-sweep mode (no live cursor to hover with)
+  // intentionally stays at 1 — that's the ambient shimmer for hand/mat cards, unchanged.
+  let opacityState = auto ? 1 : 0;
+  let targetOpacity = auto ? 1 : 0;
   let rafId = null;
   let running = true;
   const startTime = auto
@@ -123,6 +138,13 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
   const onPointerMove = (event) => {
     const rect = card.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
+    const withinBounds =
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom;
+    targetOpacity = withinBounds ? 1 : 0;
+    if (!withinBounds) return;
     targetX = clamp01((event.clientX - rect.left) / rect.width);
     targetY = clamp01((event.clientY - rect.top) / rect.height);
   };
@@ -130,6 +152,7 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
   const onPointerLeave = () => {
     targetX = 0.5;
     targetY = 0.5;
+    targetOpacity = 0;
   };
 
   const applyVars = () => {
@@ -148,6 +171,7 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
     const centerY = py - 0.5;
     card.style.setProperty('--rotate-x', (-(centerX / 3.5) * 100 * 0.35).toFixed(2) + 'deg');
     card.style.setProperty('--rotate-y', ((centerY / 3.5) * 100 * 0.35).toFixed(2) + 'deg');
+    card.style.setProperty('--card-opacity', opacityState.toFixed(3));
   };
 
   const tick = (now) => {
@@ -166,6 +190,7 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
     state.vy *= DAMPING;
     state.x += state.vx;
     state.y += state.vy;
+    opacityState += (targetOpacity - opacityState) * STIFFNESS;
     applyVars();
     rafId = requestAnimationFrame(tick);
   };
