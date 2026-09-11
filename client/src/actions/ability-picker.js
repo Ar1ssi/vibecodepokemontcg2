@@ -6,14 +6,23 @@
 // If 0 are usable, it shows a "no usable abilities" message.
 
 import { getZone } from '../setup/zones/get-zone.js';
-import { rulesState, abilityUsed, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, abilityUsed, canUsePlayedToBenchTrigger, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { appendMessage } from '../setup/chatbox/append-message.js';
 import { selfContainer, oppContainer } from '../state.js';
 import { runAbilitySteps } from '../setup/rules/rules-bridge.js';
+import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
 } from '/shared/engine/rules/collect-usable-abilities.mjs';
+
+// "When you play this Pokémon onto your Bench" triggers aren't gated by the
+// per-turn abilitiesUsed map (that resets every turn) — they're gated by the
+// one-shot window opened when the card is played from hand to Bench.
+const isPlayedToBenchTrigger = (card) => {
+  const text = card?.ability?.text ?? card?.abilityText ?? card?.text ?? '';
+  return parseAbility(text).some((s) => s.type === 'whenPlayedAbility');
+};
 
 // Human-readable labels for each family
 const FAMILY_LABELS = {
@@ -49,10 +58,16 @@ export async function collectUsableAbilities(user) {
     }
   }
 
-  return filterUsableAbilities(candidates, {
+  const usable = filterUsableAbilities(candidates, {
     rulesEnabled: rulesState.enabled,
-    isUsed: (card) => abilityUsed(user, card),
+    isUsed: (card) =>
+      isPlayedToBenchTrigger(card)
+        ? !canUsePlayedToBenchTrigger(user, card)
+        : abilityUsed(user, card),
   });
+  return usable.map((entry) =>
+    isPlayedToBenchTrigger(entry.card) ? { ...entry, family: 'when-played' } : entry
+  );
 }
 
 /**

@@ -22,7 +22,7 @@ import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { discardStadiumCardFromField, updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction, openPlayedToBenchWindow, clearPlayedToBenchWindow } from '/shared/engine/rules/rules-state.mjs';
 import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
 import { clearUntilLeavesActive, clearActiveSpotPendingEffects } from '/shared/engine/rules/attack-pending-effects.mjs';
 import { clearStatuses, getStatus, applyStatus } from '/shared/engine/rules/status.mjs';
@@ -542,6 +542,12 @@ export const moveCard = async (
         // fresh play — the Pokémon was already in play, so it stays
         // evolve-eligible instead of re-triggering the just-played gate.
         movingCard.enteredPlayTurn = rulesState.turnNumber;
+        // "When you play this Pokémon from your hand to your Bench" triggers
+        // (e.g. Meowth's Last Ditch Catch) only open a window on a genuine
+        // hand → Bench play, never on hand → Active.
+        if (rulesState.enabled && oZoneId === 'hand' && dZoneId === 'bench') {
+          openPlayedToBenchWindow(user, movingCard);
+        }
       }
       // give the card its holofoil wrapper now that initializeActiveBenchCard
       // has settled the <img> into its .play-container (clientWidth/Height are
@@ -635,6 +641,18 @@ export const moveCard = async (
     movingCard.type2
   ) {
     movingCard.type = movingCard.type2;
+  }
+
+  // A Pokémon returning to hand re-arms any "when you play onto your Bench"
+  // trigger window — the next play from hand is a fresh play. Also clear the
+  // per-image one-shot flags rules-bridge sets on the original play so they
+  // fire again too.
+  if (dZoneId === 'hand' && movingCard.type === 'Pokémon') {
+    if (rulesState.enabled) clearPlayedToBenchWindow(user, movingCard);
+    if (movingCard.image) {
+      movingCard.image.__rulesWhenPlayedFired = false;
+      movingCard.image.__rulesPokemonInPlay = false;
+    }
   }
   //update counter texts
   updateCount();
