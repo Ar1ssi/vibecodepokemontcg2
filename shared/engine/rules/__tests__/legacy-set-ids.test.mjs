@@ -17,6 +17,18 @@ test('legacy table maps the codes import.js used to own', () => {
   assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.N1, 'neo1');
 });
 
+test('legacy table maps Black & White and HeartGold & SoulSilver era codes', () => {
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.BLW, 'bw1');
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.EPO, 'bw2');
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.LTR, 'bw11');
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.LTRRC, 'bw11');
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.DRV, 'dv1');
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.HS, 'hgss1');
+  assert.equal(LEGACY_SET_CODE_TO_TCGDEX_ID.CL, 'col1');
+  assert.equal(resolveTcgdexSetId('BLW'), 'bw1');
+  assert.equal(buildPreferredCardId('BLW', '47'), 'bw1-47');
+});
+
 test('modern table maps Phantasmal Flames (PFL) to me02', () => {
   assert.equal(MODERN_SET_CODE_TO_TCGDEX_ID.PFL, 'me02');
   assert.equal(resolveTcgdexSetId('PFL'), 'me02');

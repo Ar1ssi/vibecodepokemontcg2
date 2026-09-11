@@ -66,10 +66,18 @@ export const getOldCardType = (cardId) => {
     }
 
     var index = 0
+    var lastType
     for (index in types) {
       if (card_number < index) {
         return types[index];
       }
+      lastType = types[index];
+    }
+    // card_number is at or beyond every recorded breakpoint (the set's last
+    // listed card, or a secret rare printed after it) — assume it continues
+    // the last known type rather than reporting Unknown.
+    if (lastType !== undefined) {
+      return lastType;
     }
   }
 

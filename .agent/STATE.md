@@ -4,29 +4,25 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 90 (90b: same-session follow-up, no new session number)
-Focus: merge of two concurrent sessions' work onto main — S89/S89b (3D Energy tokens on attached
-  Energy cards, design 005) and S90/S90b (nine "Generation 9".."Generation 1" pills + per-
-  generation Energy tabs in the deck builder's Browse Sets panel, design 006 — drafted as 005,
-  renumbered on merge since S89 claimed that number first). Both sessions independently numbered
-  themselves S89 on branches that hadn't met (same collision pattern as the S87/S88 merge in
-  journal S88) — this session's renumbered to S90/S90b; DECISIONS D22/D23→D24/D25 for the same
-  reason. Full detail for each feature is in journal S89/S89b and S90/S90b respectively.
-Active: done for design 006 (this session's work): `fetchGenerationSets`/`fetchGenerationEnergyCards`/
-  `GENERATION_SERIES`/`GENERATIONS` in set-browser.mjs pull every set (and a synthetic Energy tab)
-  of a Pokémon generation live from TCGdex's `/v2/en/series/{id}` grouping — confirmed live that
-  TCGdex series ids match pkmncards.com/sets/'s era headers almost exactly. Panel state in
-  native-deck-builder-set-browser.js refactored to a per-category `categoryState` Map so pills
-  don't re-fetch on revisit. 14 tests in generation-sets.test.mjs, now wired into `pnpm test`.
-  Design 005 (3D Energy tokens, S89/S89b, merged from main) is unrelated pre-existing work from a
-  different session — not touched or re-verified this session beyond the merge itself.
-Next: user should smoke-check both features on localhost:4100 (worktree server; port 4000 was
-  already taken by another node process, likely the primary checkout's): generation pills + their
-  Energy tabs in Browse Sets (design 006), and the 3D Energy token render on attached Energy
-  (design 005, already live-verified by its own session per journal S89b). Still open from
-  S82/S88: I34 (turn-desync residual, 1/10 soak failures) — see journal S88 for the lead. Still
-  open from S73: drag active→bench retreat live-verify; mat pickers + Grand Tree. Maintenance due
-  S96 (S86 sweep was the last one).
+Session: 91
+Focus: patch — fixed 3 bugs causing Black & White (and HGSS) era decklist imports to show
+  Pokémon cards as "Unknown" type in the deck builder's import screen.
+Active: done. (1) import.js:548-566 — `getOldCardType(tcgId)` no longer unconditionally
+  overwrites a correct `getCardType(set, number)` result; gated behind
+  `!type || type === 'Unknown'` same as the Limitless-fallback block already was. (2) added
+  Black & White / HeartGold&SoulSilver short codes to `LEGACY_SET_CODE_TO_TCGDEX_ID`
+  (legacy-set-ids.mjs) — were completely missing, so `cardDataToID`/`cardDataToImageURL` could
+  never resolve a tcgId or image for these cards. (3) `getCardType` (find-type.js) and
+  `getOldCardType` (find-old-type.js) breakpoint loops now continue the last known type past a
+  set's highest recorded breakpoint instead of falling to 'Unknown' — hit every set's literal
+  last card plus any secret rare beyond it. +10 tests, 1288/1288 pass. Lint clean on the diff
+  (2 pre-existing errors in import.js:400 unrelated to this change, confirmed via git diff scope).
+Next: user should re-import a Black & White era decklist on localhost to confirm cards now show
+  correct Pokémon/Trainer/Energy types (not independently browser-verified — DOM-coupled import
+  screen, static trace + unit tests on the underlying pure functions instead). Nothing else
+  queued from this session. Carried over from prior sessions: I34 (turn-desync residual, 1/10
+  soak failures, journal S88); S73 drag active→bench retreat live-verify, mat pickers + Grand
+  Tree; maintenance due S96.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -42,12 +38,16 @@ Blocked: nothing.
 - The `(user, ...parameters, emit)` acceptAction calling convention is easy to get wrong when
   a parameter can look like a boolean or overlap emit's position — see `parseAttackArgs`/
   `parseRetreatArgs` (sync-action-args.mjs) before adding a parameter to any legacy action.
-- `turnState().fromServer` is meaningless in legacy mode (SERVER_AUTHORITATIVE unset, this
-  repo's default) — it only ever becomes true under flip-gate-test.mjs's authoritative mode.
+- `client/src/setup/deck-constructor/` (legacy decklist import/type-detection, import.js/
+  find-type.js/find-old-type.js) is a much older, more error-prone area than
+  `deck-builder/core/` — the two "unconditional overwrite whichever ran last wins" and "no
+  catch-all past the last table entry" bug classes fixed in S91 are worth re-checking if more
+  "wrong card type on import" reports surface for eras still uncovered (e.g. EX/e-Card era
+  short codes' getCardType tables weren't audited this session, only Black & White/HGSS).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S91 2026-09-12 patch: fixed 3 bugs behind "old-set imports show as Unknown" — see Active above.
 - S90/S90b 2026-09-10 feature: design 006 — generation pills + per-generation Energy tabs in
-  Browse Sets — see Active above.
+  Browse Sets.
 - S89/S89b 2026-09-10 feature+patch: 3D energy tokens for attached Energy (design 005, a
   concurrent session, merged from main).
-- S88b 2026-09-10 patch(security): closed the `?e2e=1` bridge exposure.
