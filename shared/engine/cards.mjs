@@ -113,14 +113,20 @@ export function isTrainer(card) {
   );
 }
 
+// TCGdex's own `stage` field is inconsistent across printings — some return
+// "Stage 1", others "Stage1" (no space) — so compare on letters/digits only
+// rather than the raw string, matching evolution.mjs's normalizeStage().
+const collapseStage = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const NON_BASIC_STAGES = new Set(['stage1', 'stage2', 'vmax', 'vstar', 'mega']);
+
 export function isBasicPokemon(card) {
   if (!isPokemon(card)) return false;
-  const stage = String(card.stage || card.subtypes?.[0] || 'Basic').toLowerCase();
-  if (['stage 1', 'stage 2', 'vmax', 'vstar', 'mega'].includes(stage)) {
+  const stage = collapseStage(card.stage || card.subtypes?.[0] || 'Basic');
+  if (NON_BASIC_STAGES.has(stage)) {
     return false;
   }
-  const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map((s) => String(s).toLowerCase()) : [];
-  if (subtypes.some((s) => ['stage 1', 'stage 2', 'vmax', 'vstar', 'mega'].includes(s))) {
+  const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(collapseStage) : [];
+  if (subtypes.some((s) => NON_BASIC_STAGES.has(s))) {
     return false;
   }
   return true;

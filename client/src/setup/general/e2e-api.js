@@ -7,7 +7,7 @@ import {
   getAuthoritativeStadiumArray,
   hasAuthoritativeView,
 } from '../netcode/apply-view.js';
-import { rulesState } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
 import { getCardDamage, getCardSpecialCondition } from '/shared/engine/zones/card-state.mjs';
 import { resolveAttachedEnergyType } from '/shared/engine/rules/energy-effects.mjs';
@@ -287,7 +287,7 @@ export function installE2eApi() {
         }
         return { ok: false, error: `unknown option kind: ${kind}` };
       } catch (err) {
-        return { ok: false, error: String(err?.message || err) };
+        return { ok: false, error: String(err?.stack || err?.message || err) };
       }
     },
     // Design 004 slice 4: reports whichever modal the legacy rules path is currently
@@ -395,6 +395,31 @@ export function installE2eApi() {
     // the playtest runner's `--deck` option, instead of the built-in all-Basic fixture.
     loadDeckList(deckRows) {
       loadDeckData('self', deckRows, true);
+    },
+    // Pre-warms this page's TCGdex enrichment cache for a real (non-fixture) deck's
+    // unique cards, one at a time, before the deck is even built. build-deck.js's own
+    // warm-up (called from loadDeckList) still runs on every card instance, but a real
+    // deck repeats names many times over (e.g. 4x N) and its concurrent-batch fetches
+    // are the first thing to race the game's own setup steps; calling this first lets
+    // every duplicate resolve from the in-memory cache instead of hitting the network
+    // again, and going one at a time (rather than build-deck.js's already-throttled
+    // batch of 6) is the gentlest possible pace against TCGdex's flakier search
+    // endpoint. Resolves once every unique card has been attempted (success or not —
+    // a card that failed here just retries during the real per-instance warm-up).
+    async warmDeckCache(deckRows) {
+      const seen = new Set();
+      for (const [, name, type, , number, set] of deckRows) {
+        const key = `${name}|${type}|${number}|${set}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (isEnergy({ name, type })) continue;
+        try {
+          await ensureCardData({ name, type, number, set });
+        } catch {
+          /* best-effort warm; the real per-instance pass during loadDeckList retries */
+        }
+      }
+      return true;
     },
     // Design 004 slice 6: resolves once build-deck.js's bulk ensureCardData() pass has
     // settled, so the runner can hold off the first turn until hp/attacks/stage/subtypes

@@ -3103,13 +3103,17 @@ import test from 'node:test';
       assert.equal(res.abilities[0].usable, true);
     });
 
-    test('listAttacks: double-colorless energy pays any 2 symbols', () => {
-      const card = { name: 'T', types: [], attacks: [
+    test('listAttacks: double-colorless energy pays a Colorless cost, not a colored one', () => {
+      const coloredCard = { name: 'T', types: [], attacks: [
         { name: 'Blast', cost: ['Fire', 'Water'], damage: 50, text: '' },
       ] };
       const energyTypes = [{ type: 'Colorless', family: 'double-colorless' }];
-      const res = listAttacks(card, { energyTypes });
-      assert.equal(res[0].payable, true);
+      assert.equal(listAttacks(coloredCard, { energyTypes })[0].payable, false);
+
+      const colorlessCard = { name: 'T', types: [], attacks: [
+        { name: 'Slam', cost: ['Colorless', 'Colorless'], damage: 50, text: '' },
+      ] };
+      assert.equal(listAttacks(colorlessCard, { energyTypes })[0].payable, true);
     });
 
     // ── collect-usable-abilities (active + bench picker gate) ──
