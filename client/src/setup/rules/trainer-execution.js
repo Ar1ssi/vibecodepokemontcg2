@@ -6,12 +6,14 @@ import { flipCoin } from '../../actions/general/flip-coin.js';
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus } from '/shared/engine/rules/status.mjs';
-import { ensureCardData, getStadium } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, ensureCardData, getStadium } from '/shared/engine/rules/rules-state.mjs';
 import { normalizeStage, isRareCandyJump, canEvolve } from '/shared/engine/rules/evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from '/shared/engine/rules/energy-effects.mjs';
 import { filterSearchMatches, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import { countBenchPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
+import { buildMatPickEntry, findMatPickHit } from './mat-pick.mjs';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -194,8 +196,8 @@ function openPickOnly({ title, candidates, onPick, onCancel, user = _effectOwner
 // on the mat and resolve on click, instead of opening a modal card picker.
 function openMatPick({ title, candidates, onPick, onCancel }) {
   const entries = candidates
-    .map((c) => ({ card: c, img: c.image }))
-    .filter((e) => e.img);
+    .map((c) => buildMatPickEntry(c, imageAnchor))
+    .filter((e) => e.targetEl || e.img);
   if (!entries.length) {
     onCancel?.();
     return;
@@ -235,23 +237,34 @@ function openMatPick({ title, candidates, onPick, onCancel }) {
   banner.append(label, cancelBtn);
   document.body.appendChild(banner);
 
-  const restore = entries.map(({ img }) => [img, img.style.outline, img.style.outlineOffset, img.style.cursor, img.draggable]);
-  for (const { img } of entries) {
-    img.style.outline = '4px solid #ffd23f';
-    img.style.outlineOffset = '2px';
-    img.style.cursor = 'pointer';
-    img.draggable = false;
+  const restore = entries.map(({ targetEl, img }) => [
+    targetEl,
+    targetEl?.style?.outline,
+    targetEl?.style?.outlineOffset,
+    targetEl?.style?.cursor,
+    img?.draggable,
+  ]);
+  for (const { targetEl, img } of entries) {
+    if (targetEl?.style) {
+      targetEl.style.outline = '4px solid #ffd23f';
+      targetEl.style.outlineOffset = '2px';
+      targetEl.style.cursor = 'pointer';
+    }
+    if (img) img.draggable = false;
   }
 
   const cleanup = () => {
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeyDown, true);
     banner.remove();
-    for (const [img, outline, outlineOffset, cursor, draggable] of restore) {
-      img.style.outline = outline;
-      img.style.outlineOffset = outlineOffset;
-      img.style.cursor = cursor;
-      img.draggable = draggable;
+    for (const [targetEl, outline, outlineOffset, cursor, draggable] of restore) {
+      if (targetEl?.style) {
+        targetEl.style.outline = outline;
+        targetEl.style.outlineOffset = outlineOffset;
+        targetEl.style.cursor = cursor;
+      }
+      const entry = entries.find((e) => e.targetEl === targetEl);
+      if (entry?.img) entry.img.draggable = draggable;
     }
   };
 
@@ -271,10 +284,10 @@ function openMatPick({ title, candidates, onPick, onCancel }) {
       if (event.target === cancelBtn) cancel();
       return;
     }
-    const hit = entries.find((e) => e.img === event.target || e.img.contains?.(event.target));
+    const hitCard = findMatPickHit(entries, event.target);
     event.preventDefault();
     event.stopPropagation();
-    if (hit) finish(hit.card);
+    if (hitCard) finish(hitCard);
   };
   const onKeyDown = (event) => {
     if (event.key === 'Escape') {
@@ -1298,7 +1311,9 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           break;
         }
         case 'evolveStage2': {
-          const basics = getInPlayPokemon(_effectOwner).filter((c) => (normalizeStage(c.stage) || 'Basic') === 'Basic');
+          const basics = getInPlayPokemon(_effectOwner).filter(
+            (c) => !c.isEvolution && (normalizeStage(c.stage) || 'Basic') === 'Basic'
+          );
           if (!basics.length) {
             msg('  no Basic Pokémon in play');
             break;
@@ -1306,24 +1321,33 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           openMatPick({
             title: `${card.name} — click a Basic Pokémon on your mat to evolve`,
             candidates: basics,
+            onCancel: () => msg('  Rare Candy canceled'),
             onPick: async (base) => {
               const hand = zone(_effectOwner, 'hand');
               const options = [];
+              let rejectionReason = null;
+              await ensureCardData(base);
+              const wasPlayedThisTurn = Boolean(
+                base.enteredPlayTurn && base.enteredPlayTurn === rulesState.turnNumber
+              );
               for (const c of hand.array) {
                 await ensureCardData(c);
                 if (_isPokemonCard(c) && isRareCandyJump(base, c)) {
-                  const check = await canEvolve(_effectOwner, base, c, false, { isRareCandy: true });
+                  const check = await canEvolve(_effectOwner, base, c, wasPlayedThisTurn, { isRareCandy: true });
                   if (check.allowed) options.push(c);
+                  else if (!rejectionReason) rejectionReason = check.reason;
                 }
               }
               if (!options.length) {
-                msg('  no Stage 2 in hand that evolves from that Basic');
+                if (rejectionReason) msg(`  ⛔ ${rejectionReason}`);
+                else msg('  no Stage 2 in hand that evolves from that Basic');
                 return;
               }
               openPickOnly({
                 title: `${card.name} — choose Stage 2`,
                 candidates: options,
                 user: _effectOwner,
+                onCancel: () => msg('  evolution canceled'),
                 onPick: async (evo) => {
                   const loc = pokemonZoneEntry(_effectOwner, base);
                   const handIdx = hand.array.indexOf(evo);

@@ -82,16 +82,46 @@ export const STAGE1_EVOLVES_FROM = new Map([
   ['lairon', 'aron'],
 ]);
 
+/**
+ * Normalizes a Pokémon name for evolution chain matching by stripping
+ * card-type suffixes like "ex", "EX", "-EX", "GX", "VMAX", "VSTAR", "V",
+ * accents, and non-alphanumerics.
+ */
+export function cleanPokemonName(name) {
+  if (!name) return '';
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/(?:[-\s]+|\b)(?:ex|gx|vmax|vstar|v)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Checks whether two Pokémon names refer to the same base species
+ * (e.g. "Charmeleon" matches "Charmeleon ex", "Litten" matches "Litten ex").
+ */
+export function pokemonNamesMatch(a, b) {
+  const normA = cleanPokemonName(a);
+  const normB = cleanPokemonName(b);
+  if (!normA || !normB) return false;
+  return normA === normB;
+}
+
 export async function resolveStage1EvolvesFrom(stage1Name) {
   if (!stage1Name) return null;
   const key = stage1Name.toLowerCase();
   if (STAGE1_EVOLVES_FROM.has(key)) return STAGE1_EVOLVES_FROM.get(key);
+  const cleanKey = cleanPokemonName(stage1Name);
+  if (cleanKey && STAGE1_EVOLVES_FROM.has(cleanKey)) return STAGE1_EVOLVES_FROM.get(cleanKey);
 
   if (cardDataCache) {
     for (const [, data] of cardDataCache) {
-      if (data?.name && data.name.toLowerCase() === key && data.evolvesFrom) {
+      if (data?.name && (data.name.toLowerCase() === key || pokemonNamesMatch(data.name, stage1Name)) && data.evolvesFrom) {
         const base = data.evolvesFrom.toLowerCase();
         STAGE1_EVOLVES_FROM.set(key, base);
+        if (cleanKey) STAGE1_EVOLVES_FROM.set(cleanKey, base);
         return base;
       }
     }
@@ -99,7 +129,8 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
 
   if (typeof fetch === 'function' && typeof fetchCardDetail === 'function') {
     try {
-      const res = await fetch(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(stage1Name)}`);
+      const searchName = cleanKey || stage1Name;
+      const res = await fetch(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchName)}`);
       if (res.ok) {
         const list = await res.json();
         if (Array.isArray(list) && list.length > 0) {
@@ -108,6 +139,7 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
           if (from) {
             const base = String(from).toLowerCase();
             STAGE1_EVOLVES_FROM.set(key, base);
+            if (cleanKey) STAGE1_EVOLVES_FROM.set(cleanKey, base);
             return base;
           }
         }
@@ -195,9 +227,9 @@ export async function canEvolve(
     const stage1Base = evolvesFrom ? await resolveStage1EvolvesFrom(evolvesFrom) : null;
     const matchesLine =
       !evolvesFrom ||
-      evolvesFrom === baseName ||
-      (evolvesFromBase && evolvesFromBase === baseName) ||
-      (stage1Base && stage1Base === baseName) ||
+      pokemonNamesMatch(evolvesFrom, baseName) ||
+      (evolvesFromBase && pokemonNamesMatch(evolvesFromBase, baseName)) ||
+      (stage1Base && pokemonNamesMatch(stage1Base, baseName)) ||
       stage1Base === null; // graceful fallback if stage 1 cannot be resolved offline
 
     if (!matchesLine) {
@@ -209,7 +241,7 @@ export async function canEvolve(
     }
   } else {
     // Normal evolution without Rare Candy
-    if (evolvesFrom && baseName && evolvesFrom !== baseName) {
+    if (evolvesFrom && baseName && !pokemonNamesMatch(evolvesFrom, baseName)) {
       return {
         allowed: false,
         reason: `${evolutionCardInHand.name} evolves from ${evolutionCardInHand.evolvesFrom}, not ${baseCardInPlay.name}.`,
@@ -234,7 +266,12 @@ export async function canEvolve(
     if (instanceId && rulesState.flags[player]?.evolved?.[instanceId]) {
       return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
     }
-    if (!instanceId && rulesState.flags[player]?.evolved?.[baseName]) {
+    const cleanBase = cleanPokemonName(baseName);
+    if (
+      !instanceId &&
+      (rulesState.flags[player]?.evolved?.[baseName] ||
+        (cleanBase && rulesState.flags[player]?.evolved?.[cleanBase]))
+    ) {
       return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
     }
     if (Array.isArray(baseCardInPlay.attachedCards)) {
@@ -255,9 +292,10 @@ export async function canEvolve(
 // 'Basic' | 'Stage 1' | 'Stage 2' forms used by the stage-order check.
 export function normalizeStage(stage) {
   const s = String(stage || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (s === 'basic') return 'Basic';
-  if (s === 'stage1') return 'Stage 1';
-  if (s === 'stage2') return 'Stage 2';
+  if (s === 'basic' || s.startsWith('basic')) return 'Basic';
+  if (s === 'stage1' || s.startsWith('stage1')) return 'Stage 1';
+  if (s === 'stage2' || s.startsWith('stage2')) return 'Stage 2';
+  if (s === 'mega' || s.startsWith('mega')) return 'Stage 1';
   return null;
 }
 
@@ -277,8 +315,12 @@ export function markEvolvedThisTurn(player, targetCardOrName) {
     f.evolved[instanceId] = true;
   } else if (typeof targetCardOrName === 'string') {
     f.evolved[targetCardOrName.toLowerCase()] = true;
+    const clean = cleanPokemonName(targetCardOrName);
+    if (clean) f.evolved[clean] = true;
   } else if (targetCardOrName?.name) {
     f.evolved[targetCardOrName.name.toLowerCase()] = true;
+    const clean = cleanPokemonName(targetCardOrName.name);
+    if (clean) f.evolved[clean] = true;
   }
   if (
     targetCardOrName &&

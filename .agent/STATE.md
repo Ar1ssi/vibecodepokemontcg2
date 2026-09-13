@@ -4,15 +4,19 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 108
-Focus: patch (holo) — align holographic card spring physics and math with simeydotme/pokemon-cards-151.
-Active: done. Replaced single-point spring with 3 decoupled Svelte-style springs (springRotate,
-  springGlare, springBackground), fixed inverted 1D --pointer-from-center with exact 2D Euclidean distance,
-  enabled .card__glare2, and stabilized interactive card hover tracking. Added holo.test.mjs (8 tests),
-  pnpm test 1328/1328.
-Next: smoke-check holo cards in deck builder zoom preview and card picker in browser. Carried over:
-  I41 (legacy rejoin, no opening hand); I39 flip-gate-test; I37 live 2P check; I34 turn-desync residual;
-  Grand Tree cosmetic chat line; EX/e-Card era getCardType tables unaudited. Maintenance due (S100).
+Session: 110
+Focus: fix (rules-ui) — Rare Candy mat pick GUI & EX Pokémon evolution chains
+Active: done. Rare Candy GUI failed after clicking Pokémon on mat because openMatPick hit-detection
+  checked e.img === target || e.img.contains(target). For holo cards (wrapped in .mat-holo >
+  .card__rotator with sibling .card__shine/.card__glare overlays), clicks hit the shine/rotator layer
+  outside img, failing the check and leaving Cancel as the only responsive element. Created
+  mat-pick.mjs with buildMatPickEntry/findMatPickHit checking targetEl, img, and container. Updated
+  trainer-execution.js to use mat-pick and apply highlight to targetEl. Tightened evolveStage2
+  to derive wasPlayedThisTurn from base.enteredPlayTurn and await ensureCardData. Also supported EX/ex
+  Pokémon in evolution chains, Rare Candy jumps, and stadium searches via cleanPokemonName,
+  pokemonNamesMatch, and stage normalization. All unit tests pass.
+Next: smoke-test in UI: play Rare Candy, click Basic on mat, verify Stage 2 evolution selection
+  dialog appears properly.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

@@ -42,7 +42,7 @@ import {
   combinedToolRetreatCost,
 } from '/shared/engine/rules/tool-combat.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
-import { canEvolve, markEvolvedThisTurn, normalizeStage } from '/shared/engine/rules/evolution.mjs';
+import { canEvolve, markEvolvedThisTurn, normalizeStage, pokemonNamesMatch } from '/shared/engine/rules/evolution.mjs';
 import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
@@ -4064,7 +4064,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
   }
 
   const evolvePicked = async (picked) => {
-    const host = inPlay.find((p) => lowerName(p.name) === lowerName(picked.evolvesFrom));
+    const host = inPlay.find((p) => pokemonNamesMatch(p.name, picked.evolvesFrom));
     if (!host) {
       appendMessage(user, `⛔ No in-play Pokémon for ${picked.name} to evolve onto.`, 'announcement', false);
       finish();
@@ -4086,7 +4086,7 @@ async function runStadiumSearchEvolve(user, card, emit, action = {}) {
     );
     if (action.chainStage2) {
       const nextHost = zone.array.find((c) => c === picked) || zone.array[hostIdx];
-      const stage2 = deck.array.filter((c) => lowerName(c.evolvesFrom) === lowerName(picked.name));
+      const stage2 = deck.array.filter((c) => pokemonNamesMatch(c.evolvesFrom, picked.name));
       if (stage2.length) {
         openAbilityChoicePicker({
           user,
@@ -4166,21 +4166,11 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
 
   await Promise.all([...inPlay, ...deck.array].map((c) => ensureCardData(c)));
 
-  const getEvolvesFrom = (c) => String(c?.evolvesFrom || c?.evolveFrom || '').trim().toLowerCase();
-  // Tolerant name comparison: exact match after stripping punctuation/case
-  // (so "riolu" matches "Riolu", "Riolu ex", etc.) with a containment
-  // fallback for localized/abbreviated variants.
-  const normName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const nameMatches = (a, b) => {
-    const x = normName(a);
-    const y = normName(b);
-    if (!x || !y) return false;
-    return x === y || x.includes(y) || y.includes(x);
-  };
+  const getEvolvesFrom = (c) => String(c?.evolvesFrom || c?.evolveFrom || '').trim();
   const isEvolvesFromHost = (c, hostList) => {
     const from = getEvolvesFrom(c);
     if (!from) return false;
-    return hostList.some((h) => nameMatches(String(h?.name || ''), from));
+    return hostList.some((h) => pokemonNamesMatch(h?.name, from));
   };
 
   const basicHosts = inPlay.filter((p) => {
@@ -4233,8 +4223,8 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
         return;
       }
       const fromName = getEvolvesFrom(picked);
-      const host = eligibleHosts.find((p) => nameMatches(String(p?.name || ''), fromName)) ||
-                   inPlay.find((p) => nameMatches(String(p?.name || ''), fromName)) ||
+      const host = eligibleHosts.find((p) => pokemonNamesMatch(p?.name, fromName)) ||
+                   inPlay.find((p) => pokemonNamesMatch(p?.name, fromName)) ||
                    eligibleHosts[0] || inPlay[0];
 
       if (!host) {
@@ -4271,7 +4261,7 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
         const isPoke = c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok');
         if (!isPoke) return false;
         if (!getEvolvesFrom(c)) return false;
-        return nameMatches(getEvolvesFrom(c), picked.name);
+        return pokemonNamesMatch(getEvolvesFrom(c), picked.name);
       });
 
       if (stage2Candidates.length > 0) {
