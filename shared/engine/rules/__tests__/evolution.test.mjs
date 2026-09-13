@@ -350,6 +350,16 @@ import test from 'node:test';
       assert.equal(r.allowed, true, r.reason);
     });
 
+    test('canEvolve: Rare Candy supports normal Basic -> Stage 2 ex', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Basic', name: 'Charmander', id: 'b_c' };
+      const evo = { stage: 'Stage 2 ex', name: 'Charizard ex', evolvesFrom: 'Charmeleon', id: 'e_zex' };
+      const r = await canEvolve('self', base, evo, false, { isRareCandy: true });
+      assert.equal(r.allowed, true, r.reason);
+    });
+
     test('canEvolve: rejects mismatching EX evolution', async () => {
       startGame();
       for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
