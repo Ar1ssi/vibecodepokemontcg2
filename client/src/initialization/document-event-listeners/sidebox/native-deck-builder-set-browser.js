@@ -118,8 +118,11 @@ import {
             const safeName = escapeHtml(card.name);
             const safeThumb = escapeHtml(thumb);
             const safePreview = escapeHtml(preview);
+            const displayTitle = card.rarity === 'Reverse Holo'
+              ? `${safeName} (Reverse Holo)`
+              : safeName;
             return [
-              `<button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}"${preview ? ` data-preview-image="${safePreview}"` : ''} title="${safeName}">`,
+              `<button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}"${preview ? ` data-preview-image="${safePreview}"` : ''} title="${displayTitle}">`,
               `  <img src="${safeThumb}" alt="${safeName}" class="native-deck-builder-result-image" loading="lazy" />`,
               quantities[card.id] > 0 ? `  <span class="native-deck-builder-result-qty">${quantities[card.id]}</span>` : '',
               '  <span class="native-deck-builder-result-text">',

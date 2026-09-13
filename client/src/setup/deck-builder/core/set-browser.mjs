@@ -511,14 +511,44 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
+    // Sets across Pokémon generations that famously featured Reverse Holo energy cards:
+    // - Gen 8 (swsh): Crown Zenith (swsh12.5) basic energies
+    // - Gen 7 (sm): Sun & Moon (sm1), Guardians Rising (sm2), Burning Shadows (sm3), Crimson Invasion (sm4) basic energies
+    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies
+    // - Gen 3 (ecard/ex): Expedition Base Set (ecard1), EX Ruby & Sapphire (ex1), EX Emerald (ex9),
+    //                     EX Holon Phantoms (ex13), EX Power Keepers (ex16) basic energies
+    export const REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION = {
+      8: new Set(['swsh12.5']),
+      7: new Set(['sm1', 'sm2', 'sm3', 'sm4']),
+      6: new Set(['xy12', 'g1']),
+      3: new Set(['ecard1', 'ex1', 'ex9', 'ex13', 'ex16']),
+    };
+    export const GEN6_REVERSE_HOLO_ENERGY_SET_IDS = REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[6];
+
+    export function buildReverseHoloEnergyCard(card) {
+      return {
+        ...card,
+        id: `${card.id}-reverse`,
+        localId: `${card.localId} · Reverse Holo`,
+        rarity: 'Reverse Holo',
+      };
+    }
+
     // Fetch every Energy card (basic, special, and rarer variants) printed
-    // across every set in a Pokémon generation. No modern-basic/gold-secret
-    // extras here — those exist only to backfill Standard-legal sets that have
-    // since rotated out of LEGAL_SET_REGISTRY; a generation's own set list
-    // already includes every set it ever had, rotated or not.
+    // across every set in a Pokémon generation. For generations featuring
+    // Reverse Holo energy prints (Gen 8, 7, 6, 3), this includes their Reverse Holo variants.
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);
+
+      const targetSetIds = REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[Number(generation)];
+      if (targetSetIds && targetSetIds.size > 0) {
+        const reverseHoloCards = cards
+          .filter((card) => targetSetIds.has(card?.set?.id))
+          .map(buildReverseHoloEnergyCard);
+        return sortCardsWithinGroup([...cards, ...reverseHoloCards], { sortBy: 'name', sortDirection: 'asc' });
+      }
+
       return sortCardsWithinGroup(cards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
