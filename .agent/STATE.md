@@ -4,25 +4,18 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 106
-Focus: feature (follow-up to S105) — the Pokémon/Trainers/Energy summary-bar filter now also
-  narrows the Browse Sets panel's card grid, not just the deck list.
-Active: done. TCGdex's `/sets/{id}` card list carries no category field (only the per-card
-  detail endpoint does, one request each — too expensive per set). Added
-  `fetchCardSupertypeIndex()` (set-browser.mjs): lazy, cached-once id→supertype map from three
-  `/cards?category=Pokemon|Trainer|Energy` sweeps (same endpoint shape D18 already used for the
-  Energy tab). `fetchSetCards` tags every card from it; Energy-tab cards get `supertype:'Energy'`
-  directly (no lookup needed, already known). New `filterCardsBySupertype()` applied alongside
-  the existing name filter in native-deck-builder-set-browser.js's `render()`; new
-  `setSupertypeFilter()` controller method called from native-deck-builder.js's `render()` every
-  time so Browse Sets always mirrors `deckListFilter` (S105's state). +5 tests, pnpm test
-  1320/1320. Not browser-verified (no jsdom harness for this UI-wiring layer, pre-existing gap).
-Next: user should smoke-check on localhost — click a summary segment, confirm both the deck list
-  AND Browse Sets' expanded-set card grids narrow to that supertype. Carried over: I41 (legacy
-  rejoin, no opening hand, 1 sample, untriaged); I39 flip-gate-test fails on current main
-  (pre-existing); I37 live 2P check; I34 turn-desync residual; Grand Tree cosmetic chat line;
-  EX/e-Card era getCardType tables unaudited (S104 only covered Black & White/HGSS). Maintenance
-  due (carried from S100).
+Session: 108
+Focus: fix (Rare Candy GUI) — openMatPick hit-detection and stage 2 evolution dialog
+Active: done. Rare Candy GUI failed after clicking Pokémon on mat because openMatPick hit-detection
+  checked e.img === target || e.img.contains(target). For holo cards (wrapped in .mat-holo >
+  .card__rotator with sibling .card__shine/.card__glare overlays), clicks hit the shine/rotator layer
+  outside img, failing the check and leaving Cancel as the only responsive element. Created
+  mat-pick.mjs with buildMatPickEntry/findMatPickHit checking targetEl, img, and container. Updated
+  trainer-execution.js to use mat-pick and apply highlight to targetEl. Tightened evolveStage2
+  to derive wasPlayedThisTurn from base.enteredPlayTurn and await ensureCardData. Regression tests
+  in mat-pick.test.mjs. All 1324 unit tests pass.
+Next: user smoke-test in UI: play Rare Candy, click Basic on mat, verify Stage 2 evolution selection
+  dialog appears properly.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
