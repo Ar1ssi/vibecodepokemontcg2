@@ -82,10 +82,22 @@ export function parseAbilitySearchParams(lower) {
   let destination = 'hand';
   let upTo = false;
 
+  // Isolate the search clause so trigger clauses like "When you play this
+  // Pokémon from your hand onto your Bench" do not fool the destination
+  // check into thinking the searched card goes onto the Bench.
+  const withoutTrigger = lower.replace(
+    /when you play this pok[ée]mon[\s\S]*?onto your bench/g,
+    ''
+  );
+  const searchScope =
+    withoutTrigger.match(
+      /(?:search your deck|look through your deck|(?:find|up to)[\s\S]*?from your deck|from your deck)[\s\S]*/
+    )?.[0] || withoutTrigger;
+
   if (
-    lower.includes('onto your bench') ||
-    lower.includes('put it onto your bench') ||
-    lower.includes('put them onto your bench')
+    searchScope.includes('onto your bench') ||
+    searchScope.includes('put it onto your bench') ||
+    searchScope.includes('put them onto your bench')
   ) {
     destination = 'bench';
   }
@@ -127,7 +139,7 @@ export function parseAbilitySearchParams(lower) {
     return {
       what: `Basic ${sym} Pokémon`,
       count: n,
-      destination: destination === 'hand' && lower.includes('onto your bench') ? 'bench' : destination,
+      destination,
       upTo: !!typedBasicMon[1] || lower.includes('up to'),
     };
   }

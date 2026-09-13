@@ -4,19 +4,15 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 110
-Focus: fix (rules-ui) — Rare Candy mat pick GUI & EX Pokémon evolution chains
-Active: done. Rare Candy GUI failed after clicking Pokémon on mat because openMatPick hit-detection
-  checked e.img === target || e.img.contains(target). For holo cards (wrapped in .mat-holo >
-  .card__rotator with sibling .card__shine/.card__glare overlays), clicks hit the shine/rotator layer
-  outside img, failing the check and leaving Cancel as the only responsive element. Created
-  mat-pick.mjs with buildMatPickEntry/findMatPickHit checking targetEl, img, and container. Updated
-  trainer-execution.js to use mat-pick and apply highlight to targetEl. Tightened evolveStage2
-  to derive wasPlayedThisTurn from base.enteredPlayTurn and await ensureCardData. Also supported EX/ex
-  Pokémon in evolution chains, Rare Candy jumps, and stadium searches via cleanPokemonName,
-  pokemonNamesMatch, and stage normalization. All unit tests pass.
-Next: smoke-test in UI: play Rare Candy, click Basic on mat, verify Stage 2 evolution selection
-  dialog appears properly.
+Session: 111
+Focus: patch (abilities) — fix Meowth ex Last-Ditch Catch search destination routing
+Active: done. `parseAbilitySearchParams` previously inspected `lower.includes('onto your bench')`
+  across the full ability string, falsely routing searched cards to 'bench' on "when you play this
+  Pokémon from your hand onto your Bench" triggers. `move-card.js` blocked Supporters/Items from being
+  placed on bench, causing cards to stay in the deck when shuffled. Scoped destination parsing to the
+  search clause and stripped trigger phrasing in `shared/engine/rules/abilities.mjs`. Added regression
+  test in `shared/engine/rules/__tests__/evolution.test.mjs`. Tests pass.
+Next: verify in live multiplayer match.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -36,6 +32,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S108 2026-09-13 patch: aligned holo spring physics and math with simeydotme/pokemon-cards-151.
-- S106 2026-09-12 feature: Browse Sets card grid now also respects the summary-bar supertype filter.
-- S105 2026-09-12 feature: deck builder summary segments are now click-to-filter buttons for the deck list.
+- S111 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
+- S110 2026-09-13 fix: support EX/ex Pokémon in evolution chains, Rare Candy, and stadium searches.
+- S109 2026-09-13 fix: resolved Rare Candy mat pick GUI failing to advance to evolution selection.

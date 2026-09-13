@@ -154,6 +154,16 @@ import test from 'node:test';
       assert.ok(steps.some((s) => s.type === 'whenPlayedAbility'));
     });
 
+    test('ability parser: Last Ditch Catch (Meowth ex) with onto your Bench destination routes to hand', () => {
+      const steps = parseAbility(
+        'Once during your turn, when you play this Pokémon from your hand onto your Bench, you may use this Ability. Search your deck for a Supporter card, reveal it, and put it into your hand. Then, shuffle your deck. You can\'t use more than 1 Ability that has "Last-Ditch" in its name each turn.'
+      );
+      const search = steps.find((s) => s.type === 'searchAbility');
+      assert.equal(search.what, 'Supporter');
+      assert.equal(search.destination, 'hand');
+      assert.ok(steps.some((s) => s.type === 'whenPlayedAbility'));
+    });
+
     test('ability parser: effect prevention', () => {
       const steps = parseAbility("Prevent all effects of your opponent's abilities.");
       assert.equal(steps[0].type, 'effectPreventAbility');
