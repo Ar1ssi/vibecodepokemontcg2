@@ -2,7 +2,8 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn } = await import('../rules-state.mjs');
-    const { canEvolve, canPlayPokemonFromHand, isRareCandyJump, markEvolvedThisTurn, normalizeStage } = await import('../evolution.mjs');
+    const { canEvolve, canPlayPokemonFromHand, isRareCandyJump, markEvolvedThisTurn, normalizeStage, cleanPokemonName, pokemonNamesMatch } = await import('../evolution.mjs');
+    const { matchesSearch } = await import('../search-match.mjs');
     const { parseAbility } = await import('../abilities.mjs');
     
     test('no evolving on turn 1', async () => {
@@ -258,5 +259,118 @@ import test from 'node:test';
     test('ability parser: first-turn attacks (Debut Performance pattern)', () => {
       const steps = parseAbility('If you go first, this Pokémon can use attacks during your first turn.');
       assert.equal(steps[0].type, 'firstTurnAttackAbility');
+    });
+
+    test('cleanPokemonName and pokemonNamesMatch support EX/ex/GX/V variations while preserving distinct species', () => {
+      assert.equal(cleanPokemonName('Charizard ex'), 'charizard');
+      assert.equal(cleanPokemonName('Charizard-EX'), 'charizard');
+      assert.equal(cleanPokemonName('Charizard EX'), 'charizard');
+      assert.equal(cleanPokemonName('Mewtwo VSTAR'), 'mewtwo');
+      assert.equal(cleanPokemonName('Pikachu VMAX'), 'pikachu');
+      assert.equal(cleanPokemonName('Lugia GX'), 'lugia');
+      assert.equal(cleanPokemonName('Flabébé'), 'flabebe');
+
+      // Preserves words beginning with "ex"
+      assert.equal(cleanPokemonName('Exeggcute'), 'exeggcute');
+      assert.equal(cleanPokemonName('Exeggutor'), 'exeggutor');
+      assert.equal(cleanPokemonName('Excadrill'), 'excadrill');
+      assert.equal(cleanPokemonName('Exploud'), 'exploud');
+
+      // pokemonNamesMatch correctly equates variants
+      assert.equal(pokemonNamesMatch('Charmeleon', 'Charmeleon ex'), true);
+      assert.equal(pokemonNamesMatch('Charmander ex', 'Charmander'), true);
+      assert.equal(pokemonNamesMatch('Charizard-EX', 'Charizard ex'), true);
+      assert.equal(pokemonNamesMatch('Litten', 'Litten ex'), true);
+
+      // Rejects distinct species
+      assert.equal(pokemonNamesMatch('Mew', 'Mewtwo'), false);
+      assert.equal(pokemonNamesMatch('Exeggcute', 'Exeggutor'), false);
+      assert.equal(pokemonNamesMatch('Pikachu', 'Raichu'), false);
+      assert.equal(pokemonNamesMatch('', 'Charizard'), false);
+    });
+
+    test('normalizeStage supports EX stage strings and MEGA', () => {
+      assert.equal(normalizeStage('Stage 1 ex'), 'Stage 1');
+      assert.equal(normalizeStage('Stage 2 ex'), 'Stage 2');
+      assert.equal(normalizeStage('Basic ex'), 'Basic');
+      assert.equal(normalizeStage('Stage 1 EX'), 'Stage 1');
+      assert.equal(normalizeStage('Stage 2 EX'), 'Stage 2');
+      assert.equal(normalizeStage('Basic EX'), 'Basic');
+      assert.equal(normalizeStage('MEGA'), 'Stage 1');
+      assert.equal(normalizeStage('Mega'), 'Stage 1');
+    });
+
+    test('canEvolve: Basic ex evolves into normal Stage 1', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Basic', name: 'Charmander ex', id: 'b_cex' };
+      const evo = { stage: 'Stage 1', name: 'Charmeleon', evolvesFrom: 'Charmander', id: 'e_c' };
+      const r = await canEvolve('self', base, evo, false);
+      assert.equal(r.allowed, true, r.reason);
+    });
+
+    test('canEvolve: normal Basic evolves into Stage 1 ex', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Basic', name: 'Charmander', id: 'b_c' };
+      const evo = { stage: 'Stage 1 ex', name: 'Charmeleon ex', evolvesFrom: 'Charmander', id: 'e_cex' };
+      const r = await canEvolve('self', base, evo, false);
+      assert.equal(r.allowed, true, r.reason);
+    });
+
+    test('canEvolve: Stage 1 ex evolves into Stage 2 ex', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Stage 1 ex', name: 'Charmeleon ex', id: 'b_cmex' };
+      const evo = { stage: 'Stage 2 ex', name: 'Charizard ex', evolvesFrom: 'Charmeleon', id: 'e_zex' };
+      const r = await canEvolve('self', base, evo, false);
+      assert.equal(r.allowed, true, r.reason);
+    });
+
+    test('canEvolve: Rare Candy supports Basic ex -> Stage 2 ex', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Basic', name: 'Charmander ex', id: 'b_cex' };
+      const evo = { stage: 'Stage 2', name: 'Charizard ex', evolvesFrom: 'Charmeleon', id: 'e_zex' };
+      const r = await canEvolve('self', base, evo, false, { isRareCandy: true });
+      assert.equal(r.allowed, true, r.reason);
+    });
+
+    test('canEvolve: Rare Candy supports normal Basic -> Stage 2 where evolvesFrom is Stage 1 ex', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Basic', name: 'Charmander', id: 'b_c' };
+      const evo = { stage: 'Stage 2', name: 'Charizard', evolvesFrom: 'Charmeleon ex', id: 'e_z' };
+      const r = await canEvolve('self', base, evo, false, { isRareCandy: true });
+      assert.equal(r.allowed, true, r.reason);
+    });
+
+    test('canEvolve: rejects mismatching EX evolution', async () => {
+      startGame();
+      for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+      rulesState.enabled = true;
+      const base = { stage: 'Basic', name: 'Squirtle ex', id: 'b_sex' };
+      const evo = { stage: 'Stage 1', name: 'Charmeleon', evolvesFrom: 'Charmander', id: 'e_c' };
+      const r = await canEvolve('self', base, evo, false);
+      assert.equal(r.allowed, false);
+      assert.ok(r.reason.includes('evolves from'));
+    });
+
+    test('matchesSearch recognizes EX stage variants in search filters', () => {
+      const basicEx = { name: 'Miraidon ex', type: 'Pokémon', hp: 220, stage: 'Basic ex' };
+      const stage1Ex = { name: 'Charmeleon ex', type: 'Pokémon', hp: 160, stage: 'Stage 1 ex' };
+      const stage2Ex = { name: 'Charizard ex', type: 'Pokémon', hp: 330, stage: 'Stage 2 ex' };
+
+      assert.equal(matchesSearch(basicEx, 'Basic Pokémon'), true);
+      assert.equal(matchesSearch(basicEx, 'Stage 1 Pokémon'), false);
+      assert.equal(matchesSearch(stage1Ex, 'Stage 1 Pokémon'), true);
+      assert.equal(matchesSearch(stage1Ex, 'Stage 2 Pokémon'), false);
+      assert.equal(matchesSearch(stage2Ex, 'Stage 2 Pokémon'), true);
+      assert.equal(matchesSearch(stage2Ex, 'Stage 1 Pokémon'), false);
     });
     

@@ -7,6 +7,7 @@
 
 import { rulesState, getStadium } from './rules-state.mjs';
 import { attachedTools, parseHpBonus, applyHpBonus } from './ability-executors.mjs';
+import { pokemonNamesMatch } from './evolution.mjs';
 //
 // Layers:
 //   - `classifyStadiumEffect` — buckets a card into an effect family.
@@ -283,7 +284,7 @@ export function matchesStadiumEvolveSearch(deckCard, inPlayPokemon = []) {
   if (!deckCard || !inPlayPokemon.length) return false;
   const from = lower(deckCard.evolvesFrom);
   if (!from) return false;
-  return inPlayPokemon.some((host) => lower(host?.name) === from);
+  return inPlayPokemon.some((host) => pokemonNamesMatch(host?.name, from));
 }
 
 /** Deck/hand search filter for stadium once-per-turn effects. */

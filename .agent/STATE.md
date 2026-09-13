@@ -4,18 +4,15 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 108
-Focus: fix (Rare Candy GUI) — openMatPick hit-detection and stage 2 evolution dialog
-Active: done. Rare Candy GUI failed after clicking Pokémon on mat because openMatPick hit-detection
-  checked e.img === target || e.img.contains(target). For holo cards (wrapped in .mat-holo >
-  .card__rotator with sibling .card__shine/.card__glare overlays), clicks hit the shine/rotator layer
-  outside img, failing the check and leaving Cancel as the only responsive element. Created
-  mat-pick.mjs with buildMatPickEntry/findMatPickHit checking targetEl, img, and container. Updated
-  trainer-execution.js to use mat-pick and apply highlight to targetEl. Tightened evolveStage2
-  to derive wasPlayedThisTurn from base.enteredPlayTurn and await ensureCardData. Regression tests
-  in mat-pick.test.mjs. All 1324 unit tests pass.
-Next: user smoke-test in UI: play Rare Candy, click Basic on mat, verify Stage 2 evolution selection
-  dialog appears properly.
+Session: 109
+Focus: fix (rules) — support EX Pokémon in evolution chains and stadium searches
+Active: done. Supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.
+  Added cleanPokemonName and pokemonNamesMatch in evolution.mjs to canonicalize base species names.
+  Updated resolveStage1EvolvesFrom, canEvolve, normalizeStage, markEvolvedThisTurn, matchesStadiumEvolveSearch,
+  and chat-buttons.js (Grand Tree / stadium evolve) to use pokemonNamesMatch and normalized stages.
+  Updated matchesSearch to canonicalize stages via normalizeStage. Excluded opponent evolve triggers from
+  moveDamageAbility in abilities.mjs. Tests in evolution.test.mjs and rules-extended.test.mjs. All 1324 unit tests pass.
+Next: user smoke-test in UI: test evolving onto/from EX Pokémon and using Rare Candy with EX chains.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

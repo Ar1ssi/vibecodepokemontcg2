@@ -969,6 +969,14 @@ import test from 'node:test';
         matchesStadiumEvolveSearch({ name: 'Piloswine', evolvesFrom: 'Swinub' }, [{ name: 'Pikipek' }]),
         false,
       );
+      assert.equal(
+        matchesStadiumEvolveSearch({ name: 'Charmeleon', evolvesFrom: 'Charmander' }, [{ name: 'Charmander ex' }]),
+        true,
+      );
+      assert.equal(
+        matchesStadiumEvolveSearch({ name: 'Charizard ex', evolvesFrom: 'Charmeleon' }, [{ name: 'Charmeleon-EX' }]),
+        true,
+      );
     });
 
     test('Jamming Tower: tool effects blocked via combinedDamagePrevention', async () => {

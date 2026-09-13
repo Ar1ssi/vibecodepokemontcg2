@@ -415,6 +415,7 @@ export function parseAbility(text = '') {
   if (
     !hasPromotionTrigger &&
     !lower.includes('checkup') &&
+    !(lower.includes('opponent') && lower.includes('evolve')) &&
     (hasWord(lower, 'move') || lower.includes('place') || hasWord(lower, 'put')) &&
     lower.includes('damage counter') &&
     (betweenOwnDamage ||
