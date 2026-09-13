@@ -198,7 +198,8 @@
 
 /* ── Glare ─────────────────────────────────────────────────────────── */
 
-.card__glare {
+.card__glare,
+.card__glare2 {
   transform: translateZ(1.41px);
   overflow: hidden;
 
@@ -218,7 +219,8 @@
 }
 
 .card__shine,
-.card__glare {
+.card__glare,
+.card__glare2 {
   will-change: transform, opacity, background-image, background-size,
     background-position, background-blend-mode, filter;
 }
@@ -254,9 +256,14 @@
 .mat-holo .card__rotator,
 .mat-holo .card__shine,
 .mat-holo .card__glitter,
-.mat-holo .card__glare {
+.mat-holo .card__glare,
+.mat-holo .card__glare2 {
   pointer-events: none;
 }
 .mat-holo img {
+  pointer-events: auto;
+}
+.card-preview-card.mat-holo,
+.discard-pile-holo.mat-holo {
   pointer-events: auto;
 }

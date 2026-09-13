@@ -1697,6 +1697,7 @@ ul, li {
 .card-preview-overlay.is-closing {
   background-color: transparent;
   cursor: default;
+  pointer-events: none;
 }
 .card-preview-pop {
   position: fixed;

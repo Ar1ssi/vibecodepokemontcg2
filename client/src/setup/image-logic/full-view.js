@@ -252,6 +252,14 @@ export const openFloatingCardPreview = ({
       closeCardPreview(event);
     }
   });
+
+  overlay.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.target === overlay) {
+      closeCardPreview(event);
+    }
+  });
 };
 
 export const closeCardPreview = (event, immediate = false) => {

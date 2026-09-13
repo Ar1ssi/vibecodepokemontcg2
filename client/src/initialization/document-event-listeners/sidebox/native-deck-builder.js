@@ -698,6 +698,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         const target = event.target.closest('[data-preview-image]');
         if (!target) return;
         event.preventDefault();
+        event.stopPropagation();
         const index = target.dataset.resultIndex;
         const card = index !== undefined ? currentResults[Number(index)] : null;
         showCardPreview(target.dataset.previewImage, card, target);
