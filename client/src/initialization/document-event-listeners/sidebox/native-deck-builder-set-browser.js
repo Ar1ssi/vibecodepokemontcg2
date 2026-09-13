@@ -357,6 +357,7 @@ import {
         const target = event.target.closest('[data-preview-image]');
         if (!target) return;
         event.preventDefault();
+        event.stopPropagation();
         const cardId = target.closest('[data-card-id]')?.dataset.cardId;
         const card = cardId ? findCardById(cardId) : null;
         onPreviewCard?.(target.dataset.previewImage, card, target);
