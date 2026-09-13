@@ -29,7 +29,9 @@ export function findMatPickHit(entries, eventTarget) {
       e.targetEl?.contains?.(eventTarget) ||
       e.img === eventTarget ||
       e.img?.contains?.(eventTarget) ||
-      (e.container && (e.container === eventTarget || e.container.contains?.(eventTarget)))
+      (e.container && (e.container === eventTarget || e.container.contains?.(eventTarget))) ||
+      (eventTarget?.card && eventTarget.card === e.card) ||
+      (eventTarget?.closest?.('.play-container') && e.container && eventTarget.closest('.play-container') === e.container)
   );
   return hit?.card || null;
 }
