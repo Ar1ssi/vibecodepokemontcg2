@@ -4,14 +4,15 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 113
-Focus: patch (rules) — implement Iono prize-based draw and empty-hand draw prevention
-Active: done. `ionoShuffle` previously only moved cards into deck and announced shuffle without drawing,
-  while also shuffling the deck rather than putting cards on bottom. Updated `trainer-effects.mjs` to tag
-  `bottom` and `drawPrizes` on `ionoShuffle`. Updated `trainer-execution.js` and `executor.mjs` to put hand cards
-  on the bottom of the deck, draw cards equal to remaining prize cards for each player, and skip drawing
-  for the player who played Iono when their hand was empty. Added unit tests in `trainer-execution.test.mjs`. Tests pass.
-Next: verify in live multiplayer match.
+Session: 114
+Focus: feature (board-ui) — aspect-ratio locked playmats with ambient bleed wings
+Active: done. Playmats were previously stretched via object-fit: fill into wide viewports (2.68:1+),
+  severely squishing artwork. Added aspect ratio locking (~1.91:1 for 1-player, ~1.0:1 for 2-player)
+  with centered layout and ambient blurred bleed backdrop on the table surface. Scaled horizontal
+  zone coordinates in mat-layouts.mjs via CSS custom properties (--mat-aspect, --mat-width, --mat-offset-x).
+  Updated apply-mat-layout.js and index.css to manage both ambient and foreground images.
+  Unit tests pass (20/20).
+Next: visual verification in browser.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -31,6 +32,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S114 2026-09-14 feature: aspect-ratio locked playmats with ambient bleed wings and aligned card zones.
 - S113 2026-09-14 patch: implemented Iono prize-based draw and empty-hand draw prevention.
 - S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
-- S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.

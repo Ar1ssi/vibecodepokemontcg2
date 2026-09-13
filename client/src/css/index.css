@@ -218,15 +218,35 @@ ul, li {
   height: 50%;
   overflow: hidden;
   background: #0a0a0c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#battleMatArt .mat-half img.mat-ambient-image {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(32px) brightness(0.4) saturate(1.4);
+  transform: scale(1.08);
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 1;
 }
 #battleMatArt .mat-half img.mat-art-image {
-  width: 100%;
+  position: relative;
+  z-index: 2;
   height: 100%;
-  /* Trimmed board WebPs match mat aspect; fill the half so zone overlays
-     line up. cover cropped the center band when the half is wider (~2.4:1)
-     than the art (~1.9:1), which read as an oversized zoomed-in mat. */
-  object-fit: fill;
+  max-height: 100%;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: var(--mat-aspect, 1.91 / 1);
+  object-fit: contain;
+  margin: 0 auto;
   display: block;
+  border-radius: 4px;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.75), 0 0 8px rgba(0, 0, 0, 0.5);
 }
 #battleMatArt .mat-half-self {
   bottom: 0;
@@ -242,6 +262,9 @@ ul, li {
 #battleMat.mat-two-player #battleMatArt .mat-half-self {
   height: 100%;
 }
+#battleMat.mat-two-player #battleMatArt .mat-half-self img.mat-art-image {
+  aspect-ratio: var(--mat-sheet-aspect, 1 / 1);
+}
 /* Opp-only full-size mat: the artwork lives in the top half element. */
 #battleMat.mat-two-player-opp #battleMatArt .mat-half-self {
   display: none;
@@ -249,6 +272,9 @@ ul, li {
 #battleMat.mat-two-player-opp #battleMatArt .mat-half-opp {
   height: 100%;
   top: 0;
+}
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-opp img.mat-art-image {
+  aspect-ratio: var(--mat-sheet-aspect, 1 / 1);
 }
 /* With real mat art behind the board, the synthetic arena decoration would
    read as grime on top of the artwork. */
