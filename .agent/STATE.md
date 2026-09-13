@@ -4,19 +4,15 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 110
-Focus: fix (rules-ui) — Rare Candy mat pick GUI & EX Pokémon evolution chains
-Active: done. Rare Candy GUI failed after clicking Pokémon on mat because openMatPick hit-detection
-  checked e.img === target || e.img.contains(target). For holo cards (wrapped in .mat-holo >
-  .card__rotator with sibling .card__shine/.card__glare overlays), clicks hit the shine/rotator layer
-  outside img, failing the check and leaving Cancel as the only responsive element. Created
-  mat-pick.mjs with buildMatPickEntry/findMatPickHit checking targetEl, img, and container. Updated
-  trainer-execution.js to use mat-pick and apply highlight to targetEl. Tightened evolveStage2
-  to derive wasPlayedThisTurn from base.enteredPlayTurn and await ensureCardData. Also supported EX/ex
-  Pokémon in evolution chains, Rare Candy jumps, and stadium searches via cleanPokemonName,
-  pokemonNamesMatch, and stage normalization. All unit tests pass.
-Next: smoke-test in UI: play Rare Candy, click Basic on mat, verify Stage 2 evolution selection
-  dialog appears properly.
+Session: 111
+Focus: fix (rules-ui) — Rare Candy iframe mat click detection & async step flow
+Active: done. Clicks on Pokémon in play (Swinub) failed during Rare Candy because openMatPick only
+  attached event listeners to the top-level document, missing clicks in iframe playmats
+  (selfContainerDocument/oppContainerDocument). Secondarily, evolveStage2 ended with `break;` rather
+  than `return;`, causing immediate premature discard of Rare Candy before user interaction.
+  Fixed by wiring multi-document listeners, direct element capture listeners, style restoration via Map,
+  and proper return/callback sequencing for evolveStage2 and devolve. 1327 unit tests passing.
+Next: verify in live two-player game by playing Rare Candy on Swinub to evolve into Mamoswine ex.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -36,6 +32,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S110 2026-09-13 fix: supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.
+- S109 2026-09-13 fix: resolved Rare Candy GUI failing on holo cards by matching outer targetEl and container.
 - S108 2026-09-13 patch: aligned holo spring physics and math with simeydotme/pokemon-cards-151.
-- S106 2026-09-12 feature: Browse Sets card grid now also respects the summary-bar supertype filter.
-- S105 2026-09-12 feature: deck builder summary segments are now click-to-filter buttons for the deck list.

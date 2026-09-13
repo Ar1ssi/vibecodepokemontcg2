@@ -27,6 +27,23 @@ class MockElement {
     }
     return false;
   }
+  addEventListener(event, handler, useCapture = false) {
+    if (!this._listeners) this._listeners = new Map();
+    if (!this._listeners.has(event)) this._listeners.set(event, []);
+    this._listeners.get(event).push({ handler, useCapture });
+  }
+  removeEventListener(event, handler, useCapture = false) {
+    if (!this._listeners?.has(event)) return;
+    const arr = this._listeners.get(event);
+    this._listeners.set(event, arr.filter((l) => l.handler !== handler));
+  }
+  dispatchEvent(event) {
+    if (!this._listeners?.has(event.type)) return;
+    const arr = this._listeners.get(event.type);
+    for (const { handler } of [...arr]) {
+      handler(event);
+    }
+  }
 }
 
 class MockClassList {
@@ -159,4 +176,53 @@ test('findMatPickHit: successfully matches clicks on holo shine, rotator, wrappe
   // Click on irrelevant element
   const outside = new MockElement('div');
   assert.equal(findMatPickHit(entries, outside), null);
+});
+
+test('findMatPickHit: resolves attached energy inside play-container to parent Pokémon', () => {
+  const swinub = { name: 'Swinub', stage: 'Basic' };
+  const fixture = createPlainCardFixture(swinub);
+
+  // Attach an energy inside the play container
+  const energyImg = new MockElement('img', fixture.container);
+  energyImg.classList = new MockClassList(['attached-card']);
+
+  const entries = [buildMatPickEntry(swinub)];
+  assert.equal(findMatPickHit(entries, energyImg), swinub);
+});
+
+test('findMatPickHit: resolves when target directly references card property', () => {
+  const swinub = { name: 'Swinub', stage: 'Basic' };
+  const target = { card: swinub };
+  const entries = [{ card: swinub, targetEl: null, img: null, container: null }];
+  assert.equal(findMatPickHit(entries, target), swinub);
+});
+
+test('multi-document click simulation: event dispatched on iframe document reaches listeners', () => {
+  const swinub = { name: 'Swinub', stage: 'Basic' };
+  const fixture = createHoloCardFixture(swinub);
+
+  const iframeDoc = new MockElement('div');
+  fixture.container.ownerDocument = iframeDoc;
+  fixture.holo.ownerDocument = iframeDoc;
+  fixture.img.ownerDocument = iframeDoc;
+
+  let picked = null;
+  const entries = [buildMatPickEntry(swinub)];
+
+  const onDocClick = (event) => {
+    const hit = findMatPickHit(entries, event.target);
+    if (hit) picked = hit;
+  };
+
+  iframeDoc.addEventListener('click', onDocClick, true);
+
+  // Dispatch click on the holo shine inside iframe
+  iframeDoc.dispatchEvent({ type: 'click', target: fixture.shine, preventDefault() {}, stopPropagation() {} });
+  assert.equal(picked, swinub);
+
+  // Remove listener
+  iframeDoc.removeEventListener('click', onDocClick, true);
+  picked = null;
+  iframeDoc.dispatchEvent({ type: 'click', target: fixture.shine, preventDefault() {}, stopPropagation() {} });
+  assert.equal(picked, null);
 });
