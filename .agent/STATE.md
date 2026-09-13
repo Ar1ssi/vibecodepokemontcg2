@@ -4,14 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 113
-Focus: patch (rules) — implement Iono prize-based draw and empty-hand draw prevention
-Active: done. `ionoShuffle` previously only moved cards into deck and announced shuffle without drawing,
-  while also shuffling the deck rather than putting cards on bottom. Updated `trainer-effects.mjs` to tag
-  `bottom` and `drawPrizes` on `ionoShuffle`. Updated `trainer-execution.js` and `executor.mjs` to put hand cards
-  on the bottom of the deck, draw cards equal to remaining prize cards for each player, and skip drawing
-  for the player who played Iono when their hand was empty. Added unit tests in `trainer-execution.test.mjs`. Tests pass.
-Next: verify in live multiplayer match.
+Session: 114
+Focus: fix (deck-builder) — card preview right click feature on card search tab
+Active: done. Added `data-card-id` to search result buttons in `native-deck-builder-renderers.js`, updated
+  `native-deck-builder.js` searchResults `contextmenu` listener with `data-card-id` resolution and fallback image
+  extraction, and added `contextmenu` preview listener to deck cards panel. Verified via Playwright and 1330 unit tests pass.
+Next: ready for merge.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -31,6 +29,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S114 2026-09-14 fix: card preview right click feature on search tab and deck cards.
 - S113 2026-09-14 patch: implemented Iono prize-based draw and empty-hand draw prevention.
 - S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
-- S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.
