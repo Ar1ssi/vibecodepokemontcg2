@@ -511,14 +511,33 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
       return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
+    // Sets in Generation 6 that famously featured Reverse Holo energy cards
+    // (Evolutions xy12 and Generations g1).
+    export const GEN6_REVERSE_HOLO_ENERGY_SET_IDS = new Set(['xy12', 'g1']);
+
+    export function buildReverseHoloEnergyCard(card) {
+      return {
+        ...card,
+        id: `${card.id}-reverse`,
+        localId: `${card.localId} · Reverse Holo`,
+        rarity: 'Reverse Holo',
+      };
+    }
+
     // Fetch every Energy card (basic, special, and rarer variants) printed
-    // across every set in a Pokémon generation. No modern-basic/gold-secret
-    // extras here — those exist only to backfill Standard-legal sets that have
-    // since rotated out of LEGAL_SET_REGISTRY; a generation's own set list
-    // already includes every set it ever had, rotated or not.
+    // across every set in a Pokémon generation. For Generation 6 (XY era),
+    // this includes the Reverse Holo prints from Evolutions (xy12) and Generations (g1).
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);
+
+      if (Number(generation) === 6) {
+        const reverseHoloCards = cards
+          .filter((card) => GEN6_REVERSE_HOLO_ENERGY_SET_IDS.has(card?.set?.id))
+          .map(buildReverseHoloEnergyCard);
+        return sortCardsWithinGroup([...cards, ...reverseHoloCards], { sortBy: 'name', sortDirection: 'asc' });
+      }
+
       return sortCardsWithinGroup(cards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
