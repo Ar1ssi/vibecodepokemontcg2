@@ -4167,10 +4167,20 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
   await Promise.all([...inPlay, ...deck.array].map((c) => ensureCardData(c)));
 
   const getEvolvesFrom = (c) => String(c?.evolvesFrom || c?.evolveFrom || '').trim().toLowerCase();
+  // Tolerant name comparison: exact match after stripping punctuation/case
+  // (so "riolu" matches "Riolu", "Riolu ex", etc.) with a containment
+  // fallback for localized/abbreviated variants.
+  const normName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const nameMatches = (a, b) => {
+    const x = normName(a);
+    const y = normName(b);
+    if (!x || !y) return false;
+    return x === y || x.includes(y) || y.includes(x);
+  };
   const isEvolvesFromHost = (c, hostList) => {
     const from = getEvolvesFrom(c);
     if (!from) return false;
-    return hostList.some((h) => String(h?.name || '').trim().toLowerCase() === from);
+    return hostList.some((h) => nameMatches(String(h?.name || ''), from));
   };
 
   const basicHosts = inPlay.filter((p) => {
@@ -4223,8 +4233,8 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
         return;
       }
       const fromName = getEvolvesFrom(picked);
-      const host = eligibleHosts.find((p) => String(p?.name || '').trim().toLowerCase() === fromName) ||
-                   inPlay.find((p) => String(p?.name || '').trim().toLowerCase() === fromName) ||
+      const host = eligibleHosts.find((p) => nameMatches(String(p?.name || ''), fromName)) ||
+                   inPlay.find((p) => nameMatches(String(p?.name || ''), fromName)) ||
                    eligibleHosts[0] || inPlay[0];
 
       if (!host) {
@@ -4253,13 +4263,15 @@ async function executeGrandTreeSpecialRule(user, card, emit) {
       await moveCardBundle(user, user, 'deck', zoneId, deckIdx, hostIdx, 'evolve');
       appendMessage(user, `🌳 Grand Tree: ${picked.name} evolves onto ${host.name}.`, 'announcement', false);
 
-      // Stage 2 chain
-      const pickedName = String(picked.name || '').trim().toLowerCase();
+      // Stage 2 chain — tolerant name match, so "Litten" still finds
+      // "Litten ex" / localized variants whose evolvesFrom string isn't an
+      // exact string-equal match to the picked card's name.
       const stage2Candidates = deck.array.filter((c) => {
         if (!c) return false;
         const isPoke = c.type === 'Pokémon' || c.type === 'Pokemon' || String(c.type || '').toLowerCase().includes('pok');
         if (!isPoke) return false;
-        return getEvolvesFrom(c) === pickedName;
+        if (!getEvolvesFrom(c)) return false;
+        return nameMatches(getEvolvesFrom(c), picked.name);
       });
 
       if (stage2Candidates.length > 0) {

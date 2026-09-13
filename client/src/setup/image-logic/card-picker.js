@@ -677,7 +677,11 @@ const confirmPicker = async (state) => {
     picks = state.slotAssignments.filter(Boolean);
     if (picks.length < state.minCount || picks.length > state.maxCount) return;
   } else {
-    picks = [state.slotAssignments[0] ?? state.slotCard ?? cards[index]];
+    // minCount 0 (upTo) pickers allow declining: confirm with no explicit
+    // selection passes `undefined` through instead of silently adopting the
+    // currently-focused card. Required pickers keep the focus fallback.
+    const explicit = state.slotAssignments[0] ?? state.slotCard ?? null;
+    picks = [explicit != null || state.minCount > 0 ? explicit ?? cards[index] : undefined];
   }
 
   // The moves below are awaited, so a second confirm click could land while
@@ -685,21 +689,32 @@ const confirmPicker = async (state) => {
   if (state.confirming) return;
   state.confirming = true;
 
-  if (!pickOnly && zoneFrom && destination) {
-    const { moveCardBundle } = await import(
-      '../../actions/move-card-bundle/move-card-bundle.js'
-    );
-    await movePicksInOrder(picks, (cand) => {
-      const idx = getZone(user, zoneFrom).array.indexOf(cand);
-      if (idx < 0) return undefined;
-      return moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
-    });
+  try {
+    if (!pickOnly && zoneFrom && destination) {
+      const { moveCardBundle } = await import(
+        '../../actions/move-card-bundle/move-card-bundle.js'
+      );
+      await movePicksInOrder(picks, (cand) => {
+        const idx = getZone(user, zoneFrom).array.indexOf(cand);
+        if (idx < 0) return undefined;
+        return moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
+      });
+    }
+
+    // Handlers are often async (they move cards, shuffle, mark usage).
+    // Awaiting them keeps the picker open until the game state settles, and
+    // teardown in `finally` guarantees the overlay is removed even if the
+    // move path or a handler throws (previously the picker stayed stuck and
+    // the caller's promise never resolved).
+    if (multiSelect) await onConfirm?.(picks);
+    else await onPick?.(picks[0]);
+  } catch (err) {
+    // Surface the failure to the console; the caller's promise (if any)
+    // remains the contract for higher-level error handling.
+    console.error('[card-picker] confirm failed:', err);
+  } finally {
+    teardownPicker(state);
   }
-
-  if (multiSelect) onConfirm?.(picks);
-  else onPick?.(picks[0]);
-
-  teardownPicker(state);
 };
 
 
