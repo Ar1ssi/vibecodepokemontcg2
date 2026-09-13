@@ -4,15 +4,19 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 109
-Focus: fix (rules) — support EX Pokémon in evolution chains and stadium searches
-Active: done. Supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.
-  Added cleanPokemonName and pokemonNamesMatch in evolution.mjs to canonicalize base species names.
-  Updated resolveStage1EvolvesFrom, canEvolve, normalizeStage, markEvolvedThisTurn, matchesStadiumEvolveSearch,
-  and chat-buttons.js (Grand Tree / stadium evolve) to use pokemonNamesMatch and normalized stages.
-  Updated matchesSearch to canonicalize stages via normalizeStage. Excluded opponent evolve triggers from
-  moveDamageAbility in abilities.mjs. Tests in evolution.test.mjs and rules-extended.test.mjs. All 1324 unit tests pass.
-Next: user smoke-test in UI: test evolving onto/from EX Pokémon and using Rare Candy with EX chains.
+Session: 110
+Focus: fix (rules-ui) — Rare Candy mat pick GUI & EX Pokémon evolution chains
+Active: done. Rare Candy GUI failed after clicking Pokémon on mat because openMatPick hit-detection
+  checked e.img === target || e.img.contains(target). For holo cards (wrapped in .mat-holo >
+  .card__rotator with sibling .card__shine/.card__glare overlays), clicks hit the shine/rotator layer
+  outside img, failing the check and leaving Cancel as the only responsive element. Created
+  mat-pick.mjs with buildMatPickEntry/findMatPickHit checking targetEl, img, and container. Updated
+  trainer-execution.js to use mat-pick and apply highlight to targetEl. Tightened evolveStage2
+  to derive wasPlayedThisTurn from base.enteredPlayTurn and await ensureCardData. Also supported EX/ex
+  Pokémon in evolution chains, Rare Candy jumps, and stadium searches via cleanPokemonName,
+  pokemonNamesMatch, and stage normalization. All unit tests pass.
+Next: smoke-test in UI: play Rare Candy, click Basic on mat, verify Stage 2 evolution selection
+  dialog appears properly.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -32,8 +36,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S106 2026-09-12 feature: Browse Sets card grid now also respects the summary-bar supertype
-  filter — see Active above.
-- S105 2026-09-12 feature: deck builder summary segments are now click-to-filter buttons for the
-  deck list.
-- S104 2026-09-12 patch: fixed 3 bugs behind "old-set imports show as Unknown".
+- S108 2026-09-13 patch: aligned holo spring physics and math with simeydotme/pokemon-cards-151.
+- S106 2026-09-12 feature: Browse Sets card grid now also respects the summary-bar supertype filter.
+- S105 2026-09-12 feature: deck builder summary segments are now click-to-filter buttons for the deck list.
