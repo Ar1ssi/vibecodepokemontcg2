@@ -4,14 +4,13 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 112
-Focus: patch (abilities) — fix Meowth ex Last-Ditch Catch search destination routing
-Active: done. `parseAbilitySearchParams` previously inspected `lower.includes('onto your bench')`
-  across the full ability string, falsely routing searched cards to 'bench' on "when you play this
-  Pokémon from your hand onto your Bench" triggers. `move-card.js` blocked Supporters/Items from being
-  placed on bench, causing cards to stay in the deck when shuffled. Scoped destination parsing to the
-  search clause and stripped trigger phrasing in `shared/engine/rules/abilities.mjs`. Added regression
-  test in `shared/engine/rules/__tests__/evolution.test.mjs`. Tests pass.
+Session: 113
+Focus: patch (rules) — implement Iono prize-based draw and empty-hand draw prevention
+Active: done. `ionoShuffle` previously only moved cards into deck and announced shuffle without drawing,
+  while also shuffling the deck rather than putting cards on bottom. Updated `trainer-effects.mjs` to tag
+  `bottom` and `drawPrizes` on `ionoShuffle`. Updated `trainer-execution.js` and `executor.mjs` to put hand cards
+  on the bottom of the deck, draw cards equal to remaining prize cards for each player, and skip drawing
+  for the player who played Iono when their hand was empty. Added unit tests in `trainer-execution.test.mjs`. Tests pass.
 Next: verify in live multiplayer match.
 Blocked: nothing.
 
@@ -32,6 +31,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S113 2026-09-14 patch: implemented Iono prize-based draw and empty-hand draw prevention.
 - S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
 - S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.
-- S110 2026-09-13 fix: supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.

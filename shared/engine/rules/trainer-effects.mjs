@@ -577,7 +577,14 @@ export function parseTrainerEffect(text = '') {
   // "each player shuffles their hand" and PAL 185
   // "each player shuffles the cards in their hand into their deck")
   if (lower.includes('each player shuffles') && lower.includes('hand')) {
-    steps.push({ type: 'ionoShuffle' });
+    const isBottom = lower.includes('bottom of their deck');
+    const hasExplicitDraw = Boolean(lower.match(/draw\s+\d+/i) || lower.match(/opponent draws?\s+\d+/i));
+    const isPrizeDraw = lower.includes('prize card') || !hasExplicitDraw;
+    steps.push({
+      type: 'ionoShuffle',
+      ...(isBottom ? { bottom: true } : {}),
+      ...(isPrizeDraw ? { drawPrizes: true } : {}),
+    });
     appendTrailingDraw(steps, lower);
     // Archer: "you draw 5 cards, and your opponent draws 3 cards"
     const oppDraw = lower.match(/your opponent draws?\s+(\d+)\s+cards?/i);
@@ -977,7 +984,10 @@ export function describeStep(step) {
     case 'healAmount': return `Heal ${step.amount} damage from ${step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
     case 'attachMultipleFromDiscard': return `Attach up to ${step.count} ${step.energy} cards from your discard pile to ${step.target}.`;
-    case 'ionoShuffle': return 'Both players shuffle the cards in their hands into their decks.';
+    case 'ionoShuffle':
+      return step.drawPrizes
+        ? 'Both players shuffle the cards in their hands and put them on the bottom of their decks, then draw cards equal to remaining Prize cards.'
+        : 'Both players shuffle the cards in their hands into their decks.';
     case 'evolveStage2': return 'Choose 1 of your Basic Pokémon in play; if you have a Stage 2 that evolves from it in your hand, put it on to evolve, skipping the Stage 1.';
     case 'moveEnergy': return 'Move a Basic Energy from 1 of your Pokémon to another of your Pokémon.';
     case 'moveEnergyToActive': return `Move up to ${step.count} Energy from your Benched Pokémon to your Active Pokémon.`;
