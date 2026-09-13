@@ -1710,6 +1710,7 @@ ul, li {
   pointer-events: none;
   z-index: 1;
   will-change: transform;
+  overflow: visible;
 }
 .card-preview-flip {
   position: relative;
@@ -1719,27 +1720,32 @@ ul, li {
   -webkit-transform-style: preserve-3d;
   transform-origin: center center;
   will-change: transform;
+  overflow: visible;
 }
 .card-preview-face {
   position: absolute;
   inset: 0;
-  border-radius: 0.3rem;
-  overflow: hidden;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  transform-style: flat;
 }
 .card-preview-face--front {
   pointer-events: auto;
+  overflow: visible;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
 .card-preview-face--back {
   transform: rotateY(180deg);
+  border-radius: var(--card-radius, 0.3rem);
+  overflow: hidden;
+  transform-style: flat;
 }
 .card-preview-sleeve {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: var(--card-radius, 0.3rem);
 }
 .card-preview-face--front > img.card-preview-card {
   display: block;
@@ -1748,7 +1754,7 @@ ul, li {
   object-fit: contain;
   margin: 0;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
-  border-radius: 0.3rem;
+  border-radius: var(--card-radius, 0.3rem);
   pointer-events: auto;
   image-rendering: auto;
 }
@@ -1762,14 +1768,18 @@ ul, li {
   overflow: visible;
 }
 .card-preview-face--front > .mat-holo.card-preview-card .card__translater,
-.card-preview-face--front > .mat-holo.card-preview-card .card__rotator,
+.card-preview-face--front > .mat-holo.card-preview-card .card__rotator {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
 .card-preview-face--front > .mat-holo.card-preview-card .card__rotator > * {
   width: 100%;
   height: 100%;
 }
 .card-preview-face--front > .mat-holo.card-preview-card img {
   display: block;
-  object-fit: cover;
+  object-fit: contain;
 }
 .card-draw-flight {
   position: fixed;

@@ -220,7 +220,9 @@ export const previewSizeForSource = (
   viewport = { width: globalThis.innerWidth, height: globalThis.innerHeight }
 ) => {
   const max = previewTargetSize(viewport);
-  const aspect = sourceRect.height / Math.max(sourceRect.width, 1);
+  const rawAspect = sourceRect.height / Math.max(sourceRect.width, 1);
+  const aspect =
+    rawAspect >= 1.2 && rawAspect <= 1.6 ? rawAspect : CARD_ASPECT;
   let width = max.width;
   let height = width * aspect;
   if (height > max.height) {

@@ -47,6 +47,12 @@ test('previewSizeForSource keeps the source aspect inside the preview box', () =
   assert.ok(Math.abs(target.height / target.width - 128 / 80) < 0.001);
 });
 
+test('previewSizeForSource falls back to CARD_ASPECT for non-card source elements (like deck rows)', () => {
+  const rowSource = { width: 250, height: 32 };
+  const target = previewSizeForSource(rowSource, viewport);
+  assert.ok(Math.abs(target.height / target.width - 1.397) < 0.01);
+});
+
 test('centerDeltaFor moves the card center onto the viewport center', () => {
   assert.deepEqual(centerDeltaFor({ left: 100, top: 50, width: 200, height: 100 }, viewport), {
     x: 400,

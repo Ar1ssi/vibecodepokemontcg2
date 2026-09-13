@@ -4,14 +4,16 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 112
-Focus: patch (abilities) — fix Meowth ex Last-Ditch Catch search destination routing
-Active: done. `parseAbilitySearchParams` previously inspected `lower.includes('onto your bench')`
-  across the full ability string, falsely routing searched cards to 'bench' on "when you play this
-  Pokémon from your hand onto your Bench" triggers. `move-card.js` blocked Supporters/Items from being
-  placed on bench, causing cards to stay in the deck when shuffled. Scoped destination parsing to the
-  search clause and stripped trigger phrasing in `shared/engine/rules/abilities.mjs`. Added regression
-  test in `shared/engine/rules/__tests__/evolution.test.mjs`. Tests pass.
+Session: 113
+Focus: patch (ui) — expand card preview box and prevent edge clipping on 3D tilt and non-standard scans
+Active: done. `.card-preview-face` previously had `overflow: hidden; transform-style: flat;`,
+  which sliced off the card edges and drop-shadow whenever the card tilted in 3D on pointer hover.
+  In addition, `.mat-holo.card-preview-card img` had `object-fit: cover;`, which cropped borders
+  and copyright text on 600x825 (1.375 aspect) scans. `previewSizeForSource` also calculated aspect
+  ratio directly from source elements without bounds, distorting previews opened from deck rows.
+  Set `overflow: visible; transform-style: preserve-3d;` on `.card-preview-face--front`, pop, and flip;
+  set `object-fit: contain;` on preview holo cards; clamped `previewSizeForSource` aspect ratio.
+  Added unit test in `card-pop.test.mjs`. All 1328 tests pass.
 Next: verify in live multiplayer match.
 Blocked: nothing.
 
@@ -32,6 +34,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S113 2026-09-14 patch: expanded card preview bounds, prevented edge clipping on tilt and scan aspect ratio.
 - S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
 - S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.
-- S110 2026-09-13 fix: supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.
