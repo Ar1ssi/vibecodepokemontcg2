@@ -7,6 +7,7 @@ import {
   filterCardsBySupertype,
   generationEnergySetId,
   buildReverseHoloEnergyCard,
+  REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION,
   GEN6_REVERSE_HOLO_ENERGY_SET_IDS,
   GENERATION_SERIES,
   GENERATIONS,
@@ -51,6 +52,10 @@ const SHARED_ENERGY_SUMMARY = [
   { id: 'xy12-91', name: 'Grass Energy', localId: '91' },
   { id: 'g1-75', name: 'Grass Energy', localId: '75' },
   { id: 'xy1-132', name: 'Grass Energy', localId: '132' },
+  { id: 'swsh12.5-152', name: 'Grass Energy', localId: '152' },
+  { id: 'sm1-164', name: 'Grass Energy', localId: '164' },
+  { id: 'ex16-103', name: 'Grass Energy', localId: '103' },
+  { id: 'bw1-105', name: 'Grass Energy', localId: '105' },
 ];
 
 describe('fetchGenerationSets', () => {
@@ -270,6 +275,63 @@ describe('fetchGenerationEnergyCards', () => {
     const g1Reverse = cards.find((c) => c.id === 'g1-75-reverse');
     assert.equal(g1Reverse.rarity, 'Reverse Holo');
     assert.equal(g1Reverse.localId, '75 · Reverse Holo');
+  });
+
+  it('fetchGenerationEnergyCards supports Gen 8 (Crown Zenith swsh12.5)', async () => {
+    stubFetch([
+      ['/series/swsh', { id: 'swsh', name: 'Sword & Shield', sets: [{ id: 'swsh12.5' }] }],
+      ['/sets/swsh12.5', { id: 'swsh12.5', name: 'Crown Zenith', cards: [{ id: 'swsh12.5-152', name: 'Grass Energy', localId: '152', image: 'x' }] }],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    const cards = await fetchGenerationEnergyCards(8);
+    const ids = cards.map((c) => c.id);
+    assert.ok(ids.includes('swsh12.5-152'));
+    assert.ok(ids.includes('swsh12.5-152-reverse'));
+    const rh = cards.find((c) => c.id === 'swsh12.5-152-reverse');
+    assert.equal(rh.rarity, 'Reverse Holo');
+    assert.equal(rh.localId, '152 · Reverse Holo');
+  });
+
+  it('fetchGenerationEnergyCards supports Gen 7 (Sun & Moon sm1)', async () => {
+    stubFetch([
+      ['/series/sm', { id: 'sm', name: 'Sun & Moon', sets: [{ id: 'sm1' }] }],
+      ['/sets/sm1', { id: 'sm1', name: 'Sun & Moon', cards: [{ id: 'sm1-164', name: 'Grass Energy', localId: '164', image: 'x' }] }],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    const cards = await fetchGenerationEnergyCards(7);
+    const ids = cards.map((c) => c.id);
+    assert.ok(ids.includes('sm1-164'));
+    assert.ok(ids.includes('sm1-164-reverse'));
+    const rh = cards.find((c) => c.id === 'sm1-164-reverse');
+    assert.equal(rh.rarity, 'Reverse Holo');
+    assert.equal(rh.localId, '164 · Reverse Holo');
+  });
+
+  it('fetchGenerationEnergyCards supports Gen 3 (Power Keepers ex16)', async () => {
+    stubFetch([
+      ['/series/ex', { id: 'ex', name: 'EX Series', sets: [{ id: 'ex16' }] }],
+      ['/sets/ex16', { id: 'ex16', name: 'Power Keepers', cards: [{ id: 'ex16-103', name: 'Grass Energy', localId: '103', image: 'x' }] }],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    const cards = await fetchGenerationEnergyCards(3);
+    const ids = cards.map((c) => c.id);
+    assert.ok(ids.includes('ex16-103'));
+    assert.ok(ids.includes('ex16-103-reverse'));
+    const rh = cards.find((c) => c.id === 'ex16-103-reverse');
+    assert.equal(rh.rarity, 'Reverse Holo');
+    assert.equal(rh.localId, '103 · Reverse Holo');
+  });
+
+  it('fetchGenerationEnergyCards does not generate reverse holos for generations without them (e.g. Gen 5)', async () => {
+    stubFetch([
+      ['/series/bw', { id: 'bw', name: 'Black & White', sets: [{ id: 'bw1' }] }],
+      ['/sets/bw1', { id: 'bw1', name: 'Black & White', cards: [{ id: 'bw1-105', name: 'Grass Energy', localId: '105', image: 'x' }] }],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    const cards = await fetchGenerationEnergyCards(5);
+    const ids = cards.map((c) => c.id);
+    assert.ok(ids.includes('bw1-105'));
+    assert.ok(!ids.some((id) => id.endsWith('-reverse')), 'Gen 5 must not generate reverse holo energies');
   });
 });
 

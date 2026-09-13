@@ -33,4 +33,3 @@ Blocked: nothing.
 - S114 2026-09-14 feature: added reverse holo energy variants for Gen 3, 6, 7, and 8.
 - S113 2026-09-14 patch: implemented Iono prize-based draw and empty-hand draw prevention.
 - S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
-- S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.
