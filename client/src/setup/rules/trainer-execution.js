@@ -119,6 +119,16 @@ function countVariableDraw(source) {
   }
 }
 
+function getRemainingPrizes(who) {
+  const pZone = getZoneSafe(who, 'prizes');
+  const count = pZone?.getCount ? pZone.getCount() : 0;
+  if (count > 0) return count;
+  if (_prizeState?.[who]?.taken != null) {
+    return Math.max(0, 6 - (_prizeState[who].taken || 0));
+  }
+  return 6;
+}
+
 function applyStatusToCard(player, card, conditions = []) {
   const key = cardKey(card);
   if (!key) return;
@@ -889,17 +899,66 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           break;
         }
         case 'ionoShuffle': {
-          for (const who of ['self', 'opp']) {
-            const n = zone(who, 'hand').getCount();
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const getEffectiveHandCount = (who) => {
+            const h = getZoneSafe(who, 'hand');
+            const arr = Array.isArray(h?.array) ? h.array : [];
+            return arr.filter((c) => c !== card).length;
+          };
+
+          const initialHandCounts = {
+            [_effectOwner]: getEffectiveHandCount(_effectOwner),
+            [oppSide]: getEffectiveHandCount(oppSide),
+          };
+
+          const hasTrailingDraw = steps.some((s) => s.type === 'draw' || s.type === 'opponentDraw');
+          const isPrizeDraw = step.drawPrizes !== false && (!hasTrailingDraw || /iono/i.test(card?.name || ''));
+          const isBottom = step.bottom || /iono/i.test(card?.name || '') || isPrizeDraw;
+
+          for (const who of [_effectOwner, oppSide]) {
+            const n = initialHandCounts[who];
             for (let i = 0; i < n; i++) {
-              await moveCardBundle(who, who, 'hand', 'deck', 0, false, 'move');
+              await moveCardBundle(who, who, 'hand', 'deck', 0, false, isBottom ? 'bottom' : 'move');
             }
-            shuffleDeckAfterSearch(who, _appendMessage, _shuffleZone, {
-              sourceName: card.name,
-              message: null,
-            });
+            if (!isBottom) {
+              shuffleDeckAfterSearch(who, _appendMessage, _shuffleZone, {
+                sourceName: card.name,
+                message: null,
+              });
+            }
           }
-          msg('  auto: both players shuffled hands into decks');
+
+          if (isBottom) {
+            msg('  auto: both players put hands on bottom of decks');
+          } else {
+            msg('  auto: both players shuffled hands into decks');
+          }
+
+          if (isPrizeDraw) {
+            const initiatorPut = initialHandCounts[_effectOwner] > 0;
+            const oppPut = initialHandCounts[oppSide] > 0;
+            const anyPut = initiatorPut || oppPut;
+
+            if (!anyPut) {
+              msg('  auto: neither player had cards in hand — no cards drawn');
+            } else {
+              for (const who of [_effectOwner, oppSide]) {
+                if (who === _effectOwner && !initiatorPut) {
+                  msg(`  auto: ${who === 'self' ? 'your' : "opponent's"} hand was empty — drew 0 cards`);
+                  continue;
+                }
+                const prizeCount = getRemainingPrizes(who);
+                let drew = 0;
+                for (let i = 0; i < prizeCount; i++) {
+                  if (zone(who, 'deck').getCount() > 0) {
+                    await moveCardBundle(who, who, 'deck', 'hand', 0, false, 'move');
+                    drew++;
+                  }
+                }
+                msg(`  auto: ${who === 'self' ? 'you' : 'opponent'} drew ${drew} card(s) (${prizeCount} Prize(s) remaining)`);
+              }
+            }
+          }
           break;
         }
         case 'draw':

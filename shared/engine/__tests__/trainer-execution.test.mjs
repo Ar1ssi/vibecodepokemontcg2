@@ -257,3 +257,124 @@ test('trainer: Potion heals 30 damage from damaged Pokémon', () => {
   assert.equal(res.error, null);
   assert.equal(res.state.players.p1.zones.active[0].damage, 20);
 });
+
+test('trainer: Iono puts hands on bottom of deck and draws cards equal to remaining prize cards for both players', () => {
+  const { state, rng } = setupGame();
+
+  // Setup prizes
+  for (let i = 0; i < 4; i++) {
+    state.players.p1.zones.prizes.push(createCard({ instanceId: 100 + i, name: `Prize P1 ${i}` }));
+  }
+  for (let i = 0; i < 3; i++) {
+    state.players.p2.zones.prizes.push(createCard({ instanceId: 200 + i, name: `Prize P2 ${i}` }));
+  }
+
+  // Setup decks
+  for (let i = 0; i < 10; i++) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: 300 + i, name: `Deck P1 ${i}` }));
+    state.players.p2.zones.deck.push(createCard({ instanceId: 400 + i, name: `Deck P2 ${i}` }));
+  }
+
+  const iono = createCard({
+    instanceId: 50,
+    name: 'Iono',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'Each player shuffles their hand and puts it on the bottom of their deck. If either player put any cards on the bottom of their deck in this way, each player draws a card for each of their remaining Prize cards.',
+  });
+  const fodderP1 = createCard({ instanceId: 51, name: 'Fodder P1' });
+  state.players.p1.zones.hand.push(iono, fodderP1);
+
+  const fodderP2_1 = createCard({ instanceId: 61, name: 'Fodder P2 1' });
+  const fodderP2_2 = createCard({ instanceId: 62, name: 'Fodder P2 2' });
+  state.players.p2.zones.hand.push(fodderP2_1, fodderP2_2);
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 50 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  // P1 had 4 prizes -> draws 4 cards
+  assert.equal(res.state.players.p1.zones.hand.length, 4);
+  // P2 had 3 prizes -> draws 3 cards
+  assert.equal(res.state.players.p2.zones.hand.length, 3);
+  // P1 hand card (fodderP1) was put at the bottom of P1's deck
+  const p1Deck = res.state.players.p1.zones.deck;
+  assert.equal(p1Deck[p1Deck.length - 1].instanceId, 51);
+});
+
+test('trainer: Iono played as the last card in hand does not draw for the player whose hand is empty', () => {
+  const { state, rng } = setupGame();
+
+  for (let i = 0; i < 4; i++) {
+    state.players.p1.zones.prizes.push(createCard({ instanceId: 100 + i, name: `Prize P1 ${i}` }));
+  }
+  for (let i = 0; i < 3; i++) {
+    state.players.p2.zones.prizes.push(createCard({ instanceId: 200 + i, name: `Prize P2 ${i}` }));
+  }
+  for (let i = 0; i < 10; i++) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: 300 + i, name: `Deck P1 ${i}` }));
+    state.players.p2.zones.deck.push(createCard({ instanceId: 400 + i, name: `Deck P2 ${i}` }));
+  }
+
+  const iono = createCard({
+    instanceId: 50,
+    name: 'Iono',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'Each player shuffles their hand and puts it on the bottom of their deck. If either player put any cards on the bottom of their deck in this way, each player draws a card for each of their remaining Prize cards.',
+  });
+  // P1 hand only contains Iono (Iono is the last card played)
+  state.players.p1.zones.hand.push(iono);
+
+  // P2 has cards in hand
+  state.players.p2.zones.hand.push(createCard({ instanceId: 61, name: 'Fodder P2' }));
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 50 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  // P1 played Iono as last card and hand was empty -> does NOT draw for them
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  // P2 put cards on bottom -> draws 3 cards (equal to P2's remaining prizes)
+  assert.equal(res.state.players.p2.zones.hand.length, 3);
+});
+
+test('trainer: Iono played when both players have empty hands draws 0 cards for both', () => {
+  const { state, rng } = setupGame();
+
+  for (let i = 0; i < 6; i++) {
+    state.players.p1.zones.prizes.push(createCard({ instanceId: 100 + i, name: `Prize P1 ${i}` }));
+    state.players.p2.zones.prizes.push(createCard({ instanceId: 200 + i, name: `Prize P2 ${i}` }));
+  }
+  for (let i = 0; i < 10; i++) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: 300 + i, name: `Deck P1 ${i}` }));
+    state.players.p2.zones.deck.push(createCard({ instanceId: 400 + i, name: `Deck P2 ${i}` }));
+  }
+
+  const iono = createCard({
+    instanceId: 50,
+    name: 'Iono',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'Each player shuffles their hand and puts it on the bottom of their deck. If either player put any cards on the bottom of their deck in this way, each player draws a card for each of their remaining Prize cards.',
+  });
+  state.players.p1.zones.hand.push(iono);
+  // P2 has 0 cards in hand
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 50 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  // Neither player had cards to put on bottom -> 0 cards drawn
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  assert.equal(res.state.players.p2.zones.hand.length, 0);
+});
