@@ -750,71 +750,79 @@ import {
             appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
           })();
     
-          // mulligan check: opening hands must contain a Basic Pokémon
+          // mulligan check: opening hands must contain a Basic Pokémon. A
+          // player may need to mulligan more than once — the redrawn hand can
+          // still be missing a Basic — so this loops, re-evaluating after each
+          // round, until every local hand is legal. `mulligansResolved` is
+          // claimed once up front purely as a duplicate-fire guard (so a second
+          // closure can't double-run); it is NOT a "mulligan only once" limit.
           setTimeout(async () => {
             try {
               if (session !== rulesSessionGeneration) return;
               if (rulesState.mulligansResolved) return;
+              markMulligansResolved(); // claim the window before any async gap
 
-              const selfHand = getZone('self', 'hand').array;
-              const oppHand = getZone('opp', 'hand').array;
-              let steps = await evaluateMulligans({ selfHand, oppHand });
-              if (systemState.isTwoPlayer) {
-                // In 2P, each peer evaluates its own hand authoritatively;
-                // opponent mulligans arrive via the 'mulliganBonus' socket event.
-                steps = steps.filter((s) => s.player === 'self');
-                if (steps.length === 0) {
-                  steps = [{ player: 'self', mulligan: false, guidance: 'Your hand contains a Basic Pokémon.' }];
+              // Cap guards against a pathological (Basic-less) deck looping
+              // forever; a legal deck draws a hand with a Basic within a couple
+              // of mulligans, so this is generous headroom.
+              const MAX_ROUNDS = 10;
+
+              for (let round = 0; round < MAX_ROUNDS; round++) {
+                if (session !== rulesSessionGeneration) return;
+
+                const selfHand = getZone('self', 'hand').array;
+                const oppHand = getZone('opp', 'hand').array;
+                let steps = await evaluateMulligans({ selfHand, oppHand });
+                if (systemState.isTwoPlayer) {
+                  // In 2P, each peer evaluates its own hand authoritatively;
+                  // opponent mulligans arrive via the 'mulliganBonus' socket event.
+                  steps = steps.filter((s) => s.player === 'self');
                 }
-              }
 
-              // No mulligans needed
-              if (steps.length === 1 && steps[0].mulligan === false) {
-                markMulligansResolved();
-                return;
-              }
+                const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
+                const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
 
-              for (const step of steps) {
-                if (step.mulligan) {
-                  appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
+                // Both local hands legal — done.
+                if (!selfMulliganned && !oppMulliganned) break;
+
+                for (const step of steps) {
+                  if (step.mulligan) {
+                    appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
+                  }
                 }
-              }
 
-              markMulligansResolved();
-
-              const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
-              const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
-
-              // Execute self mulligan
-              if (selfMulliganned) {
-                appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
-                shuffleAndDraw('self', 'self', 7, null, true);
-              }
-
-              // In 1P, also execute opponent mulligan locally
-              if (!systemState.isTwoPlayer && oppMulliganned) {
-                appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
-                shuffleAndDraw('opp', 'opp', 7, null, true);
-              }
-              // In 2P, the opponent's client handles their own mulligan independently.
-
-              // Bonus draws (1 per mulligan)
-              if (selfMulliganned) {
-                // Opponent draws 1 bonus card
-                if (systemState.isTwoPlayer && rulesSocket) {
-                  rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
-                } else {
-                  appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
-                  draw('opp', 'opp', 1, true);
+                // Execute self mulligan. Awaiting it lets the zone settle (hand
+                // emptied, reshuffled, redrawn) before the next round re-checks.
+                if (selfMulliganned) {
+                  appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
+                  await shuffleAndDraw('self', 'self', 7, null, true);
                 }
-              }
 
-              if (oppMulliganned && !systemState.isTwoPlayer) {
-                // 1P: self draws bonus (opponent mulliganned)
-                appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
-                draw('self', 'self', 1, true);
+                // In 1P, also execute opponent mulligan locally.
+                if (!systemState.isTwoPlayer && oppMulliganned) {
+                  appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
+                  await shuffleAndDraw('opp', 'opp', 7, null, true);
+                }
+                // In 2P, the opponent's client handles their own mulligan independently.
+
+                // Bonus draws (1 per mulligan this round).
+                if (selfMulliganned) {
+                  // Opponent draws 1 bonus card.
+                  if (systemState.isTwoPlayer && rulesSocket) {
+                    rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
+                  } else {
+                    appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
+                    draw('opp', 'opp', 1, true);
+                  }
+                }
+
+                if (oppMulliganned && !systemState.isTwoPlayer) {
+                  // 1P: self draws bonus (opponent mulliganned).
+                  appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
+                  draw('self', 'self', 1, true);
+                }
+                // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
               }
-              // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
             } catch (e) {
               console.error('Mulligan execution error:', e);
             }
