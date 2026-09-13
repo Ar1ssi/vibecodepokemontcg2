@@ -14,6 +14,12 @@ import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch 
 import { countBenchPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
 import { buildMatPickEntry, findMatPickHit } from './mat-pick.mjs';
+import {
+  selfContainer,
+  oppContainer,
+  selfContainerDocument,
+  oppContainerDocument,
+} from '../../state.js';
 
 const STATUS_KEY = {
   Burned: 'burned',
@@ -237,42 +243,77 @@ function openMatPick({ title, candidates, onPick, onCancel }) {
   banner.append(label, cancelBtn);
   document.body.appendChild(banner);
 
-  const restore = entries.map(({ targetEl, img }) => [
-    targetEl,
-    targetEl?.style?.outline,
-    targetEl?.style?.outlineOffset,
-    targetEl?.style?.cursor,
-    img?.draggable,
-  ]);
-  for (const { targetEl, img } of entries) {
-    if (targetEl?.style) {
-      targetEl.style.outline = '4px solid #ffd23f';
-      targetEl.style.outlineOffset = '2px';
-      targetEl.style.cursor = 'pointer';
+  const restoreElements = new Map();
+  const getRestore = (el) => {
+    if (!restoreElements.has(el)) {
+      restoreElements.set(el, {
+        outline: el.style?.outline,
+        outlineOffset: el.style?.outlineOffset,
+        cursor: el.style?.cursor,
+        draggable: el.draggable,
+      });
     }
-    if (img) img.draggable = false;
-  }
-
-  const cleanup = () => {
-    document.removeEventListener('click', onDocClick, true);
-    document.removeEventListener('keydown', onKeyDown, true);
-    banner.remove();
-    for (const [targetEl, outline, outlineOffset, cursor, draggable] of restore) {
-      if (targetEl?.style) {
-        targetEl.style.outline = outline;
-        targetEl.style.outlineOffset = outlineOffset;
-        targetEl.style.cursor = cursor;
-      }
-      const entry = entries.find((e) => e.targetEl === targetEl);
-      if (entry?.img) entry.img.draggable = draggable;
-    }
+    return restoreElements.get(el);
   };
 
+  for (const { targetEl, img } of entries) {
+    if (targetEl) {
+      getRestore(targetEl);
+      if (targetEl.style) {
+        targetEl.style.outline = '4px solid #ffd23f';
+        targetEl.style.outlineOffset = '2px';
+        targetEl.style.cursor = 'pointer';
+      }
+    }
+    if (img) {
+      getRestore(img);
+      if (img.style && img !== targetEl) {
+        img.style.outline = '4px solid #ffd23f';
+        img.style.outlineOffset = '2px';
+        img.style.cursor = 'pointer';
+      }
+      img.draggable = false;
+    }
+  }
+
+  const targetDocs = new Set();
+  if (typeof document !== 'undefined' && document) targetDocs.add(document);
+  try {
+    if (selfContainerDocument) targetDocs.add(selfContainerDocument);
+  } catch {}
+  try {
+    if (oppContainerDocument) targetDocs.add(oppContainerDocument);
+  } catch {}
+  try {
+    if (selfContainer?.contentWindow?.document) targetDocs.add(selfContainer.contentWindow.document);
+  } catch {}
+  try {
+    if (oppContainer?.contentWindow?.document) targetDocs.add(oppContainer.contentWindow.document);
+  } catch {}
+
+  for (const entry of entries) {
+    if (entry.targetEl?.ownerDocument) targetDocs.add(entry.targetEl.ownerDocument);
+    if (entry.img?.ownerDocument) targetDocs.add(entry.img.ownerDocument);
+    if (entry.container?.ownerDocument) targetDocs.add(entry.container.ownerDocument);
+  }
+
+  const directTargets = new Set();
+  for (const entry of entries) {
+    if (entry.targetEl) directTargets.add(entry.targetEl);
+    if (entry.img) directTargets.add(entry.img);
+    if (entry.container) directTargets.add(entry.container);
+  }
+
+  let resolved = false;
   const finish = (card) => {
+    if (resolved) return;
+    resolved = true;
     cleanup();
     onPick(card);
   };
   const cancel = () => {
+    if (resolved) return;
+    resolved = true;
     cleanup();
     onCancel?.();
   };
@@ -289,6 +330,16 @@ function openMatPick({ title, candidates, onPick, onCancel }) {
     event.stopPropagation();
     if (hitCard) finish(hitCard);
   };
+
+  const onDirectClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const hitCard =
+      findMatPickHit(entries, event.currentTarget) ||
+      findMatPickHit(entries, event.target);
+    if (hitCard) finish(hitCard);
+  };
+
   const onKeyDown = (event) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -296,8 +347,43 @@ function openMatPick({ title, candidates, onPick, onCancel }) {
     }
   };
 
-  document.addEventListener('click', onDocClick, true);
-  document.addEventListener('keydown', onKeyDown, true);
+  const cleanup = () => {
+    for (const doc of targetDocs) {
+      try {
+        doc.removeEventListener('click', onDocClick, true);
+        doc.removeEventListener('keydown', onKeyDown, true);
+      } catch {}
+    }
+    for (const el of directTargets) {
+      try {
+        el.removeEventListener('click', onDirectClick, true);
+      } catch {}
+    }
+    banner.remove();
+    for (const [el, saved] of restoreElements) {
+      if (el.style) {
+        if (saved.outline !== undefined) el.style.outline = saved.outline;
+        if (saved.outlineOffset !== undefined) el.style.outlineOffset = saved.outlineOffset;
+        if (saved.cursor !== undefined) el.style.cursor = saved.cursor;
+      }
+      if (saved.draggable !== undefined) {
+        el.draggable = saved.draggable;
+      }
+    }
+  };
+
+  for (const doc of targetDocs) {
+    try {
+      doc.addEventListener('click', onDocClick, true);
+      doc.addEventListener('keydown', onKeyDown, true);
+    } catch {}
+  }
+
+  for (const el of directTargets) {
+    try {
+      el.addEventListener('click', onDirectClick, true);
+    } catch {}
+  }
 }
 
 function openMultiPickOnly({ title, candidates, count, onConfirm, onCancel, user = _effectOwner || 'self', triggerCard = null, allCandidates = null, upTo = false }) {
@@ -1316,12 +1402,16 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           );
           if (!basics.length) {
             msg('  no Basic Pokémon in play');
-            break;
+            onComplete?.();
+            return;
           }
           openMatPick({
             title: `${card.name} — click a Basic Pokémon on your mat to evolve`,
             candidates: basics,
-            onCancel: () => msg('  Rare Candy canceled'),
+            onCancel: () => {
+              msg('  Rare Candy canceled');
+              onComplete?.();
+            },
             onPick: async (base) => {
               const hand = zone(_effectOwner, 'hand');
               const options = [];
@@ -1341,17 +1431,24 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               if (!options.length) {
                 if (rejectionReason) msg(`  ⛔ ${rejectionReason}`);
                 else msg('  no Stage 2 in hand that evolves from that Basic');
+                onComplete?.();
                 return;
               }
               openPickOnly({
                 title: `${card.name} — choose Stage 2`,
                 candidates: options,
                 user: _effectOwner,
-                onCancel: () => msg('  evolution canceled'),
+                onCancel: () => {
+                  msg('  evolution canceled');
+                  onComplete?.();
+                },
                 onPick: async (evo) => {
                   const loc = pokemonZoneEntry(_effectOwner, base);
                   const handIdx = hand.array.indexOf(evo);
-                  if (!loc || handIdx < 0) return;
+                  if (!loc || handIdx < 0) {
+                    onComplete?.();
+                    return;
+                  }
                   const success = await moveCardBundle(
                     _effectOwner,
                     _effectOwner,
@@ -1368,26 +1465,32 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                   } else {
                     msg(`  ⛔ Rare Candy could not evolve ${base.name}`);
                   }
+                  runAt(idx + 1);
                 },
               });
             },
           });
-          break;
+          return;
         }
         case 'devolve': {
           const psychicOnly = String(step.target || '').includes('{P}');
           findEvolvedPokemon(_effectOwner, psychicOnly).then((targets) => {
             if (!targets.length) {
               msg('  no evolved Pokémon to devolve');
+              onComplete?.();
               return;
             }
             openMatPick({
               title: `${card.name} — click a Pokémon to devolve`,
               candidates: targets,
-              onPick: (t) => devolvePokemon(_effectOwner, t),
+              onCancel: () => onComplete?.(),
+              onPick: (t) => {
+                devolvePokemon(_effectOwner, t);
+                runAt(idx + 1);
+              },
             });
           });
-          break;
+          return;
         }
         case 'discardTools': {
           (async () => {

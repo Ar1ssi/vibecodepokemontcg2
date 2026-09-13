@@ -4,7 +4,7 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 111
+Session: 112
 Focus: patch (abilities) — fix Meowth ex Last-Ditch Catch search destination routing
 Active: done. `parseAbilitySearchParams` previously inspected `lower.includes('onto your bench')`
   across the full ability string, falsely routing searched cards to 'bench' on "when you play this
@@ -32,6 +32,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S111 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
-- S110 2026-09-13 fix: support EX/ex Pokémon in evolution chains, Rare Candy, and stadium searches.
-- S109 2026-09-13 fix: resolved Rare Candy mat pick GUI failing to advance to evolution selection.
+- S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
+- S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.
+- S110 2026-09-13 fix: supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.
