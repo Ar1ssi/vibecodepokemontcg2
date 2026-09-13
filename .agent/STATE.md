@@ -4,15 +4,15 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 111
-Focus: fix (rules-ui) — Rare Candy iframe mat click detection & async step flow
-Active: done. Clicks on Pokémon in play (Swinub) failed during Rare Candy because openMatPick only
-  attached event listeners to the top-level document, missing clicks in iframe playmats
-  (selfContainerDocument/oppContainerDocument). Secondarily, evolveStage2 ended with `break;` rather
-  than `return;`, causing immediate premature discard of Rare Candy before user interaction.
-  Fixed by wiring multi-document listeners, direct element capture listeners, style restoration via Map,
-  and proper return/callback sequencing for evolveStage2 and devolve. 1327 unit tests passing.
-Next: verify in live two-player game by playing Rare Candy on Swinub to evolve into Mamoswine ex.
+Session: 112
+Focus: patch (abilities) — fix Meowth ex Last-Ditch Catch search destination routing
+Active: done. `parseAbilitySearchParams` previously inspected `lower.includes('onto your bench')`
+  across the full ability string, falsely routing searched cards to 'bench' on "when you play this
+  Pokémon from your hand onto your Bench" triggers. `move-card.js` blocked Supporters/Items from being
+  placed on bench, causing cards to stay in the deck when shuffled. Scoped destination parsing to the
+  search clause and stripped trigger phrasing in `shared/engine/rules/abilities.mjs`. Added regression
+  test in `shared/engine/rules/__tests__/evolution.test.mjs`. Tests pass.
+Next: verify in live multiplayer match.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -32,6 +32,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S112 2026-09-13 patch: scoped ability search destination parsing away from played-to-bench triggers (Meowth ex).
+- S111 2026-09-13 fix: resolved Rare Candy failing to evolve Swinub / mat clicks doing nothing in iframes.
 - S110 2026-09-13 fix: supported EX/ex Pokémon in evolution chains, Rare Candy jumps, and stadium searches.
-- S109 2026-09-13 fix: resolved Rare Candy GUI failing on holo cards by matching outer targetEl and container.
-- S108 2026-09-13 patch: aligned holo spring physics and math with simeydotme/pokemon-cards-151.
