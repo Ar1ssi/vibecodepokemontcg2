@@ -5,27 +5,27 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 132
-Focus: patch — add user-supplied Groudon art as a selectable mat; double-click an attached card
-  now shows its energies/tools beside it, draggable.
-Active: done, uncommitted. Mat: copied art into client/src/assets/playmats/custom/groudon-{edge-
-  to-edge,full-size-edge-to-edge}.jpg; added two entries to mats-catalog.mjs mirroring the
-  existing custom Kyogre entries (one-player + two-player, fit: cover, overlay: true) — picks up
-  automatically in the Customize > Mat picker, no other code touched.
-  Mat art corrected mid-session (user caught a duplicate-of-Kyogre mistake): now the actual
-  fire-type wallpaper PNG, ids/titles renamed to "Fire Type".
+Focus: patch — Fire Type custom mat; double-click an attached card shows its energies/tools as
+  further carousel slides (read-only), reachable by scrolling/swiping.
+Active: pushed to main (c56756e), 3 commits ahead of a8e6b11. Mat: art copied into
+  client/src/assets/playmats/custom/fire-type-{edge-to-edge,full-size-edge-to-edge}.png, two
+  entries in mats-catalog.mjs (one-player + two-player), mirroring the existing custom Kyogre
+  entries — auto-picked-up in the Customize > Mat picker, no other code touched.
   Double-click: click-events.js doubleClick() branches on mouseClick.card.attachedCards.length for
-  active/bench — if attached, opens a read-only openCarouselViewer (card-picker.js, same PTCG-Live
-  carousel the discard-pile viewer uses) with candidates = [card, ...card.attachedCards], so the
-  zoom itself is unchanged and scrolling right pages through the attached energies/tools, left
-  returns to the main card. No drag-out mid-preview (close first) — user confirmed this tradeoff
-  over building a second real-draggable mechanism. openAttachedCardsPanel (full-view.js) is back
-  to right-click-menu-only, untouched. No-attachment and hand cards keep the plain zoom.
-  First cut (right-click-panel reuse) was rejected by the user before push and redone per above.
-Next: user to eyeball the Fire Type mat and the double-click carousel on localhost (this session
-  does not drive the Browser pane for CSS/visual checks, per standing preference). If liked,
-  commit (one commit ded94f5 already made both mat+attach changes together, superseded by the
-  carousel redesign — squash or amend before push per user's call) and push to main.
-Blocked: none — awaiting user's localhost check before push.
+  active/bench — if attached, opens a read-only openCarouselViewer (card-picker.js; same PTCG-Live
+  carousel the discard-pile viewer uses) instead of the plain openCardPreview zoom. Candidates =
+  [...attachedCards, mainCard] with initialIndex = attachedCards.length — card-picker.js's
+  computeSlideLayout puts higher-index slides to the LEFT (`virtualIndex - slideIndex`), so
+  attachments must sit at lower indices than the focused main card to land on its right. Energy
+  slides read the full card art from dataset.energyCardSrc (attach-card.js stashes it there and
+  swaps the board <img> to the round token icon) instead of the live icon src; the board element
+  itself is never touched, so it's back to the icon on close automatically. No drag-out
+  mid-preview by agreed tradeoff — close first to move a card. openAttachedCardsPanel
+  (full-view.js) is untouched, still right-click-menu-only. No-attachment and hand cards keep the
+  plain zoom. node --test deck-builder core 36/36 green throughout; DOM-coupled click path has no
+  headless coverage in this repo (MAP.md note) — user verified each iteration on localhost.
+Next: none pending.
+Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
 - `node_modules` needs `pnpm install` fresh each new sandbox session (not persisted). Playwright's
@@ -35,14 +35,14 @@ Blocked: none — awaiting user's localhost check before push.
   legacy-only fix to a server-authoritative prod (D17).
 - `pnpm lint` fails repo-wide on pre-existing CRLF line endings + `no-undef` globals on `.mjs`
   files (eslint.config only targets `**/*.js`) — verify a diff's own files with `npx eslint <files>`.
-- Never put `perspective`/`transform`/`filter` on an iframe's `<html>`: the root is ~8px tall and
-  becomes the containing block of every `position: fixed` zone, so the board collapses (S131). The
-  tilt lives on `#playfield`, whose fixed children now resolve against it (intended).
+- card-picker.js's carousel indexes slides RIGHT-TO-LEFT (`virtualIndex - slideIndex`, positive =
+  left) — counterintuitive; any new caller must order candidates accordingly (S132).
 - Catch-up replay sets `systemState.isCatchingUp`; `syncReplaying` is never set anywhere. Gate
   animations on `isCatchingUp`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S132 2026-09-15 patch: Fire Type custom mat; double-click attached card opens read-only
+  carousel of its energies/tools (full art, correct side). Pushed c56756e.
 - S131 2026-09-14 review+patch: design 009 build fixed + merged to main (collapse, hand, tilt sign,
   replay gate, deck stack, mat sizing).
 - S130 2026-09-14 feature: design 009 slices 1-6 built, unverified, uncommitted.
-- S129 2026-09-14 merge: SERVER_AUTHORITATIVE bot verification (9/9) + PR #128; branch to main.
