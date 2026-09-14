@@ -1959,6 +1959,113 @@ ul, li {
   pointer-events: none;
 }
 
+/* TCG Live-style attack selection overlay (design 008). Zones mount inside
+   .card-preview-face--front, positioned against the rendered content box
+   computed by attack-zone-geometry.js (R4 handles the letterbox math). */
+.attack-zone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  backdrop-filter: blur(2px);
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  text-align: center;
+}
+.attack-zone--usable {
+  cursor: pointer;
+  border-color: rgba(255, 214, 92, 0.55);
+  background: rgba(255, 214, 92, 0.08);
+  animation: attack-glow 1.6s ease-in-out infinite;
+}
+.attack-zone--usable:hover {
+  background: rgba(255, 214, 92, 0.22);
+  border-color: rgba(255, 214, 92, 0.9);
+}
+.attack-zone--unusable {
+  cursor: default;
+  pointer-events: auto;
+}
+.attack-zone-label {
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.attack-preview-empty {
+  position: static;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+@keyframes attack-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(255, 214, 92, 0.35); }
+  50% { box-shadow: 0 0 10px 3px rgba(255, 214, 92, 0.6); }
+}
+
+.attack-preview-actions {
+  position: fixed;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 2401;
+}
+.attack-preview-btn {
+  flex: 1;
+  max-width: 160px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.4rem;
+  background: rgba(20, 24, 34, 0.55);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.attack-preview-btn:hover {
+  background: rgba(20, 24, 34, 0.8);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.attack-preview-btn--retreat:hover { border-color: rgba(255, 153, 102, 0.8); }
+.attack-preview-btn--pass:hover { border-color: rgba(120, 200, 255, 0.8); }
+
+/* Ability zones (design 008 D5/D6) — wired starting slice 5; styles land now
+   so both slices share one CSS pass. */
+.ability-zone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  backdrop-filter: blur(2px);
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  text-align: center;
+}
+.ability-zone--usable {
+  cursor: pointer;
+  border-color: rgba(120, 200, 255, 0.55);
+  background: rgba(120, 200, 255, 0.08);
+  animation: attack-glow 1.6s ease-in-out infinite;
+}
+.ability-zone--usable:hover {
+  background: rgba(120, 200, 255, 0.22);
+  border-color: rgba(120, 200, 255, 0.9);
+}
+.ability-zone--unusable {
+  cursor: default;
+  pointer-events: auto;
+}
+
 /* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */
 .discard-pile-overlay {
   position: fixed;

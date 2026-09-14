@@ -8,14 +8,74 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 |---|---|---|---|
 | 1 | done (uncommitted) | — | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
 | 2 | done (uncommitted) | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
-| 3 | **next** | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
-| 4 | todo | — | `click-events.js` gating + sidebox button routing |
+| 3 | done (uncommitted) | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
+| 4 | **next** | — | `click-events.js` gating + sidebox button routing |
 | 5 | todo | — | Ability zones (D5) + bench overlay wiring (D6) |
 | 6 | todo | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
 
 > [!IMPORTANT]
 > Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
 > slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+
+## S71 — slice 3 done
+
+Built Component 1 core (attack zones + Retreat/Pass only — abilities and the bench overlay are
+slice 5's job, per the work plan) and Component 6 CSS.
+
+**New `client/src/setup/rules/attack-zone-geometry.js`** — pure, DOM-free geometry (R9): `
+attackZoneBounds`/`listAttackZoneBounds` divide the ~52%-85% attack band into `attackCount` equal
+shares and shift the whole band down per `abilityCount` (D3, D5's shift); `abilityZoneBounds`
+returns the band just above it (unused by any DOM code yet — slice 5 wires it, styles already
+exist per Component 6); `computeContentBox` implements R4's letterbox math — `cover`/no-natural-size
+returns the full box (the mat-holo path, whose CSS already forces it to 100%/100%), `contain`
+computes the actual visible rectangle from `naturalWidth`/`naturalHeight` so zone percentages land
+on the artwork instead of the pillar/letterbox bars the plain-`<img>` path can have.
+
+**New `client/src/setup/rules/attack-preview.js`** — `openAttackPreview(card, targetImage, { zone
+})`, `closeAttackPreview()`, `isAttackPreviewOpen()`. Calls slice 2's `openFloatingCardPreview`
+with `interactive: true` and hooks `onOpened`'s `whenOpened` promise (R6 — zones only ever mount
+after the pop animation *finishes*, never at DOM mount, so a mid-spin click can't hit one).
+`renderZones()` re-derives energy/cost via `resolveAttackContext` + `listUsableActions` exactly
+like the panel did, minus R7's `appendMessage` inheritance announcement (dropped for good, not
+rehomed — Component 5's own note says fold it into I43 once the panel goes in slice 6). Usable
+attacks get `.attack-zone--usable` (glow) and a click handler that closes the preview and calls
+`attack(rulesState.turnPlayer, true, idx)`; unpayable/once-used ones get `.attack-zone--unusable`
+(plain, inert, `title` = the `reason` string) per D4. R11's diagnostic (`console.warn` + the
+visible `id=… · data not loaded` hint) is carried over verbatim for the 0-attacks case. Retreat/Pass
+buttons mount as siblings in `.card-preview-overlay` (not inside the card face, per R5 — the face
+has `overflow:hidden`) and call `retreat('self')`/`pass('self')`, matching the sidebox convention.
+
+**R12 (re-render while open):** subscribes to the same 6 board-mutation events the panel used
+(minus the panel's own `rules-turn-began`/`rules-session-reset`, which close the overlay instead)
+and re-renders zones in place — but only once `zonesReady` (i.e. after `whenOpened` resolved), so
+an event firing mid-animation can't race the zone mount. `rules-turn-began`/`rules-session-reset`
+close the overlay outright (E13). Listeners are added in `onOpened` and torn down in `onClosed` —
+no listener survives a close.
+
+Bench overlays (`zone: 'bench'`): `renderZones` returns immediately with nothing rendered (no
+attack zones, no ability zones yet — D6's ability-only bench overlay is slice 5). The function
+accepts and stores `zone` now so slice 5 doesn't need to touch this file's call signature.
+
+**Component 6 CSS** added to `index.css` (`.attack-zone`, `.attack-zone--usable/--unusable`,
+`.attack-zone-label`, `.attack-preview-actions`, `.attack-preview-btn` + modifiers,
+`@keyframes attack-glow`) plus the `.ability-zone` variants up front since they're the same shapes
+— unused until slice 5 wires them, same pattern as the geometry file's unused `abilityZoneBounds`.
+Did **not** touch `#rulesAttackWindow`/`.rules-aw-*` — that deletion is Component 5/slice 6, and
+the panel is still the only working attacks UI until slice 5 lands (per the ledger's own warning).
+
+New `client/src/setup/rules/__tests__/attack-zone-geometry.test.mjs` (12 tests): 0/1/2/3-attack
+band division, non-overlap, ability-shift, out-of-range index, ability-zone presence/absence and
+placement above the attack band, and `computeContentBox`'s cover/missing-size/both-letterbox-
+directions/exact-match cases. Registered in `package.json`'s explicit test list (added after
+`mat-pick.test.mjs`, same directory).
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint tests."
+`pnpm test` (baseline 1334/1337 → expect 1346/1349 with these 12 new tests, same 3 pre-existing
+TCGdex-network failures) and `npx eslint` on the 3 touched/new JS files plus `index.css` are still
+owed before slice 4 starts. Manual verification (`pnpm start`) not done either — `openAttackPreview`
+has **no call site yet** (Component 4/slice 4 wires `click-events.js` to call it), so nothing in
+the running app changed this session; the Attack Window panel is untouched and still the only way
+to attack today. Everything uncommitted, no branch, matching S69/S70's pattern.
 
 ## S70 — slice 2 done
 
