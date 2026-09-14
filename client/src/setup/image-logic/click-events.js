@@ -313,10 +313,26 @@ export const doubleClick = (event) => {
       // pile viewer) — scroll/swipe right to see them, left to return to
       // the main card. Read-only: dragging one out means closing first.
       if (mouseClick.card?.attachedCards?.length) {
+        // Attached Energy is rendered on the mat as a small round token
+        // (attach-card.js swaps image.src to the icon and stashes the full
+        // card art in dataset.energyCardSrc) — show the real card art in the
+        // carousel slide, then revert automatically since we never touch the
+        // board's own <img>, just a read-only stand-in object here.
+        // Carousel slide N sits to the right of slide N+1 (higher index =
+        // further left, see computeSlideLayout's `virtualIndex - slideIndex`),
+        // so the attached cards go BEFORE the main card in the array to land
+        // on its right, with initialIndex pointing at the main card's slot.
+        const attachedSlides = mouseClick.card.attachedCards.map((attached) => {
+          const fullArtSrc = attached.image?.dataset?.energyCardSrc;
+          return fullArtSrc
+            ? { ...attached, image: { src: fullArtSrc } }
+            : attached;
+        });
+        const carouselCards = [...attachedSlides, mouseClick.card];
         openCarouselViewer({
           title: mouseClick.card.name || 'Attached Cards',
-          candidates: [mouseClick.card, ...mouseClick.card.attachedCards],
-          initialIndex: 0,
+          candidates: carouselCards,
+          initialIndex: attachedSlides.length,
         });
       } else {
         openCardPreview(targetImage, mouseClick.card);
