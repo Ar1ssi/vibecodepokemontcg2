@@ -27,6 +27,7 @@ import {
 } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { rulesState, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
+import { benchCardHasAbility } from '/shared/engine/rules/collect-usable-abilities.mjs';
 import { shouldOpenAttackPreview } from '../rules/attack-preview-gate.js';
 import { openAttackPreview } from '../rules/attack-preview.js';
 
@@ -274,12 +275,16 @@ export const imageClick = (event) => {
         zoneId: mouseClick.zoneId,
         cardUser: mouseClick.cardUser,
         hasSelectHighlight: false,
-        // Bench ability zones land in slice 5 — no predicate to feed yet.
-        hasAbility: false,
+        hasAbility:
+          mouseClick.zoneId === 'bench' ? benchCardHasAbility(mouseClick.card) : false,
         gate: canPerformAction({ user: mouseClick.cardUser, action: 'attack' }),
       });
       if (decision === 'attack' && mouseClick.card?.image) {
         openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'active' });
+        return;
+      }
+      if (decision === 'ability' && mouseClick.card?.image) {
+        openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'bench' });
         return;
       }
     }

@@ -14,7 +14,9 @@ import {
 } from '/shared/engine/rules/rules-state.mjs';
 import { resolveAttackContext } from '/shared/engine/rules/resolve-attack-context.mjs';
 import { listUsableActions } from '/shared/engine/rules/attack-window.mjs';
+import { benchCardHasAbility } from '/shared/engine/rules/collect-usable-abilities.mjs';
 import { attack, retreat, pass } from '../../actions/chat-buttons/chat-buttons.js';
+import { runAbilitySteps } from './rules-bridge.js';
 import {
   openFloatingCardPreview,
   closeCardPreview,
@@ -22,7 +24,11 @@ import {
 } from '../image-logic/full-view.js';
 import { toHighResCardImageUrl } from '../image-logic/card-image-url.mjs';
 import { imageAnchor, cardNode } from '../deck-constructor/hydrate-holo.js';
-import { listAttackZoneBounds, computeContentBox } from './attack-zone-geometry.js';
+import {
+  listAttackZoneBounds,
+  abilityZoneBounds,
+  computeContentBox,
+} from './attack-zone-geometry.js';
 
 const ENERGY_SYMBOLS = {
   Colorless: '⚪',
@@ -77,6 +83,48 @@ const contentBoxFor = (popHost) => {
     naturalHeight: img.naturalHeight,
     fit: 'contain',
   });
+};
+
+/**
+ * D5/D6/R10: a card's ability, whether or not it's usable right now — an
+ * already-used once-per-turn ability still renders (plain/inert per D4)
+ * rather than being hidden, so `collectUsableAbilityCandidates`'s
+ * pre-filtered list can't be reused here (R10).
+ */
+const abilityInfoFor = (card) => {
+  if (!benchCardHasAbility(card)) return null;
+  const used = abilityUsed('self', card);
+  return {
+    name: card.ability?.name || 'Ability',
+    usable: !used,
+    reason: used ? 'Already used this turn' : null,
+  };
+};
+
+const buildAbilityZoneEl = (abilityInfo, bounds, contentBox, card) => {
+  const el = document.createElement('div');
+  el.className = `ability-zone ${abilityInfo.usable ? 'ability-zone--usable' : 'ability-zone--unusable'}`;
+  el.style.left = `${contentBox.left}px`;
+  el.style.width = `${contentBox.width}px`;
+  el.style.top = `${contentBox.top + (bounds.topPct / 100) * contentBox.height}px`;
+  el.style.height = `${(bounds.heightPct / 100) * contentBox.height}px`;
+  if (abilityInfo.reason) el.title = abilityInfo.reason;
+
+  const label = document.createElement('div');
+  label.className = 'attack-zone-label';
+  label.textContent = `Ability: ${abilityInfo.name}`;
+  el.appendChild(label);
+
+  if (abilityInfo.usable) {
+    el.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      // D5/R12: using an ability does not end the turn — the overlay stays
+      // open and re-renders itself once the resulting board event fires.
+      runAbilitySteps('self', card);
+    });
+  }
+  return el;
 };
 
 const buildAttackZoneEl = (zoneAction, bounds, contentBox) => {
@@ -159,12 +207,31 @@ const emptyStateEl = (card) => {
 async function renderZones({ popHost, overlay, card }) {
   if (!previewState) return;
 
-  popHost.querySelectorAll('.attack-zone, .attack-preview-empty').forEach((el) => el.remove());
+  popHost
+    .querySelectorAll('.attack-zone, .ability-zone, .attack-preview-empty')
+    .forEach((el) => el.remove());
   overlay.querySelectorAll('.attack-preview-actions').forEach((el) => el.remove());
 
+  const face = popHost.querySelector('.card-preview-face--front');
+  const contentBox = contentBoxFor(popHost);
+  const abilityInfo = abilityInfoFor(card);
+  const abilityCount = abilityInfo ? 1 : 0;
+
+  const renderAbilityZone = () => {
+    if (!abilityInfo) return;
+    const bounds = abilityZoneBounds({ abilityCount });
+    if (!bounds) return;
+    face.appendChild(buildAbilityZoneEl(abilityInfo, bounds, contentBox, card));
+  };
+
   // A benched Pokémon cannot attack (D6) — its overlay gets ability zones
-  // only, which is slice 5's job. Nothing to render here yet.
-  if (previewState.zone === 'bench') return;
+  // only.
+  if (previewState.zone === 'bench') {
+    renderAbilityZone();
+    return;
+  }
+
+  renderAbilityZone();
 
   try {
     await ensureCardData(card);
@@ -195,9 +262,7 @@ async function renderZones({ popHost, overlay, card }) {
     priorAttacks,
   });
 
-  const face = popHost.querySelector('.card-preview-face--front');
-  const contentBox = contentBoxFor(popHost);
-  const bounds = listAttackZoneBounds({ attackCount: atkList.length, abilityCount: 0 });
+  const bounds = listAttackZoneBounds({ attackCount: atkList.length, abilityCount });
 
   if (!atkList.length) {
     face.appendChild(emptyStateEl(card));
