@@ -30,6 +30,7 @@ import {
   applyView,
   setDefaultNetcodeContext,
   resetRenderState,
+  getLastRenderedVersion,
 } from '../../setup/netcode/apply-view.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-table.js';
@@ -130,6 +131,10 @@ const startSyncCheckHeartbeat = () => {
       // flag is on (guard above), so the renderer's own view cache is
       // always the live source here.
       zones: computeSyncCheckZones('self', viewBackedGetZone),
+      // I42: the version the zones above were hashed from, so the server can
+      // tell a command landing between hash and compare (stale by design)
+      // apart from a real divergence instead of reporting both as 'desync'.
+      stateVersion: getLastRenderedVersion(),
     });
   }, SYNC_CHECK_INTERVAL_MS);
 };

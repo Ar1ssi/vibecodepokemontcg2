@@ -3,6 +3,7 @@ import {
       fetchGenerationSets,
       fetchSetCards,
       filterCardsByName,
+      filterCardsBySupertype,
       sortCardsWithinGroup,
       GENERATIONS,
     } from '../../../setup/deck-builder/core/set-browser.mjs';
@@ -52,6 +53,9 @@ import {
       };
 
       let filterTerm = '';
+      // Driven externally by the deck builder's Pokémon/Trainers/Energy
+      // summary-bar buttons (setSupertypeFilter) — null/'pokemon'/'trainer'/'energy'.
+      let supertypeFilter = null;
       let expandedSetId = null;
       let activeCategory = 'standard';
       const cardsBySet = new Map(); // setId -> Card[] (loaded lazily)
@@ -114,8 +118,11 @@ import {
             const safeName = escapeHtml(card.name);
             const safeThumb = escapeHtml(thumb);
             const safePreview = escapeHtml(preview);
+            const displayTitle = card.rarity === 'Reverse Holo'
+              ? `${safeName} (Reverse Holo)`
+              : safeName;
             return [
-              `<button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}"${preview ? ` data-preview-image="${safePreview}"` : ''} title="${safeName}">`,
+              `<button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}"${preview ? ` data-preview-image="${safePreview}"` : ''} title="${displayTitle}">`,
               `  <img src="${safeThumb}" alt="${safeName}" class="native-deck-builder-result-image" loading="lazy" />`,
               quantities[card.id] > 0 ? `  <span class="native-deck-builder-result-qty">${quantities[card.id]}</span>` : '',
               '  <span class="native-deck-builder-result-text">',
@@ -155,7 +162,8 @@ import {
           return;
         }
 
-        const isFiltering = String(filterTerm || '').trim() !== '';
+        const hasNameFilter = String(filterTerm || '').trim() !== '';
+        const isFiltering = hasNameFilter || Boolean(supertypeFilter);
         const dropdownSections = [];
 
         const buildTabsFor = (groupSets) => {
@@ -166,7 +174,7 @@ import {
             if (expanded || isFiltering) {
               const cards = cardsBySet.get(set.setId);
               if (cards) {
-                const filtered = filterCardsByName(cards, filterTerm);
+                const filtered = filterCardsBySupertype(filterCardsByName(cards, filterTerm), supertypeFilter);
                 if (isFiltering) {
                   expanded = filtered.length > 0;
                 }
@@ -352,6 +360,7 @@ import {
         const target = event.target.closest('[data-preview-image]');
         if (!target) return;
         event.preventDefault();
+        event.stopPropagation();
         const cardId = target.closest('[data-card-id]')?.dataset.cardId;
         const card = cardId ? findCardById(cardId) : null;
         onPreviewCard?.(target.dataset.previewImage, card, target);
@@ -364,6 +373,13 @@ import {
           categoryState.clear();
           cardsBySet.clear();
           load();
+        },
+        // Called by the deck builder when a summary-bar segment is
+        // clicked/toggled — null clears the filter.
+        setSupertypeFilter: (supertype) => {
+          if (supertypeFilter === supertype) return;
+          supertypeFilter = supertype;
+          render();
         },
       };
     };

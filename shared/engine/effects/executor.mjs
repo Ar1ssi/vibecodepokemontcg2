@@ -381,6 +381,74 @@ export function executeSteps(draft, {
         break;
       }
 
+      case 'ionoShuffle': {
+        const actors = [player];
+        if (opponent) actors.push(opponent);
+
+        const initialHandCounts = new Map();
+        for (const p of actors) {
+          const hand = (p.zones.hand || []).filter((c) => c.instanceId !== sourceCard?.instanceId);
+          initialHandCounts.set(p.playerId, hand.length);
+        }
+
+        const hasTrailingDraw = steps.some((s) => s.type === 'draw' || s.type === 'opponentDraw');
+        const isPrizeDraw = step.drawPrizes !== false && (!hasTrailingDraw || /iono/i.test(sourceCard?.name || ''));
+        const isBottom = step.bottom || /iono/i.test(sourceCard?.name || '') || isPrizeDraw;
+
+        for (const p of actors) {
+          const hand = p.zones.hand || [];
+          const count = hand.length;
+          if (count > 0) {
+            const returned = hand.splice(0, count);
+            if (activeRng) activeRng.shuffle(returned);
+            if (isBottom) {
+              (p.zones.deck || []).push(...returned);
+              events.push({
+                type: 'cardsMovedToDeckBottom',
+                count,
+                playerId: p.playerId,
+              });
+            } else {
+              (p.zones.deck || []).push(...returned);
+              if (activeRng) activeRng.shuffle(p.zones.deck);
+              events.push({
+                type: 'cardsShuffledIntoDeck',
+                count,
+                playerId: p.playerId,
+              });
+            }
+          }
+        }
+
+        if (isPrizeDraw) {
+          const initiatorHandCount = initialHandCounts.get(playerId) || 0;
+          const oppHandCount = opponent ? (initialHandCounts.get(opponent.playerId) || 0) : 0;
+          const anyPut = initiatorHandCount > 0 || oppHandCount > 0;
+
+          if (anyPut) {
+            for (const p of actors) {
+              if (p.playerId === playerId && initiatorHandCount === 0) {
+                continue;
+              }
+              const prizeCount = (p.zones.prizes || []).length;
+              const deck = p.zones.deck || [];
+              const drawCount = Math.min(prizeCount, deck.length);
+              if (drawCount > 0) {
+                const drawn = deck.splice(0, drawCount);
+                (p.zones.hand || []).push(...drawn);
+                events.push({
+                  type: 'cardsDrawn',
+                  count: drawCount,
+                  playerId: p.playerId,
+                  cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+                });
+              }
+            }
+          }
+        }
+        break;
+      }
+
       case 'switchOwn':
       case 'switchAbility':
       case 'switch': {

@@ -6,6 +6,24 @@
     
     const MEGA_EVOLUTION_SLEEVES = [
   {
+    "id": "primal-groudon-etb-sleeve",
+    "image": "src/assets/sleeves/Primal_Groudon_ETB_Sleeve.jpg",
+    "name": "Primal Groudon ETB Sleeve",
+    "brand": "The Pokémon Company",
+    "region": "Western",
+    "category": "Elite Trainer Box",
+    "releaseDate": "May 2015"
+  },
+  {
+    "id": "primal-kyogre-etb-sleeve",
+    "image": "src/assets/sleeves/Primal_Kyogre_ETB_Sleeve.jpg",
+    "name": "Primal Kyogre ETB Sleeve",
+    "brand": "The Pokémon Company",
+    "region": "Western",
+    "category": "Elite Trainer Box",
+    "releaseDate": "May 2015"
+  },
+  {
     "id": "56f86004-ae18-4b31-bac1-40299c3d4076",
     "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/56f86004-ae18-4b31-bac1-40299c3d4076.jpg",
     "name": "Zorua & Zoroark Good Night Pokémon Center",

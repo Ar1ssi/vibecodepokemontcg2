@@ -78,6 +78,12 @@ const applyMatLayoutToDoc = (layoutId, doc) => {
   for (const [name, value] of Object.entries(vars)) {
     root.style.setProperty(name, value);
   }
+  const scale =
+    document.documentElement?.style?.getPropertyValue('--mat-scale') ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('ptcg-sim.playmat.scale')
+      ? String((Number(localStorage.getItem('ptcg-sim.playmat.scale')) || 100) / 100)
+      : '1');
+  if (scale) root.style.setProperty('--mat-scale', scale);
 };
 
 /** @param {'self'|'opp'} target */
@@ -123,21 +129,43 @@ const syncIframeLayouts = () => {
   applyMatLayoutToDoc(parentLayout.id, document);
 };
 
-/** Ensure each mat half has an <img> we can point at CDN art without hotlink watermarks. */
-const matHalfImage = (target) => {
+/** Ensure each mat half has both an ambient backdrop <img>, a crisp foreground <img>, and a zones overlay <img>. */
+const matHalfImages = (target) => {
   const selector =
     target === 'opp' ? '#battleMatArt .mat-half-opp' : '#battleMatArt .mat-half-self';
   const half = document.querySelector(selector);
   if (!half) return null;
-  let img = half.querySelector('img.mat-art-image');
-  if (!img) {
-    img = document.createElement('img');
-    img.className = 'mat-art-image';
-    img.referrerPolicy = 'no-referrer';
-    img.alt = '';
-    half.appendChild(img);
+
+  let ambient = half.querySelector('img.mat-ambient-image');
+  if (!ambient) {
+    ambient = document.createElement('img');
+    ambient.className = 'mat-ambient-image';
+    ambient.referrerPolicy = 'no-referrer';
+    ambient.alt = '';
+    ambient.setAttribute('aria-hidden', 'true');
+    half.appendChild(ambient);
   }
-  return img;
+
+  let art = half.querySelector('img.mat-art-image');
+  if (!art) {
+    art = document.createElement('img');
+    art.className = 'mat-art-image';
+    art.referrerPolicy = 'no-referrer';
+    art.alt = '';
+    half.appendChild(art);
+  }
+
+  let overlay = half.querySelector('img.mat-zones-overlay');
+  if (!overlay) {
+    overlay = document.createElement('img');
+    overlay.className = 'mat-zones-overlay';
+    overlay.referrerPolicy = 'no-referrer';
+    overlay.alt = '';
+    overlay.setAttribute('aria-hidden', 'true');
+    half.appendChild(overlay);
+  }
+
+  return { art, ambient, overlay };
 };
 
 /**
@@ -149,37 +177,76 @@ const matHalfImage = (target) => {
 const paintMatImageForTarget = (target, mat) => {
   const key = normalizeTarget(target);
   const token = ++matPaintToken[key];
-  const img = matHalfImage(key);
+  const images = matHalfImages(key);
 
-  if (!img) return;
+  if (!images) return;
+  const { art, ambient, overlay } = images;
 
   if (!mat?.image && !mat?.imageUrl && !mat?.board) {
-    img.removeAttribute('src');
-    img.hidden = true;
+    art.removeAttribute('src');
+    art.hidden = true;
+    ambient.removeAttribute('src');
+    ambient.hidden = true;
+    if (overlay) {
+      overlay.removeAttribute('src');
+      overlay.hidden = true;
+    }
     return;
   }
 
-  img.hidden = false;
-  img.referrerPolicy = 'no-referrer';
+  art.hidden = false;
+  art.referrerPolicy = 'no-referrer';
+  ambient.hidden = false;
+  ambient.referrerPolicy = 'no-referrer';
 
   const primary = resolveMatBoardUrl(mat);
   const local = mat.image ? toAbsoluteClientPath(mat.image) : null;
   const remote = mat.imageUrl ? matImageProxyUrl(mat.imageUrl) : null;
 
   if (!primary) {
-    img.removeAttribute('src');
-    img.hidden = true;
+    art.removeAttribute('src');
+    art.hidden = true;
+    ambient.removeAttribute('src');
+    ambient.hidden = true;
+    if (overlay) {
+      overlay.removeAttribute('src');
+      overlay.hidden = true;
+    }
     return;
   }
 
-  img.src = primary;
+  art.src = primary;
+  ambient.src = primary;
+
+  const wantsOverlay = Boolean(
+    mat &&
+      (mat.overlay ||
+        mat.hasOverlay ||
+        mat.clean ||
+        mat.id?.startsWith('custom-') ||
+        /edge[\s-]?to[\s-]?edge/i.test(mat.title || ''))
+  );
+  if (overlay) {
+    if (wantsOverlay) {
+      overlay.src = toAbsoluteClientPath(
+        'src/assets/playmats/playmat_zones_overlay.svg'
+      );
+      overlay.hidden = false;
+    } else {
+      overlay.removeAttribute('src');
+      overlay.hidden = true;
+    }
+  }
 
   // When local PNGs exist (dev), upgrade after load.
   if (local && remote && local !== remote) {
     const probe = new Image();
     probe.referrerPolicy = 'no-referrer';
     probe.onload = () => {
-      if (token === matPaintToken[key]) img.src = local;
+      if (token === matPaintToken[key]) {
+        art.src = local;
+        ambient.src = local;
+      }
     };
     probe.src = local;
   }
@@ -191,8 +258,16 @@ const syncMatArt = () => {
   const shared = activeTwoPlayerMat();
   const hasAny = Boolean(shared || currentMats.self || currentMats.opp);
 
+  const activeLayout = shared
+    ? resolveMatLayout(shared.mat)
+    : currentMats.self
+      ? resolveMatLayout(currentMats.self)
+      : resolveMatLayout(currentMats.opp);
+  const isCover = activeLayout?.matFit === 'cover';
+
   if (battleMat) {
     battleMat.classList.toggle('mat-active', hasAny);
+    battleMat.classList.toggle('mat-fit-cover', isCover);
     battleMat.classList.toggle(
       'mat-two-player',
       Boolean(shared && shared.owner === 'self')

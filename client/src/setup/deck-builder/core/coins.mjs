@@ -8,6 +8,20 @@
     
     const GEN_IX_COINS = [
  {
+  "id": "PRC_Red_Primal_Groudon_Coin",
+  "url": "src/assets/coins/PRC_Red_Primal_Groudon_Coin.png",
+  "thumb": "src/assets/coins/PRC_Red_Primal_Groudon_Coin.png",
+  "name": "Primal Groudon Coin",
+  "material": "enamel"
+ },
+ {
+  "id": "PRC_Blue_Primal_Kyogre_Coin",
+  "url": "src/assets/coins/PRC_Blue_Primal_Kyogre_Coin.png",
+  "thumb": "src/assets/coins/PRC_Blue_Primal_Kyogre_Coin.png",
+  "name": "Primal Kyogre Coin",
+  "material": "enamel"
+ },
+ {
   "id": "SVAM_Green_Sprigatito_Coin",
   "url": "src/assets/coins/SVAM_Green_Sprigatito_Coin.png",
   "thumb": "src/assets/coins/SVAM_Green_Sprigatito_Coin.png",

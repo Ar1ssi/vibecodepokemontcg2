@@ -23,6 +23,7 @@ import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   addCard,
   createEmptyDeck,
+  filterDeck,
   getDeckCounts,
   removeCard,
 } from '../../../setup/deck-builder/core/deck-state.mjs';
@@ -564,6 +565,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let currentHugeResultSet = false;
   let deckDirty = false;
   let flashFrame = null;
+  // null = show every card in the deck list; 'pokemon'|'trainer'|'energy'
+  // narrows it to that supertype, set by clicking a summary-bar segment.
+  let deckListFilter = null;
 
   const flashDeckStatus = () => {
     if (!deckStatus) return;
@@ -691,30 +695,55 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   // Right-click on search results opens preview
   if (searchResults) {
     searchResults.addEventListener('contextmenu', (event) => {
-        const target = event.target.closest('[data-preview-image]');
-        if (!target) return;
-        event.preventDefault();
-        const index = target.dataset.resultIndex;
-        const card = index !== undefined ? currentResults[Number(index)] : null;
-        showCardPreview(target.dataset.previewImage, card, target);
-      });
+      const target = event.target.closest('[data-preview-image], .native-deck-builder-result');
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const cardId = target.closest('[data-card-id]')?.dataset.cardId;
+      const index = target.dataset.resultIndex;
+      const card =
+        (cardId && currentResults.find((c) => c.id === cardId)) ||
+        (index !== undefined ? currentResults[Number(index)] : null);
+      const previewImage =
+        target.dataset.previewImage ||
+        card?.images?.large ||
+        card?.images?.small ||
+        card?.image ||
+        target.querySelector('img')?.src;
+      if (previewImage) {
+        showCardPreview(previewImage, card, target);
+      }
+    });
   }
 
-  // Click on deck cards opens preview
+  const handleDeckCardPreview = (event) => {
+    const target = event.target.closest('[data-preview-image], .native-deck-builder-deck-row');
+    if (!target) return;
+    // Don't open preview if clicking the add/remove buttons
+    if (event.target.closest('.native-deck-builder-deck-btn')) return;
+    if (event.target.closest('.native-deck-builder-deck-row-controls')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // find the deck card variant carrying this image for rarity-aware holo
+    const row = target.closest('[data-deck-row-index]');
+    const index = row ? Number(row.dataset.deckRowIndex) : -1;
+    const sortedCards = getSortedDeckCardArray(deck);
+    const card = index >= 0 ? sortedCards[index] : null;
+    const previewImage =
+      target.dataset.previewImage ||
+      card?.images?.large ||
+      card?.images?.small ||
+      card?.image ||
+      target.querySelector('img')?.src;
+    if (previewImage) {
+      showCardPreview(previewImage, card, target);
+    }
+  };
+
+  // Click or right-click on deck cards opens preview
   if (cards) {
-    cards.addEventListener('click', (event) => {
-          const target = event.target.closest('[data-preview-image]');
-          if (!target) return;
-          // Don't open preview if clicking the add/remove buttons
-          if (event.target.closest('.native-deck-builder-deck-btn')) return;
-          if (event.target.closest('.native-deck-builder-deck-row-controls')) return;
-          // find the deck card variant carrying this image for rarity-aware holo
-          const row = target.closest('[data-deck-row-index]');
-          const index = row ? Number(row.dataset.deckRowIndex) : -1;
-          const sortedCards = getSortedDeckCardArray(deck);
-          const card = index >= 0 ? sortedCards[index] : null;
-          showCardPreview(target.dataset.previewImage, card, target);
-        });
+    cards.addEventListener('click', handleDeckCardPreview);
+    cards.addEventListener('contextmenu', handleDeckCardPreview);
   }
 
   document.addEventListener('native-deck-builder:deck-loaded', (event) => {
@@ -858,7 +887,16 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.saveActiveDeck(deck);
         const counts = getDeckCounts(deck);
     const result = validateDeck(deck, detectDeckFormat(deck));
-    const sortedCards = getSortedDeckCardArray(deck);
+    // The summary bar's counts always reflect the whole deck; only the list
+    // of cards below it narrows when a segment filter is active.
+    const deckForList = deckListFilter
+      ? filterDeck(deck, {
+          pokemon: deckListFilter === 'pokemon',
+          trainer: deckListFilter === 'trainer',
+          energy: deckListFilter === 'energy',
+        })
+      : deck;
+    const sortedCards = getSortedDeckCardArray(deckForList);
     const hasDeckCards = Object.keys(deck).length > 0;
 
     clearButton.style.display = hasDeckCards ? '' : 'none';
@@ -894,7 +932,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       el.classList.toggle('opp-color', !isSelf);
     }
 
-    renderDeckSummary({ summaryEl: summary, counts });
+    renderDeckSummary({
+      summaryEl: summary,
+      counts,
+      activeFilter: deckListFilter,
+      onFilterClick: (type) => {
+        deckListFilter = deckListFilter === type ? null : type;
+        render();
+      },
+    });
+    // Keep the Browse Sets panel's own card grid in sync with the same
+    // filter — the summary bar drives both the deck list and Browse Sets.
+    setBrowser?.setSupertypeFilter?.(deckListFilter);
 
     if (validationDot) {
       const formatLabel = result.formatName;

@@ -8,8 +8,19 @@
 @import url('./holo/illustration-rare.css');
 @import url('./holo/radiant-holo.css');
 @import url('./holo/rainbow-alt.css');
-@import url('./holo/gold-secret-rare.css');
 @import url('./holo/reverse-holo.css');
+
+:root {
+  --mat-half-height: 50vh;
+  --mat-container-width: 75.5vw;
+  --mat-height: 50vh;
+  --mat-offset-y: 0px;
+  --mat-scale: 1;
+}
+body.sidebox-hidden,
+body.side-menu-collapsed {
+  --mat-container-width: 100vw;
+}
 
 /* Sizing for the deck-builder preview card (replaces the old .holo-stage rules). */
 .native-deck-builder-card-preview-scrim .card {
@@ -180,6 +191,7 @@ ul, li {
   background: radial-gradient(ellipse at center, #14161c 0%, #05060a 70%, #000 100%);
   z-index: 0;
   overflow: hidden;
+  transition: width 220ms ease;
 }
 #battleMatTrim {
   position: absolute;
@@ -219,15 +231,44 @@ ul, li {
   height: 50%;
   overflow: hidden;
   background: #0a0a0c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#battleMatArt .mat-half img.mat-ambient-image {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(32px) brightness(0.4) saturate(1.4);
+  transform: scale(1.08);
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 1;
+}
+#battleMatArt .mat-half img.mat-art-image,
+#battleMatArt .mat-half img.mat-zones-overlay {
+  position: absolute;
+  bottom: var(--mat-offset-y, 0px);
+  left: var(--mat-offset-x, 0px);
+  width: var(--mat-width, 100%);
+  height: var(--mat-height, 100%);
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
+  object-fit: fill;
+  margin: 0;
+  display: block;
+  border-radius: 4px;
 }
 #battleMatArt .mat-half img.mat-art-image {
-  width: 100%;
-  height: 100%;
-  /* Trimmed board WebPs match mat aspect; fill the half so zone overlays
-     line up. cover cropped the center band when the half is wider (~2.4:1)
-     than the art (~1.9:1), which read as an oversized zoomed-in mat. */
-  object-fit: fill;
-  display: block;
+  z-index: 2;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.75), 0 0 8px rgba(0, 0, 0, 0.5);
+}
+#battleMatArt .mat-half img.mat-zones-overlay {
+  z-index: 3;
+  pointer-events: none;
 }
 #battleMatArt .mat-half-self {
   bottom: 0;
@@ -243,6 +284,13 @@ ul, li {
 #battleMat.mat-two-player #battleMatArt .mat-half-self {
   height: 100%;
 }
+#battleMat.mat-two-player #battleMatArt .mat-half-self img.mat-art-image,
+#battleMat.mat-two-player #battleMatArt .mat-half-self img.mat-zones-overlay {
+  width: var(--mat-width, 100%);
+  height: var(--mat-height, 100%);
+  bottom: var(--mat-offset-y, 0px);
+  left: var(--mat-offset-x, 0px);
+}
 /* Opp-only full-size mat: the artwork lives in the top half element. */
 #battleMat.mat-two-player-opp #battleMatArt .mat-half-self {
   display: none;
@@ -250,6 +298,29 @@ ul, li {
 #battleMat.mat-two-player-opp #battleMatArt .mat-half-opp {
   height: 100%;
   top: 0;
+}
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-opp img.mat-art-image,
+#battleMat.mat-two-player-opp #battleMatArt .mat-half-opp img.mat-zones-overlay {
+  width: var(--mat-width, 100%);
+  height: var(--mat-height, 100%);
+  bottom: var(--mat-offset-y, 0px);
+  left: var(--mat-offset-x, 0px);
+}
+
+/* When any mat is active, expand past the arena trim to fit the entire screen */
+#battleMat.mat-active #battleMatTrim,
+#battleMat.mat-active #battleMatSurface,
+#battleMat.mat-fit-cover #battleMatTrim,
+#battleMat.mat-fit-cover #battleMatSurface {
+  inset: 0;
+  clip-path: none;
+  background: none;
+  box-shadow: none;
+}
+
+#battleMat.mat-active ~ #stadium.outline {
+  box-shadow: none;
+  background-color: transparent;
 }
 /* With real mat art behind the board, the synthetic arena decoration would
    read as grime on top of the artwork. */
@@ -1203,14 +1274,18 @@ ul, li {
   border-radius: 0;
   box-shadow: none;
   z-index: 900;
-  transform: translateX(calc(100% - 8px));
+  transform: translateX(100%);
   transition: transform 220ms ease;
   display: flex;
   align-items: stretch;
   overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
 }
 .native-deck-builder-workspace.open {
   transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
 }
 .native-deck-builder-inner {
   position: relative;
@@ -1698,6 +1773,7 @@ ul, li {
 .card-preview-overlay.is-closing {
   background-color: transparent;
   cursor: default;
+  pointer-events: none;
 }
 .card-preview-pop {
   position: fixed;
@@ -1766,6 +1842,10 @@ ul, li {
 .card-preview-face--front > .mat-holo.card-preview-card .card__rotator > * {
   width: 100%;
   height: 100%;
+}
+.card-preview-face--front > .mat-holo.card-preview-card .card__rotator {
+  -webkit-transform: rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
+  transform: rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
 }
 .card-preview-face--front > .mat-holo.card-preview-card img {
   display: block;
@@ -1985,6 +2065,8 @@ ul, li {
 .discard-pile-slide .mat-holo.discard-pile-holo .card__rotator {
   overflow: hidden;
   border-radius: 0.3rem;
+  -webkit-transform: rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
+  transform: rotateY(var(--rotate-x, 0deg)) rotateX(var(--rotate-y, 0deg));
 }
 .discard-pile-slide .mat-holo.discard-pile-holo .card__translater,
 .discard-pile-slide .mat-holo.discard-pile-holo .card__rotator,
@@ -3220,24 +3302,34 @@ a:hover {
   100% { transform: rotate(360deg); } /* End at 360 degrees (full circle) */
 }
 
-/* Styles when sidebox is hidden */
-.sidebox-hidden .self {
+/* Styles when sidebox is hidden or side menu is collapsed */
+.sidebox-hidden #battleMat,
+body.side-menu-collapsed #battleMat {
   width: 100%;
 }
 
-.sidebox-hidden .opp {
+.sidebox-hidden .self,
+body.side-menu-collapsed .self {
   width: 100%;
 }
 
-.sidebox-hidden #selfResizer {
+.sidebox-hidden .opp,
+body.side-menu-collapsed .opp {
+  width: 100%;
+}
+
+.sidebox-hidden #selfResizer,
+body.side-menu-collapsed #selfResizer {
   left: -0.55%;
 }
 
-.sidebox-hidden #oppResizer {
+.sidebox-hidden #oppResizer,
+body.side-menu-collapsed #oppResizer {
   left: -0.55%;
 }
 
-.sidebox-hidden #boardButtonContainer {
+.sidebox-hidden #boardButtonContainer,
+body.side-menu-collapsed #boardButtonContainer {
   left: 67%;
 }
 
@@ -3430,11 +3522,10 @@ a:hover {
     body.side-menu-collapsed #sideMenuToggle {
       right: 0;
     }
-    /* Full-width playmat: reclaim the side menu's space while collapsed. The
-       iframes keep a tiny right inset so the edge toggle remains clickable. */
+    /* Full-width playmat: reclaim the side menu's space while collapsed. */
     body.side-menu-collapsed .self,
     body.side-menu-collapsed .opp {
-      width: calc(100% - 2vw);
+      width: 100%;
       transition: width 220ms ease;
     }
     .self,
@@ -3527,6 +3618,15 @@ a:hover {
       padding: 0.5vh 0.2vw;
       background: rgba(65, 91, 168, 0.08);
       border: 1px solid rgba(65, 91, 168, 0.16);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .native-deck-builder-summary-segment:hover {
+      background: rgba(65, 91, 168, 0.16);
+    }
+    .native-deck-builder-summary-segment.active {
+      background: rgba(65, 91, 168, 0.32);
+      border-color: rgba(65, 91, 168, 0.5);
     }
     .native-deck-builder-summary-segment:first-child {
       border-radius: 4px 0 0 4px;
@@ -3638,6 +3738,10 @@ a:hover {
       background: rgba(120, 144, 214, 0.14);
       border-color: rgba(120, 144, 214, 0.22);
       color: #a0b0e0;
+    }
+    body.dark-mode-1 .native-deck-builder-summary-segment.active {
+      background: rgba(120, 144, 214, 0.34);
+      border-color: rgba(120, 144, 214, 0.5);
     }
     body.dark-mode-1 .native-deck-builder-summary-segment strong {
       color: #eef3ff;
@@ -4756,4 +4860,30 @@ a:hover {
 
 .game-end-close-btn:hover {
   background: #2563eb;
+}
+
+/* Playmat Zoom Control */
+.native-deck-builder-mat-zoom-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8vw;
+  padding: 0.5vh 0.75vw;
+  margin-bottom: 0.6vh;
+  font-size: 1.4vh;
+  color: #333;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+.native-deck-builder-mat-zoom-control label {
+  white-space: nowrap;
+  font-weight: 500;
+}
+.native-deck-builder-mat-zoom-control input[type="range"] {
+  flex: 1;
+  cursor: pointer;
+}
+body.dark-mode-1 .native-deck-builder-mat-zoom-control {
+  background: rgba(255, 255, 255, 0.08);
+  color: #c5d0ff;
 }

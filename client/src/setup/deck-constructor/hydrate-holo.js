@@ -109,8 +109,8 @@ export function hydrateHolo(card) {
       card.wrapper = wrapper;
       // Hand/mat cards have no reliable real cursor to track (native drag
       // suppresses pointermove, and cards often just sit still) — auto-play
-      // a continuous left-to-right sweep instead of waiting on the pointer.
-      startHoloAnimation(wrapper, { auto: true });
+      // a continuous left-to-right sweep without tilting the card.
+      startHoloAnimation(wrapper, { auto: true, tilt: false });
       return wrapper;
     })
     .catch(() => {

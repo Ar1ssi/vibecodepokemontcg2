@@ -2,6 +2,7 @@
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
 import { cardHasRuleBox } from './ko-flow.mjs';
+import { normalizeStage } from './evolution.mjs';
 
 const SYMBOL_TO_TYPE = {
   c: 'Colorless',
@@ -86,11 +87,11 @@ export function matchesSearch(card, what = '') {
   }
   if (w.includes('stage 1') && !w.includes('stage 2')) {
     if (!isPokemon) return false;
-    return String(card.stage || '').toLowerCase().replace(/\s+/g, '') === 'stage1';
+    return normalizeStage(card.stage) === 'Stage 1';
   }
   if (w.includes('stage 2')) {
     if (!isPokemon) return false;
-    return String(card.stage || '').toLowerCase().replace(/\s+/g, '') === 'stage2';
+    return normalizeStage(card.stage) === 'Stage 2';
   }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
@@ -111,30 +112,31 @@ export function matchesSearch(card, what = '') {
         w.includes("rule box"));
     if (withRuleBox && !cardHasRuleBox(card)) return false;
 
-    if (w.includes('evolution') && (card.stage || 'Basic') === 'Basic') return false;
+    const normStage = normalizeStage(card.stage);
+    const effectiveStage = normStage || (card.stage ? card.stage : 'Basic');
+
+    if (w.includes('evolution') && effectiveStage === 'Basic') return false;
     const typedEvolution = what.match(/evolution\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedEvolution) {
       const typeName = SYMBOL_TO_TYPE[typedEvolution[1].toLowerCase()];
       if (!typeName) return false;
-      const stage = card.stage || 'Basic';
-      if (stage === 'Basic') return false;
+      if (effectiveStage === 'Basic') return false;
       return pokemonMatchesEnergyType(card, typeName);
     }
     if (w.includes('evolution') && !w.includes('mega')) {
-      const stage = card.stage || 'Basic';
-      if (stage === 'Basic') return false;
+      if (effectiveStage === 'Basic') return false;
     }
     const typedBasic = what.match(/basic\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedBasic) {
       const typeName = SYMBOL_TO_TYPE[typedBasic[1].toLowerCase()];
       if (typeName) return matchesBasicPokemonType(card, typeName);
     }
-    if (w.includes('basic') && (card.stage || 'Basic') !== 'Basic') return false;
+    if (w.includes('basic') && effectiveStage !== 'Basic') return false;
     const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
     if (hpCap) return matchesHpCap(card, Number(hpCap[1]));
     const hpOrLess = what.match(/(\d+)\s*hp\s*or\s*less/i);
     if (hpOrLess) return matchesHpCap(card, Number(hpOrLess[1]));
-    if (w.includes('basic')) return (card.stage || 'Basic') === 'Basic';
+    if (w.includes('basic')) return effectiveStage === 'Basic';
     return true;
   }
   const generic =

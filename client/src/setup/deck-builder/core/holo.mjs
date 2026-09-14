@@ -23,9 +23,15 @@ const RARITY_EFFECTS = {
   'Mega Hyper Rare': 'hyper rare',
   'Rainbow Rare': 'rare rainbow alt',
   'Rainbow rare': 'rare rainbow alt',
-  'Gold Rare': 'rare holo vmax',
-  'Secret Rare': 'rare holo vmax',
-  'Shiny Rare': 'rare holo vmax',
+  // Gold-bordered cards get the same treatment as literal "Hyper Rare" — verified against
+  // the reference implementation (pokemon-cards-151, simeydotme's poke-holo): "rare holo vmax"
+  // is a DIFFERENT, narrower class that only renders when data-trainer-gallery="true"
+  // (rainbow-alt.css), an attribute this app never sets. Mapping gold cards to it left them
+  // with zero holo effect — this was the root cause of several rounds of "no pillars"/
+  // "grainy"/"horizontal" reports that looked like CSS bugs but were actually a wrong mapping.
+  'Gold Rare': 'hyper rare',
+  'Secret Rare': 'hyper rare',
+  'Shiny Rare': 'hyper rare',
   'Radiant Rare': 'radiant rare',
   'Reverse Holo': 'reverse holo',
 };
@@ -46,12 +52,12 @@ export function resolveHoloEffect(card = {}) {
   if (lower.includes('rainbow')) return 'rare rainbow alt';
   if (lower.includes('holo')) return 'rare holo';
   if (lower.includes('gold') || lower.includes('secret') || lower.includes('shiny')) {
-    return 'rare holo vmax';
+    return 'hyper rare';
   }
   return null;
 }
 
-// Build the holo card: simey's DOM with a single <img> + shine/glitter/glare.
+// Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2.
 export function buildHoloCard(imageUrl, rarityValue) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -76,112 +82,265 @@ export function buildHoloCard(imageUrl, rarityValue) {
   const glare = document.createElement('div');
   glare.className = 'card__glare';
 
-  rotator.append(img, shine, glitter, glare);
+  const glare2 = document.createElement('div');
+  glare2.className = 'card__glare2';
+
+  rotator.append(img, shine, glitter, glare, glare2);
   translater.appendChild(rotator);
   card.appendChild(translater);
 
   return card;
 }
 
+// ── math helpers (matching simeydotme/pokemon-cards-151 Math.js) ──────
+export const round = (value, precision = 3) => parseFloat(value.toFixed(precision));
+
+export const clamp = (value, min = 0, max = 100) =>
+  Math.min(Math.max(value, min), max);
+
+export const adjust = (value, fromMin, fromMax, toMin, toMax) =>
+  round(toMin + ((toMax - toMin) * (value - fromMin)) / (fromMax - fromMin));
+
+export const computePointerFromCenter = (glareX, glareY) => {
+  const dx = glareX - 50;
+  const dy = glareY - 50;
+  return clamp(round(Math.sqrt(dx * dx + dy * dy) / 50, 3), 0, 1);
+};
+
+// Svelte-style Spring class matching simey's springInteractSettings
+export class Spring {
+  constructor(initial, { stiffness = 0.066, damping = 0.25, precision = 0.001 } = {}) {
+    this.stiffness = stiffness;
+    this.damping = damping;
+    this.precision = precision;
+    this.current = { ...initial };
+    this.target = { ...initial };
+    this.velocity = {};
+    for (const key of Object.keys(initial)) {
+      this.velocity[key] = 0;
+    }
+  }
+
+  set(target, { hard = false } = {}) {
+    this.target = { ...target };
+    if (hard) {
+      this.current = { ...target };
+      for (const key of Object.keys(this.velocity)) {
+        this.velocity[key] = 0;
+      }
+    }
+  }
+
+  tick() {
+    let settled = true;
+    for (const key of Object.keys(this.target)) {
+      const delta = this.target[key] - this.current[key];
+      const springForce = this.stiffness * delta;
+      const dampingForce = this.damping * this.velocity[key];
+      const acceleration = springForce - dampingForce;
+      this.velocity[key] += acceleration;
+      this.current[key] += this.velocity[key];
+
+      if (
+        Math.abs(delta) > this.precision ||
+        Math.abs(this.velocity[key]) > this.precision
+      ) {
+        settled = false;
+      } else {
+        this.current[key] = this.target[key];
+        this.velocity[key] = 0;
+      }
+    }
+    return settled;
+  }
+}
+
 // ── mouse-tracked interaction (simey's model) ────────────────────────
 // The effect follows the cursor: pointer position over the card drives
 // --pointer-x/y, the gradients pan (his adjust() range), and the card
-// tilts with his rotate math. Values ease on svelte-style springs and
+// tilts with his rotate math. Values ease on decoupled svelte springs and
 // settle back to center when the mouse leaves the card.
 const activeAnimations = new WeakMap();
 
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
-// simey's adjust(): map 0..1 into a narrower sub-range (37%..63%)
-const adjustRange = (v, lo, hi) => lo + v * (hi - lo);
-
-// Auto-sweep: emulates a pointer being dragged left-to-right (and back)
-// across the card, on a continuous loop. Used for cards sitting in the
-// hand / on the mat, where there's no real cursor to track (or where a
-// native HTML5 drag suppresses pointermove and the effect would otherwise
-// just freeze in place).
+const SPRING_INTERACT_SETTINGS = { stiffness: 0.066, damping: 0.25 };
+const SNAP_SETTINGS = { stiffness: 0.01, damping: 0.06 };
 const AUTO_SWEEP_PERIOD_MS = 3200; // one full left→right→left cycle
 
-export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {}) {
+export function startHoloAnimation(
+  card,
+  { auto = false, phaseOffset = 0, tilt = !auto } = {}
+) {
   if (!card) return () => {};
   stopHoloAnimation(card);
 
-  // spring state (position + velocity), svelte spring-ish feel
-  const state = { x: 0.5, y: 0.5, vx: 0, vy: 0 };
-  let targetX = 0.5;
-  let targetY = 0.5;
+  const springRotate = new Spring({ x: 0, y: 0 }, SPRING_INTERACT_SETTINGS);
+  const springGlare = new Spring(
+    { x: 50, y: 50, o: auto ? 1 : 0 },
+    SPRING_INTERACT_SETTINGS
+  );
+  const springBackground = new Spring({ x: 50, y: 50 }, SPRING_INTERACT_SETTINGS);
+
   let rafId = null;
   let running = true;
+  let interactEndTimer = null;
   const startTime = auto
     ? performance.now() - phaseOffset * AUTO_SWEEP_PERIOD_MS
     : 0;
 
-  // snappier than svelte's default spring: the preview is large and the
-  // light should feel immediately attached to the cursor
-  const STIFFNESS = 0.18;
-  const DAMPING = 0.42;
+  const updateSprings = (background, rotate, glare) => {
+    springBackground.stiffness = SPRING_INTERACT_SETTINGS.stiffness;
+    springBackground.damping = SPRING_INTERACT_SETTINGS.damping;
+    springRotate.stiffness = SPRING_INTERACT_SETTINGS.stiffness;
+    springRotate.damping = SPRING_INTERACT_SETTINGS.damping;
+    springGlare.stiffness = SPRING_INTERACT_SETTINGS.stiffness;
+    springGlare.damping = SPRING_INTERACT_SETTINGS.damping;
 
-  const onPointerMove = (event) => {
-    const rect = card.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    targetX = clamp01((event.clientX - rect.left) / rect.width);
-    targetY = clamp01((event.clientY - rect.top) / rect.height);
+    springBackground.set(background);
+    springRotate.set(rotate);
+    springGlare.set(glare);
   };
 
-  const onPointerLeave = () => {
-    targetX = 0.5;
-    targetY = 0.5;
+  const interact = (event) => {
+    if (interactEndTimer) {
+      clearTimeout(interactEndTimer);
+      interactEndTimer = null;
+    }
+    const rect = card.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const absolute = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    const percent = {
+      x: clamp(round((100 / rect.width) * absolute.x)),
+      y: clamp(round((100 / rect.height) * absolute.y)),
+    };
+    const center = {
+      x: percent.x - 50,
+      y: percent.y - 50,
+    };
+
+    updateSprings(
+      {
+        x: adjust(percent.x, 0, 100, 37, 63),
+        y: adjust(percent.y, 0, 100, 33, 67),
+      },
+      tilt
+        ? {
+            x: round(-(center.x / 3.5)),
+            y: round(center.y / 2),
+          }
+        : { x: 0, y: 0 },
+      {
+        x: round(percent.x),
+        y: round(percent.y),
+        o: 1,
+      }
+    );
+  };
+
+  const interactEnd = (delay = 500) => {
+    if (interactEndTimer) clearTimeout(interactEndTimer);
+    interactEndTimer = setTimeout(() => {
+      springRotate.stiffness = SNAP_SETTINGS.stiffness;
+      springRotate.damping = SNAP_SETTINGS.damping;
+      springRotate.set({ x: 0, y: 0 });
+
+      springGlare.stiffness = SNAP_SETTINGS.stiffness;
+      springGlare.damping = SNAP_SETTINGS.damping;
+      springGlare.set({ x: 50, y: 50, o: 0 });
+
+      springBackground.stiffness = SNAP_SETTINGS.stiffness;
+      springBackground.damping = SNAP_SETTINGS.damping;
+      springBackground.set({ x: 50, y: 50 });
+      interactEndTimer = null;
+    }, delay);
   };
 
   const applyVars = () => {
-    const px = state.x;
-    const py = state.y;
-    card.style.setProperty('--pointer-x', (px * 100).toFixed(2) + '%');
-    card.style.setProperty('--pointer-y', (py * 100).toFixed(2) + '%');
-    // gradients pan in simey's narrowed ranges (adjust 0..100 -> 37..63)
-    card.style.setProperty('--background-x', (adjustRange(px, 0.37, 0.63) * 100).toFixed(2) + '%');
-    card.style.setProperty('--background-y', (adjustRange(py, 0.33, 0.67) * 100).toFixed(2) + '%');
-    card.style.setProperty('--pointer-from-center', (1 - Math.abs(px - 0.5) * 2).toFixed(3));
-    card.style.setProperty('--pointer-from-left', px.toFixed(3));
-    card.style.setProperty('--pointer-from-top', py.toFixed(3));
-    // simey's rotate math: rotate = -(center / 3.5)
-    const centerX = px - 0.5;
-    const centerY = py - 0.5;
-    card.style.setProperty('--rotate-x', (-(centerX / 3.5) * 100 * 0.35).toFixed(2) + 'deg');
-    card.style.setProperty('--rotate-y', ((centerY / 3.5) * 100 * 0.35).toFixed(2) + 'deg');
+    const gx = clamp(springGlare.current.x);
+    const gy = clamp(springGlare.current.y);
+    const go = Math.max(0, Math.min(1, springGlare.current.o));
+    const bx = clamp(springBackground.current.x);
+    const by = clamp(springBackground.current.y);
+    const rx = round(springRotate.current.x);
+    const ry = round(springRotate.current.y);
+    const pointerFromCenter = computePointerFromCenter(gx, gy);
+
+    card.style.setProperty('--pointer-x', `${gx.toFixed(2)}%`);
+    card.style.setProperty('--pointer-y', `${gy.toFixed(2)}%`);
+    card.style.setProperty('--pointer-from-center', pointerFromCenter.toFixed(3));
+    card.style.setProperty('--pointer-from-top', (gy / 100).toFixed(3));
+    card.style.setProperty('--pointer-from-left', (gx / 100).toFixed(3));
+    card.style.setProperty('--card-opacity', go.toFixed(3));
+    card.style.setProperty('--rotate-x', `${rx.toFixed(2)}deg`);
+    card.style.setProperty('--rotate-y', `${ry.toFixed(2)}deg`);
+    card.style.setProperty('--background-x', `${bx.toFixed(2)}%`);
+    card.style.setProperty('--background-y', `${by.toFixed(2)}%`);
   };
 
   const tick = (now) => {
     if (!running) return;
     if (auto) {
-      // sweep target left→right→left; a light ease-in/out via sine so it
-      // reads as a hand-driven pass rather than a mechanical bounce
       const phase = ((now - startTime) % AUTO_SWEEP_PERIOD_MS) / AUTO_SWEEP_PERIOD_MS;
-      targetX = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
-      targetY = 0.5;
+      const autoPercentX = (0.5 - 0.5 * Math.cos(phase * Math.PI * 2)) * 100;
+      const autoPercentY = 50;
+      const autoCenterX = autoPercentX - 50;
+      const autoCenterY = 0;
+
+      springBackground.set({
+        x: adjust(autoPercentX, 0, 100, 37, 63),
+        y: adjust(autoPercentY, 0, 100, 33, 67),
+      });
+      if (tilt) {
+        springRotate.set({
+          x: round(-(autoCenterX / 3.5)),
+          y: round(autoCenterY / 2),
+        });
+      } else {
+        springRotate.set({ x: 0, y: 0 });
+      }
+      springGlare.set({
+        x: round(autoPercentX),
+        y: round(autoPercentY),
+        o: 1,
+      });
     }
-    // spring integration toward the target
-    state.vx += (targetX - state.x) * STIFFNESS;
-    state.vy += (targetY - state.y) * STIFFNESS;
-    state.vx *= DAMPING;
-    state.vy *= DAMPING;
-    state.x += state.vx;
-    state.y += state.vy;
+
+    springRotate.tick();
+    springGlare.tick();
+    springBackground.tick();
     applyVars();
     rafId = requestAnimationFrame(tick);
   };
 
+  const onPointerEnter = (event) => interact(event);
+  const onPointerMove = (event) => interact(event);
+  const onPointerLeave = () => interactEnd(500);
+
+  const hitTarget = card;
+  const innerImg = card.querySelector('img');
   if (!auto) {
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    document.addEventListener('pointerleave', onPointerLeave);
+    hitTarget.addEventListener('pointerenter', onPointerEnter, { passive: true });
+    hitTarget.addEventListener('pointermove', onPointerMove, { passive: true });
+    hitTarget.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    if (innerImg && innerImg !== hitTarget) {
+      innerImg.addEventListener('pointermove', onPointerMove, { passive: true });
+    }
   }
   rafId = requestAnimationFrame(tick);
 
   const stop = () => {
     running = false;
     if (rafId != null) cancelAnimationFrame(rafId);
+    if (interactEndTimer) clearTimeout(interactEndTimer);
     if (!auto) {
-      window.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerleave', onPointerLeave);
+      hitTarget.removeEventListener('pointerenter', onPointerEnter);
+      hitTarget.removeEventListener('pointermove', onPointerMove);
+      hitTarget.removeEventListener('pointerleave', onPointerLeave);
+      if (innerImg && innerImg !== hitTarget) {
+        innerImg.removeEventListener('pointermove', onPointerMove);
+      }
     }
     activeAnimations.delete(card);
   };
@@ -193,3 +352,4 @@ export function stopHoloAnimation(card) {
   const stop = activeAnimations.get(card);
   if (stop) stop();
 }
+

@@ -546,15 +546,20 @@ const DecklistArray = async (decklist) => {
       formatHint
     );
     if (!decklistArray[i][6]) {
-      if (decklistArray[i][2]) {
-        if (decklistArray[i][3]) {
-          decklistArray[i][6] = getCardType(
-            decklistArray[i][2],
-            decklistArray[i][3]
-          );
-        }
+      if (decklistArray[i][2] && decklistArray[i][3]) {
+        decklistArray[i][6] = getCardType(
+          decklistArray[i][2],
+          decklistArray[i][3]
+        );
       }
-      if (decklistArray[i][4]) {
+      // Only fall back to the tcgId-keyed lookup when the set/number lookup
+      // above didn't already resolve a real type — this used to run
+      // unconditionally and silently clobber a correct getCardType() result
+      // (e.g. Black & White era cards) with getOldCardType()'s answer.
+      if (
+        (!decklistArray[i][6] || decklistArray[i][6] === 'Unknown') &&
+        decklistArray[i][4]
+      ) {
         decklistArray[i][6] = getOldCardType(decklistArray[i][4]);
       }
       if (isEnergyName(decklistArray[i][1])) {

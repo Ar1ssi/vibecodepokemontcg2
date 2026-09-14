@@ -968,6 +968,13 @@ export const getCardType = (setName, cardNumber) => {
         return types[i];
       }
     }
+    // Card numbered at or beyond every recorded breakpoint (the set's last
+    // listed card, or a secret rare printed after it) — the table has no
+    // entry describing what comes after its highest breakpoint, so assume it
+    // continues the last known type rather than reporting Unknown.
+    if (types.length > 0) {
+      return types[types.length - 1];
+    }
   }
 
   // Default case if the setName is not found or the cardNumber is too high

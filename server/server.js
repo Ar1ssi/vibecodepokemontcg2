@@ -991,6 +991,17 @@ async function main() {
         const playerId = gameRoom.socketToPlayer.get(socket.id);
         if (!playerId) return;
         gameRoom.touchActivity();
+        // I42: a command applied between the client hashing its zones and
+        // this handler running would make an up-to-date client look
+        // divergent for a state it has since moved past. Skip the compare
+        // this beat rather than report it — the next heartbeat re-checks
+        // against whatever state has settled by then.
+        if (
+          typeof data?.stateVersion === 'number' &&
+          data.stateVersion !== gameRoom.state.stateVersion
+        ) {
+          return;
+        }
         // Compare against what this player's view shows, not raw state: the
         // client can only hash its own view, which redacts the deck (I24) and
         // unrevealed prizes. Raw-state hashing made prizes diverge every beat.
