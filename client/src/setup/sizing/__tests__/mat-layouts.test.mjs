@@ -125,8 +125,8 @@ test('layoutToCssVars emits a value for every zone property', () => {
 
 test('aspect-locked profiles scale horizontal coordinates to centered mat width', () => {
   const onePlayerVars = layoutToCssVars(getMatLayout('one-player'));
-  assert.equal(onePlayerVars['--mat-aspect'], '1.91 / 1');
-  assert.ok(onePlayerVars['--mat-width'].includes('1.91'));
+  assert.equal(onePlayerVars['--mat-aspect'], '1.9394 / 1');
+  assert.ok(onePlayerVars['--mat-width'].includes('1.9394'));
   assert.ok(onePlayerVars['--mat-offset-x'].includes('--mat-width'));
   assert.ok(onePlayerVars['--bench-left'].includes('--mat-offset-x'));
   assert.ok(onePlayerVars['--bench-width'].includes('--mat-width'));

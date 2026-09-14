@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 528" width="1024" height="528">
+  <defs>
+    <style>
+      .zone-stroke {
+        fill: none;
+        stroke: #FFFFFF;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .zone-text {
+        fill: #FFFFFF;
+        font-family: 'Futura', 'Trebuchet MS', 'Century Gothic', 'Montserrat', 'Arial Black', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 2.2px;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }
+      .yellow-line {
+        stroke: #F7D117;
+        stroke-width: 2.2;
+        fill: none;
+      }
+    </style>
+    <!-- Clip paths for back prize cards so they do not overlap inside front cards -->
+    <clipPath id="clip-back-card-1">
+      <path d="M 0 0 L 1024 0 L 1024 528 L 0 528 Z M 39 16 H 159 V 179 H 39 Z" clip-rule="evenodd"/>
+    </clipPath>
+    <clipPath id="clip-back-card-2">
+      <path d="M 0 0 L 1024 0 L 1024 528 L 0 528 Z M 39 179 H 159 V 341 H 39 Z" clip-rule="evenodd"/>
+    </clipPath>
+    <clipPath id="clip-back-card-3">
+      <path d="M 0 0 L 1024 0 L 1024 528 L 0 528 Z M 39 341 H 159 V 504 H 39 Z" clip-rule="evenodd"/>
+    </clipPath>
+  </defs>
+
+  <!-- ========================================== -->
+  <!-- PRIZE CARDS (SIDE)                         -->
+  <!-- ========================================== -->
+  <g id="prize-cards">
+    <!-- Back Cards (Offset behind front cards) -->
+    <g id="prize-back-cards">
+      <rect x="20" y="27" width="120" height="163" rx="10" ry="10" class="zone-stroke" clip-path="url(#clip-back-card-1)"/>
+      <rect x="20" y="190" width="120" height="163" rx="10" ry="10" class="zone-stroke" clip-path="url(#clip-back-card-2)"/>
+      <rect x="20" y="352" width="120" height="163" rx="10" ry="10" class="zone-stroke" clip-path="url(#clip-back-card-3)"/>
+    </g>
+
+    <!-- Front Cards -->
+    <g id="prize-front-cards">
+      <!-- Card 1 -->
+      <rect x="39" y="16" width="120" height="163" rx="10" ry="10" class="zone-stroke"/>
+      <text x="99" y="93" class="zone-text">SIDE</text>
+
+      <!-- Card 2 -->
+      <rect x="39" y="179" width="120" height="163" rx="10" ry="10" class="zone-stroke"/>
+      <text x="99" y="256" class="zone-text">SIDE</text>
+
+      <!-- Card 3 -->
+      <rect x="39" y="341" width="120" height="163" rx="10" ry="10" class="zone-stroke"/>
+      <text x="99" y="418" class="zone-text">SIDE</text>
+    </g>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- BENCH ZONE (TOP AND FLIPPED BOTTOM)        -->
+  <!-- ========================================== -->
+  <g id="bench-zone">
+    <!-- 5 Bench Card Slots: Top and Flipped Bottom Halves (120 x 163 px card size) -->
+    <!-- Slot 1 -->
+    <g id="bench-slot-1">
+      <path d="M 171 328 L 171 326.5 A 10 10 0 0 1 181 316.5 L 280 316.5 A 10 10 0 0 1 290 326.5 L 290 328" class="zone-stroke"/>
+      <path d="M 171 468 L 171 469.5 A 10 10 0 0 0 181 479.5 L 280 479.5 A 10 10 0 0 0 290 469.5 L 290 468" class="zone-stroke"/>
+    </g>
+    <!-- Slot 2 -->
+    <g id="bench-slot-2">
+      <path d="M 309 328 L 309 326.5 A 10 10 0 0 1 319 316.5 L 418 316.5 A 10 10 0 0 1 428 326.5 L 428 328" class="zone-stroke"/>
+      <path d="M 309 468 L 309 469.5 A 10 10 0 0 0 319 479.5 L 418 479.5 A 10 10 0 0 0 428 469.5 L 428 468" class="zone-stroke"/>
+    </g>
+    <!-- Slot 3 -->
+    <g id="bench-slot-3">
+      <path d="M 448 328 L 448 326.5 A 10 10 0 0 1 458 316.5 L 557 316.5 A 10 10 0 0 1 567 326.5 L 567 328" class="zone-stroke"/>
+      <path d="M 448 468 L 448 469.5 A 10 10 0 0 0 458 479.5 L 557 479.5 A 10 10 0 0 0 567 469.5 L 567 468" class="zone-stroke"/>
+    </g>
+    <!-- Slot 4 -->
+    <g id="bench-slot-4">
+      <path d="M 586 328 L 586 326.5 A 10 10 0 0 1 596 316.5 L 695 316.5 A 10 10 0 0 1 705 326.5 L 705 328" class="zone-stroke"/>
+      <path d="M 586 468 L 586 469.5 A 10 10 0 0 0 596 479.5 L 695 479.5 A 10 10 0 0 0 705 469.5 L 705 468" class="zone-stroke"/>
+    </g>
+    <!-- Slot 5 -->
+    <g id="bench-slot-5">
+      <path d="M 725 328 L 725 326.5 A 10 10 0 0 1 735 316.5 L 834 316.5 A 10 10 0 0 1 844 326.5 L 844 328" class="zone-stroke"/>
+      <path d="M 725 468 L 725 469.5 A 10 10 0 0 0 735 479.5 L 834 479.5 A 10 10 0 0 0 844 469.5 L 844 468" class="zone-stroke"/>
+    </g>
+
+    <!-- Bench Label (Centered inside middle bench card) -->
+    <text x="507.5" y="398" class="zone-text">BENCH</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- DECK ZONE                                  -->
+  <!-- ========================================== -->
+  <g id="deck-zone">
+    <rect x="876" y="66" width="120" height="163" rx="10" ry="10" class="zone-stroke"/>
+    <text x="936" y="148" class="zone-text">DECK</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- TRASH ZONE                                 -->
+  <!-- ========================================== -->
+  <g id="trash-zone">
+    <rect x="876" y="302" width="120" height="163" rx="10" ry="10" class="zone-stroke"/>
+    <text x="936" y="386" class="zone-text">TRASH</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- BATTLE FIELD (OPTIONAL LAYER)              -->
+  <!-- ========================================== -->
+  <g id="battlefield-zone">
+    <text x="502" y="88" class="zone-text">BATTLE FIELD</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- BOTTOM BASELINE BAR (OPTIONAL LAYER)       -->
+  <!-- ========================================== -->
+  <g id="bottom-bar">
+    <line x1="0" y1="474" x2="1024" y2="474" class="yellow-line"/>
+  </g>
+</svg>

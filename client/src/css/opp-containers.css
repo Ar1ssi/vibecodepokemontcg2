@@ -114,9 +114,9 @@ body, input, textarea, button {
   z-index: -2;
 }
 .outline {
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   border-radius: 15px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: transparent;
 }
 .self-view {
   transform: translate(-50%, -50%);
@@ -271,7 +271,7 @@ img.draw-flight-source,
   width: var(--lost-zone-width);
   height: var(--lost-zone-height);
   z-index: 0;
-  background-color: rgba(233, 198, 233, 0.111);
+  background-color: transparent;
   display: flex;
   justify-content: center; 
   align-items:flex-start;
@@ -779,14 +779,24 @@ body.mat-active {
 body.mat-active::before {
   display: none;
 }
+/* The synthetic zone plates are made transparent so only the crisp mat
+   art and overlay show. */
 body.mat-active #deck,
 body.mat-active #discard,
 body.mat-active #lostZone,
 body.mat-active #active,
-body.mat-active #hand {
-  background: rgba(255, 255, 255, 0.04) !important;
+body.mat-active #hand,
+body.mat-active #bench,
+body.mat-active #prizes,
+body.mat-active #deckCover,
+body.mat-active #discardCover,
+body.mat-active #lostZoneCover {
+  background: transparent !important;
   box-shadow: none !important;
 }
 body.mat-active .outline {
-  border-color: rgba(255, 255, 255, 0.22) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
 }
