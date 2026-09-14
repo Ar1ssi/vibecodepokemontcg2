@@ -78,6 +78,12 @@ const applyMatLayoutToDoc = (layoutId, doc) => {
   for (const [name, value] of Object.entries(vars)) {
     root.style.setProperty(name, value);
   }
+  const scale =
+    document.documentElement?.style?.getPropertyValue('--mat-scale') ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('ptcg-sim.playmat.scale')
+      ? String((Number(localStorage.getItem('ptcg-sim.playmat.scale')) || 100) / 100)
+      : '1');
+  if (scale) root.style.setProperty('--mat-scale', scale);
 };
 
 /** @param {'self'|'opp'} target */

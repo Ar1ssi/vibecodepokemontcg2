@@ -114,8 +114,10 @@ test('layoutToCssVars emits a value for every zone property', () => {
     '--stadium-height',
     '--mat-fit',
     '--mat-aspect',
+    '--mat-height',
     '--mat-width',
     '--mat-offset-x',
+    '--mat-offset-y',
     '--mat-sheet-aspect',
   ]) {
     assert.ok(vars[name], `expected ${name} to be set`);

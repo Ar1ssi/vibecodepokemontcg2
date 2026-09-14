@@ -31,10 +31,10 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   const mats = listMats();
 
   const SCALE_KEY = 'ptcg-sim.playmat.scale';
-  let currentScale = 85;
+  let currentScale = 100;
   try {
     const saved = localStorage.getItem(SCALE_KEY);
-    if (saved) currentScale = Number(saved) || 85;
+    if (saved) currentScale = Number(saved) || 100;
   } catch {}
   document.documentElement.style.setProperty('--mat-scale', currentScale / 100);
 
@@ -65,9 +65,14 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
   const zoomVal = panelEl.querySelector('#matZoomVal');
 
   zoomSlider?.addEventListener('input', (e) => {
-    currentScale = Number(e.target.value) || 85;
+    currentScale = Number(e.target.value) || 100;
     if (zoomVal) zoomVal.textContent = `${currentScale}%`;
-    document.documentElement.style.setProperty('--mat-scale', currentScale / 100);
+    const scaleVal = String(currentScale / 100);
+    document.documentElement.style.setProperty('--mat-scale', scaleVal);
+    const selfDoc = document.getElementById('selfContainer')?.contentDocument;
+    const oppDoc = document.getElementById('oppContainer')?.contentDocument;
+    selfDoc?.documentElement?.style.setProperty('--mat-scale', scaleVal);
+    oppDoc?.documentElement?.style.setProperty('--mat-scale', scaleVal);
     try {
       localStorage.setItem(SCALE_KEY, String(currentScale));
     } catch {}

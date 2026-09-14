@@ -4,11 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 122
-Focus: feature (board-ui) — overlapping prize cards layout matching playmat
-Active: done. Converted `#prizes` in `self-containers.css` and `opp-containers.css` to an overlapping 3-row grid
-  where cards on the left are mostly overshadowed by cards on the right, matching the playmat SVG's
-  staggered card geometry and hover-elevating for clear inspection. All 60 tests pass.
+Session: 123
+Focus: fix (board-ui) — unify playmat and zone geometry for sub-pixel card alignment
+Active: done. Removed broken object-fit cover stretching, tied mat art, zones SVG overlay,
+  and child playmat iframes to identical aspect-locked coordinates and dynamic --mat-scale.
+  Positioned deck/discard counters dynamically. Verified sub-pixel slotting via Playwright.
 Next: user visual review in browser.
 Blocked: nothing.
 
@@ -29,7 +29,7 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S123 2026-09-14 fix: unify playmat and zone geometry for sub-pixel card alignment.
 - S122 2026-09-14 feature: overlapping prize cards layout matching playmat.
 - S121 2026-09-14 feature: playmat zones SVG overlay, zone alignment & remove low-opacity highlights.
-- S120 2026-09-14 feature: playmat zoom control and 85% scale for edge-to-edge mats.
 
