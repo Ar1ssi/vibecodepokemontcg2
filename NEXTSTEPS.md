@@ -10,12 +10,63 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | 2 | done | 3ed257c | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
 | 3 | done | 4ff5744 | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
 | 4 | done | 2b1f463 | `click-events.js` gating (new `attack-preview-gate.js`) + sidebox button routing |
-| 5 | **next** | — | Ability zones (D5) + bench overlay wiring (D6) |
-| 6 | todo | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
+| 5 | done | 8d29497 | Ability zones (D5) + bench overlay wiring (D6) |
+| 6 | **next** | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
 
 > [!IMPORTANT]
 > Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
 > slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+
+## S125 — slice 5 done
+
+Built ability zones (D5) + bench overlay wiring (D6). No panel deletion yet — that's slice 6.
+
+**`shared/engine/rules/collect-usable-abilities.mjs`** — new `benchCardHasAbility(card)`:
+`isUsableAbilityCard(card, { rulesEnabled: false })`, i.e. "has an interactive ability" independent
+of whether it's been used this turn. Needed because D6's bench-click gate cares only about
+*presence* (open the overlay if the card has an ability at all), while D4/R10 still needs the
+already-used case to render plain-but-visible inside the overlay — so `filterUsableAbilities`'s
+pre-filtered list (used abilities dropped) can't answer either question alone.
+
+**`click-events.js`** — `imageClick()`'s gate now computes `hasAbility` via `benchCardHasAbility`
+only for `zoneId === 'bench'` (unset for `'active'`, matching the gate's own contract). On the
+gate's `'ability'` decision, opens `openAttackPreview(mouseClick.card, mouseClick.card.image, {
+zone: 'bench' })`. The `'attack'` branch (slice 4) is untouched.
+
+**`attack-preview.js`** — new `abilityInfoFor(card)` (presence via `benchCardHasAbility`, usability
+via `abilityUsed('self', card)`) and `buildAbilityZoneEl`. `renderZones()` now always renders the
+ability zone first (via `abilityZoneBounds`) before branching: bench overlays return right after
+(D6 — ability zone only, no attack band); active overlays continue into the existing attack-list
+render, now passing the real `abilityCount` (0 or 1) into `listAttackZoneBounds` so an ability
+pushes the attack band down (D5, geometry already built in slice 3). An ability zone click calls
+`runAbilitySteps('self', card)` (imported from `rules-bridge.js` — no circular import, that module
+never imports `attack-preview.js`) and deliberately does **not** call `closeAttackPreview()`: D5/R12
+say using an ability doesn't end the turn, so the overlay stays open and the existing REFRESH_EVENTS
+subscription (already wired in slice 3) re-renders it once the ability's own board mutation fires.
+An already-used ability zone gets `.ability-zone--unusable`, no click handler, and `title =
+'Already used this turn'` — same D4 treatment as unpayable attacks.
+
+**No new geometry/gate code needed** — `abilityZoneBounds()` (slice 3) and the gate's `'ability'`
+branch (slice 4, per its own S124 note: "the gate function below already has a branch for it")
+were both already built and already unit-tested (`attack-zone-geometry.test.mjs`,
+`attack-preview-gate.test.mjs`) against exactly this slice's cases. Added 3 new
+`benchCardHasAbility` tests to `rules-extended.test.mjs` (already in `package.json`'s test list).
+
+**Found in passing:** `attack-preview-gate.test.mjs` and `resolve-attack-context.test.mjs` (built
+in slices 1 and 4 respectively) were never added to `package.json`'s explicit `pnpm test` list —
+`pnpm test` was silently not running them. Fixed (2-line addition) since it's directly relevant to
+this slice's own new coverage; not a rewrite of test infra, just closing a registration gap.
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint". `node
+--check` (syntax only, not `pnpm test`/lint) confirms all 4 touched/new-content JS files parse
+clean, consistent with slices 1-5's "node -c only" precedent — same as S57-S61. `pnpm test` is
+owed before slice 6: expect the 3 new `benchCardHasAbility` tests on top of slice 4's baseline,
+plus `attack-preview-gate.test.mjs`/`resolve-attack-context.test.mjs` now actually running (they
+were previously silently skipped). Manual verification (`pnpm start`) also owed: click your own
+active with an ability to see it shift the attack band down; click a benched Pokémon with an
+ability to see the ability-only bench overlay open; click one without an ability to confirm
+today's select-to-move still holds (E10); use an ability from either overlay and confirm it stays
+open and re-renders unusable afterward (R12/E11); confirm the opponent's bench never opens one (R2).
 
 ## S124 — slice 4 done
 

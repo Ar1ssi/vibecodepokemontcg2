@@ -4,16 +4,18 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 124
-Focus: feature — design 008 (TCG Live attack preview), slice 4
-Active: done. Component 4 (click-events.js gating) + Component 7 (sidebox button routing) built.
-  New pure `client/src/setup/rules/attack-preview-gate.js` (`shouldOpenAttackPreview`) covers R1/R2/D6's
-  decision logic and is unit-tested for all 6 verification-plan cases. `imageClick()`'s final else
-  branch and both sidebox attackButtons now open `openAttackPreview()` when rules mode is on;
-  bench/ability wiring stays `hasAbility: false` until slice 5. Commit 2b1f463.
-Next: slice 5 — ability zones (D5) + bench overlay wiring (D6), per `NEXTSTEPS.md`. Run `pnpm
-  test`/`pnpm lint` first (not run this session per user instruction) before starting. Slice 6
-  (deleting the Attack Window panel) must stay last or rules mode is unplayable in between.
+Session: 125
+Focus: feature — design 008 (TCG Live attack preview), slice 5
+Active: done. Ability zones (D5) + bench overlay wiring (D6) built. New `benchCardHasAbility()`
+  (`collect-usable-abilities.mjs`) drives the D6 bench-click gate in `click-events.js`;
+  `attack-preview.js` renders an ability zone on both active overlays (shifts the attack band down
+  per D5) and bench-only overlays (D6), usable ones invoking `runAbilitySteps` without closing the
+  overlay (R12). Also registered two slice 1/4 test files that were never added to `pnpm test`'s
+  list (`attack-preview-gate.test.mjs`, `resolve-attack-context.test.mjs`). Commit 8d29497.
+Next: slice 6 (final) — delete the Attack Window panel + its CSS, integration + edge-case sweep,
+  per `NEXTSTEPS.md`. Run `pnpm test`/`pnpm lint` first (not run since slice 3, per user
+  instruction) before starting — this is the last chance to catch a regression before the panel
+  (rules mode's only fallback) is deleted.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -28,12 +30,12 @@ Blocked: nothing.
 - Card-preview geometry is subtler than it looks: `previewSizeForSource` sizes the pop host from
   the SOURCE rect's aspect, and the plain-image face uses `object-fit: contain` while the holo
   face uses `cover`. Anything positioned as a % of the card face will misalign (design 008 R4).
-- `native-deck-builder-*.js` (the whole native deck builder UI-wiring layer) has zero unit tests
-  — no jsdom harness exists for it in this repo. Pure logic it calls into (deck-state.mjs,
-  card-sort.mjs, set-browser.mjs, etc.) IS unit-tested; keep new deck-builder logic there and
-  keep the *.js UI files thin callers, so behavior stays testable even though the wiring isn't.
+- Before deleting `buildAttackWindow` (slice 6), re-read Component 5's own note (R11): its
+  "no attacks resolved" `console.warn` + visible hint is a real data-plumbing diagnostic and must
+  land in the overlay's empty state (already done — `attack-preview.js`'s `emptyStateEl`, slice 3)
+  before the panel goes, not after.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S125 2026-09-14 feature: design 008 slice 5 — ability zones + bench overlay wiring.
 - S124 2026-09-14 feature: design 008 slice 4 — click-events.js gating + sidebox attack routing.
 - S123 2026-09-14 review: design 008 reviewed; decisions D1–D4 + findings R1–R9 recorded.
-- S122 2026-09-14 feature: overlapping prize cards layout matching playmat.
