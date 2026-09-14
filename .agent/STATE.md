@@ -10,7 +10,11 @@ Focus: review + patch — design 009 (TCG Live table). S130 built all 6 slices u
   fixed the review findings (2 commits: build as found, then fixes).
 Active: fixes done and fast-forward merged to main (7adc417), per user. Primary checkout synced;
   its stale uncommitted 009 tree was verified identical to commit 4114449, then replaced.
-Next: user checks localhost (tilt feel, mat art vs zones, hand crop and lift, deck stack). Then run
+  Localhost look (user): zones sit on the art. Follow-up fix on branch, NOT pushed: non-holo hand
+  hover and the raised deck cover were overridden by resetImage()'s inline `transform`; now use
+  the `translate` property. User says the table "reads as multiple planes", but measured it is one
+  plane; asked what they mean, no answer yet.
+Next: push the follow-up if the user OKs. Pin down "multiple planes" with the user. Then run
   `pnpm test:2p` and the authoritative 2P run (`SERVER_AUTHORITATIVE=1 PORT=4100`).
   Carried: I39 (flip-gate-test.mjs) untested; bot runs only used the fixture deck (I35).
 Blocked: design 009 formal approval + localhost look (user).

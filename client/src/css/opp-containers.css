@@ -379,8 +379,9 @@ img.draw-flight-source,
   left: 0;
   position: relative;
   z-index: 1;
-  /* Sits on top of the #deckStack layers. */
-  transform: translateY(calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px)));
+  /* Sits on top of the #deckStack layers. `translate`, not `transform`:
+     resetImage() writes an inline `transform` on the cover <img>. */
+  translate: 0 calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px));
 }
 /* Mirror of self-containers.css's #deckStack; see the comment there. */
 #deckStack {

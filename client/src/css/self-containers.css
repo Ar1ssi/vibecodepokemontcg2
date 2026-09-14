@@ -224,12 +224,14 @@ body, input, textarea, button {
   height: calc(200% / 3);
   margin-left: .25vw;
   margin-right: .25vw;
-  transition: transform 0.15s ease;
+  transition: translate 0.15s ease;
   position: relative;
 }
+/* `translate`, not `transform`: resetImage() writes an inline
+   `transform: rotate(...)` on every card <img>, which would win. */
 #hand > img:hover,
 #hand > .mat-holo:hover {
-  transform: translateY(-50%);
+  translate: 0 -50%;
   z-index: 10;
 }
 #hand .mat-holo img {
@@ -403,8 +405,9 @@ img.draw-flight-source,
   left: 0;
   position: relative;
   z-index: 1;
-  /* Sits on top of the #deckStack layers. */
-  transform: translateY(calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px)));
+  /* Sits on top of the #deckStack layers. `translate`, not `transform`:
+     resetImage() writes an inline `transform` on the cover <img>. */
+  translate: 0 calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px));
 }
 /* Same box as #deckCover, painted before it (earlier in the DOM). Layers are
    card-sized like the contain-fitted cover image; each is offset one step
