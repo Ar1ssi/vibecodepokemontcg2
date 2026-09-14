@@ -18,6 +18,7 @@ import test from 'node:test';
       isUsableAbilityCard,
       collectUsableAbilityCandidates,
       filterUsableAbilities,
+      benchCardHasAbility,
     } = await import('../collect-usable-abilities.mjs');
     
     // ── KO / prizes ──
@@ -3140,6 +3141,26 @@ import test from 'node:test';
         ability: { name: 'Thick Fat', text: 'While this Pokémon is in play, it takes 30 less damage from attacks.' },
       };
       assert.equal(isUsableAbilityCard(card), false);
+    });
+
+    test('benchCardHasAbility: true for actionable ability regardless of used-this-turn', () => {
+      const card = {
+        name: 'Bidoof',
+        ability: { name: 'Carefree Countenance', text: 'Once during your turn, you may draw a card.' },
+      };
+      assert.equal(benchCardHasAbility(card), true);
+    });
+
+    test('benchCardHasAbility: false for a passive (non-interactive) ability', () => {
+      const card = {
+        name: 'T',
+        ability: { name: 'Thick Fat', text: 'While this Pokémon is in play, it takes 30 less damage from attacks.' },
+      };
+      assert.equal(benchCardHasAbility(card), false);
+    });
+
+    test('benchCardHasAbility: false for a card with no ability at all', () => {
+      assert.equal(benchCardHasAbility({ name: 'Pidgey', type: 'Pokémon' }), false);
     });
 
     test('filterUsableAbilities: active + bench with two actionable abilities', () => {

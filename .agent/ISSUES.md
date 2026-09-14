@@ -16,6 +16,11 @@
     RENUMBERED from I36 on merge into this branch: the two sessions ran concurrently and both
     claimed I36/S89. This branch's numbering is the incumbent; the fix/bot-authoritative commit
     message still says I36.
+- I44 2026-09-14 P3 [rules] Attack inheritance never inherits — `mergeInheritedAttacks` is dead in practice
+    because the only live call site passes `priorAttacks: []` (rules-bridge.js:305); that call site is
+    deleted by design 008 slice 6, which also drops its per-refresh chat announcement (refs: 008 R8/R7, S123)
+    RENUMBERED from I43 on merge into claude/cpu-testing-live-render-anr7fy: both branches
+    independently claimed I43. The design 008 doc still refers to it as I43.
 - I39 2026-09-11 P2 [netcode] flip-gate-test.mjs fails right after both hands are dealt (timeout waiting for a page predicate) on main fe0ad88 with S102's changes stashed — pre-existing; the server-authoritative exit gate is currently red. (refs: S102)
 - I41 2026-09-11 P3 [netcode] legacy mode: after both players leave and join a fresh room, the second player once stayed in setup with prizes but no opening hand (1 sample, S102 second-game probe). Untriaged. (refs: S102)
 - I35 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed

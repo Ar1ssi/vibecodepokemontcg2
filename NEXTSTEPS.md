@@ -1,4 +1,320 @@
+# Active work — design 008: TCG Live attack preview
+
+Branch: `claude/brave-volta-nu3duk`. Full plan: `.agent/designs/008-tcg-live-attack-preview.md`
+(status: reviewed, decisions D1–D6 confirmed, findings R1–R12, no open questions).
+One commit per slice; each commit leaves `pnpm test` green. `/clear` between slices.
+
+| Slice | Status | Commit | Notes |
+|---|---|---|---|
+| 1 | done | befcf56 | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
+| 2 | done | 3ed257c | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
+| 3 | done | 4ff5744 | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
+| 4 | done | 2b1f463 | `click-events.js` gating (new `attack-preview-gate.js`) + sidebox button routing |
+| 5 | done | 8d29497 | Ability zones (D5) + bench overlay wiring (D6) |
+| 6 | done | c761d81 | Deleted the Attack Window panel + its CSS |
+
+**Design 008 is complete — all 6 slices shipped.** The click-to-open overlay
+(`attack-preview.js`) is now the only attacks/abilities UI; `#rulesAttackWindow` /
+`buildAttackWindow()` are gone. Remaining work: the manual verification checklist in the design
+doc's "Verification Plan" (§ Manual Verification) has not been run against a live `pnpm start`
+session in this harness (no browser available to this session) — do that before considering 008
+fully closed, or delegate it to a session that can drive a browser (see `.claude/agents/` /
+the `run` skill).
+
+## S126 — slice 6 done (design 008 complete)
+
+Deleted `buildAttackWindow()`/`#rulesAttackWindow` from `rules-bridge.js` (its call site in
+`initializeRulesEngine()`, the function body, and the now-dead `listUsableActions` /
+`collectUsableAbilityCandidates` / `filterUsableAbilities` / `attack` / `resolveAttackContext`
+imports it alone used) and the `.rules-aw-*` CSS block from `index.css`. Confirmed the R11
+"no attacks resolved" diagnostic hint is already ported into `attack-preview.js` (slice 3) before
+deleting — that was the one thing slice 6 had to check first. Marked the
+`docs/card-types-taxonomy.md` "Attack window UI" appendix superseded (left the history in place
+rather than rewriting it — it's >5 lines, out of scope for a pass-through fix). No remaining
+references to `rulesAttackWindow`/`buildAttackWindow` outside a pre-existing, unrelated
+`client/src/css/index.css.bak`. `pnpm test`: 1362/1365 pass, same 3 pre-existing
+network-dependent failures as baseline. Commit c761d81.
+
+## S125 — slice 5 done
+
+Built ability zones (D5) + bench overlay wiring (D6). No panel deletion yet — that's slice 6.
+
+**`shared/engine/rules/collect-usable-abilities.mjs`** — new `benchCardHasAbility(card)`:
+`isUsableAbilityCard(card, { rulesEnabled: false })`, i.e. "has an interactive ability" independent
+of whether it's been used this turn. Needed because D6's bench-click gate cares only about
+*presence* (open the overlay if the card has an ability at all), while D4/R10 still needs the
+already-used case to render plain-but-visible inside the overlay — so `filterUsableAbilities`'s
+pre-filtered list (used abilities dropped) can't answer either question alone.
+
+**`click-events.js`** — `imageClick()`'s gate now computes `hasAbility` via `benchCardHasAbility`
+only for `zoneId === 'bench'` (unset for `'active'`, matching the gate's own contract). On the
+gate's `'ability'` decision, opens `openAttackPreview(mouseClick.card, mouseClick.card.image, {
+zone: 'bench' })`. The `'attack'` branch (slice 4) is untouched.
+
+**`attack-preview.js`** — new `abilityInfoFor(card)` (presence via `benchCardHasAbility`, usability
+via `abilityUsed('self', card)`) and `buildAbilityZoneEl`. `renderZones()` now always renders the
+ability zone first (via `abilityZoneBounds`) before branching: bench overlays return right after
+(D6 — ability zone only, no attack band); active overlays continue into the existing attack-list
+render, now passing the real `abilityCount` (0 or 1) into `listAttackZoneBounds` so an ability
+pushes the attack band down (D5, geometry already built in slice 3). An ability zone click calls
+`runAbilitySteps('self', card)` (imported from `rules-bridge.js` — no circular import, that module
+never imports `attack-preview.js`) and deliberately does **not** call `closeAttackPreview()`: D5/R12
+say using an ability doesn't end the turn, so the overlay stays open and the existing REFRESH_EVENTS
+subscription (already wired in slice 3) re-renders it once the ability's own board mutation fires.
+An already-used ability zone gets `.ability-zone--unusable`, no click handler, and `title =
+'Already used this turn'` — same D4 treatment as unpayable attacks.
+
+**No new geometry/gate code needed** — `abilityZoneBounds()` (slice 3) and the gate's `'ability'`
+branch (slice 4, per its own S124 note: "the gate function below already has a branch for it")
+were both already built and already unit-tested (`attack-zone-geometry.test.mjs`,
+`attack-preview-gate.test.mjs`) against exactly this slice's cases. Added 3 new
+`benchCardHasAbility` tests to `rules-extended.test.mjs` (already in `package.json`'s test list).
+
+**Found in passing:** `attack-preview-gate.test.mjs` and `resolve-attack-context.test.mjs` (built
+in slices 1 and 4 respectively) were never added to `package.json`'s explicit `pnpm test` list —
+`pnpm test` was silently not running them. Fixed (2-line addition) since it's directly relevant to
+this slice's own new coverage; not a rewrite of test infra, just closing a registration gap.
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint". `node
+--check` (syntax only, not `pnpm test`/lint) confirms all 4 touched/new-content JS files parse
+clean, consistent with slices 1-5's "node -c only" precedent — same as S57-S61. `pnpm test` is
+owed before slice 6: expect the 3 new `benchCardHasAbility` tests on top of slice 4's baseline,
+plus `attack-preview-gate.test.mjs`/`resolve-attack-context.test.mjs` now actually running (they
+were previously silently skipped). Manual verification (`pnpm start`) also owed: click your own
+active with an ability to see it shift the attack band down; click a benched Pokémon with an
+ability to see the ability-only bench overlay open; click one without an ability to confirm
+today's select-to-move still holds (E10); use an ability from either overlay and confirm it stays
+open and re-renders unusable afterward (R12/E11); confirm the opponent's bench never opens one (R2).
+
+## S124 — slice 4 done
+
+Built Component 4 (click gating) + Component 7 (sidebox routing). No ability/bench UI yet — that's
+slice 5's job per the work plan; the gate function below already has a branch for it.
+
+**New `client/src/setup/rules/attack-preview-gate.js`** — pure `shouldOpenAttackPreview({ zoneId,
+cardUser, hasSelectHighlight, hasAbility, gate })` returning `'attack' | 'ability' | null`. Kept out
+of `attack-preview.js` on purpose so it unit-tests without pulling in that module's DOM-heavy
+imports (`full-view.js`, `chat-buttons.js`) — R9. `hasSelectHighlight` short-circuits first (R1: the
+move-to-active flow owns that click), then `cardUser !== 'self'` (R2: both iframes have an `#active`,
+so `zoneId` alone can't tell your active from the opponent's). `zoneId: 'active'` returns `'attack'`
+iff `gate.allowed`; `zoneId: 'bench'` returns `'ability'` iff `hasAbility`, independent of `gate` (an
+ability isn't gated by attack-turn legality). Everything else is `null`. Unit tests in
+`__tests__/attack-preview-gate.test.mjs` cover all 6 cases from the verification plan.
+
+**`click-events.js`** — `imageClick()`'s final `else` branch (i.e. no `selectHighlight`, so R1 holds)
+now checks `rulesState.enabled` first (E14: no gate at all in free-play), then calls the gate with
+`hasAbility: false` (bench wiring is slice 5's) and `gate: canPerformAction({ user: mouseClick.cardUser,
+action: 'attack' })`. On `'attack'` it calls slice 3's `openAttackPreview(mouseClick.card,
+mouseClick.card.image, { zone: 'active' })` and returns before the highlight/select code runs; on
+anything else (including today's always-null bench case) it falls through unchanged, so E10 (bench,
+no ability, still select-to-move) and R3 (right-click still opens the context menu — untouched) both
+hold as before.
+
+**Sidebox routing (`sidebox/p1/chat-buttons.js`, `sidebox/p2/chat-buttons.js`)** — `attackButton`/
+`p2AttackButton` now resolve the acting user exactly as `attack()` itself would (`systemState.initiator`
+in 2P, else the fixed `'self'`/`'opp'`), then when `rulesState.enabled` look up that side's active card
+via `getActivePokemonCard(getZone(user, 'active'))` and call `openAttackPreview` instead of `attack()`
+directly. Free-play (`rulesState.enabled === false`) or no active card falls through to the original
+direct `attack(user)` call, so nothing changes when rules mode is off (D2/E14). Retreat/Pass sidebox
+buttons are untouched per D2 — they stay a separate, mirrored entry point.
+
+Manual verification (R1/R2/R3/E14) deferred to slice 6's integration sweep per the work plan; `pnpm
+test`/`pnpm lint` not run this session per user instruction — next session should run both before
+starting slice 5.
+
+## S71 — slice 3 done
+
+Built Component 1 core (attack zones + Retreat/Pass only — abilities and the bench overlay are
+slice 5's job, per the work plan) and Component 6 CSS.
+
+**New `client/src/setup/rules/attack-zone-geometry.js`** — pure, DOM-free geometry (R9): `
+attackZoneBounds`/`listAttackZoneBounds` divide the ~52%-85% attack band into `attackCount` equal
+shares and shift the whole band down per `abilityCount` (D3, D5's shift); `abilityZoneBounds`
+returns the band just above it (unused by any DOM code yet — slice 5 wires it, styles already
+exist per Component 6); `computeContentBox` implements R4's letterbox math — `cover`/no-natural-size
+returns the full box (the mat-holo path, whose CSS already forces it to 100%/100%), `contain`
+computes the actual visible rectangle from `naturalWidth`/`naturalHeight` so zone percentages land
+on the artwork instead of the pillar/letterbox bars the plain-`<img>` path can have.
+
+**New `client/src/setup/rules/attack-preview.js`** — `openAttackPreview(card, targetImage, { zone
+})`, `closeAttackPreview()`, `isAttackPreviewOpen()`. Calls slice 2's `openFloatingCardPreview`
+with `interactive: true` and hooks `onOpened`'s `whenOpened` promise (R6 — zones only ever mount
+after the pop animation *finishes*, never at DOM mount, so a mid-spin click can't hit one).
+`renderZones()` re-derives energy/cost via `resolveAttackContext` + `listUsableActions` exactly
+like the panel did, minus R7's `appendMessage` inheritance announcement (dropped for good, not
+rehomed — Component 5's own note says fold it into I43 once the panel goes in slice 6). Usable
+attacks get `.attack-zone--usable` (glow) and a click handler that closes the preview and calls
+`attack(rulesState.turnPlayer, true, idx)`; unpayable/once-used ones get `.attack-zone--unusable`
+(plain, inert, `title` = the `reason` string) per D4. R11's diagnostic (`console.warn` + the
+visible `id=… · data not loaded` hint) is carried over verbatim for the 0-attacks case. Retreat/Pass
+buttons mount as siblings in `.card-preview-overlay` (not inside the card face, per R5 — the face
+has `overflow:hidden`) and call `retreat('self')`/`pass('self')`, matching the sidebox convention.
+
+**R12 (re-render while open):** subscribes to the same 6 board-mutation events the panel used
+(minus the panel's own `rules-turn-began`/`rules-session-reset`, which close the overlay instead)
+and re-renders zones in place — but only once `zonesReady` (i.e. after `whenOpened` resolved), so
+an event firing mid-animation can't race the zone mount. `rules-turn-began`/`rules-session-reset`
+close the overlay outright (E13). Listeners are added in `onOpened` and torn down in `onClosed` —
+no listener survives a close.
+
+Bench overlays (`zone: 'bench'`): `renderZones` returns immediately with nothing rendered (no
+attack zones, no ability zones yet — D6's ability-only bench overlay is slice 5). The function
+accepts and stores `zone` now so slice 5 doesn't need to touch this file's call signature.
+
+**Component 6 CSS** added to `index.css` (`.attack-zone`, `.attack-zone--usable/--unusable`,
+`.attack-zone-label`, `.attack-preview-actions`, `.attack-preview-btn` + modifiers,
+`@keyframes attack-glow`) plus the `.ability-zone` variants up front since they're the same shapes
+— unused until slice 5 wires them, same pattern as the geometry file's unused `abilityZoneBounds`.
+Did **not** touch `#rulesAttackWindow`/`.rules-aw-*` — that deletion is Component 5/slice 6, and
+the panel is still the only working attacks UI until slice 5 lands (per the ledger's own warning).
+
+New `client/src/setup/rules/__tests__/attack-zone-geometry.test.mjs` (12 tests): 0/1/2/3-attack
+band division, non-overlap, ability-shift, out-of-range index, ability-zone presence/absence and
+placement above the attack band, and `computeContentBox`'s cover/missing-size/both-letterbox-
+directions/exact-match cases. Registered in `package.json`'s explicit test list (added after
+`mat-pick.test.mjs`, same directory).
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint tests."
+`pnpm test` (baseline 1334/1337 → expect 1346/1349 with these 12 new tests, same 3 pre-existing
+TCGdex-network failures) and `npx eslint` on the 3 touched/new JS files plus `index.css` are still
+owed before slice 4 starts. Manual verification (`pnpm start`) not done either — `openAttackPreview`
+has **no call site yet** (Component 4/slice 4 wires `click-events.js` to call it), so nothing in
+the running app changed this session; the Attack Window panel is untouched and still the only way
+to attack today. Everything uncommitted, no branch, matching S69/S70's pattern.
+
+## S70 — slice 2 done
+
+Modified `client/src/setup/image-logic/full-view.js` per Component 3:
+- `getPreviewPopHost()`: new exported getter, returns `cardPreviewState?.popHost ?? null` — the
+  one DOM seam `attack-preview.js` (slice 3) needs to mount hit-zones, without exposing the whole
+  internal state object.
+- `openFloatingCardPreview()` gained two new options: `onOpened` and `interactive` (both default
+  to off/false, so every existing caller — `openCardPreview`, `native-deck-builder.js` — is
+  unaffected).
+  - `onOpened({ popHost, overlay, whenOpened })` fires synchronously right after the overlay/pop
+    host are mounted and `playSelectPop` has been kicked off — matching Component 3's "after the
+    DOM is mounted and the pop animation starts." `whenOpened` is a promise that resolves only
+    when the pop animation actually **finishes** (wired as `playSelectPop`'s `onDone` callback,
+    previously unused — `null` — at this call site). This is deliberately handed back rather than
+    resolved internally: R6 says zone-click gating belongs to the *animation-end* signal, not
+    mount, and Component 3's own text only promises the mount-time fire — `whenOpened` lets slice
+    3 satisfy R6 without slice 2 needing to know anything about zones.
+  - `interactive`: stored on `cardPreviewState.interactive`; when true, the overlay's click
+    handler returns early for any click whose target isn't the overlay itself, instead of always
+    calling `preventDefault`/`stopPropagation` — so a click landing on a child (a future attack
+    zone) reaches that child's own listener instead of being swallowed by the overlay's
+    close-on-background-click handler. Default `false` reproduces today's overlay click behavior
+    exactly.
+- Updated the `cardPreviewState` JSDoc shape to include `interactive?: boolean`.
+
+No new call site wired yet — `interactive`/`onOpened` are unused until slice 3's
+`attack-preview.js` calls `openFloatingCardPreview` with them. Nothing in `openCardPreview()`
+(the double-click path) or `native-deck-builder.js`'s call changed.
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint tests."
+`pnpm test` and `npx eslint client/src/setup/image-logic/full-view.js` are still owed before
+slice 3 starts (baseline: 1334/1337, same 3 pre-existing TCGdex-network failures as S69). Manual
+double-click card preview comparison (`pnpm start`) also not done — should confirm the existing
+preview still opens/closes identically since default args are unchanged. Everything uncommitted,
+no branch, matching S69's pattern.
+
+## S69 — slice 1 done
+
+Built `shared/engine/rules/resolve-attack-context.mjs`: DOM-free helper wrapping
+`classifyEnergyEffect`/`resolveAttachedEnergyType` (energy-effects.mjs), `parseStadiumCostModifier`
+(stadium-effects.mjs), and `parseAttackInheritance` (ability-executors.mjs). Returns
+`{ energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks, inheritsAttacks }` — added
+`inheritsAttacks` (not in the original brief's return shape) so `rules-bridge.js` can keep its
+`appendMessage` inheritance announcement at the call site (R7) without re-deriving
+`parseAttackInheritance` itself. `priorAttacks` is hardcoded `[]` per R8/I43 — not "fixed" here.
+
+Refactored `rules-bridge.js`'s `refresh()` (lines ~282-307): the DOM-coupled energy filter
+(`getZone('self','active').array.filter(...)`) stays at the call site per the WARNING; the
+`appendMessage` chat announcement also stays, now gated on `inheritsAttacks`. Removed now-unused
+imports (`resolveAttachedEnergyType`, `parseStadiumCostModifier`, `parseAttackInheritance`) —
+`classifyEnergyEffect` stays imported, still used elsewhere in the file (line ~1090).
+
+New `shared/engine/rules/__tests__/resolve-attack-context.test.mjs`: 6 tests covering no active
+card, empty `attachedEnergyCards`, one `ensureCardData` rejection (skip-and-continue), null
+`stadiumCard`, a normal 2-energy + cost-modifier-stadium case, and `priorAttacks` staying `[]`
+even when inheritance text is present.
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint". `pnpm
+test` and `npx eslint` on the touched files are still owed before slice 2 starts (baseline to
+compare against: 1334/1337, 3 pre-existing TCGdex-network failures excluded). Manual Attack
+Window comparison (`pnpm start`) also not done. Everything uncommitted, no branch, per the
+09-2026 sessions' standing pattern (not explicitly re-confirmed this session — worth checking
+next time).
+
+## Slice 1 brief (self-contained — start here)
+
+**Goal:** extract the attack-context gathering that `rules-bridge.js` does inline into a shared,
+DOM-free, unit-tested helper, and have `rules-bridge.js` call it. Behaviour-neutral: the Attack
+Window must look and act exactly the same after this slice. No UI work, no new UI files.
+
+**Read first (and only these):**
+- `.agent/designs/008-tcg-live-attack-preview.md` — "Component 2", plus findings **R7** and **R8**
+- `client/src/setup/rules/rules-bridge.js:265–330` — the `refresh()` block being extracted
+- `shared/engine/rules/attack-window.mjs:119` — `listUsableActions()`, the consumer
+- `shared/engine/rules/__tests__/evolution.test.mjs` — test file style (node:test, top-level
+  `await import`, `assert/strict`)
+
+**Create `shared/engine/rules/resolve-attack-context.mjs`:**
+
+```javascript
+export async function resolveAttackContext({
+  activeCard,
+  attachedEnergyCards,   // caller supplies — see the DOM warning below
+  ensureCardData,        // injected async fn; must be try/caught per card
+  stadiumCard,           // may be null
+  abilityUsed,           // injected (card) => boolean
+}) // => { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks }
+```
+
+It should call `classifyEnergyEffect` + `resolveAttachedEnergyType` (`energy-effects.mjs:111,283`),
+`parseStadiumCostModifier` (`stadium-effects.mjs:444`) and `parseAttackInheritance`
+(`ability-executors.mjs:433`) — these are the exact functions the inline block uses today. The
+returned shape is what `listUsableActions()` already consumes, so don't redesign it.
+
+> [!WARNING]
+> **The energy filter is DOM-coupled and must NOT move into `shared/`.** The current line is
+> `getZone('self','active').array.filter(c => c.type === 'Energy' && c.image?.relative === active.image)`
+> — it compares live DOM nodes. That filtering stays in `rules-bridge.js`; the helper receives the
+> already-filtered `attachedEnergyCards` array. Same rule for `appendMessage()` (**R7**): the
+> attack-inheritance chat announcement stays on the client side and does not enter `shared/`.
+
+> [!NOTE]
+> `priorAttacks` is always `[]` at the live call site today, so inheritance never actually fires
+> (**R8**, tracked as I43). Preserve that behaviour exactly — return `[]`. Do not "fix" it in this
+> slice; it changes attack legality and belongs in its own change.
+
+**Then refactor `rules-bridge.js`:** replace lines ~279–307 with a `resolveAttackContext(...)` call,
+keeping the `appendMessage` inheritance announcement and the DOM energy filter at the call site.
+
+**Edge cases the helper must handle** (per the code standard — these need tests, not just code):
+no active card, `attachedEnergyCards` empty, `ensureCardData` rejecting for one energy card
+(skip it, keep going — today's `try {} catch {}` behaviour), and `stadiumCard` null.
+
+**Definition of done:**
+- `shared/engine/rules/__tests__/resolve-attack-context.test.mjs` covers the four edge cases above
+  plus a normal 2-energy case with a cost-modifier stadium.
+- `pnpm test` green. Baseline is **1334/1337** — the 3 failures in
+  `shared/engine/rules/__tests__/card-identity-live.test.mjs` hit TCGdex over the network and fail
+  in sandboxed sessions ("Host not in allowlist"). Don't chase them; don't count them as yours.
+- `npx eslint shared/engine/rules/resolve-attack-context.mjs <test file> client/src/setup/rules/rules-bridge.js`
+  clean **for those files** — repo-wide `pnpm lint` is red on pre-existing CRLF/`no-undef` noise.
+- Attack Window still renders identical attack rows with identical payability badges. Verify by
+  hand: `pnpm start`, load decks, reach main phase, compare against the pre-change panel.
+- No new dependency (if one becomes necessary, it needs a `.agent/DECISIONS.md` line first).
+
+---
+
 # Netcode repair — increment ledger
+
+> [!NOTE]
+> **Parked.** Phase 3 reached its flip gate (3.12 passing); flipping the flag is the user's call
+> (D8). The ledger below is kept as history — active work is the design 008 section above.
+
 
 Branch: `feature/netcode-repair`. Full plan: `.agent/designs/002-netcode-repair.md`.
 One commit per slice; each commit leaves `pnpm test` green. `/clear` between slices.

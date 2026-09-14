@@ -1946,6 +1946,113 @@ ul, li {
   pointer-events: none;
 }
 
+/* TCG Live-style attack selection overlay (design 008). Zones mount inside
+   .card-preview-face--front, positioned against the rendered content box
+   computed by attack-zone-geometry.js (R4 handles the letterbox math). */
+.attack-zone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  backdrop-filter: blur(2px);
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  text-align: center;
+}
+.attack-zone--usable {
+  cursor: pointer;
+  border-color: rgba(255, 214, 92, 0.55);
+  background: rgba(255, 214, 92, 0.08);
+  animation: attack-glow 1.6s ease-in-out infinite;
+}
+.attack-zone--usable:hover {
+  background: rgba(255, 214, 92, 0.22);
+  border-color: rgba(255, 214, 92, 0.9);
+}
+.attack-zone--unusable {
+  cursor: default;
+  pointer-events: auto;
+}
+.attack-zone-label {
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.attack-preview-empty {
+  position: static;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+@keyframes attack-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(255, 214, 92, 0.35); }
+  50% { box-shadow: 0 0 10px 3px rgba(255, 214, 92, 0.6); }
+}
+
+.attack-preview-actions {
+  position: fixed;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 2401;
+}
+.attack-preview-btn {
+  flex: 1;
+  max-width: 160px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.4rem;
+  background: rgba(20, 24, 34, 0.55);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.attack-preview-btn:hover {
+  background: rgba(20, 24, 34, 0.8);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.attack-preview-btn--retreat:hover { border-color: rgba(255, 153, 102, 0.8); }
+.attack-preview-btn--pass:hover { border-color: rgba(120, 200, 255, 0.8); }
+
+/* Ability zones (design 008 D5/D6) — wired starting slice 5; styles land now
+   so both slices share one CSS pass. */
+.ability-zone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  backdrop-filter: blur(2px);
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  text-align: center;
+}
+.ability-zone--usable {
+  cursor: pointer;
+  border-color: rgba(120, 200, 255, 0.55);
+  background: rgba(120, 200, 255, 0.08);
+  animation: attack-glow 1.6s ease-in-out infinite;
+}
+.ability-zone--usable:hover {
+  background: rgba(120, 200, 255, 0.22);
+  border-color: rgba(120, 200, 255, 0.9);
+}
+.ability-zone--unusable {
+  cursor: default;
+  pointer-events: auto;
+}
+
 /* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */
 .discard-pile-overlay {
   position: fixed;
@@ -4474,62 +4581,6 @@ body.side-menu-collapsed #boardButtonContainer {
     .native-deck-builder-mat-picker .native-deck-builder-mat-filter { display: none; }
     .native-deck-builder-mat-picker .native-deck-builder-section-title,
     .native-deck-builder-mat-picker .native-deck-builder-set-browser-series-tag { display: none; }
-
-    /* ── Attack Window ── */
-    #rulesAttackWindow {
-      position: fixed;
-      bottom: 12px;
-      left: 12px;
-      z-index: 9999;
-      background: rgba(20, 24, 32, 0.95);
-      border: 1px solid rgba(100, 140, 220, 0.4);
-      border-radius: 8px;
-      padding: 10px 14px;
-      max-width: 380px;
-      max-height: 45vh;
-      overflow-y: auto;
-      font-size: 0.82rem;
-      color: #dde;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    }
-    .rules-aw-title {
-      margin: 0 0 6px;
-      font-size: 0.95rem;
-      color: #aaccff;
-      border-bottom: 1px solid rgba(100,140,220,0.25);
-      padding-bottom: 4px;
-    }
-    .rules-aw-title.rules-aw-draggable {
-      cursor: move;
-      user-select: none;
-      touch-action: none;
-    }
-    .rules-aw-section {
-      font-weight: 600;
-      margin: 8px 0 3px;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #8899bb;
-    }
-    .rules-aw-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 6px;
-      border-radius: 4px;
-      margin: 2px 0;
-      cursor: default;
-    }
-    .rules-aw-clickable { cursor: pointer; }
-    .rules-aw-clickable:hover { background: rgba(80,120,200,0.2); }
-    .rules-aw-name { flex: 1; }
-    .rules-aw-cost { font-size: 0.9rem; letter-spacing: -1px; }
-    .rules-aw-dmg { color: #ff9966; font-size: 0.78rem; margin-left: 4px; }
-    .rules-aw-badge { font-size: 0.85rem; margin-left: auto; }
-    .rules-aw-usable { color: #55dd77; }
-    .rules-aw-unusable { color: #ff5555; }
-    .rules-aw-reason { font-size: 0.72rem; color: #999; margin-left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* ── Mat picker (Customize > Mat) ─────────────────────────────────────
        Same panel/grid look as the coin and sleeve pickers, with wide tiles:

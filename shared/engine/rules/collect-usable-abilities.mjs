@@ -26,6 +26,16 @@ export function isUsableAbilityCard(
   return actionable.length > 0;
 }
 
+/**
+ * True when a card carries an ability with at least one interactive step,
+ * independent of whether it's already been used this turn (design 008 D6 —
+ * the bench-overlay-opens gate cares only about presence, not usability; the
+ * overlay itself renders an already-used ability plain-but-visible per D4).
+ */
+export function benchCardHasAbility(card) {
+  return isUsableAbilityCard(card, { rulesEnabled: false });
+}
+
 /** Build scan candidates from active + bench (bench Pokémon only). */
 export function collectUsableAbilityCandidates(activeCard, benchCards = []) {
   const candidates = [];

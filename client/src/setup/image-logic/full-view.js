@@ -21,10 +21,15 @@ import {
 
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 
-/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement | null, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement, mode?: 'board' | 'float', onClosed?: () => void } | null} */
+/** @type {{ overlay: HTMLElement, popHost: HTMLElement, placeholder: HTMLElement | null, anchor: HTMLElement, host: HTMLElement | null, zoneDoc: Document, card?: { image: HTMLImageElement, wrapper?: HTMLElement, name?: string, type?: string, user?: string }, wrapper?: HTMLElement, mode?: 'board' | 'float', onClosed?: () => void, interactive?: boolean } | null} */
 let cardPreviewState = null;
 
 export const isCardPreviewOpen = () => cardPreviewState != null;
+
+// Attack-preview overlay (design 008) mounts its hit-zones inside the pop
+// host created here — this is the one seam it needs, not the whole state
+// object (which callers must not mutate).
+export const getPreviewPopHost = () => cardPreviewState?.popHost ?? null;
 
 export const resolvePreviewSleeveSrc = (card, image) => {
   const user = card?.user ?? card?.image?.user ?? image?.user ?? 'self';
@@ -180,6 +185,8 @@ export const openFloatingCardPreview = ({
   cloneFrom = null,
   hideSource = false,
   onClosed = null,
+  onOpened = null,
+  interactive = false,
 } = {}) => {
   if (cardPreviewState) {
     closeCardPreview(null, true);
@@ -229,7 +236,13 @@ export const openFloatingCardPreview = ({
     startPreviewHolo(wrapper);
   }
 
-  playSelectPop(popHost, null, null, hostRect, { startScale, endScale: 1 });
+  // R6: zone clicks (attack-preview.js) must gate on the pop animation
+  // finishing, not on this DOM mount — `whenOpened` is that signal.
+  let resolveOpened;
+  const whenOpened = new Promise((resolve) => {
+    resolveOpened = resolve;
+  });
+  playSelectPop(popHost, null, resolveOpened, hostRect, { startScale, endScale: 1 });
 
   cardPreviewState = {
     overlay,
@@ -243,15 +256,23 @@ export const openFloatingCardPreview = ({
     mode: 'float',
     closing: false,
     onClosed,
+    interactive,
   };
 
   overlay.addEventListener('click', (event) => {
+    if (interactive && event.target !== overlay) {
+      // Let the click reach whatever it landed on inside the card face
+      // (e.g. an attack-preview hit-zone) instead of being swallowed here.
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     if (event.target === overlay) {
       closeCardPreview(event);
     }
   });
+
+  onOpened?.({ popHost, overlay, whenOpened });
 
   overlay.addEventListener('contextmenu', (event) => {
     event.preventDefault();
