@@ -61,6 +61,9 @@ const escapeHtml = (value = '') => String(value)
           const imageUrl = card.images?.large || card.images?.small || card.image || '';
           const safeName = escapeHtml(card.name || 'Unknown Card');
           const safeSupertype = escapeHtml(card.supertype || 'Unknown');
+          const safeTypeLabel = card.rarity === 'Reverse Holo'
+            ? `${safeSupertype} · Reverse Holo`
+            : safeSupertype;
           const safeImageUrl = escapeHtml(imageUrl);
           const safeCssUrl = escapeHtml(escapeCssUrl(imageUrl));
     
@@ -68,7 +71,7 @@ const escapeHtml = (value = '') => String(value)
             <div class="native-deck-builder-deck-row" data-deck-row-index="${index}"${safeImageUrl ? ` data-preview-image="${safeImageUrl}"` : ''}>
               <span class="native-deck-builder-deck-row-qty">${card.count}</span>
               ${safeImageUrl ? `<img class="native-deck-builder-deck-row-thumb" src="${safeCssUrl}" alt="" loading="lazy" />` : '<span class="native-deck-builder-deck-row-thumb"></span>'}
-              <div class="native-deck-builder-deck-row-name">${safeName}<span class="native-deck-builder-deck-type">${safeSupertype}</span></div>
+              <div class="native-deck-builder-deck-row-name">${safeName}<span class="native-deck-builder-deck-type">${safeTypeLabel}</span></div>
               <div class="native-deck-builder-deck-row-controls">
                 <button class="native-deck-builder-deck-plus" data-add-index="${index}" aria-label="Add one ${safeName}" title="Add one ${safeName}">+</button>
                 <button class="native-deck-builder-deck-minus" data-remove-index="${index}" aria-label="Remove one ${safeName}" title="Remove one ${safeName}">&minus;</button>

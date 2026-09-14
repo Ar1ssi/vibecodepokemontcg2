@@ -123,21 +123,33 @@ const syncIframeLayouts = () => {
   applyMatLayoutToDoc(parentLayout.id, document);
 };
 
-/** Ensure each mat half has an <img> we can point at CDN art without hotlink watermarks. */
-const matHalfImage = (target) => {
+/** Ensure each mat half has both an ambient backdrop <img> and a crisp foreground <img>. */
+const matHalfImages = (target) => {
   const selector =
     target === 'opp' ? '#battleMatArt .mat-half-opp' : '#battleMatArt .mat-half-self';
   const half = document.querySelector(selector);
   if (!half) return null;
-  let img = half.querySelector('img.mat-art-image');
-  if (!img) {
-    img = document.createElement('img');
-    img.className = 'mat-art-image';
-    img.referrerPolicy = 'no-referrer';
-    img.alt = '';
-    half.appendChild(img);
+
+  let ambient = half.querySelector('img.mat-ambient-image');
+  if (!ambient) {
+    ambient = document.createElement('img');
+    ambient.className = 'mat-ambient-image';
+    ambient.referrerPolicy = 'no-referrer';
+    ambient.alt = '';
+    ambient.setAttribute('aria-hidden', 'true');
+    half.appendChild(ambient);
   }
-  return img;
+
+  let art = half.querySelector('img.mat-art-image');
+  if (!art) {
+    art = document.createElement('img');
+    art.className = 'mat-art-image';
+    art.referrerPolicy = 'no-referrer';
+    art.alt = '';
+    half.appendChild(art);
+  }
+
+  return { art, ambient };
 };
 
 /**
@@ -149,37 +161,48 @@ const matHalfImage = (target) => {
 const paintMatImageForTarget = (target, mat) => {
   const key = normalizeTarget(target);
   const token = ++matPaintToken[key];
-  const img = matHalfImage(key);
+  const images = matHalfImages(key);
 
-  if (!img) return;
+  if (!images) return;
+  const { art, ambient } = images;
 
   if (!mat?.image && !mat?.imageUrl && !mat?.board) {
-    img.removeAttribute('src');
-    img.hidden = true;
+    art.removeAttribute('src');
+    art.hidden = true;
+    ambient.removeAttribute('src');
+    ambient.hidden = true;
     return;
   }
 
-  img.hidden = false;
-  img.referrerPolicy = 'no-referrer';
+  art.hidden = false;
+  art.referrerPolicy = 'no-referrer';
+  ambient.hidden = false;
+  ambient.referrerPolicy = 'no-referrer';
 
   const primary = resolveMatBoardUrl(mat);
   const local = mat.image ? toAbsoluteClientPath(mat.image) : null;
   const remote = mat.imageUrl ? matImageProxyUrl(mat.imageUrl) : null;
 
   if (!primary) {
-    img.removeAttribute('src');
-    img.hidden = true;
+    art.removeAttribute('src');
+    art.hidden = true;
+    ambient.removeAttribute('src');
+    ambient.hidden = true;
     return;
   }
 
-  img.src = primary;
+  art.src = primary;
+  ambient.src = primary;
 
   // When local PNGs exist (dev), upgrade after load.
   if (local && remote && local !== remote) {
     const probe = new Image();
     probe.referrerPolicy = 'no-referrer';
     probe.onload = () => {
-      if (token === matPaintToken[key]) img.src = local;
+      if (token === matPaintToken[key]) {
+        art.src = local;
+        ambient.src = local;
+      }
     };
     probe.src = local;
   }
