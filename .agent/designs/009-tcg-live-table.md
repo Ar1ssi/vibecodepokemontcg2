@@ -234,10 +234,21 @@ object, so `tiltDeg: 0` gives a flat board if the tilt must be switched off in p
 | 6 | Knockout ghost animation, both modes (+ `onBeforeApply` hook) | pose/plan tests; KO visible on both screens in legacy and authoritative 2P runs |
 
 ## Deviations (Builder appends here during build)
-- Slice 2: tilt uses ancestor `perspective`/`perspective-origin` on each document's `<html>` plus
-  a plain `rotateX()` on `#playfield`/`#battleMat`, rather than baking `perspective(px)` into
-  `--tilt-transform` itself — needed so `eyeYFrac` has an effect independent of the rotation pivot.
-  See NEXTSTEPS.md's S130 slice-2 entry for the full reasoning.
+- Slice 2 (S130), REVERTED in S131: ancestor `perspective` on each `<html>` made the root the
+  containing block of every fixed zone and collapsed the board. S131: `--tilt-transform` is
+  `perspective(p) rotateX(±a)`, so each plane's eye point is its transform-origin, and all three
+  origins sit on the seam. `eyeYFrac` and `perspectiveOrigin` are dropped.
+- S131: halves are chosen by the frame's current class (`.self` = near, `.opp` = far), not its id.
+  The far half uses `rotateX(-a)`, which is the flip conjugate. `tiltTransforms` returns
+  `{ near, far, mat }`. The `#battleMat` box and pivot come from pure `battleMatBox()`.
+- S131: `#hand` has three bands (off-screen / strip / lift room), `pointer-events: none`, and the
+  strip is `#hand::before`. `--hand-crop-height` is in vh. A mat profile's `--hand-height` no
+  longer sizes the hand (mat-layouts test exempts it).
+- S131: the deck stack lives in a sibling `#deckStack`, not inside `#deckCover`, because
+  update-cover.js removes `firstElementChild`. `--deck-stack-dir` follows the frame class.
+- S131: the mirror gate is `shouldAnimateMirror({ syncReplaying, isCatchingUp, hidden })`.
+  `syncReplaying` is never set anywhere; `isCatchingUp` is what peer-log catch-up sets.
+- S131: a `zoneShuffledIntoDeck` event animates the deck, not its source zone.
 
 ---
 Self-approval checklist (only when the user is unreachable):

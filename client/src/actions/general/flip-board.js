@@ -204,9 +204,7 @@ export const flipBoard = () => {
     }
   }
   refreshBoard();
-  // Board flip toggles which physical iframe is on top; the tilt vars are
-  // written per-document, so nothing here actually needs new values, but a
-  // flipped iframe keeps its inherited custom properties across the swap.
-  // Re-applying is cheap and matches the design's "re-run on... board flip".
+  // The `.self`/`.opp` classes just swapped between the iframes; the tilt
+  // sign and deck-stack direction follow the class, so they must be rewritten.
   applyTableTilt();
 };

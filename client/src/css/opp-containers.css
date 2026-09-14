@@ -22,7 +22,7 @@
 :root {
   --hand-height: 32%;
   /* Mirror of self-containers.css; see the comment there. */
-  --hand-crop-height: 16%;
+  --hand-crop-height: 16vh;
 
   --bench-bottom: 34%;
   --bench-left: 20%;
@@ -46,6 +46,11 @@
   --deck-width: 9%;
   --deck-height: 28%;
   --deck-layer-px: 1.1px;
+  --deck-card-aspect: 0.716;
+  /* 1: this iframe is normally the flipped (far) half, where local "down" is
+     screen top. apply-table-tilt.js rewrites it on board flip. */
+  --deck-stack-dir: 1;
+  --deck-stack-count: 0;
 
   --discard-bottom: 35%;
   --discard-right: 1%;
@@ -58,24 +63,19 @@
   --lost-zone-height: 15%;
 
   --mat-aspect: none;
-  --mat-height: 100vh;
+  /* Zones live in #playfield, which stops at the hand strip. */
+  --mat-height: calc(100vh - var(--hand-crop-height));
   --mat-width: 100%;
   --mat-offset-x: 0px;
   --mat-offset-y: 0px;
-  --mat-half-height: 100vh;
+  --mat-half-height: calc(100vh - var(--hand-crop-height));
   --mat-container-width: 100%;
   --mat-scale: 1;
 
-  /* Table tilt (design 009 slice 2); mirror of self-containers.css. */
-  --tilt-perspective-px: 0px;
-  --tilt-perspective-origin: 50% 50%;
-  --tilt-transform: none;
+  /* Design 009 table tilt; mirror of self-containers.css (see the comment
+     there, including why `perspective` must never go on <html>). */
+  --tilt-transform: rotateX(0deg);
   --tilt-origin: 50% 0%;
-}
-
-html {
-  perspective: var(--tilt-perspective-px);
-  perspective-origin: var(--tilt-perspective-origin);
 }
 
 * {
@@ -168,31 +168,45 @@ body, input, textarea, button {
   transform: var(--tilt-transform);
   transform-origin: var(--tilt-origin);
 }
+/* Same three-band hand as self-containers.css (see the comment there), but
+   no hover lift: this iframe is flipped 180deg onto the screen, so the crop
+   reads as card backs peeking from the TOP edge. */
 #hand {
-  border-top: 3px solid rgba(188, 90, 113, 0.864);
   position: fixed;
-  bottom: 0;
+  bottom: calc(-1 * var(--hand-crop-height));
   left: 0;
   width: 100%;
-  height: calc(var(--hand-crop-height) - 3px);
+  height: calc(3 * var(--hand-crop-height));
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
+  scrollbar-width: none;
   display: flex;
   z-index: 5;
   align-items: flex-end;
+  pointer-events: none;
 }
-/* Cropped to a sliver, same as self-containers.css — but no hover lift: this
-   whole iframe is flipped 180deg onto the screen, so the crop reads as card
-   backs peeking from the TOP edge, and it can't be interacted with. */
+#hand::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--hand-crop-height);
+  box-sizing: border-box;
+  border-top: 3px solid rgba(188, 90, 113, 0.864);
+  pointer-events: auto;
+  z-index: -1;
+}
+#hand > * {
+  pointer-events: auto;
+}
 #hand img,
 #hand .mat-holo {
   box-sizing: border-box;
   width: auto;
-  height: calc(var(--hand-height) - 1.5vh);
-  margin-bottom: 1.5vh;
+  height: calc(200% / 3);
   margin-left: .25vw;
   margin-right: .25vw;
-  transform: translateY(calc(var(--hand-height) - var(--hand-crop-height)));
   position: relative;
 }
 #hand .mat-holo img {
@@ -365,17 +379,33 @@ img.draw-flight-source,
   left: 0;
   position: relative;
   z-index: 1;
+  /* Sits on top of the #deckStack layers. */
+  transform: translateY(calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px)));
+}
+/* Mirror of self-containers.css's #deckStack; see the comment there. */
+#deckStack {
+  position: fixed;
+  bottom: var(--deck-bottom);
+  right: var(--deck-right);
+  width: var(--deck-width);
+  height: var(--deck-height);
+  container-type: size;
+  pointer-events: none;
+  z-index: 0;
 }
 .deck-stack-layer {
   position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: 0;
-  height: 4%;
-  border-radius: 2px;
-  background: linear-gradient(to bottom, #b7b7b7, #7c7c7c);
-  transform: translateY(calc(var(--deck-layer-i) * -1 * var(--deck-layer-px)));
-  z-index: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: min(100cqw, 100cqh * var(--deck-card-aspect));
+  height: min(100cqh, 100cqw / var(--deck-card-aspect));
+  box-sizing: border-box;
+  border-radius: 4.55% / 3.5%;
+  background: linear-gradient(to bottom, #9a9aa3, #5d5d66);
+  border-bottom: 1px solid #2e2e35;
+  transform: translateY(calc(var(--deck-stack-dir) * (var(--deck-layer-i) - 1) * var(--deck-layer-px)));
 }
 #deckText {
   position: fixed;
@@ -796,7 +826,7 @@ img.draw-flight-source,
       border: 1px solid rgba(160, 190, 255, 0.18);
     }
     /* hand strip */
-    #hand {
+    #hand::before {
       background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
       border-top: 1px solid rgba(160, 190, 255, 0.18);
     }
@@ -852,6 +882,7 @@ body.mat-active #discard,
 body.mat-active #lostZone,
 body.mat-active #active,
 body.mat-active #hand,
+body.mat-active #hand::before,
 body.mat-active #bench,
 body.mat-active #prizes,
 body.mat-active #deckCover,

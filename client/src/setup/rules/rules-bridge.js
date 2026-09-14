@@ -1053,6 +1053,7 @@ import {
                   if (
                     shouldAnimateMirror({
                       syncReplaying: !!systemState.syncReplaying,
+                      isCatchingUp: !!systemState.isCatchingUp,
                       hidden: typeof document !== 'undefined' && !!document.hidden,
                     })
                   ) {

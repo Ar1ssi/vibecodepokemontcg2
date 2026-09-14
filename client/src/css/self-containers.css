@@ -27,10 +27,11 @@
    near edge, percentages are of the iframe box. */
 :root {
   --hand-height: 32%;
-  /* Height of the cropped hand strip visible on screen (design 009 slice 1).
-     --hand-height stays the RAISED (hover) card height; unchanged so it keeps
-     lockstep with mat-layouts.mjs's `sim` profile / its unit test. */
-  --hand-crop-height: 16%;
+  /* Design 009: visible hand strip at the near edge. In vh (= % of this
+     iframe's height) so it also works inside calc() with other vh lengths and
+     apply-table-tilt.js can read it as a fraction. Hand cards are twice this
+     tall, so half of each card is cropped off-screen. */
+  --hand-crop-height: 16vh;
 
   --bench-bottom: 34%;
   --bench-left: 20%;
@@ -54,6 +55,11 @@
   --deck-width: 9%;
   --deck-height: 28%;
   --deck-layer-px: 1.1px;
+  --deck-card-aspect: 0.716;
+  /* -1: the stack rises toward screen top. apply-table-tilt.js writes 1 when
+     this iframe is the flipped (far) half. */
+  --deck-stack-dir: -1;
+  --deck-stack-count: 0;
 
   --discard-bottom: 35%;
   --discard-right: 1%;
@@ -66,27 +72,22 @@
   --lost-zone-height: 15%;
 
   --mat-aspect: none;
-  --mat-height: 100vh;
+  /* Zones live in #playfield, which stops at the hand strip. */
+  --mat-height: calc(100vh - var(--hand-crop-height));
   --mat-width: 100%;
   --mat-offset-x: 0px;
   --mat-offset-y: 0px;
-  --mat-half-height: 100vh;
+  --mat-half-height: calc(100vh - var(--hand-crop-height));
   --mat-container-width: 100%;
   --mat-scale: 1;
 
-  /* Table tilt (design 009 slice 2). apply-table-tilt.js overwrites these on
-     this document's <html>; with no tilt applied yet, --tilt-transform is
-     `none` and --tilt-perspective-px is 0, so #playfield renders exactly as
-     it did before this slice. */
-  --tilt-perspective-px: 0px;
-  --tilt-perspective-origin: 50% 50%;
-  --tilt-transform: none;
+  /* Design 009 table tilt; apply-table-tilt.js overwrites both. The default
+     is a no-op but NOT `none`, so #playfield is the containing block for its
+     fixed zones from first paint (no layout jump when the tilt arrives).
+     Never put `perspective` on <html>: it makes the ~0px-tall root the
+     containing block of every fixed element and collapses the board. */
+  --tilt-transform: rotateX(0deg);
   --tilt-origin: 50% 0%;
-}
-
-html {
-  perspective: var(--tilt-perspective-px);
-  perspective-origin: var(--tilt-perspective-origin);
 }
 
 * {
@@ -178,39 +179,57 @@ body, input, textarea, button {
   transform: var(--tilt-transform);
   transform-origin: var(--tilt-origin);
 }
+/* Design 009 hand. #hand is three strip-heights tall, bottom to top:
+   1. below the iframe's bottom edge (the viewport crops it),
+   2. the visible strip,
+   3. room for a hovered card to lift into.
+   Cards are two strips tall and sit on the bottom, so only their top half
+   shows. The box holds a lifted card, so nothing overflows vertically and the
+   horizontal scroller never clips the lift. The box is pointer-transparent so
+   band 3 does not block the playfield; cards and the strip (::before, which
+   hit-tests as #hand for drops) take pointer events. */
 #hand {
-  border-top: 3px solid rgba(90, 110, 188, 0.864);
   position: fixed;
-  bottom: 0;
+  bottom: calc(-1 * var(--hand-crop-height));
   left: 0;
   width: 100%;
-  height: calc(var(--hand-crop-height) - 3px);
+  height: calc(3 * var(--hand-crop-height));
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
+  scrollbar-width: none;
   display: flex;
   z-index: 5;
   align-items: flex-end;
+  pointer-events: none;
 }
-/* Cards render at full (raised) card height, then are pulled down by the
-   difference so only the top --hand-crop-height sliver sits above the strip's
-   border — the classic "half-cropped, peeking from the screen edge" look.
-   :hover cancels the pull so the whole card lifts clear of the mat. */
+#hand::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--hand-crop-height);
+  box-sizing: border-box;
+  border-top: 3px solid rgba(90, 110, 188, 0.864);
+  pointer-events: auto;
+  z-index: -1;
+}
+#hand > * {
+  pointer-events: auto;
+}
 #hand img,
 #hand .mat-holo {
   box-sizing: border-box;
   width: auto;
-  height: calc(var(--hand-height) - 1.5vh);
-  margin-bottom: 1.5vh;
+  height: calc(200% / 3);
   margin-left: .25vw;
   margin-right: .25vw;
-  transform: translateY(calc(var(--hand-height) - var(--hand-crop-height)));
   transition: transform 0.15s ease;
   position: relative;
 }
-#hand img:hover,
-#hand .mat-holo:hover,
-#hand .mat-holo:has(> img:hover) {
-  transform: translateY(0);
+#hand > img:hover,
+#hand > .mat-holo:hover {
+  transform: translateY(-50%);
   z-index: 10;
 }
 #hand .mat-holo img {
@@ -384,17 +403,35 @@ img.draw-flight-source,
   left: 0;
   position: relative;
   z-index: 1;
+  /* Sits on top of the #deckStack layers. */
+  transform: translateY(calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px)));
+}
+/* Same box as #deckCover, painted before it (earlier in the DOM). Layers are
+   card-sized like the contain-fitted cover image; each is offset one step
+   further, and the raised cover leaves their bottom edges showing. */
+#deckStack {
+  position: fixed;
+  bottom: var(--deck-bottom);
+  right: var(--deck-right);
+  width: var(--deck-width);
+  height: var(--deck-height);
+  container-type: size;
+  pointer-events: none;
+  z-index: 0;
 }
 .deck-stack-layer {
   position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: 0;
-  height: 4%;
-  border-radius: 2px;
-  background: linear-gradient(to bottom, #b7b7b7, #7c7c7c);
-  transform: translateY(calc(var(--deck-layer-i) * -1 * var(--deck-layer-px)));
-  z-index: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: min(100cqw, 100cqh * var(--deck-card-aspect));
+  height: min(100cqh, 100cqw / var(--deck-card-aspect));
+  box-sizing: border-box;
+  border-radius: 4.55% / 3.5%;
+  background: linear-gradient(to bottom, #9a9aa3, #5d5d66);
+  border-bottom: 1px solid #2e2e35;
+  transform: translateY(calc(var(--deck-stack-dir) * (var(--deck-layer-i) - 1) * var(--deck-layer-px)));
 }
 #deckText {
   position: fixed;
@@ -816,7 +853,7 @@ img.draw-flight-source,
       border: 1px solid rgba(160, 190, 255, 0.18);
     }
     /* hand strip */
-    #hand {
+    #hand::before {
       background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
       border-top: 1px solid rgba(160, 190, 255, 0.18);
     }
@@ -877,6 +914,7 @@ body.mat-active #discard,
 body.mat-active #lostZone,
 body.mat-active #active,
 body.mat-active #hand,
+body.mat-active #hand::before,
 body.mat-active #bench,
 body.mat-active #prizes,
 body.mat-active #deckCover,

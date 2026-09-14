@@ -16,13 +16,15 @@ test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side
   });
 });
 
-test('advisoryAnimationPlan: zoneShuffledIntoDeck also plans a shuffle', () => {
-  const event = { type: 'zoneShuffledIntoDeck', zoneId: 'hand', playerId: 'p1' };
-  assert.deepEqual(advisoryAnimationPlan(event, 'p1'), {
-    kind: 'shuffle',
-    user: 'self',
-    zoneId: 'hand',
-  });
+test('advisoryAnimationPlan: zoneShuffledIntoDeck animates the deck, not the source zone', () => {
+  for (const zoneId of ['hand', 'discard', 'board']) {
+    const event = { type: 'zoneShuffledIntoDeck', zoneId, playerId: 'p1' };
+    assert.deepEqual(advisoryAnimationPlan(event, 'p1'), {
+      kind: 'shuffle',
+      user: 'self',
+      zoneId: 'deck',
+    });
+  }
 });
 
 test('advisoryAnimationPlan: zoneShuffled with no zoneId returns null', () => {

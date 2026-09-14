@@ -1,17 +1,26 @@
 # Active work — design 009: TCG Live table rework
 
-Branch: none yet (working tree, per user instruction — no worktree, no commit this session).
-Full plan: `.agent/designs/009-tcg-live-table.md` (status: draft, awaiting user approval — user
-told this session to start slice 1 anyway).
+Branch: `claude/design-009-review-287815` (worktree `dawns-multi-stage-selection-8f8db1`).
+Commit 1 = S130's build as found; commit 2 = S131 review fixes. The primary checkout still holds
+S130's original uncommitted tree; discard it once this branch is accepted.
+Full plan: `.agent/designs/009-tcg-live-table.md` (status: draft; S131 deviations appended).
 
 | Slice | Status | Notes |
 |---|---|---|
-| 1 | done (uncommitted) | `#playfield` wrapper + cropped hand, no tilt yet |
-| 2 | done (uncommitted) | table-tilt.mjs + apply-table-tilt.js, tilt wired on both playfields + `#battleMat` |
-| 3 | done (uncommitted) | 3D deck stack |
-| 4 | done (uncommitted) | legacy mirror animations (shuffle + draw) |
-| 5 | done (uncommitted) | authoritative advisory animations wired |
-| 6 | done (uncommitted) | knockout ghost animation, both modes |
+| 1 | built, S131-fixed | `#playfield` + three-band cropped hand |
+| 2 | built, S131-fixed | perspective() in transform, far half negated, mat sized to playfields |
+| 3 | built, S131-fixed | `#deckStack` sibling + raised cover |
+| 4 | built, S131-fixed | mirror gate uses `isCatchingUp` |
+| 5 | built, S131-fixed | `zoneShuffledIntoDeck` animates the deck |
+| 6 | built | knockout ghost, both modes |
+
+## S131 — review fixes (read this first)
+Verified: `pnpm test` 1402/1402; headless Chromium on the real iframe HTML+CSS (zones full size,
+hand shows half of each card, no vertical hand scroll, strip hit-tests as `#hand`, lift band lets
+clicks through to the playfield, near edge wider / far edge narrower, 12px deck edge on both
+halves). NOT verified: the full app (parent `#battleMat` sizing/pivot, seam alignment with mat
+art, drag/drop from the flat hand onto the tilted bench), `pnpm test:2p`, the authoritative 2P
+run, the user's localhost look. Tune `tiltDeg`/`perspectivePx` (14 / 1400) with the user.
 
 ## S130 (cont.) — slice 6 done (design 009 all 6 slices built)
 

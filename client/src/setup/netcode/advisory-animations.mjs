@@ -11,9 +11,13 @@ export function advisoryAnimationPlan(event, selfPlayerId) {
 
   switch (event.type) {
     case 'zoneShuffled':
-    case 'zoneShuffledIntoDeck':
       if (!event.zoneId) return null;
       return { kind: 'shuffle', user, zoneId: event.zoneId };
+
+    // event.zoneId is the SOURCE zone (hand, discard, board); the shuffle
+    // itself happens in the deck, so that is where it animates.
+    case 'zoneShuffledIntoDeck':
+      return { kind: 'shuffle', user, zoneId: 'deck' };
 
     case 'cardsDrawn': {
       if (!Array.isArray(event.cards) || event.cards.length === 0) return null;

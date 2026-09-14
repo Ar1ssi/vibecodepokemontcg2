@@ -6,15 +6,14 @@ export function shouldAnimateDrawFlight({
   return !syncReplay && !syncReplaying && !hidden;
 }
 
-// Design 009 slice 4: a mirror-apply of the other player's live action also
-// sets syncReplay (moveCardBundle's isMirrorReplay / shuffle's !emit path) —
-// that flag alone can't distinguish "live action relayed to this client" from
-// true catch-up replay, so this predicate ignores it and gates only on
-// syncReplaying (actual catch-up) and tab visibility.
+// Design 009: a live action relayed from the other player also carries
+// syncReplay (moveCardBundle's isMirrorReplay, shuffle's !emit path), so
+// syncReplay cannot tell "mirror of a live action" from catch-up. Catch-up
+// replay of the peer log is flagged by systemState.isCatchingUp.
 export function shouldAnimateMirror({
-  syncReplay = false,
   syncReplaying = false,
+  isCatchingUp = false,
   hidden = false,
 } = {}) {
-  return !syncReplaying && !hidden;
+  return !syncReplaying && !isCatchingUp && !hidden;
 }

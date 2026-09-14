@@ -127,14 +127,27 @@ test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay / hidde
   assert.equal(shouldAnimateDrawFlight({ syncReplay: false, hidden: true }), false);
 });
 
-test('shouldAnimateMirror: ignores syncReplay (a live mirror-apply still sets it), gates on catch-up/hidden', () => {
+test('shouldAnimateMirror: live mirror animates; catch-up (isCatchingUp/syncReplaying) and hidden do not', () => {
   assert.equal(shouldAnimateMirror({}), true);
-  assert.equal(shouldAnimateMirror({ syncReplay: true }), true);
-  assert.equal(shouldAnimateMirror({ syncReplay: true, syncReplaying: false }), true);
   assert.equal(shouldAnimateMirror({ syncReplaying: true }), false);
-  assert.equal(shouldAnimateMirror({ syncReplay: true, syncReplaying: true }), false);
+  assert.equal(shouldAnimateMirror({ isCatchingUp: true }), false);
   assert.equal(shouldAnimateMirror({ hidden: true }), false);
-  assert.equal(shouldAnimateMirror({ syncReplay: true, hidden: true }), false);
+});
+
+test('mirror animation call sites pass isCatchingUp (the flag peer-log catch-up actually sets)', () => {
+  for (const rel of [
+    '../../../actions/zones/shuffle-zone.js',
+    '../../../actions/move-card-bundle/move-card.js',
+    '../../rules/rules-bridge.js',
+    '../../netcode/advisory-animations.js',
+  ]) {
+    const source = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+    const calls = source.match(/shouldAnimateMirror\(\{[^}]*\}\)/g) || [];
+    assert.ok(calls.length > 0, `${rel} calls shouldAnimateMirror`);
+    for (const call of calls) {
+      assert.match(call, /isCatchingUp: !!systemState\.isCatchingUp/, `${rel}: ${call}`);
+    }
+  }
 });
 
 test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => {

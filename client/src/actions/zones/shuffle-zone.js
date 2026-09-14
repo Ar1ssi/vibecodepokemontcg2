@@ -50,6 +50,7 @@ export const shuffleZone = (
     emit ||
     shouldAnimateMirror({
       syncReplaying: !!systemState.syncReplaying,
+      isCatchingUp: !!systemState.isCatchingUp,
       hidden: typeof document !== 'undefined' && !!document.hidden,
     })
   ) {

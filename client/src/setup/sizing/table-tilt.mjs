@@ -1,88 +1,104 @@
 /**
- * Pure tilt math for design 009 slice 2 (see .agent/designs/009-tcg-live-table.md,
+ * Pure tilt math for design 009 (see .agent/designs/009-tcg-live-table.md,
  * "Tilt (slices 1-2)").
  *
- * The board is three separate 3D rendering contexts: the self iframe, the opp
- * iframe (each its own document — a `perspective()`/`rotateX()` inside one
- * iframe never affects the other, or the parent page), and the parent page's
- * `#battleMat`. All three must lean the same way and meet at one continuous
- * seam.
+ * The board is three separately rendered planes: the NEAR iframe (class
+ * `.self`, bottom of the screen, unflipped), the FAR iframe (class `.opp`,
+ * top of the screen, flipped 180deg by the parent page) and the parent
+ * page's `#battleMat`. All three must read as ONE table leaning away from
+ * the viewer.
  *
- * Every half rotates around an axis that sits exactly ON the seam:
- * `#playfield` (self/opp) pivots at its own local top edge (y=0), which is
- * where the seam lands in BOTH iframes — self because its box starts at the
- * seam, opp because its box is flipped 180° so its local top edge lands on
- * the seam too (see the design's "Current state" + Hand section). `#battleMat`
- * spans the full mat height, so its seam is its own vertical center.
- *
- * `rotateX` only displaces points that are OFF its rotation axis (y=0
- * relative to the transform-origin); every point exactly on that axis stays
- * fixed no matter what `tiltDeg`/`perspectivePx` are. Pivoting all three
- * halves' rotation axis on the seam is therefore what keeps the seam
- * continuous — not a coincidence of chosen numbers. `projectPoint` below is
- * the same math the browser performs for `perspective()`/`rotateX()`, used by
- * the seam-continuity unit test to prove that invariant holds.
+ * Two rules make that true:
+ * 1. Perspective lives inside each element's own transform
+ *    (`perspective(p) rotateX(a)`), so every plane's eye point is its own
+ *    transform-origin. All three origins sit on the seam's centre, so all
+ *    three share one eye point. (An ancestor `perspective` property on
+ *    `<html>` was tried first: it made `<html>` the containing block for
+ *    every `position: fixed` zone and collapsed the board.)
+ * 2. The far iframe is flipped 180deg AFTER its content is rendered.
+ *    Conjugating rotateX(a) by that flip gives rotateX(-a), so the far
+ *    half's local rotation is the negative of the near half's. With the
+ *    same sign, the far edge would come TOWARD the viewer.
  *
  * Pure and DOM-free so it runs under `node --test`.
  */
 
 export const DEFAULT_TILT_DEG = 14;
 export const DEFAULT_PERSPECTIVE_PX = 1400;
-export const DEFAULT_EYE_Y_FRAC = 0.5;
+
+const tiltTransform = (perspectivePx, deg) =>
+  `perspective(${perspectivePx}px) rotateX(${deg}deg)`;
 
 /**
- * @param {{ tiltDeg?: number, perspectivePx?: number, eyeYFrac?: number }} [params]
+ * @param {{ tiltDeg?: number, perspectivePx?: number }} [params]
  * @returns {{
- *   perspectivePx: number,
- *   self: { transform: string, origin: string, perspectiveOrigin: string },
- *   opp: { transform: string, origin: string, perspectiveOrigin: string },
- *   mat: { transform: string, origin: string, perspectiveOrigin: string },
- * }}
+ *   near: { transform: string, origin: string },
+ *   far: { transform: string, origin: string },
+ *   mat: { transform: string },
+ * }} `origin` is the local top edge (the seam) of each iframe's
+ *   `#playfield`. The mat's origin depends on measured geometry: see
+ *   `battleMatBox`.
  */
 export function tiltTransforms({
   tiltDeg = DEFAULT_TILT_DEG,
   perspectivePx = DEFAULT_PERSPECTIVE_PX,
-  eyeYFrac = DEFAULT_EYE_Y_FRAC,
 } = {}) {
-  const rotate = `rotateX(${tiltDeg}deg)`;
-  const perspectiveOrigin = `50% ${eyeYFrac * 100}%`;
-
   return {
-    perspectivePx,
-    // Pivot at the local top edge — the seam in both iframes.
-    self: { transform: rotate, origin: '50% 0%', perspectiveOrigin },
-    opp: { transform: rotate, origin: '50% 0%', perspectiveOrigin },
-    // #battleMat spans the full mat height; its seam is its own center.
-    mat: { transform: rotate, origin: '50% 50%', perspectiveOrigin },
+    near: {
+      transform: tiltTransform(perspectivePx, tiltDeg),
+      origin: '50% 0%',
+    },
+    far: {
+      transform: tiltTransform(perspectivePx, -tiltDeg),
+      origin: '50% 0%',
+    },
+    mat: { transform: tiltTransform(perspectivePx, tiltDeg) },
   };
 }
 
 /**
- * Project a point given in a half's own local (pre-transform) CSS pixel
- * coordinates through that half's `perspective`(ancestor) + `rotateX`(this
- * element) pipeline — the same math the browser applies. Used only by the
- * seam-continuity test.
+ * The parent `#battleMat` box that spans exactly the two playfields (the
+ * iframes minus their cropped hand strips), plus the seam's offset inside
+ * it (the mat's rotation origin).
  *
- * @param {{ x: number, y: number, height?: number }} point - `height` is
- *   only needed for `half === 'mat'`, to locate its center pivot.
+ * @param {{
+ *   nearRect: { top: number, height: number },
+ *   farRect: { top: number, height: number },
+ *   cropFrac: number,
+ * }} geometry - frame rects in parent-viewport px; `cropFrac` is the hand
+ *   strip's share of each iframe's height.
+ * @returns {{ top: number, height: number, seamOffset: number } | null}
+ */
+export function battleMatBox({ nearRect, farRect, cropFrac }) {
+  if (!nearRect || !farRect || !(nearRect.height > 0) || !(farRect.height > 0))
+    return null;
+  const crop = Number.isFinite(cropFrac)
+    ? Math.min(Math.max(cropFrac, 0), 0.9)
+    : 0;
+  const top = farRect.top + farRect.height * crop;
+  const bottom = nearRect.top + nearRect.height * (1 - crop);
+  if (!(bottom > top)) return null;
+  return { top, height: bottom - top, seamOffset: nearRect.top - top };
+}
+
+/**
+ * Project a point through `perspective(p) rotateX(a)` with the
+ * transform-origin at (0, 0): the same math the browser applies. `x` and `y`
+ * are local px relative to the origin, y pointing down.
+ *
+ * @param {{ x: number, y: number }} point
  * @param {{ tiltDeg?: number, perspectivePx?: number }} [params]
- * @param {'self'|'opp'|'mat'} [half]
+ * @param {'near'|'far'|'mat'} [half] - far uses the negated angle.
  * @returns {{ x: number, y: number }}
  */
 export function projectPoint(
   point,
   { tiltDeg = DEFAULT_TILT_DEG, perspectivePx = DEFAULT_PERSPECTIVE_PX } = {},
-  half = 'self'
+  half = 'near'
 ) {
-  const originY = half === 'mat' ? (point.height ?? 0) / 2 : 0;
-  const x = point.x;
-  const y = point.y - originY;
-  const rad = (tiltDeg * Math.PI) / 180;
-  const rotatedY = y * Math.cos(rad);
-  const z = y * Math.sin(rad);
-  const scale = perspectivePx > 0 ? perspectivePx / (perspectivePx - z) : 1;
-  return {
-    x: x * scale,
-    y: originY + rotatedY * scale,
-  };
+  const deg = half === 'far' ? -tiltDeg : tiltDeg;
+  const rad = (deg * Math.PI) / 180;
+  const z = point.y * Math.sin(rad);
+  const scale = perspectivePx / (perspectivePx - z);
+  return { x: point.x * scale, y: point.y * Math.cos(rad) * scale };
 }

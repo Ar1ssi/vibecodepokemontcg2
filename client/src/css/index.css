@@ -16,18 +16,6 @@
   --mat-height: 50vh;
   --mat-offset-y: 0px;
   --mat-scale: 1;
-
-  /* Table tilt (design 009 slice 2). apply-table-tilt.js overwrites these on
-     the root; with no tilt applied yet, --tilt-transform is `none` and
-     --tilt-perspective-px is 0, so #battleMat renders exactly as before. */
-  --tilt-perspective-px: 0px;
-  --tilt-perspective-origin: 50% 50%;
-  --tilt-transform: none;
-  --tilt-origin: 50% 50%;
-}
-html {
-  perspective: var(--tilt-perspective-px);
-  perspective-origin: var(--tilt-perspective-origin);
 }
 :root.sidebox-hidden,
 :root.side-menu-collapsed,
@@ -208,8 +196,10 @@ ul, li {
   z-index: 0;
   overflow: hidden;
   transition: width 220ms ease;
-  transform: var(--tilt-transform);
-  transform-origin: var(--tilt-origin);
+  /* Design 009 table tilt: apply-table-tilt.js sets these (and top/height)
+     inline on this element. */
+  transform: var(--tilt-transform, none);
+  transform-origin: var(--tilt-origin, 50% 50%);
 }
 #battleMatTrim {
   position: absolute;

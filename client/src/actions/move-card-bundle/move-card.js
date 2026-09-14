@@ -564,14 +564,11 @@ export const moveCard = async (
       if (['hand', 'prizes', 'discard', 'lostZone', 'board'].includes(dZoneId)) hydrateHolo(movingCard);
       if (
         handFlight &&
-        // Design 009 slice 4: a mirror-apply of the opponent's own draw sets
-        // syncReplay too (isMirrorReplay above), so gating on it here (as
-        // shouldAnimateDrawFlight does) silenced the opponent's draw flight
-        // on every live 2P game, not just true catch-up replay.
-        // shouldAnimateMirror ignores syncReplay and gates only on actual
-        // replay/hidden-tab, so both originator and mirror now animate live.
+        // The mirror of the opponent's live draw sets syncReplay too
+        // (isMirrorReplay above), so gate on catch-up flags instead.
         shouldAnimateMirror({
           syncReplaying: !!systemState.syncReplaying,
+          isCatchingUp: !!systemState.isCatchingUp,
         })
       ) {
         playDrawToHand(user, movingCard, { fromRect: flightOrigin });
