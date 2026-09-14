@@ -113,10 +113,30 @@ test('layoutToCssVars emits a value for every zone property', () => {
     '--stadium-width',
     '--stadium-height',
     '--mat-fit',
+    '--mat-aspect',
+    '--mat-width',
+    '--mat-offset-x',
+    '--mat-sheet-aspect',
   ]) {
     assert.ok(vars[name], `expected ${name} to be set`);
     assert.equal(typeof vars[name], 'string');
   }
+});
+
+test('aspect-locked profiles scale horizontal coordinates to centered mat width', () => {
+  const onePlayerVars = layoutToCssVars(getMatLayout('one-player'));
+  assert.equal(onePlayerVars['--mat-aspect'], '1.91 / 1');
+  assert.ok(onePlayerVars['--mat-width'].includes('1.91'));
+  assert.ok(onePlayerVars['--mat-offset-x'].includes('--mat-width'));
+  assert.ok(onePlayerVars['--bench-left'].includes('--mat-offset-x'));
+  assert.ok(onePlayerVars['--bench-width'].includes('--mat-width'));
+
+  const simVars = layoutToCssVars(getMatLayout('sim'));
+  assert.equal(simVars['--mat-aspect'], 'none');
+  assert.equal(simVars['--mat-width'], '100%');
+  assert.equal(simVars['--mat-offset-x'], '0px');
+  assert.equal(simVars['--bench-left'], '20%');
+  assert.equal(simVars['--bench-width'], '60%');
 });
 
 test('prize columns drive the printed prize grid width', () => {

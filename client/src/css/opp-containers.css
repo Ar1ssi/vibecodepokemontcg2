@@ -53,6 +53,10 @@
   --lost-zone-left: 1%;
   --lost-zone-width: 7%;
   --lost-zone-height: 15%;
+
+  --mat-aspect: none;
+  --mat-width: 100%;
+  --mat-offset-x: 0px;
 }
 
 * {

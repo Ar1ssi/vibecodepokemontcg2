@@ -60,7 +60,8 @@ const ONE_PLAYER = {
   id: 'one-player',
   label: 'One-player mat',
   matMode: 'one-player',
-  matFit: '100% 100%',
+  matFit: 'contain',
+  aspectRatio: 1.91,
   zones: {
     hand: { height: '30%' },
     bench: {
@@ -96,7 +97,9 @@ const TWO_PLAYER = {
   id: 'two-player',
   label: 'Full-size mat (both players)',
   matMode: 'two-player',
-  matFit: '100% 100%',
+  matFit: 'contain',
+  aspectRatio: 1.91,
+  sheetAspectRatio: 1.0,
   zones: {
     hand: { height: '26%' },
     bench: {
@@ -178,22 +181,79 @@ export function layoutToCssVars(layout) {
     if (value !== undefined && value !== null) vars[name] = String(value);
   };
 
+  const aspect = resolved.aspectRatio ? Number(resolved.aspectRatio) : null;
+  const hasAspect = aspect !== null && !Number.isNaN(aspect) && aspect > 0;
+
+  if (hasAspect) {
+    put('--mat-aspect', `${aspect} / 1`);
+    put('--mat-width', `min(100%, calc(100vh * ${aspect}))`);
+    put('--mat-offset-x', 'max(0px, calc((100% - var(--mat-width)) / 2))');
+  } else {
+    put('--mat-aspect', 'none');
+    put('--mat-width', '100%');
+    put('--mat-offset-x', '0px');
+  }
+
+  if (resolved.sheetAspectRatio) {
+    put('--mat-sheet-aspect', `${resolved.sheetAspectRatio} / 1`);
+  } else if (hasAspect) {
+    put('--mat-sheet-aspect', `${aspect} / 1`);
+  } else {
+    put('--mat-sheet-aspect', 'none');
+  }
+
+  const scaleH = (val) => {
+    if (!val || !hasAspect) return val;
+    const str = String(val).trim();
+    if (str.endsWith('%')) {
+      const num = Number.parseFloat(str);
+      if (!Number.isNaN(num)) {
+        return `calc(var(--mat-width) * ${num / 100})`;
+      }
+    }
+    return val;
+  };
+
+  const scaleLeft = (val) => {
+    if (!val || !hasAspect) return val;
+    const str = String(val).trim();
+    if (str.endsWith('%')) {
+      const num = Number.parseFloat(str);
+      if (!Number.isNaN(num)) {
+        return `calc(var(--mat-offset-x) + var(--mat-width) * ${num / 100})`;
+      }
+    }
+    return val;
+  };
+
+  const scaleRight = (val) => {
+    if (!val || !hasAspect) return val;
+    const str = String(val).trim();
+    if (str.endsWith('%')) {
+      const num = Number.parseFloat(str);
+      if (!Number.isNaN(num)) {
+        return `calc(var(--mat-offset-x) + var(--mat-width) * ${num / 100})`;
+      }
+    }
+    return val;
+  };
+
   put('--hand-height', zones.hand?.height);
 
   put('--bench-bottom', zones.bench?.bottom);
-  put('--bench-left', zones.bench?.left);
-  put('--bench-width', zones.bench?.width);
+  put('--bench-left', scaleLeft(zones.bench?.left));
+  put('--bench-width', scaleH(zones.bench?.width));
   put('--bench-height', zones.bench?.height);
   put('--bench-gap', zones.bench?.gap);
 
   put('--active-bottom', zones.active?.bottom);
-  put('--active-left', zones.active?.left);
-  put('--active-width', zones.active?.width);
+  put('--active-left', scaleLeft(zones.active?.left));
+  put('--active-width', scaleH(zones.active?.width));
   put('--active-height', zones.active?.height);
 
   put('--prizes-bottom', zones.prizes?.bottom);
-  put('--prizes-left', zones.prizes?.left);
-  put('--prizes-width', zones.prizes?.width);
+  put('--prizes-left', scaleLeft(zones.prizes?.left));
+  put('--prizes-width', scaleH(zones.prizes?.width));
   put('--prizes-height', zones.prizes?.height);
   if (zones.prizes?.columns) {
     const columns = Number(zones.prizes.columns);
@@ -202,23 +262,23 @@ export function layoutToCssVars(layout) {
   }
 
   put('--deck-bottom', zones.deck?.bottom);
-  put('--deck-right', zones.deck?.right);
-  put('--deck-width', zones.deck?.width);
+  put('--deck-right', scaleRight(zones.deck?.right));
+  put('--deck-width', scaleH(zones.deck?.width));
   put('--deck-height', zones.deck?.height);
 
   put('--discard-bottom', zones.discard?.bottom);
-  put('--discard-right', zones.discard?.right);
-  put('--discard-width', zones.discard?.width);
+  put('--discard-right', scaleRight(zones.discard?.right));
+  put('--discard-width', scaleH(zones.discard?.width));
   put('--discard-height', zones.discard?.height);
 
   put('--lost-zone-bottom', zones.lostZone?.bottom);
-  put('--lost-zone-left', zones.lostZone?.left);
-  put('--lost-zone-width', zones.lostZone?.width);
+  put('--lost-zone-left', scaleLeft(zones.lostZone?.left));
+  put('--lost-zone-width', scaleH(zones.lostZone?.width));
   put('--lost-zone-height', zones.lostZone?.height);
 
   put('--stadium-bottom', zones.stadium?.bottom);
-  put('--stadium-left', zones.stadium?.left);
-  put('--stadium-width', zones.stadium?.width);
+  put('--stadium-left', scaleLeft(zones.stadium?.left));
+  put('--stadium-width', scaleH(zones.stadium?.width));
   put('--stadium-height', zones.stadium?.height);
 
   put('--mat-fit', resolved.matFit);
