@@ -243,6 +243,11 @@ object, so `tiltDeg: 0` gives a flat board if the tilt must be switched off in p
   `translateY(shift)` keeps the projected seam on the iframe boundary. The far half's origin is
   `50% -Dpx`, D being the near playfield height, which `battleMatBox().depth` supplies. A 20vh
   spread shadow on `#battleMat` fills the bands this leaves above and below the table.
+- S131: tilt default is 12deg (user). Each `#playfield` is laid out at 2x (`zoom: 2`, kept in
+  step with `OVERSAMPLE` in table-tilt.mjs) and shrunk by `scale(0.5)` inside its transform.
+  Chrome rasterizes perspective layers at 1x, which blurred cards on HiDPI screens. Zoom scales
+  transform lengths too, so playfield transforms use origin `0 0`, explicit pivot translates and
+  halved lengths.
 - S131: halves are chosen by the frame's current class (`.self` = near, `.opp` = far), not its id.
   The far half uses `rotateX(-a)`, which is the flip conjugate. `tiltTransforms` returns
   `{ near, far, mat }`. The `#battleMat` box and pivot come from pure `battleMatBox()`.

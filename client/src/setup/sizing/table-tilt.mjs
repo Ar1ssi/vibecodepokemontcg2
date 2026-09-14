@@ -53,6 +53,17 @@ export function seamShiftPx({ tiltDeg, perspectivePx, depthPx }) {
   return -depthPx - seam.y;
 }
 
+/**
+ * Chrome rasterizes a layer whose screen transform has perspective at 1 texel
+ * per CSS px, ignoring the device pixel ratio, so tilted cards look fuzzy on
+ * HiDPI screens (measured: sharpness 76 flat vs 8 tilted at DPR 1.5). Each
+ * `#playfield` is therefore laid out OVERSAMPLE times larger (`zoom: 2` in
+ * self/opp-containers.css; keep the two in step) and shrunk back by
+ * scale(1/OVERSAMPLE) inside its own transform. Zoom also scales the
+ * transform's own lengths, so every length below is divided by OVERSAMPLE.
+ */
+export const OVERSAMPLE = 2;
+
 const round = (value) => Math.round(value * 100) / 100 || 0;
 
 const half = (shiftPx, deg, perspectivePx, origin) => ({
@@ -63,31 +74,61 @@ const half = (shiftPx, deg, perspectivePx, origin) => ({
 });
 
 /**
- * @param {{ tiltDeg?: number, perspectivePx?: number, depthPx?: number }} [params]
- *   `depthPx` is the near playfield's on-screen height; 0 means "not
- *   measured yet" and disables the seam shift.
+ * The same plane as `half()`, written for a zoomed `#playfield` with
+ * transform-origin 0 0: move to the pivot, tilt, move back, then shrink the
+ * oversampled layout. `pivot` is in unzoomed local px.
+ */
+const zoomedHalf = (shiftPx, deg, perspectivePx, pivot) => {
+  const k = OVERSAMPLE;
+  const x = round(pivot.x / k);
+  const back = `translate(${-x}px, ${round(-pivot.y / k)}px)`;
+  return {
+    shiftPx,
+    deg,
+    origin: '0 0',
+    transform:
+      `translate(${x}px, ${round((pivot.y + shiftPx) / k)}px) ` +
+      `perspective(${round(perspectivePx / k)}px) rotateX(${deg}deg) ${back} scale(${1 / k})`,
+  };
+};
+
+/** Flat, correctly sized playfield until the board has been measured. */
+export const UNMEASURED_PLAYFIELD = {
+  transform: `scale(${1 / OVERSAMPLE})`,
+  origin: '0 0',
+};
+
+/**
+ * @param {{ tiltDeg?: number, perspectivePx?: number, depthPx?: number, widthPx?: number }} [params]
+ *   `depthPx` is the near playfield's on-screen height and `widthPx` the
+ *   iframes' width. Until both are measured the playfields render flat.
  * @returns {{
- *   near: { transform: string, origin: string, shiftPx: number, deg: number },
- *   far: { transform: string, origin: string, shiftPx: number, deg: number },
+ *   near: { transform: string, origin: string, shiftPx?: number, deg?: number },
+ *   far: { transform: string, origin: string, shiftPx?: number, deg?: number },
  *   mat: { transform: string, origin: string, shiftPx: number, deg: number },
- * }}
+ * }} near/far are for the zoomed `#playfield`s, mat for the unzoomed
+ *   `#battleMat`.
  */
 export function tiltTransforms({
   tiltDeg = DEFAULT_TILT_DEG,
   perspectivePx = DEFAULT_PERSPECTIVE_PX,
   depthPx = 0,
+  widthPx = 0,
 } = {}) {
   const shift = round(seamShiftPx({ tiltDeg, perspectivePx, depthPx }));
-  const depth = round(depthPx > 0 ? depthPx : 0);
+  const mat = half(shift, tiltDeg, perspectivePx, '50% 100%');
+  if (!(depthPx > 0 && widthPx > 0)) {
+    return { near: UNMEASURED_PLAYFIELD, far: UNMEASURED_PLAYFIELD, mat };
+  }
+  const depth = round(depthPx);
+  const centre = widthPx / 2;
   return {
-    near: half(shift, tiltDeg, perspectivePx, '50% 100%'),
-    far: half(
-      round(-shift),
-      round(-tiltDeg),
-      perspectivePx,
-      `50% ${round(-depth)}px`
-    ),
-    mat: half(shift, tiltDeg, perspectivePx, '50% 100%'),
+    near: zoomedHalf(shift, tiltDeg, perspectivePx, { x: centre, y: depth }),
+    far: zoomedHalf(round(-shift), round(-tiltDeg), perspectivePx, {
+      x: centre,
+      y: -depth,
+    }),
+    mat,
   };
 }
 

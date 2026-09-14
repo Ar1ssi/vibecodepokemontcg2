@@ -29,21 +29,56 @@ const onScreen = {
   },
 };
 
-test('tiltTransforms: near and mat pivot on their bottom edge, far pivots D above its top', () => {
-  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
-  assert.equal(tilt.near.origin, '50% 100%');
+const W = 800;
+
+test('tiltTransforms: mat pivots on its bottom edge; far half is the flip-conjugate', () => {
+  const tilt = tiltTransforms({
+    tiltDeg: 14,
+    perspectivePx: P,
+    depthPx: D,
+    widthPx: W,
+  });
   assert.equal(tilt.mat.origin, '50% 100%');
-  assert.equal(tilt.far.origin, `50% -${D}px`);
+  assert.match(
+    tilt.mat.transform,
+    /^translateY\(-?[\d.]+px\) perspective\(1400px\) rotateX\(14deg\)$/
+  );
   assert.equal(tilt.far.deg, -14);
   assert.equal(tilt.far.shiftPx, -tilt.near.shiftPx);
-  assert.match(
+});
+
+test('playfield transforms are written for zoom 2: halved lengths, pivot round trip, scale(0.5)', () => {
+  const tilt = tiltTransforms({
+    tiltDeg: 12,
+    perspectivePx: P,
+    depthPx: D,
+    widthPx: W,
+  });
+  const s = tilt.near.shiftPx;
+  assert.equal(tilt.near.origin, '0 0');
+  assert.equal(
     tilt.near.transform,
-    /^translateY\(-?[\d.]+px\) perspective\(1400px\) rotateX\(14deg\)$/
+    `translate(200px, ${(D + s) / 2}px) perspective(700px) rotateX(12deg) translate(-200px, -${D / 2}px) scale(0.5)`
+  );
+  assert.equal(
+    tilt.far.transform,
+    `translate(200px, ${(-D - s) / 2}px) perspective(700px) rotateX(-12deg) translate(-200px, ${D / 2}px) scale(0.5)`
   );
 });
 
+test('unmeasured board: playfields render flat at their zoomed-back size', () => {
+  const tilt = tiltTransforms({ tiltDeg: 12, depthPx: D, widthPx: 0 });
+  assert.deepEqual(tilt.near, { transform: 'scale(0.5)', origin: '0 0' });
+  assert.deepEqual(tilt.far, { transform: 'scale(0.5)', origin: '0 0' });
+});
+
 test('the far half, flipped, and the near half both land on the mat plane', () => {
-  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  const tilt = tiltTransforms({
+    tiltDeg: 14,
+    perspectivePx: P,
+    depthPx: D,
+    widthPx: W,
+  });
   for (const x of [-300, 0, 250]) {
     for (const y of [-2 * D, -1.5 * D, -D - 1]) {
       const far = onScreen.far(tilt, { x, y });
@@ -61,7 +96,12 @@ test('the far half, flipped, and the near half both land on the mat plane', () =
 });
 
 test('the seam stays on the iframe boundary (no far-half clipping)', () => {
-  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  const tilt = tiltTransforms({
+    tiltDeg: 14,
+    perspectivePx: P,
+    depthPx: D,
+    widthPx: W,
+  });
   for (const x of [-300, 0, 300]) {
     close(onScreen.near(tilt, { x: 0, y: -D }).y, -D, 'near seam y');
     close(onScreen.far(tilt, { x: 0, y: -D }).y, -D, 'far seam y');
@@ -74,7 +114,12 @@ test('the seam stays on the iframe boundary (no far-half clipping)', () => {
 });
 
 test('the table recedes from the near edge: nothing is magnified, width shrinks upward', () => {
-  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  const tilt = tiltTransforms({
+    tiltDeg: 14,
+    perspectivePx: P,
+    depthPx: D,
+    widthPx: W,
+  });
   const widthAt = (y) => {
     const plane = y < -D ? onScreen.far : onScreen.near;
     return plane(tilt, { x: 100, y }).x;
@@ -95,14 +140,15 @@ test('seamShiftPx lifts the table (negative) and is 0 when flat or unmeasured', 
   assert.equal(seamShiftPx({ tiltDeg: 14, perspectivePx: P, depthPx: 0 }), 0);
 });
 
-test('tiltDeg 0 keeps a non-none identity transform (stable containing block)', () => {
-  const tilt = tiltTransforms({ tiltDeg: 0, depthPx: D });
+test('tiltDeg 0 is flat: no seam shift, only the oversampling scale', () => {
+  const tilt = tiltTransforms({ tiltDeg: 0, depthPx: D, widthPx: W });
+  assert.equal(tilt.near.shiftPx, 0);
   assert.equal(
     tilt.near.transform,
-    'translateY(0px) perspective(1400px) rotateX(0deg)'
+    `translate(200px, ${D / 2}px) perspective(700px) rotateX(0deg) translate(-200px, -${D / 2}px) scale(0.5)`
   );
   assert.equal(
-    tilt.far.transform,
+    tilt.mat.transform,
     'translateY(0px) perspective(1400px) rotateX(0deg)'
   );
 });

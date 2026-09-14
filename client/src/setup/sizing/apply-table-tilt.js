@@ -68,7 +68,11 @@ export const applyTableTilt = (params) => {
   const box = measureBoard(near, far);
   // Without both frames measured, depth 0 still tilts, just without the
   // seam shift; the next load/resize re-applies with real geometry.
-  const tilt = tiltTransforms({ ...params, depthPx: box?.depth ?? 0 });
+  const tilt = tiltTransforms({
+    ...params,
+    depthPx: box?.depth ?? 0,
+    widthPx: near?.frame.getBoundingClientRect().width ?? 0,
+  });
 
   for (const entry of frames)
     writeHalf(entry, entry.isFar ? tilt.far : tilt.near);

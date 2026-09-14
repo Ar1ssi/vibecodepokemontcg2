@@ -14,7 +14,10 @@ Active: fixes done and fast-forward merged to main (7adc417), per user. Primary 
   hover and the raised deck cover were overridden by resetImage()'s inline `transform`; now use
   the `translate` property. "Multiple planes" = the near half bulged toward the viewer (user
   picked this). Fixed: pivot + eye at the near edge, seam kept on the iframe boundary by a
-  translateY shift, dark spread shadow on #battleMat fills the uncovered bands. On branch, NOT pushed.
+  translateY shift, dark spread shadow on #battleMat fills the uncovered bands. Tilt 14 -> 12deg
+  (user). Fuzzy tilted cards fixed: #playfield laid out at 2x (`zoom: 2`) and shrunk by
+  scale(0.5) inside the tilt transform (Chrome rasters perspective layers at 1x). On branch, NOT
+  pushed.
 Next: user reviews the new tilt on localhost; push to main if they OK it. Then run
   `pnpm test:2p` and the authoritative 2P run (`SERVER_AUTHORITATIVE=1 PORT=4100`).
   Carried: I39 (flip-gate-test.mjs) untested; bot runs only used the fixture deck (I35).

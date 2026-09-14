@@ -74,8 +74,8 @@
 
   /* Design 009 table tilt; mirror of self-containers.css (see the comment
      there, including why `perspective` must never go on <html>). */
-  --tilt-transform: rotateX(0deg);
-  --tilt-origin: 50% 0%;
+  --tilt-transform: scale(0.5);
+  --tilt-origin: 0 0;
 }
 
 * {
@@ -159,12 +159,15 @@ body, input, textarea, button {
 .highlightBox {
   background-color: rgba(188, 90, 113, 0.3);
 }
+/* 2x layout + scale(0.5) against Chrome's 1x raster of perspective layers;
+   see self-containers.css. */
 #playfield {
   position: fixed;
   left: 0;
-  right: 0;
   top: 0;
-  bottom: var(--hand-crop-height);
+  width: 100vw;
+  height: calc(100vh - var(--hand-crop-height));
+  zoom: 2;
   transform: var(--tilt-transform);
   transform-origin: var(--tilt-origin);
 }

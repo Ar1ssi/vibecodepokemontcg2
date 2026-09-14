@@ -86,8 +86,8 @@
      fixed zones from first paint (no layout jump when the tilt arrives).
      Never put `perspective` on <html>: it makes the ~0px-tall root the
      containing block of every fixed element and collapses the board. */
-  --tilt-transform: rotateX(0deg);
-  --tilt-origin: 50% 0%;
+  --tilt-transform: scale(0.5);
+  --tilt-origin: 0 0;
 }
 
 * {
@@ -170,12 +170,17 @@ body, input, textarea, button {
 .highlightBox {
   background-color: rgba(90, 110, 188, 0.3);
 }
+/* Laid out at 2x (zoom) and shrunk back by the tilt transform's scale(0.5):
+   Chrome rasterizes perspective layers at 1 texel per CSS px, so without
+   the oversampling tilted cards blur on HiDPI screens. Keep zoom in step
+   with OVERSAMPLE in table-tilt.mjs. */
 #playfield {
   position: fixed;
   left: 0;
-  right: 0;
   top: 0;
-  bottom: var(--hand-crop-height);
+  width: 100vw;
+  height: calc(100vh - var(--hand-crop-height));
+  zoom: 2;
   transform: var(--tilt-transform);
   transform-origin: var(--tilt-origin);
 }
