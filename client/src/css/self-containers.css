@@ -61,10 +61,13 @@
   --lost-zone-height: 15%;
 
   --mat-aspect: none;
+  --mat-height: 100vh;
   --mat-width: 100%;
   --mat-offset-x: 0px;
+  --mat-offset-y: 0px;
   --mat-half-height: 100vh;
   --mat-container-width: 100%;
+  --mat-scale: 1;
 }
 
 * {
@@ -323,8 +326,10 @@ img.draw-flight-source,
 }
 #lostZoneText {
   position: fixed;
-  left: 8.5%;
-  bottom: 90%;
+  left: var(--lost-zone-left);
+  bottom: calc(var(--lost-zone-bottom) + var(--lost-zone-height) + 0.5vh);
+  width: var(--lost-zone-width);
+  text-align: center;
 }
 #deckCover {
   position: fixed;
@@ -348,8 +353,10 @@ img.draw-flight-source,
 } 
 #deckText {
   position: fixed;
-  right: 2%;
-  bottom: 91%;
+  right: var(--deck-right);
+  bottom: calc(var(--deck-bottom) + var(--deck-height) + 0.5vh);
+  width: var(--deck-width);
+  text-align: center;
 }
 .self-text {
   font-size: clamp(10px, 4vh, 20px);
@@ -360,8 +367,10 @@ img.draw-flight-source,
 }
 #discardText {
   position: fixed;
-  right: 2%;
-  bottom: 60%;
+  right: var(--discard-right);
+  bottom: calc(var(--discard-bottom) + var(--discard-height) + 0.5vh);
+  width: var(--discard-width);
+  text-align: center;
 }
 #discardCover {
   position: fixed;
