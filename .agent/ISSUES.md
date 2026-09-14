@@ -12,6 +12,8 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I43 2026-09-14 P3 [rules] Attack inheritance never inherits — `mergeInheritedAttacks` is dead in practice
+    because the only live call site passes `priorAttacks: []` (rules-bridge.js:305) (refs: design 008 R8, S123)
 - I39 2026-09-11 P2 [netcode] flip-gate-test.mjs fails right after both hands are dealt (timeout waiting for a page predicate) on main fe0ad88 with S102's changes stashed — pre-existing; the server-authoritative exit gate is currently red. (refs: S102)
 - I41 2026-09-11 P3 [netcode] legacy mode: after both players leave and join a fresh room, the second player once stayed in setup with prizes but no opening hand (1 sample, S102 second-game probe). Untriaged. (refs: S102)
 - I35 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed
