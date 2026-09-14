@@ -57,6 +57,8 @@
   --mat-aspect: none;
   --mat-width: 100%;
   --mat-offset-x: 0px;
+  --mat-half-height: 100vh;
+  --mat-container-width: 100%;
 }
 
 * {

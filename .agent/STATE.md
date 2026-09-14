@@ -4,14 +4,9 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 115
-Focus: feature (board-ui) — aspect-ratio locked playmats with ambient bleed wings
-Active: done. Playmats were previously stretched via object-fit: fill into wide viewports (2.68:1+),
-  severely squishing artwork. Added aspect ratio locking (~1.91:1 for 1-player, ~1.0:1 for 2-player)
-  with centered layout and ambient blurred bleed backdrop on the table surface. Scaled horizontal
-  zone coordinates in mat-layouts.mjs via CSS custom properties (--mat-aspect, --mat-width, --mat-offset-x).
-  Updated apply-mat-layout.js and index.css to manage both ambient and foreground images.
-  Unit tests pass (20/20).
+Session: 116
+Focus: feature (board-ui) — expand #battleMat to 100% in fullscreen sidebox-hidden mode
+Active: done. When sidebox was hidden (.sidebox-hidden), #battleMat stayed pinned at 75.5% while iframes expanded to 100%, causing a white margin on right and misaligning cards. Expanded #battleMat to 100% in .sidebox-hidden and wired dynamic container variables (--mat-container-width, --mat-half-height). All 46 tests pass.
 Next: visual verification in browser.
 Blocked: nothing.
 
@@ -32,6 +27,6 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S116 2026-09-14 feature: expand #battleMat to 100% in fullscreen sidebox-hidden mode.
 - S115 2026-09-14 feature: aspect-ratio locked playmats with ambient bleed wings and aligned card zones.
 - S114 2026-09-14 feature: added reverse holo energy variants for Gen 3, 6, 7, and 8.
-- S113 2026-09-14 patch: implemented Iono prize-based draw and empty-hand draw prevention.
