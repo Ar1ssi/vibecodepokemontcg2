@@ -24,9 +24,9 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import {
   closeCardPreview,
   openCardPreview,
-  openAttachedCardsPanel,
 } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
+import { openCarouselViewer } from './card-picker.js';
 import { rulesState, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
 import { benchCardHasAbility } from '/shared/engine/rules/collect-usable-abilities.mjs';
 import { shouldOpenAttackPreview } from '../rules/attack-preview-gate.js';
@@ -308,11 +308,16 @@ export const doubleClick = (event) => {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
-      // Card carries energies/tools: show them fanned out beside it (same
-      // panel as the right-click "View attached cards" menu item) instead
-      // of the plain zoom, since the zoom hides attachments entirely.
+      // Card carries energies/tools: same zoom, but the attached cards ride
+      // along as further carousel slides (PTCG Live-style, like the discard
+      // pile viewer) — scroll/swipe right to see them, left to return to
+      // the main card. Read-only: dragging one out means closing first.
       if (mouseClick.card?.attachedCards?.length) {
-        openAttachedCardsPanel(targetImage, mouseClick.card);
+        openCarouselViewer({
+          title: mouseClick.card.name || 'Attached Cards',
+          candidates: [mouseClick.card, ...mouseClick.card.attachedCards],
+          initialIndex: 0,
+        });
       } else {
         openCardPreview(targetImage, mouseClick.card);
       }

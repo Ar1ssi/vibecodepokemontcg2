@@ -11,14 +11,21 @@ Active: done, uncommitted. Mat: copied art into client/src/assets/playmats/custo
   to-edge,full-size-edge-to-edge}.jpg; added two entries to mats-catalog.mjs mirroring the
   existing custom Kyogre entries (one-player + two-player, fit: cover, overlay: true) — picks up
   automatically in the Customize > Mat picker, no other code touched.
-  Double-click: click-events.js doubleClick() now branches on mouseClick.card.attachedCards.length
-  for active/bench — if attached, calls the existing openAttachedCardsPanel (full-view.js; was
-  right-click-only "View attached cards") instead of openCardPreview's zoom, since the zoom hides
-  attachments. No-attachment cards and hand cards unchanged. Reuses existing drag/attach
-  mechanism verbatim (right-click panel already supported dragging attached cards out).
-Next: user to eyeball the Groudon mat and double-click behavior on localhost (this session does
-  not drive the Browser pane for CSS/visual checks, per standing preference). If liked, commit.
-Blocked: none.
+  Mat art corrected mid-session (user caught a duplicate-of-Kyogre mistake): now the actual
+  fire-type wallpaper PNG, ids/titles renamed to "Fire Type".
+  Double-click: click-events.js doubleClick() branches on mouseClick.card.attachedCards.length for
+  active/bench — if attached, opens a read-only openCarouselViewer (card-picker.js, same PTCG-Live
+  carousel the discard-pile viewer uses) with candidates = [card, ...card.attachedCards], so the
+  zoom itself is unchanged and scrolling right pages through the attached energies/tools, left
+  returns to the main card. No drag-out mid-preview (close first) — user confirmed this tradeoff
+  over building a second real-draggable mechanism. openAttachedCardsPanel (full-view.js) is back
+  to right-click-menu-only, untouched. No-attachment and hand cards keep the plain zoom.
+  First cut (right-click-panel reuse) was rejected by the user before push and redone per above.
+Next: user to eyeball the Fire Type mat and the double-click carousel on localhost (this session
+  does not drive the Browser pane for CSS/visual checks, per standing preference). If liked,
+  commit (one commit ded94f5 already made both mat+attach changes together, superseded by the
+  carousel redesign — squash or amend before push per user's call) and push to main.
+Blocked: none — awaiting user's localhost check before push.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
 - `node_modules` needs `pnpm install` fresh each new sandbox session (not persisted). Playwright's
