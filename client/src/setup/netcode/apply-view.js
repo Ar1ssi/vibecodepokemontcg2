@@ -159,6 +159,20 @@ export function getAuthoritativeZoneArray(side, zoneId) {
 }
 
 /**
+ * Deck is always redacted to `{ count }` (design O4-A / I5), even for its own
+ * owner, so it never satisfies `getAuthoritativeZoneArray`'s array shape.
+ * Design 009 slice 5's shuffle-flight animation needs a real card count to
+ * size itself, so this reads the redacted count directly.
+ *
+ * @param {string} side 'you' | 'them'
+ * @returns {number}
+ */
+export function getAuthoritativeDeckCount(side) {
+  const deck = lastAppliedView?.[side]?.zones?.deck;
+  return typeof deck?.count === 'number' ? deck.count : 0;
+}
+
+/**
  * Returns the neutral Stadium card as a single-element array, matching the
  * shape `hashState`'s `playerHashZones` builds server-side
  * (`state.stadium ? [state.stadium] : []`), or an empty array when there is
@@ -1088,6 +1102,18 @@ export function applyView(view, events = [], options = {}) {
   // Clear in-flight affordances now that server response has landed
   clearInFlightAffordances();
 
+  // Computed early (not just at reconcilePendingChoice below) so slice 6's
+  // onBeforeApply hook can resolve event.playerId -> self/opp before the diff
+  // runs.
+  const localPlayerId = view.you?.playerId || null;
+
+  // Design 009 slice 6: snapshot knockout victims BEFORE the DOM diff removes
+  // them. A knocked-out card's instanceId is still in cardRegistry here; by the
+  // time the diff runs (below), it may already be gone from its zone's view.
+  if (Array.isArray(events) && typeof options.onBeforeApply === 'function') {
+    options.onBeforeApply(events, localPlayerId);
+  }
+
   const diff = diffViews(options.previousView || null, view);
 
   // Reconcile player sides ('you' and 'them')
@@ -1153,7 +1179,6 @@ export function applyView(view, events = [], options = {}) {
   reconcileStadium(view.stadium || null, options);
 
   // Reconcile PendingChoice modal / banner
-  const localPlayerId = view.you?.playerId || null;
   reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
 
   // Sync local turn state — the server is the only turn authority under the flag
@@ -1165,7 +1190,7 @@ export function applyView(view, events = [], options = {}) {
   // Play advisory events for UI animations/logs (Invariant 4: deletion leaves client correct)
   if (Array.isArray(events) && typeof options.onAdvisoryEvent === 'function') {
     for (const ev of events) {
-      options.onAdvisoryEvent(ev);
+      options.onAdvisoryEvent(ev, localPlayerId);
     }
   }
 

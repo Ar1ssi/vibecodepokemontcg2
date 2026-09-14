@@ -5,6 +5,7 @@ import {
   selfContainerDocument,
 } from '../../initialization/global-variables/containers.js';
 import { systemState } from '../../initialization/global-variables/global-variables.js';
+import { applyTableTilt } from '../../setup/sizing/apply-table-tilt.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import {
   flippedOppHandleMouseDown,
@@ -203,4 +204,9 @@ export const flipBoard = () => {
     }
   }
   refreshBoard();
+  // Board flip toggles which physical iframe is on top; the tilt vars are
+  // written per-document, so nothing here actually needs new values, but a
+  // flipped iframe keeps its inherited custom properties across the swap.
+  // Re-applying is cheap and matches the design's "re-run on... board flip".
+  applyTableTilt();
 };

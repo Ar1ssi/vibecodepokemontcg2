@@ -21,6 +21,8 @@
    re-fit either side's zones with one set of values. */
 :root {
   --hand-height: 32%;
+  /* Mirror of self-containers.css; see the comment there. */
+  --hand-crop-height: 16%;
 
   --bench-bottom: 34%;
   --bench-left: 20%;
@@ -43,6 +45,7 @@
   --deck-right: 1%;
   --deck-width: 9%;
   --deck-height: 28%;
+  --deck-layer-px: 1.1px;
 
   --discard-bottom: 35%;
   --discard-right: 1%;
@@ -62,6 +65,17 @@
   --mat-half-height: 100vh;
   --mat-container-width: 100%;
   --mat-scale: 1;
+
+  /* Table tilt (design 009 slice 2); mirror of self-containers.css. */
+  --tilt-perspective-px: 0px;
+  --tilt-perspective-origin: 50% 50%;
+  --tilt-transform: none;
+  --tilt-origin: 50% 0%;
+}
+
+html {
+  perspective: var(--tilt-perspective-px);
+  perspective-origin: var(--tilt-perspective-origin);
 }
 
 * {
@@ -145,36 +159,41 @@ body, input, textarea, button {
 .highlightBox {
   background-color: rgba(188, 90, 113, 0.3);
 }
+#playfield {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: var(--hand-crop-height);
+  transform: var(--tilt-transform);
+  transform-origin: var(--tilt-origin);
+}
 #hand {
-  border-top: 3px solid rgba(188, 90, 113, 0.864);  
+  border-top: 3px solid rgba(188, 90, 113, 0.864);
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: calc(var(--hand-height) - 3px);
+  height: calc(var(--hand-crop-height) - 3px);
   overflow-x: auto;
+  overflow-y: visible;
   display: flex;
-  z-index: 0;
+  z-index: 5;
   align-items: flex-end;
 }
-#hand img {
-  box-sizing: border-box;
-  width: auto;
-  max-height: calc(100% - 1.5vh);
-  margin-bottom: 1.5vh;
-  margin-left: .25vw;
-  margin-right: .25vw;
-}
-/* Holo cards: size the wrapper the same way a bare hand <img> sizes itself
-   (see #hand img above) so it rescales live with #hand, instead of a
-   one-time JS pixel snapshot. The nested real <img> just fills that box. */
+/* Cropped to a sliver, same as self-containers.css — but no hover lift: this
+   whole iframe is flipped 180deg onto the screen, so the crop reads as card
+   backs peeking from the TOP edge, and it can't be interacted with. */
+#hand img,
 #hand .mat-holo {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 1.5vh);
+  height: calc(var(--hand-height) - 1.5vh);
   margin-bottom: 1.5vh;
   margin-left: .25vw;
   margin-right: .25vw;
+  transform: translateY(calc(var(--hand-height) - var(--hand-crop-height)));
+  position: relative;
 }
 #hand .mat-holo img {
   width: 100%;
@@ -191,13 +210,13 @@ img.draw-flight-source,
 #handText {
   position: fixed;
   right: 2%;
-  bottom: var(--hand-height);
-  color: rgba(188, 90, 113, 0.864);  
+  bottom: var(--hand-crop-height);
+  color: rgba(188, 90, 113, 0.864);
 }
 #handLabel {
   position: fixed;
   left: 0%;
-  bottom: calc(var(--hand-height) - 0.5%);
+  bottom: calc(var(--hand-crop-height) - 0.5%);
   color: rgba(188, 90, 113, 0.864);
   font-size: 5vh;
 }
@@ -344,7 +363,20 @@ img.draw-flight-source,
   max-height: 100%;
   object-fit: contain;
   left: 0;
-} 
+  position: relative;
+  z-index: 1;
+}
+.deck-stack-layer {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 4%;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, #b7b7b7, #7c7c7c);
+  transform: translateY(calc(var(--deck-layer-i) * -1 * var(--deck-layer-px)));
+  z-index: 0;
+}
 #deckText {
   position: fixed;
   right: var(--deck-right);
@@ -792,17 +824,11 @@ img.draw-flight-source,
       0%   { transform: none; opacity: 1; }
       100% { transform: translateY(18px) rotate(5deg) scale(0.94); opacity: 0; }
     }
-    @keyframes tcgl-knockout {
-      0%   { filter: brightness(1); }
-      30%  { filter: brightness(1.6) saturate(0.2); }
-      100% { filter: brightness(0.4); opacity: 0.85; }
-    }
     .tcgl-anim { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1); animation-fill-mode: backwards; }
     .tcgl-from-deck { animation-name: tcgl-from-deck; }
     .tcgl-from-hand { animation-name: tcgl-from-hand; }
     .tcgl-to-discard { animation-name: tcgl-to-discard; animation-fill-mode: forwards; }
-    .tcgl-knockout { animation-name: tcgl-knockout; animation-duration: 0.5s; animation-fill-mode: forwards; }
-    
+
     /* shuffle: a restrained single wobble of the deck label plate only */
     @keyframes tcgl-shuffle {
       0%, 100% { transform: none; }

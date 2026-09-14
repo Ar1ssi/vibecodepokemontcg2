@@ -5,19 +5,30 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 130
-Focus: feature (design only) — design 009 TCG Live table: tilted mat, both hands half-cropped
-  (own at bottom, opp at top) with the mat above them on screen, 3D deck stack, shuffle/draw/
-  knockout animations on both screens.
-Active: design 009 drafted + revised with user answers, pushed to main. Status: draft, awaiting
-  user approval. No code written. Key finding: prod (authoritative) plays NO shuffle animation
-  for anyone — shuffle-zone.js returns before the flight and socket-event-listeners.js never
-  passes onAdvisoryEvent to applyView.
-Next: maintenance due (S130 milestone). Then: user approves design 009 → build slice 1 on
-  `feature/009-tcg-live-table` in a worktree (re-verify the design's file:line refs first; it was
-  read on a checkout 55 commits behind). Open question for user: tilt-off setting? Carried: I39
-  (flip-gate-test.mjs, the server-authoritative exit gate) untested; bot runs used only the
-  fixture deck — real decklists via --deckA/--deckB would exercise the effect executor (I35).
-Blocked: design 009 approval (user).
+Focus: feature (design 009, building ahead of formal approval per user instruction) — TCG Live
+  table: tilted mat, cropped hands, 3D deck stack, shuffle/draw/knockout animations on both
+  screens. All 6 slices done this session, uncommitted, no worktree/branch (explicit instruction).
+Active: slice 6 done (knockout ghost animation). New pure
+  `client/src/setup/image-logic/knockout-pose.mjs` (`knockoutPose(t, {fromRect, toRect})` — flash
+  in place then drift/fade to the discard rect) + DOM `knockout-flight.js`
+  (`captureKnockoutGhost`/`playKnockoutGhost`, same overlay pattern as `shuffle-flight.js`).
+  Extracted `visualRectOf` out of `shuffle-flight.js` into `iframe-rect.mjs` (shared). Legacy:
+  wired into `rules-bridge.js`'s `checkKnockouts` for BOTH player values, gated by
+  `shouldAnimateMirror`. Authoritative: `apply-view.js` gained `options.onBeforeApply(events,
+  localPlayerId)` called BEFORE the DOM diff (so a KO'd card's registry entry still exists);
+  `socket-event-listeners.js` wires `advisory-animations.js`'s new `handleBeforeApply` to it,
+  which captures ghosts into a pending map keyed by instanceId for `handleAdvisoryEvent`'s new
+  `'knockout'` branch to play. `advisoryAnimationPlan` gained a `pokemonKnockedOut` case. Deleted
+  the unused `tcgl-knockout` CSS (no JS ever applied it); added `.card-knockout-ghost` CSS.
+Next: **design 009 has no slices left to build.** Full verification is owed before calling it
+  done: `pnpm test` (expect new `knockout-pose.test.mjs` + revised `advisory-animations.test.mjs`
+  on top of slice 5's baseline — a stale slice-5 test asserting `pokemonKnockedOut -> null` was
+  updated, since that event now plans a real knockout animation), `pnpm test:2p` (legacy), an
+  authoritative 2P run (`SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js`), and a manual
+  localhost look across all 6 slices (tilt feel, deck stack, mirror animations, KO ghost timing) —
+  none run yet, "no node/pnpm/lint" instruction still standing this whole session.
+Blocked: none this session (user told this session to build ahead of design 009's formal
+  approval). Full verification (pnpm test/test:2p, authoritative run, localhost look) still owed.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
 - `node_modules` needs `pnpm install` fresh each new sandbox session (not persisted). Playwright's
@@ -34,6 +45,8 @@ Blocked: design 009 approval (user).
   re-anchors them to itself — intended, but popups/menus must stay outside the wrapper.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S130 2026-09-14 design: design 009 (TCG Live table) drafted, pushed for approval.
+- S130 2026-09-14 feature: design 009 slice 6 built (knockout ghost animation, both modes) —
+  uncommitted, unverified, per user instruction. All 6 slices of design 009 now built.
+- S130 2026-09-14 feature: design 009 slice 5 built (authoritative shuffle/draw advisory
+  animations wired) — uncommitted, unverified, per user instruction.
 - S129 2026-09-14 merge: SERVER_AUTHORITATIVE bot verification (9/9) + PR #128; branch to main.
-- S128 2026-09-14 merge: brave-volta's design 008 live manual verification into the test branch.

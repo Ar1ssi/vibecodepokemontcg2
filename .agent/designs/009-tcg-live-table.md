@@ -234,6 +234,10 @@ object, so `tiltDeg: 0` gives a flat board if the tilt must be switched off in p
 | 6 | Knockout ghost animation, both modes (+ `onBeforeApply` hook) | pose/plan tests; KO visible on both screens in legacy and authoritative 2P runs |
 
 ## Deviations (Builder appends here during build)
+- Slice 2: tilt uses ancestor `perspective`/`perspective-origin` on each document's `<html>` plus
+  a plain `rotateX()` on `#playfield`/`#battleMat`, rather than baking `perspective(px)` into
+  `--tilt-transform` itself — needed so `eyeYFrac` has an effect independent of the rotation pivot.
+  See NEXTSTEPS.md's S130 slice-2 entry for the full reasoning.
 
 ---
 Self-approval checklist (only when the user is unreachable):

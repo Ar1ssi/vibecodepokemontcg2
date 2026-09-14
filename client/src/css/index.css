@@ -16,6 +16,18 @@
   --mat-height: 50vh;
   --mat-offset-y: 0px;
   --mat-scale: 1;
+
+  /* Table tilt (design 009 slice 2). apply-table-tilt.js overwrites these on
+     the root; with no tilt applied yet, --tilt-transform is `none` and
+     --tilt-perspective-px is 0, so #battleMat renders exactly as before. */
+  --tilt-perspective-px: 0px;
+  --tilt-perspective-origin: 50% 50%;
+  --tilt-transform: none;
+  --tilt-origin: 50% 50%;
+}
+html {
+  perspective: var(--tilt-perspective-px);
+  perspective-origin: var(--tilt-perspective-origin);
 }
 :root.sidebox-hidden,
 :root.side-menu-collapsed,
@@ -196,6 +208,8 @@ ul, li {
   z-index: 0;
   overflow: hidden;
   transition: width 220ms ease;
+  transform: var(--tilt-transform);
+  transform-origin: var(--tilt-origin);
 }
 #battleMatTrim {
   position: absolute;
@@ -1889,6 +1903,25 @@ ul, li {
   will-change: transform;
 }
 .card-shuffle-flight img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0.3rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.48);
+}
+.card-knockout-ghost {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 2400;
+  will-change: transform, opacity;
+}
+.card-knockout-ghost img {
   display: block;
   width: 100%;
   height: 100%;

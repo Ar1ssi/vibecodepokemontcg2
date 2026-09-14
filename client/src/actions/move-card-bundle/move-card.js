@@ -4,7 +4,7 @@ import {
   originRectForHandFlight,
   playDrawToHand,
 } from '../../setup/image-logic/draw-flight.js';
-import { shouldAnimateDrawFlight } from '../../setup/image-logic/draw-flight.js';
+import { shouldAnimateMirror } from '../../setup/image-logic/draw-flight-predicate.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { closePopups, deselectCard } from '../general/close-popups.js';
 import { updateCount } from '../general/count.js';
@@ -564,8 +564,13 @@ export const moveCard = async (
       if (['hand', 'prizes', 'discard', 'lostZone', 'board'].includes(dZoneId)) hydrateHolo(movingCard);
       if (
         handFlight &&
-        shouldAnimateDrawFlight({
-          syncReplay,
+        // Design 009 slice 4: a mirror-apply of the opponent's own draw sets
+        // syncReplay too (isMirrorReplay above), so gating on it here (as
+        // shouldAnimateDrawFlight does) silenced the opponent's draw flight
+        // on every live 2P game, not just true catch-up replay.
+        // shouldAnimateMirror ignores syncReplay and gates only on actual
+        // replay/hidden-tab, so both originator and mirror now animate live.
+        shouldAnimateMirror({
           syncReplaying: !!systemState.syncReplaying,
         })
       ) {

@@ -12,7 +12,7 @@ import {
 import { hashBoardSnapshot, hashCardList } from '../../../../../shared/engine/zones/zone-hash.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
-import { shouldAnimateDrawFlight } from '../../image-logic/draw-flight-predicate.mjs';
+import { shouldAnimateDrawFlight, shouldAnimateMirror } from '../../image-logic/draw-flight-predicate.mjs';
 
 test('splitEmitAndTail: local emit boolean stays emit', () => {
   assert.deepEqual(splitEmitAndTail(true), { emit: true, tail: null });
@@ -125,6 +125,16 @@ test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay / hidde
   assert.equal(shouldAnimateDrawFlight({ syncReplay: true, syncReplaying: true }), false);
   assert.equal(shouldAnimateDrawFlight({ hidden: true }), false);
   assert.equal(shouldAnimateDrawFlight({ syncReplay: false, hidden: true }), false);
+});
+
+test('shouldAnimateMirror: ignores syncReplay (a live mirror-apply still sets it), gates on catch-up/hidden', () => {
+  assert.equal(shouldAnimateMirror({}), true);
+  assert.equal(shouldAnimateMirror({ syncReplay: true }), true);
+  assert.equal(shouldAnimateMirror({ syncReplay: true, syncReplaying: false }), true);
+  assert.equal(shouldAnimateMirror({ syncReplaying: true }), false);
+  assert.equal(shouldAnimateMirror({ syncReplay: true, syncReplaying: true }), false);
+  assert.equal(shouldAnimateMirror({ hidden: true }), false);
+  assert.equal(shouldAnimateMirror({ syncReplay: true, hidden: true }), false);
 });
 
 test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => {

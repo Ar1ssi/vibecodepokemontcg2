@@ -2,6 +2,25 @@
     // Subtle slide+fade keyed to the ORIGIN zone (deck->hand rises, hand->board
     // drops in), applied to the single moved card image. No board shake; no
     // layout properties touched, so zones never disappear.
+    import { deckStackLayers } from './zones/deck-stack.mjs';
+
+    // 3D deck stack (design 009 slice 3): N edge layers behind the cover img,
+    // count driven off #deckCount's own text so every path that updates the
+    // count (legacy, authoritative, replay) covers the stack for free.
+    function renderDeckStack(deckCoverEl, countText) {
+      if (!deckCoverEl) return;
+      const count = Number.parseInt(countText, 10);
+      if (!Number.isFinite(count)) return; // non-numeric/empty: leave stack unchanged
+      const layers = deckStackLayers(count);
+      deckCoverEl.querySelectorAll('.deck-stack-layer').forEach((el) => el.remove());
+      for (let i = 1; i <= layers; i++) {
+        const layer = document.createElement('div');
+        layer.className = 'deck-stack-layer';
+        layer.style.setProperty('--deck-layer-i', String(i));
+        deckCoverEl.insertBefore(layer, deckCoverEl.firstChild);
+      }
+    }
+
     (function playmatAnimations() {
       if (window.__playmatAnimActive) return;
       window.__playmatAnimActive = true;
@@ -61,17 +80,20 @@
         wobble(document.getElementById('deckText')?.parentElement || document.getElementById('deck'));
       }, true);
     
-      // deck count drop = a card left the deck: tiny label settle
+      // deck count drop = a card left the deck: tiny label settle + 3D stack
       const deckLabel = document.getElementById('deckText')?.parentElement;
       const count = document.getElementById('deckCount');
+      const deckCover = document.getElementById('deckCover');
       if (deckLabel && count) {
         let last = count.textContent;
         const obs = new MutationObserver(() => {
           if (count.textContent !== last) {
             last = count.textContent;
           }
+          renderDeckStack(deckCover, count.textContent);
         });
         obs.observe(count, { childList: true, characterData: true, subtree: true });
       }
+      renderDeckStack(deckCover, count?.textContent);
     })();
     

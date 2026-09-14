@@ -6,6 +6,8 @@
     import { processAction } from '../general/process-action.js';
     import { getZone } from '../zones/get-zone.js';
     import { openCardPicker } from '../image-logic/card-picker.js';
+    import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+    import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
     import {
       rulesState,
       canPerformAction,
@@ -1042,6 +1044,22 @@ import {
                 const effHp = effectiveHp(card.hp, player, card, zone.array);
                 if (effHp > 0 && damage >= effHp) {
                   card.__rulesKODetected = true;
+
+                  // Design 009 slice 6: ghost the KO'd card BEFORE the owner's
+                  // discard move (below) removes the real one. Runs for BOTH
+                  // player values — this loop already watches both sides'
+                  // zones for local detection (see the comment on the
+                  // owner-only discard branch below).
+                  if (
+                    shouldAnimateMirror({
+                      syncReplaying: !!systemState.syncReplaying,
+                      hidden: typeof document !== 'undefined' && !!document.hidden,
+                    })
+                  ) {
+                    const ghost = captureKnockoutGhost(player, card.image);
+                    if (ghost) playKnockoutGhost(ghost);
+                  }
+
                   const who = player === 'self' ? 'Your' : "Opponent's";
                   appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to discard${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
     
