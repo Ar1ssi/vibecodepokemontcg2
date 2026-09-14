@@ -335,7 +335,10 @@ const TRIGGER_NUDGE_PX = 10;
 const CHOOSE_PEEK_MAX = 8;
 
 const getPlaymatBounds = () => {
-  if (document.body.classList.contains('side-menu-collapsed')) {
+  if (
+    document.body.classList.contains('side-menu-collapsed') ||
+    document.body.classList.contains('sidebox-hidden')
+  ) {
     return { left: 0, right: window.innerWidth, width: window.innerWidth };
   }
   const sidebox = [...document.querySelectorAll('.sidebox')].find(
