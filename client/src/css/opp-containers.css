@@ -236,33 +236,64 @@ img.draw-flight-source,
   width: var(--prizes-width);
   height: var(--prizes-height);
   z-index: 0;
-  padding: 5px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 13.67% 72.66% 13.67%;
+  grid-template-rows: repeat(3, 1fr);
+  align-items: start;
 }
-#prizes img {
-  margin-left: .1vw;
-  width: auto;
-  max-width: var(--prizes-card-max-width);
+#prizes > img,
+#prizes > .mat-holo {
+  width: 100%;
+  height: 100%;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain;
+  margin: 0;
+  position: relative;
 }
-/* Holo cards in prizes: same wrapper-sizes-live-instead-of-frozen-px
-   approach as #hand .mat-holo above. */
-#prizes .mat-holo {
-  margin-left: .1vw;
-  width: auto;
-  max-width: var(--prizes-card-max-width);
-  max-height: 33%;
-}
-#prizes .mat-holo img {
+#prizes > .mat-holo img {
   width: 100%;
   height: 100%;
   max-width: none;
   max-height: none;
   margin: 0;
 }
-.prizes-normal-size {
-  max-height: 33%;
+/* Cards on the left (back): mostly overshadowed by ones on the right */
+#prizes > :nth-child(2n+1) {
+  grid-column: 1 / 3;
+  z-index: 1;
+  transform: translateY(6.75%);
 }
-.prizes-small-size {
-  max-height: 23%;
+/* Cards on the right (front): on top, overshadowing cards on the left */
+#prizes > :nth-child(2n) {
+  grid-column: 2 / 4;
+  z-index: 2;
+  transform: translateY(0);
+}
+/* When hovering any prize card, bring to top so it can be clearly viewed and clicked */
+#prizes > :hover {
+  z-index: 10;
+}
+/* 3 rows */
+#prizes > :nth-child(1),
+#prizes > :nth-child(2) {
+  grid-row: 1;
+}
+#prizes > :nth-child(3),
+#prizes > :nth-child(4) {
+  grid-row: 2;
+}
+#prizes > :nth-child(5),
+#prizes > :nth-child(6) {
+  grid-row: 3;
+}
+#prizes .prizes-normal-size,
+#prizes .prizes-small-size {
+  max-height: 100%;
+}
+#prizes img {
+  --prizes-card-max-width-ref: var(--prizes-card-max-width);
 }
 #lostZoneCover {
   position: fixed;

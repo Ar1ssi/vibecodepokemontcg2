@@ -4,11 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 121
-Focus: feature (board-ui) — playmat zones SVG overlay, zone alignment & remove low-opacity highlights
-Active: done. Added `playmat_zones_overlay.svg` to client assets, wired `img.mat-zones-overlay` in `apply-mat-layout.js`
-  and `index.css`, aligned `ONE_PLAYER` & `EDGE_TO_EDGE` zone geometry to coincide with SVG outlines, and removed
-  low-opacity highlights across `.outline` and `body.mat-active`. All 46 tests pass.
+Session: 122
+Focus: feature (board-ui) — overlapping prize cards layout matching playmat
+Active: done. Converted `#prizes` in `self-containers.css` and `opp-containers.css` to an overlapping 3-row grid
+  where cards on the left are mostly overshadowed by cards on the right, matching the playmat SVG's
+  staggered card geometry and hover-elevating for clear inspection. All 60 tests pass.
 Next: user visual review in browser.
 Blocked: nothing.
 
@@ -29,7 +29,7 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S122 2026-09-14 feature: overlapping prize cards layout matching playmat.
 - S121 2026-09-14 feature: playmat zones SVG overlay, zone alignment & remove low-opacity highlights.
 - S120 2026-09-14 feature: playmat zoom control and 85% scale for edge-to-edge mats.
-- S119 2026-09-14 feature: edge-to-edge zoneless playmat profiles and custom Kyogre mat.
 
