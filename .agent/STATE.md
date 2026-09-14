@@ -4,13 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 118
-Focus: fix (board-ui) — synchronize #battleMat and card zones in side-menu-collapsed mode
-Active: done. Collapsing right menu (#sideMenuToggle -> side-menu-collapsed) left #battleMat at 75.5% while
-  iframes were 98%, causing a 215px mat/card misalignment and exposing closed deck-builder text on right edge.
-  Synced body.side-menu-collapsed to 100% width and --mat-container-width: 100vw, hid closed deck builder workspace,
-  and updated getPlaymatBounds. 46 tests pass.
-Next: verify in browser.
+Session: 119
+Focus: feature (board-ui) — edge-to-edge zoneless playmats and custom Kyogre mat
+Active: done. Added edge-to-edge and edge-to-edge-two-player layout profiles (`matFit: 'cover'`), updated
+  `apply-mat-layout.js` and `index.css` to remove arena polygon clipping and stretch artwork edge-to-edge
+  without squishing, and added custom Kyogre mat to catalog. All 46 tests pass.
+Next: user visual review in browser.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -30,7 +29,7 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S119 2026-09-14 feature: edge-to-edge zoneless playmat profiles and custom Kyogre mat.
 - S118 2026-09-14 fix: synchronize #battleMat and card zones in side-menu-collapsed mode.
 - S117 2026-09-14 fix: card preview right click feature on search tab and deck cards.
-- S116 2026-09-14 feature: expand #battleMat to 100% in fullscreen sidebox-hidden mode.
 

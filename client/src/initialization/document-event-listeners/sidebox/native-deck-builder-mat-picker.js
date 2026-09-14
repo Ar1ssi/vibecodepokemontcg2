@@ -64,8 +64,11 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
     ].join('');
   };
 
-  const layoutLabel = (mat) =>
-    mat.layout === 'two-player' ? 'Full size · both players' : 'One-player mat';
+  const layoutLabel = (mat) => {
+    const base =
+      mat.layout === 'two-player' ? 'Full size · both players' : 'One-player mat';
+    return mat.fit === 'cover' ? `${base} · Edge-to-edge` : base;
+  };
 
   const findMat = (id) => mats.find((mat) => mat.id === id) || null;
 

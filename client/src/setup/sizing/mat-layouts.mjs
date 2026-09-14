@@ -124,17 +124,50 @@ const TWO_PLAYER = {
   },
 };
 
+/**
+ * Edge-to-edge / zoneless playmat for a single player half. Fits 100% of the half
+ * using object-fit: cover, spreading cards in the default simulator layout.
+ */
+const EDGE_TO_EDGE = {
+  id: 'edge-to-edge',
+  label: 'Edge-to-edge (one player)',
+  matMode: 'one-player',
+  matFit: 'cover',
+  aspectRatio: null,
+  zones: SIM.zones,
+};
+
+/**
+ * Edge-to-edge / zoneless playmat spanning both players across the entire table.
+ */
+const EDGE_TO_EDGE_TWO_PLAYER = {
+  id: 'edge-to-edge-two-player',
+  label: 'Full-size edge-to-edge (both players)',
+  matMode: 'two-player',
+  matFit: 'cover',
+  aspectRatio: null,
+  zones: SIM.zones,
+};
+
 export const MAT_LAYOUTS = {
   [SIM.id]: SIM,
   [ONE_PLAYER.id]: ONE_PLAYER,
   [TWO_PLAYER.id]: TWO_PLAYER,
+  [EDGE_TO_EDGE.id]: EDGE_TO_EDGE,
+  [EDGE_TO_EDGE_TWO_PLAYER.id]: EDGE_TO_EDGE_TWO_PLAYER,
 };
 
 export const DEFAULT_MAT_LAYOUT_ID = SIM.id;
 
 /** Profiles in picker order. */
 export function listMatLayouts() {
-  return [SIM, ONE_PLAYER, TWO_PLAYER].map(({ id, label }) => ({ id, label }));
+  return [
+    SIM,
+    ONE_PLAYER,
+    TWO_PLAYER,
+    EDGE_TO_EDGE,
+    EDGE_TO_EDGE_TWO_PLAYER,
+  ].map(({ id, label }) => ({ id, label }));
 }
 
 export function getMatLayout(id) {
@@ -149,6 +182,11 @@ export function getMatLayout(id) {
 export function classifyMatLayout(title) {
   const text = String(title || '').toLowerCase();
   if (!text) return DEFAULT_MAT_LAYOUT_ID;
+  if (/(edge[\s-]?to[\s-]?edge|zoneless|seamless|full[\s-]?bleed)/.test(text)) {
+    return /full[\s-]?size|two[\s-]?player|both/.test(text)
+      ? EDGE_TO_EDGE_TWO_PLAYER.id
+      : EDGE_TO_EDGE.id;
+  }
   if (/full[\s-]?size/.test(text)) return TWO_PLAYER.id;
   // The English-language "Official Playmat" releases are two-player sheets.
   if (/official\s+playmat/.test(text)) return TWO_PLAYER.id;
@@ -163,6 +201,19 @@ export function classifyMatLayout(title) {
 export function resolveMatLayout(mat) {
   if (!mat) return getMatLayout(DEFAULT_MAT_LAYOUT_ID);
   if (typeof mat === 'string') return getMatLayout(mat);
+  if (mat.layoutProfile && MAT_LAYOUTS[mat.layoutProfile]) {
+    return MAT_LAYOUTS[mat.layoutProfile];
+  }
+  if (
+    mat.fit === 'cover' ||
+    mat.layout === 'edge-to-edge' ||
+    mat.layout === 'edge-to-edge-two-player'
+  ) {
+    return mat.layout === 'two-player' ||
+      /full[\s-]?size|two[\s-]?player/i.test(mat.title)
+      ? getMatLayout(EDGE_TO_EDGE_TWO_PLAYER.id)
+      : getMatLayout(EDGE_TO_EDGE.id);
+  }
   if (mat.layout && MAT_LAYOUTS[mat.layout]) return MAT_LAYOUTS[mat.layout];
   return getMatLayout(classifyMatLayout(mat.title));
 }

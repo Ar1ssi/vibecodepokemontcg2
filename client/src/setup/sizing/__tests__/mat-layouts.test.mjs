@@ -174,7 +174,7 @@ test('each profile is offered to the picker exactly once', () => {
   assert.equal(listed.length, Object.keys(MAT_LAYOUTS).length);
   assert.deepEqual(
     listed.map((entry) => entry.id),
-    ['sim', 'one-player', 'two-player']
+    ['sim', 'one-player', 'two-player', 'edge-to-edge', 'edge-to-edge-two-player']
   );
   for (const entry of listed) {
     assert.ok(entry.label, `${entry.id} needs a label`);

@@ -214,8 +214,16 @@ const syncMatArt = () => {
   const shared = activeTwoPlayerMat();
   const hasAny = Boolean(shared || currentMats.self || currentMats.opp);
 
+  const activeLayout = shared
+    ? resolveMatLayout(shared.mat)
+    : currentMats.self
+      ? resolveMatLayout(currentMats.self)
+      : resolveMatLayout(currentMats.opp);
+  const isCover = activeLayout?.matFit === 'cover';
+
   if (battleMat) {
     battleMat.classList.toggle('mat-active', hasAny);
+    battleMat.classList.toggle('mat-fit-cover', isCover);
     battleMat.classList.toggle(
       'mat-two-player',
       Boolean(shared && shared.owner === 'self')

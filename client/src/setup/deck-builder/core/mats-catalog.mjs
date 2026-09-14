@@ -7,6 +7,28 @@
 
 export const MATS_CATALOG = [
   {
+    id: 'custom-kyogre-edge-to-edge',
+    title: 'Playmat Kyogre (Edge-to-Edge)',
+    image: 'src/assets/playmats/custom/kyogre-edge-to-edge.jpg',
+    thumb: 'src/assets/playmats/custom/kyogre-edge-to-edge.jpg',
+    board: 'src/assets/playmats/custom/kyogre-edge-to-edge.jpg',
+    layout: 'one-player',
+    fit: 'cover',
+    sourceUrl: '',
+    imageUrl: '',
+  },
+  {
+    id: 'custom-kyogre-full-size-edge-to-edge',
+    title: 'Playmat Full size Kyogre (Edge-to-Edge Table)',
+    image: 'src/assets/playmats/custom/kyogre-full-size-edge-to-edge.jpg',
+    thumb: 'src/assets/playmats/custom/kyogre-full-size-edge-to-edge.jpg',
+    board: 'src/assets/playmats/custom/kyogre-full-size-edge-to-edge.jpg',
+    layout: 'two-player',
+    fit: 'cover',
+    sourceUrl: '',
+    imageUrl: '',
+  },
+  {
     id: '3234-rubber-playmat-full-size-showdown-mega-rayquaza-1',
     title: 'Rubber Playmat Full size Showdown! Mega Rayquaza',
     image:
