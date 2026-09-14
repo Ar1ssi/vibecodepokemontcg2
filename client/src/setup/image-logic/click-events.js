@@ -26,6 +26,9 @@ import {
   openCardPreview,
 } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
+import { rulesState, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
+import { shouldOpenAttackPreview } from '../rules/attack-preview-gate.js';
+import { openAttackPreview } from '../rules/attack-preview.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -261,6 +264,26 @@ export const imageClick = (event) => {
       'move'
     );
   } else {
+    // Design 008 (D1/D6): a plain click on your own active or an
+    // ability-bearing benched Pokémon opens the TCG Live-style attack/ability
+    // preview instead of the usual select-to-move highlight. Gated here,
+    // after the selectHighlight branch above, so attaching Energy or
+    // promoting from bench (R1) is untouched.
+    if (rulesState.enabled) {
+      const decision = shouldOpenAttackPreview({
+        zoneId: mouseClick.zoneId,
+        cardUser: mouseClick.cardUser,
+        hasSelectHighlight: false,
+        // Bench ability zones land in slice 5 — no predicate to feed yet.
+        hasAbility: false,
+        gate: canPerformAction({ user: mouseClick.cardUser, action: 'attack' }),
+      });
+      if (decision === 'attack' && mouseClick.card?.image) {
+        openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'active' });
+        return;
+      }
+    }
+
     closePopups(event); //need both because of highlights condition in the if block above
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
