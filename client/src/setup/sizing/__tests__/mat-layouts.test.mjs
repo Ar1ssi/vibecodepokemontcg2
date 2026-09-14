@@ -315,3 +315,16 @@ test('board zone hides scrollbars across both container stylesheets', () => {
     );
   }
 });
+
+test('index.css expands --mat-container-width to 100vw on :root when drawer is closed', () => {
+  const indexCss = readCss('index.css');
+  assert.ok(
+    /:root\.side-menu-collapsed|:root:has\(body\.side-menu-collapsed\)/.test(indexCss),
+    'index.css should define --mat-container-width for :root when side menu is collapsed'
+  );
+  assert.ok(
+    /:root\.sidebox-hidden|:root:has\(body\.sidebox-hidden\)/.test(indexCss),
+    'index.css should define --mat-container-width for :root when sidebox is hidden'
+  );
+});
+

@@ -4,17 +4,18 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 128
-Focus: merge — fold brave-volta's follow-up (796aa79, design 008 live manual verification)
-  into claude/cpu-testing-live-render-anr7fy. This branch is the test server going forward.
-Active: done. Docs-only merge (NEXTSTEPS.md + .agent). brave-volta ran design 008's manual
-  checklist against a real two-browser session: 15/16 pass — single-click gating, attack zones,
-  Retreat/Pass, overlay-click and Escape close, double-click plain preview, #rulesAttackWindow
-  gone. Their run predates main's playmat/zone geometry rework, so the geometry-sensitive checks
-  are not yet verified on this merged tree. Their new issue renumbered I44 -> I45 (I44 was taken).
-Next: re-run design 008's geometry-sensitive checks on THIS tree (merged playmat geometry) before
-  trusting it as the test server. I45 needs a session to trace SERVER_AUTHORITATIVE on vs off.
-  Session 130 is a maintenance-due milestone — run `.agent/workflows/maintain.md` if idle then.
+Session: 129
+Focus: merge — verify the test branch under SERVER_AUTHORITATIVE, fold in main's PR #128, and
+  promote claude/cpu-testing-live-render-anr7fy to main.
+Active: done. Ran a real SERVER_AUTHORITATIVE=1 server with two bots: 9 games, all PASS (5
+  heuristic + 3 coverage + 1 smoke), zero pageerror/cmdRejected, board-hash and secret-count
+  parity every game. Confirmed the clients are genuinely server-driven (isAuthoritative true,
+  fromServer true, 8/7 opening hands, server-picked first player) rather than falling back to
+  legacy. Then merged main's PR #128 (mat position when the right drawer is closed) — code
+  auto-merged, only .agent docs conflicted.
+Next: I39 (flip-gate-test.mjs, the named server-authoritative exit gate) is still untested and
+  open. Bot runs so far used only the fixture deck — real decklists via --deckA/--deckB would
+  exercise the effect executor (I35). Session 130 is a maintenance-due milestone.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -33,6 +34,6 @@ Blocked: nothing.
   files (eslint.config only targets `**/*.js`) — verify a diff's own files with `npx eslint <files>`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S129 2026-09-14 merge: SERVER_AUTHORITATIVE bot verification (9/9) + PR #128; branch to main.
 - S128 2026-09-14 merge: brave-volta's design 008 live manual verification into the test branch.
 - S127 2026-09-14 merge: main (39 commits) + brave-volta (design 008) into the test-server branch.
-- S126 2026-09-14 feature: design 008 slice 6 (final) — deleted the Attack Window panel + CSS.
