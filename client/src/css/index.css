@@ -4593,62 +4593,6 @@ body.side-menu-collapsed #boardButtonContainer {
     .native-deck-builder-mat-picker .native-deck-builder-section-title,
     .native-deck-builder-mat-picker .native-deck-builder-set-browser-series-tag { display: none; }
 
-    /* ── Attack Window ── */
-    #rulesAttackWindow {
-      position: fixed;
-      bottom: 12px;
-      left: 12px;
-      z-index: 9999;
-      background: rgba(20, 24, 32, 0.95);
-      border: 1px solid rgba(100, 140, 220, 0.4);
-      border-radius: 8px;
-      padding: 10px 14px;
-      max-width: 380px;
-      max-height: 45vh;
-      overflow-y: auto;
-      font-size: 0.82rem;
-      color: #dde;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    }
-    .rules-aw-title {
-      margin: 0 0 6px;
-      font-size: 0.95rem;
-      color: #aaccff;
-      border-bottom: 1px solid rgba(100,140,220,0.25);
-      padding-bottom: 4px;
-    }
-    .rules-aw-title.rules-aw-draggable {
-      cursor: move;
-      user-select: none;
-      touch-action: none;
-    }
-    .rules-aw-section {
-      font-weight: 600;
-      margin: 8px 0 3px;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #8899bb;
-    }
-    .rules-aw-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 6px;
-      border-radius: 4px;
-      margin: 2px 0;
-      cursor: default;
-    }
-    .rules-aw-clickable { cursor: pointer; }
-    .rules-aw-clickable:hover { background: rgba(80,120,200,0.2); }
-    .rules-aw-name { flex: 1; }
-    .rules-aw-cost { font-size: 0.9rem; letter-spacing: -1px; }
-    .rules-aw-dmg { color: #ff9966; font-size: 0.78rem; margin-left: 4px; }
-    .rules-aw-badge { font-size: 0.85rem; margin-left: auto; }
-    .rules-aw-usable { color: #55dd77; }
-    .rules-aw-unusable { color: #ff5555; }
-    .rules-aw-reason { font-size: 0.72rem; color: #999; margin-left: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
     /* ── Mat picker (Customize > Mat) ─────────────────────────────────────
        Same panel/grid look as the coin and sleeve pickers, with wide tiles:
        one-player mats are roughly 2:1 and full-size mats roughly 1:1, so
