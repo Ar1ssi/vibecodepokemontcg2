@@ -12,15 +12,24 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
-- I43 2026-09-11 P2 [netcode] Client per-turn rules flags were never synced from the authoritative view — FIXED S89, recorded because it affected real players, not only the bot. Under `SERVER_AUTHORITATIVE` the legacy bodies that set `rulesState.flags` (markRetreated, markSupporterPlayed, the energy-attach and attack markers) are gated away, so the flags stayed frozen while the server tracked the real ones; `canPerformAction` reads them, so the client offered moves the server then rejected ("Already retreated this turn." after one retreat). `reconcileTurnState` (apply-view.js) already existed for exactly this class of staleness and synced turn player/number/phase but not flags; it now merges `view.you/them.flags` too. Verified: bot 8/8 games in authoritative mode, was 0/8 (refs: design 002 slice 3.12, S89).
-    RENUMBERED from I36 on merge into this branch: the two sessions ran concurrently and both
-    claimed I36/S89. This branch's numbering is the incumbent; the fix/bot-authoritative commit
-    message still says I36.
+- I45 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a
+    UI-driven attack() call that runs to completion (no cmdRejected, attack option correctly drops
+    from the acting client's own legal-move list afterward), the attacking client's own observe()
+    of opp.active.damage still read 0 several seconds later. Not reproduced via targeted debug
+    (S127); likely a stale-view read in this ad-hoc harness, not the attack-engine itself (1362
+    unit tests incl. damage application are green). Needs a session with time to trace with
+    SERVER_AUTHORITATIVE on/off. (refs: design 008 manual verification, S127)
+    RENUMBERED from I44 on merge into claude/cpu-testing-live-render-anr7fy: this branch
+    already used I44 for the attack-inheritance issue below.
 - I44 2026-09-14 P3 [rules] Attack inheritance never inherits — `mergeInheritedAttacks` is dead in practice
     because the only live call site passes `priorAttacks: []` (rules-bridge.js:305); that call site is
     deleted by design 008 slice 6, which also drops its per-refresh chat announcement (refs: 008 R8/R7, S123)
     RENUMBERED from I43 on merge into claude/cpu-testing-live-render-anr7fy: both branches
     independently claimed I43. The design 008 doc still refers to it as I43.
+- I43 2026-09-11 P2 [netcode] Client per-turn rules flags were never synced from the authoritative view — FIXED S89, recorded because it affected real players, not only the bot. Under `SERVER_AUTHORITATIVE` the legacy bodies that set `rulesState.flags` (markRetreated, markSupporterPlayed, the energy-attach and attack markers) are gated away, so the flags stayed frozen while the server tracked the real ones; `canPerformAction` reads them, so the client offered moves the server then rejected ("Already retreated this turn." after one retreat). `reconcileTurnState` (apply-view.js) already existed for exactly this class of staleness and synced turn player/number/phase but not flags; it now merges `view.you/them.flags` too. Verified: bot 8/8 games in authoritative mode, was 0/8 (refs: design 002 slice 3.12, S89).
+    RENUMBERED from I36 on merge into this branch: the two sessions ran concurrently and both
+    claimed I36/S89. This branch's numbering is the incumbent; the fix/bot-authoritative commit
+    message still says I36.
 - I39 2026-09-11 P2 [netcode] flip-gate-test.mjs fails right after both hands are dealt (timeout waiting for a page predicate) on main fe0ad88 with S102's changes stashed — pre-existing; the server-authoritative exit gate is currently red. (refs: S102)
 - I41 2026-09-11 P3 [netcode] legacy mode: after both players leave and join a fresh room, the second player once stayed in setup with prizes but no opening hand (1 sample, S102 second-game probe). Untriaged. (refs: S102)
 - I35 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed
