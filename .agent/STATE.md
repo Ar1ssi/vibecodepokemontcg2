@@ -4,16 +4,16 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 123
-Focus: review — design 008 (TCG Live attack preview): plan review + user decisions folded in
-Active: done. `.agent/designs/008-tcg-live-attack-preview.md` now carries decisions D1–D6 and
-  review findings R1–R12, folded into the component specs, edge cases (E1–E14), work plan
-  (now 6 slices) and verification plan. D5/D6 retire the Attack Window panel entirely: abilities
-  move onto the card overlay, and a bench single-click opens an ability-only overlay.
-  No product code touched. I43 filed for R8. No open questions remain.
-Next: implement slice 1 — a self-contained brief is at the TOP of `NEXTSTEPS.md` (design 008
-  ledger, 6 slices). Slice 6 (deleting the panel) must stay last or rules mode is unplayable
-  in between. The netcode ledger below it is parked history, not active work.
+Session: 124
+Focus: feature — design 008 (TCG Live attack preview), slice 4
+Active: done. Component 4 (click-events.js gating) + Component 7 (sidebox button routing) built.
+  New pure `client/src/setup/rules/attack-preview-gate.js` (`shouldOpenAttackPreview`) covers R1/R2/D6's
+  decision logic and is unit-tested for all 6 verification-plan cases. `imageClick()`'s final else
+  branch and both sidebox attackButtons now open `openAttackPreview()` when rules mode is on;
+  bench/ability wiring stays `hasAbility: false` until slice 5. Commit 2b1f463.
+Next: slice 5 — ability zones (D5) + bench overlay wiring (D6), per `NEXTSTEPS.md`. Run `pnpm
+  test`/`pnpm lint` first (not run this session per user instruction) before starting. Slice 6
+  (deleting the Attack Window panel) must stay last or rules mode is unplayable in between.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -34,6 +34,6 @@ Blocked: nothing.
   keep the *.js UI files thin callers, so behavior stays testable even though the wiring isn't.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S124 2026-09-14 feature: design 008 slice 4 — click-events.js gating + sidebox attack routing.
 - S123 2026-09-14 review: design 008 reviewed; decisions D1–D4 + findings R1–R9 recorded.
 - S122 2026-09-14 feature: overlapping prize cards layout matching playmat.
-- S121 2026-09-14 feature: playmat zones SVG overlay, zone alignment & remove low-opacity highlights.

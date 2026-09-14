@@ -9,13 +9,49 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | 1 | done | befcf56 | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
 | 2 | done | 3ed257c | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
 | 3 | done | 4ff5744 | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
-| 4 | **next** | — | `click-events.js` gating + sidebox button routing |
-| 5 | todo | — | Ability zones (D5) + bench overlay wiring (D6) |
+| 4 | done | 2b1f463 | `click-events.js` gating (new `attack-preview-gate.js`) + sidebox button routing |
+| 5 | **next** | — | Ability zones (D5) + bench overlay wiring (D6) |
 | 6 | todo | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
 
 > [!IMPORTANT]
 > Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
 > slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+
+## S124 — slice 4 done
+
+Built Component 4 (click gating) + Component 7 (sidebox routing). No ability/bench UI yet — that's
+slice 5's job per the work plan; the gate function below already has a branch for it.
+
+**New `client/src/setup/rules/attack-preview-gate.js`** — pure `shouldOpenAttackPreview({ zoneId,
+cardUser, hasSelectHighlight, hasAbility, gate })` returning `'attack' | 'ability' | null`. Kept out
+of `attack-preview.js` on purpose so it unit-tests without pulling in that module's DOM-heavy
+imports (`full-view.js`, `chat-buttons.js`) — R9. `hasSelectHighlight` short-circuits first (R1: the
+move-to-active flow owns that click), then `cardUser !== 'self'` (R2: both iframes have an `#active`,
+so `zoneId` alone can't tell your active from the opponent's). `zoneId: 'active'` returns `'attack'`
+iff `gate.allowed`; `zoneId: 'bench'` returns `'ability'` iff `hasAbility`, independent of `gate` (an
+ability isn't gated by attack-turn legality). Everything else is `null`. Unit tests in
+`__tests__/attack-preview-gate.test.mjs` cover all 6 cases from the verification plan.
+
+**`click-events.js`** — `imageClick()`'s final `else` branch (i.e. no `selectHighlight`, so R1 holds)
+now checks `rulesState.enabled` first (E14: no gate at all in free-play), then calls the gate with
+`hasAbility: false` (bench wiring is slice 5's) and `gate: canPerformAction({ user: mouseClick.cardUser,
+action: 'attack' })`. On `'attack'` it calls slice 3's `openAttackPreview(mouseClick.card,
+mouseClick.card.image, { zone: 'active' })` and returns before the highlight/select code runs; on
+anything else (including today's always-null bench case) it falls through unchanged, so E10 (bench,
+no ability, still select-to-move) and R3 (right-click still opens the context menu — untouched) both
+hold as before.
+
+**Sidebox routing (`sidebox/p1/chat-buttons.js`, `sidebox/p2/chat-buttons.js`)** — `attackButton`/
+`p2AttackButton` now resolve the acting user exactly as `attack()` itself would (`systemState.initiator`
+in 2P, else the fixed `'self'`/`'opp'`), then when `rulesState.enabled` look up that side's active card
+via `getActivePokemonCard(getZone(user, 'active'))` and call `openAttackPreview` instead of `attack()`
+directly. Free-play (`rulesState.enabled === false`) or no active card falls through to the original
+direct `attack(user)` call, so nothing changes when rules mode is off (D2/E14). Retreat/Pass sidebox
+buttons are untouched per D2 — they stay a separate, mirrored entry point.
+
+Manual verification (R1/R2/R3/E14) deferred to slice 6's integration sweep per the work plan; `pnpm
+test`/`pnpm lint` not run this session per user instruction — next session should run both before
+starting slice 5.
 
 ## S71 — slice 3 done
 
