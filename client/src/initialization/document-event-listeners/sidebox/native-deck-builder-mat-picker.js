@@ -30,6 +30,14 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
 
   const mats = listMats();
 
+  const SCALE_KEY = 'ptcg-sim.playmat.scale';
+  let currentScale = 85;
+  try {
+    const saved = localStorage.getItem(SCALE_KEY);
+    if (saved) currentScale = Number(saved) || 85;
+  } catch {}
+  document.documentElement.style.setProperty('--mat-scale', currentScale / 100);
+
   let selectedId = null;
   let filterTerm = '';
 
@@ -43,12 +51,27 @@ export const initializeDeckBuilderMatPicker = ({ panelEl, onChange }) => {
     '    placeholder="Filter mats..." aria-label="Filter mats by name" />',
     '</div>',
     '<div class="native-deck-builder-mat-preview" aria-live="polite"></div>',
+    '<div class="native-deck-builder-mat-zoom-control">',
+    `  <label for="nativeDeckBuilderMatZoom">Zoom: <span id="matZoomVal">${currentScale}%</span></label>`,
+    `  <input type="range" id="nativeDeckBuilderMatZoom" min="50" max="120" step="5" value="${currentScale}" />`,
+    '</div>',
     '<div class="native-deck-builder-mat-gallery"></div>',
   ].join('');
 
   const previewEl = panelEl.querySelector('.native-deck-builder-mat-preview');
   const galleryEl = panelEl.querySelector('.native-deck-builder-mat-gallery');
   const filterInput = panelEl.querySelector('.native-deck-builder-mat-filter');
+  const zoomSlider = panelEl.querySelector('#nativeDeckBuilderMatZoom');
+  const zoomVal = panelEl.querySelector('#matZoomVal');
+
+  zoomSlider?.addEventListener('input', (e) => {
+    currentScale = Number(e.target.value) || 85;
+    if (zoomVal) zoomVal.textContent = `${currentScale}%`;
+    document.documentElement.style.setProperty('--mat-scale', currentScale / 100);
+    try {
+      localStorage.setItem(SCALE_KEY, String(currentScale));
+    } catch {}
+  });
 
   const matImageSrc = (mat) => matThumbFallbackChain(mat).primary;
   const matImageFallback = (mat) => matThumbFallbackChain(mat).fallback;

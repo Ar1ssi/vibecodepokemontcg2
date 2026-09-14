@@ -13,6 +13,7 @@
 :root {
   --mat-half-height: 50vh;
   --mat-container-width: 75.5vw;
+  --mat-scale: 0.85;
 }
 body.sidebox-hidden,
 body.side-menu-collapsed {
@@ -303,12 +304,14 @@ ul, li {
   max-height: 100%;
   aspect-ratio: auto;
   object-fit: cover;
-  border-radius: 0;
-  box-shadow: none;
+  transform: scale(var(--mat-scale, 0.85));
+  transition: transform 180ms ease;
+  border-radius: 4px;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
 }
 
 #battleMat.mat-fit-cover #battleMatArt .mat-half img.mat-ambient-image {
-  display: none;
+  display: block;
 }
 /* With real mat art behind the board, the synthetic arena decoration would
    read as grime on top of the artwork. */
@@ -4842,4 +4845,30 @@ body.side-menu-collapsed #boardButtonContainer {
 
 .game-end-close-btn:hover {
   background: #2563eb;
+}
+
+/* Playmat Zoom Control */
+.native-deck-builder-mat-zoom-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8vw;
+  padding: 0.5vh 0.75vw;
+  margin-bottom: 0.6vh;
+  font-size: 1.4vh;
+  color: #333;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+.native-deck-builder-mat-zoom-control label {
+  white-space: nowrap;
+  font-weight: 500;
+}
+.native-deck-builder-mat-zoom-control input[type="range"] {
+  flex: 1;
+  cursor: pointer;
+}
+body.dark-mode-1 .native-deck-builder-mat-zoom-control {
+  background: rgba(255, 255, 255, 0.08);
+  color: #c5d0ff;
 }
