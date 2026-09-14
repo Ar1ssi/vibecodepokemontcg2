@@ -6,12 +6,13 @@
 
 Session: 123
 Focus: review — design 008 (TCG Live attack preview): plan review + user decisions folded in
-Active: done. `.agent/designs/008-tcg-live-attack-preview.md` now carries decisions D1–D4
-  (single-click trigger, keep both Retreat/Pass locations, dynamic zone sizing, unpayable
-  attacks unhighlighted) and review findings R1–R9, folded into the component specs, edge-case
-  table, work plan and verification plan. No product code touched. I43 filed for R8.
-Next: user to answer the one open question (do abilities move onto the card overlay?), then
-  implement slice 1 (`resolve-attack-context.mjs`). Design 008 is not yet approved to build.
+Active: done. `.agent/designs/008-tcg-live-attack-preview.md` now carries decisions D1–D6 and
+  review findings R1–R12, folded into the component specs, edge cases (E1–E14), work plan
+  (now 6 slices) and verification plan. D5/D6 retire the Attack Window panel entirely: abilities
+  move onto the card overlay, and a bench single-click opens an ability-only overlay.
+  No product code touched. I43 filed for R8. No open questions remain.
+Next: implement slice 1 (`resolve-attack-context.mjs` + unit tests) — design 008 is ready to
+  build; slice 6 (deleting the panel) must stay last or rules mode is unplayable in between.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

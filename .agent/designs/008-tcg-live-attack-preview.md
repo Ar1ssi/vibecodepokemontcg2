@@ -1,5 +1,5 @@
 # Design 008 — TCG Live-Style Attack Selection System
-Status: reviewed — decisions D1–D4 confirmed by user (S123); abilities placement still open
+Status: reviewed — decisions D1–D6 confirmed by user (S123); no open questions, ready to plan slice 1
 Author: agent (S114)
 
 Replace the current draggable floating "Attack Window" panel with a TCG Live-style interaction: **click the active Pokémon → card magnifies into the existing card preview overlay → translucent attack hit-zones overlay the magnified card's attack text regions → click an attack to use it**.
@@ -12,14 +12,16 @@ Replace the current draggable floating "Attack Window" panel with a TCG Live-sty
 | D2 | Retreat & Pass placement | **Keep both.** Retreat/Pass buttons are added to the magnified card overlay *and* stay in their existing sidebox/chat location — the overlay is an additional entry point, not a replacement. |
 | D3 | Attack zone sizing | **Dynamically sized** (Option B): zone height derives from the attack count rather than fixed slots. |
 | D4 | Unpayable attacks | **Not highlighted.** Every attack still gets a zone, but only payable attacks receive the glow/hover treatment. Unpayable zones render plain (no glow, no dim-to-grey), are inert on click, and expose the `reason` from `listUsableActions()` as a hover tooltip. |
+| D5 | Ability activation | **Abilities move onto the card overlay.** The Attack Window panel is retired entirely (not reduced to an Abilities panel) — see the rewritten Component 5. |
+| D6 | Bench abilities | **Single-click a benched Pokémon opens its own overlay**, showing ability zones only (a benched Pokémon cannot attack). This is the TCG Live behaviour and is what lets D5 retire the panel completely. |
 
 > [!NOTE]
 > Assumed while recording D4: unpayable zones stay *visible and inert with a reason tooltip* rather than being removed. "Not highlighted" was read as "no glow", not "no zone".
 
-### Still open
+> [!NOTE]
+> Assumed while recording D6: a bench single-click opens the overlay **only when that card actually has an ability**; a benched Pokémon with no ability keeps today's select-to-move behaviour. Opening an empty overlay on every bench click would cost selection for no gain. The predicate is pure and testable (`benchCardHasAbility`).
 
-> [!WARNING]
-> **Ability activation** (unanswered): should abilities also move onto the magnified card overlay, or stay in the existing panel? The plan below assumes they stay, and the Attack Window becomes an Abilities-only panel (Component 5).
+All review questions are now resolved; nothing in this design is waiting on the user.
 
 ## Review findings (S123)
 
@@ -78,11 +80,33 @@ dependency-injected modules, so the placement is fine.
 "(inherited)" zones is therefore dead code until `priorAttacks` is populated. Either drop E8 from
 this design's scope or file the gap separately — do not claim it works.
 
+**R10 — `filterUsableAbilities` discards unusable abilities, so D4's treatment can't apply (Component 1/5).**
+`filterUsableAbilities()` (`collect-usable-abilities.mjs:48`) returns only abilities that pass
+`isUsableAbilityCard`, so the panel today shows nothing at all for a once-per-turn ability that has
+already been used. To give abilities the same render-plain-when-unusable treatment as attacks (D4),
+the overlay must render from `collectUsableAbilityCandidates()` and carry the usable flag itself,
+rather than consuming the pre-filtered list.
+
+**R11 — Retiring the panel deletes the only "no attacks resolved" diagnostic (Component 5).**
+`rules-bridge.js:347-359` is a deliberate self-diagnosing surface: a `console.warn` plus a visible
+`id=… · data not loaded (check network / TCGdex)` hint when a card's attacks never resolved. It is
+how a data-plumbing failure becomes visible to the player. Deleting `buildAttackWindow` must carry
+this into the overlay's empty state (E1), warning and visible hint included — not drop it.
+
+**R12 — The overlay is transient but board state changes under it (Component 1).**
+The panel re-renders on seven events (`rules-turn-began`, `rules-energy-attached`,
+`rules-card-moved`, `rules-damage-changed`, `action-processed`, `rules-mode-changed`,
+`rules-session-reset`; `rules-bridge.js:397-403`). With D5 this matters *while the overlay is open*:
+using an ability from the overlay can attach Energy or move a card and make a previously unpayable
+attack payable. The overlay must subscribe to the same events while open and re-render its zones in
+place (and close itself on `rules-turn-began` / `rules-session-reset`), or it will show stale
+payability immediately after the ability it just ran.
+
 **R9 — Verification plan has no coverage for the wiring.**
 Only `resolve-attack-context.mjs` and the zone-geometry function get unit tests. Per the
 watch-outs, `client/src/setup/...` UI wiring has no jsdom harness in this repo, so keep the
-decision logic (should-open predicate from R1/R2, zone geometry from R4/D3, usable-vs-plain
-classification from D4) in pure exported functions that tests can reach, and keep the DOM files
+decision logic (should-open predicate from R1/R2/D6, zone geometry from R4/D3, usable-vs-plain
+classification from D4/R10) in pure exported functions that tests can reach, and keep the DOM files
 thin callers.
 
 ## Current state
@@ -118,14 +142,17 @@ User clicks chat button / attack window row
 
 New module that orchestrates the TCG Live-style attack selection flow. Responsibilities:
 
-- **`openAttackPreview(card, targetImage)`** — the main entry point:
+- **`openAttackPreview(card, targetImage, { zone })`** — the main entry point (`zone` is `'active'` or `'bench'`):
   1. Calls the existing `openFloatingCardPreview()` from `full-view.js` to magnify the card with the holo animation
   2. After the preview DOM is created, overlays transparent clickable attack hit-zones on top of the magnified card face
   3. Gathers energy/cost data using the new shared `resolveAttackContext()` helper
-  4. Calls `listUsableActions()` from `attack-window.mjs` to get payability status
+  4. Calls `listUsableActions()` from `attack-window.mjs` to get payability status (skipped for `zone: 'bench'` — a benched Pokémon cannot attack, so it gets ability zones only, per D6)
+  4b. Calls `collectUsableAbilityCandidates()` directly — **not** the pre-filtered `filterUsableAbilities()` list — so unusable abilities can still render plain per D4 (R10)
   5. Renders attack zones with visual states per D4: **usable** (highlighted glow border), **unpayable** (plain — no glow, inert, `title` tooltip carrying the `reason`), **once-used** (locked icon)
   6. Renders "Retreat" and "Pass Turn" action buttons below the card — mounted in `.card-preview-overlay`, not in the card face (see R5). These are additive; the sidebox/chat buttons stay (D2).
   7. On attack zone click: closes the preview and calls `attack(rulesState.turnPlayer, true, idx)` from `chat-buttons.js`
+  8. On ability zone click (D5): calls `runAbilitySteps('self', card)` — the same entry the panel used (`rules-bridge.js:388`). Using an ability does **not** end the turn, so the overlay stays open and re-renders (R12) rather than closing
+  9. While open, subscribes to the board events the panel used and re-renders zones in place; closes itself on `rules-turn-began` and `rules-session-reset` (R12)
 
 - **`closeAttackPreview()`** — closes the overlay via `closeCardPreview()` and cleans up hit-zones
 
@@ -139,6 +166,14 @@ New module that orchestrates the TCG Live-style attack selection flow. Responsib
   - Each zone has: attack name label, energy cost icons (using existing energy token PNGs from `client/src/assets/energy/tokens/`), damage value
   - Hover state: zone border glows, background lightens
   - Click: brief flash animation → close overlay → execute attack
+
+- **Ability zone layout (D5):**
+  - A Pokémon's ability sits *above* its attacks on the card, so the ability zone occupies the band
+    between the artwork and the attack band; `attackZoneBounds` already takes the ability count and
+    shifts the attack band down, and the same helper returns the ability band
+  - Bench overlays (D6) render the ability zone only, with no attack band
+  - Usable / unusable rendering follows D4 exactly: usable glows, unusable renders plain and inert
+    with its reason as a tooltip
 
 ---
 
@@ -176,20 +211,35 @@ Both `rules-bridge.js` and `attack-preview.js` will call this instead of inline 
 
 - In `imageClick()` (line 238): open the attack preview **only from the final `else` branch** — i.e. the target carries no `selectHighlight` class, so move-to-active flows (attaching Energy, promoting from bench) are untouched (R1).
 - The gate is `mouseClick.zoneId === 'active' && mouseClick.cardUser === 'self'` plus `canPerformAction({ user: 'self', action: 'attack' })` returning `allowed: true` or a payability-only reason. The `cardUser` check is required — both iframes contain an `#active` element (R2).
-- Factor the gate into a pure exported `shouldOpenAttackPreview({ zoneId, cardUser, hasSelectHighlight, gate })` so it can be unit-tested (R9).
-- Because single-click on the active no longer selects it during your main phase (D1), right-click → `openCardContextMenu()` (line 84) is the documented way to move the active elsewhere (R3); call this out in the release note.
+- Per D6, the same `else` branch also opens a **bench** overlay when `mouseClick.zoneId === 'bench'`, `mouseClick.cardUser === 'self'`, and the card has an ability (`benchCardHasAbility`). R1 and R2 apply identically to the bench: attaching Energy to a benched Pokémon also goes through the `selectHighlight` branch, and the opponent's bench must not open one.
+- A benched Pokémon with **no** ability keeps today's select-to-move behaviour — the overlay is not opened.
+- Factor the gate into a pure exported `shouldOpenAttackPreview({ zoneId, cardUser, hasSelectHighlight, hasAbility, gate })` returning `'attack' | 'ability' | null`, so it can be unit-tested (R9).
+- Because single-click no longer selects the active (D1) — nor a benched Pokémon that has an ability (D6) — right-click → `openCardContextMenu()` (line 84) is the documented way to move those cards (R3); call this out in the release note.
 - The existing double-click handler remains unchanged (it opens a pure visual preview without attack zones, useful for inspecting opponent's cards or your own cards outside main phase).
 
 ---
 
-### Component 5: Attack Window Panel (Modify)
+### Component 5: Attack Window Panel (Remove)
 
 #### [MODIFY] `client/src/setup/rules/rules-bridge.js`
 
-- `buildAttackWindow` `refresh()` (line 265): strip the "Attacks" section from the panel HTML when rules mode is on — the panel becomes an "Abilities" panel only.
-- Keep the "Abilities" section rendering and click handling intact.
-- Refactor energy/cost data gathering to use the new `resolveAttackContext()` helper.
-- Rename the window title from "⚔️ Attack Window" to "✨ Abilities" (only shown when abilities exist).
+Per D5 + D6 the panel has no remaining job — attacks move to the active overlay, active abilities
+move with them, and bench abilities move to the bench overlay. So `buildAttackWindow` is **removed**,
+not reduced:
+
+- Delete `buildAttackWindow` (lines 207–408) and its seven `document.addEventListener` refresh
+  subscriptions (lines 397–403). The overlay subscribes to the same events itself, but only while
+  open (R12).
+- Carry these three things out of it before deleting, or they are lost:
+  1. The attack-execution call `attack(rulesState.turnPlayer, true, idx)` → already in Component 1.
+  2. The ability-execution call `runAbilitySteps('self', card)` → Component 1 step 8.
+  3. The "no attacks resolved" diagnostic (`console.warn` + the visible `id=… · data not loaded`
+     hint, lines 347–359) → Component 1's empty state / E1 (**R11**).
+- The energy/cost gathering block (lines 279–307) moves into `resolveAttackContext()` — minus the
+  `appendMessage()` inheritance announcement, which is chat I/O and must not enter `shared/` (**R7**).
+  Since the panel is going away entirely, that announcement has no remaining caller; drop it and
+  fold the note into I43 rather than rehoming it.
+- Remove the now-dead `#rulesAttackWindow` markup and drag wiring.
 
 ---
 
@@ -207,7 +257,13 @@ Both `rules-bridge.js` and `attack-preview.js` will call this instead of inline 
 .attack-preview-btn         — styled action buttons (glass/frost effect to match TCG Live)
 .attack-preview-btn--retreat
 .attack-preview-btn--pass
+.ability-zone               — ability hit region above the attack band (D5)
+.ability-zone--usable       — same glow treatment as .attack-zone--usable
+.ability-zone--unusable     — plain, inert, reason tooltip (D4 + R10)
 ```
+
+Delete the `#rulesAttackWindow` and `.rules-aw-*` rules (`index.css:4395+`) along with the panel
+(Component 5).
 
 Key visual properties:
 - Attack zones: `backdrop-filter: blur(2px)` with a subtle colored border matching the Pokémon's type
@@ -228,7 +284,7 @@ Key visual properties:
 
 | # | Case | Handling |
 |---|------|----------|
-| E1 | Active Pokémon has 0 attacks (data not loaded yet) | Show the magnified card with a "Loading attacks…" message where zones would be; no zones rendered. Retry on `ensureCardData` resolve. |
+| E1 | Active Pokémon has 0 attacks (data not loaded yet) | Show the magnified card with a "Loading attacks…" message where zones would be; no zones rendered. Retry on `ensureCardData` resolve. Once resolved and still empty, show the panel's old diagnostic — `console.warn` plus a visible `id=… · data not loaded (check network / TCGdex)` hint (R11). |
 | E2 | Player clicks active during opponent's turn | Normal highlight behavior (no attack preview). `canPerformAction` returns `allowed: false`. |
 | E3 | Player clicks active during setup/draw phase | Normal highlight behavior (not main phase). |
 | E4 | Player clicks active after already attacking this turn | Normal highlight or dimmed preview with "Already attacked" message. |
@@ -237,6 +293,11 @@ Key visual properties:
 | E7 | Escape key pressed while attack preview is open | Routes through existing `closeCardPreview` → `closeAttackPreview` cleanup. |
 | E8 | Inherited attacks (attack-inheritance ability) | **Out of scope** — the live call site always passes `priorAttacks: []`, so nothing is ever inherited today (R8). Zones render whatever `listUsableActions` returns; no "(inherited)" label work in this design. Tracked separately in ISSUES. |
 | E9 | Preview animation not yet finished when attack zone is clicked | Zone clicks are gated on the pop animation **completing**, via `playSelectPop`'s `onDone` — not on DOM mount (R6). |
+| E10 | Benched Pokémon with no ability is single-clicked | No overlay; today's select-to-move behaviour is unchanged (D6 assumption). |
+| E11 | Ability used from the overlay attaches Energy, making an attack payable | The overlay re-renders its zones in place on `rules-energy-attached` / `action-processed` and the attack becomes usable without reopening (R12). |
+| E12 | Ability used from the **bench** overlay | Overlay re-renders; the bench card has no attack band, so only the ability zone updates (now unusable, rendered plain per D4/R10). |
+| E13 | Turn ends or the session resets while an overlay is open | Overlay closes itself on `rules-turn-began` / `rules-session-reset` (R12). |
+| E14 | Rules mode is off | No overlay at all — free-play keeps the direct `attack()` path (Component 7) and there are no ability zones. |
 
 ## Work plan
 
@@ -246,9 +307,13 @@ Key visual properties:
 | 2 | Component 3 (`full-view.js` modifications — `onOpened`, `getPreviewPopHost`, `interactive` flag) | small |
 | 3 | Component 1 (`attack-preview.js`) + Component 6 (CSS) — core overlay with attack zones, retreat/pass buttons | medium |
 | 4 | Component 4 (click-events.js wiring) + Component 7 (sidebox button routing) | small |
-| 5 | Component 5 (attack window → abilities-only panel) + integration testing + edge-case sweep | small |
+| 5 | Component 1 ability zones (D5) + bench overlay wiring (D6) | medium |
+| 6 | Component 5 (delete the Attack Window panel + its CSS) + integration testing + edge-case sweep | small |
 
-Slice 1 must keep `appendMessage()` out of the extracted helper (R7).
+Slice 1 must keep `appendMessage()` out of the extracted helper (R7). Slice 6 is last on purpose:
+the panel is the only working attacks/abilities UI until slices 3–5 land, so deleting it earlier
+leaves rules mode unplayable in between. Before deleting, confirm all three carried-over behaviours
+from Component 5 are live in the overlay (R11 especially).
 
 ## Verification Plan
 
@@ -256,7 +321,8 @@ Slice 1 must keep `appendMessage()` out of the extracted helper (R7).
 
 - Unit tests for `resolve-attack-context.mjs`: verify energy gathering, cost modifiers, and ability-used flag resolution against stub card data — `pnpm test`.
 - Unit tests for `attackZoneBounds()`: 1-, 2- and 3-attack cards produce non-overlapping bounds inside the band; ability-bearing cards shift the band down; 0 attacks returns an empty list.
-- Unit tests for `shouldOpenAttackPreview()`: opponent's active → false; `selectHighlight` present → false; not your turn → false; own active in main phase → true.
+- Unit tests for `shouldOpenAttackPreview()`: opponent's active → `null`; `selectHighlight` present → `null`; not your turn → `null`; own active in main phase → `'attack'`; own bench with an ability → `'ability'`; own bench without one → `null`.
+- Unit tests for the ability list feeding the overlay: a once-per-turn ability already used still appears (unusable), rather than being filtered out (R10).
 - Existing attack engine tests (`pnpm test`) must remain green — no changes to `attack-engine.mjs`, `attack-window.mjs`, or `damage-parser.mjs`.
 
 ### Manual Verification
@@ -270,7 +336,12 @@ Slice 1 must keep `appendMessage()` out of the extracted helper (R7).
 - Click a usable attack → verify the preview closes and the attack executes normally (damage applied, turn advances).
 - Click an unpayable attack → verify nothing happens (no crash, zone stays dimmed).
 - Press Escape or click the dark overlay → verify the preview closes without attacking.
-- Verify the Abilities panel still works for Pokémon with abilities.
+- Verify an active Pokémon's ability appears on its overlay and runs on click, and that the overlay stays open and re-renders afterwards (R12/E11).
+- Verify single-clicking a benched Pokémon with an ability opens an ability-only overlay (no attack zones), and one without an ability still just selects (D6/E10).
+- Verify single-clicking a hand Energy and then a bench Pokémon still attaches it (R1 on the bench).
+- Verify an already-used once-per-turn ability still shows, unhighlighted and inert (D4/R10).
+- Verify the Attack Window panel is gone and nothing references `#rulesAttackWindow`.
+- Verify a card whose attacks never resolve still surfaces the `id=… · data not loaded` hint (R11).
 - Verify double-click on bench/hand cards still opens the normal card preview (no attack zones).
 - Verify opponent's active Pokémon click does NOT open attack zones.
 - Run `pnpm test` — all tests pass.
