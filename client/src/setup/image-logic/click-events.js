@@ -24,6 +24,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import {
   closeCardPreview,
   openCardPreview,
+  openAttachedCardsPanel,
 } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { rulesState, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
@@ -307,7 +308,14 @@ export const doubleClick = (event) => {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
-      openCardPreview(targetImage, mouseClick.card);
+      // Card carries energies/tools: show them fanned out beside it (same
+      // panel as the right-click "View attached cards" menu item) instead
+      // of the plain zoom, since the zoom hides attachments entirely.
+      if (mouseClick.card?.attachedCards?.length) {
+        openAttachedCardsPanel(targetImage, mouseClick.card);
+      } else {
+        openCardPreview(targetImage, mouseClick.card);
+      }
     }
   } else {
     let overlay = document.createElement('div');

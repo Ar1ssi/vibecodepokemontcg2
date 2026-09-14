@@ -4,25 +4,21 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 131
-Focus: review + patch — design 009 (TCG Live table). S130 built all 6 slices unverified in the
-  primary checkout. S131 ported them into worktree branch `claude/design-009-review-287815` and
-  fixed the review findings (2 commits: build as found, then fixes).
-Active: fixes done and fast-forward merged to main (7adc417), per user. Primary checkout synced;
-  its stale uncommitted 009 tree was verified identical to commit 4114449, then replaced.
-  Localhost look (user): zones sit on the art. Follow-up fix on branch, NOT pushed: non-holo hand
-  hover and the raised deck cover were overridden by resetImage()'s inline `transform`; now use
-  the `translate` property. "Multiple planes" = the near half bulged toward the viewer (user
-  picked this). Fixed: pivot + eye at the near edge, seam kept on the iframe boundary by a
-  translateY shift, dark spread shadow on #battleMat fills the uncovered bands. Tilt 14 -> 12deg
-  (user). Fuzzy tilted cards fixed: #playfield laid out at 2x (`zoom: 2`) and shrunk by
-  scale(0.5) inside the tilt transform (Chrome rasters perspective layers at 1x). All pushed to
-  main (user).
-Next: play one live game to confirm drag/drop inside the zoomed #playfield. Offer the same
-  oversampling for the #battleMat art if it looks soft. Then run
-  `pnpm test:2p` and the authoritative 2P run (`SERVER_AUTHORITATIVE=1 PORT=4100`).
-  Carried: I39 (flip-gate-test.mjs) untested; bot runs only used the fixture deck (I35).
-Blocked: design 009 formal approval + localhost look (user).
+Session: 132
+Focus: patch — add user-supplied Groudon art as a selectable mat; double-click an attached card
+  now shows its energies/tools beside it, draggable.
+Active: done, uncommitted. Mat: copied art into client/src/assets/playmats/custom/groudon-{edge-
+  to-edge,full-size-edge-to-edge}.jpg; added two entries to mats-catalog.mjs mirroring the
+  existing custom Kyogre entries (one-player + two-player, fit: cover, overlay: true) — picks up
+  automatically in the Customize > Mat picker, no other code touched.
+  Double-click: click-events.js doubleClick() now branches on mouseClick.card.attachedCards.length
+  for active/bench — if attached, calls the existing openAttachedCardsPanel (full-view.js; was
+  right-click-only "View attached cards") instead of openCardPreview's zoom, since the zoom hides
+  attachments. No-attachment cards and hand cards unchanged. Reuses existing drag/attach
+  mechanism verbatim (right-click panel already supported dragging attached cards out).
+Next: user to eyeball the Groudon mat and double-click behavior on localhost (this session does
+  not drive the Browser pane for CSS/visual checks, per standing preference). If liked, commit.
+Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
 - `node_modules` needs `pnpm install` fresh each new sandbox session (not persisted). Playwright's
