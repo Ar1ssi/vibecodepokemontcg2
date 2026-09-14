@@ -26,7 +26,7 @@ const escapeHtml = (value = '') => String(value)
           const qty = quantities[card.id] || 0;
     
           return `
-            <button class="native-deck-builder-result" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}">
+            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}">
               <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" />
               ${qty > 0 ? `<span class="native-deck-builder-result-qty">${qty}</span>` : ''}
               <span class="native-deck-builder-result-text">

@@ -4,10 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 116
-Focus: feature (board-ui) — expand #battleMat to 100% in fullscreen sidebox-hidden mode
-Active: done. When sidebox was hidden (.sidebox-hidden), #battleMat stayed pinned at 75.5% while iframes expanded to 100%, causing a white margin on right and misaligning cards. Expanded #battleMat to 100% in .sidebox-hidden and wired dynamic container variables (--mat-container-width, --mat-half-height). All 46 tests pass.
-Next: visual verification in browser.
+Session: 117
+Focus: fix (deck-builder) — card preview right click feature on card search tab
+Active: done. Added `data-card-id` to search result buttons in `native-deck-builder-renderers.js`, updated
+  `native-deck-builder.js` searchResults `contextmenu` listener with `data-card-id` resolution and fallback image
+  extraction, and added `contextmenu` preview listener to deck cards panel. Verified via Playwright and 1333 unit tests pass.
+Next: ready for merge.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -27,6 +29,7 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S117 2026-09-14 fix: card preview right click feature on search tab and deck cards.
 - S116 2026-09-14 feature: expand #battleMat to 100% in fullscreen sidebox-hidden mode.
 - S115 2026-09-14 feature: aspect-ratio locked playmats with ambient bleed wings and aligned card zones.
-- S114 2026-09-14 feature: added reverse holo energy variants for Gen 3, 6, 7, and 8.
+

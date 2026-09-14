@@ -695,31 +695,55 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   // Right-click on search results opens preview
   if (searchResults) {
     searchResults.addEventListener('contextmenu', (event) => {
-        const target = event.target.closest('[data-preview-image]');
-        if (!target) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const index = target.dataset.resultIndex;
-        const card = index !== undefined ? currentResults[Number(index)] : null;
-        showCardPreview(target.dataset.previewImage, card, target);
-      });
+      const target = event.target.closest('[data-preview-image], .native-deck-builder-result');
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const cardId = target.closest('[data-card-id]')?.dataset.cardId;
+      const index = target.dataset.resultIndex;
+      const card =
+        (cardId && currentResults.find((c) => c.id === cardId)) ||
+        (index !== undefined ? currentResults[Number(index)] : null);
+      const previewImage =
+        target.dataset.previewImage ||
+        card?.images?.large ||
+        card?.images?.small ||
+        card?.image ||
+        target.querySelector('img')?.src;
+      if (previewImage) {
+        showCardPreview(previewImage, card, target);
+      }
+    });
   }
 
-  // Click on deck cards opens preview
+  const handleDeckCardPreview = (event) => {
+    const target = event.target.closest('[data-preview-image], .native-deck-builder-deck-row');
+    if (!target) return;
+    // Don't open preview if clicking the add/remove buttons
+    if (event.target.closest('.native-deck-builder-deck-btn')) return;
+    if (event.target.closest('.native-deck-builder-deck-row-controls')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // find the deck card variant carrying this image for rarity-aware holo
+    const row = target.closest('[data-deck-row-index]');
+    const index = row ? Number(row.dataset.deckRowIndex) : -1;
+    const sortedCards = getSortedDeckCardArray(deck);
+    const card = index >= 0 ? sortedCards[index] : null;
+    const previewImage =
+      target.dataset.previewImage ||
+      card?.images?.large ||
+      card?.images?.small ||
+      card?.image ||
+      target.querySelector('img')?.src;
+    if (previewImage) {
+      showCardPreview(previewImage, card, target);
+    }
+  };
+
+  // Click or right-click on deck cards opens preview
   if (cards) {
-    cards.addEventListener('click', (event) => {
-          const target = event.target.closest('[data-preview-image]');
-          if (!target) return;
-          // Don't open preview if clicking the add/remove buttons
-          if (event.target.closest('.native-deck-builder-deck-btn')) return;
-          if (event.target.closest('.native-deck-builder-deck-row-controls')) return;
-          // find the deck card variant carrying this image for rarity-aware holo
-          const row = target.closest('[data-deck-row-index]');
-          const index = row ? Number(row.dataset.deckRowIndex) : -1;
-          const sortedCards = getSortedDeckCardArray(deck);
-          const card = index >= 0 ? sortedCards[index] : null;
-          showCardPreview(target.dataset.previewImage, card, target);
-        });
+    cards.addEventListener('click', handleDeckCardPreview);
+    cards.addEventListener('contextmenu', handleDeckCardPreview);
   }
 
   document.addEventListener('native-deck-builder:deck-loaded', (event) => {
