@@ -17,6 +17,10 @@
   --mat-offset-y: 0px;
   --mat-scale: 1;
 }
+:root.sidebox-hidden,
+:root.side-menu-collapsed,
+:root:has(body.sidebox-hidden),
+:root:has(body.side-menu-collapsed),
 body.sidebox-hidden,
 body.side-menu-collapsed {
   --mat-container-width: 100vw;
@@ -261,6 +265,7 @@ ul, li {
   margin: 0;
   display: block;
   border-radius: 4px;
+  transition: left 220ms ease, width 220ms ease;
 }
 #battleMatArt .mat-half img.mat-art-image {
   z-index: 2;
@@ -374,6 +379,7 @@ ul, li {
 	justify-content: center;
   border-radius: 15px;
   z-index: 3;
+  transition: left 220ms ease;
 }
 #stadium img {
   max-width: 100%;
@@ -3303,31 +3309,43 @@ a:hover {
 }
 
 /* Styles when sidebox is hidden or side menu is collapsed */
+:root.sidebox-hidden #battleMat,
+:root.side-menu-collapsed #battleMat,
 .sidebox-hidden #battleMat,
 body.side-menu-collapsed #battleMat {
   width: 100%;
 }
 
+:root.sidebox-hidden .self,
+:root.side-menu-collapsed .self,
 .sidebox-hidden .self,
 body.side-menu-collapsed .self {
   width: 100%;
 }
 
+:root.sidebox-hidden .opp,
+:root.side-menu-collapsed .opp,
 .sidebox-hidden .opp,
 body.side-menu-collapsed .opp {
   width: 100%;
 }
 
+:root.sidebox-hidden #selfResizer,
+:root.side-menu-collapsed #selfResizer,
 .sidebox-hidden #selfResizer,
 body.side-menu-collapsed #selfResizer {
   left: -0.55%;
 }
 
+:root.sidebox-hidden #oppResizer,
+:root.side-menu-collapsed #oppResizer,
 .sidebox-hidden #oppResizer,
 body.side-menu-collapsed #oppResizer {
   left: -0.55%;
 }
 
+:root.sidebox-hidden #boardButtonContainer,
+:root.side-menu-collapsed #boardButtonContainer,
 .sidebox-hidden #boardButtonContainer,
 body.side-menu-collapsed #boardButtonContainer {
   left: 67%;

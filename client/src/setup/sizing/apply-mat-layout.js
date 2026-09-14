@@ -86,6 +86,14 @@ const applyMatLayoutToDoc = (layoutId, doc) => {
   if (scale) root.style.setProperty('--mat-scale', scale);
 };
 
+const applyMatLayoutToElement = (layoutId, el) => {
+  if (!el) return;
+  const vars = layoutToCssVars(getMatLayout(layoutId));
+  for (const [name, value] of Object.entries(vars)) {
+    el.style.setProperty(name, value);
+  }
+};
+
 /** @param {'self'|'opp'} target */
 const layoutForTarget = (target) => {
   const mat = currentMats[target];
@@ -107,12 +115,17 @@ const activeTwoPlayerMat = () => {
 };
 
 const syncIframeLayouts = () => {
+  const halfSelf = document.querySelector('#battleMatArt .mat-half-self');
+  const halfOpp = document.querySelector('#battleMatArt .mat-half-opp');
+
   const shared = activeTwoPlayerMat();
   if (shared) {
     const layoutId = resolveMatLayout(shared.mat).id;
     for (const target of MAT_TARGETS) {
       applyMatLayoutToDoc(layoutId, frameDocument(target));
     }
+    applyMatLayoutToElement(layoutId, halfSelf);
+    applyMatLayoutToElement(layoutId, halfOpp);
     applyMatLayoutToDoc(layoutId, document);
     return;
   }
@@ -120,6 +133,8 @@ const syncIframeLayouts = () => {
   for (const target of MAT_TARGETS) {
     applyMatLayoutToDoc(layoutForTarget(target).id, frameDocument(target));
   }
+  applyMatLayoutToElement(layoutForTarget('self').id, halfSelf);
+  applyMatLayoutToElement(layoutForTarget('opp').id, halfOpp);
 
   // Stadium sits on the parent page; follow the bottom player's mat, then opp.
   const parentLayout =
