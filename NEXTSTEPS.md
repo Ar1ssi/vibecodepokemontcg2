@@ -11,11 +11,29 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | 3 | done | 4ff5744 | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
 | 4 | done | 2b1f463 | `click-events.js` gating (new `attack-preview-gate.js`) + sidebox button routing |
 | 5 | done | 8d29497 | Ability zones (D5) + bench overlay wiring (D6) |
-| 6 | **next** | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
+| 6 | done | c761d81 | Deleted the Attack Window panel + its CSS |
 
-> [!IMPORTANT]
-> Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
-> slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+**Design 008 is complete — all 6 slices shipped.** The click-to-open overlay
+(`attack-preview.js`) is now the only attacks/abilities UI; `#rulesAttackWindow` /
+`buildAttackWindow()` are gone. Remaining work: the manual verification checklist in the design
+doc's "Verification Plan" (§ Manual Verification) has not been run against a live `pnpm start`
+session in this harness (no browser available to this session) — do that before considering 008
+fully closed, or delegate it to a session that can drive a browser (see `.claude/agents/` /
+the `run` skill).
+
+## S126 — slice 6 done (design 008 complete)
+
+Deleted `buildAttackWindow()`/`#rulesAttackWindow` from `rules-bridge.js` (its call site in
+`initializeRulesEngine()`, the function body, and the now-dead `listUsableActions` /
+`collectUsableAbilityCandidates` / `filterUsableAbilities` / `attack` / `resolveAttackContext`
+imports it alone used) and the `.rules-aw-*` CSS block from `index.css`. Confirmed the R11
+"no attacks resolved" diagnostic hint is already ported into `attack-preview.js` (slice 3) before
+deleting — that was the one thing slice 6 had to check first. Marked the
+`docs/card-types-taxonomy.md` "Attack window UI" appendix superseded (left the history in place
+rather than rewriting it — it's >5 lines, out of scope for a pass-through fix). No remaining
+references to `rulesAttackWindow`/`buildAttackWindow` outside a pre-existing, unrelated
+`client/src/css/index.css.bak`. `pnpm test`: 1362/1365 pass, same 3 pre-existing
+network-dependent failures as baseline. Commit c761d81.
 
 ## S125 — slice 5 done
 
