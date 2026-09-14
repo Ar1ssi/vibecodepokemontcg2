@@ -11,8 +11,9 @@ Active: done. `.agent/designs/008-tcg-live-attack-preview.md` now carries decisi
   (now 6 slices) and verification plan. D5/D6 retire the Attack Window panel entirely: abilities
   move onto the card overlay, and a bench single-click opens an ability-only overlay.
   No product code touched. I43 filed for R8. No open questions remain.
-Next: implement slice 1 (`resolve-attack-context.mjs` + unit tests) — design 008 is ready to
-  build; slice 6 (deleting the panel) must stay last or rules mode is unplayable in between.
+Next: implement slice 1 — a self-contained brief is at the TOP of `NEXTSTEPS.md` (design 008
+  ledger, 6 slices). Slice 6 (deleting the panel) must stay last or rules mode is unplayable
+  in between. The netcode ledger below it is parked history, not active work.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

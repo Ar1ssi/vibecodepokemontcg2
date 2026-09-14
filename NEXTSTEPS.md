@@ -1,4 +1,91 @@
+# Active work — design 008: TCG Live attack preview
+
+Branch: `claude/brave-volta-nu3duk`. Full plan: `.agent/designs/008-tcg-live-attack-preview.md`
+(status: reviewed, decisions D1–D6 confirmed, findings R1–R12, no open questions).
+One commit per slice; each commit leaves `pnpm test` green. `/clear` between slices.
+
+| Slice | Status | Commit | Notes |
+|---|---|---|---|
+| 1 | **next** | — | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactor `rules-bridge.js` to use it |
+| 2 | todo | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
+| 3 | todo | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
+| 4 | todo | — | `click-events.js` gating + sidebox button routing |
+| 5 | todo | — | Ability zones (D5) + bench overlay wiring (D6) |
+| 6 | todo | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
+
+> [!IMPORTANT]
+> Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
+> slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+
+## Slice 1 brief (self-contained — start here)
+
+**Goal:** extract the attack-context gathering that `rules-bridge.js` does inline into a shared,
+DOM-free, unit-tested helper, and have `rules-bridge.js` call it. Behaviour-neutral: the Attack
+Window must look and act exactly the same after this slice. No UI work, no new UI files.
+
+**Read first (and only these):**
+- `.agent/designs/008-tcg-live-attack-preview.md` — "Component 2", plus findings **R7** and **R8**
+- `client/src/setup/rules/rules-bridge.js:265–330` — the `refresh()` block being extracted
+- `shared/engine/rules/attack-window.mjs:119` — `listUsableActions()`, the consumer
+- `shared/engine/rules/__tests__/evolution.test.mjs` — test file style (node:test, top-level
+  `await import`, `assert/strict`)
+
+**Create `shared/engine/rules/resolve-attack-context.mjs`:**
+
+```javascript
+export async function resolveAttackContext({
+  activeCard,
+  attachedEnergyCards,   // caller supplies — see the DOM warning below
+  ensureCardData,        // injected async fn; must be try/caught per card
+  stadiumCard,           // may be null
+  abilityUsed,           // injected (card) => boolean
+}) // => { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks }
+```
+
+It should call `classifyEnergyEffect` + `resolveAttachedEnergyType` (`energy-effects.mjs:111,283`),
+`parseStadiumCostModifier` (`stadium-effects.mjs:444`) and `parseAttackInheritance`
+(`ability-executors.mjs:433`) — these are the exact functions the inline block uses today. The
+returned shape is what `listUsableActions()` already consumes, so don't redesign it.
+
+> [!WARNING]
+> **The energy filter is DOM-coupled and must NOT move into `shared/`.** The current line is
+> `getZone('self','active').array.filter(c => c.type === 'Energy' && c.image?.relative === active.image)`
+> — it compares live DOM nodes. That filtering stays in `rules-bridge.js`; the helper receives the
+> already-filtered `attachedEnergyCards` array. Same rule for `appendMessage()` (**R7**): the
+> attack-inheritance chat announcement stays on the client side and does not enter `shared/`.
+
+> [!NOTE]
+> `priorAttacks` is always `[]` at the live call site today, so inheritance never actually fires
+> (**R8**, tracked as I43). Preserve that behaviour exactly — return `[]`. Do not "fix" it in this
+> slice; it changes attack legality and belongs in its own change.
+
+**Then refactor `rules-bridge.js`:** replace lines ~279–307 with a `resolveAttackContext(...)` call,
+keeping the `appendMessage` inheritance announcement and the DOM energy filter at the call site.
+
+**Edge cases the helper must handle** (per the code standard — these need tests, not just code):
+no active card, `attachedEnergyCards` empty, `ensureCardData` rejecting for one energy card
+(skip it, keep going — today's `try {} catch {}` behaviour), and `stadiumCard` null.
+
+**Definition of done:**
+- `shared/engine/rules/__tests__/resolve-attack-context.test.mjs` covers the four edge cases above
+  plus a normal 2-energy case with a cost-modifier stadium.
+- `pnpm test` green. Baseline is **1334/1337** — the 3 failures in
+  `shared/engine/rules/__tests__/card-identity-live.test.mjs` hit TCGdex over the network and fail
+  in sandboxed sessions ("Host not in allowlist"). Don't chase them; don't count them as yours.
+- `npx eslint shared/engine/rules/resolve-attack-context.mjs <test file> client/src/setup/rules/rules-bridge.js`
+  clean **for those files** — repo-wide `pnpm lint` is red on pre-existing CRLF/`no-undef` noise.
+- Attack Window still renders identical attack rows with identical payability badges. Verify by
+  hand: `pnpm start`, load decks, reach main phase, compare against the pre-change panel.
+- No new dependency (if one becomes necessary, it needs a `.agent/DECISIONS.md` line first).
+
+---
+
 # Netcode repair — increment ledger
+
+> [!NOTE]
+> **Parked.** Phase 3 reached its flip gate (3.12 passing); flipping the flag is the user's call
+> (D8). The ledger below is kept as history — active work is the design 008 section above.
+
 
 Branch: `feature/netcode-repair`. Full plan: `.agent/designs/002-netcode-repair.md`.
 One commit per slice; each commit leaves `pnpm test` green. `/clear` between slices.
