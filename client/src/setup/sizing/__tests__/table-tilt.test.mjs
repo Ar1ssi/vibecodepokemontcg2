@@ -1,102 +1,121 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { battleMatBox, projectPoint, tiltTransforms } from '../table-tilt.mjs';
+import {
+  battleMatBox,
+  projectLocal,
+  seamShiftPx,
+  tiltTransforms,
+} from '../table-tilt.mjs';
 
-const close = (actual, expected, message) =>
+const P = 1400;
+const D = 380;
+
+const close = (actual, expected, message, tolerance = 0.02) =>
   assert.ok(
-    Math.abs(actual - expected) < 1e-9,
+    Math.abs(actual - expected) < tolerance,
     `${message}: ${actual} vs ${expected}`
   );
 
-test('tiltTransforms bakes perspective into each transform and negates the far half', () => {
-  const { near, far, mat } = tiltTransforms({
-    tiltDeg: 20,
-    perspectivePx: 900,
-  });
-  assert.equal(near.transform, 'perspective(900px) rotateX(20deg)');
-  assert.equal(far.transform, 'perspective(900px) rotateX(-20deg)');
-  assert.equal(mat.transform, near.transform);
-  assert.equal(near.origin, '50% 0%');
-  assert.equal(far.origin, '50% 0%');
-});
+// Screen positions are relative to the pivot (near edge centre); y < 0 is up.
+const onScreen = {
+  near: (tilt, point) => projectLocal(point, tilt.near, P),
+  mat: (tilt, point) => projectLocal(point, tilt.mat, P),
+  // The far iframe is flipped 180deg: a screen vector v is -v in its local
+  // frame, and its result is flipped back the same way.
+  far: (tilt, { x, y }) => {
+    const local = projectLocal({ x: -x, y: -y }, tilt.far, P);
+    return { x: -local.x, y: -local.y };
+  },
+};
 
-test('tiltTransforms defaults match the design doc', () => {
-  assert.equal(
-    tiltTransforms().near.transform,
-    'perspective(1400px) rotateX(14deg)'
+test('tiltTransforms: near and mat pivot on their bottom edge, far pivots D above its top', () => {
+  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  assert.equal(tilt.near.origin, '50% 100%');
+  assert.equal(tilt.mat.origin, '50% 100%');
+  assert.equal(tilt.far.origin, `50% -${D}px`);
+  assert.equal(tilt.far.deg, -14);
+  assert.equal(tilt.far.shiftPx, -tilt.near.shiftPx);
+  assert.match(
+    tilt.near.transform,
+    /^translateY\(-?[\d.]+px\) perspective\(1400px\) rotateX\(14deg\)$/
   );
 });
 
-test('tiltDeg 0 keeps a non-none transform (stable containing block for fixed zones)', () => {
-  assert.equal(
-    tiltTransforms({ tiltDeg: 0 }).near.transform,
-    'perspective(1400px) rotateX(0deg)'
-  );
-});
-
-test('seam points (y = 0) never move, in any half', () => {
-  for (const half of ['near', 'far', 'mat']) {
-    for (const x of [-300, 0, 42]) {
-      const projected = projectPoint(
-        { x, y: 0 },
-        { tiltDeg: 14, perspectivePx: 1400 },
-        half
+test('the far half, flipped, and the near half both land on the mat plane', () => {
+  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  for (const x of [-300, 0, 250]) {
+    for (const y of [-2 * D, -1.5 * D, -D - 1]) {
+      const far = onScreen.far(tilt, { x, y });
+      const mat = onScreen.mat(tilt, { x, y });
+      close(far.x, mat.x, `far x at ${x},${y}`);
+      close(far.y, mat.y, `far y at ${x},${y}`);
+    }
+    for (const y of [-D, -D / 2, 0]) {
+      assert.deepEqual(
+        onScreen.near(tilt, { x, y }),
+        onScreen.mat(tilt, { x, y })
       );
-      close(projected.x, x, `${half} x`);
-      close(projected.y, 0, `${half} y`);
     }
   }
 });
 
-test('far half, once flipped 180deg, lands exactly where the mat top half does', () => {
-  const params = { tiltDeg: 14, perspectivePx: 1400 };
-  for (const [screenX, distanceAboveSeam] of [
-    [0, 100],
-    [250, 40],
-    [-180, 300],
-  ]) {
-    // Flip maps local (x, y) to screen (-x, -y) around the seam centre.
-    const farLocal = projectPoint(
-      { x: -screenX, y: distanceAboveSeam },
-      params,
-      'far'
+test('the seam stays on the iframe boundary (no far-half clipping)', () => {
+  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  for (const x of [-300, 0, 300]) {
+    close(onScreen.near(tilt, { x: 0, y: -D }).y, -D, 'near seam y');
+    close(onScreen.far(tilt, { x: 0, y: -D }).y, -D, 'far seam y');
+    close(
+      onScreen.far(tilt, { x, y: -D }).y,
+      onScreen.near(tilt, { x, y: -D }).y,
+      'seam agrees'
     );
-    const farOnScreen = { x: -farLocal.x, y: -farLocal.y };
-    const mat = projectPoint(
-      { x: screenX, y: -distanceAboveSeam },
-      params,
-      'mat'
-    );
-    close(farOnScreen.x, mat.x, 'x');
-    close(farOnScreen.y, mat.y, 'y');
   }
 });
 
-test('near half matches the mat bottom half', () => {
-  const params = { tiltDeg: 14, perspectivePx: 1400 };
-  const near = projectPoint({ x: 120, y: 200 }, params, 'near');
-  const mat = projectPoint({ x: 120, y: 200 }, params, 'mat');
-  assert.deepEqual(near, mat);
+test('the table recedes from the near edge: nothing is magnified, width shrinks upward', () => {
+  const tilt = tiltTransforms({ tiltDeg: 14, perspectivePx: P, depthPx: D });
+  const widthAt = (y) => {
+    const plane = y < -D ? onScreen.far : onScreen.near;
+    return plane(tilt, { x: 100, y }).x;
+  };
+  close(widthAt(0), 100, 'near edge keeps its flat width', 1e-9);
+  let previous = widthAt(0);
+  for (const y of [-D / 2, -D, -1.5 * D, -2 * D]) {
+    const width = widthAt(y);
+    assert.ok(width < previous, `narrower at y=${y}`);
+    assert.ok(width <= 100, `never magnified at y=${y}`);
+    previous = width;
+  }
 });
 
-test('table leans away: far edge shrinks, near edge grows', () => {
-  const params = { tiltDeg: 14, perspectivePx: 1400 };
-  const far = projectPoint({ x: 100, y: 300 }, params, 'far');
-  const near = projectPoint({ x: 100, y: 300 }, params, 'near');
-  assert.ok(Math.abs(far.x) < 100, 'far edge narrower than flat');
-  assert.ok(Math.abs(near.x) > 100, 'near edge wider than flat');
+test('seamShiftPx lifts the table (negative) and is 0 when flat or unmeasured', () => {
+  assert.ok(seamShiftPx({ tiltDeg: 14, perspectivePx: P, depthPx: D }) < 0);
+  assert.equal(seamShiftPx({ tiltDeg: 0, perspectivePx: P, depthPx: D }), 0);
+  assert.equal(seamShiftPx({ tiltDeg: 14, perspectivePx: P, depthPx: 0 }), 0);
 });
 
-test('battleMatBox spans both playfields and puts the seam at the frame boundary', () => {
+test('tiltDeg 0 keeps a non-none identity transform (stable containing block)', () => {
+  const tilt = tiltTransforms({ tiltDeg: 0, depthPx: D });
+  assert.equal(
+    tilt.near.transform,
+    'translateY(0px) perspective(1400px) rotateX(0deg)'
+  );
+  assert.equal(
+    tilt.far.transform,
+    'translateY(0px) perspective(1400px) rotateX(0deg)'
+  );
+});
+
+test('battleMatBox spans both playfields and reports the near playfield depth', () => {
   const box = battleMatBox({
     farRect: { top: 0, height: 250 },
     nearRect: { top: 250, height: 250 },
     cropFrac: 0.16,
   });
-  close(box.top, 40, 'top');
-  close(box.height, 420, 'height');
-  close(box.seamOffset, 210, 'seamOffset');
+  close(box.top, 40, 'top', 1e-9);
+  close(box.height, 420, 'height', 1e-9);
+  close(box.depth, 210, 'depth', 1e-9);
 });
 
 test('battleMatBox handles unequal halves (resizer dragged)', () => {
@@ -105,24 +124,21 @@ test('battleMatBox handles unequal halves (resizer dragged)', () => {
     nearRect: { top: 200, height: 300 },
     cropFrac: 0.1,
   });
-  close(box.top, 20, 'top');
-  close(box.height, 450, 'height');
-  close(box.seamOffset, 180, 'seamOffset');
+  close(box.top, 20, 'top', 1e-9);
+  close(box.height, 450, 'height', 1e-9);
+  close(box.depth, 270, 'depth', 1e-9);
 });
 
 test('battleMatBox returns null for missing or collapsed frames', () => {
+  const near = { top: 0, height: 10 };
   assert.equal(
-    battleMatBox({
-      farRect: null,
-      nearRect: { top: 0, height: 10 },
-      cropFrac: 0.16,
-    }),
+    battleMatBox({ farRect: null, nearRect: near, cropFrac: 0.16 }),
     null
   );
   assert.equal(
     battleMatBox({
       farRect: { top: 0, height: 0 },
-      nearRect: { top: 0, height: 10 },
+      nearRect: near,
       cropFrac: 0.16,
     }),
     null
@@ -135,5 +151,5 @@ test('battleMatBox treats a non-numeric crop as no crop', () => {
     nearRect: { top: 100, height: 100 },
     cropFrac: Number.NaN,
   });
-  assert.deepEqual(box, { top: 0, height: 200, seamOffset: 100 });
+  assert.deepEqual(box, { top: 0, height: 200, depth: 100 });
 });

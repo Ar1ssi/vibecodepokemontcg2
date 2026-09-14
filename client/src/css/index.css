@@ -197,7 +197,10 @@ ul, li {
   overflow: hidden;
   transition: width 220ms ease;
   /* Design 009 table tilt: apply-table-tilt.js sets these (and top/height)
-     inline on this element. */
+     inline on this element. A receding table no longer fills its box on
+     screen; the spread shadow (same plane, not clipped by overflow) fills
+     the bands it leaves above and below, and sits behind the hand strips. */
+  box-shadow: 0 0 0 20vh #05060a;
   transform: var(--tilt-transform, none);
   transform-origin: var(--tilt-origin, 50% 50%);
 }

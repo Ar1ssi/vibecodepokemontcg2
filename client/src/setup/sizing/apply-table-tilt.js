@@ -33,42 +33,46 @@ const cropFraction = (doc) => {
   return Number.isFinite(value) ? value / 100 : DEFAULT_CROP_FRAC;
 };
 
-const sizeBattleMat = (near, far, matTransform) => {
-  const mat = document.getElementById('battleMat');
-  if (!mat || !near || !far) return;
-  const box = battleMatBox({
+const measureBoard = (near, far) => {
+  if (!near || !far) return null;
+  return battleMatBox({
     nearRect: near.frame.getBoundingClientRect(),
     farRect: far.frame.getBoundingClientRect(),
     cropFrac: cropFraction(near.doc),
   });
-  if (!box) return;
+};
+
+const writeHalf = (entry, half) => {
+  const root = entry.doc.documentElement;
+  root.style.setProperty('--tilt-transform', half.transform);
+  root.style.setProperty('--tilt-origin', half.origin);
+  root.style.setProperty('--deck-stack-dir', entry.isFar ? '1' : '-1');
+};
+
+const writeBattleMat = (box, matHalf) => {
+  const mat = document.getElementById('battleMat');
+  if (!mat || !box) return;
   mat.style.top = `${box.top}px`;
   mat.style.height = `${box.height}px`;
   // Mat halves size their art from this; each half is one playfield tall.
   mat.style.setProperty('--mat-half-height', `${box.height / 2}px`);
-  mat.style.setProperty('--tilt-transform', matTransform);
-  mat.style.setProperty('--tilt-origin', `50% ${box.seamOffset}px`);
+  mat.style.setProperty('--tilt-transform', matHalf.transform);
+  mat.style.setProperty('--tilt-origin', matHalf.origin);
 };
 
-/** @param {Parameters<typeof tiltTransforms>[0]} [params] */
+/** @param {{ tiltDeg?: number, perspectivePx?: number }} [params] */
 export const applyTableTilt = (params) => {
-  const tilt = tiltTransforms(params);
-  let near = null;
-  let far = null;
+  const frames = FRAME_IDS.map(readFrame).filter(Boolean);
+  const near = frames.find((entry) => !entry.isFar) || null;
+  const far = frames.find((entry) => entry.isFar) || null;
+  const box = measureBoard(near, far);
+  // Without both frames measured, depth 0 still tilts, just without the
+  // seam shift; the next load/resize re-applies with real geometry.
+  const tilt = tiltTransforms({ ...params, depthPx: box?.depth ?? 0 });
 
-  for (const id of FRAME_IDS) {
-    const entry = readFrame(id);
-    if (!entry) continue;
-    const half = entry.isFar ? tilt.far : tilt.near;
-    const root = entry.doc.documentElement;
-    root.style.setProperty('--tilt-transform', half.transform);
-    root.style.setProperty('--tilt-origin', half.origin);
-    root.style.setProperty('--deck-stack-dir', entry.isFar ? '1' : '-1');
-    if (entry.isFar) far = entry;
-    else near = entry;
-  }
-
-  sizeBattleMat(near, far, tilt.mat.transform);
+  for (const entry of frames)
+    writeHalf(entry, entry.isFar ? tilt.far : tilt.near);
+  writeBattleMat(box, tilt.mat);
 };
 
 export const initializeTableTilt = (params) => {

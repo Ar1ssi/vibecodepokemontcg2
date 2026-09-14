@@ -238,6 +238,11 @@ object, so `tiltDeg: 0` gives a flat board if the tilt must be switched off in p
   containing block of every fixed zone and collapsed the board. S131: `--tilt-transform` is
   `perspective(p) rotateX(±a)`, so each plane's eye point is its transform-origin, and all three
   origins sit on the seam. `eyeYFrac` and `perspectiveOrigin` are dropped.
+- S131 (after the user's localhost look): pivot and eye moved from the seam to the near
+  playfield's bottom edge, so the whole table recedes and nothing is magnified. A
+  `translateY(shift)` keeps the projected seam on the iframe boundary. The far half's origin is
+  `50% -Dpx`, D being the near playfield height, which `battleMatBox().depth` supplies. A 20vh
+  spread shadow on `#battleMat` fills the bands this leaves above and below the table.
 - S131: halves are chosen by the frame's current class (`.self` = near, `.opp` = far), not its id.
   The far half uses `rotateX(-a)`, which is the flip conjugate. `tiltTransforms` returns
   `{ near, far, mat }`. The `#battleMat` box and pivot come from pure `battleMatBox()`.
