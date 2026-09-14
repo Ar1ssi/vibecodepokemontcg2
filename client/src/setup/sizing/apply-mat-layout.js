@@ -123,7 +123,7 @@ const syncIframeLayouts = () => {
   applyMatLayoutToDoc(parentLayout.id, document);
 };
 
-/** Ensure each mat half has both an ambient backdrop <img> and a crisp foreground <img>. */
+/** Ensure each mat half has both an ambient backdrop <img>, a crisp foreground <img>, and a zones overlay <img>. */
 const matHalfImages = (target) => {
   const selector =
     target === 'opp' ? '#battleMatArt .mat-half-opp' : '#battleMatArt .mat-half-self';
@@ -149,7 +149,17 @@ const matHalfImages = (target) => {
     half.appendChild(art);
   }
 
-  return { art, ambient };
+  let overlay = half.querySelector('img.mat-zones-overlay');
+  if (!overlay) {
+    overlay = document.createElement('img');
+    overlay.className = 'mat-zones-overlay';
+    overlay.referrerPolicy = 'no-referrer';
+    overlay.alt = '';
+    overlay.setAttribute('aria-hidden', 'true');
+    half.appendChild(overlay);
+  }
+
+  return { art, ambient, overlay };
 };
 
 /**
@@ -164,13 +174,17 @@ const paintMatImageForTarget = (target, mat) => {
   const images = matHalfImages(key);
 
   if (!images) return;
-  const { art, ambient } = images;
+  const { art, ambient, overlay } = images;
 
   if (!mat?.image && !mat?.imageUrl && !mat?.board) {
     art.removeAttribute('src');
     art.hidden = true;
     ambient.removeAttribute('src');
     ambient.hidden = true;
+    if (overlay) {
+      overlay.removeAttribute('src');
+      overlay.hidden = true;
+    }
     return;
   }
 
@@ -188,11 +202,35 @@ const paintMatImageForTarget = (target, mat) => {
     art.hidden = true;
     ambient.removeAttribute('src');
     ambient.hidden = true;
+    if (overlay) {
+      overlay.removeAttribute('src');
+      overlay.hidden = true;
+    }
     return;
   }
 
   art.src = primary;
   ambient.src = primary;
+
+  const wantsOverlay = Boolean(
+    mat &&
+      (mat.overlay ||
+        mat.hasOverlay ||
+        mat.clean ||
+        mat.id?.startsWith('custom-') ||
+        /edge[\s-]?to[\s-]?edge/i.test(mat.title || ''))
+  );
+  if (overlay) {
+    if (wantsOverlay) {
+      overlay.src = toAbsoluteClientPath(
+        'src/assets/playmats/playmat_zones_overlay.svg'
+      );
+      overlay.hidden = false;
+    } else {
+      overlay.removeAttribute('src');
+      overlay.hidden = true;
+    }
+  }
 
   // When local PNGs exist (dev), upgrade after load.
   if (local && remote && local !== remote) {

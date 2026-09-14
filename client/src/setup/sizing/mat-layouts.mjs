@@ -61,26 +61,26 @@ const ONE_PLAYER = {
   label: 'One-player mat',
   matMode: 'one-player',
   matFit: 'contain',
-  aspectRatio: 1.91,
+  aspectRatio: 1.9394,
   zones: {
     hand: { height: '30%' },
     bench: {
-      bottom: '30%',
-      left: '19%',
-      width: '62%',
-      height: '28%',
-      gap: '0.3vw',
+      bottom: '9.2%',
+      left: '16.7%',
+      width: '65.7%',
+      height: '30.9%',
+      gap: '1.9%',
     },
-    active: { bottom: '62%', left: '36%', width: '26%', height: '30%' },
+    active: { bottom: '66.1%', left: '38%', width: '24%', height: '30.9%' },
     prizes: {
-      bottom: '30%',
-      left: '2%',
-      width: '12%',
-      height: '52%',
+      bottom: '4.5%',
+      left: '2.0%',
+      width: '13.6%',
+      height: '92.4%',
       columns: 2,
     },
-    deck: { bottom: '60%', right: '2%', width: '12%', height: '28%' },
-    discard: { bottom: '30%', right: '2%', width: '12%', height: '26%' },
+    deck: { bottom: '56.6%', right: '2.7%', width: '11.7%', height: '30.9%' },
+    discard: { bottom: '11.9%', right: '2.7%', width: '11.7%', height: '30.9%' },
     lostZone: { bottom: '84%', left: '2%', width: '8%', height: '14%' },
     stadium: { bottom: '44%', left: '15%', width: '8%', height: '16%' },
   },
@@ -133,8 +133,8 @@ const EDGE_TO_EDGE = {
   label: 'Edge-to-edge (one player)',
   matMode: 'one-player',
   matFit: 'cover',
-  aspectRatio: null,
-  zones: SIM.zones,
+  aspectRatio: 1.9394,
+  zones: ONE_PLAYER.zones,
 };
 
 /**
@@ -301,7 +301,7 @@ export function layoutToCssVars(layout) {
   put('--bench-left', scaleLeft(zones.bench?.left));
   put('--bench-width', scaleH(zones.bench?.width));
   put('--bench-height', zones.bench?.height);
-  put('--bench-gap', zones.bench?.gap);
+  put('--bench-gap', scaleH(zones.bench?.gap));
 
   put('--active-bottom', zones.active?.bottom);
   put('--active-left', scaleLeft(zones.active?.left));

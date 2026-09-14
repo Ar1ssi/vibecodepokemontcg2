@@ -27,6 +27,7 @@ export const MATS = MATS_CATALOG.map((mat) => ({
   board: mat.board || mat.thumb || mat.image,
   layout: mat.layout || classifyMatLayoutFromTitle(mat.title),
   fit: mat.fit || 'contain',
+  overlay: Boolean(mat.overlay),
   sourceUrl: mat.sourceUrl,
   imageUrl: mat.imageUrl,
 }));
