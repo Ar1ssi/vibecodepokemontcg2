@@ -6,9 +6,9 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 
 | Slice | Status | Commit | Notes |
 |---|---|---|---|
-| 1 | done (uncommitted) | — | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
-| 2 | done (uncommitted) | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
-| 3 | done (uncommitted) | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
+| 1 | done | befcf56 | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
+| 2 | done | 3ed257c | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
+| 3 | done | 4ff5744 | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
 | 4 | **next** | — | `click-events.js` gating + sidebox button routing |
 | 5 | todo | — | Ability zones (D5) + bench overlay wiring (D6) |
 | 6 | todo | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
