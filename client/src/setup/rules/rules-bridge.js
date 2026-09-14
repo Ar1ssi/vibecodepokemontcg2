@@ -53,9 +53,9 @@ function shouldEmitTurnStartDraw({ isTwoPlayer = false, turnPlayer = 'self' } = 
 import { canEvolve, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
-import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, parseAttackInheritance, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
-import { isStadiumCard, isStadiumHandProtect, effectiveHp, parseStadiumCostModifier, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from '/shared/engine/rules/stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, resolveAttachedEnergyType, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
+import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
+import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from '/shared/engine/rules/stadium-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
@@ -73,6 +73,7 @@ import {
 } from '/shared/engine/rules/ability-step-plan.mjs';
 import { decideTurnOrder, resolveTurnOrderCaller } from '/shared/engine/rules/rules-turnorder.mjs';
 import { listUsableActions } from '/shared/engine/rules/attack-window.mjs';
+import { resolveAttackContext } from '/shared/engine/rules/resolve-attack-context.mjs';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
@@ -283,27 +284,23 @@ import {
         const attachedEnergies = getZone('self', 'active').array.filter(
           (c) => c.type === 'Energy' && c.image?.relative === active.image
         );
-        const energyTypes = [];
-        for (const e of attachedEnergies) {
-          try { await ensureCardData(e); } catch { /* skip */ }
-          const family = classifyEnergyEffect(e);
-          energyTypes.push({ type: resolveAttachedEnergyType(e), family });
-        }
 
         const stadiumCard = getStadium()?.card;
-        const stadiumCostModifier = stadiumCard ? parseStadiumCostModifier(stadiumCard) : 0;
-        const abilityUsedFlag = abilityUsed('self', active);
-        let priorAttacks = [];
-        if (parseAttackInheritance(active)) {
+        const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks, inheritsAttacks } =
+          await resolveAttackContext({
+            activeCard: active,
+            attachedEnergyCards: attachedEnergies,
+            ensureCardData,
+            stadiumCard,
+            abilityUsed: (card) => abilityUsed('self', card),
+          });
+        if (inheritsAttacks) {
           appendMessage(
             '',
             `🧬 ${active.name}: can use attacks from previous Evolutions (see card text).`,
             'announcement',
             false
           );
-          if (active.evolvesFrom) {
-            priorAttacks = [];
-          }
         }
 
         const { attacks: atkList } = listUsableActions(active, {

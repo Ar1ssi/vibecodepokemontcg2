@@ -6,8 +6,8 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 
 | Slice | Status | Commit | Notes |
 |---|---|---|---|
-| 1 | **next** | — | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactor `rules-bridge.js` to use it |
-| 2 | todo | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
+| 1 | done (uncommitted) | — | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
+| 2 | **next** | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
 | 3 | todo | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
 | 4 | todo | — | `click-events.js` gating + sidebox button routing |
 | 5 | todo | — | Ability zones (D5) + bench overlay wiring (D6) |
@@ -16,6 +16,34 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 > [!IMPORTANT]
 > Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
 > slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+
+## S69 — slice 1 done
+
+Built `shared/engine/rules/resolve-attack-context.mjs`: DOM-free helper wrapping
+`classifyEnergyEffect`/`resolveAttachedEnergyType` (energy-effects.mjs), `parseStadiumCostModifier`
+(stadium-effects.mjs), and `parseAttackInheritance` (ability-executors.mjs). Returns
+`{ energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks, inheritsAttacks }` — added
+`inheritsAttacks` (not in the original brief's return shape) so `rules-bridge.js` can keep its
+`appendMessage` inheritance announcement at the call site (R7) without re-deriving
+`parseAttackInheritance` itself. `priorAttacks` is hardcoded `[]` per R8/I43 — not "fixed" here.
+
+Refactored `rules-bridge.js`'s `refresh()` (lines ~282-307): the DOM-coupled energy filter
+(`getZone('self','active').array.filter(...)`) stays at the call site per the WARNING; the
+`appendMessage` chat announcement also stays, now gated on `inheritsAttacks`. Removed now-unused
+imports (`resolveAttachedEnergyType`, `parseStadiumCostModifier`, `parseAttackInheritance`) —
+`classifyEnergyEffect` stays imported, still used elsewhere in the file (line ~1090).
+
+New `shared/engine/rules/__tests__/resolve-attack-context.test.mjs`: 6 tests covering no active
+card, empty `attachedEnergyCards`, one `ensureCardData` rejection (skip-and-continue), null
+`stadiumCard`, a normal 2-energy + cost-modifier-stadium case, and `priorAttacks` staying `[]`
+even when inheritance text is present.
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint". `pnpm
+test` and `npx eslint` on the touched files are still owed before slice 2 starts (baseline to
+compare against: 1334/1337, 3 pre-existing TCGdex-network failures excluded). Manual Attack
+Window comparison (`pnpm start`) also not done. Everything uncommitted, no branch, per the
+09-2026 sessions' standing pattern (not explicitly re-confirmed this session — worth checking
+next time).
 
 ## Slice 1 brief (self-contained — start here)
 
