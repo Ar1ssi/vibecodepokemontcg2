@@ -8,11 +8,10 @@ Session: 131
 Focus: review + patch — design 009 (TCG Live table). S130 built all 6 slices unverified in the
   primary checkout. S131 ported them into worktree branch `claude/design-009-review-287815` and
   fixed the review findings (2 commits: build as found, then fixes).
-Active: fixes done. Unit tests 1402/1402. The real iframe CSS was measured in headless Chromium
-  and is correct. Not pushed.
+Active: fixes done and fast-forward merged to main (7adc417), per user. Primary checkout synced;
+  its stale uncommitted 009 tree was verified identical to commit 4114449, then replaced.
 Next: user checks localhost (tilt feel, mat art vs zones, hand crop and lift, deck stack). Then run
-  `pnpm test:2p` and the authoritative 2P run (`SERVER_AUTHORITATIVE=1 PORT=4100`). Then decide
-  merge/PR. Discard the primary checkout's stale uncommitted 009 tree once the branch is accepted.
+  `pnpm test:2p` and the authoritative 2P run (`SERVER_AUTHORITATIVE=1 PORT=4100`).
   Carried: I39 (flip-gate-test.mjs) untested; bot runs only used the fixture deck (I35).
 Blocked: design 009 formal approval + localhost look (user).
 
@@ -31,7 +30,7 @@ Blocked: design 009 formal approval + localhost look (user).
   animations on `isCatchingUp`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S131 2026-09-14 review+patch: design 009 build fixed (collapse, hand sizing, far-tilt sign,
-  replay gate, deck stack, mat sizing). On branch, unpushed.
+- S131 2026-09-14 review+patch: design 009 build fixed + merged to main (collapse, hand, tilt sign,
+  replay gate, deck stack, mat sizing).
 - S130 2026-09-14 feature: design 009 slices 1-6 built, unverified, uncommitted.
 - S129 2026-09-14 merge: SERVER_AUTHORITATIVE bot verification (9/9) + PR #128; branch to main.
