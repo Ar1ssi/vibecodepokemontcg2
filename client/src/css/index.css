@@ -10,6 +10,14 @@
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
 
+:root {
+  --mat-half-height: 50vh;
+  --mat-container-width: 75.5vw;
+}
+body.sidebox-hidden {
+  --mat-container-width: 100vw;
+}
+
 /* Sizing for the deck-builder preview card (replaces the old .holo-stage rules). */
 .native-deck-builder-card-preview-scrim .card {
   width: min(78vw, 600px);
@@ -3247,6 +3255,10 @@ a:hover {
 }
 
 /* Styles when sidebox is hidden */
+.sidebox-hidden #battleMat {
+  width: 100%;
+}
+
 .sidebox-hidden .self {
   width: 100%;
 }

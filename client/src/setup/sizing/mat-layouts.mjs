@@ -186,8 +186,14 @@ export function layoutToCssVars(layout) {
 
   if (hasAspect) {
     put('--mat-aspect', `${aspect} / 1`);
-    put('--mat-width', `min(100%, calc(100vh * ${aspect}))`);
-    put('--mat-offset-x', 'max(0px, calc((100% - var(--mat-width)) / 2))');
+    put(
+      '--mat-width',
+      `min(var(--mat-container-width, 100%), calc(var(--mat-half-height, 100vh) * ${aspect}))`
+    );
+    put(
+      '--mat-offset-x',
+      'max(0px, calc((var(--mat-container-width, 100%) - var(--mat-width)) / 2))'
+    );
   } else {
     put('--mat-aspect', 'none');
     put('--mat-width', '100%');
