@@ -119,7 +119,7 @@ export const closeFullView = (event) => {
       // an evolution stack keeps the base card hydrated under the evolved one.
       fullViewElement
         .querySelectorAll('.mat-holo')
-        .forEach((wrapper) => startHoloAnimation(wrapper, { auto: true }));
+        .forEach((wrapper) => startHoloAnimation(wrapper, { auto: true, tilt: false }));
       // Revert the styles. The inline transform is the pop's, not the layout's —
       // leaving it behind would keep the container translated off its mat slot.
       fullViewElement.classList.remove('full-view', 'dark-mode-5');

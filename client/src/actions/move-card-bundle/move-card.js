@@ -561,7 +561,7 @@ export const moveCard = async (
         : null;
       if (dZoneId === 'stadium') unhydrateHolo(movingCard);
       dZone.element.appendChild(movingCard.image);
-      if (['hand', 'prizes', 'discard', 'lostZone'].includes(dZoneId)) hydrateHolo(movingCard);
+      if (['hand', 'prizes', 'discard', 'lostZone', 'board'].includes(dZoneId)) hydrateHolo(movingCard);
       if (
         handFlight &&
         shouldAnimateDrawFlight({

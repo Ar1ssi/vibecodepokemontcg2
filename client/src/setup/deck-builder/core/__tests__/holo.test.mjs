@@ -8,6 +8,8 @@ import {
   Spring,
   resolveHoloEffect,
   buildHoloCard,
+  startHoloAnimation,
+  stopHoloAnimation,
 } from '../holo.mjs';
 
 describe('holo math helpers (from simeydotme/pokemon-cards-151)', () => {
@@ -144,3 +146,46 @@ describe('buildHoloCard', () => {
     assert.ok(classes.includes('card__glare2'));
   });
 });
+
+describe('startHoloAnimation tilt behavior', () => {
+  it('does not tilt when tilt is false (defaults to !auto for auto sweeps)', () => {
+    let queuedRaf = null;
+    global.requestAnimationFrame = (fn) => {
+      queuedRaf = fn;
+      return 1;
+    };
+    global.cancelAnimationFrame = () => {
+      queuedRaf = null;
+    };
+
+    const properties = {};
+    const mockCard = {
+      style: {
+        setProperty(name, value) {
+          properties[name] = value;
+        },
+      },
+      querySelector() {
+        return null;
+      },
+      addEventListener() {},
+      removeEventListener() {},
+      getBoundingClientRect() {
+        return { left: 0, top: 0, width: 100, height: 140 };
+      },
+    };
+
+    startHoloAnimation(mockCard, { auto: true, tilt: false });
+    assert.ok(queuedRaf, 'animation tick was queued');
+    queuedRaf(1000);
+
+    assert.equal(properties['--rotate-x'], '0.00deg');
+    assert.equal(properties['--rotate-y'], '0.00deg');
+    // Glare and pointer sweep variables should still be applied
+    assert.ok(properties['--pointer-x']);
+    assert.ok(properties['--background-x']);
+
+    stopHoloAnimation(mockCard);
+  });
+});
+

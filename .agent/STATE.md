@@ -4,13 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 122
-Focus: feature (board-ui) — overlapping prize cards layout matching playmat
-Active: done. Converted `#prizes` in `self-containers.css` and `opp-containers.css` to an overlapping 3-row grid
-  where cards on the left are mostly overshadowed by cards on the right, matching the playmat SVG's
-  staggered card geometry and hover-elevating for clear inspection. All 60 tests pass.
+Session: 123
+Focus: patch — disable 3D tilt on board holo cards
+Active: done. Disabled 3D tilt for cards on the board while preserving shader glare/shine animation.
 Next: user visual review in browser.
-Blocked: nothing.
+Block: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
 - Test netcode changes in BOTH modes: `SERVER_AUTHORITATIVE=1 PORT=4100 node server/server.js`
@@ -29,7 +27,7 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S123 2026-09-14 patch: disable 3D tilt for holo cards on the board.
 - S122 2026-09-14 feature: overlapping prize cards layout matching playmat.
 - S121 2026-09-14 feature: playmat zones SVG overlay, zone alignment & remove low-opacity highlights.
-- S120 2026-09-14 feature: playmat zoom control and 85% scale for edge-to-edge mats.
 

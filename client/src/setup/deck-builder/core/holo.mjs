@@ -166,7 +166,10 @@ const SPRING_INTERACT_SETTINGS = { stiffness: 0.066, damping: 0.25 };
 const SNAP_SETTINGS = { stiffness: 0.01, damping: 0.06 };
 const AUTO_SWEEP_PERIOD_MS = 3200; // one full left→right→left cycle
 
-export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {}) {
+export function startHoloAnimation(
+  card,
+  { auto = false, phaseOffset = 0, tilt = !auto } = {}
+) {
   if (!card) return () => {};
   stopHoloAnimation(card);
 
@@ -222,10 +225,12 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
         x: adjust(percent.x, 0, 100, 37, 63),
         y: adjust(percent.y, 0, 100, 33, 67),
       },
-      {
-        x: round(-(center.x / 3.5)),
-        y: round(center.y / 2),
-      },
+      tilt
+        ? {
+            x: round(-(center.x / 3.5)),
+            y: round(center.y / 2),
+          }
+        : { x: 0, y: 0 },
       {
         x: round(percent.x),
         y: round(percent.y),
@@ -287,10 +292,14 @@ export function startHoloAnimation(card, { auto = false, phaseOffset = 0 } = {})
         x: adjust(autoPercentX, 0, 100, 37, 63),
         y: adjust(autoPercentY, 0, 100, 33, 67),
       });
-      springRotate.set({
-        x: round(-(autoCenterX / 3.5)),
-        y: round(autoCenterY / 2),
-      });
+      if (tilt) {
+        springRotate.set({
+          x: round(-(autoCenterX / 3.5)),
+          y: round(autoCenterY / 2),
+        });
+      } else {
+        springRotate.set({ x: 0, y: 0 });
+      }
       springGlare.set({
         x: round(autoPercentX),
         y: round(autoPercentY),
