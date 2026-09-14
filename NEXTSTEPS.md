@@ -7,8 +7,8 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | Slice | Status | Commit | Notes |
 |---|---|---|---|
 | 1 | done (uncommitted) | — | `shared/engine/rules/resolve-attack-context.mjs` + unit tests; refactored `rules-bridge.js` to use it |
-| 2 | **next** | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
-| 3 | todo | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
+| 2 | done (uncommitted) | — | `full-view.js`: `onOpened`, `getPreviewPopHost()`, `interactive` flag |
+| 3 | **next** | — | `attack-preview.js` + CSS — attack zones, Retreat/Pass buttons |
 | 4 | todo | — | `click-events.js` gating + sidebox button routing |
 | 5 | todo | — | Ability zones (D5) + bench overlay wiring (D6) |
 | 6 | todo | — | Delete the Attack Window panel + its CSS; integration + edge-case sweep |
@@ -16,6 +16,42 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 > [!IMPORTANT]
 > Slice 6 must stay last. The Attack Window panel is the only working attacks/abilities UI until
 > slices 3–5 land — deleting it earlier leaves rules mode unplayable in between.
+
+## S70 — slice 2 done
+
+Modified `client/src/setup/image-logic/full-view.js` per Component 3:
+- `getPreviewPopHost()`: new exported getter, returns `cardPreviewState?.popHost ?? null` — the
+  one DOM seam `attack-preview.js` (slice 3) needs to mount hit-zones, without exposing the whole
+  internal state object.
+- `openFloatingCardPreview()` gained two new options: `onOpened` and `interactive` (both default
+  to off/false, so every existing caller — `openCardPreview`, `native-deck-builder.js` — is
+  unaffected).
+  - `onOpened({ popHost, overlay, whenOpened })` fires synchronously right after the overlay/pop
+    host are mounted and `playSelectPop` has been kicked off — matching Component 3's "after the
+    DOM is mounted and the pop animation starts." `whenOpened` is a promise that resolves only
+    when the pop animation actually **finishes** (wired as `playSelectPop`'s `onDone` callback,
+    previously unused — `null` — at this call site). This is deliberately handed back rather than
+    resolved internally: R6 says zone-click gating belongs to the *animation-end* signal, not
+    mount, and Component 3's own text only promises the mount-time fire — `whenOpened` lets slice
+    3 satisfy R6 without slice 2 needing to know anything about zones.
+  - `interactive`: stored on `cardPreviewState.interactive`; when true, the overlay's click
+    handler returns early for any click whose target isn't the overlay itself, instead of always
+    calling `preventDefault`/`stopPropagation` — so a click landing on a child (a future attack
+    zone) reaches that child's own listener instead of being swallowed by the overlay's
+    close-on-background-click handler. Default `false` reproduces today's overlay click behavior
+    exactly.
+- Updated the `cardPreviewState` JSDoc shape to include `interactive?: boolean`.
+
+No new call site wired yet — `interactive`/`onOpened` are unused until slice 3's
+`attack-preview.js` calls `openFloatingCardPreview` with them. Nothing in `openCardPreview()`
+(the double-click path) or `native-deck-builder.js`'s call changed.
+
+**Not verified this session** — standing instruction was "do not run node/pnpm/lint tests."
+`pnpm test` and `npx eslint client/src/setup/image-logic/full-view.js` are still owed before
+slice 3 starts (baseline: 1334/1337, same 3 pre-existing TCGdex-network failures as S69). Manual
+double-click card preview comparison (`pnpm start`) also not done — should confirm the existing
+preview still opens/closes identically since default args are unchanged. Everything uncommitted,
+no branch, matching S69's pattern.
 
 ## S69 — slice 1 done
 
