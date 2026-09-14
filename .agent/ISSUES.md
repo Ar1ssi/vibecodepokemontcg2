@@ -12,6 +12,13 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I44 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a
+    UI-driven attack() call that runs to completion (no cmdRejected, attack option correctly drops
+    from the acting client's own legal-move list afterward), the attacking client's own observe()
+    of opp.active.damage still read 0 several seconds later. Not reproduced via targeted debug
+    (S127); likely a stale-view read in this ad-hoc harness, not the attack-engine itself (1362
+    unit tests incl. damage application are green). Needs a session with time to trace with
+    SERVER_AUTHORITATIVE on/off. (refs: design 008 manual verification, S127)
 - I43 2026-09-14 P3 [rules] Attack inheritance never inherits — `mergeInheritedAttacks` is dead in practice
     because the only live call site passes `priorAttacks: []` (rules-bridge.js:305); that call site is
     deleted by design 008 slice 6, which also drops its per-refresh chat announcement (refs: 008 R8/R7, S123)

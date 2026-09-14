@@ -13,13 +13,14 @@ One commit per slice; each commit leaves `pnpm test` green. `/clear` between sli
 | 5 | done | 8d29497 | Ability zones (D5) + bench overlay wiring (D6) |
 | 6 | done | c761d81 | Deleted the Attack Window panel + its CSS |
 
-**Design 008 is complete — all 6 slices shipped.** The click-to-open overlay
-(`attack-preview.js`) is now the only attacks/abilities UI; `#rulesAttackWindow` /
-`buildAttackWindow()` are gone. Remaining work: the manual verification checklist in the design
-doc's "Verification Plan" (§ Manual Verification) has not been run against a live `pnpm start`
-session in this harness (no browser available to this session) — do that before considering 008
-fully closed, or delegate it to a session that can drive a browser (see `.claude/agents/` /
-the `run` skill).
+**Design 008 is complete — all 6 slices shipped and manually verified (S127).** The click-to-open
+overlay (`attack-preview.js`) is now the only attacks/abilities UI; `#rulesAttackWindow` /
+`buildAttackWindow()` are gone. S127 ran the design doc's manual verification checklist against a
+live `pnpm start` session with two real Playwright browsers: 15/16 checks pass. The one open item
+(I44 — damage not observed after a UI-driven attack in this 2-browser harness; did not reproduce
+under targeted debugging, likely a stale-read in the harness rather than the attack engine) is
+filed separately and does not block closing 008. Remaining: archive the design doc and clear this
+section from NEXTSTEPS.md next touch.
 
 ## S126 — slice 6 done (design 008 complete)
 
