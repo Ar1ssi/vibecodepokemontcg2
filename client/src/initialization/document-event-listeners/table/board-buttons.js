@@ -27,8 +27,10 @@ export const initializeBoardButtons = () => {
     // Check if sideboxes are currently visible
     const isVisible = sideboxes[0] && sideboxes[0].style.display !== 'none';
 
-    // Toggle the CSS class on body for layout adjustments
+    // Toggle the CSS class on body and html for layout adjustments
     document.body.classList.toggle('sidebox-hidden', isVisible);
+    document.documentElement.classList.toggle('sidebox-hidden', isVisible);
+    window.setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
 
     // Toggle background position based on sidebox visibility
     if (isVisible) {

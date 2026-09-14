@@ -4,11 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 124
-Focus: fix (board-ui) — unify playmat and zone geometry for sub-pixel card alignment
-Active: done. Removed broken object-fit cover stretching, tied mat art, zones SVG overlay,
-  and child playmat iframes to identical aspect-locked coordinates and dynamic --mat-scale.
-  Positioned deck/discard counters dynamically. Verified sub-pixel slotting via Playwright.
+Session: 125
+Focus: patch (board-ui) — fix mat and card adjustment when right drawer is closed
+Active: done. Extended --mat-container-width: 100vw to :root variants, toggled collapsed
+  class on documentElement, synchronized per-half mat CSS vars, added smooth transitions.
+  Verified sub-pixel alignment across open/closed/reopened states via Playwright.
 Next: user visual review in browser.
 Blocked: nothing.
 
@@ -29,7 +29,7 @@ Blocked: nothing.
   don't call it per-card or per-set-expand, only once per session via the cached index/promise.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S125 2026-09-14 patch: fix mat and card adjustment when right drawer is closed.
 - S124 2026-09-14 fix: unify playmat and zone geometry for sub-pixel card alignment.
 - S123 2026-09-14 patch: disable 3D tilt for holo cards on the board.
-- S122 2026-09-14 feature: overlapping prize cards layout matching playmat.
 

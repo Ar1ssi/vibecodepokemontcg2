@@ -21,6 +21,7 @@
     
       const applyState = (collapsed) => {
         document.body.classList.toggle(COLLAPSED_CLASS, collapsed);
+        document.documentElement.classList.toggle(COLLAPSED_CLASS, collapsed);
         toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
         toggle.title = collapsed ? 'Open menu' : 'Close menu';
         toggle.querySelector('.side-menu-toggle-arrow').innerHTML = collapsed
