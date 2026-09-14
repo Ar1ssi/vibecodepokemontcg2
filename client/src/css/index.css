@@ -14,7 +14,8 @@
   --mat-half-height: 50vh;
   --mat-container-width: 75.5vw;
 }
-body.sidebox-hidden {
+body.sidebox-hidden,
+body.side-menu-collapsed {
   --mat-container-width: 100vw;
 }
 
@@ -187,6 +188,7 @@ ul, li {
   background: radial-gradient(ellipse at center, #14161c 0%, #05060a 70%, #000 100%);
   z-index: 0;
   overflow: hidden;
+  transition: width 220ms ease;
 }
 #battleMatTrim {
   position: absolute;
@@ -1236,14 +1238,18 @@ ul, li {
   border-radius: 0;
   box-shadow: none;
   z-index: 900;
-  transform: translateX(calc(100% - 8px));
+  transform: translateX(100%);
   transition: transform 220ms ease;
   display: flex;
   align-items: stretch;
   overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
 }
 .native-deck-builder-workspace.open {
   transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
 }
 .native-deck-builder-inner {
   position: relative;
@@ -3254,28 +3260,34 @@ a:hover {
   100% { transform: rotate(360deg); } /* End at 360 degrees (full circle) */
 }
 
-/* Styles when sidebox is hidden */
-.sidebox-hidden #battleMat {
+/* Styles when sidebox is hidden or side menu is collapsed */
+.sidebox-hidden #battleMat,
+body.side-menu-collapsed #battleMat {
   width: 100%;
 }
 
-.sidebox-hidden .self {
+.sidebox-hidden .self,
+body.side-menu-collapsed .self {
   width: 100%;
 }
 
-.sidebox-hidden .opp {
+.sidebox-hidden .opp,
+body.side-menu-collapsed .opp {
   width: 100%;
 }
 
-.sidebox-hidden #selfResizer {
+.sidebox-hidden #selfResizer,
+body.side-menu-collapsed #selfResizer {
   left: -0.55%;
 }
 
-.sidebox-hidden #oppResizer {
+.sidebox-hidden #oppResizer,
+body.side-menu-collapsed #oppResizer {
   left: -0.55%;
 }
 
-.sidebox-hidden #boardButtonContainer {
+.sidebox-hidden #boardButtonContainer,
+body.side-menu-collapsed #boardButtonContainer {
   left: 67%;
 }
 
@@ -3468,11 +3480,10 @@ a:hover {
     body.side-menu-collapsed #sideMenuToggle {
       right: 0;
     }
-    /* Full-width playmat: reclaim the side menu's space while collapsed. The
-       iframes keep a tiny right inset so the edge toggle remains clickable. */
+    /* Full-width playmat: reclaim the side menu's space while collapsed. */
     body.side-menu-collapsed .self,
     body.side-menu-collapsed .opp {
-      width: calc(100% - 2vw);
+      width: 100%;
       transition: width 220ms ease;
     }
     .self,
