@@ -28,7 +28,7 @@
  * Pure and DOM-free so it runs under `node --test`.
  */
 
-export const DEFAULT_TILT_DEG = 14;
+export const DEFAULT_TILT_DEG = 12;
 export const DEFAULT_PERSPECTIVE_PX = 1400;
 
 /**
