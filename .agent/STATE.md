@@ -40,6 +40,6 @@ Blocked: none.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S136 2026-09-15 feature: TCG Live-style holofoil (fixed light, ink mask) — PR #130, merged 9729902.
-  + patch: Primal Kyogre sleeve cropped (no white margins), pushed to main directly.
+  + patch: Primal Kyogre + Groudon sleeves cropped (no white margins), pushed to main directly.
 - S135 2026-09-15 feature: ability-guidance accuracy + Mega/Primal Spirit Link turn-end rule.
 - S134 2026-09-15 feature: CSV deck export/import now carries sleeve+coin. Pushed 3883471.
