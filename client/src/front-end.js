@@ -5,6 +5,7 @@ import { loadImportData } from './initialization/load-import-data/load-import-da
 import { initializeMutationObservers } from './initialization/mutation-observers/initialize-mutation-observers.js';
 import { initializeSocketEventListeners } from './initialization/socket-event-listeners/socket-event-listeners.js';
 import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
+import { initializeTableTilt } from './setup/sizing/apply-table-tilt.js';
 import { initSyncLogger } from './setup/general/sync-logger-bridge.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
 
@@ -13,5 +14,6 @@ initializeSocketEventListeners();
 initializeDOMEventListeners();
 initializeMutationObservers();
 initializeMatLayout();
+initializeTableTilt();
 loadImportData();
 installE2eApi();

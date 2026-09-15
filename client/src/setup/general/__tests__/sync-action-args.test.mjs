@@ -12,7 +12,7 @@ import {
 import { hashBoardSnapshot, hashCardList } from '../../../../../shared/engine/zones/zone-hash.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
-import { shouldAnimateDrawFlight } from '../../image-logic/draw-flight-predicate.mjs';
+import { shouldAnimateDrawFlight, shouldAnimateMirror } from '../../image-logic/draw-flight-predicate.mjs';
 
 test('splitEmitAndTail: local emit boolean stays emit', () => {
   assert.deepEqual(splitEmitAndTail(true), { emit: true, tail: null });
@@ -125,6 +125,29 @@ test('shouldAnimateDrawFlight: live draw animates, catch-up / syncReplay / hidde
   assert.equal(shouldAnimateDrawFlight({ syncReplay: true, syncReplaying: true }), false);
   assert.equal(shouldAnimateDrawFlight({ hidden: true }), false);
   assert.equal(shouldAnimateDrawFlight({ syncReplay: false, hidden: true }), false);
+});
+
+test('shouldAnimateMirror: live mirror animates; catch-up (isCatchingUp/syncReplaying) and hidden do not', () => {
+  assert.equal(shouldAnimateMirror({}), true);
+  assert.equal(shouldAnimateMirror({ syncReplaying: true }), false);
+  assert.equal(shouldAnimateMirror({ isCatchingUp: true }), false);
+  assert.equal(shouldAnimateMirror({ hidden: true }), false);
+});
+
+test('mirror animation call sites pass isCatchingUp (the flag peer-log catch-up actually sets)', () => {
+  for (const rel of [
+    '../../../actions/zones/shuffle-zone.js',
+    '../../../actions/move-card-bundle/move-card.js',
+    '../../rules/rules-bridge.js',
+    '../../netcode/advisory-animations.js',
+  ]) {
+    const source = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+    const calls = source.match(/shouldAnimateMirror\(\{[^}]*\}\)/g) || [];
+    assert.ok(calls.length > 0, `${rel} calls shouldAnimateMirror`);
+    for (const call of calls) {
+      assert.match(call, /isCatchingUp: !!systemState\.isCatchingUp/, `${rel}: ${call}`);
+    }
+  }
 });
 
 test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => {

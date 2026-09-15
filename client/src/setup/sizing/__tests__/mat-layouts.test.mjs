@@ -202,9 +202,13 @@ const CONTAINER_CSS = {
 // itself are painted by the parent page, so they are not expected here.
 const PARENT_OWNED = /^--(stadium|mat)-/;
 
+// Design 009 moved the hand off the mat into a fixed, half-cropped strip
+// (--hand-crop-height), so a mat's printed hand height no longer sizes it.
+const NOT_CONSUMED = new Set(['--prizes-columns', '--hand-height']);
+
 test('both container stylesheets consume every zone variable', () => {
   const emitted = Object.keys(layoutToCssVars(getMatLayout('sim'))).filter(
-    (name) => !PARENT_OWNED.test(name) && name !== '--prizes-columns'
+    (name) => !PARENT_OWNED.test(name) && !NOT_CONSUMED.has(name)
   );
 
   for (const [file, css] of Object.entries(CONTAINER_CSS)) {

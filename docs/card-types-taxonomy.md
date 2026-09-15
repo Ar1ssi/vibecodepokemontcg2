@@ -512,6 +512,11 @@ evolveStage2 / moveEnergy / devolve / discardTools / … → trailing/bare draw
 
 ## Appendix — Attack window UI (verified)
 
+> **Superseded (design 008, slice 6):** `#rulesAttackWindow` / `buildAttackWindow()` were
+> deleted. The attacks/abilities UI is now the click-to-open overlay in
+> `client/src/setup/rules/attack-preview.js` (`.attack-zone`/`.ability-zone`/
+> `.attack-preview-*` CSS). This appendix describes the removed panel for history only.
+
 A persistent side panel (`#rulesAttackWindow`) that lists the active Pokémon's
 attacks and abilities with **current usability**, and lets the player pick which
 one to execute. Previously "execute attack" was dead (hardcoded `attacks[0]`;

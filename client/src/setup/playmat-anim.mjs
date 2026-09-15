@@ -2,6 +2,30 @@
     // Subtle slide+fade keyed to the ORIGIN zone (deck->hand rises, hand->board
     // drops in), applied to the single moved card image. No board shake; no
     // layout properties touched, so zones never disappear.
+    import { deckStackLayers } from './zones/deck-stack.mjs';
+
+    // 3D deck stack (design 009): N card-edge layers in #deckStack, a sibling
+    // BEHIND #deckCover, and the cover image raised by --deck-stack-count
+    // layers. Kept out of #deckCover because update-cover.js removes
+    // #deckCover's firstElementChild assuming it is the cover image. Driven off
+    // #deckCount's text so every path that updates the count (legacy,
+    // authoritative, replay) updates the stack.
+    function renderDeckStack(stackEl, countText) {
+      if (!stackEl) return;
+      const count = Number.parseInt(countText, 10);
+      if (!Number.isFinite(count)) return; // non-numeric/empty: leave stack unchanged
+      const layers = deckStackLayers(count);
+      document.documentElement.style.setProperty('--deck-stack-count', String(layers));
+      const nodes = [];
+      for (let i = 1; i <= layers; i++) {
+        const layer = document.createElement('div');
+        layer.className = 'deck-stack-layer';
+        layer.style.setProperty('--deck-layer-i', String(i));
+        nodes.push(layer);
+      }
+      stackEl.replaceChildren(...nodes);
+    }
+
     (function playmatAnimations() {
       if (window.__playmatAnimActive) return;
       window.__playmatAnimActive = true;
@@ -61,17 +85,13 @@
         wobble(document.getElementById('deckText')?.parentElement || document.getElementById('deck'));
       }, true);
     
-      // deck count drop = a card left the deck: tiny label settle
-      const deckLabel = document.getElementById('deckText')?.parentElement;
+      // deck count change: re-render the 3D stack
       const count = document.getElementById('deckCount');
-      if (deckLabel && count) {
-        let last = count.textContent;
-        const obs = new MutationObserver(() => {
-          if (count.textContent !== last) {
-            last = count.textContent;
-          }
-        });
+      const deckStack = document.getElementById('deckStack');
+      if (count) {
+        const obs = new MutationObserver(() => renderDeckStack(deckStack, count.textContent));
         obs.observe(count, { childList: true, characterData: true, subtree: true });
       }
+      renderDeckStack(deckStack, count?.textContent);
     })();
     

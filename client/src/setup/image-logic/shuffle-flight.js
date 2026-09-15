@@ -3,7 +3,7 @@ import {
   selfContainerDocument,
 } from '../../state.js';
 import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
-import { mapIframeLocalToViewport, readFrameTransform } from './iframe-rect.mjs';
+import { visualRectOf } from './iframe-rect.mjs';
 import {
   SHUFFLE_DURATION_MS,
   shuffleFlightPlan,
@@ -13,21 +13,6 @@ import {
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 
 const activeByUser = { self: null, opp: null };
-
-const visualRectOf = (el) => {
-  const local = el.getBoundingClientRect();
-  const frame = el.ownerDocument?.defaultView?.frameElement;
-  if (!frame) {
-    return {
-      left: local.left,
-      top: local.top,
-      width: local.width,
-      height: local.height,
-    };
-  }
-  const { frameRect, matrix, origin } = readFrameTransform(frame);
-  return mapIframeLocalToViewport(local, frameRect, matrix, origin);
-};
 
 const zoneOriginEl = (user, zoneId) => {
   const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;

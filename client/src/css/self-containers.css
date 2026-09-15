@@ -27,6 +27,11 @@
    near edge, percentages are of the iframe box. */
 :root {
   --hand-height: 32%;
+  /* Design 009: visible hand strip at the near edge. In vh (= % of this
+     iframe's height) so it also works inside calc() with other vh lengths and
+     apply-table-tilt.js can read it as a fraction. Hand cards are twice this
+     tall, so half of each card is cropped off-screen. */
+  --hand-crop-height: 16vh;
 
   --bench-bottom: 34%;
   --bench-left: 20%;
@@ -49,6 +54,12 @@
   --deck-right: 1%;
   --deck-width: 9%;
   --deck-height: 28%;
+  --deck-layer-px: 1.1px;
+  --deck-card-aspect: 0.716;
+  /* -1: the stack rises toward screen top. apply-table-tilt.js writes 1 when
+     this iframe is the flipped (far) half. */
+  --deck-stack-dir: -1;
+  --deck-stack-count: 0;
 
   --discard-bottom: 35%;
   --discard-right: 1%;
@@ -61,13 +72,22 @@
   --lost-zone-height: 15%;
 
   --mat-aspect: none;
-  --mat-height: 100vh;
+  /* Zones live in #playfield, which stops at the hand strip. */
+  --mat-height: calc(100vh - var(--hand-crop-height));
   --mat-width: 100%;
   --mat-offset-x: 0px;
   --mat-offset-y: 0px;
-  --mat-half-height: 100vh;
+  --mat-half-height: calc(100vh - var(--hand-crop-height));
   --mat-container-width: 100%;
   --mat-scale: 1;
+
+  /* Design 009 table tilt; apply-table-tilt.js overwrites both. The default
+     is a no-op but NOT `none`, so #playfield is the containing block for its
+     fixed zones from first paint (no layout jump when the tilt arrives).
+     Never put `perspective` on <html>: it makes the ~0px-tall root the
+     containing block of every fixed element and collapses the board. */
+  --tilt-transform: scale(0.5);
+  --tilt-origin: 0 0;
 }
 
 * {
@@ -150,36 +170,74 @@ body, input, textarea, button {
 .highlightBox {
   background-color: rgba(90, 110, 188, 0.3);
 }
-#hand {
-  border-top: 3px solid rgba(90, 110, 188, 0.864);
+/* Laid out at 2x (zoom) and shrunk back by the tilt transform's scale(0.5):
+   Chrome rasterizes perspective layers at 1 texel per CSS px, so without
+   the oversampling tilted cards blur on HiDPI screens. Keep zoom in step
+   with OVERSAMPLE in table-tilt.mjs. */
+#playfield {
   position: fixed;
-  bottom: 0;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: calc(100vh - var(--hand-crop-height));
+  zoom: 2;
+  transform: var(--tilt-transform);
+  transform-origin: var(--tilt-origin);
+}
+/* Design 009 hand. #hand is three strip-heights tall, bottom to top:
+   1. below the iframe's bottom edge (the viewport crops it),
+   2. the visible strip,
+   3. room for a hovered card to lift into.
+   Cards are two strips tall and sit on the bottom, so only their top half
+   shows. The box holds a lifted card, so nothing overflows vertically and the
+   horizontal scroller never clips the lift. The box is pointer-transparent so
+   band 3 does not block the playfield; cards and the strip (::before, which
+   hit-tests as #hand for drops) take pointer events. */
+#hand {
+  position: fixed;
+  bottom: calc(-1 * var(--hand-crop-height));
   left: 0;
   width: 100%;
-  height: calc(var(--hand-height) - 3px);
+  height: calc(3 * var(--hand-crop-height));
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
   display: flex;
-  z-index: 0;
+  z-index: 5;
   align-items: flex-end;
+  pointer-events: none;
 }
-#hand img {
+#hand::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--hand-crop-height);
   box-sizing: border-box;
-  width: auto;
-  max-height: calc(100% - 1.5vh);
-  margin-bottom: 1.5vh;
-  margin-left: .25vw;
-  margin-right: .25vw;
+  border-top: 3px solid rgba(90, 110, 188, 0.864);
+  pointer-events: auto;
+  z-index: -1;
 }
-/* Holo cards: size the wrapper the same way a bare hand <img> sizes itself
-   (see #hand img above) so it rescales live with #hand, instead of a
-   one-time JS pixel snapshot. The nested real <img> just fills that box. */
+#hand > * {
+  pointer-events: auto;
+}
+#hand img,
 #hand .mat-holo {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 1.5vh);
-  margin-bottom: 1.5vh;
+  height: calc(200% / 3);
   margin-left: .25vw;
   margin-right: .25vw;
+  transition: translate 0.15s ease;
+  position: relative;
+}
+/* `translate`, not `transform`: resetImage() writes an inline
+   `transform: rotate(...)` on every card <img>, which would win. */
+#hand > img:hover,
+#hand > .mat-holo:hover {
+  translate: 0 -50%;
+  z-index: 10;
 }
 #hand .mat-holo img {
   width: 100%;
@@ -196,13 +254,13 @@ img.draw-flight-source,
 #handText {
   position: fixed;
   right: 2%;
-  bottom: var(--hand-height);
+  bottom: var(--hand-crop-height);
   color:rgba(90, 110, 188, 0.864);
 }
 #handLabel {
   position: fixed;
   left: 0%;
-  bottom: calc(var(--hand-height) - 0.5%);
+  bottom: calc(var(--hand-crop-height) - 0.5%);
   color:rgba(90, 110, 188, 0.864);
   font-size: 5vh;
 }
@@ -350,7 +408,39 @@ img.draw-flight-source,
   max-height: 100%;
   object-fit: contain;
   left: 0;
-} 
+  position: relative;
+  z-index: 1;
+  /* Sits on top of the #deckStack layers. `translate`, not `transform`:
+     resetImage() writes an inline `transform` on the cover <img>. */
+  translate: 0 calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px));
+}
+/* Same box as #deckCover, painted before it (earlier in the DOM). Layers are
+   card-sized like the contain-fitted cover image; each is offset one step
+   further, and the raised cover leaves their bottom edges showing. */
+#deckStack {
+  position: fixed;
+  bottom: var(--deck-bottom);
+  right: var(--deck-right);
+  width: var(--deck-width);
+  height: var(--deck-height);
+  container-type: size;
+  pointer-events: none;
+  z-index: 0;
+}
+.deck-stack-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: min(100cqw, 100cqh * var(--deck-card-aspect));
+  height: min(100cqh, 100cqw / var(--deck-card-aspect));
+  box-sizing: border-box;
+  border-radius: 4.55% / 3.5%;
+  background: linear-gradient(to bottom, #9a9aa3, #5d5d66);
+  border-bottom: 1px solid #2e2e35;
+  transform: translateY(calc(var(--deck-stack-dir) * (var(--deck-layer-i) - 1) * var(--deck-layer-px)));
+}
 #deckText {
   position: fixed;
   right: var(--deck-right);
@@ -771,7 +861,7 @@ img.draw-flight-source,
       border: 1px solid rgba(160, 190, 255, 0.18);
     }
     /* hand strip */
-    #hand {
+    #hand::before {
       background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
       border-top: 1px solid rgba(160, 190, 255, 0.18);
     }
@@ -799,17 +889,11 @@ img.draw-flight-source,
       0%   { transform: none; opacity: 1; }
       100% { transform: translateY(18px) rotate(5deg) scale(0.94); opacity: 0; }
     }
-    @keyframes tcgl-knockout {
-      0%   { filter: brightness(1); }
-      30%  { filter: brightness(1.6) saturate(0.2); }
-      100% { filter: brightness(0.4); opacity: 0.85; }
-    }
     .tcgl-anim { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1); animation-fill-mode: backwards; }
     .tcgl-from-deck { animation-name: tcgl-from-deck; }
     .tcgl-from-hand { animation-name: tcgl-from-hand; }
     .tcgl-to-discard { animation-name: tcgl-to-discard; animation-fill-mode: forwards; }
-    .tcgl-knockout { animation-name: tcgl-knockout; animation-duration: 0.5s; animation-fill-mode: forwards; }
-    
+
     /* shuffle: a restrained single wobble of the deck label plate only */
     @keyframes tcgl-shuffle {
       0%, 100% { transform: none; }
@@ -838,6 +922,7 @@ body.mat-active #discard,
 body.mat-active #lostZone,
 body.mat-active #active,
 body.mat-active #hand,
+body.mat-active #hand::before,
 body.mat-active #bench,
 body.mat-active #prizes,
 body.mat-active #deckCover,

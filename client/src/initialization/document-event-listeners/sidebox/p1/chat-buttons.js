@@ -4,12 +4,26 @@ import { undo } from '../../../../actions/general/undo.js';
 import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
+import { rulesState } from '/shared/engine/rules/rules-state.mjs';
+import { getZone } from '../../../../setup/zones/get-zone.js';
+import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
+import { openAttackPreview } from '../../../../setup/rules/attack-preview.js';
 
 export const initializeP1ChatButtons = () => {
   const attackButton = document.getElementById('attackButton');
-  attackButton.addEventListener('click', () =>
-    attack(systemState.isTwoPlayer ? systemState.initiator : 'self')
-  );
+  attackButton.addEventListener('click', () => {
+    const user = systemState.isTwoPlayer ? systemState.initiator : 'self';
+    // Design 008 (Component 7): rules mode routes through the same TCG
+    // Live-style preview a card click opens, rather than attacking directly.
+    if (rulesState.enabled) {
+      const active = getActivePokemonCard(getZone(user, 'active'));
+      if (active?.image) {
+        openAttackPreview(active, active.image, { zone: 'active' });
+        return;
+      }
+    }
+    attack(user);
+  });
 
   const retreatButton = document.getElementById('retreatButton');
   retreatButton.addEventListener('click', () => retreat(systemState.initiator));

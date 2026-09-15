@@ -5,6 +5,7 @@ import {
   selfContainerDocument,
 } from '../../initialization/global-variables/containers.js';
 import { systemState } from '../../initialization/global-variables/global-variables.js';
+import { applyTableTilt } from '../../setup/sizing/apply-table-tilt.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import {
   flippedOppHandleMouseDown,
@@ -203,4 +204,7 @@ export const flipBoard = () => {
     }
   }
   refreshBoard();
+  // The `.self`/`.opp` classes just swapped between the iframes; the tilt
+  // sign and deck-stack direction follow the class, so they must be rewritten.
+  applyTableTilt();
 };

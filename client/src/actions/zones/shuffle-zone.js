@@ -10,6 +10,7 @@ import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate
 import { playShuffleFlight } from '../../setup/image-logic/shuffle-flight.js';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 import { logSync } from '../../setup/general/sync-logger-bridge.js';
+import { shouldAnimateMirror } from '../../setup/image-logic/draw-flight-predicate.mjs';
 
 export const shuffleZone = (
   user,
@@ -40,9 +41,19 @@ export const shuffleZone = (
     return;
 
   const zone = getZone(user, zoneId);
-  // Originator plays the flight; the mirror only applies the new order.
-  // Animating on receive made the other player's deck look like it shuffled too.
-  if (!(systemState.isTwoPlayer && !emit)) {
+  // Originator always plays the flight. The mirror (2P, receiving the relayed
+  // shuffle) now plays it too, gated by shouldAnimateMirror so a batch
+  // catch-up replay or a hidden tab still stays silent (design 009 slice 4;
+  // the old "made the other deck look like it shuffled too" complaint was
+  // about a wrong user/side mapping, not the animation itself — confirm live).
+  if (
+    emit ||
+    shouldAnimateMirror({
+      syncReplaying: !!systemState.syncReplaying,
+      isCatchingUp: !!systemState.isCatchingUp,
+      hidden: typeof document !== 'undefined' && !!document.hidden,
+    })
+  ) {
     playShuffleFlight(user, zoneId, zone.getCount());
   }
   removeImages(zone.element);

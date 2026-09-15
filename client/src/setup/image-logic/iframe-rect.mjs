@@ -66,6 +66,27 @@ export const mapIframeLocalToViewport = (
   };
 };
 
+/**
+ * Parent-viewport rect for a same-document or iframe-nested element,
+ * projected through the iframe's CSS transform when it lives inside one
+ * (shared by shuffle-flight.js and knockout-flight.js — both fly a card
+ * overlay from a rect captured inside `#selfContainer`/`#oppContainer`).
+ */
+export const visualRectOf = (el) => {
+  const local = el.getBoundingClientRect();
+  const frame = el.ownerDocument?.defaultView?.frameElement;
+  if (!frame) {
+    return {
+      left: local.left,
+      top: local.top,
+      width: local.width,
+      height: local.height,
+    };
+  }
+  const { frameRect, matrix, origin } = readFrameTransform(frame);
+  return mapIframeLocalToViewport(local, frameRect, matrix, origin);
+};
+
 export const readFrameTransform = (frame) => {
   const frameRect = frame.getBoundingClientRect();
   const fallbackOrigin = { x: frameRect.width / 2, y: frameRect.height / 2 };

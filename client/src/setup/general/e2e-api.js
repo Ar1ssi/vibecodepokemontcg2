@@ -5,6 +5,7 @@ import { getZone } from '../zones/get-zone.js';
 import {
   getAuthoritativeZoneArray,
   getAuthoritativeStadiumArray,
+  getLastRenderedVersion,
   hasAuthoritativeView,
 } from '../netcode/apply-view.js';
 import { rulesState, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
@@ -169,6 +170,21 @@ function serializePlayerObservation(user) {
   };
 }
 
+// Card-identity bundle for moveCardBundle's authoritative dispatch gate
+// (authoritative-dispatch.js buildAuthoritativeCardHints). Under SERVER_AUTHORITATIVE
+// the option's handIndex addresses the SERVER view array, while moveCardBundle's legacy
+// fallback indexes the local DOM zone array — passing the index alone made the gate fail
+// open and the legacy body then read a different array, crashing on an undefined card.
+// Omitted (undefined) in legacy mode, where the index IS the identity and the gate is
+// inert anyway; the builder fails closed as a unit, so a half-resolved bundle is never
+// sent.
+const idsFor = (option) => {
+  if (option?.instanceId == null) return undefined;
+  const ids = { moving: option.instanceId };
+  if (option.targetInstanceId != null) ids.target = option.targetInstanceId;
+  return ids;
+};
+
 export function installE2eApi() {
   if (typeof window === 'undefined' || !isE2eMode()) return;
   window.__ptcg = {
@@ -235,7 +251,8 @@ export function installE2eApi() {
             '../../actions/move-card-bundle/move-card-bundle.js'
           );
           const ok = await moveCardBundle(
-            'self', 'self', 'hand', option.targetZone, option.handIndex, false, 'move', true
+            'self', 'self', 'hand', option.targetZone, option.handIndex, false, 'move', true,
+            undefined, idsFor(option)
           );
           return { ok: ok !== false };
         }
@@ -245,7 +262,7 @@ export function installE2eApi() {
           );
           const ok = await moveCardBundle(
             'self', 'self', 'hand', option.targetZone, option.handIndex,
-            option.targetIndex, 'move', true
+            option.targetIndex, 'move', true, undefined, idsFor(option)
           );
           return { ok: ok !== false };
         }
@@ -254,7 +271,8 @@ export function installE2eApi() {
             '../../actions/move-card-bundle/move-card-bundle.js'
           );
           const ok = await moveCardBundle(
-            'self', 'self', 'hand', 'board', option.handIndex, false, 'move', true
+            'self', 'self', 'hand', 'board', option.handIndex, false, 'move', true,
+            undefined, idsFor(option)
           );
           return { ok: ok !== false };
         }
@@ -334,6 +352,22 @@ export function installE2eApi() {
         return this.callCoin(face);
       }
       return false;
+    },
+    // True when this client is being driven by the server's view rather than the legacy
+    // local engine. The runner uses it to skip the legacy-only coin-call ritual: under
+    // server authority setup (deal, prizes, first player) is done server-side and no
+    // #rulesCoinCallOverlay is ever shown.
+    isAuthoritative() {
+      return hasAuthoritativeView();
+    },
+    // Version of the last authoritative view this client applied. The runner waits for
+    // this to advance after each action: under server authority the client's options are
+    // computed from the LAST view, so acting again before the next one arrives means
+    // choosing against a stale board — which the server then rejects (the reproducible
+    // case was a second retreat in one turn, chosen before the view carrying
+    // retreatedThisTurn landed). 0 in legacy mode, where there is no view to wait for.
+    viewVersion() {
+      return getLastRenderedVersion();
     },
     turnState() {
       return {

@@ -26,6 +26,11 @@ import {
   openCardPreview,
 } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
+import { openCarouselViewer } from './card-picker.js';
+import { rulesState, canPerformAction } from '/shared/engine/rules/rules-state.mjs';
+import { benchCardHasAbility } from '/shared/engine/rules/collect-usable-abilities.mjs';
+import { shouldOpenAttackPreview } from '../rules/attack-preview-gate.js';
+import { openAttackPreview } from '../rules/attack-preview.js';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -261,6 +266,30 @@ export const imageClick = (event) => {
       'move'
     );
   } else {
+    // Design 008 (D1/D6): a plain click on your own active or an
+    // ability-bearing benched Pokémon opens the TCG Live-style attack/ability
+    // preview instead of the usual select-to-move highlight. Gated here,
+    // after the selectHighlight branch above, so attaching Energy or
+    // promoting from bench (R1) is untouched.
+    if (rulesState.enabled) {
+      const decision = shouldOpenAttackPreview({
+        zoneId: mouseClick.zoneId,
+        cardUser: mouseClick.cardUser,
+        hasSelectHighlight: false,
+        hasAbility:
+          mouseClick.zoneId === 'bench' ? benchCardHasAbility(mouseClick.card) : false,
+        gate: canPerformAction({ user: mouseClick.cardUser, action: 'attack' }),
+      });
+      if (decision === 'attack' && mouseClick.card?.image) {
+        openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'active' });
+        return;
+      }
+      if (decision === 'ability' && mouseClick.card?.image) {
+        openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'bench' });
+        return;
+      }
+    }
+
     closePopups(event); //need both because of highlights condition in the if block above
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
@@ -279,7 +308,35 @@ export const doubleClick = (event) => {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
-      openCardPreview(targetImage, mouseClick.card);
+      // Card carries energies/tools: same zoom, but the attached cards ride
+      // along as further carousel slides (PTCG Live-style, like the discard
+      // pile viewer) — scroll/swipe right to see them, left to return to
+      // the main card. Read-only: dragging one out means closing first.
+      if (mouseClick.card?.attachedCards?.length) {
+        // Attached Energy is rendered on the mat as a small round token
+        // (attach-card.js swaps image.src to the icon and stashes the full
+        // card art in dataset.energyCardSrc) — show the real card art in the
+        // carousel slide, then revert automatically since we never touch the
+        // board's own <img>, just a read-only stand-in object here.
+        // Carousel slide N sits to the right of slide N+1 (higher index =
+        // further left, see computeSlideLayout's `virtualIndex - slideIndex`),
+        // so the attached cards go BEFORE the main card in the array to land
+        // on its right, with initialIndex pointing at the main card's slot.
+        const attachedSlides = mouseClick.card.attachedCards.map((attached) => {
+          const fullArtSrc = attached.image?.dataset?.energyCardSrc;
+          return fullArtSrc
+            ? { ...attached, image: { src: fullArtSrc } }
+            : attached;
+        });
+        const carouselCards = [...attachedSlides, mouseClick.card];
+        openCarouselViewer({
+          title: mouseClick.card.name || 'Attached Cards',
+          candidates: carouselCards,
+          initialIndex: attachedSlides.length,
+        });
+      } else {
+        openCardPreview(targetImage, mouseClick.card);
+      }
     }
   } else {
     let overlay = document.createElement('div');

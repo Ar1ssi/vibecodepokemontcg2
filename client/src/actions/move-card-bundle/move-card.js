@@ -4,7 +4,7 @@ import {
   originRectForHandFlight,
   playDrawToHand,
 } from '../../setup/image-logic/draw-flight.js';
-import { shouldAnimateDrawFlight } from '../../setup/image-logic/draw-flight.js';
+import { shouldAnimateMirror } from '../../setup/image-logic/draw-flight-predicate.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { closePopups, deselectCard } from '../general/close-popups.js';
 import { updateCount } from '../general/count.js';
@@ -564,9 +564,11 @@ export const moveCard = async (
       if (['hand', 'prizes', 'discard', 'lostZone', 'board'].includes(dZoneId)) hydrateHolo(movingCard);
       if (
         handFlight &&
-        shouldAnimateDrawFlight({
-          syncReplay,
+        // The mirror of the opponent's live draw sets syncReplay too
+        // (isMirrorReplay above), so gate on catch-up flags instead.
+        shouldAnimateMirror({
           syncReplaying: !!systemState.syncReplaying,
+          isCatchingUp: !!systemState.isCatchingUp,
         })
       ) {
         playDrawToHand(user, movingCard, { fromRect: flightOrigin });
