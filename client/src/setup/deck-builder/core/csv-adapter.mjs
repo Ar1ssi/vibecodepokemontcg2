@@ -48,7 +48,11 @@ function deckCardIdentityFields(data = {}) {
   };
 }
 
-export function serializeDeckToSimCsv(decklist = {}) {
+// Sleeve/coin choices ride as `#`-prefixed comment lines above the header so
+// simulator CSVs (no comment lines) and older exports parse unchanged.
+const META_LINE_PREFIXES = { sleeveId: '#SLEEVE,', coinId: '#COIN,' };
+
+export function serializeDeckToSimCsv(decklist = {}, meta = {}) {
   const rows = [];
 
   for (const cardName in decklist) {
@@ -70,15 +74,45 @@ export function serializeDeckToSimCsv(decklist = {}) {
     }
   }
 
-  return `${SIM_CSV_HEADER}\n${rows.join('\n')}`;
+  const metaLines = [];
+  if (meta.sleeveId) metaLines.push(`${META_LINE_PREFIXES.sleeveId}${meta.sleeveId}`);
+  if (meta.coinId) metaLines.push(`${META_LINE_PREFIXES.coinId}${meta.coinId}`);
+  const metaBlock = metaLines.length ? `${metaLines.join('\n')}\n` : '';
+
+  return `${metaBlock}${SIM_CSV_HEADER}\n${rows.join('\n')}`;
+}
+
+// Reads the `#SLEEVE`/`#COIN` comment lines a CSV export may carry; absent on
+// simulator CSVs and pre-existing exports, where both come back null.
+export function parseCsvMeta(csvData = '') {
+  const meta = { sleeveId: null, coinId: null };
+  const rows = String(csvData).split('\n');
+
+  for (const row of rows) {
+    if (row.startsWith(META_LINE_PREFIXES.sleeveId)) {
+      meta.sleeveId = row.slice(META_LINE_PREFIXES.sleeveId.length).trim() || null;
+    } else if (row.startsWith(META_LINE_PREFIXES.coinId)) {
+      meta.coinId = row.slice(META_LINE_PREFIXES.coinId.length).trim() || null;
+    } else if (!row.startsWith('#')) {
+      break;
+    }
+  }
+
+  return meta;
 }
 
 export function parseSimCsv(csvData = '') {
   const rows = String(csvData).split('\n');
   const newDecklist = {};
+  let headerSeen = false;
 
-  for (const [index, row] of rows.entries()) {
-    if (index === 0 || !row.trim()) continue;
+  for (const row of rows) {
+    if (row.startsWith('#')) continue;
+    if (!headerSeen) {
+      headerSeen = true;
+      continue;
+    }
+    if (!row.trim()) continue;
 
     const cells = row.split(',');
     const card = {

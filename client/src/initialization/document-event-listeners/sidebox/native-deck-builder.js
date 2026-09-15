@@ -1,5 +1,6 @@
 import {
   formatImageUrl,
+  parseCsvMeta,
   parseSimCsv,
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
@@ -1045,7 +1046,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   });
 
   exportCsvButton.addEventListener('click', () => {
-    const csv = serializeDeckToSimCsv(deck);
+    const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget) || null;
+    const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
+    const csv = serializeDeckToSimCsv(deck, { sleeveId, coinId });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -1066,6 +1069,26 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       deck = parseSimCsv(csvText);
       syncedDecks[currentLoadTarget] = deck;
       deckDirty = true;
+
+      const { sleeveId, coinId } = parseCsvMeta(csvText);
+      if (sleeveId !== null) {
+        deckLibrary?.setActiveSleeve(currentLoadTarget, sleeveId);
+        sleevePicker?.setSelected(sleeveId);
+        const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
+        if (sleeve?.image) {
+          changeCardBack(currentLoadTarget, sleeve.image, true);
+          document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: sleeve.image } }));
+        }
+      }
+      if (coinId !== null) {
+        deckLibrary?.setActiveCoin(currentLoadTarget, coinId);
+        coinPicker?.setSelected(coinId);
+        const coin = getCoinById(coinId) || null;
+        document.dispatchEvent(new CustomEvent('rules-coin-changed', {
+          detail: { target: currentLoadTarget, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
+        }));
+      }
+
       render();
     } catch (error) {
       searchStatus.textContent = `CSV import failed: ${error.message}`;
