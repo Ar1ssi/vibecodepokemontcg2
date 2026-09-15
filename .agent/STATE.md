@@ -4,24 +4,22 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 135
-Focus: feature — ability guidance accuracy for Ancient-Trait-style texts (α Growth / Ω Barrier)
-  + Gen 6 Mega Evolution/Primal Reversion turn-end mechanic with Spirit Link exemption, excluding
-  modern (2025+) Mega ex cards.
-Active: implemented, tests green, not yet committed.
-  abilities.mjs: attach step detects "when(ever) you attach ... you may attach N" trigger phrasing
-  (was mis-guided as a manual action); effectPreventAbility detects "opponent plays a Trainer
-  card ... prevent effects" phrasing and names the trigger.
-  evolution.mjs: new isModernMegaCard/isLegacyMegaOrPrimalCard ("M "/"Primal " prefix, NOT
-  full-word "Mega ")/hasMatchingSpiritLink/requiresTurnEndOnEvolve.
-  move-card.js: reads requiresTurnEndOnEvolve BEFORE evolveCard() (which migrates attachedCards
-  off targetCard) — dispatches `rules-mega-evolution-forces-turn-end`.
-  rules-bridge.js: listener clicks the Pass button on that event, reusing hookTurnButton's full
-  pipeline instead of duplicating it (same pattern as keybinds.js Alt+T).
-  Tests: +9 (evolution.test.mjs, rules-extended.test.mjs). Full suite 1412/1412 green. Lint: only
-  pre-existing CRLF noise on touched files. Not exercised live in browser — user verifies gameplay
-  UI themselves (recorded preference); design routes through the already-vetted Pass-button path.
-Next: none pending. Not yet committed — ask user before commit/push.
+Session: 136
+Focus: feature — TCG Live-style holofoil (design 010, D34): fixed virtual light instead of the
+  cursor, card-ink luminance mask, gold/SIR rewrite, default sparkle, angle shading.
+Active: built on branch claude/holofoil-effects-comparison-919cf3 (worktree), tests green,
+  committed + PR + merged to main at user's request (S136 close). holo.mjs (computeLightVars/driftTilt/foilMaskUrl, light from rotation or drift),
+  css/holo/base.css (ink mask on all layers, default sparkle, angle shading), hyper-rare.css +
+  ex-special-illustration-rare.css (identical, contract-tested), ex-full-art.css (ink mask),
+  holo.test.mjs + new holo-css.test.mjs, package.json test list. Suite 1446/1446.
+  Not viewed in a browser by me — user checks localhost (recorded preference).
+  Highlight direction flipped so previews never read as a cursor light (design 010 Deviations).
+  Round 2 (user feedback): no dark glare edges, stronger foil, tilted previews no longer clipped.
+  Worktree server running for the user at http://localhost:4000 (preview "app").
+  User's localhost :4001 serves the PRIMARY checkout (main) — the worktree must run on its own
+  port (PORT=4002) to be seen before merge.
+Next: user eyeballs holo cards on localhost (board drift, preview tilt, gold hyper rare); tune
+  LIGHT/DRIFT constants or CSS opacities from feedback; commit + push only when user says so.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -30,14 +28,17 @@ Blocked: none.
   with `executablePath: '/opt/pw-browsers/chromium'`, don't `playwright install`.
 - Test netcode changes in BOTH modes (`SERVER_AUTHORITATIVE=1` vs default); S101 shipped a
   legacy-only fix to a server-authoritative prod (D17).
-- `pnpm lint` fails repo-wide on pre-existing CRLF line endings + `no-undef` globals on `.mjs`
-  files (eslint.config only targets `**/*.js`) — verify a diff's own files with `npx eslint <files>`.
+- `pnpm test` is an explicit file list — a new test file runs only once added to package.json
+  (holo tests were silently excluded until S136). `pnpm lint` fails repo-wide on CRLF + `no-undef`
+  on `.mjs`; lint a diff with `npx eslint --rule 'linebreak-style: off' <files>`. No prettier CLI
+  installed — `eslint --fix` applies prettier formatting.
 - card-picker.js's carousel indexes slides RIGHT-TO-LEFT (`virtualIndex - slideIndex`, positive =
   left) — counterintuitive; any new caller must order candidates accordingly (S132).
-- Catch-up replay sets `systemState.isCatchingUp`; `syncReplaying` is never set anywhere. Gate
-  animations on `isCatchingUp`.
+- Holo `--pointer-*` CSS vars mean the LIGHT position (from card angle), not the cursor (D34).
+  A mask-image host without CORS hides the foil entirely — extend INK_MASK_CORS_HOSTS only after
+  checking the host's Access-Control-Allow-Origin header.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S136 2026-09-15 feature: TCG Live-style holofoil (fixed light, ink mask) — built, uncommitted.
 - S135 2026-09-15 feature: ability-guidance accuracy + Mega/Primal Spirit Link turn-end rule.
 - S134 2026-09-15 feature: CSV deck export/import now carries sleeve+coin. Pushed 3883471.
-- S133 2026-09-15 patch: enhance playmat zones vector sharpness and edge contrast.

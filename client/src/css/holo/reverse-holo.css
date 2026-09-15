@@ -74,7 +74,7 @@
       farthest-corner circle at var(--pointer-x) var(--pointer-y),
       hsla(0, 0%, 100%, 0.8) 10%,
       hsla(0, 0%, 100%, 0.5) 20%,
-      hsla(0, 0%, 0%, 0.75) 90%
+      hsla(0, 0%, 50%, 0) 90%
     );
 
   filter: brightness(.7) contrast(1.5);
@@ -91,7 +91,7 @@
       farthest-corner circle at var(--pointer-x) var(--pointer-y), 
       hsl(0, 0%, 100%) 10%, 
       hsla(0, 0%, 100%, 0.5) 20%, 
-      hsla(0, 0%, 0%, 0.5) 120% 
+      hsla(0, 0%, 50%, 0) 120%
     );
 
   filter: brightness(1) contrast(1.5);

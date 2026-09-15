@@ -166,7 +166,7 @@
     radial-gradient( 
       farthest-corner circle at var(--pointer-x) var(--pointer-y),
       hsla(0, 0%, 100%, 0.33) 0%, 
-      hsl(0, 0%, 25%) 110% 
+      hsla(0, 0%, 50%, 0) 110% 
     );
   
   filter: brightness(1) contrast(1.5);

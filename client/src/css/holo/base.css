@@ -29,9 +29,13 @@
   --birthday: url('../../assets/holo/birthday-holo.webp');
   --birthday-dank: url('../../assets/holo/birthday-holo-dank.webp');
   --birthday-dank2: url('../../assets/holo/birthday-holo-dank-2.webp');
-  /* We render unmasked: variants that still reference these resolve to nothing. */
+  /* No per-card foil art exists, so --foil stays empty. --mask (upstream's slot for a
+     per-card foil mask) is the card's own ink: buildHoloCard sets --card-ink-mask to the
+     card image when its host allows CORS; otherwise this opaque gradient keeps every
+     layer fully visible. */
   --foil: none;
-  --mask: none;
+  --card-ink-mask: linear-gradient(#fff, #fff);
+  --mask: var(--card-ink-mask);
 
   --glittersize: 25%;
   --space: 5%;
@@ -207,7 +211,7 @@
     farthest-corner circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
     hsla(0, 0%, 100%, 0.8) 10%,
     hsla(0, 0%, 100%, 0.65) 20%,
-    hsla(0, 0%, 0%, 0.5) 90%
+    hsla(0, 0%, 50%, 0) 90%
   );
 
   opacity: var(--card-opacity, 1);
@@ -223,6 +227,69 @@
 .card__glare2 {
   will-change: transform, opacity, background-image, background-size,
     background-position, background-blend-mode, filter;
+}
+
+/* ── Ink mask ──────────────────────────────────────────────────────────
+   Foil only lives where the printed card is bright: dark ink (text, HP,
+   attack costs) masks every decorative layer out, like ink over real foil. */
+.card__shine,
+.card__glitter,
+.card__glare,
+.card__glare2 {
+  /* The same luminance mask twice, composited with `add`, lifts midtones
+     (50% grey art → 75% foil) while black ink stays near zero. */
+  -webkit-mask-image: var(--card-ink-mask), var(--card-ink-mask);
+  mask-image: var(--card-ink-mask), var(--card-ink-mask);
+  mask-mode: luminance;
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* ── Default sparkle ───────────────────────────────────────────────────
+   Fine foil grain is the strongest "real foil" cue. Two iridescent grain
+   layers sized relative to the card slide opposite ways as the light moves
+   and cross-fade, so specks twinkle. Rarities with their own glitter keep it. */
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter {
+  --shift: 6%;
+  display: grid;
+  mix-blend-mode: color-dodge;
+  /* Dark, high-contrast grain: color-dodge then only brightens the specks
+     instead of lifting the whole card into a milky haze. */
+  filter: brightness(.7) contrast(2) saturate(1.3);
+  opacity: .7;
+}
+
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter:before,
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter:after {
+  content: "";
+  background-image: var(--iri8);
+  background-size: 45% auto;
+  background-repeat: repeat;
+  background-position:
+    calc(50% + var(--pointer-from-left) * var(--shift))
+    calc(50% + var(--pointer-from-top) * var(--shift));
+  opacity: var(--pointer-from-left);
+}
+
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter:after {
+  background-image: var(--iri7);
+  background-position:
+    calc(50% - var(--pointer-from-left) * var(--shift))
+    calc(50% - var(--pointer-from-top) * var(--shift));
+  opacity: calc(1 - var(--pointer-from-left));
+}
+
+/* ── Angle shading ─────────────────────────────────────────────────────
+   The whole card dims slightly as it tilts away from the fixed light.
+   --tilt-amount only tracks visible rotation, so flat board cards stay at 1. */
+.card[data-rarity] .card__translater {
+  filter: brightness(calc(1 - var(--tilt-amount, 0) * 0.08));
 }
 
 /* ── Mat holo overrides (scoped to .mat-holo) ─────────────────────────

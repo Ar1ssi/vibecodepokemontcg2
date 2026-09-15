@@ -1,9 +1,29 @@
 /*
 
-  EX REGULAR
+  SPECIAL ILLUSTRATION RARE — same treatment as hyper-rare.css.
+
+  Lit by the fixed virtual light in holo.mjs: --pointer-x/y is the highlight
+  position and --background-x/y the foil pan, both driven by the card angle.
+    shine   — broad sheen band + one low-frequency rainbow region, overlay,
+              neutral grey elsewhere so the art keeps its colors outside the
+              light. Rainbow stops are saturated mid-lightness colors: pastels
+              under overlay lighten more than they color and wash the card out.
+    glitter — fine iridescent grain sized relative to the card, kept dark and
+              contrasty so color-dodge only brightens the specks
+    glare   — soft highlight at the light position, fading to transparent
+              (never darkens the card edges)
+  No glare2: upstream masks it to per-card foil art we don't have, and
+  unmasked it washed the whole card white.
+  Keep in sync with hyper-rare.css (holo-css.test.mjs).
 
 */
 
+.card[data-rarity="special illustration rare"] {
+
+  --shift: 6%;
+  --glitter-size: 45% auto;
+
+}
 
 
 
@@ -15,67 +35,38 @@
 
 */
 
-.card[data-rarity="special illustration rare"] {
-  
-  --shift: calc( 3px * var(--card-scale) );
-  --glitter-size: 150px 150px;
-
-}
-
 .card[data-rarity="special illustration rare"] .card__shine {
 
-  filter: brightness(.6) contrast(1.5) saturate(1);
-
-}
-
-.card[data-rarity="special illustration rare"] .card__shine:after {
-    
-  content: "";
-
-  background-image: 
-    linear-gradient( calc((var(--rotate-x) - var(--rotate-delta)) * -0.25), 
-      black 24%, #797979 30%, black 36%
+  background-image:
+    linear-gradient( 115deg,
+      hsl(0, 0%, 50%) 28%,
+      hsl(45, 60%, 66%) 46%,
+      hsl(45, 35%, 86%) 50%,
+      hsl(45, 60%, 66%) 54%,
+      hsl(0, 0%, 50%) 72%
     ),
-    linear-gradient( calc((var(--rotate-x) - var(--rotate-delta)) * 0.25), 
-      black 24%, #797979 30%, black 36%
+    linear-gradient( 125deg,
+      hsl(0, 0%, 50%) 26%,
+      hsl(285, 85%, 58%) 36%,
+      hsl(225, 90%, 58%) 42%,
+      hsl(185, 85%, 50%) 48%,
+      hsl(125, 75%, 50%) 54%,
+      hsl(50, 95%, 55%) 60%,
+      hsl(0, 0%, 50%) 70%
     );
-  
-  background-position: 
-    50% calc( ( var(--background-y) * 1.7 ) ),
-    50% calc( ( var(--background-y) * -1.3 ) );
-  
-  background-size: 
+
+  background-size:
+    250% 250%,
     300% 300%;
-  
-  background-blend-mode: exclusion;
-  filter: brightness(1) contrast(.75) saturate(1);
-  mix-blend-mode: hard-light;
 
-  z-index: 3;
+  background-position:
+    calc( (var(--background-x) - 50%) * 5 + 50% ) calc( (var(--background-y) - 50%) * 5 + 50% ),
+    calc( (var(--background-x) - 50%) * -4 + 50% ) calc( (var(--background-y) - 50%) * -4 + 50% );
 
-}
-
-.card[data-rarity="special illustration rare"] .card__shine:before {
-    
-  content: "";
-
-  background-image: 
-    repeating-linear-gradient( 15deg,
-      var( --holo ),
-      var( --holo ),
-      var( --holo )
-    );
-  
-  background-position: 
-    center center;
-  
-  background-size: 
-    240% 240%;
-  
-  filter: brightness(1) contrast(.75) saturate(1);
+  background-blend-mode: soft-light;
   mix-blend-mode: overlay;
-
-  z-index: 2;
+  filter: saturate(1.5) contrast(1.15);
+  opacity: 1;
 
 }
 
@@ -88,19 +79,10 @@
   background-position: center center;
   background-repeat: repeat;
 
-  filter: brightness(1) contrast(2) saturate(1.2);
-  mix-blend-mode: plus-lighter;
+  filter: brightness(.65) contrast(2.2) saturate(1.4);
+  mix-blend-mode: color-dodge;
 
-  -webkit-mask-image: var(--mask);
-  mask-image: var(--mask);
-  -webkit-mask-size: cover;
-  mask-size: cover;
-  -webkit-mask-position: center center;
-  mask-position: center center;
-  -webkit-mask-mode: luminance;
-  mask-mode: luminance;
-
-  opacity: calc( var(--card-opacity) * ( .2 + var(--pointer-from-center) * .5 ) );
+  opacity: calc( .4 + var(--pointer-from-center) * .3 );
 
 }
 
@@ -111,8 +93,8 @@
 
   background-image: var(--iri8);
   background-size: var(--glitter-size);
-  background-position: 
-    calc( 50% + (var( --pointer-from-left ) * var(--shift)) ) 
+  background-position:
+    calc( 50% + (var( --pointer-from-left ) * var(--shift)) )
     calc( 50% + (var( --pointer-from-top ) * var(--shift)) );
   background-repeat: repeat;
 
@@ -123,34 +105,20 @@
 
   opacity: var(--pointer-from-top);
 
-  -webkit-mask-image: var(--mask);
-  mask-image: var(--mask);
-  -webkit-mask-size: cover;
-  mask-size: cover;
-  -webkit-mask-position: center center;
-  mask-position: center center;
-  -webkit-mask-mode: luminance;
-  mask-mode: luminance;
-
 }
 
 .card[data-rarity="special illustration rare"] .card__glitter:after {
 
   background-image: var(--iri7);
-  background-position: 
-    calc( 50% + (var( --pointer-from-left ) * var(--shift) * -1) ) 
+  background-position:
+    calc( 50% + (var( --pointer-from-left ) * var(--shift) * -1) )
     calc( 50% + (var( --pointer-from-top ) * var(--shift) * -1) );
-  
+
   z-index: 3;
 
   opacity: calc( var(--pointer-from-top) * -1 + 1 );
 
 }
-
-
-
-
-
 
 
 
@@ -164,27 +132,15 @@
 
 .card[data-rarity="special illustration rare"] .card__glare {
 
-  background-image: radial-gradient( 
-    farthest-corner circle at var(--pointer-x) var(--pointer-y), 
-    hsl(0, 0%, 80%) 10%, 
-    hsl(0, 0%, 50%) 70% 
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsla(0, 0%, 100%, 0.6) 0%,
+    hsla(0, 0%, 100%, 0.25) 25%,
+    hsla(0, 0%, 50%, 0) 60%
     );
 
-    mix-blend-mode: multiply;
-    filter: contrast(1.5);
-
-}
-
-.card[data-rarity="special illustration rare"] .card__glare2 {
-
-  display: block;
-  background: white;
-  mask: var(--foil);
-  -webkit-mask-mode: luminance;
-  mask-mode: luminance;
-  mask-size: cover;
-  mix-blend-mode: overlay;
-
-  filter: contrast(.8);
+  mix-blend-mode: soft-light;
+  filter: none;
+  opacity: 1;
 
 }

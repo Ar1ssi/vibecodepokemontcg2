@@ -1820,6 +1820,9 @@ ul, li {
 }
 .card-preview-face--front {
   pointer-events: auto;
+  /* A tilted holo card projects past its box (perspective); let it show
+     instead of cutting the corners off. The card rounds its own corners. */
+  overflow: visible;
 }
 .card-preview-face--back {
   transform: rotateY(180deg);
@@ -2198,7 +2201,9 @@ ul, li {
   width: 100%;
   height: 100%;
   aspect-ratio: var(--card-aspect);
-  overflow: hidden;
+  /* Visible so the tilted card isn't clipped; .card__rotator still rounds
+     and clips the card's own layers. */
+  overflow: visible;
   border-radius: 0.3rem;
 }
 .discard-pile-slide .mat-holo.discard-pile-holo .card__rotator {
@@ -2465,7 +2470,8 @@ ul, li {
   position: relative;
   z-index: 500;
   isolation: isolate;
-  overflow: hidden;
+  /* Visible so the tilted holo trigger card isn't clipped. */
+  overflow: visible;
   border-radius: 0.35rem;
   margin-left: var(--card-picker-trigger-nudge, 10px);
   animation: card-picker-float 3.2s ease-in-out infinite;
@@ -2490,7 +2496,7 @@ ul, li {
   border-radius: 0.35rem;
 }
 .card-picker-choose .card-picker-trigger-holo {
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
 }
 .card-picker-choose .card-picker-trigger-holo .card__translater,

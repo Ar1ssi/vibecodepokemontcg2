@@ -102,7 +102,7 @@
     radial-gradient( 
       farthest-corner circle at var(--pointer-x) var(--pointer-y), 
       hsl(0, 0%, 100%) 0%, 
-      hsl(0, 0%, 0%) 100% 
+      hsla(0, 0%, 50%, 0) 100%
     );
 
   opacity: var(--card-opacity);
@@ -117,7 +117,7 @@
     radial-gradient( 
       farthest-corner circle at var(--pointer-x) var(--pointer-y), 
       hsl(0, 0%, 100%) 5%, 
-      hsl(0, 0%, 0%) 120% 
+      hsla(0, 0%, 0%, 0) 120%
     );
 
   opacity: calc( var(--card-opacity) * var(--pointer-from-center) );
