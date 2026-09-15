@@ -89,7 +89,7 @@
       farthest-corner circle at var(--pointer-x) var(--pointer-y), 
         hsla(0, 0%, 90%, 0.8) 0%, 
         hsla(0, 0%, 78%, 0.1) 25%, 
-        hsl(0, 0%, 35%) 90% 
+        hsl(0, 0%, 50%) 90%
       );
     
   background-position: 
@@ -126,7 +126,7 @@
     farthest-corner circle at var(--pointer-x) var(--pointer-y), 
       hsla(0, 0%, 100%, 0.8) 10%, 
       hsla(0, 0%, 100%, 0.65) 20%, 
-      hsla(0, 0%, 0%, .5) 120% 
+      hsla(0, 0%, 50%, 0) 120%
     );
 
   opacity: calc( var(--card-opacity) * .8 );
