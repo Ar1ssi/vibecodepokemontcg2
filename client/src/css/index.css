@@ -448,21 +448,38 @@ ul, li {
   background: linear-gradient(to bottom, rgba(112, 112, 112, 0.864), rgba(82, 82, 82, 0.864));
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
 }
+/* Off the mat: horizontal row floating in the blurred gutter right of the
+   mat, vertically centered. Same position whether the sidebar tab is open
+   or closed (was overlapping the mat's card zones at left:52% / bottom:47%). */
 #boardButtonContainer {
   position: fixed;
-  height: 6%;
-  left: 52%;
-  bottom: 47%;
+  right: 1.5%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: auto;
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  z-index: 3;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(20, 22, 30, 0.35);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  box-sizing: border-box;
+  z-index: 1310;
+  cursor: grab;
+  touch-action: none;
+}
+#boardButtonContainer:active {
+  cursor: grabbing;
 }
 #boardButtonContainer button {
   margin-left: 5px;
-  border-radius: 10px;
-  font-size: 2vh;
+  border-radius: 8px;
+  font-size: 1.4vh;
+  padding: 0.3vh 0.5vw;
   cursor: pointer;
   background: linear-gradient(to bottom, rgb(250, 250, 250), rgb(230, 230, 230));
   color: rgb(60, 60, 60);
@@ -3481,13 +3498,6 @@ body.side-menu-collapsed #selfResizer {
 .sidebox-hidden #oppResizer,
 body.side-menu-collapsed #oppResizer {
   left: -0.55%;
-}
-
-:root.sidebox-hidden #boardButtonContainer,
-:root.side-menu-collapsed #boardButtonContainer,
-.sidebox-hidden #boardButtonContainer,
-body.side-menu-collapsed #boardButtonContainer {
-  left: 67%;
 }
 
     /* ── Card sleeve picker ─────────────────────────────────────────────── */
