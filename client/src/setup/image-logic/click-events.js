@@ -64,15 +64,43 @@ export const coverClick = (event) => {
     return;
   }
 
-  const selectedZone = getZone(event.target.user, event.target.id);
-  if (selectedZone.elementCover) {
-    selectedZone.element.style.display = 'block';
-  }
-
   const notSpectator = !(
     document.getElementById('spectatorModeCheckbox').checked &&
     systemState.isTwoPlayer
   );
+
+  // Pregame / rules-off: no privacy to protect yet, so show the deck with
+  // the same carousel viewer used for the discard pile instead of the raw
+  // stacked-image zone (that legacy display is still used mid-game below).
+  if (event.target.id === 'deckCover') {
+    const preGameOrRulesOff = !rulesState.enabled || rulesState.phase === 'setup';
+    if (preGameOrRulesOff) {
+      event.stopPropagation();
+      const user = event.target.user === 'self' ? 'self' : 'opp';
+      const zone = getZone(user, 'deck');
+      if (zone.getCount() === 0) return;
+      openCarouselViewer({
+        title: determineUsername(user) + "'s Deck",
+        candidates: zone.array,
+      });
+      if (notSpectator) {
+        appendMessage(
+          systemState.initiator,
+          determineUsername(systemState.initiator) +
+            ' is looking through ' +
+            determineUsername(event.target.user) +
+            "'s deck",
+          'player'
+        );
+      }
+      return;
+    }
+  }
+
+  const selectedZone = getZone(event.target.user, event.target.id);
+  if (selectedZone.elementCover) {
+    selectedZone.element.style.display = 'block';
+  }
 
   if (event.target.id === 'deckCover' && notSpectator) {
     appendMessage(
@@ -302,7 +330,21 @@ export const doubleClick = (event) => {
     identifyCard(event);
   }
   if (!mouseClick.card?.image) return;
-  if (mouseClick.zoneId === 'prizes') return;
+  if (mouseClick.zoneId === 'prizes') {
+    // Real fix (was a `return` bandaid): route through the same carousel
+    // viewer as the discard pile / deck instead of the legacy raw #fullImage
+    // overlay below, which stacks a fresh overlay + listeners on every
+    // double-click and is never wired into closePopups() — see investigation.
+    const zone = getZone(mouseClick.cardUser, 'prizes');
+    if (zone.getCount() === 0) return;
+    const initialIndex = Math.max(0, zone.array.indexOf(mouseClick.card));
+    openCarouselViewer({
+      title: determineUsername(mouseClick.cardUser) + "'s Prizes",
+      candidates: zone.array,
+      initialIndex,
+    });
+    return;
+  }
   const targetImage = mouseClick.card.image;
   targetImage.classList.remove('highlight');
   if (['active', 'bench', 'hand'].includes(mouseClick.zoneId)) {
