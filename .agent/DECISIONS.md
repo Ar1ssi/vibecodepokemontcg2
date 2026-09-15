@@ -76,3 +76,4 @@
   log now states explicitly. Not anti-cheat hardening (a non-goal): everything the bridge does
   is reachable from devtools anyway. This only stops it being five characters in the URL.
 
+- D36 2026-09-16 [netcode] Under SERVER_AUTHORITATIVE 2P the legacy renderer never writes the DOM of a zone apply-view draws (hand/prizes/active/bench/discard/lostZone/board — `server-rendered-zones.mjs`); legacy move/sort/shuffle/reveal still update the zone arrays rules code reads, but their images stay detached. The deck and pile covers remain legacy-rendered because the server sends only a deck count (I48, S142; follows D11).

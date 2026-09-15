@@ -3,7 +3,7 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { showPopup } from '../../setup/general/pop-up-message.js';
 import { processAction } from '../../setup/general/process-action.js';
-import { removeImages } from '../../setup/image-logic/remove-images.js';
+import { appendZoneImage, clearZoneImages } from '../../setup/image-logic/rebuild-zone-dom.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { convertZoneName } from '../move-card-bundle/move-card-message.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
@@ -65,10 +65,10 @@ export const lookAtCards = (
   if (emit) {
     const zone = getZone(user, zoneId);
     zone.array.forEach((card) => unhydrateHolo(card));
-    removeImages(zone.element);
+    clearZoneImages(zone, zoneId);
     zone.array.forEach((card) => {
       revealCard(user, card);
-      zone.element.appendChild(card.image);
+      appendZoneImage(zone, zoneId, card.image);
     });
     if (zoneId === 'hand') {
       sort(user, zoneId);
@@ -116,10 +116,10 @@ export const stopLookingAtCards = (
   if (emit) {
     const zone = getZone(user, zoneId);
     zone.array.forEach((card) => unhydrateHolo(card));
-    removeImages(zone.element);
+    clearZoneImages(zone, zoneId);
     zone.array.forEach((card) => {
       hideCard(user, card);
-      zone.element.appendChild(card.image);
+      appendZoneImage(zone, zoneId, card.image);
     });
     if (zoneId === 'hand') {
       sort(user, zoneId);

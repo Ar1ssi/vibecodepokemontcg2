@@ -3,7 +3,7 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { rearrangeArray, shuffleIndices } from '../../setup/general/shuffle.js';
-import { removeImages } from '../../setup/image-logic/remove-images.js';
+import { appendZoneImage, clearZoneImages } from '../../setup/image-logic/rebuild-zone-dom.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { sort } from './general.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
@@ -56,7 +56,7 @@ export const shuffleZone = (
   ) {
     playShuffleFlight(user, zoneId, zone.getCount());
   }
-  removeImages(zone.element);
+  clearZoneImages(zone, zoneId);
   indices = indices ? indices : shuffleIndices(zone.getCount());
 
   const zoneLength = zone.getCount();
@@ -80,7 +80,7 @@ export const shuffleZone = (
   }
   for (let i = 0; i < zone.getCount(); i++) {
     unhydrateHolo(zone.array[i]);
-    zone.element.appendChild(zone.array[i].image);
+    appendZoneImage(zone, zoneId, zone.array[i].image);
   }
   if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
     zone.array.forEach((card) => hydrateHolo(card));
