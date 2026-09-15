@@ -22,6 +22,7 @@ const ZONES = [
   'discard',
   'lostZone',
   'stadium',
+  'board',
 ];
 
 test('every layout profile defines all board zones', () => {
@@ -112,6 +113,10 @@ test('layoutToCssVars emits a value for every zone property', () => {
     '--stadium-left',
     '--stadium-width',
     '--stadium-height',
+    '--board-bottom',
+    '--board-left',
+    '--board-width',
+    '--board-height',
     '--mat-fit',
     '--mat-aspect',
     '--mat-height',
@@ -248,7 +253,7 @@ test('container stylesheet defaults match the sim profile', () => {
 
 test('no card zone is still positioned by a hardcoded percentage', () => {
   const zoneRule =
-    /^#(bench|active|prizes|deckCover|discardCover|lostZoneCover|hand)\s*\{([^}]*)\}/gm;
+    /^(?:#|\.)(bench|active|prizes|deckCover|discardCover|lostZoneCover|hand|board|self-board|opp-board)\s*\{([^}]*)\}/gm;
 
   // The hand is a strip pinned across the player's near edge on every mat, so
   // its origin and width are structural rather than mat-dependent; only its
@@ -258,7 +263,7 @@ test('no card zone is still positioned by a hardcoded percentage', () => {
   for (const [file, css] of Object.entries(CONTAINER_CSS)) {
     for (const [, zone, body] of css.matchAll(zoneRule)) {
       for (const [, property, value] of body.matchAll(
-        /(bottom|left|right|width|height|gap)\s*:\s*([^;]+);/g
+        /(?<![\w-])(bottom|left|right|width|height|gap)\s*:\s*([^;]+);/g
       )) {
         if (structural[zone]?.has(property)) continue;
         assert.ok(

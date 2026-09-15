@@ -71,6 +71,11 @@
   --lost-zone-width: 7%;
   --lost-zone-height: 15%;
 
+  --board-bottom: 61%;
+  --board-left: 66%;
+  --board-width: 24%;
+  --board-height: 30%;
+
   --mat-aspect: none;
   /* Zones live in #playfield, which stops at the hand strip. */
   --mat-height: calc(100vh - var(--hand-crop-height));
@@ -522,18 +527,15 @@ img.draw-flight-source,
   max-height: none;
   margin: 0;
 }
-.self-board {
-  bottom: 61%;
-  left: 66%;
-  width: 24%;
-  height: 30%;
-  border-radius: 20px;
-}
+/* Trainers in play. Both classes share one geometry: each iframe is its
+   player's own frame and the mat art rotates with it, so the zone must sit on
+   the same printed spot for either side (flip-board.js swaps these classes). */
+.self-board,
 .opp-board {
-  bottom: 61%;
-  right: 66%;
-  width: 22%;
-  height: 30%;
+  bottom: var(--board-bottom);
+  left: var(--board-left);
+  width: var(--board-width);
+  height: var(--board-height);
   border-radius: 20px;
 }
 .used-special-move {

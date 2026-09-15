@@ -4,15 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 138
-Focus: patch — authoritative multiplayer setup/reset lifecycle (S137 + S138).
-Active: S138 on branch fix/setup-waits-for-ready (worktree ../vibecode-wt-setup-ready), NOT committed.
-  Server deals only after BOTH players press Set Up (GameRoom.markReady via pushAction 'readyUp';
-  isReadyToDeal = setup phase + 2 seats + 2 decks + both ready). A player's Reset (pushAction
-  'reset', clean=false) runs resetGame, emits 'gameReset' (client clears Set Up flags + dispatches
-  game-restarted) and fresh views (D35). Suite 1451/1451. Live repro (scratchpad
-  setup-reset-repro.mjs): join→no deal, one Set Up→no deal, both→dealt, Reset→both 'setup', again→dealt.
-Next: user decides merge; then sync primary checkout. Investigate I47 (test:flip red on main).
+Session: 139
+Focus: patch — trainer "board" zone given a mat-aware position (merged to main).
+Active: none. S139 merged: `board` zone in every mat-layouts.mjs profile (--board-* vars), read by
+  .self-board/.opp-board in both container CSS files. Visual check left to user (localhost).
+  S138 (authoritative Set Up/Reset lifecycle) is on main as 01a670b.
+Next: user eyeballs board zone on a mat. Investigate I47 (test:flip red on main).
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -32,6 +29,6 @@ Blocked: none.
   checking the host's Access-Control-Allow-Origin header.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S138 2026-09-16 patch: server waits for both Set Ups; Reset resets the server game (branch, uncommitted).
+- S139 2026-09-16 patch: trainer board zone is now a mat-layout zone — on main.
+- S138 2026-09-16 patch: server waits for both Set Ups; Reset resets the server game — 01a670b on main.
 - S137 2026-09-16 patch: solo host no longer auto-dealt under SERVER_AUTHORITATIVE — f4e069e on main.
-- S136 2026-09-15 feature: TCG Live-style holofoil (fixed light, ink mask) — PR #130, merged 9729902.
