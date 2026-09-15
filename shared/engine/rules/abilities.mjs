@@ -339,19 +339,28 @@ export function parseAbility(text = '') {
   )) {
     const fromDiscard = lower.includes('from your discard pile');
     const upTo = lower.match(/(?:attach|put)\s+up to\s+(\d+)/)?.[1] || null;
+    // "α Growth"-style Ancient Trait phrasing: "When you attach an Energy
+    // card from your hand to this Pokémon ... you may attach N Energy
+    // cards" — a passive trigger off your normal attach, not a separate
+    // once-per-turn manual action.
+    const mayAttach = lower.match(/may attach\s+(\d+)/)?.[1] || null;
     const basic = lower.includes('basic');
     const energyType = parseEnergyTypeHint(lower);
+    const triggeredByAttach = /when(?:ever)?\s+you attach an?\s+energy/.test(lower);
     steps.push({
       type: 'attachAbility',
       fromDiscard,
-      upTo: upTo ? Number(upTo) : null,
+      upTo: upTo ? Number(upTo) : mayAttach ? Number(mayAttach) : null,
       basic,
       energyType,
+      triggeredByAttach,
       guidance: fromDiscard
         ? 'Once during your turn: attach Energy from your discard pile.'
-        : upTo
-          ? `Once during your turn: attach up to ${upTo} Energy cards.`
-          : 'Once during your turn: attach Energy as described.',
+        : triggeredByAttach
+          ? `Whenever you attach an Energy card from your hand to this Pokémon: you may attach ${mayAttach || 'more'} additional Energy card${mayAttach && mayAttach !== '1' ? 's' : ''} (triggers automatically on your normal attach — not a separate manual action).`
+          : upTo
+            ? `Once during your turn: attach up to ${upTo} Energy cards.`
+            : 'Once during your turn: attach Energy as described.',
     });
   }
 
@@ -771,9 +780,20 @@ export function parseAbility(text = '') {
       (lower.includes('effect') || lower.includes('ability') || lower.includes('attack'))) ||
     (lower.includes('active spot') && lower.includes('no abilities')))
   ) {
+    // "Ω Barrier"-style Ancient Trait phrasing: "Whenever your opponent
+    // plays a Trainer card ..., prevent all effects of that card done to
+    // this Pokémon" — scope the guidance to Trainer-card effects specifically
+    // instead of the generic catch-all.
+    const trainerTriggered = /(?:whenever|when)\s+your opponent plays a trainer card/.test(lower);
+    const toolStadiumExcluded =
+      trainerTriggered && lower.includes('excluding') &&
+      (lower.includes('pokémon tool') || lower.includes('pokemon tool') || lower.includes('stadium'));
     steps.push({
       type: 'effectPreventAbility',
-      guidance: 'Passive: prevent or negate effects/abilities as described.',
+      trainerTriggered,
+      guidance: trainerTriggered
+        ? `Whenever your opponent plays a Trainer card${toolStadiumExcluded ? ' (excluding Pokémon Tools/Stadium)' : ''}: prevent all effects of that card done to this Pokémon.`
+        : 'Passive: prevent or negate effects/abilities as described.',
     });
   }
 

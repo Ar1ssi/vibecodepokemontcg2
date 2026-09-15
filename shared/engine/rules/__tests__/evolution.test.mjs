@@ -2,7 +2,7 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn } = await import('../rules-state.mjs');
-    const { canEvolve, canPlayPokemonFromHand, isRareCandyJump, markEvolvedThisTurn, normalizeStage, cleanPokemonName, pokemonNamesMatch } = await import('../evolution.mjs');
+    const { canEvolve, canPlayPokemonFromHand, isRareCandyJump, markEvolvedThisTurn, normalizeStage, cleanPokemonName, pokemonNamesMatch, isModernMegaCard, isLegacyMegaOrPrimalCard, hasMatchingSpiritLink, requiresTurnEndOnEvolve } = await import('../evolution.mjs');
     const { matchesSearch } = await import('../search-match.mjs');
     const { parseAbility } = await import('../abilities.mjs');
     
@@ -392,5 +392,62 @@ import test from 'node:test';
       assert.equal(matchesSearch(stage1Ex, 'Stage 2 Pokémon'), false);
       assert.equal(matchesSearch(stage2Ex, 'Stage 2 Pokémon'), true);
       assert.equal(matchesSearch(stage2Ex, 'Stage 1 Pokémon'), false);
+    });
+
+    // ── Gen 6 Mega Evolution / Primal Reversion turn-end mechanic ──────────
+    test('isLegacyMegaOrPrimalCard: recognizes legacy "M "/"Primal " prefixes', () => {
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'M Groudon-EX' }), true);
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'Primal Groudon EX' }), true);
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'Primal Kyogre EX' }), true);
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'Groudon EX' }), false);
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'Marshtomp' }), false);
+    });
+
+    test('isLegacyMegaOrPrimalCard: excludes modern (2025+) "Mega X ex" cards', () => {
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'Mega Gardevoir ex' }), false);
+      assert.equal(isLegacyMegaOrPrimalCard({ name: 'Mega Lucario ex', rarity: 'Mega Hyper Rare' }), false);
+      assert.equal(isModernMegaCard({ name: 'Mega Gardevoir ex' }), true);
+      assert.equal(isModernMegaCard({ name: 'M Gardevoir-EX' }), false);
+    });
+
+    test('hasMatchingSpiritLink: matches by base species name, ignores unrelated tools', () => {
+      const base = {
+        name: 'Groudon EX',
+        attachedCards: [{ name: 'Groudon Spirit Link', type: 'Trainer' }],
+      };
+      assert.equal(hasMatchingSpiritLink(base, 'Primal Groudon EX'), true);
+      assert.equal(hasMatchingSpiritLink(base, 'Primal Kyogre EX'), false);
+      assert.equal(hasMatchingSpiritLink({ name: 'Groudon EX', attachedCards: [] }, 'Primal Groudon EX'), false);
+      assert.equal(
+        hasMatchingSpiritLink({ name: 'Kyogre EX', attachedCards: [{ name: 'Muscle Band' }] }, 'Primal Kyogre EX'),
+        false
+      );
+    });
+
+    test('requiresTurnEndOnEvolve: ends turn on legacy Primal Reversion without Spirit Link', () => {
+      const base = { name: 'Groudon EX', attachedCards: [] };
+      const evo = { name: 'Primal Groudon EX' };
+      assert.equal(requiresTurnEndOnEvolve(evo, base), true);
+    });
+
+    test('requiresTurnEndOnEvolve: no turn-end when matching Spirit Link is attached', () => {
+      const base = {
+        name: 'Groudon EX',
+        attachedCards: [{ name: 'Groudon Spirit Link' }],
+      };
+      const evo = { name: 'Primal Groudon EX' };
+      assert.equal(requiresTurnEndOnEvolve(evo, base), false);
+    });
+
+    test('requiresTurnEndOnEvolve: no turn-end for a normal (non-Mega/Primal) evolution', () => {
+      const base = { name: 'Charmander', attachedCards: [] };
+      const evo = { name: 'Charmeleon' };
+      assert.equal(requiresTurnEndOnEvolve(evo, base), false);
+    });
+
+    test('requiresTurnEndOnEvolve: no turn-end for modern (2025+) Mega ex evolution', () => {
+      const base = { name: 'Gardevoir ex', attachedCards: [] };
+      const evo = { name: 'Mega Gardevoir ex', rarity: 'Mega Hyper Rare' };
+      assert.equal(requiresTurnEndOnEvolve(evo, base), false);
     });
     

@@ -3795,6 +3795,29 @@ import test from 'node:test';
       assert.equal(steps[0].type, 'effectPreventAbility');
     });
 
+    test('parseAbility: "Ω Barrier" — Trainer-card effect prevention names the trigger', () => {
+      const steps = parseAbility(
+        "Whenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon."
+      );
+      const step = steps.find((s) => s.type === 'effectPreventAbility');
+      assert.ok(step, 'expected an effectPreventAbility step');
+      assert.equal(step.trainerTriggered, true);
+      assert.match(step.guidance, /Trainer card/);
+      assert.match(step.guidance, /Pokémon Tools\/Stadium/);
+    });
+
+    test('parseAbility: "α Growth" — attach-triggered ability names the trigger, not a manual step', () => {
+      const steps = parseAbility(
+        'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.'
+      );
+      const step = steps.find((s) => s.type === 'attachAbility');
+      assert.ok(step, 'expected an attachAbility step');
+      assert.equal(step.triggeredByAttach, true);
+      assert.equal(step.upTo, 2);
+      assert.match(step.guidance, /Whenever you attach/);
+      assert.match(step.guidance, /triggers automatically/);
+    });
+
     // ── compound ability step orchestration (planAbilitySteps) ──
 
     test('planAbilitySteps: draw + search interactive order', async () => {

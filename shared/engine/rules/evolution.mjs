@@ -334,7 +334,63 @@ export function markEvolvedThisTurn(player, targetCardOrName) {
   }
 }
 
-    // Playing a Pokémon from hand onto Active/Bench (not evolving onto one
+// Generation 6 (XY, 2015) Mega Evolution / Primal Reversion turn-end rule:
+// playing an "M <Name>-EX" or "Primal <Name>-EX" card from hand to evolve a
+// Pokémon-EX in play ends the turn immediately, UNLESS the matching
+// "<Name> Spirit Link" Trainer card is already attached to that Pokémon.
+// Legacy naming only ("M "/"Primal " prefix) — the modern (2025+) "Mega
+// <Name> ex" line uses a different, unrelated mechanic and must NOT trigger
+// this turn-end (isModernMegaCard excludes it below).
+const LEGACY_MEGA_OR_PRIMAL_NAME = /^(?:m|primal)\s+\S/i;
+
+export function isModernMegaCard(card = {}) {
+  const rarity = String(card?.rarity || '').toLowerCase();
+  if (rarity.includes('mega')) return true;
+  const subtypes = Array.isArray(card?.subtypes)
+    ? card.subtypes.map((s) => String(s).toLowerCase())
+    : [];
+  if (subtypes.some((s) => s.includes('mega'))) return true;
+  // Full word "mega" (modern cards spell it out) — the legacy abbreviation
+  // is "M " (single letter), which this word-boundary regex does not match.
+  return /\bmega\b/i.test(String(card?.name || ''));
+}
+
+export function isLegacyMegaOrPrimalCard(card = {}) {
+  const name = String(card?.name || '').trim();
+  if (!name) return false;
+  if (!LEGACY_MEGA_OR_PRIMAL_NAME.test(name)) return false;
+  if (isModernMegaCard(card)) return false;
+  return true;
+}
+
+// Spirit Link cards are named "<Species> Spirit Link" and attach to the
+// Basic/EX Pokémon they cover. Match on the evolving card's base species
+// name (its "M "/"Primal " prefix and EX suffix stripped) against every
+// attached card's name.
+export function hasMatchingSpiritLink(baseCardInPlay, evolvingCardName) {
+  const attached = Array.isArray(baseCardInPlay?.attachedCards)
+    ? baseCardInPlay.attachedCards
+    : [];
+  const baseSpecies = cleanPokemonName(
+    String(evolvingCardName || '').replace(/^(?:m|primal)\s+/i, '')
+  );
+  if (!baseSpecies) return false;
+  return attached.some((c) => {
+    const n = String(c?.name || '').toLowerCase().trim();
+    if (!n.endsWith('spirit link')) return false;
+    return cleanPokemonName(n.replace(/\s*spirit link\s*$/i, '')) === baseSpecies;
+  });
+}
+
+// True when evolving `evolvingCard` onto `baseCardInPlay` must end the
+// turn immediately per the Gen 6 Mega Evolution / Primal Reversion rule.
+export function requiresTurnEndOnEvolve(evolvingCard, baseCardInPlay) {
+  if (!isLegacyMegaOrPrimalCard(evolvingCard)) return false;
+  if (hasMatchingSpiritLink(baseCardInPlay, evolvingCard?.name)) return false;
+  return true;
+}
+
+// Playing a Pokémon from hand onto Active/Bench (not evolving onto one
     // already in play) is limited to Basic stage.
     export async function canPlayPokemonFromHand(pokemonCard) {
       if (!rulesState.enabled) return { allowed: true };

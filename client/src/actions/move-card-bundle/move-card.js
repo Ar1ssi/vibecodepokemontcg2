@@ -23,7 +23,7 @@ import { updateDestinationCover, updateOriginCover } from './update-cover.js';
 import { discardStadiumCardFromField, updateStadiumCard } from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction, openPlayedToBenchWindow, clearPlayedToBenchWindow } from '/shared/engine/rules/rules-state.mjs';
-import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn } from '/shared/engine/rules/evolution.mjs';
+import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn, requiresTurnEndOnEvolve } from '/shared/engine/rules/evolution.mjs';
 import { clearUntilLeavesActive, clearActiveSpotPendingEffects } from '/shared/engine/rules/attack-pending-effects.mjs';
 import { clearStatuses, getStatus, applyStatus } from '/shared/engine/rules/status.mjs';
 import {
@@ -492,6 +492,9 @@ export const moveCard = async (
 
   if (isTargetCardValid && isAttachAllowed) {
     if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
+      // Must read attachedCards (Spirit Link check) BEFORE evolveCard() moves
+      // them from targetCard onto movingCard.
+      const forcesTurnEnd = requiresTurnEndOnEvolve(movingCard, targetCard);
       evolveCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
       movingCard.enteredPlayTurn = rulesState.turnNumber;
       if (!syncReplay) {
@@ -513,6 +516,15 @@ export const moveCard = async (
             detail: { user, evolvedCard: movingCard, zoneId: dZoneId },
           })
         );
+        if (rulesState.enabled && forcesTurnEnd) {
+          appendMessage(
+            '',
+            `⚡ ${movingCard.name} evolved without a matching Spirit Link attached — turn ends immediately.`,
+            'announcement',
+            false
+          );
+          document.dispatchEvent(new CustomEvent('rules-mega-evolution-forces-turn-end', { detail: { user } }));
+        }
       }
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);

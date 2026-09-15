@@ -2115,6 +2115,18 @@ if (!isTrainer) {
         }
       });
 
+      // Gen 6 Mega Evolution / Primal Reversion rule: move-card.js already
+      // decided (requiresTurnEndOnEvolve) that this evolve must end the
+      // turn — route through the Pass button click so hookTurnButton's
+      // handlePassClick runs its full pipeline (status boundary, end-of-turn
+      // abilities, endTurn, banner, 2P sync) exactly as a normal pass does.
+      // Same pattern as keybinds.js's Alt+T "end turn" shortcut.
+      document.addEventListener('rules-mega-evolution-forces-turn-end', () => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        const passBtn = document.getElementById('passButton') || document.getElementById('p2PassButton');
+        passBtn?.click();
+      });
+
       // Backstop: catches anything that (for whatever reason) didn't fire
       // the event above — same logic, just on a slow poll so it's never
       // the thing the player is waiting on. Disabled in online 2P: mirror
