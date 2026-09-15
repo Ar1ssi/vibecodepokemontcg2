@@ -1,27 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 528" width="1024" height="528">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 528" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
   <defs>
+    <filter id="zone-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="0.8" flood-color="#000000" flood-opacity="0.95"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000000" flood-opacity="0.85"/>
+    </filter>
     <style>
       .zone-stroke {
         fill: none;
         stroke: #FFFFFF;
-        stroke-width: 1.8;
+        stroke-width: 2.2;
         stroke-linecap: round;
         stroke-linejoin: round;
+        filter: url(#zone-shadow);
       }
       .zone-text {
         fill: #FFFFFF;
         font-family: 'Futura', 'Trebuchet MS', 'Century Gothic', 'Montserrat', 'Arial Black', sans-serif;
-        font-weight: 700;
-        font-size: 11px;
+        font-weight: 800;
+        font-size: 11.5px;
         letter-spacing: 2.2px;
         text-anchor: middle;
         dominant-baseline: central;
+        filter: url(#zone-shadow);
       }
       .yellow-line {
         stroke: #F7D117;
-        stroke-width: 2.2;
+        stroke-width: 2.4;
         fill: none;
+        filter: url(#zone-shadow);
       }
     </style>
     <!-- Clip paths for back prize cards so they do not overlap inside front cards -->
