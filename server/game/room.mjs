@@ -49,6 +49,10 @@ export class GameRoom {
     // Monotonic sequence tracking per player for deduplication (Edge Case 4)
     this.clientSeqByPlayer = new Map(); // playerId -> lastSeenClientSeq
 
+    // Seats whose player pressed Set Up this game. Kept outside `state` so it never
+    // enters commandLog/undo replay; cleared by resetGame.
+    this.readyPlayerIds = new Set();
+
     // Sweep grace (Finding 5): touched on any join or command traffic so the
     // periodic empty-socket sweep can distinguish a brief double-disconnect
     // from an actually-abandoned room.
@@ -318,16 +322,31 @@ export class GameRoom {
    * @param {string} playerId
    */
   /**
-   * True once both seats exist and both have a loaded deck. A seat is created on join
-   * (addPlayer), not when the room is created, so a host alone in the room must not
-   * count as "every player loaded" — dealing then starts a one-player game that the
-   * opponent can never be dealt into, because 'setup' is only allowed once.
+   * Records that a seated player pressed Set Up. Unknown playerIds are ignored.
+   *
+   * @param {string} playerId
+   */
+  markReady(playerId) {
+    if (!this.state.players[playerId]) return;
+    this.readyPlayerIds.add(playerId);
+  }
+
+  /**
+   * True when the opening deal may run: still in setup, both seats exist, both have a
+   * loaded deck, and both players pressed Set Up. A seat is created on join (addPlayer),
+   * not when the room is created, so a host alone must not count as "every player".
    *
    * @returns {boolean}
    */
   isReadyToDeal() {
+    if (this.state.turn?.phase !== 'setup') return false;
     const players = Object.values(this.state.players || {});
-    return players.length === 2 && players.every((p) => p.zones?.deck?.length > 0);
+    return (
+      players.length === 2 &&
+      players.every(
+        (p) => p.zones?.deck?.length > 0 && this.readyPlayerIds.has(p.playerId)
+      )
+    );
   }
 
   /**
@@ -380,6 +399,7 @@ export class GameRoom {
 
     const minimumVersion = (this.state.stateVersion || 0) + 1;
     this.clientSeqByPlayer.clear();
+    this.readyPlayerIds.clear();
     this.rng = createRng(this.seed);
     this.state = createGameState({
       gameId: this.roomId,

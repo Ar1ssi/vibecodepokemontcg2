@@ -322,7 +322,27 @@ async function main() {
     const leaverPlayerId = gameRoom.getPlayerIdByUsername(leaverUsername);
     if (!leaverPlayerId) return;
     const remaining = gameRoom.resetGame({ removePlayerId: leaverPlayerId });
-    for (const { playerId, socketId } of remaining) {
+    broadcastFreshGame(gameRoom, roomId, remaining);
+  };
+
+  // A player's Reset button (legacy 'reset' pushAction with clean === false) ends
+  // the game for both seats: the server owns turn/phase, so a one-sided reset can't
+  // be represented. Deck-load resets send clean === true and must not land here.
+  const isPlayerRequestedReset = (data) =>
+    data.action === 'reset' &&
+    Array.isArray(data.parameters) &&
+    data.parameters[0] === false;
+
+  const resetGameOnPlayerRequest = (gameRoom, roomId) => {
+    const players = gameRoom.resetGame();
+    for (const { socketId } of players) {
+      if (socketId) io.to(socketId).emit('gameReset', { roomId });
+    }
+    broadcastFreshGame(gameRoom, roomId, players);
+  };
+
+  const broadcastFreshGame = (gameRoom, roomId, players) => {
+    for (const { playerId, socketId } of players) {
       if (!socketId) continue;
       io.to(socketId).emit('instanceMap', {
         roomId,
@@ -339,6 +359,40 @@ async function main() {
       });
     }
   };
+  // Design 002 slice 3.5 finding: nothing else calls the 'setup' command, so without
+  // this the server never deals hands/prizes. setupGame() deals every registered
+  // player at once, so this runs once, when GameRoom.isReadyToDeal() says both seats
+  // have a deck and pressed Set Up — never on deck load alone, which auto-started
+  // the game the moment both players joined.
+  const dealOpeningHandsIfReady = (gameRoom, roomId, socketId) => {
+    if (!gameRoom.isReadyToDeal()) return;
+    const setupResult = gameRoom.handleCommand(socketId, {
+      type: 'setup',
+      payload: {},
+    });
+    if (!setupResult.success) return;
+
+    // Design 002 I17: the server never trusts a client-supplied shuffle (D10), so
+    // hand each player their own syncInstance deal order — [prizes(6), hand(7),
+    // rest(deck)], matching the client's rules-mode setupPrizes()-then-
+    // drawOpeningHand() split. Design 002 I27: setupGame() also picked the starter
+    // from its own RNG; send it relative to each recipient so the client's coin
+    // flip uses it instead of guessing.
+    const starterId = gameRoom.state.turn?.player ?? null;
+    for (const pid of Object.keys(gameRoom.state.players)) {
+      const p = gameRoom.state.players[pid];
+      const order = [...p.zones.prizes, ...p.zones.hand, ...p.zones.deck].map(
+        (card) => card.syncInstance
+      );
+      const starter =
+        starterId == null ? null : starterId === pid ? 'self' : 'opp';
+      const pSocketId = gameRoom.playerToSocket.get(pid);
+      if (pSocketId) {
+        io.to(pSocketId).emit('dealOrder', { roomId, order, starter });
+      }
+    }
+  };
+
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
     // Function to handle disconnections (unintended)
@@ -735,6 +789,13 @@ async function main() {
           if (gameRoom && event === 'pushAction') {
             gameRoom.touchActivity();
             const playerId = gameRoom.socketToPlayer.get(socket.id);
+            if (playerId && data.action === 'readyUp') {
+              gameRoom.markReady(playerId);
+              dealOpeningHandsIfReady(gameRoom, roomId, socket.id);
+            }
+            if (playerId && isPlayerRequestedReset(data)) {
+              resetGameOnPlayerRequest(gameRoom, roomId);
+            }
             if (
               playerId &&
               (data.action === 'exchangeData' || data.action === 'loadDeckData')
@@ -760,55 +821,8 @@ async function main() {
                     io.to(targetSocketId).emit('instanceMap', { roomId, map });
                   }
 
-                  // Design 002 slice 3.5 finding: nothing else ever calls the 'setup'
-                  // command, so without this the server never deals hands/prizes and
-                  // stays permanently out of sync with any client. Deals both players
-                  // at once (setupGame() shuffles/deals for every registered player),
-                  // so it only needs to fire once both decks are loaded. A second call
-                  // for the other player's loadDeck is a harmless no-op — 'setup' is
-                  // only 'allowed' while turn.phase === 'setup', which this flips to
-                  // 'main'.
-                  //
-                  // Needs both seats AND both decks: a seat only exists once its
-                  // socket joins, so a host alone in the room would otherwise be
-                  // dealt a solo game (see GameRoom.isReadyToDeal).
-                  if (gameRoom.isReadyToDeal()) {
-                    const setupResult = gameRoom.handleCommand(socket.id, {
-                      type: 'setup',
-                      payload: {},
-                    });
-
-                    // Design 002 I17: the server never trusts a client-supplied
-                    // shuffle (D10), so the client can't roll its own opening deal
-                    // and expect it to match GameRoom's. Hand each player their own
-                    // syncInstance deal order — [prizes(6), hand(7), rest(deck)],
-                    // matching the client's rules-mode setupPrizes()-then-
-                    // drawOpeningHand() split — so its local shuffle reproduces
-                    // exactly what the server already dealt.
-                    if (setupResult.success) {
-                      // Design 002 I27: setupGame() (shared/engine/setup.mjs) also picked the
-                      // starter here, from its own activeRng, with no client input — the
-                      // client's separate peer-to-peer coin flip (rules-bridge.js) is an
-                      // unrelated RNG stream and agrees with this one only by chance. Include
-                      // the real starter, relative to each recipient, alongside the deal order
-                      // so the client can use it instead of guessing.
-                      const starterId = gameRoom.state.turn?.player ?? null;
-                      for (const pid of Object.keys(gameRoom.state.players)) {
-                        const p = gameRoom.state.players[pid];
-                        const order = [
-                          ...p.zones.prizes,
-                          ...p.zones.hand,
-                          ...p.zones.deck,
-                        ].map((card) => card.syncInstance);
-                        const starter =
-                          starterId == null ? null : starterId === pid ? 'self' : 'opp';
-                        const pSocketId = gameRoom.playerToSocket.get(pid);
-                        if (pSocketId) {
-                          io.to(pSocketId).emit('dealOrder', { roomId, order, starter });
-                        }
-                      }
-                    }
-                  }
+                  // A deck can finish loading after both players pressed Set Up.
+                  dealOpeningHandsIfReady(gameRoom, roomId, socket.id);
                 }
               }
             }
