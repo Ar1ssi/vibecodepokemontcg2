@@ -15,6 +15,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
+import { zoneOf } from './drop-zone.mjs';
 
 const popupContainers = [
   'lostZone',
@@ -23,10 +24,6 @@ const popupContainers = [
   'attachedCards',
   'viewCards',
 ];
-
-const ZONE_SELECTOR =
-  '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone';
-const zoneOf = (el) => el?.closest?.(ZONE_SELECTOR);
 
 export const dragStart = (event) => {
   if (systemState.isReplay && !systemState.isTwoPlayer) {
@@ -144,7 +141,7 @@ export const dragOver = (event) => {
       zoneOf(event.target)?.classList.add('highlightBox');
     } else if (!targetParentIsActiveOrBench && targetParentIsNotOwnContainer) {
       const zone = zoneOf(event.target);
-      if (zone?.parentElement?.id === 'board') {
+      if (zone?.id === 'board') {
         zone.classList.add('highlightBox');
       } else if (zone) {
         zone.classList.add('highlight');
