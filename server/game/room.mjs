@@ -318,6 +318,19 @@ export class GameRoom {
    * @param {string} playerId
    */
   /**
+   * True once both seats exist and both have a loaded deck. A seat is created on join
+   * (addPlayer), not when the room is created, so a host alone in the room must not
+   * count as "every player loaded" — dealing then starts a one-player game that the
+   * opponent can never be dealt into, because 'setup' is only allowed once.
+   *
+   * @returns {boolean}
+   */
+  isReadyToDeal() {
+    const players = Object.values(this.state.players || {});
+    return players.length === 2 && players.every((p) => p.zones?.deck?.length > 0);
+  }
+
+  /**
    * This player's syncInstance -> instanceId lookup for their deck (design 002
    * §3.1 / D10). Sent only to the owning socket: it would leak opponent ids.
    *

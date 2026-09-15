@@ -769,16 +769,10 @@ async function main() {
                   // only 'allowed' while turn.phase === 'setup', which this flips to
                   // 'main'.
                   //
-                  // Both playerIds exist in gameRoom.state.players as soon as each
-                  // socket joins (addPlayer), well before either has loaded a deck —
-                  // checking Object.keys(...).length === 2 alone fired this on the
-                  // FIRST loadDeck, dealing an empty hand for whoever hadn't loaded
-                  // yet (design 002 I17 fix regression, found while verifying it).
-                  // Require every registered player to actually have cards.
-                  const allDecksLoaded = Object.values(
-                    gameRoom.state.players
-                  ).every((p) => p.zones.deck.length > 0);
-                  if (allDecksLoaded) {
+                  // Needs both seats AND both decks: a seat only exists once its
+                  // socket joins, so a host alone in the room would otherwise be
+                  // dealt a solo game (see GameRoom.isReadyToDeal).
+                  if (gameRoom.isReadyToDeal()) {
                     const setupResult = gameRoom.handleCommand(socket.id, {
                       type: 'setup',
                       payload: {},

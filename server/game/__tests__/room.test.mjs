@@ -291,6 +291,24 @@ test('Finding 12: clientSeqByPlayer is cleared on removeSocket, not just on re-a
   );
 });
 
+test('isReadyToDeal: a host alone with a loaded deck is not ready; both seats + decks are', () => {
+  const room = new GameRoom({ roomId: 'ready-to-deal-1', rulesEnabled: false });
+  const deck = [
+    [2, 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1'],
+    [1, 'Lightning Energy', 'Energy', 'u', '002', 'e2e', 'x-2'],
+  ];
+  assert.equal(room.isReadyToDeal(), false, 'empty room');
+
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  assert.equal(room.handleCommand('sock-a', { type: 'loadDeck', payload: { deckData: deck } }).success, true);
+  assert.equal(room.isReadyToDeal(), false, 'host alone must not trigger the opening deal');
+
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  assert.equal(room.isReadyToDeal(), false, 'opponent seated but deck not loaded yet');
+
+  assert.equal(room.handleCommand('sock-b', { type: 'loadDeck', payload: { deckData: deck } }).success, true);
+  assert.equal(room.isReadyToDeal(), true);
+});
 
 test('resetGame: explicit leave frees the leaver seat and restarts the game for the player who stays', () => {
   const room = new GameRoom({ roomId: 'reset-game-1', rulesEnabled: false });
