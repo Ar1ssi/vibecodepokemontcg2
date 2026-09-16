@@ -4,10 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 145
+Session: 146
 Focus: Trainer effects + evolution stats server-side; I35/I49/I50 closed (branch feature/trainer-play-effects, not merged).
 Active: none.
-Next: merge feature/trainer-play-effects (15 live games PASS). Then I47, I52.
+Next: merge PR #136, then the I51/I52 PR (untested at user request: run pnpm test + a live bot game before merge). Then I47.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
