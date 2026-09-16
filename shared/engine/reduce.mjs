@@ -913,10 +913,13 @@ function promoteTrainerPlay(state, command) {
   const card = cardRef.card;
   const kind = `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
   if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
-  // Effect text arrives later via cardStats. Until it does, playTrainer would find no steps
-  // and discard the card, so keep the plain move rather than silently spend the card. A Tool
-  // or Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
-  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) return command;
+  // Effect text arrives via cardStats. Until it does, playTrainer would find no steps and
+  // discard the card, and a plain move would leave it on the board doing nothing, so reject
+  // the drop: the card stays in hand and can be played once the data lands. A Tool or
+  // Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
+  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) {
+    return { ...command, pendingDataReason: 'Card data is still loading. Try playing this card again.' };
+  }
   return { ...command, type: 'playTrainer', payload: { instanceId: payload.instanceId } };
 }
 
@@ -958,6 +961,15 @@ export function applyCommand(state, command, rng = null) {
   }
 
   command = promoteTrainerPlay(state, command);
+  if (command.pendingDataReason) {
+    return {
+      state,
+      events: [],
+      pendingChoice: state.pendingChoice,
+      error: 'card_data_pending',
+      reason: command.pendingDataReason,
+    };
+  }
   const { type, payload, playerId } = command;
   if (!playerId || typeof playerId !== 'string') {
     return {
