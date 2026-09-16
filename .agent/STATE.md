@@ -4,10 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 149
+Session: 150
 Focus: multiplayer render parity with single-player (apply-view.js): holo, stacks/evolutions, tokens, rotation, ability tab, counts, VSTAR/GX, Stadium flip, picker.
 Active: none. Branch fix/mp-render-holo-energy-picker (worktree ../wt-mp-render), committed, not pushed.
-Next: user live-checks a SERVER_AUTHORITATIVE 2P game (holo, evolve stack, Tool/Energy layout + double-click carousel,
+Next: maintenance due (S150). user live-checks a SERVER_AUTHORITATIVE 2P game (holo, evolve stack, Tool/Energy layout + double-click carousel,
   rotation, ability tab, counts, VSTAR/GX, Stadium flip, Nest Ball picker); then push + PR. Pre-existing fail on main: "trainer drop: stays a plain move
   when promotion does not apply". Then I47. Owed: test for changeCardBack/applySleeveToPlaymat stale-image patch.
 Blocked: none.
@@ -28,6 +28,6 @@ Blocked: none.
 - Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S150 2026-09-17 debug: MP discard cover blew up over prizes (#discardCover id rule hit the img); resetImage on covers.
 - S149 2026-09-17 feature: MP evolution stacks, Tool offsets, rotation, ability tab, zone counts, VSTAR/GX, Stadium flip, overlay resize (branch).
 - S148 2026-09-16 feature: MP holo / Energy tokens / card-picker choices in apply-view.js (branch, unpushed).
-- S147 2026-09-16 patch: bench card layout fixed with 5-column CSS grid matching 5 SVG slots.
