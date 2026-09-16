@@ -11,7 +11,10 @@
  */
 
 import { findCard } from '../state.mjs';
+import { isPokemon } from '../cards.mjs';
+import { normalizeStage } from '../rules/evolution.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
 
@@ -51,6 +54,29 @@ export function createPendingChoice({
     cancellable: Boolean(cancellable),
     resumeToken: token,
   };
+}
+
+function opponentBenchIsEvolved(player, root) {
+  const stage = normalizeStage(root.stage);
+  if (stage && stage !== 'Basic') return true;
+  return [...(player.zones.active || []), ...(player.zones.bench || [])].some(
+    (c) => c.attachedTo === root.instanceId && isPokemon(c)
+  );
+}
+
+function inPlayRoots(player) {
+  return [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => !c.attachedTo);
+}
+
+function attachToRoot(player, card, root, events) {
+  for (const zone of [player.zones.deck, player.zones.discard, player.zones.hand]) {
+    const i = (zone || []).indexOf(card);
+    if (i >= 0) zone.splice(i, 1);
+  }
+  card.attachedTo = root.instanceId;
+  const rootZone = (player.zones.active || []).includes(root) ? player.zones.active : player.zones.bench;
+  rootZone.push(card);
+  events.push({ type: 'cardAttached', instanceId: card.instanceId, targetInstanceId: root.instanceId, playerId: player.playerId });
 }
 
 /**
@@ -120,6 +146,49 @@ export function executeSteps(draft, {
     const stepSelection = currentSelection;
     currentSelection = null; // Consume selection for the resumed step
 
+    const extraHandler = EXTRA_STEP_HANDLERS[step.type];
+    if (extraHandler) {
+      const memoKey = `${idx}:${step.type}`;
+      const choice = extraHandler({
+        draft,
+        step,
+        player,
+        opponent,
+        playerId,
+        sourceCard,
+        activeRng,
+        events,
+        selection: stepSelection,
+        memo: context[memoKey],
+        ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
+          context[memoKey] = memo;
+          return createPendingChoice({
+            player: chooser,
+            prompt,
+            source: sourceCard?.name || '',
+            options,
+            min,
+            max,
+            cancellable: min === 0,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context,
+              budgetCount: budget.count,
+            },
+          });
+        },
+      });
+      if (choice) return { pendingChoice: choice, completed: false };
+      delete context[memoKey];
+      continue;
+    }
+
     switch (step.type) {
       case 'discardCost': {
         if (stepSelection) {
@@ -176,6 +245,49 @@ export function executeSteps(draft, {
         const what = step.what || step.searchTarget || 'card';
         const dest = step.destination || 'hand';
         const maxCount = step.count || 1;
+
+        const attachKey = `${idx}:searchAttach`;
+        if (stepSelection && context[attachKey]) {
+          // Resume: second choice picked the Pokémon the searched Energy attaches to
+          const deck = player.zones.deck || [];
+          const root = inPlayRoots(player).find((c) => c.instanceId === stepSelection[0]);
+          if (root) {
+            for (const card of deck.filter((c) => context[attachKey].includes(c.instanceId))) {
+              attachToRoot(player, card, root, events);
+            }
+          }
+          delete context[attachKey];
+          if (activeRng) activeRng.shuffle(deck);
+          events.push({ type: 'deckShuffled', playerId });
+          break;
+        }
+
+        if (stepSelection && dest === 'attach' && stepSelection.length > 0) {
+          const roots = inPlayRoots(player);
+          if (roots.length > 0) {
+            context[attachKey] = [...stepSelection];
+            const choice = createPendingChoice({
+              player: playerId,
+              prompt: `${sourceCard?.name || 'Search'}: Choose a Pokémon to attach the Energy to`,
+              source: sourceCard?.name || '',
+              options: roots,
+              min: 1,
+              max: 1,
+              stateVersion: draft.stateVersion,
+              stepIndex: idx,
+              resumeToken: {
+                effectType,
+                sourceInstanceId: sourceCard?.instanceId,
+                initiatorPlayerId: playerId,
+                stepIndex: idx,
+                steps,
+                context,
+                budgetCount: budget.count,
+              },
+            });
+            return { pendingChoice: choice, completed: false };
+          }
+        }
 
         if (stepSelection) {
           // Resume: move chosen cards to destination
@@ -368,7 +480,9 @@ export function executeSteps(draft, {
         deck.push(...hand.splice(0, hand.length));
         if (activeRng) activeRng.shuffle(deck);
         events.push({ type: 'deckShuffled', playerId });
-        const count = step.count || 1;
+        const bonusApplies =
+          step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && (player.zones.prizes || []).length === 6;
+        const count = bonusApplies ? step.bonusCount : step.count || 1;
         const actual = Math.min(count, deck.length);
         const drawn = deck.splice(0, actual);
         hand.push(...drawn);
@@ -384,6 +498,26 @@ export function executeSteps(draft, {
       case 'ionoShuffle': {
         const actors = [player];
         if (opponent) actors.push(opponent);
+
+        // Judge-style: each player shuffles their hand into their deck and draws a fixed count.
+        if (step.drawCount) {
+          for (const p of actors) {
+            const hand = p.zones.hand || [];
+            const returned = hand.splice(0, hand.length);
+            (p.zones.deck || []).push(...returned);
+            if (activeRng) activeRng.shuffle(p.zones.deck);
+            events.push({ type: 'cardsShuffledIntoDeck', count: returned.length, playerId: p.playerId });
+            const drawn = p.zones.deck.splice(0, Math.min(step.drawCount, p.zones.deck.length));
+            hand.push(...drawn);
+            events.push({
+              type: 'cardsDrawn',
+              count: drawn.length,
+              playerId: p.playerId,
+              cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+            });
+          }
+          break;
+        }
 
         const initialHandCounts = new Map();
         for (const p of actors) {
@@ -521,7 +655,9 @@ export function executeSteps(draft, {
       case 'switchOpponent':
       case 'switchOpponentOut': {
         if (!opponent) break;
-        const oppBench = (opponent.zones.bench || []).filter((c) => !c.attachedTo);
+        const oppBench = (opponent.zones.bench || []).filter(
+          (c) => !c.attachedTo && (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c))
+        );
         const oppActive = (opponent.zones.active || []).find((c) => !c.attachedTo);
         if (!oppActive || oppBench.length === 0) {
           events.push({ type: 'effectStepSkipped', reason: 'no_opponent_bench', step: step.type });
@@ -584,6 +720,15 @@ export function executeSteps(draft, {
             activeId: oppActive.instanceId,
             benchId: oppBenchCard.instanceId,
           });
+          if (step.thenCondition) {
+            oppBenchCard.specialCondition = step.thenCondition;
+            events.push({
+              type: 'statusApplied',
+              playerId: opponent.playerId,
+              instanceId: oppBenchCard.instanceId,
+              condition: step.thenCondition,
+            });
+          }
         }
         break;
       }
@@ -593,13 +738,23 @@ export function executeSteps(draft, {
       case 'shuffleFromDiscard': {
         const discard = player.zones.discard || [];
         const isShuffle = step.type === 'shuffleFromDiscard';
-        const what = step.what || 'card';
-        const count = step.count || 1;
+        const categories = step.choices?.length
+          ? step.choices
+          : [{ what: step.what || 'card', count: step.count || 1 }];
+        const what = categories.map((c) => c.what).join(' or ');
+        const count = categories.reduce((sum, c) => sum + (c.count || 1), 0);
 
         if (stepSelection) {
           const destZone = isShuffle ? player.zones.deck : player.zones.hand;
           const recovered = [];
+          const takenPerCategory = categories.map(() => 0);
           for (const sId of stepSelection) {
+            const picked = discard.find((c) => c.instanceId === sId);
+            const category = categories.findIndex(
+              (cat, i) => picked && matchesSearch(picked, cat.what) && takenPerCategory[i] < (cat.count || 1)
+            );
+            if (category < 0) continue;
+            takenPerCategory[category] += 1;
             const dIdx = discard.findIndex((c) => c.instanceId === sId);
             if (dIdx >= 0) {
               const [c] = discard.splice(dIdx, 1);
@@ -650,12 +805,38 @@ export function executeSteps(draft, {
       case 'heal':
       case 'healAmount':
       case 'healAbility': {
-        const healAmt = step.amount || 30;
+        // 'heal' with no amount is "heal all damage" (Wally's Compassion).
+        const healAmt = step.amount ?? (step.type === 'heal' ? Infinity : 30);
         // Edge Case 10: re-resolve damaged in-play Pokemon dynamically
         const inPlay = [
           ...(player.zones.active || []),
           ...(player.zones.bench || []),
-        ].filter((c) => !c.attachedTo && (c.damage || 0) > 0);
+        ].filter(
+          (c) =>
+            !c.attachedTo &&
+            ((c.damage || 0) > 0 || (step.cure && c.specialCondition)) &&
+            rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target)
+        );
+
+        const healOne = (card) => {
+          const oldDamage = card.damage || 0;
+          card.damage = Math.max(0, oldDamage - healAmt);
+          events.push({
+            type: 'damageUpdated',
+            instanceId: card.instanceId,
+            damage: card.damage,
+            healed: oldDamage - card.damage,
+          });
+          if (step.cure && card.specialCondition) {
+            card.specialCondition = null;
+            events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null });
+          }
+        };
+
+        if (/each of your/i.test(step.target || '')) {
+          inPlay.forEach(healOne);
+          break;
+        }
 
         if (inPlay.length === 0) {
           events.push({ type: 'effectStepSkipped', reason: 'no_damaged_pokemon' });
@@ -670,7 +851,7 @@ export function executeSteps(draft, {
         } else {
           const choice = createPendingChoice({
             player: playerId,
-            prompt: `${sourceCard?.name || 'Heal'}: Select a Pokémon to heal (${healAmt} HP)`,
+            prompt: `${sourceCard?.name || 'Heal'}: Select a Pokémon to heal${Number.isFinite(healAmt) ? ` (${healAmt} HP)` : ''}`,
             source: sourceCard?.name || '',
             options: inPlay,
             min: 1,
@@ -694,14 +875,7 @@ export function executeSteps(draft, {
         const targetRef = findCard(draft, targetId);
         // Edge Case 10: verify target still exists
         if (targetRef && targetRef.card) {
-          const oldDamage = targetRef.card.damage || 0;
-          targetRef.card.damage = Math.max(0, oldDamage - healAmt);
-          events.push({
-            type: 'damageUpdated',
-            instanceId: targetId,
-            damage: targetRef.card.damage,
-            healed: oldDamage - targetRef.card.damage,
-          });
+          healOne(targetRef.card);
         } else {
           events.push({ type: 'effectStepSkipped', reason: 'target_not_found', targetInstanceId: targetId });
         }
@@ -749,63 +923,80 @@ export function executeSteps(draft, {
 
       case 'attachFromDiscard': {
         const discard = player.zones.discard || [];
-        const inPlay = [...(player.zones.active || []), ...(player.zones.bench || [])].filter(
-          (c) => !c.attachedTo
+        const memoKey = `${idx}:attachFromDiscard`;
+        const targets = inPlayRoots(player).filter((c) => rootMatchesTarget(player, c, step.target));
+        const energyCandidates = discard.filter(
+          (c) => String(c.name || '').toLowerCase().includes('energy') && matchesSearch(c, step.energy || 'Basic Energy')
         );
+        const ask = (prompt, options, memo) => {
+          context[memoKey] = memo;
+          return createPendingChoice({
+            player: playerId,
+            prompt,
+            source: sourceCard?.name || '',
+            options,
+            min: 1,
+            max: 1,
+            cancellable: false,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context,
+              budgetCount: budget.count,
+            },
+          });
+        };
 
-        if (stepSelection) {
-          // Resumed: energy selection
-          const energyCard = discard.find((c) => c.instanceId === stepSelection[0]);
-          const targetCard = inPlay[0]; // Active or bench target
-          // Edge Case 10: verify target still exists in play
+        if (stepSelection && context[memoKey]?.energyId != null) {
+          // Edge Case 10: both the Energy and the target are re-resolved from live state
+          const energyCard = energyCandidates.find((c) => c.instanceId === context[memoKey].energyId);
+          const targetCard = targets.find((c) => c.instanceId === stepSelection[0]);
+          delete context[memoKey];
           if (energyCard && targetCard) {
-            const dIdx = discard.indexOf(energyCard);
-            if (dIdx >= 0) {
-              discard.splice(dIdx, 1);
-              energyCard.attachedTo = targetCard.instanceId;
-              const targetZone = targetCard === player.zones.active[0] ? player.zones.active : player.zones.bench;
-              targetZone.push(energyCard);
-              events.push({
-                type: 'cardAttached',
-                instanceId: energyCard.instanceId,
-                targetInstanceId: targetCard.instanceId,
-                playerId,
-              });
-            }
+            attachToRoot(player, energyCard, targetCard, events);
           } else {
             events.push({ type: 'effectStepSkipped', reason: 'target_not_found' });
           }
           break;
         }
 
-        const energyCandidates = discard.filter((c) =>
-          String(c.name || '').toLowerCase().includes('energy')
-        );
-        if (energyCandidates.length === 0 || inPlay.length === 0) {
+        const chosenEnergy = stepSelection
+          ? energyCandidates.find((c) => c.instanceId === stepSelection[0])
+          : null;
+        if (stepSelection && (!chosenEnergy || targets.length === 0)) {
+          delete context[memoKey];
+          events.push({ type: 'effectStepSkipped', reason: 'target_not_found' });
+          break;
+        }
+        if (chosenEnergy) {
+          if (targets.length === 1) {
+            attachToRoot(player, chosenEnergy, targets[0], events);
+            delete context[memoKey];
+            break;
+          }
+          const choice = ask(
+            `${sourceCard?.name || 'Attach'}: Choose ${step.target || 'a Pokémon'} to attach ${chosenEnergy.name} to`,
+            targets,
+            { energyId: chosenEnergy.instanceId }
+          );
+          return { pendingChoice: choice, completed: false };
+        }
+
+        if (energyCandidates.length === 0 || targets.length === 0) {
           events.push({ type: 'effectStepSkipped', reason: 'no_energy_or_target' });
           break;
         }
 
-        const choice = createPendingChoice({
-          player: playerId,
-          prompt: `${sourceCard?.name || 'Attach'}: Select an Energy card from discard to attach`,
-          source: sourceCard?.name || '',
-          options: energyCandidates,
-          min: 1,
-          max: 1,
-          cancellable: true,
-          stateVersion: draft.stateVersion,
-          stepIndex: idx,
-          resumeToken: {
-            effectType,
-            sourceInstanceId: sourceCard?.instanceId,
-            initiatorPlayerId: playerId,
-            stepIndex: idx,
-            steps,
-            context,
-            budgetCount: budget.count,
-          },
-        });
+        const choice = ask(
+          `${sourceCard?.name || 'Attach'}: Select an Energy card from discard to attach`,
+          energyCandidates,
+          {}
+        );
         return { pendingChoice: choice, completed: false };
       }
 

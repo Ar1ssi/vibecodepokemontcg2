@@ -47,6 +47,7 @@ export function executeStadium(draft, {
       activeRng,
       events,
       selection,
+      context: resumeToken?.context || {},
       budget,
     });
 

@@ -462,8 +462,6 @@ test('trainer drop: stays a plain move when promotion does not apply', () => {
   const cases = [
     ['effect text not yet synced', { name: 'Potion', type: 'Trainer' }, true],
     ['rules mode off', { name: 'Potion', type: 'Trainer', text: 'Heal 30 damage from 1 of your Pokémon.' }, false],
-    ['Pokémon Tool', { name: 'Vitality Band', type: 'Trainer', trainerType: 'Tool', text: 'Attacks do 10 more damage.' }, true],
-    ['Stadium', { name: 'Artazon', type: 'Trainer', trainerType: 'Stadium', text: 'Once during each player\'s turn, search.' }, true],
     ['Pokémon', { name: 'Pichu', supertype: 'Pokémon', text: 'Draw 3 cards.' }, true],
   ];
   for (const [label, props, rulesEnabled] of cases) {

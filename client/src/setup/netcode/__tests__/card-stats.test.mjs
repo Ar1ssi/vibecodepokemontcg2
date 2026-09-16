@@ -75,3 +75,18 @@ test('trainer cards carry effect text, trainerType and subtypes for server-side 
     { syncInstance: 1, hp: 60 },
   ]);
 });
+
+test('Pokémon carry evolvesFrom and their Ability text for server-side Salvatore and useAbility', () => {
+  const { stats } = buildCardStatsPayload([
+    { syncInstance: 3, hp: 90, evolvesFrom: 'Ralts', ability: { name: 'Refinement', text: 'Discard a card, draw 2.' } },
+  ]);
+
+  assert.deepEqual(stats, [
+    {
+      syncInstance: 3,
+      hp: 90,
+      evolvesFrom: 'Ralts',
+      abilities: [{ name: 'Refinement', text: 'Discard a card, draw 2.' }],
+    },
+  ]);
+});

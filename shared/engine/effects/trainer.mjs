@@ -6,19 +6,7 @@
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { executeSteps } from './executor.mjs';
 import { findCard } from '../state.mjs';
-
-function isToolCard(card) {
-  const name = String(card?.name || '').toLowerCase();
-  const type = String(card?.type || '').toLowerCase();
-  const sub = `${card?.subtypes || ''} ${card?.trainerType || ''}`.toLowerCase();
-  return sub.includes('tool') || type.includes('tool') || name.includes('tool');
-}
-
-function isStadium(card) {
-  const type = String(card?.type || '').toLowerCase();
-  const sub = `${card?.subtypes || ''} ${card?.trainerType || ''}`.toLowerCase();
-  return sub.includes('stadium') || type.includes('stadium');
-}
+import { isToolCard, isStadiumCard as isStadium } from './trainer-steps.mjs';
 
 /**
  * Discards the currently active stadium card, moving it to its owner's discard zone.
@@ -128,6 +116,7 @@ export function executeTrainer(draft, {
       activeRng,
       events,
       selection,
+      context: resumeToken?.context || {},
       budget,
     });
 
@@ -225,9 +214,15 @@ export function executeTrainer(draft, {
     }
   }
 
-  // Parse trainer effect steps
+  // A Stadium's text is a standing effect, used through the stadium-effect command, not on play.
+  if (isStadium(card)) {
+    draft.pendingChoice = null;
+    return { pendingChoice: null, completed: true };
+  }
+
+  // A Tool's text is a passive modifier; playing it without a target means attaching it.
   const text = card.text || card.effect || card.cardText || '';
-  const parsed = parseTrainerEffect(text);
+  const parsed = isToolCard(card) ? { steps: [{ type: 'attachTool' }] } : parseTrainerEffect(text);
 
   if (!parsed || !parsed.steps || parsed.steps.length === 0) {
     // No steps or passive only: clean up to discard

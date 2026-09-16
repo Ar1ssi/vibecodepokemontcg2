@@ -847,6 +847,12 @@ export function validateLegality(state, command) {
             reason: 'Supporter already played this turn.',
           };
         }
+        if (isSupporter && state.turn?.number === 1) {
+          return {
+            allowed: false,
+            reason: "The player going first can't play a Supporter on turn 1.",
+          };
+        }
 
         const isStadiumCard =
           subStr.includes('stadium') || typeStr.includes('stadium');
@@ -887,6 +893,9 @@ export function validateLegality(state, command) {
             };
           }
         }
+
+        const conditionFailure = unmetPlayCondition(state, player, playerId, parsed?.playCondition);
+        if (conditionFailure) return { allowed: false, reason: conditionFailure };
 
         // Edge Case 9: Cannot play search-to-bench trainers when bench is full
         if (parsed?.steps && parsed.steps.length > 0) {
@@ -962,12 +971,35 @@ export function validateLegality(state, command) {
  * plain moveCard (it has no reliable card type at the drop site). Rewriting that move to
  * playTrainer here, from the server's own card data, is what makes the effect run; deciding
  * it server-side also means a client cannot place a Trainer while skipping its effect.
- * Tools (attach to a Pokémon) and Stadiums (own zone) keep their existing moveCard paths.
+ * A Tool dropped on the board asks which Pokémon to attach to; a Stadium goes to the Stadium zone.
  *
  * @param {object} state GameState
  * @param {object} command Shape-valid command envelope
  * @returns {object} The playTrainer command, or the original command unchanged
  */
+/**
+ * Checks a Trainer's "You can use this card only if ..." condition from parseTrainerEffect.
+ *
+ * @returns {string|null} The rejection reason, or null when the card may be played.
+ */
+function unmetPlayCondition(state, player, playerId, playCondition) {
+  if (!playCondition) return null;
+  const opponent = Object.values(state.players || {}).find((p) => p.playerId !== playerId);
+  const myPrizes = (player.zones?.prizes || []).length;
+  const opponentPrizes = (opponent?.zones?.prizes || []).length;
+  const maxOpponentPrizes = playCondition.match(/^opponentPrizes<=(\d+)$/);
+  if (maxOpponentPrizes && opponentPrizes > Number(maxOpponentPrizes[1])) {
+    return `Your opponent must have ${maxOpponentPrizes[1]} or fewer Prize cards remaining.`;
+  }
+  if (playCondition === 'morePrizesThanOpponent' && myPrizes <= opponentPrizes) {
+    return 'You must have more Prize cards remaining than your opponent.';
+  }
+  if (playCondition === 'notFirstTurn' && (state.turn?.number ?? 0) <= 2) {
+    return "You can't use this card during your first turn.";
+  }
+  return null;
+}
+
 function trainerEffectText(card) {
   return String(card.text || card.effect || card.cardText || '').trim();
 }
@@ -985,10 +1017,10 @@ function promoteTrainerPlay(state, command) {
   const card = cardRef.card;
   const kind = `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
   if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
-  if (/tool|stadium/.test(kind)) return command;
   // Effect text arrives later via cardStats. Until it does, playTrainer would find no steps
-  // and discard the card, so keep the plain move rather than silently spend the card.
-  if (!trainerEffectText(card)) return command;
+  // and discard the card, so keep the plain move rather than silently spend the card. A Tool
+  // or Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
+  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) return command;
   return { ...command, type: 'playTrainer', payload: { instanceId: payload.instanceId } };
 }
 
@@ -2255,6 +2287,12 @@ export function applyCommand(state, command, rng = null) {
         if (Array.isArray(entry.retreatCost))
           card.retreatCost = [...entry.retreatCost];
         if (entry.stage != null) card.stage = entry.stage;
+        if (typeof entry.evolvesFrom === 'string') card.evolvesFrom = entry.evolvesFrom;
+        if (Array.isArray(entry.abilities)) {
+          card.abilities = entry.abilities
+            .filter((a) => a && typeof a.text === 'string')
+            .map((a) => ({ name: String(a.name || ''), text: a.text }));
+        }
         if (typeof entry.text === 'string') card.text = entry.text;
         if (typeof entry.trainerType === 'string')
           card.trainerType = entry.trainerType;

@@ -49,6 +49,7 @@ export function executeAbility(draft, {
       activeRng,
       events,
       selection,
+      context: resumeToken?.context || {},
       budget,
     });
 
