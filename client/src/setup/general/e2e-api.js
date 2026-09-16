@@ -238,6 +238,11 @@ export function installE2eApi() {
         activeZoneCards: liveZoneArray(user, 'active'),
         attachedCardsOf: (card) =>
           attachedCardsFor(user, card === active ? 'active' : 'bench', card),
+        prizeCounts: {
+          self: liveZoneArray(user, 'prizes').length,
+          opponent: liveZoneArray(user === 'self' ? 'opp' : 'self', 'prizes').length,
+        },
+        stadiumName: liveZoneArray('self', 'stadium')[0]?.name || null,
       });
     },
     // Design 004 slice 3: drives a single option (as returned by options()) through the

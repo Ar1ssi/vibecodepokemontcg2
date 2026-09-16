@@ -26,8 +26,8 @@ import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { executeStadium } from './effects/stadium.mjs';
-import { parseTrainerEffect } from './rules/trainer-effects.mjs';
 import { parseStadiumOncePerTurn } from './rules/stadium-effects.mjs';
+import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 
 /**
  * Handles Knockout resolution for a Pokemon:
@@ -310,7 +310,7 @@ function getEnergyDescriptor(card) {
                 : /metal/.test(name)
                   ? 'Metal'
                   : /dark/.test(name)
-                    ? 'Dark'
+                    ? 'Darkness'
                     : /dragon/.test(name)
                       ? 'Dragon'
                       : 'Colorless');
@@ -847,72 +847,18 @@ export function validateLegality(state, command) {
             reason: 'Supporter already played this turn.',
           };
         }
-        if (isSupporter && state.turn?.number === 1) {
-          return {
-            allowed: false,
-            reason: "The player going first can't play a Supporter on turn 1.",
-          };
-        }
 
-        const isStadiumCard =
-          subStr.includes('stadium') || typeStr.includes('stadium');
-        if (isStadiumCard && state.stadium) {
-          const currentStadiumName = String(state.stadium.name || '')
-            .trim()
-            .toLowerCase();
-          const newStadiumName = String(cardRef.card.name || '')
-            .trim()
-            .toLowerCase();
-          if (
-            currentStadiumName &&
-            newStadiumName &&
-            currentStadiumName === newStadiumName
-          ) {
-            return {
-              allowed: false,
-              reason: 'A Stadium card with the same name is already in play.',
-            };
-          }
-        }
-
-        const text =
-          cardRef.card.text ||
-          cardRef.card.effect ||
-          cardRef.card.cardText ||
-          '';
-        const parsed = parseTrainerEffect(text);
-        if (parsed?.steps?.[0]?.type === 'discardCost') {
-          const cost = parsed.steps[0].count || 1;
-          const otherHandCards = (player.zones?.hand || []).filter(
-            (c) => c.instanceId !== payload.instanceId
-          );
-          if (otherHandCards.length < cost) {
-            return {
-              allowed: false,
-              reason: 'Not enough cards in hand to pay discard cost.',
-            };
-          }
-        }
-
-        const conditionFailure = unmetPlayCondition(state, player, playerId, parsed?.playCondition);
-        if (conditionFailure) return { allowed: false, reason: conditionFailure };
-
-        // Edge Case 9: Cannot play search-to-bench trainers when bench is full
-        if (parsed?.steps && parsed.steps.length > 0) {
-          const nonCostSteps = parsed.steps.filter(
-            (s) => s.type !== 'discardCost'
-          );
-          if (
-            nonCostSteps.length > 0 &&
-            nonCostSteps.every((s) => s.destination === 'bench')
-          ) {
-            const bench = player.zones?.bench || [];
-            const benchPokemonCount = bench.filter((c) => !c.attachedTo).length;
-            if (benchPokemonCount >= 5) {
-              return { allowed: false, reason: 'bench_full' };
-            }
-          }
-        }
+        const opponent = Object.values(state.players || {}).find((p) => p.playerId !== playerId);
+        const blockReason = trainerPlayBlockReason({
+          card: cardRef.card,
+          turnNumber: state.turn?.number ?? 0,
+          myPrizes: (player.zones?.prizes || []).length,
+          opponentPrizes: (opponent?.zones?.prizes || []).length,
+          stadiumName: state.stadium?.name || null,
+          handCount: (player.zones?.hand || []).length,
+          benchCount: (player.zones?.bench || []).filter((c) => !c.attachedTo).length,
+        });
+        if (blockReason) return { allowed: false, reason: blockReason };
       }
       return { allowed: true };
     }
@@ -977,29 +923,6 @@ export function validateLegality(state, command) {
  * @param {object} command Shape-valid command envelope
  * @returns {object} The playTrainer command, or the original command unchanged
  */
-/**
- * Checks a Trainer's "You can use this card only if ..." condition from parseTrainerEffect.
- *
- * @returns {string|null} The rejection reason, or null when the card may be played.
- */
-function unmetPlayCondition(state, player, playerId, playCondition) {
-  if (!playCondition) return null;
-  const opponent = Object.values(state.players || {}).find((p) => p.playerId !== playerId);
-  const myPrizes = (player.zones?.prizes || []).length;
-  const opponentPrizes = (opponent?.zones?.prizes || []).length;
-  const maxOpponentPrizes = playCondition.match(/^opponentPrizes<=(\d+)$/);
-  if (maxOpponentPrizes && opponentPrizes > Number(maxOpponentPrizes[1])) {
-    return `Your opponent must have ${maxOpponentPrizes[1]} or fewer Prize cards remaining.`;
-  }
-  if (playCondition === 'morePrizesThanOpponent' && myPrizes <= opponentPrizes) {
-    return 'You must have more Prize cards remaining than your opponent.';
-  }
-  if (playCondition === 'notFirstTurn' && (state.turn?.number ?? 0) <= 2) {
-    return "You can't use this card during your first turn.";
-  }
-  return null;
-}
-
 function trainerEffectText(card) {
   return String(card.text || card.effect || card.cardText || '').trim();
 }

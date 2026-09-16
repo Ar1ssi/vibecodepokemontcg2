@@ -31,6 +31,10 @@ import {
   filterUsableAbilities,
 } from '../../../../shared/engine/rules/collect-usable-abilities.mjs';
 import { BENCH_LIMIT } from '../../../../shared/engine/rules/ko-flow.mjs';
+import {
+  isSupporterTrainer,
+  trainerPlayBlockReason,
+} from '../../../../shared/engine/rules/trainer-play-conditions.mjs';
 
 // Same key the client uses for statusState lookups (chat-buttons.js attack path):
 // the DOM card id when the card is rendered, its name otherwise. Read as a plain
@@ -48,7 +52,7 @@ function subtypeSet(card) {
 }
 
 function isSupporterCard(card) {
-  return subtypeSet(card).has('supporter');
+  return subtypeSet(card).has('supporter') || isSupporterTrainer(card);
 }
 
 function isItemCard(card) {
@@ -108,6 +112,8 @@ export async function enumerateOptions({
   isAbilityUsed = (card) => abilityUsed(user, card),
   statusKey = defaultStatusKey,
   attachedCardsOf = defaultAttachedCards,
+  prizeCounts = null,
+  stadiumName = null,
 } = {}) {
   const options = [];
   // Server card identity, when the authoritative view is what we are reading. Under that
@@ -223,6 +229,20 @@ export async function enumerateOptions({
         ? 'playItem'
         : 'moveCard';
     if (!canPerformAction({ user, action, initiator: user }).allowed) return;
+    // The server also enforces card-printed conditions; offering a blocked card earns a
+    // cmdRejected. Skipped only when the caller has no prize counts to judge them by.
+    const blocked =
+      prizeCounts &&
+      trainerPlayBlockReason({
+        card,
+        turnNumber: rulesState.turnNumber,
+        myPrizes: prizeCounts.self,
+        opponentPrizes: prizeCounts.opponent,
+        stadiumName,
+        handCount: handCards.length,
+        benchCount: benchCards.length,
+      });
+    if (blocked) return;
     options.push({ kind: 'playTrainer', handIndex, instanceId: idOf(card) });
   });
 

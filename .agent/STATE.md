@@ -5,9 +5,9 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 144
-Focus: Trainer cards run their effects under SERVER_AUTHORITATIVE (branch feature/trainer-play-effects, not merged).
+Focus: every parsed Trainer effect runs server-side; I35/I49 closed (branch feature/trainer-play-effects, not merged).
 Active: none.
-Next: merge feature/trainer-play-effects (live bot run PASS). Then Tool/Stadium drops + silent step kinds (I49, I35), I47.
+Next: merge feature/trainer-play-effects (5 starter decks PASS live). Then I50 (evolution model), I47.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -25,6 +25,6 @@ Blocked: none.
 - Trainer drops: server promotes hand->board moveCard to playTrainer (D37); needs effect text from cardStats first.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S144 2026-09-16 feature: Trainer drop -> playTrainer promotion + effect text via cardStats (branch, unmerged).
+- S144 2026-09-16 feature: Trainer drops run effects server-side; all 31 missing step kinds + play conditions (branch, unmerged).
 - S143 2026-09-16 feature: 8 custom Pokémon playmats added with 2x upscale and 1.9394:1 mat crop.
 - S142 2026-09-16 debug: I48 closed — no double-rendered cards in multiplayer (on main).
