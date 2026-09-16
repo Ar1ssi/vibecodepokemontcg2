@@ -4,10 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 144
-Focus: every parsed Trainer effect runs server-side; I35/I49 closed (branch feature/trainer-play-effects, not merged).
+Session: 145
+Focus: Trainer effects + evolution stats server-side; I35/I49/I50 closed (branch feature/trainer-play-effects, not merged).
 Active: none.
-Next: merge feature/trainer-play-effects (5 starter decks PASS live). Then I50 (evolution model), I47.
+Next: merge feature/trainer-play-effects (15 live games PASS). Then I47, I52.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -22,9 +22,9 @@ Blocked: none.
   `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <files>`.
 - card-picker.js's carousel indexes slides RIGHT-TO-LEFT (`virtualIndex - slideIndex`, positive =
   left) — counterintuitive; any new caller must order candidates accordingly (S132).
-- Trainer drops: server promotes hand->board moveCard to playTrainer (D37); needs effect text from cardStats first.
+- Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S145 2026-09-16 patch: I50 — evolved Pokémon use their Evolution stats; Rare Candy checks its line (branch, unmerged).
 - S144 2026-09-16 feature: Trainer drops run effects server-side; all 31 missing step kinds + play conditions (branch, unmerged).
 - S143 2026-09-16 feature: 8 custom Pokémon playmats added with 2x upscale and 1.9394:1 mat crop.
-- S142 2026-09-16 debug: I48 closed — no double-rendered cards in multiplayer (on main).

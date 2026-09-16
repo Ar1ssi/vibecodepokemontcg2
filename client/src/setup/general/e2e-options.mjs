@@ -22,17 +22,16 @@ import { canEvolve, normalizeStage } from '../../../../shared/engine/rules/evolu
 import { canPayAttackCost } from '../../../../shared/engine/rules/attack-engine.mjs';
 import { canRetreat } from '../../../../shared/engine/rules/retreat.mjs';
 import { canAct, statusAllowsRetreat } from '../../../../shared/engine/rules/status.mjs';
-import {
-  classifyEnergyEffect,
-  resolveAttachedEnergyType,
-} from '../../../../shared/engine/rules/energy-effects.mjs';
+import { serverEnergyDescriptor } from '../../../../shared/engine/rules/server-energy.mjs';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
 } from '../../../../shared/engine/rules/collect-usable-abilities.mjs';
 import { BENCH_LIMIT } from '../../../../shared/engine/rules/ko-flow.mjs';
+import { stage2EvolvesFromBasic } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import {
   isSupporterTrainer,
+  isToolTrainer,
   trainerPlayBlockReason,
 } from '../../../../shared/engine/rules/trainer-play-conditions.mjs';
 
@@ -61,13 +60,9 @@ function isItemCard(card) {
 
 // Attack/retreat cost checks take { type, family } descriptors (see
 // expandEnergyEntries in attack-engine.mjs), so a Double Colorless counts twice.
+// Read the way the authoritative server reads them, so an offered attack is never rejected.
 function energyDescriptors(attachedCards) {
-  return (Array.isArray(attachedCards) ? attachedCards : [])
-    .filter(isEnergy)
-    .map((card) => ({
-      type: resolveAttachedEnergyType(card),
-      family: classifyEnergyEffect(card),
-    }));
+  return (Array.isArray(attachedCards) ? attachedCards : []).filter(isEnergy).map(serverEnergyDescriptor);
 }
 
 // Where a Pokémon's attached energy lives depends on the render path: the
@@ -76,6 +71,26 @@ function energyDescriptors(attachedCards) {
 // (energiesAttachedToPokemon). The caller knows which; this is only the default.
 function defaultAttachedCards(card) {
   return Array.isArray(card?.attachedCards) ? card.attachedCards : [];
+}
+
+// Mirrors trainerTargetCounts (evolved-pokemon.mjs) for the client's card shapes: an
+// evolution shows up either as the card itself (legacy) or under attachedCards (authoritative).
+function trainerTargetCountsOf(handCards, targets, attachedCardsOf, deckList) {
+  const attachedOf = (card) => attachedCardsOf(card) || [];
+  const isTool = (card) => isTrainer(card) && isToolTrainer(card);
+  const basics = targets
+    .map(({ card }) => card)
+    .filter((card) => isBasicPokemon(card) && !attachedOf(card).some(isPokemon));
+  const knownCards = [...deckList, ...handCards, ...targets.flatMap(({ card }) => [card, ...attachedOf(card)])];
+  return {
+    rareCandyOptionCount: handCards.filter(
+      (c) =>
+        isPokemon(c) &&
+        normalizeStage(c?.stage) === 'Stage 2' &&
+        basics.some((basic) => stage2EvolvesFromBasic(c, basic, knownCards))
+    ).length,
+    toolTargetCount: targets.filter(({ card }) => !attachedOf(card).some(isTool)).length,
+  };
 }
 
 function inPlayTargets(active, bench) {
@@ -101,6 +116,7 @@ function inPlayTargets(active, bench) {
  * @param {(card) => boolean} [board.isAbilityUsed]
  * @param {(card) => string} [board.statusKey]
  * @param {(card) => Array} [board.attachedCardsOf]
+ * @param {Array} [board.deckList] every card of the player's own 60 (traces Rare Candy lines)
  * @returns {Promise<Array<object>>}
  */
 export async function enumerateOptions({
@@ -114,6 +130,7 @@ export async function enumerateOptions({
   attachedCardsOf = defaultAttachedCards,
   prizeCounts = null,
   stadiumName = null,
+  deckList = [],
 } = {}) {
   const options = [];
   // Server card identity, when the authoritative view is what we are reading. Under that
@@ -241,6 +258,7 @@ export async function enumerateOptions({
         stadiumName,
         handCount: handCards.length,
         benchCount: benchCards.length,
+        ...trainerTargetCountsOf(handCards, inPlayTargets(active, benchCards), attachedCardsOf, deckList),
       });
     if (blocked) return;
     options.push({ kind: 'playTrainer', handIndex, instanceId: idOf(card) });

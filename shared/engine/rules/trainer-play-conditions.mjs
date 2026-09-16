@@ -9,6 +9,10 @@ function kindText(card) {
   return `${card?.type || ''} ${card?.trainerType || ''} ${subtypes}`.toLowerCase();
 }
 
+export function isToolTrainer(card) {
+  return kindText(card).includes('tool');
+}
+
 export function isSupporterTrainer(card) {
   return kindText(card).includes('supporter');
 }
@@ -22,6 +26,9 @@ export function isSupporterTrainer(card) {
  * @param {string|null} [params.stadiumName] Name of the Stadium in play, if any
  * @param {number} [params.handCount] Cards in hand, including the Trainer being played
  * @param {number} [params.benchCount] Benched Pokémon
+ * @param {number|null} [params.rareCandyOptionCount] Stage 2 cards in hand with a Basic in play they
+ *   can evolve (evolved-pokemon.mjs rareCandyOptions); null when unknown
+ * @param {number|null} [params.toolTargetCount] Pokémon in play with no Tool attached; null when unknown
  * @returns {string|null} Why the card cannot be played, or null when it can
  */
 export function trainerPlayBlockReason({
@@ -32,6 +39,8 @@ export function trainerPlayBlockReason({
   stadiumName = null,
   handCount = Infinity,
   benchCount = 0,
+  rareCandyOptionCount = null,
+  toolTargetCount = null,
 }) {
   if (!card) return null;
   if (isSupporterTrainer(card) && turnNumber === 1) {
@@ -50,6 +59,13 @@ export function trainerPlayBlockReason({
   const effectSteps = (parsed.steps || []).filter((step) => step.type !== 'discardCost');
   if (effectSteps.length > 0 && effectSteps.every((step) => step.destination === 'bench') && benchCount >= 5) {
     return 'bench_full';
+  }
+  if (isToolTrainer(card) && toolTargetCount === 0) {
+    return 'No Pokémon to attach this Tool to.';
+  }
+  const evolvesStage2 = effectSteps.some((step) => step.type === 'evolveStage2');
+  if (evolvesStage2 && rareCandyOptionCount === 0) {
+    return 'You need a Stage 2 Pokémon in hand that evolves from a Basic Pokémon you have in play.';
   }
   const maxOpponentPrizes = condition?.match(/^opponentPrizes<=(\d+)$/);
   if (maxOpponentPrizes && opponentPrizes > Number(maxOpponentPrizes[1])) {

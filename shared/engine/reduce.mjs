@@ -28,6 +28,16 @@ import { executeAbility } from './effects/ability.mjs';
 import { executeStadium } from './effects/stadium.mjs';
 import { parseStadiumOncePerTurn } from './rules/stadium-effects.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
+import { serverEnergyDescriptor } from './rules/server-energy.mjs';
+import { evolvedView, trainerTargetCounts, ownedCards } from './rules/evolved-pokemon.mjs';
+
+// An in-play Pokémon as its top evolution card (see evolved-pokemon.mjs). Read-only.
+function inPlayView(state, card) {
+  if (!card) return card;
+  const ref = findCard(state, card.instanceId);
+  const zone = ref?.player?.zones?.[ref.zoneId];
+  return Array.isArray(zone) ? evolvedView(zone, card) : card;
+}
 
 /**
  * Handles Knockout resolution for a Pokemon:
@@ -40,7 +50,7 @@ function handleKnockout(
   draft,
   { victimPlayerId, attackerPlayerId, victim, events }
 ) {
-  const prizeCount = prizesForKO(victim);
+  const prizeCount = prizesForKO(inPlayView(draft, victim));
   const attackerPrizes = draft.players[attackerPlayerId]?.zones?.prizes || [];
   const attackerHand = draft.players[attackerPlayerId]?.zones?.hand || [];
   const actualPrizes = Math.min(prizeCount, attackerPrizes.length);
@@ -170,7 +180,8 @@ function resolveCheckup(
         damage: 10,
         playerId: pid,
       });
-      if (active.hp && active.damage >= active.hp) {
+      const activeHp = inPlayView(draft, active).hp;
+      if (activeHp && active.damage >= activeHp) {
         const oppId = Object.keys(draft.players).find((id) => id !== pid);
         handleKnockout(draft, {
           victimPlayerId: pid,
@@ -198,7 +209,8 @@ function resolveCheckup(
           playerId: pid,
         });
       }
-      if (active.hp && active.damage >= active.hp) {
+      const activeHp = inPlayView(draft, active).hp;
+      if (activeHp && active.damage >= activeHp) {
         const oppId = Object.keys(draft.players).find((id) => id !== pid);
         handleKnockout(draft, {
           victimPlayerId: pid,
@@ -283,46 +295,6 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     player: nextPlayerId,
     number: draft.turn.number,
   });
-}
-
-/**
- * Normalizes an Energy Card object to a { type, family } descriptor for canPayAttackCost.
- */
-function getEnergyDescriptor(card) {
-  if (!card) return { type: 'Colorless', family: 'basic' };
-  if (typeof card === 'string') return { type: card, family: 'basic' };
-
-  const name = String(card.name || '').toLowerCase();
-  const type =
-    card.types?.[0] ||
-    (/fire/.test(name)
-      ? 'Fire'
-      : /water/.test(name)
-        ? 'Water'
-        : /grass/.test(name)
-          ? 'Grass'
-          : /lightning/.test(name)
-            ? 'Lightning'
-            : /psychic/.test(name)
-              ? 'Psychic'
-              : /fighting/.test(name)
-                ? 'Fighting'
-                : /metal/.test(name)
-                  ? 'Metal'
-                  : /dark/.test(name)
-                    ? 'Darkness'
-                    : /dragon/.test(name)
-                      ? 'Dragon'
-                      : 'Colorless');
-
-  let family = 'basic';
-  if (/double colorless/.test(name)) {
-    family = 'double-colorless';
-  } else if (/double/.test(name)) {
-    family = 'double';
-  }
-
-  return { type, family };
 }
 
 /**
@@ -737,14 +709,14 @@ export function validateLegality(state, command) {
         };
       }
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = active.attacks?.[atkIdx];
+      const attack = inPlayView(state, active).attacks?.[atkIdx];
       if (attack && attack.cost?.length > 0) {
         const attached = (player.zones?.active || []).filter(
           (c) => c.attachedTo === active.instanceId && isEnergy(c)
         );
         if (
           !canPayAttackCost(
-            expandEnergyEntries(attached.map(getEnergyDescriptor)),
+            expandEnergyEntries(attached.map(serverEnergyDescriptor)),
             attack.cost
           )
         ) {
@@ -783,7 +755,7 @@ export function validateLegality(state, command) {
       if (benchPokemon.length === 0) {
         return { allowed: false, reason: 'No bench Pokémon to retreat to.' };
       }
-      const retreatCostN = getRetreatCostCount(active);
+      const retreatCostN = getRetreatCostCount(inPlayView(state, active));
       if (retreatCostN > 0) {
         const attached = (player.zones?.active || []).filter(
           (c) => c.attachedTo === active.instanceId && isEnergy(c)
@@ -791,7 +763,7 @@ export function validateLegality(state, command) {
         const costSymbols = new Array(retreatCostN).fill('Colorless');
         if (
           !canPayAttackCost(
-            expandEnergyEntries(attached.map(getEnergyDescriptor)),
+            expandEnergyEntries(attached.map(serverEnergyDescriptor)),
             costSymbols
           )
         ) {
@@ -857,6 +829,7 @@ export function validateLegality(state, command) {
           stadiumName: state.stadium?.name || null,
           handCount: (player.zones?.hand || []).length,
           benchCount: (player.zones?.bench || []).filter((c) => !c.attachedTo).length,
+          ...trainerTargetCounts(player, ownedCards(player)),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
       }
@@ -1354,7 +1327,8 @@ export function applyCommand(state, command, rng = null) {
         (c) => !c.attachedTo
       );
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = attacker?.attacks?.[atkIdx] || {
+      const attackerView = inPlayView(draft, attacker);
+      const attack = attackerView?.attacks?.[atkIdx] || {
         name: 'Attack',
         damage: 10,
       };
@@ -1394,7 +1368,7 @@ export function applyCommand(state, command, rng = null) {
           });
 
           // Check if confused self-damage KO'd attacker
-          if (attacker.hp && attacker.damage >= attacker.hp) {
+          if (attackerView.hp && attacker.damage >= attackerView.hp) {
             handleKnockout(draft, {
               victimPlayerId: playerId,
               attackerPlayerId: oppId,
@@ -1422,7 +1396,8 @@ export function applyCommand(state, command, rng = null) {
 
       let dmgDealt = 0;
       if (attacker && defender) {
-        const dmgResult = computeAttackDamage(attacker, defender, attack);
+        const defenderView = inPlayView(draft, defender);
+        const dmgResult = computeAttackDamage(attackerView, defenderView, attack);
         dmgDealt = dmgResult.total;
         defender.damage = (defender.damage || 0) + dmgDealt;
         events.push({
@@ -1433,7 +1408,7 @@ export function applyCommand(state, command, rng = null) {
         });
 
         // KO check
-        const koHp = defender.hp || 0;
+        const koHp = defenderView.hp || 0;
         if (koHp > 0 && defender.damage >= koHp) {
           handleKnockout(draft, {
             victimPlayerId: defenderPlayerId,
@@ -1490,7 +1465,7 @@ export function applyCommand(state, command, rng = null) {
     case 'retreat': {
       const player = draft.players[playerId];
       const active = player?.zones?.active?.find((c) => !c.attachedTo);
-      const costN = getRetreatCostCount(active);
+      const costN = getRetreatCostCount(inPlayView(draft, active));
 
       // Discard energy cost
       if (

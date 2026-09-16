@@ -349,3 +349,27 @@ test('e2e options: card-printed play conditions the server enforces are not offe
   const later = await enumerateOptions({ ...board, stadiumName: null });
   assert.equal(later.filter((o) => o.kind === 'playTrainer').length, 2);
 });
+
+test('e2e options: Rare Candy is offered only when a Stage 2 in hand evolves from a Basic in play', async () => {
+  resetRules();
+  rulesState.turnNumber = 3;
+  const rareCandy = {
+    name: 'Rare Candy',
+    type: 'Trainer',
+    trainerType: 'Item',
+    effect: 'Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it, skipping the Stage 1.',
+  };
+  const gengar = { ...pokemon('Mega Gengar ex'), stage: 'Stage 2', evolvesFrom: 'Haunter' };
+  const haunter = { ...pokemon('Haunter'), stage: 'Stage 1', evolvesFrom: 'Gastly' };
+  const board = {
+    user: 'self',
+    active: pokemon('Darkrai'),
+    hand: [rareCandy, gengar],
+    prizeCounts: { self: 6, opponent: 6 },
+    deckList: [haunter],
+  };
+  const offered = (options) => options.some((o) => o.kind === 'playTrainer');
+
+  assert.equal(offered(await enumerateOptions(board)), false);
+  assert.equal(offered(await enumerateOptions({ ...board, active: pokemon('Gastly') })), true);
+});

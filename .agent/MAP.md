@@ -46,6 +46,8 @@ shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` lega
 shared/engine/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
 shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
 shared/engine/rules/trainer-play-conditions.mjs — `trainerPlayBlockReason` (turn-1 Supporter, same Stadium, printed play conditions); used by reduce.mjs legality and the bot's e2e-options.mjs
+shared/engine/rules/evolved-pokemon.mjs — `evolvedView` (in-play Pokémon read as its top Evolution card), Rare Candy line tracing, Trainer target counts; used by reduce.mjs, trainer-steps.mjs, the bot
+shared/engine/rules/server-energy.mjs — `serverEnergyDescriptor`: how the server prices attached Energy; the bot uses it too
 shared/engine/effects/executor.mjs — resumable step runner; core step kinds inline, the rest delegated to trainer-steps.mjs
 shared/engine/effects/trainer-steps.mjs — server handlers for the other trainer step kinds; multi-choice progress lives in resumeToken.context
 shared/engine/rules/abilities.mjs + ability-step-plan.mjs — ability parse + ordered step plan (resume seam)

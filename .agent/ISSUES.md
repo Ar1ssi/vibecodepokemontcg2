@@ -12,7 +12,8 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
-- I50 2026-09-16 P3 [rules] Server models an evolution as the Evolution card attached under the Basic (reduce.mjs attachCard); the Basic stays the root, so anything reading the root's name/hp/attacks sees the Basic. trainer-steps.mjs reads the top Pokémon card for Salvatore/devolve, but attack/KO/retreat code does not. Also a Trainer whose effect has no valid target (Rare Candy with no Stage 2 in hand, 11x in S144 bot runs) is still playable and is discarded for nothing (refs: S144).
+- I52 2026-09-16 P3 [rules] Server prices special Energy by name only (rules/server-energy.mjs): Prism/Neo Upper-style "any type" Energy pays only its name type or Colorless, and U Energy etc. are unrecognized. The client guidance (energy-effects.mjs) treats unknown specials as wildcards. Pick one rule set and make both use it (refs: S145).
+- I51 2026-09-16 P3 [netcode] A Trainer dropped on the board before its cardStats (effect text) reaches the server stays a plain move with no effect (reduce.mjs promoteTrainerPlay needs text) (refs: S144, S145).
 - I47 2026-09-16 P2 [netcode] `test:flip` (flip-gate-test.mjs, SERVER_AUTHORITATIVE=1 :4100) fails on unmodified main: step 1 "both clients joined" passes, then "timeout waiting for page predicate" — debug showed client A hand 9 (drew before setup settled), B hand 7 (refs: S137)
 - I46 2026-09-14 P3 [board-ui] Design 009 hand: #hand's horizontal scrollbar sits in the off-screen band (hidden via scrollbar-width: none), so a 15+ card hand scrolls only by trackpad/shift+wheel — map vertical wheel to scrollLeft or add arrows (refs: design 009, S131)
 - I45 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a
@@ -62,6 +63,7 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I50 2026-09-16 P3 [rules] Server models an evolution as the Evolution card attached under the Basic (reduce.mjs attachCard); the Basic stays the root, so anything reading the root's name/hp/attacks sees the Basic. trainer-steps.mjs reads the top Pokémon card for Salvatore/devolve, but attack/KO/retreat code does not. Also a Trainer whose effect has no valid target (Rare Candy with no Stage 2 in hand, 11x in S144 bot runs) is still playable and is discarded for nothing (refs: S144). → closed 2026-09-16 S145: attack/KO/checkup/retreat read evolvedView (D40); Rare Candy and Tools blocked with no valid target, Rare Candy traces the evolution line (D41); 15 live bot games PASS, 0 rejections.
 - I35 2026-09-10 P3 [rules] `shared/engine/effects/executor.mjs` implements ~23 of 40+ parsed
     trainer-effect step kinds from `trainer-effects.mjs` — an unimplemented effect silently
     no-ops instead of erroring, so a headless harness (or `playtest-bot.mjs`'s legacy-mode runs,

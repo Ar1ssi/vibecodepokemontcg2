@@ -13,6 +13,7 @@ import { hashBoardSnapshot } from '/shared/engine/zones/zone-hash.mjs';
 import { getCardDamage, getCardSpecialCondition } from '/shared/engine/zones/card-state.mjs';
 import { resolveAttachedEnergyType } from '/shared/engine/rules/energy-effects.mjs';
 import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import { evolvedView } from '/shared/engine/rules/evolved-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
@@ -120,8 +121,10 @@ function serializeHandCard(card, index) {
 // attached Energy as benched Pokémon.
 function boardPokemon(user, zoneId) {
   const cards = liveZoneArray(user, zoneId);
+  // The server keeps an Evolution card attached under the Basic; read the Pokémon as its top
+  // card, the way the server does (evolved-pokemon.mjs), so offered attacks match its rules.
   return hasAuthoritativeView()
-    ? cards.filter((card) => card.attachedTo == null)
+    ? cards.filter((card) => card.attachedTo == null).map((root) => evolvedView(cards, root))
     : cards.filter(isBoardPokemon);
 }
 
@@ -243,6 +246,7 @@ export function installE2eApi() {
           opponent: liveZoneArray(user === 'self' ? 'opp' : 'self', 'prizes').length,
         },
         stadiumName: liveZoneArray('self', 'stadium')[0]?.name || null,
+        deckList: user === 'self' ? systemState.ownDeckCards || [] : [],
       });
     },
     // Design 004 slice 3: drives a single option (as returned by options()) through the

@@ -11,6 +11,11 @@ import { isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
+import {
+  topPokemonCard as topOfStack,
+  rareCandyOptions,
+  ownedCards,
+} from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 
 const BENCH_LIMIT = 5;
@@ -64,18 +69,8 @@ function attachedCards(player, rootId) {
   );
 }
 
-// Evolution cards are Pokémon cards attached under the Basic (see reduce.mjs attachCard), so
-// the Pokémon a player sees is the highest-stage Pokémon card in that stack.
 function topPokemonCard(player, root) {
-  const evolutions = attachedCards(player, root.instanceId).filter(isPokemon);
-  if (evolutions.length === 0) return root;
-  return evolutions.reduce((top, card) =>
-    stageRank(card) >= stageRank(top) ? card : top
-  , root);
-}
-
-function stageRank(card) {
-  return { Basic: 0, 'Stage 1': 1, 'Stage 2': 2 }[stageOf(card)] ?? 0;
+  return topOfStack([...(player?.zones?.active || []), ...(player?.zones?.bench || [])], root);
 }
 
 function zoneIdOf(player, card) {
@@ -433,34 +428,35 @@ function searchDeckSequence(ctx) {
 // Rare Candy: a Stage 2 from hand onto a Basic in play, skipping Stage 1.
 function evolveStage2(ctx) {
   const { player } = ctx;
-  const basics = rootsOf(player).filter((root) => topPokemonCard(player, root) === root && stageOf(root) === 'Basic');
-  const stage2s = player.zones.hand.filter((c) => isPokemon(c) && stageOf(c) === 'Stage 2');
+  const options = rareCandyOptions(player, ownedCards(player));
+  const optionFor = (stage2Id) => options.find((option) => option.stage2.instanceId === stage2Id);
 
   if (ctx.memo?.phase === 'basic') {
-    const stage2 = stage2s.find((c) => c.instanceId === ctx.memo.stage2Id);
-    const basic = basics.find((c) => c.instanceId === ctx.selection?.[0]);
-    if (!stage2 || !basic) return skip(ctx, 'target_not_found');
+    const option = optionFor(ctx.memo.stage2Id);
+    const basic = option?.basics.find((c) => c.instanceId === ctx.selection?.[0]);
+    if (!option || !basic) return skip(ctx, 'target_not_found');
+    const stage2 = option.stage2;
     attachTo(player, stage2, basic, ctx.events);
     ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: stage2.instanceId, targetInstanceId: basic.instanceId });
     return null;
   }
 
   if (ctx.selection) {
-    const stage2 = stage2s.find((c) => c.instanceId === ctx.selection[0]);
-    if (!stage2) return skip(ctx, 'target_not_found');
+    const option = optionFor(ctx.selection[0]);
+    if (!option) return skip(ctx, 'target_not_found');
     return ctx.ask({
-      prompt: `${sourceName(ctx, 'Rare Candy')}: Choose the Basic Pokémon ${stage2.name} evolves from`,
-      options: basics,
+      prompt: `${sourceName(ctx, 'Rare Candy')}: Choose the Basic Pokémon ${option.stage2.name} evolves from`,
+      options: option.basics,
       min: 1,
       max: 1,
-      memo: { phase: 'basic', stage2Id: stage2.instanceId },
+      memo: { phase: 'basic', stage2Id: option.stage2.instanceId },
     });
   }
 
-  if (stage2s.length === 0 || basics.length === 0) return skip(ctx, 'no_stage2_or_basic');
+  if (options.length === 0) return skip(ctx, 'no_stage2_or_basic');
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Rare Candy')}: Choose a Stage 2 card from your hand`,
-    options: stage2s,
+    options: options.map((option) => option.stage2),
     min: 1,
     max: 1,
   });

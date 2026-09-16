@@ -223,6 +223,19 @@ test('evolveStage2 (Rare Candy): Stage 2 from hand goes onto the chosen Basic', 
   assert.equal(evolved.attachedTo, ralts.instanceId);
 });
 
+test('evolveStage2 (Rare Candy): only Basics on the Stage 2 line are offered', () => {
+  const game = setup();
+  const gardevoir = pokemon('Gardevoir ex', { stage: 'Stage 2', evolvesFrom: 'Kirlia' });
+  const riolu = pokemon('Riolu');
+  game.p1.zones.hand.push(gardevoir);
+  game.p1.zones.bench.push(riolu);
+  game.p1.zones.discard.push(pokemon('Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' }));
+  const ralts = game.p1.zones.active[0];
+  const { res } = play(game, "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it, skipping the Stage 1. You can't use this card during your first turn or on a Basic Pokémon that was put into play this turn.", { name: 'Rare Candy' });
+  const r2 = resolve(game, res, [gardevoir.instanceId]);
+  assert.deepEqual(ids(r2.pendingChoice.options), [ralts.instanceId]);
+});
+
 test('searchEvolve (Salvatore): Evolution from deck onto the Pokémon it evolves from; Ability cards excluded', () => {
   const game = setup();
   const kirlia = pokemon('Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' });
