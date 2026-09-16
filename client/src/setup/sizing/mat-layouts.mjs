@@ -47,6 +47,7 @@ const SIM = {
     discard: { bottom: '35%', right: '1%', width: '9%', height: '26%' },
     lostZone: { bottom: '84%', left: '1%', width: '7%', height: '15%' },
     stadium: { bottom: '42%', left: '11%', width: '6%', height: '16%' },
+    board: { bottom: '61%', left: '66%', width: '24%', height: '30%' },
   },
 };
 
@@ -83,6 +84,8 @@ const ONE_PLAYER = {
     discard: { bottom: '11.9%', right: '2.7%', width: '11.7%', height: '30.9%' },
     lostZone: { bottom: '84%', left: '2%', width: '8%', height: '14%' },
     stadium: { bottom: '44%', left: '15%', width: '8%', height: '16%' },
+    // Trainers in play: the open strip between the battle field and the deck.
+    board: { bottom: '56.6%', left: '63.5%', width: '20.5%', height: '30.9%' },
   },
 };
 
@@ -121,6 +124,7 @@ const TWO_PLAYER = {
     discard: { bottom: '18%', right: '2%', width: '14%', height: '26%' },
     lostZone: { bottom: '86%', left: '1%', width: '8%', height: '13%' },
     stadium: { bottom: '50%', left: '20%', width: '9%', height: '17%' },
+    board: { bottom: '72%', left: '63%', width: '20%', height: '26%' },
   },
 };
 
@@ -371,6 +375,11 @@ export function layoutToCssVars(layout) {
   put('--stadium-left', scaleLeft(zones.stadium?.left));
   put('--stadium-width', scaleH(zones.stadium?.width));
   put('--stadium-height', scaleV(zones.stadium?.height));
+
+  put('--board-bottom', scaleBottom(zones.board?.bottom));
+  put('--board-left', scaleLeft(zones.board?.left));
+  put('--board-width', scaleH(zones.board?.width));
+  put('--board-height', scaleV(zones.board?.height));
 
   put('--mat-fit', resolved.matFit);
 

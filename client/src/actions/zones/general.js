@@ -9,7 +9,7 @@ import { determineDeckData } from '../../setup/general/determine-deckdata.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { shuffleIndices } from '../../setup/general/shuffle.js';
-import { removeImages } from '../../setup/image-logic/remove-images.js';
+import { appendZoneImage, clearZoneImages } from '../../setup/image-logic/rebuild-zone-dom.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addAbilityCounter } from '../counters/ability-counter.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
@@ -339,7 +339,7 @@ export const sort = (user, zoneId) => {
   const deckData = determineDeckData(user);
   const zone = getZone(user, zoneId);
 
-  removeImages(zone.element);
+  clearZoneImages(zone, zoneId);
   zone.array.forEach((card) => unhydrateHolo(card));
 
   // In multiplayer, card order must match on both clients. Local "Sort"
@@ -359,8 +359,8 @@ export const sort = (user, zoneId) => {
     zone.array.forEach((card) => {
       // eslint-disable-next-line no-self-assign
       card.image.src = card.image.src; // redraw trick as insurance
-      zone.element.appendChild(card.image);
-      if (card.image.abilityCounter) {
+      const appended = appendZoneImage(zone, zoneId, card.image);
+      if (appended && card.image.abilityCounter) {
         const index = zone.array.findIndex(
           (selectedCard) => selectedCard === card
         );
@@ -371,8 +371,8 @@ export const sort = (user, zoneId) => {
     zone.array.forEach((card) => {
       // eslint-disable-next-line no-self-assign
       card.image.src = card.image.src; // redraw trick as insurance
-      zone.element.appendChild(card.image);
-      if (card.image.abilityCounter) {
+      const appended = appendZoneImage(zone, zoneId, card.image);
+      if (appended && card.image.abilityCounter) {
         const index = zone.array.findIndex(
           (selectedCard) => selectedCard === card
         );

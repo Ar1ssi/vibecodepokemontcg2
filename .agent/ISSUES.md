@@ -12,6 +12,7 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I47 2026-09-16 P2 [netcode] `test:flip` (flip-gate-test.mjs, SERVER_AUTHORITATIVE=1 :4100) fails on unmodified main: step 1 "both clients joined" passes, then "timeout waiting for page predicate" — debug showed client A hand 9 (drew before setup settled), B hand 7 (refs: S137)
 - I46 2026-09-14 P3 [board-ui] Design 009 hand: #hand's horizontal scrollbar sits in the off-screen band (hidden via scrollbar-width: none), so a 15+ card hand scrolls only by trackpad/shift+wheel — map vertical wheel to scrollLeft or add arrows (refs: design 009, S131)
 - I45 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a
     UI-driven attack() call that runs to completion (no cmdRejected, attack option correctly drops
@@ -196,3 +197,4 @@
     server.js routes exchangeData/loadDeckData through gameRoom.handleCommand('loadDeck', ...)
     instead of calling initializePlayerDeck directly; `undo` implemented as commandLog-minus-tail
     replay from a fresh seeded state.
+- I48 2026-09-16 P2 [netcode] SERVER_AUTHORITATIVE hand renders every card TWICE: after setup client A's #hand held 8 legacy <img>s (no data-instance-id) plus 9 server-rendered ones (apply-view.js); legacy zone arrays (window.__ptcg.zone) still count 9, so harness waits on zone counts are unreliable — likely also behind I47. Repro: .agent/scratch/mp-preview-repro.mjs "hand imgs" dump (refs: S141, I47) — **Closed S142 2026-09-16**: legacy move/sort/shuffle/reveal paths no longer write the DOM of server-drawn zones (server-rendered-zones.mjs, rebuild-zone-dom.js); live repro 53 duplicate <img>s before, 0 after. Not the cause of I47 (test:flip still stalls after join).

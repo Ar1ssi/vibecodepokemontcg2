@@ -11,7 +11,8 @@ import { updateCount } from '../general/count.js';
 import { hideCard, revealCard } from '../general/reveal-and-hide.js';
 import { sort } from '../zones/general.js';
 import { attachCard } from './attach-card.js';
-import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { hydrateHolo, imageAnchor, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import { legacyDomSuppressed } from '../../setup/netcode/server-rendered-zones.mjs';
 import { autoMoveActiveBenchCard } from './auto-move-active-bench-card.js';
 import { decreaseCardLayer } from './decrease-card-layer.js';
 import { evolveCard } from './evolve-card.js';
@@ -565,6 +566,11 @@ export const moveCard = async (
       // has settled the <img> into its .play-container (clientWidth/Height are
       // valid). No-op for common/non-holo cards.
       hydrateHolo(movingCard);
+    } else if (legacyDomSuppressed(dZoneId, systemState)) {
+      // The authoritative renderer draws this zone (I48): keep the legacy card
+      // out of the DOM, or the zone shows every card twice. Its zone-array
+      // bookkeeping above still ran, which is all the rules gates read.
+      imageAnchor(movingCard.image).remove();
     } else {
       const handFlight =
         dZoneId === 'hand' && (oZoneId === 'deck' || oZoneId === 'prizes');

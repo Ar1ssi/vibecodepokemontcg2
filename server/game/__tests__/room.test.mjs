@@ -291,6 +291,74 @@ test('Finding 12: clientSeqByPlayer is cleared on removeSocket, not just on re-a
   );
 });
 
+const readyDeck = [
+  [2, 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1'],
+  [1, 'Lightning Energy', 'Energy', 'u', '002', 'e2e', 'x-2'],
+];
+const loadReadyDeck = (room, socketId) =>
+  assert.equal(
+    room.handleCommand(socketId, { type: 'loadDeck', payload: { deckData: readyDeck } }).success,
+    true
+  );
+
+test('isReadyToDeal: needs both seats, both decks and both players pressing Set Up', () => {
+  const room = new GameRoom({ roomId: 'ready-to-deal-1', rulesEnabled: false });
+  assert.equal(room.isReadyToDeal(), false, 'empty room');
+
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  loadReadyDeck(room, 'sock-a');
+  room.markReady('p1');
+  assert.equal(room.isReadyToDeal(), false, 'host alone must not trigger the opening deal');
+
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  assert.equal(room.isReadyToDeal(), false, 'opponent seated but deck not loaded yet');
+
+  loadReadyDeck(room, 'sock-b');
+  assert.equal(room.isReadyToDeal(), false, 'both decks loaded, but only p1 pressed Set Up');
+
+  room.markReady('p2');
+  assert.equal(room.isReadyToDeal(), true);
+
+  assert.equal(room.handleCommand('sock-a', { type: 'setup', payload: {} }).success, true);
+  assert.equal(room.isReadyToDeal(), false, 'already dealt — setup phase is over');
+});
+
+test('isReadyToDeal: joining with decks loaded never deals without Set Up', () => {
+  const room = new GameRoom({ roomId: 'ready-to-deal-2', rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  loadReadyDeck(room, 'sock-a');
+  loadReadyDeck(room, 'sock-b');
+  assert.equal(room.isReadyToDeal(), false);
+});
+
+test('markReady: ignores a playerId with no seat', () => {
+  const room = new GameRoom({ roomId: 'ready-to-deal-3', rulesEnabled: false });
+  room.markReady('p9');
+  assert.equal(room.readyPlayerIds.size, 0);
+});
+
+test('resetGame: back to setup with Set Up cleared, so the next game waits for Set Up again', () => {
+  const room = new GameRoom({ roomId: 'ready-to-deal-4', rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  loadReadyDeck(room, 'sock-a');
+  loadReadyDeck(room, 'sock-b');
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.handleCommand('sock-a', { type: 'setup', payload: {} }).success, true);
+  assert.equal(room.state.turn.phase, 'main');
+
+  room.resetGame();
+  assert.equal(room.state.turn.phase, 'setup');
+  assert.equal(room.state.players.p1.zones.hand.length, 0, 'reset returns dealt cards');
+  assert.equal(room.state.players.p1.zones.deck.length, 3, 'deck reloaded from deckList');
+  assert.equal(room.isReadyToDeal(), false, 'Set Up must be pressed again');
+
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.isReadyToDeal(), true);
+});
 
 test('resetGame: explicit leave frees the leaver seat and restarts the game for the player who stays', () => {
   const room = new GameRoom({ roomId: 'reset-game-1', rulesEnabled: false });

@@ -1,5 +1,6 @@
 import { flipBoard } from '../../actions/general/flip-board.js';
 import { reset } from '../../actions/general/reset.js';
+import { clearReady } from '../../actions/general/ready.js';
 import {
   hideCards,
   hideShortcut,
@@ -469,6 +470,14 @@ export const initializeSocketEventListeners = () => {
   // instead of an independent local shuffle.
   socket.on('dealOrder', (data) => {
     if (Array.isArray(data?.order)) setDealOrder(data.order, data?.starter ?? null);
+  });
+
+  // Either player's Reset restarted the server game. The peer that didn't click
+  // Reset still holds the old rules session, deal order and Set Up flags.
+  socket.on('gameReset', () => {
+    clearReady('self');
+    clearReady('opp');
+    document.dispatchEvent(new CustomEvent('game-restarted'));
   });
 
   socket.on('cmdRejected', (data) => {

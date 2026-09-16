@@ -31,6 +31,7 @@ import { rulesState, canPerformAction } from '/shared/engine/rules/rules-state.m
 import { benchCardHasAbility } from '/shared/engine/rules/collect-usable-abilities.mjs';
 import { shouldOpenAttackPreview } from '../rules/attack-preview-gate.js';
 import { openAttackPreview } from '../rules/attack-preview.js';
+import { resolvePreviewCard } from './preview-card.mjs';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -64,15 +65,43 @@ export const coverClick = (event) => {
     return;
   }
 
-  const selectedZone = getZone(event.target.user, event.target.id);
-  if (selectedZone.elementCover) {
-    selectedZone.element.style.display = 'block';
-  }
-
   const notSpectator = !(
     document.getElementById('spectatorModeCheckbox').checked &&
     systemState.isTwoPlayer
   );
+
+  // Pregame / rules-off: no privacy to protect yet, so show the deck with
+  // the same carousel viewer used for the discard pile instead of the raw
+  // stacked-image zone (that legacy display is still used mid-game below).
+  if (event.target.id === 'deckCover') {
+    const preGameOrRulesOff = !rulesState.enabled || rulesState.phase === 'setup';
+    if (preGameOrRulesOff) {
+      event.stopPropagation();
+      const user = event.target.user === 'self' ? 'self' : 'opp';
+      const zone = getZone(user, 'deck');
+      if (zone.getCount() === 0) return;
+      openCarouselViewer({
+        title: determineUsername(user) + "'s Deck",
+        candidates: zone.array,
+      });
+      if (notSpectator) {
+        appendMessage(
+          systemState.initiator,
+          determineUsername(systemState.initiator) +
+            ' is looking through ' +
+            determineUsername(event.target.user) +
+            "'s deck",
+          'player'
+        );
+      }
+      return;
+    }
+  }
+
+  const selectedZone = getZone(event.target.user, event.target.id);
+  if (selectedZone.elementCover) {
+    selectedZone.element.style.display = 'block';
+  }
 
   if (event.target.id === 'deckCover' && notSpectator) {
     appendMessage(
@@ -291,6 +320,9 @@ export const imageClick = (event) => {
     }
 
     closePopups(event); //need both because of highlights condition in the if block above
+    // Select-to-move resolves the card through the legacy zone arrays, which a
+    // server-authoritative game never populates — nothing to select there.
+    if (!mouseClick.card?.image) return;
     mouseClick.card.image.classList.add('highlight');
     mouseClick.selectingCard = true;
   }
@@ -301,8 +333,24 @@ export const doubleClick = (event) => {
     event.stopPropagation();
     identifyCard(event);
   }
-  if (!mouseClick.card?.image) return;
-  const targetImage = mouseClick.card.image;
+  const card = resolvePreviewCard(mouseClick.card, event?.target);
+  if (!card?.image) return;
+  if (mouseClick.zoneId === 'prizes') {
+    // Real fix (was a `return` bandaid): route through the same carousel
+    // viewer as the discard pile / deck instead of the legacy raw #fullImage
+    // overlay below, which stacks a fresh overlay + listeners on every
+    // double-click and is never wired into closePopups() — see investigation.
+    const zone = getZone(mouseClick.cardUser, 'prizes');
+    if (zone.getCount() === 0) return;
+    const initialIndex = Math.max(0, zone.array.indexOf(card));
+    openCarouselViewer({
+      title: determineUsername(mouseClick.cardUser) + "'s Prizes",
+      candidates: zone.array,
+      initialIndex,
+    });
+    return;
+  }
+  const targetImage = card.image;
   targetImage.classList.remove('highlight');
   if (['active', 'bench', 'hand'].includes(mouseClick.zoneId)) {
     closeCardPreview(null, true);
@@ -312,7 +360,7 @@ export const doubleClick = (event) => {
       // along as further carousel slides (PTCG Live-style, like the discard
       // pile viewer) — scroll/swipe right to see them, left to return to
       // the main card. Read-only: dragging one out means closing first.
-      if (mouseClick.card?.attachedCards?.length) {
+      if (card.attachedCards?.length) {
         // Attached Energy is rendered on the mat as a small round token
         // (attach-card.js swaps image.src to the icon and stashes the full
         // card art in dataset.energyCardSrc) — show the real card art in the
@@ -322,20 +370,20 @@ export const doubleClick = (event) => {
         // further left, see computeSlideLayout's `virtualIndex - slideIndex`),
         // so the attached cards go BEFORE the main card in the array to land
         // on its right, with initialIndex pointing at the main card's slot.
-        const attachedSlides = mouseClick.card.attachedCards.map((attached) => {
+        const attachedSlides = card.attachedCards.map((attached) => {
           const fullArtSrc = attached.image?.dataset?.energyCardSrc;
           return fullArtSrc
             ? { ...attached, image: { src: fullArtSrc } }
             : attached;
         });
-        const carouselCards = [...attachedSlides, mouseClick.card];
+        const carouselCards = [...attachedSlides, card];
         openCarouselViewer({
-          title: mouseClick.card.name || 'Attached Cards',
+          title: card.name || 'Attached Cards',
           candidates: carouselCards,
           initialIndex: attachedSlides.length,
         });
       } else {
-        openCardPreview(targetImage, mouseClick.card);
+        openCardPreview(targetImage, card);
       }
     }
   } else {

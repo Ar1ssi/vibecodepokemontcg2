@@ -1,7 +1,9 @@
 import {
   oppContainerDocument,
   selfContainerDocument,
+  systemState,
 } from '../../state.js';
+import { legacyDomSuppressed } from '../../setup/netcode/server-rendered-zones.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addAbilityCounter } from '../counters/ability-counter.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
@@ -23,7 +25,11 @@ export const initializeActiveBenchCard = (user, movingCard, dZoneId, dZone) => {
   }
   container.className = 'play-container';
   container.style.zIndex = '0';
-  dZone.element.appendChild(container);
+  // Under the authoritative renderer the slot stays detached (I48): apply-view
+  // draws this Pokémon's own play-container from the server's view.
+  if (!legacyDomSuppressed(dZoneId, systemState)) {
+    dZone.element.appendChild(container);
+  }
   unhydrateHolo(movingCard);
   container.appendChild(movingCard.image);
 
