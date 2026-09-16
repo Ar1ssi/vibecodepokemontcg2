@@ -179,6 +179,26 @@ export const moveCard = async (
     }
   }
 
+  // Non-Stadium cards dropped onto stadium: redirect hand plays to board, or block
+  if (dZoneId === 'stadium') {
+    await ensureCardData(movingCard);
+    if (!isStadiumCard(movingCard)) {
+      if (oZoneId === 'hand') {
+        dZoneId = 'board';
+        destZoneId = 'board';
+        dZone = getZone(user, 'board');
+      } else {
+        appendMessage(
+          user,
+          `⛔ ${movingCard.name || 'Card'} is not a Stadium card.`,
+          'announcement',
+          false
+        );
+        return { destZoneId, ok: false };
+      }
+    }
+  }
+
   // ── rules: Item play blocked by opponent Active (effect-prevent family) ─
   if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
     await ensureCardData(movingCard);

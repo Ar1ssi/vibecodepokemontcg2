@@ -26,7 +26,7 @@ import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { executeStadium } from './effects/stadium.mjs';
-import { parseStadiumOncePerTurn } from './rules/stadium-effects.mjs';
+import { parseStadiumOncePerTurn, isStadiumCard } from './rules/stadium-effects.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import { evolvedView, trainerTargetCounts, ownedCards } from './rules/evolved-pokemon.mjs';
@@ -648,6 +648,14 @@ export function validateLegality(state, command) {
     }
 
     case 'moveCard': {
+      // Stadium zone validation
+      if (payload.to === 'stadium') {
+        const cardRef = findCard(state, payload.instanceId);
+        if (cardRef && !isStadiumCard(cardRef.card)) {
+          return { allowed: false, reason: 'invalid_stadium_target' };
+        }
+      }
+
       // Bench limit validation (Edge Case 9: bench full)
       if (payload.to === 'bench' && payload.from !== 'bench') {
         const bench = player.zones?.bench || [];
@@ -913,13 +921,10 @@ function promoteTrainerPlay(state, command) {
   const card = cardRef.card;
   const kind = `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
   if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
-  // Effect text arrives via cardStats. Until it does, playTrainer would find no steps and
-  // discard the card, and a plain move would leave it on the board doing nothing, so reject
-  // the drop: the card stays in hand and can be played once the data lands. A Tool or
-  // Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
-  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) {
-    return { ...command, pendingDataReason: 'Card data is still loading. Try playing this card again.' };
-  }
+  // Effect text arrives later via cardStats. Until it does, playTrainer would find no steps
+  // and discard the card, so keep the plain move rather than silently spend the card. A Tool
+  // or Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
+  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) return command;
   return { ...command, type: 'playTrainer', payload: { instanceId: payload.instanceId } };
 }
 
