@@ -12,6 +12,7 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I49 2026-09-16 P2 [netcode] Trainer drop runs its effect only after the card's effect text reaches the server via cardStats (async TCGdex enrichment). A Trainer dropped before then stays a plain hand -> board move with no effect, as before S144. Also not yet exercised in a live 2-player browser game — only reducer tests cover the drop -> pendingChoice -> resolveChoice flow; the client choice modal path is unverified live (refs: S144).
 - I47 2026-09-16 P2 [netcode] `test:flip` (flip-gate-test.mjs, SERVER_AUTHORITATIVE=1 :4100) fails on unmodified main: step 1 "both clients joined" passes, then "timeout waiting for page predicate" — debug showed client A hand 9 (drew before setup settled), B hand 7 (refs: S137)
 - I46 2026-09-14 P3 [board-ui] Design 009 hand: #hand's horizontal scrollbar sits in the off-screen band (hidden via scrollbar-width: none), so a 15+ card hand scrolls only by trackpad/shift+wheel — map vertical wheel to scrollLeft or add arrows (refs: design 009, S131)
 - I45 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a

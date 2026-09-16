@@ -8,6 +8,7 @@ import { cloneGameState, findCard, createGameState } from './state.mjs';
 import {
   isEnergy,
   isPokemon,
+  isTrainer,
   getRetreatCostCount,
   createCard,
   mintInstanceId,
@@ -837,7 +838,7 @@ export function validateLegality(state, command) {
       const cardRef = findCard(state, payload.instanceId);
       if (cardRef) {
         const typeStr = String(cardRef.card.type || '').toLowerCase();
-        const subStr = String(cardRef.card.subtypes || '').toLowerCase();
+        const subStr = `${cardRef.card.subtypes || ''} ${cardRef.card.trainerType || ''}`.toLowerCase();
         const isSupporter =
           typeStr.includes('supporter') || subStr.includes('supporter');
         if (isSupporter && player.flags?.supporterPlayed) {
@@ -957,6 +958,41 @@ export function validateLegality(state, command) {
 }
 
 /**
+ * The client plays an Item or Supporter by dropping it hand -> 'board', which it sends as a
+ * plain moveCard (it has no reliable card type at the drop site). Rewriting that move to
+ * playTrainer here, from the server's own card data, is what makes the effect run; deciding
+ * it server-side also means a client cannot place a Trainer while skipping its effect.
+ * Tools (attach to a Pokémon) and Stadiums (own zone) keep their existing moveCard paths.
+ *
+ * @param {object} state GameState
+ * @param {object} command Shape-valid command envelope
+ * @returns {object} The playTrainer command, or the original command unchanged
+ */
+function trainerEffectText(card) {
+  return String(card.text || card.effect || card.cardText || '').trim();
+}
+
+function promoteTrainerPlay(state, command) {
+  if (!state.rulesEnabled) return command;
+  const { type, payload, playerId } = command;
+  if (type !== 'moveCard' || payload.from !== 'hand' || payload.to !== 'board') {
+    return command;
+  }
+  const cardRef = findCard(state, payload.instanceId);
+  if (!cardRef || cardRef.zoneId !== 'hand' || cardRef.playerId !== playerId) {
+    return command;
+  }
+  const card = cardRef.card;
+  const kind = `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
+  if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
+  if (/tool|stadium/.test(kind)) return command;
+  // Effect text arrives later via cardStats. Until it does, playTrainer would find no steps
+  // and discard the card, so keep the plain move rather than silently spend the card.
+  if (!trainerEffectText(card)) return command;
+  return { ...command, type: 'playTrainer', payload: { instanceId: payload.instanceId } };
+}
+
+/**
  * Pure and total command reducer.
  *
  * @param {object} state GameState
@@ -993,6 +1029,7 @@ export function applyCommand(state, command, rng = null) {
     };
   }
 
+  command = promoteTrainerPlay(state, command);
   const { type, payload, playerId } = command;
   if (!playerId || typeof playerId !== 'string') {
     return {
@@ -2218,6 +2255,11 @@ export function applyCommand(state, command, rng = null) {
         if (Array.isArray(entry.retreatCost))
           card.retreatCost = [...entry.retreatCost];
         if (entry.stage != null) card.stage = entry.stage;
+        if (typeof entry.text === 'string') card.text = entry.text;
+        if (typeof entry.trainerType === 'string')
+          card.trainerType = entry.trainerType;
+        if (Array.isArray(entry.subtypes))
+          card.subtypes = entry.subtypes.map(String);
         updated += 1;
       }
 

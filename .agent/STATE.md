@@ -4,11 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 143
-Focus: added 8 custom Pokémon playmats (upscaled 2x + cropped 1.9394:1).
+Session: 144
+Focus: Trainer cards run their effects under SERVER_AUTHORITATIVE (branch feature/trainer-play-effects, not merged).
 Active: none.
-Next: I47 (test:flip stalls right after join, SERVER_AUTHORITATIVE) — I48 was not its cause.
-  Legacy zone arrays drift from server counts (client A: 8 legacy vs 9 server hand cards).
+Next: live 2P check of a Trainer drop + choice modal (I49), then merge. Then I35 step-kind gaps, I47.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -23,10 +22,9 @@ Blocked: none.
   `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <files>`.
 - card-picker.js's carousel indexes slides RIGHT-TO-LEFT (`virtualIndex - slideIndex`, positive =
   left) — counterintuitive; any new caller must order candidates accordingly (S132).
-- Holo `--pointer-*` CSS vars mean the LIGHT position (from card angle), not the cursor (D34).
+- Trainer drops: server promotes hand->board moveCard to playTrainer (D37); needs effect text from cardStats first.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S144 2026-09-16 feature: Trainer drop -> playTrainer promotion + effect text via cardStats (branch, unmerged).
 - S143 2026-09-16 feature: 8 custom Pokémon playmats added with 2x upscale and 1.9394:1 mat crop.
 - S142 2026-09-16 debug: I48 closed — no double-rendered cards in multiplayer (on main).
-- S141 2026-09-16 debug: multiplayer card preview works for server-rendered cards (on main).
-

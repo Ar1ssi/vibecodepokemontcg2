@@ -10,13 +10,13 @@ import { findCard } from '../state.mjs';
 function isToolCard(card) {
   const name = String(card?.name || '').toLowerCase();
   const type = String(card?.type || '').toLowerCase();
-  const sub = String(card?.subtypes || '').toLowerCase();
+  const sub = `${card?.subtypes || ''} ${card?.trainerType || ''}`.toLowerCase();
   return sub.includes('tool') || type.includes('tool') || name.includes('tool');
 }
 
 function isStadium(card) {
   const type = String(card?.type || '').toLowerCase();
-  const sub = String(card?.subtypes || '').toLowerCase();
+  const sub = `${card?.subtypes || ''} ${card?.trainerType || ''}`.toLowerCase();
   return sub.includes('stadium') || type.includes('stadium');
 }
 
@@ -196,7 +196,7 @@ export function executeTrainer(draft, {
 
   // Supporter turn restriction
   const typeStr = String(card.type || '').toLowerCase();
-  const subStr = String(card.subtypes || '').toLowerCase();
+  const subStr = `${card.subtypes || ''} ${card.trainerType || ''}`.toLowerCase();
   const isSupporter = typeStr.includes('supporter') || subStr.includes('supporter');
   if (isSupporter) {
     if (!player.flags) player.flags = {};

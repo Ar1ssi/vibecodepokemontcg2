@@ -62,3 +62,16 @@ test('I26: an entirely unenriched deck yields no entries, so no command is sent'
   ]);
   assert.deepEqual(stats, []);
 });
+
+test('trainer cards carry effect text, trainerType and subtypes for server-side playTrainer', () => {
+  const { stats } = buildCardStatsPayload([
+    { syncInstance: 0, type: 'Trainer', trainerType: 'Item', effect: 'Heal 30 damage.', subtypes: ['ACE SPEC'] },
+    { syncInstance: 1, hp: 60, text: 'Flavor text.', subtypes: ['ex'] },
+    { syncInstance: 2, type: 'Trainer' },
+  ]);
+
+  assert.deepEqual(stats, [
+    { syncInstance: 0, text: 'Heal 30 damage.', trainerType: 'Item', subtypes: ['ACE SPEC'] },
+    { syncInstance: 1, hp: 60 },
+  ]);
+});

@@ -378,3 +378,134 @@ test('trainer: Iono played when both players have empty hands draws 0 cards for 
   assert.equal(res.state.players.p1.zones.hand.length, 0);
   assert.equal(res.state.players.p2.zones.hand.length, 0);
 });
+
+// The live client plays an Item/Supporter as a hand -> 'board' moveCard, never as
+// playTrainer. These cover applyCommand promoting that move so the effect actually runs.
+function moveToBoard(state, instanceId, rng, playerId = 'p1') {
+  return applyCommand(state, {
+    type: 'moveCard',
+    payload: { instanceId, from: 'hand', to: 'board' },
+    playerId,
+  }, rng);
+}
+
+test('trainer drop: hand -> board moveCard runs Potion effect and discards it', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active[0].damage = 50;
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 30, name: 'Potion', type: 'Trainer', text: 'Heal 30 damage from 1 of your Pokémon.',
+  }));
+
+  const res = moveToBoard(state, 30, rng);
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.active[0].damage, 20);
+  assert.equal(res.state.players.p1.zones.board.length, 0);
+  assert.deepEqual(res.state.players.p1.zones.discard.map((c) => c.instanceId), [30]);
+});
+
+test('trainer drop: Ultra Ball via moveCard opens a choice and resumes through resolveChoice', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(
+    createCard({
+      instanceId: 7, name: 'Ultra Ball', type: 'Trainer',
+      text: 'Discard 2 cards from your hand. If you do, search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.',
+    }),
+    createCard({ instanceId: 15, name: 'Lightning Energy', type: 'Energy' }),
+    createCard({ instanceId: 23, name: 'Potion', type: 'Trainer' }),
+  );
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 31, name: 'Raichu', hp: 120, supertype: 'Pokémon' }),
+    createCard({ instanceId: 40, name: 'Fire Energy', type: 'Energy' }),
+  );
+
+  const played = moveToBoard(state, 7, rng);
+  assert.equal(played.error, null);
+  assert.ok(played.pendingChoice, 'dropping Ultra Ball must ask for the discard cost');
+  assert.deepEqual(played.pendingChoice.options.map((o) => o.instanceId).sort(), [15, 23]);
+  assert.equal(viewFor(played.state, 'p1').pendingChoice.options.length, 2);
+
+  const discarded = applyCommand(played.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: played.pendingChoice.choiceId, selection: [15, 23] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(discarded.error, null);
+  assert.deepEqual(discarded.pendingChoice.options.map((o) => o.instanceId), [31]);
+  assert.equal(viewFor(discarded.state, 'p2').pendingChoice.options, undefined);
+
+  const searched = applyCommand(discarded.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: discarded.pendingChoice.choiceId, selection: [31] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(searched.error, null);
+  assert.equal(searched.pendingChoice, null);
+  assert.deepEqual(searched.state.players.p1.zones.hand.map((c) => c.instanceId), [31]);
+  assert.ok(searched.state.players.p1.zones.discard.some((c) => c.instanceId === 7));
+});
+
+test('trainer drop: second Supporter via moveCard is rejected by the Supporter rule', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.flags.supporterPlayed = true;
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 50, name: 'Hop', type: 'Trainer', trainerType: 'Supporter', text: 'Draw 3 cards.',
+  }));
+
+  const res = moveToBoard(state, 50, rng);
+
+  assert.equal(res.error, 'Supporter already played this turn.');
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [50]);
+});
+
+test('trainer drop: stays a plain move when promotion does not apply', () => {
+  const cases = [
+    ['effect text not yet synced', { name: 'Potion', type: 'Trainer' }, true],
+    ['rules mode off', { name: 'Potion', type: 'Trainer', text: 'Heal 30 damage from 1 of your Pokémon.' }, false],
+    ['Pokémon Tool', { name: 'Vitality Band', type: 'Trainer', trainerType: 'Tool', text: 'Attacks do 10 more damage.' }, true],
+    ['Stadium', { name: 'Artazon', type: 'Trainer', trainerType: 'Stadium', text: 'Once during each player\'s turn, search.' }, true],
+    ['Pokémon', { name: 'Pichu', supertype: 'Pokémon', text: 'Draw 3 cards.' }, true],
+  ];
+  for (const [label, props, rulesEnabled] of cases) {
+    const { state, rng } = setupGame();
+    state.rulesEnabled = rulesEnabled;
+    state.players.p1.zones.hand.push(createCard({ instanceId: 60, ...props }));
+
+    const res = moveToBoard(state, 60, rng);
+
+    assert.equal(res.error, null, label);
+    assert.deepEqual(res.state.players.p1.zones.board.map((c) => c.instanceId), [60], label);
+    assert.equal(res.state.players.p1.zones.discard.length, 0, label);
+  }
+});
+
+test('trainer drop: cardStats supplies effect text so a loaded deck card runs its effect', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active[0].damage = 50;
+  state.players.p1.zones.hand.push(createCard({ instanceId: 30, syncInstance: 4, name: 'Potion', type: 'Trainer' }));
+
+  const synced = applyCommand(state, {
+    type: 'cardStats',
+    payload: { stats: [{ syncInstance: 4, text: 'Heal 30 damage from 1 of your Pokémon.', trainerType: 'Item', subtypes: [] }] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(synced.error, null);
+  assert.equal(synced.state.players.p1.zones.hand[0].trainerType, 'Item');
+
+  const res = moveToBoard(synced.state, 30, rng);
+
+  assert.equal(res.state.players.p1.zones.active[0].damage, 20);
+});
+
+test('trainer drop: a TCGdex Supporter (trainerType only) sets supporterPlayed', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.deck.push(createCard({ instanceId: 70, name: 'Grass Energy', type: 'Energy' }));
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 51, name: 'Hop', type: 'Trainer', trainerType: 'Supporter', text: 'Draw 1 card.',
+  }));
+
+  const res = moveToBoard(state, 51, rng);
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.flags.supporterPlayed, true);
+});
