@@ -906,14 +906,32 @@ saveButton.addEventListener('click', () => {
 export const changeCardBack = (user, userInput, emit = true) => {
   const containerDocument =
     user === 'self' ? selfContainerDocument : oppContainerDocument;
+  // `img.src` is always the browser-resolved absolute URL; the tracked
+  // systemState values are stored as-typed (often relative, e.g. the
+  // default '/src/assets/cardback.png'). Comparing them raw silently never
+  // matches, so a stale cover image is never repainted (only a full
+  // buildDeck rebuild — e.g. leaving and rejoining the room — ever shows
+  // the correct sleeve). Resolve both sides against the iframe's own
+  // document before comparing.
+  const resolve = (src) => {
+    if (!src) return src;
+    try {
+      return new URL(src, containerDocument.baseURI).href;
+    } catch {
+      return src;
+    }
+  };
+  const oldSrcs = new Set(
+    [
+      systemState.cardBackSrc,
+      systemState.p1OppCardBackSrc,
+      systemState.p2OppCardBackSrc,
+    ]
+      .map(resolve)
+      .filter(Boolean)
+  );
   containerDocument.querySelectorAll('img').forEach((img) => {
-    if (
-      [
-        systemState.cardBackSrc,
-        systemState.p1OppCardBackSrc,
-        systemState.p2OppCardBackSrc,
-      ].includes(img.src)
-    ) {
+    if (oldSrcs.has(img.src)) {
       img.src = userInput;
     }
   });

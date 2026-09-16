@@ -415,19 +415,36 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               // this player's own card back already is — never borrow the
               // default and never touch the other player's playmat
               const resolvedTarget = image || getCardBackForTarget(target) || fallback;
-              const knownBacks = [
-                systemState.cardBackSrc,
-                systemState.p1OppCardBackSrc,
-                systemState.p2OppCardBackSrc,
-                fallback,
-                LEGACY_DEFAULT_CARD_BACK_SRC,
-              ];
               const containerId = target === 'opp' ? 'oppContainer' : 'selfContainer';
               const doc = document.getElementById(containerId)?.contentWindow?.document;
               if (!doc) return;
+              // `img.src` is always the browser-resolved absolute URL; the
+              // tracked values here are stored as-typed (often relative),
+              // so comparing them raw silently never matches and the stale
+              // cover/card-back image is never repainted. Resolve both
+              // sides against the target iframe's own document first.
+              const resolve = (src) => {
+                if (!src) return src;
+                try {
+                  return new URL(src, doc.baseURI).href;
+                } catch {
+                  return src;
+                }
+              };
+              const knownBacks = new Set(
+                [
+                  systemState.cardBackSrc,
+                  systemState.p1OppCardBackSrc,
+                  systemState.p2OppCardBackSrc,
+                  fallback,
+                  LEGACY_DEFAULT_CARD_BACK_SRC,
+                ]
+                  .map(resolve)
+                  .filter(Boolean)
+              );
               // any img currently showing a card back gets the new sleeve
               doc.querySelectorAll('img').forEach((img) => {
-                if (knownBacks.includes(img.src)) img.src = resolvedTarget;
+                if (knownBacks.has(img.src)) img.src = resolvedTarget;
               });
             } catch {}
           };
