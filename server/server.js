@@ -372,6 +372,20 @@ async function main() {
     });
     if (!setupResult.success) return;
 
+    // Broadcast the post-setup view so the authoritative renderer draws the
+    // dealt prizes and hands (prizes DOM is suppressed on the legacy path in
+    // server-authoritative mode — without this view, prize zones stay empty).
+    for (const broadcast of setupResult.broadcasts || []) {
+      io.to(broadcast.socketId).emit('view', {
+        gameId: roomId,
+        stateVersion: setupResult.stateVersion,
+        view: broadcast.view,
+        events: setupResult.events || [],
+        pendingChoice: broadcast.view?.pendingChoice || null,
+        lastClientSeq: broadcast.lastClientSeq,
+      });
+    }
+
     // Design 002 I17: the server never trusts a client-supplied shuffle (D10), so
     // hand each player their own syncInstance deal order — [prizes(6), hand(7),
     // rest(deck)], matching the client's rules-mode setupPrizes()-then-
