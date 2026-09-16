@@ -3,9 +3,11 @@
   AMAZING RARE
 
   A rainbow foil splash bursts out of the art window behind the Pokémon; the
-  rest of the card is a regular frame. The shine is a rainbow cone multiplied
-  by a ring-shaped fade, so it is black (no effect under color-dodge) in the
-  middle of the art and past the splash. The cone turns with the light.
+  rest of the card is a regular frame. A rainbow cone shows through a
+  ring-shaped hole in a mid-grey cover; grey is neutral under soft-light, so
+  only the ring around the Pokémon is foiled. The cone turns with the light
+  (--pointer-from-left is unitless; a percentage times deg is invalid and
+  silently drops the whole background).
 
 */
 
@@ -13,13 +15,13 @@
 
   background-image:
     radial-gradient( circle at 50% 30%,
-      hsl(0, 0%, 0%) 0%,
-      hsl(0, 0%, 0%) 12%,
-      hsl(0, 0%, 100%) 24%,
-      hsl(0, 0%, 100%) 34%,
-      hsl(0, 0%, 0%) 52%
+      hsl(0, 0%, 50%) 0%,
+      hsl(0, 0%, 50%) 12%,
+      hsla(0, 0%, 50%, 0) 24%,
+      hsla(0, 0%, 50%, 0) 34%,
+      hsl(0, 0%, 50%) 52%
     ),
-    conic-gradient( from calc( (var(--background-x) - 50%) * 3.6deg ) at 50% 30%,
+    conic-gradient( from calc( (var(--pointer-from-left) - .5) * 180deg ) at 50% 30%,
       hsl(0, 100%, 60%),
       hsl(50, 100%, 55%),
       hsl(125, 90%, 50%),
@@ -33,10 +35,10 @@
   background-repeat: no-repeat;
   background-position: center center, center center;
 
-  background-blend-mode: multiply;
-  mix-blend-mode: color-dodge;
-  filter: brightness(.7) saturate(1.4);
-  opacity: .85;
+  background-blend-mode: normal;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
 
 }
 

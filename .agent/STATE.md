@@ -4,13 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 137
-Focus: feature — holofoil fixes per generation (reverse holo art cut, gold seams, rarity mapping,
-  silver shiny effect, holo rare art-window clip, classic cosmos).
-Active: all uncommitted in worktree claude/holofoil-effects-comparison-919cf3; suite 1477/1477.
-  Worktree server for the user at http://localhost:4000 (preview "app").
-Next: user checks on :4000 every new effect (list in journal S137); tune from feedback;
-  commit + push only when user says so. Radiant not reviewed against TCG Live.
+Session: 138
+Focus: none active — per-generation holofoil work shipped (PR #133, merged to main).
+Active: none.
+Next: user feedback on foil look in real games; possible tuning of water web/tinsel/prism. TCG Live wins
+  over physical cards on disagreement (DECISIONS).
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -30,7 +28,7 @@ Blocked: none.
   checking the host's Access-Control-Allow-Origin header.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S137 2026-09-16 feature: reverse holo rewrite + per-generation holo fixes (uncommitted, awaiting user check).
+- S137 2026-09-16 feature: per-generation holofoil patterns + render-checked tuning — PR #133 merged.
 - S136 2026-09-15 feature: TCG Live-style holofoil (fixed light, ink mask) — PR #130, merged 9729902.
   + patch: Primal Kyogre + Groudon sleeves cropped (no white margins), pushed to main directly.
 - S135 2026-09-15 feature: ability-guidance accuracy + Mega/Primal Spirit Link turn-end rule.

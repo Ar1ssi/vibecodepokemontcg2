@@ -161,6 +161,21 @@ describe('per-generation foil CSS', () => {
     }
   });
 
+  it('never multiplies a percentage by an angle (invalid calc drops the whole background)', () => {
+    for (const file of files) {
+      assert.doesNotMatch(readCss(`holo/${file}`), /%\)\s*\*\s*-?[\d.]+deg/, file);
+    }
+  });
+
+  it('blends pattern stacks with soft-light (color-dodge over black was invisible on bright art)', () => {
+    for (const file of ['classic-holo.css', 'modern-holo.css', 'ace-spec-rare.css', 'amazing-rare.css']) {
+      const shineRules = readCss(`holo/${file}`).match(/\.card__shine \{[^}]*\}/g) ?? [];
+      for (const rule of shineRules.filter((r) => r.includes('mix-blend-mode'))) {
+        assert.ok(rule.includes('mix-blend-mode: soft-light;'), `${file}: ${rule.slice(0, 60)}`);
+      }
+    }
+  });
+
   it('never tiles a diagonal gradient (tile edges draw boxes)', () => {
     for (const file of files) {
       const css = readCss(`holo/${file}`);

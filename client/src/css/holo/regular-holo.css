@@ -204,9 +204,9 @@
     calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% );
 
   background-blend-mode: screen, screen, multiply;
-  mix-blend-mode: color-dodge;
-  filter: brightness(.8) contrast(1.3) saturate(1.2);
-  opacity: .75;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
 
 }
 
