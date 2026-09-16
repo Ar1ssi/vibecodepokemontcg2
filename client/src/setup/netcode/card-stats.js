@@ -15,7 +15,12 @@ import { emitCmd } from './cmd-emitter.js';
 
 // Exactly the fields the server's own reducers read: hp for the KO check
 // (reduce.mjs 'attack'), attacks for damage/name, types+weakness+resistance for
-// computeAttackDamage, retreatCost for getRetreatCostCount, stage for evolution legality.
+// computeAttackDamage, retreatCost for getRetreatCostCount, stage for evolution legality,
+// text/trainerType/subtypes for playTrainer, evolvesFrom for Salvatore, abilities for useAbility.
+function isTrainerCard(card) {
+  return Boolean(card.trainerType) || /trainer|item|supporter|stadium|tool/i.test(card.type || '');
+}
+
 function extractStats(card) {
   const stats = { syncInstance: card.syncInstance };
   let hasAny = false;
@@ -56,6 +61,31 @@ function extractStats(card) {
   }
   if (card.stage) {
     stats.stage = card.stage;
+    hasAny = true;
+  }
+  if (card.evolvesFrom) {
+    stats.evolvesFrom = String(card.evolvesFrom);
+    hasAny = true;
+  }
+  if (card.ability?.text) {
+    stats.abilities = [{ name: String(card.ability.name || ''), text: String(card.ability.text) }];
+    hasAny = true;
+  }
+  // Trainer-only: playTrainer parses this text server-side to run the card's effect. Kept
+  // off Pokémon, where the server reads card.text as an ability fallback and subtypes as a
+  // stage fallback.
+  if (!isTrainerCard(card)) return hasAny ? stats : null;
+  const effectText = [card.effect || card.text || []].flat().join(' ').trim();
+  if (effectText) {
+    stats.text = effectText;
+    hasAny = true;
+  }
+  if (typeof card.trainerType === 'string' && card.trainerType) {
+    stats.trainerType = card.trainerType;
+    hasAny = true;
+  }
+  if (Array.isArray(card.subtypes) && card.subtypes.length > 0) {
+    stats.subtypes = card.subtypes.map(String);
     hasAny = true;
   }
 

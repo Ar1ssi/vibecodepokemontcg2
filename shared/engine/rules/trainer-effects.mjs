@@ -51,6 +51,11 @@
 //   { type: 'damageCounters', count: N, target: '…' }
 //   { type: 'millSelf', count: N }
 //   { type: 'passive', detail?: '…' }
+//   { type: 'searchEvolve', noAbilities?: true }
+//   { type: 'prizeBargain', drawCount: N }
+//   { type: 'searchAttachEach', count: N, energy: '…', target: '…', poisonActive?: true }
+// parseTrainerEffect also returns `playCondition` ('opponentPrizes<=N' | 'morePrizesThanOpponent')
+// when the card can only be played under that condition.
 
 // Normalize printed card text before matching. Real card text (and the
 // pkmncards.com dump) uses curly apostrophes (U+2019) and renders energy
@@ -311,7 +316,7 @@ export function parseSearchDeckParams(lower) {
       upTo: true,
       ...(reveal ? { reveal: true } : {}),
     };
-  } else if (lower.includes('basic') && lower.includes('energy') && !lower.includes('or')) {
+  } else if (lower.includes('basic') && lower.includes('energy') && !/\bor\b/.test(lower)) {
     const typed = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
     const countMatch = lower.match(/up to\s+(\d+)/);
     if (countMatch) count = Number(countMatch[1]);
@@ -319,7 +324,7 @@ export function parseSearchDeckParams(lower) {
   } else if (lower.includes('up to 4') && lower.includes('pokémon')) {
     what = 'Pokémon';
     count = 4;
-  } else if (lower.includes('energy') && lower.includes('or') && lower.includes('pokémon')) {
+  } else if (lower.includes('energy') && /\bor\b/.test(lower) && lower.includes('pokémon')) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
@@ -383,9 +388,53 @@ function parseCoinFlipStep(lower) {
   return null;
 }
 
+function parsePlayCondition(lower) {
+  const oppPrizes = lower.match(/only if your opponent has\s+(\d+)\s+or fewer prize cards remaining/);
+  if (oppPrizes) return `opponentPrizes<=${oppPrizes[1]}`;
+  if (lower.includes('only if you have more prize cards remaining than your opponent')) {
+    return 'morePrizesThanOpponent';
+  }
+  if (lower.includes("can't use this card during your first turn")) return 'notFirstTurn';
+  return null;
+}
+
 export function parseTrainerEffect(text = '') {
   const lower = normalizeText(text);
+  const playCondition = parsePlayCondition(lower);
+  const result = parseTrainerSteps(lower);
+  return playCondition ? { ...result, playCondition } : result;
+}
+
+function parseTrainerSteps(lower) {
   const steps = [];
+
+  // Lt. Surge's Bargain — opponent chooses: each player takes a Prize, or you draw
+  if (lower.includes('ask your opponent if each player may take a prize card')) {
+    const m = lower.match(/if no, you draw\s+(\d+)\s+cards?/);
+    steps.push({ type: 'prizeBargain', drawCount: m ? Number(m[1]) : 4 });
+    return { steps, recognizable: true };
+  }
+
+  // Salvatore — search for an Evolution that evolves from 1 of your Pokémon and evolve it
+  if (lower.includes('evolves from 1 of your pokémon') && lower.includes('put it onto that pokémon')) {
+    steps.push({ type: 'searchEvolve', ...(lower.includes('no abilities') ? { noAbilities: true } : {}) });
+    return { steps, recognizable: true };
+  }
+
+  // Janine's Secret Art — for each chosen Pokémon, search a Basic Energy and attach it
+  const eachAttach = lower.match(/choose up to\s+(\d+)\s+of your\s+(\{[a-z]\}\s+)?pokémon\. for each of those pokémon, search your deck for a basic\s+(\{[a-z]\}\s+)?energy/);
+  if (eachAttach) {
+    const typeSym = (eachAttach[2] || '').trim().toUpperCase();
+    const energySym = (eachAttach[3] || '').trim().toUpperCase();
+    steps.push({
+      type: 'searchAttachEach',
+      count: Number(eachAttach[1]),
+      energy: energySym ? `Basic ${energySym} Energy` : 'Basic Energy',
+      target: typeSym ? `1 of your ${typeSym} Pokémon` : '1 of your Pokémon',
+      ...(lower.includes('active pokémon in this way, it is now poisoned') ? { poisonActive: true } : {}),
+    });
+    return { steps, recognizable: true };
+  }
 
   // discard-hand-then-draw (Professor's Research)
   if (lower.includes('discard your hand and draw')) {
@@ -459,7 +508,8 @@ export function parseTrainerEffect(text = '') {
   if (lower.includes('look at the top')) {
     const m = lower.match(/top\s+(\d+)\s+cards?/);
     let pick = 'any';
-    if (lower.includes('supporter card')) pick = 'Supporter';
+    if (lower.includes('discard any number of them')) pick = 'discard';
+    else if (lower.includes('supporter card')) pick = 'Supporter';
     else if (lower.includes('attach a basic energy')) pick = 'Basic Energy (attach)';
     else if (lower.includes('onto your bench')) pick = 'Darkness Pokémon (bench)';
     steps.push({
@@ -467,6 +517,7 @@ export function parseTrainerEffect(text = '') {
       count: m ? Number(m[1]) : 7,
       pick,
       destination: lower.includes('onto your bench') ? 'bench' : 'hand',
+      ...(lower.includes('put them on the bottom of your deck') ? { restToBottom: true } : {}),
     });
     // Compound effects: look-then-draw is common
     appendTrailingDraw(steps, lower);
@@ -498,7 +549,12 @@ export function parseTrainerEffect(text = '') {
       steps.push({ type: 'switchOwn' });
       steps.push({ type: 'switchOpponent' });
     } else {
-      steps.push({ type: 'switchOpponent' });
+      const condition = lower.match(/the new active pokémon is now (burned|confused|poisoned|asleep|paralyzed)/);
+      steps.push({
+        type: 'switchOpponent',
+        ...(lower.includes("opponent's benched basic pokémon") ? { filter: 'Basic' } : {}),
+        ...(condition ? { thenCondition: condition[1][0].toUpperCase() + condition[1].slice(1) } : {}),
+      });
     }
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
@@ -531,7 +587,9 @@ export function parseTrainerEffect(text = '') {
     steps.push({
       type: 'healAmount',
       amount: Number(m[1]),
-      target: lower.includes('active pokémon') ? 'Active Pokémon' : '1 of your Pokémon',
+      target: lower.includes('each of your pokémon')
+        ? 'each of your Pokémon'
+        : lower.includes('active pokémon') ? 'Active Pokémon' : '1 of your Pokémon',
       cure: lower.includes('special condition'),
     });
     appendTrailingDraw(steps, lower);
@@ -553,6 +611,7 @@ export function parseTrainerEffect(text = '') {
     const energy = type ? `Basic ${type} Energy` : 'Basic Energy';
     let target = '1 of your Pokémon';
     if (type && lower.includes(`${type.toLowerCase()} pokémon`)) target = `1 of your ${type} Pokémon`;
+    else if (lower.includes('stage 2 pokémon')) target = '1 of your Stage 2 Pokémon';
     else if (lower.includes('benched')) target = '1 of your Benched Pokémon';
     steps.push({ type: 'attachMultipleFromDiscard', count, energy, target });
     appendTrailingDraw(steps, lower);
@@ -570,6 +629,13 @@ export function parseTrainerEffect(text = '') {
     else target = '1 of your Benched Pokémon';
     steps.push({ type: 'attachFromDiscard', energy, target });
     appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Judge — each player shuffles their hand into their deck and draws a fixed number
+  const eachDraws = lower.match(/each player shuffles their hand into their deck and draws\s+(\d+)\s+cards?/);
+  if (eachDraws) {
+    steps.push({ type: 'ionoShuffle', drawCount: Number(eachDraws[1]) });
     return { steps, recognizable: true };
   }
 
@@ -704,7 +770,7 @@ export function parseTrainerEffect(text = '') {
   }
 
   // Accompanying Flute — reveal opponent deck top, bench Basic Pokémon
-  if (lower.includes("opponent's deck") && lower.includes('onto their bench')) {
+  if (lower.includes("opponent's deck") && (lower.includes('onto their bench') || lower.includes("onto your opponent's bench"))) {
     const m = lower.match(/top\s+(\d+)\s+cards?/);
     steps.push({
       type: 'revealOpponentDeckBench',
@@ -1053,6 +1119,9 @@ export function describeStep(step) {
     case 'millSelf':
       return `Discard the top ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
     case 'passive': return step.detail || 'Passive effect — stays in play.';
+    case 'searchEvolve': return 'Search your deck for a card that evolves from 1 of your Pokémon and evolve it, then shuffle.';
+    case 'prizeBargain': return `Your opponent chooses: each player takes a Prize card, or you draw ${step.drawCount} cards.`;
+    case 'searchAttachEach': return `Choose up to ${step.count} of your Pokémon; attach a ${step.energy} from your deck to each, then shuffle.`;
     default: return '';
   }
 }

@@ -772,6 +772,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
   const min = pendingChoice.min ?? 1;
   const max = pendingChoice.max ?? 1;
   const selectedIds = new Set();
+  if (modal.dataset) modal.dataset.min = String(min);
 
   const container = doc.createElement('div');
   container.className = 'choice-modal-container';

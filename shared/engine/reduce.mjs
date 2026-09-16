@@ -8,6 +8,7 @@ import { cloneGameState, findCard, createGameState } from './state.mjs';
 import {
   isEnergy,
   isPokemon,
+  isTrainer,
   getRetreatCostCount,
   createCard,
   mintInstanceId,
@@ -25,8 +26,18 @@ import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { executeStadium } from './effects/stadium.mjs';
-import { parseTrainerEffect } from './rules/trainer-effects.mjs';
 import { parseStadiumOncePerTurn } from './rules/stadium-effects.mjs';
+import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
+import { serverEnergyDescriptor } from './rules/server-energy.mjs';
+import { evolvedView, trainerTargetCounts, ownedCards } from './rules/evolved-pokemon.mjs';
+
+// An in-play Pokémon as its top evolution card (see evolved-pokemon.mjs). Read-only.
+function inPlayView(state, card) {
+  if (!card) return card;
+  const ref = findCard(state, card.instanceId);
+  const zone = ref?.player?.zones?.[ref.zoneId];
+  return Array.isArray(zone) ? evolvedView(zone, card) : card;
+}
 
 /**
  * Handles Knockout resolution for a Pokemon:
@@ -39,7 +50,7 @@ function handleKnockout(
   draft,
   { victimPlayerId, attackerPlayerId, victim, events }
 ) {
-  const prizeCount = prizesForKO(victim);
+  const prizeCount = prizesForKO(inPlayView(draft, victim));
   const attackerPrizes = draft.players[attackerPlayerId]?.zones?.prizes || [];
   const attackerHand = draft.players[attackerPlayerId]?.zones?.hand || [];
   const actualPrizes = Math.min(prizeCount, attackerPrizes.length);
@@ -169,7 +180,8 @@ function resolveCheckup(
         damage: 10,
         playerId: pid,
       });
-      if (active.hp && active.damage >= active.hp) {
+      const activeHp = inPlayView(draft, active).hp;
+      if (activeHp && active.damage >= activeHp) {
         const oppId = Object.keys(draft.players).find((id) => id !== pid);
         handleKnockout(draft, {
           victimPlayerId: pid,
@@ -197,7 +209,8 @@ function resolveCheckup(
           playerId: pid,
         });
       }
-      if (active.hp && active.damage >= active.hp) {
+      const activeHp = inPlayView(draft, active).hp;
+      if (activeHp && active.damage >= activeHp) {
         const oppId = Object.keys(draft.players).find((id) => id !== pid);
         handleKnockout(draft, {
           victimPlayerId: pid,
@@ -282,46 +295,6 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     player: nextPlayerId,
     number: draft.turn.number,
   });
-}
-
-/**
- * Normalizes an Energy Card object to a { type, family } descriptor for canPayAttackCost.
- */
-function getEnergyDescriptor(card) {
-  if (!card) return { type: 'Colorless', family: 'basic' };
-  if (typeof card === 'string') return { type: card, family: 'basic' };
-
-  const name = String(card.name || '').toLowerCase();
-  const type =
-    card.types?.[0] ||
-    (/fire/.test(name)
-      ? 'Fire'
-      : /water/.test(name)
-        ? 'Water'
-        : /grass/.test(name)
-          ? 'Grass'
-          : /lightning/.test(name)
-            ? 'Lightning'
-            : /psychic/.test(name)
-              ? 'Psychic'
-              : /fighting/.test(name)
-                ? 'Fighting'
-                : /metal/.test(name)
-                  ? 'Metal'
-                  : /dark/.test(name)
-                    ? 'Dark'
-                    : /dragon/.test(name)
-                      ? 'Dragon'
-                      : 'Colorless');
-
-  let family = 'basic';
-  if (/double colorless/.test(name)) {
-    family = 'double-colorless';
-  } else if (/double/.test(name)) {
-    family = 'double';
-  }
-
-  return { type, family };
 }
 
 /**
@@ -736,14 +709,14 @@ export function validateLegality(state, command) {
         };
       }
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = active.attacks?.[atkIdx];
+      const attack = inPlayView(state, active).attacks?.[atkIdx];
       if (attack && attack.cost?.length > 0) {
         const attached = (player.zones?.active || []).filter(
           (c) => c.attachedTo === active.instanceId && isEnergy(c)
         );
         if (
           !canPayAttackCost(
-            expandEnergyEntries(attached.map(getEnergyDescriptor)),
+            expandEnergyEntries(attached.map(serverEnergyDescriptor)),
             attack.cost
           )
         ) {
@@ -782,7 +755,7 @@ export function validateLegality(state, command) {
       if (benchPokemon.length === 0) {
         return { allowed: false, reason: 'No bench Pokémon to retreat to.' };
       }
-      const retreatCostN = getRetreatCostCount(active);
+      const retreatCostN = getRetreatCostCount(inPlayView(state, active));
       if (retreatCostN > 0) {
         const attached = (player.zones?.active || []).filter(
           (c) => c.attachedTo === active.instanceId && isEnergy(c)
@@ -790,7 +763,7 @@ export function validateLegality(state, command) {
         const costSymbols = new Array(retreatCostN).fill('Colorless');
         if (
           !canPayAttackCost(
-            expandEnergyEntries(attached.map(getEnergyDescriptor)),
+            expandEnergyEntries(attached.map(serverEnergyDescriptor)),
             costSymbols
           )
         ) {
@@ -837,7 +810,7 @@ export function validateLegality(state, command) {
       const cardRef = findCard(state, payload.instanceId);
       if (cardRef) {
         const typeStr = String(cardRef.card.type || '').toLowerCase();
-        const subStr = String(cardRef.card.subtypes || '').toLowerCase();
+        const subStr = `${cardRef.card.subtypes || ''} ${cardRef.card.trainerType || ''}`.toLowerCase();
         const isSupporter =
           typeStr.includes('supporter') || subStr.includes('supporter');
         if (isSupporter && player.flags?.supporterPlayed) {
@@ -847,62 +820,18 @@ export function validateLegality(state, command) {
           };
         }
 
-        const isStadiumCard =
-          subStr.includes('stadium') || typeStr.includes('stadium');
-        if (isStadiumCard && state.stadium) {
-          const currentStadiumName = String(state.stadium.name || '')
-            .trim()
-            .toLowerCase();
-          const newStadiumName = String(cardRef.card.name || '')
-            .trim()
-            .toLowerCase();
-          if (
-            currentStadiumName &&
-            newStadiumName &&
-            currentStadiumName === newStadiumName
-          ) {
-            return {
-              allowed: false,
-              reason: 'A Stadium card with the same name is already in play.',
-            };
-          }
-        }
-
-        const text =
-          cardRef.card.text ||
-          cardRef.card.effect ||
-          cardRef.card.cardText ||
-          '';
-        const parsed = parseTrainerEffect(text);
-        if (parsed?.steps?.[0]?.type === 'discardCost') {
-          const cost = parsed.steps[0].count || 1;
-          const otherHandCards = (player.zones?.hand || []).filter(
-            (c) => c.instanceId !== payload.instanceId
-          );
-          if (otherHandCards.length < cost) {
-            return {
-              allowed: false,
-              reason: 'Not enough cards in hand to pay discard cost.',
-            };
-          }
-        }
-
-        // Edge Case 9: Cannot play search-to-bench trainers when bench is full
-        if (parsed?.steps && parsed.steps.length > 0) {
-          const nonCostSteps = parsed.steps.filter(
-            (s) => s.type !== 'discardCost'
-          );
-          if (
-            nonCostSteps.length > 0 &&
-            nonCostSteps.every((s) => s.destination === 'bench')
-          ) {
-            const bench = player.zones?.bench || [];
-            const benchPokemonCount = bench.filter((c) => !c.attachedTo).length;
-            if (benchPokemonCount >= 5) {
-              return { allowed: false, reason: 'bench_full' };
-            }
-          }
-        }
+        const opponent = Object.values(state.players || {}).find((p) => p.playerId !== playerId);
+        const blockReason = trainerPlayBlockReason({
+          card: cardRef.card,
+          turnNumber: state.turn?.number ?? 0,
+          myPrizes: (player.zones?.prizes || []).length,
+          opponentPrizes: (opponent?.zones?.prizes || []).length,
+          stadiumName: state.stadium?.name || null,
+          handCount: (player.zones?.hand || []).length,
+          benchCount: (player.zones?.bench || []).filter((c) => !c.attachedTo).length,
+          ...trainerTargetCounts(player, ownedCards(player)),
+        });
+        if (blockReason) return { allowed: false, reason: blockReason };
       }
       return { allowed: true };
     }
@@ -957,6 +886,44 @@ export function validateLegality(state, command) {
 }
 
 /**
+ * The client plays an Item or Supporter by dropping it hand -> 'board', which it sends as a
+ * plain moveCard (it has no reliable card type at the drop site). Rewriting that move to
+ * playTrainer here, from the server's own card data, is what makes the effect run; deciding
+ * it server-side also means a client cannot place a Trainer while skipping its effect.
+ * A Tool dropped on the board asks which Pokémon to attach to; a Stadium goes to the Stadium zone.
+ *
+ * @param {object} state GameState
+ * @param {object} command Shape-valid command envelope
+ * @returns {object} The playTrainer command, or the original command unchanged
+ */
+function trainerEffectText(card) {
+  return String(card.text || card.effect || card.cardText || '').trim();
+}
+
+function promoteTrainerPlay(state, command) {
+  if (!state.rulesEnabled) return command;
+  const { type, payload, playerId } = command;
+  if (type !== 'moveCard' || payload.from !== 'hand' || payload.to !== 'board') {
+    return command;
+  }
+  const cardRef = findCard(state, payload.instanceId);
+  if (!cardRef || cardRef.zoneId !== 'hand' || cardRef.playerId !== playerId) {
+    return command;
+  }
+  const card = cardRef.card;
+  const kind = `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
+  if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
+  // Effect text arrives via cardStats. Until it does, playTrainer would find no steps and
+  // discard the card, and a plain move would leave it on the board doing nothing, so reject
+  // the drop: the card stays in hand and can be played once the data lands. A Tool or
+  // Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
+  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) {
+    return { ...command, pendingDataReason: 'Card data is still loading. Try playing this card again.' };
+  }
+  return { ...command, type: 'playTrainer', payload: { instanceId: payload.instanceId } };
+}
+
+/**
  * Pure and total command reducer.
  *
  * @param {object} state GameState
@@ -993,6 +960,16 @@ export function applyCommand(state, command, rng = null) {
     };
   }
 
+  command = promoteTrainerPlay(state, command);
+  if (command.pendingDataReason) {
+    return {
+      state,
+      events: [],
+      pendingChoice: state.pendingChoice,
+      error: 'card_data_pending',
+      reason: command.pendingDataReason,
+    };
+  }
   const { type, payload, playerId } = command;
   if (!playerId || typeof playerId !== 'string') {
     return {
@@ -1362,7 +1339,8 @@ export function applyCommand(state, command, rng = null) {
         (c) => !c.attachedTo
       );
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = attacker?.attacks?.[atkIdx] || {
+      const attackerView = inPlayView(draft, attacker);
+      const attack = attackerView?.attacks?.[atkIdx] || {
         name: 'Attack',
         damage: 10,
       };
@@ -1402,7 +1380,7 @@ export function applyCommand(state, command, rng = null) {
           });
 
           // Check if confused self-damage KO'd attacker
-          if (attacker.hp && attacker.damage >= attacker.hp) {
+          if (attackerView.hp && attacker.damage >= attackerView.hp) {
             handleKnockout(draft, {
               victimPlayerId: playerId,
               attackerPlayerId: oppId,
@@ -1430,7 +1408,8 @@ export function applyCommand(state, command, rng = null) {
 
       let dmgDealt = 0;
       if (attacker && defender) {
-        const dmgResult = computeAttackDamage(attacker, defender, attack);
+        const defenderView = inPlayView(draft, defender);
+        const dmgResult = computeAttackDamage(attackerView, defenderView, attack);
         dmgDealt = dmgResult.total;
         defender.damage = (defender.damage || 0) + dmgDealt;
         events.push({
@@ -1441,7 +1420,7 @@ export function applyCommand(state, command, rng = null) {
         });
 
         // KO check
-        const koHp = defender.hp || 0;
+        const koHp = defenderView.hp || 0;
         if (koHp > 0 && defender.damage >= koHp) {
           handleKnockout(draft, {
             victimPlayerId: defenderPlayerId,
@@ -1498,7 +1477,7 @@ export function applyCommand(state, command, rng = null) {
     case 'retreat': {
       const player = draft.players[playerId];
       const active = player?.zones?.active?.find((c) => !c.attachedTo);
-      const costN = getRetreatCostCount(active);
+      const costN = getRetreatCostCount(inPlayView(draft, active));
 
       // Discard energy cost
       if (
@@ -2218,6 +2197,17 @@ export function applyCommand(state, command, rng = null) {
         if (Array.isArray(entry.retreatCost))
           card.retreatCost = [...entry.retreatCost];
         if (entry.stage != null) card.stage = entry.stage;
+        if (typeof entry.evolvesFrom === 'string') card.evolvesFrom = entry.evolvesFrom;
+        if (Array.isArray(entry.abilities)) {
+          card.abilities = entry.abilities
+            .filter((a) => a && typeof a.text === 'string')
+            .map((a) => ({ name: String(a.name || ''), text: a.text }));
+        }
+        if (typeof entry.text === 'string') card.text = entry.text;
+        if (typeof entry.trainerType === 'string')
+          card.trainerType = entry.trainerType;
+        if (Array.isArray(entry.subtypes))
+          card.subtypes = entry.subtypes.map(String);
         updated += 1;
       }
 

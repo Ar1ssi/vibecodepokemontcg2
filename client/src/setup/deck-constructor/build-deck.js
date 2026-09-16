@@ -75,6 +75,7 @@ export const buildDeck = (user) => {
   // (no attack, no evolve) and the bot passes instead. Parked here for __ptcg.cardDataReady()
   // to await; read by nothing else, so live play is unchanged. Already-settled swallow of
   // rejections matches the two consumers below: partial data still beats none.
+  if (user === 'self') systemState.ownDeckCards = builtCards;
   systemState.cardDataReady = enriched.then(
     () => true,
     () => false

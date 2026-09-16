@@ -392,3 +392,27 @@ test('attack: Collect attack draws a card for the user then ends turn', () => {
   assert.equal(res.events.some((e) => e.type === 'cardsDrawn' && e.playerId === 'p1' && e.count === 1), true);
 });
 
+
+test('attack: Basic Darkness Energy pays a Darkness cost', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash' },
+      p2: { username: 'Gary' },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  const toxel = createCard({
+    instanceId: 30,
+    name: 'Toxel',
+    hp: 70,
+    attacks: [{ name: 'Call for Family', cost: ['Darkness'], damage: 0 }],
+  });
+  const dark = createCard({ instanceId: 31, name: 'Basic Darkness Energy', type: 'Energy', attachedTo: 30 });
+  state.players.p1.zones.active.push(toxel, dark);
+  state.players.p2.zones.active.push(createCard({ instanceId: 40, name: 'Riolu', hp: 70 }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+
+  assert.equal(res.error, null);
+});
