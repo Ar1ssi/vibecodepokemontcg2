@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 
 import {
   DEFAULT_MAT_LAYOUT_ID,
@@ -325,6 +325,22 @@ test('board zone hides scrollbars across both container stylesheets', () => {
   }
 });
 
+test('bench zone uses 5-column grid layout across both container stylesheets', () => {
+  for (const [file, css] of Object.entries(CONTAINER_CSS)) {
+    const benchRuleMatch = css.match(/#bench\s*\{([^}]*)\}/);
+    assert.ok(benchRuleMatch, `${file} missing #bench rule`);
+    const benchRule = benchRuleMatch[1];
+    assert.ok(
+      benchRule.includes('display: grid'),
+      `${file} #bench should set display: grid`
+    );
+    assert.ok(
+      benchRule.includes('grid-template-columns: repeat(5, 1fr)'),
+      `${file} #bench should define 5 slot columns (repeat(5, 1fr))`
+    );
+  }
+});
+
 test('index.css expands --mat-container-width to 100vw on :root when drawer is closed', () => {
   const indexCss = readCss('index.css');
   assert.ok(
@@ -336,4 +352,5 @@ test('index.css expands --mat-container-width to 100vw on :root when drawer is c
     'index.css should define --mat-container-width for :root when sidebox is hidden'
   );
 });
+
 

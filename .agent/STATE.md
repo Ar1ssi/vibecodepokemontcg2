@@ -4,8 +4,8 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 146
-Focus: Trainer effects + evolution stats server-side (PRs #136/#137 merged to main); grey multiplayer sleeves fixed.
+Session: 147
+Focus: bench cards layout updated to 5-column CSS grid aligning cards with printed/SVG bench zone slots.
 Active: none.
 Next: run pnpm test + a live SERVER_AUTHORITATIVE bot game on main (#137 merged untested at user request).
   Then I47 (test:flip stalls right after join). Owed: test for changeCardBack/applySleeveToPlaymat stale-image patch.
@@ -26,6 +26,6 @@ Blocked: none.
 - Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S147 2026-09-16 patch: bench card layout fixed with 5-column CSS grid matching 5 SVG slots.
 - S146 2026-09-16 patch: I51/I52 — Trainer drops before card data rejected; one Energy rule set (untested).
 - S145 2026-09-16 patch: I50 — evolved Pokémon use their Evolution stats; Rare Candy checks its line.
-- S144 2026-09-16 feature+debug: Trainer effects server-side (31 step kinds); grey multiplayer sleeves fixed.
