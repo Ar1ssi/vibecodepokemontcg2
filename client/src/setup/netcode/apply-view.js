@@ -17,6 +17,7 @@ import {
   getDamageCounterTier,
 } from '../counters/damage-counter-style.mjs';
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
+import { getEnergyTokenFront } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -39,9 +40,29 @@ let defaultNetcodeContext = {
   cardListeners: null,
   coverListeners: null,
   sortZoneCards: null,
+  // { hydrate(card), unhydrate(card) } — hydrate-holo.js, injected because it
+  // imports front-end.js, which is unimportable outside a browser.
+  holo: null,
+  // { open({ choice, onResolve }), close() } — card-picker.js, injected for the
+  // same reason (it pulls in get-zone.js).
+  choicePicker: null,
 };
 
+// choiceId the injected card picker is currently showing, so re-applying a view
+// that still carries the same pendingChoice doesn't reopen (and reset) it.
+let openPickerChoiceId = null;
+
 const PLAY_ZONES = ['active', 'bench'];
+
+// Zones legacy move-card.js gives a holofoil wrapper; stadium and attached cards
+// never get one.
+const HOLO_ZONES = ['hand', 'prizes', 'discard', 'lostZone', 'board', 'active', 'bench'];
+
+// Legacy attach-card.js token geometry, as fractions of the parent card.
+const ENERGY_TOKEN_SIZE = 0.24;
+const ENERGY_TOKEN_SPACING = 1.15;
+const ENERGY_TOKEN_BOTTOM = 0.03;
+const ENERGY_TOKEN_STYLE_KEYS = ['position', 'width', 'height', 'left', 'bottom', 'zIndex'];
 
 /**
  * Returns the highest stateVersion successfully applied by the renderer.
@@ -82,6 +103,8 @@ export function setDefaultNetcodeContext(ctx = {}) {
   if (ctx.cardListeners !== undefined) defaultNetcodeContext.cardListeners = ctx.cardListeners;
   if (ctx.coverListeners !== undefined) defaultNetcodeContext.coverListeners = ctx.coverListeners;
   if (ctx.sortZoneCards !== undefined) defaultNetcodeContext.sortZoneCards = ctx.sortZoneCards;
+  if (ctx.holo !== undefined) defaultNetcodeContext.holo = ctx.holo;
+  if (ctx.choicePicker !== undefined) defaultNetcodeContext.choicePicker = ctx.choicePicker;
 }
 
 /**
@@ -109,6 +132,7 @@ export function resetRenderState() {
   coverRegistry.clear();
   lastAppliedView = null;
   clearInFlightAffordances();
+  openPickerChoiceId = null;
   defaultNetcodeContext = {
     socket: null,
     roomId: null,
@@ -117,6 +141,8 @@ export function resetRenderState() {
     cardListeners: null,
     coverListeners: null,
     sortZoneCards: null,
+    holo: null,
+    choicePicker: null,
   };
 }
 
@@ -359,6 +385,9 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
       side,
       zone: zoneId,
       container: null,
+      // Stable per-card shim for hydrateHolo, which keys its pending lookups
+      // off the card object and stores the wrapper on it.
+      holoCard: { image: img },
     };
     cardRegistry.set(instanceId, record);
   } else {
@@ -366,6 +395,13 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
     record.side = side;
     record.zone = zoneId;
   }
+  record.holoCard.name = cardData.name;
+  record.holoCard.type = cardData.type;
+  record.holoCard.user = img.user;
+  record.isRedacted = isRedacted;
+  // Keep the stamped data current: double-click previews read img.card
+  // (preview-card.mjs), including the attachedCards rebuilt each view.
+  if (img.card) img.card = record.card;
 
   return img;
 }
@@ -557,39 +593,46 @@ function reconcileCardOverlays(cardData, img, zoneElement, side, options = {}) {
  * @param {string} side
  * @param {string} zoneId
  * @param {object} options
+ * @returns {{ attachedParent: object|null }} the parent's registry record when the
+ *   card was placed as an attachment
  */
 function placeCardInZone(cardData, side, zoneId, options = {}) {
   const doc = options.document || (typeof document !== 'undefined' ? document : null);
   const zone = resolveZone(side, zoneId, options);
   const record = cardRegistry.get(cardData.instanceId);
-  if (!zone.element || !record) return;
+  if (!zone.element || !record) return { attachedParent: null };
 
   const img = record.element;
+  const parentRecord =
+    PLAY_ZONES.includes(zoneId) && cardData.attachedTo != null
+      ? cardRegistry.get(cardData.attachedTo)
+      : null;
 
   // Handle play zones (active & bench)
+  if (parentRecord && parentRecord.container) {
+    // An attached card never keeps a holo wrapper (legacy attach-card.js):
+    // it sits as a bare sibling of the parent inside `.play-container`.
+    unhydrateCard(record, options);
+    // Append attached card under parent container with attached style.
+    // Always appendChild (not just when the parent differs): appendChild
+    // on an existing child moves it to the end, so re-appending every
+    // card in view order each applyView reconciles sibling order among
+    // a parent's attachments (finding #10) instead of only placing a
+    // card the first time it arrives.
+    img.classList.add('attached-card');
+    parentRecord.container.appendChild(img);
+    return { attachedParent: parentRecord };
+  }
+
+  // A card that was attached last view (and maybe drawn as an Energy token)
+  // must lose that look wherever it lands now, not only on the
+  // leaves-play-zones branch (finding #11).
+  img.classList.remove('attached-card');
+  clearEnergyToken(img);
+  const node = cardNodeOf(record);
+
   if (PLAY_ZONES.includes(zoneId)) {
-    // Check if card is attached to another Pokemon
-    if (cardData.attachedTo != null) {
-      const parentRecord = cardRegistry.get(cardData.attachedTo);
-      if (parentRecord && parentRecord.container) {
-        // Append attached card under parent container with attached style.
-        // Always appendChild (not just when the parent differs): appendChild
-        // on an existing child moves it to the end, so re-appending every
-        // card in view order each applyView reconciles sibling order among
-        // a parent's attachments (finding #10) instead of only placing a
-        // card the first time it arrives.
-        img.classList.add('attached-card');
-        parentRecord.container.appendChild(img);
-        return;
-      }
-    }
-
-    // Top-level active/bench Pokemon: wrap in .play-container. A card that
-    // was attached last view and is top-level this view must lose the
-    // 'attached-card' class here too, not only on the leaves-play-zones
-    // branch below (finding #11).
-    img.classList.remove('attached-card');
-
+    // Top-level active/bench Pokemon: wrap in .play-container.
     let container = record.container;
     if (!container || !container.parentNode) {
       container = doc.createElement('div');
@@ -599,9 +642,9 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
     }
     // Always appendChild: reconciles both the image-within-container order
     // and the container-within-zone order (finding #10) on every view.
-    container.appendChild(img);
+    container.appendChild(node);
     zone.element.appendChild(container);
-    return;
+    return { attachedParent: null };
   }
 
   // If card was previously in a play-container, clean up container
@@ -610,11 +653,128 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
     record.container = null;
   }
 
-  img.classList.remove('attached-card');
   // Always appendChild (not just when the parent differs): reconciles
   // intra-zone order to match the view's array order on every applyView
   // (finding #10) instead of freezing the first-seen DOM position.
-  zone.element.appendChild(img);
+  zone.element.appendChild(node);
+  return { attachedParent: null };
+}
+
+/**
+ * The node that represents a card in its zone: its holo wrapper once
+ * hydrated (the <img> then lives inside the wrapper's `.card__rotator`),
+ * otherwise the bare <img>. Moving the <img> itself would tear it out of
+ * the wrapper and leave an empty foil frame behind.
+ *
+ * @param {object} record
+ * @returns {object}
+ */
+function cardNodeOf(record) {
+  return record.holoCard?.wrapper || record.element;
+}
+
+function holoApi(options = {}) {
+  return options.holo || defaultNetcodeContext.holo || null;
+}
+
+function unhydrateCard(record, options = {}) {
+  if (!record.holoCard?.wrapper) return;
+  holoApi(options)?.unhydrate?.(record.holoCard);
+}
+
+/**
+ * Gives a face-up card in a holo zone its holofoil wrapper (async, idempotent:
+ * hydrateHolo returns early once `card.wrapper` exists), and strips it from
+ * face-down cards and cards in zones legacy never foils.
+ *
+ * @param {object} record
+ * @param {string} zoneId
+ * @param {boolean} isAttached
+ * @param {object} options
+ */
+function reconcileHolo(record, zoneId, isAttached, options = {}) {
+  const holo = holoApi(options);
+  if (!holo) return;
+  const wantsHolo =
+    !isAttached && !record.isRedacted && Boolean(record.holoCard.name) && HOLO_ZONES.includes(zoneId);
+  if (!wantsHolo) {
+    unhydrateCard(record, options);
+    return;
+  }
+  if (!record.element.parentNode) return;
+  try {
+    const pending = holo.hydrate?.(record.holoCard);
+    pending?.catch?.(() => {});
+  } catch {
+    // A holo failure is cosmetic; the card is already placed.
+  }
+}
+
+function clearEnergyToken(img) {
+  if (!img.dataset.energyCardSrc) return;
+  delete img.dataset.energyCardSrc;
+  img.classList.remove('energy-token-3d');
+  for (const key of ENERGY_TOKEN_STYLE_KEYS) img.style[key] = '';
+}
+
+/**
+ * Draws an attached Energy as the same small round type token legacy
+ * attach-card.js uses: full card art stashed in `data-energy-card-src` (the
+ * double-click carousel shows it), a row along the parent's bottom edge,
+ * layered above the parent's face.
+ *
+ * @param {object} img attached Energy <img> (src already set to its card art)
+ * @param {object} cardData
+ * @param {object} parentImg
+ * @param {number} layer 1-based position among the parent's Energy tokens
+ * @returns {boolean} whether a token was drawn
+ */
+function applyEnergyToken(img, cardData, parentImg, layer) {
+  const tokenSrc = getEnergyTokenFront(cardData);
+  if (!tokenSrc) {
+    clearEnergyToken(img);
+    return false;
+  }
+  const cardWidth = parentImg?.clientWidth || 0;
+  const cardHeight = parentImg?.clientHeight || 0;
+  const tokenSize = cardWidth * ENERGY_TOKEN_SIZE;
+  img.dataset.energyCardSrc = img.getAttribute('src');
+  img.setAttribute('src', tokenSrc);
+  img.classList.add('energy-token-3d');
+  img.style.position = 'absolute';
+  img.style.width = `${tokenSize}px`;
+  img.style.height = `${tokenSize}px`;
+  img.style.left = `${(layer - 1) * tokenSize * ENERGY_TOKEN_SPACING}px`;
+  img.style.bottom = `${cardHeight * ENERGY_TOKEN_BOTTOM}px`;
+  img.style.zIndex = String(100 + layer);
+  img.energyLayer = layer;
+  return true;
+}
+
+/**
+ * Rebuilds every parent's `attachedCards` (read by the double-click carousel
+ * in click-events.js) and draws attached Energy as tokens, in view order.
+ * Runs after all zones are placed so a parent processed after its
+ * attachments still ends up with the full list.
+ *
+ * @param {{ cardData: object, img: object, parentRecord: object }[]} attachments
+ */
+function reconcileAttachments(attachments) {
+  const energyCountByParent = new Map();
+  for (const { parentRecord } of attachments) {
+    parentRecord.card.attachedCards = [];
+  }
+  for (const { cardData, img, parentRecord } of attachments) {
+    parentRecord.card.attachedCards.push({ ...cardData, image: img });
+    if (cardData.type !== 'Energy') {
+      clearEnergyToken(img);
+      continue;
+    }
+    const layer = (energyCountByParent.get(parentRecord) || 0) + 1;
+    if (applyEnergyToken(img, cardData, parentRecord.element, layer)) {
+      energyCountByParent.set(parentRecord, layer);
+    }
+  }
 }
 
 const COVER_ZONES = ['deck', 'discard', 'lostZone'];
@@ -710,6 +870,7 @@ function reconcileStadium(stadiumCard, options = {}) {
   }
 
   const img = createOrUpdateCardElement(stadiumCard, 'neutral', 'stadium', options);
+  unhydrateCard(cardRegistry.get(stadiumCard.instanceId), options);
   if (img.parentNode !== stadiumElement) {
     if (stadiumElement.innerHTML !== undefined) {
       stadiumElement.innerHTML = '';
@@ -733,6 +894,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
   const existingBanner = doc.getElementById ? doc.getElementById('netcodeChoiceBanner') : null;
 
   if (!pendingChoice) {
+    closeChoicePicker(options);
     if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
     if (existingBanner?.parentNode) existingBanner.parentNode.removeChild(existingBanner);
     return;
@@ -742,6 +904,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
 
   if (!isOwner) {
     // Opponent is choosing: show non-interactive waiting banner
+    closeChoicePicker(options);
     if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
     let banner = existingBanner;
     if (!banner) {
@@ -756,6 +919,12 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
 
   // Local player must make a choice: mount interactive picker
   if (existingBanner?.parentNode) existingBanner.parentNode.removeChild(existingBanner);
+
+  if (openChoiceInCardPicker(pendingChoice, options)) {
+    if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
+    return;
+  }
+  closeChoicePicker(options);
 
   let modal = existingModal;
   if (!modal) {
@@ -834,23 +1003,71 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     confirmBtn.disabled = true;
     const selection = Array.from(selectedIds);
     try {
-      if (typeof options.onResolveChoice === 'function') {
-        options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
-      } else {
-        const { socket, roomId } = await resolveNetcodeContext(options);
-        if (socket && roomId) {
-          emitResolveChoice({
-            socket,
-            roomId,
-            choiceId: pendingChoice.choiceId,
-            selection,
-          });
-        }
-      }
+      await submitChoiceSelection(pendingChoice, selection, options);
     } finally {
       if (modal.parentNode) modal.parentNode.removeChild(modal);
     }
   });
+}
+
+async function submitChoiceSelection(pendingChoice, selection, options = {}) {
+  if (typeof options.onResolveChoice === 'function') {
+    options.onResolveChoice({ choiceId: pendingChoice.choiceId, selection });
+    return;
+  }
+  const { socket, roomId } = await resolveNetcodeContext(options);
+  if (socket && roomId) {
+    emitResolveChoice({
+      socket,
+      roomId,
+      choiceId: pendingChoice.choiceId,
+      selection,
+    });
+  }
+}
+
+function choicePickerApi(options = {}) {
+  return options.choicePicker || defaultNetcodeContext.choicePicker || null;
+}
+
+/**
+ * Shows a card choice in the injected PTCG Live-style card picker (the same
+ * one single-player rules mode uses) instead of the flat grid modal. Only
+ * card choices qualify: every option needs art to draw a carousel slide.
+ *
+ * @returns {boolean} whether the picker owns this choice
+ */
+function openChoiceInCardPicker(pendingChoice, options = {}) {
+  const picker = choicePickerApi(options);
+  if (typeof picker?.open !== 'function') return false;
+  const choiceOptions = Array.isArray(pendingChoice.options) ? pendingChoice.options : [];
+  if (choiceOptions.length === 0 || !choiceOptions.every((opt) => opt?.src)) return false;
+  if (openPickerChoiceId === pendingChoice.choiceId) return true;
+
+  closeChoicePicker(options);
+  openPickerChoiceId = pendingChoice.choiceId;
+  try {
+    picker.open({
+      choice: pendingChoice,
+      onResolve: (selection) => {
+        // Mirrors the modal, which unmounts on confirm: a later view that
+        // still carries this choice (e.g. the server rejected it) reopens.
+        openPickerChoiceId = null;
+        return submitChoiceSelection(pendingChoice, selection, options);
+      },
+    });
+  } catch (err) {
+    openPickerChoiceId = null;
+    console.error('[apply-view] card picker failed, using choice modal:', err);
+    return false;
+  }
+  return true;
+}
+
+function closeChoicePicker(options = {}) {
+  if (openPickerChoiceId == null) return;
+  openPickerChoiceId = null;
+  choicePickerApi(options)?.close?.();
 }
 
 /**
@@ -946,6 +1163,7 @@ export function reconcileGameEnded(view, options = {}) {
   const existingChoiceBanner = doc.getElementById ? doc.getElementById('netcodeChoiceBanner') : null;
   if (existingChoiceModal?.parentNode) existingChoiceModal.parentNode.removeChild(existingChoiceModal);
   if (existingChoiceBanner?.parentNode) existingChoiceBanner.parentNode.removeChild(existingChoiceBanner);
+  closeChoicePicker(options);
 
   const localPlayerId = view.you?.playerId || null;
   const isWinner = Boolean(view.winner && localPlayerId && view.winner === localPlayerId);
@@ -1119,6 +1337,7 @@ export function applyView(view, events = [], options = {}) {
 
   // Reconcile player sides ('you' and 'them')
   const sides = ['you', 'them'];
+  const attachments = [];
   for (const side of sides) {
     const playerView = view[side];
     if (!playerView || !playerView.zones) continue;
@@ -1134,12 +1353,15 @@ export function applyView(view, events = [], options = {}) {
 
       for (const cardData of orderedCards) {
         const img = createOrUpdateCardElement(cardData, side, zoneId, options);
-        placeCardInZone(cardData, side, zoneId, options);
+        const { attachedParent } = placeCardInZone(cardData, side, zoneId, options);
+        if (attachedParent) attachments.push({ cardData, img, parentRecord: attachedParent });
+        reconcileHolo(cardRegistry.get(cardData.instanceId), zoneId, Boolean(attachedParent), options);
         const zone = resolveZone(side, zoneId, options);
         reconcileCardOverlays(cardData, img, zone.element, side, options);
       }
     }
   }
+  reconcileAttachments(attachments);
 
   // Clean up removed cards from registry and DOM
   const liveInstanceIds = new Set();
@@ -1167,6 +1389,7 @@ export function applyView(view, events = [], options = {}) {
       if (record.element?.specialCondition?.parentNode) {
         record.element.specialCondition.parentNode.removeChild(record.element.specialCondition);
       }
+      unhydrateCard(record, options);
       if (record.container && record.container.parentNode) {
         record.container.parentNode.removeChild(record.container);
       } else if (record.element && record.element.parentNode) {

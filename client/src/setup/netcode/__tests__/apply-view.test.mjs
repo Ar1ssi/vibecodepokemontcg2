@@ -1531,3 +1531,212 @@ test('3.12: applyView syncs turn state as part of a normal view apply', () => {
   assert.equal(local.turnNumber, 2);
   assert.equal(local.phase, 'main');
 });
+
+// Stands in for hydrate-holo.js: wraps the <img> in a `.mat-holo` node the way
+// hydrateHolo does (synchronously here), and unwraps it back in place.
+function fakeHolo(doc) {
+  return {
+    hydrate(card) {
+      if (card.wrapper) return Promise.resolve(card.wrapper);
+      const wrapper = doc.createElement('div');
+      wrapper.className = 'mat-holo';
+      card.image.parentNode.appendChild(wrapper);
+      wrapper.appendChild(card.image);
+      card.wrapper = wrapper;
+      return Promise.resolve(wrapper);
+    },
+    unhydrate(card) {
+      const wrapper = card.wrapper;
+      if (!wrapper) return;
+      wrapper.parentNode?.appendChild(card.image);
+      wrapper.parentNode?.removeChild(wrapper);
+      card.wrapper = undefined;
+    },
+  };
+}
+
+test('holo: a face-up hand card is hydrated and moves as its wrapper', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone, holo: fakeHolo(doc) };
+  const selfMat = doc.getElementById('selfMat');
+  const hand = selfMat.querySelector('#hand');
+  const discard = selfMat.querySelector('#discard');
+  const mew = { instanceId: 1, name: 'Mew ex', src: 'mew.png' };
+
+  applyView({ stateVersion: 1, you: { playerId: 'p1', zones: { hand: [mew] } } }, [], opts);
+  const wrapper = hand.querySelector('.mat-holo');
+  assert.ok(wrapper, 'hand card gets a holo wrapper');
+  assert.equal(wrapper.querySelector('img').dataset.instanceId, '1');
+
+  applyView({ stateVersion: 2, you: { playerId: 'p1', zones: { hand: [], discard: [mew] } } }, [], opts);
+  assert.equal(hand.children.length, 0, 'no empty foil frame left in hand');
+  assert.equal(discard.querySelector('.mat-holo'), wrapper, 'wrapper moved with the card');
+  assert.equal(wrapper.querySelector('img').dataset.instanceId, '1');
+});
+
+test('holo: face-down, attached and removed cards lose their wrapper', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone, holo: fakeHolo(doc) };
+  const selfMat = doc.getElementById('selfMat');
+  const active = selfMat.querySelector('#active');
+  const pikachu = { instanceId: 10, name: 'Pikachu', src: 'pika.png' };
+  const raichu = { instanceId: 11, name: 'Raichu', src: 'rai.png' };
+
+  applyView(
+    {
+      stateVersion: 1,
+      you: { playerId: 'p1', zones: { active: [pikachu], bench: [raichu], prizes: [{ instanceId: 12 }] } },
+    },
+    [],
+    opts
+  );
+  assert.equal(selfMat.querySelector('#prizes').querySelector('.mat-holo'), null, 'redacted prize is never foiled');
+  assert.equal(selfMat.querySelector('#bench').querySelectorAll('.mat-holo').length, 1);
+
+  applyView(
+    {
+      stateVersion: 2,
+      you: { playerId: 'p1', zones: { active: [pikachu, { ...raichu, attachedTo: 10 }], bench: [], prizes: [] } },
+    },
+    [],
+    opts
+  );
+  const container = active.querySelector('.play-container');
+  const raichuImg = container.querySelector('img[data-instance-id="11"]');
+  assert.equal(raichuImg.parentNode, container, 'attached card is a bare child of the container');
+  assert.equal(active.querySelectorAll('.mat-holo').length, 1, 'only the parent keeps its foil');
+
+  applyView({ stateVersion: 3, you: { playerId: 'p1', zones: { active: [], bench: [], prizes: [] } } }, [], opts);
+  assert.equal(active.children.length, 0);
+  assert.equal(getCardRegistry().size, 0);
+});
+
+test('energy: attached Energy draws as tokens and fills the parent attachedCards', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
+  const pikachu = { instanceId: 10, name: 'Pikachu', src: 'pika.png', type: 'Pokémon' };
+  const lightning = { instanceId: 11, name: 'Basic Lightning Energy', src: 'l.png', type: 'Energy' };
+  const belt = { instanceId: 12, name: 'Choice Belt', src: 'belt.png', type: 'Trainer' };
+  const fire = { instanceId: 13, name: 'Basic Fire Energy', src: 'f.png', type: 'Energy' };
+
+  applyView(
+    view(1, {
+      active: [
+        pikachu,
+        { ...lightning, attachedTo: 10 },
+        { ...belt, attachedTo: 10 },
+        { ...fire, attachedTo: 10 },
+      ],
+    }),
+    [],
+    opts
+  );
+  const registry = getCardRegistry();
+  const lightningImg = registry.get(11).element;
+  const beltImg = registry.get(12).element;
+  const fireImg = registry.get(13).element;
+
+  assert.equal(lightningImg.getAttribute('src'), '/src/assets/energy/tokens/lightning.png');
+  assert.equal(lightningImg.dataset.energyCardSrc, 'l.png');
+  assert.equal(lightningImg.classList.contains('energy-token-3d'), true);
+  assert.equal(lightningImg.style.zIndex, '101');
+  assert.equal(fireImg.getAttribute('src'), '/src/assets/energy/tokens/fire.png');
+  assert.equal(fireImg.style.zIndex, '102', 'second Energy stacks after the first, skipping the Tool');
+  assert.equal(beltImg.getAttribute('src'), 'belt.png', 'Tools keep their card art');
+  assert.deepEqual(
+    registry.get(10).card.attachedCards.map((c) => [c.instanceId, c.image]),
+    [
+      [11, lightningImg],
+      [12, beltImg],
+      [13, fireImg],
+    ]
+  );
+
+  applyView(
+    view(2, { active: [pikachu, { ...fire, attachedTo: 10 }], discard: [lightning], hand: [belt] }),
+    [],
+    opts
+  );
+  assert.deepEqual(registry.get(10).card.attachedCards.map((c) => c.instanceId), [13]);
+  assert.equal(fireImg.style.zIndex, '101');
+  assert.equal(lightningImg.getAttribute('src'), 'l.png', 'detached Energy shows its card art again');
+  assert.equal(lightningImg.dataset.energyCardSrc, undefined);
+  assert.equal(lightningImg.classList.contains('energy-token-3d'), false);
+  assert.equal(lightningImg.style.position, '');
+});
+
+const NEST_BALL_CHOICE = {
+  choiceId: 'choice_p1_4',
+  player: 'p1',
+  prompt: 'Nest Ball: choose a Basic Pokémon',
+  options: [
+    { instanceId: 1, name: 'Pikachu', src: 'pika.png' },
+    { instanceId: 2, name: 'Mew', src: 'mew.png' },
+  ],
+  min: 0,
+  max: 1,
+};
+
+const choiceView = (stateVersion, pendingChoice) => ({
+  stateVersion,
+  pendingChoice,
+  you: { playerId: 'p1', zones: {} },
+  them: { playerId: 'p2', zones: {} },
+});
+
+function fakeChoicePicker() {
+  const picker = { opened: [], closed: 0 };
+  picker.open = (request) => picker.opened.push(request);
+  picker.close = () => {
+    picker.closed += 1;
+  };
+  return picker;
+}
+
+test('choice: a card choice opens the card picker once instead of the grid modal', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const choicePicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = { document: doc, getZone: mockGetZone, choicePicker, onResolveChoice: (sel) => resolved.push(sel) };
+
+  applyView(choiceView(1, NEST_BALL_CHOICE), [], opts);
+  applyView(choiceView(2, NEST_BALL_CHOICE), [], opts);
+
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  assert.equal(choicePicker.opened.length, 1, 're-applied view does not reopen the picker');
+  assert.equal(choicePicker.opened[0].choice.choiceId, 'choice_p1_4');
+
+  await choicePicker.opened[0].onResolve([2]);
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_4', selection: [2] }]);
+
+  applyView(choiceView(3, null), [], opts);
+  assert.equal(choicePicker.closed, 0, 'a resolved picker already closed itself');
+});
+
+test('choice: picker closes when the choice clears or passes to the opponent', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const choicePicker = fakeChoicePicker();
+  const opts = { document: doc, getZone: mockGetZone, choicePicker };
+
+  applyView(choiceView(1, NEST_BALL_CHOICE), [], opts);
+  applyView(choiceView(2, null), [], opts);
+  assert.equal(choicePicker.closed, 1);
+
+  applyView(choiceView(3, NEST_BALL_CHOICE), [], opts);
+  applyView(choiceView(4, { ...NEST_BALL_CHOICE, player: 'p2' }), [], opts);
+  assert.equal(choicePicker.opened.length, 2);
+  assert.equal(choicePicker.closed, 2);
+  assert.ok(doc.getElementById('netcodeChoiceBanner'));
+});
+
+test('choice: options without art fall back to the grid modal', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const choicePicker = fakeChoicePicker();
+  const noArt = { ...NEST_BALL_CHOICE, options: [{ instanceId: 1, name: 'Pikachu', src: '' }] };
+
+  applyView(choiceView(1, noArt), [], { document: doc, getZone: mockGetZone, choicePicker });
+
+  assert.equal(choicePicker.opened.length, 0);
+  assert.ok(doc.getElementById('netcodeChoiceModal'));
+});
