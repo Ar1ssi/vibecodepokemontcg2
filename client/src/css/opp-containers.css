@@ -255,15 +255,15 @@ img.draw-flight-source,
 	left: var(--bench-left);
 	width: var(--bench-width);
 	height: var(--bench-height);
-	display: flex;
-	justify-content: center;
-	align-items: flex-end;
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	align-items: end;
+	justify-items: center;
 	gap: var(--bench-gap);
 	z-index: 0;
 }
 #bench div {
   height: 100%;
-	flex: 0 0 auto;
 }
 #active {
   position: fixed;
