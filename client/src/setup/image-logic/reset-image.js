@@ -1,4 +1,16 @@
 export const resetImage = (image, zoneId = '') => {
+  // hydrateHolo() takes a one-time px snapshot of the wrapper's width/height
+  // at hydration time (board sizing, possibly inflated by energyLayer
+  // stacking). Off the board, each zone has its own `.mat-holo` CSS sizing
+  // rule — clear the inline snapshot so that rule wins instead of a stale
+  // board-size px value following the card around.
+  if (!['active', 'bench'].includes(zoneId)) {
+    const wrapper = image.closest?.('.mat-holo');
+    if (wrapper) {
+      wrapper.style.width = '';
+      wrapper.style.height = '';
+    }
+  }
   if (image.dataset?.energyCardSrc) {
     image.src = image.dataset.energyCardSrc;
     delete image.dataset.energyCardSrc;
