@@ -4,8 +4,8 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 142
-Focus: merged S140 (board-zone drops), S141 (multiplayer card preview), S142 (I48 double render) to main.
+Session: 143
+Focus: added 8 custom Pokémon playmats (upscaled 2x + cropped 1.9394:1).
 Active: none.
 Next: I47 (test:flip stalls right after join, SERVER_AUTHORITATIVE) — I48 was not its cause.
   Legacy zone arrays drift from server counts (client A: 8 legacy vs 9 server hand cards).
@@ -26,6 +26,7 @@ Blocked: none.
 - Holo `--pointer-*` CSS vars mean the LIGHT position (from card angle), not the cursor (D34).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S143 2026-09-16 feature: 8 custom Pokémon playmats added with 2x upscale and 1.9394:1 mat crop.
 - S142 2026-09-16 debug: I48 closed — no double-rendered cards in multiplayer (on main).
 - S141 2026-09-16 debug: multiplayer card preview works for server-rendered cards (on main).
-- S137 2026-09-16 feature: per-generation holofoil patterns, render-checked (PR #133, on main).
+
