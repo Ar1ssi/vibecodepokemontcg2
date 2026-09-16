@@ -301,20 +301,24 @@ export const imageClick = (event) => {
     // after the selectHighlight branch above, so attaching Energy or
     // promoting from bench (R1) is untouched.
     if (rulesState.enabled) {
+      // Server-rendered cards are not in the legacy zone arrays
+      // (mouseClick.card is null in multiplayer); use the stamped card data,
+      // the same fallback double-click uses.
+      const previewCard = resolvePreviewCard(mouseClick.card, event.target);
       const decision = shouldOpenAttackPreview({
         zoneId: mouseClick.zoneId,
         cardUser: mouseClick.cardUser,
         hasSelectHighlight: false,
         hasAbility:
-          mouseClick.zoneId === 'bench' ? benchCardHasAbility(mouseClick.card) : false,
+          mouseClick.zoneId === 'bench' ? benchCardHasAbility(previewCard) : false,
         gate: canPerformAction({ user: mouseClick.cardUser, action: 'attack' }),
       });
-      if (decision === 'attack' && mouseClick.card?.image) {
-        openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'active' });
+      if (decision === 'attack' && previewCard?.image) {
+        openAttackPreview(previewCard, previewCard.image, { zone: 'active' });
         return;
       }
-      if (decision === 'ability' && mouseClick.card?.image) {
-        openAttackPreview(mouseClick.card, mouseClick.card.image, { zone: 'bench' });
+      if (decision === 'ability' && previewCard?.image) {
+        openAttackPreview(previewCard, previewCard.image, { zone: 'bench' });
         return;
       }
     }

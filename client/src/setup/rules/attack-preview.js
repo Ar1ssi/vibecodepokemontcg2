@@ -6,6 +6,16 @@
 // this can be opened for) is a later slice; this module only implements the
 // overlay itself once something else decides to open it.
 import { getZone } from '../zones/get-zone.js';
+import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import {
+  isAuthoritativeDispatchActive,
+  dispatchAuthoritativeUseAbility,
+} from '../netcode/authoritative-dispatch.js';
+import {
+  attachedEnergiesFor,
+  stadiumCardFor,
+  abilityUsedFor,
+} from './attack-preview-sources.mjs';
 import {
   rulesState,
   ensureCardData,
@@ -93,7 +103,7 @@ const contentBoxFor = (popHost) => {
  */
 const abilityInfoFor = (card) => {
   if (!benchCardHasAbility(card)) return null;
-  const used = abilityUsed('self', card);
+  const used = abilityUsedFor(card, abilityUsed('self', card), rulesState.flags?.self?.abilitiesUsed);
   return {
     name: card.ability?.name || 'Ability',
     usable: !used,
@@ -121,6 +131,20 @@ const buildAbilityZoneEl = (abilityInfo, bounds, contentBox, card) => {
       event.stopPropagation();
       // D5/R12: using an ability does not end the turn — the overlay stays
       // open and re-renders itself once the resulting board event fires.
+      // Multiplayer: the server runs the ability (and asks for any picks
+      // through a pendingChoice); the local step runner would mutate legacy
+      // zone arrays the server never sees.
+      if (card.instanceId != null && isAuthoritativeDispatchActive()) {
+        dispatchAuthoritativeUseAbility({
+          user: 'self',
+          emit: true,
+          oInitiator: 'opp',
+          zoneId: previewState?.zone || 'active',
+          index: 0,
+          authoritativeId: card.instanceId,
+        });
+        return;
+      }
       runAbilitySteps('self', card);
     });
   }
@@ -240,17 +264,15 @@ async function renderZones({ popHost, overlay, card }) {
   }
   if (!previewState) return; // closed while awaiting
 
-  const attachedEnergies = getZone('self', 'active').array.filter(
-    (c) => c.type === 'Energy' && c.image?.relative === card.image
-  );
-  const stadiumCard = getStadium()?.card;
+  const attachedEnergies = attachedEnergiesFor(card, getZone('self', 'active').array);
+  const stadiumCard = stadiumCardFor(getStadium(), getAuthoritativeStadiumArray());
   const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks } =
     await resolveAttackContext({
       activeCard: card,
       attachedEnergyCards: attachedEnergies,
       ensureCardData,
       stadiumCard,
-      abilityUsed: (c) => abilityUsed('self', c),
+      abilityUsed: (c) => abilityUsedFor(c, abilityUsed('self', c), rulesState.flags?.self?.abilitiesUsed),
     });
   if (!previewState) return;
 
