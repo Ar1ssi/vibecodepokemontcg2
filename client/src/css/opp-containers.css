@@ -795,51 +795,39 @@ img.draw-flight-source,
        zone plates (deck, prizes, discard, lost zone, active, bench), plus
        card motion animations for draw/shuffle/play. */
     
-    /* arena mat background */
+    /* arena mat background: transparent so the parent page's black
+       #battleMat + zone-outline svg overlay show through */
     body {
-      background:
-        radial-gradient(120% 90% at 50% 0%, rgba(120, 160, 230, 0.10), transparent 60%),
-        linear-gradient(180deg, #23324e 0%, #1b2740 55%, #161f36 100%) !important;
+      background: transparent !important;
     }
     body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(60% 40% at 50% 55%, rgba(140, 190, 255, 0.06), transparent 70%),
-        repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0 2px, transparent 2px 90px),
-        repeating-linear-gradient(0deg, rgba(255,255,255,0.014) 0 2px, transparent 2px 90px);
-      pointer-events: none;
-      z-index: 0;
+      content: none;
     }
-    
-    /* zone plates: rounded, softly lit, labeled */
+
+    /* zone plates: rounded outline, no fill */
     .zone, .outline {
       border-radius: 10px;
     }
-    
-    /* deck/discard/lost-zone plates */
+
+    /* deck/discard/lost-zone: no plate, zone position marked by the
+       parent page's svg outline overlay instead */
     #deck, #discard, #lostZone {
-      background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-      border: 1px solid rgba(160, 190, 255, 0.22);
-      box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+      background: transparent;
+      border: none;
+      box-shadow: none;
     }
-    /* active spot: spotlight plate */
     #active {
-      background: radial-gradient(80% 80% at 50% 40%, rgba(255, 214, 120, 0.10), transparent 70%),
-                  linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255, 214, 120, 0.30);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      background: transparent;
+      border: none;
+      box-shadow: none;
     }
-    /* bench + stadium */
     #board .outline, #stadium {
-      background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
-      border: 1px solid rgba(160, 190, 255, 0.18);
+      background: transparent;
+      border: none;
     }
-    /* hand strip */
     #hand::before {
-      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
-      border-top: 1px solid rgba(160, 190, 255, 0.18);
+      background: transparent;
+      border-top: none;
     }
     
     /* hover affordance on plates */

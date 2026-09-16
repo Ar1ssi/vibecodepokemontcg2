@@ -10,7 +10,6 @@
  */
 
 import {
-  DEFAULT_MAT_LAYOUT_ID,
   getMatLayout,
   layoutToCssVars,
   resolveMatLayout,
@@ -94,10 +93,15 @@ const applyMatLayoutToElement = (layoutId, el) => {
   }
 };
 
+/** No mat chosen: use the edge-to-edge one-player profile, since that's the
+ * zone geometry `playmat_zones_overlay.svg` was drawn against — matches
+ * card positions to the svg outline exactly, same as a real mat would. */
+const NO_MAT_LAYOUT_ID = 'edge-to-edge';
+
 /** @param {'self'|'opp'} target */
 const layoutForTarget = (target) => {
   const mat = currentMats[target];
-  return mat ? resolveMatLayout(mat) : getMatLayout(DEFAULT_MAT_LAYOUT_ID);
+  return mat ? resolveMatLayout(mat) : getMatLayout(NO_MAT_LAYOUT_ID);
 };
 
 const isTwoPlayerMat = (mat) =>
@@ -137,10 +141,9 @@ const syncIframeLayouts = () => {
   applyMatLayoutToElement(layoutForTarget('opp').id, halfOpp);
 
   // Stadium sits on the parent page; follow the bottom player's mat, then opp.
-  const parentLayout =
-    currentMats.self && layoutForTarget('self').id !== DEFAULT_MAT_LAYOUT_ID
-      ? layoutForTarget('self')
-      : layoutForTarget('opp');
+  const parentLayout = currentMats.self
+    ? layoutForTarget('self')
+    : layoutForTarget('opp');
   applyMatLayoutToDoc(parentLayout.id, document);
 };
 
@@ -202,9 +205,13 @@ const paintMatImageForTarget = (target, mat) => {
     art.hidden = true;
     ambient.removeAttribute('src');
     ambient.hidden = true;
+    // No mat art chosen: still show the zone-outline svg over the flat
+    // black board, same as a one-sided mat's overlay would.
     if (overlay) {
-      overlay.removeAttribute('src');
-      overlay.hidden = true;
+      overlay.src = toAbsoluteClientPath(
+        'src/assets/playmats/playmat_zones_overlay.svg'
+      );
+      overlay.hidden = false;
     }
     return;
   }
@@ -271,17 +278,19 @@ const syncMatArt = () => {
   const battleMat = document.getElementById('battleMat');
   const art = document.getElementById('battleMatArt');
   const shared = activeTwoPlayerMat();
-  const hasAny = Boolean(shared || currentMats.self || currentMats.opp);
 
   const activeLayout = shared
     ? resolveMatLayout(shared.mat)
     : currentMats.self
-      ? resolveMatLayout(currentMats.self)
-      : resolveMatLayout(currentMats.opp);
+      ? layoutForTarget('self')
+      : layoutForTarget('opp');
   const isCover = activeLayout?.matFit === 'cover';
 
+  // No mat chosen behaves exactly like a chosen mat (default zone-outline
+  // svg standing in for the art): mat-active is always on, not gated on
+  // hasAny.
   if (battleMat) {
-    battleMat.classList.toggle('mat-active', hasAny);
+    battleMat.classList.toggle('mat-active', true);
     battleMat.classList.toggle('mat-fit-cover', isCover);
     battleMat.classList.toggle(
       'mat-two-player',
@@ -294,10 +303,7 @@ const syncMatArt = () => {
   }
 
   for (const target of MAT_TARGETS) {
-    frameDocument(target)?.body?.classList.toggle(
-      'mat-active',
-      Boolean(shared || currentMats[target])
-    );
+    frameDocument(target)?.body?.classList.toggle('mat-active', true);
   }
 
   if (art) {
@@ -309,7 +315,9 @@ const syncMatArt = () => {
       paintMatImageForTarget('self', currentMats.self);
       paintMatImageForTarget('opp', currentMats.opp);
     }
-    art.hidden = !hasAny;
+    // Always visible: even without a chosen mat, the zone-outline svg
+    // painted above needs #battleMatArt shown.
+    art.hidden = false;
   }
 };
 
