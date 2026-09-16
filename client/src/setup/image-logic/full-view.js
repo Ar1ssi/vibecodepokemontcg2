@@ -10,6 +10,7 @@ import {
   imageAnchor,
 } from '../deck-constructor/hydrate-holo.js';
 import { toHighResCardImageUrl } from './card-image-url.mjs';
+import { hidePreviewSource } from './preview-source.mjs';
 import {
   playSelectPop,
   playDeselectPop,
@@ -228,9 +229,8 @@ export const openFloatingCardPreview = ({
   popHost.appendChild(buildPreviewFlip(frontNode, sleeveSrc || DEFAULT_SLEEVE));
   overlay.appendChild(popHost);
   document.body.appendChild(overlay);
-  if (hideSource && sourceEl) {
-    sourceEl.style.visibility = 'hidden';
-  }
+  // Restored in closeCardPreview's revert for every caller, before onClosed.
+  const restoreSource = hideSource ? hidePreviewSource(sourceEl) : () => {};
 
   if (wrapper) {
     startPreviewHolo(wrapper);
@@ -255,6 +255,7 @@ export const openFloatingCardPreview = ({
     wrapper,
     mode: 'float',
     closing: false,
+    restoreSource,
     onClosed,
     interactive,
   };
@@ -303,6 +304,7 @@ export const closeCardPreview = (event, immediate = false) => {
   const revert = () => {
     if (cardPreviewState === state) cardPreviewState = null;
     state.overlay.remove();
+    state.restoreSource?.();
     state.onClosed?.();
   };
 
