@@ -5,9 +5,10 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 146
-Focus: Trainer effects + evolution stats server-side; I35/I49/I50 closed (branch feature/trainer-play-effects, not merged).
+Focus: Trainer effects + evolution stats server-side (PRs #136/#137 merged to main); grey multiplayer sleeves fixed.
 Active: none.
-Next: merge PR #136, then the I51/I52 PR (untested at user request: run pnpm test + a live bot game before merge). Then I47.
+Next: run pnpm test + a live SERVER_AUTHORITATIVE bot game on main (#137 merged untested at user request).
+  Then I47 (test:flip stalls right after join). Owed: test for changeCardBack/applySleeveToPlaymat stale-image patch.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -25,6 +26,6 @@ Blocked: none.
 - Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S145 2026-09-16 patch: I50 — evolved Pokémon use their Evolution stats; Rare Candy checks its line (branch, unmerged).
-- S144 2026-09-16 feature: Trainer drops run effects server-side; all 31 missing step kinds + play conditions (branch, unmerged).
-- S143 2026-09-16 feature: 8 custom Pokémon playmats added with 2x upscale and 1.9394:1 mat crop.
+- S146 2026-09-16 patch: I51/I52 — Trainer drops before card data rejected; one Energy rule set (untested).
+- S145 2026-09-16 patch: I50 — evolved Pokémon use their Evolution stats; Rare Candy checks its line.
+- S144 2026-09-16 feature+debug: Trainer effects server-side (31 step kinds); grey multiplayer sleeves fixed.
