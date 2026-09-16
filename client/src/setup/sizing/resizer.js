@@ -213,12 +213,14 @@ export const adjustCards = (user, zoneId, ratio) => {
     } else {
       const baseWidth = parseFloat(card.image.clientWidth);
       const adjustment = parseFloat(card.image.clientWidth / 6);
-      const newWidth =
-        (baseWidth + card.image.energyLayer * adjustment) * ratio;
+      const energyLayer = card.image.energyLayer || 0;
+      const newWidth = (baseWidth + energyLayer * adjustment) * ratio;
       // Size the `.play-container`, resolved through the holo wrapper when the
       // card is hydrated — the <img>'s own parent is then `.card__rotator`, and
       // writing a px width there squashes the card inside its wrapper.
-      imageAnchor(card.image).parentElement.style.width = `${newWidth}px`;
+      if (Number.isFinite(newWidth) && newWidth > 0) {
+        imageAnchor(card.image).parentElement.style.width = `${newWidth}px`;
+      }
     }
     if (card.image.damageCounter) {
       const index = zone.array.findIndex((loopCard) => loopCard === card);
