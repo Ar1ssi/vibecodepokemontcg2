@@ -458,9 +458,19 @@ test('trainer drop: second Supporter via moveCard is rejected by the Supporter r
   assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [50]);
 });
 
+test('trainer drop: a Trainer without synced effect text is rejected, not played blind', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(createCard({ instanceId: 60, name: 'Potion', type: 'Trainer' }));
+
+  const res = moveToBoard(state, 60, rng);
+
+  assert.equal(res.error, 'card_data_pending');
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [60]);
+  assert.equal(res.state.players.p1.zones.board.length, 0);
+});
+
 test('trainer drop: stays a plain move when promotion does not apply', () => {
   const cases = [
-    ['effect text not yet synced', { name: 'Potion', type: 'Trainer' }, true],
     ['rules mode off', { name: 'Potion', type: 'Trainer', text: 'Heal 30 damage from 1 of your Pokémon.' }, false],
     ['Pokémon', { name: 'Pichu', supertype: 'Pokémon', text: 'Draw 3 cards.' }, true],
   ];
