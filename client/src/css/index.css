@@ -4772,15 +4772,6 @@ body.side-menu-collapsed #oppResizer {
   transition: opacity 0.15s ease, transform 0.15s ease !important;
 }
 
-/* Attached cards stacking */
-.attached-card {
-  position: absolute !important;
-  top: 15% !important;
-  left: 10% !important;
-  z-index: 1 !important;
-  pointer-events: auto !important;
-}
-
 /* Netcode: PendingChoice modal and waiting banner */
 .choice-modal-overlay {
   position: fixed;

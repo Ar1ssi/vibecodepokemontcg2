@@ -1580,33 +1580,33 @@ test('holo: face-down, attached and removed cards lose their wrapper', () => {
   const selfMat = doc.getElementById('selfMat');
   const active = selfMat.querySelector('#active');
   const pikachu = { instanceId: 10, name: 'Pikachu', src: 'pika.png' };
-  const raichu = { instanceId: 11, name: 'Raichu', src: 'rai.png' };
+  const belt = { instanceId: 11, name: 'Choice Belt', src: 'belt.png', type: 'Trainer' };
 
   applyView(
     {
       stateVersion: 1,
-      you: { playerId: 'p1', zones: { active: [pikachu], bench: [raichu], prizes: [{ instanceId: 12 }] } },
+      you: { playerId: 'p1', zones: { active: [pikachu], hand: [belt], prizes: [{ instanceId: 12 }] } },
     },
     [],
     opts
   );
   assert.equal(selfMat.querySelector('#prizes').querySelector('.mat-holo'), null, 'redacted prize is never foiled');
-  assert.equal(selfMat.querySelector('#bench').querySelectorAll('.mat-holo').length, 1);
+  assert.equal(selfMat.querySelector('#hand').querySelectorAll('.mat-holo').length, 1);
 
   applyView(
     {
       stateVersion: 2,
-      you: { playerId: 'p1', zones: { active: [pikachu, { ...raichu, attachedTo: 10 }], bench: [], prizes: [] } },
+      you: { playerId: 'p1', zones: { active: [pikachu, { ...belt, attachedTo: 10 }], hand: [], prizes: [] } },
     },
     [],
     opts
   );
   const container = active.querySelector('.play-container');
-  const raichuImg = container.querySelector('img[data-instance-id="11"]');
-  assert.equal(raichuImg.parentNode, container, 'attached card is a bare child of the container');
+  const beltImg = container.querySelector('img[data-instance-id="11"]');
+  assert.equal(beltImg.parentNode, container, 'attached Tool is a bare child of the container');
   assert.equal(active.querySelectorAll('.mat-holo').length, 1, 'only the parent keeps its foil');
 
-  applyView({ stateVersion: 3, you: { playerId: 'p1', zones: { active: [], bench: [], prizes: [] } } }, [], opts);
+  applyView({ stateVersion: 3, you: { playerId: 'p1', zones: { active: [], hand: [], prizes: [] } } }, [], opts);
   assert.equal(active.children.length, 0);
   assert.equal(getCardRegistry().size, 0);
 });
@@ -1739,4 +1739,149 @@ test('choice: options without art fall back to the grid modal', () => {
 
   assert.equal(choicePicker.opened.length, 0);
   assert.ok(doc.getElementById('netcodeChoiceModal'));
+});
+
+// Mock elements have no layout; give every registered card a real-looking size
+// and re-apply, the way a loaded image would measure in the browser.
+function sizeRegisteredCards(width, height) {
+  for (const record of getCardRegistry().values()) {
+    record.element.clientWidth = width;
+    record.element.clientHeight = height;
+  }
+}
+
+test('stack: an evolution is the visible card with the Basic peeking out underneath', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone, holo: fakeHolo(doc) };
+  const active = doc.getElementById('selfMat').querySelector('#active');
+  const zones = {
+    active: [
+      { instanceId: 10, name: 'Charmander', src: 'c.png', type: 'Pokémon', stage: 'Basic', damage: 30 },
+      { instanceId: 11, name: 'Charmeleon', src: 'm.png', type: 'Pokémon', stage: 'Stage 1', attachedTo: 10 },
+      { instanceId: 12, name: 'Choice Belt', src: 'belt.png', type: 'Trainer', attachedTo: 10 },
+      { instanceId: 13, name: 'Basic Fire Energy', src: 'f.png', type: 'Energy', attachedTo: 10 },
+    ],
+  };
+
+  applyView({ stateVersion: 1, you: { playerId: 'p1', zones } }, [], opts);
+  sizeRegisteredCards(150, 210);
+  applyView({ stateVersion: 2, you: { playerId: 'p1', zones } }, [], opts);
+
+  const registry = getCardRegistry();
+  const basic = registry.get(10);
+  const stage1 = registry.get(11);
+  assert.equal(stage1.element.style.position || '', '', 'Stage 1 stays in flow as the visible card');
+  assert.equal(basic.element.style.position, 'absolute');
+  assert.equal(basic.element.style.bottom, '10px');
+  assert.equal(basic.element.style.zIndex, '-1');
+
+  const belt = registry.get(12).element;
+  assert.equal(belt.style.left, '25px', 'Tool fans out behind by a sixth of the card');
+  assert.equal(belt.style.zIndex, '-1');
+  assert.equal(basic.container.style.width, '175px', 'slot widens for the Tool');
+  assert.equal(registry.get(13).element.style.width, '36px', 'token sized from the visible card');
+
+  const holoWrappers = active.querySelectorAll('.mat-holo');
+  assert.equal(holoWrappers.length, 1);
+  assert.equal(holoWrappers[0].querySelector('img'), stage1.element, 'only the visible card is foiled');
+
+  assert.deepEqual(stage1.card.attachedCards.map((c) => c.instanceId), [10, 12, 13]);
+  assert.deepEqual(basic.card.attachedCards, []);
+  assert.equal(basic.element.damageCounter.textContent, '30', 'root damage still shown');
+  assert.equal(basic.overlayImage, stage1.element, 'overlays measured on the visible card');
+
+  // Evolution discarded: the Basic is back in flow with no stack styling.
+  zones.active = [zones.active[0]];
+  applyView({ stateVersion: 3, you: { playerId: 'p1', zones } }, [], opts);
+  assert.equal(basic.element.style.position, '');
+  assert.equal(basic.element.style.bottom, '');
+  assert.equal(basic.container.style.width, '');
+});
+
+test('rotation: the root turns its whole stack and clears back to upright', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const stack = (rotation) => ({
+    active: [
+      { instanceId: 10, name: 'Pikachu', src: 'p.png', type: 'Pokémon', rotation },
+      { instanceId: 11, name: 'Basic Lightning Energy', src: 'l.png', type: 'Energy', attachedTo: 10 },
+    ],
+  });
+
+  applyView({ stateVersion: 1, you: { playerId: 'p1', zones: stack(90) } }, [], opts);
+  const registry = getCardRegistry();
+  assert.equal(registry.get(10).element.style.transform, 'rotate(90deg)');
+  assert.equal(registry.get(11).element.style.transform, 'rotate(90deg)');
+
+  applyView({ stateVersion: 2, you: { playerId: 'p1', zones: stack(0) } }, [], opts);
+  assert.equal(registry.get(10).element.style.transform, '');
+  assert.equal(registry.get(11).element.style.transform, '');
+});
+
+test('ability used: shows the legacy tab on the card and removes it when reset', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const active = doc.getElementById('selfMat').querySelector('#active');
+  const view = (stateVersion, abilityUsed) => ({
+    stateVersion,
+    you: { playerId: 'p1', zones: { active: [{ instanceId: 10, name: 'Mew', src: 'm.png', abilityUsed }] } },
+  });
+
+  applyView(view(1, true), [], opts);
+  assert.equal(active.querySelectorAll('.self-tab').length, 1);
+
+  applyView(view(2, false), [], opts);
+  assert.equal(active.querySelectorAll('.self-tab').length, 0);
+  assert.equal(getCardRegistry().get(10).element.abilityCounter, null);
+});
+
+test('zone counts and VSTAR/GX buttons follow the view', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const labels = {};
+  for (const id of ['deckCount', 'handCount', 'discardCount', 'VSTARButton', 'GXButton']) {
+    labels[id] = doc.registerElement(id, doc.createElement(id.endsWith('Button') ? 'button' : 'span'));
+  }
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, flags) => ({
+    stateVersion,
+    you: {
+      playerId: 'p1',
+      flags,
+      zones: {
+        deck: { count: 47 },
+        hand: [
+          { instanceId: 1, name: 'A', src: 'a.png' },
+          { instanceId: 2, name: 'B', src: 'b.png' },
+        ],
+        discard: [],
+      },
+    },
+  });
+
+  applyView(view(1, { vstarUsed: true, gxUsed: true }), [], opts);
+  assert.equal(labels.deckCount.textContent, '47');
+  assert.equal(labels.handCount.textContent, '2');
+  assert.equal(labels.discardCount.textContent, '0');
+  assert.equal(labels.VSTARButton.classList.contains('used-special-move'), true);
+  assert.equal(labels.GXButton.classList.contains('used-special-move'), true);
+
+  applyView(view(2, { vstarUsed: false, gxUsed: false }), [], opts);
+  assert.equal(labels.VSTARButton.classList.contains('used-special-move'), false);
+});
+
+test('stadium: reads upright for its owner and flipped for the opponent', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, ownerId) => ({
+    stateVersion,
+    stadium: { instanceId: 99, name: 'Artazon', src: 'a.png', ownerId },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  });
+
+  applyView(view(1, 'p2'), [], opts);
+  assert.equal(doc.getElementById('stadium').style.transform, 'scaleX(-1) scaleY(-1)');
+
+  applyView(view(2, 'p1'), [], opts);
+  assert.equal(doc.getElementById('stadium').style.transform, 'scaleX(1) scaleY(1)');
 });

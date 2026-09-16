@@ -18,6 +18,8 @@ import {
 } from '../counters/damage-counter-style.mjs';
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
 import { getEnergyTokenFront } from '../../actions/move-card-bundle/energy-token-assets.mjs';
+import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
+import { isPokemon } from '../../../../shared/engine/cards.mjs';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -52,6 +54,10 @@ let defaultNetcodeContext = {
 // that still carries the same pendingChoice doesn't reopen (and reset) it.
 let openPickerChoiceId = null;
 
+// Options of the last applied view, reused when overlays re-measure on resize.
+let lastOverlayOptions = null;
+let resizeListenerBound = false;
+
 const PLAY_ZONES = ['active', 'bench'];
 
 // Zones legacy move-card.js gives a holofoil wrapper; stadium and attached cards
@@ -62,7 +68,11 @@ const HOLO_ZONES = ['hand', 'prizes', 'discard', 'lostZone', 'board', 'active', 
 const ENERGY_TOKEN_SIZE = 0.24;
 const ENERGY_TOKEN_SPACING = 1.15;
 const ENERGY_TOKEN_BOTTOM = 0.03;
-const ENERGY_TOKEN_STYLE_KEYS = ['position', 'width', 'height', 'left', 'bottom', 'zIndex'];
+// Legacy attach-card.js / evolve-card.js offsets, as fractions of the visible card's width.
+const ATTACHED_CARD_SHIFT = 1 / 6;
+const UNDER_POKEMON_SHIFT = 1 / 15;
+const STACK_STYLE_KEYS = ['position', 'width', 'height', 'left', 'bottom', 'zIndex'];
+const COUNT_ZONES = ['deck', 'discard', 'lostZone', 'hand'];
 
 /**
  * Returns the highest stateVersion successfully applied by the renderer.
@@ -133,6 +143,7 @@ export function resetRenderState() {
   lastAppliedView = null;
   clearInFlightAffordances();
   openPickerChoiceId = null;
+  lastOverlayOptions = null;
   defaultNetcodeContext = {
     socket: null,
     roomId: null,
@@ -479,7 +490,7 @@ function overlaySideClass(side, options = {}) {
  * @param {string} side
  * @param {object} options
  */
-function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}) {
+function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
   const damage = typeof cardData.damage === 'number' && cardData.damage > 0 ? cardData.damage : 0;
 
   if (damage <= 0) {
@@ -511,7 +522,7 @@ function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}) 
     zoneElement.appendChild(counter);
   }
 
-  const targetRect = getRect(img);
+  const targetRect = getRect(rectImg);
   const zoneRect = getRect(zoneElement);
   positionOverlay(counter, targetRect, zoneRect, {
     leftOffset: targetRect.width / 1.5,
@@ -532,7 +543,7 @@ function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}) 
  * @param {string} side
  * @param {object} options
  */
-function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options = {}) {
+function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
   const condition = cardData.specialCondition || null;
 
   if (!condition) {
@@ -562,7 +573,7 @@ function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, opti
     zoneElement.appendChild(marker);
   }
 
-  const targetRect = getRect(img);
+  const targetRect = getRect(rectImg);
   const zoneRect = getRect(zoneElement);
   positionOverlay(marker, targetRect, zoneRect, {
     leftOffset: 0,
@@ -581,9 +592,64 @@ function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, opti
  * @param {string} side
  * @param {object} options
  */
-function reconcileCardOverlays(cardData, img, zoneElement, side, options = {}) {
-  reconcileDamageOverlay(cardData, img, zoneElement, side, options);
-  reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options);
+function reconcileCardOverlays(cardData, img, zoneElement, side, options = {}, rectImg = img) {
+  reconcileDamageOverlay(cardData, img, zoneElement, side, options, rectImg);
+  reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options, rectImg);
+  reconcileAbilityOverlay(cardData, img, zoneElement, side, options, rectImg);
+}
+
+/**
+ * The "ability used" tab legacy `addAbilityCounter` (ability-counter.js)
+ * draws across the card's middle, display-only like the other overlays.
+ * Stored in `img.abilityCounter`, the same slot legacy uses.
+ */
+function reconcileAbilityOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
+  if (!cardData.abilityUsed) {
+    if (img.abilityCounter) {
+      if (img.abilityCounter.parentNode) img.abilityCounter.parentNode.removeChild(img.abilityCounter);
+      img.abilityCounter = null;
+    }
+    return;
+  }
+
+  const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
+  let tab = img.abilityCounter;
+  if (!tab) {
+    if (!doc || typeof doc.createElement !== 'function') return;
+    tab = doc.createElement('div');
+    tab.className = side === 'you' ? 'self-tab' : 'opp-tab';
+    img.abilityCounter = tab;
+  }
+  if (zoneElement && tab.parentNode !== zoneElement) {
+    zoneElement.appendChild(tab);
+  }
+
+  const targetRect = getRect(rectImg);
+  const zoneRect = getRect(zoneElement);
+  tab.style.display = 'inline-block';
+  tab.style.left = `${targetRect.left - zoneRect.left}px`;
+  tab.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 2}px`;
+  tab.style.width = `${targetRect.width}px`;
+  tab.style.height = `${targetRect.width / 5}px`;
+  tab.style.lineHeight = `${targetRect.width / 3}px`;
+  tab.style.zIndex = '1';
+}
+
+/**
+ * Re-positions every in-play card's overlays against its current rect.
+ * Overlays are absolutely positioned from a measured rect, so a window
+ * resize leaves them behind until the next view (legacy counters re-add on
+ * resize for the same reason).
+ */
+export function repositionCardOverlays(options = lastOverlayOptions) {
+  if (!options) return;
+  for (const record of cardRegistry.values()) {
+    if (!record.overlayImage || !record.element.parentNode) continue;
+    const zone = resolveZone(record.side, record.zone, options);
+    if (!zone.element) continue;
+    const overlayData = { ...record.card, abilityUsed: Boolean(record.element.abilityCounter) };
+    reconcileCardOverlays(overlayData, record.element, zone.element, record.side, options, record.overlayImage);
+  }
 }
 
 /**
@@ -610,9 +676,8 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
 
   // Handle play zones (active & bench)
   if (parentRecord && parentRecord.container) {
-    // An attached card never keeps a holo wrapper (legacy attach-card.js):
-    // it sits as a bare sibling of the parent inside `.play-container`.
-    unhydrateCard(record, options);
+    // Holo is settled after stack layout (reconcilePlacedCard): only the
+    // stack's visible card, e.g. a Stage 1 attached under its Basic, keeps foil.
     // Append attached card under parent container with attached style.
     // Always appendChild (not just when the parent differs): appendChild
     // on an existing child moves it to the end, so re-appending every
@@ -620,7 +685,7 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
     // a parent's attachments (finding #10) instead of only placing a
     // card the first time it arrives.
     img.classList.add('attached-card');
-    parentRecord.container.appendChild(img);
+    parentRecord.container.appendChild(cardNodeOf(record));
     return { attachedParent: parentRecord };
   }
 
@@ -628,7 +693,7 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
   // must lose that look wherever it lands now, not only on the
   // leaves-play-zones branch (finding #11).
   img.classList.remove('attached-card');
-  clearEnergyToken(img);
+  clearStackStyle(img);
   const node = cardNodeOf(record);
 
   if (PLAY_ZONES.includes(zoneId)) {
@@ -710,70 +775,249 @@ function reconcileHolo(record, zoneId, isAttached, options = {}) {
   }
 }
 
-function clearEnergyToken(img) {
-  if (!img.dataset.energyCardSrc) return;
+/**
+ * Undoes every inline style and token swap `layoutCardStack` wrote, so a card
+ * that left a stack (or changed its place in one) starts from a clean <img>.
+ * `createOrUpdateCardElement` has already reset `src` to the card art.
+ */
+function clearStackStyle(img) {
+  if (!img.dataset?.stackStyled || !img.style) return;
+  delete img.dataset.stackStyled;
   delete img.dataset.energyCardSrc;
   img.classList.remove('energy-token-3d');
-  for (const key of ENERGY_TOKEN_STYLE_KEYS) img.style[key] = '';
+  for (const key of STACK_STYLE_KEYS) img.style[key] = '';
+}
+
+function setStackStyle(img, styles) {
+  if (!img.dataset || !img.style) return;
+  img.dataset.stackStyled = 'true';
+  img.style.position = 'absolute';
+  for (const [key, value] of Object.entries(styles)) img.style[key] = value;
 }
 
 /**
  * Draws an attached Energy as the same small round type token legacy
  * attach-card.js uses: full card art stashed in `data-energy-card-src` (the
- * double-click carousel shows it), a row along the parent's bottom edge,
- * layered above the parent's face.
+ * double-click carousel shows it), a row along the visible card's bottom
+ * edge, layered above its face.
  *
- * @param {object} img attached Energy <img> (src already set to its card art)
- * @param {object} cardData
- * @param {object} parentImg
- * @param {number} layer 1-based position among the parent's Energy tokens
  * @returns {boolean} whether a token was drawn
  */
-function applyEnergyToken(img, cardData, parentImg, layer) {
+function applyEnergyToken(img, cardData, cardWidth, cardHeight, layer) {
   const tokenSrc = getEnergyTokenFront(cardData);
-  if (!tokenSrc) {
-    clearEnergyToken(img);
-    return false;
-  }
-  const cardWidth = parentImg?.clientWidth || 0;
-  const cardHeight = parentImg?.clientHeight || 0;
+  if (!tokenSrc || !img.dataset || !img.style) return false;
   const tokenSize = cardWidth * ENERGY_TOKEN_SIZE;
-  img.dataset.energyCardSrc = img.getAttribute('src');
+  const cardArt = img.getAttribute('src');
+  setStackStyle(img, {
+    width: `${tokenSize}px`,
+    height: `${tokenSize}px`,
+    left: `${(layer - 1) * tokenSize * ENERGY_TOKEN_SPACING}px`,
+    bottom: `${cardHeight * ENERGY_TOKEN_BOTTOM}px`,
+    zIndex: String(100 + layer),
+  });
+  img.dataset.energyCardSrc = cardArt;
   img.setAttribute('src', tokenSrc);
   img.classList.add('energy-token-3d');
-  img.style.position = 'absolute';
-  img.style.width = `${tokenSize}px`;
-  img.style.height = `${tokenSize}px`;
-  img.style.left = `${(layer - 1) * tokenSize * ENERGY_TOKEN_SPACING}px`;
-  img.style.bottom = `${cardHeight * ENERGY_TOKEN_BOTTOM}px`;
-  img.style.zIndex = String(100 + layer);
   img.energyLayer = layer;
   return true;
 }
 
 /**
- * Rebuilds every parent's `attachedCards` (read by the double-click carousel
- * in click-events.js) and draws attached Energy as tokens, in view order.
- * Runs after all zones are placed so a parent processed after its
- * attachments still ends up with the full list.
+ * Lays out one in-play Pokémon's stack the way legacy attach/evolve does.
+ * The server keeps evolutions attached under the Basic (D40), so the highest
+ * Stage card is drawn as the visible card; the Basic and lower Stages peek out
+ * underneath, Tools and token-less cards fan out behind to the right (growing
+ * the slot), and Energy becomes tokens on the visible card.
  *
- * @param {{ cardData: object, img: object, parentRecord: object }[]} attachments
+ * @param {object} rootRecord
+ * @param {{ cardData: object, record: object }[]} attached in view order
+ * @returns {object} the registry record of the visible card
  */
-function reconcileAttachments(attachments) {
-  const energyCountByParent = new Map();
-  for (const { parentRecord } of attachments) {
-    parentRecord.card.attachedCards = [];
-  }
-  for (const { cardData, img, parentRecord } of attachments) {
-    parentRecord.card.attachedCards.push({ ...cardData, image: img });
-    if (cardData.type !== 'Energy') {
-      clearEnergyToken(img);
+function layoutCardStack(rootRecord, attached) {
+  const stackCards = [rootRecord.card, ...attached.map((a) => a.cardData)];
+  const top = topPokemonCard(stackCards, rootRecord.card);
+  const displayRecord = cardRegistry.get(top.instanceId) || rootRecord;
+  const displayImg = displayRecord.element;
+
+  const members = [rootRecord, ...attached.map((a) => a.record)];
+  for (const record of members) clearStackStyle(record.element);
+  const cardWidth = displayImg.clientWidth || 0;
+  const cardHeight = displayImg.clientHeight || 0;
+  rootRecord.stackAttached = attached;
+  if (!cardWidth) relayoutWhenLoaded(rootRecord, displayImg);
+
+  // Closest Stage under the visible card first: the one attached last.
+  const underPokemon = members
+    .filter((record) => record !== displayRecord && isPokemon(record.card))
+    .reverse();
+  underPokemon.forEach((record, i) => {
+    const layer = i + 1;
+    setStackStyle(record.element, {
+      bottom: `${layer * cardWidth * UNDER_POKEMON_SHIFT}px`,
+      zIndex: String(-layer),
+    });
+  });
+
+  let tokenLayer = 0;
+  let shiftLayer = 0;
+  for (const { cardData, record } of attached) {
+    if (record === displayRecord || isPokemon(cardData)) continue;
+    const img = record.element;
+    if (
+      cardData.type === 'Energy' &&
+      applyEnergyToken(img, cardData, cardWidth, cardHeight, tokenLayer + 1)
+    ) {
+      tokenLayer += 1;
       continue;
     }
-    const layer = (energyCountByParent.get(parentRecord) || 0) + 1;
-    if (applyEnergyToken(img, cardData, parentRecord.element, layer)) {
-      energyCountByParent.set(parentRecord, layer);
+    shiftLayer += 1;
+    setStackStyle(img, {
+      left: `${shiftLayer * cardWidth * ATTACHED_CARD_SHIFT}px`,
+      zIndex: String(-shiftLayer),
+    });
+  }
+  if (rootRecord.container?.style) {
+    rootRecord.container.style.width =
+      shiftLayer > 0 && cardWidth ? `${cardWidth * (1 + shiftLayer * ATTACHED_CARD_SHIFT)}px` : '';
+  }
+
+  // The double-click carousel reads the clicked card's attachedCards
+  // (click-events.js); only the visible card is clickable.
+  for (const record of members) record.card.attachedCards = [];
+  displayRecord.card.attachedCards = members
+    .filter((record) => record !== displayRecord)
+    .map((record) => ({ ...record.card, image: record.element }));
+  return displayRecord;
+}
+
+/**
+ * A card that just arrived has no size until its art loads, which would draw
+ * every offset and token at 0px. Lay the stack out again once it has one.
+ */
+function relayoutWhenLoaded(rootRecord, displayImg) {
+  if (displayImg.complete !== false || typeof displayImg.addEventListener !== 'function') return;
+  if (displayImg.stackRelayoutPending) return;
+  displayImg.stackRelayoutPending = true;
+  displayImg.addEventListener(
+    'load',
+    () => {
+      displayImg.stackRelayoutPending = false;
+      if (cardRegistry.get(rootRecord.instanceId) !== rootRecord) return;
+      layoutCardStack(rootRecord, rootRecord.stackAttached || []);
+      repositionCardOverlays();
+    },
+    { once: true }
+  );
+}
+
+/**
+ * @param {{ cardData: object, zoneId: string, record: object, attachedParent: object|null }[]} placed
+ * @returns {Map<object, object>} root record -> visible card record
+ */
+function layoutCardStacks(placed) {
+  const attachedByRoot = new Map();
+  for (const entry of placed) {
+    if (!entry.attachedParent) continue;
+    if (!attachedByRoot.has(entry.attachedParent)) attachedByRoot.set(entry.attachedParent, []);
+    attachedByRoot.get(entry.attachedParent).push(entry);
+  }
+  const displayByRoot = new Map();
+  for (const entry of placed) {
+    if (entry.attachedParent || !PLAY_ZONES.includes(entry.zoneId)) continue;
+    displayByRoot.set(entry.record, layoutCardStack(entry.record, attachedByRoot.get(entry.record) || []));
+  }
+  return displayByRoot;
+}
+
+function bindOverlayResize() {
+  if (resizeListenerBound || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  resizeListenerBound = true;
+  window.addEventListener('resize', () => repositionCardOverlays());
+}
+
+/**
+ * Server rotation (reduce.mjs rotateCard) as the inline transform legacy
+ * rotate-card.js writes. Attached cards turn with their root (syncRotation).
+ */
+function applyRotation(img, rotation) {
+  if (!img.dataset || !img.style) return;
+  const degrees = Number(rotation) || 0;
+  if (degrees === 0) {
+    if (img.dataset.rotation) {
+      delete img.dataset.rotation;
+      img.style.transform = '';
     }
+    return;
+  }
+  img.dataset.rotation = String(degrees);
+  img.style.transform = `rotate(${degrees}deg)`;
+}
+
+const NO_OVERLAYS = { damage: 0, specialCondition: null, abilityUsed: false };
+
+/**
+ * Per-card work that depends on the finished stack layout: rotation, holofoil
+ * (only the visible card of a stack keeps its foil) and counter overlays
+ * (drawn on the visible card, from the root's damage/conditions).
+ */
+function reconcilePlacedCard(entry, displayByRoot, options = {}) {
+  const { cardData, side, zoneId, record, attachedParent } = entry;
+  const root = attachedParent || record;
+  const displayRecord = displayByRoot.get(root) || root;
+  const isVisible = record === displayRecord;
+
+  applyRotation(record.element, root.card.rotation);
+  reconcileHolo(record, zoneId, !isVisible, options);
+
+  const zone = resolveZone(side, zoneId, options);
+  if (attachedParent) {
+    reconcileCardOverlays(NO_OVERLAYS, record.element, zone.element, side, options);
+    return;
+  }
+  record.overlayImage = displayRecord.element;
+  const overlayData = {
+    ...cardData,
+    abilityUsed: Boolean(cardData.abilityUsed || displayRecord.card.abilityUsed),
+  };
+  if (displayRecord !== record) {
+    // Overlays live on the root's <img> (their storage slot), positioned over the visible card.
+    reconcileCardOverlays(NO_OVERLAYS, displayRecord.element, zone.element, side, options);
+  }
+  reconcileCardOverlays(overlayData, record.element, zone.element, side, options, displayRecord.element);
+}
+
+/**
+ * Legacy count.js's `(<span id="deckCount">)` labels, from the view: the deck
+ * is `{ count }`, every other zone an array (redacted cards still count).
+ */
+function reconcileZoneCounts(side, zones, options = {}) {
+  for (const zoneId of COUNT_ZONES) {
+    const zoneData = zones[zoneId];
+    if (zoneData === undefined) continue;
+    const count = Array.isArray(zoneData) ? zoneData.length : Number(zoneData?.count) || 0;
+    const doc = resolveZone(side, zoneId, options).element?.ownerDocument;
+    const label = doc?.getElementById?.(`${zoneId}Count`);
+    if (label) label.textContent = String(count);
+  }
+}
+
+/**
+ * Legacy VSTAR-GX.js marks a spent once-per-game button `.used-special-move`;
+ * the server tracks the same thing as player flags (useVStarGX sets both).
+ */
+function reconcileSpecialMoveButtons(side, flags, options = {}) {
+  if (!flags || typeof flags !== 'object') return;
+  const doc = resolveZone(side, 'active', options).element?.ownerDocument;
+  if (!doc?.getElementById) return;
+  const buttons = [
+    ['VSTARButton', flags.vstarUsed],
+    ['GXButton', flags.gxUsed],
+  ];
+  for (const [id, used] of buttons) {
+    const button = doc.getElementById(id);
+    if (!button) continue;
+    if (used) button.classList.add('used-special-move');
+    else button.classList.remove('used-special-move');
   }
 }
 
@@ -854,7 +1098,7 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
  * @param {object|null} stadiumCard
  * @param {object} options
  */
-function reconcileStadium(stadiumCard, options = {}) {
+function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
   const doc = options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
 
@@ -871,6 +1115,14 @@ function reconcileStadium(stadiumCard, options = {}) {
 
   const img = createOrUpdateCardElement(stadiumCard, 'neutral', 'stadium', options);
   unhydrateCard(cardRegistry.get(stadiumCard.instanceId), options);
+  // Legacy update-stadium-card.js: the Stadium reads upright for whoever played it.
+  const ownerId = stadiumCard.ownerId || stadiumCard.playerId || null;
+  if (stadiumElement.style) {
+    stadiumElement.style.transform =
+      ownerId && localPlayerId && ownerId !== localPlayerId
+        ? 'scaleX(-1) scaleY(-1)'
+        : 'scaleX(1) scaleY(1)';
+  }
   if (img.parentNode !== stadiumElement) {
     if (stadiumElement.innerHTML !== undefined) {
       stadiumElement.innerHTML = '';
@@ -1337,7 +1589,7 @@ export function applyView(view, events = [], options = {}) {
 
   // Reconcile player sides ('you' and 'them')
   const sides = ['you', 'them'];
-  const attachments = [];
+  const placed = [];
   for (const side of sides) {
     const playerView = view[side];
     if (!playerView || !playerView.zones) continue;
@@ -1352,16 +1604,23 @@ export function applyView(view, events = [], options = {}) {
       const orderedCards = typeof sortFn === 'function' ? sortFn(side, zoneId, cards) || cards : cards;
 
       for (const cardData of orderedCards) {
-        const img = createOrUpdateCardElement(cardData, side, zoneId, options);
+        createOrUpdateCardElement(cardData, side, zoneId, options);
         const { attachedParent } = placeCardInZone(cardData, side, zoneId, options);
-        if (attachedParent) attachments.push({ cardData, img, parentRecord: attachedParent });
-        reconcileHolo(cardRegistry.get(cardData.instanceId), zoneId, Boolean(attachedParent), options);
-        const zone = resolveZone(side, zoneId, options);
-        reconcileCardOverlays(cardData, img, zone.element, side, options);
+        const record = cardRegistry.get(cardData.instanceId);
+        if (record) placed.push({ cardData, side, zoneId, record, attachedParent });
       }
     }
+    reconcileZoneCounts(side, playerView.zones, options);
+    reconcileSpecialMoveButtons(side, playerView.flags, options);
   }
-  reconcileAttachments(attachments);
+  // Stack layout needs every card of a stack placed first: a root can come
+  // after its attachments in view order.
+  const displayByRoot = layoutCardStacks(placed);
+  for (const entry of placed) {
+    reconcilePlacedCard(entry, displayByRoot, options);
+  }
+  lastOverlayOptions = options;
+  bindOverlayResize();
 
   // Clean up removed cards from registry and DOM
   const liveInstanceIds = new Set();
@@ -1389,6 +1648,9 @@ export function applyView(view, events = [], options = {}) {
       if (record.element?.specialCondition?.parentNode) {
         record.element.specialCondition.parentNode.removeChild(record.element.specialCondition);
       }
+      if (record.element?.abilityCounter?.parentNode) {
+        record.element.abilityCounter.parentNode.removeChild(record.element.abilityCounter);
+      }
       unhydrateCard(record, options);
       if (record.container && record.container.parentNode) {
         record.container.parentNode.removeChild(record.container);
@@ -1400,7 +1662,7 @@ export function applyView(view, events = [], options = {}) {
   }
 
   // Reconcile neutral Stadium
-  reconcileStadium(view.stadium || null, options);
+  reconcileStadium(view.stadium || null, localPlayerId, options);
 
   // Reconcile PendingChoice modal / banner
   reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
