@@ -1,0 +1,52 @@
+/*
+
+  TRAINER GALLERY / GALARIAN GALLERY
+
+  holo.mjs sets data-trainer-gallery from the image URL (TG/GG subset or card
+  number). Whatever the rarity, these cards carry a fine textured foil over
+  the whole card, so the art-window clip and the holo-rare beams are dropped.
+  Selectors carry [data-rarity] so they outrank the per-rarity rules.
+
+*/
+
+.card[data-rarity][data-trainer-gallery="true"] .card__shine,
+.card[data-rarity][data-trainer-gallery="true"] .card__glitter {
+
+  -webkit-clip-path: none;
+  clip-path: none;
+
+}
+
+.card[data-rarity][data-trainer-gallery="true"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(285, 80%, 58%) 0%,
+      hsl(225, 85%, 58%) 4%,
+      hsl(185, 80%, 50%) 8%,
+      hsl(125, 70%, 50%) 12%,
+      hsl(50, 90%, 55%) 16%,
+      hsl(0, 80%, 58%) 20%,
+      hsl(285, 80%, 58%) 24%
+    ),
+    var(--grain);
+
+  background-size: 600% 600%, cover;
+  background-repeat: no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center;
+
+  background-blend-mode: hard-light;
+  mix-blend-mode: soft-light;
+  filter: saturate(1.6) contrast(1.4);
+  opacity: 1;
+
+}
+
+.card[data-rarity][data-trainer-gallery="true"] .card__shine:before,
+.card[data-rarity][data-trainer-gallery="true"] .card__shine:after {
+
+  display: none;
+
+}

@@ -38,6 +38,7 @@
   --mask: var(--card-ink-mask);
 
   --glittersize: 25%;
+  --glitter-tile-size: 45% auto;
   --space: 5%;
   --angle: 133deg;
   --imgsize: cover;
@@ -251,11 +252,28 @@
   mask-repeat: no-repeat;
 }
 
+/* ── Art window ───────────────────────────────────────────────────────
+   Edges of the art box, as % of the card: left, top, right, bottom. The box
+   sits at a different place per layout era; holo.mjs sets data-card-era from
+   the image URL, and cards with an unknown era use the default window. */
+.card {
+  --art-l: 8.5%;
+  --art-t: 10.5%;
+  --art-r: 91.5%;
+  --art-b: 51%;
+}
+
+.card[data-card-era="sv"]      { --art-l: 7.5%; --art-t: 10%;   --art-r: 92.5%; --art-b: 52.5%; }
+.card[data-card-era="swsh"]    { --art-l: 8%;   --art-t: 11%;   --art-r: 92%;   --art-b: 50.5%; }
+.card[data-card-era="sm"]      { --art-l: 8.5%; --art-t: 11.5%; --art-r: 91.5%; --art-b: 50.5%; }
+.card[data-card-era="xy"]      { --art-l: 5.5%; --art-t: 11.5%; --art-r: 94.5%; --art-b: 51%; }
+.card[data-card-era="classic"] { --art-l: 11%;  --art-t: 11%;   --art-r: 89%;   --art-b: 46.5%; }
+
 /* ── Default sparkle ───────────────────────────────────────────────────
    Fine foil grain is the strongest "real foil" cue. Two iridescent grain
    layers sized relative to the card slide opposite ways as the light moves
    and cross-fade, so specks twinkle. Rarities with their own glitter keep it. */
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter {
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter {
   --shift: 6%;
   display: grid;
   mix-blend-mode: color-dodge;
@@ -265,11 +283,11 @@
   opacity: .7;
 }
 
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter:before,
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter:after {
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter:before,
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter:after {
   content: "";
   background-image: var(--iri8);
-  background-size: 45% auto;
+  background-size: var(--glitter-tile-size);
   background-repeat: repeat;
   background-position:
     calc(50% + var(--pointer-from-left) * var(--shift))
@@ -277,7 +295,7 @@
   opacity: var(--pointer-from-left);
 }
 
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]) .card__glitter:after {
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter:after {
   background-image: var(--iri7);
   background-position:
     calc(50% - var(--pointer-from-left) * var(--shift))

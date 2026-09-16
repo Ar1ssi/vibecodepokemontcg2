@@ -2,9 +2,40 @@
 
   REVERSE HOLO
 
+  Real reverse holos foil everything EXCEPT the art window: the art stays
+  matte and the frame, text panel and borders shimmer. Lit by the fixed
+  virtual light in holo.mjs, like every other variant.
+    shine   — grain texture under a fully saturated rainbow and a white sheen,
+              hard-light then soft-light (overlay was too faint on bright frames)
+    glitter — fine iridescent sparkle, color-dodge on dark grain only
+    glare   — bright highlight at the light position, fading to transparent
+  Shine and glitter cut the art window out with an even-odd clip-path. The
+  window (--art-*, base.css) differs per layout era.
+  The ink mask (base.css) still keeps text and symbols black.
+
 */
 
+.card[data-rarity$="reverse holo"] .card__shine,
+.card[data-rarity$="reverse holo"] .card__glitter {
 
+  -webkit-clip-path: polygon( evenodd,
+    0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+    var(--art-l) var(--art-t),
+    var(--art-r) var(--art-t),
+    var(--art-r) var(--art-b),
+    var(--art-l) var(--art-b),
+    var(--art-l) var(--art-t)
+  );
+  clip-path: polygon( evenodd,
+    0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+    var(--art-l) var(--art-t),
+    var(--art-r) var(--art-t),
+    var(--art-r) var(--art-b),
+    var(--art-l) var(--art-b),
+    var(--art-l) var(--art-t)
+  );
+
+}
 
 
 
@@ -15,45 +46,75 @@
   SHINE LAYERS
 
 */
-.card {
-  --foil-brightness: 0.55;
-}
 
 .card[data-rarity$="reverse holo"] .card__shine {
-  
-  background-image: 
-    radial-gradient( 
-      circle at var(--pointer-x) var(--pointer-y),
-      #fff 5%, 
-      #000 50%, 
-      #fff 80% 
-    ), 
-    linear-gradient( 
-      -45deg, 
-      #000 15%, 
-      #fff, 
-      #000 85% 
-    ), 
-    var(--foil);
 
-  background-blend-mode: soft-light, difference;
-  background-size: 120% 120%, 200% 200%, cover;
-  background-position: center center, calc( (100% * var(--pointer-from-left))) calc( (100% * var(--pointer-from-top))) , center center;
-  
-  filter: brightness(var(--foil-brightness)) contrast(1.5) saturate(1);
-  mix-blend-mode: color-dodge;
+  background-image:
+    repeating-linear-gradient( 115deg,
+      hsl(0, 0%, 30%) 0%,
+      hsl(0, 0%, 30%) 10.67%,
+      hsl(0, 0%, 100%) 16.67%,
+      hsl(0, 0%, 30%) 22.67%,
+      hsl(0, 0%, 30%) 33.33%
+    ),
+    repeating-linear-gradient( 125deg,
+      hsl(285, 100%, 55%) 0%,
+      hsl(225, 100%, 55%) 2%,
+      hsl(185, 100%, 48%) 4%,
+      hsl(125, 100%, 45%) 6%,
+      hsl(50, 100%, 52%) 8%,
+      hsl(0, 100%, 58%) 10%,
+      hsl(285, 100%, 55%) 12%
+    ),
+    url('../../assets/holo/grain.webp');
 
-  opacity: calc( (1.5 * var(--card-opacity)) - var(--pointer-from-center));
-  
+  background-size: 750% 750%, 900% 900%, cover;
+  /* Gradients are never tiled: a diagonal gradient tile edge draws a hard
+     box. Tiles are 3x their old size and repeat their bands inside, and the
+     pan stays inside 0-100% (--background-x/y stay within 26-74%), so the tile
+     always covers the card. */
+  background-repeat: no-repeat;
+
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    calc( (var(--background-x) - 50%) * -1 + 50% ) calc( (var(--background-y) - 50%) * -1 + 50% ),
+    center center;
+
+  background-blend-mode: hard-light, hard-light;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.6);
+
+  opacity: 1;
+
 }
 
-.card.lightning   { --foil-brightness: 0.7; }
-.card.darkness    { --foil-brightness: 0.8; }
-.card.metal       { --foil-brightness: 0.6; }
 
 
 
 
+/*
+
+  GLITTER
+
+*/
+
+.card[data-rarity$="reverse holo"] .card__glitter {
+
+  display: grid;
+
+  background-image: var(--iri9);
+  background-size: var(--glitter-tile-size);
+  background-position:
+    calc( 50% + (var(--pointer-from-left) - .5) * 6% )
+    calc( 50% + (var(--pointer-from-top) - .5) * 6% );
+  background-repeat: repeat;
+
+  filter: brightness(.75) contrast(2.4) saturate(1.8);
+  mix-blend-mode: color-dodge;
+
+  opacity: calc( .7 + var(--tilt-amount, 0) * .3 );
+
+}
 
 
 
@@ -64,37 +125,20 @@
   GLARE LAYERS
 
 */
-	
+
 .card[data-rarity$="reverse holo"] .card__glare {
 
-  opacity: var(--card-opacity);
-  
-  background-image: 
+  background-image:
     radial-gradient(
       farthest-corner circle at var(--pointer-x) var(--pointer-y),
-      hsla(0, 0%, 100%, 0.8) 10%,
-      hsla(0, 0%, 100%, 0.5) 20%,
-      hsla(0, 0%, 50%, 0) 90%
+      hsla(0, 0%, 100%, 0.7) 0%,
+      hsla(0, 0%, 100%, 0.3) 22%,
+      hsla(0, 0%, 50%, 0) 55%
     );
 
-  filter: brightness(.7) contrast(1.5);
-
-}
-
-.card[data-rarity$="reverse holo"] .card__glare:after {
-
-  content: "";
-  opacity: var(--card-opacity);
-  
-  background-image: 
-    radial-gradient( 
-      farthest-corner circle at var(--pointer-x) var(--pointer-y), 
-      hsl(0, 0%, 100%) 10%, 
-      hsla(0, 0%, 100%, 0.5) 20%, 
-      hsla(0, 0%, 50%, 0) 120%
-    );
-
-  filter: brightness(1) contrast(1.5);
+  mix-blend-mode: soft-light;
+  filter: none;
+  opacity: 1;
 
 }
 
@@ -102,11 +146,26 @@
 
 
 
+/*
 
+  ENERGY
 
+  Energy cards have no art window: foil the whole card and tone the rainbow
+  down so the energy symbol and its colors stay readable.
 
+*/
 
+.card[data-rarity="energy reverse holo"] .card__shine,
+.card[data-rarity="energy reverse holo"] .card__glitter {
 
+  -webkit-clip-path: none;
+  clip-path: none;
 
+}
 
+.card[data-rarity="energy reverse holo"] .card__shine {
 
+  filter: saturate(1.1) contrast(1.2);
+  opacity: .55;
+
+}

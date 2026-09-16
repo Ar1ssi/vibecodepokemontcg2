@@ -1,0 +1,321 @@
+/*
+
+  MODERN HOLO PATTERNS (BLACK & WHITE TO MEGA)
+
+  Foil patterns per set and era, following the reference video (Sleeve No
+  Card Behind, "All 39 Pokémon Card Holo Patterns Explained"). Where the
+  physical card and Pokémon TCG Live disagree, TCG Live wins, so Scarlet &
+  Violet reverse holos keep their rainbow (reverse-holo.css) instead of the
+  plain mirror of the printed cards.
+    bw1-bw8 holo rares               — tinsel: fine horizontal streaks on two planes
+    bw9-bw11, XY holo rares          — diagonal sheen
+    xy12 Evolutions holo rares       — starlight II: bold, colorful stars, no depth
+    Sun & Moon holo rares and GX     — water web: an oil-slick sheen
+    Sword & Shield holo rares        — striped vertical sheen
+    Scarlet & Violet, Mega holo rares — horizontal sheen
+    Mega ex                           — horizontal rainbow sheen with glitter
+    VMAX and rainbow rares            — rainbow glitter over the whole card
+  holo.mjs sets data-card-era, data-card-series and data-card-set from the
+  image URL, and gives VMAX Pokémon the "vmax rare" effect.
+
+  Stacking matches classic-holo.css: white-on-black pattern layers, a rainbow
+  multiplied on top, color-dodge onto the card. Sheen gradients are never
+  tiled and pan at most x1.15; small tiles join seamlessly.
+
+*/
+
+.card[data-rarity="rare holo"][data-card-era="xy"] .card__shine:before,
+.card[data-rarity="rare holo"][data-card-era="xy"] .card__shine:after,
+.card[data-rarity="rare holo"][data-card-era="sm"] .card__shine:before,
+.card[data-rarity="rare holo"][data-card-era="sm"] .card__shine:after,
+.card[data-rarity="rare holo"][data-card-era="swsh"] .card__shine:before,
+.card[data-rarity="rare holo"][data-card-era="swsh"] .card__shine:after,
+.card[data-rarity="rare holo"][data-card-era="sv"] .card__shine:before,
+.card[data-rarity="rare holo"][data-card-era="sv"] .card__shine:after,
+.card[data-rarity="rare rainbow alt"] .card__shine:before,
+.card[data-rarity="rare rainbow alt"] .card__shine:after {
+
+  display: none;
+
+}
+
+
+
+/* Diagonal sheen: the default for XY, and bw9-bw11 below. */
+.card[data-rarity="rare holo"][data-card-era="xy"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 60deg,
+      hsl(0, 0%, 0%) 0%,
+      hsl(0, 0%, 0%) 6%,
+      hsl(285, 90%, 60%) 9%,
+      hsl(225, 90%, 60%) 11%,
+      hsl(185, 90%, 52%) 13%,
+      hsl(125, 80%, 50%) 15%,
+      hsl(50, 95%, 55%) 17%,
+      hsl(0, 90%, 60%) 19%,
+      hsl(0, 0%, 0%) 22%,
+      hsl(0, 0%, 0%) 33.33%
+    ),
+    linear-gradient( hsl(0, 0%, 18%), hsl(0, 0%, 18%) );
+
+  background-size: 300% 300%, cover;
+  background-repeat: no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center;
+
+  background-blend-mode: screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.9) contrast(1.3) saturate(1.3);
+  opacity: .85;
+
+}
+
+/* Tinsel: Black & White sets before Plasma Storm. */
+.card[data-rarity="rare holo"][data-card-set="bw1"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw2"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw3"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw4"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw5"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw6"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw7"] .card__shine,
+.card[data-rarity="rare holo"][data-card-set="bw8"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(285, 100%, 62%) 0%,
+      hsl(225, 100%, 62%) 3%,
+      hsl(185, 100%, 55%) 6%,
+      hsl(125, 90%, 52%) 9%,
+      hsl(50, 100%, 58%) 12%,
+      hsl(0, 100%, 62%) 15%,
+      hsl(285, 100%, 62%) 18%
+    ),
+    var(--glitter),
+    var(--glitter),
+    linear-gradient( hsl(0, 0%, 0%), hsl(0, 0%, 0%) );
+
+  /* Glitter stretched wide becomes short horizontal streaks; two planes
+     sliding opposite ways give the bouncing look. */
+  background-size: 600% 600%, 40% 3%, 28% 2%, cover;
+  background-repeat: no-repeat, repeat, repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    calc( 50% + (var(--pointer-from-left) - .5) * 8% ) 50%,
+    calc( 50% - (var(--pointer-from-left) - .5) * 8% ) 50%,
+    center center;
+
+  background-blend-mode: multiply, screen, screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.9) contrast(2) saturate(1.3);
+  opacity: .9;
+
+}
+
+/* Starlight II: Evolutions. */
+.card[data-rarity="rare holo"][data-card-set="xy12"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 110deg,
+      hsl(285, 100%, 62%) 0%,
+      hsl(225, 100%, 62%) 4%,
+      hsl(185, 100%, 55%) 8%,
+      hsl(125, 90%, 52%) 12%,
+      hsl(50, 100%, 58%) 16%,
+      hsl(0, 100%, 62%) 20%,
+      hsl(285, 100%, 62%) 24%
+    ),
+    radial-gradient( circle, hsl(0, 0%, 100%) 0 10%, transparent 24% ),
+    radial-gradient( circle, hsl(0, 0%, 100%) 0 8%, transparent 20% ),
+    var(--glitter),
+    linear-gradient( hsl(0, 0%, 0%), hsl(0, 0%, 0%) );
+
+  background-size: 300% 300%, 9% 6.5%, 5% 3.6%, 30% 30%, cover;
+  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center,
+    calc( 50% + 2.5% ) calc( 50% + 1.8% ),
+    center center,
+    center center;
+
+  background-blend-mode: multiply, screen, screen, screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.95) contrast(1.5) saturate(1.5);
+  opacity: .9;
+
+}
+
+
+
+/* Water web (oil slick): Sun & Moon holo rares and GX. */
+.card[data-rarity="rare holo"][data-card-era="sm"] .card__shine,
+.card[data-rarity="double rare"][data-card-era="sm"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 135deg,
+      hsl(285, 90%, 60%) 0%,
+      hsl(225, 90%, 60%) 5%,
+      hsl(185, 90%, 52%) 10%,
+      hsl(125, 80%, 50%) 15%,
+      hsl(50, 95%, 55%) 20%,
+      hsl(0, 90%, 60%) 25%,
+      hsl(285, 90%, 60%) 30%
+    ),
+    var(--noise),
+    var(--noise-over),
+    linear-gradient( hsl(0, 0%, 0%), hsl(0, 0%, 0%) );
+
+  /* Two noise fields differenced into thin bright veins read as a web;
+     both are larger than the card and pan inside it. */
+  background-size: 300% 300%, 130% 130%, 120% 120%, cover;
+  background-repeat: no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    calc( (var(--background-x) - 50%) * .5 + 50% ) calc( (var(--background-y) - 50%) * .5 + 50% ),
+    calc( (var(--background-x) - 50%) * -.5 + 50% ) calc( (var(--background-y) - 50%) * -.5 + 50% ),
+    center center;
+
+  background-blend-mode: multiply, difference, screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.9) contrast(1.8) saturate(1.3);
+  opacity: .8;
+
+}
+
+.card[data-rarity="double rare"][data-card-era="sm"] .card__glitter {
+
+  display: none;
+
+}
+
+
+
+/* Striped vertical sheen: Sword & Shield holo rares. */
+.card[data-rarity="rare holo"][data-card-era="swsh"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 90deg,
+      hsl(0, 0%, 0%) 0%,
+      hsl(0, 0%, 0%) 6%,
+      hsl(285, 90%, 60%) 9%,
+      hsl(225, 90%, 60%) 11%,
+      hsl(185, 90%, 52%) 13%,
+      hsl(125, 80%, 50%) 15%,
+      hsl(50, 95%, 55%) 17%,
+      hsl(0, 90%, 60%) 19%,
+      hsl(0, 0%, 0%) 22%,
+      hsl(0, 0%, 0%) 33.33%
+    ),
+    repeating-linear-gradient( 90deg,
+      hsl(0, 0%, 100%) 0%,
+      hsl(0, 0%, 100%) 50%,
+      hsl(0, 0%, 55%) 50%,
+      hsl(0, 0%, 55%) 100%
+    ),
+    linear-gradient( hsl(0, 0%, 18%), hsl(0, 0%, 18%) );
+
+  /* The stripe tile edges fall on stripe boundaries, so tiling is seamless. */
+  background-size: 300% 100%, .8% 100%, cover;
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) 50%,
+    0% 0%,
+    center center;
+
+  background-blend-mode: multiply, screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.9) contrast(1.3) saturate(1.3);
+  opacity: .85;
+
+}
+
+
+
+/* Horizontal sheen: Scarlet & Violet and Mega holo rares. */
+.card[data-rarity="rare holo"][data-card-era="sv"] .card__shine,
+.card[data-rarity="double rare"][data-card-series="me"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 0deg,
+      hsl(0, 0%, 0%) 0%,
+      hsl(0, 0%, 0%) 6%,
+      hsl(285, 90%, 60%) 9%,
+      hsl(225, 90%, 60%) 11%,
+      hsl(185, 90%, 52%) 13%,
+      hsl(125, 80%, 50%) 15%,
+      hsl(50, 95%, 55%) 17%,
+      hsl(0, 90%, 60%) 19%,
+      hsl(0, 0%, 0%) 22%,
+      hsl(0, 0%, 0%) 33.33%
+    ),
+    linear-gradient( hsl(0, 0%, 18%), hsl(0, 0%, 18%) );
+
+  background-size: 100% 300%, cover;
+  background-repeat: no-repeat;
+  background-position:
+    50% calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center;
+
+  background-blend-mode: screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.9) contrast(1.3) saturate(1.3);
+  opacity: .85;
+
+}
+
+/* Mega ex: the horizontal rainbow sheen gains a glitter layer. */
+.card[data-rarity="double rare"][data-card-series="me"] .card__glitter {
+
+  display: grid;
+  background-image: var(--glitter);
+  background-size: var(--glittersize);
+  background-repeat: repeat;
+  background-position:
+    calc( 50% + (var(--pointer-from-left) - .5) * 6% )
+    calc( 50% + (var(--pointer-from-top) - .5) * 6% );
+  -webkit-mask-image: var(--card-ink-mask);
+  mask-image: var(--card-ink-mask);
+  -webkit-mask-mode: luminance;
+  mask-mode: luminance;
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  filter: brightness(.8) contrast(2) saturate(1.5);
+  mix-blend-mode: color-dodge;
+  opacity: .8;
+
+}
+
+
+
+/* Rainbow glitter: VMAX and rainbow rares, over the whole card. */
+.card[data-rarity="vmax rare"] .card__shine,
+.card[data-rarity="rare rainbow alt"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(285, 90%, 62%) 0%,
+      hsl(225, 90%, 62%) 4%,
+      hsl(185, 90%, 55%) 8%,
+      hsl(125, 80%, 52%) 12%,
+      hsl(50, 95%, 58%) 16%,
+      hsl(0, 90%, 62%) 20%,
+      hsl(285, 90%, 62%) 24%
+    ),
+    var(--glitter),
+    linear-gradient( hsl(0, 0%, 10%), hsl(0, 0%, 10%) );
+
+  background-size: 300% 300%, var(--glittersize), cover;
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    calc( 50% + (var(--pointer-from-left) - .5) * 6% ) calc( 50% + (var(--pointer-from-top) - .5) * 6% ),
+    center center;
+
+  background-blend-mode: multiply, screen, normal;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.9) contrast(1.6) saturate(1.3);
+  opacity: .85;
+
+}

@@ -1,0 +1,57 @@
+/*
+
+  AMAZING RARE
+
+  A rainbow foil splash bursts out of the art window behind the Pokémon; the
+  rest of the card is a regular frame. The shine is a rainbow cone multiplied
+  by a ring-shaped fade, so it is black (no effect under color-dodge) in the
+  middle of the art and past the splash. The cone turns with the light.
+
+*/
+
+.card[data-rarity="amazing rare"] .card__shine {
+
+  background-image:
+    radial-gradient( circle at 50% 30%,
+      hsl(0, 0%, 0%) 0%,
+      hsl(0, 0%, 0%) 12%,
+      hsl(0, 0%, 100%) 24%,
+      hsl(0, 0%, 100%) 34%,
+      hsl(0, 0%, 0%) 52%
+    ),
+    conic-gradient( from calc( (var(--background-x) - 50%) * 3.6deg ) at 50% 30%,
+      hsl(0, 100%, 60%),
+      hsl(50, 100%, 55%),
+      hsl(125, 90%, 50%),
+      hsl(185, 100%, 50%),
+      hsl(225, 100%, 60%),
+      hsl(285, 100%, 60%),
+      hsl(0, 100%, 60%)
+    );
+
+  background-size: cover, cover;
+  background-repeat: no-repeat;
+  background-position: center center, center center;
+
+  background-blend-mode: multiply;
+  mix-blend-mode: color-dodge;
+  filter: brightness(.7) saturate(1.4);
+  opacity: .85;
+
+}
+
+.card[data-rarity="amazing rare"] .card__glare {
+
+  background-image:
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 100%, 0.6) 0%,
+      hsla(0, 0%, 100%, 0.25) 22%,
+      hsla(0, 0%, 50%, 0) 55%
+    );
+
+  mix-blend-mode: soft-light;
+  filter: none;
+  opacity: 1;
+
+}

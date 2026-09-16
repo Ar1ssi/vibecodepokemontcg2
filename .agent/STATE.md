@@ -4,22 +4,13 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 136
-Focus: feature — TCG Live-style holofoil (design 010, D34): fixed virtual light instead of the
-  cursor, card-ink luminance mask, gold/SIR rewrite, default sparkle, angle shading.
-Active: built on branch claude/holofoil-effects-comparison-919cf3 (worktree), tests green,
-  committed + PR + merged to main at user's request (S136 close). holo.mjs (computeLightVars/driftTilt/foilMaskUrl, light from rotation or drift),
-  css/holo/base.css (ink mask on all layers, default sparkle, angle shading), hyper-rare.css +
-  ex-special-illustration-rare.css (identical, contract-tested), ex-full-art.css (ink mask),
-  holo.test.mjs + new holo-css.test.mjs, package.json test list. Suite 1446/1446.
-  Not viewed in a browser by me — user checks localhost (recorded preference).
-  Highlight direction flipped so previews never read as a cursor light (design 010 Deviations).
-  Round 2 (user feedback): no dark glare edges, stronger foil, tilted previews no longer clipped.
-  Worktree server running for the user at http://localhost:4000 (preview "app").
-  User's localhost :4001 serves the PRIMARY checkout (main) — the worktree must run on its own
-  port (PORT=4002) to be seen before merge.
-Next: user eyeballs holo cards on localhost (board drift, preview tilt, gold hyper rare); tune
-  LIGHT/DRIFT constants or CSS opacities from feedback; commit + push only when user says so.
+Session: 137
+Focus: feature — holofoil fixes per generation (reverse holo art cut, gold seams, rarity mapping,
+  silver shiny effect, holo rare art-window clip, classic cosmos).
+Active: all uncommitted in worktree claude/holofoil-effects-comparison-919cf3; suite 1477/1477.
+  Worktree server for the user at http://localhost:4000 (preview "app").
+Next: user checks on :4000 every new effect (list in journal S137); tune from feedback;
+  commit + push only when user says so. Radiant not reviewed against TCG Live.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -39,6 +30,7 @@ Blocked: none.
   checking the host's Access-Control-Allow-Origin header.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S137 2026-09-16 feature: reverse holo rewrite + per-generation holo fixes (uncommitted, awaiting user check).
 - S136 2026-09-15 feature: TCG Live-style holofoil (fixed light, ink mask) — PR #130, merged 9729902.
   + patch: Primal Kyogre + Groudon sleeves cropped (no white margins), pushed to main directly.
 - S135 2026-09-15 feature: ability-guidance accuracy + Mega/Primal Spirit Link turn-end rule.

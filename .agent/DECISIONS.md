@@ -75,3 +75,5 @@
   log now states explicitly. Not anti-cheat hardening (a non-goal): everything the bridge does
   is reachable from devtools anyway. This only stops it being five characters in the URL.
 
+- D-holo-gen 2026-09-16: Holo effect picks from rarity text plus card name (rule-box holo rares become double rare) and data-card-era (art window, classic cosmos); shiny cards get a silver effect, not gold.
+- D-holo-ref 2026-09-16: Holo patterns follow physical cards (Sleeve No Card Behind holo-pattern video) except where Pokémon TCG Live differs; TCG Live wins (user decision).
