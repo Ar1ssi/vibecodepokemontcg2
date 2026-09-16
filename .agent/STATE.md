@@ -7,7 +7,7 @@
 Session: 144
 Focus: Trainer cards run their effects under SERVER_AUTHORITATIVE (branch feature/trainer-play-effects, not merged).
 Active: none.
-Next: live 2P check of a Trainer drop + choice modal (I49), then merge. Then I35 step-kind gaps, I47.
+Next: merge feature/trainer-play-effects (live bot run PASS). Then Tool/Stadium drops + silent step kinds (I49, I35), I47.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)

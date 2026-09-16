@@ -22,6 +22,14 @@ import {
   pickCardPickerIndices,
 } from '../image-logic/card-picker.js';
 
+// Server-authoritative pendingChoice modal (apply-view.js reconcilePendingChoice). Answered
+// through the same picker()/pick() surface as the legacy card picker so the bot drains it.
+function netcodeChoiceOptions() {
+  const modal = document.getElementById('netcodeChoiceModal');
+  if (!modal) return null;
+  return [...modal.querySelectorAll('.choice-option-card')];
+}
+
 // Same zone set the server hashes in shared/engine/state.mjs hashState() minus
 // stadium (neutral zone, not per-player) — design 002 slice 3.5 replay harness.
 const HASHED_PLAYER_ZONES = [
@@ -313,6 +321,19 @@ export function installE2eApi() {
     // open at a time in practice; card-picker is checked first since it is the highest-
     // volume case (every search/discard Trainer effect).
     picker() {
+      const netcodeChoice = netcodeChoiceOptions();
+      if (netcodeChoice) {
+        return {
+          type: 'cardPicker',
+          open: true,
+          source: 'netcodeChoice',
+          min: Number(document.getElementById('netcodeChoiceModal')?.dataset.min) || 0,
+          candidates: netcodeChoice.map((el, index) => ({
+            index,
+            name: el.querySelector('img')?.alt || '',
+          })),
+        };
+      }
       const cardPicker = getCardPickerSnapshot();
       if (cardPicker) return { type: 'cardPicker', open: true, ...cardPicker };
       const matCandidates = matPickCandidates();
@@ -336,6 +357,14 @@ export function installE2eApi() {
     // coinEffect/coinCall (see callCoin); `indices` answers cardPicker/matPick — matPick
     // only ever resolves its first index since openMatPick takes one click and closes.
     pick(indices = [], face = 'heads') {
+      const netcodeChoice = netcodeChoiceOptions();
+      if (netcodeChoice) {
+        for (const index of indices) netcodeChoice[index]?.click();
+        const confirm = document.getElementById('choiceConfirmBtn');
+        if (!confirm || confirm.disabled) return false;
+        confirm.click();
+        return true;
+      }
       const cardPicker = getCardPickerSnapshot();
       if (cardPicker) return pickCardPickerIndices(indices);
       const matCandidates = matPickCandidates();
