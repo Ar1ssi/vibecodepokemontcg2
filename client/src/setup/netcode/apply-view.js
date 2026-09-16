@@ -17,6 +17,7 @@ import {
   getDamageCounterTier,
 } from '../counters/damage-counter-style.mjs';
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
+import { resetImage } from '../image-logic/reset-image.js';
 import { getEnergyTokenFront } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
@@ -1075,6 +1076,11 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
       draggable: true,
       ...(coverListeners || {}),
     });
+    // Same as legacy Cover: the <img> shares its container's id
+    // (`discardCover`), so the container's `#discardCover { position: fixed }`
+    // rule also matches the image; resetImage's inline `position: relative`
+    // keeps it inside the slot instead of at natural size across the board.
+    resetImage(img);
     coverRegistry.set(key, img);
   }
 

@@ -1099,6 +1099,9 @@ test('Row 22 / Cover: discard/lostZone cover mirrors the real top card and updat
   assert.equal(coverImg.id, 'discardCover');
   assert.equal(coverImg.getAttribute('src'), '/charmander.png');
   assert.equal(coverImg.getAttribute('alt'), 'Charmander');
+  // Shares its container's id, so it must carry legacy Cover's inline reset or
+  // `#discardCover { position: fixed }` blows it up across the board.
+  assert.equal(coverImg.style.position, 'relative');
 
   // A third card discarded on top: cover follows the new top card, same
   // element reused (not a second competing node).
