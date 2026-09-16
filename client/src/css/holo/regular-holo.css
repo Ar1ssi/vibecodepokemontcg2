@@ -2,7 +2,20 @@
 
   REGULAR HOLO
 
+  Only the art window is foil on a real holo rare; the frame and text box
+  stay flat. Shine and glitter are clipped to the per-era window (--art-*,
+  base.css). The glare stays card-wide because it is the light on the card.
+  Classic-era (WotC to HGSS) holos swap the beams for the cosmos pattern.
+
 */
+
+.card[data-rarity="rare holo"] .card__shine,
+.card[data-rarity="rare holo"] .card__glitter {
+
+  -webkit-clip-path: inset( var(--art-t) calc(100% - var(--art-r)) calc(100% - var(--art-b)) var(--art-l) );
+  clip-path: inset( var(--art-t) calc(100% - var(--art-r)) calc(100% - var(--art-b)) var(--art-l) );
+
+}
 
 
 
@@ -155,10 +168,51 @@
 
 
 
+/*
 
+  CLASSIC COSMOS
 
+  Three transparent cosmos textures (dots, swirls, stars) over a rainbow that
+  slides against them. Textures are sized past the window and panned with
+  percentages that stay inside 0-100%, so no texture edge ever shows.
 
+*/
 
+.card[data-rarity="rare holo"][data-card-era="classic"] .card__shine {
 
+  background-image:
+    url("../../assets/holo/cosmos-top-trans.png"),
+    url("../../assets/holo/cosmos-middle-trans.png"),
+    url("../../assets/holo/cosmos-bottom-trans.png"),
+    repeating-linear-gradient( 110deg,
+      hsl(285, 90%, 60%) 0%,
+      hsl(225, 90%, 60%) 4%,
+      hsl(185, 90%, 52%) 8%,
+      hsl(125, 80%, 50%) 12%,
+      hsl(50, 95%, 55%) 16%,
+      hsl(0, 90%, 60%) 20%,
+      hsl(285, 90%, 60%) 24%
+    );
 
+  background-size: 140% 140%, 130% 130%, 120% 120%, 300% 300%;
+  background-repeat: no-repeat;
 
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.5 + 50% ) calc( (var(--background-y) - 50%) * 1.5 + 50% ),
+    calc( (var(--background-x) - 50%) * -1 + 50% ) calc( (var(--background-y) - 50%) * -1 + 50% ),
+    calc( (var(--background-x) - 50%) * .5 + 50% ) calc( (var(--background-y) - 50%) * .5 + 50% ),
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% );
+
+  background-blend-mode: screen, screen, multiply;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
+
+}
+
+.card[data-rarity="rare holo"][data-card-era="classic"] .card__shine:before,
+.card[data-rarity="rare holo"][data-card-era="classic"] .card__shine:after {
+
+  display: none;
+
+}

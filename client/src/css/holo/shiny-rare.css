@@ -1,0 +1,73 @@
+/*
+
+  SHINY RARE
+
+  Shiny cards (Hidden Fates, Shining Fates, Paldean Fates, Shiny Ultra Rare)
+  are a silver glitter foil over the whole card, not gold. A near-greyscale
+  glitter sparkles everywhere and a silver sheen band sweeps with the light.
+  The sheen follows the hyper-rare rules: never tiled, repeating bands inside
+  a 3x tile, pan kept at x1.15 so no tile edge reaches the card.
+
+*/
+
+.card[data-rarity="shiny rare"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 115deg,
+      hsl(0, 0%, 45%) 0%,
+      hsl(0, 0%, 45%) 9.33%,
+      hsl(210, 15%, 80%) 15.33%,
+      hsl(0, 0%, 100%) 16.67%,
+      hsl(210, 15%, 80%) 18%,
+      hsl(0, 0%, 45%) 24%,
+      hsl(0, 0%, 45%) 33.33%
+    ),
+    url('../../assets/holo/grain.webp');
+
+  background-size: 750% 750%, cover;
+  background-repeat: no-repeat;
+
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center;
+
+  background-blend-mode: hard-light;
+  mix-blend-mode: soft-light;
+  filter: contrast(1.5) saturate(.2);
+  opacity: 1;
+
+}
+
+.card[data-rarity="shiny rare"] .card__glitter {
+
+  display: grid;
+
+  background-image: var(--glitter);
+  background-size: var(--glittersize);
+  background-repeat: repeat;
+  background-position:
+    calc( 50% + (var(--pointer-from-left) - .5) * 6% )
+    calc( 50% + (var(--pointer-from-top) - .5) * 6% );
+
+  filter: brightness(.8) contrast(2.2) saturate(.35);
+  mix-blend-mode: color-dodge;
+
+  opacity: calc( .75 + var(--tilt-amount, 0) * .25 );
+
+}
+
+.card[data-rarity="shiny rare"] .card__glare {
+
+  background-image:
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 100%, 0.7) 0%,
+      hsla(0, 0%, 100%, 0.3) 22%,
+      hsla(0, 0%, 50%, 0) 55%
+    );
+
+  mix-blend-mode: soft-light;
+  filter: none;
+  opacity: 1;
+
+}

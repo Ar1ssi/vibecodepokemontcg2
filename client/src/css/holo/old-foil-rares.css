@@ -1,0 +1,251 @@
+/*
+
+  OLD FOIL RARES — BREAK, LEGEND, PRIME, LV.X, GOLD STAR
+
+  Rarities from before the full-art era, each with its own foil:
+    break rare — the prism pattern: a grid of small square pyramids whose
+                 four facets catch the rainbow differently, over the whole card
+    legend rare — flat, smooth foil over the whole card, no texture or glitter
+    prime rare — fine vertical stripes on the frame only
+    lvx rare   — the cosmos pattern in the art window
+    gold star  — star-shaped glitter in the art window
+  BREAK and LV.X follow the reference video (Sleeve No Card Behind, "All 39
+  Pokémon Card Holo Patterns Explained"); LEGEND, Prime and Gold Star are not
+  covered by it.
+  Sheen gradients follow the hyper-rare tile rules: never tiled, repeating
+  bands inside an oversized tile, pan at most x1.15.
+
+*/
+
+.card[data-rarity="break rare"] .card__shine {
+
+  /* Each prism tile is four triangles meeting in the middle, so tile edges
+     are facet edges and the grid never shows a seam. */
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(285, 100%, 62%) 0%,
+      hsl(225, 100%, 62%) 3%,
+      hsl(185, 100%, 55%) 6%,
+      hsl(125, 90%, 52%) 9%,
+      hsl(50, 100%, 58%) 12%,
+      hsl(0, 100%, 62%) 15%,
+      hsl(285, 100%, 62%) 18%
+    ),
+    conic-gradient( from 45deg at 50% 50%,
+      hsl(0, 0%, 100%) 0deg 90deg,
+      hsl(0, 0%, 55%) 90deg 180deg,
+      hsl(0, 0%, 20%) 180deg 270deg,
+      hsl(0, 0%, 70%) 270deg 360deg
+    );
+
+  background-size: 600% 600%, 3.5% 2.5%;
+  background-repeat: no-repeat, repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center;
+
+  background-blend-mode: multiply;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
+
+}
+
+.card[data-rarity="break rare"] .card__glitter {
+
+  display: none;
+
+}
+
+
+
+.card[data-rarity="legend rare"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(0, 0%, 30%) 0%,
+      hsl(285, 75%, 55%) 5%,
+      hsl(200, 80%, 70%) 10%,
+      hsl(0, 0%, 95%) 15%,
+      hsl(50, 85%, 70%) 20%,
+      hsl(330, 75%, 58%) 25%,
+      hsl(0, 0%, 30%) 33.33%
+    );
+
+  background-size: 300% 300%;
+  background-repeat: no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% );
+
+  mix-blend-mode: soft-light;
+  filter: saturate(1.6) contrast(1.8);
+  opacity: 1;
+
+}
+
+.card[data-rarity="legend rare"] .card__glitter {
+
+  display: none;
+
+}
+
+
+
+.card[data-rarity="prime rare"] .card__shine,
+.card[data-rarity="prime rare"] .card__glitter {
+
+  -webkit-clip-path: polygon( evenodd,
+    0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+    var(--art-l) var(--art-t),
+    var(--art-r) var(--art-t),
+    var(--art-r) var(--art-b),
+    var(--art-l) var(--art-b),
+    var(--art-l) var(--art-t)
+  );
+  clip-path: polygon( evenodd,
+    0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+    var(--art-l) var(--art-t),
+    var(--art-r) var(--art-t),
+    var(--art-r) var(--art-b),
+    var(--art-l) var(--art-b),
+    var(--art-l) var(--art-t)
+  );
+
+}
+
+.card[data-rarity="prime rare"] .card__shine {
+
+  /* Vertical stripes are tiled on purpose: a 90deg tile edge falls on a
+     stripe boundary, so it never draws a box. */
+  background-image:
+    repeating-linear-gradient( 90deg,
+      hsl(0, 0%, 35%) 0%,
+      hsl(0, 0%, 35%) 40%,
+      hsl(0, 0%, 85%) 50%,
+      hsl(0, 0%, 35%) 60%,
+      hsl(0, 0%, 35%) 100%
+    ),
+    repeating-linear-gradient( 125deg,
+      hsl(285, 90%, 60%) 0%,
+      hsl(225, 90%, 60%) 4%,
+      hsl(185, 90%, 52%) 8%,
+      hsl(125, 80%, 50%) 12%,
+      hsl(50, 95%, 55%) 16%,
+      hsl(0, 90%, 60%) 20%,
+      hsl(285, 90%, 60%) 24%
+    );
+
+  background-size: 1.6% 100%, 600% 600%;
+  background-repeat: repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * .1 ) 0%,
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% );
+
+  background-blend-mode: hard-light;
+  mix-blend-mode: soft-light;
+  filter: contrast(1.6) saturate(1.5);
+  opacity: 1;
+
+}
+
+
+
+.card[data-rarity="lvx rare"] .card__shine,
+.card[data-rarity="lvx rare"] .card__glitter,
+.card[data-rarity="gold star"] .card__shine,
+.card[data-rarity="gold star"] .card__glitter {
+
+  -webkit-clip-path: inset( var(--art-t) calc(100% - var(--art-r)) calc(100% - var(--art-b)) var(--art-l) );
+  clip-path: inset( var(--art-t) calc(100% - var(--art-r)) calc(100% - var(--art-b)) var(--art-l) );
+
+}
+
+.card[data-rarity="lvx rare"] .card__shine {
+
+  /* Same cosmos layers as classic holo rares (regular-holo.css). */
+  background-image:
+    url("../../assets/holo/cosmos-top-trans.png"),
+    url("../../assets/holo/cosmos-middle-trans.png"),
+    url("../../assets/holo/cosmos-bottom-trans.png"),
+    repeating-linear-gradient( 110deg,
+      hsl(285, 90%, 60%) 0%,
+      hsl(225, 90%, 60%) 4%,
+      hsl(185, 90%, 52%) 8%,
+      hsl(125, 80%, 50%) 12%,
+      hsl(50, 95%, 55%) 16%,
+      hsl(0, 90%, 60%) 20%,
+      hsl(285, 90%, 60%) 24%
+    );
+
+  background-size: 140% 140%, 130% 130%, 120% 120%, 300% 300%;
+  background-repeat: no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    calc( (var(--background-x) - 50%) * -1 + 50% ) calc( (var(--background-y) - 50%) * -1 + 50% ),
+    calc( (var(--background-x) - 50%) * .5 + 50% ) calc( (var(--background-y) - 50%) * .5 + 50% ),
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% );
+
+  background-blend-mode: screen, screen, multiply;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
+
+}
+
+.card[data-rarity="lvx rare"] .card__glitter {
+
+  display: none;
+
+}
+
+
+
+.card[data-rarity="gold star"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(45, 90%, 55%) 0%,
+      hsl(20, 90%, 60%) 4%,
+      hsl(320, 80%, 62%) 8%,
+      hsl(225, 90%, 62%) 12%,
+      hsl(185, 90%, 52%) 16%,
+      hsl(90, 70%, 50%) 20%,
+      hsl(45, 90%, 55%) 24%
+    );
+
+  background-size: 600% 600%;
+  background-repeat: no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% );
+
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
+
+}
+
+.card[data-rarity="gold star"] .card__glitter {
+
+  display: grid;
+
+  /* Four-point stars: a thin horizontal and vertical streak crossing a dot,
+     in two offset grids that cross-fade as the light moves. */
+  background-image:
+    radial-gradient( circle, hsl(0, 0%, 100%) 0 .08em, transparent .16em ),
+    linear-gradient( 90deg, transparent 42%, hsla(0, 0%, 100%, .8) 50%, transparent 58% ),
+    linear-gradient( 0deg, transparent 42%, hsla(0, 0%, 100%, .8) 50%, transparent 58% ),
+    var(--glitter);
+
+  background-size: 9% 6.5%, 9% .5%, .6% 6.5%, var(--glittersize);
+  background-repeat: repeat;
+  background-position:
+    calc( 50% + (var(--pointer-from-left) - .5) * 4% ) calc( 50% + (var(--pointer-from-top) - .5) * 4% ),
+    calc( 50% + (var(--pointer-from-left) - .5) * 4% ) calc( 50% + (var(--pointer-from-top) - .5) * 4% + 3% ),
+    calc( 50% + (var(--pointer-from-left) - .5) * 4% + 4.2% ) calc( 50% + (var(--pointer-from-top) - .5) * 4% ),
+    center center;
+
+  mix-blend-mode: soft-light;
+  filter: sepia(.5) saturate(2) brightness(.9);
+  opacity: calc( .6 + var(--tilt-amount, 0) * .4 );
+
+}

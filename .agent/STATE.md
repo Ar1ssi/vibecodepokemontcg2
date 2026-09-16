@@ -28,4 +28,4 @@ Blocked: none.
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S142 2026-09-16 debug: I48 closed — no double-rendered cards in multiplayer (on main).
 - S141 2026-09-16 debug: multiplayer card preview works for server-rendered cards (on main).
-- S140 2026-09-16 debug: drops onto cards in board/stadium/covers resolve to their zone (on main).
+- S137 2026-09-16 feature: per-generation holofoil patterns, render-checked (PR #133, on main).

@@ -1,0 +1,105 @@
+/*
+
+  ACE SPEC RARE
+
+  Scarlet & Violet ACE SPEC cards use a foil unique to them: a rainbow mirror
+  covered in diagonal crosses and squares, like a zoomed-in radiant pattern.
+  It sits under the whole card, so the ink mask decides where it shows.
+  Black & White ACE SPECs (xy layout era here) used the tinsel pattern instead.
+
+  Lattice lines are screened over a dark grey base and the rainbow multiplies
+  over them, so only the lines carry color; soft-light then keeps the lines
+  crisp and bright while the dark base barely dims the card. Each lattice
+  tile draws corner-to-corner diagonals, so neighbouring tiles always join
+  into a continuous lattice and no tile edge shows.
+
+*/
+
+.card[data-rarity="ace spec rare"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(285, 100%, 62%) 0%,
+      hsl(225, 100%, 62%) 3%,
+      hsl(185, 100%, 55%) 6%,
+      hsl(125, 90%, 52%) 9%,
+      hsl(50, 100%, 58%) 12%,
+      hsl(0, 100%, 62%) 15%,
+      hsl(285, 100%, 62%) 18%
+    ),
+    linear-gradient( to top right,
+      transparent calc(50% - 7%), hsl(0, 0%, 100%) 50%, transparent calc(50% + 7%) ),
+    linear-gradient( to bottom right,
+      transparent calc(50% - 7%), hsl(0, 0%, 100%) 50%, transparent calc(50% + 7%) ),
+    linear-gradient( to top right,
+      transparent calc(50% - 6%), hsl(0, 0%, 80%) 50%, transparent calc(50% + 6%) ),
+    linear-gradient( to bottom right,
+      transparent calc(50% - 6%), hsl(0, 0%, 80%) 50%, transparent calc(50% + 6%) ),
+    linear-gradient( hsl(0, 0%, 28%), hsl(0, 0%, 28%) );
+
+  background-size: 600% 600%, 11% 8%, 11% 8%, 5.5% 4%, 5.5% 4%, cover;
+  background-repeat: no-repeat, repeat, repeat, repeat, repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    center center,
+    center center,
+    calc( 50% + 2.75% ) calc( 50% + 2% ),
+    calc( 50% + 2.75% ) calc( 50% + 2% ),
+    center center;
+
+  background-blend-mode: multiply, screen, screen, screen, screen, normal;
+  mix-blend-mode: soft-light;
+  filter: saturate(2.2) contrast(2.2);
+  opacity: 1;
+
+}
+
+.card[data-rarity="ace spec rare"] .card__glare {
+
+  background-image:
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 100%, 0.6) 0%,
+      hsla(0, 0%, 100%, 0.25) 22%,
+      hsla(0, 0%, 50%, 0) 55%
+    );
+
+  mix-blend-mode: soft-light;
+  filter: none;
+  opacity: 1;
+
+}
+
+
+
+/* Black & White ACE SPECs: tinsel. */
+.card[data-rarity="ace spec rare"][data-card-era="xy"] .card__shine {
+
+  background-image:
+    repeating-linear-gradient( 125deg,
+      hsl(285, 100%, 62%) 0%,
+      hsl(225, 100%, 62%) 3%,
+      hsl(185, 100%, 55%) 6%,
+      hsl(125, 90%, 52%) 9%,
+      hsl(50, 100%, 58%) 12%,
+      hsl(0, 100%, 62%) 15%,
+      hsl(285, 100%, 62%) 18%
+    ),
+    var(--glitter),
+    var(--glitter),
+    linear-gradient( hsl(0, 0%, 40%), hsl(0, 0%, 40%) );
+
+  background-size: 600% 600%, 40% 3%, 28% 2%, cover;
+  background-repeat: no-repeat, repeat, repeat, no-repeat;
+  background-position:
+    calc( (var(--background-x) - 50%) * 1.15 + 50% ) calc( (var(--background-y) - 50%) * 1.15 + 50% ),
+    calc( 50% + (var(--pointer-from-left) - .5) * 8% ) 50%,
+    calc( 50% - (var(--pointer-from-left) - .5) * 8% ) 50%,
+    center center;
+
+  background-blend-mode: hard-light, screen, screen, normal;
+  mix-blend-mode: soft-light;
+  filter: saturate(2) contrast(1.8);
+  opacity: 1;
+
+}

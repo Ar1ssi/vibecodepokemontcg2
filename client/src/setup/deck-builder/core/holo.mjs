@@ -17,8 +17,8 @@ const RARITY_EFFECTS = {
   'Holo Rare': 'rare holo',
   'Holo rare': 'rare holo',
   'Double rare': 'double rare',
-  'Amazing Rare': 'special illustration rare',
-  'Amazing rare': 'special illustration rare',
+  'Amazing Rare': 'amazing rare',
+  'Amazing rare': 'amazing rare',
   'Illustration rare': 'illustration rare',
   'Special Illustration rare': 'special illustration rare',
   'Ultra Rare': 'ultra rare',
@@ -34,18 +34,75 @@ const RARITY_EFFECTS = {
   // "grainy"/"horizontal" reports that looked like CSS bugs but were actually a wrong mapping.
   'Gold Rare': 'hyper rare',
   'Secret Rare': 'hyper rare',
-  'Shiny Rare': 'hyper rare',
+  Crown: 'hyper rare',
+  // Shiny cards are a silver glitter foil, not gold.
+  'Shiny Rare': 'shiny rare',
+  'Shiny rare': 'shiny rare',
+  'Shiny rare V': 'shiny rare',
+  'Shiny rare VMAX': 'shiny rare',
+  'Shiny Ultra Rare': 'shiny rare',
   'Radiant Rare': 'radiant rare',
   'Reverse Holo': 'reverse holo',
+  LEGEND: 'legend rare',
+  'Rare PRIME': 'prime rare',
+  'Rare Holo LV.X': 'lvx rare',
+  'Rare BREAK': 'break rare',
+  'Rare Holo Star': 'gold star',
+  'Full Art Trainer': 'ultra rare',
+  'ACE SPEC Rare': 'ace spec rare',
+  'Classic Collection': 'rare holo',
+};
+
+// Rule-box Pokémon (EX, GX, V, VMAX, VSTAR, ex) printed as plain holo rares
+// foil the whole card with a light texture rather than only the art window.
+const RULE_BOX_NAME = /(?:^|[\s-])(?:ex|gx|v|vmax|vstar)$/i;
+// Gold Star cards print a star after the name ("Pikachu ★").
+const GOLD_STAR_NAME = /\u2605/;
+
+// Energy cards have no art window, so reverse-holo energy gets its own value.
+// It still ends in "reverse holo", so the shared [data-rarity$="reverse holo"]
+// rules apply and reverse-holo.css only overrides the clip and strength.
+const isEnergyCard = (card) => {
+  const kinds = [
+    card.supertype,
+    card.category,
+    card.type,
+    card?.data?.supertype,
+    card?.data?.category,
+  ];
+  if (kinds.some((kind) => /energy/i.test(String(kind || '')))) return true;
+  return /\benergy$/i.test(String(card.name || card?.data?.name || '').trim());
 };
 
 export function resolveHoloEffect(card = {}) {
+  const effect = resolveRarityEffect(card);
+  if (effect === 'reverse holo' && isEnergyCard(card))
+    return 'energy reverse holo';
+  const name = String(card.name || card?.data?.name || '').trim();
+  if (effect === 'rare holo' && GOLD_STAR_NAME.test(name)) return 'gold star';
+  // VMAX foil is rainbow glitter over the whole card, not the V texture.
+  if (effect === 'rare holo' && /(?:^|\s)vmax$/i.test(name)) return 'vmax rare';
+  if (effect === 'rare holo' && RULE_BOX_NAME.test(name)) return 'double rare';
+  return effect;
+}
+
+function resolveRarityEffect(card) {
   const rarity = String(card.rarity || card?.data?.rarity || '').trim();
   if (!rarity) return null;
   if (RARITY_EFFECTS[rarity]) return RARITY_EFFECTS[rarity];
   const lower = rarity.toLowerCase();
   // Order matters: check the most specific substrings first.
   if (lower.includes('reverse holo')) return 'reverse holo';
+  if (lower.includes('shiny') || lower.includes('shining'))
+    return 'shiny rare';
+  if (lower.includes('ace spec')) return 'ace spec rare';
+  if (lower.includes('amazing')) return 'amazing rare';
+  if (lower.includes('break')) return 'break rare';
+  if (lower.includes('legend')) return 'legend rare';
+  if (lower.includes('prime')) return 'prime rare';
+  if (lower.includes('lv.x')) return 'lvx rare';
+  if (lower.includes('holo star')) return 'gold star';
+  if (lower.includes('rare ultra')) return 'ultra rare';
   if (lower.includes('radiant rare')) return 'radiant rare';
   if (lower.includes('special illustration rare'))
     return 'special illustration rare';
@@ -55,11 +112,7 @@ export function resolveHoloEffect(card = {}) {
   if (lower.includes('hyper rare')) return 'hyper rare';
   if (lower.includes('rainbow')) return 'rare rainbow alt';
   if (lower.includes('holo')) return 'rare holo';
-  if (
-    lower.includes('gold') ||
-    lower.includes('secret') ||
-    lower.includes('shiny')
-  ) {
+  if (lower.includes('gold') || lower.includes('secret')) {
     return 'hyper rare';
   }
   return null;
@@ -103,6 +156,98 @@ export function foilMaskUrl(src, pageOrigin = globalThis.location?.origin) {
   return INK_MASK_CORS_HOSTS.has(url.hostname) ? url.href : null;
 }
 
+// ── card era ─────────────────────────────────────────────────────────
+// The art window sits at a different place per card layout generation, and
+// reverse holo keeps foil out of it. The era comes from the image URL's
+// series/set segment (tcgdex: /<lang>/<series>/<set>/..., pokemontcg.io:
+// /<set>/...). Unknown hosts or sets return null and use the default window.
+// Keyed by the code's leading letters ("swsh12pt5" -> "swsh", "base1" -> "base").
+const ERA_BY_SERIES = {
+  sv: 'sv',
+  svp: 'sv',
+  sve: 'sv',
+  me: 'sv',
+  mep: 'sv',
+  swsh: 'swsh',
+  swshp: 'swsh',
+  sm: 'sm',
+  smp: 'sm',
+  sma: 'sm',
+  xy: 'xy',
+  xyp: 'xy',
+  bw: 'xy',
+  bwp: 'xy',
+  base: 'classic',
+  gym: 'classic',
+  neo: 'classic',
+  lc: 'classic',
+  ecard: 'classic',
+  ex: 'classic',
+  pop: 'classic',
+  dp: 'classic',
+  dpp: 'classic',
+  pl: 'classic',
+  hgss: 'classic',
+  hsp: 'classic',
+  col: 'classic',
+};
+
+const eraFromCode = (code) => {
+  const series = /^[a-z]+/.exec(String(code || '').toLowerCase())?.[0];
+  return series && Object.hasOwn(ERA_BY_SERIES, series)
+    ? ERA_BY_SERIES[series]
+    : null;
+};
+
+// Splits a known card image URL into its series, set and card number.
+// Returns null for other hosts or unparseable input.
+const cardImageParts = (src) => {
+  if (typeof src !== 'string' || !src) return null;
+  let url;
+  try {
+    url = new URL(src);
+  } catch {
+    return null;
+  }
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (url.hostname === 'assets.tcgdex.net')
+    return { series: parts[1], set: parts[2], number: parts[3] };
+  if (url.hostname === 'images.pokemontcg.io')
+    return { series: parts[0], set: parts[0], number: parts[1] };
+  return null;
+};
+
+export function cardEraFromImageUrl(src) {
+  return eraFromCode(cardImageParts(src)?.series);
+}
+
+// The leading letters of the series code ("hgss", "dp", "base"), for foil
+// patterns that changed within one layout era. Null when the series is unknown.
+export function cardSeriesFromImageUrl(src) {
+  const series = /^[a-z]+/.exec(
+    String(cardImageParts(src)?.series || '').toLowerCase()
+  )?.[0];
+  return series && Object.hasOwn(ERA_BY_SERIES, series) ? series : null;
+}
+
+// The lowercase set code ("base1", "ex5"), for foil patterns used by only one
+// set. Null for other hosts or a set code with unexpected characters.
+export function cardSetFromImageUrl(src) {
+  const set = String(cardImageParts(src)?.set || '').toLowerCase();
+  return /^[a-z0-9.]+$/.test(set) ? set : null;
+}
+
+// Trainer Gallery and Galarian Gallery cards: their own subset ("swsh9tg") or
+// a TG/GG card number. TCGdex has no rarity for them, so the URL is the only signal.
+export function isTrainerGalleryImageUrl(src) {
+  const parts = cardImageParts(src);
+  if (!parts) return false;
+  return (
+    /(?:tg|gg)$/i.test(String(parts.set || '')) ||
+    /^(?:tg|gg)\d/i.test(String(parts.number || ''))
+  );
+}
+
 // Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2.
 export function buildHoloCard(imageUrl, rarityValue) {
   const card = document.createElement('div');
@@ -114,6 +259,13 @@ export function buildHoloCard(imageUrl, rarityValue) {
     card.dataset.inkMask = 'true';
     card.style.setProperty('--card-ink-mask', `url("${inkMask}")`);
   }
+  const era = cardEraFromImageUrl(imageUrl);
+  if (era) card.dataset.cardEra = era;
+  const series = cardSeriesFromImageUrl(imageUrl);
+  if (series) card.dataset.cardSeries = series;
+  const set = cardSetFromImageUrl(imageUrl);
+  if (set) card.dataset.cardSet = set;
+  if (isTrainerGalleryImageUrl(imageUrl)) card.dataset.trainerGallery = 'true';
 
   const translater = document.createElement('div');
   translater.className = 'card__translater';

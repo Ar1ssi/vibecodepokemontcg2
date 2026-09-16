@@ -127,3 +127,100 @@ describe('full-art (ultra rare) foil', () => {
     assert.doesNotMatch(css, /mix-blend-mode: exclusion/);
   });
 });
+
+describe('reverse holo foil', () => {
+  const css = () => normalize(readHoloCss('reverse-holo.css'));
+
+  it('cuts the art window out of shine and glitter with an even-odd clip', () => {
+    assert.match(
+      css(),
+      /\.card__shine, \.card\[data-rarity\$="reverse holo"\] \.card__glitter \{[^}]*clip-path: polygon\( evenodd,/
+    );
+  });
+
+  it('defines the art window for every era holo.mjs can emit', () => {
+    const base = normalize(readHoloCss('base.css'));
+    for (const era of ['sv', 'swsh', 'sm', 'xy', 'classic']) {
+      assert.match(
+        base,
+        new RegExp(
+          `\\[data-card-era="${era}"\\] \\{ --art-l: [\\d.]+%; --art-t: [\\d.]+%; --art-r: [\\d.]+%; --art-b: [\\d.]+%; \\}`
+        ),
+        era
+      );
+    }
+  });
+
+  it('shows real color and never dims the foil with a brightness cut', () => {
+    assert.match(css(), /hsl\(285, 100%, 55%\)/);
+    assert.doesNotMatch(css(), /--foil-brightness/);
+    assert.doesNotMatch(css(), /var\(--foil\)/);
+  });
+});
+
+describe('reverse holo energy', () => {
+  it('drops the art-window clip and tones the rainbow down', () => {
+    const css = normalize(readHoloCss('reverse-holo.css'));
+    assert.match(
+      css,
+      /\.card\[data-rarity="energy reverse holo"\] \.card__glitter \{ -webkit-clip-path: none; clip-path: none; \}/
+    );
+    assert.match(
+      css,
+      /\.card\[data-rarity="energy reverse holo"\] \.card__shine \{ filter: [^}]*opacity: \.55; \}/
+    );
+  });
+});
+
+describe('shine gradients', () => {
+  it('never tile the diagonal sheen/rainbow and keep the pan inside the tile (tile edges drew boxes)', () => {
+    for (const name of ['hyper-rare.css', 'ex-special-illustration-rare.css', 'reverse-holo.css']) {
+      const css = normalize(readHoloCss(name));
+      assert.match(css, /\.card__shine \{[^}]*background-repeat: no-repeat;/, name);
+      // clamp() percentages in background-position render wrong in Chrome and hid the layer.
+      assert.doesNotMatch(css, /clamp\(/, name);
+      const factors = [...css.matchAll(/var\(--background-[xy]\) - 50%\) \* (-?[\d.]+) \+ 50%/g)];
+      assert.ok(factors.length >= 4, `${name} pans its shine`);
+      for (const [, factor] of factors) {
+        assert.ok(Math.abs(Number(factor)) <= 1.15, `${name} pan x${factor} would expose a tile edge`);
+      }
+    }
+  });
+});
+
+describe('regular holo foil', () => {
+  const css = () => normalize(readHoloCss('regular-holo.css'));
+
+  it('clips shine and glitter to the art window', () => {
+    assert.ok(
+      css().includes(
+        '.card[data-rarity="rare holo"] .card__glitter { -webkit-clip-path: inset( var(--art-t) calc(100% - var(--art-r)) calc(100% - var(--art-b)) var(--art-l) ); clip-path: inset( var(--art-t)'
+      )
+    );
+  });
+
+  it('gives classic-era holos the cosmos pattern without the beams', () => {
+    const classicShine = css().split('[data-card-era="classic"] .card__shine {')[1] ?? '';
+    assert.ok(classicShine.split('}')[0].includes('cosmos-top-trans.png'));
+    assert.ok(
+      css().includes('[data-card-era="classic"] .card__shine:after { display: none; }')
+    );
+  });
+});
+
+describe('shiny rare foil', () => {
+  it('is imported by both stylesheets and keeps its own glitter', () => {
+    for (const sheet of ['index.css', 'opp-containers.css']) {
+      const source = readFileSync(
+        fileURLToPath(new URL(`../../../../css/${sheet}`, import.meta.url)),
+        'utf8'
+      );
+      assert.ok(source.includes("@import url('./holo/shiny-rare.css');"), sheet);
+    }
+    assert.ok(
+      readHoloCss('base.css').includes(
+        ':not([data-rarity="shiny rare"]):not('
+      )
+    );
+  });
+});

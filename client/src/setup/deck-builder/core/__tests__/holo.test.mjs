@@ -7,6 +7,7 @@ import {
   computeLightVars,
   driftTilt,
   DRIFT,
+  cardEraFromImageUrl,
   foilMaskUrl,
   LIGHT,
   MAX_ROTATE_X,
@@ -426,5 +427,107 @@ describe('startHoloAnimation', () => {
     assert.equal(card.listeners.get('pointerleave').size, 1);
     stopHoloAnimation(card);
     assert.equal(card.listeners.get('pointermove').size, 0);
+  });
+});
+
+describe('cardEraFromImageUrl', () => {
+  it('reads the series from tcgdex URLs', () => {
+    const tcgdex = (series, set) =>
+      `https://assets.tcgdex.net/en/${series}/${set}/91/high.webp`;
+    assert.equal(cardEraFromImageUrl(tcgdex('sv', 'sv01')), 'sv');
+    assert.equal(cardEraFromImageUrl(tcgdex('me', 'me02')), 'sv');
+    assert.equal(cardEraFromImageUrl(tcgdex('swsh', 'swsh3')), 'swsh');
+    assert.equal(cardEraFromImageUrl(tcgdex('sm', 'sm12')), 'sm');
+    assert.equal(cardEraFromImageUrl(tcgdex('xy', 'xy5')), 'xy');
+    assert.equal(cardEraFromImageUrl(tcgdex('bw', 'bw1')), 'xy');
+    assert.equal(cardEraFromImageUrl(tcgdex('hgss', 'hgss1')), 'classic');
+  });
+
+  it('reads the set id from pokemontcg.io URLs', () => {
+    const ptcgio = (set) => `https://images.pokemontcg.io/${set}/1_hires.png`;
+    assert.equal(cardEraFromImageUrl(ptcgio('sv1')), 'sv');
+    assert.equal(cardEraFromImageUrl(ptcgio('swsh12pt5')), 'swsh');
+    assert.equal(cardEraFromImageUrl(ptcgio('sm115')), 'sm');
+    assert.equal(cardEraFromImageUrl(ptcgio('xy12')), 'xy');
+    assert.equal(cardEraFromImageUrl(ptcgio('base1')), 'classic');
+  });
+
+  it('returns null for unknown hosts, sets and bad input', () => {
+    assert.equal(cardEraFromImageUrl('https://example.com/sv/sv1/1.png'), null);
+    assert.equal(
+      cardEraFromImageUrl('https://images.pokemontcg.io/zz9/1.png'),
+      null
+    );
+    assert.equal(cardEraFromImageUrl('/relative/card.png'), null);
+    assert.equal(cardEraFromImageUrl(''), null);
+    assert.equal(cardEraFromImageUrl(undefined), null);
+  });
+});
+
+describe('buildHoloCard card era', () => {
+  it('tags the card with the era from its image URL', () => {
+    const card = buildHoloCard(TCGDEX_URL, 'reverse holo');
+    assert.equal(card.dataset.cardEra, cardEraFromImageUrl(TCGDEX_URL));
+    assert.ok(card.dataset.cardEra);
+    // TCGDEX_URL is /en/me/me01/077/..., so the set-specific foil can key on it.
+    assert.equal(card.dataset.cardSet, 'me01');
+  });
+
+  it('leaves the era unset when it is unknown', () => {
+    const card = buildHoloCard('https://example.com/card.png', 'reverse holo');
+    assert.equal(card.dataset.cardEra, undefined);
+  });
+});
+
+describe('resolveHoloEffect energy', () => {
+  it('gives reverse holo energy its own effect', () => {
+    assert.equal(
+      resolveHoloEffect({
+        rarity: 'Reverse Holo',
+        supertype: 'Energy',
+        name: 'Grass Energy',
+      }),
+      'energy reverse holo'
+    );
+    assert.equal(
+      resolveHoloEffect({ rarity: 'Reverse Holo', name: 'Grass Energy' }),
+      'energy reverse holo'
+    );
+  });
+
+  it('leaves non-energy reverse holos and other energy rarities alone', () => {
+    assert.equal(
+      resolveHoloEffect({ rarity: 'Reverse Holo', name: 'Beedrill' }),
+      'reverse holo'
+    );
+    assert.equal(
+      resolveHoloEffect({ rarity: 'Holo Rare', name: 'Grass Energy' }),
+      'rare holo'
+    );
+  });
+});
+
+describe('resolveHoloEffect per-generation rarities', () => {
+  it('foils old rarities that used to get no effect', () => {
+    for (const rarity of ['Full Art Trainer', 'Rare Ultra']) {
+      assert.equal(resolveHoloEffect({ rarity }), 'ultra rare', rarity);
+    }
+    assert.equal(resolveHoloEffect({ rarity: 'Crown' }), 'hyper rare');
+  });
+
+  it('gives shiny cards the silver shiny effect instead of gold', () => {
+    for (const rarity of ['Shiny Rare', 'Shiny rare', 'Shiny rare VMAX', 'Shiny Ultra Rare', 'Rare Shiny GX', 'Rare Shining']) {
+      assert.equal(resolveHoloEffect({ rarity }), 'shiny rare', rarity);
+    }
+    assert.equal(resolveHoloEffect({ rarity: 'Rare Secret' }), 'hyper rare');
+  });
+
+  it('foils rule-box holo rares across the whole card', () => {
+    assert.equal(resolveHoloEffect({ rarity: 'Rare Holo', name: 'Eternatus VMAX' }), 'vmax rare');
+    for (const name of ['Mewtwo-EX', 'Pikachu GX', 'Zacian V', 'Arceus VSTAR', 'Blaziken ex']) {
+      assert.equal(resolveHoloEffect({ rarity: 'Rare Holo', name }), 'double rare', name);
+    }
+    assert.equal(resolveHoloEffect({ rarity: 'Rare Holo', name: 'Vespiquen' }), 'rare holo');
+    assert.equal(resolveHoloEffect({ rarity: 'Reverse Holo', name: 'Zacian V' }), 'reverse holo');
   });
 });
