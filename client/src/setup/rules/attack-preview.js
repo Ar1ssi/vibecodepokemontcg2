@@ -33,6 +33,7 @@ import {
   resolvePreviewSleeveSrc,
 } from '../image-logic/full-view.js';
 import { toHighResCardImageUrl } from '../image-logic/card-image-url.mjs';
+import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { imageAnchor, cardNode } from '../deck-constructor/hydrate-holo.js';
 import {
   listAttackZoneBounds,
@@ -40,6 +41,8 @@ import {
   computeContentBox,
 } from './attack-zone-geometry.js';
 
+// Fallback glyph for a cost symbol that has no token art (ENERGY_TOKEN_FRONT
+// covers every TCGdex type, so this is the "data we don't recognise" path).
 const ENERGY_SYMBOLS = {
   Colorless: '⚪',
   Fire: '🔥',
@@ -52,7 +55,31 @@ const ENERGY_SYMBOLS = {
   Dark: '🌑',
   Dragon: '🐉',
 };
-const costLabel = (arr) => (arr || []).map((s) => ENERGY_SYMBOLS[s] || s).join(' ');
+
+// TCG Live paints a printed attack cost as a row of type-symbol circles rather
+// than emoji, and the board already ships exactly those circles as energy
+// token art — so the cost reuses them (same URL the attached-energy tokens
+// draw, hence the browser cache is warm).
+const costOrb = (symbol) => {
+  const src = getEnergyTokenSrcForType(symbol);
+  if (!src) return null;
+  const orb = document.createElement('img');
+  orb.className = 'attack-cost-orb';
+  orb.src = src;
+  orb.alt = String(symbol);
+  orb.title = String(symbol);
+  return orb;
+};
+
+const costEl = (cost) => {
+  const wrap = document.createElement('span');
+  wrap.className = 'attack-zone-cost';
+  for (const symbol of cost || []) {
+    const orb = costOrb(symbol);
+    wrap.appendChild(orb ?? document.createTextNode(String(ENERGY_SYMBOLS[symbol] || symbol)));
+  }
+  return wrap;
+};
 
 // Events that can change payability while the overlay is open (R12). A
 // subset of the panel's own refresh list — the pieces that can flip an
@@ -162,8 +189,11 @@ const buildAttackZoneEl = (zoneAction, bounds, contentBox) => {
 
   const label = document.createElement('div');
   label.className = 'attack-zone-label';
+  const cost = zoneAction.effectiveCost || [];
   const dmg = zoneAction.damage != null ? ` · ${zoneAction.damage} dmg` : '';
-  label.textContent = `${zoneAction.name} ${costLabel(zoneAction.effectiveCost)}${dmg}`;
+  label.appendChild(document.createTextNode(`${zoneAction.name} `));
+  if (cost.length) label.appendChild(costEl(cost));
+  if (dmg) label.appendChild(document.createTextNode(dmg));
   el.appendChild(label);
 
   if (zoneAction.usable) {

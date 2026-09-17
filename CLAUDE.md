@@ -37,6 +37,7 @@ If the new Session number is a multiple of 10, add "maintenance due" to STATE `N
 | Request looks like | Route |
 |---|---|
 | Whole project from one brief; no product code yet | `.agent/workflows/oneshot.md` |
+| Work through a sectioned plan/brief already in the repo | `.agent/workflows/exec-plan.md` |
 | New capability; or touches >2 files, or any interface/schema/dependency | `.agent/workflows/feature.md` |
 | Small fix or tweak, cause known | `.agent/workflows/patch.md` |
 | Defect, cause unknown | `.agent/workflows/debug.md` |
@@ -86,6 +87,9 @@ Unattended (oneshot, CI): question budget spent up front; the `(assumed)` ledger
 - Every boundary you touch handles: empty/null, invalid input, dependency failure/timeout.
   "Happy path only" is incomplete work.
 - Every behavior change ships with a test that fails without it.
+- Verification is never a question: run the project's test and lint commands on your own initiative after
+  a change, and iterate to green before calling it done. Ask only when running them is impossible or
+  destructive — and then say plainly that the work is unverified.
 - Comments only for constraints and whys the code can't express. No dead or commented-out code.
 - Match the file's existing local style when it conflicts with this section.
 

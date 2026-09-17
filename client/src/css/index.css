@@ -395,8 +395,20 @@ ul, li {
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
   background-color: rgba(255, 255, 255, 0.1);
 }
+/* Board rings breathe (highlight-parity plan C1). The ring has to be restated
+   in every keyframe because an animated `box-shadow` replaces the whole
+   property; the animation still outranks the plain `box-shadow` rules on
+   cards/zones the way the old `!important` did (author animations beat
+   author-normal declarations at any specificity), and `!important` rules that
+   beat it today keep beating it. Stadium cards live in this document; the two
+   playmat iframes mirror this block in self/opp-containers.css. */
+@keyframes highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgb(122, 185, 133), 0 0 0 0 rgba(122, 185, 133, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgb(122, 185, 133), 0 0 14px 5px rgba(122, 185, 133, 0.55); }
+}
 .highlight {
-  box-shadow: 0 0 0 4px rgb(122, 185, 133) !important;
+  box-shadow: 0 0 0 4px rgb(122, 185, 133);
+  animation: highlight-pulse 1.8s ease-in-out infinite;
   background-color: rgba(133, 197, 155, 0.3);
 }
 #selfResizer {
@@ -725,6 +737,31 @@ ul, li {
 }
 #FREEBUTTON, #p2FREEBUTTON {
   border-radius: .5vw 0 0 .5vw;
+}
+/* Turn-aware action affordances (highlight-parity plan B1/B3), toggled by
+   rules-bridge.js hookActionAffordances. Gold = some attack on the Active is
+   payable right now; blue = some ability is activatable right now; dimmed =
+   not this side's turn. ID+class beats the .self-color/.opp-color gradients
+   and the container :hover rules, so hover is restated per state. */
+#attackButton.attacks-available,
+#p2AttackButton.attacks-available {
+  background: linear-gradient(to bottom, rgba(200, 170, 60, 0.864), rgba(170, 140, 40, 0.864));
+}
+#attackButton.attacks-available:hover,
+#p2AttackButton.attacks-available:hover {
+  background: linear-gradient(to bottom, rgba(224, 196, 96, 0.9), rgba(190, 160, 55, 0.9));
+}
+#abilityButton.abilities-available,
+#p2AbilityButton.abilities-available {
+  background: linear-gradient(to bottom, rgba(80, 150, 220, 0.864), rgba(60, 120, 190, 0.864));
+}
+#abilityButton.abilities-available:hover,
+#p2AbilityButton.abilities-available:hover {
+  background: linear-gradient(to bottom, rgba(112, 178, 238, 0.9), rgba(84, 142, 212, 0.9));
+}
+.chat-button-container button.turn-disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 #messageInput {
   width: 100%;
@@ -2016,6 +2053,32 @@ ul, li {
 .attack-zone--unusable {
   cursor: default;
   pointer-events: auto;
+  background: rgba(128, 128, 128, 0.08);
+  border-color: rgba(128, 128, 128, 0.2);
+}
+/* Plan A2 dims the _text_, not the whole zone (it used to be `opacity: 0.4` on
+   the zone), because an opacity on the container also fades the plan A3 blocked
+   marker below legibility. */
+.attack-zone--unusable .attack-zone-label,
+.ability-zone--unusable .attack-zone-label {
+  opacity: 0.45;
+}
+/* Plan A3: the red ✕ says "you cannot pick this" at a glance; which of the two
+   reasons applies (unpayable cost vs once-per-turn already spent) stays in the
+   zone's `title` tooltip, which attack-preview.js fills from the engine. */
+.attack-zone--unusable::after,
+.ability-zone--unusable::after {
+  content: '✕';
+  position: absolute;
+  right: 0.4em;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgb(255, 86, 86);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
 }
 .attack-zone-label {
   color: #fff;
@@ -2023,6 +2086,23 @@ ul, li {
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   pointer-events: none;
+}
+/* Printed attack cost, drawn with the same type-symbol discs as the attached
+   energy tokens on the board (highlight-parity plan B2). `em` sizing keeps the
+   orbs in step with the label's font size, so they scale with the preview. */
+.attack-zone-cost {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  gap: 0.1em;
+  margin: 0 0.1em;
+}
+.attack-cost-orb {
+  width: 1.15em;
+  height: 1.15em;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
 .attack-preview-empty {
   position: static;
@@ -2033,6 +2113,25 @@ ul, li {
 @keyframes attack-glow {
   0%, 100% { box-shadow: 0 0 4px 1px rgba(255, 214, 92, 0.35); }
   50% { box-shadow: 0 0 10px 3px rgba(255, 214, 92, 0.6); }
+}
+@keyframes ability-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(120, 200, 255, 0.35); }
+  50% { box-shadow: 0 0 10px 3px rgba(120, 200, 255, 0.6); }
+}
+/* Plan A4: the preview is sized off the viewport, so a 10px glow that reads as
+   a halo at 1280px is a hairline on a large monitor. Re-declaring the keyframes
+   inside the query beats threading a size var through both animations above.
+   The plan C3 board glow is not scaled: it lives in the playmat sheets, whose
+   viewport is the mat rather than the window. */
+@media (min-width: 1600px) {
+  @keyframes attack-glow {
+    0%, 100% { box-shadow: 0 0 7px 2px rgba(255, 214, 92, 0.4); }
+    50% { box-shadow: 0 0 16px 5px rgba(255, 214, 92, 0.65); }
+  }
+  @keyframes ability-glow {
+    0%, 100% { box-shadow: 0 0 7px 2px rgba(120, 200, 255, 0.4); }
+    50% { box-shadow: 0 0 16px 5px rgba(120, 200, 255, 0.65); }
+  }
 }
 
 .attack-preview-actions {
@@ -2083,7 +2182,7 @@ ul, li {
   cursor: pointer;
   border-color: rgba(120, 200, 255, 0.55);
   background: rgba(120, 200, 255, 0.08);
-  animation: attack-glow 1.6s ease-in-out infinite;
+  animation: ability-glow 1.6s ease-in-out infinite;
 }
 .ability-zone--usable:hover {
   background: rgba(120, 200, 255, 0.22);
@@ -2092,7 +2191,14 @@ ul, li {
 .ability-zone--unusable {
   cursor: default;
   pointer-events: auto;
+  background: rgba(128, 128, 128, 0.08);
+  border-color: rgba(128, 128, 128, 0.2);
 }
+
+/* Board cards are not in this document — they live inside the self/opp playmat
+   iframes, which load only self-/opp-containers.css. The plan C3 board glow
+   (.has-usable-ability) is therefore styled there, not here; only the overlay
+   above (the card preview) and the Stadium belong to this sheet. */
 
 /* Discard pile viewer — PTCG Live-style stacked carousel on single-click. */
 .discard-pile-overlay {

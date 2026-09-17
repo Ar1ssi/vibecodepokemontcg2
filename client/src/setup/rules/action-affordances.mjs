@@ -1,0 +1,97 @@
+/**
+ * @file Action affordances for the highlight-parity plan (gaps B1/B3/C3):
+ * "can this player's Active pay for any attack right now, and which of their
+ * in-play Pokémon have an activatable ability?"
+ *
+ * Pure and DOM-free so it runs under `node --test` (same split as
+ * attack-preview-sources.mjs). The DOM glue in rules-bridge.js supplies the
+ * zone arrays, the merged legacy+server ability-used predicate, and
+ * ensureCardData.
+ */
+
+import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-attack-context.mjs';
+import { listUsableActions } from '../../../../shared/engine/rules/attack-window.mjs';
+import {
+  collectUsableAbilityCandidates,
+  filterUsableAbilities,
+} from '../../../../shared/engine/rules/collect-usable-abilities.mjs';
+import { parseAbility } from '../../../../shared/engine/rules/abilities.mjs';
+
+/**
+ * Same gate as ability-picker.js: "When you play this Pokémon onto your
+ * Bench" triggers are gated by the one-shot window, not the per-turn
+ * abilitiesUsed map.
+ */
+export function isPlayedToBenchTriggerCard(card) {
+  const text = card?.ability?.text ?? card?.abilityText ?? card?.text ?? '';
+  return parseAbility(text).some((s) => s.type === 'whenPlayedAbility');
+}
+
+/**
+ * @param {object} opts
+ * @param {object|null} opts.activeCard the player's Active Pokémon (or null)
+ * @param {object[]} [opts.attachedEnergyCards] energies on the Active
+ *   (caller-computed via attachedEnergiesFor)
+ * @param {object[]} [opts.benchCards] raw bench zone array (Pokémon are
+ *   filtered inside)
+ * @param {object|null} [opts.stadiumCard] the Stadium in play
+ * @param {(card: object) => boolean} [opts.isAbilityUsed] merged already-spent
+ *   predicate — legacy flag, stamped flag, server flags, and the
+ *   when-played-to-bench window all folded in by the caller (same shape as
+ *   ability-picker.js)
+ * @param {(card: object) => Promise<void>} [opts.ensureCardData]
+ * @returns {Promise<{ attackAvailable: boolean, abilityAvailable: boolean,
+ *   usableAbilities: Array<{ card, zone, index, family, abilityName }> }>}
+ */
+export async function computeActionAffordances({
+  activeCard = null,
+  attachedEnergyCards = [],
+  benchCards = [],
+  stadiumCard = null,
+  isAbilityUsed = () => false,
+  ensureCardData = async () => {},
+} = {}) {
+  let attackAvailable = false;
+  if (activeCard) {
+    try {
+      await ensureCardData(activeCard);
+    } catch {
+      /* card data may not be ready yet — treat as no payable attack */
+    }
+    const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks } =
+      await resolveAttackContext({
+        activeCard,
+        attachedEnergyCards,
+        ensureCardData,
+        stadiumCard,
+        abilityUsed: isAbilityUsed,
+      });
+    const { attacks } = listUsableActions(activeCard, {
+      energyTypes,
+      stadiumCostModifier,
+      abilityUsed: abilityUsedFlag,
+      rulesEnabled: true,
+      priorAttacks,
+    });
+    attackAvailable = attacks.some((a) => a.usable);
+  }
+
+  const candidates = collectUsableAbilityCandidates(activeCard, benchCards);
+  for (const { card } of candidates) {
+    try {
+      await ensureCardData(card);
+    } catch {
+      /* card data may not be ready yet */
+    }
+  }
+  const usableAbilities = filterUsableAbilities(candidates, {
+    rulesEnabled: true,
+    isUsed: isAbilityUsed,
+  });
+
+  return {
+    attackAvailable,
+    abilityAvailable: usableAbilities.length > 0,
+    usableAbilities,
+  };
+}

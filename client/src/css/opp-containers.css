@@ -160,13 +160,38 @@ body, input, textarea, button {
 .flip-image img {
   transform: scaleX(-1) scaleY(-1) !important;
 }
+/* Mirror of self-containers.css (see the comment there), including the source
+   order: declared above the ring rules so `.highlight`/`.selectHighlight` win
+   the `animation` tie. Same blue on this side — the glow advertises an
+   activatable ability, not who owns the card. */
+@keyframes ability-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(120, 200, 255, 0.35); }
+  50% { box-shadow: 0 0 10px 3px rgba(120, 200, 255, 0.6); }
+}
+.has-usable-ability {
+  box-shadow: 0 0 8px 2px rgba(120, 200, 255, 0.5);
+  animation: ability-glow 2s ease-in-out infinite;
+}
+/* Mirror of self-containers.css (see the comment there), with this side's red
+   ring. Each playmat iframe is its own document, so the keyframes must be
+   declared in every sheet that animates a ring. */
+@keyframes highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgb(182, 110, 110), 0 0 0 0 rgba(182, 110, 110, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgb(182, 110, 110), 0 0 14px 5px rgba(182, 110, 110, 0.55); }
+}
+@keyframes select-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864), 0 0 0 0 rgba(143, 215, 153, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864), 0 0 14px 5px rgba(143, 215, 153, 0.55); }
+}
 .highlight {
-  box-shadow: 0 0 0 4px rgb(182, 110, 110) !important;
+  box-shadow: 0 0 0 4px rgb(182, 110, 110);
+  animation: highlight-pulse 1.8s ease-in-out infinite;
   background-color: rgba(188, 90, 113, 0.3) !important;
   z-index: 1 !important;
 }
 .selectHighlight {
-  box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864) !important;
+  box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864);
+  animation: select-highlight-pulse 1.8s ease-in-out infinite;
 }
 .highlightBox {
   background-color: rgba(188, 90, 113, 0.3);
