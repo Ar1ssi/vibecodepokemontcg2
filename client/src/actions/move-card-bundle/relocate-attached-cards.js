@@ -21,7 +21,7 @@ export const relocateAttachedCards = (
     }
     const card = oZone.array[i];
     if (image.relative === movingCard.image || card.parentCard === movingCard) {
-      resetImage(image);
+      resetImage(image, dZoneId);
       //moving to active or bench
       if (['active', 'bench'].includes(dZoneId)) {
         image.attached = true;
