@@ -15,6 +15,16 @@ export const resetImage = (image, zoneId = '') => {
     // returns to a non-board zone overrides that zone's own CSS sizing.
     image.style.width = '';
     image.style.height = '';
+    // Evolving/attaching (evolve-card.js, attach-card.js, decrease-card-layer.js)
+    // also stamps an inline px width on the stack's play-container to fit the
+    // widest attached card. That container is reused by whatever card ends up
+    // there next — clear it too, or a card that inherits this slot after an
+    // evolution/attachment chain keeps the old stack's inflated width.
+    const container = image.parentElement?.closest?.('.play-container');
+    if (container) {
+      container.style.width = '';
+      container.style.height = '';
+    }
   }
   if (image.dataset?.energyCardSrc) {
     image.src = image.dataset.energyCardSrc;
