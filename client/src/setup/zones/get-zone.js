@@ -64,5 +64,9 @@ export const getZone = (user, zoneId) => {
     return array ? array.length : 0;
   };
 
-  return { array, element, elementCover, getCount };
+  const getRenderedCount = () => {
+    return element ? element.querySelectorAll('img').length : 0;
+  };
+
+  return { array, element, elementCover, getCount, getRenderedCount };
 };

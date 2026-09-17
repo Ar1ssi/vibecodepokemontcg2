@@ -810,10 +810,10 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
         destination: 'discard',
         multiSelect: true,
         requiredCount: step.count,
-        onConfirm: (selected) => {
+        onConfirm: async (selected) => {
           for (const s of selected) {
             const i = zone(_effectOwner, 'hand').array.indexOf(s);
-            if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', i, false, 'move');
+            if (i >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', i, false, 'move');
           }
           msg(`  cost paid: discarded ${selected.map((s) => s.name).join(', ')}`);
           runAt(idx + 1);

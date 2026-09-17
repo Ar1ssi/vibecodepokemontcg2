@@ -78,6 +78,14 @@
     }
     
     // ── win detection ────────────────────────────────────────────────────
+    // A zone's card array can drift empty while its cards are still rendered
+    // (seen after a reset + re-setup in 2P). Losing the game on a stale array
+    // is far worse than missing a real no-Pokémon loss for one check, so a zone
+    // counts as occupied if either the array or the rendered board says so.
+    export function occupiedZoneCount({ arrayCount, renderedCount }) {
+      return Math.max(Number(arrayCount) || 0, Number(renderedCount) || 0);
+    }
+
     export function checkWinConditions({ activeCounts, deckCounts, turnPlayer }) {
       // deck-out: the player who must draw but can't loses
       if (deckCounts && deckCounts[turnPlayer] === 0) {

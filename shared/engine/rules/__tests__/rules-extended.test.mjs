@@ -127,6 +127,14 @@ import test from 'node:test';
       assert.equal(r.winner, 'opp');
     });
     
+    test('occupiedZoneCount: rendered cards keep a drifted-empty zone occupied', async () => {
+      const { occupiedZoneCount } = await import('../ko-flow.mjs');
+      assert.equal(occupiedZoneCount({ arrayCount: 0, renderedCount: 2 }), 2);
+      assert.equal(occupiedZoneCount({ arrayCount: 1, renderedCount: 0 }), 1);
+      assert.equal(occupiedZoneCount({ arrayCount: 0, renderedCount: 0 }), 0);
+      assert.equal(occupiedZoneCount({ arrayCount: undefined, renderedCount: undefined }), 0);
+    });
+
     // ── retreat ──
     test('retreat blocked after attacking', () => {
       startGame();

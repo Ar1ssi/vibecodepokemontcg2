@@ -48,7 +48,7 @@ import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
-import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions } from '/shared/engine/rules/ko-flow.mjs';
+import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions, occupiedZoneCount } from '/shared/engine/rules/ko-flow.mjs';
 import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '/shared/engine/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
@@ -374,6 +374,11 @@ const syncAttackFromCard = (card, attackIndex, prev) => {
   return text ? { ...latest, text } : latest;
 };
 
+const inPlayCount = (user, zoneId) => {
+  const zone = getZone(user, zoneId);
+  return occupiedZoneCount({ arrayCount: zone.getCount(), renderedCount: zone.getRenderedCount?.() });
+};
+
 export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
   if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
     return false;
@@ -383,8 +388,8 @@ export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
     const counts = {};
     for (const p of ['self', 'opp']) {
       counts[p] = {
-        active: getZone(p, 'active').getCount(),
-        bench: getZone(p, 'bench').getCount(),
+        active: inPlayCount(p, 'active'),
+        bench: inPlayCount(p, 'bench'),
       };
     }
     const inGame = {

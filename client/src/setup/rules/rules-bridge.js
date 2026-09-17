@@ -31,7 +31,7 @@
       consumePlayedToBenchTrigger,
     } from '/shared/engine/rules/rules-state.mjs';
     import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
-    import { handleKO, checkWinConditions, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
+    import { handleKO, checkWinConditions, occupiedZoneCount, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
     import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from '/shared/engine/rules/status.mjs';
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
@@ -254,6 +254,11 @@ import {
       syncRulesToggleUI();
     };
 
+    const inPlayCount = (user, zoneId) => {
+      const zone = getZone(user, zoneId);
+      return occupiedZoneCount({ arrayCount: zone.getCount(), renderedCount: zone.getRenderedCount?.() });
+    };
+
     export function evaluateAndApplyWinConditions(turnPlayer = rulesState.turnPlayer) {
       if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
         return false;
@@ -263,8 +268,8 @@ import {
         const counts = {};
         for (const p of ['self', 'opp']) {
           counts[p] = {
-            active: getZone(p, 'active').getCount(),
-            bench: getZone(p, 'bench').getCount(),
+            active: inPlayCount(p, 'active'),
+            bench: inPlayCount(p, 'bench'),
           };
         }
         const inGame = {
