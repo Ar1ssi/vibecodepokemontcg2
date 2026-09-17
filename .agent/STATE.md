@@ -4,9 +4,9 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 154
-Focus: Guided setup announcement: move basic pokemon to active spot before turn 1.
-Active: none. Shipped guided prompt in rules-bridge.js and ready.js.
+Session: 155
+Focus: Fix shuffling seed not resetting / cards dealing in identical order.
+Active: none. Shipped dynamic PRNG seed randomization and deal-order cache resets.
 Next: maintenance due (S150, still owed). user live-checks a SERVER_AUTHORITATIVE 2P game (holo, evolve stack, Tool/Energy layout + double-click carousel,
   rotation, ability tab, counts, VSTAR/GX, Stadium flip, Nest Ball picker); then push + PR.
 Blocked: none.
@@ -27,6 +27,6 @@ Blocked: none.
 - Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S155 2026-09-17 patch: fix static PRNG seed preventing deck shuffle randomness across games and resets.
 - S154 2026-09-17 feature: guided statement for both players to move Basic Pokémon to Active Spot before turn 1.
 - S153 2026-09-17 patch: hydrateHolo ensureCardData pass-through for accurate ID/rarity resolution.
-- S150 2026-09-17 debug: MP discard cover blew up over prizes (#discardCover id rule hit the img); resetImage on covers.
