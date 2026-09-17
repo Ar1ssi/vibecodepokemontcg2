@@ -9,8 +9,8 @@ Focus: design 013 — the opening turn-order coin call is decided by the server 
 Active: none. Work is committed on branch `feature/server-turn-order-coin` in worktree ../vibe-turnorder.
 Next: live 2P check of the coin call under SERVER_AUTHORITATIVE=1 (picker opens on exactly one seat, the
   announced winner matches the call, both clients agree on turn 1) — the only design-013 row not covered by
-  tests. Then I56 (keybinds c/z/e/q on server cards), audit lows A-6/A-10, I28 holo/mat sizing,
-  PR #143 2P rules pass. maintenance due.
+  tests. Then I59 (server has no evolution timing), I58 (unimplemented stadium kinds), I56 (keybinds c/z/e/q on server cards),
+  audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -23,6 +23,9 @@ Blocked: none.
   read `getAuthoritativeZoneArray(side, zone)` / the `cardRegistry` and address cards by instanceId (D12, D47).
 - Board cards live INSIDE the `selfContainer`/`oppContainer` playmat iframes (separate documents that load only
   self-/opp-containers.css + its @imported partials; index.css never reaches them). Stadium is the exception.
+- Anything the legacy client does in `chat-buttons.js` for a `server_command` action (stadium, attack,
+  retreat, abilities) is DEAD under the flag — the dispatch gate returns first. Fix such cards in
+  `shared/engine/`, not in the client (D50).
 - Netcode: test under `SERVER_AUTHORITATIVE=1` only (S137). Pick a free PORT — other sessions hold :4000/:4317.
   Live 2P probe harness: `.agent/scratch/probe.mjs <step-file>` (Playwright, joins a room, deals, runs a step
   module). A worktree needs `node_modules` junctioned in before eslint/playwright will run there.
@@ -33,6 +36,6 @@ Blocked: none.
   are turn-player-only in rules mode. Pre-existing failing test: "trainer drop: a Trainer without synced effect text".
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S173 2026-09-18 feature: design 013 server-owned turn-order coin call (D50, D51).
-- S172 2026-09-18 patch: I57 discard-pile viewer reads the authoritative discard.
-- S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
+- S173 2026-09-18 feature: design 013 server-owned turn-order coin call (D51, D52).
+- S173 2026-09-18 feature: Grand Tree search-evolve + Stage 2 chain in the server engine (design 013, D50).
+- S173 2026-09-18 patch: cost-symbol/untyped Energy rows render as tokens (energy-token-assets.mjs).
