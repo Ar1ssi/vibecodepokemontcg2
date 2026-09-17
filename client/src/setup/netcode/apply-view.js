@@ -18,7 +18,10 @@ import {
 } from '../counters/damage-counter-style.mjs';
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
 import { resetImage } from '../image-logic/reset-image.js';
-import { getEnergyTokenFront } from '../../actions/move-card-bundle/energy-token-assets.mjs';
+import {
+  getEnergyTokenFront,
+  isEnergyCard,
+} from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
 import { listConditions, ROTATION_CONDITIONS } from '../../../../shared/engine/rules/special-conditions.mjs';
@@ -900,7 +903,7 @@ function layoutCardStack(rootRecord, attached) {
     if (record === displayRecord || isPokemon(cardData)) continue;
     const img = record.element;
     if (
-      cardData.type === 'Energy' &&
+      isEnergyCard(cardData) &&
       applyEnergyToken(img, cardData, cardWidth, cardHeight, tokenLayer + 1)
     ) {
       tokenLayer += 1;

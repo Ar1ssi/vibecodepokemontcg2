@@ -285,6 +285,8 @@ async function main() {
           room.spectatorSockets.size === 0 &&
           Date.now() - room.lastActivityAt > ROOM_GRACE_MS
         ) {
+          room.clearTurnOrderCall();
+          clearTurnOrderTimer(roomId);
           gameRooms.delete(roomId);
           // roomInfo is not deleted here: it has its own username-keyed
           // lifecycle (line ~316 above), and deleting it here is what turned
@@ -321,6 +323,8 @@ async function main() {
     if (!gameRoom) return;
     const leaverPlayerId = gameRoom.getPlayerIdByUsername(leaverUsername);
     if (!leaverPlayerId) return;
+    // resetGame drops any open coin call; its answer timeout lives here.
+    clearTurnOrderTimer(roomId);
     const remaining = gameRoom.resetGame({ removePlayerId: leaverPlayerId });
     broadcastFreshGame(gameRoom, roomId, remaining);
   };
@@ -334,6 +338,7 @@ async function main() {
     data.parameters[0] === false;
 
   const resetGameOnPlayerRequest = (gameRoom, roomId) => {
+    clearTurnOrderTimer(roomId);
     const players = gameRoom.resetGame();
     for (const { socketId } of players) {
       if (socketId) io.to(socketId).emit('gameReset', { roomId });
@@ -359,16 +364,27 @@ async function main() {
       });
     }
   };
+  // Design 013: the opening deal no longer happens the moment both seats are ready.
+  // It waits behind the turn-order coin call, whose winner becomes `setup`'s
+  // firstPlayerId — so the call decides the first turn instead of setupGame's own RNG
+  // (the I27 "cosmetic flip" this replaces).
+  //
   // Design 002 slice 3.5 finding: nothing else calls the 'setup' command, so without
   // this the server never deals hands/prizes. setupGame() deals every registered
   // player at once, so this runs once, when GameRoom.isReadyToDeal() says both seats
   // have a deck and pressed Set Up — never on deck load alone, which auto-started
   // the game the moment both players joined.
-  const dealOpeningHandsIfReady = (gameRoom, roomId, socketId) => {
-    if (!gameRoom.isReadyToDeal()) return;
-    const setupResult = gameRoom.handleCommand(socketId, {
+  const dealOpeningHands = (gameRoom, roomId, starterPlayerId) => {
+    // Any seated socket identifies the room to handleCommand; `setup` is a
+    // server_lifecycle command, so it is not attributed to the sender.
+    const actingSocketId =
+      gameRoom.playerToSocket.get(starterPlayerId) ||
+      [...gameRoom.playerToSocket.values()][0];
+    if (!actingSocketId) return;
+
+    const setupResult = gameRoom.handleCommand(actingSocketId, {
       type: 'setup',
-      payload: {},
+      payload: { firstPlayerId: starterPlayerId },
     });
     if (!setupResult.success) return;
 
@@ -389,9 +405,9 @@ async function main() {
     // Design 002 I17: the server never trusts a client-supplied shuffle (D10), so
     // hand each player their own syncInstance deal order — [prizes(6), hand(7),
     // rest(deck)], matching the client's rules-mode setupPrizes()-then-
-    // drawOpeningHand() split. Design 002 I27: setupGame() also picked the starter
-    // from its own RNG; send it relative to each recipient so the client's coin
-    // flip uses it instead of guessing.
+    // drawOpeningHand() split. Design 002 I27: `starter` rides along relative to
+    // each recipient; under design 013 it is the coin call's winner, so it agrees
+    // with the flip the players just watched.
     const starterId = gameRoom.state.turn?.player ?? null;
     for (const pid of Object.keys(gameRoom.state.players)) {
       const p = gameRoom.state.players[pid];
@@ -407,6 +423,75 @@ async function main() {
     }
   };
 
+  /**
+   * Tells both seats how the coin landed (each from its own 'self'/'opp'
+   * perspective), then deals with the called winner going first.
+   */
+  // Answer timeouts for open coin calls, keyed by roomId. Owned here rather than
+  // on GameRoom so the pure-ish room module stays free of transport timers.
+  const turnOrderTimers = new Map();
+
+  const clearTurnOrderTimer = (roomId) => {
+    const timer = turnOrderTimers.get(roomId);
+    if (timer) clearTimeout(timer);
+    turnOrderTimers.delete(roomId);
+  };
+
+  const finishTurnOrder = (gameRoom, roomId, resolution) => {
+    clearTurnOrderTimer(roomId);
+    for (const pid of Object.keys(gameRoom.state.players)) {
+      const pSocketId = gameRoom.playerToSocket.get(pid);
+      if (!pSocketId) continue;
+      io.to(pSocketId).emit('turnOrderResult', {
+        roomId,
+        caller: resolution.callerPlayerId === pid ? 'self' : 'opp',
+        call: resolution.call,
+        result: resolution.result,
+        starter: resolution.starterPlayerId === pid ? 'self' : 'opp',
+        auto: Boolean(resolution.auto),
+      });
+    }
+    dealOpeningHands(gameRoom, roomId, resolution.starterPlayerId);
+  };
+
+  /** Resolves an unanswered call on the server's own coin (timeout, disconnect). */
+  const autoFinishTurnOrder = (gameRoom, roomId) => {
+    const resolution = gameRoom.resolveTurnOrderCallAutomatically();
+    if (!resolution.ok) return;
+    finishTurnOrder(gameRoom, roomId, resolution);
+  };
+
+  /**
+   * Opens the turn-order coin call once both seats are ready. Idempotent: a
+   * second trigger while a call is open or already resolved does nothing, so a
+   * late deck load or a duplicate readyUp cannot re-roll the caller or re-deal.
+   */
+  const dealOpeningHandsIfReady = (gameRoom, roomId) => {
+    const opened = gameRoom.beginTurnOrderCall();
+    if (!opened) return;
+
+    for (const pid of Object.keys(gameRoom.state.players)) {
+      const pSocketId = gameRoom.playerToSocket.get(pid);
+      if (!pSocketId) continue;
+      const isCaller = pid === opened.callerPlayerId;
+      io.to(pSocketId).emit('turnOrderCall', {
+        roomId,
+        callId: isCaller ? opened.callId : null,
+        waiting: !isCaller,
+        timeoutMs: opened.timeoutMs,
+      });
+    }
+
+    // A caller who never answers (tab closed, dialog ignored) must not hang the
+    // match: the server calls for them and deals.
+    const timer = setTimeout(() => {
+      turnOrderTimers.delete(roomId);
+      autoFinishTurnOrder(gameRoom, roomId);
+    }, opened.timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    turnOrderTimers.set(roomId, timer);
+  };
+
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
     // Function to handle disconnections (unintended)
@@ -415,7 +500,18 @@ async function main() {
         socket.to(roomId).emit('userDisconnected', username);
       }
       if (SERVER_AUTHORITATIVE && gameRooms.has(roomId)) {
-        gameRooms.get(roomId).removeSocket(socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        // Design 013 row 6: if the coin caller drops before answering, the server
+        // calls for them — otherwise the remaining player waits on a seat that is
+        // never coming back.
+        const wasPendingCaller =
+          gameRoom.isAwaitingTurnOrderCall() &&
+          gameRoom.socketToPlayer.get(socket.id) ===
+            gameRoom.turnOrder.callerPlayerId;
+        gameRoom.removeSocket(socket.id);
+        if (wasPendingCaller) {
+          autoFinishTurnOrder(gameRoom, roomId);
+        }
       }
       if (SHADOW_MODE && shadowSessions.has(roomId)) {
         shadowSessions.get(roomId).removeSocket(socket.id);
@@ -436,7 +532,11 @@ async function main() {
           // If both players and spectators are empty, remove the roomInfo entry
           if (room.players.size === 0 && room.spectators.size === 0) {
             roomInfo.delete(roomId);
-            if (SERVER_AUTHORITATIVE) gameRooms.delete(roomId);
+            if (SERVER_AUTHORITATIVE) {
+              gameRooms.get(roomId)?.clearTurnOrderCall();
+              clearTurnOrderTimer(roomId);
+              gameRooms.delete(roomId);
+            }
             if (SHADOW_MODE) shadowSessions.delete(roomId);
           } else if (leftAsPlayer && SERVER_AUTHORITATIVE) {
             resetGameAfterPlayerLeft(roomId, username);
@@ -807,7 +907,7 @@ async function main() {
             const playerId = gameRoom.socketToPlayer.get(socket.id);
             if (playerId && data.action === 'readyUp') {
               gameRoom.markReady(playerId);
-              dealOpeningHandsIfReady(gameRoom, roomId, socket.id);
+              dealOpeningHandsIfReady(gameRoom, roomId);
             }
             if (playerId && isPlayerRequestedReset(data)) {
               resetGameOnPlayerRequest(gameRoom, roomId);
@@ -838,12 +938,37 @@ async function main() {
                   }
 
                   // A deck can finish loading after both players pressed Set Up.
-                  dealOpeningHandsIfReady(gameRoom, roomId, socket.id);
+                  dealOpeningHandsIfReady(gameRoom, roomId);
                 }
               }
             }
           }
         }
+      });
+    }
+
+    if (SERVER_AUTHORITATIVE) {
+      // Design 013: the designated caller's heads/tails pick. The client supplies
+      // only the call — the coin itself is flipped by the room's seeded rng (D10).
+      socket.on('turnOrderCall', (data) => {
+        const roomId =
+          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (!gameRoom) return;
+        gameRoom.touchActivity();
+
+        const resolution = gameRoom.submitTurnOrderCall(socket.id, {
+          callId: data?.callId ?? null,
+          call: data?.call ?? null,
+        });
+        if (!resolution.ok) {
+          socket.emit('turnOrderCallRejected', {
+            roomId,
+            reason: resolution.reason,
+          });
+          return;
+        }
+        finishTurnOrder(gameRoom, roomId, resolution);
       });
     }
 

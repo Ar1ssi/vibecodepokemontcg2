@@ -1754,6 +1754,52 @@ test('energy: attached Energy draws as tokens and fills the parent attachedCards
   assert.equal(lightningImg.style.position, '');
 });
 
+// Live 2P regression (sync log ptcg-sync-log_combined_test_1789677999175): decklists
+// exported from Limitless name basic Energy by its cost symbol, and a deck row that
+// skipped the importer's type resolution arrives with an empty `type`. Both used to
+// miss the token branch and cascade behind the Pokemon as flat cards.
+test('energy: cost-symbol names and untyped Energy rows still draw as tokens', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
+  const swinub = { instanceId: 20, name: 'Swinub', src: 'swinub.png', type: 'Pokemon' };
+  const symbolEnergy = {
+    instanceId: 21,
+    name: 'Basic {F} Energy',
+    src: 'GRI_169_R_EN.png',
+    type: 'Energy',
+  };
+  const untypedEnergy = {
+    instanceId: 22,
+    name: 'Rocky Fighting Energy',
+    src: 'me03-087.webp',
+    type: '',
+  };
+
+  applyView(
+    view(1, {
+      active: [
+        swinub,
+        { ...symbolEnergy, attachedTo: 20 },
+        { ...untypedEnergy, attachedTo: 20 },
+      ],
+    }),
+    [],
+    opts
+  );
+  const registry = getCardRegistry();
+  const symbolImg = registry.get(21).element;
+  const untypedImg = registry.get(22).element;
+
+  assert.equal(symbolImg.getAttribute('src'), '/src/assets/energy/tokens/fighting.png');
+  assert.equal(symbolImg.dataset.energyCardSrc, 'GRI_169_R_EN.png');
+  assert.equal(symbolImg.classList.contains('energy-token-3d'), true);
+  assert.equal(symbolImg.style.zIndex, '101');
+  assert.equal(untypedImg.getAttribute('src'), '/src/assets/energy/tokens/fighting.png');
+  assert.equal(untypedImg.classList.contains('energy-token-3d'), true);
+  assert.equal(untypedImg.style.zIndex, '102');
+});
+
 const NEST_BALL_CHOICE = {
   choiceId: 'choice_p1_4',
   player: 'p1',

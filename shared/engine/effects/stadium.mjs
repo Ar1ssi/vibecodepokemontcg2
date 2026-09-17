@@ -90,6 +90,11 @@ export function executeStadium(draft, {
         destination: 'hand',
         count: opt.n || 1,
       });
+    } else if (opt.kind === 'search-evolve') {
+      steps.push({
+        type: 'searchEvolve',
+        chainStage2: !!opt.chainStage2,
+      });
     } else if (opt.kind === 'draw') {
       steps.push({ type: 'draw', count: opt.n || 1 });
     } else if (opt.kind === 'heal-all') {
@@ -99,17 +104,6 @@ export function executeStadium(draft, {
         steps.push({ type: 'discardCost', count: opt.cost.n || 1 });
       }
       steps.push({ type: 'draw', count: opt.n || 1 });
-    }
-  }
-
-  if (steps.length === 0) {
-    if (String(stadium.name || '').toLowerCase().trim() === 'grand tree') {
-      steps.push({
-        type: 'searchDeck',
-        what: 'Evolution Pokémon',
-        destination: 'hand',
-        count: 1,
-      });
     }
   }
 

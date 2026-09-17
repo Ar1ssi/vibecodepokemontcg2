@@ -12,6 +12,15 @@ import { createRng } from '../../shared/engine/rng.mjs';
 import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
 import { applyCommand } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
+import {
+  flipCoinFace,
+  isCoinFace,
+  pickCoinCaller,
+  resolveStarterPlayerId,
+} from '../../shared/engine/rules/turn-order-flip.mjs';
+
+/** How long the designated caller has to answer before the server calls for them. */
+export const TURN_ORDER_CALL_TIMEOUT_MS = 15000;
 
 export class GameRoom {
   /**
@@ -52,6 +61,13 @@ export class GameRoom {
     // Seats whose player pressed Set Up this game. Kept outside `state` so it never
     // enters commandLog/undo replay; cleared by resetGame.
     this.readyPlayerIds = new Set();
+
+    // Opening turn-order coin call (design 013). Transient handshake state, kept
+    // outside `state` so it never reaches hashState/commandLog/undo replay.
+    // null | { phase: 'awaiting-call'|'resolved', callerPlayerId, callId,
+    //          call, result, starterPlayerId, auto }
+    this.turnOrder = null;
+    this.turnOrderCallCounter = 0;
 
     // Sweep grace (Finding 5): touched on any join or command traffic so the
     // periodic empty-socket sweep can distinguish a brief double-disconnect
@@ -384,6 +400,131 @@ export class GameRoom {
   }
 
   /**
+   * Opens the opening turn-order coin call (design 013). The server picks the
+   * caller from its own seeded rng, so neither client has to learn the other's
+   * socket id first. Idempotent: a second call while one is open returns null,
+   * so a duplicate "both ready" trigger cannot re-roll the caller.
+   *
+   * @returns {{ callerPlayerId: string, callId: string, timeoutMs: number }|null}
+   *   null when the room is not ready to deal or a call already exists.
+   */
+  beginTurnOrderCall() {
+    if (this.turnOrder) return null;
+    if (!this.isReadyToDeal()) return null;
+    const playerIds = Object.keys(this.state.players || {});
+    const callerPlayerId = pickCoinCaller(playerIds, this.rng);
+    if (!callerPlayerId) return null;
+
+    this.turnOrderCallCounter += 1;
+    const callId = `${this.roomId}:${this.turnOrderCallCounter}`;
+    this.turnOrder = {
+      phase: 'awaiting-call',
+      callerPlayerId,
+      callId,
+      call: null,
+      result: null,
+      starterPlayerId: null,
+      auto: false,
+    };
+    this.touchActivity();
+    return { callerPlayerId, callId, timeoutMs: TURN_ORDER_CALL_TIMEOUT_MS };
+  }
+
+  /** True while a call is open and still unanswered. */
+  isAwaitingTurnOrderCall() {
+    return this.turnOrder?.phase === 'awaiting-call';
+  }
+
+  /**
+   * Records the caller's heads/tails pick and flips the coin with the server's
+   * own rng — the client supplies the call, never the result (D10).
+   *
+   * @param {string} socketId The socket that sent the call.
+   * @param {object} [payload]
+   * @param {string} [payload.callId]
+   * @param {string} [payload.call] 'heads' | 'tails'
+   * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
+   *             starterPlayerId: string, auto: false }
+   *          |{ ok: false, reason: string }}
+   */
+  submitTurnOrderCall(socketId, { callId = null, call = null } = {}) {
+    if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
+    if (this.turnOrder.phase !== 'awaiting-call') {
+      return { ok: false, reason: 'already_resolved' };
+    }
+    const playerId = this.socketToPlayer.get(socketId);
+    if (!playerId || playerId !== this.turnOrder.callerPlayerId) {
+      return { ok: false, reason: 'not_caller' };
+    }
+    if (callId !== this.turnOrder.callId) {
+      return { ok: false, reason: 'stale_call' };
+    }
+    if (!isCoinFace(call)) return { ok: false, reason: 'invalid_call' };
+    return this.#resolveTurnOrder(call, false);
+  }
+
+  /**
+   * Resolves the open call on the caller's behalf — used when they time out or
+   * disconnect, so a silent seat can never hang the match.
+   *
+   * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
+   *             starterPlayerId: string, auto: true }|{ ok: false, reason: string }}
+   */
+  resolveTurnOrderCallAutomatically() {
+    if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
+    if (this.turnOrder.phase !== 'awaiting-call') {
+      return { ok: false, reason: 'already_resolved' };
+    }
+    return this.#resolveTurnOrder(flipCoinFace(this.rng), true);
+  }
+
+  /**
+   * Shared tail of both resolution paths: flip, decide the starter, freeze the
+   * handshake.
+   *
+   * @param {string} call
+   * @param {boolean} auto
+   * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
+   *             starterPlayerId: string, auto: boolean }|{ ok: false, reason: string }}
+   */
+  #resolveTurnOrder(call, auto) {
+    const result = flipCoinFace(this.rng);
+    const starterPlayerId = resolveStarterPlayerId({
+      playerIds: Object.keys(this.state.players || {}),
+      callerPlayerId: this.turnOrder.callerPlayerId,
+      call,
+      result,
+    });
+    if (!starterPlayerId) return { ok: false, reason: 'no_starter' };
+
+    this.turnOrder = {
+      ...this.turnOrder,
+      phase: 'resolved',
+      call,
+      result,
+      starterPlayerId,
+      auto,
+    };
+    this.touchActivity();
+    return {
+      ok: true,
+      callerPlayerId: this.turnOrder.callerPlayerId,
+      call,
+      result,
+      starterPlayerId,
+      auto,
+    };
+  }
+
+  /**
+   * Drops any open or resolved call (new game, room teardown). The answer
+   * timeout itself is owned by the transport layer, which clears it alongside.
+   */
+  clearTurnOrderCall() {
+    this.turnOrder = null;
+  }
+
+  /**
    * This player's syncInstance -> instanceId lookup for their deck (design 002
    * §3.1 / D10). Sent only to the owning socket: it would leak opponent ids.
    *
@@ -435,6 +576,7 @@ export class GameRoom {
     const minimumVersion = (this.state.stateVersion || 0) + 1;
     this.clientSeqByPlayer.clear();
     this.readyPlayerIds.clear();
+    this.clearTurnOrderCall();
     this.seed = seed ?? Math.floor(Math.random() * 0x7fffffff);
     this.rng = createRng(this.seed);
     this.state = createGameState({
