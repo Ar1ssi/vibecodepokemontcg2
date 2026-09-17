@@ -1,12 +1,23 @@
-Session: 162
+# State — the single source of "now". Rewritten IN FULL at every session END. Cap: 40 lines.
+<!-- Keep exactly these sections. Prune, never accrete: this file is read by every session,
+     so every stale line here is a tax on all future work. History belongs in journal/.
+     Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
+     file from the last journal entry + `git log -5`, note the crash in the journal. -->
+
+Session: 163
 Focus: Ability-used flag name-key collision fixed (I48). PR #143's owed verification pass (pnpm
   test/lint + 2P rules-mode browser walk) is still the next real chore — node/pnpm now work here.
-Active: none — S162 fix complete and tested (pnpm test green modulo 1 pre-existing unrelated failure,
-  same trainer-execution.test.mjs one S161 also saw).
-Next: run the PR #143 body's 2-player rules-mode browser verification pass (node/pnpm confirmed present
-  now, S161). Then the deferred cleanup: delete dead `#attackPanel` / `.attack-panel-*` CSS.
-  maintenance due (S150, still owed). If the Meowth-ex-style "ability shows unusable" report recurs
-  with only one copy of the card, I48's fix wasn't the whole story — reopen with a browser repro.
+  Also chasing I28: MP bench holo frozen on the non-owning client's opp view.
+Active: I28 (MP bench holo frozen on the non-owning client's opp view) — diagnosis in progress, not
+  yet reproduced in an isolated harness. TEMP DEBUG try/catch added to holo.mjs's tick(); waiting on
+  user's next live repro (console for '[holo TEMP DEBUG]', DOM structure of the frozen card). Worth
+  checking against the S161 finding below: opp board cards render inside a separate `oppContainer`
+  iframe document — a rAF loop's browser-side scheduling/priority can differ per-iframe, unverified.
+Next: continue I28 once user reports back. Then run the PR #143 body's 2-player rules-mode browser
+  verification pass (node/pnpm confirmed present now, S161). Then the deferred cleanup: delete dead
+  `#attackPanel` / `.attack-panel-*` CSS. maintenance due (S150, still owed). If the Meowth-ex-style
+  "ability shows unusable" report recurs with only one copy of the card, I48's fix wasn't the whole
+  story — reopen with a browser repro.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -28,9 +39,11 @@ Blocked: none.
   of its own (S161 root cause of the drag-to-retreat bug).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S163 2026-09-17 debug (I28, in progress): MP bench holo freezes on the opponent-viewing client only.
+  Couldn't isolate-repro yet. Added TEMP DEBUG try/catch in holo.mjs's tick() to surface a
+  silently-thrown loop-killer; also fixed hydrateHolo's ensureCardData() call dropping
+  card.image/set/number (separate bug: fuzzy name search often failed silently -> no holo at all).
 - S162 2026-09-17 debug: ability-used flag keyed by card.name collided across same-named Pokémon
-  (I48) — shared\engine\effects\ability.mjs now keys by instanceId first.
+  (I48) — shared/engine/effects/ability.mjs now keys by instanceId first.
 - S161 2026-09-17 patch: drag-to-retreat dZoneId bugfix + require explicit bench-card target when 2+
-  eligible — client\src\setup\image-logic\drag.js.
-- S160 2026-09-17 feature: highlight-parity phases 1-3 merged as PR #143 — UNVERIFIED, nothing had run
-  (now unblocked: node/pnpm work here as of S161).
+  eligible — client/src/setup/image-logic/drag.js.

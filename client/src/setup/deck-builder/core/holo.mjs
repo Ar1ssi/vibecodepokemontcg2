@@ -494,30 +494,41 @@ export function startHoloAnimation(
     set('--tilt-amount', tiltAmount.toFixed(3));
   };
 
+  // TEMP DEBUG (I28 — MP bench holo freezes for the non-owning client): if
+  // tick() throws, requestAnimationFrame is never rescheduled and the loop
+  // dies silently mid-sequence, leaving the last-applied vars stuck — which
+  // matches the reported symptom exactly. Remove this try/catch once the
+  // freeze is understood; a healthy tick() should never throw.
   const tick = (now) => {
     if (!running) return;
-    let lightTilt = null;
-    if (auto) {
-      lightTilt = driftTilt(now + driftOffsetMs, driftAmplitude);
-      const visibleRotate = tilt
-        ? {
-            x: lightTilt.tiltX * MAX_ROTATE_X,
-            y: lightTilt.tiltY * MAX_ROTATE_Y,
-          }
-        : { x: 0, y: 0 };
-      springRotate.set(visibleRotate);
+    try {
+      let lightTilt = null;
+      if (auto) {
+        lightTilt = driftTilt(now + driftOffsetMs, driftAmplitude);
+        const visibleRotate = tilt
+          ? {
+              x: lightTilt.tiltX * MAX_ROTATE_X,
+              y: lightTilt.tiltY * MAX_ROTATE_Y,
+            }
+          : { x: 0, y: 0 };
+        springRotate.set(visibleRotate);
+      }
+      springRotate.tick();
+      const rotateTilt = {
+        tiltX: springRotate.current.x / MAX_ROTATE_X,
+        tiltY: springRotate.current.y / MAX_ROTATE_Y,
+      };
+      applyVars(
+        computeLightVars(lightTilt ?? rotateTilt),
+        springRotate.current.x,
+        springRotate.current.y,
+        tiltAmountOf(rotateTilt.tiltX, rotateTilt.tiltY)
+      );
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[holo TEMP DEBUG] tick() threw, animation loop stopped:', err, card);
+      return;
     }
-    springRotate.tick();
-    const rotateTilt = {
-      tiltX: springRotate.current.x / MAX_ROTATE_X,
-      tiltY: springRotate.current.y / MAX_ROTATE_Y,
-    };
-    applyVars(
-      computeLightVars(lightTilt ?? rotateTilt),
-      springRotate.current.x,
-      springRotate.current.y,
-      tiltAmountOf(rotateTilt.tiltX, rotateTilt.tiltY)
-    );
     rafId = requestAnimationFrame(tick);
   };
 
