@@ -740,6 +740,8 @@ async function main() {
       'peerLog',
       'requestSyncLogBundle',
       'syncLogBundle',
+      'requestDecisionLogBundle',
+      'decisionLogBundle',
       'appendMessage',
       'spectatorActionData',
       'requestSpectatorData',

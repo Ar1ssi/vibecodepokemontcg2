@@ -66,6 +66,7 @@ import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
 import { changePlaymat } from '../sizing/apply-mat-layout.js';
 import { isBlockedByReplay } from './replay-block.js';
 import { logSyncAction } from './sync-logger-bridge.js';
+import { logDecision } from './decision-logger-bridge.js';
 import { systemState } from '../../state.js';
 import { isMirrorSuppressedAction } from '../netcode/authoritative-dispatch.js';
 
@@ -165,6 +166,7 @@ export const acceptAction = async (
   const emit = user === 'self' || isStateImport ? true : false;
   if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
     logSyncAction(actionName, actionParams, 'in');
+    logDecision('opp', actionName, actionParams);
   }
   if (
     user === 'opp' &&

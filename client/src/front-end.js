@@ -7,9 +7,11 @@ import { initializeSocketEventListeners } from './initialization/socket-event-li
 import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
 import { initializeTableTilt } from './setup/sizing/apply-table-tilt.js';
 import { initSyncLogger } from './setup/general/sync-logger-bridge.js';
+import { initDecisionLogger } from './setup/general/decision-logger-bridge.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
 
 initSyncLogger();
+initDecisionLogger();
 initializeSocketEventListeners();
 initializeDOMEventListeners();
 initializeMutationObservers();
