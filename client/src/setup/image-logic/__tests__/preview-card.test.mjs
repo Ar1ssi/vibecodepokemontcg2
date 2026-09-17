@@ -31,6 +31,45 @@ test('a face-down server card is not previewed', () => {
   assert.equal(resolvePreviewCard(undefined, serverImage({})), null);
 });
 
+// The overlays are children of the zone <div>, absolutely positioned over the
+// card, so the click never reaches the <img>. The card keeps the only
+// reference to them, which is what resolves the click back.
+const zoneWithCounter = (slot) => {
+  const image = serverImage({ name: 'Garchomp', src: 'garchomp.png' }, 'opp');
+  const zone = { querySelectorAll: (selector) => (selector === 'img' ? [image] : []) };
+  const overlay = { parentElement: zone, closest: () => null };
+  image[slot] = overlay;
+  return { image, overlay };
+};
+
+for (const slot of ['damageCounter', 'specialCondition', 'abilityCounter']) {
+  test(`a click on a card's ${slot} resolves to the card it marks`, () => {
+    const { image, overlay } = zoneWithCounter(slot);
+    assert.equal(resolvePreviewCard(null, overlay).image, image);
+  });
+}
+
+test('a click on the stadium slot previews the card sitting in it', () => {
+  const image = serverImage({ name: 'Cosmic Estate', src: 'estate.png' }, 'neutral');
+  const stadium = { querySelectorAll: (selector) => (selector === 'img' ? [image] : []) };
+  const plate = {
+    parentElement: stadium,
+    closest: (selector) => (selector.includes('#stadium') ? stadium : null),
+  };
+  assert.equal(resolvePreviewCard(null, plate).name, 'Cosmic Estate');
+});
+
+test('a click on decoration in a zone holding several cards is not guessed at', () => {
+  const first = serverImage({ name: 'Sobble', src: 'sobble.png' }, 'opp');
+  const second = serverImage({ name: 'Dracovish', src: 'dracovish.png' }, 'opp');
+  const zone = { querySelectorAll: (selector) => (selector === 'img' ? [first, second] : []) };
+  const plate = {
+    parentElement: zone,
+    closest: (selector) => (selector.includes('#bench') ? zone : null),
+  };
+  assert.equal(resolvePreviewCard(null, plate), null);
+});
+
 test('nothing to preview without a card or a target', () => {
   assert.equal(resolvePreviewCard(undefined, undefined), null);
   assert.equal(resolvePreviewCard(null, { closest: () => null }), null);
