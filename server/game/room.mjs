@@ -24,13 +24,13 @@ export class GameRoom {
   constructor({
     roomId,
     rulesEnabled = true,
-    seed = 0,
+    seed = null,
     initialState = null,
     rng = null,
   }) {
     this.roomId = roomId;
     this.rulesEnabled = Boolean(rulesEnabled);
-    this.seed = seed ?? 0;
+    this.seed = seed ?? Math.floor(Math.random() * 0x7fffffff);
     this.rng = rng || createRng(this.seed);
 
     this.state =
@@ -376,9 +376,10 @@ export class GameRoom {
    *
    * @param {object} [options]
    * @param {string|null} [options.removePlayerId] Seat to free
+   * @param {number|string|null} [options.seed] PRNG seed override
    * @returns {Array<{ playerId: string, socketId: string|null }>} Players kept
    */
-  resetGame({ removePlayerId = null } = {}) {
+  resetGame({ removePlayerId = null, seed = null } = {}) {
     const kept = [];
     for (const [playerId, player] of Object.entries(this.state.players)) {
       if (!player || playerId === removePlayerId) continue;
@@ -400,6 +401,7 @@ export class GameRoom {
     const minimumVersion = (this.state.stateVersion || 0) + 1;
     this.clientSeqByPlayer.clear();
     this.readyPlayerIds.clear();
+    this.seed = seed ?? Math.floor(Math.random() * 0x7fffffff);
     this.rng = createRng(this.seed);
     this.state = createGameState({
       gameId: this.roomId,

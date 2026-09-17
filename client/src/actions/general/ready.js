@@ -128,6 +128,12 @@ export const readyUp = async (user, emit = true) => {
         // trigger the mirrored setup, so do it locally for both sides.
         await setup('opp');
       }
+      appendMessage(
+        '',
+        'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
+        'announcement',
+        false
+      );
     }
     updateReadyButtons();
     // Let other systems (e.g. the rules engine's turn-order coin flip)

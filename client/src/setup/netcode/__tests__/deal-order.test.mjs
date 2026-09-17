@@ -39,3 +39,15 @@ test('deal-order: resetDealOrder clears a stale starter before the next game', (
   setDealOrder([2], 'self');
   assert.equal(getDealOrderStarter(), 'self');
 });
+
+test('deal-order: waitForDealOrder consumes pendingOrder so second call waits for fresh order', async () => {
+  resetDealOrder();
+  setDealOrder([10, 20, 30]);
+  const first = await waitForDealOrder(100);
+  assert.deepEqual(first, [10, 20, 30]);
+
+  // Second call with no new setDealOrder times out and returns null
+  const second = await waitForDealOrder(10);
+  assert.equal(second, null);
+});
+

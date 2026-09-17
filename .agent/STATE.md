@@ -4,12 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 153
-Focus: multiplayer render parity with single-player (apply-view.js): holo, stacks/evolutions, tokens, rotation, ability tab, counts, VSTAR/GX, Stadium flip, picker.
-Active: none. Branch claude/admiring-faraday-j1nyja: fixed hydrateHolo's id-resolution starvation (patch, see journal S153).
+Session: 155
+Focus: Fix shuffling seed not resetting / cards dealing in identical order.
+Active: none. Shipped dynamic PRNG seed randomization and deal-order cache resets.
 Next: maintenance due (S150, still owed). user live-checks a SERVER_AUTHORITATIVE 2P game (holo, evolve stack, Tool/Energy layout + double-click carousel,
-  rotation, ability tab, counts, VSTAR/GX, Stadium flip, Nest Ball picker); then push + PR. Pre-existing fail on main: "trainer drop: stays a plain move
-  when promotion does not apply". Then I47. Owed: test for changeCardBack/applySleeveToPlaymat stale-image patch.
+  rotation, ability tab, counts, VSTAR/GX, Stadium flip, Nest Ball picker); then push + PR.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -28,7 +27,6 @@ Blocked: none.
 - Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S153 2026-09-17 patch: hydrateHolo's ensureCardData() call dropped card.image/set/number, so id resolution
-  fell back to fuzzy name search and often failed silently -> no holo. Pass them through.
-- S150 2026-09-17 debug: MP discard cover blew up over prizes (#discardCover id rule hit the img); resetImage on covers.
-- S149 2026-09-17 feature: MP evolution stacks, Tool offsets, rotation, ability tab, zone counts, VSTAR/GX, Stadium flip, overlay resize (branch).
+- S155 2026-09-17 patch: fix static PRNG seed preventing deck shuffle randomness across games and resets.
+- S154 2026-09-17 feature: guided statement for both players to move Basic Pokémon to Active Spot before turn 1.
+- S153 2026-09-17 patch: hydrateHolo ensureCardData pass-through for accurate ID/rarity resolution.

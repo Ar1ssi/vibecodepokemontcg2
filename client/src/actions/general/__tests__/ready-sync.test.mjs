@@ -102,17 +102,34 @@ test('coin flip starts after both-players-ready opens the gate', () => {
   );
 });
 
-test('rules setup order: prizes before coin flip before hands', () => {
+test('rules setup order: prizes before coin flip before hands then guided prompt', () => {
   const steps = [];
   const rulesEnabled = true;
   if (rulesEnabled) {
     steps.push('prizes');
     steps.push('coinFlip');
     steps.push('hands');
+    steps.push('guidedPrompt');
   } else {
     steps.push('prizesAndHands');
+    steps.push('guidedPrompt');
   }
-  assert.deepEqual(steps, ['prizes', 'coinFlip', 'hands']);
+  assert.deepEqual(steps, ['prizes', 'coinFlip', 'hands', 'guidedPrompt']);
+});
+
+test('non-rules setup order: prizesAndHands then guided prompt', () => {
+  const steps = [];
+  const rulesEnabled = false;
+  if (rulesEnabled) {
+    steps.push('prizes');
+    steps.push('coinFlip');
+    steps.push('hands');
+    steps.push('guidedPrompt');
+  } else {
+    steps.push('prizesAndHands');
+    steps.push('guidedPrompt');
+  }
+  assert.deepEqual(steps, ['prizesAndHands', 'guidedPrompt']);
 });
 
 // Mirrors _takePrizesWithPicker and promptPrizeTake ownership gating in multiplayer.

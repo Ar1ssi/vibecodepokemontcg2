@@ -45,10 +45,15 @@ export function resetDealOrder() {
  * @returns {Promise<number[]|null>}
  */
 export function waitForDealOrder(timeoutMs = 5000) {
-  if (pendingOrder) return Promise.resolve(pendingOrder);
+  if (pendingOrder) {
+    const order = pendingOrder;
+    pendingOrder = null;
+    return Promise.resolve(order);
+  }
   return new Promise((resolve) => {
     const onOrder = (order) => {
       clearTimeout(timer);
+      pendingOrder = null;
       resolve(order);
     };
     const timer = setTimeout(() => {
