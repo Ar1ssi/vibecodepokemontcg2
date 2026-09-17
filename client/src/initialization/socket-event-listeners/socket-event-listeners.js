@@ -27,6 +27,7 @@ import {
   enableSyncLogForMultiplayer,
   logSync,
 } from '../../setup/general/sync-logger-bridge.js';
+import { enableDecisionLogForMultiplayer } from '../../setup/general/decision-logger-bridge.js';
 import {
   applyView,
   setDefaultNetcodeContext,
@@ -329,6 +330,7 @@ export const initializeSocketEventListeners = () => {
     startSyncCheckHeartbeat();
     forceRulesEnabledForMultiplayer();
     enableSyncLogForMultiplayer();
+    enableDecisionLogForMultiplayer();
     cleanActionData('self');
     cleanActionData('opp');
     reset('opp', true, false, false, false);

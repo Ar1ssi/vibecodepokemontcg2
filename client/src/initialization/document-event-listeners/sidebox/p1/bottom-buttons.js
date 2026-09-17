@@ -17,6 +17,10 @@ import {
   copySyncCompareLog,
   exportSyncLog,
 } from '../../../../setup/general/sync-logger-bridge.js';
+import {
+  copyDecisionCompareLog,
+  exportDecisionLog,
+} from '../../../../setup/general/decision-logger-bridge.js';
 import { acceptAction } from '../../../../setup/general/accept-action.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
@@ -85,6 +89,22 @@ export const initializeP1BottomButtons = () => {
       await copySyncCompareLog();
     } catch (err) {
       console.error('Copy sync compare failed:', err);
+    }
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const exportDecisionLogButton = document.getElementById('exportDecisionLog');
+  exportDecisionLogButton.addEventListener('click', () => {
+    exportDecisionLog().catch((err) => console.error('Export decision log failed:', err));
+    optionsContextMenu.style.display = 'none';
+  });
+
+  const copyDecisionCompareLogButton = document.getElementById('copyDecisionCompareLog');
+  copyDecisionCompareLogButton.addEventListener('click', async () => {
+    try {
+      await copyDecisionCompareLog();
+    } catch (err) {
+      console.error('Copy decision compare failed:', err);
     }
     optionsContextMenu.style.display = 'none';
   });

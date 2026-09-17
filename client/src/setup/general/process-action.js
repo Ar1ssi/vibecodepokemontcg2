@@ -1,5 +1,6 @@
 import { socket, systemState } from '../../state.js';
 import { logSyncAction, logSync } from './sync-logger-bridge.js';
+import { logDecision } from './decision-logger-bridge.js';
 import { createAction } from './action-event.mjs';
 import { translateActionToCmd } from '../netcode/dual-run-bridge.js';
 import { emitCmd } from '../netcode/cmd-emitter.js';
@@ -36,6 +37,7 @@ export const processAction = (user, emit, action, parameters) => {
         counter: systemState.selfCounter,
         transport: 'pushAction',
       });
+      logDecision('self', action, parameters);
       if (systemState.serverAuthoritative) {
         const cmdSpec = translateActionToCmd(action, parameters);
         if (cmdSpec) {
