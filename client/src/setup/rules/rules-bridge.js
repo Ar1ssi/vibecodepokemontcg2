@@ -89,6 +89,10 @@ import {
   pickRandomCoin,
   setSelectedCoin,
 } from './mat-coin.js';
+import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
+import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
+import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-affordances.mjs';
     
     let initialized = false;
 
@@ -146,6 +150,7 @@ import {
   turnAutomation();
   koWatcher();
   renderStatusBadges();
+  hookActionAffordances();
   hookMultiplayerSync();
   buildEndScreen();
       hookMoveCard();
@@ -1172,7 +1177,101 @@ import {
       document.addEventListener('rules-session-reset', updateBadges);
       document.addEventListener('action-processed', updateBadges);
     };
-    
+
+    // ── action affordances: turn-aware sidebox buttons + board ability glow ──
+    // Highlight-parity plan gaps B1/B3/C3. Each sidebox is scored for the same
+    // user its click handlers act as (see sidebox/p1|p2/chat-buttons.js), so
+    // a highlight always describes what the button would actually do. The
+    // pure payability scan lives in action-affordances.mjs.
+    const hookActionAffordances = () => {
+      const sideboxes = [
+        {
+          attackButton: document.getElementById('attackButton'),
+          abilityButton: document.getElementById('abilityButton'),
+          user: () => (systemState.isTwoPlayer ? systemState.initiator : 'self'),
+        },
+        {
+          attackButton: document.getElementById('p2AttackButton'),
+          abilityButton: document.getElementById('p2AbilityButton'),
+          user: () => (systemState.isTwoPlayer ? systemState.initiator : 'opp'),
+        },
+      ];
+      const glowNodes = new Set();
+      let generation = 0;
+
+      const clearGlow = () => {
+        for (const node of glowNodes) node.classList?.remove('has-usable-ability');
+        glowNodes.clear();
+      };
+
+      const isAbilitySpent = (user, card) =>
+        isPlayedToBenchTriggerCard(card)
+          ? !canUsePlayedToBenchTrigger(user, card)
+          : abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed);
+
+      const refresh = async () => {
+        const gen = ++generation;
+        clearGlow();
+        if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
+          for (const box of sideboxes) {
+            box.attackButton?.classList.remove('attacks-available', 'turn-disabled');
+            box.abilityButton?.classList.remove('abilities-available', 'turn-disabled');
+          }
+          return;
+        }
+        const scored = [];
+        for (const box of sideboxes) {
+          const user = box.user();
+          const isTurn = rulesState.turnPlayer === user;
+          let affordance = { attackAvailable: false, abilityAvailable: false, usableAbilities: [] };
+          if (isTurn) {
+            try {
+              const activeZone = getZone(user, 'active');
+              const activeCard = getActivePokemonCard(activeZone);
+              affordance = await computeActionAffordances({
+                activeCard,
+                attachedEnergyCards: attachedEnergiesFor(activeCard, activeZone.array),
+                benchCards: getZone(user, 'bench').array,
+                stadiumCard: stadiumCardFor(getStadium(), getAuthoritativeStadiumArray()),
+                isAbilityUsed: (card) => isAbilitySpent(user, card),
+                ensureCardData,
+              });
+            } catch {
+              /* engine not ready — leave this side dim rather than lie */
+            }
+          }
+          scored.push({ box, isTurn, affordance });
+          if (gen !== generation) return; // a newer refresh took over mid-await
+        }
+        for (const { box, isTurn, affordance } of scored) {
+          box.attackButton?.classList.toggle('attacks-available', affordance.attackAvailable);
+          box.attackButton?.classList.toggle('turn-disabled', !isTurn);
+          box.abilityButton?.classList.toggle('abilities-available', affordance.abilityAvailable);
+          box.abilityButton?.classList.toggle('turn-disabled', !isTurn);
+          for (const { card } of affordance.usableAbilities) {
+            const node = card?.wrapper || card?.image;
+            if (node?.classList) {
+              node.classList.add('has-usable-ability');
+              glowNodes.add(node);
+            }
+          }
+        }
+      };
+
+      [
+        'rules-turn-began',
+        'rules-turn-view-applied',
+        'rules-mode-changed',
+        'rules-session-reset',
+        'rules-energy-attached',
+        'rules-card-moved',
+        'rules-damage-changed',
+        'rules-status-changed',
+        'action-processed',
+      ].forEach((name) => document.addEventListener(name, () => refresh()));
+      refresh();
+    };
+
 // ── choice picker for search effects ─────────────────────────────────
     // Opens a modal with candidate cards (from deck/discard); clicking one
     // executes the pending move (to hand or bench) automatically.

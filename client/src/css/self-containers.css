@@ -164,13 +164,46 @@ body, input, textarea, button {
 .flip-image img {
   transform: scaleX(-1) scaleY(-1) !important;
 }
+/* Board ambient glow for a Pokémon whose ability is activatable right now
+   (highlight-parity plan C3). rules-bridge.js hookActionAffordances toggles the
+   class on the card's .mat-holo wrapper, or its <img> when it isn't holo-hydrated
+   — both of which live in THIS iframe document, so index.css never reaches them
+   and the style has to be here. Mirrored in opp-containers.css.
+   Declared above the ring rules on purpose: `.highlight`/`.selectHighlight` set
+   the `animation` shorthand at the same specificity, so a real selection ring
+   wins the source-order tie over this ambient glow. */
+@keyframes ability-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(120, 200, 255, 0.35); }
+  50% { box-shadow: 0 0 10px 3px rgba(120, 200, 255, 0.6); }
+}
+.has-usable-ability {
+  box-shadow: 0 0 8px 2px rgba(120, 200, 255, 0.5);
+  animation: ability-glow 2s ease-in-out infinite;
+}
+/* Board rings breathe (highlight-parity plan C1). The ring is restated in
+   every keyframe because an animated `box-shadow` replaces the whole property;
+   the animation still outranks `.outline`'s and `.play-container img`'s plain
+   `box-shadow` the way the old `!important` did (author animations beat
+   author-normal declarations at any specificity), and the `body.mat-active`
+   `box-shadow: none !important` zone resets keep beating it. Mirrored, with
+   the far side's red, in opp-containers.css. */
+@keyframes highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(90, 110, 188, 0.864), 0 0 0 0 rgba(90, 110, 188, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgba(90, 110, 188, 0.864), 0 0 14px 5px rgba(90, 110, 188, 0.55); }
+}
+@keyframes select-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864), 0 0 0 0 rgba(143, 215, 153, 0.45); }
+  50% { box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864), 0 0 14px 5px rgba(143, 215, 153, 0.55); }
+}
 .highlight {
-  box-shadow: 0 0 0 4px rgba(90, 110, 188, 0.864) !important;
+  box-shadow: 0 0 0 4px rgba(90, 110, 188, 0.864);
+  animation: highlight-pulse 1.8s ease-in-out infinite;
   background-color: rgba(90, 110, 188, 0.3) !important;
   z-index: 1 !important;
 }
 .selectHighlight {
-  box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864) !important;
+  box-shadow: 0 0 0 4px rgba(143, 215, 153, 0.864);
+  animation: select-highlight-pulse 1.8s ease-in-out infinite;
 }
 .highlightBox {
   background-color: rgba(90, 110, 188, 0.3);

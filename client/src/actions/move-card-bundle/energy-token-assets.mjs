@@ -23,12 +23,20 @@ const normalizeType = (raw) => {
 };
 
 /**
+ * Resolve the token image for a printed energy type name — an Energy card's
+ * `types[0]` or an attack's cost symbol, which share TCGdex spelling ('Fire',
+ * 'Dark', …). Null when the type has no token asset.
+ */
+export const getEnergyTokenSrcForType = (type) =>
+  ENERGY_TOKEN_FRONT[normalizeType(type)] || null;
+
+/**
  * Resolve the coin-front image for an Energy card, or null if this Energy
  * type has no token asset (e.g. Fairy — dropped from the 151MT sheet).
  */
 export const getEnergyTokenFront = (card) => {
-  const declaredType = normalizeType(card?.types?.[0]);
-  if (ENERGY_TOKEN_FRONT[declaredType]) return ENERGY_TOKEN_FRONT[declaredType];
+  const byDeclaredType = getEnergyTokenSrcForType(card?.types?.[0]);
+  if (byDeclaredType) return byDeclaredType;
 
   const name = String(card?.name || '').toLowerCase();
   const nameMatch = TYPE_WORDS.find((word) => name.includes(word));
