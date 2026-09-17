@@ -108,8 +108,8 @@ describe('per-generation foil CSS', () => {
     'trainer-gallery.css',
   ];
 
-  it('is imported by both stylesheets', () => {
-    for (const sheet of ['index.css', 'opp-containers.css']) {
+  it('is imported by the main page and both playmat iframes', () => {
+    for (const sheet of ['index.css', 'self-containers.css', 'opp-containers.css']) {
       const source = readFileSync(`${CSS_DIR}${sheet}`, 'utf8');
       for (const file of files) {
         assert.ok(source.includes(`@import url('./holo/${file}');`), `${sheet} ${file}`);

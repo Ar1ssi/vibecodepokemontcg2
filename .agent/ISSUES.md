@@ -12,18 +12,6 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
-- I28 2026-09-17 P1 [holo][netcode] MP 2P game (SERVER_AUTHORITATIVE): a bench Pokemon's holo
-    animates on its owner's client but is frozen (stuck CSS custom-property values, not just
-    subtle/imperceptible) on the OTHER client's opponent-side view of the same card, even after
-    refocusing that tab. Self/opp code paths through reconcileHolo/hydrateHolo/startHoloAnimation
-    are provably identical (verified by reading, no isolated repro built yet — Playwright harness
-    setup hit env friction: blocked CDN for socket.io, coin-flip overlay timing). Every known
-    caller of stopHoloAnimation (only unhydrateHolo) also removes the wrapper from the DOM, which
-    contradicts a wrapper staying visible with a frozen value — the mechanism is not yet identified.
-    Added TEMP DEBUG try/catch around startHoloAnimation's tick() in holo.mjs (S153) to catch a
-    silently-thrown/uncaught tick exception, the one mechanism that fits the symptom; remove once
-    diagnosed. Next repro: check console for '[holo TEMP DEBUG]' and inspect the frozen element's
-    DOM structure (.mat-holo wrapper present or bare <img>?) before closing the tab.
 - I47 2026-09-16 P2 [netcode] `test:flip` (flip-gate-test.mjs, SERVER_AUTHORITATIVE=1 :4100) fails on unmodified main: step 1 "both clients joined" passes, then "timeout waiting for page predicate" — debug showed client A hand 9 (drew before setup settled), B hand 7 (refs: S137)
 - I46 2026-09-14 P3 [board-ui] Design 009 hand: #hand's horizontal scrollbar sits in the off-screen band (hidden via scrollbar-width: none), so a 15+ card hand scrolls only by trackpad/shift+wheel — map vertical wheel to scrollLeft or add arrows (refs: design 009, S131)
 - I45 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a
@@ -73,6 +61,7 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I28 2026-09-17 P1 [holo][netcode] MP bench holo animates for owner, looks frozen on the other client's opp view → closed 2026-09-17 S164: self-containers.css lacked the 7 per-generation holo @imports opp-containers.css/index.css had, so owner and opponent rendered different foil effects; imports added, parity test extended, TEMP DEBUG removed
 - I48 2026-09-17 P2 [rules] User report: Meowth ex on bench, never used, showed "unusable" in the
     attack-preview ability zone. Log export cut off before the click event, so that exact instance
     wasn't directly reproduced. Source read found a real, confirmed defect on the same mechanism:

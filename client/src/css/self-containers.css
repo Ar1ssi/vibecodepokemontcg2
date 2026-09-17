@@ -10,6 +10,13 @@
 @import url('./holo/radiant-holo.css');
 @import url('./holo/rainbow-alt.css');
 @import url('./holo/reverse-holo.css');
+@import url('./holo/shiny-rare.css');
+@import url('./holo/amazing-rare.css');
+@import url('./holo/ace-spec-rare.css');
+@import url('./holo/old-foil-rares.css');
+@import url('./holo/classic-holo.css');
+@import url('./holo/modern-holo.css');
+@import url('./holo/trainer-gallery.css');
 @import url('./damage-counter.css');
 @import url('./status-marker.css');
 @import url('./energy-token.css');
