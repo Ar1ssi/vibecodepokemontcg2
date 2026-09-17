@@ -429,3 +429,42 @@ test('initializePlayerDeck (shadow): a string quantity loads that many cards', a
   initializePlayerDeck(room.state, 'p1', [['3', 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1']]);
   assert.equal(room.state.players.p1.zones.deck.length, 3);
 });
+
+test('seed: GameRoom initializes with a fresh seed and resetGame generates a new seed so card shuffles differ', () => {
+  const fullDeck = Array.from({ length: 60 }, (_, i) => [
+    1,
+    `Card ${i}`,
+    i < 10 ? 'Pokémon' : 'Energy',
+    'u',
+    String(i).padStart(3, '0'),
+    'e2e',
+    `x-${i}`,
+  ]);
+
+  const room = new GameRoom({ roomId: 'seed-diff-test', rulesEnabled: false });
+  assert.ok(typeof room.seed === 'number' || typeof room.seed === 'string');
+  assert.notEqual(room.seed, 0);
+
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  room.handleCommand('sock-a', { type: 'loadDeck', payload: { deckData: fullDeck } });
+  room.handleCommand('sock-b', { type: 'loadDeck', payload: { deckData: fullDeck } });
+  room.markReady('p1');
+  room.markReady('p2');
+
+  const initialSeed = room.seed;
+  assert.equal(room.handleCommand('sock-a', { type: 'setup', payload: {} }).success, true);
+  const game1P1Hand = room.state.players.p1.zones.hand.map((c) => c.syncInstance);
+
+  room.resetGame();
+  const resetSeed = room.seed;
+  assert.notEqual(resetSeed, initialSeed, 'resetGame must assign a new seed');
+
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.handleCommand('sock-a', { type: 'setup', payload: {} }).success, true);
+  const game2P1Hand = room.state.players.p1.zones.hand.map((c) => c.syncInstance);
+
+  assert.notDeepEqual(game1P1Hand, game2P1Hand, 'Hands drawn in game 2 should have different card order than game 1');
+});
+

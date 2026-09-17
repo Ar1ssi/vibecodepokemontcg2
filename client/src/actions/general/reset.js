@@ -15,6 +15,7 @@ import { hideZoneElements } from './close-popups.js';
 import { cancelPrizeTake } from '../zones/prize-take-prompt.js';
 import { updateCount } from './count.js';
 import { clearReady } from './ready.js';
+import { resetDealOrder } from '../../setup/netcode/deal-order.js';
 
 export const reset = (
   user,
@@ -28,6 +29,7 @@ export const reset = (
     return;
   }
 
+  resetDealOrder();
   cancelPrizeTake();
 
   const stadium = getZone('neutral', 'stadium');

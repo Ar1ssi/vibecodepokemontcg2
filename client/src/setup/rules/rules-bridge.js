@@ -546,6 +546,12 @@ import {
             }
             appendMessage('', 'Opening hands drawn!', 'announcement', false);
             appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
+            appendMessage(
+              '',
+              'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
+              'announcement',
+              false
+            );
           })();
     
           // mulligan check: opening hands must contain a Basic Pokémon. A
@@ -564,6 +570,7 @@ import {
               // forever; a legal deck draws a hand with a Basic within a couple
               // of mulligans, so this is generous headroom.
               const MAX_ROUNDS = 10;
+              let anyMulligans = false;
 
               for (let round = 0; round < MAX_ROUNDS; round++) {
                 if (session !== rulesSessionGeneration) return;
@@ -582,6 +589,7 @@ import {
 
                 // Both local hands legal — done.
                 if (!selfMulliganned && !oppMulliganned) break;
+                anyMulligans = true;
 
                 for (const step of steps) {
                   if (step.mulligan) {
@@ -620,6 +628,15 @@ import {
                   draw('self', 'self', 1, true);
                 }
                 // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
+              }
+
+              if (anyMulligans) {
+                appendMessage(
+                  '',
+                  'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
+                  'announcement',
+                  false
+                );
               }
             } catch (e) {
               console.error('Mulligan execution error:', e);
