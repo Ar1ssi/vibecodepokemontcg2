@@ -21,7 +21,13 @@ import {
   expandEnergyEntries,
   canPayAttackCost,
 } from './rules/attack-engine.mjs';
-import { drawCount } from './rules/damage-parser.mjs';
+import {
+  drawCount,
+  parseAttackDamage,
+  planBenchTarget,
+  allBenchDamage,
+} from './rules/damage-parser.mjs';
+import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -39,6 +45,77 @@ import {
   hasAnyCondition,
   listConditions,
 } from './rules/special-conditions.mjs';
+
+/**
+ * Coin flips an attack's own printed text calls for, rolled from the command's RNG so a
+ * replay reproduces them (design 002 catch-up). "Flip a coin" is one flip; "Flip N coins"
+ * plus a "for each heads" clause is N flips whose heads are counted for damage scaling.
+ *
+ * @returns {{ coin: 'heads'|'tails'|null, headsCount: number|undefined, flips: string[] }}
+ */
+function flipAttackCoins(attack, rng) {
+  const text = String(attack?.text || '').toLowerCase();
+  const flip = () => ((rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails');
+
+  const multi = text.match(/flip (\d+) coins?/);
+  if (multi && /for each heads/.test(text)) {
+    const requested = Number.parseInt(multi[1], 10);
+    // A printed count is always small; cap it so a malformed text cannot spin the RNG.
+    const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 0), 20) : 0;
+    const flips = Array.from({ length: count }, flip);
+    return {
+      coin: null,
+      headsCount: flips.filter((f) => f === 'heads').length,
+      flips,
+    };
+  }
+  if (/flip a coin/.test(text)) {
+    const coin = flip();
+    return { coin, headsCount: undefined, flips: [coin] };
+  }
+  return { coin: null, headsCount: undefined, flips: [] };
+}
+
+/** Benched Pokémon of a player, roots only (attached cards are not targets). */
+function benchTargets(player) {
+  return (player?.zones?.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
+}
+
+/**
+ * Applies damage to one benched Pokémon: counters, event, and KO through handleKnockout
+ * (so the prize entitlement stays server-granted, D43).
+ */
+function damageBenchedPokemon(
+  draft,
+  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, events }
+) {
+  victim.damage = (victim.damage || 0) + dealt;
+  events.push({
+    type: 'damageUpdated',
+    instanceId: victim.instanceId,
+    damage: victim.damage,
+    dealt,
+  });
+  events.push({
+    type: 'benchDamaged',
+    instanceId: victim.instanceId,
+    playerId: victimPlayerId,
+    attackerPlayerId,
+    attackName,
+    dealt,
+    auto: Boolean(auto),
+  });
+
+  const koHp = inPlayView(draft, victim).hp || 0;
+  if (koHp > 0 && victim.damage >= koHp) {
+    handleKnockout(draft, {
+      victimPlayerId,
+      attackerPlayerId,
+      victim,
+      events,
+    });
+  }
+}
 
 // An in-play Pokémon as its top evolution card (see evolved-pokemon.mjs). Read-only.
 function inPlayView(state, card) {
@@ -1606,10 +1683,54 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
+      // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
+      // the parser resolves from live board counts, then bench/spread damage. Without this
+      // every attack dealt its flat printed number regardless of the board (I26 follow-up).
+      const { coin, headsCount, flips } = flipAttackCoins(attack, activeRng);
+      if (flips.length > 0) {
+        events.push({
+          type: 'attackCoinFlipped',
+          playerId,
+          attackName: attack.name,
+          coin,
+          headsCount,
+          flips,
+        });
+      }
+
+      const parsed = parseAttackDamage(
+        attack,
+        attackerView,
+        defender ? inPlayView(draft, defender) : {},
+        buildServerAttackContext(draft, {
+          attackerPlayerId: playerId,
+          defenderPlayerId,
+          attacker,
+          defender,
+          attackerView,
+          defenderView: defender ? inPlayView(draft, defender) : null,
+          coin,
+          headsCount,
+        })
+      );
+      const effectiveAttack =
+        parsed.total !== parsed.base ? { ...attack, damage: parsed.total } : attack;
+      if (parsed.notes.length > 0) {
+        events.push({
+          type: 'attackDamageScaled',
+          playerId,
+          attackName: attack.name,
+          base: parsed.base,
+          total: parsed.total,
+          notes: [...parsed.notes],
+          resolved: parsed.resolved,
+        });
+      }
+
       let dmgDealt = 0;
       if (attacker && defender) {
         const defenderView = inPlayView(draft, defender);
-        const dmgResult = computeAttackDamage(attackerView, defenderView, attack);
+        const dmgResult = computeAttackDamage(attackerView, defenderView, effectiveAttack);
         dmgDealt = dmgResult.total;
         defender.damage = (defender.damage || 0) + dmgDealt;
         events.push({
@@ -1628,6 +1749,91 @@ export function applyCommand(state, command, rng = null) {
             victim: defender,
             events,
           });
+        }
+      }
+
+      // Recoil: printed damage the attack deals to its own Pokémon. A recoil KO hands the
+      // prize entitlement to the DEFENDING player.
+      if (parsed.selfDamage > 0 && attacker) {
+        attacker.damage = (attacker.damage || 0) + parsed.selfDamage;
+        events.push({
+          type: 'damageUpdated',
+          instanceId: attacker.instanceId,
+          damage: attacker.damage,
+          dealt: parsed.selfDamage,
+        });
+        const selfKoHp = attackerView.hp || 0;
+        if (selfKoHp > 0 && attacker.damage >= selfKoHp) {
+          handleKnockout(draft, {
+            victimPlayerId: playerId,
+            attackerPlayerId: oppId,
+            victim: attacker,
+            events,
+          });
+        }
+      }
+
+      // Spread damage ("… to EACH of your opponent's Benched Pokémon") and single-target bench
+      // damage ("… to 1 of your opponent's Benched Pokémon") are the same printed sentence to
+      // `parsed.bench`'s looser regex, so a spread attack matches both. Spread wins: applying
+      // both would double every benched Pokémon's damage.
+      const spread = allBenchDamage(attack.text);
+
+      // Single-target bench damage. The server picks the first benched Pokémon rather than
+      // prompting (design 013 option 2A); `auto` tells the clients it was a heuristic pick.
+      let benchDealt = 0;
+      if (parsed.bench > 0 && spread === 0) {
+        const targets = benchTargets(draft.players[defenderPlayerId]);
+        const plan = planBenchTarget(targets.length);
+        if (plan === null) {
+          events.push({
+            type: 'attackBenchFizzled',
+            playerId,
+            attackName: attack.name,
+            reason: 'no-benched-pokemon',
+          });
+        } else {
+          benchDealt += parsed.bench;
+          damageBenchedPokemon(draft, {
+            victim: targets[0],
+            victimPlayerId: defenderPlayerId,
+            attackerPlayerId: playerId,
+            attackName: attack.name,
+            dealt: parsed.bench,
+            auto: plan === -1,
+            events,
+          });
+        }
+      }
+
+      // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
+      // list is snapshotted first, because a KO inside the loop mutates the bench array.
+      if (spread > 0) {
+        const targets = benchTargets(draft.players[defenderPlayerId]);
+        if (targets.length === 0) {
+          events.push({
+            type: 'attackBenchFizzled',
+            playerId,
+            attackName: attack.name,
+            reason: 'no-benched-pokemon',
+          });
+        } else {
+          for (const victim of targets) {
+            // A previous KO in this same loop (or the active KO above) may already have
+            // moved this card to the discard — never damage a card that has left the bench.
+            const ref = findCard(draft, victim.instanceId);
+            if (ref?.zoneId !== 'bench') continue;
+            benchDealt += spread;
+            damageBenchedPokemon(draft, {
+              victim,
+              victimPlayerId: defenderPlayerId,
+              attackerPlayerId: playerId,
+              attackName: attack.name,
+              dealt: spread,
+              auto: false,
+              events,
+            });
+          }
         }
       }
 
@@ -1654,6 +1860,7 @@ export function applyCommand(state, command, rng = null) {
         attackerId: attacker?.instanceId,
         attackName: attack.name,
         damage: dmgDealt,
+        benchDealt,
         playerId,
       });
 
