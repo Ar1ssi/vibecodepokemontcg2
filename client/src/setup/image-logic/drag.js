@@ -16,6 +16,7 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 import { zoneOf } from './drop-zone.mjs';
+import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 
 const popupContainers = [
   'lostZone',
@@ -266,7 +267,12 @@ export const drop = (event) => {
     } else if (event.target.tagName === 'IMG') {
       dZoneId = zoneOf(event.target)?.id;
     } else {
-      dZoneId = event.target.id;
+      // Fall back to the closest zone ancestor, not the raw event.target id —
+      // an empty bench slot's target is a child placeholder div with no id of
+      // its own, so reading event.target.id directly left dZoneId wrong and
+      // silently skipped the retreat branch below (drag-to-retreat onto an
+      // empty bench slot never paid the retreat cost).
+      dZoneId = zoneOf(event.target)?.id ?? event.target.id;
     }
 
     // Dragging the active Pokémon onto the bench is a retreat, not a plain move:
@@ -277,11 +283,22 @@ export const drop = (event) => {
       dZoneId === 'bench' &&
       !draggedImage.attached
     ) {
-      retreat(
-        mouseClick.cardUser,
-        true,
-        event.target.tagName === 'IMG' ? event.target : null
-      );
+      const droppedOnCard = event.target.tagName === 'IMG' ? event.target : null;
+      if (!droppedOnCard) {
+        const benchZone = getZone(mouseClick.cardUser, 'bench');
+        const benchCandidates = benchZone.array.filter(isBoardPokemon);
+        if (benchCandidates.length > 1) {
+          appendMessage(
+            mouseClick.cardUser,
+            '⛔ Drop onto the Bench Pokémon you want to switch in.',
+            'announcement',
+            false
+          );
+          event.stopPropagation();
+          return;
+        }
+      }
+      retreat(mouseClick.cardUser, true, droppedOnCard);
       event.stopPropagation();
       return;
     }
