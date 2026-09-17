@@ -25,7 +25,7 @@ import { zoneOf } from './drop-zone.mjs';
 
 // The slot each renderer stores a created overlay element in, on the card it
 // is drawn over.
-const OVERLAY_SLOTS = ['damageCounter', 'specialCondition', 'abilityCounter'];
+const OVERLAY_SLOTS = ['damageCounter', 'specialCondition', 'poisonMarker', 'burnMarker', 'abilityCounter'];
 
 const imagesIn = (element) => Array.from(element?.querySelectorAll?.('img') ?? []);
 

@@ -20,7 +20,11 @@ function hashCardCounters(c) {
     typeof c?.abilityUsed === 'boolean'
       ? (c.abilityUsed ? '1' : '0')
       : (c?.image?.abilityCounter ? '1' : '0');
-  return [damage, condition, abilityUsed].join('|');
+  // Poison/Burn markers (design 011) are appended only when set, so a card without
+  // them keeps the exact fingerprint it had before markers existed.
+  const markers = `${c?.poisoned ? 'P' : ''}${c?.burned ? 'B' : ''}`;
+  const fingerprint = [damage, condition, abilityUsed].join('|');
+  return markers ? `${fingerprint}|${markers}` : fingerprint;
 }
 
 /** Deterministic fingerprint of a zone's cards (identity + counter/status state, not image URLs). */

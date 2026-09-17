@@ -13,6 +13,7 @@
 import { findCard } from '../state.mjs';
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
+import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
 
@@ -641,7 +642,7 @@ export function executeSteps(draft, {
               player.zones.active.push(c);
             }
           }
-          active.specialCondition = null;
+          clearConditions(active);
           events.push({
             type: 'cardSwitched',
             playerId,
@@ -713,7 +714,7 @@ export function executeSteps(draft, {
               opponent.zones.active.push(c);
             }
           }
-          oppActive.specialCondition = null;
+          clearConditions(oppActive);
           events.push({
             type: 'cardSwitched',
             playerId: opponent.playerId,
@@ -721,7 +722,7 @@ export function executeSteps(draft, {
             benchId: oppBenchCard.instanceId,
           });
           if (step.thenCondition) {
-            oppBenchCard.specialCondition = step.thenCondition;
+            addCondition(oppBenchCard, step.thenCondition);
             events.push({
               type: 'statusApplied',
               playerId: opponent.playerId,
@@ -814,7 +815,7 @@ export function executeSteps(draft, {
         ].filter(
           (c) =>
             !c.attachedTo &&
-            ((c.damage || 0) > 0 || (step.cure && c.specialCondition)) &&
+            ((c.damage || 0) > 0 || (step.cure && hasAnyCondition(c))) &&
             rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target)
         );
 
@@ -827,9 +828,9 @@ export function executeSteps(draft, {
             damage: card.damage,
             healed: oldDamage - card.damage,
           });
-          if (step.cure && card.specialCondition) {
-            card.specialCondition = null;
-            events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null });
+          if (step.cure && hasAnyCondition(card)) {
+            clearConditions(card);
+            events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null, conditions: [] });
           }
         };
 
@@ -909,14 +910,17 @@ export function executeSteps(draft, {
         const targetSide = step.target === 'bothActiveNonDark' || step.target === 'opponentActive' ? opponent : player;
         const targetActive = targetSide?.zones?.active?.find((c) => !c.attachedTo);
         if (targetActive) {
-          const condition = step.condition || step.conditions?.[0] || 'Poisoned';
-          targetActive.specialCondition = condition;
-          events.push({
-            type: 'statusApplied',
-            playerId: targetSide.playerId,
-            instanceId: targetActive.instanceId,
-            condition,
-          });
+          // Every listed condition lands: markers stack with a rotation condition (design 011).
+          const conditions = step.conditions?.length ? step.conditions : [step.condition || 'Poisoned'];
+          for (const condition of conditions) {
+            if (!addCondition(targetActive, condition)) continue;
+            events.push({
+              type: 'statusApplied',
+              playerId: targetSide.playerId,
+              instanceId: targetActive.instanceId,
+              condition,
+            });
+          }
         }
         break;
       }

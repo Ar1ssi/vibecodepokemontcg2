@@ -230,6 +230,15 @@ export const COMMAND_SCHEMAS = {
       ) {
         return { valid: false, reason: 'instanceId must be an integer' };
       }
+      if (
+        payload.condition != null &&
+        !SPECIAL_CONDITIONS.includes(payload.condition)
+      ) {
+        return {
+          valid: false,
+          reason: `condition must be omitted or one of: ${SPECIAL_CONDITIONS.join(', ')}`,
+        };
+      }
       return { valid: true };
     },
   },

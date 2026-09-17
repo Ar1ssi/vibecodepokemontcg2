@@ -63,6 +63,8 @@ export function hasCardChanged(prev, next) {
   if (prev.instanceId !== next.instanceId) return true;
   if ((prev.damage || 0) !== (next.damage || 0)) return true;
   if ((prev.specialCondition || null) !== (next.specialCondition || null)) return true;
+  if (Boolean(prev.poisoned) !== Boolean(next.poisoned)) return true;
+  if (Boolean(prev.burned) !== Boolean(next.burned)) return true;
   if (Boolean(prev.abilityUsed) !== Boolean(next.abilityUsed)) return true;
   if ((prev.attachedTo ?? null) !== (next.attachedTo ?? null)) return true;
 

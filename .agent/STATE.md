@@ -4,12 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 165
-Focus: I28 holo import parity (PR #144) and mat sizing fix (4abcb5c) both on main.
+Session: 170
+Focus: Prize picker restored under server authority (D46) on top of the audit fixes — uncommitted.
 Active: none.
-Next: user eyeball-check both in a live 2P game (same era foil both sides; Active/Bench evolutions,
-  prizes, board sized right). Then PR #143 2P rules-mode verification pass. Then delete dead
-  `#attackPanel` / `.attack-panel-*` CSS. maintenance due (S150, still owed).
+Next: commit (user to confirm). Fix local node_modules (express/@eslint/js missing; pnpm install EACCES)
+  then run lint + `SERVER_AUTHORITATIVE=1` playtest-bot to see a real KO prize pick. User eyeballs the
+  prize fan and stacked condition markers in a live 2P game. Then audit lows A-6/A-10. maintenance due.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -26,16 +26,14 @@ Blocked: none.
 - `pnpm test` is an explicit file list — a new test file runs only once added to package.json.
   `pnpm lint` fails repo-wide on CRLF; lint a diff with
   `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <files>`.
-- Drag-drop zone resolution: always use `zoneOf(event.target)?.id` (drop-zone.mjs), never
-  `event.target.id` directly — an empty zone slot's target is often a child placeholder div with no id
-  of its own (S161 root cause of the drag-to-retreat bug).
-
+- Prize cards move only on a server-granted entitlement (`flags.prizesOwed`, D43). A KO raises a prize
+  pendingChoice at command end (D46) that pauses the game; never splice `zones.prizes` on a client's say-so. Manual counters/conditions and deck-order ops are
+  turn-player-only in rules mode (S167).
 - Mat `.mat-holo` wrappers get NO inline px size (S164): each zone's CSS sizes them. Never measure
   clientWidth in one document/zoom space and write px into another (hand is 1x, #playfield is zoom:2).
   Pre-existing failing test: "trainer drop: a Trainer without synced effect text is rejected".
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S165 2026-09-17 merge: PR #144 merged into main.
-- S164 2026-09-17 debug: I28 — self-containers.css lacked 7 per-generation holo @imports; added + parity test.
-- S164 2026-09-17 debug: mat card sizing — removed hydrateHolo px snapshot, cancel in-flight hydration,
-  prizes grid rows minmax(0,1fr), board img/holo same height.
+- S170 2026-09-17 feature: prize picker — KO raises server prize choice, client fly-up fan (D46, I4).
+- S169 2026-09-17 feature: A-1 stacked conditions — Poison/Burn marker keys + per-condition board markers (D45).
+- S168 2026-09-17 patch: audit mediums — status parity, dual-type weakness, clientSeq required (D44).

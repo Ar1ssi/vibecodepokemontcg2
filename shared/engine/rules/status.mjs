@@ -4,8 +4,9 @@
 //
 // Modern mutual-exclusion rules (enforced in applyStatus):
 //   - Turn-skip family  { asleep, paralyzed, confused }  → at most ONE at a time
-//   - Damage family     { poisoned, burned }             → at most ONE at a time
-// Applying a new status in the same family clears the older one ("newest wins").
+// Applying a new turn-skip status clears the older one ("newest wins").
+// Poisoned and Burned are markers, not a family: they coexist with each other and
+// with any turn-skip status (audit A-2).
 //
 // Confused rule (printed):
 //   "If your Pokémon is Confused, you must flip a coin before attacking with
@@ -27,7 +28,6 @@ export function resetStatuses() {
 
 const ALL = ['asleep', 'paralyzed', 'poisoned', 'burned', 'confused'];
 const TURN_SKIP = ['asleep', 'paralyzed', 'confused'];
-const DAMAGE = ['poisoned', 'burned'];
 
 export function getStatus(player, cardId) {
   return statusState[player][cardId] || null;
@@ -38,11 +38,9 @@ export function applyStatus(player, cardId, status, opts = {}) {
   if (!ALL.includes(status)) return false;
   if (!statusState[player][cardId]) statusState[player][cardId] = {};
   const s = statusState[player][cardId];
-  // Mutual exclusion: newest wins within each family.
+  // Mutual exclusion: newest wins among turn-skip statuses only.
   if (TURN_SKIP.includes(status)) {
     for (const other of TURN_SKIP) if (other !== status) delete s[other];
-  } else if (DAMAGE.includes(status)) {
-    for (const other of DAMAGE) if (other !== status) delete s[other];
   }
   s[status] = true;
   return true;
@@ -68,12 +66,12 @@ export function canAct(player, cardId) {
 }
 
 // Can the active Pokémon retreat this turn?
-// Only Paralyzed blocks retreating. Confused does NOT (and retreating
-// clears Confused per the confirmed definition); Asleep does NOT block
-// retreat in this implementation (TCG allows retreating while asleep).
+// Paralyzed and Asleep block retreating, matching the server reducer (audit A-3).
+// Confused does NOT (and retreating clears Confused).
 export function statusAllowsRetreat(player, cardId) {
   const s = statusState[player][cardId];
   if (s?.paralyzed) return { can: false, reason: "Paralyzed — this Pokémon can't retreat." };
+  if (s?.asleep) return { can: false, reason: "Asleep — this Pokémon can't retreat." };
   return { can: true };
 }
 

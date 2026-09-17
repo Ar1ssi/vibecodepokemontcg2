@@ -22,7 +22,7 @@ const STAGGER_MS = 70;
 /** @type {{
  *  user: string,
  *  needed: number,
- *  zone: ReturnType<typeof getZone>,
+ *  onChosen: (chosen: Array<{ card: object, host: HTMLElement }>) => number,
  *  entries: Array<{ card: object, host: HTMLElement, origin: object }>,
  *  selected: Set<object>,
  *  overlay: HTMLElement,
@@ -114,41 +114,38 @@ const returnUnselectedThenFinish = async (taken) => {
   finishPrizeTake(taken, false);
 };
 
-const confirmSelection = () => {
-  if (!pending || !pending.ready || pending.resolving) return;
-  const { user, zone, entries, selected, needed } = pending;
+// `force` lets the e2e bot answer before the fly-up animation has finished.
+const confirmSelection = (force = false) => {
+  if (!pending || pending.resolving) return;
+  if (!pending.ready && !force) return;
+  const { entries, selected, needed, onChosen } = pending;
   if (selected.size < needed) return;
   pending.ready = false;
   pending.overlay.classList.remove('is-ready');
 
   const chosen = entries.filter((entry) => selected.has(entry.card));
-  const indices = chosen
-    .map((entry) => zone.array.indexOf(entry.card))
-    .filter((index) => index >= 0);
-
   for (const entry of chosen) {
-    setHandFlightOrigin(entry.card, viewportRectOf(entry.host));
     entry.host.style.visibility = 'hidden';
   }
 
-  if (indices.length > 0) {
-    takePrizesByIndex(user, user, indices);
-  }
+  returnUnselectedThenFinish(onChosen(chosen));
+};
 
-  returnUnselectedThenFinish(indices.length);
+const selectEntry = (card, host) => {
+  if (pending.selected.has(card)) {
+    pending.selected.delete(card);
+    host.classList.remove('is-selected');
+    return false;
+  }
+  if (pending.selected.size >= pending.needed) return false;
+  pending.selected.add(card);
+  host.classList.add('is-selected');
+  return pending.selected.size >= pending.needed;
 };
 
 const toggleSelect = (card, host) => {
   if (!pending?.ready || pending.resolving) return;
-  if (pending.selected.has(card)) {
-    pending.selected.delete(card);
-    host.classList.remove('is-selected');
-    return;
-  }
-  if (pending.selected.size >= pending.needed) return;
-  pending.selected.add(card);
-  host.classList.add('is-selected');
-  if (pending.selected.size >= pending.needed) {
+  if (selectEntry(card, host)) {
     globalThis.setTimeout(confirmSelection, 220);
   }
 };
@@ -160,20 +157,32 @@ export const cancelPrizeTake = () => {
   finishPrizeTake(0);
 };
 
-// TCG Live prize pick: every remaining prize flies up sleeve-forward.
-// The player clicks as many as they earned; the rest drop back.
-export const promptPrizeTake = (user, count) => {
-  if (systemState.isTwoPlayer && user !== 'self') {
-    return Promise.resolve(0);
-  }
-  cancelPrizeTake();
-  const zone = getZone(user, 'prizes');
-  const needed = Math.min(Math.max(0, count), zone.getCount());
-  if (needed <= 0) {
-    return Promise.resolve(0);
-  }
+/** e2e: the open prize fan as a card-picker snapshot, or null. */
+export const getPrizeTakeSnapshot = () => {
+  if (!pending || pending.resolving) return null;
+  return {
+    min: pending.needed,
+    candidates: pending.entries.map((_, index) => ({ index, name: '' })),
+  };
+};
 
-  const cards = [...zone.array];
+/** e2e: picks prize cards by index and confirms at once. */
+export const pickPrizeTakeIndices = (indices = []) => {
+  if (!pending || pending.resolving) return false;
+  for (const index of indices) {
+    const entry = pending.entries[index];
+    if (entry && !pending.selected.has(entry.card)) selectEntry(entry.card, entry.host);
+  }
+  if (pending.selected.size < pending.needed) return false;
+  confirmSelection(true);
+  return true;
+};
+
+// TCG Live prize pick: every remaining prize flies up sleeve-forward. The player clicks
+// as many as they earned; `onChosen` takes the chosen entries and returns how many
+// prizes it took; the rest drop back.
+const openPrizeFan = ({ user, cards, needed, onChosen }) => {
+  cancelPrizeTake();
   const viewport = {
     width: globalThis.innerWidth,
     height: globalThis.innerHeight,
@@ -185,6 +194,7 @@ export const promptPrizeTake = (user, count) => {
   const overlay = document.createElement('div');
   overlay.id = 'prizeTakeOverlay';
   overlay.className = 'prize-take-overlay';
+  overlay.dataset.min = String(needed);
   const hint = document.createElement('div');
   hint.className = 'prize-take-hint';
   const noun = needed === 1 ? 'prize card' : `${needed} prize cards`;
@@ -193,7 +203,7 @@ export const promptPrizeTake = (user, count) => {
   document.body.appendChild(overlay);
 
   const entries = cards.map((card, i) => {
-    const originEl = cardNode(card) ?? card.image;
+    const originEl = cardNode(card);
     const origin = originEl
       ? viewportRectOf(originEl)
       : { left: 40, top: viewport.height - 180, width: 70, height: 98 };
@@ -213,7 +223,7 @@ export const promptPrizeTake = (user, count) => {
     pending = {
       user,
       needed,
-      zone,
+      onChosen,
       entries,
       selected: new Set(),
       overlay,
@@ -237,3 +247,49 @@ export const promptPrizeTake = (user, count) => {
     });
   });
 };
+
+// Legacy (non-authoritative) path: the chosen prizes are taken by zone index.
+export const promptPrizeTake = (user, count) => {
+  if (systemState.isTwoPlayer && user !== 'self') {
+    return Promise.resolve(0);
+  }
+  const zone = getZone(user, 'prizes');
+  const needed = Math.min(Math.max(0, count), zone.getCount());
+  if (needed <= 0) {
+    cancelPrizeTake();
+    return Promise.resolve(0);
+  }
+  return openPrizeFan({
+    user,
+    cards: [...zone.array],
+    needed,
+    onChosen: (chosen) => {
+      const indices = chosen
+        .map((entry) => zone.array.indexOf(entry.card))
+        .filter((index) => index >= 0);
+      for (const entry of chosen) {
+        setHandFlightOrigin(entry.card, viewportRectOf(entry.host));
+      }
+      if (indices.length > 0) {
+        takePrizesByIndex(user, user, indices);
+      }
+      return indices.length;
+    },
+  });
+};
+
+/**
+ * Server-authoritative path: a prize pendingChoice. `cards` are the server-drawn prize
+ * cards as `{ instanceId, image, wrapper }`; `onResolve` receives the chosen instanceIds,
+ * which the server moves to hand.
+ */
+export const promptServerPrizeChoice = ({ cards, needed, onResolve }) =>
+  openPrizeFan({
+    user: 'self',
+    cards,
+    needed,
+    onChosen: (chosen) => {
+      onResolve(chosen.map((entry) => entry.card.instanceId));
+      return chosen.length;
+    },
+  });

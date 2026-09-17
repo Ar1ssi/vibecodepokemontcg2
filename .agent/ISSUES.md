@@ -12,6 +12,14 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I54 2026-09-17 P2 [rules] Audit A-1 (High) still open: `specialCondition` is one string, so adding Asleep
+    to a Poisoned Pokémon wipes Poison, and resolveCheckup's else-if chain applies only one condition. Fix needs a
+    condition-set model across reduce.mjs, view/zone-hash, apply-view.js, status.mjs (~150 refs, 23 files) — pair
+    with A-2 — client status.mjs already allows Poisoned+Burned since S168; server must catch up. (refs: server-authority-and-rules-engine-audit.md, S167) → closed 2026-09-17 S169: design 011, D45.
+- I53 2026-09-17 P1 [rules] Audit finding B-1c still open: `takePrizesByIndex` (reduce.mjs:851 legality,
+    :1669 apply) keeps the bare bounds check and no turn gate, so `indices:[0..5]` wins the game off-turn —
+    B-1's fix (prize entitlement + turn gate, D43) applies verbatim; the entitlement is granted as a count,
+    so the indices variant must check `indices.length` against it (refs: D43, S166) → closed 2026-09-17 S167: turn-gated, entitlement-checked, integer/non-negative/unique indices.
 - I47 2026-09-16 P2 [netcode] `test:flip` (flip-gate-test.mjs, SERVER_AUTHORITATIVE=1 :4100) fails on unmodified main: step 1 "both clients joined" passes, then "timeout waiting for page predicate" — debug showed client A hand 9 (drew before setup settled), B hand 7 (refs: S137)
 - I46 2026-09-14 P3 [board-ui] Design 009 hand: #hand's horizontal scrollbar sits in the off-screen band (hidden via scrollbar-width: none), so a 15+ card hand scrolls only by trackpad/shift+wheel — map vertical wheel to scrollLeft or add arrows (refs: design 009, S131)
 - I45 2026-09-14 P3 [netcode] 2-browser Playwright E2E (legacy/non-authoritative mode): after a
@@ -54,7 +62,7 @@
 - I1 2026-09-07 P2 [rules] Turn start auto-draw: both players draw a card when turn is started (ref: ISSUES.txt)
 - I2 2026-09-07 P2 [rules] End Turn button logic: +Turn needs rework to end active player's turn (ref: ISSUES.txt)
 - I3 2026-09-07 P2 [rules] Garland Ray energy discard parsing fail on multiplier attacks (ref: ISSUES.txt)
-- I4 2026-09-07 P2 [rules] Prize card selection on KO fails (ref: ISSUES.txt)
+- I4 2026-09-07 P2 [rules] Prize card selection on KO fails (ref: ISSUES.txt) → closed 2026-09-17 S170: server prize pendingChoice + fly-up prize fan (D46).
 - I6 2026-09-07 P2 [netcode] Multiplayer desyncs are architectural: two client simulations, no arbiter — 54 of last 200 commits are sync/replay/RNG patches (refs: design 001)
 - I5 2026-09-07 P2 [rules] Deck inspection allowed during rules mode (ref: ISSUES.txt)
     Root cause is data, not UI: both clients hold the full opponent deck. Design 001 closes it by redacting the view server-side — don't fix separately.

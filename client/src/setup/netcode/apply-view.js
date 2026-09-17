@@ -21,6 +21,7 @@ import { resetImage } from '../image-logic/reset-image.js';
 import { getEnergyTokenFront } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
+import { listConditions, ROTATION_CONDITIONS } from '../../../../shared/engine/rules/special-conditions.mjs';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -49,11 +50,16 @@ let defaultNetcodeContext = {
   // { open({ choice, onResolve }), close() } — card-picker.js, injected for the
   // same reason (it pulls in get-zone.js).
   choicePicker: null,
+  // { open({ choice, cards, onResolve }), close() } — the prize fly-up picker
+  // (prize-take-prompt.js), injected for the same reason.
+  prizePicker: null,
 };
 
 // choiceId the injected card picker is currently showing, so re-applying a view
 // that still carries the same pendingChoice doesn't reopen (and reset) it.
 let openPickerChoiceId = null;
+// Same guard for the prize picker.
+let openPrizeChoiceId = null;
 
 // Options of the last applied view, reused when overlays re-measure on resize.
 let lastOverlayOptions = null;
@@ -116,6 +122,7 @@ export function setDefaultNetcodeContext(ctx = {}) {
   if (ctx.sortZoneCards !== undefined) defaultNetcodeContext.sortZoneCards = ctx.sortZoneCards;
   if (ctx.holo !== undefined) defaultNetcodeContext.holo = ctx.holo;
   if (ctx.choicePicker !== undefined) defaultNetcodeContext.choicePicker = ctx.choicePicker;
+  if (ctx.prizePicker !== undefined) defaultNetcodeContext.prizePicker = ctx.prizePicker;
 }
 
 /**
@@ -144,6 +151,7 @@ export function resetRenderState() {
   lastAppliedView = null;
   clearInFlightAffordances();
   openPickerChoiceId = null;
+  openPrizeChoiceId = null;
   lastOverlayOptions = null;
   defaultNetcodeContext = {
     socket: null,
@@ -155,6 +163,7 @@ export function resetRenderState() {
     sortZoneCards: null,
     holo: null,
     choicePicker: null,
+    prizePicker: null,
   };
 }
 
@@ -403,6 +412,12 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
     };
     cardRegistry.set(instanceId, record);
   } else {
+    if (record.zone === 'prizes' && zoneId !== 'prizes') {
+      // The prize picker hides prize cards while they fan out; a chosen prize stays
+      // hidden until the server moves it, so reveal it once it has left the prizes.
+      img.classList?.remove('draw-flight-source');
+      record.holoCard?.wrapper?.classList?.remove('draw-flight-source');
+    }
     record.card = { ...cardData };
     record.side = side;
     record.zone = zoneId;
@@ -446,12 +461,12 @@ function getRect(el) {
  * @param {object} overlay
  * @param {object} targetRect Card image's bounding rect
  * @param {object} zoneRect Zone element's bounding rect
- * @param {{ leftOffset: number, size: number, fontSize: number }} spec
+ * @param {{ leftOffset: number, size: number, fontSize: number, topOffset?: number }} spec
  */
-function positionOverlay(overlay, targetRect, zoneRect, { leftOffset, size, fontSize }) {
+function positionOverlay(overlay, targetRect, zoneRect, { leftOffset, size, fontSize, topOffset = 0 }) {
   overlay.style.display = 'inline-block';
   overlay.style.left = `${targetRect.left - zoneRect.left + leftOffset}px`;
-  overlay.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 4}px`;
+  overlay.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 4 + topOffset}px`;
   overlay.style.width = `${size}px`;
   overlay.style.height = `${size}px`;
   overlay.style.lineHeight = `${size}px`;
@@ -532,11 +547,28 @@ function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}, 
   });
 }
 
+// Where each condition's marker `<div>` is stored on the card image (design 011): the
+// rotation condition keeps legacy's `img.specialCondition` slot; Poison and Burn stack
+// with it, so each gets a slot of its own.
+export const CONDITION_MARKER_SLOTS = {
+  rotation: 'specialCondition',
+  Poisoned: 'poisonMarker',
+  Burned: 'burnMarker',
+};
+
+function removeOverlaySlot(img, slot) {
+  const overlay = img[slot];
+  if (!overlay) return;
+  if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  img[slot] = null;
+}
+
 /**
- * Creates, updates or removes the special-condition sibling `<div>` for a card, mirroring
+ * Creates, updates or removes the special-condition sibling `<div>`s for a card, mirroring
  * `addSpecialCondition`/`updateSpecialCondition`/`removeSpecialCondition`
  * (`client/src/actions/counters/special-condition.js`) but display-only — see
- * `reconcileDamageOverlay`'s header for why.
+ * `reconcileDamageOverlay`'s header for why. One marker per held condition, stacked
+ * top-down in the order rotation condition, Poison, Burn.
  *
  * @param {object} cardData
  * @param {object} img
@@ -545,41 +577,44 @@ function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}, 
  * @param {object} options
  */
 function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
-  const condition = cardData.specialCondition || null;
-
-  if (!condition) {
-    if (img.specialCondition) {
-      if (img.specialCondition.parentNode) {
-        img.specialCondition.parentNode.removeChild(img.specialCondition);
-      }
-      img.specialCondition = null;
-    }
-    return;
+  const held = listConditions(cardData);
+  const markersInDisplayOrder = [
+    ...held.filter((c) => ROTATION_CONDITIONS.includes(c)).map((c) => [CONDITION_MARKER_SLOTS.rotation, c]),
+    ...held.filter((c) => !ROTATION_CONDITIONS.includes(c)).map((c) => [CONDITION_MARKER_SLOTS[c], c]),
+  ];
+  const wantedSlots = new Set(markersInDisplayOrder.map(([slot]) => slot));
+  for (const slot of Object.values(CONDITION_MARKER_SLOTS)) {
+    if (!wantedSlots.has(slot)) removeOverlaySlot(img, slot);
   }
+  if (markersInDisplayOrder.length === 0) return;
 
   const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
-  let marker = img.specialCondition;
-  if (!marker) {
-    if (!doc || typeof doc.createElement !== 'function') return;
-    marker = doc.createElement('div');
-    marker.contentEditable = 'false';
-    marker.className = overlaySideClass(side, options);
-    img.specialCondition = marker;
-  }
-
-  const code = CONDITION_WORD_TO_CODE[condition] || condition;
-  applySpecialConditionStyle(marker, code);
-
-  if (zoneElement && marker.parentNode !== zoneElement) {
-    zoneElement.appendChild(marker);
-  }
-
   const targetRect = getRect(rectImg);
   const zoneRect = getRect(zoneElement);
-  positionOverlay(marker, targetRect, zoneRect, {
-    leftOffset: 0,
-    size: targetRect.width / 3,
-    fontSize: targetRect.width / 4,
+  const size = targetRect.width / 3;
+
+  markersInDisplayOrder.forEach(([slot, condition], position) => {
+    let marker = img[slot];
+    if (!marker) {
+      if (!doc || typeof doc.createElement !== 'function') return;
+      marker = doc.createElement('div');
+      marker.contentEditable = 'false';
+      marker.className = overlaySideClass(side, options);
+      img[slot] = marker;
+    }
+
+    applySpecialConditionStyle(marker, CONDITION_WORD_TO_CODE[condition] || condition);
+
+    if (zoneElement && marker.parentNode !== zoneElement) {
+      zoneElement.appendChild(marker);
+    }
+
+    positionOverlay(marker, targetRect, zoneRect, {
+      leftOffset: 0,
+      topOffset: position * size,
+      size,
+      fontSize: targetRect.width / 4,
+    });
   });
 }
 
@@ -1152,6 +1187,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
   const existingBanner = doc.getElementById ? doc.getElementById('netcodeChoiceBanner') : null;
 
   if (!pendingChoice) {
+    closePrizePicker(options);
     closeChoicePicker(options);
     if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
     if (existingBanner?.parentNode) existingBanner.parentNode.removeChild(existingBanner);
@@ -1162,6 +1198,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
 
   if (!isOwner) {
     // Opponent is choosing: show non-interactive waiting banner
+    closePrizePicker(options);
     closeChoicePicker(options);
     if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
     let banner = existingBanner;
@@ -1177,6 +1214,13 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
 
   // Local player must make a choice: mount interactive picker
   if (existingBanner?.parentNode) existingBanner.parentNode.removeChild(existingBanner);
+
+  if (openChoiceInPrizePicker(pendingChoice, options)) {
+    closeChoicePicker(options);
+    if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
+    return;
+  }
+  closePrizePicker(options);
 
   if (openChoiceInCardPicker(pendingChoice, options)) {
     if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
@@ -1320,6 +1364,52 @@ function openChoiceInCardPicker(pendingChoice, options = {}) {
     return false;
   }
   return true;
+}
+
+/**
+ * Shows a prize pendingChoice (server `resumeToken.effectType === 'prizes'`) as the TCG
+ * Live fly-up prize fan over this player's server-drawn prize cards. Falls back to the
+ * choice modal when no picker is injected or a prize card isn't on the board yet.
+ *
+ * @returns {boolean} whether the prize picker owns this choice
+ */
+function openChoiceInPrizePicker(pendingChoice, options = {}) {
+  if (pendingChoice.resumeToken?.effectType !== 'prizes') return false;
+  const picker = options.prizePicker || defaultNetcodeContext.prizePicker;
+  if (typeof picker?.open !== 'function') return false;
+  if (openPrizeChoiceId === pendingChoice.choiceId) return true;
+
+  const records = (pendingChoice.options || []).map((opt) => cardRegistry.get(opt.instanceId));
+  if (records.length === 0 || records.some((record) => !record?.element)) return false;
+  const cards = records.map((record) => ({
+    instanceId: record.instanceId,
+    image: record.element,
+    wrapper: record.holoCard?.wrapper,
+  }));
+
+  closePrizePicker(options);
+  openPrizeChoiceId = pendingChoice.choiceId;
+  try {
+    picker.open({
+      choice: pendingChoice,
+      cards,
+      onResolve: (selection) => {
+        openPrizeChoiceId = null;
+        return submitChoiceSelection(pendingChoice, selection, options);
+      },
+    });
+  } catch (err) {
+    openPrizeChoiceId = null;
+    console.error('[apply-view] prize picker failed, using choice modal:', err);
+    return false;
+  }
+  return true;
+}
+
+function closePrizePicker(options = {}) {
+  if (openPrizeChoiceId == null) return;
+  openPrizeChoiceId = null;
+  (options.prizePicker || defaultNetcodeContext.prizePicker)?.close?.();
 }
 
 function closeChoicePicker(options = {}) {
@@ -1651,8 +1741,10 @@ export function applyView(view, events = [], options = {}) {
       if (record.element?.damageCounter?.parentNode) {
         record.element.damageCounter.parentNode.removeChild(record.element.damageCounter);
       }
-      if (record.element?.specialCondition?.parentNode) {
-        record.element.specialCondition.parentNode.removeChild(record.element.specialCondition);
+      for (const slot of Object.values(CONDITION_MARKER_SLOTS)) {
+        if (record.element?.[slot]?.parentNode) {
+          record.element[slot].parentNode.removeChild(record.element[slot]);
+        }
       }
       if (record.element?.abilityCounter?.parentNode) {
         record.element.abilityCounter.parentNode.removeChild(record.element.abilityCounter);

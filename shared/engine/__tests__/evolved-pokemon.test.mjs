@@ -87,7 +87,15 @@ test('knockout: an evolved Pokémon ex gives up 2 Prize cards', () => {
   state.players.p2.zones.active.push(basic, evolved);
   state.players.p2.zones.bench.push(pokemon({ instanceId: 30, name: 'Squirtle', hp: 60 }));
 
-  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  const attackRes = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(attackRes.error, null);
+  assert.equal(attackRes.state.pendingChoice.min, 2);
+  const choice = attackRes.state.pendingChoice;
+  const res = applyCommand(attackRes.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: choice.options.slice(0, 2).map((o) => o.instanceId) },
+    playerId: 'p1',
+  });
   assert.equal(res.error, null);
   assert.equal(res.state.players.p1.zones.prizes.length, 4);
 });

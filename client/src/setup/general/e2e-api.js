@@ -22,6 +22,10 @@ import {
   getCardPickerSnapshot,
   pickCardPickerIndices,
 } from '../image-logic/card-picker.js';
+import {
+  getPrizeTakeSnapshot,
+  pickPrizeTakeIndices,
+} from '../../actions/zones/prize-take-prompt.js';
 
 // Server-authoritative pendingChoice modal (apply-view.js reconcilePendingChoice). Answered
 // through the same picker()/pick() surface as the legacy card picker so the bot drains it.
@@ -343,6 +347,8 @@ export function installE2eApi() {
           })),
         };
       }
+      const prizeTake = getPrizeTakeSnapshot();
+      if (prizeTake) return { type: 'cardPicker', open: true, source: 'prizeTake', ...prizeTake };
       const cardPicker = getCardPickerSnapshot();
       if (cardPicker) return { type: 'cardPicker', open: true, ...cardPicker };
       const matCandidates = matPickCandidates();
@@ -374,6 +380,7 @@ export function installE2eApi() {
         confirm.click();
         return true;
       }
+      if (getPrizeTakeSnapshot()) return pickPrizeTakeIndices(indices);
       const cardPicker = getCardPickerSnapshot();
       if (cardPicker) return pickCardPickerIndices(indices);
       const matCandidates = matPickCandidates();

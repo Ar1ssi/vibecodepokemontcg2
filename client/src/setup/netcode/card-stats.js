@@ -58,6 +58,11 @@ function extractStats(card) {
   if (Array.isArray(card.retreatCost) && card.retreatCost.length > 0) {
     stats.retreatCost = [...card.retreatCost];
     hasAny = true;
+  } else if (Number.isInteger(card.retreatCost) && card.retreatCost > 0) {
+    // Board cards carry the parsed Colorless count; the server contract is an array
+    // (audit B-6: dropping the number made every retreat free).
+    stats.retreatCost = new Array(card.retreatCost).fill('Colorless');
+    hasAny = true;
   }
   if (card.stage) {
     stats.stage = card.stage;

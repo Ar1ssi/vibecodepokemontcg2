@@ -11,6 +11,7 @@ import { isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
+import { addCondition, clearConditions, copyConditions } from '../rules/special-conditions.mjs';
 import {
   topPokemonCard as topOfStack,
   rareCandyOptions,
@@ -797,10 +798,10 @@ function swapWithDiscard(ctx) {
     removeFromZones(player, incoming);
     zone.splice(zone.indexOf(outgoing), 1, incoming);
     incoming.damage = outgoing.damage || 0;
-    incoming.specialCondition = outgoing.specialCondition || null;
+    copyConditions(outgoing, incoming);
     for (const card of attachedCards(player, outgoing.instanceId)) card.attachedTo = incoming.instanceId;
     outgoing.damage = 0;
-    outgoing.specialCondition = null;
+    clearConditions(outgoing);
     player.zones.discard.push(outgoing);
     ctx.events.push({ type: 'pokemonSwapped', playerId: player.playerId, instanceId: incoming.instanceId, replacedInstanceId: outgoing.instanceId });
     return null;
@@ -1137,7 +1138,7 @@ function searchAttachEach(ctx) {
     }
     shuffleDeck(player, ctx);
     if (step.poisonActive && attachedToActive) {
-      active.specialCondition = 'Poisoned';
+      addCondition(active, 'Poisoned');
       ctx.events.push({ type: 'statusApplied', playerId: player.playerId, instanceId: active.instanceId, condition: 'Poisoned' });
     }
     return null;

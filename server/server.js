@@ -900,7 +900,7 @@ async function main() {
           return;
         }
 
-        const result = gameRoom.handleCommand(socket.id, cmd);
+        const result = gameRoom.handleClientCommand(socket.id, cmd);
         if (!result.success) {
           socket.emit('cmdRejected', {
             clientSeq: cmd?.clientSeq,
@@ -946,7 +946,11 @@ async function main() {
           return;
         }
 
-        const result = gameRoom.resolveChoice(socket.id, data, data?.clientSeq);
+        const result = gameRoom.handleClientCommand(socket.id, {
+          type: 'resolveChoice',
+          payload: data,
+          clientSeq: data?.clientSeq,
+        });
         if (!result.success) {
           socket.emit('cmdRejected', {
             clientSeq: data?.clientSeq,

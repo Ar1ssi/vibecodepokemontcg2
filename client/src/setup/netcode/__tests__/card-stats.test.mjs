@@ -90,3 +90,10 @@ test('Pokémon carry evolvesFrom and their Ability text for server-side Salvator
     },
   ]);
 });
+
+// Audit B-6: board cards carry retreatCost as the parsed Colorless count, and the payload used to
+// forward arrays only — so the server never learned any Retreat Cost and every retreat was free.
+test('B-6: a numeric retreatCost is sent as that many Colorless symbols', () => {
+  const { stats } = buildCardStatsPayload([{ syncInstance: 0, hp: 100, retreatCost: 2 }]);
+  assert.deepEqual(stats[0].retreatCost, ['Colorless', 'Colorless']);
+});

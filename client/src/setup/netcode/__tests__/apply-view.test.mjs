@@ -13,6 +13,7 @@ import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
   getAuthoritativeStadiumArray,
+  repositionCardOverlays,
 } from '../apply-view.js';
 
 class MockClassList {
@@ -1006,7 +1007,7 @@ test('Row 21: special-condition overlay created from server condition word, remo
       playerId: 'p1',
       zones: {
         active: [
-          { instanceId: 20, name: 'Pikachu', src: '/a.png', specialCondition: 'Poisoned' },
+          { instanceId: 20, name: 'Pikachu', src: '/a.png', specialCondition: null, poisoned: true },
         ],
       },
     },
@@ -1015,9 +1016,9 @@ test('Row 21: special-condition overlay created from server condition word, remo
   applyView(v1, [], { document: doc, getZone: mockGetZone });
 
   const img = getCardRegistry().get(20).element;
-  assert.ok(img.specialCondition, 'special-condition div created');
-  assert.equal(img.specialCondition.classList.contains('status-poison'), true);
-  assert.equal(img.specialCondition.parentNode, selfActive);
+  assert.ok(img.poisonMarker, 'poison marker div created');
+  assert.equal(img.poisonMarker.classList.contains('status-poison'), true);
+  assert.equal(img.poisonMarker.parentNode, selfActive);
 
   const v2 = {
     stateVersion: 2,
@@ -1030,7 +1031,87 @@ test('Row 21: special-condition overlay created from server condition word, remo
     them: { playerId: 'p2', zones: {} },
   };
   applyView(v2, [], { document: doc, getZone: mockGetZone });
-  assert.equal(img.specialCondition, null);
+  assert.equal(img.poisonMarker, null);
+});
+
+// Design 011 / audit A-1: Poison and Burn stack with the rotation condition, one marker each.
+test('Row 21: stacked conditions draw one marker each, stacked down the card, and clear independently', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfActive = doc.getElementById('selfMat').querySelector('#active');
+  const card = (extra) => ({ instanceId: 25, name: 'Pikachu', src: '/a.png', ...extra });
+
+  applyView(
+    {
+      stateVersion: 1,
+      you: { playerId: 'p1', zones: { active: [card({ specialCondition: 'Asleep', poisoned: true, burned: true })] } },
+      them: { playerId: 'p2', zones: {} },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  const img = getCardRegistry().get(25).element;
+  // The mock DOM has no layout; give the card a size so marker offsets are measurable.
+  img.getBoundingClientRect = () => ({ left: 0, top: 0, width: 90, height: 126 });
+  applyView(
+    {
+      stateVersion: 2,
+      you: { playerId: 'p1', zones: { active: [card({ specialCondition: 'Asleep', poisoned: true, burned: true })] } },
+      them: { playerId: 'p2', zones: {} },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  const markers = [img.specialCondition, img.poisonMarker, img.burnMarker];
+  assert.ok(markers.every(Boolean), 'rotation, poison and burn markers all exist');
+  assert.equal(markers.every((m) => m.parentNode === selfActive), true);
+  assert.equal(new Set(markers.map((m) => m.style.top)).size, 3, 'markers do not overlap');
+  const burnMarker = img.burnMarker;
+
+  applyView(
+    {
+      stateVersion: 3,
+      you: { playerId: 'p1', zones: { active: [card({ specialCondition: 'Asleep', poisoned: true })] } },
+      them: { playerId: 'p2', zones: {} },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  assert.equal(img.burnMarker, null);
+  assert.equal(selfActive.children.includes(burnMarker), false);
+  assert.ok(img.specialCondition);
+  assert.ok(img.poisonMarker);
+});
+
+// A window resize moves the card without a new view; the Poison/Burn markers must follow it
+// like the rotation marker does (repositionCardOverlays is the resize listener's handler).
+test('Row 21: resize re-positions the Poison and Burn markers, not only the rotation marker', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const view = {
+    stateVersion: 1,
+    you: {
+      playerId: 'p1',
+      zones: {
+        active: [{ instanceId: 26, name: 'Pikachu', src: '/a.png', specialCondition: 'Asleep', poisoned: true, burned: true }],
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  };
+  const options = { document: doc, getZone: mockGetZone };
+  applyView(view, [], options);
+  const img = getCardRegistry().get(26).element;
+  img.getBoundingClientRect = () => ({ left: 0, top: 0, width: 90, height: 126 });
+  applyView({ ...view, stateVersion: 2 }, [], options);
+  const tops = () => [img.specialCondition, img.poisonMarker, img.burnMarker].map((m) => m.style.top);
+  const before = tops();
+
+  img.getBoundingClientRect = () => ({ left: 0, top: 100, width: 150, height: 210 });
+  repositionCardOverlays();
+
+  const after = tops();
+  assert.equal(after.every((top, i) => top !== before[i]), true, `markers moved: ${before} -> ${after}`);
+  assert.equal(new Set(after).size, 3, 'markers still stacked without overlap');
+  assert.equal(img.poisonMarker.style.width, '50px');
+  assert.equal(img.burnMarker.style.width, '50px');
 });
 
 test('Row 21: overlays removed from the zone element when the card itself leaves the registry', () => {
@@ -1048,7 +1129,8 @@ test('Row 21: overlays removed from the zone element when the card itself leaves
             name: 'Pikachu',
             src: '/a.png',
             damage: 30,
-            specialCondition: 'Burned',
+            specialCondition: 'Asleep',
+            burned: true,
           },
         ],
       },
@@ -1060,8 +1142,10 @@ test('Row 21: overlays removed from the zone element when the card itself leaves
   const img = getCardRegistry().get(30).element;
   const damageCounter = img.damageCounter;
   const specialCondition = img.specialCondition;
+  const burnMarker = img.burnMarker;
   assert.equal(selfActive.children.includes(damageCounter), true);
   assert.equal(selfActive.children.includes(specialCondition), true);
+  assert.equal(selfActive.children.includes(burnMarker), true);
 
   // Card discarded: leaves the view entirely
   const v2 = {
@@ -1073,6 +1157,7 @@ test('Row 21: overlays removed from the zone element when the card itself leaves
 
   assert.equal(selfActive.children.includes(damageCounter), false);
   assert.equal(selfActive.children.includes(specialCondition), false);
+  assert.equal(selfActive.children.includes(burnMarker), false);
   assert.equal(getCardRegistry().has(30), false);
 });
 
@@ -1887,4 +1972,76 @@ test('stadium: reads upright for its owner and flipped for the opponent', () => 
 
   applyView(view(2, 'p1'), [], opts);
   assert.equal(doc.getElementById('stadium').style.transform, 'scaleX(1) scaleY(1)');
+});
+
+// A Knockout's prize pendingChoice opens the fly-up prize fan over this player's
+// server-drawn prize cards instead of the grid modal.
+const PRIZE_CHOICE = {
+  choiceId: 'choice_p1_prizes_7',
+  player: 'p1',
+  prompt: 'Choose a Prize card',
+  options: [{ instanceId: 101, name: '', src: '' }, { instanceId: 102, name: '', src: '' }],
+  min: 1,
+  max: 1,
+  resumeToken: { effectType: 'prizes', initiatorPlayerId: 'p1' },
+};
+
+const prizeView = (stateVersion, pendingChoice, zones = { prizes: [{ instanceId: 101 }, { instanceId: 102 }] }) => ({
+  stateVersion,
+  pendingChoice,
+  you: { playerId: 'p1', zones },
+  them: { playerId: 'p2', zones: {} },
+});
+
+test('prize choice: opens the prize picker over the prize cards once, and submits the chosen ids', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const choicePicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = { document: doc, getZone: mockGetZone, prizePicker, choicePicker, onResolveChoice: (sel) => resolved.push(sel) };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [], opts);
+  applyView(prizeView(2, PRIZE_CHOICE), [], opts);
+
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  assert.equal(choicePicker.opened.length, 0);
+  assert.equal(prizePicker.opened.length, 1, 're-applied view does not reopen the prize fan');
+  const request = prizePicker.opened[0];
+  assert.deepEqual(request.cards.map((c) => c.instanceId), [101, 102]);
+  assert.equal(request.cards[0].image, getCardRegistry().get(101).element);
+
+  await request.onResolve([102]);
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_prizes_7', selection: [102] }]);
+});
+
+test('prize choice: the fan closes when the choice passes to the opponent', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const prizePicker = fakeChoicePicker();
+  const opts = { document: doc, getZone: mockGetZone, prizePicker };
+
+  applyView(prizeView(1, PRIZE_CHOICE), [], opts);
+  applyView(prizeView(2, { ...PRIZE_CHOICE, player: 'p2' }), [], opts);
+  assert.equal(prizePicker.closed, 1);
+  assert.ok(doc.getElementById('netcodeChoiceBanner'));
+});
+
+test('prize choice: falls back to the choice modal when no prize picker is available', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  applyView(prizeView(1, PRIZE_CHOICE), [], { document: doc, getZone: mockGetZone });
+  assert.ok(doc.getElementById('netcodeChoiceModal'));
+});
+
+test('prize choice: a chosen prize hidden by the fan is shown again once it reaches the hand', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone, prizePicker: fakeChoicePicker() };
+  applyView(prizeView(1, PRIZE_CHOICE), [], opts);
+  const img = getCardRegistry().get(102).element;
+  img.classList.add('draw-flight-source');
+
+  applyView(
+    prizeView(2, null, { prizes: [{ instanceId: 101 }], hand: [{ instanceId: 102, name: 'Pikachu', src: '/p.png' }] }),
+    [],
+    opts
+  );
+  assert.equal(img.classList.contains('draw-flight-source'), false);
 });

@@ -37,6 +37,7 @@ from the comparison (owner-secret, O4-A/I5)
 client/src/setup/netcode/authoritative-dispatch.js — gated-action dispatch primitive (design 003
 slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAction injected, not
 imported. Fails open to the legacy body when a command cannot be translated (D12)
+client/src/setup/netcode/prize-picker-adapter.js — injected `prizePicker`: shows a server prize pendingChoice as the fly-up prize fan (actions/zones/prize-take-prompt.js, D46)
 client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
 resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
 server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles
@@ -44,6 +45,7 @@ server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
 shared/engine/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
+shared/engine/rules/special-conditions.mjs — server card conditions: rotation field + Poison/Burn marker keys (D45); every reducer/effect write goes through it
 shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
 shared/engine/rules/trainer-play-conditions.mjs — `trainerPlayBlockReason` (turn-1 Supporter, same Stadium, printed play conditions); used by reduce.mjs legality and the bot's e2e-options.mjs
 shared/engine/rules/evolved-pokemon.mjs — `evolvedView` (in-play Pokémon read as its top Evolution card), Rare Candy line tracing, Trainer target counts; used by reduce.mjs, trainer-steps.mjs, the bot

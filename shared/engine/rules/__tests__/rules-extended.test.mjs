@@ -329,7 +329,7 @@ import test from 'node:test';
       assert.equal(getStatus('self', 'c1').asleep, true);
     });
 
-    test('statusAllowsRetreat: only paralyzed blocks retreat; confused does not', () => {
+    test('statusAllowsRetreat: paralyzed and asleep block retreat; confused does not (A-3)', () => {
       resetStatuses();
       applyStatus('self', 'c1', 'paralyzed');
       assert.equal(statusAllowsRetreat('self', 'c1').can, false);
@@ -338,7 +338,7 @@ import test from 'node:test';
       assert.equal(statusAllowsRetreat('self', 'c2').can, true);
       resetStatuses();
       applyStatus('self', 'c3', 'asleep');
-      assert.equal(statusAllowsRetreat('self', 'c3').can, true);
+      assert.equal(statusAllowsRetreat('self', 'c3').can, false);
       // clean card always allowed
       assert.equal(statusAllowsRetreat('self', 'c4').can, true);
     });
@@ -399,13 +399,13 @@ import test from 'node:test';
       assert.equal(s2.paralyzed, undefined);
     });
 
-    test('mutual exclusion: damage family — newest wins', () => {
+    test('poisoned and burned coexist (A-2)', () => {
       resetStatuses();
       applyStatus('self', 'c1', 'poisoned');
       applyStatus('self', 'c1', 'burned');
       const s = getStatus('self', 'c1');
       assert.equal(s.burned, true);
-      assert.equal(s.poisoned, undefined);
+      assert.equal(s.poisoned, true);
     });
 
     test('cross-family: turn-skip + damage can coexist', () => {

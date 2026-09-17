@@ -195,6 +195,25 @@ export class GameRoom {
    *   broadcasts?: Array<{ socketId: string, playerId: string|null, view: object }>
    * }}
    */
+  handleClientCommand(socketId, cmd = {}) {
+    // Audit A-9: dedupe keys on clientSeq, so a socket command without one would skip
+    // dedupe entirely. Every real client stamps one (cmd-emitter.js); server-internal
+    // calls (setup, loadDeck, shadow) go through handleCommand directly.
+    if (!Number.isInteger(cmd?.clientSeq) || cmd.clientSeq < 0) {
+      return {
+        success: false,
+        error: 'bad_command',
+        reason: 'clientSeq must be a non-negative integer',
+        clientSeq: cmd?.clientSeq,
+      };
+    }
+    return this.handleCommand(socketId, cmd);
+  }
+
+  /**
+   * Executes a command for the socket's player: dedupes by clientSeq when present,
+   * runs applyCommand, and assembles redacted broadcasts.
+   */
   handleCommand(socketId, cmd = {}) {
     this.touchActivity();
     const playerId = this.socketToPlayer.get(socketId);

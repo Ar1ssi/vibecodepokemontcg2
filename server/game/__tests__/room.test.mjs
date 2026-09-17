@@ -468,3 +468,30 @@ test('seed: GameRoom initializes with a fresh seed and resetGame generates a new
   assert.notDeepEqual(game1P1Hand, game2P1Hand, 'Hands drawn in game 2 should have different card order than game 1');
 });
 
+// Audit A-9: a socket command without a numeric clientSeq used to bypass dedupe, so a
+// replayed packet executed twice.
+test('GameRoom: A-9 - socket commands without an integer clientSeq are rejected', () => {
+  for (const clientSeq of [undefined, '1', -1, 1.5]) {
+    const room = new GameRoom({ roomId: 'test-room-a9', rulesEnabled: false });
+    room.addPlayer('socket-ash', 'p1', 'Ash');
+    room.state.players.p1.zones.hand.push(createCard({ instanceId: 10, name: 'Pikachu' }));
+    const res = room.handleClientCommand('socket-ash', {
+      type: 'moveCard',
+      payload: { instanceId: 10, from: 'hand', to: 'bench' },
+      clientSeq,
+    });
+    assert.equal(res.success, false, `clientSeq ${String(clientSeq)}`);
+    assert.equal(res.error, 'bad_command');
+    assert.equal(room.state.players.p1.zones.bench.length, 0);
+  }
+});
+
+test('GameRoom: A-9 - a replayed socket command is deduped, not executed twice', () => {
+  const room = new GameRoom({ roomId: 'test-room-a9b', rulesEnabled: false });
+  room.addPlayer('socket-ash', 'p1', 'Ash');
+  room.state.players.p1.zones.hand.push(createCard({ instanceId: 10, name: 'Pikachu' }));
+  const cmd = { type: 'moveCard', payload: { instanceId: 10, from: 'hand', to: 'bench' }, clientSeq: 1 };
+  assert.equal(room.handleClientCommand('socket-ash', cmd).dedupe, false);
+  assert.equal(room.handleClientCommand('socket-ash', cmd).dedupe, true);
+  assert.equal(room.state.stateVersion, 1);
+});

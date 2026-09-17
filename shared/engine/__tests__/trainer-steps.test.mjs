@@ -510,7 +510,7 @@ test("searchAttachEach (Janine's Secret Art): energy per chosen Darkness Pokémo
   const { res } = play(game, "Choose up to 2 of your {D} Pokémon. For each of those Pokémon, search your deck for a Basic {D} Energy card and attach it to that Pokémon. Then, shuffle your deck. If you attached Energy to your Active Pokémon in this way, it is now Poisoned.", { trainerType: 'Supporter' });
   assert.deepEqual(ids(res.pendingChoice.options).sort(), [active.instanceId, benched.instanceId].sort());
   const done = resolve(game, res, [active.instanceId, benched.instanceId]);
-  assert.equal(zone(done, 'p1', 'active')[0].specialCondition, 'Poisoned');
+  assert.equal(zone(done, 'p1', 'active')[0].poisoned, true);
   assert.equal(zone(done, 'p1', 'deck').length, 0);
 });
 

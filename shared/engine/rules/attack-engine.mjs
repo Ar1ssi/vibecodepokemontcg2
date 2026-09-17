@@ -9,13 +9,15 @@ import { effectiveHp } from './stadium-effects.mjs';
     // or +20/+30 flat; TCGdex gives us { type, value } where value is the
     // multiplier (2) or flat bonus (20/30).
     export function computeAttackDamage(attacker, defender, attack) {
-      const base = attack.damage ?? 0;
+      // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
+      // string yields NaN, which makes the defender un-KO-able (audit A-4).
+      const base = parseInt(attack?.damage, 10) || 0;
     
       let multiplier = 1;
       let flat = 0;
       if (attacker?.types?.length && defender?.weakness) {
-        const atkType = attacker.types[0];
-        if (defender.weakness.type === atkType) {
+        // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
+        if (attacker.types.includes(defender.weakness.type)) {
           const v = defender.weakness.value;
           if (v <= 2) {
             multiplier = Math.max(1, v);      // modern weakness: ×2 (or ×1)
@@ -27,8 +29,7 @@ import { effectiveHp } from './stadium-effects.mjs';
     
       let resistance = 0;
       if (attacker?.types?.length && defender?.resistance) {
-        const atkType = attacker.types[0];
-        if (defender.resistance.type === atkType) {
+        if (attacker.types.includes(defender.resistance.type)) {
           resistance = Math.abs(defender.resistance.value || 0);
         }
       }

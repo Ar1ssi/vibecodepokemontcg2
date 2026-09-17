@@ -25,11 +25,20 @@ import { drawCount } from './rules/damage-parser.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
+import { createPendingChoice } from './effects/executor.mjs';
 import { executeStadium } from './effects/stadium.mjs';
 import { parseStadiumOncePerTurn, isStadiumCard } from './rules/stadium-effects.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import { evolvedView, trainerTargetCounts, ownedCards } from './rules/evolved-pokemon.mjs';
+import {
+  addCondition,
+  removeCondition,
+  clearConditions,
+  hasCondition,
+  hasAnyCondition,
+  listConditions,
+} from './rules/special-conditions.mjs';
 
 // An in-play Pokémon as its top evolution card (see evolved-pokemon.mjs). Read-only.
 function inPlayView(state, card) {
@@ -41,7 +50,9 @@ function inPlayView(state, card) {
 
 /**
  * Handles Knockout resolution for a Pokemon:
- * - Awards prize cards to attacker
+ * - Grants the attacker a prize entitlement, settled by collectPrizeEntitlement
+ *   when the command finishes (audit finding B-1: the grant, not a client-supplied
+ *   count, is what authorises a prize card changing hands)
  * - Discards victim and its attached cards
  * - Auto-promotes first benched Pokemon to active (if any)
  * - Checks win conditions
@@ -51,18 +62,12 @@ function handleKnockout(
   { victimPlayerId, attackerPlayerId, victim, events }
 ) {
   const prizeCount = prizesForKO(inPlayView(draft, victim));
-  const attackerPrizes = draft.players[attackerPlayerId]?.zones?.prizes || [];
-  const attackerHand = draft.players[attackerPlayerId]?.zones?.hand || [];
-  const actualPrizes = Math.min(prizeCount, attackerPrizes.length);
-  const taken = attackerPrizes.splice(0, actualPrizes);
-  attackerHand.push(...taken);
-
-  events.push({
-    type: 'prizesTaken',
-    playerId: attackerPlayerId,
-    count: actualPrizes,
-    cards: taken.map((c) => ({ instanceId: c.instanceId })),
-  });
+  const attacker = draft.players[attackerPlayerId];
+  const attackerPrizes = attacker?.zones?.prizes || [];
+  if (attacker) {
+    if (!attacker.flags) attacker.flags = {};
+    attacker.flags.prizesOwed = (attacker.flags.prizesOwed || 0) + prizeCount;
+  }
 
   // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
@@ -98,7 +103,7 @@ function handleKnockout(
       ) {
         targetZone.splice(i, 1);
         c.damage = 0;
-        c.specialCondition = null;
+        clearConditions(c);
         c.attachedTo = null;
         victimDiscard.push(c);
       }
@@ -135,8 +140,10 @@ function handleKnockout(
     }
   }
 
-  // Win condition checks
-  if (attackerPrizes.length === 0) {
+  // Win condition checks. An entitlement covering every remaining prize is the win
+  // condition even though the cards only reach hand when the command settles, and it
+  // must be reported ahead of the victim's no-Pokémon loss.
+  if (attackerPrizes.length <= (attacker?.flags?.prizesOwed || 0)) {
     setGameEnded(draft, {
       winner: attackerPlayerId,
       reason: 'all prize cards taken',
@@ -156,7 +163,8 @@ function handleKnockout(
 }
 
 /**
- * Resolves Pokémon Checkup between turns:
+ * Resolves Pokémon Checkup between turns, applying every condition the Active holds
+ * in this order, then checking for a Knockout once:
  * - Poison: 10 damage
  * - Burn: 20 damage + 50% cure flip
  * - Asleep: 50% cure flip
@@ -169,79 +177,181 @@ function resolveCheckup(
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
     const active = player.zones?.active?.find((c) => !c.attachedTo);
-    if (!active || !active.specialCondition) continue;
+    if (!active || !hasAnyCondition(active)) continue;
 
-    if (active.specialCondition === 'Poisoned') {
-      active.damage = (active.damage || 0) + 10;
+    // Every condition resolves, in rules order, and the Knockout check runs once after
+    // all Checkup damage (audit A-1: this used to be an else-if chain over one string).
+    const flip = () => ((rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails');
+    const cleared = (condition) => {
+      removeCondition(active, condition);
+      events.push({
+        type: 'statusCleared',
+        condition,
+        instanceId: active.instanceId,
+        playerId: pid,
+      });
+    };
+    const checkupDamage = (condition, damage) => {
+      active.damage = (active.damage || 0) + damage;
       events.push({
         type: 'checkupDamage',
         instanceId: active.instanceId,
-        condition: 'Poisoned',
-        damage: 10,
+        condition,
+        damage,
         playerId: pid,
       });
-      const activeHp = inPlayView(draft, active).hp;
-      if (activeHp && active.damage >= activeHp) {
-        const oppId = Object.keys(draft.players).find((id) => id !== pid);
-        handleKnockout(draft, {
-          victimPlayerId: pid,
-          attackerPlayerId: oppId,
-          victim: active,
-          events,
-        });
-      }
-    } else if (active.specialCondition === 'Burned') {
-      active.damage = (active.damage || 0) + 20;
-      events.push({
-        type: 'checkupDamage',
-        instanceId: active.instanceId,
-        condition: 'Burned',
-        damage: 20,
-        playerId: pid,
-      });
-      const coin = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
-      if (coin === 'heads') {
-        active.specialCondition = null;
-        events.push({
-          type: 'statusCleared',
-          condition: 'Burned',
-          instanceId: active.instanceId,
-          playerId: pid,
-        });
-      }
-      const activeHp = inPlayView(draft, active).hp;
-      if (activeHp && active.damage >= activeHp) {
-        const oppId = Object.keys(draft.players).find((id) => id !== pid);
-        handleKnockout(draft, {
-          victimPlayerId: pid,
-          attackerPlayerId: oppId,
-          victim: active,
-          events,
-        });
-      }
-    } else if (active.specialCondition === 'Asleep') {
-      const coin = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
-      if (coin === 'heads') {
-        active.specialCondition = null;
-        events.push({
-          type: 'statusCleared',
-          condition: 'Asleep',
-          instanceId: active.instanceId,
-          playerId: pid,
-        });
-      }
-    } else if (active.specialCondition === 'Paralyzed') {
-      // Under official Pokémon TCG rules, Paralysis is only cured at the end of that player's turn.
-      if (!endingPlayerId || pid === endingPlayerId) {
-        active.specialCondition = null;
-        events.push({
-          type: 'statusCleared',
-          condition: 'Paralyzed',
-          instanceId: active.instanceId,
-          playerId: pid,
-        });
-      }
+    };
+
+    if (hasCondition(active, 'Poisoned')) {
+      checkupDamage('Poisoned', 10);
     }
+    if (hasCondition(active, 'Burned')) {
+      checkupDamage('Burned', 20);
+      if (flip() === 'heads') cleared('Burned');
+    }
+    if (hasCondition(active, 'Asleep')) {
+      if (flip() === 'heads') cleared('Asleep');
+    }
+    // Under official Pokémon TCG rules, Paralysis is only cured at the end of that player's turn.
+    if (
+      hasCondition(active, 'Paralyzed') &&
+      (!endingPlayerId || pid === endingPlayerId)
+    ) {
+      cleared('Paralyzed');
+    }
+
+    const activeHp = inPlayView(draft, active).hp;
+    if (activeHp && active.damage >= activeHp) {
+      const oppId = Object.keys(draft.players).find((id) => id !== pid);
+      handleKnockout(draft, {
+        victimPlayerId: pid,
+        attackerPlayerId: oppId,
+        victim: active,
+        events,
+      });
+    }
+  }
+}
+
+/**
+ * Collects a player's outstanding prize entitlement (flags.prizesOwed, granted by
+ * handleKnockout) into their hand, so a Knockout can never leave prizes stranded.
+ * takePrizes is the only other consumer of the entitlement, and it can only redeem
+ * what handleKnockout granted — never prizes the game did not award. Win conditions
+ * are not evaluated here; handleKnockout owns that check.
+ */
+function collectPrizeEntitlement(draft, { playerId, events }) {
+  const player = draft.players?.[playerId];
+  const owed = player?.flags?.prizesOwed || 0;
+  if (owed <= 0) return;
+
+  const prizes = player.zones.prizes;
+  const actualCount = Math.min(owed, prizes.length);
+  const taken = prizes.splice(0, actualCount);
+  player.zones.hand.push(...taken);
+  // Drop the key rather than leaving a zeroed one behind, so a fully settled state
+  // is byte-identical to one that never saw a Knockout (views and the state hash
+  // both carry player.flags verbatim).
+  if (owed - actualCount > 0) {
+    player.flags.prizesOwed = owed - actualCount;
+  } else {
+    delete player.flags.prizesOwed;
+  }
+
+  events.push({
+    type: 'prizesTaken',
+    playerId,
+    count: actualCount,
+    cards: taken.map((c) => ({ instanceId: c.instanceId })),
+  });
+}
+
+function conditionsUpdatedEvent(card, condition) {
+  return {
+    type: 'specialConditionUpdated',
+    instanceId: card.instanceId,
+    condition,
+    conditions: listConditions(card),
+  };
+}
+
+function consumePrizeEntitlement(player, count) {
+  if (!player.flags?.prizesOwed) return;
+  const remainingOwed = Math.max(0, player.flags.prizesOwed - count);
+  if (remainingOwed > 0) player.flags.prizesOwed = remainingOwed;
+  else delete player.flags.prizesOwed;
+}
+
+function isZoneIndex(index, zone) {
+  return Number.isInteger(index) && index >= 0 && index < zone.length;
+}
+
+const PRIZE_CHOICE_EFFECT = 'prizes';
+
+/**
+ * Settles prize entitlements once a command has finished. While the game is still
+ * running, the first player owed prizes gets a pendingChoice over their face-down prize
+ * cards (the whole game waits on it, like TCG Live); a second owed player gets theirs
+ * after the first resolves. Once the game has ended nobody is left to wait for, so
+ * everything owed is collected directly.
+ */
+function settlePrizeEntitlements(draft, { events }) {
+  const owedPlayerIds = Object.keys(draft.players || {}).filter(
+    (pid) => (draft.players[pid].flags?.prizesOwed || 0) > 0
+  );
+  if (owedPlayerIds.length === 0) return;
+
+  if (draft.turn?.phase === 'ended') {
+    for (const pid of owedPlayerIds) collectPrizeEntitlement(draft, { playerId: pid, events });
+    return;
+  }
+  if (draft.pendingChoice) return;
+
+  const playerId = owedPlayerIds[0];
+  const player = draft.players[playerId];
+  const prizes = player.zones.prizes || [];
+  const count = Math.min(player.flags.prizesOwed, prizes.length);
+  if (count === prizes.length) {
+    // Every remaining prize is owed: there is nothing to choose between.
+    collectPrizeEntitlement(draft, { playerId, events });
+    settlePrizeEntitlements(draft, { events });
+    return;
+  }
+
+  draft.pendingChoice = createPendingChoice({
+    choiceId: `choice_${playerId}_prizes_${(draft.stateVersion || 0) + 1}`,
+    player: playerId,
+    prompt: count === 1 ? 'Choose a Prize card' : `Choose ${count} Prize cards`,
+    source: 'Prize cards',
+    // Identity only: prizes are face down, so the chooser never sees names or art.
+    options: prizes.map((card) => ({ instanceId: card.instanceId })),
+    min: count,
+    max: count,
+    stateVersion: draft.stateVersion || 0,
+    resumeToken: { effectType: PRIZE_CHOICE_EFFECT, initiatorPlayerId: playerId },
+  });
+  events.push({ type: 'prizeChoiceRequested', playerId, count });
+}
+
+function resolvePrizeChoice(draft, { playerId, selection, events }) {
+  const player = draft.players[playerId];
+  const prizes = player.zones.prizes;
+  const chosenIds = new Set(selection);
+  const taken = prizes.filter((card) => chosenIds.has(card.instanceId));
+  player.zones.prizes = prizes.filter((card) => !chosenIds.has(card.instanceId));
+  player.zones.hand.push(...taken);
+  consumePrizeEntitlement(player, taken.length);
+  draft.pendingChoice = null;
+
+  events.push({
+    type: 'prizesTaken',
+    playerId,
+    count: taken.length,
+    cards: taken.map((c) => ({ instanceId: c.instanceId })),
+  });
+
+  if (player.zones.prizes.length === 0) {
+    setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
   }
 }
 
@@ -249,6 +359,11 @@ function resolveCheckup(
  * Advances the turn to the next player, reset flags, and performs start-of-turn draw.
  */
 function advanceTurn(draft, { nextPlayerId, events }) {
+  // The flags object is replaced wholesale below; a Checkup Knockout may have just
+  // entitled the incoming player, and that entitlement must survive the reset so the
+  // prize choice raised at the end of the command can be settled.
+  const prizesOwed = draft.players[nextPlayerId].flags?.prizesOwed;
+
   draft.turn.player = nextPlayerId;
   draft.turn.number = (draft.turn.number || 1) + 1;
   draft.turn.phase = 'main';
@@ -263,6 +378,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     supporterPlayed: false,
     stadiumUsedThisTurn: false,
     abilitiesUsed: {},
+    ...(prizesOwed ? { prizesOwed } : {}),
   };
 
   // Reset once-per-turn ability markers on in-play Pokemon
@@ -413,7 +529,7 @@ function validateReferences(state, command) {
       }
       if (payload?.benchInstanceId != null) {
         const benchCard = state.players?.[playerId]?.zones?.bench?.find(
-          (c) => c.instanceId === payload.benchInstanceId
+          (c) => c.instanceId === payload.benchInstanceId && !c.attachedTo
         );
         if (!benchCard) {
           return { valid: false, error: 'stale_view' };
@@ -435,7 +551,7 @@ function validateReferences(state, command) {
 
     case 'promote': {
       const benchCard = state.players?.[playerId]?.zones?.bench?.find(
-        (c) => c.instanceId === payload?.instanceId
+        (c) => c.instanceId === payload?.instanceId && !c.attachedTo
       );
       if (!benchCard) {
         return { valid: false, error: 'stale_view' };
@@ -454,7 +570,10 @@ function validateReferences(state, command) {
       const prizes = state.players?.[playerId]?.zones?.prizes || [];
       if (
         !Array.isArray(payload?.indices) ||
-        payload.indices.some((idx) => idx >= prizes.length)
+        payload.indices.some(
+          (idx) => !Number.isInteger(idx) || idx < 0 || idx >= prizes.length
+        ) ||
+        new Set(payload.indices).size !== payload.indices.length
       ) {
         return { valid: false, error: 'stale_view' };
       }
@@ -517,7 +636,7 @@ function validateReferences(state, command) {
     case 'moveToDeckTop':
     case 'switchWithDeckTop': {
       const zone = state.players?.[playerId]?.zones?.[payload.from];
-      if (!Array.isArray(zone) || payload.index >= zone.length) {
+      if (!Array.isArray(zone) || !isZoneIndex(payload.index, zone)) {
         return { valid: false, error: 'stale_view' };
       }
       return { valid: true };
@@ -527,7 +646,7 @@ function validateReferences(state, command) {
     case 'revealShortcut':
     case 'hideShortcut': {
       const zone = state.players?.[playerId]?.zones?.[payload?.zoneId];
-      if (!Array.isArray(zone) || payload.index >= zone.length) {
+      if (!Array.isArray(zone) || !isZoneIndex(payload.index, zone)) {
         return { valid: false, error: 'stale_view' };
       }
       return { valid: true };
@@ -607,8 +726,22 @@ export function validateLegality(state, command) {
       'draw',
       'playTrainer',
       'useAbility',
+      'takePrizes',
+      'takePrizesByIndex',
       'stadium-effect',
       'useVStarGX',
+      // Audit B-2/B-2c: manual counters and conditions are the turn player's tools;
+      // off-turn they let the opponent damage, heal or Paralyze at will.
+      'addDamageCounter',
+      'updateDamageCounter',
+      'removeDamageCounter',
+      'addSpecialCondition',
+      'updateSpecialCondition',
+      'removeSpecialCondition',
+      // Audit A-7: deck-order mutations.
+      'shuffleIntoDeck',
+      'moveToDeckTop',
+      'switchWithDeckTop',
     ].includes(type)
   ) {
     if (state.turn?.player && state.turn.player !== playerId) {
@@ -764,10 +897,27 @@ export function validateLegality(state, command) {
         return { allowed: false, reason: 'No bench Pokémon to retreat to.' };
       }
       const retreatCostN = getRetreatCostCount(inPlayView(state, active));
+      const chosenIds = Array.isArray(payload?.discardEnergyIds)
+        ? payload.discardEnergyIds
+        : [];
+      if (new Set(chosenIds).size !== chosenIds.length) {
+        return { allowed: false, reason: 'Duplicate Energy chosen to discard.' };
+      }
       if (retreatCostN > 0) {
+        // Audit B-4: an explicit discard list is what gets paid, so it — not every
+        // attached Energy — is what must cover the cost.
         const attached = (player.zones?.active || []).filter(
-          (c) => c.attachedTo === active.instanceId && isEnergy(c)
+          (c) =>
+            c.attachedTo === active.instanceId &&
+            isEnergy(c) &&
+            (chosenIds.length === 0 || chosenIds.includes(c.instanceId))
         );
+        if (attached.length !== chosenIds.length && chosenIds.length > 0) {
+          return {
+            allowed: false,
+            reason: 'Only attached Energy can be discarded to retreat.',
+          };
+        }
         const costSymbols = new Array(retreatCostN).fill('Colorless');
         if (
           !canPayAttackCost(
@@ -799,6 +949,16 @@ export function validateLegality(state, command) {
 
     case 'takePrizes': {
       const count = payload?.count ?? 1;
+      const owed = player.flags?.prizesOwed || 0;
+      if (!Number.isInteger(count) || count < 1) {
+        return { allowed: false, reason: 'Invalid prize count.' };
+      }
+      if (count > owed) {
+        return {
+          allowed: false,
+          reason: 'No Knockout has awarded you that many prize cards.',
+        };
+      }
       if ((player.zones?.prizes?.length || 0) < count) {
         return { allowed: false, reason: 'Not enough prize cards left.' };
       }
@@ -806,9 +966,14 @@ export function validateLegality(state, command) {
     }
 
     case 'takePrizesByIndex': {
-      if (
-        (player.zones?.prizes?.length || 0) < (payload?.indices?.length || 0)
-      ) {
+      const count = payload?.indices?.length || 0;
+      if (count > (player.flags?.prizesOwed || 0)) {
+        return {
+          allowed: false,
+          reason: 'No Knockout has awarded you that many prize cards.',
+        };
+      }
+      if ((player.zones?.prizes?.length || 0) < count) {
         return { allowed: false, reason: 'Not enough prize cards left.' };
       }
       return { allowed: true };
@@ -1254,12 +1419,8 @@ export function applyCommand(state, command, rng = null) {
     case 'addSpecialCondition': {
       const cardRef = findCard(draft, payload.instanceId);
       if (cardRef) {
-        cardRef.card.specialCondition = payload.condition;
-        events.push({
-          type: 'specialConditionUpdated',
-          instanceId: payload.instanceId,
-          condition: cardRef.card.specialCondition,
-        });
+        addCondition(cardRef.card, payload.condition);
+        events.push(conditionsUpdatedEvent(cardRef.card, payload.condition));
       }
       break;
     }
@@ -1267,12 +1428,9 @@ export function applyCommand(state, command, rng = null) {
     case 'updateSpecialCondition': {
       const cardRef = findCard(draft, payload.instanceId);
       if (cardRef) {
-        cardRef.card.specialCondition = payload.condition;
-        events.push({
-          type: 'specialConditionUpdated',
-          instanceId: payload.instanceId,
-          condition: cardRef.card.specialCondition,
-        });
+        if (payload.condition == null) clearConditions(cardRef.card);
+        else addCondition(cardRef.card, payload.condition);
+        events.push(conditionsUpdatedEvent(cardRef.card, payload.condition ?? null));
       }
       break;
     }
@@ -1280,12 +1438,10 @@ export function applyCommand(state, command, rng = null) {
     case 'removeSpecialCondition': {
       const cardRef = findCard(draft, payload.instanceId);
       if (cardRef) {
-        cardRef.card.specialCondition = null;
-        events.push({
-          type: 'specialConditionUpdated',
-          instanceId: payload.instanceId,
-          condition: null,
-        });
+        // A named condition removes only that one; no name clears them all.
+        if (payload.condition) removeCondition(cardRef.card, payload.condition);
+        else clearConditions(cardRef.card);
+        events.push(conditionsUpdatedEvent(cardRef.card, null));
       }
       break;
     }
@@ -1562,7 +1718,7 @@ export function applyCommand(state, command, rng = null) {
           }
         }
 
-        active.specialCondition = null;
+        clearConditions(active);
         if (!player.flags) player.flags = {};
         player.flags.retreatedThisTurn = true;
 
@@ -1594,11 +1750,13 @@ export function applyCommand(state, command, rng = null) {
 
     case 'takePrizes': {
       const count = payload?.count ?? 1;
-      const prizes = draft.players[playerId].zones.prizes;
-      const hand = draft.players[playerId].zones.hand;
+      const player = draft.players[playerId];
+      const prizes = player.zones.prizes;
+      const hand = player.zones.hand;
       const actualCount = Math.min(count, prizes.length);
       const drawnPrizes = prizes.splice(0, actualCount);
       hand.push(...drawnPrizes);
+      consumePrizeEntitlement(player, actualCount);
 
       events.push({
         type: 'prizesTaken',
@@ -1630,6 +1788,7 @@ export function applyCommand(state, command, rng = null) {
           hand.push(card);
         }
       }
+      consumePrizeEntitlement(draft.players[playerId], taken.length);
 
       events.push({
         type: 'prizesTaken',
@@ -1752,6 +1911,12 @@ export function applyCommand(state, command, rng = null) {
           events,
           selection: payload.selection,
           resumeToken: token,
+        });
+      } else if (token.effectType === PRIZE_CHOICE_EFFECT) {
+        resolvePrizeChoice(draft, {
+          playerId: initiatorPlayerId,
+          selection: payload.selection || [],
+          events,
         });
       } else if (token.effectType === 'stadium') {
         executeStadium(draft, {
@@ -2285,6 +2450,8 @@ export function applyCommand(state, command, rng = null) {
     default:
       break;
   }
+
+  settlePrizeEntitlements(draft, { events });
 
   // Advance state version and append to commandLog
   draft.stateVersion = (state.stateVersion || 0) + 1;
