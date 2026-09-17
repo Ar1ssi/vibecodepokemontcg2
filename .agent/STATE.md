@@ -4,10 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 152
+Session: 153
 Focus: multiplayer render parity with single-player (apply-view.js): holo, stacks/evolutions, tokens, rotation, ability tab, counts, VSTAR/GX, Stadium flip, picker.
-Active: none. Branch fix/mp-render-holo-energy-picker (worktree ../wt-mp-render), committed, not pushed.
-Next: maintenance due (S150). user live-checks a SERVER_AUTHORITATIVE 2P game (holo, evolve stack, Tool/Energy layout + double-click carousel,
+Active: none. Branch claude/admiring-faraday-j1nyja: fixed hydrateHolo's id-resolution starvation (patch, see journal S153).
+Next: maintenance due (S150, still owed). user live-checks a SERVER_AUTHORITATIVE 2P game (holo, evolve stack, Tool/Energy layout + double-click carousel,
   rotation, ability tab, counts, VSTAR/GX, Stadium flip, Nest Ball picker); then push + PR. Pre-existing fail on main: "trainer drop: stays a plain move
   when promotion does not apply". Then I47. Owed: test for changeCardBack/applySleeveToPlaymat stale-image patch.
 Blocked: none.
@@ -28,6 +28,7 @@ Blocked: none.
 - Evolutions stay attached under the Basic: read HP/attacks/stats through evolvedView (D40), write damage to the root.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S153 2026-09-17 patch: hydrateHolo's ensureCardData() call dropped card.image/set/number, so id resolution
+  fell back to fuzzy name search and often failed silently -> no holo. Pass them through.
 - S150 2026-09-17 debug: MP discard cover blew up over prizes (#discardCover id rule hit the img); resetImage on covers.
 - S149 2026-09-17 feature: MP evolution stacks, Tool offsets, rotation, ability tab, zone counts, VSTAR/GX, Stadium flip, overlay resize (branch).
-- S148 2026-09-16 feature: MP holo / Energy tokens / card-picker choices in apply-view.js (branch, unpushed).

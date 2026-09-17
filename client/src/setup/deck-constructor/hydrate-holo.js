@@ -67,7 +67,14 @@ export function hydrateHolo(card) {
   const pending = pendingHydrations.get(card);
   if (pending) return pending;
 
-  const promise = ensureCardData({ name: card.name, type: card.type })
+  const promise = ensureCardData({
+    id: card.id,
+    name: card.name,
+    type: card.type,
+    set: card.set,
+    number: card.number,
+    image: card.image,
+  })
     .then((data) => {
       if (!card.image.isConnected || isCardHidden(card)) {
         hydrated.delete(card);
