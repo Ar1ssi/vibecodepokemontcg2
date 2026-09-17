@@ -167,6 +167,16 @@ export const moveCard = async (
       );
       return { destZoneId, ok: false };
     }
+    const isEnergy = cardType === 'energy' || subtypes.includes('energy');
+    if (isEnergy) {
+      appendMessage(
+        user,
+        `⛔ ${movingCard.name}: Energy cards must be attached to a Pokémon, not placed on an empty Bench slot.`,
+        'announcement',
+        false
+      );
+      return { destZoneId, ok: false };
+    }
   }
 
   // Stadium Trainers belong on the dedicated left-side field, not the play board.
