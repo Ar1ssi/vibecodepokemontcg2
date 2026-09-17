@@ -4,11 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 172
-Focus: I57 — discard-pile viewer restored under server authority (follow-up to design 012).
-Active: none. Work is committed on branch `fix/netcode-dropped-features` in worktree ../vibe-netcode-gaps.
-Next: user reviews/merges the branch (nothing pushed). Then I56 (keybinds c/z/e/q on server cards).
-  Then audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
+Session: 173
+Focus: design 013 — Grand Tree search-evolve implemented in the server engine (D50).
+Active: none. Work is on branch `fix/grand-tree-server-evolve` in worktree ../vibe-grandtree-server (PR open).
+Next: user manually verifies Grand Tree in a live 2P game. Then I59 (server has no evolution timing),
+  I58 (unimplemented stadium kinds), I56 (keybinds c/z/e/q on server cards), then audit lows
+  A-6/A-10, I28 holo/mat sizing. maintenance due.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -17,6 +18,9 @@ Blocked: none.
   read `getAuthoritativeZoneArray(side, zone)` / the `cardRegistry` and address cards by instanceId (D12, D47).
 - Board cards live INSIDE the `selfContainer`/`oppContainer` playmat iframes (separate documents that load only
   self-/opp-containers.css + its @imported partials; index.css never reaches them). Stadium is the exception.
+- Anything the legacy client does in `chat-buttons.js` for a `server_command` action (stadium, attack,
+  retreat, abilities) is DEAD under the flag — the dispatch gate returns first. Fix such cards in
+  `shared/engine/`, not in the client (D50).
 - Netcode: test under `SERVER_AUTHORITATIVE=1` only (S137). Pick a free PORT — other sessions hold :4000/:4317.
   Live 2P probe harness: `.agent/scratch/probe.mjs <step-file>` (Playwright, joins a room, deals, runs a step module).
 - `pnpm test` is an explicit file list — a new test file runs only once added to package.json. `pnpm lint` fails
@@ -25,6 +29,6 @@ Blocked: none.
   are turn-player-only in rules mode. Pre-existing failing test: "trainer drop: a Trainer without synced effect text".
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
+- S173 2026-09-18 feature: Grand Tree search-evolve + Stage 2 chain in the server engine (design 013, D50).
 - S172 2026-09-18 patch: I57 discard-pile viewer reads the authoritative discard.
-- S170 2026-09-17 feature: prize picker restored under server authority (D46).
+- S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
