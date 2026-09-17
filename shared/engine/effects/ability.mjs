@@ -66,7 +66,9 @@ export function executeAbility(draft, {
   card.abilityUsed = true;
   if (!player.flags) player.flags = {};
   if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
-  player.flags.abilitiesUsed[card.name || card.instanceId] = true;
+  // instanceId first: two Pokémon sharing a name must not share one used-flag
+  // slot, or using one blocks the other's separate ability (I48).
+  player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
 
   events.push({
     type: 'abilityUsed',

@@ -54,7 +54,7 @@ test('ability: activating draw ability (e.g. Kirlia Refinement / Bibarel Indomit
   assert.equal(res.error, null);
   assert.equal(res.state.players.p1.zones.hand.length, 2);
   assert.equal(res.state.players.p1.zones.bench[0].abilityUsed, true);
-  assert.equal(res.state.players.p1.flags.abilitiesUsed.Kirlia, true);
+  assert.equal(res.state.players.p1.flags.abilitiesUsed[10], true);
 
   // Attempting second use in same turn should be rejected
   const res2 = applyCommand(res.state, {
@@ -111,4 +111,48 @@ test('ability: activating search ability prompts choice and resumes', () => {
   assert.equal(res2.pendingChoice, null);
   assert.equal(res2.state.players.p1.zones.hand.length, 1);
   assert.equal(res2.state.players.p1.zones.hand[0].instanceId, 50);
+});
+
+test('ability: two Pokémon sharing a name track "used" independently (I48)', () => {
+  const { state, rng } = setupGame();
+  const makeKirlia = (instanceId) => createCard({
+    instanceId,
+    name: 'Kirlia',
+    hp: 80,
+    supertype: 'Pokémon',
+    abilityText: 'Refinement: Once during your turn, you may draw 2 cards.',
+    abilities: [
+      {
+        name: 'Refinement',
+        type: 'Ability',
+        text: 'Refinement: Once during your turn, you may draw 2 cards.',
+      },
+    ],
+  });
+  const kirliaA = makeKirlia(10);
+  const kirliaB = makeKirlia(11);
+  state.players.p1.zones.active.push(kirliaA);
+  state.players.p1.zones.bench.push(kirliaB);
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 101 }),
+    createCard({ instanceId: 102 }),
+    createCard({ instanceId: 103 }),
+    createCard({ instanceId: 104 })
+  );
+
+  const res1 = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 10 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res1.error, null);
+
+  // Using kirliaA's ability must not block kirliaB's separate copy.
+  const res2 = applyCommand(res1.state, {
+    type: 'useAbility',
+    payload: { instanceId: 11 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.state.players.p1.zones.hand.length, 4);
 });

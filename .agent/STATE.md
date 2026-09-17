@@ -1,10 +1,12 @@
-Session: 161
-Focus: Drag-to-retreat bugfix (dZoneId mis-resolution) shipped. PR #143's owed verification pass (pnpm
+Session: 162
+Focus: Ability-used flag name-key collision fixed (I48). PR #143's owed verification pass (pnpm
   test/lint + 2P rules-mode browser walk) is still the next real chore — node/pnpm now work here.
-Active: none — S161 patch complete and tested (pnpm test green modulo 1 pre-existing unrelated failure).
+Active: none — S162 fix complete and tested (pnpm test green modulo 1 pre-existing unrelated failure,
+  same trainer-execution.test.mjs one S161 also saw).
 Next: run the PR #143 body's 2-player rules-mode browser verification pass (node/pnpm confirmed present
-  now, S161 — STATE's old "absent" claim was stale). Then the deferred cleanup: delete dead `#attackPanel`
-  / `.attack-panel-*` CSS. maintenance due (S150, still owed).
+  now, S161). Then the deferred cleanup: delete dead `#attackPanel` / `.attack-panel-*` CSS.
+  maintenance due (S150, still owed). If the Meowth-ex-style "ability shows unusable" report recurs
+  with only one copy of the card, I48's fix wasn't the whole story — reopen with a browser repro.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -26,8 +28,9 @@ Blocked: none.
   of its own (S161 root cause of the drag-to-retreat bug).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S162 2026-09-17 debug: ability-used flag keyed by card.name collided across same-named Pokémon
+  (I48) — shared\engine\effects\ability.mjs now keys by instanceId first.
 - S161 2026-09-17 patch: drag-to-retreat dZoneId bugfix + require explicit bench-card target when 2+
   eligible — client\src\setup\image-logic\drag.js.
 - S160 2026-09-17 feature: highlight-parity phases 1-3 merged as PR #143 — UNVERIFIED, nothing had run
   (now unblocked: node/pnpm work here as of S161).
-- S159 2026-09-17 harness: exec-plan.md workflow + routing; CLAUDE.md and QWEN.md are LF/CRLF mirrors — edit both together (D44).

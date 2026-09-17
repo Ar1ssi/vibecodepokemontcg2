@@ -61,6 +61,19 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I48 2026-09-17 P2 [rules] User report: Meowth ex on bench, never used, showed "unusable" in the
+    attack-preview ability zone. Log export cut off before the click event, so that exact instance
+    wasn't directly reproduced. Source read found a real, confirmed defect on the same mechanism:
+    `effects/ability.mjs:69` marked the server's `abilitiesUsed` flag by `card.name` (instanceId
+    fallback was dead code — every card has a name), so two same-named Pokémon in play shared one
+    used-flag slot; using one blocked the other's separate ability. Inconsistent with
+    `rules-state.mjs:592 abilityKey()`, which deliberately prefers instance identity for this
+    reason. → closed 2026-09-17 S161: `effects/ability.mjs` now keys by `instanceId` first (name
+    only when no instanceId); probe script flipped the collision red→green pre/post fix; new
+    regression test `shared/engine/__tests__/ability-execution.test.mjs` ("two Pokémon sharing a
+    name track 'used' independently"). Not fully proven to be the user's exact single-Meowth-ex
+    case (no duplicate name visible in the supplied log) — flag for a follow-up browser repro if
+    it recurs.
 - I52 2026-09-16 P3 [rules] Server prices special Energy by name only (rules/server-energy.mjs): Prism/Neo Upper-style "any type" Energy pays only its name type or Colorless, and U Energy etc. are unrecognized. The client guidance (energy-effects.mjs) treats unknown specials as wildcards. Pick one rule set and make both use it (refs: S145). → closed 2026-09-16 S146: server-energy.mjs now reads Energy through energy-effects.mjs (classifyEnergyEffect + resolveAttachedEnergyType), same as client guidance and bot.
 - I51 2026-09-16 P3 [netcode] A Trainer dropped on the board before its cardStats (effect text) reaches the server stays a plain move with no effect (reduce.mjs promoteTrainerPlay needs text) (refs: S144, S145). → closed 2026-09-16 S146: the drop is rejected with card_data_pending, so the card stays in hand until cardStats lands.
 - I50 2026-09-16 P3 [rules] Server models an evolution as the Evolution card attached under the Basic (reduce.mjs attachCard); the Basic stays the root, so anything reading the root's name/hp/attacks sees the Basic. trainer-steps.mjs reads the top Pokémon card for Salvatore/devolve, but attack/KO/retreat code does not. Also a Trainer whose effect has no valid target (Rare Candy with no Stage 2 in hand, 11x in S144 bot runs) is still playable and is discarded for nothing (refs: S144). → closed 2026-09-16 S145: attack/KO/checkup/retreat read evolvedView (D40); Rare Candy and Tools blocked with no valid target, Rare Candy traces the evolution line (D41); 15 live bot games PASS, 0 rejections.
