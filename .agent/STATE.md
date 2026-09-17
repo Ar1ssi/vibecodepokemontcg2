@@ -4,11 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 172
-Focus: I57 — discard-pile viewer restored under server authority (follow-up to design 012).
-Active: none. Work is committed on branch `fix/netcode-dropped-features` in worktree ../vibe-netcode-gaps.
-Next: user reviews/merges the branch (nothing pushed). Then I56 (keybinds c/z/e/q on server cards).
-  Then audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
+Session: 173
+Focus: energy tokens — attached Energy drew as a flat card for cost-symbol / untyped deck rows.
+Active: none. Work is committed on branch `fix/energy-token-symbol-names` in worktree ../vibe-energy-token.
+Next: user reviews/merges the branch (nothing pushed). Then review `fix/netcode-dropped-features`,
+  then I56 (keybinds c/z/e/q on server cards), audit lows A-6/A-10, I28 holo/mat sizing, PR #143. maintenance due.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -27,4 +27,4 @@ Blocked: none.
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
 - S172 2026-09-18 patch: I57 discard-pile viewer reads the authoritative discard.
-- S170 2026-09-17 feature: prize picker restored under server authority (D46).
+- S173 2026-09-18 patch: cost-symbol/untyped Energy rows render as tokens (energy-token-assets.mjs).

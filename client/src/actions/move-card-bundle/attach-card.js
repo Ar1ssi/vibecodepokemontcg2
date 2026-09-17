@@ -5,7 +5,7 @@ import {
 } from '../../setup/deck-constructor/hydrate-holo.js';
 import { syncRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
-import { getEnergyTokenFront } from './energy-token-assets.mjs';
+import { getEnergyTokenFront, isEnergyCard } from './energy-token-assets.mjs';
 
 export const attachCard = (
   user,
@@ -46,7 +46,7 @@ export const attachCard = (
     layer = targetCard.image.energyLayer;
 
     tokenFront =
-      movingCard.type === 'Energy' ? getEnergyTokenFront(movingCard) : null;
+      isEnergyCard(movingCard) ? getEnergyTokenFront(movingCard) : null;
 
     if (tokenFront) {
       // Small round token row along the bottom edge of the target card,
