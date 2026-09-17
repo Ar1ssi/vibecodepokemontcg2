@@ -12,7 +12,6 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
-- I57 2026-09-18 P2 [netcode] Discard-pile viewer is dead under SERVER_AUTHORITATIVE: `coverClick`/`openDiscardPileViewer` (click-events.js, discard-pile-viewer.js) read `getZone(user, 'discard').array`, which is empty under server rendering, so the click returns before opening. Fix like design 012's deck peek: read `getAuthoritativeZoneArray(side, 'discard')` (discard is public, no server round-trip needed). (refs: design 012, S171)
 - I56 2026-09-18 P2 [netcode] Keybinds that still read `mouseClick.card.image` throw a TypeError on a server-drawn card: `c` (look/stop looking), `z`/alt-z (hide/reveal shortcut), `e`/`q` highlight, and the `keyBinds` move keys resolve through the empty legacy zone arrays. Design 012 fixed the counter/condition/rotate/type/ability keys only; the rest need the same registry-sourced treatment (reveal/hide shortcuts are position-addressed server commands, so they also need an index from the view). (refs: design 012, S171)
 - I55 2026-09-18 P3 [netcode] Under server authority a peeked deck card can only be taken into hand, and `changeType` on an opponent's card changes type without the legacy move-to-board (the server refuses moves of another player's cards). Legacy allowed any destination and always moved the card to the board. Revisit if players miss it. (refs: design 012, S171)
 - I54 2026-09-17 P2 [rules] Audit A-1 (High) still open: `specialCondition` is one string, so adding Asleep
@@ -72,6 +71,7 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I57 2026-09-18 P2 [netcode] Discard-pile viewer is dead under SERVER_AUTHORITATIVE: `coverClick`/`openDiscardPileViewer` (click-events.js, discard-pile-viewer.js) read `getZone(user, 'discard').array`, which is empty under server rendering, so the click returns before opening. Fix like design 012's deck peek: read `getAuthoritativeZoneArray(side, 'discard')` (discard is public, no server round-trip needed). (refs: design 012, S171) → closed 2026-09-18 S172: viewer reads the live pile (discard-pile-source.mjs), clicked card found by instanceId; live probe on both seats.
 - I28 2026-09-17 P1 [holo][netcode] MP bench holo animates for owner, looks frozen on the other client's opp view → closed 2026-09-17 S164: self-containers.css lacked the 7 per-generation holo @imports opp-containers.css/index.css had, so owner and opponent rendered different foil effects; imports added, parity test extended, TEMP DEBUG removed
 - I48 2026-09-17 P2 [rules] User report: Meowth ex on bench, never used, showed "unusable" in the
     attack-preview ability zone. Log export cut off before the click event, so that exact instance

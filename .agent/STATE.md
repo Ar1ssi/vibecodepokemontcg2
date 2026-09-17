@@ -4,11 +4,11 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 171
-Focus: Design 012 — manual board tools restored under server authority (items 1-6 of the S171 gap diagnosis).
+Session: 172
+Focus: I57 — discard-pile viewer restored under server authority (follow-up to design 012).
 Active: none. Work is committed on branch `fix/netcode-dropped-features` in worktree ../vibe-netcode-gaps.
-Next: user reviews/merges the branch (nothing pushed). Then I56 (keybinds c/z/e/q on server cards) and
-  I57 (discard viewer). Then audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
+Next: user reviews/merges the branch (nothing pushed). Then I56 (keybinds c/z/e/q on server cards).
+  Then audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -26,5 +26,5 @@ Blocked: none.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
+- S172 2026-09-18 patch: I57 discard-pile viewer reads the authoritative discard.
 - S170 2026-09-17 feature: prize picker restored under server authority (D46).
-- S169 2026-09-17 feature: A-1 stacked conditions — Poison/Burn marker keys + per-condition markers (D45).

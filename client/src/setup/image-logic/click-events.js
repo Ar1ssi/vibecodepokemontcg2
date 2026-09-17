@@ -59,9 +59,9 @@ export const coverClick = (event) => {
   if (event.target.id === 'discardCover') {
     event.stopPropagation();
     const user = event.target.user === 'self' ? 'self' : 'opp';
-    const zone = getZone(user, 'discard');
-    if (zone.getCount() === 0) return;
-    openDiscardPileViewer(user, zone.getCount() - 1);
+    // I57: no legacy count gate — under server authority that array is empty. The viewer
+    // reads the live pile itself and returns when there is nothing to show.
+    openDiscardPileViewer(user);
     return;
   }
 
@@ -274,7 +274,13 @@ export const imageClick = (event) => {
   identifyCard(event);
 
   if (mouseClick.zoneId === 'discard') {
-    openDiscardPileViewer(mouseClick.cardUser, mouseClick.cardIndex);
+    // I57: `cardIndex` is a legacy zone index and is meaningless for a server-drawn card,
+    // so the clicked card is identified by the renderer's instanceId stamp when it has one.
+    openDiscardPileViewer(
+      mouseClick.cardUser,
+      mouseClick.cardIndex,
+      mouseClick.cardInstanceId
+    );
     return;
   }
 
