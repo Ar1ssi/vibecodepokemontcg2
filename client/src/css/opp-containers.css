@@ -316,7 +316,7 @@ img.draw-flight-source,
   padding: 0;
   display: grid;
   grid-template-columns: 13.67% 72.66% 13.67%;
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   align-items: start;
 }
 #prizes > img,
@@ -513,14 +513,13 @@ img.draw-flight-source,
 #board img {
   box-sizing: border-box;
   width: auto;
-  height: auto;
-  max-height: calc(100% - 1.5vh);
+  height: calc(100% - 1.5vh);
   margin: .25vw;
 }
 #board .mat-holo {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 1.5vh);
+  height: calc(100% - 1.5vh);
   margin: .25vw;
 }
 #board .mat-holo img {

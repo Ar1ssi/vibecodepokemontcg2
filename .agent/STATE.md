@@ -4,14 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 164
-Focus: I28 closed (holo CSS import parity). PR #143's owed verification pass (pnpm test/lint + 2P
-  rules-mode browser walk) is the next real chore.
-Active: none — S164 fix complete; pnpm test 1619/1620 (same pre-existing trainer-execution failure).
-Next: user eyeball-check I28 fix in a live 2P game (both sides should show the same era foil).
-  Then PR #143 2-player rules-mode verification pass. Then delete dead `#attackPanel` /
-  `.attack-panel-*` CSS. maintenance due (S150, still owed). If Meowth-ex "ability unusable" recurs
-  with one copy, I48's fix wasn't the whole story.
+Session: 165
+Focus: I28 holo import parity (PR #144) and mat sizing fix (4abcb5c) both on main.
+Active: none.
+Next: user eyeball-check both in a live 2P game (same era foil both sides; Active/Bench evolutions,
+  prizes, board sized right). Then PR #143 2P rules-mode verification pass. Then delete dead
+  `#attackPanel` / `.attack-panel-*` CSS. maintenance due (S150, still owed).
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -32,12 +30,12 @@ Blocked: none.
   `event.target.id` directly — an empty zone slot's target is often a child placeholder div with no id
   of its own (S161 root cause of the drag-to-retreat bug).
 
+- Mat `.mat-holo` wrappers get NO inline px size (S164): each zone's CSS sizes them. Never measure
+  clientWidth in one document/zoom space and write px into another (hand is 1x, #playfield is zoom:2).
+  Pre-existing failing test: "trainer drop: a Trainer without synced effect text is rejected".
+
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S164 2026-09-17 debug: I28 — self-containers.css missing 7 per-generation holo @imports that
-  opp-containers.css had; owner/opponent saw different foils. Added + test parity.
-- S163 2026-09-17 debug (I28, in progress): MP bench holo freezes on the opponent-viewing client only.
-  Couldn't isolate-repro yet. Added TEMP DEBUG try/catch in holo.mjs's tick() to surface a
-  silently-thrown loop-killer; also fixed hydrateHolo's ensureCardData() call dropping
-  card.image/set/number (separate bug: fuzzy name search often failed silently -> no holo at all).
-- S162 2026-09-17 debug: ability-used flag keyed by card.name collided across same-named Pokémon
-  (I48) — shared/engine/effects/ability.mjs now keys by instanceId first.
+- S165 2026-09-17 merge: PR #144 merged into main.
+- S164 2026-09-17 debug: I28 — self-containers.css lacked 7 per-generation holo @imports; added + parity test.
+- S164 2026-09-17 debug: mat card sizing — removed hydrateHolo px snapshot, cancel in-flight hydration,
+  prizes grid rows minmax(0,1fr), board img/holo same height.

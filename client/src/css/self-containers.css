@@ -351,7 +351,7 @@ img.draw-flight-source,
   padding: 0;
   display: grid;
   grid-template-columns: 13.67% 72.66% 13.67%;
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   align-items: start;
 }
 #prizes > img,
@@ -551,14 +551,13 @@ img.draw-flight-source,
 #board img {
   box-sizing: border-box;
   width: auto;
-  height: auto;
-  max-height: calc(100% - 1.5vh);
+  height: calc(100% - 1.5vh);
   margin: .25vw;
 }
 #board .mat-holo {
   box-sizing: border-box;
   width: auto;
-  max-height: calc(100% - 1.5vh);
+  height: calc(100% - 1.5vh);
   margin: .25vw;
 }
 #board .mat-holo img {
@@ -634,9 +633,9 @@ img.draw-flight-source,
 }
 /* The double-clicked card fills the panel so the preview is an enlargement;
    `.full-view img { height: 24% }` above only sizes the attached energies and
-   tools around it. Holo wrappers carry a pixel size frozen at hydration time,
-   so it has to be overridden here (hence `!important`) and the aspect ratio
-   restated — the wrapper has no intrinsic width of its own. */
+   tools around it. `!important` beats the zone rule the wrapper carried in
+   (e.g. `.play-container .mat-holo`); the wrapper has no intrinsic width, so
+   the aspect ratio is restated. */
 .full-view > img.full-view-card {
   height: 100%;
   width: auto;
