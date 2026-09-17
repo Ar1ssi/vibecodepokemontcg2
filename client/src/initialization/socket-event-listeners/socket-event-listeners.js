@@ -44,6 +44,7 @@ import { PRIZE_PICKER } from '../../setup/netcode/prize-picker-adapter.js';
 import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
 import { setInstanceMap } from '../../setup/netcode/dual-run-bridge.js';
 import { setDealOrder } from '../../setup/netcode/deal-order.js';
+import { registerTurnOrderCallListeners } from '../../setup/netcode/turn-order-call.js';
 import {
   handleCmdRejected,
   emitRequestView,
@@ -476,6 +477,11 @@ export const initializeSocketEventListeners = () => {
   // Design 002 I17: the server's authoritative opening-deal order, so this client's
   // setupPrizes() shuffles into the same hand/prizes/deck the server actually dealt
   // instead of an independent local shuffle.
+  // Design 013: the opening coin call reaches us BEFORE the deal, while
+  // setupPrizes() is still awaiting dealOrder — so it is wired here, not in the
+  // rules bridge's own setup path.
+  registerTurnOrderCallListeners(socket);
+
   socket.on('dealOrder', (data) => {
     if (Array.isArray(data?.order)) setDealOrder(data.order, data?.starter ?? null);
   });

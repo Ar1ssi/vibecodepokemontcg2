@@ -74,6 +74,10 @@ import {
   markAbilityUseAfterSearchStep,
 } from '/shared/engine/rules/ability-step-plan.mjs';
 import { decideTurnOrder, resolveTurnOrderCaller } from '/shared/engine/rules/rules-turnorder.mjs';
+import {
+  getTurnOrderResult,
+  resetTurnOrderCall,
+} from '../netcode/turn-order-call.js';
 import { healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
@@ -135,6 +139,18 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
     // Bumped on reset/restart so stale coin-flip / mulligan callbacks cannot
     // re-enter beginSetupWithTurnOrder after the session was cleared.
     let rulesSessionGeneration = 0;
+    // Design 013: the opening sequence has run this session. Replaces the old
+    // "phase is still 'setup'" double-start guard, which cannot be trusted under
+    // server authority — the authoritative post-deal view moves rulesState.phase
+    // to 'main' (apply-view.js reconcileTurnState) before the client's own
+    // opening ceremony has had a chance to run.
+    let openingStarted = false;
+    // The server's flip, once it has been shown: the starter it decided, and
+    // whether the coin animation has finished. The game starts only when both
+    // that animation and the local deal ('both-players-ready') are done.
+    let serverTurnOrderStarter = null;
+    let serverTurnOrderShown = false;
+    let serverTurnOrderAnimationDone = false;
     
     export const initializeRulesEngine = () => {
       if (initialized) return;
@@ -476,6 +492,27 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
         openingSetupReadyForCoinFlip = true;
         handleSetupClick();
       });
+      // Design 013: raised by turn-order-call.js from the server's messages.
+      document.addEventListener('rules-turn-order-call', (event) => {
+        handleServerTurnOrderCall(event.detail);
+      });
+      document.addEventListener('rules-turn-order-result', (event) => {
+        if (!isServerOwnedTurnOrder()) return;
+        applyServerTurnOrder(event.detail);
+      });
+      document.addEventListener('rules-turn-order-call-rejected', (event) => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        // The server refused our call (stale id, not our turn to call, malformed
+        // face). Say so instead of leaving a dead picker behind.
+        coinCallPending = false;
+        document.getElementById('rulesCoinCallOverlay')?.remove();
+        appendMessage(
+          '',
+          `Coin call not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server's flip.`,
+          'announcement',
+          false
+        );
+      });
       hookResetButtons();
     };
     
@@ -485,6 +522,11 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       rulesSessionGeneration += 1;
       resetRulesSessionState();
       resetDealOrder();
+      resetTurnOrderCall();
+      openingStarted = false;
+      serverTurnOrderStarter = null;
+      serverTurnOrderShown = false;
+      serverTurnOrderAnimationDone = false;
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;
@@ -528,11 +570,13 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
     // local Set Up click and by the mirror side's auto-start (so the mirror
     // no longer needs a second Set Up click).
     const beginSetupWithTurnOrder = (firstPlayer) => {
-      // Guard: if the game has already started (phase left 'setup'), a second
-      // invocation (double Set Up click, duplicate turnOrderCoinFlip event,
-      // or local flip + mirror both landing) would re-run startGame() and
-      // reset drewThisTurn, causing a double auto-draw on turn 1.
-      if (rulesState.phase !== 'setup') return;
+      // Guard: a second invocation (double Set Up click, duplicate
+      // turnOrderCoinFlip event, or local flip + mirror both landing) would
+      // re-run startGame() and reset drewThisTurn, causing a double auto-draw on
+      // turn 1. This used to test rulesState.phase, which the authoritative view
+      // rewrites to 'main' before this ever runs (design 013).
+      if (openingStarted) return;
+      openingStarted = true;
       const session = rulesSessionGeneration;
       startGame(firstPlayer);
           // startGame() only resets to turnNumber 0 / phase 'draw' — it never
@@ -650,6 +694,117 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
           updateTurnBanner();
     };
     
+    // ── design 013: server-owned turn-order coin call ────────────────────
+    // True when the server, not this client, decides turn order.
+    const isServerOwnedTurnOrder = () =>
+      Boolean(systemState.isTwoPlayer && systemState.serverAuthoritative);
+
+    // The opening sequence needs two things that arrive independently: the
+    // server's flip (shown as the coin animation) and the local deal, which
+    // finishes when ready.js raises 'both-players-ready'. Whichever lands last
+    // starts the game.
+    const maybeBeginServerTurnOrder = () => {
+      if (!serverTurnOrderAnimationDone) return false;
+      if (!serverTurnOrderStarter) return false;
+      if (!openingSetupReadyForCoinFlip && !isE2eMode()) return false;
+      const starter = serverTurnOrderStarter;
+      serverTurnOrderStarter = null;
+      beginSetupWithTurnOrder(starter);
+      return true;
+    };
+
+    // Shows the server's resolved flip. Deliberately NOT gated on
+    // rulesState.phase: the authoritative post-deal view has usually already
+    // moved it to 'main' by now.
+    const applyServerTurnOrder = (serverResult) => {
+      if (!serverResult) return false;
+      if (!rulesState.enabled) return false;
+      if (serverTurnOrderShown) return false; // one ceremony per game
+      serverTurnOrderShown = true;
+
+      // A local flip can no longer win: the server's answer supersedes it.
+      flipSuperseded = true;
+      coinFlipPending = false;
+      coinCallPending = false;
+      document.getElementById('rulesCoinCallOverlay')?.remove();
+
+      const { caller, call, result, starter, auto } = serverResult;
+      const coinOwner = caller;
+      const coin = getSelectedCoin(coinOwner) || pickRandomCoin();
+      const callerLabel = caller === 'self' ? 'You' : 'Opponent';
+      appendMessage(
+        '',
+        auto
+          ? `No call came in time — the coin was called ${call} automatically.`
+          : `${callerLabel} called ${call}.`,
+        'announcement',
+        false
+      );
+      playTurnOrderCoinAnimation({
+        coin,
+        result,
+        coinOwner,
+        turnPlayer: starter,
+        isRemote: false,
+      });
+
+      serverTurnOrderStarter = starter;
+      const session = rulesSessionGeneration;
+      setTimeout(() => {
+        if (session !== rulesSessionGeneration) return;
+        serverTurnOrderAnimationDone = true;
+        maybeBeginServerTurnOrder();
+      }, e2eDelayMs(2700));
+      return true;
+    };
+
+    // The server nominated a caller. Only the nominated seat gets a callId.
+    const handleServerTurnOrderCall = (detail) => {
+      if (!isServerOwnedTurnOrder()) return;
+      const { callId, waiting, roomId } = detail || {};
+      const targetRoomId = roomId || systemState.roomId;
+
+      if (waiting || !callId) {
+        if (rulesState.enabled) {
+          appendMessage(
+            '',
+            'Waiting for opponent to call the coin…',
+            'announcement',
+            false
+          );
+        }
+        return;
+      }
+
+      // Two cases with nobody to click the picker: free play (rules mode off has
+      // no coin ceremony) and the Playwright harness. The deal still waits on this
+      // answer, so answer at once rather than stalling both seats until the
+      // server's timeout fires. The face is immaterial — the server flips either
+      // way, and neither mode shows the call or the flip.
+      if (!rulesState.enabled || isE2eMode()) {
+        rulesSocket?.emit('turnOrderCall', {
+          roomId: targetRoomId,
+          callId,
+          call: 'heads',
+        });
+        return;
+      }
+
+      if (coinCallPending) return;
+      coinCallPending = true;
+      openCoinCallPicker({
+        onCall: (call) => {
+          coinCallPending = false;
+          rulesSocket?.emit('turnOrderCall', {
+            roomId: targetRoomId,
+            callId,
+            call,
+          });
+          appendMessage('', `You called ${call} — flipping…`, 'announcement', false);
+        },
+      });
+    };
+
     // Fires once both players have pressed Set Up and their prize cards
     // are on the mat (see the 'both-players-ready' event dispatched by
     // ready.js). Decides turn order via a coin flip, draws opening hands,
@@ -658,6 +813,19 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       if (!rulesState.enabled) return;
       if (!openingSetupReadyForCoinFlip) return;
       if (systemState.isReplay) return;
+
+      // Design 013: under server authority the coin call belongs to the server.
+      // It opened the picker (or is still waiting on the caller) and broadcasts
+      // the one authoritative flip; this client never picks a caller and never
+      // flips. Checked before the guards below because the authoritative view has
+      // already moved rulesState.phase off 'setup' by the time we get here.
+      if (isServerOwnedTurnOrder()) {
+        if (!maybeBeginServerTurnOrder()) {
+          applyServerTurnOrder(getTurnOrderResult());
+        }
+        return;
+      }
+
       if (coinFlipPending) return; // a flip already in flight will start the game
       if (rulesState.phase !== 'setup') return; // already started (e.g. auto-start)
       if (coinCallPending) return; // the heads/tails call picker is already open
