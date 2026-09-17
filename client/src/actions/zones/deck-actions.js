@@ -10,7 +10,12 @@ import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
-import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
+import {
+  dispatchAuthoritativeZoneOp,
+  isAuthoritativeDispatchActive,
+} from '../../setup/netcode/authoritative-dispatch.js';
+import { getAuthoritativeDeckCount } from '../../setup/netcode/apply-view.js';
+import { peekServerDeck } from '../../setup/netcode/deck-peek.js';
 
 export const shuffleIntoDeck = (
   user,
@@ -137,7 +142,11 @@ export const handleViewButtonClick = (user, initiator, top) => {
     '1'
   );
   viewAmount = parseInt(userInput);
-  const selectedDeckCount = getZone(user, 'deck').getCount();
+  // Design 012: under server authority the legacy deck array is a stale copy — the real
+  // count lives in the view, and the server clamps the look to it anyway.
+  const selectedDeckCount = isAuthoritativeDispatchActive()
+    ? getAuthoritativeDeckCount(user === 'self' ? 'you' : 'them')
+    : getZone(user, 'deck').getCount();
 
   viewAmount = Math.min(viewAmount, selectedDeckCount);
   if (!isNaN(viewAmount) && viewAmount >= 1) {
@@ -157,6 +166,11 @@ export const viewDeck = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
+  // Design 012: the client holds no deck contents under server authority, so the look is
+  // answered by the server instead of read out of the legacy deck copy.
+  if (emit && peekServerDeck({ user, count: viewAmount, top })) {
+    return;
+  }
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'viewDeck', [
       oInitiator,

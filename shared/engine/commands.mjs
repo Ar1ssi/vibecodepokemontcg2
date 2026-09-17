@@ -297,6 +297,17 @@ export const COMMAND_SCHEMAS = {
     },
   },
 
+  // Design 012: the server picks the card with its seeded RNG, so the payload names nothing.
+  playRandomCardFaceDown: {
+    type: 'playRandomCardFaceDown',
+    validate(payload) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { valid: false, reason: 'Payload must be an object' };
+      }
+      return { valid: true };
+    },
+  },
+
   attack: {
     type: 'attack',
     validate(payload = {}) {

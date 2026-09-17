@@ -72,6 +72,23 @@ function resolveHintInstanceId(hint) {
 }
 
 /**
+ * Reads the single `{ instanceId, ... }` object parameter the manual board tools send,
+ * resolving its identity the same way the counter translators do. Returns null for any
+ * other parameter shape or an unresolvable card.
+ *
+ * @param {any[]} parameters
+ * @returns {object|null} a copy of the object with a numeric `instanceId`, or null
+ */
+function readObjectParam(parameters) {
+  if (!Array.isArray(parameters) || parameters.length !== 1) return null;
+  const [param] = parameters;
+  if (!param || typeof param !== 'object' || Array.isArray(param)) return null;
+  const instanceId = resolveHintInstanceId(param);
+  if (instanceId == null) return null;
+  return { ...param, instanceId };
+}
+
+/**
  * Helper to normalize a special condition string or code into canonical engine name.
  *
  * @param {any} val
@@ -763,6 +780,38 @@ export function translateActionToCmd(action, parameters = []) {
     // the tail to drop from its own authoritative commandLog.
     case 'undo': {
       return { type: 'undo', payload: {} };
+    }
+
+    // Design 012: manual board tools. Sent only in object form by
+    // manual-card-dispatch.js, which reads the card identity from the authoritative
+    // cardRegistry — the legacy index-addressed parameter shapes can't name a server card.
+    case 'rotateCard': {
+      const target = readObjectParam(parameters);
+      const rotation = Number(target?.rotation);
+      if (!target || target.rotation == null || !Number.isFinite(rotation)) return null;
+      return { type: 'rotateCard', payload: { instanceId: target.instanceId, rotation } };
+    }
+
+    case 'changeType': {
+      const target = readObjectParam(parameters);
+      if (!target || typeof target.type !== 'string' || !target.type.trim()) return null;
+      return { type: 'changeType', payload: { instanceId: target.instanceId, type: target.type } };
+    }
+
+    case 'removeAbilityCounter': {
+      const target = readObjectParam(parameters);
+      if (!target) return null;
+      return { type: 'removeAbilityCounter', payload: { instanceId: target.instanceId } };
+    }
+
+    // The server picks the card with its seeded RNG; the client names nothing.
+    case 'playRandomCardFaceDown': {
+      const args = Array.isArray(parameters) ? parameters : [];
+      const [param] = args;
+      if (args.length !== 1 || !param || typeof param !== 'object' || Array.isArray(param)) {
+        return null;
+      }
+      return { type: 'playRandomCardFaceDown', payload: {} };
     }
 
     case 'VSTARGXFunction': {

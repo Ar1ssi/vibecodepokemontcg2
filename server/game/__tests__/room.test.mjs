@@ -495,3 +495,18 @@ test('GameRoom: A-9 - a replayed socket command is deduped, not executed twice',
   assert.equal(room.handleClientCommand('socket-ash', cmd).dedupe, true);
   assert.equal(room.state.stateVersion, 1);
 });
+
+test('GameRoom.peekDeck answers the asking seat only and refuses unknown sockets (design 012)', () => {
+  const room = new GameRoom({ roomId: 'peek-room', rulesEnabled: true });
+  room.addPlayer('socket-ash', 'p1', 'Ash');
+  room.addPlayer('socket-gary', 'p2', 'Gary');
+  room.state.players.p1.zones.deck.push(createCard({ instanceId: 7, name: 'Top' }));
+  room.state.players.p2.zones.deck.push(createCard({ instanceId: 8, name: 'Theirs' }));
+
+  assert.deepEqual(
+    room.peekDeck('socket-ash', { side: 'you', count: 1, fromTop: true }).cards.map((c) => c.name),
+    ['Top']
+  );
+  assert.equal(room.peekDeck('socket-ash', { side: 'them', count: 1 }).ok, false);
+  assert.equal(room.peekDeck('socket-spectator', { count: 1 }).ok, false);
+});

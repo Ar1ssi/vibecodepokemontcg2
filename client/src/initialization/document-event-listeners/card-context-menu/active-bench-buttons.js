@@ -10,11 +10,13 @@ import {
   leaveAll,
 } from '../../../actions/zones/general.js';
 import { openAttachedCardsPanel } from '../../../setup/image-logic/full-view.js';
+import { dispatchServerCardMenu } from '../../../setup/netcode/manual-card-dispatch.js';
 import { mouseClick, systemState } from '../../../state.js';
 
 export const initializeActiveAndBenchButtons = () => {
   const damageCounterButton = document.getElementById('damageCounterButton');
   damageCounterButton.addEventListener('click', () => {
+    if (dispatchServerCardMenu('damageCounterButton')) return;
     addDamageCounter(
       mouseClick.cardUser,
       mouseClick.zoneId,
@@ -26,6 +28,7 @@ export const initializeActiveAndBenchButtons = () => {
     'specialConditionButton'
   );
   specialConditionButton.addEventListener('click', () => {
+    if (dispatchServerCardMenu('specialConditionButton')) return;
     addSpecialCondition(
       mouseClick.cardUser,
       mouseClick.zoneId,
@@ -35,7 +38,8 @@ export const initializeActiveAndBenchButtons = () => {
 
   const abilityCounterButton = document.getElementById('abilityCounterButton');
   abilityCounterButton.addEventListener('click', () => {
-    if (mouseClick.card.image.abilityCounter) {
+    if (dispatchServerCardMenu('abilityCounterButton')) return;
+    if (mouseClick.card?.image?.abilityCounter) {
       mouseClick.card.image.abilityCounter.handleRemove();
     } else {
       useAbility(
@@ -52,6 +56,7 @@ export const initializeActiveAndBenchButtons = () => {
 
   const changeToEnergyButton = document.getElementById('changeToEnergyButton');
   changeToEnergyButton.addEventListener('click', () => {
+    if (dispatchServerCardMenu('changeToEnergyButton')) return;
     changeType(
       mouseClick.cardUser,
       systemState.initiator,
@@ -62,6 +67,7 @@ export const initializeActiveAndBenchButtons = () => {
   });
   const changeToToolButton = document.getElementById('changeToToolButton');
   changeToToolButton.addEventListener('click', () => {
+    if (dispatchServerCardMenu('changeToToolButton')) return;
     changeType(
       mouseClick.cardUser,
       systemState.initiator,
@@ -74,6 +80,7 @@ export const initializeActiveAndBenchButtons = () => {
     'changeToPokémonButton'
   );
   changeToPokémonButton.addEventListener('click', () => {
+    if (dispatchServerCardMenu('changeToPokémonButton')) return;
     changeType(
       mouseClick.cardUser,
       systemState.initiator,

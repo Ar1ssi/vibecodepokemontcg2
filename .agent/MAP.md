@@ -38,6 +38,11 @@ client/src/setup/netcode/authoritative-dispatch.js — gated-action dispatch pri
 slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAction injected, not
 imported. Fails open to the legacy body when a command cannot be translated (D12)
 client/src/setup/netcode/prize-picker-adapter.js — injected `prizePicker`: shows a server prize pendingChoice as the fly-up prize fan (actions/zones/prize-take-prompt.js, D46)
+client/src/setup/netcode/manual-card-commands.mjs — pure planner for the manual board tools
+  (damage/conditions/rotate/type/ability marker) from a registry card; manual-card-dispatch.js emits them
+client/src/setup/netcode/deck-peek.js + deck-peek-request.mjs — "look at top/bottom N cards":
+  `peekDeck` socket request (server/game/room.mjs `peekDeck`, shared/engine/view.mjs `deckPeekFor`),
+  shown in the card picker; picks leave the deck as moveCard commands (design 012, D49)
 client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
 resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
 server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles

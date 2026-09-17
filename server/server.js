@@ -977,6 +977,25 @@ async function main() {
         }
       });
 
+      // Design 012: "look at the top/bottom N cards of a deck", answered to the asker only.
+      socket.on('peekDeck', (data, ack) => {
+        if (typeof ack !== 'function') return;
+        const roomId =
+          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (!gameRoom) {
+          ack({ ok: false, reason: 'room_not_found' });
+          return;
+        }
+        ack(
+          gameRoom.peekDeck(socket.id, {
+            side: data?.side,
+            count: data?.count,
+            fromTop: data?.fromTop,
+          })
+        );
+      });
+
       socket.on('requestView', (data) => {
         const roomId =
           data?.roomId || [...socket.rooms].find((r) => r !== socket.id);

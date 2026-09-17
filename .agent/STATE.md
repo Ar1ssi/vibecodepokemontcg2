@@ -4,36 +4,27 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 170
-Focus: Prize picker restored under server authority (D46) on top of the audit fixes — uncommitted.
-Active: none.
-Next: commit (user to confirm). Fix local node_modules (express/@eslint/js missing; pnpm install EACCES)
-  then run lint + `SERVER_AUTHORITATIVE=1` playtest-bot to see a real KO prize pick. User eyeballs the
-  prize fan and stacked condition markers in a live 2P game. Then audit lows A-6/A-10. maintenance due.
+Session: 171
+Focus: Design 012 — manual board tools restored under server authority (items 1-6 of the S171 gap diagnosis).
+Active: none. Work is committed on branch `fix/netcode-dropped-features` in worktree ../vibe-netcode-gaps.
+Next: user reviews/merges the branch (nothing pushed). Then I56 (keybinds c/z/e/q on server cards) and
+  I57 (discard viewer). Then audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- node/pnpm ARE on PATH on this machine as of S161 (`node v24.20.0`, `pnpm 12.3.4`) — ignore any older
-  note in this file or the journal claiming otherwise.
-- Board cards live INSIDE the `selfContainer`/`oppContainer` playmat iframes (separate documents that
-  load only self-/opp-containers.css + its @imported partials; index.css never reaches them). Any class
-  you put on a card/wrapper must be styled there, not in index.css. Stadium cards are the exception —
-  they're in the main document, so index.css is right for those.
-- Netcode: test under `SERVER_AUTHORITATIVE=1` only (S137). :4000 is often another session's
-  server — run your own with `PORT=<free>`. Server-rendered cards carry `data-instance-id` + `img.card`;
-  legacy images never enter server-drawn zones' DOM (D36). Holo-hydrated server cards move as their
-  `.mat-holo` wrapper (`cardNodeOf` in apply-view.js) — never appendChild the bare <img>.
-- `pnpm test` is an explicit file list — a new test file runs only once added to package.json.
-  `pnpm lint` fails repo-wide on CRLF; lint a diff with
-  `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <files>`.
-- Prize cards move only on a server-granted entitlement (`flags.prizesOwed`, D43). A KO raises a prize
-  pendingChoice at command end (D46) that pauses the game; never splice `zones.prizes` on a client's say-so. Manual counters/conditions and deck-order ops are
-  turn-player-only in rules mode (S167).
-- Mat `.mat-holo` wrappers get NO inline px size (S164): each zone's CSS sizes them. Never measure
-  clientWidth in one document/zoom space and write px into another (hand is 1x, #playfield is zoom:2).
-  Pre-existing failing test: "trainer drop: a Trainer without synced effect text is rejected".
+- Legacy zone arrays are EMPTY under SERVER_AUTHORITATIVE 2P (verified live S171: legacy hand 0 vs view 7,
+  legacy deck stale at 14). Anything reading `getZone(user, z).array` or `mouseClick.card` is broken there —
+  read `getAuthoritativeZoneArray(side, zone)` / the `cardRegistry` and address cards by instanceId (D12, D47).
+- Board cards live INSIDE the `selfContainer`/`oppContainer` playmat iframes (separate documents that load only
+  self-/opp-containers.css + its @imported partials; index.css never reaches them). Stadium is the exception.
+- Netcode: test under `SERVER_AUTHORITATIVE=1` only (S137). Pick a free PORT — other sessions hold :4000/:4317.
+  Live 2P probe harness: `.agent/scratch/probe.mjs <step-file>` (Playwright, joins a room, deals, runs a step module).
+- `pnpm test` is an explicit file list — a new test file runs only once added to package.json. `pnpm lint` fails
+  repo-wide on CRLF; lint a diff with `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <files>`.
+- Prize cards move only on a server-granted entitlement (D43/D46). Manual counters/conditions and deck-order ops
+  are turn-player-only in rules mode. Pre-existing failing test: "trainer drop: a Trainer without synced effect text".
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S170 2026-09-17 feature: prize picker — KO raises server prize choice, client fly-up fan (D46, I4).
-- S169 2026-09-17 feature: A-1 stacked conditions — Poison/Burn marker keys + per-condition board markers (D45).
-- S168 2026-09-17 patch: audit mediums — status parity, dual-type weakness, clientSeq required (D44).
+- S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
+- S170 2026-09-17 feature: prize picker restored under server authority (D46).
+- S169 2026-09-17 feature: A-1 stacked conditions — Poison/Burn marker keys + per-condition markers (D45).

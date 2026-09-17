@@ -16,6 +16,7 @@ import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import { doubleClick } from '../../setup/image-logic/click-events.js';
 import { refreshBoardImages } from '../../setup/sizing/refresh-board.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { dispatchServerCardKey } from '../../setup/netcode/manual-card-dispatch.js';
 import { isInFullView } from '../../setup/deck-constructor/hydrate-holo.js';
 import { isCardPreviewOpen } from '../../setup/image-logic/full-view.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
@@ -178,6 +179,8 @@ export const keyDown = (event) => {
   }
   if (mouseClick.selectingCard && notSpectator) {
     event.preventDefault();
+    // Design 012: a server-drawn card has no legacy zone entry for the handlers below.
+    if (dispatchServerCardKey(event)) return;
 
     const keyBinds = {
       h: 'hand',
@@ -277,7 +280,7 @@ export const keyDown = (event) => {
     ) {
       deselectCard();
       event.preventDefault();
-      if (mouseClick.card.image.abilityCounter) {
+      if (mouseClick.card?.image?.abilityCounter) {
         mouseClick.card.image.abilityCounter.handleRemove();
       } else {
         useAbility(

@@ -8,6 +8,7 @@ import {
   shuffleAndDraw,
   shuffleBottomAndDraw,
 } from '../../../actions/zones/hand-actions.js';
+import { dispatchServerRandomFaceDown } from '../../../setup/netcode/manual-card-dispatch.js';
 import { mouseClick, systemState } from '../../../state.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 import { appendMessage } from '../../../setup/chatbox/append-message.js';
@@ -39,9 +40,10 @@ export const initializeHandButtons = () => {
   });
 
   const randomHandButton = document.getElementById('randomHandButton');
-  randomHandButton.addEventListener('click', () =>
-    playRandomCardFaceDown(mouseClick.cardUser, systemState.initiator)
-  );
+  randomHandButton.addEventListener('click', () => {
+    if (dispatchServerRandomFaceDown(mouseClick.cardUser)) return;
+    playRandomCardFaceDown(mouseClick.cardUser, systemState.initiator);
+  });
 
   const discardHandButton = document.getElementById('discardHandButton');
   discardHandButton.addEventListener('click', () => {

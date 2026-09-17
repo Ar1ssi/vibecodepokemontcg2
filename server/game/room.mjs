@@ -9,7 +9,7 @@ import {
   createPlayerZones,
 } from '../../shared/engine/state.mjs';
 import { createRng } from '../../shared/engine/rng.mjs';
-import { viewFor } from '../../shared/engine/view.mjs';
+import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
 import { applyCommand } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 
@@ -334,6 +334,21 @@ export class GameRoom {
   getViewForSocket(socketId) {
     const playerId = this.socketToPlayer.get(socketId) || null;
     return viewFor(this.state, playerId);
+  }
+
+  /**
+   * Design 012: the top or bottom cards of a deck for the asking socket only (see
+   * `deckPeekFor`). A spectator or unknown socket is refused.
+   *
+   * @param {string} socketId
+   * @param {{ side?: 'you'|'them', count?: number, fromTop?: boolean }} request
+   * @returns {{ ok: true, cards: object[], deckCount: number } | { ok: false, reason: string }}
+   */
+  peekDeck(socketId, request = {}) {
+    const playerId = this.socketToPlayer.get(socketId);
+    if (!playerId) return { ok: false, reason: 'Only a seated player can look at a deck.' };
+    this.touchActivity();
+    return deckPeekFor(this.state, playerId, request);
   }
 
   /**

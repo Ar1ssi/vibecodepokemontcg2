@@ -12,6 +12,9 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I57 2026-09-18 P2 [netcode] Discard-pile viewer is dead under SERVER_AUTHORITATIVE: `coverClick`/`openDiscardPileViewer` (click-events.js, discard-pile-viewer.js) read `getZone(user, 'discard').array`, which is empty under server rendering, so the click returns before opening. Fix like design 012's deck peek: read `getAuthoritativeZoneArray(side, 'discard')` (discard is public, no server round-trip needed). (refs: design 012, S171)
+- I56 2026-09-18 P2 [netcode] Keybinds that still read `mouseClick.card.image` throw a TypeError on a server-drawn card: `c` (look/stop looking), `z`/alt-z (hide/reveal shortcut), `e`/`q` highlight, and the `keyBinds` move keys resolve through the empty legacy zone arrays. Design 012 fixed the counter/condition/rotate/type/ability keys only; the rest need the same registry-sourced treatment (reveal/hide shortcuts are position-addressed server commands, so they also need an index from the view). (refs: design 012, S171)
+- I55 2026-09-18 P3 [netcode] Under server authority a peeked deck card can only be taken into hand, and `changeType` on an opponent's card changes type without the legacy move-to-board (the server refuses moves of another player's cards). Legacy allowed any destination and always moved the card to the board. Revisit if players miss it. (refs: design 012, S171)
 - I54 2026-09-17 P2 [rules] Audit A-1 (High) still open: `specialCondition` is one string, so adding Asleep
     to a Poisoned Pokémon wipes Poison, and resolveCheckup's else-if chain applies only one condition. Fix needs a
     condition-set model across reduce.mjs, view/zone-hash, apply-view.js, status.mjs (~150 refs, 23 files) — pair

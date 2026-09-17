@@ -674,3 +674,35 @@ test('disposition gate: an action absent from DISPOSITION_TABLE throws under a d
     /totallyMadeUpAction/
   );
 });
+
+// Design 012: manual board tools translate only from the object form manual-card-dispatch.js sends.
+test('rotateCard / changeType / removeAbilityCounter translate an instanceId object into a valid command', () => {
+  const cases = [
+    ['rotateCard', { instanceId: 12, rotation: 90 }, { instanceId: 12, rotation: 90 }],
+    ['changeType', { instanceId: 12, type: 'Energy' }, { instanceId: 12, type: 'Energy' }],
+    ['removeAbilityCounter', { instanceId: 12 }, { instanceId: 12 }],
+  ];
+  for (const [action, param, payload] of cases) {
+    const cmd = translateActionToCmd(action, [param]);
+    assert.deepEqual(cmd, { type: action, payload }, action);
+    assert.equal(validateCommandShape(cmd).valid, true, action);
+  }
+});
+
+test('manual board tools drop legacy index-addressed or incomplete parameters instead of guessing', () => {
+  assert.equal(translateActionToCmd('rotateCard', ['active', 0, false, 90]), null);
+  assert.equal(translateActionToCmd('rotateCard', [{ instanceId: 12 }]), null);
+  assert.equal(translateActionToCmd('rotateCard', [{ instanceId: 'x', rotation: 90 }]), null);
+  assert.equal(translateActionToCmd('changeType', ['self', 'bench', 1, 'Energy']), null);
+  assert.equal(translateActionToCmd('changeType', [{ instanceId: 12, type: '  ' }]), null);
+  assert.equal(translateActionToCmd('removeAbilityCounter', ['active', 0, null]), null);
+  assert.equal(translateActionToCmd('removeAbilityCounter', [{ syncInstance: 3 }]), null);
+});
+
+test('playRandomCardFaceDown translates only its object form, to an empty payload', () => {
+  const cmd = translateActionToCmd('playRandomCardFaceDown', [{}]);
+  assert.deepEqual(cmd, { type: 'playRandomCardFaceDown', payload: {} });
+  assert.equal(validateCommandShape(cmd).valid, true);
+  assert.equal(translateActionToCmd('playRandomCardFaceDown', ['opp', 2]), null);
+  assert.equal(translateActionToCmd('playRandomCardFaceDown', []), null);
+});

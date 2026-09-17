@@ -282,6 +282,24 @@ function consumePrizeEntitlement(player, count) {
   else delete player.flags.prizesOwed;
 }
 
+/**
+ * Design 012: `faceDown` only means something on the board. Every path that takes a card off
+ * the board (moves, mass discards, shuffles, undo replay) would otherwise have to clear it, and
+ * a missed one would hide the card again the next time it lands on the board — so the flag is
+ * swept once, after every command.
+ */
+function clearFaceDownOffBoard(draft) {
+  if (draft.stadium?.faceDown) delete draft.stadium.faceDown;
+  for (const player of Object.values(draft.players || {})) {
+    for (const [zoneId, zone] of Object.entries(player.zones || {})) {
+      if (zoneId === 'board' || !Array.isArray(zone)) continue;
+      for (const card of zone) {
+        if (card?.faceDown) delete card.faceDown;
+      }
+    }
+  }
+}
+
 function isZoneIndex(index, zone) {
   return Number.isInteger(index) && index >= 0 && index < zone.length;
 }
@@ -661,6 +679,14 @@ function validateReferences(state, command) {
       return { valid: true };
     }
 
+    case 'playRandomCardFaceDown': {
+      const hand = state.players?.[playerId]?.zones?.hand;
+      if (!Array.isArray(hand) || hand.length === 0) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
     default:
       return { valid: true };
   }
@@ -742,6 +768,8 @@ export function validateLegality(state, command) {
       'shuffleIntoDeck',
       'moveToDeckTop',
       'switchWithDeckTop',
+      // Design 012: plays a card to the board like any other hand play.
+      'playRandomCardFaceDown',
     ].includes(type)
   ) {
     if (state.turn?.player && state.turn.player !== playerId) {
@@ -761,6 +789,7 @@ export function validateLegality(state, command) {
         'useAbility',
         'stadium-effect',
         'useVStarGX',
+        'playRandomCardFaceDown',
       ].includes(type)
     ) {
       return {
@@ -1482,6 +1511,16 @@ export function applyCommand(state, command, rng = null) {
           rotation: payload.rotation,
         });
       }
+      break;
+    }
+
+    case 'playRandomCardFaceDown': {
+      const hand = draft.players[playerId].zones.hand;
+      const [card] = hand.splice(activeRng.int(hand.length), 1);
+      card.faceDown = true;
+      card.revealed = false;
+      draft.players[playerId].zones.board.push(card);
+      events.push({ type: 'cardPlayedFaceDown', instanceId: card.instanceId, playerId });
       break;
     }
 
@@ -2452,6 +2491,7 @@ export function applyCommand(state, command, rng = null) {
   }
 
   settlePrizeEntitlements(draft, { events });
+  clearFaceDownOffBoard(draft);
 
   // Advance state version and append to commandLog
   draft.stateVersion = (state.stateVersion || 0) + 1;
