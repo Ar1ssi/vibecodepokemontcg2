@@ -356,7 +356,12 @@ export const doubleClick = (event) => {
   }
   const targetImage = card.image;
   targetImage.classList.remove('highlight');
-  if (['active', 'bench', 'hand'].includes(mouseClick.zoneId)) {
+  // 'stadium' belongs in this list, not in the raw #fullImage branch below:
+  // that overlay is appended to the main document with no z-index, so it paints
+  // UNDER the z-index-2 playmat iframes (and #stadium itself is z-index 3),
+  // burying the enlarged card and swallowing its own click-to-close. Same
+  // reason prizes was routed through a viewer above.
+  if (['active', 'bench', 'hand', 'stadium'].includes(mouseClick.zoneId)) {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
