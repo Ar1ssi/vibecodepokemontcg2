@@ -10,13 +10,16 @@ export const resetImage = (image, zoneId = '') => {
       wrapper.style.width = '';
       wrapper.style.height = '';
     }
+    // Board zones (active/bench) size cards via inline px snapshots (energy
+    // stacking, evolve/attach layering). Leaving those on an <img> that
+    // returns to a non-board zone overrides that zone's own CSS sizing.
+    image.style.width = '';
+    image.style.height = '';
   }
   if (image.dataset?.energyCardSrc) {
     image.src = image.dataset.energyCardSrc;
     delete image.dataset.energyCardSrc;
     image.classList.remove('energy-token-3d');
-    image.style.width = '';
-    image.style.height = '';
   }
   image.style.opacity = 1;
   image.style.position = 'relative';
