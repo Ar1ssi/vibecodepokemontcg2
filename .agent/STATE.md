@@ -30,5 +30,5 @@ Blocked: none.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S173 2026-09-18 feature: Grand Tree search-evolve + Stage 2 chain in the server engine (design 013, D50).
+- S173 2026-09-18 patch: cost-symbol/untyped Energy rows render as tokens (energy-token-assets.mjs).
 - S172 2026-09-18 patch: I57 discard-pile viewer reads the authoritative discard.
-- S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
