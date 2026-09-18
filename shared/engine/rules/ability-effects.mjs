@@ -67,13 +67,21 @@ const lower = (v) =>
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'");
 
-const textOf = (card) =>
-  lower(card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? '');
+const textOf = (card) => {
+  const arrText =
+    Array.isArray(card?.abilities) && card.abilities.length > 0
+      ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
+      : null;
+  return lower(
+    arrText ?? card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
+  );
+};
 
 const nameOf = (card) => lower(card?.name ?? '');
 
 const isAbilityCard = (card) => {
   if (!card) return false;
+  if (Array.isArray(card.abilities) && card.abilities.length > 0) return true;
   if (card.ability?.text || card.abilityText) return true;
   if (card.ability) return true;
   return false;

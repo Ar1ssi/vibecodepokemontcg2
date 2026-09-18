@@ -45,6 +45,11 @@ import {
   hasAnyCondition,
   listConditions,
 } from './rules/special-conditions.mjs';
+import {
+  classifyAttackEffect,
+  dualStatus,
+  selfStatus,
+} from './rules/attack-effects.mjs';
 
 /**
  * Coin flips an attack's own printed text calls for, rolled from the command's RNG so a
@@ -58,22 +63,67 @@ function flipAttackCoins(attack, rng) {
   const flip = () => ((rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails');
 
   const multi = text.match(/flip (\d+) coins?/);
-  if (multi && /for each heads/.test(text)) {
+  if (multi) {
     const requested = Number.parseInt(multi[1], 10);
     // A printed count is always small; cap it so a malformed text cannot spin the RNG.
     const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 0), 20) : 0;
     const flips = Array.from({ length: count }, flip);
+    const headsCount = flips.filter((f) => f === 'heads').length;
     return {
-      coin: null,
-      headsCount: flips.filter((f) => f === 'heads').length,
+      coin: count === 1 ? flips[0] : headsCount === count ? 'heads' : headsCount === 0 ? 'tails' : null,
+      headsCount,
       flips,
     };
   }
   if (/flip a coin/.test(text)) {
     const coin = flip();
-    return { coin, headsCount: undefined, flips: [coin] };
+    return { coin, headsCount: coin === 'heads' ? 1 : 0, flips: [coin] };
   }
   return { coin: null, headsCount: undefined, flips: [] };
+}
+
+function resolveAttackStatusConditions(attack, { coin, headsCount = 0, flips = [] } = {}) {
+  const text = String(attack?.text || '').toLowerCase();
+  if (!text) return { defenderConditions: [], attackerConditions: [] };
+
+  const family = classifyAttackEffect(attack);
+  const toProperCase = (str) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+
+  // Coin check gating status application:
+  // e.g. "Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed."
+  const hasHeadsReq = /if heads[,.\s].*(asleep|paralyzed|poisoned|burned|confused)/.test(text);
+  const hasTailsReq = /if tails[,.\s].*(asleep|paralyzed|poisoned|burned|confused)/.test(text);
+  if (hasHeadsReq && coin !== 'heads' && headsCount < 1) {
+    return { defenderConditions: [], attackerConditions: [] };
+  }
+  if (hasTailsReq && coin !== 'tails' && flips.length > 0 && flips.every((f) => f === 'heads')) {
+    return { defenderConditions: [], attackerConditions: [] };
+  }
+
+  const self = selfStatus(text);
+  if (self) {
+    return { defenderConditions: [], attackerConditions: [toProperCase(self)] };
+  }
+
+  const dual = dualStatus(text);
+  if (dual) {
+    return { defenderConditions: dual.map(toProperCase), attackerConditions: [] };
+  }
+
+  switch (family) {
+    case 'status-asleep':
+      return { defenderConditions: ['Asleep'], attackerConditions: [] };
+    case 'status-paralyzed':
+      return { defenderConditions: ['Paralyzed'], attackerConditions: [] };
+    case 'status-poisoned':
+      return { defenderConditions: ['Poisoned'], attackerConditions: [] };
+    case 'status-burned':
+      return { defenderConditions: ['Burned'], attackerConditions: [] };
+    case 'status-confused':
+      return { defenderConditions: ['Confused'], attackerConditions: [] };
+    default:
+      return { defenderConditions: [], attackerConditions: [] };
+  }
 }
 
 /** Benched Pokémon of a player, roots only (attached cards are not targets). */
@@ -1193,9 +1243,11 @@ function promoteTrainerPlay(state, command) {
   const kind = `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
   if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
   // Effect text arrives later via cardStats. Until it does, playTrainer would find no steps
-  // and discard the card, so keep the plain move rather than silently spend the card. A Tool
-  // or Stadium needs no text: playTrainer attaches the Tool or places the Stadium.
-  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) return command;
+  // and discard the card, so reject the drop until cardStats arrives. A Tool or Stadium
+  // needs no text: playTrainer attaches the Tool or places the Stadium.
+  if (!/tool|stadium/.test(kind) && !trainerEffectText(card)) {
+    return { ...command, pendingDataReason: 'card_data_pending' };
+  }
   return { ...command, type: 'playTrainer', payload: { instanceId: payload.instanceId } };
 }
 
@@ -1770,6 +1822,34 @@ export function applyCommand(state, command, rng = null) {
             victim: attacker,
             events,
           });
+        }
+      }
+
+      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack
+      const { defenderConditions, attackerConditions } = resolveAttackStatusConditions(attack, {
+        coin,
+        headsCount,
+        flips,
+      });
+
+      if (defenderConditions.length > 0 && defender) {
+        // Only apply condition if defender survived the attack (not KO'd)
+        const defRef = findCard(draft, defender.instanceId);
+        if (defRef && defRef.zoneId === 'active') {
+          for (const cond of defenderConditions) {
+            addCondition(defRef.card, cond);
+            events.push(conditionsUpdatedEvent(defRef.card, cond));
+          }
+        }
+      }
+
+      if (attackerConditions.length > 0 && attacker) {
+        const atkRef = findCard(draft, attacker.instanceId);
+        if (atkRef && atkRef.zoneId === 'active') {
+          for (const cond of attackerConditions) {
+            addCondition(atkRef.card, cond);
+            events.push(conditionsUpdatedEvent(atkRef.card, cond));
+          }
         }
       }
 

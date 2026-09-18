@@ -299,7 +299,16 @@ export function installE2eApi() {
         }
         if (kind === 'ability') {
           const { useAbility } = await import('../../actions/counters/use-ability.js');
-          const ok = await useAbility('self', 'self', option.zone, option.index, true);
+          const authId = idsFor(option)?.[0] ?? option.instanceId ?? null;
+          const ok = await useAbility(
+            'self',
+            'self',
+            option.zone,
+            option.index,
+            true,
+            undefined,
+            authId
+          );
           return { ok: ok !== false };
         }
         if (kind === 'attack') {

@@ -16,8 +16,14 @@ export function isUsableAbilityCard(
   if (!card || !isAbilityCard(card)) return false;
   if (rulesEnabled && used) return false;
 
+  const firstAbility =
+    Array.isArray(card.abilities) && card.abilities.length > 0 ? card.abilities[0] : null;
   const abilityText =
-    card.ability?.text ?? card.abilityText ?? card.text ?? '';
+    (typeof firstAbility === 'string' ? firstAbility : firstAbility?.text) ??
+    card.ability?.text ??
+    card.abilityText ??
+    card.text ??
+    '';
   const steps = parseAbility(abilityText);
   const plan = planAbilitySteps(steps, { mode: 'interactive' });
   const actionable = actionableAbilityPlan(plan, { mode: 'interactive' }).filter(
@@ -70,12 +76,18 @@ export function filterUsableAbilities(
     ) {
       continue;
     }
+    const firstAbility =
+      Array.isArray(card.abilities) && card.abilities.length > 0 ? card.abilities[0] : null;
+    const abilityName =
+      (typeof firstAbility === 'object' ? firstAbility?.name : null) ||
+      card.ability?.name ||
+      'Ability';
     usable.push({
       card,
       zone,
       index,
       family: classifyAbility(card),
-      abilityName: card.ability?.name || 'Ability',
+      abilityName,
     });
   }
   return usable;
