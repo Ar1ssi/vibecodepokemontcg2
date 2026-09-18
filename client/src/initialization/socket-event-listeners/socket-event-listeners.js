@@ -34,7 +34,10 @@ import {
   resetRenderState,
   getLastRenderedVersion,
 } from '../../setup/netcode/apply-view.js';
-import { handleAdvisoryEvent, handleBeforeApply } from '../../setup/netcode/advisory-animations.js';
+import {
+  handleAdvisoryEvent,
+  handleBeforeApply,
+} from '../../setup/netcode/advisory-animations.js';
 import { handleAttackAnnouncement } from '../../setup/netcode/attack-announcements.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-table.js';
@@ -42,7 +45,11 @@ import { COVER_IMAGE_LISTENERS } from '../../setup/image-logic/cover-listener-ta
 import { sortZoneCardsForRender } from '../../setup/netcode/hand-sort-context.js';
 import { CHOICE_PICKER } from '../../setup/netcode/choice-picker-adapter.js';
 import { PRIZE_PICKER } from '../../setup/netcode/prize-picker-adapter.js';
-import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import {
+  hydrateHolo,
+  unhydrateHolo,
+} from '../../setup/deck-constructor/hydrate-holo.js';
+import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
 import { setInstanceMap } from '../../setup/netcode/dual-run-bridge.js';
 import { setDealOrder } from '../../setup/netcode/deal-order.js';
 import { registerTurnOrderCallListeners } from '../../setup/netcode/turn-order-call.js';
@@ -258,6 +265,7 @@ const seedNetcodeContext = () => {
     holo: { hydrate: hydrateHolo, unhydrate: unhydrateHolo },
     choicePicker: CHOICE_PICKER,
     prizePicker: PRIZE_PICKER,
+    reconcileHandStacks,
   });
   // Design 003 slice 1: the authoritative gate needs the same two browser-only
   // dependencies `apply-view.js` does, injected for the same reason
@@ -487,7 +495,8 @@ export const initializeSocketEventListeners = () => {
   registerTurnOrderCallListeners(socket);
 
   socket.on('dealOrder', (data) => {
-    if (Array.isArray(data?.order)) setDealOrder(data.order, data?.starter ?? null);
+    if (Array.isArray(data?.order))
+      setDealOrder(data.order, data?.starter ?? null);
   });
 
   // Either player's Reset restarted the server game. The peer that didn't click
@@ -617,7 +626,8 @@ export const initializeSocketEventListeners = () => {
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
     );
-    if (!notSpectator || !systemState.isTwoPlayer || !systemState.roomId) return;
+    if (!notSpectator || !systemState.isTwoPlayer || !systemState.roomId)
+      return;
     const response = buildPeerLogResponse({
       selfActionData: systemState.selfActionData,
       fromCounter: data?.fromCounter,
@@ -634,7 +644,9 @@ export const initializeSocketEventListeners = () => {
 
   // Our peer's reply to a requestPeerLog we sent on reconnect.
   socket.on('peerLog', (data) => {
-    if (!isPeerLogForMe({ toSocketId: data?.toSocketId, mySocketId: socket.id })) {
+    if (
+      !isPeerLogForMe({ toSocketId: data?.toSocketId, mySocketId: socket.id })
+    ) {
       return;
     }
     if (peerLogTimeout) {
@@ -782,7 +794,10 @@ export const initializeSocketEventListeners = () => {
     appendMessage('self', message, 'announcement', false);
   });
 
-  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  if (
+    typeof document !== 'undefined' &&
+    typeof document.addEventListener === 'function'
+  ) {
     document.addEventListener('action-processed', () => {
       if (systemState.isTwoPlayer) {
         emitSpectatorDataDebounced();
@@ -804,12 +819,12 @@ export const initializeSocketEventListeners = () => {
     });
   }
 
-  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.addEventListener === 'function'
+  ) {
     window.addEventListener('focus', () => {
-      if (
-        systemState.isTwoPlayer &&
-        systemState.roomId
-      ) {
+      if (systemState.isTwoPlayer && systemState.roomId) {
         if (!socket.connected) {
           logSync('focus.reconnect', {}, 'local');
           socket.connect();

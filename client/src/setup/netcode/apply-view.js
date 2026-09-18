@@ -24,7 +24,10 @@ import {
 } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
-import { listConditions, ROTATION_CONDITIONS } from '../../../../shared/engine/rules/special-conditions.mjs';
+import {
+  listConditions,
+  ROTATION_CONDITIONS,
+} from '../../../../shared/engine/rules/special-conditions.mjs';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -56,6 +59,7 @@ let defaultNetcodeContext = {
   // { open({ choice, cards, onResolve }), close() } — the prize fly-up picker
   // (prize-take-prompt.js), injected for the same reason.
   prizePicker: null,
+  reconcileHandStacks: null,
 };
 
 // choiceId the injected card picker is currently showing, so re-applying a view
@@ -72,7 +76,15 @@ const PLAY_ZONES = ['active', 'bench'];
 
 // Zones legacy move-card.js gives a holofoil wrapper; stadium and attached cards
 // never get one.
-const HOLO_ZONES = ['hand', 'prizes', 'discard', 'lostZone', 'board', 'active', 'bench'];
+const HOLO_ZONES = [
+  'hand',
+  'prizes',
+  'discard',
+  'lostZone',
+  'board',
+  'active',
+  'bench',
+];
 
 // Legacy attach-card.js token geometry, as fractions of the parent card.
 const ENERGY_TOKEN_SIZE = 0.24;
@@ -81,7 +93,14 @@ const ENERGY_TOKEN_BOTTOM = 0.03;
 // Legacy attach-card.js / evolve-card.js offsets, as fractions of the visible card's width.
 const ATTACHED_CARD_SHIFT = 1 / 6;
 const UNDER_POKEMON_SHIFT = 1 / 15;
-const STACK_STYLE_KEYS = ['position', 'width', 'height', 'left', 'bottom', 'zIndex'];
+const STACK_STYLE_KEYS = [
+  'position',
+  'width',
+  'height',
+  'left',
+  'bottom',
+  'zIndex',
+];
 const COUNT_ZONES = ['deck', 'discard', 'lostZone', 'hand'];
 
 /**
@@ -118,14 +137,22 @@ export function getLastRenderedVersion() {
 export function setDefaultNetcodeContext(ctx = {}) {
   if (ctx.socket !== undefined) defaultNetcodeContext.socket = ctx.socket;
   if (ctx.roomId !== undefined) defaultNetcodeContext.roomId = ctx.roomId;
-  if (ctx.systemState !== undefined) defaultNetcodeContext.systemState = ctx.systemState;
+  if (ctx.systemState !== undefined)
+    defaultNetcodeContext.systemState = ctx.systemState;
   if (ctx.getZone !== undefined) defaultNetcodeContext.getZone = ctx.getZone;
-  if (ctx.cardListeners !== undefined) defaultNetcodeContext.cardListeners = ctx.cardListeners;
-  if (ctx.coverListeners !== undefined) defaultNetcodeContext.coverListeners = ctx.coverListeners;
-  if (ctx.sortZoneCards !== undefined) defaultNetcodeContext.sortZoneCards = ctx.sortZoneCards;
+  if (ctx.cardListeners !== undefined)
+    defaultNetcodeContext.cardListeners = ctx.cardListeners;
+  if (ctx.coverListeners !== undefined)
+    defaultNetcodeContext.coverListeners = ctx.coverListeners;
+  if (ctx.sortZoneCards !== undefined)
+    defaultNetcodeContext.sortZoneCards = ctx.sortZoneCards;
   if (ctx.holo !== undefined) defaultNetcodeContext.holo = ctx.holo;
-  if (ctx.choicePicker !== undefined) defaultNetcodeContext.choicePicker = ctx.choicePicker;
-  if (ctx.prizePicker !== undefined) defaultNetcodeContext.prizePicker = ctx.prizePicker;
+  if (ctx.choicePicker !== undefined)
+    defaultNetcodeContext.choicePicker = ctx.choicePicker;
+  if (ctx.prizePicker !== undefined)
+    defaultNetcodeContext.prizePicker = ctx.prizePicker;
+  if (ctx.reconcileHandStacks !== undefined)
+    defaultNetcodeContext.reconcileHandStacks = ctx.reconcileHandStacks;
 }
 
 /**
@@ -139,7 +166,9 @@ export function getDefaultNetcodeContext() {
     roomId:
       typeof defaultNetcodeContext.roomId === 'function'
         ? defaultNetcodeContext.roomId()
-        : defaultNetcodeContext.roomId || defaultNetcodeContext.systemState?.roomId || null,
+        : defaultNetcodeContext.roomId ||
+          defaultNetcodeContext.systemState?.roomId ||
+          null,
     systemState: defaultNetcodeContext.systemState,
   };
 }
@@ -167,6 +196,7 @@ export function resetRenderState() {
     holo: null,
     choicePicker: null,
     prizePicker: null,
+    reconcileHandStacks: null,
   };
 }
 
@@ -257,7 +287,8 @@ function resolveZone(side, zoneId, options = {}) {
     return defaultNetcodeContext.getZone(user, zoneId);
   }
 
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return { element: null, array: [] };
 
   const element = doc.getElementById ? doc.getElementById(zoneId) : null;
@@ -302,7 +333,11 @@ function resolveCardBackSrc(side, options = {}) {
   if (!systemState) return fallback;
 
   if (side === 'you') return systemState.cardBackSrc || fallback;
-  return (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc) || fallback;
+  return (
+    (systemState.isTwoPlayer
+      ? systemState.p2OppCardBackSrc
+      : systemState.p1OppCardBackSrc) || fallback
+  );
 }
 
 /**
@@ -315,7 +350,8 @@ function resolveCardBackSrc(side, options = {}) {
  * @returns {HTMLElement}
  */
 function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc || typeof doc.createElement !== 'function') {
     return {
       tagName: 'IMG',
@@ -330,7 +366,7 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
   const instanceId = cardData.instanceId;
   const isRedacted = !cardData.name && !cardData.src;
   const cardBackSrc = resolveCardBackSrc(side, options);
-  const displaySrc = isRedacted ? cardBackSrc : (cardData.src || cardBackSrc);
+  const displaySrc = isRedacted ? cardBackSrc : cardData.src || cardBackSrc;
 
   let record = cardRegistry.get(instanceId);
   let img = record?.element;
@@ -345,7 +381,8 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
     // them itself (they pull in state.js, which is unimportable outside a
     // browser). Unwired (tests, or before that wiring lands) the card is a
     // bare, non-interactive <img> — identical to pre-3.6 behavior.
-    const cardListeners = options.cardListeners || defaultNetcodeContext.cardListeners;
+    const cardListeners =
+      options.cardListeners || defaultNetcodeContext.cardListeners;
     const user = side === 'you' ? 'self' : side === 'them' ? 'opp' : side;
     img = buildCardImage(doc, {
       user,
@@ -466,7 +503,12 @@ function getRect(el) {
  * @param {object} zoneRect Zone element's bounding rect
  * @param {{ leftOffset: number, size: number, fontSize: number, topOffset?: number }} spec
  */
-function positionOverlay(overlay, targetRect, zoneRect, { leftOffset, size, fontSize, topOffset = 0 }) {
+function positionOverlay(
+  overlay,
+  targetRect,
+  zoneRect,
+  { leftOffset, size, fontSize, topOffset = 0 }
+) {
   overlay.style.display = 'inline-block';
   overlay.style.left = `${targetRect.left - zoneRect.left + leftOffset}px`;
   overlay.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 4 + topOffset}px`;
@@ -509,8 +551,18 @@ function overlaySideClass(side, options = {}) {
  * @param {string} side
  * @param {object} options
  */
-function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
-  const damage = typeof cardData.damage === 'number' && cardData.damage > 0 ? cardData.damage : 0;
+function reconcileDamageOverlay(
+  cardData,
+  img,
+  zoneElement,
+  side,
+  options = {},
+  rectImg = img
+) {
+  const damage =
+    typeof cardData.damage === 'number' && cardData.damage > 0
+      ? cardData.damage
+      : 0;
 
   if (damage <= 0) {
     if (img.damageCounter) {
@@ -522,7 +574,10 @@ function reconcileDamageOverlay(cardData, img, zoneElement, side, options = {}, 
     return;
   }
 
-  const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    img.ownerDocument ||
+    options.document ||
+    (typeof document !== 'undefined' ? document : null);
   let counter = img.damageCounter;
   if (!counter) {
     if (!doc || typeof doc.createElement !== 'function') return;
@@ -579,11 +634,22 @@ function removeOverlaySlot(img, slot) {
  * @param {string} side
  * @param {object} options
  */
-function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
+function reconcileSpecialConditionOverlay(
+  cardData,
+  img,
+  zoneElement,
+  side,
+  options = {},
+  rectImg = img
+) {
   const held = listConditions(cardData);
   const markersInDisplayOrder = [
-    ...held.filter((c) => ROTATION_CONDITIONS.includes(c)).map((c) => [CONDITION_MARKER_SLOTS.rotation, c]),
-    ...held.filter((c) => !ROTATION_CONDITIONS.includes(c)).map((c) => [CONDITION_MARKER_SLOTS[c], c]),
+    ...held
+      .filter((c) => ROTATION_CONDITIONS.includes(c))
+      .map((c) => [CONDITION_MARKER_SLOTS.rotation, c]),
+    ...held
+      .filter((c) => !ROTATION_CONDITIONS.includes(c))
+      .map((c) => [CONDITION_MARKER_SLOTS[c], c]),
   ];
   const wantedSlots = new Set(markersInDisplayOrder.map(([slot]) => slot));
   for (const slot of Object.values(CONDITION_MARKER_SLOTS)) {
@@ -591,7 +657,10 @@ function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, opti
   }
   if (markersInDisplayOrder.length === 0) return;
 
-  const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    img.ownerDocument ||
+    options.document ||
+    (typeof document !== 'undefined' ? document : null);
   const targetRect = getRect(rectImg);
   const zoneRect = getRect(zoneElement);
   const size = targetRect.width / 3;
@@ -606,7 +675,10 @@ function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, opti
       img[slot] = marker;
     }
 
-    applySpecialConditionStyle(marker, CONDITION_WORD_TO_CODE[condition] || condition);
+    applySpecialConditionStyle(
+      marker,
+      CONDITION_WORD_TO_CODE[condition] || condition
+    );
 
     if (zoneElement && marker.parentNode !== zoneElement) {
       zoneElement.appendChild(marker);
@@ -631,9 +703,23 @@ function reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, opti
  * @param {string} side
  * @param {object} options
  */
-function reconcileCardOverlays(cardData, img, zoneElement, side, options = {}, rectImg = img) {
+function reconcileCardOverlays(
+  cardData,
+  img,
+  zoneElement,
+  side,
+  options = {},
+  rectImg = img
+) {
   reconcileDamageOverlay(cardData, img, zoneElement, side, options, rectImg);
-  reconcileSpecialConditionOverlay(cardData, img, zoneElement, side, options, rectImg);
+  reconcileSpecialConditionOverlay(
+    cardData,
+    img,
+    zoneElement,
+    side,
+    options,
+    rectImg
+  );
   reconcileAbilityOverlay(cardData, img, zoneElement, side, options, rectImg);
 }
 
@@ -642,16 +728,27 @@ function reconcileCardOverlays(cardData, img, zoneElement, side, options = {}, r
  * draws across the card's middle, display-only like the other overlays.
  * Stored in `img.abilityCounter`, the same slot legacy uses.
  */
-function reconcileAbilityOverlay(cardData, img, zoneElement, side, options = {}, rectImg = img) {
+function reconcileAbilityOverlay(
+  cardData,
+  img,
+  zoneElement,
+  side,
+  options = {},
+  rectImg = img
+) {
   if (!cardData.abilityUsed) {
     if (img.abilityCounter) {
-      if (img.abilityCounter.parentNode) img.abilityCounter.parentNode.removeChild(img.abilityCounter);
+      if (img.abilityCounter.parentNode)
+        img.abilityCounter.parentNode.removeChild(img.abilityCounter);
       img.abilityCounter = null;
     }
     return;
   }
 
-  const doc = img.ownerDocument || options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    img.ownerDocument ||
+    options.document ||
+    (typeof document !== 'undefined' ? document : null);
   let tab = img.abilityCounter;
   if (!tab) {
     if (!doc || typeof doc.createElement !== 'function') return;
@@ -686,8 +783,18 @@ export function repositionCardOverlays(options = lastOverlayOptions) {
     if (!record.overlayImage || !record.element.parentNode) continue;
     const zone = resolveZone(record.side, record.zone, options);
     if (!zone.element) continue;
-    const overlayData = { ...record.card, abilityUsed: Boolean(record.element.abilityCounter) };
-    reconcileCardOverlays(overlayData, record.element, zone.element, record.side, options, record.overlayImage);
+    const overlayData = {
+      ...record.card,
+      abilityUsed: Boolean(record.element.abilityCounter),
+    };
+    reconcileCardOverlays(
+      overlayData,
+      record.element,
+      zone.element,
+      record.side,
+      options,
+      record.overlayImage
+    );
   }
 }
 
@@ -702,7 +809,8 @@ export function repositionCardOverlays(options = lastOverlayOptions) {
  *   card was placed as an attachment
  */
 function placeCardInZone(cardData, side, zoneId, options = {}) {
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   const zone = resolveZone(side, zoneId, options);
   const record = cardRegistry.get(cardData.instanceId);
   if (!zone.element || !record) return { attachedParent: null };
@@ -800,7 +908,10 @@ function reconcileHolo(record, zoneId, isAttached, options = {}) {
   const holo = holoApi(options);
   if (!holo) return;
   const wantsHolo =
-    !isAttached && !record.isRedacted && Boolean(record.holoCard.name) && HOLO_ZONES.includes(zoneId);
+    !isAttached &&
+    !record.isRedacted &&
+    Boolean(record.holoCard.name) &&
+    HOLO_ZONES.includes(zoneId);
   if (!wantsHolo) {
     unhydrateCard(record, options);
     return;
@@ -917,7 +1028,9 @@ function layoutCardStack(rootRecord, attached) {
   }
   if (rootRecord.container?.style) {
     rootRecord.container.style.width =
-      shiftLayer > 0 && cardWidth ? `${cardWidth * (1 + shiftLayer * ATTACHED_CARD_SHIFT)}px` : '';
+      shiftLayer > 0 && cardWidth
+        ? `${cardWidth * (1 + shiftLayer * ATTACHED_CARD_SHIFT)}px`
+        : '';
   }
 
   // The double-click carousel reads the clicked card's attachedCards
@@ -934,7 +1047,11 @@ function layoutCardStack(rootRecord, attached) {
  * every offset and token at 0px. Lay the stack out again once it has one.
  */
 function relayoutWhenLoaded(rootRecord, displayImg) {
-  if (displayImg.complete !== false || typeof displayImg.addEventListener !== 'function') return;
+  if (
+    displayImg.complete !== false ||
+    typeof displayImg.addEventListener !== 'function'
+  )
+    return;
   if (displayImg.stackRelayoutPending) return;
   displayImg.stackRelayoutPending = true;
   displayImg.addEventListener(
@@ -957,19 +1074,28 @@ function layoutCardStacks(placed) {
   const attachedByRoot = new Map();
   for (const entry of placed) {
     if (!entry.attachedParent) continue;
-    if (!attachedByRoot.has(entry.attachedParent)) attachedByRoot.set(entry.attachedParent, []);
+    if (!attachedByRoot.has(entry.attachedParent))
+      attachedByRoot.set(entry.attachedParent, []);
     attachedByRoot.get(entry.attachedParent).push(entry);
   }
   const displayByRoot = new Map();
   for (const entry of placed) {
     if (entry.attachedParent || !PLAY_ZONES.includes(entry.zoneId)) continue;
-    displayByRoot.set(entry.record, layoutCardStack(entry.record, attachedByRoot.get(entry.record) || []));
+    displayByRoot.set(
+      entry.record,
+      layoutCardStack(entry.record, attachedByRoot.get(entry.record) || [])
+    );
   }
   return displayByRoot;
 }
 
 function bindOverlayResize() {
-  if (resizeListenerBound || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  if (
+    resizeListenerBound ||
+    typeof window === 'undefined' ||
+    typeof window.addEventListener !== 'function'
+  )
+    return;
   resizeListenerBound = true;
   window.addEventListener('resize', () => repositionCardOverlays());
 }
@@ -1010,19 +1136,40 @@ function reconcilePlacedCard(entry, displayByRoot, options = {}) {
 
   const zone = resolveZone(side, zoneId, options);
   if (attachedParent) {
-    reconcileCardOverlays(NO_OVERLAYS, record.element, zone.element, side, options);
+    reconcileCardOverlays(
+      NO_OVERLAYS,
+      record.element,
+      zone.element,
+      side,
+      options
+    );
     return;
   }
   record.overlayImage = displayRecord.element;
   const overlayData = {
     ...cardData,
-    abilityUsed: Boolean(cardData.abilityUsed || displayRecord.card.abilityUsed),
+    abilityUsed: Boolean(
+      cardData.abilityUsed || displayRecord.card.abilityUsed
+    ),
   };
   if (displayRecord !== record) {
     // Overlays live on the root's <img> (their storage slot), positioned over the visible card.
-    reconcileCardOverlays(NO_OVERLAYS, displayRecord.element, zone.element, side, options);
+    reconcileCardOverlays(
+      NO_OVERLAYS,
+      displayRecord.element,
+      zone.element,
+      side,
+      options
+    );
   }
-  reconcileCardOverlays(overlayData, record.element, zone.element, side, options, displayRecord.element);
+  reconcileCardOverlays(
+    overlayData,
+    record.element,
+    zone.element,
+    side,
+    options,
+    displayRecord.element
+  );
 }
 
 /**
@@ -1033,7 +1180,9 @@ function reconcileZoneCounts(side, zones, options = {}) {
   for (const zoneId of COUNT_ZONES) {
     const zoneData = zones[zoneId];
     if (zoneData === undefined) continue;
-    const count = Array.isArray(zoneData) ? zoneData.length : Number(zoneData?.count) || 0;
+    const count = Array.isArray(zoneData)
+      ? zoneData.length
+      : Number(zoneData?.count) || 0;
     const doc = resolveZone(side, zoneId, options).element?.ownerDocument;
     const label = doc?.getElementById?.(`${zoneId}Count`);
     if (label) label.textContent = String(count);
@@ -1089,8 +1238,14 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
 
   const key = `${side}:${zoneId}`;
   const isDeck = zoneId === 'deck';
-  const topCard = isDeck ? null : Array.isArray(zoneData) && zoneData.length > 0 ? zoneData[zoneData.length - 1] : null;
-  const hasCards = isDeck ? Boolean(zoneData && zoneData.count > 0) : Boolean(topCard);
+  const topCard = isDeck
+    ? null
+    : Array.isArray(zoneData) && zoneData.length > 0
+      ? zoneData[zoneData.length - 1]
+      : null;
+  const hasCards = isDeck
+    ? Boolean(zoneData && zoneData.count > 0)
+    : Boolean(topCard);
 
   if (!hasCards) {
     const existing = coverRegistry.get(key);
@@ -1099,10 +1254,12 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
     return;
   }
 
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc || typeof doc.createElement !== 'function') return;
 
-  const coverListeners = options.coverListeners || defaultNetcodeContext.coverListeners;
+  const coverListeners =
+    options.coverListeners || defaultNetcodeContext.coverListeners;
   const user = side === 'you' ? 'self' : 'opp';
   const id = `${zoneId}Cover`;
 
@@ -1122,14 +1279,19 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
     coverRegistry.set(key, img);
   }
 
-  const src = isDeck ? resolveCardBackSrc(side, options) : topCard.src || resolveCardBackSrc(side, options);
+  const src = isDeck
+    ? resolveCardBackSrc(side, options)
+    : topCard.src || resolveCardBackSrc(side, options);
   img.setAttribute('src', src);
   img.setAttribute('alt', isDeck ? id : topCard.name || id);
 
   // Legacy keeps exactly one child in elementCover, replacing it on every
   // update (`update-cover.js`'s removeChild-then-appendChild pattern).
   if (img.parentNode !== zone.elementCover) {
-    while (zone.elementCover.children && zone.elementCover.children.length > 0) {
+    while (
+      zone.elementCover.children &&
+      zone.elementCover.children.length > 0
+    ) {
       zone.elementCover.removeChild(zone.elementCover.children[0]);
     }
     zone.elementCover.appendChild(img);
@@ -1143,10 +1305,13 @@ function reconcileZoneCover(side, zoneId, zoneData, options = {}) {
  * @param {object} options
  */
 function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
 
-  const stadiumElement = doc.getElementById ? doc.getElementById('stadium') : null;
+  const stadiumElement = doc.getElementById
+    ? doc.getElementById('stadium')
+    : null;
   if (!stadiumElement) return;
 
   if (!stadiumCard) {
@@ -1157,7 +1322,12 @@ function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
     return;
   }
 
-  const img = createOrUpdateCardElement(stadiumCard, 'neutral', 'stadium', options);
+  const img = createOrUpdateCardElement(
+    stadiumCard,
+    'neutral',
+    'stadium',
+    options
+  );
   unhydrateCard(cardRegistry.get(stadiumCard.instanceId), options);
   // Legacy update-stadium-card.js: the Stadium reads upright for whoever played it.
   const ownerId = stadiumCard.ownerId || stadiumCard.playerId || null;
@@ -1183,27 +1353,36 @@ function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
  * @param {object} options
  */
 function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
 
-  const existingModal = doc.getElementById ? doc.getElementById('netcodeChoiceModal') : null;
-  const existingBanner = doc.getElementById ? doc.getElementById('netcodeChoiceBanner') : null;
+  const existingModal = doc.getElementById
+    ? doc.getElementById('netcodeChoiceModal')
+    : null;
+  const existingBanner = doc.getElementById
+    ? doc.getElementById('netcodeChoiceBanner')
+    : null;
 
   if (!pendingChoice) {
     closePrizePicker(options);
     closeChoicePicker(options);
-    if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
-    if (existingBanner?.parentNode) existingBanner.parentNode.removeChild(existingBanner);
+    if (existingModal?.parentNode)
+      existingModal.parentNode.removeChild(existingModal);
+    if (existingBanner?.parentNode)
+      existingBanner.parentNode.removeChild(existingBanner);
     return;
   }
 
-  const isOwner = !pendingChoice.player || pendingChoice.player === localPlayerId;
+  const isOwner =
+    !pendingChoice.player || pendingChoice.player === localPlayerId;
 
   if (!isOwner) {
     // Opponent is choosing: show non-interactive waiting banner
     closePrizePicker(options);
     closeChoicePicker(options);
-    if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
+    if (existingModal?.parentNode)
+      existingModal.parentNode.removeChild(existingModal);
     let banner = existingBanner;
     if (!banner) {
       banner = doc.createElement('div');
@@ -1216,17 +1395,20 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
   }
 
   // Local player must make a choice: mount interactive picker
-  if (existingBanner?.parentNode) existingBanner.parentNode.removeChild(existingBanner);
+  if (existingBanner?.parentNode)
+    existingBanner.parentNode.removeChild(existingBanner);
 
   if (openChoiceInPrizePicker(pendingChoice, options)) {
     closeChoicePicker(options);
-    if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
+    if (existingModal?.parentNode)
+      existingModal.parentNode.removeChild(existingModal);
     return;
   }
   closePrizePicker(options);
 
   if (openChoiceInCardPicker(pendingChoice, options)) {
-    if (existingModal?.parentNode) existingModal.parentNode.removeChild(existingModal);
+    if (existingModal?.parentNode)
+      existingModal.parentNode.removeChild(existingModal);
     return;
   }
   closeChoicePicker(options);
@@ -1279,7 +1461,9 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     confirmBtn.textContent = `Confirm (${count}/${max})`;
   };
 
-  const optionsList = Array.isArray(pendingChoice.options) ? pendingChoice.options : [];
+  const optionsList = Array.isArray(pendingChoice.options)
+    ? pendingChoice.options
+    : [];
   for (const opt of optionsList) {
     const optDiv = doc.createElement('div');
     optDiv.className = 'choice-option-card';
@@ -1345,8 +1529,11 @@ function choicePickerApi(options = {}) {
 function openChoiceInCardPicker(pendingChoice, options = {}) {
   const picker = choicePickerApi(options);
   if (typeof picker?.open !== 'function') return false;
-  const choiceOptions = Array.isArray(pendingChoice.options) ? pendingChoice.options : [];
-  if (choiceOptions.length === 0 || !choiceOptions.every((opt) => opt?.src)) return false;
+  const choiceOptions = Array.isArray(pendingChoice.options)
+    ? pendingChoice.options
+    : [];
+  if (choiceOptions.length === 0 || !choiceOptions.every((opt) => opt?.src))
+    return false;
   if (openPickerChoiceId === pendingChoice.choiceId) return true;
 
   closeChoicePicker(options);
@@ -1382,8 +1569,11 @@ function openChoiceInPrizePicker(pendingChoice, options = {}) {
   if (typeof picker?.open !== 'function') return false;
   if (openPrizeChoiceId === pendingChoice.choiceId) return true;
 
-  const records = (pendingChoice.options || []).map((opt) => cardRegistry.get(opt.instanceId));
-  if (records.length === 0 || records.some((record) => !record?.element)) return false;
+  const records = (pendingChoice.options || []).map((opt) =>
+    cardRegistry.get(opt.instanceId)
+  );
+  if (records.length === 0 || records.some((record) => !record?.element))
+    return false;
   const cards = records.map((record) => ({
     instanceId: record.instanceId,
     image: record.element,
@@ -1476,10 +1666,13 @@ export function reconcileTurnState(view, options = {}) {
     state.flags[side] = { ...(state.flags[side] || {}), ...flags };
   }
 
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (doc) {
     doc.dispatchEvent(
-      new CustomEvent('rules-turn-view-applied', { detail: { player: turnPlayer } })
+      new CustomEvent('rules-turn-view-applied', {
+        detail: { player: turnPlayer },
+      })
     );
   }
 
@@ -1493,11 +1686,16 @@ export function reconcileTurnState(view, options = {}) {
  * @param {object} [options={}]
  */
 export function reconcileGameEnded(view, options = {}) {
-  const doc = options.document || (typeof document !== 'undefined' ? document : null);
+  const doc =
+    options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
 
-  const existingModal = doc.getElementById ? doc.getElementById('netcodeEndModal') : null;
-  const rulesEndScreen = doc.getElementById ? doc.getElementById('rulesEndScreen') : null;
+  const existingModal = doc.getElementById
+    ? doc.getElementById('netcodeEndModal')
+    : null;
+  const rulesEndScreen = doc.getElementById
+    ? doc.getElementById('rulesEndScreen')
+    : null;
 
   if (!view || view.turn?.phase !== 'ended') {
     if (existingModal?.parentNode) {
@@ -1510,15 +1708,25 @@ export function reconcileGameEnded(view, options = {}) {
   }
 
   // Phase is ended: ensure pending choice overlays are cleared
-  const existingChoiceModal = doc.getElementById ? doc.getElementById('netcodeChoiceModal') : null;
-  const existingChoiceBanner = doc.getElementById ? doc.getElementById('netcodeChoiceBanner') : null;
-  if (existingChoiceModal?.parentNode) existingChoiceModal.parentNode.removeChild(existingChoiceModal);
-  if (existingChoiceBanner?.parentNode) existingChoiceBanner.parentNode.removeChild(existingChoiceBanner);
+  const existingChoiceModal = doc.getElementById
+    ? doc.getElementById('netcodeChoiceModal')
+    : null;
+  const existingChoiceBanner = doc.getElementById
+    ? doc.getElementById('netcodeChoiceBanner')
+    : null;
+  if (existingChoiceModal?.parentNode)
+    existingChoiceModal.parentNode.removeChild(existingChoiceModal);
+  if (existingChoiceBanner?.parentNode)
+    existingChoiceBanner.parentNode.removeChild(existingChoiceBanner);
   closeChoicePicker(options);
 
   const localPlayerId = view.you?.playerId || null;
-  const isWinner = Boolean(view.winner && localPlayerId && view.winner === localPlayerId);
-  const isLoser = Boolean(view.winner && localPlayerId && view.winner !== localPlayerId);
+  const isWinner = Boolean(
+    view.winner && localPlayerId && view.winner === localPlayerId
+  );
+  const isLoser = Boolean(
+    view.winner && localPlayerId && view.winner !== localPlayerId
+  );
 
   let titleText = 'Game Over';
   if (isWinner) {
@@ -1530,7 +1738,9 @@ export function reconcileGameEnded(view, options = {}) {
     titleText = `${oppName} Wins!`;
   }
 
-  const reasonText = view.winReason ? `Reason: ${view.winReason}` : 'The game has ended.';
+  const reasonText = view.winReason
+    ? `Reason: ${view.winReason}`
+    : 'The game has ended.';
 
   // If rulesEndScreen exists from HTML/EJS, synchronize and display it
   if (rulesEndScreen) {
@@ -1559,7 +1769,8 @@ export function reconcileGameEnded(view, options = {}) {
   modal.appendChild(container);
 
   const titleEl = doc.createElement('h2');
-  titleEl.className = `game-end-modal-title ${isWinner ? 'winner' : isLoser ? 'loser' : ''}`.trim();
+  titleEl.className =
+    `game-end-modal-title ${isWinner ? 'winner' : isLoser ? 'loser' : ''}`.trim();
   titleEl.textContent = titleText;
   container.appendChild(titleEl);
 
@@ -1618,14 +1829,16 @@ async function resolveNetcodeContext(options = {}) {
 
   if (typeof window !== 'undefined') {
     if (!socket && window.socket) socket = window.socket;
-    if (!roomId && window.systemState?.roomId) roomId = window.systemState.roomId;
+    if (!roomId && window.systemState?.roomId)
+      roomId = window.systemState.roomId;
   }
 
   if ((!socket || !roomId) && typeof window !== 'undefined') {
     try {
       const state = await import('../../state.js');
       if (!socket && state.socket) socket = state.socket;
-      if (!roomId && state.systemState?.roomId) roomId = state.systemState.roomId;
+      if (!roomId && state.systemState?.roomId)
+        roomId = state.systemState.roomId;
     } catch {
       // dynamic import fallback ignored if unavailable
     }
@@ -1699,14 +1912,24 @@ export function applyView(view, events = [], options = {}) {
       }
       if (!Array.isArray(cards)) continue;
 
-      const sortFn = options.sortZoneCards || defaultNetcodeContext.sortZoneCards;
-      const orderedCards = typeof sortFn === 'function' ? sortFn(side, zoneId, cards) || cards : cards;
+      const sortFn =
+        options.sortZoneCards || defaultNetcodeContext.sortZoneCards;
+      const orderedCards =
+        typeof sortFn === 'function'
+          ? sortFn(side, zoneId, cards) || cards
+          : cards;
 
       for (const cardData of orderedCards) {
         createOrUpdateCardElement(cardData, side, zoneId, options);
-        const { attachedParent } = placeCardInZone(cardData, side, zoneId, options);
+        const { attachedParent } = placeCardInZone(
+          cardData,
+          side,
+          zoneId,
+          options
+        );
         const record = cardRegistry.get(cardData.instanceId);
-        if (record) placed.push({ cardData, side, zoneId, record, attachedParent });
+        if (record)
+          placed.push({ cardData, side, zoneId, record, attachedParent });
       }
     }
     reconcileZoneCounts(side, playerView.zones, options);
@@ -1742,7 +1965,9 @@ export function applyView(view, events = [], options = {}) {
       // Counter overlays are siblings of the image in the zone element, not children of
       // it or its play-container — removing the image/container leaves them orphaned.
       if (record.element?.damageCounter?.parentNode) {
-        record.element.damageCounter.parentNode.removeChild(record.element.damageCounter);
+        record.element.damageCounter.parentNode.removeChild(
+          record.element.damageCounter
+        );
       }
       for (const slot of Object.values(CONDITION_MARKER_SLOTS)) {
         if (record.element?.[slot]?.parentNode) {
@@ -1750,7 +1975,9 @@ export function applyView(view, events = [], options = {}) {
         }
       }
       if (record.element?.abilityCounter?.parentNode) {
-        record.element.abilityCounter.parentNode.removeChild(record.element.abilityCounter);
+        record.element.abilityCounter.parentNode.removeChild(
+          record.element.abilityCounter
+        );
       }
       unhydrateCard(record, options);
       if (record.container && record.container.parentNode) {
@@ -1760,6 +1987,12 @@ export function applyView(view, events = [], options = {}) {
       }
       cardRegistry.delete(id);
     }
+  }
+
+  const reconcileHand =
+    options.reconcileHandStacks || defaultNetcodeContext.reconcileHandStacks;
+  if (typeof reconcileHand === 'function') {
+    reconcileHand('self', options);
   }
 
   // Reconcile neutral Stadium

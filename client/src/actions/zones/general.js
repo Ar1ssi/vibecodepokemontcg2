@@ -9,14 +9,21 @@ import { determineDeckData } from '../../setup/general/determine-deckdata.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { shuffleIndices } from '../../setup/general/shuffle.js';
-import { appendZoneImage, clearZoneImages } from '../../setup/image-logic/rebuild-zone-dom.js';
+import {
+  appendZoneImage,
+  clearZoneImages,
+} from '../../setup/image-logic/rebuild-zone-dom.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { addAbilityCounter } from '../counters/ability-counter.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
-import { hydrateHolo, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import {
+  hydrateHolo,
+  unhydrateHolo,
+} from '../../setup/deck-constructor/hydrate-holo.js';
 import { sortCardsByDeckList } from '/shared/engine/zones/hand-sort.mjs';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
+import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
@@ -250,14 +257,21 @@ export const closeDisplay = (user, zoneId) => {
   zone.element.style.display = 'none';
 };
 
-export const leaveAll = (user, initiator, oZoneId, dZoneIdParam, emit = true) => {
+export const leaveAll = (
+  user,
+  initiator,
+  oZoneId,
+  dZoneIdParam,
+  emit = true
+) => {
   // Handle backward compatibility: if dZoneIdParam is boolean, it's the old emit parameter
   if (typeof dZoneIdParam === 'boolean') {
     emit = dZoneIdParam;
     dZoneIdParam = undefined;
   }
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  const dZoneId = dZoneIdParam || (mouseClick.isActiveZone ? 'active' : 'bench');
+  const dZoneId =
+    dZoneIdParam || (mouseClick.isActiveZone ? 'active' : 'bench');
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
     processAction(user, emit, 'leaveAll', [oInitiator, oZoneId, dZoneId]);
     return;
@@ -348,9 +362,7 @@ export const sort = (user, zoneId) => {
   const isSortedZone2P =
     systemState.isTwoPlayer &&
     (zoneId === 'hand' || zoneId === 'discard' || zoneId === 'lostZone');
-  const sortByDeckList =
-    ((checkbox?.checked || isSortedZone2P) &&
-      deckData);
+  const sortByDeckList = (checkbox?.checked || isSortedZone2P) && deckData;
 
   if (sortByDeckList) {
     const sorted = sortCardsByDeckList(zone.array, deckData);
@@ -382,5 +394,8 @@ export const sort = (user, zoneId) => {
   }
   if (['hand', 'prizes', 'discard', 'lostZone'].includes(zoneId)) {
     zone.array.forEach((card) => hydrateHolo(card));
+  }
+  if (zoneId === 'hand') {
+    reconcileHandStacks(user);
   }
 };
