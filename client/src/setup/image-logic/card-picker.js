@@ -698,9 +698,49 @@ const confirmPicker = async (state) => {
         '../../actions/move-card-bundle/move-card-bundle.js'
       );
       await movePicksInOrder(picks, (cand) => {
-        const idx = getZone(user, zoneFrom).array.indexOf(cand);
-        if (idx < 0) return undefined;
-        return moveCardBundle(user, user, zoneFrom, destination, idx, false, 'move');
+        let idx = getZone(user, zoneFrom)?.array?.indexOf(cand) ?? -1;
+        const rawInstanceId =
+          cand?.instanceId ??
+          cand?.dataset?.instanceId ??
+          cand?.closest?.('[data-instance-id]')?.dataset?.instanceId ??
+          null;
+        const instanceId =
+          rawInstanceId != null && Number.isInteger(Number(rawInstanceId))
+            ? Number(rawInstanceId)
+            : null;
+
+        if (idx < 0) {
+          const zoneArr = getZone(user, zoneFrom)?.array || [];
+          if (instanceId != null) {
+            idx = zoneArr.findIndex(
+              (c) =>
+                c?.instanceId === instanceId ||
+                Number(c?.dataset?.instanceId) === instanceId
+            );
+          }
+          if (idx < 0 && cand?.name) {
+            idx = zoneArr.findIndex((c) => c?.name === cand.name);
+          }
+          if (idx < 0 && instanceId != null) {
+            idx = 0;
+          }
+        }
+
+        if (idx < 0 && instanceId == null) return undefined;
+
+        const authIds = instanceId != null ? { moving: instanceId } : undefined;
+        return moveCardBundle(
+          user,
+          user,
+          zoneFrom,
+          destination,
+          Math.max(0, idx),
+          false,
+          'move',
+          true,
+          null,
+          authIds
+        );
       });
     }
 

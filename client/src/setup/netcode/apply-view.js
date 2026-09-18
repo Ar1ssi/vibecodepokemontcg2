@@ -1645,8 +1645,23 @@ export function reconcileTurnState(view, options = {}) {
   const changed = state.turnPlayer !== turnPlayer;
 
   state.turnPlayer = turnPlayer;
-  if (typeof turn.number === 'number') state.turnNumber = turn.number;
-  if (typeof turn.phase === 'string') state.phase = turn.phase;
+
+  const bothActivesSet =
+    Array.isArray(view.you?.zones?.active) &&
+    view.you.zones.active.length > 0 &&
+    Array.isArray(view.them?.zones?.active) &&
+    view.them.zones.active.length > 0;
+
+  if (!state.startingActiveDone && !bothActivesSet && (turn.number == null || turn.number <= 1)) {
+    state.turnNumber = 0;
+    state.phase = 'setup';
+  } else {
+    if (bothActivesSet) {
+      state.startingActiveDone = true;
+    }
+    if (typeof turn.number === 'number') state.turnNumber = turn.number;
+    if (typeof turn.phase === 'string') state.phase = turn.phase;
+  }
 
   // Per-turn flags, for the same reason as the turn fields above: under the flag the legacy
   // bodies that used to set them (markRetreated, markSupporterPlayed, the energy-attach and

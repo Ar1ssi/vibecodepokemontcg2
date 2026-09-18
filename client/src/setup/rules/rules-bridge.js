@@ -162,7 +162,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
 
     const hookStartingActiveWatcher = () => {
       const check = () => {
-        if (startingActiveSelectionPending && !startingActiveFinished) {
+        if (!startingActiveFinished && (openingStarted || startingActiveSelectionPending)) {
           checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration);
         }
       };
@@ -620,7 +620,6 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
     const checkBothActivesSetAndBegin = (firstPlayer, session) => {
       if (session !== rulesSessionGeneration) return false;
       if (startingActiveFinished) return true;
-      if (rulesState.turnNumber >= 1) return true;
 
       const selfActive = liveZoneArray('self', 'active');
       const oppActive = liveZoneArray('opp', 'active');
@@ -642,7 +641,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
 
     const promptStartingActiveSelection = async (firstPlayer, session) => {
       if (session !== rulesSessionGeneration) return;
-      if (startingActiveFinished || rulesState.turnNumber >= 1) return;
+      if (startingActiveFinished) return;
 
       startingActiveFirstPlayer = firstPlayer;
       startingActiveSelectionPending = true;
@@ -757,8 +756,12 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
           for (let round = 0; round < MAX_ROUNDS; round++) {
             if (session !== rulesSessionGeneration) return;
 
-            const selfHand = getZone('self', 'hand').array;
-            const oppHand = getZone('opp', 'hand').array;
+            const selfHand = liveZoneArray('self', 'hand');
+            const oppHand = liveZoneArray('opp', 'hand');
+            if (systemState.isTwoPlayer && selfHand.length === 0) {
+              // In 2P, if the deal view has not populated yet, don't false-mulligan
+              break;
+            }
             let steps = await evaluateMulligans({ selfHand, oppHand });
             if (systemState.isTwoPlayer) {
               // In 2P, each peer evaluates its own hand authoritatively;
