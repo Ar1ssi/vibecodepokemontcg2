@@ -5,45 +5,46 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 174
-Focus: Design 013 — TCG Live card inspector on double-click. APPROVED by user (D50).
-Active: **slice 1 of 3 SHIPPED** on branch `worktree-card-inspector` (4ce9c9d) —
-  `client/src/setup/rules/card-inspector-model.mjs` + 28 tests. Pure/DOM-free, so still ZERO
-  user-visible change. Work happens in `.qwen/worktrees/card-inspector`, not the primary checkout.
-Next: slice 2 = `decorate` hook in `card-picker.js` + `card-inspector.mjs` renderer + CSS + band
-  table. Then slice 3 = double-click routing, fold 008's zones in, live refresh, delete the spike.
-  Unrelated queue: I56 (keybinds c/z/e/q on server cards), audit lows A-6/A-10, I28, PR #143.
+Focus: Design 013 — TCG Live card inspector on double-click. All 3 slices CODE-COMPLETE.
+Active: branch `worktree-card-inspector` PUSHED to origin (4 commits on main). **Draft PR NOT
+  created — `gh` is not authenticated on this machine** (`gh auth status`: "not logged into any
+  GitHub hosts"). Open it at https://github.com/Ar1ssi/vibecodepokemontcg2/pull/new/worktree-card-inspector
+  with body `C:\Users\SMG26\AppData\Local\Temp\pr-013-body.md`, or `gh auth login` then
+  `gh pr create --draft`. Work lives in `.qwen/worktrees/card-inspector`.
+Next: **THE E2E NEVER RAN** (013 Deviation D1) — double-click under SERVER_AUTHORITATIVE=1:
+  chrome anchored, dim lifts on attach, attack click fires, Energy slide has no chrome, Escape
+  closes. Then mark the PR ready. Unrelated queue: I56, audit lows A-6/A-10, I28, PR #143.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- **D50 supersedes 008 D1/D6.** Inspection AND attack/ability selection both live on double-click,
-  in one inspector; single-click returns to select-to-move. Do NOT "restore" 008's single-click
-  preview — it collided with `dblclick` on the same nodes (`card-listener-table.js:18-19`) and
-  popped/re-popped/tore down itself. Slice 3 is what actually removes it; until then 008's zones
-  still fire on single-click and the flash still exists.
+- **A WORKTREE CANNOT RUN THE SERVER HERE.** No `node_modules` inside it, so `server/server.js`
+  dies on `ERR_MODULE_NOT_FOUND: socket.io`. Browser verification needs deps installed in the
+  worktree, or the branch landed on main and tested from the primary checkout. The :4000 server
+  belongs to the primary checkout and serves PRE-slice-3 code — do not test against it.
+- **D50 supersedes 008 D1/D6, and it is now in the code.** Double-click = inspect AND attack;
+  single-click is back to select-to-move (repairs 008 R3). `attack-preview.js`,
+  `attack-preview-gate.js` and the gate test are DELETED. Do not resurrect them.
 - **The card scan is the background and stays visible (C1).** Pieces occlude only the print they
   replace — never an opaque cream/silver/dark fill. Dimming uses `filter`, NEVER `opacity` (C2):
-  alpha makes a panel translucent and the printed text ghosts back through it.
-- **Card shapes are dual-sourced; the model handles all of these — the renderer must not undo it.**
+  alpha makes a panel translucent and the printed text ghosts back through it. Guarded by
+  `card-inspector-css.test.mjs`, which asserts on the stylesheet text.
+- **Card shapes are dual-sourced; the model handles all of these — do not undo it.**
   Weakness/resistance arrive singular (`card.weakness`, server hydration) AND plural
-  (`card.weaknesses`, createCard), and they are NOT `${key}s` ("weakness" → "weaknesses"). Printed
-  damage is a STRING server-side ('30+') and a NUMBER client-side. `bandTopPct`/`bandHeightPct` are
-  NULLABLE (attackZoneBounds returns null for 0 attacks). Retreat tiles can only ever show Colorless
-  pips — that is what the engine charges, not a bug.
-- Chrome mounts in the **carousel** (`card-picker.js`), not 008's pop host — only the carousel can
-  carry attached-Energy slides (C3). Slice 2 adds an optional `decorate({node, holoWrapper, card,
-  index})` hook; the decorator MUST keep `holoWrapper` inside the returned node or `slideWrapper()`
-  and the holo hover sync break. card-picker also serves the discard/deck/prizes/trainer pickers, so
-  no-decorate behaviour must stay byte-identical. Reuse `computeContentBox()` for the letterbox case
-  (008 R4); bands are FRAME-SPECIFIC, one set cannot serve Tera-ex and classic frames.
-- Tooling: test under `SERVER_AUTHORITATIVE=1`, pick a free port (:4000/:4317 often held). Board
-  cards live INSIDE the playmat iframes (only self-/opp-containers.css), so chrome mounts in the
-  main document; legacy zone arrays are EMPTY there — read the `img.card` stamp via
-  `resolvePreviewCard`. `pnpm test` is an explicit file list — a new test file runs only once added
-  to package.json. Prettier is not a direct dep (`npx prettier` and the `format` script both fail) —
-  format with `npx eslint --fix --rule "linebreak-style: off" <files>`, and only files you touched:
-  `rules-state.mjs` is legacy CRLF and reports ~1200 pre-existing errors. Suite is 1746/1747; the
-  one fail ("trainer drop: Trainer without synced effect text") is pre-existing.
+  (`card.weaknesses`, createCard), and they are NOT `${key}s` ("weakness" → "weaknesses").
+  Printed damage is a STRING server-side ('30+') and a NUMBER client-side. `bandTopPct`/
+  `bandHeightPct` are NULLABLE (attackZoneBounds returns null for 0 attacks). Retreat tiles can
+  only ever show Colorless pips — that is what the engine charges, not a bug.
+- **Grep before deleting a module.** `attack-preview.js` had two callers outside the click path
+  (sidebox p1/p2 chat-buttons, 008 Component 7); the design never mentioned them. Also: the
+  inspector ports 008's ATTACK panels only, NOT its ability zones (D5) — abilities still come from
+  `abilityPicker()`, so nothing is unreachable, but the panel cannot show or fire them yet.
+- Tooling: `pnpm test` is an explicit file list — a new test file runs only once added to
+  package.json. Suite is 1752 with 1 pre-existing fail ("trainer drop: Trainer without synced
+  effect text"). Prettier is not a direct dep (`npx prettier` and the `format` script both fail) —
+  format with `npx eslint --fix --rule "linebreak-style: off" <files>`, only on files you touched:
+  `rules-state.mjs`/`card-picker.js` are legacy CRLF and report ~1200 pre-existing errors. Every
+  root `.mjs` fails `no-undef` because `eslint.config.mjs` scopes globals to `**/*.js` only.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S174 2026-09-19 feature: design 013 slice 1 — card inspector model + tests (D50).
+- S174 2026-09-19 feature: design 013 all 3 slices — card inspector on double-click (D50). Pushed, PR pending auth, NOT browser-verified.
 - S171 2026-09-18 feature: design 012 manual board tools under server authority (D47, D48, D49).
 - S172 2026-09-18 patch: I57 discard-pile viewer reads the authoritative discard.
