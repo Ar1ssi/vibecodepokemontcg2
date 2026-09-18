@@ -4,13 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 173
-Focus: design 013 — the opening turn-order coin call is decided by the server and actually called.
-Active: none. Work is committed on branch `feature/server-turn-order-coin` in worktree ../vibe-turnorder.
-Next: live 2P check of the coin call under SERVER_AUTHORITATIVE=1 (picker opens on exactly one seat, the
-  announced winner matches the call, both clients agree on turn 1) — the only design-013 row not covered by
-  tests. Then I59 (server has no evolution timing), I58 (unimplemented stadium kinds), I56 (keybinds c/z/e/q on server cards),
-  audit lows A-6/A-10, I28 holo/mat sizing, PR #143 2P rules pass. maintenance due.
+Session: 174
+Focus: fix server-authoritative parsers and reducer gaps for attacks, abilities, stadiums, and trainers (PR #149).
+Active: none. Work is committed and pushed on branch `feature/fix-server-authoritative-parsers` (PR #149).
+Next: Review PR #149 and merge to main; then live 2P check of the coin call under SERVER_AUTHORITATIVE=1, I59 (server has no evolution timing), I56 (keybinds c/z/e/q on server cards), audit lows A-6/A-10.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -29,13 +26,8 @@ Blocked: none.
 - Netcode: test under `SERVER_AUTHORITATIVE=1` only (S137). Pick a free PORT — other sessions hold :4000/:4317.
   Live 2P probe harness: `.agent/scratch/probe.mjs <step-file>` (Playwright, joins a room, deals, runs a step
   module). A worktree needs `node_modules` junctioned in before eslint/playwright will run there.
-- `pnpm test` is an explicit file list — a new test file runs only once added to package.json. `pnpm lint` fails
-  repo-wide on CRLF; lint a diff with `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <files>`.
-  Most source files are CRLF: a scripted patch matching on `\n` silently finds nothing.
-- Prize cards move only on a server-granted entitlement (D43/D46). Manual counters/conditions and deck-order ops
-  are turn-player-only in rules mode. Pre-existing failing test: "trainer drop: a Trainer without synced effect text".
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S174 2026-09-18 feature: server-authoritative parser parity, attack status & coin flips, abilities, stadium steps, trainer drop fix (PR #149).
 - S173 2026-09-18 feature: design 013 server-owned turn-order coin call (D51, D52).
 - S173 2026-09-18 feature: Grand Tree search-evolve + Stage 2 chain in the server engine (design 013, D50).
-- S173 2026-09-18 patch: cost-symbol/untyped Energy rows render as tokens (energy-token-assets.mjs).
