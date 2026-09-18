@@ -1,19 +1,22 @@
-import {
-  oppContainerDocument,
-  selfContainerDocument,
-} from '../../state.js';
+import { oppContainerDocument, selfContainerDocument } from '../../state.js';
 import { adjustAlignment } from '../../setup/sizing/adjust-alignment.js';
+import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
 
 export const initializeHandObserver = () => {
   const handElement = selfContainerDocument.getElementById('hand');
   const oppHandElement = oppContainerDocument.getElementById('hand');
 
   const handObserver = new MutationObserver((mutations) => {
+    let hasChildList = false;
     mutations.forEach((mutation) => {
       if (mutation.type === 'childList') {
-        [handElement, oppHandElement].forEach(adjustAlignment);
+        hasChildList = true;
       }
     });
+    if (hasChildList) {
+      reconcileHandStacks('self');
+      [handElement, oppHandElement].forEach(adjustAlignment);
+    }
   });
 
   // Options for the observer (which mutations to observe)
