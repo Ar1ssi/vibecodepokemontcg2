@@ -99,11 +99,41 @@ export function executeStadium(draft, {
       steps.push({ type: 'draw', count: opt.n || 1 });
     } else if (opt.kind === 'heal-all') {
       steps.push({ type: 'heal', amount: opt.n || 10 });
+    } else if (opt.kind === 'heal') {
+      steps.push({ type: 'healAmount', amount: opt.n || 10, target: 'Active Pokémon' });
     } else if (opt.kind === 'discard-draw') {
       if (opt.cost?.type === 'discard-hand') {
         steps.push({ type: 'discardCost', count: opt.cost.n || 1 });
       }
       steps.push({ type: 'draw', count: opt.n || 1 });
+    } else if (opt.kind === 'hand-to-deck-top') {
+      steps.push({ type: 'putHandOnBottom', count: opt.n || 1 });
+    } else if (opt.kind === 'switch-type') {
+      steps.push({ type: 'switchOwn' });
+    } else if (opt.kind === 'discard-to-bench') {
+      const energyType = opt.typeFilter
+        ? `Basic {${opt.typeFilter.charAt(0).toUpperCase()}} Energy`
+        : 'Basic Energy';
+      steps.push({
+        type: 'attachFromDiscard',
+        energy: energyType,
+        count: opt.n || 2,
+        target: '1 of your Benched Pokémon',
+      });
+    } else if (opt.kind === 'energy') {
+      steps.push({
+        type: 'searchDeck',
+        what: 'Energy',
+        destination: 'hand',
+        count: opt.n || 1,
+      });
+    } else if (opt.kind === 'search') {
+      steps.push({
+        type: 'searchDeck',
+        what: 'card',
+        destination: 'hand',
+        count: opt.n || 1,
+      });
     }
   }
 

@@ -102,7 +102,7 @@ const STATUS_NOUNS = ['asleep', 'paralyzed', 'poisoned', 'burned', 'confused'];
 
 // Detect a dual-status application: "now Asleep and Poisoned",
 // "is now Burned and Confused", etc. Returns the two status nouns or null.
-function dualStatus(t) {
+export function dualStatus(t) {
   const m = t.match(/now\s+('?(asleep|paralyzed|poisoned|burned|confused)')?\s+and\s+('?(asleep|paralyzed|poisoned|burned|confused)')?/);
   if (!m) {
     // Try "is now X and Y" where the nouns are explicit.
@@ -120,7 +120,7 @@ function dualStatus(t) {
 
 // Detect a self-status application: "This Pokémon is now Asleep."
 // (status applied to the attacker, not the opponent's Active).
-function selfStatus(t) {
+export function selfStatus(t) {
   const m = t.match(/this pok[ée]mon\s+is\s+now\s+(asleep|paralyzed|poisoned|burned|confused)/);
   return m ? m[1] : null;
 }

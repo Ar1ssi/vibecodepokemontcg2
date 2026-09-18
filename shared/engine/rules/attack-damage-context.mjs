@@ -11,6 +11,8 @@ import { serverEnergyDescriptor } from './server-energy.mjs';
 import { expandEnergyEntries } from './attack-engine.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
+import { classifyEnergyEffect } from './energy-effects.mjs';
+import { listConditions } from './special-conditions.mjs';
 
 const zoneOf = (player, zoneId) =>
   Array.isArray(player?.zones?.[zoneId]) ? player.zones[zoneId] : [];
@@ -41,7 +43,41 @@ function energyOn(player, pokemon) {
   return expandEnergyEntries(attached.map(serverEnergyDescriptor));
 }
 
+function specialEnergyOn(player, pokemon) {
+  if (!pokemon) return 0;
+  return [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
+    (card) =>
+      card.attachedTo === pokemon.instanceId &&
+      isEnergy(card) &&
+      classifyEnergyEffect(card) !== 'basic'
+  ).length;
+}
+
 const isStage2 = (card) => normalizeStage(card?.stage) === 'Stage 2';
+
+const hasRoundAttack = ({ card, view }) =>
+  (card?.attacks || view?.attacks || []).some(
+    (a) => String(a?.name || '').trim().toLowerCase() === 'round'
+  );
+
+const isTeamRocketPokemon = ({ card, view }) =>
+  /team rocket/i.test(
+    `${card?.name || ''} ${view?.name || ''} ${card?.subtypes || ''} ${view?.subtypes || ''}`
+  );
+
+const isAncientPokemon = ({ card, view }) =>
+  /ancient/i.test(
+    `${card?.subtypes || ''} ${view?.subtypes || ''} ${card?.name || ''} ${view?.name || ''}`
+  );
+
+const isBeedrillPokemon = ({ card, view }) =>
+  /beedrill/i.test(card?.name || view?.name || '');
+
+const isGrassPokemon = ({ card, view }) =>
+  (card?.types || view?.types || []).some((t) => /grass|^g$/i.test(String(t || '')));
+
+const isDamagedTauros = ({ card, view }) =>
+  /tauros/i.test(card?.name || view?.name || '') && (card?.damage || 0) > 0;
 
 /**
  * Build the `ctx` argument for `parseAttackDamage`.
@@ -56,6 +92,7 @@ const isStage2 = (card) => normalizeStage(card?.stage) === 'Stage 2';
  * @param {object|null} [args.defenderView] `evolvedView` of the defender
  * @param {'heads'|'tails'|null} [args.coin] Result of this attack's single coin flip
  * @param {number} [args.headsCount] Heads among a multi-flip "for each heads" attack
+ * @param {number} [args.energyDiscarded] Number of energy discarded for scaling damage
  * @returns {object} ctx for parseAttackDamage
  */
 export function buildServerAttackContext(
@@ -69,6 +106,7 @@ export function buildServerAttackContext(
     defenderView = null,
     coin = null,
     headsCount = undefined,
+    energyDiscarded = undefined,
   } = {}
 ) {
   const own = state?.players?.[attackerPlayerId] || null;
@@ -98,8 +136,20 @@ export function buildServerAttackContext(
     stage2InPlayCount: ownInPlay.filter(({ view }) => isStage2(view)).length,
     ownPokemonInPlayCount: ownInPlay.length,
     damagedOwnPokemonCount: ownInPlay.filter(({ card }) => (card.damage || 0) > 0).length,
+    damagedBenchCount: ownBench.filter(({ card }) => (card.damage || 0) > 0).length,
+    roundAttackCount: ownInPlay.filter(hasRoundAttack).length,
+    teamRocketCount: ownInPlay.filter(isTeamRocketPokemon).length,
+    ancientCount: ownInPlay.filter(isAncientPokemon).length,
+    speciesCount: ownInPlay.filter(isBeedrillPokemon).length,
+    grassPokemonCount: ownInPlay.filter(isGrassPokemon).length,
+    specialEnergyOnSelfCount: specialEnergyOn(own, attacker),
+    taurosDamagedCount: ownInPlay.filter(isDamagedTauros).length,
     coin,
   };
+
+  if (energyDiscarded !== undefined) {
+    ctx.energyDiscarded = energyDiscarded;
+  }
 
   // Defender-derived fields only exist while there IS a defender: an effect-only attack
   // (Call for Family with an empty opposing board) must not read 0 HP as "the defender
@@ -109,6 +159,7 @@ export function buildServerAttackContext(
     ctx.defenderDamage = defender.damage || 0;
     ctx.opponentEnergyCount = energyOn(opponent, defender).length;
     ctx.retreatCostColorless = getRetreatCostCount(defenderCard);
+    ctx.opponentStatusCount = listConditions(defender).length;
   }
   if (headsCount !== undefined) ctx.headsCount = headsCount;
 
