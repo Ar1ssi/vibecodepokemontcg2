@@ -29,6 +29,15 @@ import {
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
+import {
+  evaluateToolKoPrevention,
+  toolPrizeCountAdjust,
+  attachedToolOnDamageEffects,
+  isExCard,
+  isVCard,
+  isTeraCard,
+} from './rules/tool-combat.mjs';
+import { parseThorns } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice } from './effects/executor.mjs';
@@ -132,6 +141,24 @@ function benchTargets(player) {
   return (player?.zones?.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
 }
 
+function discardCardFromPlayerZone(draft, instanceId, playerId) {
+  const player = draft.players[playerId];
+  if (!player?.zones) return null;
+  for (const zoneKey of ['active', 'bench']) {
+    const zone = player.zones[zoneKey];
+    if (!Array.isArray(zone)) continue;
+    const idx = zone.findIndex((c) => c.instanceId === instanceId);
+    if (idx !== -1) {
+      const [removed] = zone.splice(idx, 1);
+      removed.attachedTo = null;
+      if (!player.zones.discard) player.zones.discard = [];
+      player.zones.discard.push(removed);
+      return removed;
+    }
+  }
+  return null;
+}
+
 /**
  * Applies damage to one benched Pokémon: counters, event, and KO through handleKnockout
  * (so the prize entitlement stays server-granted, D43).
@@ -140,7 +167,75 @@ function damageBenchedPokemon(
   draft,
   { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, events }
 ) {
-  victim.damage = (victim.damage || 0) + dealt;
+  if (dealt <= 0) return;
+
+  // Check Tera bench damage immunity ("Tera: As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks")
+  if (isTeraCard(victim)) {
+    events.push({
+      type: 'damagePrevented',
+      instanceId: victim.instanceId,
+      attackName,
+      reason: 'tera-bench',
+    });
+    return;
+  }
+
+  // Check team bench protection abilities (e.g. Manaphy Wave Veil)
+  const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
+  const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
+  const allVictimCards = [...victimActive, ...victimBench];
+  const benchProtected = allVictimCards.some((c) => {
+    if (c.attachedTo) return false;
+    const t = String(c?.ability?.text ?? c?.abilityText ?? c?.text ?? c?.effect ?? '').toLowerCase();
+    return (
+      t.includes('prevent all damage done to your benched pokémon') ||
+      t.includes('prevent all damage done to your benched pokemon')
+    );
+  });
+  if (benchProtected) {
+    events.push({
+      type: 'damagePrevented',
+      instanceId: victim.instanceId,
+      attackName,
+      reason: 'bench-shield',
+    });
+    return;
+  }
+
+  const prevDamage = victim.damage || 0;
+  const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
+  const wouldKo = koHp > 0 && prevDamage + dealt >= koHp;
+
+  if (wouldKo) {
+    const koEval = evaluateToolKoPrevention(victim, victimBench, {
+      currentDamage: prevDamage,
+      incomingDamage: dealt,
+      baseHp: koHp,
+      stadium: draft.stadium,
+      inHp: true,
+    });
+    if (koEval.prevented) {
+      victim.damage = koEval.totalDamage;
+      events.push({
+        type: 'damageUpdated',
+        instanceId: victim.instanceId,
+        damage: victim.damage,
+        dealt,
+      });
+      events.push({
+        type: 'koPrevented',
+        instanceId: victim.instanceId,
+        tool: koEval.tool,
+        surviveHp: koEval.surviveHp,
+      });
+      if (koEval.discardOnUse && koEval.toolCard) {
+        discardCardFromPlayerZone(draft, koEval.toolCard.instanceId, victimPlayerId);
+      }
+      return;
+    }
+  }
+
+  victim.damage = prevDamage + dealt;
   events.push({
     type: 'damageUpdated',
     instanceId: victim.instanceId,
@@ -157,7 +252,6 @@ function damageBenchedPokemon(
     auto: Boolean(auto),
   });
 
-  const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
   if (koHp > 0 && victim.damage >= koHp) {
     handleKnockout(draft, {
       victimPlayerId,
@@ -200,14 +294,6 @@ function handleKnockout(
   draft,
   { victimPlayerId, attackerPlayerId, victim, events }
 ) {
-  const prizeCount = prizesForKO(inPlayView(draft, victim));
-  const attacker = draft.players[attackerPlayerId];
-  const attackerPrizes = attacker?.zones?.prizes || [];
-  if (attacker) {
-    if (!attacker.flags) attacker.flags = {};
-    attacker.flags.prizesOwed = (attacker.flags.prizesOwed || 0) + prizeCount;
-  }
-
   // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
@@ -217,6 +303,28 @@ function handleKnockout(
     (c) => c.instanceId === victim.instanceId
   );
   const wasBench = victimBench.some((c) => c.instanceId === victim.instanceId);
+
+  const victimZoneCards = wasActive ? victimActive : wasBench ? victimBench : [victim];
+
+  const basePrizeCount = prizesForKO(inPlayView(draft, victim));
+  let prizeCount = toolPrizeCountAdjust(victim, victimZoneCards, basePrizeCount, {
+    stadium: draft.stadium,
+  });
+
+  const attacker = draft.players[attackerPlayerId];
+  if (attacker?.flags?.briarActive) {
+    const victimIsEx = isExCard(victim);
+    const attackerActive = attacker?.zones?.active?.find((c) => !c.attachedTo);
+    if (victimIsEx && attackerActive && isTeraCard(attackerActive)) {
+      prizeCount += 1;
+    }
+  }
+
+  const attackerPrizes = attacker?.zones?.prizes || [];
+  if (attacker) {
+    if (!attacker.flags) attacker.flags = {};
+    attacker.flags.prizesOwed = (attacker.flags.prizesOwed || 0) + prizeCount;
+  }
 
   let targetZone = null;
   if (wasActive) {
@@ -537,8 +645,14 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     stadiumUsedThisTurn: false,
     abilitiesUsed: {},
     evolved: {},
+    briarActive: false,
     ...(prizesOwed ? { prizesOwed } : {}),
   };
+  for (const p of Object.values(draft.players || {})) {
+    if (p.playerId !== nextPlayerId && p.flags) {
+      p.flags.briarActive = false;
+    }
+  }
 
   // Reset once-per-turn ability markers on in-play Pokemon
   const inPlay = [
@@ -1859,25 +1973,149 @@ export function applyCommand(state, command, rng = null) {
       let dmgDealt = 0;
       if (attacker && defender) {
         const defenderView = inPlayView(draft, defender);
-        const dmgResult = computeAttackDamage(attackerView, defenderView, effectiveAttack);
-        dmgDealt = dmgResult.total;
-        defender.damage = (defender.damage || 0) + dmgDealt;
-        events.push({
-          type: 'damageUpdated',
-          instanceId: defender.instanceId,
-          damage: defender.damage,
-          dealt: dmgDealt,
-        });
+        const attackerView = inPlayView(draft, attacker);
+        const attackerZoneCards = draft.players[playerId]?.zones?.active || [];
+        const defenderZoneCards = draft.players[defenderPlayerId]?.zones?.active || [];
+        const defenderInPlayCards = [
+          ...(draft.players[defenderPlayerId]?.zones?.active || []),
+          ...(draft.players[defenderPlayerId]?.zones?.bench || []),
+        ];
+        const myPrizes = (draft.players[playerId]?.zones?.prizes || []).length;
+        const oppPrizes = (draft.players[defenderPlayerId]?.zones?.prizes || []).length;
+        const attackerTrailingPrizes = myPrizes > oppPrizes;
+        const defenderPoisoned = hasCondition(defender, 'Poisoned');
 
-        // KO check
-        const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
-        if (koHp > 0 && defender.damage >= koHp) {
-          handleKnockout(draft, {
-            victimPlayerId: defenderPlayerId,
-            attackerPlayerId: playerId,
-            victim: defender,
-            events,
+        const dmgResult = computeAttackDamage(attackerView, defenderView, effectiveAttack, {
+          attackerZoneCards,
+          defenderZoneCards,
+          defenderInPlayCards,
+          stadium: draft.stadium,
+          defenderIsActive: true,
+          attackerTrailingPrizes,
+          defenderPoisoned,
+          baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
+        });
+        dmgDealt = dmgResult.total;
+
+        if (dmgResult.prevented) {
+          events.push({
+            type: 'damagePrevented',
+            instanceId: defender.instanceId,
+            attackerInstanceId: attacker.instanceId,
+            attackName: effectiveAttack?.name,
           });
+        }
+
+        if (dmgDealt > 0) {
+          const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
+          const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
+
+          if (wouldKo) {
+            const koEval = evaluateToolKoPrevention(defender, defenderZoneCards, {
+              currentDamage: defender.damage || 0,
+              incomingDamage: dmgDealt,
+              baseHp: koHp,
+              stadium: draft.stadium,
+              inHp: true,
+            });
+
+            if (koEval.prevented) {
+              defender.damage = koEval.totalDamage;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+              });
+              events.push({
+                type: 'koPrevented',
+                instanceId: defender.instanceId,
+                tool: koEval.tool,
+                surviveHp: koEval.surviveHp,
+              });
+              if (koEval.discardOnUse && koEval.toolCard) {
+                discardCardFromPlayerZone(draft, koEval.toolCard.instanceId, defenderPlayerId);
+              }
+            } else {
+              defender.damage = (defender.damage || 0) + dmgDealt;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+              });
+              handleKnockout(draft, {
+                victimPlayerId: defenderPlayerId,
+                attackerPlayerId: playerId,
+                victim: defender,
+                events,
+              });
+            }
+          } else {
+            defender.damage = (defender.damage || 0) + dmgDealt;
+            events.push({
+              type: 'damageUpdated',
+              instanceId: defender.instanceId,
+              damage: defender.damage,
+              dealt: dmgDealt,
+            });
+          }
+        }
+
+        // Reactive tool effects & Thorns on damage (if damage > 0 and not prevented)
+        if (dmgDealt > 0 && !dmgResult.prevented && attacker) {
+          let thornsDamage = 0;
+          const toolEffects = attachedToolOnDamageEffects(defender, defenderZoneCards, {
+            stadium: draft.stadium,
+            isActive: true,
+          });
+          for (const eff of toolEffects) {
+            if (eff.damageAttacker > 0) {
+              thornsDamage += eff.damageAttacker * 10;
+            }
+            if (eff.draw > 0) {
+              const defPlayer = draft.players[defenderPlayerId];
+              if (defPlayer?.zones?.deck && defPlayer?.zones?.hand) {
+                for (let d = 0; d < eff.draw && defPlayer.zones.deck.length > 0; d++) {
+                  defPlayer.zones.hand.push(defPlayer.zones.deck.pop());
+                }
+                events.push({
+                  type: 'cardsDrawn',
+                  playerId: defenderPlayerId,
+                  count: eff.draw,
+                  source: eff.tool?.name || 'Tool',
+                });
+              }
+            }
+            if (eff.discardTool && eff.tool) {
+              discardCardFromPlayerZone(draft, eff.tool.instanceId, defenderPlayerId);
+            }
+          }
+
+          const thorns = parseThorns(defender);
+          if (thorns?.count > 0) {
+            thornsDamage += thorns.count * 10;
+          }
+
+          if (thornsDamage > 0) {
+            attacker.damage = (attacker.damage || 0) + thornsDamage;
+            events.push({
+              type: 'damageUpdated',
+              instanceId: attacker.instanceId,
+              damage: attacker.damage,
+              dealt: thornsDamage,
+              reason: 'thorns',
+            });
+            const atkKoHp = cardEffectiveHp(draft, attacker, playerId);
+            if (atkKoHp > 0 && attacker.damage >= atkKoHp) {
+              handleKnockout(draft, {
+                victimPlayerId: playerId,
+                attackerPlayerId: defenderPlayerId,
+                victim: attacker,
+                events,
+              });
+            }
+          }
         }
       }
 

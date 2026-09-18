@@ -233,6 +233,18 @@ export function executeTrainer(draft, {
   const text = card.text || card.effect || card.cardText || '';
   const parsed = isToolCard(card) ? { steps: [{ type: 'attachTool' }] } : parseTrainerEffect(text);
 
+  if (parsed?.steps) {
+    for (const step of parsed.steps) {
+      if (
+        step.type === 'passive' &&
+        (/take 1 more prize/i.test(step.detail || '') || /prize/i.test(step.detail || ''))
+      ) {
+        if (!player.flags) player.flags = {};
+        player.flags.briarActive = true;
+      }
+    }
+  }
+
   if (!parsed || !parsed.steps || parsed.steps.length === 0) {
     // No steps or passive only: clean up to discard
     const bIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);

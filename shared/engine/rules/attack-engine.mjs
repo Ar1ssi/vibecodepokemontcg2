@@ -4,40 +4,108 @@
     
     import { rulesState, markAttacked } from './rules-state.mjs';
 import { effectiveHp } from './stadium-effects.mjs';
-    
-    // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
-    // or +20/+30 flat; TCGdex gives us { type, value } where value is the
-    // multiplier (2) or flat bonus (20/30).
-    export function computeAttackDamage(attacker, defender, attack) {
-      // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
-      // string yields NaN, which makes the defender un-KO-able (audit A-4).
-      const base = parseInt(attack?.damage, 10) || 0;
-    
-      let multiplier = 1;
-      let flat = 0;
-      if (attacker?.types?.length && defender?.weakness) {
-        // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
-        if (attacker.types.includes(defender.weakness.type)) {
-          const v = defender.weakness.value;
-          if (v <= 2) {
-            multiplier = Math.max(1, v);      // modern weakness: ×2 (or ×1)
-          } else {
-            flat += v;                        // legacy weakness: flat +20/+30
-          }
-        }
+import {
+  combinedToolAttackBonus,
+  applyToolDamageReduction,
+  combinedToolDamagePrevention,
+} from './tool-combat.mjs';
+
+// Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
+// or +20/+30 flat; TCGdex gives us { type, value } where value is the
+// multiplier (2) or flat bonus (20/30).
+export function computeAttackDamage(attacker, defender, attack, options = {}) {
+  const {
+    attackerZoneCards = [],
+    defenderZoneCards = [],
+    defenderInPlayCards = [],
+    stadium = null,
+    defenderIsActive = true,
+    attackerTrailingPrizes = false,
+    defenderPoisoned = false,
+    baseDamage = null,
+    blockTools = false,
+  } = options;
+
+  // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
+  // string yields NaN, which makes the defender un-KO-able (audit A-4).
+  const base = baseDamage != null ? baseDamage : (parseInt(attack?.damage, 10) || 0);
+
+  // Step 2: Attacker tool and ability damage bonuses (e.g. Choice Belt, Maximum Belt, Defiance Band)
+  // Applied BEFORE Weakness and Resistance.
+  const attackerBonus = combinedToolAttackBonus(attacker, attackerZoneCards, defender, {
+    blockTools,
+    defenderIsActive,
+    defenderPoisoned,
+    attackerTrailingPrizes,
+    stadium,
+  });
+
+  const damageBeforeWR = Math.max(0, base + attackerBonus);
+
+  let multiplier = 1;
+  let flat = 0;
+  if (attacker?.types?.length && defender?.weakness) {
+    // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
+    if (attacker.types.includes(defender.weakness.type)) {
+      const v = defender.weakness.value;
+      if (v <= 2) {
+        multiplier = Math.max(1, v);      // modern weakness: ×2 (or ×1)
+      } else {
+        flat += v;                        // legacy weakness: flat +20/+30
       }
-    
-      let resistance = 0;
-      if (attacker?.types?.length && defender?.resistance) {
-        if (attacker.types.includes(defender.resistance.type)) {
-          resistance = Math.abs(defender.resistance.value || 0);
-        }
-      }
-    
-      let total = base * multiplier + flat - resistance;
-      if (total < 0) total = 0;
-      return { total, base, multiplier, flat, resistance };
     }
+  }
+
+  let resistance = 0;
+  if (attacker?.types?.length && defender?.resistance) {
+    if (attacker.types.includes(defender.resistance.type)) {
+      resistance = Math.abs(defender.resistance.value || 0);
+    }
+  }
+
+  let damageAfterWR = damageBeforeWR * multiplier + flat - resistance;
+  if (damageAfterWR < 0) damageAfterWR = 0;
+
+  // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
+  let reduced = 0;
+  let damageAfterReduction = damageAfterWR;
+  if (damageAfterWR > 0) {
+    damageAfterReduction = applyToolDamageReduction(
+      damageAfterWR,
+      defender,
+      defenderZoneCards,
+      attacker,
+      { blockTools, stadium, inPlayCards: defenderInPlayCards }
+    );
+    reduced = damageAfterWR - damageAfterReduction;
+  }
+
+  // Step 6: Damage prevention (tools + abilities)
+  const prevention = combinedToolDamagePrevention(defender, defenderZoneCards, attacker, {
+    blockTools,
+    stadium,
+  });
+
+  let prevented = false;
+  let finalDamage = damageAfterReduction;
+  if (prevention?.preventAll) {
+    prevented = true;
+    finalDamage = 0;
+  } else if (prevention?.reduce > 0) {
+    finalDamage = Math.max(0, finalDamage - prevention.reduce * 10);
+  }
+
+  return {
+    total: finalDamage,
+    base,
+    attackerBonus,
+    multiplier,
+    flat,
+    resistance,
+    reduced,
+    prevented,
+  };
+}
     
     // Expand attached-energy entries into a flat pool of provided types.
     // Entries may be plain type strings (legacy) or `{ type, family }`
