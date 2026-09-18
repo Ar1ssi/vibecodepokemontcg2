@@ -4,10 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 177
-Focus: Hand card stacking for duplicate face-up cards with count badges and stepped offsets (PTCG Live style).
-Active: branch `feature/duplicate-hand-stacking`.
-Next: Review and merge PR for duplicate hand stacking.
+Session: 178
+Focus: Hand card stacking for duplicate face-up cards with count badges and stepped offsets (PR #151).
+Active: branch `feature/duplicate-hand-stacking` (PR #151).
+Next: Review and merge PR #151 for duplicate hand stacking.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -23,6 +23,6 @@ Blocked: none.
 - Netcode: test under `SERVER_AUTHORITATIVE=1` only (S137). Pick a free PORT — other sessions hold :4000/:4317.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S177 2026-09-18 feature: duplicate card stacking in hand with stepped offset layers and count badges.
+- S178 2026-09-18 feature: duplicate card stacking in hand with stepped offset layers and count badges (PR #151).
+- S177 2026-09-18 feature: Starting Active Pokémon Selection Step (TCG Live style) before turn 1 starts.
 - S176 2026-09-18 feature: Phases 2, 3, 4 retreat engine, tool cap, attack effects, energy acceleration (PR #149).
-- S175 2026-09-18 feature: Phase 1 combat passives, prevention/reduction, tools, thorns, KO & prize modifiers (PR #149).

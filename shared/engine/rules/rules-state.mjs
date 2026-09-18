@@ -542,6 +542,7 @@
       turnNumber = 0,
       lastDrawnTurn = 0,
     } = {}) {
+      if (turnNumber < 1) return false;
       if (lastDrawnTurn && Number(lastDrawnTurn) === Number(turnNumber)) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }
@@ -675,9 +676,12 @@
       const S = rulesState;
       const isYourTurn = user === S.turnPlayer;
     
-      // during setup nobody acts except via the setup flow
-      if (S.phase === 'setup') {
-        return { allowed: false, reason: 'Set up the game first (Set Up button).' };
+      // during setup nobody acts except via the setup flow (e.g. setting starting active)
+      if (S.phase === 'setup' || S.turnNumber === 0) {
+        if (action === 'moveCard' && targetZoneId === 'active') {
+          return { allowed: true };
+        }
+        return { allowed: false, reason: 'Choose your Starting Active Pokémon before starting turn 1.' };
       }
       if (S.phase === 'ended') {
         return { allowed: false, reason: 'Game is over.' };
@@ -694,7 +698,7 @@
           return { allowed: false, reason: "Deck is private — only card effects may search it." };
     
         case 'moveCard': {
-          if (!isYourTurn) {
+          if (!isYourTurn && !(targetZoneId === 'active' && (S.phase === 'setup' || S.turnNumber === 0))) {
             return { allowed: false, reason: "It's not your turn." };
           }
           if (S.phase === 'attack') {
