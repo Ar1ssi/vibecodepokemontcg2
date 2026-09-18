@@ -85,6 +85,28 @@ Facts from reading code this session.
   D6 (bench single-click = ability preview) are user-confirmed; R3 records that this made
   single-click selection of the active unreachable, with right-click as the escape hatch.
 
+### Verified while building slice 1 (S174)
+
+Three shapes the renderer must tolerate, confirmed by test rather than read:
+
+- **Weakness/resistance arrive under two spellings.** Server hydration sets `card.weakness` /
+  `card.resistance` (singular objects) while `createCard` normalizes `weaknesses` /
+  `resistances` (plural arrays, empty unless a source filled them). A reader handling only one
+  spelling shows a blank tile on half the cards. They are not `${key}s` — "weakness"
+  pluralises to "weaknesses", so that construction silently misses.
+- **Printed damage is a string on the server path, a number on the client path.** `extractStats`
+  passes `attack.damage` through unchanged ('30+'), while client enrichment runs it through
+  `parseDamage`. The model keeps both halves: a numeric base for `parseAttackDamage`, and the
+  printed label as the fallback.
+- **The retreat tile can only ever show Colorless pips, and that is correct.** `parseRetreatCost`
+  discards the printed symbols and keeps a count; `extractStats` expands that count into
+  `['Colorless', …]` (audit B-6). Colorless is exactly what the engine charges, so showing it
+  beats reproducing print the game would not honour. O4-B resolved without widening
+  `parseRetreatCost`.
+
+`attackZoneBounds()` returns `null` for a card with no attacks, so the band is optional in the
+model (`bandTopPct: null`) rather than assumed present — E5.
+
 ## Options
 
 ### O1 — where the collision goes
@@ -326,7 +348,7 @@ half-landed state is inert rather than broken.
 
 | Slice | Delivers | Green when |
 |---|---|---|
-| 1 | `card-inspector-model.mjs` + tests; export `ENERGY_SYMBOL_TO_TYPE` from `energy-effects.mjs` (C7); confirm the server-stamped card carries `retreat` symbols (O4) | `pnpm test` green with the new file listed; no DOM touched |
+| 1 ✅ DONE 4ce9c9d | `card-inspector-model.mjs` + tests; export `ENERGY_SYMBOL_TO_TYPE` from `energy-effects.mjs` (C7); confirm the server-stamped card carries `retreat` symbols (O4) | 28 new unit tests green, wired into `pnpm test`; full suite 1746/1747 (the 1 fail is the pre-existing `trainer drop` case); no DOM touched |
 | 2 | `decorate` hook in `card-picker.js`/`openCarouselViewer`; `card-inspector.mjs` renderer + CSS; band table | unit + integration green; discard/deck/prizes pickers visually unchanged (E2E regression pass) |
 | 3 | Double-click routing, zone relocation from `attack-preview.js`, live refresh, dim wiring; delete `openAttackPreview` and the spike's duplicated constants | E2E under `SERVER_AUTHORITATIVE=1`; `panel-spike.mjs` deleted; lint + format clean |
 
