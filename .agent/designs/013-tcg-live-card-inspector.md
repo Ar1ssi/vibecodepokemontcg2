@@ -349,14 +349,46 @@ half-landed state is inert rather than broken.
 | Slice | Delivers | Green when |
 |---|---|---|
 | 1 ✅ DONE 4ce9c9d | `card-inspector-model.mjs` + tests; export `ENERGY_SYMBOL_TO_TYPE` from `energy-effects.mjs` (C7); confirm the server-stamped card carries `retreat` symbols (O4) | 28 new unit tests green, wired into `pnpm test`; full suite 1746/1747 (the 1 fail is the pre-existing `trainer drop` case); no DOM touched |
-| 2 | `decorate` hook in `card-picker.js`/`openCarouselViewer`; `card-inspector.mjs` renderer + CSS; band table | unit + integration green; discard/deck/prizes pickers visually unchanged (E2E regression pass) |
-| 3 | Double-click routing, zone relocation from `attack-preview.js`, live refresh, dim wiring; delete `openAttackPreview` and the spike's duplicated constants | E2E under `SERVER_AUTHORITATIVE=1`; `panel-spike.mjs` deleted; lint + format clean |
+| 2 ✅ DONE 07577d0 | `decorate` hook in `card-picker.js`/`openCarouselViewer`; `card-inspector.mjs` renderer + CSS; band table | 12 CSS-text tests green guarding C1/C2/C5; `card-picker.js` still reports 0 lint errors; no-decorate path untouched |
+| 3 ✅ CODE LANDED, NOT BROWSER-VERIFIED | Double-click routing, zone relocation from `attack-preview.js`, live refresh, dim wiring; delete `openAttackPreview` and the spike's duplicated constants | unit suite green (1752, 1 pre-existing fail) + syntax/specifier checks clean. **The `SERVER_AUTHORITATIVE=1` e2e did not run — see Deviations** |
 
 Slice order is load-bearing: 1 and 2 land without changing any user-visible behaviour, so
 the repo is shippable between every slice. Only 3 rewires gestures, and it does so in one
 commit so 008's zones are never left orphaned.
 
 ## Deviations (Builder appends here during build)
+
+**D1 (S174, slice 3) — the `SERVER_AUTHORITATIVE=1` e2e was never run.** The Test plan and
+slice 3's green condition both require it; neither is satisfied. Two independent blockers:
+the worktree carries no `node_modules`, so `server/server.js` dies on
+`ERR_MODULE_NOT_FOUND: socket.io`; and the only listening server (:4000) serves the *primary*
+checkout, i.e. the pre-slice-3 code. Separately, the user reports the game is currently bugged
+in a way that blocks exercising the feature at all. What was verified instead: the unit suite
+(1752 tests, 1 pre-existing failure), `node --check` on all four rewired files, and that every
+relative specifier in the new renderer resolves to a real file. **This PR is therefore not
+browser-verified and must not be treated as a finished feature** — the double-click path, the
+dim, the attack click and the attached-card slides are all unproven in a live game.
+
+**D2 (S174, slice 3) — `panel-spike.mjs` was not deleted.** Slice 3's green condition lists it.
+It is untracked and lives only in the primary checkout, so no commit on this branch can remove
+it, and deleting ~450 lines of unrecoverable scratch work was not worth doing unasked. It is the
+record of the approved visual design (`out/ptcg-live-panel-v20-0.png` and the v24/v25 dim
+states) and should be dropped by whoever lands this.
+
+**D3 (S174, slice 3) — the sidebox attack buttons were rewired too.** Not in the original slice
+plan: `grep` before deleting `attack-preview.js` found `sidebox/p1/chat-buttons.js` and
+`sidebox/p2/chat-buttons.js` both calling `openAttackPreview` (008 Component 7). Deleting the
+module without touching them would have broken the build, so they now open the inspector.
+
+**D4 (S174, slice 2/3) — attached Tools keep their slide.** The design text said "attached
+Energy rides along". Today's carousel shows everything in `card.attachedCards`, Energy *and*
+Tools, so `openCardInspector` takes the prepared slides from the caller rather than filtering to
+Energy — narrowing it would have silently removed the ability to look at an attached Tool.
+
+**D5 (S174, slice 3) — no ability zones in the inspector.** 008 D5/D6 put ability zones on the
+overlay; this design folded 008's zones in but only ported the **attack** panels. Abilities are
+still reachable via `abilityPicker()` from the sidebox, so nothing became unreachable, but the
+inspector does not yet show or fire them. Follow-up, not a regression.
 
 ---
 Self-approval checklist (only when the user is unreachable):

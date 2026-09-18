@@ -17,7 +17,11 @@
 
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
-import { attachedEnergiesFor } from './attack-preview-sources.mjs';
+import { rulesState, ensureCardData, getStadium, abilityUsed } from '../../../../shared/engine/rules/rules-state.mjs';
+import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-attack-context.mjs';
+import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
+import { getZone } from '../zones/get-zone.js';
+import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
 import { openCarouselViewer } from '../image-logic/card-picker.js';
@@ -289,7 +293,7 @@ const applyDim = (wrap, model) => {
  */
 const rerender = (state) => {
   if (!state.wrap.isConnected) return;
-  const model = buildInspectorModel(state.card, state.getContext());
+  const model = buildInspectorModel(state.card, state.context || state.getContext());
   const next = buildChrome(model);
   state.wrap.replaceChild(next, state.chrome);
   state.chrome = next;
@@ -319,12 +323,13 @@ export const decorateInspectorSlide = (
   const chrome = buildChrome(model);
   wrap.appendChild(chrome);
 
-  const state = { card, wrap, chrome, getContext, actions };
+  const state = { card, wrap, chrome, getContext, actions, context: null };
   state.refresh = () => rerender(state);
   states.add(state);
   wireBoundary();
   applyDim(wrap, model);
   applyActions(state, model);
+  hydrateContext(state);
 
   // Positioned after layout, once the image has its natural size and the slide its final box.
   requestAnimationFrame(() => {
@@ -358,35 +363,101 @@ const energyTypesFor = (card) =>
     .map((energy) => energy?.types?.[0] || null)
     .filter(Boolean);
 
-const defaultContextFor = (card) => ({
+/**
+ * First paint only. The card stamp carries attached Energy and damage but not the Stadium cost
+ * modifier or the once-per-turn flags, so it over-reports unpayable attacks.
+ * `resolveLiveContext` replaces it as soon as the async data lands.
+ */
+const stampContextFor = (card) => ({
   energyTypes: energyTypesFor(card),
   attacker: card,
   damageCtx: {
     attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
   },
+  rulesEnabled: true,
 });
+
+/**
+ * The authoritative context the model needs, resolved through the same shared helper the engine
+ * path uses so the panel cannot drift from it.
+ *
+ * `defender` is deliberately absent: this panel reports what an attack DOES, not what it would
+ * deal to the current target. Applying the defender's weakness here would print 500 on a card
+ * that says 250 and read as a bug.
+ */
+async function resolveLiveContext(card) {
+  try {
+    await ensureCardData(card);
+  } catch {
+    /* card data not resolved yet — fall back on whatever the stamp carries */
+  }
+  const attachedEnergyCards = attachedEnergiesFor(card, getZone('self', 'active').array);
+  const stadiumCard = stadiumCardFor(getStadium(), getAuthoritativeStadiumArray());
+  const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks } =
+    await resolveAttackContext({
+      activeCard: card,
+      attachedEnergyCards,
+      ensureCardData,
+      stadiumCard,
+      abilityUsed: (c) =>
+        abilityUsedFor(c, abilityUsed('self', c), rulesState.flags?.self?.abilitiesUsed),
+    });
+
+  return {
+    energyTypes,
+    stadiumCostModifier,
+    abilityUsed: abilityUsedFlag,
+    priorAttacks,
+    attacker: card,
+    damageCtx: {
+      attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
+      energyCount: energyTypes.length,
+    },
+    rulesEnabled: Boolean(rulesState.enabled),
+  };
+}
+
+/**
+ * Hydrate the context once the async data is in, then re-render in place. Guarded on the state
+ * still being mounted — the player can close the inspector during the fetch (008 R12).
+ */
+const hydrateContext = (state) => {
+  resolveLiveContext(state.card).then(
+    (context) => {
+      if (!state.wrap.isConnected) return;
+      state.context = context;
+      rerender(state);
+    },
+    () => {
+      /* resolution failed — the stamp-derived first paint stays on screen */
+    },
+  );
+};
 
 /**
  * Open the inspector for one of your own board Pokémon.
  *
  * @param {object} options
  * @param {object} options.card a preview card — a server stamp or a legacy zone card
- * @param {() => object} [options.getContext] supplies the live model context; defaults to
- *   reading attached Energy off the card stamp. Slice 3 replaces this with the authoritative
- *   resolver so payability tracks the real board.
+ * @param {object[]} [options.attachedSlides] further carousel slides, prepared by the caller.
+ *   The caller owns this because turning a board token back into full card art is a playmat
+ *   concern (attach-card.js swaps the img src and stashes the real art in a dataset key).
+ *   Everything attached rides along — Energy and Tools — as it does today.
+ * @param {() => object} [options.getContext] overrides the first-paint context; the authoritative
+ *   one always arrives via `hydrateContext`, so this only changes what shows before then.
  * @param {(attackIndex: number) => void} [options.onAttack] fires a payable attack
  */
 export function openCardInspector({
   card,
-  getContext = () => defaultContextFor(card),
+  attachedSlides = [],
+  getContext = () => stampContextFor(card),
   onAttack = null,
 } = {}) {
   if (!card?.image) return false;
 
-  const attached = attachedEnergiesFor(card, []);
   // Carousel slide N sits to the right of slide N+1, so the attached cards go BEFORE the main
   // card and initialIndex points at the main card's slot.
-  const slides = [...attached, card];
+  const slides = [...attachedSlides, card];
   const mainIndex = slides.length - 1;
 
   const decorate = (built, slideCard, index) =>
