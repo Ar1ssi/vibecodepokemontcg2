@@ -5084,3 +5084,189 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   background: rgba(255, 255, 255, 0.08);
   color: #c5d0ff;
 }
+
+/* ── Card inspector (design 013) ─────────────────────────────────────────────
+   The card scan is the background and stays visible. These pieces sit ON TOP of
+   it and occlude only the print they replace — never an opaque field standing in
+   for the card. Every size is a multiple of --u, which card-inspector.mjs sets to
+   1% of the rendered card width, so the panel tracks the slide at any zoom. */
+.ptcg-inspector {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Attack cost not met. The whole card dims, pieces included, rather than hiding
+   them: the player opens this precisely to read what is missing and decide what
+   to attach. filter, not opacity — see the C2 note in card-inspector.mjs. */
+.ptcg-inspector--locked {
+  filter: saturate(0.28) brightness(0.62);
+}
+
+.ptcg-chrome {
+  position: absolute;
+  pointer-events: none;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.ptcg-orb {
+  width: calc(var(--u) * 4.8);
+  height: calc(var(--u) * 4.8);
+  display: inline-block;
+  vertical-align: middle;
+}
+.ptcg-orb--cost { width: calc(var(--u) * 4.8); height: calc(var(--u) * 4.8); }
+.ptcg-orb--sm { width: calc(var(--u) * 4.3); height: calc(var(--u) * 4.3); }
+.ptcg-orb--inline { width: calc(var(--u) * 2.9); height: calc(var(--u) * 2.9); vertical-align: -0.4em; }
+.ptcg-orb--missing {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ccc;
+  font-size: calc(var(--u) * 2.6);
+}
+
+/* Parked over the card's own printed HP slot. It reports live HP, which diverges
+   from the print once the Pokémon is damaged, so leaving the print beside it reads
+   as two different numbers for the same card. */
+.ptcg-hp {
+  position: absolute;
+  top: 3%;
+  right: 2%;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.9);
+  padding: calc(var(--u) * 0.7) calc(var(--u) * 1.6) calc(var(--u) * 0.7) calc(var(--u) * 3);
+  border-radius: calc(var(--u) * 3);
+  background: linear-gradient(#ffffff, #eef1f5);
+  box-shadow: 0 calc(var(--u) * 0.4) calc(var(--u) * 1.8) rgba(0, 0, 0, 0.45);
+}
+.ptcg-hp__num {
+  font-size: calc(var(--u) * 8.6);
+  font-weight: 900;
+  color: #16202b;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.ptcg-hp__orb { width: calc(var(--u) * 7.7); height: calc(var(--u) * 7.7); }
+
+/* No backing and no gaps: the panels tile the printed attack box edge-to-edge and
+   the tiles tile the printed weakness strip edge-to-edge. top/bottom come from the
+   model (attackZoneBounds + the frame's foot), so the printed foot stays visible. */
+.ptcg-lower {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ptcg-atks {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ptcg-atk {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-top: 1px solid #d9d2c5;
+  pointer-events: auto;
+}
+.ptcg-atk:first-child { border-top: 0; }
+.ptcg-atk__head {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.4);
+  background: var(--ptcg-banner, #8e8e93);
+  padding: calc(var(--u) * 1.4) calc(var(--u) * 2.3);
+}
+.ptcg-atk__name {
+  flex: 1;
+  font-size: calc(var(--u) * 3.2);
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ptcg-atk__right { display: flex; align-items: center; gap: calc(var(--u) * 0.5); }
+.ptcg-atk__dmg {
+  font-size: calc(var(--u) * 4.5);
+  font-weight: 900;
+  color: #fff;
+  margin-left: calc(var(--u) * 1.4);
+  min-width: calc(var(--u) * 6.4);
+  text-align: right;
+}
+/* Panels absorb the block's leftover height and centre their text in it, so the region
+   from the printed attack box down to the tiles stays continuously opaque. */
+.ptcg-atk__text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: calc(var(--u) * 1.4) calc(var(--u) * 2.3);
+  font-size: calc(var(--u) * 2.7);
+  line-height: 1.45;
+  color: #1c2530;
+}
+.ptcg-atk--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
+.ptcg-atk--usable { cursor: pointer; }
+.ptcg-atk--usable:hover { box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85); }
+
+/* Flush on the printed weakness strip they replace; hairline dividers keep them
+   reading as three separate pieces without gaps that let the print through. */
+.ptcg-stats { flex: 0 0 auto; display: flex; pointer-events: auto; }
+.ptcg-stat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 0.5);
+  padding: calc(var(--u) * 1.1) calc(var(--u) * 0.9);
+  background: #fff;
+  border-top: 1px solid #d9d2c5;
+  border-left: 1px solid #d9d2c5;
+}
+.ptcg-stat:first-child { border-left: 0; border-radius: 0 0 0 calc(var(--u) * 2.1); }
+.ptcg-stat:last-child { border-radius: 0 0 calc(var(--u) * 2.1) 0; }
+.ptcg-stat__k {
+  font-size: calc(var(--u) * 1.9);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  color: #8a8272;
+  white-space: nowrap;
+}
+.ptcg-stat__v {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 0.7);
+}
+.ptcg-stat__n { font-size: calc(var(--u) * 2.7); font-weight: 800; color: #16202b; }
+.ptcg-stat__n--none { color: #a3adb8; font-weight: 600; }
+
+.ptcg-dmg {
+  position: absolute;
+  right: calc(var(--u) * -2.1);
+  top: 40%;
+  width: calc(var(--u) * 12.2);
+  height: calc(var(--u) * 12.2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffc45c, #f08a1d 60%, #c96a08);
+  border: calc(var(--u) * 0.7) solid #fff;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--u) * 5.2);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 calc(var(--u) * 0.5) calc(var(--u) * 0.7) rgba(0, 0, 0, 0.45);
+  box-shadow: 0 calc(var(--u) * 1.4) calc(var(--u) * 3.6) rgba(0, 0, 0, 0.45);
+}
