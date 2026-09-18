@@ -1101,7 +1101,16 @@ export function validateLegality(state, command) {
   if (type === 'cardStats') {
     return { allowed: true };
   }
-  if (state.turn?.phase === 'setup') {
+  const isStartingActiveMove =
+    type === 'moveCard' &&
+    payload?.from === 'hand' &&
+    payload?.to === 'active' &&
+    (!state.players?.[playerId]?.zones?.active?.length || state.players?.[playerId]?.zones?.active?.length === 0);
+
+  if (state.turn?.phase === 'setup' || state.turn?.number === 0) {
+    if (isStartingActiveMove) {
+      return { allowed: true };
+    }
     return { allowed: false, reason: 'Set up the game first (Set Up button).' };
   }
 
@@ -1137,7 +1146,7 @@ export function validateLegality(state, command) {
       'playRandomCardFaceDown',
     ].includes(type)
   ) {
-    if (state.turn?.player && state.turn.player !== playerId) {
+    if (state.turn?.player && state.turn.player !== playerId && !isStartingActiveMove) {
       return { allowed: false, reason: "It's not your turn." };
     }
   }

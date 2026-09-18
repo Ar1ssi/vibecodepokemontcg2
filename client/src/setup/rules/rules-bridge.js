@@ -5,7 +5,7 @@
     import { appendMessage } from '../chatbox/append-message.js';
     import { processAction } from '../general/process-action.js';
     import { getZone } from '../zones/get-zone.js';
-    import { openCardPicker } from '../image-logic/card-picker.js';
+    import { openCardPicker, closeCardPicker } from '../image-logic/card-picker.js';
     import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
     import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
     import {
@@ -94,7 +94,12 @@ import {
   setSelectedCoin,
 } from './mat-coin.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
-import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import {
+  hasAuthoritativeView,
+  getAuthoritativeZoneArray,
+  getAuthoritativeStadiumArray,
+} from '../netcode/apply-view.js';
+import { isBasicPokemon, isEnergy, isTrainer } from '/shared/engine/cards.mjs';
 import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
 import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-affordances.mjs';
     
@@ -151,7 +156,26 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
     let serverTurnOrderStarter = null;
     let serverTurnOrderShown = false;
     let serverTurnOrderAnimationDone = false;
-    
+    let startingActiveSelectionPending = false;
+    let startingActiveFinished = false;
+    let startingActiveFirstPlayer = null;
+
+    const hookStartingActiveWatcher = () => {
+      const check = () => {
+        if (startingActiveSelectionPending && !startingActiveFinished) {
+          checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration);
+        }
+      };
+      [
+        'rules-card-moved',
+        'action-processed',
+        'rules-turn-view-applied',
+        'card-moved',
+      ].forEach((evt) => {
+        document.addEventListener(evt, check);
+      });
+    };
+
     export const initializeRulesEngine = () => {
       if (initialized) return;
       initialized = true;
@@ -173,6 +197,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       hookEnergyAttach();
       syncRulesToggleUI();
       hookTurnStartDraw();
+      hookStartingActiveWatcher();
     };
     
     // ── turn HUD: persistent whose-turn/phase banner ─────────────────────
@@ -538,6 +563,10 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       coinFlipPending = false;
       openingSetupReadyForCoinFlip = false;
       closeDeckSearchWindow();
+      startingActiveSelectionPending = false;
+      startingActiveFinished = false;
+      startingActiveFirstPlayer = null;
+      closeCardPicker(null, true);
       document.getElementById('rulesCoinCallOverlay')?.remove();
       document.getElementById('rulesChoicePicker')?.remove();
       const hud = document.getElementById('rulesTurnHUD');
@@ -566,6 +595,123 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       document.addEventListener('room-changed', resetRulesSession);
     };
     
+    const liveZoneArray = (user, zoneId) => {
+      if (hasAuthoritativeView()) {
+        const side = user === 'self' ? 'you' : 'them';
+        return zoneId === 'stadium'
+          ? getAuthoritativeStadiumArray()
+          : getAuthoritativeZoneArray(side, zoneId);
+      }
+      return getZone(user, zoneId)?.array || [];
+    };
+
+    const getBasicPokemonFromHand = async (user) => {
+      const hand = liveZoneArray(user, 'hand');
+      const basics = [];
+      for (const card of hand) {
+        await ensureCardData(card);
+        if (!isTrainer(card) && !isEnergy(card) && (isBasicPokemon(card) || (card.stage || 'Basic') === 'Basic')) {
+          basics.push(card);
+        }
+      }
+      return basics.length > 0 ? basics : hand;
+    };
+
+    const checkBothActivesSetAndBegin = (firstPlayer, session) => {
+      if (session !== rulesSessionGeneration) return false;
+      if (startingActiveFinished) return true;
+      if (rulesState.turnNumber >= 1) return true;
+
+      const selfActive = liveZoneArray('self', 'active');
+      const oppActive = liveZoneArray('opp', 'active');
+      if (selfActive.length === 0 || oppActive.length === 0) {
+        return false;
+      }
+
+      startingActiveFinished = true;
+      startingActiveSelectionPending = false;
+      closeCardPicker(null, true);
+
+      appendMessage('', 'Both players have set their Active Pokémon!', 'announcement', false);
+
+      const starter = firstPlayer || startingActiveFirstPlayer || rulesState.turnPlayer || 'self';
+      beginTurn(starter === 'opp' ? 'opp' : 'self');
+      updateTurnBanner();
+      return true;
+    };
+
+    const promptStartingActiveSelection = async (firstPlayer, session) => {
+      if (session !== rulesSessionGeneration) return;
+      if (startingActiveFinished || rulesState.turnNumber >= 1) return;
+
+      startingActiveFirstPlayer = firstPlayer;
+      startingActiveSelectionPending = true;
+
+      if (checkBothActivesSetAndBegin(firstPlayer, session)) return;
+
+      appendMessage(
+        '',
+        'Prompt: Both players, choose a Basic Pokémon from your hand for your Active Spot before starting turn 1.',
+        'announcement',
+        false
+      );
+
+      const promptPlayerActive = async (user, title) => {
+        if (session !== rulesSessionGeneration) return;
+        if (liveZoneArray(user, 'active').length > 0) {
+          checkBothActivesSetAndBegin(firstPlayer, session);
+          return;
+        }
+
+        const candidates = await getBasicPokemonFromHand(user);
+        if (!candidates || candidates.length === 0) {
+          appendMessage('', `No cards in ${user === 'self' ? 'your' : "opponent's"} hand for Active Spot.`, 'announcement', false);
+          return;
+        }
+
+        openCardPicker({
+          title,
+          candidates,
+          mode: 'single',
+          zoneFrom: 'hand',
+          destination: 'active',
+          user,
+          onPick: async (card) => {
+            if (session !== rulesSessionGeneration) return;
+            appendMessage(
+              '',
+              `${user === 'self' ? 'You' : 'Opponent'} chose ${card?.name || 'a Pokémon'} as Active Pokémon.`,
+              'announcement',
+              false
+            );
+
+            if (systemState.isTwoPlayer && rulesSocket) {
+              rulesSocket.emit('rulesEvent', {
+                type: 'startingActiveChosen',
+                data: { player: user, cardName: card?.name },
+              });
+            }
+
+            if (checkBothActivesSetAndBegin(firstPlayer, session)) {
+              return;
+            }
+
+            if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+              setTimeout(() => {
+                promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+              }, 100);
+            }
+          },
+        });
+      };
+
+      if (liveZoneArray('self', 'active').length === 0) {
+        await promptPlayerActive('self', 'Choose your Starting Active Pokémon');
+      } else if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+        await promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+      }
+    };
+
     // Shared setup sequence once turn order is decided — used both by the
     // local Set Up click and by the mirror side's auto-start (so the mirror
     // no longer needs a second Set Up click).
@@ -579,119 +725,99 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       openingStarted = true;
       const session = rulesSessionGeneration;
       startGame(firstPlayer);
-          // startGame() only resets to turnNumber 0 / phase 'draw' — it never
-          // advances into the first player's actual turn 1. beginTurn() is
-          // what increments turnNumber and flips phase to 'main'; without
-          // calling it here, the first player's opening turn silently runs
-          // at turnNumber 0, which shifts the "turn 1" attack restriction
-          // onto the second player's first turn instead.
-          beginTurn(firstPlayer === 'opp' ? 'opp' : 'self');
-          resetPrizes();
-          resetStatuses();
-          void (async () => {
-            await drawOpeningHand('self', 'self', true);
-            if (!systemState.isTwoPlayer) {
-              await drawOpeningHand('opp', 'opp', true);
+      resetPrizes();
+      resetStatuses();
+      void (async () => {
+        await drawOpeningHand('self', 'self', true);
+        if (!systemState.isTwoPlayer) {
+          await drawOpeningHand('opp', 'opp', true);
+        }
+        appendMessage('', 'Opening hands drawn!', 'announcement', false);
+        appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
+      })();
+
+      // mulligan check: opening hands must contain a Basic Pokémon. A
+      // player may need to mulligan more than once — the redrawn hand can
+      // still be missing a Basic — so this loops, re-evaluating after each
+      // round, until every local hand is legal. `mulligansResolved` is
+      // claimed once up front purely as a duplicate-fire guard (so a second
+      // closure can't double-run); it is NOT a "mulligan only once" limit.
+      setTimeout(async () => {
+        try {
+          if (session !== rulesSessionGeneration) return;
+          if (rulesState.mulligansResolved) return;
+          markMulligansResolved(); // claim the window before any async gap
+
+          // Cap guards against a pathological (Basic-less) deck looping
+          // forever; a legal deck draws a hand with a Basic within a couple
+          // of mulligans, so this is generous headroom.
+          const MAX_ROUNDS = 10;
+          let anyMulligans = false;
+
+          for (let round = 0; round < MAX_ROUNDS; round++) {
+            if (session !== rulesSessionGeneration) return;
+
+            const selfHand = getZone('self', 'hand').array;
+            const oppHand = getZone('opp', 'hand').array;
+            let steps = await evaluateMulligans({ selfHand, oppHand });
+            if (systemState.isTwoPlayer) {
+              // In 2P, each peer evaluates its own hand authoritatively;
+              // opponent mulligans arrive via the 'mulliganBonus' socket event.
+              steps = steps.filter((s) => s.player === 'self');
             }
-            appendMessage('', 'Opening hands drawn!', 'announcement', false);
-            appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
-            appendMessage(
-              '',
-              'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
-              'announcement',
-              false
-            );
-          })();
-    
-          // mulligan check: opening hands must contain a Basic Pokémon. A
-          // player may need to mulligan more than once — the redrawn hand can
-          // still be missing a Basic — so this loops, re-evaluating after each
-          // round, until every local hand is legal. `mulligansResolved` is
-          // claimed once up front purely as a duplicate-fire guard (so a second
-          // closure can't double-run); it is NOT a "mulligan only once" limit.
-          setTimeout(async () => {
-            try {
-              if (session !== rulesSessionGeneration) return;
-              if (rulesState.mulligansResolved) return;
-              markMulligansResolved(); // claim the window before any async gap
 
-              // Cap guards against a pathological (Basic-less) deck looping
-              // forever; a legal deck draws a hand with a Basic within a couple
-              // of mulligans, so this is generous headroom.
-              const MAX_ROUNDS = 10;
-              let anyMulligans = false;
+            const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
+            const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
 
-              for (let round = 0; round < MAX_ROUNDS; round++) {
-                if (session !== rulesSessionGeneration) return;
+            // Both local hands legal — done.
+            if (!selfMulliganned && !oppMulliganned) break;
+            anyMulligans = true;
 
-                const selfHand = getZone('self', 'hand').array;
-                const oppHand = getZone('opp', 'hand').array;
-                let steps = await evaluateMulligans({ selfHand, oppHand });
-                if (systemState.isTwoPlayer) {
-                  // In 2P, each peer evaluates its own hand authoritatively;
-                  // opponent mulligans arrive via the 'mulliganBonus' socket event.
-                  steps = steps.filter((s) => s.player === 'self');
-                }
-
-                const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
-                const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
-
-                // Both local hands legal — done.
-                if (!selfMulliganned && !oppMulliganned) break;
-                anyMulligans = true;
-
-                for (const step of steps) {
-                  if (step.mulligan) {
-                    appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
-                  }
-                }
-
-                // Execute self mulligan. Awaiting it lets the zone settle (hand
-                // emptied, reshuffled, redrawn) before the next round re-checks.
-                if (selfMulliganned) {
-                  appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
-                  await shuffleAndDraw('self', 'self', 7, null, true);
-                }
-
-                // In 1P, also execute opponent mulligan locally.
-                if (!systemState.isTwoPlayer && oppMulliganned) {
-                  appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
-                  await shuffleAndDraw('opp', 'opp', 7, null, true);
-                }
-                // In 2P, the opponent's client handles their own mulligan independently.
-
-                // Bonus draws (1 per mulligan this round).
-                if (selfMulliganned) {
-                  // Opponent draws 1 bonus card.
-                  if (systemState.isTwoPlayer && rulesSocket) {
-                    rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
-                  } else {
-                    appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
-                    draw('opp', 'opp', 1, true);
-                  }
-                }
-
-                if (oppMulliganned && !systemState.isTwoPlayer) {
-                  // 1P: self draws bonus (opponent mulliganned).
-                  appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
-                  draw('self', 'self', 1, true);
-                }
-                // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
+            for (const step of steps) {
+              if (step.mulligan) {
+                appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
               }
-
-              if (anyMulligans) {
-                appendMessage(
-                  '',
-                  'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
-                  'announcement',
-                  false
-                );
-              }
-            } catch (e) {
-              console.error('Mulligan execution error:', e);
             }
-          }, e2eDelayMs(2500));
-          updateTurnBanner();
+
+            // Execute self mulligan. Awaiting it lets the zone settle (hand
+            // emptied, reshuffled, redrawn) before the next round re-checks.
+            if (selfMulliganned) {
+              appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
+              await shuffleAndDraw('self', 'self', 7, null, true);
+            }
+
+            // In 1P, also execute opponent mulligan locally.
+            if (!systemState.isTwoPlayer && oppMulliganned) {
+              appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
+              await shuffleAndDraw('opp', 'opp', 7, null, true);
+            }
+            // In 2P, the opponent's client handles their own mulligan independently.
+
+            // Bonus draws (1 per mulligan this round).
+            if (selfMulliganned) {
+              // Opponent draws 1 bonus card.
+              if (systemState.isTwoPlayer && rulesSocket) {
+                rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
+              } else {
+                appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
+                draw('opp', 'opp', 1, true);
+              }
+            }
+
+            if (oppMulliganned && !systemState.isTwoPlayer) {
+              // 1P: self draws bonus (opponent mulliganned).
+              appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
+              draw('self', 'self', 1, true);
+            }
+            // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
+          }
+
+          // Once opening hands are legally settled, prompt for Starting Active selection
+          await promptStartingActiveSelection(firstPlayer, session);
+        } catch (e) {
+          console.error('Mulligan execution error:', e);
+        }
+      }, e2eDelayMs(2500));
     };
     
     // ── design 013: server-owned turn-order coin call ────────────────────
@@ -1634,6 +1760,9 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
                 draw('self', 'self', 1, true);
                 appendMessage('', 'Bonus draw: you drew 1 card (opponent mulliganed).', 'announcement', false);
               }
+            } else if (type === 'startingActiveChosen') {
+              appendMessage('', 'Opponent chose their Starting Active Pokémon.', 'announcement', false);
+              checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration);
             }
           } catch (_err) {
             // ignore malformed socket payload

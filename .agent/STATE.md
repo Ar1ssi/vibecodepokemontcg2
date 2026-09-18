@@ -4,10 +4,10 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 176
-Focus: Phases 2, 3, & 4 retreat engine, tool cap, attack effects, and energy acceleration (PR #149).
-Active: none. Work is committed and pushed on branch `feature/fix-server-authoritative-parsers` (PR #149).
-Next: Review PR #149 and proceed to Phase 5 (Client Keybinds & UI Alignment) or merge to main.
+Session: 178
+Focus: Starting Active Pokémon Selection Step (TCG Live Style).
+Active: Completed and verified starting active Pokémon selection step in rules-bridge.js, rules-state.mjs, and reduce.mjs.
+Next: Ready for next task.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -28,6 +28,6 @@ Blocked: none.
   module). A worktree needs `node_modules` junctioned in before eslint/playwright will run there.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S177 2026-09-18 feature: Starting Active Pokémon Selection Step (TCG Live style) before turn 1 starts.
 - S176 2026-09-18 feature: Phases 2, 3, 4 retreat engine, tool cap, attack effects, energy acceleration (PR #149).
 - S175 2026-09-18 feature: Phase 1 combat passives, prevention/reduction, tools, thorns, KO & prize modifiers (PR #149).
-- S174 2026-09-18 feature: server-authoritative parser sweep, attack status & heal, abilities, stadium steps, evolution legality & timing (I58, I59, PR #149).
