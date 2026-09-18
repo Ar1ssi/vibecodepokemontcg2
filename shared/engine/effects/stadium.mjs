@@ -107,17 +107,18 @@ export function executeStadium(draft, {
       }
       steps.push({ type: 'draw', count: opt.n || 1 });
     } else if (opt.kind === 'hand-to-deck-top') {
-      steps.push({ type: 'putHandOnBottom', count: opt.n || 1 });
+      steps.push({ type: 'putHandOnTop', count: opt.n || 1 });
     } else if (opt.kind === 'switch-type') {
       steps.push({ type: 'switchOwn' });
     } else if (opt.kind === 'discard-to-bench') {
       const energyType = opt.typeFilter
         ? `Basic {${opt.typeFilter.charAt(0).toUpperCase()}} Energy`
         : 'Basic Energy';
+      const count = opt.n || 2;
       steps.push({
-        type: 'attachFromDiscard',
+        type: count > 1 ? 'attachMultipleFromDiscard' : 'attachFromDiscard',
         energy: energyType,
-        count: opt.n || 2,
+        count,
         target: '1 of your Benched Pokémon',
       });
     } else if (opt.kind === 'energy') {

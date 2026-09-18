@@ -309,3 +309,86 @@ test('executeStadium: handles switch-type and heal once-per-turn kinds', () => {
   assert.ok(res);
   assert.equal(draft.players.p1.flags.stadiumUsedThisTurn, true);
 });
+
+test('executeStadium: handles hand-to-deck-top by placing card on top of deck', () => {
+  const draft = setupGame();
+  const handCard = createCard({ instanceId: 77, name: 'Hand Card' });
+  const topDeckCard = draft.players.p1.zones.deck[0];
+  draft.players.p1.zones.hand.push(handCard);
+
+  draft.stadium = createCard({
+    instanceId: 91,
+    name: 'Top Deck Gym',
+    type: 'Trainer',
+    subtypes: ['Stadium'],
+    text: "Once during each player's turn, that player may put a card from their hand on top of their deck.",
+  });
+
+  const events = [];
+  // Initial call prompts player to choose card from hand
+  const res1 = executeStadium(draft, {
+    stadium: draft.stadium,
+    playerId: 'p1',
+    activeRng: { next: () => 0.5 },
+    events,
+  });
+
+  assert.ok(res1.pendingChoice);
+  assert.equal(res1.pendingChoice.min, 1);
+  assert.equal(res1.pendingChoice.max, 1);
+
+  // Resume with chosen hand card
+  const res2 = executeStadium(draft, {
+    stadium: draft.stadium,
+    playerId: 'p1',
+    activeRng: { next: () => 0.5 },
+    selection: [77],
+    resumeToken: res1.pendingChoice.resumeToken,
+    events,
+  });
+
+  assert.ok(res2.completed);
+  // Hand card was unshifted to index 0 (top of deck)
+  assert.equal(draft.players.p1.zones.deck[0].instanceId, 77);
+  assert.equal(draft.players.p1.zones.deck[1].instanceId, topDeckCard.instanceId);
+  assert.ok(events.some((e) => e.type === 'cardsMovedToDeckTop' && e.count === 1));
+});
+
+test('executeStadium: handles discard-to-bench by generating attachMultipleFromDiscard with count', () => {
+  const draft = setupGame();
+  const benchMon = createCard({
+    instanceId: 88,
+    name: 'Pikachu',
+    supertype: 'Pokémon',
+    type: 'Lightning',
+  });
+  draft.players.p1.zones.bench.push(benchMon);
+
+  const e1 = createCard({ instanceId: 201, name: 'Lightning Energy', type: 'Energy', subtypes: ['Basic'] });
+  const e2 = createCard({ instanceId: 202, name: 'Lightning Energy', type: 'Energy', subtypes: ['Basic'] });
+  draft.players.p1.zones.discard.push(e1, e2);
+
+  draft.stadium = createCard({
+    instanceId: 92,
+    name: 'Thunder Mountain',
+    type: 'Trainer',
+    subtypes: ['Stadium'],
+    text: "Once during each player's turn, that player may put up to 2 Basic {L} Energy cards from their discard pile onto 1 of their Benched Pokémon.",
+  });
+
+  const events = [];
+  // Initial call prompts for energy or target
+  const res = executeStadium(draft, {
+    stadium: draft.stadium,
+    playerId: 'p1',
+    activeRng: { next: () => 0.5 },
+    events,
+  });
+
+  assert.ok(res);
+  // Since there is 1 bench target, attachMultipleFromDiscard asks for up to 2 energies directly
+  assert.ok(res.pendingChoice);
+  assert.equal(res.pendingChoice.max, 2);
+  assert.ok(res.pendingChoice.prompt.includes('Attach up to 2'));
+});
+

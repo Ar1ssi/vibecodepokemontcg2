@@ -220,6 +220,26 @@ function putHandOnBottom(ctx) {
   });
 }
 
+function putHandOnTop(ctx) {
+  const { player, step } = ctx;
+  const hand = player.zones.hand;
+  if (ctx.selection) {
+    const chosen = pickById(hand, ctx.selection);
+    for (const card of chosen) removeFromZones(player, card);
+    player.zones.deck.unshift(...chosen);
+    ctx.events.push({ type: 'cardsMovedToDeckTop', count: chosen.length, playerId: player.playerId });
+    return null;
+  }
+  const count = Math.min(step.count || 1, hand.length);
+  if (count === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Put ${count} card${count > 1 ? 's' : ''} from your hand on top of your deck`,
+    options: hand,
+    min: count,
+    max: count,
+  });
+}
+
 function opponentShuffleHandDraw(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -1222,6 +1242,7 @@ export const EXTRA_STEP_HANDLERS = {
   searchAttachEach,
   opponentDraw,
   putHandOnBottom,
+  putHandOnTop,
   opponentShuffleHandDraw,
   opponentCountShuffleDraw,
   countShuffleDrawPlus,
