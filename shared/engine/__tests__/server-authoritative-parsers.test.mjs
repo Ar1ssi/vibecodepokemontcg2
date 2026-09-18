@@ -57,7 +57,12 @@ function setupGame(overrides = {}) {
                 },
               ],
             }),
-            createCard({ instanceId: 101, name: 'Lightning Energy', type: 'Energy', attachedTo: 1 }),
+            createCard({
+              instanceId: 101,
+              name: 'Lightning Energy',
+              type: 'Energy',
+              attachedTo: 1,
+            }),
           ],
           bench: [],
           hand: [],
@@ -112,7 +117,11 @@ test('attack status: Hypnosis inflicts Asleep unconditionally', () => {
   assert.equal(res.error, null);
   const defender = res.state.players.p2.zones.active[0];
   assert.equal(defender.specialCondition, 'Asleep');
-  assert.ok(res.events.some((e) => e.type === 'specialConditionUpdated' && e.condition === 'Asleep'));
+  assert.ok(
+    res.events.some(
+      (e) => e.type === 'specialConditionUpdated' && e.condition === 'Asleep'
+    )
+  );
 });
 
 test('attack status: Thunder Shock inflicts Paralyzed on coin heads, not on tails', () => {
@@ -352,8 +361,13 @@ test('executeStadium: handles hand-to-deck-top by placing card on top of deck', 
   assert.ok(res2.completed);
   // Hand card was unshifted to index 0 (top of deck)
   assert.equal(draft.players.p1.zones.deck[0].instanceId, 77);
-  assert.equal(draft.players.p1.zones.deck[1].instanceId, topDeckCard.instanceId);
-  assert.ok(events.some((e) => e.type === 'cardsMovedToDeckTop' && e.count === 1));
+  assert.equal(
+    draft.players.p1.zones.deck[1].instanceId,
+    topDeckCard.instanceId
+  );
+  assert.ok(
+    events.some((e) => e.type === 'cardsMovedToDeckTop' && e.count === 1)
+  );
 });
 
 test('executeStadium: handles discard-to-bench by generating attachMultipleFromDiscard with count', () => {
@@ -366,8 +380,18 @@ test('executeStadium: handles discard-to-bench by generating attachMultipleFromD
   });
   draft.players.p1.zones.bench.push(benchMon);
 
-  const e1 = createCard({ instanceId: 201, name: 'Lightning Energy', type: 'Energy', subtypes: ['Basic'] });
-  const e2 = createCard({ instanceId: 202, name: 'Lightning Energy', type: 'Energy', subtypes: ['Basic'] });
+  const e1 = createCard({
+    instanceId: 201,
+    name: 'Lightning Energy',
+    type: 'Energy',
+    subtypes: ['Basic'],
+  });
+  const e2 = createCard({
+    instanceId: 202,
+    name: 'Lightning Energy',
+    type: 'Energy',
+    subtypes: ['Basic'],
+  });
   draft.players.p1.zones.discard.push(e1, e2);
 
   draft.stadium = createCard({
@@ -408,7 +432,7 @@ test('attachedTools: resolves attached Tool cards via attachedTo in headless sta
   assert.equal(found[0].instanceId, 50);
 });
 
-test('effectiveHp: attached Tool (Hero\'s Cape) prevents knockout when damage equals base HP', () => {
+test("effectiveHp: attached Tool (Hero's Cape) prevents knockout when damage equals base HP", () => {
   const state = setupGame();
   const cap = createCard({
     instanceId: 105,
@@ -435,7 +459,9 @@ test('effectiveHp: attached Tool (Hero\'s Cape) prevents knockout when damage eq
   });
 
   assert.equal(res.error, null);
-  const defender = res.state.players.p2.zones.active.find((c) => c.instanceId === 2);
+  const defender = res.state.players.p2.zones.active.find(
+    (c) => c.instanceId === 2
+  );
   // Squirtle should survive with 70 damage because effective HP is 170 (70 + 100)
   assert.ok(defender, 'Squirtle should not be discarded');
   assert.equal(defender.damage, 70);
@@ -454,8 +480,15 @@ test('effectiveHp: attached Tool (Hero\'s Cape) prevents knockout when damage eq
     playerId: 'p1',
   });
   assert.equal(resKo.error, null);
-  assert.equal(resKo.state.players.p2.zones.active.length, 0, 'Squirtle should be knocked out without tool');
-  assert.ok(resKo.events.some((e) => e.type === 'prizesTaken'), 'Should award prize on KO');
+  assert.equal(
+    resKo.state.players.p2.zones.active.length,
+    0,
+    'Squirtle should be knocked out without tool'
+  );
+  assert.ok(
+    resKo.events.some((e) => e.type === 'prizesTaken'),
+    'Should award prize on KO'
+  );
 
   // Third test: 170 damage against Squirtle with Hero's Cape -> should knock out
   const stateBigHit = setupGame();
@@ -471,8 +504,15 @@ test('effectiveHp: attached Tool (Hero\'s Cape) prevents knockout when damage eq
     playerId: 'p1',
   });
   assert.equal(resBigKo.error, null);
-  assert.equal(resBigKo.state.players.p2.zones.active.length, 0, 'Squirtle should be knocked out at 170 HP');
-  assert.ok(resBigKo.events.some((e) => e.type === 'prizesTaken'), 'Should award prize on KO');
+  assert.equal(
+    resBigKo.state.players.p2.zones.active.length,
+    0,
+    'Squirtle should be knocked out at 170 HP'
+  );
+  assert.ok(
+    resBigKo.events.some((e) => e.type === 'prizesTaken'),
+    'Should award prize on KO'
+  );
 });
 
 test('attack heal: heals damage from attacker and emits damageUpdated event', () => {
@@ -498,7 +538,10 @@ test('attack heal: heals damage from attacker and emits damageUpdated event', ()
   assert.equal(updatedAttacker.damage, 20);
   assert.ok(
     res.events.some(
-      (e) => e.type === 'damageUpdated' && e.instanceId === attacker.instanceId && e.healed === 30
+      (e) =>
+        e.type === 'damageUpdated' &&
+        e.instanceId === attacker.instanceId &&
+        e.healed === 30
     )
   );
 });
@@ -539,7 +582,7 @@ test('stadium play limit: can only play 1 Stadium per turn', () => {
   assert.match(res2.error, /only play 1 Stadium card per turn/i);
 });
 
-test('trainer play conditions: Switch and Boss\'s Orders validate bench counts', () => {
+test("trainer play conditions: Switch and Boss's Orders validate bench counts", () => {
   const state = setupGame();
   const switchCard = createCard({
     instanceId: 310,
@@ -576,8 +619,12 @@ test('trainer play conditions: Switch and Boss\'s Orders validate bench counts',
   assert.match(bossLegal.reason, /Opponent has no Benched Pokémon to switch/i);
 
   // Add bench to p1 and p2
-  state.players.p1.zones.bench.push(createCard({ instanceId: 312, name: 'Benched P1', supertype: 'Pokémon' }));
-  state.players.p2.zones.bench.push(createCard({ instanceId: 313, name: 'Benched P2', supertype: 'Pokémon' }));
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 312, name: 'Benched P1', supertype: 'Pokémon' })
+  );
+  state.players.p2.zones.bench.push(
+    createCard({ instanceId: 313, name: 'Benched P2', supertype: 'Pokémon' })
+  );
 
   const switchLegalAfter = validateLegality(state, {
     type: 'playTrainer',
@@ -675,7 +722,10 @@ test('evolution legality: enforces turn-1 ban, same-turn ban, stage order, and o
     playerId: 'p1',
   });
   assert.equal(secondEvoCheck.allowed, false);
-  assert.match(secondEvoCheck.reason, /Already evolved that Pokémon this turn/i);
+  assert.match(
+    secondEvoCheck.reason,
+    /Already evolved that Pokémon this turn/i
+  );
 });
 
 test('Rare Candy: blocked on turn 1/2 and blocked on same-turn Basics', () => {
@@ -757,11 +807,16 @@ test('executeSteps: handles discardCostAbility, statusAbility, and opponent gust
     events,
   });
   assert.ok(resDiscard.completed);
-  assert.equal(draft.players.p1.zones.discard.some((c) => c.instanceId === 501), true);
+  assert.equal(
+    draft.players.p1.zones.discard.some((c) => c.instanceId === 501),
+    true
+  );
 
   // 2. statusAbility
   const resStatus = executeSteps(draft, {
-    steps: [{ type: 'statusAbility', status: 'Poisoned', target: 'opponentActive' }],
+    steps: [
+      { type: 'statusAbility', status: 'Poisoned', target: 'opponentActive' },
+    ],
     playerId: 'p1',
     activeRng: { next: () => 0.5 },
     events,
@@ -770,7 +825,11 @@ test('executeSteps: handles discardCostAbility, statusAbility, and opponent gust
   assert.equal(draft.players.p2.zones.active[0].poisoned, true);
 
   // 3. switchAbility with target opponent
-  const oppBenchMon = createCard({ instanceId: 505, name: 'Opponent Bench Mon', supertype: 'Pokémon' });
+  const oppBenchMon = createCard({
+    instanceId: 505,
+    name: 'Opponent Bench Mon',
+    supertype: 'Pokémon',
+  });
   draft.players.p2.zones.bench.push(oppBenchMon);
   const oppActiveId = draft.players.p2.zones.active[0].instanceId;
 
@@ -786,5 +845,3 @@ test('executeSteps: handles discardCostAbility, statusAbility, and opponent gust
   // Former active should now be on bench
   assert.equal(draft.players.p2.zones.bench[0].instanceId, oppActiveId);
 });
-
-

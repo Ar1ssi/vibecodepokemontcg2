@@ -9,16 +9,19 @@ import {
   parseDamageReduction,
   parseDamageBonus,
   parseHpBonus,
-  applyHpBonus,
   parseRetreatCostModifier,
   applyRetreatCostModifier,
   parsePrizeModify,
   parseKoPrevention,
   parseThorns,
   mergeDamagePrevention,
-  applyDamagePrevention,
 } from './ability-executors.mjs';
-import { isExCard, isGxCard, isMegaCard, cardHasRuleBox as baseCardHasRuleBox } from './ko-flow.mjs';
+import {
+  isExCard,
+  isGxCard,
+  isMegaCard,
+  cardHasRuleBox as baseCardHasRuleBox,
+} from './ko-flow.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 
 const lower = (v) =>
@@ -27,7 +30,9 @@ const lower = (v) =>
     .replace(/[\u2018\u2019]/g, "'");
 
 const textOf = (card) =>
-  lower(card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? '');
+  lower(
+    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
+  );
 
 const TYPE_LETTER = {
   g: 'grass',
@@ -43,7 +48,7 @@ const TYPE_LETTER = {
   c: 'colorless',
 };
 
-export { isExCard, isGxCard, isMegaCard };
+export { isExCard, isGxCard, isMegaCard, isPokemonToolCard, attachedTools };
 
 export function cardHasRuleBox(card) {
   if (!card) return false;
@@ -57,8 +62,16 @@ export function attackerTypes(attacker) {
 export function isVCard(card = {}) {
   if (!card) return false;
   const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  if (subs.includes('v') || subs.includes('vstar') || subs.includes('vmax') || subs.includes('v-union')) return true;
-  const name = String(card.name || '').toLowerCase().trim();
+  if (
+    subs.includes('v') ||
+    subs.includes('vstar') ||
+    subs.includes('vmax') ||
+    subs.includes('v-union')
+  )
+    return true;
+  const name = String(card.name || '')
+    .toLowerCase()
+    .trim();
   return /(?:^|\s)v(?:star|max|-union)?$/i.test(name) || /\bv\b/i.test(name);
 }
 
@@ -67,7 +80,11 @@ export function isTeraCard(card = {}) {
   const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
   if (subs.includes('tera')) return true;
   const text = textOf(card);
-  if (text.includes('tera: as long as this pokémon is on your bench') || text.includes('tera rule')) return true;
+  if (
+    text.includes('tera: as long as this pokémon is on your bench') ||
+    text.includes('tera rule')
+  )
+    return true;
   return /\btera\b/i.test(String(card.name || ''));
 }
 
@@ -82,7 +99,8 @@ export function cardHasAbility(card = {}) {
 export function isEvolutionCard(card = {}) {
   if (!card) return false;
   const stage = String(card.stage || '').toLowerCase();
-  if (stage === 'stage 1' || stage === 'stage 2' || stage === 'evolution') return true;
+  if (stage === 'stage 1' || stage === 'stage 2' || stage === 'evolution')
+    return true;
   const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
   if (
     subs.includes('stage 1') ||
@@ -107,21 +125,26 @@ export function isStage1Card(card = {}) {
   if (!card) return false;
   const stage = String(card.stage || '').toLowerCase();
   const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  return stage === 'stage 1' || subs.includes('stage 1') || subs.includes('stage1');
+  return (
+    stage === 'stage 1' || subs.includes('stage 1') || subs.includes('stage1')
+  );
 }
 
 export function isStage2Card(card = {}) {
   if (!card) return false;
   const stage = String(card.stage || '').toLowerCase();
   const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  return stage === 'stage 2' || subs.includes('stage 2') || subs.includes('stage2');
+  return (
+    stage === 'stage 2' || subs.includes('stage 2') || subs.includes('stage2')
+  );
 }
 
 export function attachedCards(pokemon, zoneCards = []) {
   if (!pokemon) return [];
   return (zoneCards || []).filter((c) => {
     if (c === pokemon) return false;
-    if (pokemon.instanceId != null && c.attachedTo === pokemon.instanceId) return true;
+    if (pokemon.instanceId != null && c.attachedTo === pokemon.instanceId)
+      return true;
     if (pokemon.image && c.image?.relative === pokemon.image) return true;
     return false;
   });
@@ -182,8 +205,14 @@ export function reductionForCard(card, defender, attacker) {
     return 0;
   }
   if (/\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
-    const letters = [...t.matchAll(/\{([a-z])\}/gi)].map((m) => TYPE_LETTER[m[1].toLowerCase()]).filter(Boolean);
-    if (letters.length && !letters.some((ty) => attackerTypes(attacker).includes(ty))) return 0;
+    const letters = [...t.matchAll(/\{([a-z])\}/gi)]
+      .map((m) => TYPE_LETTER[m[1].toLowerCase()])
+      .filter(Boolean);
+    if (
+      letters.length &&
+      !letters.some((ty) => attackerTypes(attacker).includes(ty))
+    )
+      return 0;
   }
 
   // Defender requirements (e.g. "The Fighting Pokémon this card is attached to takes 30 less damage")
@@ -208,34 +237,70 @@ export function reductionForCard(card, defender, attacker) {
 
 function bonusForTool(
   tool,
-  { defender, defenderIsActive = true, attacker, defenderPoisoned = false, attackerTrailingPrizes = false }
+  {
+    defender,
+    defenderIsActive = true,
+    attacker,
+    defenderPoisoned = false,
+    attackerTrailingPrizes = false,
+  }
 ) {
   const t = textOf(tool);
   const bonus = parseDamageBonus(tool).bonus;
   if (!bonus) return 0;
-  if (/active pokémon ex|active pokemon ex/i.test(t) && !isExCard(defender)) return 0;
-  if (/active pokémon ex|active pokemon ex/i.test(t) && !defenderIsActive) return 0;
-  if (/active pokémon v\b|active pokemon v\b/i.test(t) && !isVCard(defender)) return 0;
-  if (/active pokémon v\b|active pokemon v\b/i.test(t) && !defenderIsActive) return 0;
-  if (/more prize cards remaining than your opponent/i.test(t) && !attackerTrailingPrizes) return 0;
-  if (/doesn'?t have a rule box|do not have a rule box/i.test(t) && cardHasRuleBox(attacker)) return 0;
+  if (/active pokémon ex|active pokemon ex/i.test(t) && !isExCard(defender))
+    return 0;
+  if (/active pokémon ex|active pokemon ex/i.test(t) && !defenderIsActive)
+    return 0;
+  if (/active pokémon v\b|active pokemon v\b/i.test(t) && !isVCard(defender))
+    return 0;
+  if (/active pokémon v\b|active pokemon v\b/i.test(t) && !defenderIsActive)
+    return 0;
+  if (
+    /more prize cards remaining than your opponent/i.test(t) &&
+    !attackerTrailingPrizes
+  )
+    return 0;
+  if (
+    /doesn'?t have a rule box|do not have a rule box/i.test(t) &&
+    cardHasRuleBox(attacker)
+  )
+    return 0;
   const attackerPoisoned = (attacker?.conditions || []).includes('Poisoned');
-  if (/this pokémon is poisoned|pokémon this card is attached to is poisoned/i.test(t) && !attackerPoisoned) return 0;
+  if (
+    /this pokémon is poisoned|pokémon this card is attached to is poisoned/i.test(
+      t
+    ) &&
+    !attackerPoisoned
+  )
+    return 0;
   if (
     /poisoned pokémon|poisoned pokemon/i.test(t) &&
-    !/this pokémon is poisoned|pokémon this card is attached to is poisoned/i.test(t) &&
+    !/this pokémon is poisoned|pokémon this card is attached to is poisoned/i.test(
+      t
+    ) &&
     !defenderPoisoned
   ) {
     return 0;
   }
-  if (/hop's pokémon|hop's pokemon/i.test(t) && !/hop's/i.test(defender?.name || '')) return 0;
-  if (/pikachu ex/i.test(t) && !/pikachu ex/i.test(attacker?.name || '')) return 0;
+  if (
+    /hop's pokémon|hop's pokemon/i.test(t) &&
+    !/hop's/i.test(defender?.name || '')
+  )
+    return 0;
+  if (/pikachu ex/i.test(t) && !/pikachu ex/i.test(attacker?.name || ''))
+    return 0;
   if (/tera pokémon|tera pokemon/i.test(t) && !isTeraCard(attacker)) return 0;
   return bonus;
 }
 
 /** Defender-side prevention from Pokémon + attached Tools. */
-export function combinedToolDamagePrevention(defender, zoneCards, attacker, { blockTools = false, stadium = null } = {}) {
+export function combinedToolDamagePrevention(
+  defender,
+  zoneCards,
+  attacker,
+  { blockTools = false, stadium = null } = {}
+) {
   let out = preventionForCard(defender, attacker);
   if (toolBlocked(blockTools, stadium)) return out;
   for (const tool of attachedTools(defender, zoneCards)) {
@@ -285,18 +350,34 @@ export function combinedToolAttackBonus(
   attacker,
   zoneCards,
   defender,
-  { blockTools = false, defenderIsActive = true, defenderPoisoned = false, attackerTrailingPrizes = false, stadium = null } = {}
+  {
+    blockTools = false,
+    defenderIsActive = true,
+    defenderPoisoned = false,
+    attackerTrailingPrizes = false,
+    stadium = null,
+  } = {}
 ) {
   let bonus = 0;
   if (toolBlocked(blockTools, stadium)) return bonus;
   for (const tool of attachedTools(attacker, zoneCards)) {
-    bonus += bonusForTool(tool, { defender, defenderIsActive, attacker, defenderPoisoned, attackerTrailingPrizes });
+    bonus += bonusForTool(tool, {
+      defender,
+      defenderIsActive,
+      attacker,
+      defenderPoisoned,
+      attackerTrailingPrizes,
+    });
   }
   return bonus;
 }
 
 /** HP bonus from attached Tools (stadium bonus applied separately). */
-export function combinedToolHpBonus(pokemon, zoneCards, { blockTools = false } = {}) {
+export function combinedToolHpBonus(
+  pokemon,
+  zoneCards,
+  { blockTools = false } = {}
+) {
   let bonus = 0;
   if (toolBlocked(blockTools)) return bonus;
   for (const tool of attachedTools(pokemon, zoneCards)) {
@@ -306,19 +387,28 @@ export function combinedToolHpBonus(pokemon, zoneCards, { blockTools = false } =
 }
 
 /** Retreat cost delta from Pokémon + attached Tools. */
-export function combinedToolRetreatCost(baseRetreat, pokemon, zoneCards, { blockTools = false } = {}) {
+export function combinedToolRetreatCost(
+  baseRetreat,
+  pokemon,
+  zoneCards,
+  { blockTools = false, stadium = null } = {}
+) {
   let cost = baseRetreat || 0;
   const mod = parseRetreatCostModifier(pokemon);
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
-  if (toolBlocked(blockTools)) return cost;
+  if (toolBlocked(blockTools, stadium)) return cost;
   for (const tool of attachedTools(pokemon, zoneCards)) {
     const tmod = parseRetreatCostModifier(tool);
     cost = applyRetreatCostModifier(cost, tmod?.delta || 0);
     const t = textOf(tool);
-    if (/remaining hp is 30 or less/.test(t) && pokemon?.image?.damageCounter) {
-      const dmg = parseInt(pokemon.image.damageCounter.textContent || '0', 10) || 0;
-      const hp = pokemon.hp || 0;
-      if (hp > 0 && hp - dmg * 10 <= 30) cost = 0;
+    if (/remaining hp is 30 or less/i.test(t)) {
+      const dmg =
+        typeof pokemon?.damage === 'number'
+          ? pokemon.damage
+          : (parseInt(pokemon?.image?.damageCounter?.textContent || '0', 10) ||
+              0) * 10;
+      const hp = pokemon?.hp || 0;
+      if (hp > 0 && hp - dmg <= 30) cost = 0;
     }
   }
   return cost;
@@ -331,13 +421,24 @@ export function combinedToolRetreatCost(baseRetreat, pokemon, zoneCards, { block
 export function evaluateToolKoPrevention(
   defender,
   zoneCards,
-  { currentDamage = 0, incomingDamage = 0, baseHp = 0, blockTools = false, stadium = null, inHp = false } = {}
+  {
+    currentDamage = 0,
+    incomingDamage = 0,
+    baseHp = 0,
+    blockTools = false,
+    stadium = null,
+    inHp = false,
+  } = {}
 ) {
   const isBlocked = toolBlocked(blockTools, stadium);
   const totalAfter = currentDamage + incomingDamage;
 
   if (!defender) {
-    return { prevented: false, totalDamage: inHp ? totalAfter : Math.ceil(totalAfter / 10), damageHp: totalAfter };
+    return {
+      prevented: false,
+      totalDamage: inHp ? totalAfter : Math.ceil(totalAfter / 10),
+      damageHp: totalAfter,
+    };
   }
 
   const candidates = [];
@@ -355,7 +456,7 @@ export function evaluateToolKoPrevention(
     }
   }
 
-  const hpThreshold = inHp ? (baseHp || 0) : Math.ceil((baseHp || 0) / 10);
+  const hpThreshold = inHp ? baseHp || 0 : Math.ceil((baseHp || 0) / 10);
   const dmgCurrent = currentDamage;
   const dmgTotal = totalAfter;
 
@@ -367,7 +468,10 @@ export function evaluateToolKoPrevention(
     const surviveHp = ko.surviveHp ?? 10;
     const hp = baseHp || 0;
     const maxDamageHp = Math.max(0, hp - surviveHp);
-    const maxDamageCounters = Math.max(0, Math.ceil(hp / 10) - Math.ceil(surviveHp / 10));
+    const maxDamageCounters = Math.max(
+      0,
+      Math.ceil(hp / 10) - Math.ceil(surviveHp / 10)
+    );
     const discardOnUse = /discard this card/i.test(textOf(source));
 
     return {
@@ -389,7 +493,12 @@ export function evaluateToolKoPrevention(
 }
 
 /** Adjust prize count when defender is KO'd (e.g. Lillie's Pearl, Legacy Energy). */
-export function toolPrizeCountAdjust(defender, zoneCards, baseCount, { blockTools = false, stadium = null } = {}) {
+export function toolPrizeCountAdjust(
+  defender,
+  zoneCards,
+  baseCount,
+  { blockTools = false, stadium = null } = {}
+) {
   let count = baseCount;
   if (!defender) return count;
   const toolsBlocked = toolBlocked(blockTools, stadium);
@@ -404,10 +513,20 @@ export function toolPrizeCountAdjust(defender, zoneCards, baseCount, { blockTool
 /** Parse reactive tool effects when the host is damaged by an attack. */
 export function parseToolOnDamageEffect(tool) {
   const t = textOf(tool);
-  if (!t.includes('damaged by an attack') && !t.includes('knocked out by damage')) {
+  if (
+    !t.includes('damaged by an attack') &&
+    !t.includes('knocked out by damage')
+  ) {
     return null;
   }
-  const out = { draw: 0, damageAttacker: 0, searchDeckOnKo: 0, moveDamage: 0, discardTool: false, requiresActive: /active spot/.test(t) };
+  const out = {
+    draw: 0,
+    damageAttacker: 0,
+    searchDeckOnKo: 0,
+    moveDamage: 0,
+    discardTool: false,
+    requiresActive: /active spot/.test(t),
+  };
   const dm = t.match(/draw (\d+) cards?/);
   if (dm) out.draw = parseInt(dm[1], 10) || 2;
   const atk = t.match(/put (\d+) damage counters on the attacking pokémon/);
@@ -418,14 +537,20 @@ export function parseToolOnDamageEffect(tool) {
   const mv = t.match(/move (\d+) damage counters?/);
   if (mv) out.moveDamage = parseInt(mv[1], 10) || 1;
   const search = t.match(/search your deck for up to (\d+) cards?/);
-  if (search && t.includes('knocked out')) out.searchDeckOnKo = parseInt(search[1], 10) || 1;
+  if (search && t.includes('knocked out'))
+    out.searchDeckOnKo = parseInt(search[1], 10) || 1;
   const th = parseThorns(tool);
   if (th.count && !out.damageAttacker) out.damageAttacker = th.count;
-  if (out.draw || out.damageAttacker || out.searchDeckOnKo || out.moveDamage) return out;
+  if (out.draw || out.damageAttacker || out.searchDeckOnKo || out.moveDamage)
+    return out;
   return null;
 }
 
-export function attachedToolOnDamageEffects(defender, zoneCards, { blockTools = false, stadium = null, isActive = true } = {}) {
+export function attachedToolOnDamageEffects(
+  defender,
+  zoneCards,
+  { blockTools = false, stadium = null, isActive = true } = {}
+) {
   if (toolBlocked(blockTools, stadium) || !defender) return [];
   const effects = [];
   for (const tool of attachedTools(defender, zoneCards)) {
