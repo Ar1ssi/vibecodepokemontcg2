@@ -25,6 +25,7 @@
       turnPlayer: 'self',      // whose turn: 'self' | 'opp'
       turnNumber: 0,
       phase: 'setup',          // setup | draw | main | attack | ended
+      startingActiveDone: false,
       // Stadium currently on the field (both players share it): { user, card } | null
       stadium: null,
       mulligansResolved: false, // guard: mulligan execution runs at most once per game
@@ -437,6 +438,7 @@
       rulesState.phase = 'setup';
       rulesState.turnNumber = 0;
       rulesState.turnPlayer = 'self';
+      rulesState.startingActiveDone = false;
       rulesState.stadium = null;
       rulesState.mulligansResolved = false;
       rulesState.attackExecuting = false;
@@ -455,6 +457,7 @@
       rulesState.turnNumber = 0;
       rulesState.turnPlayer = firstPlayer === 'opp' ? 'opp' : 'self';
       rulesState.phase = 'draw';
+      rulesState.startingActiveDone = false;
       rulesState.stadium = null; // new game: nothing on the stadium field
       rulesState.mulligansResolved = false;
       rulesState.pendingEffects = { self: [], opp: [] };
@@ -466,6 +469,7 @@
     }
 
     export function beginTurn(player) {
+      rulesState.startingActiveDone = true;
       rulesState.turnPlayer = player;
       rulesState.turnNumber += 1;
       if (!rulesState.playerTurnCount) {
@@ -677,7 +681,7 @@
       const isYourTurn = user === S.turnPlayer;
     
       // during setup nobody acts except via the setup flow (e.g. setting starting active)
-      if (S.phase === 'setup' || S.turnNumber === 0) {
+      if (S.phase === 'setup' || S.turnNumber === 0 || !S.startingActiveDone) {
         if (action === 'moveCard' && targetZoneId === 'active') {
           return { allowed: true };
         }
@@ -698,7 +702,13 @@
           return { allowed: false, reason: "Deck is private — only card effects may search it." };
     
         case 'moveCard': {
-          if (!isYourTurn && !(targetZoneId === 'active' && (S.phase === 'setup' || S.turnNumber === 0))) {
+          if (
+            !isYourTurn &&
+            !(
+              targetZoneId === 'active' &&
+              (S.phase === 'setup' || S.turnNumber === 0 || !S.startingActiveDone)
+            )
+          ) {
             return { allowed: false, reason: "It's not your turn." };
           }
           if (S.phase === 'attack') {
