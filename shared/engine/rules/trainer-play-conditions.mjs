@@ -37,8 +37,10 @@ export function trainerPlayBlockReason({
   myPrizes,
   opponentPrizes,
   stadiumName = null,
+  stadiumPlayedThisTurn = false,
   handCount = Infinity,
   benchCount = 0,
+  opponentBenchCount = null,
   rareCandyOptionCount = null,
   toolTargetCount = null,
 }) {
@@ -47,9 +49,14 @@ export function trainerPlayBlockReason({
     return "The player going first can't play a Supporter on turn 1.";
   }
   const kind = kindText(card);
-  if (kind.includes('stadium') && stadiumName) {
-    const same = String(stadiumName).trim().toLowerCase() === String(card.name || '').trim().toLowerCase();
-    if (same) return 'A Stadium card with the same name is already in play.';
+  if (kind.includes('stadium')) {
+    if (stadiumPlayedThisTurn) {
+      return 'You can only play 1 Stadium card per turn.';
+    }
+    if (stadiumName) {
+      const same = String(stadiumName).trim().toLowerCase() === String(card.name || '').trim().toLowerCase();
+      if (same) return 'A Stadium card with the same name is already in play.';
+    }
   }
   const text = card.text || card.effect || card.cardText || '';
   const parsed = parseTrainerEffect(Array.isArray(text) ? text.join(' ') : text);
@@ -57,13 +64,29 @@ export function trainerPlayBlockReason({
   const cost = parsed.steps?.[0]?.type === 'discardCost' ? parsed.steps[0].count || 1 : 0;
   if (cost > 0 && handCount - 1 < cost) return 'Not enough cards in hand to pay discard cost.';
   const effectSteps = (parsed.steps || []).filter((step) => step.type !== 'discardCost');
-  if (effectSteps.length > 0 && effectSteps.every((step) => step.destination === 'bench') && benchCount >= 5) {
+  if (
+    effectSteps.length > 0 &&
+    (effectSteps.every((step) => step.destination === 'bench') || effectSteps.some((step) => step.type === 'fossilItem')) &&
+    benchCount >= 5
+  ) {
     return 'bench_full';
+  }
+  if (effectSteps.some((step) => step.type === 'switchOwn' || step.type === 'switch') && benchCount === 0) {
+    return 'No Benched Pokémon to switch with.';
+  }
+  if (
+    effectSteps.some((step) => step.type === 'switchOpponent' || step.type === 'switchOpponentOut') &&
+    opponentBenchCount === 0
+  ) {
+    return 'Opponent has no Benched Pokémon to switch.';
   }
   if (isToolTrainer(card) && toolTargetCount === 0) {
     return 'No Pokémon to attach this Tool to.';
   }
   const evolvesStage2 = effectSteps.some((step) => step.type === 'evolveStage2');
+  if (evolvesStage2 && turnNumber <= 2) {
+    return "You can't use this card during your first turn.";
+  }
   if (evolvesStage2 && rareCandyOptionCount === 0) {
     return 'You need a Stage 2 Pokémon in hand that evolves from a Basic Pokémon you have in play.';
   }

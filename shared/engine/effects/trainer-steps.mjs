@@ -449,7 +449,8 @@ function searchDeckSequence(ctx) {
 // Rare Candy: a Stage 2 from hand onto a Basic in play, skipping Stage 1.
 function evolveStage2(ctx) {
   const { player } = ctx;
-  const options = rareCandyOptions(player, ownedCards(player));
+  const turnNumber = ctx.draft?.turn?.number;
+  const options = rareCandyOptions(player, ownedCards(player), turnNumber);
   const optionFor = (stage2Id) => options.find((option) => option.stage2.instanceId === stage2Id);
 
   if (ctx.memo?.phase === 'basic') {
@@ -458,6 +459,14 @@ function evolveStage2(ctx) {
     if (!option || !basic) return skip(ctx, 'target_not_found');
     const stage2 = option.stage2;
     attachTo(player, stage2, basic, ctx.events);
+    if (turnNumber != null) {
+      stage2.enteredPlayTurn = turnNumber;
+      basic.lastEvolvedTurn = turnNumber;
+    }
+    clearConditions(basic);
+    if (!player.flags) player.flags = {};
+    if (!player.flags.evolved) player.flags.evolved = {};
+    player.flags.evolved[basic.instanceId] = true;
     ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: stage2.instanceId, targetInstanceId: basic.instanceId });
     return null;
   }
@@ -1061,6 +1070,15 @@ function searchEvolve(ctx) {
 
   const evolveOnto = (card, root) => {
     attachTo(player, card, root, ctx.events);
+    const turnNumber = ctx.draft?.turn?.number;
+    if (turnNumber != null) {
+      card.enteredPlayTurn = turnNumber;
+      root.lastEvolvedTurn = turnNumber;
+    }
+    clearConditions(root);
+    if (!player.flags) player.flags = {};
+    if (!player.flags.evolved) player.flags.evolved = {};
+    player.flags.evolved[root.instanceId] = true;
     ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: card.instanceId, targetInstanceId: root.instanceId });
   };
 
@@ -1250,6 +1268,7 @@ export const EXTRA_STEP_HANDLERS = {
   reshufflePrizes,
   variableDraw,
   lookAtTop: (ctx) => lookAtDeckEnd(ctx, false),
+  lookAtTopAbility: (ctx) => lookAtDeckEnd(ctx, false),
   lookAtBottom: (ctx) => lookAtDeckEnd(ctx, true),
   searchDeckSequence,
   evolveStage2,

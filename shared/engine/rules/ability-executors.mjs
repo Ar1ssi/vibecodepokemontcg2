@@ -112,6 +112,7 @@ export function isPokemonToolCard(card) {
     String(s).toLowerCase()
   );
   if (sub.includes('tool') || sub.includes('pokémon tool')) return true;
+  if (card.isTool) return true;
   if (type === 'tool') return true;
   if (String(card.trainerType || '').toLowerCase() === 'tool') return true;
   return false;
@@ -119,10 +120,13 @@ export function isPokemonToolCard(card) {
 
 /** Tools attached to a Pokémon in a zone array. */
 export function attachedTools(pokemon, zoneCards = []) {
-  if (!pokemon?.image) return [];
-  return (zoneCards || []).filter(
-    (c) => c.image?.relative === pokemon.image && isPokemonToolCard(c)
-  );
+  if (!pokemon) return [];
+  return (zoneCards || []).filter((c) => {
+    if (!isPokemonToolCard(c)) return false;
+    if (pokemon.instanceId != null && c.attachedTo === pokemon.instanceId) return true;
+    if (pokemon.image && c.image?.relative === pokemon.image) return true;
+    return false;
+  });
 }
 
 /** Damage prevention from Pokémon + attached Tools (optional tool block). */

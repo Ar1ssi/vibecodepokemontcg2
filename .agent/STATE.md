@@ -5,9 +5,9 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 174
-Focus: fix server-authoritative parsers and reducer gaps for attacks, abilities, stadiums, and trainers (PR #149).
+Focus: fix server-authoritative parsers and reducer gaps for attacks, abilities, stadiums, trainers, and evolution legality (I58, I59, PR #149).
 Active: none. Work is committed and pushed on branch `feature/fix-server-authoritative-parsers` (PR #149).
-Next: Review PR #149 and merge to main; then live 2P check of the coin call under SERVER_AUTHORITATIVE=1, I59 (server has no evolution timing), I56 (keybinds c/z/e/q on server cards), audit lows A-6/A-10.
+Next: Review PR #149 and merge to main; then live 2P check of the coin call under SERVER_AUTHORITATIVE=1, I56 (keybinds c/z/e/q on server cards), audit lows A-6/A-10.
 Blocked: none.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -28,6 +28,6 @@ Blocked: none.
   module). A worktree needs `node_modules` junctioned in before eslint/playwright will run there.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S174 2026-09-18 feature: server-authoritative parser parity, attack status & coin flips, abilities, stadium steps, trainer drop fix (PR #149).
+- S174 2026-09-18 feature: server-authoritative parser sweep, attack status & heal, abilities, stadium steps, trainer drop fix, evolution legality & timing (I58, I59, PR #149).
 - S173 2026-09-18 feature: design 013 server-owned turn-order coin call (D51, D52).
 - S173 2026-09-18 feature: Grand Tree search-evolve + Stage 2 chain in the server engine (design 013, D50).

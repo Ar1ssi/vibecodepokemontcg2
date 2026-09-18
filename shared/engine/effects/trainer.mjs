@@ -175,9 +175,18 @@ export function executeTrainer(draft, {
       }
       played.ownerId = played.ownerId || playerId;
       draft.stadium = played;
+      if (!player.flags) player.flags = {};
+      player.flags.stadiumPlayedThisTurn = true;
       for (const p of Object.values(draft.players || {})) {
         if (p.flags) p.flags.stadiumUsedThisTurn = false;
       }
+      events.push({
+        type: 'cardMoved',
+        instanceId: played.instanceId,
+        from: 'hand',
+        to: 'stadium',
+        playerId,
+      });
     } else {
       player.zones.board.push(played);
     }

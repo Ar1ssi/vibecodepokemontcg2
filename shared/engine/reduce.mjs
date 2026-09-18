@@ -33,10 +33,11 @@ import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice } from './effects/executor.mjs';
 import { executeStadium } from './effects/stadium.mjs';
-import { parseStadiumOncePerTurn, isStadiumCard } from './rules/stadium-effects.mjs';
+import { parseStadiumOncePerTurn, isStadiumCard, effectiveHp } from './rules/stadium-effects.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
-import { evolvedView, trainerTargetCounts, ownedCards } from './rules/evolved-pokemon.mjs';
+import { evolvedView, trainerTargetCounts, ownedCards, topPokemonCard } from './rules/evolved-pokemon.mjs';
+import { normalizeStage, pokemonNamesMatch } from './rules/evolution.mjs';
 import {
   addCondition,
   removeCondition,
@@ -156,7 +157,7 @@ function damageBenchedPokemon(
     auto: Boolean(auto),
   });
 
-  const koHp = inPlayView(draft, victim).hp || 0;
+  const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
   if (koHp > 0 && victim.damage >= koHp) {
     handleKnockout(draft, {
       victimPlayerId,
@@ -173,6 +174,17 @@ function inPlayView(state, card) {
   const ref = findCard(state, card.instanceId);
   const zone = ref?.player?.zones?.[ref.zoneId];
   return Array.isArray(zone) ? evolvedView(zone, card) : card;
+}
+
+// Effective HP including printed base stats, top evolution, attached Tools, and Stadium modifiers.
+function cardEffectiveHp(state, card, playerId) {
+  if (!card) return 0;
+  const view = inPlayView(state, card);
+  const baseHp = view?.hp || 0;
+  if (!baseHp) return 0;
+  const ref = findCard(state, card.instanceId);
+  const zoneCards = ref?.player?.zones?.[ref.zoneId] || [];
+  return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium);
 }
 
 /**
@@ -347,7 +359,7 @@ function resolveCheckup(
       cleared('Paralyzed');
     }
 
-    const activeHp = inPlayView(draft, active).hp;
+    const activeHp = cardEffectiveHp(draft, active, pid);
     if (activeHp && active.damage >= activeHp) {
       const oppId = Object.keys(draft.players).find((id) => id !== pid);
       handleKnockout(draft, {
@@ -521,8 +533,10 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     attackerAttacked: false,
     retreatedThisTurn: false,
     supporterPlayed: false,
+    stadiumPlayedThisTurn: false,
     stadiumUsedThisTurn: false,
     abilitiesUsed: {},
+    evolved: {},
     ...(prizesOwed ? { prizesOwed } : {}),
   };
 
@@ -976,6 +990,43 @@ export function validateLegality(state, command) {
           };
         }
       }
+      if (cardRef && isPokemon(cardRef.card)) {
+        const targetRef = findCard(state, payload.targetInstanceId);
+        if (!targetRef || !isPokemon(targetRef.card)) {
+          return { allowed: false, reason: 'Can only evolve a Pokémon in play.' };
+        }
+        if ((state.turn?.number || 1) <= 2) {
+          return { allowed: false, reason: "Can't evolve on the first turn." };
+        }
+        if (targetRef.card.enteredPlayTurn === state.turn?.number) {
+          return {
+            allowed: false,
+            reason: "That Pokémon was just played this turn — it can't evolve yet.",
+          };
+        }
+        if (player.flags?.evolved?.[payload.targetInstanceId]) {
+          return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };
+        }
+        const targetZoneCards = targetRef.player?.zones?.[targetRef.zoneId] || [];
+        const topTarget = topPokemonCard(targetZoneCards, targetRef.card);
+        const baseStage = normalizeStage(topTarget?.stage) || 'Basic';
+        const evoStage = normalizeStage(cardRef.card.stage);
+        if (!evoStage || evoStage === 'Basic') {
+          return { allowed: false, reason: `${cardRef.card.name} is not an Evolution Pokémon.` };
+        }
+        const order = ['Basic', 'Stage 1', 'Stage 2'];
+        const baseIdx = order.indexOf(baseStage);
+        const evoIdx = order.indexOf(evoStage);
+        if (evoIdx !== baseIdx + 1) {
+          return { allowed: false, reason: `${evoStage} can't evolve from ${baseStage} directly.` };
+        }
+        if (cardRef.card.evolvesFrom && !pokemonNamesMatch(cardRef.card.evolvesFrom, topTarget.name)) {
+          return {
+            allowed: false,
+            reason: `${cardRef.card.name} evolves from ${cardRef.card.evolvesFrom}, not ${topTarget.name}.`,
+          };
+        }
+      }
       return { allowed: true };
     }
 
@@ -1156,9 +1207,11 @@ export function validateLegality(state, command) {
           myPrizes: (player.zones?.prizes || []).length,
           opponentPrizes: (opponent?.zones?.prizes || []).length,
           stadiumName: state.stadium?.name || null,
+          stadiumPlayedThisTurn: Boolean(player.flags?.stadiumPlayedThisTurn),
           handCount: (player.zones?.hand || []).length,
           benchCount: (player.zones?.bench || []).filter((c) => !c.attachedTo).length,
-          ...trainerTargetCounts(player, ownedCards(player)),
+          opponentBenchCount: (opponent?.zones?.bench || []).filter((c) => !c.attachedTo).length,
+          ...trainerTargetCounts(player, ownedCards(player), state.turn?.number),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
       }
@@ -1450,6 +1503,13 @@ export function applyCommand(state, command, rng = null) {
             destZone.push(card);
           }
 
+          if (
+            ['active', 'bench'].includes(payload.to) &&
+            ['hand', 'deck', 'discard'].includes(payload.from)
+          ) {
+            card.enteredPlayTurn = draft.turn.number;
+          }
+
           // If moving between active and bench, bring along all attached cards
           if (
             ['active', 'bench'].includes(payload.from) &&
@@ -1521,6 +1581,23 @@ export function applyCommand(state, command, rng = null) {
             draft.players[playerId].flags = {};
           }
           draft.players[playerId].flags.energyAttached = true;
+        } else if (isPokemon(cardRef.card)) {
+          if (!draft.players[playerId].flags) {
+            draft.players[playerId].flags = {};
+          }
+          if (!draft.players[playerId].flags.evolved) {
+            draft.players[playerId].flags.evolved = {};
+          }
+          draft.players[playerId].flags.evolved[payload.targetInstanceId] = true;
+          cardRef.card.enteredPlayTurn = draft.turn.number;
+          targetRef.card.lastEvolvedTurn = draft.turn.number;
+          clearConditions(targetRef.card);
+          events.push({
+            type: 'pokemonEvolved',
+            playerId,
+            instanceId: payload.instanceId,
+            targetInstanceId: payload.targetInstanceId,
+          });
         }
 
         events.push({
@@ -1793,7 +1870,7 @@ export function applyCommand(state, command, rng = null) {
         });
 
         // KO check
-        const koHp = defenderView.hp || 0;
+        const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
         if (koHp > 0 && defender.damage >= koHp) {
           handleKnockout(draft, {
             victimPlayerId: defenderPlayerId,
@@ -1814,13 +1891,28 @@ export function applyCommand(state, command, rng = null) {
           damage: attacker.damage,
           dealt: parsed.selfDamage,
         });
-        const selfKoHp = attackerView.hp || 0;
+        const selfKoHp = cardEffectiveHp(draft, attacker, playerId);
         if (selfKoHp > 0 && attacker.damage >= selfKoHp) {
           handleKnockout(draft, {
             victimPlayerId: playerId,
             attackerPlayerId: oppId,
             victim: attacker,
             events,
+          });
+        }
+      }
+
+      // Healing from attack effect (e.g. "Heal 30 damage from this Pokémon")
+      if (parsed.heal > 0 && attacker) {
+        const atkRef = findCard(draft, attacker.instanceId);
+        if (atkRef && atkRef.zoneId === 'active' && (attacker.damage || 0) > 0) {
+          const healAmount = Math.min(attacker.damage, parsed.heal);
+          attacker.damage -= healAmount;
+          events.push({
+            type: 'damageUpdated',
+            instanceId: attacker.instanceId,
+            damage: attacker.damage,
+            healed: healAmount,
           });
         }
       }

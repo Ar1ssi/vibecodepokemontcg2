@@ -503,9 +503,10 @@ function stadiumTargetScope(stadiumCard) {
  * Determine the HP bonus applicable to a given player's Pokémon from the
  * current stadium. Returns a number (positive or negative, 0 if none).
  */
-export function getStadiumHpBonus(targetPlayer, pokemon = null) {
-  if (!rulesState.enabled) return 0;
-  const stadium = getStadium();
+export function getStadiumHpBonus(targetPlayer, pokemon = null, stadiumOverride = null) {
+  const stadium = stadiumOverride
+    ? (stadiumOverride.card ? stadiumOverride : { card: stadiumOverride, user: stadiumOverride.ownerId })
+    : (rulesState.enabled ? getStadium() : null);
   if (!stadium?.card) return 0;
   const bonus = parseStadiumHpModifier(stadium.card);
   if (bonus === 0) return 0;
@@ -519,13 +520,17 @@ export function getStadiumHpBonus(targetPlayer, pokemon = null) {
 /**
  * Compute effective HP for a Pokémon given a base HP and the target player.
  * Optional zoneCards includes attached Tools for HP bonuses (Hero's Cape, etc.).
+ * Optional stadiumOverride provides the server draft.stadium without relying on rulesState.
  * Clamped to ≥ 1 so a −HP modifier can't make a Pokémon have 0 HP.
  */
-export function effectiveHp(baseHp, targetPlayer, pokemon = null, zoneCards = null) {
+export function effectiveHp(baseHp, targetPlayer, pokemon = null, zoneCards = null, stadiumOverride = null) {
   const base = baseHp || 0;
   if (!base) return 0;
-  let total = base + getStadiumHpBonus(targetPlayer, pokemon);
-  if (zoneCards?.length && pokemon && !stadiumBlocksToolEffects()) {
+  let total = base + getStadiumHpBonus(targetPlayer, pokemon, stadiumOverride);
+  const blockTools = stadiumOverride
+    ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)
+    : stadiumBlocksToolEffects();
+  if (zoneCards?.length && pokemon && !blockTools) {
     for (const tool of attachedTools(pokemon, zoneCards)) {
       total = applyHpBonus(total, parseHpBonus(tool).bonus);
     }
@@ -722,7 +727,11 @@ export function getStadiumDamageReduction(defender, targetPlayer) {
   return amount;
 }
 
-export function stadiumBlocksToolEffects() {
+export function stadiumBlocksToolEffects(stadiumOverride = null) {
+  if (stadiumOverride) {
+    const card = stadiumOverride.card || stadiumOverride;
+    return card ? isStadiumToolNegation(card) : false;
+  }
   if (!rulesState.enabled) return false;
   const stadium = getStadium()?.card;
   return stadium ? isStadiumToolNegation(stadium) : false;

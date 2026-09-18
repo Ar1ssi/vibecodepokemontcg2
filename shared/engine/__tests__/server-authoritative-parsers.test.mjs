@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCommand } from '../reduce.mjs';
+import { applyCommand, validateLegality } from '../reduce.mjs';
 import { createCard } from '../cards.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
 import { parseAttackDamage } from '../rules/damage-parser.mjs';
@@ -8,6 +8,8 @@ import { isAbilityCard } from '../rules/ability-effects.mjs';
 import { isUsableAbilityCard } from '../rules/collect-usable-abilities.mjs';
 import { tcgAbilityFromDetail } from '../rules/rules-state.mjs';
 import { executeStadium } from '../effects/stadium.mjs';
+import { attachedTools } from '../rules/ability-executors.mjs';
+import { executeSteps } from '../effects/executor.mjs';
 
 function setupGame(overrides = {}) {
   const state = {
@@ -391,4 +393,398 @@ test('executeStadium: handles discard-to-bench by generating attachMultipleFromD
   assert.equal(res.pendingChoice.max, 2);
   assert.ok(res.pendingChoice.prompt.includes('Attach up to 2'));
 });
+
+test('attachedTools: resolves attached Tool cards via attachedTo in headless state', () => {
+  const mon = createCard({ instanceId: 10, name: 'Pikachu' });
+  const toolCard = createCard({
+    instanceId: 50,
+    name: 'Bravery Charm',
+    isTool: true,
+    attachedTo: 10,
+  });
+  const zoneCards = [mon, toolCard];
+  const found = attachedTools(mon, zoneCards);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].instanceId, 50);
+});
+
+test('effectiveHp: attached Tool (Hero\'s Cape) prevents knockout when damage equals base HP', () => {
+  const state = setupGame();
+  const cap = createCard({
+    instanceId: 105,
+    name: "Hero's Cape",
+    type: 'Trainer',
+    subtypes: ['Pokémon Tool'],
+    isTool: true,
+    attachedTo: 2,
+    text: 'The Pokémon this card is attached to gets +100 HP.',
+  });
+  state.players.p2.zones.active.push(cap);
+
+  // Attack with 70 damage (Squirtle base HP is 70)
+  state.players.p1.zones.active[0].attacks.push({
+    name: 'Mega Shock',
+    damage: 70,
+    cost: ['Lightning'],
+  });
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  const defender = res.state.players.p2.zones.active.find((c) => c.instanceId === 2);
+  // Squirtle should survive with 70 damage because effective HP is 170 (70 + 100)
+  assert.ok(defender, 'Squirtle should not be discarded');
+  assert.equal(defender.damage, 70);
+  assert.equal(res.state.players.p1.flags.prizesOwed || 0, 0);
+
+  // Separate test state without Hero's Cape -> 70 damage should knock out Squirtle
+  const stateNoTool = setupGame();
+  stateNoTool.players.p1.zones.active[0].attacks.push({
+    name: 'Mega Shock',
+    damage: 70,
+    cost: ['Lightning'],
+  });
+  const resKo = applyCommand(stateNoTool, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(resKo.error, null);
+  assert.equal(resKo.state.players.p2.zones.active.length, 0, 'Squirtle should be knocked out without tool');
+  assert.ok(resKo.events.some((e) => e.type === 'prizesTaken'), 'Should award prize on KO');
+
+  // Third test: 170 damage against Squirtle with Hero's Cape -> should knock out
+  const stateBigHit = setupGame();
+  stateBigHit.players.p2.zones.active.push(cap);
+  stateBigHit.players.p1.zones.active[0].attacks.push({
+    name: 'Ultra Shock',
+    damage: 170,
+    cost: ['Lightning'],
+  });
+  const resBigKo = applyCommand(stateBigHit, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(resBigKo.error, null);
+  assert.equal(resBigKo.state.players.p2.zones.active.length, 0, 'Squirtle should be knocked out at 170 HP');
+  assert.ok(resBigKo.events.some((e) => e.type === 'prizesTaken'), 'Should award prize on KO');
+});
+
+test('attack heal: heals damage from attacker and emits damageUpdated event', () => {
+  const state = setupGame();
+  const attacker = state.players.p1.zones.active[0];
+  attacker.damage = 50;
+  attacker.attacks.push({
+    name: 'Draining Kiss',
+    damage: 20,
+    cost: ['Lightning'],
+    text: 'Heal 30 damage from this Pokémon.',
+  });
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  const updatedAttacker = res.state.players.p1.zones.active[0];
+  // 50 - 30 = 20 damage remaining
+  assert.equal(updatedAttacker.damage, 20);
+  assert.ok(
+    res.events.some(
+      (e) => e.type === 'damageUpdated' && e.instanceId === attacker.instanceId && e.healed === 30
+    )
+  );
+});
+
+test('stadium play limit: can only play 1 Stadium per turn', () => {
+  const state = setupGame();
+  const stadium1 = createCard({
+    instanceId: 301,
+    name: 'Gym 1',
+    type: 'Trainer',
+    subtypes: ['Stadium'],
+  });
+  const stadium2 = createCard({
+    instanceId: 302,
+    name: 'Gym 2',
+    type: 'Trainer',
+    subtypes: ['Stadium'],
+  });
+  state.players.p1.zones.hand.push(stadium1, stadium2);
+
+  // Play first stadium
+  const res1 = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 301 },
+    playerId: 'p1',
+  });
+  assert.equal(res1.error, null);
+  assert.equal(res1.state.players.p1.flags.stadiumPlayedThisTurn, true);
+  assert.equal(res1.state.stadium?.instanceId, 301);
+
+  // Attempt to play second stadium in same turn
+  const res2 = applyCommand(res1.state, {
+    type: 'playTrainer',
+    payload: { instanceId: 302 },
+    playerId: 'p1',
+  });
+  assert.ok(res2.error);
+  assert.match(res2.error, /only play 1 Stadium card per turn/i);
+});
+
+test('trainer play conditions: Switch and Boss\'s Orders validate bench counts', () => {
+  const state = setupGame();
+  const switchCard = createCard({
+    instanceId: 310,
+    name: 'Switch',
+    type: 'Trainer',
+    subtypes: ['Item'],
+    text: 'Switch your Active Pokémon with 1 of your Benched Pokémon.',
+  });
+  const bossOrders = createCard({
+    instanceId: 311,
+    name: "Boss's Orders",
+    type: 'Trainer',
+    subtypes: ['Supporter'],
+    text: "Switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
+  });
+  state.players.p1.zones.hand.push(switchCard, bossOrders);
+
+  // P1 has 0 bench
+  const switchLegal = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 310 },
+    playerId: 'p1',
+  });
+  assert.equal(switchLegal.allowed, false);
+  assert.match(switchLegal.reason, /No Benched Pokémon to switch with/i);
+
+  // P2 has 0 bench
+  const bossLegal = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 311 },
+    playerId: 'p1',
+  });
+  assert.equal(bossLegal.allowed, false);
+  assert.match(bossLegal.reason, /Opponent has no Benched Pokémon to switch/i);
+
+  // Add bench to p1 and p2
+  state.players.p1.zones.bench.push(createCard({ instanceId: 312, name: 'Benched P1', supertype: 'Pokémon' }));
+  state.players.p2.zones.bench.push(createCard({ instanceId: 313, name: 'Benched P2', supertype: 'Pokémon' }));
+
+  const switchLegalAfter = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 310 },
+    playerId: 'p1',
+  });
+  assert.equal(switchLegalAfter.allowed, true);
+
+  const bossLegalAfter = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 311 },
+    playerId: 'p1',
+  });
+  assert.equal(bossLegalAfter.allowed, true);
+});
+
+test('evolution legality: enforces turn-1 ban, same-turn ban, stage order, and once-per-turn', () => {
+  const state = setupGame({ turn: { number: 1, player: 'p1', phase: 'turn' } });
+  const charmander = createCard({
+    instanceId: 401,
+    name: 'Charmander',
+    supertype: 'Pokémon',
+    stage: 'Basic',
+    enteredPlayTurn: 1,
+  });
+  const charmeleon = createCard({
+    instanceId: 402,
+    name: 'Charmeleon',
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    evolvesFrom: 'Charmander',
+  });
+  const charizard = createCard({
+    instanceId: 403,
+    name: 'Charizard',
+    supertype: 'Pokémon',
+    stage: 'Stage 2',
+    evolvesFrom: 'Charmeleon',
+  });
+  state.players.p1.zones.bench.push(charmander);
+  state.players.p1.zones.hand.push(charmeleon, charizard);
+
+  // Turn 1 check: cannot evolve
+  const t1Check = validateLegality(state, {
+    type: 'attachCard',
+    payload: { instanceId: 402, targetInstanceId: 401 },
+    playerId: 'p1',
+  });
+  assert.equal(t1Check.allowed, false);
+  assert.match(t1Check.reason, /Can't evolve on the first turn/i);
+
+  // Turn 3: Charmander was played on Turn 3 (same-turn ban)
+  state.turn.number = 3;
+  charmander.enteredPlayTurn = 3;
+  const sameTurnCheck = validateLegality(state, {
+    type: 'attachCard',
+    payload: { instanceId: 402, targetInstanceId: 401 },
+    playerId: 'p1',
+  });
+  assert.equal(sameTurnCheck.allowed, false);
+  assert.match(sameTurnCheck.reason, /just played this turn/i);
+
+  // Charmander was entered on turn 1 -> Stage skipping check (Basic to Stage 2)
+  charmander.enteredPlayTurn = 1;
+  const skipCheck = validateLegality(state, {
+    type: 'attachCard',
+    payload: { instanceId: 403, targetInstanceId: 401 },
+    playerId: 'p1',
+  });
+  assert.equal(skipCheck.allowed, false);
+  assert.match(skipCheck.reason, /can't evolve from Basic directly/i);
+
+  // Valid evolution from Charmander to Charmeleon
+  const validCheck = validateLegality(state, {
+    type: 'attachCard',
+    payload: { instanceId: 402, targetInstanceId: 401 },
+    playerId: 'p1',
+  });
+  assert.equal(validCheck.allowed, true);
+
+  // Apply evolution
+  const evoRes = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: 402, targetInstanceId: 401 },
+    playerId: 'p1',
+  });
+  assert.equal(evoRes.error, null);
+  assert.ok(evoRes.events.some((e) => e.type === 'pokemonEvolved'));
+  assert.equal(evoRes.state.players.p1.flags.evolved[401], true);
+
+  // Attempting to evolve again in the same turn
+  const secondEvoCheck = validateLegality(evoRes.state, {
+    type: 'attachCard',
+    payload: { instanceId: 403, targetInstanceId: 401 },
+    playerId: 'p1',
+  });
+  assert.equal(secondEvoCheck.allowed, false);
+  assert.match(secondEvoCheck.reason, /Already evolved that Pokémon this turn/i);
+});
+
+test('Rare Candy: blocked on turn 1/2 and blocked on same-turn Basics', () => {
+  const state = setupGame({ turn: { number: 1, player: 'p1', phase: 'turn' } });
+  const candy = createCard({
+    instanceId: 450,
+    name: 'Rare Candy',
+    type: 'Trainer',
+    subtypes: ['Item'],
+    text: 'Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it.',
+  });
+  const pidgey = createCard({
+    instanceId: 451,
+    name: 'Pidgey',
+    supertype: 'Pokémon',
+    stage: 'Basic',
+    enteredPlayTurn: 1,
+  });
+  const pidgeotto = createCard({
+    instanceId: 453,
+    name: 'Pidgeotto',
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    evolvesFrom: 'Pidgey',
+  });
+  const pidgeot = createCard({
+    instanceId: 452,
+    name: 'Pidgeot ex',
+    supertype: 'Pokémon',
+    stage: 'Stage 2',
+    evolvesFrom: 'Pidgeotto',
+  });
+  state.players.p1.zones.bench.push(pidgey);
+  state.players.p1.zones.deck.push(pidgeotto);
+  state.players.p1.zones.hand.push(candy, pidgeot);
+
+  // Turn 1: Rare Candy blocked
+  const candyT1 = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 450 },
+    playerId: 'p1',
+  });
+  assert.equal(candyT1.allowed, false);
+  assert.match(candyT1.reason, /during your first turn/i);
+
+  // Turn 3, but Pidgey was played on Turn 3
+  state.turn.number = 3;
+  pidgey.enteredPlayTurn = 3;
+  const candySameTurn = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 450 },
+    playerId: 'p1',
+  });
+  assert.equal(candySameTurn.allowed, false);
+
+  // Turn 3, Pidgey was played on Turn 1 -> Allowed
+  pidgey.enteredPlayTurn = 1;
+  const candyAllowed = validateLegality(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 450 },
+    playerId: 'p1',
+  });
+  assert.equal(candyAllowed.allowed, true);
+});
+
+test('executeSteps: handles discardCostAbility, statusAbility, and opponent gust switchAbility', () => {
+  const draft = setupGame();
+  const card1 = createCard({ instanceId: 501, name: 'Energy 1' });
+  const card2 = createCard({ instanceId: 502, name: 'Energy 2' });
+  draft.players.p1.zones.hand.push(card1, card2);
+
+  // 1. discardCostAbility
+  const events = [];
+  const resDiscard = executeSteps(draft, {
+    steps: [{ type: 'discardCostAbility', count: 1 }],
+    playerId: 'p1',
+    activeRng: { next: () => 0.5 },
+    selection: [501],
+    events,
+  });
+  assert.ok(resDiscard.completed);
+  assert.equal(draft.players.p1.zones.discard.some((c) => c.instanceId === 501), true);
+
+  // 2. statusAbility
+  const resStatus = executeSteps(draft, {
+    steps: [{ type: 'statusAbility', status: 'Poisoned', target: 'opponentActive' }],
+    playerId: 'p1',
+    activeRng: { next: () => 0.5 },
+    events,
+  });
+  assert.ok(resStatus.completed);
+  assert.equal(draft.players.p2.zones.active[0].poisoned, true);
+
+  // 3. switchAbility with target opponent
+  const oppBenchMon = createCard({ instanceId: 505, name: 'Opponent Bench Mon', supertype: 'Pokémon' });
+  draft.players.p2.zones.bench.push(oppBenchMon);
+  const oppActiveId = draft.players.p2.zones.active[0].instanceId;
+
+  const resSwitch = executeSteps(draft, {
+    steps: [{ type: 'switchAbility', target: 'opponent' }],
+    playerId: 'p1',
+    activeRng: { next: () => 0.5 },
+    events,
+  });
+  assert.ok(resSwitch.completed);
+  // Bench mon should now be active
+  assert.equal(draft.players.p2.zones.active[0].instanceId, 505);
+  // Former active should now be on bench
+  assert.equal(draft.players.p2.zones.bench[0].instanceId, oppActiveId);
+});
+
 
