@@ -44,6 +44,7 @@ import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-tabl
 import { COVER_IMAGE_LISTENERS } from '../../setup/image-logic/cover-listener-table.js';
 import { sortZoneCardsForRender } from '../../setup/netcode/hand-sort-context.js';
 import { CHOICE_PICKER } from '../../setup/netcode/choice-picker-adapter.js';
+import { MAT_PICKER } from '../../setup/netcode/mat-picker-adapter.js';
 import { PRIZE_PICKER } from '../../setup/netcode/prize-picker-adapter.js';
 import {
   hydrateHolo,
@@ -268,6 +269,7 @@ const seedNetcodeContext = () => {
     holo: { hydrate: hydrateHolo, unhydrate: unhydrateHolo },
     choicePicker: CHOICE_PICKER,
     prizePicker: PRIZE_PICKER,
+    matPicker: MAT_PICKER,
     reconcileHandStacks,
     clearHandStackPositioning,
   });
