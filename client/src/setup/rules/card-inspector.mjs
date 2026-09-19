@@ -24,7 +24,7 @@ import { getZone } from '../zones/get-zone.js';
 import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
-import { openCarouselViewer } from '../image-logic/card-picker.js';
+import { openCarouselViewer, closeCardPicker } from '../image-logic/card-picker.js';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -474,5 +474,8 @@ export function openCardInspector({
   return true;
 }
 
-export const closeCardInspector = teardownAll;
+export const closeCardInspector = () => {
+  teardownAll();
+  closeCardPicker(null, true);
+};
 export const isCardInspectorOpen = () => states.size > 0;
