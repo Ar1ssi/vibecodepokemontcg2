@@ -278,6 +278,19 @@ export function energyMatchesSearchWhat(card, what = '') {
     const name = lower(card.name);
     return name.includes(expected) && name.includes('energy');
   }
+  // Word-form type qualifier ("a Lightning Energy card", "a Water Energy").
+  // The printed type word stands in for the {L}/{W} glyph; without this every
+  // energy card would match (the branch below only checks "basic").
+  const word = w.match(
+    /\b(grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|dragon|fairy|colorless)\b/
+  );
+  if (word) {
+    const expected = word[1] === 'darkness' ? 'dark' : word[1];
+    if (w.includes('basic') && classifyEnergyEffect(card) !== 'basic') return false;
+    if (primaryEnergyTypeName(card) === expected) return true;
+    const name = lower(card.name);
+    return name.includes(expected) && name.includes('energy');
+  }
   if (w.includes('basic')) {
     return classifyEnergyEffect(card) === 'basic' || lower(card.name).includes('basic');
   }

@@ -2163,6 +2163,67 @@ function promoteTrainerPlay(state, command) {
 }
 
 /**
+ * Builds the attack deck-search PendingChoice for the first stage (at or after
+ * `fromIndex`) that has at least one legal card in the deck. A staged
+ * `searchDeckSequence` is walked one stage per choice so each stage keeps its
+ * own filter; collapsing the stages into one list previously left `what`
+ * undefined and offered the entire deck. Returns null when no stage matches.
+ *
+ * @param {object} draft
+ * @param {{ playerId: string, oppId: string, attackerId?: number, stages: object[], fromIndex?: number }} params
+ * @returns {object|null}
+ */
+function buildAttackSearchChoice(
+  draft,
+  { playerId, oppId, attackerId, stages, fromIndex = 0 }
+) {
+  const player = draft.players[playerId];
+  const deck = player?.zones?.deck || [];
+  for (let i = fromIndex; i < stages.length; i++) {
+    const stage = stages[i] || {};
+    const what = stage.what || 'card';
+    const dest = stage.destination || 'hand';
+    const matches = deck.filter((c) => matchesSearch(c, what));
+    if (matches.length === 0) continue;
+
+    let maxCount = stage.count || 1;
+    if (dest === 'bench') {
+      const benchCount = (player.zones.bench || []).filter(
+        (c) => !c.attachedTo
+      ).length;
+      maxCount = Math.min(maxCount, Math.max(0, 5 - benchCount));
+    }
+    if (maxCount <= 0) continue;
+
+    return createPendingChoice({
+      player: playerId,
+      source: 'attack',
+      prompt: `Search your deck for up to ${Math.min(maxCount, matches.length)} ${what}.`,
+      // src is required for the client's card picker: apply-view's
+      // openChoiceInCardPicker only uses the carousel when every option carries
+      // art, otherwise it falls back to the face-down grid modal.
+      options: matches.map((c) => ({
+        instanceId: c.instanceId,
+        name: c.name,
+        src: c.src || '',
+        type: c.type || '',
+      })),
+      min: 0,
+      max: Math.min(maxCount, matches.length),
+      resumeToken: {
+        effectType: 'attack',
+        initiatorPlayerId: playerId,
+        oppId,
+        attackerId,
+        searchStages: stages,
+        searchStageIndex: i,
+      },
+    });
+  }
+  return null;
+}
+
+/**
  * Pure and total command reducer.
  *
  * @param {object} state GameState
@@ -3140,43 +3201,22 @@ export function applyCommand(state, command, rng = null) {
       const searchClause = parseAttackSearchClause(effectiveAttack);
       let searchTriggered = false;
       if (searchClause && attackerPlayer?.zones?.deck?.length > 0) {
-        const benchCount = (attackerPlayer.zones.bench || []).filter(
-          (c) => !c.attachedTo
-        ).length;
-        const maxAllowed =
-          searchClause.destination === 'bench'
-            ? Math.max(0, 5 - benchCount)
-            : searchClause.count || 1;
-        // Server-side filter: only offer cards the clause actually names. Without
-        // this the pendingChoice exposed the whole deck (any card pickable) and
-        // the client carousel showed every card too.
-        const matches = attackerPlayer.zones.deck.filter((c) =>
-          matchesSearch(c, searchClause.what)
-        );
-        if (maxAllowed > 0 && matches.length > 0) {
-          draft.pendingChoice = createPendingChoice({
-            player: playerId,
-            source: 'attack',
-            prompt: `Search your deck for up to ${Math.min(searchClause.count || 1, maxAllowed)} ${searchClause.what || 'cards'}.`,
-            // src is required for the client's card picker: apply-view's
-            // openChoiceInCardPicker only uses the carousel when every option
-            // carries art, otherwise it falls back to the face-down grid modal.
-            options: matches.map((c) => ({
-              instanceId: c.instanceId,
-              name: c.name,
-              src: c.src || '',
-              type: c.type || '',
-            })),
-            min: 0,
-            max: Math.min(searchClause.count || 1, maxAllowed),
-            resumeToken: {
-              effectType: 'attack',
-              initiatorPlayerId: playerId,
-              oppId,
-              attackerId: attacker?.instanceId,
-              searchParams: searchClause,
-            },
-          });
+        // A staged clause (searchDeckSequence) is walked one stage per choice so
+        // each stage keeps its own filter; treating it as a single clause left
+        // `what` undefined and offered the entire deck.
+        const stages =
+          searchClause.type === 'searchDeckSequence' &&
+          Array.isArray(searchClause.stages)
+            ? searchClause.stages
+            : [searchClause];
+        const choice = buildAttackSearchChoice(draft, {
+          playerId,
+          oppId,
+          attackerId: attacker?.instanceId,
+          stages,
+        });
+        if (choice) {
+          draft.pendingChoice = choice;
           searchTriggered = true;
         }
       }
@@ -3659,7 +3699,14 @@ export function applyCommand(state, command, rng = null) {
         const selection = Array.isArray(payload.selection)
           ? payload.selection
           : [];
-        const dest = token.searchParams?.destination || 'hand';
+        const stages = Array.isArray(token.searchStages)
+          ? token.searchStages
+          : token.searchParams
+            ? [token.searchParams]
+            : [];
+        const currentIndex = token.searchStageIndex ?? 0;
+        const stage = stages[currentIndex] || stages[0] || {};
+        const dest = stage.destination || 'hand';
         // "attach it to this Pokémon" (Charge): the searched Energy goes onto the
         // attacker, not into hand. Falls back to the active Pokémon when the
         // attacker id is missing.
@@ -3702,6 +3749,20 @@ export function applyCommand(state, command, rng = null) {
               });
             }
           }
+        }
+
+        // A staged search resumes with the next stage that still has a match;
+        // only after the final stage does the deck shuffle and the turn end.
+        const nextChoice = buildAttackSearchChoice(draft, {
+          playerId: initiatorPlayerId,
+          oppId: token.oppId,
+          attackerId: token.attackerId,
+          stages,
+          fromIndex: currentIndex + 1,
+        });
+        if (nextChoice) {
+          draft.pendingChoice = nextChoice;
+          break;
         }
 
         player.zones.deck = activeRng.shuffle(player.zones.deck);

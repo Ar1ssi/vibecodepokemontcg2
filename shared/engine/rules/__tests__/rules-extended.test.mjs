@@ -1705,6 +1705,27 @@ import test from 'node:test';
         destination: 'attach',
       });
 
+      // Same family, no type word: the trailing "this Pokémon" must not make
+      // the generic fallback search for a Pokémon.
+      assert.deepEqual(
+        parseAttackSearchClause(
+          'Search your deck for a Basic Energy card and attach it to this Pokémon. Shuffle your deck afterward.'
+        ),
+        { what: 'Basic Energy', count: 1, destination: 'attach' }
+      );
+      assert.deepEqual(
+        parseAttackSearchClause(
+          'Search your deck for a {L} Energy card and attach it to this Pokémon. Shuffle your deck afterward.'
+        ),
+        { what: 'Basic {L} Energy', count: 1, destination: 'attach' }
+      );
+      assert.deepEqual(
+        parseAttackSearchClause(
+          'Search your deck for an Energy card and attach it to this Pokémon. Shuffle your deck afterward.'
+        ),
+        { what: 'Energy', count: 1, destination: 'attach' }
+      );
+
       assert.equal(parseAttackSearchClause('Flip a coin. If heads, this attack does 30 more damage.'), null);
     });
 
