@@ -5169,7 +5169,8 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   flex-direction: column;
 }
 .ptcg-atk,
-.ptcg-ability {
+.ptcg-ability,
+.ptcg-stadium {
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -5177,6 +5178,7 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   pointer-events: auto;
 }
 .ptcg-stack > .ptcg-ability:first-child,
+.ptcg-stack > .ptcg-stadium:first-child,
 .ptcg-atks > .ptcg-atk:first-child { border-top: 0; }
 .ptcg-atk__head {
   display: flex;
@@ -5195,6 +5197,21 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   letter-spacing: 0.04em;
   color: #fff;
   background: rgba(0, 0, 0, 0.28);
+  border-radius: calc(var(--u) * 2);
+  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.6);
+  white-space: nowrap;
+}
+/* The Stadium panel's action chip. Present only when the card has an activatable effect; the
+   head banner it sits in is the same as an ability/attack head. */
+.ptcg-atk__use {
+  flex: 0 0 auto;
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: calc(var(--u) * 2);
   padding: calc(var(--u) * 0.4) calc(var(--u) * 1.6);
   white-space: nowrap;
@@ -5227,11 +5244,14 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   color: #1c2530;
 }
 .ptcg-atk--recede,
-.ptcg-ability--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
+.ptcg-ability--recede,
+.ptcg-stadium--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
 .ptcg-atk--usable,
-.ptcg-ability--usable { cursor: pointer; }
+.ptcg-ability--usable,
+.ptcg-stadium--usable { cursor: pointer; }
 .ptcg-atk--usable:hover,
-.ptcg-ability--usable:hover {
+.ptcg-ability--usable:hover,
+.ptcg-stadium--usable:hover {
   box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85);
 }
 

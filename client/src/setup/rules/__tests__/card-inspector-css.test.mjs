@@ -72,7 +72,7 @@ describe('013 C1 — the card scan stays the background', () => {
   }
 
   // …and the pieces that DO replace print must actually be opaque, or the print shows twice.
-  for (const selector of ['.ptcg-atk', '.ptcg-ability', '.ptcg-stat']) {
+  for (const selector of ['.ptcg-atk', '.ptcg-ability', '.ptcg-stat', '.ptcg-stadium']) {
     it(`${selector} is opaque so it covers the print it replaces`, () => {
       const decls = body(selector);
       assert.ok(decls, `${selector} is missing from index.css`);

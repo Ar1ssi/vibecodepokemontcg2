@@ -5,38 +5,43 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 193
-Focus: Once-per-game GX attack + VSTAR Power (design 018, rulebook gaps #2/#3). `player.oncePerGame
-  {vstarUsed,gxUsed}` is game-scoped (state/setup/clone; `advanceTurn` never rebuilds it);
-  `isGxAttack` (name ends `GX`) gates the `attack` command and sets `gxUsed` on resolve (also on
-  the target-choice resume); `useVStarGX` takes `kind:'vstar'|'gx'` and splits the independent
-  limits; legacy `ko-flow` GX KO now awards 2 prizes instead of declaring a match loss. VMAX
-  untouched (no once-per-game rule; 3-prize KO already correct).
-Active: worktree `C:\Users\SMG26\Downloads\vibe-gx-vmax` on `feature/gx-vmax-attacks` @ 1bcff16
-  with UNCOMMITTED S193 edits: `shared/engine/{reduce,state,setup,view,commands}.mjs`,
-  `rules/damage-parser.mjs` (+`isGxAttack`), `rules/ko-flow.mjs`, `server/game/room.mjs` (seeds
-  oncePerGame), `__tests__/once-per-game.test.mjs`, `rules/__tests__/rules-extended.test.mjs`,
-  `netcode/dual-run-bridge.js` (+ test), `package.json`, `README.md`, `docs/card-types-taxonomy.md`,
-  `.agent/designs/018-*.md`, DECISIONS/MAP/STATE/journal.
-Next: user review; commit/push when asked. Primary checkout is still on `main` @ 1bcff16 with its
-  own S192 uncommitted mat-picker work — do not confuse the two.
-Blocked: nothing.
+Focus: Double-clicking the in-play Stadium now opens the card-inspector module (effect panel +
+  Use) instead of a plain scan; Use routes through the existing `stadiumEffect(user)`. Usability
+  is a new pure `stadiumActivationStatus` (rules on / your turn / once-per-turn unused / condition
+  met); continuous Stadiums show text but no click. Design 018, D61.
+
+Active: worktree `C:\Users\SMG26\Downloads\vibe-stadium-inspector` on
+  `feature/stadium-inspector-use` @ f78f3f6, pushed, PR #172 open against `main`. Changes:
+  `stadium-effects.mjs`, `card-inspector.mjs`, `card-inspector-model.mjs`, `attack-zone-geometry.js`,
+  `click-events.js`, `index.css`, tests (`rules-extended`, `card-inspector-model`,
+  `card-inspector-css`), design 018 / DECISIONS / STATE / journal.
+Next: PR #172 review/merge. Live browser e2e for this feature is still owed. Primary checkout still
+  on `main` @ 1bcff16 with uncommitted S190 holo + S183/S184/S188/S189 work — none on a branch yet,
+  and PR #170 (S192 mat-picker) still unmerged. Live browser e2e for this feature is still owed.
+
+Blocked: live browser e2e not runnable here — primary `node_modules` lacks `socket.io`, so
+  `node server/server.js` cannot boot; `pnpm test:inspector` therefore can't run.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- `player.oncePerGame` is the ONLY game-scoped marker; `advanceTurn` replaces `player.flags`
-  wholesale, so never put a once-per-game flag back on `flags`. Reads use `?.` for old snapshots.
-- `useVStarGX.kind` is REQUIRED (`'vstar'|'gx'`); `instanceId` is optional and only verified when
-  present. `dual-run-bridge.js` maps legacy `[type]` → kind. Shape rejection = `bad_command`.
-- The attack panel (`attack-window.mjs`/`attack-preview`) does not yet grey a spent GX attack; the
-  server rejects it with "Only one GX attack can be used per game." (design 018 out-of-scope note).
-- `pnpm test` fails on Windows with "The command line is too long" (the explicit file list). Use
-  `node --test "shared/**/__tests__/*.test.mjs" "client/**/__tests__/*.test.mjs"
-  "server/**/__tests__/*.test.mjs" "bot/__tests__/*.test.mjs"` (2065/2065 green S193).
-- `pnpm lint` is repo-wide red on CRLF (`core.autocrlf=true`) plus pre-existing unused imports in
-  `rules-extended.test.mjs` / `ko-flow.mjs`; confirm new errors only via prettier-off eslint.
+- `stadiumActivationStatus` (stadium-effects.mjs) is the ONLY stadium-usability decision; the model
+  reads it, the DOM never re-derives it. `stadiumContextFor` (card-inspector.mjs) maps live
+  `rulesState` into the model ctx; `hydrateContext` skips stadium (its getContext is authoritative
+  and re-read on every REFRESH_EVENT).
+- Inspector routing: `click-events.js` special-cases `zoneId === 'stadium'` BEFORE the
+  `cardUser === 'self'` Pokémon gate — `#stadium` is neutral, and `identifyCard` sets cardUser
+  `'opp'` there. Actor is `systemState.initiator` (same as the sidebox stadium button).
+- `isStadiumCard` (stadium-effects.mjs) has name fallbacks (`zone`/`rooftop`/`grand tree`); the
+  model's stadium branch runs before `isInspectablePokemon`, so a non-stadium reaching it stays
+  plain (kind:'stadium' only for real stadium records).
+- Under SERVER_AUTHORITATIVE the legacy zone arrays are EMPTY; read
+  `getAuthoritativeZoneArray`/`cardRegistry` and address cards by instanceId.
+- `pnpm test` is an explicit file list (a new test file runs only once listed). Full explicit list
+  2012/2012 green as of S193; `pnpm lint` still repo-wide red on CRLF (`core.autocrlf=true`) plus
+  pre-existing `no-undef` (`document` in card-inspector.mjs, `dmg` in chat-buttons.js).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S193 2026-09-19 feature: once-per-game GX attack + VSTAR Power, legacy GX KO = 2 prizes
-  (design 018, gaps #2/#3); node --test 2060/2060.
+- S193 2026-09-20 feature: Stadium double-click → inspector module with a Use panel running
+  `stadiumEffect`; pure `stadiumActivationStatus`, model/renderer `kind:'stadium'` (design 018, D61).
 - S192 2026-09-19 feature: mat picker multi-select + retreat/Escape Rope/attack-target choices +
   "in any way" counter distribution, netcode and legacy (design 017, D60); pnpm test 1989/1989.
 - S191 2026-09-19 feature: in-play-Pokémon server choices use the mat picker (design 016, D59,

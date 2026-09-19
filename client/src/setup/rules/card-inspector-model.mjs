@@ -22,7 +22,15 @@ import {
 } from '../../../../shared/engine/rules/attack-window.mjs';
 import { parseAttackDamage } from '../../../../shared/engine/rules/damage-parser.mjs';
 import { parseTypeValue } from '../../../../shared/engine/rules/rules-state.mjs';
-import { attackZoneBounds, abilityZoneBounds } from './attack-zone-geometry.js';
+import {
+  isStadiumCard,
+  stadiumActivationStatus,
+} from '../../../../shared/engine/rules/stadium-effects.mjs';
+import {
+  attackZoneBounds,
+  abilityZoneBounds,
+  stadiumZoneBounds,
+} from './attack-zone-geometry.js';
 
 const POKEMON_SUPERTYPES = ['Pokémon', 'Pokemon', ''];
 
@@ -197,6 +205,32 @@ export function buildInspectorModel(card, ctx = {}) {
 
   const name = String(card?.name ?? '');
   const hp = Number.isFinite(Number(card?.hp)) ? Number(card.hp) : null;
+
+  // A Stadium is not a Pokémon, but it earns the same module: an effect panel over the printed
+  // text with a Use affordance when the effect is activatable. The decision is the pure
+  // stadiumActivationStatus() the sidebox path's gates mirror, so the panel cannot advertise a
+  // use the game would reject.
+  if (isStadiumCard(card)) {
+    const status = stadiumActivationStatus(card, {
+      rulesEnabled,
+      yourTurn: ctx.yourTurn ?? true,
+      usedThisTurn: Boolean(ctx.stadiumUsed),
+      flags: ctx.flags || {},
+    });
+    return {
+      kind: 'stadium',
+      name,
+      hp,
+      text: String(card?.text ?? card?.effect ?? ''),
+      actionable: status.actionable,
+      usable: status.usable,
+      reason: status.reason,
+      recede: status.actionable && !status.usable,
+      blockTopPct: stadiumZoneBounds().topPct,
+      dimLevel: 'none',
+      interactive: status.usable,
+    };
+  }
 
   if (!isInspectablePokemon(card)) {
     return {

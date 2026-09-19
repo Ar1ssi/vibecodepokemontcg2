@@ -66,6 +66,7 @@ shared/engine/rules/server-energy.mjs — `serverEnergyDescriptor`: how the serv
 shared/engine/effects/executor.mjs — resumable step runner; core step kinds inline, the rest delegated to trainer-steps.mjs
 shared/engine/effects/trainer-steps.mjs — server handlers for the other trainer step kinds; multi-choice progress lives in resumeToken.context
 shared/engine/rules/abilities.mjs + ability-step-plan.mjs — ability parse + ordered step plan (resume seam)
+shared/engine/rules/stadium-effects.mjs — pure stadium classify/parse/apply (`applyStadiumEffect`) + `stadiumActivationStatus` (the inspector stadium Use gate, design 018); server executor in shared/engine/effects/stadium.mjs
 shared/engine/rules/damage-parser.mjs — attack text → damage math; `isGxAttack` name classifier
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)

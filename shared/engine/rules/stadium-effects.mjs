@@ -968,6 +968,60 @@ function collectPassiveStadiumResults(card) {
   return results;
 }
 
+export const STADIUM_ACTION_FAMILIES = ['setup-once', 'once-per-turn'];
+
+/**
+ * Whether the in-play Stadium's effect can be activated by `player` right now, plus the reason
+ * it cannot. The inspector's Use panel is the only consumer; the click itself still routes
+ * through chat-buttons' `stadiumEffect`, which repeats these gates against live zone state —
+ * this decides the affordance, not the execution.
+ *
+ * @returns {{ actionable:boolean, usable:boolean, reason:string|null }} `actionable` is false
+ *   when the card has no activatable family at all (continuous/passive/unknown), which is a
+ *   permanent property of the card; `usable` folds in the per-turn gates.
+ */
+export function stadiumActivationStatus(
+  card,
+  { rulesEnabled = true, yourTurn = true, usedThisTurn = false, flags = {} } = {}
+) {
+  if (!isStadiumCard(card)) {
+    return { actionable: false, usable: false, reason: 'Not a Stadium card.' };
+  }
+  const applied = applyStadiumEffect(card);
+  if (!STADIUM_ACTION_FAMILIES.includes(applied.family)) {
+    return {
+      actionable: false,
+      usable: false,
+      reason:
+        applied.family === 'continuous-both' ||
+        applied.family === 'opponent-affected'
+          ? 'Continuous effect — always active while in play.'
+          : 'This Stadium has no activatable effect.',
+    };
+  }
+  if (!rulesEnabled) {
+    return { actionable: true, usable: false, reason: 'Rules mode is off.' };
+  }
+  if (!yourTurn) {
+    return { actionable: true, usable: false, reason: "It's not your turn." };
+  }
+  if (applied.family === 'once-per-turn' && usedThisTurn) {
+    return { actionable: true, usable: false, reason: 'Already used this turn.' };
+  }
+  const condition = applied.results[0]?.condition;
+  if (condition && !stadiumOnceConditionMet(condition, flags)) {
+    return {
+      actionable: true,
+      usable: false,
+      reason:
+        condition.type === 'named-supporter'
+          ? `Play a Supporter with "${condition.contains}" in its name first this turn.`
+          : 'Play a Supporter from your hand this turn first.',
+    };
+  }
+  return { actionable: true, usable: true, reason: null };
+}
+
 /**
  * Apply (or describe) a stadium effect. Returns:
  *   { family, executed, message, results: [] }

@@ -17,6 +17,7 @@
 
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
+import { isStadiumCard } from '../../../../shared/engine/rules/stadium-effects.mjs';
 import {
   rulesState,
   ensureCardData,
@@ -140,6 +141,38 @@ const textWithOrbs = (target, text, className) => {
 // type would make an ability panel look like an attack panel of a different cost.
 const ABILITY_BANNER = '#a52834';
 
+// A Stadium prints no type, so its panel uses one fixed slate banner regardless of card.
+const STADIUM_BANNER = '#5a6070';
+
+const stadiumEl = (model) => {
+  const section = el(
+    'section',
+    `ptcg-stadium${model.recede ? ' ptcg-stadium--recede' : ''}`
+  );
+  section.dataset.ptcgStadium = '1';
+  section.style.setProperty('--ptcg-banner', STADIUM_BANNER);
+
+  const head = el('div', 'ptcg-atk__head');
+  head.appendChild(el('span', 'ptcg-atk__badge', 'Stadium'));
+  head.appendChild(el('span', 'ptcg-atk__name', model.name));
+  if (model.actionable) {
+    head.appendChild(
+      el('span', 'ptcg-atk__use', model.usable ? 'Use' : 'Unusable')
+    );
+  }
+  section.appendChild(head);
+
+  if (model.text) {
+    const body = el('p', 'ptcg-atk__text');
+    textWithOrbs(body, model.text, 'ptcg-orb ptcg-orb--inline');
+    section.appendChild(body);
+  }
+  // `reason` explains a receded panel; `applyAffordances` gates the click off `usable` alone,
+  // so the tooltip is the only place the "why not" surfaces.
+  if (model.reason) section.title = model.reason;
+  return section;
+};
+
 const abilityEl = (ability) => {
   const section = el(
     'section',
@@ -236,6 +269,16 @@ const retreatTile = (symbols) =>
  */
 const buildChrome = (model) => {
   const chrome = el('div', 'ptcg-chrome');
+
+  // A Stadium has no HP row, attack panels or stat strip — just its effect text, laid out as a
+  // content-sized panel anchored over the printed effect box.
+  if (model.kind === 'stadium') {
+    const stack = el('div', 'ptcg-stack');
+    stack.style.top = `${model.blockTopPct}%`;
+    stack.appendChild(stadiumEl(model));
+    chrome.appendChild(stack);
+    return chrome;
+  }
 
   const hp = el('div', 'ptcg-hp');
   hp.appendChild(el('span', 'ptcg-hp__num', model.hp));
@@ -412,6 +455,13 @@ const applyAffordances = (state, model) => {
   const handlers = state.actions;
 
   state.wrap
+    .querySelector('.ptcg-stadium')
+    ?.classList.toggle(
+      'ptcg-stadium--usable',
+      Boolean(handlers?.onUse) && Boolean(model.usable)
+    );
+
+  state.wrap
     .querySelector('.ptcg-ability')
     ?.classList.toggle(
       'ptcg-ability--usable',
@@ -434,6 +484,13 @@ const applyAffordances = (state, model) => {
  */
 const wirePanelClicks = (state) => {
   state.wrap.addEventListener('click', (event) => {
+    const stadiumPanel = event.target.closest?.('.ptcg-stadium[data-ptcg-stadium]');
+    if (stadiumPanel) {
+      if (!state.model.usable) return;
+      event.stopPropagation();
+      state.actions?.onUse?.();
+      return;
+    }
     const attackPanel = event.target.closest?.('.ptcg-atk[data-ptcg-attack]');
     if (attackPanel) {
       const attack =
@@ -469,6 +526,23 @@ const stampContextFor = (card, zone = 'active') => ({
     attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
   },
   rulesEnabled: true,
+});
+
+/**
+ * The context a Stadium panel needs: the live per-player flags the pure model reads. Unlike a
+ * Pokémon this resolves nothing async, so `getContext` is authoritative from first paint and the
+ * model stays current across REFRESH_EVENT re-renders.
+ */
+export const stadiumContextFor = ({
+  rulesEnabled = false,
+  yourTurn = false,
+  usedThisTurn = false,
+  flags = {},
+} = {}) => ({
+  rulesEnabled: Boolean(rulesEnabled),
+  yourTurn: Boolean(yourTurn),
+  stadiumUsed: Boolean(usedThisTurn),
+  flags: flags || {},
 });
 
 /**
@@ -527,6 +601,9 @@ async function resolveLiveContext(card, zone = 'active') {
  * still being mounted — the player can close the inspector during the fetch (008 R12).
  */
 const hydrateContext = (state) => {
+  // A Stadium has nothing async to resolve — its context is the live rules flags, which
+  // `getContext` re-reads on every REFRESH_EVENT, so the panel stays accurate while open.
+  if (isStadiumCard(state.card)) return;
   resolveLiveContext(state.card, state.getContext().zone).then(
     (context) => {
       if (!state.wrap.isConnected) return;
@@ -561,6 +638,7 @@ export function openCardInspector({
   getContext = () => stampContextFor(card, zone),
   onAttack = null,
   onAbility = () => useAbility(card, zone),
+  onUse = null,
 } = {}) {
   if (!card?.image) return false;
 
@@ -574,6 +652,7 @@ export function openCardInspector({
       ? decorateInspectorSlide(built, slideCard, getContext, {
           onAttack,
           onAbility,
+          onUse,
         })
       : built.node;
 

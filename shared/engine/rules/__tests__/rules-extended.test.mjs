@@ -8,7 +8,7 @@ import test from 'node:test';
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility } = await import('../abilities.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch } = await import('../stadium-effects.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
@@ -919,6 +919,47 @@ import test from 'node:test';
       assert.equal(r.executed, true);
       assert.equal(r.results[0].action, 'draw');
       assert.equal(r.results[0].n, 2);
+    });
+
+    test('stadiumActivationStatus: actionable families and per-turn gates', () => {
+      const safari = { type: 'Stadium', name: 'Safari Zone', text: 'Once per turn, search your deck for a Basic Pokémon.' };
+      assert.deepEqual(stadiumActivationStatus(safari), { actionable: true, usable: true, reason: null });
+      assert.equal(stadiumActivationStatus(safari, { usedThisTurn: true }).usable, false);
+      assert.match(stadiumActivationStatus(safari, { usedThisTurn: true }).reason, /Already used/);
+      assert.equal(stadiumActivationStatus(safari, { yourTurn: false }).usable, false);
+      assert.match(stadiumActivationStatus(safari, { yourTurn: false }).reason, /not your turn/);
+      assert.equal(stadiumActivationStatus(safari, { rulesEnabled: false }).usable, false);
+      assert.match(stadiumActivationStatus(safari, { rulesEnabled: false }).reason, /Rules mode/);
+    });
+
+    test('stadiumActivationStatus: setup-once is actionable, condition gates once-per-turn', () => {
+      const victory = { type: 'Stadium', name: 'Victory Road', text: 'When you play this card, draw 2 cards.' };
+      assert.equal(stadiumActivationStatus(victory).actionable, true);
+      assert.equal(stadiumActivationStatus(victory).usable, true);
+
+      const factory = {
+        type: 'Stadium',
+        name: 'Team Rocket\u2019s Factory',
+        text: 'Once during each player\'s turn, if they played a Supporter card that has "Team Rocket" in its name from their hand, they may draw 2 cards.',
+      };
+      const unmet = stadiumActivationStatus(factory, { flags: {} });
+      assert.equal(unmet.usable, false);
+      assert.match(unmet.reason, /team rocket/i);
+      assert.equal(stadiumActivationStatus(factory, { flags: { lastSupporterName: 'Team Rocket Grunt' } }).usable, true);
+    });
+
+    test('stadiumActivationStatus: continuous and non-stadium are never usable', () => {
+      const route = { type: 'Stadium', name: 'Route 25', text: 'Both players: Basic Pokémon have +20 HP.' };
+      assert.deepEqual(stadiumActivationStatus(route), {
+        actionable: false,
+        usable: false,
+        reason: 'Continuous effect — always active while in play.',
+      });
+      const unknown = { type: 'Stadium', name: 'Mystery', text: 'Do something odd.' };
+      assert.equal(stadiumActivationStatus(unknown).actionable, false);
+      assert.match(stadiumActivationStatus(unknown).reason, /no activatable effect/);
+      assert.equal(stadiumActivationStatus({ name: 'Pikachu' }).usable, false);
+      assert.match(stadiumActivationStatus({ name: 'Pikachu' }).reason, /Not a Stadium/);
     });
 
     test('parseStadiumSetupDraw: only the when-you-play sentence, never a default 1', () => {
