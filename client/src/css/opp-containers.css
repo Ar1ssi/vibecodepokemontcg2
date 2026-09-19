@@ -277,6 +277,11 @@ body, input, textarea, button {
   margin: 0;
   box-sizing: border-box;
 }
+/* Mirrors self-containers.css: `.high-zIndex` (z-index: 1 !important) would
+   otherwise sink a dragged card behind its own back copies. */
+.hand-card-stack > .dragging {
+  z-index: 30 !important;
+}
 .hand-card--stacked-front {
   box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.28);
 }
