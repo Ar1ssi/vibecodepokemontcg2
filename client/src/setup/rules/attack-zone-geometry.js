@@ -51,6 +51,17 @@ export function abilityZoneBounds({ abilityCount = 0 }) {
 }
 
 /**
+ * Anchor for the Stadium effect panel. A Stadium prints its effect in a wide box below the
+ * header, so there is no attack band to subdivide — a single content-sized panel anchored here
+ * covers the printed text the same way an attack panel covers its attack. Only `topPct` is
+ * returned; the renderer sizes the panel by its content (013: the stack must not stretch).
+ */
+const STADIUM_BAND_TOP_PCT = 30;
+export function stadiumZoneBounds() {
+  return { topPct: STADIUM_BAND_TOP_PCT };
+}
+
+/**
  * The rendered content box of a card image inside its `boxWidth`x`boxHeight`
  * container, given the image's natural size and CSS `object-fit`.
  *

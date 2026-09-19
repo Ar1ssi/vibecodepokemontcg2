@@ -23,12 +23,16 @@ import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
 import { orderAttachedForCarousel } from './carousel-order.mjs';
-import { rulesState } from '/shared/engine/rules/rules-state.mjs';
+import { rulesState, stadiumUsed } from '/shared/engine/rules/rules-state.mjs';
 import {
   openCardInspector,
   closeCardInspector,
+  stadiumContextFor,
 } from '../rules/card-inspector.mjs';
-import { attack } from '../../actions/chat-buttons/chat-buttons.js';
+import {
+  attack,
+  stadiumEffect,
+} from '../../actions/chat-buttons/chat-buttons.js';
 import { resolvePreviewCard } from './preview-card.mjs';
 
 export const identifyCard = (event) => {
@@ -360,10 +364,37 @@ export const doubleClick = (event) => {
           : attached;
       });
 
+      // Design 018: the shared in-play Stadium opens the same module — the effect text as a
+      // content-sized panel, clicked to run the Stadium effect. It has no cardUser (`#stadium`
+      // is neutral), so route on the zone alone; the actor is the local player, exactly the user
+      // the sidebox Stadium button passes. `getContext` reads live flags so the panel's Use
+      // affordance tracks turn/once-per-turn state.
+      if (mouseClick.zoneId === 'stadium') {
+        const user = systemState.initiator;
+        openCardInspector({
+          card,
+          attachedSlides,
+          zone: 'stadium',
+          getContext: () =>
+            stadiumContextFor({
+              rulesEnabled: Boolean(rulesState.enabled),
+              yourTurn: rulesState.turnPlayer === user,
+              usedThisTurn: stadiumUsed(user),
+              flags: rulesState.flags?.[user] || {},
+            }),
+          onUse: () => {
+            closeCardInspector();
+            stadiumEffect(user);
+          },
+        });
+        return;
+      }
+
       // D50 (design 013): your own board Pokémon open the inspector — the enlarged scan with the
       // TCG Live readout over it, attached cards as further slides, a payable attack fired by
-      // clicking its panel, and the ability fired by clicking its own. Opponent's Pokémon, hand
-      // and stadium keep the plain scan: payability and actions are not theirs to show.
+      // clicking its panel, and the ability fired by clicking its own. Opponent's Pokémon and
+      // hand cards keep the plain scan: payability and actions are not theirs to show. (The
+      // shared Stadium is handled above, design 018.)
       if (
         ['active', 'bench'].includes(mouseClick.zoneId) &&
         mouseClick.cardUser === 'self'

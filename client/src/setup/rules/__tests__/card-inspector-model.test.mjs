@@ -574,3 +574,65 @@ test('model: a positional ability does not dim the bench (015)', () => {
   });
   assert.equal(m.dimLevel, 'none');
 });
+
+// ── Stadium (018) ────────────────────────────────────────────────────────────
+
+const SAFARI_ZONE = {
+  name: 'Safari Zone',
+  supertype: 'Trainer',
+  type: 'Stadium',
+  text: 'Once per turn, search your deck for a Basic Pokémon.',
+};
+
+test('model: a Stadium gets kind stadium, not pokemon (018)', () => {
+  const m = buildInspectorModel(SAFARI_ZONE);
+  assert.equal(m.kind, 'stadium');
+  assert.equal(m.name, 'Safari Zone');
+  assert.equal(m.text, 'Once per turn, search your deck for a Basic Pokémon.');
+  assert.equal(m.actionable, true);
+  assert.equal(m.usable, true);
+  assert.equal(m.recede, false);
+  assert.equal(m.dimLevel, 'none');
+  assert.ok(m.blockTopPct > 0);
+});
+
+test('model: stadium reads effect from card.effect when text is absent (018)', () => {
+  const m = buildInspectorModel({
+    name: 'Victory Road',
+    type: 'Stadium',
+    effect: 'When you play this card, draw 2 cards.',
+  });
+  assert.equal(m.kind, 'stadium');
+  assert.equal(m.text, 'When you play this card, draw 2 cards.');
+  assert.equal(m.actionable, true);
+});
+
+test('model: a once-per-turn Stadium already used recedes with a reason (018)', () => {
+  const m = buildInspectorModel(SAFARI_ZONE, { stadiumUsed: true });
+  assert.equal(m.usable, false);
+  assert.equal(m.recede, true);
+  assert.match(m.reason, /Already used/);
+  assert.equal(m.interactive, false);
+});
+
+test('model: off-turn and rules-off Stadiums recede with a reason (018)', () => {
+  const offTurn = buildInspectorModel(SAFARI_ZONE, { yourTurn: false });
+  assert.equal(offTurn.usable, false);
+  assert.match(offTurn.reason, /not your turn/);
+  const rulesOff = buildInspectorModel(SAFARI_ZONE, { rulesEnabled: false });
+  assert.equal(rulesOff.usable, false);
+  assert.match(rulesOff.reason, /Rules mode/);
+});
+
+test('model: a continuous Stadium shows text but is never usable (018)', () => {
+  const m = buildInspectorModel({
+    name: 'Route 25',
+    type: 'Stadium',
+    text: 'Both players: Basic Pokémon have +20 HP.',
+  });
+  assert.equal(m.kind, 'stadium');
+  assert.equal(m.actionable, false);
+  assert.equal(m.usable, false);
+  assert.equal(m.recede, false);
+  assert.match(m.reason, /Continuous/);
+});
