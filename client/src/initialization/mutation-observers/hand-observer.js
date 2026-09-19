@@ -1,6 +1,5 @@
 import { oppContainerDocument, selfContainerDocument } from '../../state.js';
 import { adjustAlignment } from '../../setup/sizing/adjust-alignment.js';
-import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
 
 export const initializeHandObserver = () => {
   const handElement = selfContainerDocument.getElementById('hand');
@@ -14,7 +13,6 @@ export const initializeHandObserver = () => {
       }
     });
     if (hasChildList) {
-      reconcileHandStacks('self');
       [handElement, oppHandElement].forEach(adjustAlignment);
     }
   });

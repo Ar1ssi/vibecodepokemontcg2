@@ -2,6 +2,7 @@
     // least one Basic Pokémon. A player without one reshuffles and redraws;
     // their opponent then draws a bonus card for each mulligan taken.
     
+    import { isBasicPokemon } from '../cards.mjs';
     import { ensureCardData } from './rules-state.mjs';
     
     // Does this hand contain a Basic Pokémon? (card.stage is on enriched data;
@@ -9,7 +10,7 @@
     export async function handHasBasic(hand = []) {
       for (const card of hand) {
         await ensureCardData(card);
-        if ((card.stage || 'Basic') === 'Basic' && card.hp) {
+        if (isBasicPokemon(card)) {
           return true;
         }
       }

@@ -377,6 +377,29 @@
         }
       }
       if (!card?.id) return card;
+      if (card.id.startsWith('e2e-') || card.set === 'e2e') {
+        const data = {
+          hp: card.hp || 60,
+          types: card.types || ['Colorless'],
+          weakness: card.weakness ?? null,
+          resistance: card.resistance ?? null,
+          retreatCost: card.retreatCost ?? 1,
+          attacks: Array.isArray(card.attacks) && card.attacks.length > 0
+            ? card.attacks
+            : [{ name: 'Tackle', damage: '10', text: '' }],
+          stage: card.stage || 'Basic',
+          evolvesFrom: null,
+          ability: null,
+          subtypes: card.subtypes || [],
+          trainerType: null,
+          rarity: '',
+          effect: null,
+          text: null,
+        };
+        cardDataCache.set(card.id, data);
+        applyEnrichedData(card, data);
+        return card;
+      }
       if (cardDataCache.has(card.id)) {
         applyEnrichedData(card, cardDataCache.get(card.id));
         return card;
@@ -681,7 +704,7 @@
       const isYourTurn = user === S.turnPlayer;
     
       // during setup nobody acts except via the setup flow (e.g. setting starting active)
-      if (S.phase === 'setup' || S.turnNumber === 0 || !S.startingActiveDone) {
+      if (S.phase === 'setup' || S.turnNumber === 0 || (!S.startingActiveDone && S.turnNumber < 1)) {
         if (action === 'moveCard' && targetZoneId === 'active') {
           return { allowed: true };
         }
@@ -706,7 +729,7 @@
             !isYourTurn &&
             !(
               targetZoneId === 'active' &&
-              (S.phase === 'setup' || S.turnNumber === 0 || !S.startingActiveDone)
+              (S.phase === 'setup' || S.turnNumber === 0 || (!S.startingActiveDone && S.turnNumber < 1))
             )
           ) {
             return { allowed: false, reason: "It's not your turn." };
