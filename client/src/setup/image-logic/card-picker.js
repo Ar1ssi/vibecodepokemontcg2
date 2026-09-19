@@ -1,6 +1,7 @@
 import { getZone } from '../zones/get-zone.js';
 import {
   buildHoloCard,
+  MAT_HOLO_OPTIONS,
   resolveHoloEffect,
   startHoloAnimation,
   stopHoloAnimation,
@@ -231,9 +232,10 @@ const syncHoloAnimations = (state) => {
     }
 
     if (!slide.holoRunning) {
-      // Picker slides have a real cursor over them — real pointer-tracked hover,
-      // not the auto-sweep (that's for mat/hand cards with no reliable cursor).
-      startHoloAnimation(wrapper);
+      // Carousel slides are enlarged cards (inspector, discard/pile viewers,
+      // deck pickers) — run the same mat sweep as the board so their foil
+      // flows instead of holding the light under the cursor.
+      startHoloAnimation(wrapper, MAT_HOLO_OPTIONS);
       slide.holoRunning = true;
     }
   });
@@ -1378,7 +1380,7 @@ export const openCardPicker = async ({
     if (holoWrapper) {
       holoWrapper.classList.add('card-picker-trigger-holo');
       state.triggerHoloWrapper = holoWrapper;
-      startHoloAnimation(holoWrapper);
+      startHoloAnimation(holoWrapper, MAT_HOLO_OPTIONS);
       if (!isBrowse) syncChooseLayout(state);
     }
   }

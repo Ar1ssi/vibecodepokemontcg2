@@ -384,6 +384,12 @@ export const DRIFT = Object.freeze({
   periodYMs: 13000,
 });
 
+// The board/hand sweep: the drift above with no cursor hold and no visible
+// tilt. Surfaces standing in for a mat card (the double-click preview) reuse
+// this so their foil flows exactly like the board's instead of tracking the
+// pointer while it is over the card.
+export const MAT_HOLO_OPTIONS = Object.freeze({ auto: true, tilt: false });
+
 const unitTilt = (value) => (Number.isFinite(value) ? clamp(value, -1, 1) : 0);
 
 const tiltAmountOf = (tiltX, tiltY) =>
