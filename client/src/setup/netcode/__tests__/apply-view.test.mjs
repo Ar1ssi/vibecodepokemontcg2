@@ -1932,6 +1932,40 @@ test('stack: an evolution is the visible card with the Basic peeking out underne
   assert.equal(basic.container.style.width, '');
 });
 
+test('stack: an attachment to the stacked evolution stays in the host slot, not the zone', () => {
+  // Reported S181: Energy dropped onto Mega Greninja ex — the TOP card of a stack, whose
+  // own `attachedTo` is the Basic underneath — rendered as a separate in-play card lying
+  // in the bench row, instead of a token on the visible card.
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const bench = doc.getElementById('selfMat').querySelector('#bench');
+  const zones = {
+    bench: [
+      { instanceId: 10, name: 'Froakie', src: 'f.png', type: 'Pokémon', stage: 'Basic' },
+      { instanceId: 11, name: 'Mega Greninja ex', src: 'g.png', type: 'Pokémon', stage: 'Stage 2', attachedTo: 10 },
+      { instanceId: 12, name: 'Choice Belt', src: 'belt.png', type: 'Trainer', attachedTo: 11 },
+      { instanceId: 13, name: 'Basic Water Energy', src: 'w.png', type: 'Energy', attachedTo: 11 },
+    ],
+  };
+
+  applyView({ stateVersion: 1, you: { playerId: 'p1', zones } }, [], opts);
+  sizeRegisteredCards(150, 210);
+  applyView({ stateVersion: 2, you: { playerId: 'p1', zones } }, [], opts);
+
+  const registry = getCardRegistry();
+  const basic = registry.get(10);
+  const stage2 = registry.get(11);
+  const energy = registry.get(13);
+
+  assert.equal(bench.children.length, 1, 'the stack owns the only play-container in the zone');
+  assert.equal(bench.children[0], basic.container);
+  assert.equal(energy.element.parentNode, basic.container, 'Energy stays in the host slot');
+  assert.equal(registry.get(12).element.parentNode, basic.container, 'Tool stays in the host slot');
+  assert.equal(energy.element.style.width, '36px', 'Energy is drawn as a token on the visible card');
+  assert.ok(energy.element.classList.contains('attached-card'));
+  assert.deepEqual(stage2.card.attachedCards.map((c) => c.instanceId), [10, 12, 13]);
+});
+
 test('rotation: the root turns its whole stack and clears back to upright', () => {
   const { doc, mockGetZone } = setupMockDom();
   const opts = { document: doc, getZone: mockGetZone };
