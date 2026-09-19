@@ -26,53 +26,53 @@
 
 // Effect families an attack can be classified into (taxonomy Section D).
 export const ATTACK_FAMILIES = [
-  'flat',             // bare "30" damage number
-  'per-energy',       // "× the number of Energy attached" / "for each Energy attached"
-  'per-prize',        // "for each of your opponent's Prize cards"
-  'per-turn',         // "for each turn" / turn counters
-  'multi-target',     // "do N to each of your opponent's Pokémon"
-  'extra-by-type',    // "+N if the Defending Pokémon is [type]"
+  'flat', // bare "30" damage number
+  'per-energy', // "× the number of Energy attached" / "for each Energy attached"
+  'per-prize', // "for each of your opponent's Prize cards"
+  'per-turn', // "for each turn" / turn counters
+  'multi-target', // "do N to each of your opponent's Pokémon"
+  'extra-by-type', // "+N if the Defending Pokémon is [type]"
   'conditional-damage', // "if …, this attack does N more"
-  'bench-damage',     // "you may also do N to a benched Pokémon"
-  'discard-cost',     // "discard an Energy / N cards from this Pokémon / your hand"
+  'bench-damage', // "you may also do N to a benched Pokémon"
+  'discard-cost', // "discard an Energy / N cards from this Pokémon / your hand"
   'discard-opponent', // "discard … from your opponent's deck / hand / Energy"
-  'shuffle-cost',     // "shuffle into your deck, then draw"
-  'status-asleep',    // "put the Defending Pokémon to Sleep"
+  'shuffle-cost', // "shuffle into your deck, then draw"
+  'status-asleep', // "put the Defending Pokémon to Sleep"
   'status-paralyzed', // "Paralyze the Defending Pokémon"
-  'status-poisoned',  // "Poison the Defending Pokémon"
-  'status-burned',    // "Burn the Defending Pokémon"
-  'status-confused',  // "Confuse the Defending Pokémon"
-  'dual-status',      // "now Asleep and Poisoned" (two statuses at once)
-  'self-status',      // "This Pokémon is now Asleep" (status on the attacker)
-  'coin-flip',        // "flip a coin; if heads, …"
-  'per-heads-coin',   // "flip … for each heads" (damage scales with heads count)
-  'heal',             // "remove N damage counters" / "Heal N damage"
-  'draw-attach',      // "draw N / attach an Energy"
-  'draw-until',       // "draw cards until you have N cards"
-  'search-deck',      // "search your deck for … put onto Bench / into hand"
-  'switch',           // "then switch your Active"
-  'move-energy',      // "move an Energy from this Pokémon to a Benched Pokémon"
-  'reveal-hand',      // "your opponent reveals their hand"
-  'conditional-ko',   // "if … Special Condition … Knocked Out"
-  'once-per-turn',    // "Once during your turn: …"
+  'status-poisoned', // "Poison the Defending Pokémon"
+  'status-burned', // "Burn the Defending Pokémon"
+  'status-confused', // "Confuse the Defending Pokémon"
+  'dual-status', // "now Asleep and Poisoned" (two statuses at once)
+  'self-status', // "This Pokémon is now Asleep" (status on the attacker)
+  'coin-flip', // "flip a coin; if heads, …"
+  'per-heads-coin', // "flip … for each heads" (damage scales with heads count)
+  'heal', // "remove N damage counters" / "Heal N damage"
+  'draw-attach', // "draw N / attach an Energy"
+  'draw-until', // "draw cards until you have N cards"
+  'search-deck', // "search your deck for … put onto Bench / into hand"
+  'switch', // "then switch your Active"
+  'move-energy', // "move an Energy from this Pokémon to a Benched Pokémon"
+  'reveal-hand', // "your opponent reveals their hand"
+  'conditional-ko', // "if … Special Condition … Knocked Out"
+  'once-per-turn', // "Once during your turn: …"
   'damage-prevention', // "takes N less damage" / "prevent all damage"
-  'next-turn-lock',   // "can't use [attack]" / "can't attack" / "can't retreat"
-  'self-damage',      // "this Pokémon also does N damage to itself"
-  'immunity',         // "damage isn't affected by Weakness/Resistance"
-  'redirect-damage',  // "place N damage counters on the Attacking Pokémon"
-  'mirror-heal',      // heal self for damage dealt this attack
-  'copy-attack',      // choose another Pokémon's attack and use it
-  'retaliate',        // thorns: damage attacker next turn if hit
-  'return-self',      // put this Pokémon and attachments into hand
-  'deferred-damage',  // damage at end of opponent's next turn
+  'next-turn-lock', // "can't use [attack]" / "can't attack" / "can't retreat"
+  'self-damage', // "this Pokémon also does N damage to itself"
+  'immunity', // "damage isn't affected by Weakness/Resistance"
+  'redirect-damage', // "place N damage counters on the Attacking Pokémon"
+  'mirror-heal', // heal self for damage dealt this attack
+  'copy-attack', // choose another Pokémon's attack and use it
+  'retaliate', // thorns: damage attacker next turn if hit
+  'return-self', // put this Pokémon and attachments into hand
+  'deferred-damage', // damage at end of opponent's next turn
   'look-opponent-deck', // look at / reorder top of opponent's deck
-  'next-turn-bonus',  // named attack does more damage next turn
+  'next-turn-bonus', // named attack does more damage next turn
   'devolve-opponent', // devolve each opponent's evolved Pokémon
-  'recover-status',   // recovers from all Special Conditions
-  'hp-cap-damage',    // place counters until remaining HP is N
+  'recover-status', // recovers from all Special Conditions
+  'hp-cap-damage', // place counters until remaining HP is N
   'return-opponent-energy', // return opponent's Active Energy to their hand
-  'look-own-deck',    // look at top of your deck and reorder
-  'unknown',          // attack we can't place
+  'look-own-deck', // look at top of your deck and reorder
+  'unknown', // attack we can't place
 ];
 
 // Normalize curly quotes to straight so keyword checks work on card text.
@@ -98,30 +98,46 @@ const TYPE_RE = TYPES.join('|');
 const hasTypeMention = (t) => new RegExp(`\\b(${TYPE_RE})\\b`).test(t);
 
 // Status nouns (lowercased) used to detect "X and Y" dual-status applications.
-const STATUS_NOUNS = ['asleep', 'paralyzed', 'poisoned', 'burned', 'confused'];
+export const STATUS_NOUNS = [
+  'asleep',
+  'paralyzed',
+  'poisoned',
+  'burned',
+  'confused',
+];
 
 // Detect a dual-status application: "now Asleep and Poisoned",
 // "is now Burned and Confused", etc. Returns the two status nouns or null.
-function dualStatus(t) {
-  const m = t.match(/now\s+('?(asleep|paralyzed|poisoned|burned|confused)')?\s+and\s+('?(asleep|paralyzed|poisoned|burned|confused)')?/);
+export function dualStatus(t) {
+  const m = t.match(
+    /now\s+('?(asleep|paralyzed|poisoned|burned|confused)')?\s+and\s+('?(asleep|paralyzed|poisoned|burned|confused)')?/
+  );
   if (!m) {
     // Try "is now X and Y" where the nouns are explicit.
-    const m2 = t.match(/(asleep|paralyzed|poisoned|burned|confused)\s+and\s+(asleep|paralyzed|poisoned|burned|confused)/);
-    if (m2) return [m2[1], m2[2]];
-    return null;
+    const m2 = t.match(
+      /is\s+now\s+('?(asleep|paralyzed|poisoned|burned|confused)')?\s+and\s+('?(asleep|paralyzed|poisoned|burned|confused)')?/
+    );
+    if (!m2) return null;
+    const a = m2[2] || m2[1];
+    const b = m2[4] || m2[3];
+    return a && b ? [a, b] : null;
   }
   const a = m[2] || m[1];
   const b = m[3] || m[4];
   if (a && b && a !== b) return [a, b];
-  const m3 = t.match(/(asleep|paralyzed|poisoned|burned|confused)\s+and\s+(asleep|paralyzed|poisoned|burned|confused)/);
+  const m3 = t.match(
+    /(asleep|paralyzed|poisoned|burned|confused)\s+and\s+(asleep|paralyzed|poisoned|burned|confused)/
+  );
   if (m3) return [m3[1], m3[2]];
   return null;
 }
 
 // Detect a self-status application: "This Pokémon is now Asleep."
 // (status applied to the attacker, not the opponent's Active).
-function selfStatus(t) {
-  const m = t.match(/this pok[ée]mon\s+is\s+now\s+(asleep|paralyzed|poisoned|burned|confused)/);
+export function selfStatus(t) {
+  const m = t.match(
+    /this pok[ée]mon\s+is\s+now\s+(asleep|paralyzed|poisoned|burned|confused)/
+  );
   return m ? m[1] : null;
 }
 
@@ -160,7 +176,7 @@ function appliesStatus(t, status) {
 //   - dual-status and self-status are detected before the single-status
 //     families so "now Asleep and Poisoned" / "This Pokémon is now Asleep"
 //     keep their distinct meaning (E).
-export function classifyAttackEffect(attack, attackerCard = {}) {
+export function classifyAttackEffect(attack) {
   const text = lower(attack?.text ?? '');
   const hasDamage = Number.isFinite(attack?.damage);
   if (!text) {
@@ -179,17 +195,22 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   // Coin-conditional bonuses ("if heads/if tails … more damage") are excluded
   // here and handled by the coin-flip / per-heads-coin families below.
   const hasCoin = /flip a coin|flip \d+ coins?|a coin/.test(t);
-  if (/if the defending pok[ée]mon is/.test(t) && hasTypeMention(t)) return 'extra-by-type';
+  if (/if the defending pok[ée]mon is/.test(t) && hasTypeMention(t))
+    return 'extra-by-type';
   if (
     !hasCoin &&
-    /if .*more damage|if .*this attack does|if the defending|base damage is \d+/.test(t)
+    /if .*more damage|if .*this attack does|if the defending|base damage is \d+/.test(
+      t
+    )
   ) {
     return 'conditional-damage';
   }
 
   // Conditional KO (Abyss Eye) — before status so Special Condition refs aren't misfiled.
   if (
-    /if your opponent's active pok[ée]mon is affected by a special condition/i.test(t) &&
+    /if your opponent's active pok[ée]mon is affected by a special condition/i.test(
+      t
+    ) &&
     /knocked out/i.test(t)
   ) {
     return 'conditional-ko';
@@ -201,7 +222,9 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
     return 'conditional-ko';
   }
   if (
-    /if your opponent's active pok[ée]mon has any special energy attached/i.test(t) &&
+    /if your opponent's active pok[ée]mon has any special energy attached/i.test(
+      t
+    ) &&
     /knocked out/i.test(t)
   ) {
     return 'conditional-ko';
@@ -217,7 +240,11 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   }
 
   // Counter placement on opponent Pokémon (Snipe, Pulverize, …).
-  if (/choose \d+ of your opponent's pok[ée]mon and put \d+ damage counters on each/i.test(t)) {
+  if (
+    /choose \d+ of your opponent's pok[ée]mon and put \d+ damage counters on each/i.test(
+      t
+    )
+  ) {
     return 'multi-target';
   }
   if (
@@ -238,31 +265,48 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   // Target shape — multi-Pokémon and bench damage.
   if (
     /each of your opponent's pok[ée]mon|to all of your opponent's|to every of|each pok[ée]mon/.test(
-      t,
+      t
     )
   ) {
     return 'multi-target';
   }
-  if (/(benched pok[ée]mon|a benched|your bench)/.test(t) && /damage|do \d|\d+ damage|hit/.test(t)) {
+  if (
+    /(benched pok[ée]mon|a benched|your bench)/.test(t) &&
+    /damage|do \d|\d+ damage|hit/.test(t)
+  ) {
     return 'bench-damage';
   }
 
   // Follow-up actions that ride on the attack.
-  if (/your opponent reveal(?:s)? (?:their )?hand/i.test(t)) return 'reveal-hand';
-  if (/reveal any number of .* from your hand/i.test(t)) return 'conditional-damage';
+  if (/your opponent reveal(?:s)? (?:their )?hand/i.test(t))
+    return 'reveal-hand';
+  if (/reveal any number of .* from your hand/i.test(t))
+    return 'conditional-damage';
   if (
     /move an? energy from this pok[ée]mon/i.test(t) ||
-    (/move\b[^.;]*\benergy\b/i.test(t) && /benched pok[ée]mon|your bench/i.test(t)) ||
+    (/move\b[^.;]*\benergy\b/i.test(t) &&
+      /benched pok[ée]mon|your bench/i.test(t)) ||
     (/move\b[^.;]*\benergy\b/i.test(t) && /opponent's pok[ée]mon/i.test(t)) ||
-    /move any amount of (?:\{[a-zA-Z]\} )?energy from your pok[ée]mon to your other pok[ée]mon/i.test(t)
+    /move any amount of (?:\{[a-zA-Z]\} )?energy from your pok[ée]mon to your other pok[ée]mon/i.test(
+      t
+    )
   ) {
     return 'move-energy';
   }
-  if (/(remove|heal)[^.]*damage counter|remove [^.]*counters|heal \d+ damage/.test(t)) return 'heal';
+  if (
+    /(remove|heal)[^.]*damage counter|remove [^.]*counters|heal \d+ damage/.test(
+      t
+    )
+  )
+    return 'heal';
   if (/switch/.test(t)) return 'switch';
   if (/draw cards until you have \d+ cards/.test(t)) return 'draw-until';
   if (/each player draws \d+ cards?/.test(t)) return 'draw-attach';
-  if (/draw (a |the )?card|draw \d+|attach [^.]*energy|\bcollect\b/.test(t) || /^collect$/i.test(attack?.name ?? '')) return 'draw-attach';
+  if (
+    /draw (a |the )?card|draw \d+|attach [^.]*energy|\bcollect\b/.test(t) ||
+    /^collect$/i.test(attack?.name ?? '')
+  )
+    return 'draw-attach';
 
   // Coin-flip branching (per-heads scaling is the more specific form).
   if (/for each heads/.test(t) && /flip/.test(t)) return 'per-heads-coin';
@@ -271,9 +315,11 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   // Scaling damage.
   if (
     /number of energy|× the number|\* the number|for each damage counter|does \d+(?: more)? damage for each .*energy attached|for each (\{[a-zA-Z]\}|[a-zA-Z]+ )?energy attached/.test(
-      t,
+      t
     ) ||
-    /does \d+(?: more)? damage for each (of )?your pok[ée]mon in play/.test(t) ||
+    /does \d+(?: more)? damage for each (of )?your pok[ée]mon in play/.test(
+      t
+    ) ||
     /for each of your .* pok[ée]mon in play/.test(t) ||
     /for each \{[a-zA-Z]\} pok[ée]mon in play/.test(t) ||
     /round attack/.test(t) ||
@@ -291,27 +337,42 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   ) {
     return 'per-energy';
   }
-  if (/for each (of )?(your opponent's )?prize|each prize card|prize card/.test(t)) return 'per-prize';
-  if (/for each turn|each turn|turn counter|this is the \d+th turn|this is the first turn/.test(t)) {
+  if (
+    /for each (of )?(your opponent's )?prize|each prize card|prize card/.test(t)
+  )
+    return 'per-prize';
+  if (
+    /for each turn|each turn|turn counter|this is the \d+th turn|this is the first turn/.test(
+      t
+    )
+  ) {
     return 'per-turn';
   }
   // Per-heads coin scaling (damage scales with the number of heads).
   if (/for each heads/.test(t)) return 'per-heads-coin';
 
   // Self-damage (the attack deals damage to the attacker).
-  if (/(this pok[ée]mon|it) (also )?does \d+ damage to (itself|itself)/.test(t) ||
-      /does \d+ damage to itself/.test(t)) {
+  if (
+    /(this pok[ée]mon|it) (also )?does \d+ damage to (itself|itself)/.test(t) ||
+    /does \d+ damage to itself/.test(t)
+  ) {
     return 'self-damage';
   }
 
   // Damage prevention / next-turn protection.
-  if (/takes \d+ less damage|prevent all damage|do \d+ less damage|less damage from attacks/.test(t)) {
+  if (
+    /takes \d+ less damage|prevent all damage|do \d+ less damage|less damage from attacks/.test(
+      t
+    )
+  ) {
     return 'damage-prevention';
   }
 
   // Next-turn lock (can't use / can't attack / can't retreat / can't play cards).
   if (
-    /can't use|can't attack|can't retreat|cannot use|cannot attack|cannot retreat/.test(t) ||
+    /can't use|can't attack|can't retreat|cannot use|cannot attack|cannot retreat/.test(
+      t
+    ) ||
     /can't play any (item|supporter) cards?/.test(t) ||
     /can't play any pok[ée]mon from their hand to evolve/.test(t) ||
     /energy can't be attached from your opponent's hand/.test(t) ||
@@ -346,13 +407,17 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   // Return self to hand with attachments.
   if (
     /put this pok[ée]mon and all attached cards into your hand/.test(t) ||
-    /put 1 of your benched pok[ée]mon and all attached cards into your hand/.test(t)
+    /put 1 of your benched pok[ée]mon and all attached cards into your hand/.test(
+      t
+    )
   ) {
     return 'return-self';
   }
 
   // Deferred damage (end of opponent's next turn).
-  if (/at the end of your opponent's next turn.*put .* damage counters/.test(t)) {
+  if (
+    /at the end of your opponent's next turn.*put .* damage counters/.test(t)
+  ) {
     return 'deferred-damage';
   }
 
@@ -369,7 +434,9 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   // Next-turn attack bonus (Echoed Voice, Meteor Mash, …).
   if (
     /during your next turn.*attack does .* more damage/.test(t) ||
-    /during your next turn, attacks used by this pok[ée]mon do \d+ more damage/.test(t)
+    /during your next turn, attacks used by this pok[ée]mon do \d+ more damage/.test(
+      t
+    )
   ) {
     return 'next-turn-bonus';
   }
@@ -394,8 +461,12 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
 
   // Return opponent Active's Energy to their hand.
   if (
-    /put .* energy attached to your opponent's active pok[ée]mon into their hand/.test(t) ||
-    /put \d+ energy attached to your opponent's active stage 2 pok[ée]mon into their hand/.test(t)
+    /put .* energy attached to your opponent's active pok[ée]mon into their hand/.test(
+      t
+    ) ||
+    /put \d+ energy attached to your opponent's active stage 2 pok[ée]mon into their hand/.test(
+      t
+    )
   ) {
     return 'return-opponent-energy';
   }
@@ -410,7 +481,9 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
 
   // Immunity (damage not affected by Weakness/Resistance/effects).
   if (
-    /isn't affected by|is not affected by|not affected by (weakness|resistance)/.test(t) ||
+    /isn't affected by|is not affected by|not affected by (weakness|resistance)/.test(
+      t
+    ) ||
     /has no weakness/.test(t)
   ) {
     return 'immunity';
@@ -422,7 +495,10 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   }
 
   // Costs attached to the attack.
-  if (/discard/.test(t) && /your opponent's (deck|hand|active pok[ée]mon)/.test(t)) {
+  if (
+    /discard/.test(t) &&
+    /your opponent's (deck|hand|active pok[ée]mon)/.test(t)
+  ) {
     return 'discard-opponent';
   }
   if (/discard/.test(t)) return 'discard-cost';
@@ -435,32 +511,56 @@ export function classifyAttackEffect(attack, attackerCard = {}) {
   if (/shuffle/.test(t)) return 'shuffle-cost';
 
   // Turn-locked one-shot / bench attacks.
-  if (/once (during your turn|per turn|during the game)/.test(t)) return 'once-per-turn';
-  if (/this attack can be used even if this pok[ée]mon is on the bench/.test(t)) {
+  if (/once (during your turn|per turn|during the game)/.test(t))
+    return 'once-per-turn';
+  if (
+    /this attack can be used even if this pok[ée]mon is on the bench/.test(t)
+  ) {
     return 'once-per-turn';
   }
 
   // Hand-scaling counter placement, return-energy, lowest-HP KO — before flat.
-  if (/place \d+ damage counters? on your opponent's active.*for each card in your hand/.test(t)) {
+  if (
+    /place \d+ damage counters? on your opponent's active.*for each card in your hand/.test(
+      t
+    )
+  ) {
     return 'bench-damage';
   }
-  if (/put (?:\d+|an?) .*energy .* into your hand/.test(t)) return 'move-energy';
+  if (/put (?:\d+|an?) .*energy .* into your hand/.test(t))
+    return 'move-energy';
   if (
-    /you may put all energy attached to this pok[ée]mon into your hand to have this attack do \d+ more damage/.test(t)
+    /you may put all energy attached to this pok[ée]mon into your hand to have this attack do \d+ more damage/.test(
+      t
+    )
   ) {
     return 'conditional-damage';
   }
-  if (/if this pok[ée]mon is affected by a special condition, ignore all energy in this attack's cost/.test(t)) {
+  if (
+    /if this pok[ée]mon is affected by a special condition, ignore all energy in this attack's cost/.test(
+      t
+    )
+  ) {
     return 'conditional-damage';
   }
-  if (/you can use this attack only if this pok[ée]mon used .+ during your last turn/.test(t)) {
+  if (
+    /you can use this attack only if this pok[ée]mon used .+ during your last turn/.test(
+      t
+    )
+  ) {
     return 'conditional-damage';
   }
-  if (/exactly \d+ damage counters/.test(t) && /knocked out/.test(t)) return 'conditional-ko';
-  if (/knock out 1 of your opponent's pok[ée]mon that has exactly \d+ damage counters/.test(t)) {
+  if (/exactly \d+ damage counters/.test(t) && /knocked out/.test(t))
+    return 'conditional-ko';
+  if (
+    /knock out 1 of your opponent's pok[ée]mon that has exactly \d+ damage counters/.test(
+      t
+    )
+  ) {
     return 'conditional-ko';
   }
-  if (/least hp remaining/.test(t) && /knocked out/.test(t)) return 'conditional-ko';
+  if (/least hp remaining/.test(t) && /knocked out/.test(t))
+    return 'conditional-ko';
   if (/for each damage counter/.test(t)) return 'per-energy';
   if (/this attack can be used for/.test(t)) return 'conditional-damage';
 
@@ -474,7 +574,9 @@ export function describeAttackEffect(attack, attackerCard = {}) {
   const family = classifyAttackEffect(attack, attackerCard);
   const name = attackerCard?.name || attack?.name || 'This attack';
   const attackName = attack?.name || 'the attack';
-  const damage = Number.isFinite(attack?.damage) ? attack.damage : 'the printed';
+  const damage = Number.isFinite(attack?.damage)
+    ? attack.damage
+    : 'the printed';
 
   switch (family) {
     case 'flat':
@@ -587,4 +689,123 @@ export function applyAttackEffect(attack, attackerCard = {}) {
     executed: false,
     message: `✦ ${description} (announce-only — effect execution not yet implemented)`,
   };
+}
+
+/**
+ * Next-turn locks from attack text:
+ * - selfCannotAttack: "can't attack during your next turn"
+ * - selfCannotUseAttack: "can't use [Attack Name] during your next turn"
+ * - oppCannotRetreat: "the Defending Pokémon can't retreat during your opponent's next turn"
+ */
+export function parseNextTurnLock(attack) {
+  const t = lower(attack?.text ?? '');
+  if (!t) return null;
+
+  const out = {
+    selfCannotAttack: false,
+    selfCannotUseAttack: null,
+    oppCannotRetreat: false,
+  };
+
+  // Opponent retreat lock
+  if (
+    /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
+      t
+    ) ||
+    /during\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+retreat/i.test(
+      t
+    ) ||
+    /can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
+      t
+    )
+  ) {
+    out.oppCannotRetreat = true;
+  }
+
+  // Self cannot use specific attack
+  const specificMatch =
+    t.match(
+      /during your next turn, this pok[ée]mon can(?:'t|not) use ([^.]+)/i
+    ) ||
+    t.match(/this pok[ée]mon can(?:'t|not) use ([^.]+) during your next turn/i);
+  if (specificMatch) {
+    out.selfCannotUseAttack = specificMatch[1].trim();
+  } else if (
+    /during your next turn, this pok[ée]mon can(?:'t|not) attack/i.test(t) ||
+    /this pok[ée]mon can(?:'t|not) attack during your next turn/i.test(t)
+  ) {
+    out.selfCannotAttack = true;
+  }
+
+  if (
+    !out.selfCannotAttack &&
+    !out.selfCannotUseAttack &&
+    !out.oppCannotRetreat
+  ) {
+    return null;
+  }
+  return out;
+}
+
+/**
+ * Energy discard requirements from attacker:
+ * - all: discard all energy from this Pokémon
+ * - count: number of energy cards to discard
+ * - energyType: specific type if required (e.g. 'Fire')
+ */
+export function parseAttackEnergyDiscard(attack) {
+  const t = lower(attack?.text ?? '');
+  if (!t || !t.includes('discard')) return null;
+
+  // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
+  if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(t)) {
+    return { all: true, count: Infinity, energyType: null };
+  }
+
+  // "Discard [N] [Type] Energy from this Pokémon"
+  const typeMatch = t.match(
+    /discard\s+(\d+|an?)\s+([a-z]+)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/i
+  );
+  if (typeMatch) {
+    const rawCount = typeMatch[1].toLowerCase();
+    const count =
+      rawCount === 'a' || rawCount === 'an' ? 1 : parseInt(rawCount, 10) || 1;
+    const typeCandidate = typeMatch[2].toLowerCase();
+    const knownTypes = [
+      'fire',
+      'water',
+      'grass',
+      'lightning',
+      'psychic',
+      'fighting',
+      'darkness',
+      'metal',
+    ];
+    const energyType = knownTypes.includes(typeCandidate)
+      ? typeCandidate.charAt(0).toUpperCase() + typeCandidate.slice(1)
+      : null;
+    return { all: false, count, energyType };
+  }
+
+  // "Discard [N] Energy from this Pokémon"
+  const generalMatch = t.match(
+    /discard\s+(\d+|an?)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/i
+  );
+  if (generalMatch) {
+    const rawCount = generalMatch[1].toLowerCase();
+    const count =
+      rawCount === 'a' || rawCount === 'an' ? 1 : parseInt(rawCount, 10) || 1;
+    return { all: false, count, energyType: null };
+  }
+
+  // "discard an Energy card attached to this Pokémon"
+  if (
+    /discard\s+(?:an?|1)\s+energy\s+card\s+attached\s+to\s+this\s+pok[ée]mon/i.test(
+      t
+    )
+  ) {
+    return { all: false, count: 1, energyType: null };
+  }
+
+  return null;
 }

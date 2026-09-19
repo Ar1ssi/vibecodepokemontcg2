@@ -13,7 +13,8 @@ export function mintInstanceId(state) {
   if (!state) {
     throw new Error('mintInstanceId requires a state object');
   }
-  state.nextInstanceId = (typeof state.nextInstanceId === 'number' ? state.nextInstanceId : 0) + 1;
+  state.nextInstanceId =
+    (typeof state.nextInstanceId === 'number' ? state.nextInstanceId : 0) + 1;
   return state.nextInstanceId;
 }
 
@@ -38,12 +39,22 @@ export function createCard(props = {}) {
     supertype: props.supertype ?? '',
     subtypes: Array.isArray(props.subtypes) ? [...props.subtypes] : [],
     hp: props.hp != null ? props.hp : null,
-    attacks: Array.isArray(props.attacks) ? props.attacks.map((a) => ({ ...a })) : [],
-    weaknesses: Array.isArray(props.weaknesses) ? props.weaknesses.map((w) => ({ ...w })) : [],
-    retreatCost: Array.isArray(props.retreatCost) ? [...props.retreatCost] : [],
-    damage: typeof props.damage === 'number' && props.damage > 0 ? props.damage : 0,
+    attacks: Array.isArray(props.attacks)
+      ? props.attacks.map((a) => ({ ...a }))
+      : [],
+    weaknesses: Array.isArray(props.weaknesses)
+      ? props.weaknesses.map((w) => ({ ...w }))
+      : [],
+    retreatCost: Array.isArray(props.retreatCost)
+      ? [...props.retreatCost]
+      : typeof props.retreatCost === 'number'
+        ? props.retreatCost
+        : [],
+    damage:
+      typeof props.damage === 'number' && props.damage > 0 ? props.damage : 0,
     specialCondition: props.specialCondition ?? null,
-    abilityUsed: typeof props.abilityUsed === 'boolean' ? props.abilityUsed : false,
+    abilityUsed:
+      typeof props.abilityUsed === 'boolean' ? props.abilityUsed : false,
     attachedTo: props.attachedTo ?? null,
     revealed: typeof props.revealed === 'boolean' ? props.revealed : false,
   };
@@ -79,7 +90,8 @@ export function cloneCard(card) {
 export function describeCard(card) {
   if (!card) return 'Empty';
   const name = card.name || 'Unknown';
-  const setNum = card.set && card.number ? ` (${card.set} #${card.number})` : '';
+  const setNum =
+    card.set && card.number ? ` (${card.set} #${card.number})` : '';
   const idStr = card.instanceId != null ? ` [#${card.instanceId}]` : '';
   return `${name}${setNum}${idStr}`;
 }
@@ -89,10 +101,19 @@ export function describeCard(card) {
  */
 export function isPokemon(card) {
   if (!card) return false;
+  if (isTrainer(card) || isEnergy(card)) return false;
   return (
     card.supertype === 'Pokémon' ||
     card.supertype === 'Pokemon' ||
-    Boolean(card.type && !['Trainer', 'Energy', 'Item', 'Supporter', 'Stadium'].includes(card.type))
+    Boolean(card.stage) ||
+    card.hp != null ||
+    (Array.isArray(card.types) && card.types.length > 0) ||
+    Boolean(
+      card.type &&
+        !['Trainer', 'Energy', 'Item', 'Supporter', 'Stadium'].includes(
+          card.type
+        )
+    )
   );
 }
 
@@ -101,7 +122,10 @@ export function isEnergy(card) {
   return (
     card.supertype === 'Energy' ||
     card.type === 'Energy' ||
-    Boolean(typeof card.name === 'string' && card.name.toLowerCase().includes('energy'))
+    Boolean(
+      typeof card.name === 'string' &&
+        card.name.toLowerCase().includes('energy')
+    )
   );
 }
 
@@ -109,14 +133,24 @@ export function isTrainer(card) {
   if (!card) return false;
   return (
     card.supertype === 'Trainer' ||
-    ['Trainer', 'Item', 'Supporter', 'Stadium', 'Tool', 'Pokémon Tool'].includes(card.type)
+    [
+      'Trainer',
+      'Item',
+      'Supporter',
+      'Stadium',
+      'Tool',
+      'Pokémon Tool',
+    ].includes(card.type)
   );
 }
 
 // TCGdex's own `stage` field is inconsistent across printings — some return
 // "Stage 1", others "Stage1" (no space) — so compare on letters/digits only
 // rather than the raw string, matching evolution.mjs's normalizeStage().
-const collapseStage = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const collapseStage = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 const NON_BASIC_STAGES = new Set(['stage1', 'stage2', 'vmax', 'vstar', 'mega']);
 
 export function isBasicPokemon(card) {
@@ -125,7 +159,9 @@ export function isBasicPokemon(card) {
   if (NON_BASIC_STAGES.has(stage)) {
     return false;
   }
-  const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(collapseStage) : [];
+  const subtypes = Array.isArray(card.subtypes)
+    ? card.subtypes.map(collapseStage)
+    : [];
   if (subtypes.some((s) => NON_BASIC_STAGES.has(s))) {
     return false;
   }
@@ -134,8 +170,8 @@ export function isBasicPokemon(card) {
 
 export function getRetreatCostCount(card) {
   if (!card) return 0;
-  if (typeof card.retreatCost === 'number') return Math.max(0, card.retreatCost);
+  if (typeof card.retreatCost === 'number')
+    return Math.max(0, card.retreatCost);
   if (Array.isArray(card.retreatCost)) return card.retreatCost.length;
   return 0;
 }
-

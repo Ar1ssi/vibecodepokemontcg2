@@ -5,7 +5,7 @@
     import { appendMessage } from '../chatbox/append-message.js';
     import { processAction } from '../general/process-action.js';
     import { getZone } from '../zones/get-zone.js';
-    import { openCardPicker } from '../image-logic/card-picker.js';
+    import { openCardPicker, closeCardPicker } from '../image-logic/card-picker.js';
     import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
     import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
     import {
@@ -74,6 +74,10 @@ import {
   markAbilityUseAfterSearchStep,
 } from '/shared/engine/rules/ability-step-plan.mjs';
 import { decideTurnOrder, resolveTurnOrderCaller } from '/shared/engine/rules/rules-turnorder.mjs';
+import {
+  getTurnOrderResult,
+  resetTurnOrderCall,
+} from '../netcode/turn-order-call.js';
 import { healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
@@ -90,7 +94,12 @@ import {
   setSelectedCoin,
 } from './mat-coin.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
-import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import {
+  hasAuthoritativeView,
+  getAuthoritativeZoneArray,
+  getAuthoritativeStadiumArray,
+} from '../netcode/apply-view.js';
+import { isBasicPokemon, isEnergy, isTrainer } from '/shared/engine/cards.mjs';
 import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
 import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-affordances.mjs';
     
@@ -135,7 +144,38 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
     // Bumped on reset/restart so stale coin-flip / mulligan callbacks cannot
     // re-enter beginSetupWithTurnOrder after the session was cleared.
     let rulesSessionGeneration = 0;
-    
+    // Design 013: the opening sequence has run this session. Replaces the old
+    // "phase is still 'setup'" double-start guard, which cannot be trusted under
+    // server authority — the authoritative post-deal view moves rulesState.phase
+    // to 'main' (apply-view.js reconcileTurnState) before the client's own
+    // opening ceremony has had a chance to run.
+    let openingStarted = false;
+    // The server's flip, once it has been shown: the starter it decided, and
+    // whether the coin animation has finished. The game starts only when both
+    // that animation and the local deal ('both-players-ready') are done.
+    let serverTurnOrderStarter = null;
+    let serverTurnOrderShown = false;
+    let serverTurnOrderAnimationDone = false;
+    let startingActiveSelectionPending = false;
+    let startingActiveFinished = false;
+    let startingActiveFirstPlayer = null;
+
+    const hookStartingActiveWatcher = () => {
+      const check = () => {
+        if (!startingActiveFinished && (openingStarted || startingActiveSelectionPending)) {
+          checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration);
+        }
+      };
+      [
+        'rules-card-moved',
+        'action-processed',
+        'rules-turn-view-applied',
+        'card-moved',
+      ].forEach((evt) => {
+        document.addEventListener(evt, check);
+      });
+    };
+
     export const initializeRulesEngine = () => {
       if (initialized) return;
       initialized = true;
@@ -157,6 +197,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       hookEnergyAttach();
       syncRulesToggleUI();
       hookTurnStartDraw();
+      hookStartingActiveWatcher();
     };
     
     // ── turn HUD: persistent whose-turn/phase banner ─────────────────────
@@ -476,6 +517,27 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
         openingSetupReadyForCoinFlip = true;
         handleSetupClick();
       });
+      // Design 013: raised by turn-order-call.js from the server's messages.
+      document.addEventListener('rules-turn-order-call', (event) => {
+        handleServerTurnOrderCall(event.detail);
+      });
+      document.addEventListener('rules-turn-order-result', (event) => {
+        if (!isServerOwnedTurnOrder()) return;
+        applyServerTurnOrder(event.detail);
+      });
+      document.addEventListener('rules-turn-order-call-rejected', (event) => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        // The server refused our call (stale id, not our turn to call, malformed
+        // face). Say so instead of leaving a dead picker behind.
+        coinCallPending = false;
+        document.getElementById('rulesCoinCallOverlay')?.remove();
+        appendMessage(
+          '',
+          `Coin call not accepted (${event.detail?.reason || 'unknown'}) — waiting for the server's flip.`,
+          'announcement',
+          false
+        );
+      });
       hookResetButtons();
     };
     
@@ -485,6 +547,11 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       rulesSessionGeneration += 1;
       resetRulesSessionState();
       resetDealOrder();
+      resetTurnOrderCall();
+      openingStarted = false;
+      serverTurnOrderStarter = null;
+      serverTurnOrderShown = false;
+      serverTurnOrderAnimationDone = false;
       resetPrizes();
       resetStatuses();
       syncedTurnOrder = null;
@@ -496,6 +563,10 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       coinFlipPending = false;
       openingSetupReadyForCoinFlip = false;
       closeDeckSearchWindow();
+      startingActiveSelectionPending = false;
+      startingActiveFinished = false;
+      startingActiveFirstPlayer = null;
+      closeCardPicker(null, true);
       document.getElementById('rulesCoinCallOverlay')?.remove();
       document.getElementById('rulesChoicePicker')?.remove();
       const hud = document.getElementById('rulesTurnHUD');
@@ -524,132 +595,341 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       document.addEventListener('room-changed', resetRulesSession);
     };
     
+    const liveZoneArray = (user, zoneId) => {
+      if (hasAuthoritativeView()) {
+        const side = user === 'self' ? 'you' : 'them';
+        return zoneId === 'stadium'
+          ? getAuthoritativeStadiumArray()
+          : getAuthoritativeZoneArray(side, zoneId);
+      }
+      return getZone(user, zoneId)?.array || [];
+    };
+
+    const getBasicPokemonFromHand = async (user) => {
+      const hand = liveZoneArray(user, 'hand');
+      const basics = [];
+      for (const card of hand) {
+        await ensureCardData(card);
+        if (!isTrainer(card) && !isEnergy(card) && (isBasicPokemon(card) || (card.stage || 'Basic') === 'Basic')) {
+          basics.push(card);
+        }
+      }
+      return basics.length > 0 ? basics : hand;
+    };
+
+    const checkBothActivesSetAndBegin = (firstPlayer, session) => {
+      if (session !== rulesSessionGeneration) return false;
+      if (startingActiveFinished) return true;
+
+      const selfActive = liveZoneArray('self', 'active');
+      const oppActive = liveZoneArray('opp', 'active');
+      if (selfActive.length === 0 || oppActive.length === 0) {
+        return false;
+      }
+
+      startingActiveFinished = true;
+      startingActiveSelectionPending = false;
+      closeCardPicker(null, true);
+
+      appendMessage('', 'Both players have set their Active Pokémon!', 'announcement', false);
+
+      const starter = firstPlayer || startingActiveFirstPlayer || rulesState.turnPlayer || 'self';
+      beginTurn(starter === 'opp' ? 'opp' : 'self');
+      updateTurnBanner();
+      return true;
+    };
+
+    const promptStartingActiveSelection = async (firstPlayer, session) => {
+      if (session !== rulesSessionGeneration) return;
+      if (startingActiveFinished) return;
+
+      startingActiveFirstPlayer = firstPlayer;
+      startingActiveSelectionPending = true;
+
+      if (checkBothActivesSetAndBegin(firstPlayer, session)) return;
+
+      appendMessage(
+        '',
+        'Prompt: Both players, choose a Basic Pokémon from your hand for your Active Spot before starting turn 1.',
+        'announcement',
+        false
+      );
+
+      const promptPlayerActive = async (user, title) => {
+        if (session !== rulesSessionGeneration) return;
+        if (liveZoneArray(user, 'active').length > 0) {
+          checkBothActivesSetAndBegin(firstPlayer, session);
+          return;
+        }
+
+        const candidates = await getBasicPokemonFromHand(user);
+        if (!candidates || candidates.length === 0) {
+          appendMessage('', `No cards in ${user === 'self' ? 'your' : "opponent's"} hand for Active Spot.`, 'announcement', false);
+          return;
+        }
+
+        openCardPicker({
+          title,
+          candidates,
+          mode: 'single',
+          zoneFrom: 'hand',
+          destination: 'active',
+          user,
+          onPick: async (card) => {
+            if (session !== rulesSessionGeneration) return;
+            appendMessage(
+              '',
+              `${user === 'self' ? 'You' : 'Opponent'} chose ${card?.name || 'a Pokémon'} as Active Pokémon.`,
+              'announcement',
+              false
+            );
+
+            if (systemState.isTwoPlayer && rulesSocket) {
+              rulesSocket.emit('rulesEvent', {
+                type: 'startingActiveChosen',
+                data: { player: user, cardName: card?.name },
+              });
+            }
+
+            if (checkBothActivesSetAndBegin(firstPlayer, session)) {
+              return;
+            }
+
+            if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+              setTimeout(() => {
+                promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+              }, 100);
+            }
+          },
+        });
+      };
+
+      if (liveZoneArray('self', 'active').length === 0) {
+        await promptPlayerActive('self', 'Choose your Starting Active Pokémon');
+      } else if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+        await promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+      }
+    };
+
     // Shared setup sequence once turn order is decided — used both by the
     // local Set Up click and by the mirror side's auto-start (so the mirror
     // no longer needs a second Set Up click).
     const beginSetupWithTurnOrder = (firstPlayer) => {
-      // Guard: if the game has already started (phase left 'setup'), a second
-      // invocation (double Set Up click, duplicate turnOrderCoinFlip event,
-      // or local flip + mirror both landing) would re-run startGame() and
-      // reset drewThisTurn, causing a double auto-draw on turn 1.
-      if (rulesState.phase !== 'setup') return;
+      // Guard: a second invocation (double Set Up click, duplicate
+      // turnOrderCoinFlip event, or local flip + mirror both landing) would
+      // re-run startGame() and reset drewThisTurn, causing a double auto-draw on
+      // turn 1. This used to test rulesState.phase, which the authoritative view
+      // rewrites to 'main' before this ever runs (design 013).
+      if (openingStarted) return;
+      openingStarted = true;
       const session = rulesSessionGeneration;
       startGame(firstPlayer);
-          // startGame() only resets to turnNumber 0 / phase 'draw' — it never
-          // advances into the first player's actual turn 1. beginTurn() is
-          // what increments turnNumber and flips phase to 'main'; without
-          // calling it here, the first player's opening turn silently runs
-          // at turnNumber 0, which shifts the "turn 1" attack restriction
-          // onto the second player's first turn instead.
-          beginTurn(firstPlayer === 'opp' ? 'opp' : 'self');
-          resetPrizes();
-          resetStatuses();
-          void (async () => {
-            await drawOpeningHand('self', 'self', true);
-            if (!systemState.isTwoPlayer) {
-              await drawOpeningHand('opp', 'opp', true);
+      resetPrizes();
+      resetStatuses();
+      void (async () => {
+        try {
+          await drawOpeningHand('self', 'self', true);
+          if (!systemState.isTwoPlayer) {
+            await drawOpeningHand('opp', 'opp', true);
+          }
+          appendMessage('', 'Opening hands drawn!', 'announcement', false);
+          appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
+
+          if (!isE2eMode()) {
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+
+          if (session !== rulesSessionGeneration) return;
+          if (rulesState.mulligansResolved) return;
+          markMulligansResolved(); // claim the window before any async gap
+
+          // Cap guards against a pathological (Basic-less) deck looping
+          // forever; a legal deck draws a hand with a Basic within a couple
+          // of mulligans, so this is generous headroom.
+          const MAX_ROUNDS = 10;
+          let anyMulligans = false;
+
+          for (let round = 0; round < MAX_ROUNDS; round++) {
+            if (session !== rulesSessionGeneration) return;
+
+            const selfHand = liveZoneArray('self', 'hand');
+            const oppHand = liveZoneArray('opp', 'hand');
+            if (systemState.isTwoPlayer && selfHand.length === 0) {
+              // In 2P, if the deal view has not populated yet, don't false-mulligan
+              break;
             }
-            appendMessage('', 'Opening hands drawn!', 'announcement', false);
-            appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
-            appendMessage(
-              '',
-              'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
-              'announcement',
-              false
-            );
-          })();
-    
-          // mulligan check: opening hands must contain a Basic Pokémon. A
-          // player may need to mulligan more than once — the redrawn hand can
-          // still be missing a Basic — so this loops, re-evaluating after each
-          // round, until every local hand is legal. `mulligansResolved` is
-          // claimed once up front purely as a duplicate-fire guard (so a second
-          // closure can't double-run); it is NOT a "mulligan only once" limit.
-          setTimeout(async () => {
-            try {
-              if (session !== rulesSessionGeneration) return;
-              if (rulesState.mulligansResolved) return;
-              markMulligansResolved(); // claim the window before any async gap
-
-              // Cap guards against a pathological (Basic-less) deck looping
-              // forever; a legal deck draws a hand with a Basic within a couple
-              // of mulligans, so this is generous headroom.
-              const MAX_ROUNDS = 10;
-              let anyMulligans = false;
-
-              for (let round = 0; round < MAX_ROUNDS; round++) {
-                if (session !== rulesSessionGeneration) return;
-
-                const selfHand = getZone('self', 'hand').array;
-                const oppHand = getZone('opp', 'hand').array;
-                let steps = await evaluateMulligans({ selfHand, oppHand });
-                if (systemState.isTwoPlayer) {
-                  // In 2P, each peer evaluates its own hand authoritatively;
-                  // opponent mulligans arrive via the 'mulliganBonus' socket event.
-                  steps = steps.filter((s) => s.player === 'self');
-                }
-
-                const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
-                const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
-
-                // Both local hands legal — done.
-                if (!selfMulliganned && !oppMulliganned) break;
-                anyMulligans = true;
-
-                for (const step of steps) {
-                  if (step.mulligan) {
-                    appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
-                  }
-                }
-
-                // Execute self mulligan. Awaiting it lets the zone settle (hand
-                // emptied, reshuffled, redrawn) before the next round re-checks.
-                if (selfMulliganned) {
-                  appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
-                  await shuffleAndDraw('self', 'self', 7, null, true);
-                }
-
-                // In 1P, also execute opponent mulligan locally.
-                if (!systemState.isTwoPlayer && oppMulliganned) {
-                  appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
-                  await shuffleAndDraw('opp', 'opp', 7, null, true);
-                }
-                // In 2P, the opponent's client handles their own mulligan independently.
-
-                // Bonus draws (1 per mulligan this round).
-                if (selfMulliganned) {
-                  // Opponent draws 1 bonus card.
-                  if (systemState.isTwoPlayer && rulesSocket) {
-                    rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
-                  } else {
-                    appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
-                    draw('opp', 'opp', 1, true);
-                  }
-                }
-
-                if (oppMulliganned && !systemState.isTwoPlayer) {
-                  // 1P: self draws bonus (opponent mulliganned).
-                  appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
-                  draw('self', 'self', 1, true);
-                }
-                // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
-              }
-
-              if (anyMulligans) {
-                appendMessage(
-                  '',
-                  'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
-                  'announcement',
-                  false
-                );
-              }
-            } catch (e) {
-              console.error('Mulligan execution error:', e);
+            let steps = await evaluateMulligans({ selfHand, oppHand });
+            if (systemState.isTwoPlayer) {
+              // In 2P, each peer evaluates its own hand authoritatively;
+              // opponent mulligans arrive via the 'mulliganBonus' socket event.
+              steps = steps.filter((s) => s.player === 'self');
             }
-          }, e2eDelayMs(2500));
-          updateTurnBanner();
+
+            const selfMulliganned = steps.some(s => s.player === 'self' && s.mulligan);
+            const oppMulliganned = !systemState.isTwoPlayer && steps.some(s => s.player === 'opp' && s.mulligan);
+
+            // Both local hands legal — done.
+            if (!selfMulliganned && !oppMulliganned) break;
+            anyMulligans = true;
+
+            for (const step of steps) {
+              if (step.mulligan) {
+                appendMessage('', 'Mulligan: ' + step.guidance, 'announcement', false);
+              }
+            }
+
+            // Execute self mulligan. Awaiting it lets the zone settle (hand
+            // emptied, reshuffled, redrawn) before the next round re-checks.
+            if (selfMulliganned) {
+              appendMessage('', 'Shuffling hand into deck and drawing 7…', 'announcement', false);
+              await shuffleAndDraw('self', 'self', 7, null, true);
+            }
+
+            // In 1P, also execute opponent mulligan locally.
+            if (!systemState.isTwoPlayer && oppMulliganned) {
+              appendMessage('', 'Opponent shuffles hand into deck and draws 7…', 'announcement', false);
+              await shuffleAndDraw('opp', 'opp', 7, null, true);
+            }
+            // In 2P, the opponent's client handles their own mulligan independently.
+
+            // Bonus draws (1 per mulligan this round).
+            if (selfMulliganned) {
+              // Opponent draws 1 bonus card.
+              if (systemState.isTwoPlayer && rulesSocket) {
+                rulesSocket.emit('rulesEvent', { type: 'mulliganBonus' });
+              } else {
+                appendMessage('', 'Opponent draws a bonus card.', 'announcement', false);
+                draw('opp', 'opp', 1, true);
+              }
+            }
+
+            if (oppMulliganned && !systemState.isTwoPlayer) {
+              // 1P: self draws bonus (opponent mulliganned).
+              appendMessage('', 'You draw a bonus card (opponent mulliganed).', 'announcement', false);
+              draw('self', 'self', 1, true);
+            }
+            // 2P: bonus arrives via the opponent's mulliganBonus event (hookMultiplayerSync)
+          }
+
+          // Once opening hands are legally settled, prompt for Starting Active selection
+          await promptStartingActiveSelection(firstPlayer, session);
+        } catch (e) {
+          console.error('Mulligan execution error:', e);
+        }
+      })();
     };
     
+    // ── design 013: server-owned turn-order coin call ────────────────────
+    // True when the server, not this client, decides turn order.
+    const isServerOwnedTurnOrder = () =>
+      Boolean(systemState.isTwoPlayer && systemState.serverAuthoritative);
+
+    // The opening sequence needs two things that arrive independently: the
+    // server's flip (shown as the coin animation) and the local deal, which
+    // finishes when ready.js raises 'both-players-ready'. Whichever lands last
+    // starts the game.
+    const maybeBeginServerTurnOrder = () => {
+      if (!serverTurnOrderAnimationDone) return false;
+      if (!serverTurnOrderStarter) return false;
+      if (!openingSetupReadyForCoinFlip && !isE2eMode()) return false;
+      const starter = serverTurnOrderStarter;
+      serverTurnOrderStarter = null;
+      beginSetupWithTurnOrder(starter);
+      return true;
+    };
+
+    // Shows the server's resolved flip. Deliberately NOT gated on
+    // rulesState.phase: the authoritative post-deal view has usually already
+    // moved it to 'main' by now.
+    const applyServerTurnOrder = (serverResult) => {
+      if (!serverResult) return false;
+      if (!rulesState.enabled) return false;
+      if (serverTurnOrderShown) return false; // one ceremony per game
+      serverTurnOrderShown = true;
+
+      // A local flip can no longer win: the server's answer supersedes it.
+      flipSuperseded = true;
+      coinFlipPending = false;
+      coinCallPending = false;
+      document.getElementById('rulesCoinCallOverlay')?.remove();
+
+      const { caller, call, result, starter, auto } = serverResult;
+      const coinOwner = caller;
+      const coin = getSelectedCoin(coinOwner) || pickRandomCoin();
+      const callerLabel = caller === 'self' ? 'You' : 'Opponent';
+      appendMessage(
+        '',
+        auto
+          ? `No call came in time — the coin was called ${call} automatically.`
+          : `${callerLabel} called ${call}.`,
+        'announcement',
+        false
+      );
+      playTurnOrderCoinAnimation({
+        coin,
+        result,
+        coinOwner,
+        turnPlayer: starter,
+        isRemote: false,
+      });
+
+      serverTurnOrderStarter = starter;
+      const session = rulesSessionGeneration;
+      setTimeout(() => {
+        if (session !== rulesSessionGeneration) return;
+        serverTurnOrderAnimationDone = true;
+        maybeBeginServerTurnOrder();
+      }, e2eDelayMs(2700));
+      return true;
+    };
+
+    // The server nominated a caller. Only the nominated seat gets a callId.
+    const handleServerTurnOrderCall = (detail) => {
+      if (!isServerOwnedTurnOrder()) return;
+      const { callId, waiting, roomId } = detail || {};
+      const targetRoomId = roomId || systemState.roomId;
+
+      if (waiting || !callId) {
+        if (rulesState.enabled) {
+          appendMessage(
+            '',
+            'Waiting for opponent to call the coin…',
+            'announcement',
+            false
+          );
+        }
+        return;
+      }
+
+      // Two cases with nobody to click the picker: free play (rules mode off has
+      // no coin ceremony) and the Playwright harness. The deal still waits on this
+      // answer, so answer at once rather than stalling both seats until the
+      // server's timeout fires. The face is immaterial — the server flips either
+      // way, and neither mode shows the call or the flip.
+      if (!rulesState.enabled || isE2eMode()) {
+        rulesSocket?.emit('turnOrderCall', {
+          roomId: targetRoomId,
+          callId,
+          call: 'heads',
+        });
+        return;
+      }
+
+      if (coinCallPending) return;
+      coinCallPending = true;
+      openCoinCallPicker({
+        onCall: (call) => {
+          coinCallPending = false;
+          rulesSocket?.emit('turnOrderCall', {
+            roomId: targetRoomId,
+            callId,
+            call,
+          });
+          appendMessage('', `You called ${call} — flipping…`, 'announcement', false);
+        },
+      });
+    };
+
     // Fires once both players have pressed Set Up and their prize cards
     // are on the mat (see the 'both-players-ready' event dispatched by
     // ready.js). Decides turn order via a coin flip, draws opening hands,
@@ -658,6 +938,19 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       if (!rulesState.enabled) return;
       if (!openingSetupReadyForCoinFlip) return;
       if (systemState.isReplay) return;
+
+      // Design 013: under server authority the coin call belongs to the server.
+      // It opened the picker (or is still waiting on the caller) and broadcasts
+      // the one authoritative flip; this client never picks a caller and never
+      // flips. Checked before the guards below because the authoritative view has
+      // already moved rulesState.phase off 'setup' by the time we get here.
+      if (isServerOwnedTurnOrder()) {
+        if (!maybeBeginServerTurnOrder()) {
+          applyServerTurnOrder(getTurnOrderResult());
+        }
+        return;
+      }
+
       if (coinFlipPending) return; // a flip already in flight will start the game
       if (rulesState.phase !== 'setup') return; // already started (e.g. auto-start)
       if (coinCallPending) return; // the heads/tails call picker is already open
@@ -1466,6 +1759,9 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
                 draw('self', 'self', 1, true);
                 appendMessage('', 'Bonus draw: you drew 1 card (opponent mulliganed).', 'announcement', false);
               }
+            } else if (type === 'startingActiveChosen') {
+              appendMessage('', 'Opponent chose their Starting Active Pokémon.', 'announcement', false);
+              checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration);
             }
           } catch (_err) {
             // ignore malformed socket payload

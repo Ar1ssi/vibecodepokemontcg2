@@ -155,7 +155,10 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
       attackerAttacked: false,
       retreatedThisTurn: false,
       supporterPlayed: false,
+      stadiumPlayedThisTurn: false,
+      stadiumUsedThisTurn: false,
       abilitiesUsed: {},
+      evolved: {},
     };
   }
 

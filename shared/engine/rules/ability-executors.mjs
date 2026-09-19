@@ -12,7 +12,9 @@ const lower = (v) =>
     .replace(/[\u2018\u2019]/g, "'");
 
 const textOf = (card) =>
-  lower(card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? '');
+  lower(
+    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
+  );
 
 // --- passive -----------------------------------------------------------
 
@@ -76,7 +78,10 @@ export function parseDamagePrevention(card) {
   const t = textOf(card);
   const out = { preventAll: false, reduce: 0 };
   if (!t) return out;
-  if (/prevent (all )?(damage|effect)/.test(t) || t.includes('can\'t be damaged')) {
+  if (
+    /prevent (all )?(damage|effect)/.test(t) ||
+    t.includes("can't be damaged")
+  ) {
     out.preventAll = true;
     return out;
   }
@@ -107,11 +112,13 @@ export function mergeDamagePrevention(a, b) {
 export function isPokemonToolCard(card) {
   if (!card) return false;
   const type = String(card.type || '').toLowerCase();
-  if (type === 'pokémon' || type === 'pokemon' || type === 'energy') return false;
+  if (type === 'pokémon' || type === 'pokemon' || type === 'energy')
+    return false;
   const sub = (Array.isArray(card.subtypes) ? card.subtypes : []).map((s) =>
     String(s).toLowerCase()
   );
   if (sub.includes('tool') || sub.includes('pokémon tool')) return true;
+  if (card.isTool) return true;
   if (type === 'tool') return true;
   if (String(card.trainerType || '').toLowerCase() === 'tool') return true;
   return false;
@@ -119,14 +126,22 @@ export function isPokemonToolCard(card) {
 
 /** Tools attached to a Pokémon in a zone array. */
 export function attachedTools(pokemon, zoneCards = []) {
-  if (!pokemon?.image) return [];
-  return (zoneCards || []).filter(
-    (c) => c.image?.relative === pokemon.image && isPokemonToolCard(c)
-  );
+  if (!pokemon) return [];
+  return (zoneCards || []).filter((c) => {
+    if (!isPokemonToolCard(c)) return false;
+    if (pokemon.instanceId != null && c.attachedTo === pokemon.instanceId)
+      return true;
+    if (pokemon.image && c.image?.relative === pokemon.image) return true;
+    return false;
+  });
 }
 
 /** Damage prevention from Pokémon + attached Tools (optional tool block). */
-export function combinedDamagePrevention(pokemon, zoneCards = [], { blockTools = false } = {}) {
+export function combinedDamagePrevention(
+  pokemon,
+  zoneCards = [],
+  { blockTools = false } = {}
+) {
   let out = parseDamagePrevention(pokemon);
   if (blockTools) return out;
   for (const tool of attachedTools(pokemon, zoneCards)) {
@@ -136,7 +151,11 @@ export function combinedDamagePrevention(pokemon, zoneCards = [], { blockTools =
 }
 
 /** Passive attack-cost discount from Pokémon + attached Tools. */
-export function combinedPassiveCostDiscount(pokemon, zoneCards = [], { blockTools = false } = {}) {
+export function combinedPassiveCostDiscount(
+  pokemon,
+  zoneCards = [],
+  { blockTools = false } = {}
+) {
   let discount = passiveCostDiscount(pokemon);
   if (blockTools) return discount;
   for (const tool of attachedTools(pokemon, zoneCards)) {
@@ -146,7 +165,11 @@ export function combinedPassiveCostDiscount(pokemon, zoneCards = [], { blockTool
 }
 
 /** Hand protection from Pokémon abilities or attached Tools. */
-export function combinedHandProtected(pokemon, zoneCards = [], { blockTools = false } = {}) {
+export function combinedHandProtected(
+  pokemon,
+  zoneCards = [],
+  { blockTools = false } = {}
+) {
   if (isHandProtected(pokemon)) return true;
   if (blockTools) return false;
   return attachedTools(pokemon, zoneCards).some((t) => isHandProtected(t));
@@ -236,7 +259,12 @@ export function parseDamageBonus(card) {
   if (
     !t ||
     !t.includes('more damage') ||
-    !(t.includes('attack') || t.includes('this pokémon') || t.includes('deals') || t.includes('does'))
+    !(
+      t.includes('attack') ||
+      t.includes('this pokémon') ||
+      t.includes('deals') ||
+      t.includes('does')
+    )
   ) {
     return { bonus: 0 };
   }
@@ -254,9 +282,7 @@ export function applyDamageBonus(baseDamage, bonus) {
 export function parseHpBonus(card) {
   const t = textOf(card);
   if (!t || !/hp/.test(t)) return { bonus: 0 };
-  if (
-    !/(more|increase|treated as|gets \+|\+\d+\s+hp|for each)/.test(t)
-  ) {
+  if (!/(more|increase|treated as|gets \+|\+\d+\s+hp|for each)/.test(t)) {
     return { bonus: 0 };
   }
   const m =
@@ -277,7 +303,15 @@ export function applyHpBonus(baseHp, bonus) {
 // "+N more to retreat", "retreat cost is N less"
 export function parseRetreatCostModifier(card) {
   const t = textOf(card);
-  if (!t || (!t.includes('retreat cost') && !/retreat/.test(t))) return { delta: 0 };
+  if (!t || (!t.includes('retreat cost') && !/retreat/.test(t)))
+    return { delta: 0 };
+  if (
+    /has no retreat cost|no retreat cost|retreat cost is 0|retreat for free/i.test(
+      t
+    )
+  ) {
+    return { delta: -Infinity };
+  }
   const increased = /(more|increase)/.test(t);
   const decreased = /(less|fewer|reduc|decrease)/.test(t);
   const m =
@@ -291,6 +325,7 @@ export function parseRetreatCostModifier(card) {
 }
 
 export function applyRetreatCostModifier(baseCost, delta) {
+  if (delta === -Infinity) return 0;
   return Math.max(0, (baseCost || 0) + (delta || 0));
 }
 
@@ -327,8 +362,7 @@ export function parseKoPrevention(card) {
   if (!matches) return out;
   out.fullHpOnly = t.includes('full hp');
   const survive =
-    t.match(/remaining hp becomes\s+(\d+)/) ||
-    t.match(/hp becomes\s+(\d+)/);
+    t.match(/remaining hp becomes\s+(\d+)/) || t.match(/hp becomes\s+(\d+)/);
   if (survive) out.surviveHp = parseInt(survive[1], 10);
   return out;
 }
@@ -373,7 +407,10 @@ export function parseCheckupEffect(card) {
     else if (/opponent/.test(t)) filter = 'opponent';
   }
   const exceptName =
-    t.match(/except any ([^.]+)/)?.[1]?.trim().toLowerCase() || null;
+    t
+      .match(/except any ([^.]+)/)?.[1]
+      ?.trim()
+      .toLowerCase() || null;
   const targetHasAbility =
     t.includes('has an ability') || t.includes('with an ability');
   return {
@@ -416,16 +453,10 @@ export function parseEnergyMultiplier(card) {
 // Extra Pokémon Tool slot
 export function parseToolCap(card) {
   const t = textOf(card);
-  if (
-    !t ||
-    !t.includes('tool') ||
-    !/(attach|slot|more|extra)/.test(t)
-  ) {
+  if (!t || !t.includes('tool') || !/(attach|slot|more|extra)/.test(t)) {
     return { extra: 0 };
   }
-  const m =
-    t.match(/(\d+)\s*(?:more|extra)/) ||
-    t.match(/extra\s+(\d+)/);
+  const m = t.match(/(\d+)\s*(?:more|extra)/) || t.match(/extra\s+(\d+)/);
   return { extra: m ? parseInt(m[1], 10) || 1 : 1 };
 }
 
@@ -475,13 +506,26 @@ export function parseSwitchAbility(card) {
   const typed = t.match(/benched\s+\{([a-z])\}\s+pok/);
   if (typed) {
     const map = {
-      w: 'water', r: 'fire', g: 'grass', l: 'lightning', p: 'psychic',
-      f: 'fighting', d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy', c: 'colorless',
+      w: 'water',
+      r: 'fire',
+      g: 'grass',
+      l: 'lightning',
+      p: 'psychic',
+      f: 'fighting',
+      d: 'darkness',
+      m: 'metal',
+      n: 'dragon',
+      y: 'fairy',
+      c: 'colorless',
     };
     out.pokemonType = map[typed[1]] || null;
   }
 
-  out.exceptName = t.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null;
+  out.exceptName =
+    t
+      .match(/except any ([^.,]+)/)?.[1]
+      ?.trim()
+      .toLowerCase() || null;
   out.poisonNewActive =
     t.includes('if you do') &&
     (t.includes('now poisoned') || t.includes('is now poisoned'));
@@ -505,7 +549,8 @@ export function parseStatusInflict(card) {
   if (!matches) return out;
 
   if (t.includes('asleep')) out.status = 'asleep';
-  else if (t.includes('poisoned') || t.includes('now poisoned')) out.status = 'poisoned';
+  else if (t.includes('poisoned') || t.includes('now poisoned'))
+    out.status = 'poisoned';
   else if (t.includes('burned')) out.status = 'burned';
   else if (t.includes('confused')) out.status = 'confused';
 
@@ -539,11 +584,11 @@ export function parseMoveDamage(card) {
 // Look at top N of deck
 export function parseLookAtTop(card) {
   const t = textOf(card);
-  if (!t || !t.includes('look at the top')) return { count: 0, takeToHand: false };
+  if (!t || !t.includes('look at the top'))
+    return { count: 0, takeToHand: false };
   const m = t.match(/top\s+(\d+)\s+cards?/);
   const takeToHand =
-    t.includes('into your hand') ||
-    (t.includes('put') && t.includes('hand'));
+    t.includes('into your hand') || (t.includes('put') && t.includes('hand'));
   return {
     count: m ? parseInt(m[1], 10) || 1 : 1,
     takeToHand,
@@ -576,10 +621,10 @@ export function parseEffectPrevent(card) {
   const t = textOf(card);
   if (!t) return { scope: null };
   const matches =
-    ((/(prevent|can't|have no effect|have no abilities|has no abilities)/.test(
+    (/(prevent|can't|have no effect|have no abilities|has no abilities)/.test(
       t
-    )) &&
-      (/(effect|ability|attack|item)/.test(t))) ||
+    ) &&
+      /(effect|ability|attack|item)/.test(t)) ||
     (t.includes('active spot') && t.includes('no abilities'));
   if (!matches) return { scope: null };
   if (/item/.test(t)) return { scope: 'items' };
@@ -632,7 +677,8 @@ export function expandEnergyForMultiplier(
   const expanded = [];
   for (const entry of energyTypes) {
     const type = typeof entry === 'string' ? entry : entry?.type;
-    const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
+    const family =
+      typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
     if (!type) continue;
     if (energyType && type !== energyType) {
       expanded.push(entry);
@@ -643,7 +689,9 @@ export function expandEnergyForMultiplier(
       continue;
     }
     for (let i = 0; i < multiplier; i++) {
-      expanded.push(typeof entry === 'string' ? type : { type, family: 'basic' });
+      expanded.push(
+        typeof entry === 'string' ? type : { type, family: 'basic' }
+      );
     }
   }
   return expanded;
@@ -664,4 +712,78 @@ export function pokemonHpThreshold(baseHp, card, stadiumBonus = 0) {
 
 export function blocksItemPlay(card) {
   return parseEffectPrevent(card)?.scope === 'items';
+}
+
+/**
+ * Unlimited hand energy acceleration (e.g. Baxcalibur Supercold, Frosmoth Ice Dance, Blastoise Deluge).
+ * Returns { energyType, benchedOnly, noRuleBox, targetType } or null.
+ */
+export function parseUnlimitedHandEnergyAcceleration(card) {
+  const t = textOf(card);
+  if (!t) return null;
+  const isUnlimited = /as often as you like/i.test(t);
+  const isHandAttach =
+    /(?:attach|put)\s+(?:an?|a basic|up to\s+\d+)?\s*.*energy.*(?:from your hand)/i.test(
+      t
+    ) ||
+    (/from your hand/i.test(t) && /attach/i.test(t) && /energy/i.test(t));
+  if (!isUnlimited || !isHandAttach) return null;
+
+  let energyType = null;
+  const typeLetterMatch = t.match(/\{([wlfmpdgyn])\}\s*energy/i);
+  if (typeLetterMatch) {
+    const typeMap = {
+      w: 'Water',
+      l: 'Lightning',
+      f: 'Fighting',
+      m: 'Metal',
+      p: 'Psychic',
+      d: 'Darkness',
+      g: 'Grass',
+      y: 'Fairy',
+      n: 'Dragon',
+    };
+    energyType = typeMap[typeLetterMatch[1].toLowerCase()] || null;
+  }
+  if (!energyType) {
+    const typeWordMatch = t.match(
+      /\b(water|fire|grass|lightning|psychic|fighting|darkness|metal)\s+energy/i
+    );
+    if (typeWordMatch) {
+      energyType =
+        typeWordMatch[1].charAt(0).toUpperCase() +
+        typeWordMatch[1].slice(1).toLowerCase();
+    }
+  }
+
+  const benchedOnly = /benched/i.test(t) && !/active/i.test(t);
+  const noRuleBox = /doesn't have a rule box|without a rule box/i.test(t);
+  let targetType = null;
+  const targetTypeMatch = t.match(
+    /to 1 of your\s+(?:benched\s+)?([a-z]+)\s+pok[ée]mon/i
+  );
+  if (targetTypeMatch) {
+    const candidate = targetTypeMatch[1].toLowerCase();
+    if (
+      [
+        'water',
+        'fire',
+        'grass',
+        'lightning',
+        'psychic',
+        'fighting',
+        'darkness',
+        'metal',
+      ].includes(candidate)
+    ) {
+      targetType = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+    }
+  }
+
+  return {
+    energyType,
+    benchedOnly,
+    noRuleBox,
+    targetType,
+  };
 }

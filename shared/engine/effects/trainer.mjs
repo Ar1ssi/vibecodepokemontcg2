@@ -175,9 +175,18 @@ export function executeTrainer(draft, {
       }
       played.ownerId = played.ownerId || playerId;
       draft.stadium = played;
+      if (!player.flags) player.flags = {};
+      player.flags.stadiumPlayedThisTurn = true;
       for (const p of Object.values(draft.players || {})) {
         if (p.flags) p.flags.stadiumUsedThisTurn = false;
       }
+      events.push({
+        type: 'cardMoved',
+        instanceId: played.instanceId,
+        from: 'hand',
+        to: 'stadium',
+        playerId,
+      });
     } else {
       player.zones.board.push(played);
     }
@@ -223,6 +232,18 @@ export function executeTrainer(draft, {
   // A Tool's text is a passive modifier; playing it without a target means attaching it.
   const text = card.text || card.effect || card.cardText || '';
   const parsed = isToolCard(card) ? { steps: [{ type: 'attachTool' }] } : parseTrainerEffect(text);
+
+  if (parsed?.steps) {
+    for (const step of parsed.steps) {
+      if (
+        step.type === 'passive' &&
+        (/take 1 more prize/i.test(step.detail || '') || /prize/i.test(step.detail || ''))
+      ) {
+        if (!player.flags) player.flags = {};
+        player.flags.briarActive = true;
+      }
+    }
+  }
 
   if (!parsed || !parsed.steps || parsed.steps.length === 0) {
     // No steps or passive only: clean up to discard

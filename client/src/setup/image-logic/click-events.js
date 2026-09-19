@@ -236,7 +236,7 @@ export const openCardContextMenu = (event) => {
     ) {
       cardContextMenu.style.left = `${targetRect.left - cardContextMenu.clientWidth}px`;
       cardContextMenu.style.top = `${targetRect.top + offsetHeight}px`;
-    } else if (event.target.parentElement.id === 'hand') {
+    } else if (event.target.closest('#hand')) {
       cardContextMenu.style.left = `${targetRect.left}px`;
       cardContextMenu.style.top = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight}px`;
     } else if (event.target.parentElement.id === 'prizes') {

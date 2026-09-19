@@ -43,6 +43,10 @@ client/src/setup/netcode/manual-card-commands.mjs — pure planner for the manua
 client/src/setup/netcode/deck-peek.js + deck-peek-request.mjs — "look at top/bottom N cards":
   `peekDeck` socket request (server/game/room.mjs `peekDeck`, shared/engine/view.mjs `deckPeekFor`),
   shown in the card picker; picks leave the deck as moveCard commands (design 012, D49)
+client/src/setup/netcode/turn-order-call.js — transport for the server-owned opening coin call:
+turns `turnOrderCall`/`turnOrderResult`/`turnOrderCallRejected` into `rules-turn-order-*` DOM events and
+caches the resolved flip for a late reader; registered from socket-event-listeners.js, NOT the rules
+bridge, because the call arrives while setupPrizes() is still awaiting dealOrder (design 013, D50)
 client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
 resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
 server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles
@@ -59,7 +63,8 @@ shared/engine/effects/executor.mjs — resumable step runner; core step kinds in
 shared/engine/effects/trainer-steps.mjs — server handlers for the other trainer step kinds; multi-choice progress lives in resumeToken.context
 shared/engine/rules/abilities.mjs + ability-step-plan.mjs — ability parse + ordered step plan (resume seam)
 shared/engine/rules/damage-parser.mjs — attack text → damage math
-shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection
+shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
+shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
 shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping
 
 ## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
