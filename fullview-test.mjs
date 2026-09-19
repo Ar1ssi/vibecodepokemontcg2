@@ -125,6 +125,42 @@ if (before.holo) {
     dblOpen.rotatorStyle === '',
     `style="${dblOpen.rotatorStyle}"`
   );
+
+  // The enlarged preview stands in for the card on the mat, so its foil must
+  // keep flowing even with the cursor parked over it — the board sweep, not
+  // cursor tracking (which holds the light until the pointer leaves).
+  const previewCenter = await page.evaluate(() => {
+    const el = document.querySelector('.card-preview-pop .mat-holo');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  if (previewCenter) {
+    await page.mouse.move(previewCenter.x, previewCenter.y);
+    const sampleHolo = () =>
+      page.evaluate(() => {
+        const el = document.querySelector('.card-preview-pop .mat-holo');
+        return el
+          ? {
+              px: el.style.getPropertyValue('--pointer-x'),
+              rx: el.style.getPropertyValue('--rotate-x'),
+            }
+          : null;
+      });
+    const holoBefore = await sampleHolo();
+    await page.waitForTimeout(1200);
+    const holoAfter = await sampleHolo();
+    T(
+      'double-click preview foil keeps flowing under the cursor',
+      holoBefore && holoAfter && holoBefore.px !== holoAfter.px,
+      `${holoBefore?.px} -> ${holoAfter?.px}`
+    );
+    T(
+      'double-click preview foil does not tilt to the cursor',
+      holoAfter && parseFloat(holoAfter.rx) === 0,
+      `rotate-x=${holoAfter?.rx}`
+    );
+  }
 }
 
 await page.keyboard.press('Escape');

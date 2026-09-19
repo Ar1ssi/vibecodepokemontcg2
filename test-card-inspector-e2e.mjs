@@ -173,6 +173,47 @@ try {
   await actor.page.screenshot({ path: 'out/e2e-inspector-dimmed.png' });
   console.log('Screenshot saved: out/e2e-inspector-dimmed.png');
 
+  // 7b. Holo flow (D58): the enlarged inspector carousel is a mat card enlarged
+  // in place, so its foil must keep flowing with the cursor parked over it —
+  // never hold the light or tilt to the pointer. Skipped if the card is not holo.
+  const holoCenter = await actor.page.evaluate(() => {
+    const visible = [...document.querySelectorAll('.card-picker-overlay .mat-holo')].find((w) => {
+      const r = w.getBoundingClientRect();
+      return r.width > 0 && r.left < window.innerWidth && r.right > 0;
+    });
+    if (!visible) return null;
+    const r = visible.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  if (holoCenter) {
+    await actor.page.mouse.move(holoCenter.x, holoCenter.y);
+    const readHolo = () =>
+      actor.page.evaluate(() => {
+        const el = [...document.querySelectorAll('.card-picker-overlay .mat-holo')].find((w) =>
+          w.style.getPropertyValue('--pointer-x')
+        );
+        return el
+          ? {
+              px: el.style.getPropertyValue('--pointer-x'),
+              rx: el.style.getPropertyValue('--rotate-x'),
+            }
+          : null;
+      });
+    const holoBefore = await readHolo();
+    await actor.page.waitForTimeout(1200);
+    const holoAfter = await readHolo();
+    T(
+      '7b. Inspector foil keeps flowing under the cursor',
+      holoBefore && holoAfter && holoBefore.px !== holoAfter.px,
+      `${holoBefore?.px} -> ${holoAfter?.px}`
+    );
+    T(
+      '7c. Inspector foil does not tilt to the cursor',
+      holoAfter && parseFloat(holoAfter.rx) === 0,
+      `rotate-x=${holoAfter?.rx}`
+    );
+  }
+
   // 6. Test Escape Closes Inspector
   console.log('Testing Escape key to close inspector...');
   await actor.page.keyboard.press('Escape');

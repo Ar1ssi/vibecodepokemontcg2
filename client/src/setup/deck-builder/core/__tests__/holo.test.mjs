@@ -7,6 +7,7 @@ import {
   computeLightVars,
   driftTilt,
   DRIFT,
+  MAT_HOLO_OPTIONS,
   cardEraFromImageUrl,
   foilMaskUrl,
   LIGHT,
@@ -499,6 +500,27 @@ describe('startHoloAnimation', () => {
     assert.equal(card.listeners.get('pointerleave').size, 1);
     stopHoloAnimation(card);
     assert.equal(card.listeners.get('pointermove').size, 0);
+  });
+});
+
+describe('MAT_HOLO_OPTIONS (mat-style flow)', () => {
+  it('is the drift-only sweep the board uses', () => {
+    assert.deepEqual(MAT_HOLO_OPTIONS, { auto: true, tilt: false });
+  });
+
+  it('sweeps without tilting and attaches no cursor listeners', () => {
+    const card = createFakeElement();
+    startHoloAnimation(card, MAT_HOLO_OPTIONS);
+    runFrame(0);
+    const first = card.properties['--pointer-x'];
+
+    card.dispatch('pointermove', { clientX: 100, clientY: 0 });
+    runFrame(3000);
+
+    assert.equal(card.listeners.get('pointermove'), undefined);
+    assert.equal(card.properties['--rotate-x'], '0.00deg');
+    assert.notEqual(card.properties['--pointer-x'], first);
+    stopHoloAnimation(card);
   });
 });
 
