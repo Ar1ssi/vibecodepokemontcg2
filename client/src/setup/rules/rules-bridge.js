@@ -727,22 +727,18 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       resetPrizes();
       resetStatuses();
       void (async () => {
-        await drawOpeningHand('self', 'self', true);
-        if (!systemState.isTwoPlayer) {
-          await drawOpeningHand('opp', 'opp', true);
-        }
-        appendMessage('', 'Opening hands drawn!', 'announcement', false);
-        appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
-      })();
-
-      // mulligan check: opening hands must contain a Basic Pokémon. A
-      // player may need to mulligan more than once — the redrawn hand can
-      // still be missing a Basic — so this loops, re-evaluating after each
-      // round, until every local hand is legal. `mulligansResolved` is
-      // claimed once up front purely as a duplicate-fire guard (so a second
-      // closure can't double-run); it is NOT a "mulligan only once" limit.
-      setTimeout(async () => {
         try {
+          await drawOpeningHand('self', 'self', true);
+          if (!systemState.isTwoPlayer) {
+            await drawOpeningHand('opp', 'opp', true);
+          }
+          appendMessage('', 'Opening hands drawn!', 'announcement', false);
+          appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
+
+          if (!isE2eMode()) {
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+
           if (session !== rulesSessionGeneration) return;
           if (rulesState.mulligansResolved) return;
           markMulligansResolved(); // claim the window before any async gap
@@ -820,7 +816,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
         } catch (e) {
           console.error('Mulligan execution error:', e);
         }
-      }, e2eDelayMs(2500));
+      })();
     };
     
     // ── design 013: server-owned turn-order coin call ────────────────────
