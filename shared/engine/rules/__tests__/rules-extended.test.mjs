@@ -950,6 +950,12 @@ import test from 'node:test';
         parseStadiumOncePerTurn({ text: "Once during each player's turn, that player may heal 10 damage from each of their Pokémon." }).kind,
         'heal-all',
       );
+      const roughSeas = parseStadiumOncePerTurn({
+        text: "Once during each player's turn, that player may heal 30 damage from each of their Water Pokémon and Lightning Pokémon.",
+      });
+      assert.equal(roughSeas.kind, 'heal-all');
+      assert.equal(roughSeas.n, 30);
+      assert.deepEqual(roughSeas.types, ['water', 'lightning']);
       const factory = parseStadiumOncePerTurn({ text: 'Once during each player\'s turn, if they played a Supporter card that has "Team Rocket" in its name from their hand, they may draw 2 cards.' });
       assert.equal(factory.kind, 'draw');
       assert.equal(factory.n, 2);

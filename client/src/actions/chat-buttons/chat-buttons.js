@@ -4462,17 +4462,22 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     }
     case 'heal-all': {
       const n = action.n || 10;
+      const typeFilter = Array.isArray(action.types) && action.types.length ? action.types : null;
       let healed = 0;
       for (const zoneId of ['active', 'bench']) {
         const zone = getZone(user, zoneId);
         for (let i = 0; i < zone.array.length; i++) {
-          if (zone.array[i]?.type !== 'Pokémon') continue;
+          const mon = zone.array[i];
+          if (mon?.type !== 'Pokémon') continue;
+          if (typeFilter && !typeFilter.some((ty) => pokemonMatchesType(mon, ty))) continue;
           removeDamageCounter(user, zoneId, i, n, emit);
           healed++;
         }
       }
-      appendMessage(user, `💚 ${card.name}: Healed ${n} damage from each of your Pokémon (${healed} total).`, 'announcement', false);
-      finishStadiumAction(user, card, emit, { action: 'heal-all', n });
+      const scope = typeFilter ? typeFilter.join(' and ') : '';
+      const noun = typeFilter ? `${scope} Pokémon` : 'Pokémon';
+      appendMessage(user, `💚 ${card.name}: Healed ${n} damage from each of your ${noun} (${healed} total).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'heal-all', n, ...(typeFilter ? { types: typeFilter } : {}) });
       break;
     }
     case 'search-bench': {
