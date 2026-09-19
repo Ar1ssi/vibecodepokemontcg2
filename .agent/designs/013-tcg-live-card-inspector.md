@@ -389,6 +389,61 @@ Energy — narrowing it would have silently removed the ability to look at an at
 overlay; this design folded 008's zones in but only ported the **attack** panels. Abilities are
 still reachable via `abilityPicker()` from the sidebox, so nothing became unreachable, but the
 inspector does not yet show or fire them. Follow-up, not a regression.
+**RESOLVED in S175 — see D6 below.**
+
+**D6 (S175) — abilities added; supersedes D5.** The user reported Charmander's "Agile" not
+appearing. The stack now anchors on `abilityZoneBounds()` when the card has an ability (it prints
+above the attacks), renders an ability panel, and fires through the dispatch 008 already used —
+`dispatchAuthoritativeUseAbility` under server authority, `runAbilitySteps` locally. Rule-box text
+(Tera ex, Stellar) is excluded: TCGdex carries it in the same `abilities` array, and it is printed
+flavour, not something the player uses. A **benched** Pokémon shows its attacks inert and does
+NOT dim — the reason is positional, not an energy shortage, so receding them would lie.
+
+**D7 (S175) — the stack is content-sized; supersedes the "continuously opaque" layout.** The
+Design section had the panels absorb the leftover height with `flex: 1` so no print leaked between
+the attack box and the tiles. On a one-attack card that painted a foot of empty white over the
+artwork. The user asked for the card to show there instead, so the stack is anchored at
+`blockTopPct` with no bottom and sized by its content, and the stat band pins to the printed
+weakness strip independently. This relaxes, not contradicts, C1: the card is more visible than
+before, and the pieces that replace print are still opaque.
+
+**D8 (S175) — `closeCardInspector` never closed the carousel.** It was a bare alias for
+`teardownAll`, which only removed listeners. The attack dispatched into a modal still covering the
+board, which is indistinguishable from "clicking does nothing" — the reported symptom. It now
+closes the picker too. Related hardening: the per-panel `onclick` handlers are replaced by one
+delegated listener on the wrap, so a `REFRESH_EVENTS` re-render that swaps the chrome subtree
+cannot silently drop a handler.
+
+**D9 (S175) — found, NOT fixed: `passiveCostDiscount` misreads Agile as a cost reduction.**
+`ability-executors.mjs` gates on `/(cost|energy)/` and then returns 1 unconditionally when no
+number matches, so *"If this Pokémon has no Energy attached, it has no Weakness"* grants −1 to
+every attack — Live Coal ({R}) is payable with zero Energy. This is a rules-layer defect affecting
+combat legality, outside this design's scope, so it is left to the rules owner; the model stays
+faithful to the engine rather than disagreeing with it, and
+`card-inspector-model.test.mjs` pins the consequence under a comment naming it a quirk.
+**FIXED in S181 — see D12 below.**
+
+**D10 (S175) — renumbered on the shared branch.** This design's decision was recorded as D50 in
+S174; concurrent work had already taken D50–D52, so it landed as **D53**. The design filename is
+still `013-…` while three other S173/S175 designs also claim 013 — the numbering in
+`.agent/designs/` needs a reconciliation pass by whoever owns it.
+
+**D11 (S175) — merged with ~10.7k lines of concurrent work on this branch.** Suite is 1930/1930;
+the pre-existing `trainer drop` failure named in D1 was fixed by that work
+(`server-authoritative parser and reducer gaps`), so D1's caveat now covers only the missing
+browser run, not a red suite.
+
+**D12 (S181) — D9 fixed in the rules layer.** `passiveCostDiscount` now requires a reduction verb
+(`less|fewer|reduc|decrease|lower`) instead of assuming one from a bare `/(cost|energy)/` match, so
+merely mentioning Energy no longer grants a free symbol. Two further narrowings came out of writing
+the proof: a retreat-cost wording with no attack mention is declined (`parseRetreatCostModifier`
+owns it — reading it here would have discounted attacks off a *retreat* ability), and `fewer N` now
+parses its amount, which the amount regexes had missed. Five regression tests in
+`rules-extended.test.mjs` (Agile, the retreat wording, cost-without-reduction, three real
+reductions) plus the end-to-end assertion in `card-inspector-model.test.mjs`, which now expects
+`payable: false` / `dimLevel: 'full'` for Charmander with no Energy. Suite 1934/1934. Chosen over
+leaving it: a false positive here silently removes a cost from combat, and the panel had been
+faithfully displaying the bug rather than hiding it.
 
 ---
 Self-approval checklist (only when the user is unreachable):

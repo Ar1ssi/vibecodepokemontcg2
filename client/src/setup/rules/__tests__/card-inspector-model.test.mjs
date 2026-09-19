@@ -7,6 +7,7 @@ const {
   normalizeRetreatSymbols,
   splitDamageLabel,
   isInspectablePokemon,
+  rawAbilityOf,
   bandsForFrame,
 } = await import('../card-inspector-model.mjs');
 
@@ -319,4 +320,215 @@ test('model: a card with no damage field reports 0, never undefined', () => {
     { energyTypes: THREE_FIRE }
   );
   assert.equal(m.damage, 0);
+});
+
+// ── abilities ──────────────────────────────────────────────────────────────
+
+// Charmander from PFL 011/094 — one ability, one attack, no resistance. The reported bug was
+// that its "Agile" ability never appeared in the inspector at all.
+const CHARMANDER = {
+  name: 'Charmander',
+  supertype: 'Pokémon',
+  type: 'Fire',
+  types: ['Fire'],
+  hp: 80,
+  stage: 'Basic',
+  ability: {
+    name: 'Agile',
+    text: 'If this Pokémon has no Energy attached, it has no Weakness.',
+  },
+  attacks: [{ name: 'Live Coal', cost: ['Fire'], damage: 20, text: '' }],
+  weakness: { type: 'Water', value: 2 },
+  retreatCost: ['Colorless', 'Colorless'],
+};
+
+test('rawAbilityOf: reads singular ability (client enrichment)', () => {
+  assert.equal(rawAbilityOf(CHARMANDER).name, 'Agile');
+});
+
+test('rawAbilityOf: reads plural abilities (server hydration)', () => {
+  const card = {
+    name: 'Charmander',
+    abilities: [
+      { name: 'Agile', text: 'If this Pokémon has no Energy attached.' },
+    ],
+  };
+  assert.equal(rawAbilityOf(card).name, 'Agile');
+});
+
+test('rawAbilityOf: a typed Ability counts', () => {
+  const card = {
+    abilities: [{ name: 'Tera', text: 'Rule box text.', type: 'Ability' }],
+  };
+  assert.equal(rawAbilityOf(card).name, 'Tera');
+});
+
+test('rawAbilityOf: rule-box text is NOT an ability (Tera ex, Stellar)', () => {
+  const card = {
+    abilities: [
+      {
+        name: 'Tera',
+        text: 'As long as this Pokémon is on your Bench, prevent all damage.',
+        type: 'Tera',
+      },
+    ],
+  };
+  assert.equal(rawAbilityOf(card), null);
+});
+
+test('rawAbilityOf: an entry with no text is not an ability', () => {
+  assert.equal(
+    rawAbilityOf({ abilities: [{ name: 'Empty', type: 'Ability' }] }),
+    null
+  );
+  assert.equal(rawAbilityOf(null), null);
+});
+
+test('model: the ability is reported with its printed text', () => {
+  const m = buildInspectorModel(CHARMANDER, { energyTypes: ['Fire'] });
+  assert.equal(m.ability.name, 'Agile');
+  assert.equal(m.ability.text, CHARMANDER.ability.text);
+  assert.equal(m.ability.usable, true);
+});
+
+test('model: no ability leaves the field null rather than an empty object', () => {
+  const m = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE });
+  assert.equal(m.ability, null);
+});
+
+test('model: an ability moves the stack up to the ability band', () => {
+  const withAbility = buildInspectorModel(CHARMANDER, {
+    energyTypes: ['Fire'],
+  });
+  const without = buildInspectorModel(
+    { ...CHARMANDER, ability: undefined },
+    { energyTypes: ['Fire'] }
+  );
+  // The ability band prints ABOVE the attacks, so the stack anchor is higher (smaller pct)
+  // than the attack band, and the attack band itself shifts down to make room.
+  assert.ok(withAbility.blockTopPct < withAbility.bandTopPct);
+  assert.equal(without.blockTopPct, without.bandTopPct);
+  assert.ok(withAbility.bandTopPct > without.bandTopPct);
+});
+
+test('model: blockTopPct falls back to the attack band with no ability', () => {
+  const m = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE });
+  assert.equal(m.blockTopPct, m.bandTopPct);
+});
+
+test('model: an ability-only card still gets a stack', () => {
+  const card = { ...CHARMANDER, attacks: [] };
+  const m = buildInspectorModel(card, { energyTypes: [] });
+  assert.equal(m.ability.name, 'Agile');
+  assert.notEqual(m.blockTopPct, null);
+  assert.deepEqual(m.attacks, []);
+});
+
+test('model: a spent once-per-turn ability recedes but stays readable', () => {
+  const card = {
+    ...CHARMANDER,
+    ability: { name: 'Ember', text: 'Once during your turn, you may do this.' },
+  };
+  const fresh = buildInspectorModel(card, { energyTypes: ['Fire'] });
+  assert.equal(fresh.ability.usable, true);
+  assert.equal(fresh.ability.recede, false);
+
+  const spent = buildInspectorModel(card, {
+    energyTypes: ['Fire'],
+    abilityUsed: true,
+  });
+  assert.equal(spent.ability.usable, false);
+  assert.equal(spent.ability.recede, true);
+  assert.match(spent.ability.reason, /once per turn/i);
+});
+
+test('model: an ability does not affect the attack dim', () => {
+  const card = {
+    ...CHARMANDER,
+    ability: { name: 'Ember', text: 'Once during your turn, you may do this.' },
+  };
+  const spent = buildInspectorModel(card, {
+    energyTypes: [],
+    abilityUsed: true,
+  });
+  // No payable attack, so the card dims — a spent ability is not what drives it.
+  assert.equal(spent.dimLevel, 'full');
+});
+
+test('model: an opponent card shows the ability but never fires it (E7)', () => {
+  const m = buildInspectorModel(CHARMANDER, {
+    energyTypes: ['Fire'],
+    readOnly: true,
+  });
+  assert.equal(m.ability.name, 'Agile');
+  assert.equal(m.ability.usable, false);
+  assert.equal(
+    m.ability.recede,
+    false,
+    'read-only is not "unpayable" — nothing recedes'
+  );
+});
+
+test('model: rules off keeps the ability text but drops the action (E18)', () => {
+  const m = buildInspectorModel(CHARMANDER, {
+    energyTypes: ['Fire'],
+    rulesEnabled: false,
+  });
+  assert.equal(m.ability.text, CHARMANDER.ability.text);
+  assert.equal(m.ability.usable, false);
+});
+
+// ── bench ──────────────────────────────────────────────────────────────────
+
+test('model: a benched Pokémon cannot attack, but the card does not dim', () => {
+  const m = buildInspectorModel(CHARMANDER, {
+    energyTypes: ['Fire'],
+    zone: 'bench',
+  });
+  assert.equal(m.attackable, false);
+  assert.equal(m.attacks[0].usable, false);
+  // The reason is positional, not an energy shortage — so nothing recedes and the card stays lit.
+  assert.equal(m.attacks[0].recede, false);
+  assert.equal(m.dimLevel, 'none');
+  assert.match(m.attacks[0].reason, /benched/i);
+});
+
+test('model: a benched Pokémon with no energy still does not dim', () => {
+  const m = buildInspectorModel(ARCANINE, { energyTypes: [], zone: 'bench' });
+  assert.equal(m.dimLevel, 'none');
+  assert.equal(m.attacks[0].payable, false);
+});
+
+// Cross-layer regression: passiveCostDiscount used to return 1 for ANY ability text mentioning
+// "cost" or "Energy", so Agile ("If this Pokémon has no Energy attached, it has no Weakness") read
+// as a -1 cost reduction and made Live Coal ({R}) payable with zero Energy. The panel is faithful
+// to the engine by design, so it showed the wrong thing until the rules layer was fixed — this
+// asserts the whole path, not just the parser.
+test('Agile no longer discounts attacks (fixed in the rules layer)', () => {
+  const m = buildInspectorModel(CHARMANDER, { energyTypes: [] });
+  assert.equal(
+    m.attacks[0].payable,
+    false,
+    'Live Coal ({R}) needs a Fire Energy'
+  );
+  assert.equal(m.dimLevel, 'full');
+});
+
+test('model: a card without an ability behaves the same as one with an inert ability', () => {
+  const m = buildInspectorModel(ARCANINE, { energyTypes: [] });
+  assert.equal(m.attacks[0].payable, false);
+  assert.equal(m.dimLevel, 'full');
+});
+
+test('model: an ability IS usable from the bench', () => {
+  const m = buildInspectorModel(CHARMANDER, {
+    energyTypes: ['Fire'],
+    zone: 'bench',
+  });
+  assert.equal(m.ability.usable, true);
+});
+
+test('model: zone defaults to active', () => {
+  assert.equal(buildInspectorModel(CHARMANDER, {}).zone, 'active');
+  assert.equal(buildInspectorModel(CHARMANDER, {}).attackable, true);
 });

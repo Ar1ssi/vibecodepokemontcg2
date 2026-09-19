@@ -2074,6 +2074,57 @@ import test from 'node:test';
       assert.equal(applyCostDiscount(['Psychic'], 2).length, 0);
     });
 
+    // Regression: merely mentioning Energy is NOT a cost reduction. This returned 1 before, which
+    // made Charmander's Live Coal ({R}) payable with zero Energy attached.
+    test('passiveCostDiscount: mentioning Energy is not a discount', () => {
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'If this Pokémon has no Energy attached, it has no Weakness.' },
+        }),
+        0,
+      );
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'This Pokémon has no Energy attached.' } }),
+        0,
+      );
+    });
+
+    test('passiveCostDiscount: a Retreat Cost reduction is not an attack discount', () => {
+      // parseRetreatCostModifier owns this wording; reading it here discounted the attacks.
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'The Retreat Cost of this Pokémon is 1 less.' },
+        }),
+        0,
+      );
+    });
+
+    test('passiveCostDiscount: cost text with no reduction verb is not a discount', () => {
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'This Pokémon’s attacks cost Energy.' } }),
+        0,
+      );
+    });
+
+    // The reduction verb is required, so a genuine wording must still parse — including the ones
+    // that name the cost without a number.
+    test('passiveCostDiscount: real reductions still parse', () => {
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'The Energy cost of this Pokémon’s attacks is reduced by 1.' },
+        }),
+        1,
+      );
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'This Pokémon’s attacks cost {C} less.' } }),
+        1,
+      );
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'Your attacks cost 3 fewer Energy.' } }),
+        3,
+      );
+    });
+
     test('parseWhenPlayedEffect', () => {
       assert.deepEqual(parseWhenPlayedEffect({ ability: { text: 'When you play this Pokémon, draw 2 cards.' } }), { kind: 'draw', n: 2 });
       assert.deepEqual(parseWhenPlayedEffect({ ability: { text: 'When you play this Pokémon, put 3 damage counters on the opponent’s Active.' } }), { kind: 'damage', n: 3 });
