@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reconcileHandStacks } from '../hand-stack-dom.js';
+import {
+  clearHandStackPositioning,
+  reconcileHandStacks,
+} from '../hand-stack-dom.js';
 
 class MockClassList {
   constructor() {
@@ -270,4 +273,66 @@ test('reconcileHandStacks: hidden card backs are never stacked', () => {
 
   assert.equal(hand.children.length, 2);
   assert.equal(hand.querySelectorAll('.hand-card-stack').length, 0);
+});
+
+// S181 live report: "the Pokémon is invisible in the Active spot but still takes up the
+// space". A stacked card carries `position: absolute` + `width/height: 100%` +
+// `translateY(-Npx)` inline; playing it to Active used to keep them, and inline styles
+// outrank `.play-container img` / `.play-container .mat-holo`, so it stopped drawing where
+// its slot was. Cleared on the way out, the card arrives clean.
+test('a card leaving a duplicate stack loses every stack style', () => {
+  const doc = new MockDocument();
+  const hand = doc.registerElement('hand', doc.createElement('div'));
+
+  const front = createCardImg(doc, 'Rare Candy');
+  const back = createCardImg(doc, 'Rare Candy');
+  hand.appendChild(front);
+  hand.appendChild(back);
+
+  reconcileHandStacks('self', { document: doc });
+
+  // The reconciler really did write the styles this fix exists to undo.
+  assert.equal(back.style.position, 'absolute');
+  assert.equal(back.style.transform, 'translateY(-14px)');
+  const writtenKeys = Object.keys(back.style).filter(
+    (k) => back.style[k] !== ''
+  );
+  assert.ok(
+    writtenKeys.length >= 8,
+    `expected the full stack style set, got ${writtenKeys}`
+  );
+
+  clearHandStackPositioning(back);
+  clearHandStackPositioning(front);
+
+  // Nothing may survive onto the board: this also fails if a future stack style is added
+  // to the reconciler without being added to the clearer.
+  assert.deepEqual(
+    Object.keys(back.style).filter((k) => back.style[k] !== ''),
+    [],
+    'a played card must keep no stack inline styles'
+  );
+  assert.deepEqual(
+    Object.keys(front.style).filter((k) => front.style[k] !== ''),
+    []
+  );
+  assert.equal(back.classList.contains('hand-card--stacked-back'), false);
+  assert.equal(front.classList.contains('hand-card--stacked-front'), false);
+});
+
+test('clearing stack positioning leaves other cards and non-elements alone', () => {
+  const doc = new MockDocument();
+  const plain = createCardImg(doc, 'Pikachu');
+  plain.style.width = 'auto';
+
+  clearHandStackPositioning(plain);
+  assert.equal(
+    plain.style.width,
+    'auto',
+    'an unstacked card keeps its own styles'
+  );
+
+  assert.doesNotThrow(() => clearHandStackPositioning(null));
+  assert.doesNotThrow(() => clearHandStackPositioning(undefined));
+  assert.doesNotThrow(() => clearHandStackPositioning({}));
 });

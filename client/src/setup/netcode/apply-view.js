@@ -60,6 +60,11 @@ let defaultNetcodeContext = {
   // (prize-take-prompt.js), injected for the same reason.
   prizePicker: null,
   reconcileHandStacks: null,
+  // clearHandStackPositioning(node) — hand-stack-dom.js, injected for the same
+  // reason. Undoes the hand stack's inline positioning on a card that left the
+  // hand, which would otherwise outrank the board's own `.play-container` rules
+  // and leave the card not drawing where its slot is.
+  clearHandStackPositioning: null,
 };
 
 // choiceId the injected card picker is currently showing, so re-applying a view
@@ -153,6 +158,8 @@ export function setDefaultNetcodeContext(ctx = {}) {
     defaultNetcodeContext.prizePicker = ctx.prizePicker;
   if (ctx.reconcileHandStacks !== undefined)
     defaultNetcodeContext.reconcileHandStacks = ctx.reconcileHandStacks;
+  if (ctx.clearHandStackPositioning !== undefined)
+    defaultNetcodeContext.clearHandStackPositioning = ctx.clearHandStackPositioning;
 }
 
 /**
@@ -197,6 +204,7 @@ export function resetRenderState() {
     choicePicker: null,
     prizePicker: null,
     reconcileHandStacks: null,
+    clearHandStackPositioning: null,
   };
 }
 
@@ -869,6 +877,17 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
   img.classList.remove('attached-card');
   clearStackStyle(img);
   const node = cardNodeOf(record);
+  // A card fresh out of a duplicate hand stack still carries that stack's inline
+  // positioning (`position: absolute` plus a `translateY` lift, written by
+  // hand-stack-dom.js). That is only valid inside `#hand`; anywhere else it outranks
+  // the destination's own rules (`.play-container img`, `.play-container .mat-holo`),
+  // so the card does not draw where its slot is — the zone keeps the space and the card
+  // is missing from it until a re-render builds a clean element. The hand keeps its
+  // styles, because that is where they belong.
+  if (zoneId !== 'hand') {
+    defaultNetcodeContext.clearHandStackPositioning?.(node);
+    defaultNetcodeContext.clearHandStackPositioning?.(img);
+  }
 
   if (PLAY_ZONES.includes(zoneId)) {
     // Top-level active/bench Pokemon: wrap in .play-container.

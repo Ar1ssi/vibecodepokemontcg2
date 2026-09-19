@@ -138,6 +138,33 @@ function clearCardStackStyles(node) {
 }
 
 /**
+ * Undoes the inline positioning a hand stack writes on a card root node.
+ *
+ * Those styles describe a slot inside `#hand`: `position: absolute`, 100% of the stack, and
+ * a `translateY` lift for the cards behind the front one. They are only valid while the
+ * card is IN a stack. A card that leaves the hand — played to Active or Bench — keeps them,
+ * and inline styles outrank the board's own rules (`.play-container img`,
+ * `.play-container .mat-holo`), so the card no longer draws where its slot is: the zone
+ * keeps the space and the card is missing from it, and only a re-render (reload) builds a
+ * clean element from the view.
+ *
+ * Guarded on the stack classes, which the reconciler sets exactly when it writes those
+ * styles, so this is a cheap no-op for every other card.
+ *
+ * @param {HTMLElement|null|undefined} node Card root node (bare <img> or .mat-holo wrapper)
+ */
+export function clearHandStackPositioning(node) {
+  if (typeof node?.classList?.contains !== 'function') return;
+  if (
+    !node.classList.contains('hand-card--stacked-front') &&
+    !node.classList.contains('hand-card--stacked-back')
+  ) {
+    return;
+  }
+  clearCardStackStyles(node);
+}
+
+/**
  * Reconciles duplicate card stacks in a player's hand.
  *
  * @param {string} [user='self'] 'self' or 'opp'
