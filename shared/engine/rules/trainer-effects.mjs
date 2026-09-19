@@ -57,6 +57,31 @@
 // parseTrainerEffect also returns `playCondition` ('opponentPrizes<=N' | 'morePrizesThanOpponent')
 // when the card can only be played under that condition.
 
+import { WORD_POKEMON_TYPES } from './search-match.mjs';
+
+const POKEMON_TYPE_WORDS = Object.keys(WORD_POKEMON_TYPES).join('|');
+
+// "Search your deck for a Water Pokémon" / "up to 2 Basic Psychic Pokémon" name
+// the type in words. Without this, the generic Pokémon fallback drops the
+// qualifier and the deck picker shows every Pokémon (Dive Ball).
+const TYPED_POKEMON_SEARCH_RE = new RegExp(
+  `search your deck for (?:up to\\s+\\d+\\s+)?(?:an?\\s+)?(?:(basic|evolution)\\s+)?(?:${POKEMON_TYPE_WORDS})(?:-type)?\\s+pok[ée]mon`,
+);
+const TYPED_POKEMON_TYPE_RE = new RegExp(
+  `\\b(${POKEMON_TYPE_WORDS})(?:-type)?\\s+pok[ée]mon`,
+);
+
+function typedPokemonSearchWhat(lower) {
+  const clause = lower.match(TYPED_POKEMON_SEARCH_RE);
+  if (!clause) return null;
+  const typed = clause[0].match(TYPED_POKEMON_TYPE_RE);
+  if (!typed) return null;
+  const type = WORD_POKEMON_TYPES[typed[1]];
+  if (!type) return null;
+  const stage = clause[1] ? `${clause[1][0].toUpperCase()}${clause[1].slice(1)} ` : '';
+  return `${stage}${type} Pokémon`;
+}
+
 // Normalize printed card text before matching. Real card text (and the
 // pkmncards.com dump) uses curly apostrophes (U+2019) and renders energy
 // symbols with inner spaces ("{ P }"). Both broke exact substring matches,
@@ -276,7 +301,12 @@ export function parseSearchDeckParams(lower) {
     return { what: 'Basic Pokémon', count: 1, destination: 'bench', upTo: false };
   }
 
-  if (lower.includes('evolution team rocket')) what = "Evolution Team Rocket's Pokémon";
+  const typedPokemonWhat = typedPokemonSearchWhat(lower);
+  if (typedPokemonWhat) {
+    what = typedPokemonWhat;
+    const upToMatch = lower.match(/up to\s+(\d+)/);
+    if (upToMatch) count = Number(upToMatch[1]);
+  } else if (lower.includes('evolution team rocket')) what = "Evolution Team Rocket's Pokémon";
   else if (lower.includes('basic team rocket')) {
     what = "Basic Team Rocket's Pokémon";
     const m = lower.match(/up to\s+(\d+)/);
