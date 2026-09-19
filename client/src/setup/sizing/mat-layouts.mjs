@@ -46,7 +46,9 @@ const SIM = {
     deck: { bottom: '64%', right: '1%', width: '9%', height: '28%' },
     discard: { bottom: '35%', right: '1%', width: '9%', height: '26%' },
     lostZone: { bottom: '84%', left: '1%', width: '7%', height: '15%' },
-    stadium: { bottom: '42%', left: '11%', width: '6%', height: '16%' },
+    // Stadium straddles the midline: half on the opponent's half, half on the
+    // player's. Bottom = 50% - height/2, so the card centers on the seam.
+    stadium: { bottom: '42%', left: '26%', width: '6%', height: '16%' },
     board: { bottom: '61%', left: '66%', width: '24%', height: '30%' },
   },
 };
@@ -83,7 +85,8 @@ const ONE_PLAYER = {
     deck: { bottom: '56.6%', right: '2.7%', width: '11.7%', height: '30.9%' },
     discard: { bottom: '11.9%', right: '2.7%', width: '11.7%', height: '30.9%' },
     lostZone: { bottom: '84%', left: '2%', width: '8%', height: '14%' },
-    stadium: { bottom: '44%', left: '15%', width: '8%', height: '16%' },
+    // Straddles the midline: bottom = 100% - height/2 in the half frame.
+    stadium: { bottom: '92%', left: '25%', width: '8%', height: '16%' },
     // Trainers in play: the open strip between the battle field and the deck.
     board: { bottom: '56.6%', left: '63.5%', width: '20.5%', height: '30.9%' },
   },
@@ -123,7 +126,8 @@ const TWO_PLAYER = {
     deck: { bottom: '47%', right: '2%', width: '14%', height: '26%' },
     discard: { bottom: '18%', right: '2%', width: '14%', height: '26%' },
     lostZone: { bottom: '86%', left: '1%', width: '8%', height: '13%' },
-    stadium: { bottom: '50%', left: '20%', width: '9%', height: '17%' },
+    // Straddles the midline: bottom = 100% - height/2 in the half frame.
+    stadium: { bottom: '91.5%', left: '24%', width: '9%', height: '17%' },
     board: { bottom: '72%', left: '63%', width: '20%', height: '26%' },
   },
 };

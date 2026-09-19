@@ -283,6 +283,10 @@ test('zone rectangles stay inside their own half of the board', () => {
 
   for (const [id, layout] of Object.entries(MAT_LAYOUTS)) {
     for (const zone of ZONES) {
+      // The stadium is painted by the parent page and intentionally straddles
+      // the midline (half on each player's side), so it is exempt from the
+      // within-one-half rule that constrains the iframe card zones.
+      if (zone === 'stadium') continue;
       const rect = layout.zones[zone];
       const bottom = percent(rect.bottom);
       const height = percent(rect.height);
