@@ -11,12 +11,11 @@ Focus: Double-clicking the in-play Stadium now opens the card-inspector module (
   met); continuous Stadiums show text but no click. Design 018, D61.
 
 Active: worktree `C:\Users\SMG26\Downloads\vibe-stadium-inspector` on
-  `feature/stadium-inspector-use` @ 1bcff16 (UNCOMMITTED S193 changes): `stadium-effects.mjs`,
-  `card-inspector.mjs`, `card-inspector-model.mjs`, `attack-zone-geometry.js`, `click-events.js`,
-  `index.css`, tests (`rules-extended`, `card-inspector-model`, `card-inspector-css`),
-  design 018 / DECISIONS / STATE / journal. Worktree `node_modules` is a junction to the primary
-  checkout (remove before finishing).
-Next: review the diff, then commit/push the branch (nothing committed yet). Primary checkout still
+  `feature/stadium-inspector-use` @ f78f3f6, pushed, PR #172 open against `main`. Changes:
+  `stadium-effects.mjs`, `card-inspector.mjs`, `card-inspector-model.mjs`, `attack-zone-geometry.js`,
+  `click-events.js`, `index.css`, tests (`rules-extended`, `card-inspector-model`,
+  `card-inspector-css`), design 018 / DECISIONS / STATE / journal.
+Next: PR #172 review/merge. Live browser e2e for this feature is still owed. Primary checkout still
   on `main` @ 1bcff16 with uncommitted S190 holo + S183/S184/S188/S189 work — none on a branch yet,
   and PR #170 (S192 mat-picker) still unmerged. Live browser e2e for this feature is still owed.
 
