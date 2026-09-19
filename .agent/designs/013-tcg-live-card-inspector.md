@@ -421,6 +421,7 @@ every attack — Live Coal ({R}) is payable with zero Energy. This is a rules-la
 combat legality, outside this design's scope, so it is left to the rules owner; the model stays
 faithful to the engine rather than disagreeing with it, and
 `card-inspector-model.test.mjs` pins the consequence under a comment naming it a quirk.
+**FIXED in S181 — see D12 below.**
 
 **D10 (S175) — renumbered on the shared branch.** This design's decision was recorded as D50 in
 S174; concurrent work had already taken D50–D52, so it landed as **D53**. The design filename is
@@ -431,6 +432,18 @@ still `013-…` while three other S173/S175 designs also claim 013 — the numbe
 the pre-existing `trainer drop` failure named in D1 was fixed by that work
 (`server-authoritative parser and reducer gaps`), so D1's caveat now covers only the missing
 browser run, not a red suite.
+
+**D12 (S181) — D9 fixed in the rules layer.** `passiveCostDiscount` now requires a reduction verb
+(`less|fewer|reduc|decrease|lower`) instead of assuming one from a bare `/(cost|energy)/` match, so
+merely mentioning Energy no longer grants a free symbol. Two further narrowings came out of writing
+the proof: a retreat-cost wording with no attack mention is declined (`parseRetreatCostModifier`
+owns it — reading it here would have discounted attacks off a *retreat* ability), and `fewer N` now
+parses its amount, which the amount regexes had missed. Five regression tests in
+`rules-extended.test.mjs` (Agile, the retreat wording, cost-without-reduction, three real
+reductions) plus the end-to-end assertion in `card-inspector-model.test.mjs`, which now expects
+`payable: false` / `dimLevel: 'full'` for Charmander with no Energy. Suite 1934/1934. Chosen over
+leaving it: a false positive here silently removes a cost from combat, and the panel had been
+faithfully displaying the bug rather than hiding it.
 
 ---
 Self-approval checklist (only when the user is unreachable):

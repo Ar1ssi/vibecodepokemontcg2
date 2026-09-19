@@ -499,22 +499,22 @@ test('model: a benched Pokémon with no energy still does not dim', () => {
   assert.equal(m.attacks[0].payable, false);
 });
 
-// Documents engine behaviour rather than asserting it is right: passiveCostDiscount returns 1 for
-// ANY ability text that mentions "cost" or "Energy" without an explicit number, so Charmander's
-// Agile ("If this Pokémon has no Energy attached, it has no Weakness") reads as a -1 cost
-// reduction. The panel stays faithful to the engine by design — it must not quietly disagree —
-// so this pins the consequence and points at the real fix, which belongs in the rules layer.
-test('known engine quirk: Agile is misread as a cost discount', () => {
+// Cross-layer regression: passiveCostDiscount used to return 1 for ANY ability text mentioning
+// "cost" or "Energy", so Agile ("If this Pokémon has no Energy attached, it has no Weakness") read
+// as a -1 cost reduction and made Live Coal ({R}) payable with zero Energy. The panel is faithful
+// to the engine by design, so it showed the wrong thing until the rules layer was fixed — this
+// asserts the whole path, not just the parser.
+test('Agile no longer discounts attacks (fixed in the rules layer)', () => {
   const m = buildInspectorModel(CHARMANDER, { energyTypes: [] });
   assert.equal(
     m.attacks[0].payable,
-    true,
-    'Live Coal ({R}) reads payable with zero Energy'
+    false,
+    'Live Coal ({R}) needs a Fire Energy'
   );
-  assert.equal(m.dimLevel, 'none');
+  assert.equal(m.dimLevel, 'full');
 });
 
-test('model: a card without an ability is unaffected by that quirk', () => {
+test('model: a card without an ability behaves the same as one with an inert ability', () => {
   const m = buildInspectorModel(ARCANINE, { energyTypes: [] });
   assert.equal(m.attacks[0].payable, false);
   assert.equal(m.dimLevel, 'full');
