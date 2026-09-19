@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createGameState, getZone, findCard } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { topPokemonCard, evolvedView } from '../rules/evolved-pokemon.mjs';
 
 test('applyCommand: Invariant 3 & 7 - pure, total, and stateVersion only increments on success', () => {
   const state = createGameState({
@@ -250,6 +251,132 @@ test('applyCommand: attachCard attaches energy and sets attachedTo pointer and t
     playerId: 'p1',
   });
   assert.equal(res2.error, 'Energy already attached this turn.');
+});
+
+test('applyCommand: energy dropped on a stacked evolution attaches to the Basic and pays its attack', () => {
+  const state = createGameState({
+    players: { p1: { username: 'ARISSI2' }, p2: { username: 'ARISSI' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  // The reporter's board: Froakie (root) with Mega Greninja ex evolved onto it (D40).
+  const froakie = createCard({
+    instanceId: 10,
+    name: 'Froakie',
+    hp: 60,
+    stage: 'Basic',
+    types: ['Water'],
+  });
+  const greninja = createCard({
+    instanceId: 11,
+    name: 'Mega Greninja ex',
+    hp: 330,
+    stage: 'Stage 2',
+    types: ['Water'],
+    attacks: [{ name: 'Water Shuriken', cost: ['Water'], damage: 100 }],
+    attachedTo: 10,
+  });
+  const energy = createCard({
+    instanceId: 12,
+    name: 'Basic Water Energy',
+    supertype: 'Energy',
+  });
+  state.players.p1.zones.active.push(froakie, greninja);
+  state.players.p1.zones.hand.push(energy);
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 20, name: 'Budew', hp: 300 })
+  );
+
+  // The client addresses the card the player sees — the top Evolution, not the Basic.
+  const attach = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: 12, targetInstanceId: 11 },
+    playerId: 'p1',
+  });
+  assert.equal(attach.error, null);
+  const attachedEnergy = attach.state.players.p1.zones.active.find(
+    (c) => c.instanceId === 12
+  );
+  assert.equal(
+    attachedEnergy.attachedTo,
+    10,
+    'the pointer lands on the stack root'
+  );
+
+  // …which is exactly what the attack-cost lookup reads (reduce.mjs, case 'attack').
+  const attack = applyCommand(attach.state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+  assert.equal(attack.error, null);
+  assert.equal(attack.state.players.p2.zones.active[0].damage, 100);
+});
+
+test('applyCommand: a second evolution dropped on the visible Stage 1 reads as the top card', () => {
+  const state = createGameState({
+    players: { p1: { username: 'ARISSI2' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+
+  const froakie = createCard({
+    instanceId: 10,
+    name: 'Froakie',
+    hp: 60,
+    stage: 'Basic',
+    types: ['Water'],
+    specialCondition: 'Burned',
+  });
+  froakie.enteredPlayTurn = 1;
+  const frogadier = createCard({
+    instanceId: 11,
+    name: 'Frogadier',
+    hp: 90,
+    stage: 'Stage 1',
+    evolvesFrom: 'Froakie',
+    types: ['Water'],
+    attachedTo: 10,
+  });
+  const greninja = createCard({
+    instanceId: 13,
+    name: 'Greninja',
+    hp: 140,
+    stage: 'Stage 2',
+    evolvesFrom: 'Frogadier',
+    types: ['Water'],
+  });
+  state.players.p1.zones.active.push(froakie, frogadier);
+  state.players.p1.zones.hand.push(greninja);
+
+  // Dropped on the visible card, which for this stack is the Stage 1.
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: 13, targetInstanceId: 11 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+
+  const active = res.state.players.p1.zones.active;
+  const root = active.find((c) => !c.attachedTo);
+  assert.equal(
+    active.find((c) => c.instanceId === 13).attachedTo,
+    10,
+    'the evolution is stored against the Basic (D40)'
+  );
+  assert.equal(
+    topPokemonCard(active, root).instanceId,
+    13,
+    'the Stage 2 reads as the top card'
+  );
+  assert.equal(evolvedView(active, root).name, 'Greninja');
+  assert.equal(
+    root.specialCondition,
+    null,
+    'evolving clears the root-held condition'
+  );
+  assert.equal(root.lastEvolvedTurn, res.state.turn.number);
 });
 
 test('applyCommand: manual counter and status updates modify card attributes', () => {

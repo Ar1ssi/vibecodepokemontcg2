@@ -167,6 +167,33 @@ export function findCard(state, instanceId) {
 }
 
 /**
+ * The instanceId an in-play attachment hangs off: its stack's ROOT (the Basic).
+ *
+ * Clients address the card the player actually sees — for a stacked Pokémon that is the
+ * top Evolution — so an attach command can name any card in the stack. Every in-play
+ * attachment is stored against the root (D40), which is what `topPokemonCard` and the
+ * engine's `attachedTo === <root>` attachment lookups assume.
+ *
+ * @param {object} state
+ * @param {number} instanceId
+ * @returns {number|null} the root's instanceId, or `instanceId` unchanged when it is
+ *   already a root or not found (callers keep their own not-found handling).
+ */
+export function attachmentHostId(state, instanceId) {
+  if (!state || instanceId == null) return instanceId ?? null;
+
+  let ref = findCard(state, instanceId);
+  // `seen` only guards a malformed state that points `attachedTo` at itself or into a
+  // cycle; a well-formed state has at most one hop (evolutions attach to the Basic).
+  const seen = new Set();
+  while (ref?.card?.attachedTo != null && !seen.has(ref.card.instanceId)) {
+    seen.add(ref.card.instanceId);
+    ref = findCard(state, ref.card.attachedTo);
+  }
+  return ref?.card?.instanceId ?? instanceId;
+}
+
+/**
  * Locates all cards attached to a given card instance.
  *
  * @param {object} state
