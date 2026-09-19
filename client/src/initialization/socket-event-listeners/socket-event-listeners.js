@@ -49,7 +49,10 @@ import {
   hydrateHolo,
   unhydrateHolo,
 } from '../../setup/deck-constructor/hydrate-holo.js';
-import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
+import {
+  clearHandStackPositioning,
+  reconcileHandStacks,
+} from '../../setup/zones/hand-stack-dom.js';
 import { setInstanceMap } from '../../setup/netcode/dual-run-bridge.js';
 import { setDealOrder } from '../../setup/netcode/deal-order.js';
 import { registerTurnOrderCallListeners } from '../../setup/netcode/turn-order-call.js';
@@ -266,6 +269,7 @@ const seedNetcodeContext = () => {
     choicePicker: CHOICE_PICKER,
     prizePicker: PRIZE_PICKER,
     reconcileHandStacks,
+    clearHandStackPositioning,
   });
   // Design 003 slice 1: the authoritative gate needs the same two browser-only
   // dependencies `apply-view.js` does, injected for the same reason
