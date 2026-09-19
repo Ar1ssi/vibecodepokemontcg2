@@ -29,8 +29,9 @@ import {
 import {
   drawCount,
   parseAttackDamage,
-  planBenchTarget,
   allBenchDamage,
+  attackTargetClause,
+  opponentCounterClause,
   parseAttackSearchClause,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
@@ -319,6 +320,118 @@ function damageBenchedPokemon(
       events,
     });
   }
+}
+
+// Chosen-target damage/counters for attacks that let the player pick one or more
+// of the opponent's Pokémon (design 017 / D19). Returns a clause, or null.
+//   { kind: 'damage'|'counters', amount, count, scope: 'bench'|'any'|'active' }
+// 'active' scope is a fixed Active target and is applied without a choice.
+function resolveAttackTargetClause(text, parsed, spread) {
+  if (spread > 0) return null;
+  const t = String(text || '');
+  const counters = opponentCounterClause(t);
+  if (counters) {
+    if (counters.mode === 'active') {
+      return { kind: 'counters', amount: counters.count * 10, count: 1, scope: 'active' };
+    }
+    // "put N damage counters on your opponent's Pokémon in any way you like":
+    // place them one click at a time, each counter 10 damage, all N must land.
+    if (/in any way/i.test(t)) {
+      return {
+        kind: 'counters',
+        amount: 10,
+        count: 1,
+        scope: 'any',
+        distributable: true,
+        remaining: counters.count,
+      };
+    }
+    return {
+      kind: 'counters',
+      amount: counters.count * 10,
+      count: counters.mode === 'multi' ? counters.targets : 1,
+      scope: 'any',
+    };
+  }
+  const damage = attackTargetClause(t);
+  if (damage) {
+    return {
+      kind: 'damage',
+      amount: damage.amount,
+      count: damage.count,
+      scope: damage.scope,
+    };
+  }
+  if (parsed?.bench > 0) {
+    return { kind: 'damage', amount: parsed.bench, count: 1, scope: 'bench' };
+  }
+  return null;
+}
+
+function attackTargetOptions(draft, defenderPlayerId, scope) {
+  const player = draft.players[defenderPlayerId];
+  const active = (player?.zones?.active || []).filter((c) => !c.attachedTo);
+  const bench = (player?.zones?.bench || []).filter((c) => !c.attachedTo);
+  if (scope === 'bench') return bench;
+  if (scope === 'active') return active;
+  return [...active, ...bench];
+}
+
+// Flat damage to an Active target: no W/R for counter placement, and the printed
+// snipe clause is treated as unmodified. Bench targets go through
+// damageBenchedPokemon (Tera/bench-shield guards + KO).
+function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, events }) {
+  const victim = ref.card;
+  if (!victim || amount <= 0) return 0;
+  victim.damage = (victim.damage || 0) + amount;
+  events.push({
+    type: 'damageUpdated',
+    instanceId: victim.instanceId,
+    damage: victim.damage,
+    dealt: amount,
+  });
+  const koHp = cardEffectiveHp(draft, victim, ref.playerId);
+  if (koHp > 0 && victim.damage >= koHp) {
+    handleKnockout(draft, {
+      victimPlayerId: ref.playerId,
+      attackerPlayerId,
+      victim,
+      events,
+    });
+  }
+  return amount;
+}
+
+// Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
+function applyAttackTargets(
+  draft,
+  { selection, clause, defenderPlayerId, attackerPlayerId, attackName, events }
+) {
+  let dealt = 0;
+  for (const id of selection || []) {
+    const ref = findCard(draft, id);
+    if (!ref || ref.playerId !== defenderPlayerId) continue;
+    if (ref.zoneId === 'bench') {
+      dealt += clause.amount;
+      damageBenchedPokemon(draft, {
+        victim: ref.card,
+        victimPlayerId: defenderPlayerId,
+        attackerPlayerId,
+        attackName,
+        dealt: clause.amount,
+        auto: false,
+        events,
+      });
+    } else if (ref.zoneId === 'active') {
+      dealt += applyFlatDamageToTarget(draft, {
+        ref,
+        amount: clause.amount,
+        attackerPlayerId,
+        events,
+      });
+    }
+  }
+  return dealt;
 }
 
 // An in-play Pokémon as its top evolution card (see evolved-pokemon.mjs). Read-only.
@@ -732,6 +845,114 @@ function resolvePrizeChoice(draft, { playerId, selection, events }) {
       winner: playerId,
       reason: 'all prize cards taken',
       events,
+    });
+  }
+}
+
+/**
+ * Applies an already-legal retreat: pays the Energy cost and swaps the Active with the
+ * chosen Benched Pokémon. Pure; legality (turn, conditions, cost, bench non-empty) is
+ * validated by the command gate before this runs. Shared by the direct `retreat` command
+ * and the `retreat` PendingChoice resume path, so a player with 2+ Benched Pokémon can
+ * click the one to switch in (design 017 / D19).
+ */
+function applyRetreatSwap(
+  draft,
+  { playerId, benchInstanceId = null, discardEnergyIds = [], events }
+) {
+  const player = draft.players[playerId];
+  const active = player?.zones?.active?.find((c) => !c.attachedTo);
+  if (!player || !active) return;
+  const costN = computeEffectiveRetreatCost(draft, active, playerId);
+
+  // Discard energy cost
+  if (Array.isArray(discardEnergyIds) && discardEnergyIds.length > 0) {
+    for (const id of discardEnergyIds) {
+      const idx = player.zones.active.findIndex((c) => c.instanceId === id);
+      if (idx >= 0) {
+        const [discarded] = player.zones.active.splice(idx, 1);
+        discarded.attachedTo = null;
+        player.zones.discard.push(discarded);
+        events.push({
+          type: 'cardMoved',
+          instanceId: id,
+          from: 'active',
+          to: 'discard',
+          playerId,
+        });
+      }
+    }
+  } else if (costN > 0) {
+    let discardedCount = 0;
+    for (
+      let i = player.zones.active.length - 1;
+      i >= 0 && discardedCount < costN;
+      i--
+    ) {
+      const card = player.zones.active[i];
+      if (card.attachedTo === active.instanceId && isEnergy(card)) {
+        player.zones.active.splice(i, 1);
+        card.attachedTo = null;
+        player.zones.discard.push(card);
+        discardedCount++;
+        events.push({
+          type: 'cardMoved',
+          instanceId: card.instanceId,
+          from: 'active',
+          to: 'discard',
+          playerId,
+        });
+      }
+    }
+  }
+
+  // Bench swap
+  let benchPokemon = null;
+  if (benchInstanceId != null) {
+    benchPokemon = player.zones.bench.find(
+      (c) => c.instanceId === benchInstanceId
+    );
+  } else {
+    benchPokemon = player.zones.bench.find((c) => !c.attachedTo);
+  }
+
+  if (active && benchPokemon) {
+    // Move active + attachments to bench
+    for (let i = player.zones.active.length - 1; i >= 0; i--) {
+      const c = player.zones.active[i];
+      if (
+        c.instanceId === active.instanceId ||
+        c.attachedTo === active.instanceId
+      ) {
+        player.zones.active.splice(i, 1);
+        player.zones.bench.push(c);
+      }
+    }
+    // Move benchPokemon + attachments to active
+    for (let i = player.zones.bench.length - 1; i >= 0; i--) {
+      const c = player.zones.bench[i];
+      if (
+        c.instanceId === benchPokemon.instanceId ||
+        c.attachedTo === benchPokemon.instanceId
+      ) {
+        player.zones.bench.splice(i, 1);
+        player.zones.active.push(c);
+      }
+    }
+
+    clearConditions(active);
+    delete active.cannotAttackUntilTurn;
+    delete active.cannotAttackAttackName;
+    delete active.cannotRetreatUntilTurn;
+
+    if (!player.flags) player.flags = {};
+    player.flags.retreatedThisTurn = true;
+
+    events.push({
+      type: 'cardRetreated',
+      activeId: active.instanceId,
+      promotedId: benchPokemon.instanceId,
+      playerId,
     });
   }
 }
@@ -2520,32 +2741,11 @@ export function applyCommand(state, command, rng = null) {
       // both would double every benched Pokémon's damage.
       const spread = allBenchDamage(attack.text);
 
-      // Single-target bench damage. The server picks the first benched Pokémon rather than
-      // prompting (design 013 option 2A); `auto` tells the clients it was a heuristic pick.
+      // A printed clause that lets the player choose which opponent Pokémon take
+      // damage / counters. Resolved after the attack's other effects below so a
+      // suspension never drops them (design 017 / D19).
+      const attackTarget = resolveAttackTargetClause(attack.text, parsed, spread);
       let benchDealt = 0;
-      if (parsed.bench > 0 && spread === 0) {
-        const targets = benchTargets(draft.players[defenderPlayerId]);
-        const plan = planBenchTarget(targets.length);
-        if (plan === null) {
-          events.push({
-            type: 'attackBenchFizzled',
-            playerId,
-            attackName: attack.name,
-            reason: 'no-benched-pokemon',
-          });
-        } else {
-          benchDealt += parsed.bench;
-          damageBenchedPokemon(draft, {
-            victim: targets[0],
-            victimPlayerId: defenderPlayerId,
-            attackerPlayerId: playerId,
-            attackName: attack.name,
-            dealt: parsed.bench,
-            auto: plan === -1,
-            events,
-          });
-        }
-      }
 
       // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
       // list is snapshotted first, because a KO inside the loop mutates the bench array.
@@ -2699,6 +2899,78 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
+      // Chosen-target damage/counters, resolved now (after every other attack
+      // effect) so a click-to-select suspension never drops them. The player
+      // clicks the target(s) on the mat (design 017 / D19).
+      if (attackTarget) {
+        const candidates = attackTargetOptions(
+          draft,
+          defenderPlayerId,
+          attackTarget.scope
+        );
+        if (candidates.length === 0) {
+          events.push({
+            type: 'attackBenchFizzled',
+            playerId,
+            attackName: attack.name,
+            reason: 'no-target',
+          });
+        } else {
+          const distributable = Boolean(attackTarget.distributable);
+          const required = distributable
+            ? attackTarget.remaining || 0
+            : attackTarget.count;
+          const picksFor = (cards) =>
+            distributable
+              ? new Array(required).fill(cards[0].instanceId)
+              : cards.slice(0, attackTarget.count).map((c) => c.instanceId);
+          if (
+            attackTarget.scope === 'active' ||
+            candidates.length <= (distributable ? 1 : attackTarget.count)
+          ) {
+            benchDealt += applyAttackTargets(draft, {
+              selection: picksFor(candidates),
+              clause: attackTarget,
+              defenderPlayerId,
+              attackerPlayerId: playerId,
+              attackName: attack.name,
+              events,
+            });
+          } else if (!searchTriggered) {
+            draft.pendingChoice = createPendingChoice({
+              player: playerId,
+              source: 'attack',
+              prompt: distributable
+                ? `${attack.name}: Place a damage counter (${required} left)`
+                : `${attack.name}: Choose ${attackTarget.count > 1 ? `${attackTarget.count} ` : ''}of your opponent's Pokémon to take damage`,
+              options: candidates,
+              min: distributable ? 1 : attackTarget.count,
+              max: distributable ? 1 : attackTarget.count,
+              resumeToken: {
+                effectType: 'attack',
+                initiatorPlayerId: playerId,
+                oppId,
+                attackTarget,
+                effectiveAttack,
+                damage: dmgDealt,
+              },
+            });
+            break;
+          } else {
+            // A deck-search clause already suspended this attack; apply the target
+            // to the first eligible Pokémon rather than overwriting its choice.
+            benchDealt += applyAttackTargets(draft, {
+              selection: picksFor(candidates),
+              clause: attackTarget,
+              defenderPlayerId,
+              attackerPlayerId: playerId,
+              attackName: attack.name,
+              events,
+            });
+          }
+        }
+      }
+
       events.push({
         type: 'attackExecuted',
         attackerId: attacker?.instanceId,
@@ -2727,102 +2999,41 @@ export function applyCommand(state, command, rng = null) {
 
     case 'retreat': {
       const player = draft.players[playerId];
-      const active = player?.zones?.active?.find((c) => !c.attachedTo);
-      const costN = computeEffectiveRetreatCost(draft, active, playerId);
+      const benchRoots = (player?.zones?.bench || []).filter(
+        (c) => !c.attachedTo
+      );
 
-      // Discard energy cost
-      if (
-        Array.isArray(payload?.discardEnergyIds) &&
-        payload.discardEnergyIds.length > 0
-      ) {
-        for (const id of payload.discardEnergyIds) {
-          const idx = player.zones.active.findIndex((c) => c.instanceId === id);
-          if (idx >= 0) {
-            const [discarded] = player.zones.active.splice(idx, 1);
-            discarded.attachedTo = null;
-            player.zones.discard.push(discarded);
-            events.push({
-              type: 'cardMoved',
-              instanceId: id,
-              from: 'active',
-              to: 'discard',
-              playerId,
-            });
-          }
-        }
-      } else if (costN > 0) {
-        let discardedCount = 0;
-        for (
-          let i = player.zones.active.length - 1;
-          i >= 0 && discardedCount < costN;
-          i--
-        ) {
-          const card = player.zones.active[i];
-          if (card.attachedTo === active.instanceId && isEnergy(card)) {
-            player.zones.active.splice(i, 1);
-            card.attachedTo = null;
-            player.zones.discard.push(card);
-            discardedCount++;
-            events.push({
-              type: 'cardMoved',
-              instanceId: card.instanceId,
-              from: 'active',
-              to: 'discard',
-              playerId,
-            });
-          }
-        }
-      }
-
-      // Bench swap
-      let benchPokemon = null;
-      if (payload?.benchInstanceId != null) {
-        benchPokemon = player.zones.bench.find(
-          (c) => c.instanceId === payload.benchInstanceId
-        );
-      } else {
-        benchPokemon = player.zones.bench.find((c) => !c.attachedTo);
-      }
-
-      if (active && benchPokemon) {
-        // Move active + attachments to bench
-        for (let i = player.zones.active.length - 1; i >= 0; i--) {
-          const c = player.zones.active[i];
-          if (
-            c.instanceId === active.instanceId ||
-            c.attachedTo === active.instanceId
-          ) {
-            player.zones.active.splice(i, 1);
-            player.zones.bench.push(c);
-          }
-        }
-        // Move benchPokemon + attachments to active
-        for (let i = player.zones.bench.length - 1; i >= 0; i--) {
-          const c = player.zones.bench[i];
-          if (
-            c.instanceId === benchPokemon.instanceId ||
-            c.attachedTo === benchPokemon.instanceId
-          ) {
-            player.zones.bench.splice(i, 1);
-            player.zones.active.push(c);
-          }
-        }
-
-        clearConditions(active);
-        delete active.cannotAttackUntilTurn;
-        delete active.cannotAttackAttackName;
-        delete active.cannotRetreatUntilTurn;
-
-        if (!player.flags) player.flags = {};
-        player.flags.retreatedThisTurn = true;
-
-        events.push({
-          type: 'cardRetreated',
-          activeId: active.instanceId,
-          promotedId: benchPokemon.instanceId,
-          playerId,
+      // 2+ Benched Pokémon and no explicit target: suspend and let the player
+      // click the one to switch in (server mat picker, D19). Legality has
+      // already guaranteed at least one valid bench target.
+      if (payload?.benchInstanceId == null && benchRoots.length > 1) {
+        draft.pendingChoice = createPendingChoice({
+          player: playerId,
+          prompt: 'Retreat: Choose a Benched Pokémon to switch in',
+          source: 'retreat',
+          options: benchRoots,
+          min: 1,
+          max: 1,
+          stateVersion: draft.stateVersion,
+          resumeToken: {
+            effectType: 'retreat',
+            initiatorPlayerId: playerId,
+            discardEnergyIds: Array.isArray(payload?.discardEnergyIds)
+              ? payload.discardEnergyIds
+              : [],
+          },
         });
+        break;
       }
+
+      applyRetreatSwap(draft, {
+        playerId,
+        benchInstanceId: payload?.benchInstanceId ?? null,
+        discardEnergyIds: Array.isArray(payload?.discardEnergyIds)
+          ? payload.discardEnergyIds
+          : [],
+        events,
+      });
       break;
     }
 
@@ -3012,6 +3223,16 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection || [],
           events,
         });
+      } else if (token.effectType === 'retreat') {
+        // The player clicked the Benched Pokémon to switch in; pay the retreat
+        // cost and perform the swap (retreat does not end the turn).
+        applyRetreatSwap(draft, {
+          playerId: initiatorPlayerId,
+          benchInstanceId: (payload.selection || [])[0] ?? null,
+          discardEnergyIds: token.discardEnergyIds || [],
+          events,
+        });
+        draft.pendingChoice = null;
       } else if (token.effectType === 'stadium') {
         executeStadium(draft, {
           playerId: initiatorPlayerId,
@@ -3021,6 +3242,69 @@ export function applyCommand(state, command, rng = null) {
           resumeToken: token,
         });
       } else if (token.effectType === 'attack') {
+        // Chosen-target attack: the player clicked the opponent Pokémon to damage.
+        // The rest of the attack's effects already ran before the suspension.
+        if (token.attackTarget) {
+          const targetPlayer = draft.players[initiatorPlayerId];
+          const selection = Array.isArray(payload.selection)
+            ? payload.selection
+            : [];
+          const dealt = applyAttackTargets(draft, {
+            selection,
+            clause: token.attackTarget,
+            defenderPlayerId: token.oppId,
+            attackerPlayerId: initiatorPlayerId,
+            attackName: token.effectiveAttack?.name || '',
+            events,
+          });
+          // "in any way you like": one counter per click until all are placed.
+          const remaining = token.attackTarget.distributable
+            ? (token.attackTarget.remaining || 1) - 1
+            : 0;
+          if (remaining > 0) {
+            const options = attackTargetOptions(draft, token.oppId, 'any');
+            if (options.length > 0) {
+              draft.pendingChoice = createPendingChoice({
+                player: initiatorPlayerId,
+                source: 'attack',
+                prompt: `${token.effectiveAttack?.name || 'Attack'}: Place a damage counter (${remaining} left)`,
+                options,
+                min: 1,
+                max: 1,
+                resumeToken: {
+                  ...token,
+                  attackTarget: { ...token.attackTarget, remaining },
+                },
+              });
+              break;
+            }
+          }
+          draft.pendingChoice = null;
+          events.push({
+            type: 'attackExecuted',
+            attackerId: targetPlayer?.zones?.active?.find((c) => !c.attachedTo)
+              ?.instanceId,
+            attackName: token.effectiveAttack?.name,
+            damage: token.damage || 0,
+            benchDealt: dealt,
+            playerId: initiatorPlayerId,
+          });
+          if (targetPlayer) {
+            if (!targetPlayer.flags) targetPlayer.flags = {};
+            targetPlayer.flags.attackerAttacked = true;
+          }
+          if (draft.turn.phase !== 'ended') {
+            resolveCheckup(draft, {
+              rng: activeRng,
+              events,
+              endingPlayerId: initiatorPlayerId,
+            });
+            if (draft.turn.phase !== 'ended') {
+              advanceTurn(draft, { nextPlayerId: token.oppId, events });
+            }
+          }
+          break;
+        }
         const player = draft.players[initiatorPlayerId];
         const selection = Array.isArray(payload.selection)
           ? payload.selection

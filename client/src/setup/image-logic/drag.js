@@ -16,7 +16,6 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 import { zoneOf } from './drop-zone.mjs';
-import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 
 const popupContainers = [
   'lostZone',
@@ -283,21 +282,12 @@ export const drop = (event) => {
       dZoneId === 'bench' &&
       !draggedImage.attached
     ) {
+      // Drop directly on a (bare <img>) Bench Pokémon to switch with it. Any other
+      // drop on the Bench — an empty slot, the zone background, or a holo-wrapped
+      // card whose hit target is an overlay layer rather than the <img> — passes no
+      // target, so retreat() lets the player click the card on the mat (design 017,
+      // D19) instead of silently promoting the first Bench Pokémon.
       const droppedOnCard = event.target.tagName === 'IMG' ? event.target : null;
-      if (!droppedOnCard) {
-        const benchZone = getZone(mouseClick.cardUser, 'bench');
-        const benchCandidates = benchZone.array.filter(isBoardPokemon);
-        if (benchCandidates.length > 1) {
-          appendMessage(
-            mouseClick.cardUser,
-            '⛔ Drop onto the Bench Pokémon you want to switch in.',
-            'announcement',
-            false
-          );
-          event.stopPropagation();
-          return;
-        }
-      }
       retreat(mouseClick.cardUser, true, droppedOnCard);
       event.stopPropagation();
       return;

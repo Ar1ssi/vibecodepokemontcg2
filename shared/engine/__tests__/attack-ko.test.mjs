@@ -215,6 +215,77 @@ test('retreat: swaps active with bench, clears status, and pays energy cost', ()
   assert.equal(res.state.players.p1.flags.retreatedThisTurn, true);
 });
 
+test('retreat: a 2+ bench retreat suspends to a mat pick, then resolves the clicked bench', () => {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 1, name: 'Snorlax', hp: 140, retreatCost: [] })
+  );
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 2, name: 'Pikachu', hp: 60 }),
+    createCard({ instanceId: 3, name: 'Raichu', hp: 100 })
+  );
+
+  const suspended = applyCommand(state, {
+    type: 'retreat',
+    payload: {},
+    playerId: 'p1',
+  });
+  assert.equal(suspended.error, null);
+  const choice = suspended.state.pendingChoice;
+  assert.ok(choice, 'a 2+ bench retreat must raise a choice');
+  assert.equal(choice.player, 'p1');
+  assert.equal(choice.min, 1);
+  assert.equal(choice.max, 1);
+  assert.deepEqual(
+    choice.options.map((o) => o.instanceId),
+    [2, 3]
+  );
+  assert.equal(choice.resumeToken.effectType, 'retreat');
+  // Nothing has moved yet.
+  assert.equal(suspended.state.players.p1.zones.active[0].instanceId, 1);
+
+  const resolved = applyCommand(suspended.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: [3] },
+    playerId: 'p1',
+  });
+  assert.equal(resolved.error, null);
+  assert.equal(resolved.state.pendingChoice, null);
+  assert.equal(resolved.state.players.p1.zones.active[0].instanceId, 3);
+  assert.equal(resolved.state.players.p1.flags.retreatedThisTurn, true);
+  assert.ok(
+    resolved.state.players.p1.zones.bench.some((c) => c.instanceId === 1),
+    'the old Active is now benched'
+  );
+});
+
+test('retreat: exactly one bench target still auto-switches without a choice', () => {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 1, name: 'Snorlax', hp: 140, retreatCost: [] })
+  );
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 2, name: 'Pikachu', hp: 60 })
+  );
+
+  const res = applyCommand(state, {
+    type: 'retreat',
+    payload: {},
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.active[0].instanceId, 2);
+});
+
 // Audit finding B-1: takePrizes used to be a bare "count <= prizes.length" bounds check with no
 // turn gate, so any client could emit takePrizes{count:6} and win outright. Prize cards are now an
 // entitlement granted by handleKnockout (flags.prizesOwed) and settled by the reducer when the

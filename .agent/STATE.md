@@ -4,37 +4,46 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 190
-Focus: "Dive Ball shows every Pokémon, not just Water" — the search parser only knew the energy-symbol
-  form (`Basic {W} Pokémon`); a word-form type (`a Water Pokémon`) fell through to `what: 'Pokémon'`, so
-  the picker matched every Pokémon. Word-form types now parse + enforce the printed type.
-Active: worktree `vibe-dive-ball`, branch `fix/dive-ball-water-filter` @ 990ff54+ (PR #167, open):
-  `shared/engine/rules/{search-match,trainer-effects}.mjs` + `trainer-effects.test.mjs`. Primary
-  checkout on `main` @ ce0cc55 still holds the uncommitted S188/S183/S184/S189 work, untouched here.
-Next: review/merge PR #167. Then commit the primary checkout's still-uncommitted S189 (and S188/S183/
-  S184) work — none of it is on a branch/PR. S183's rules-bridge gate is still owed: `flip-gate-test.mjs`'s
-  `playFromHand` throws under SERVER_AUTHORITATIVE, so it needs real UI drags or `__ptcg.act`.
+Session: 192
+Focus: Made EVERY effect that chooses in-play Pokémon route to the mat picker (D60, supersedes
+  D59's max===1 gate): mat picker now multi-selects; retreat (2+ bench) raises a choice; Escape
+  Rope parses to switchOwn+switchOpponentOut; attack snipes/counter-placement raise an attack-target
+  choice, including "in any way you like" placed one counter per click. Boss/Switch/heal already
+  worked; damage-to-all-bench spread is intentionally automatic. Legacy chat-buttons.js retreat +
+  attack snipes/counters also use openMatPick. Server-authoritative path is the tested one.
+Active: worktree `C:\Users\SMG26\Downloads\vibe-mat-picker-server` on `feature/server-mat-picker`
+  @ 48e612d (PR #170), with UNCOMMITTED S192 edits: `rules/mat-picker.js`, `mat-pick-request.mjs`,
+  `mat-picker-adapter.js`, `apply-view.js`, `shared/engine/reduce.mjs`, `rules/damage-parser.mjs`,
+  `rules/trainer-effects.mjs`, `client/src/actions/chat-buttons/chat-buttons.js`,
+  `client/src/setup/image-logic/drag.js`, tests, `.agent/designs/017-*.md`, DECISIONS/MAP/STATE/journal.
+Next: commit and push S192 onto the PR #170 branch. Then PR #170 merge. Primary checkout still on
+  `main` @ ce0cc55 with uncommitted S190 holo + S183/S184/S188/S189 work — none on a branch yet.
+  Legacy chat-buttons.js changes are syntax/lint-checked only (no unit/live harness); W/R is not
+  applied to chosen snipe targets on either path.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Carousel clicks: `stage.setPointerCapture()` makes the browser deliver the follow-up `click` to the
-  capturing stage, so a bubbling listener on carousel-slide content never fires. Interactive slide
-  content must be in `isSwipeBlockedTarget` (`card-picker.js`). Verify with REAL input — `el.click()`
-  dispatches no pointerdown and hides it (it did for S180's "working attack click" and PR #163).
-- The holo must NEVER consult `prefers-reduced-motion` again (D56): drift amplitude is unconditional,
-  and this machine reports reduce, so a re-added gate freezes every card. Measure with Playwright
-  `reducedMotion: null` — its default 'no-preference' emulation masks the OS value.
-- Under SERVER_AUTHORITATIVE the legacy zone arrays are EMPTY, so `__ptcg.playFromHand` dies in
-  `moveCardMessage`; read `getAuthoritativeZoneArray`/`cardRegistry` and address cards by instanceId.
-- `matchesSearch` (`search-match.mjs`) silently widens to all Pokémon when the parsed `what` loses a
-  qualifier — any new search clause must round-trip its type. `pnpm test` is an explicit file list (a
-  new test file runs only once listed); gate 1967/1967 green as of S190. `pnpm lint` still repo-wide red
-  on CRLF (`core.autocrlf=true`) plus pre-existing `no-undef`/`no-useless-escape`.
-- The opening sequence must gate on state, never a sleep: `waitForOpeningHand` + the `openingStarted`
-  latch (D52); under server authority the server already dealt.
+- Server mat pick (design 016/017, D59/D60): `apply-view.js` routes a PendingChoice to the mat
+  picker when every option is an in-play Pokémon root (`cardRegistry` record: `zone ∈ active|bench`,
+  `card.attachedTo == null`, `.element`) at ANY `max`; `mat-picker.js` toggles for `max>1` and needs
+  Confirm. `MAT_PICKER.close()` is a SILENT `dismissMatPick()` — only user Cancel/Escape calls
+  `onCancel`.
+- Attack target choices are `resumeToken.effectType:'attack'` with `token.attackTarget`; the resume
+  branch in `reduce.mjs` applies the damage then emits `attackExecuted` and ends the turn. The
+  target block runs AFTER draw/energy/locks/search so a suspension never drops them; a
+  `distributable` clause re-suspends one counter at a time (`remaining`).
+- Carousel clicks: `stage.setPointerCapture()` retargets the follow-up `click` to the stage;
+  interactive slide content must be in `isSwipeBlockedTarget` (`card-picker.js`). Verify with REAL
+  input — `el.click()` hides it.
+- Under SERVER_AUTHORITATIVE the legacy zone arrays are EMPTY; read
+  `getAuthoritativeZoneArray`/`cardRegistry` and address cards by instanceId.
+- `pnpm test` is an explicit file list (a new test file runs only once listed). Gate 1989/1989 green
+  as of S192; `pnpm lint` still repo-wide red on CRLF (`core.autocrlf=true`) plus pre-existing
+  `no-undef` (`dmg` in `chat-buttons.js`) and `no-useless-escape` in `trainer-effects.mjs:182/188`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S190 2026-09-19 debug: Dive Ball (and word-form typed searches) filter by the printed type; 1967/1967, PR #167.
-- S189 2026-09-19 debug: attack-panel clicks now reach the inspector's handler (pointer-capture fix);
-  real-input e2e step 13 red→green, 1965/1965.
-- S188 2026-09-19 patch: the foil drifts even when the OS asks for reduced motion (D56, PR #165).
+- S192 2026-09-19 feature: mat picker multi-select + retreat/Escape Rope/attack-target choices +
+  "in any way" counter distribution, netcode and legacy (design 017, D60); pnpm test 1989/1989.
+- S191 2026-09-19 feature: in-play-Pokémon server choices use the mat picker (design 016, D59,
+  PR #170); pnpm test 1978/1978, live 2P probe passed.
+- S190 2026-09-19 patch (primary, uncommitted): double-click preview foil flows like the mat (D58).

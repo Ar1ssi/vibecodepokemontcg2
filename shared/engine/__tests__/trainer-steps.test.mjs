@@ -64,6 +64,51 @@ function resolve(game, res, selection) {
 const ids = (cards) => cards.map((c) => c.instanceId);
 const zone = (res, player, zoneId) => res.state.players[player].zones[zoneId];
 
+test('Escape Rope: the initiator switches first, then the opponent picks their own new Active', () => {
+  const game = setup();
+  game.p1.zones.bench.push(pokemon('P1 Bench A'), pokemon('P1 Bench B'));
+  game.p2.zones.bench.push(pokemon('P2 Bench A'), pokemon('P2 Bench B'));
+  const p1Active = game.p1.zones.active[0].instanceId;
+  const p2Active = game.p2.zones.active[0].instanceId;
+
+  const { res } = play(
+    game,
+    'Each player switches their Active Pokémon with 1 of their Benched Pokémon. (The player who plays this card switches first.)'
+  );
+  assert.equal(res.error, null);
+
+  // Step 1: the player who played the card chooses their own new Active.
+  const first = res.pendingChoice;
+  assert.ok(first, 'initiator choice expected');
+  assert.equal(first.player, 'p1');
+  assert.equal(first.min, 1);
+  assert.equal(first.max, 1);
+  assert.deepEqual(ids(first.options), ids(game.p1.zones.bench));
+  const p1Pick = first.options[1].instanceId;
+  const afterFirst = resolve(game, res, [p1Pick]);
+  assert.equal(afterFirst.error, null);
+  assert.equal(afterFirst.state.players.p1.zones.active[0].instanceId, p1Pick);
+  assert.ok(
+    afterFirst.state.players.p1.zones.bench.some((c) => c.instanceId === p1Active),
+    'the old p1 Active is benched'
+  );
+
+  // Step 2: the opponent then chooses THEIR own new Active.
+  const second = afterFirst.pendingChoice;
+  assert.ok(second, 'opponent choice expected');
+  assert.equal(second.player, 'p2');
+  assert.deepEqual(ids(second.options), ids(game.p2.zones.bench));
+  const p2Pick = second.options[1].instanceId;
+  const afterSecond = resolve(game, afterFirst, [p2Pick]);
+  assert.equal(afterSecond.error, null);
+  assert.equal(afterSecond.pendingChoice, null);
+  assert.equal(afterSecond.state.players.p2.zones.active[0].instanceId, p2Pick);
+  assert.ok(
+    afterSecond.state.players.p2.zones.bench.some((c) => c.instanceId === p2Active),
+    'the old p2 Active is benched'
+  );
+});
+
 test('opponentDraw (Archer): you draw 5, your opponent draws 3', () => {
   const game = setup();
   for (const p of [game.p1, game.p2]) {
