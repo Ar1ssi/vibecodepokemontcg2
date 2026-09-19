@@ -799,6 +799,36 @@ export function repositionCardOverlays(options = lastOverlayOptions) {
 }
 
 /**
+ * The registry record whose `.play-container` hosts this attachment.
+ *
+ * The immediate `attachedTo` parent is not always the host: the server keeps
+ * evolutions attached under the Basic (D40), so a parent that is itself an
+ * attachment (an evolution in the stack) owns no container of its own. Walking up
+ * to the nearest ancestor that has one keeps the card inside its host's
+ * `.play-container`, the way legacy `attach-card.js` inserted it beside the target
+ * card's own anchor. Returns null when no ancestor in the chain hosts a container
+ * — the caller then falls through to the unchanged top-level branch.
+ *
+ * @param {object} cardData
+ * @param {string} zoneId
+ * @returns {object|null}
+ */
+function attachmentHostRecord(cardData, zoneId) {
+  if (!PLAY_ZONES.includes(zoneId) || cardData.attachedTo == null) return null;
+
+  // `visited` only guards a malformed view that points a card's `attachedTo` at
+  // itself or into a cycle: this walk must never spin the render loop.
+  const visited = new Set();
+  let record = cardRegistry.get(cardData.attachedTo);
+  while (record && !record.container && !visited.has(record)) {
+    visited.add(record);
+    const hostId = record.card?.attachedTo;
+    record = hostId != null ? cardRegistry.get(hostId) : null;
+  }
+  return record?.container ? record : null;
+}
+
+/**
  * Places a card element into its target zone, handling play-containers and attachments.
  *
  * @param {object} cardData
@@ -816,10 +846,7 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
   if (!zone.element || !record) return { attachedParent: null };
 
   const img = record.element;
-  const parentRecord =
-    PLAY_ZONES.includes(zoneId) && cardData.attachedTo != null
-      ? cardRegistry.get(cardData.attachedTo)
-      : null;
+  const parentRecord = attachmentHostRecord(cardData, zoneId);
 
   // Handle play zones (active & bench)
   if (parentRecord && parentRecord.container) {
