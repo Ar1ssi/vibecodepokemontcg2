@@ -345,7 +345,7 @@ describe('startHoloAnimation', () => {
     stopHoloAnimation(card);
   });
 
-  it('reduced motion freezes the board drift', () => {
+  it('the OS reduce-motion preference does not still the board drift', () => {
     global.matchMedia = () => ({ matches: true });
     const card = createFakeElement();
     startHoloAnimation(card, { auto: true, tilt: false });
@@ -353,8 +353,7 @@ describe('startHoloAnimation', () => {
     const first = card.properties['--pointer-x'];
     runFrame(3000);
 
-    assert.equal(card.properties['--pointer-x'], first);
-    assert.equal(first, `${LIGHT.originX.toFixed(2)}%`);
+    assert.notEqual(card.properties['--pointer-x'], first);
     stopHoloAnimation(card);
   });
 
@@ -436,7 +435,7 @@ describe('startHoloAnimation', () => {
     }
   });
 
-  it('reduced motion stills the interactive drift too', () => {
+  it('the OS reduce-motion preference does not still the interactive drift', () => {
     global.matchMedia = () => ({ matches: true });
     const card = createFakeElement();
     startHoloAnimation(card);
@@ -444,8 +443,7 @@ describe('startHoloAnimation', () => {
     const first = card.properties['--pointer-x'];
     runFrame(3000);
 
-    assert.equal(card.properties['--pointer-x'], first);
-    assert.equal(first, `${LIGHT.originX.toFixed(2)}%`);
+    assert.notEqual(card.properties['--pointer-x'], first);
     stopHoloAnimation(card);
   });
 

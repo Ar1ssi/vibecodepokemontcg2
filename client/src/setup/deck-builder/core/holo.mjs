@@ -417,9 +417,6 @@ export function driftTilt(nowMs, amplitude = DRIFT.amplitude) {
   };
 }
 
-const prefersReducedMotion = () =>
-  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-
 // ── animation loop ───────────────────────────────────────────────────
 // Interactive (previews, picker): the cursor tilts the card on simey's rotate
 // spring; the light then follows the card's rotation, and the idle drift below
@@ -439,8 +436,10 @@ export function startHoloAnimation(
   stopHoloAnimation(card);
 
   const springRotate = new Spring({ x: 0, y: 0 }, SPRING_INTERACT_SETTINGS);
-  // Both modes drift; reduced motion is the only thing that stills them.
-  const driftAmplitude = prefersReducedMotion() ? 0 : DRIFT.amplitude;
+  // The OS "reduce motion" preference deliberately does NOT still the foil:
+  // zeroing the amplitude left every card frozen on the neutral pose, which
+  // reads as a broken effect rather than a calmer one (user decision, D54).
+  const driftAmplitude = DRIFT.amplitude;
   const driftOffsetMs = phaseOffset * DRIFT.periodXMs;
 
   let rafId = null;
