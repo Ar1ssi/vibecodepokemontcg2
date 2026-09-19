@@ -68,21 +68,31 @@ import test from 'node:test';
       assert.equal(isExCard({ name: 'Ninetales GX' }), false);
     });
 
-    test('koOutcome: GX = match loss, otherwise prize counts', () => {
-      assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'matchLoss' });
+    test('koOutcome: GX awards 2 prizes (no match loss)', () => {
+      assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'prizes', count: 2 });
+      assert.deepEqual(koOutcome({ name: 'Ninetales GX' }), { type: 'prizes', count: 2 });
       assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 2 });
       assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 3 });
       assert.deepEqual(koOutcome({ rarity: 'Common' }), { type: 'prizes', count: 1 });
     });
 
-    test('handleKO: KOing a Pokémon GX wins the match immediately (no prizes taken)', () => {
+    test('handleKO: KOing a Pokémon GX awards 2 prizes, not a match win', () => {
       resetPrizes();
       awardPrizes('self', 2);
       const r = handleKO({ attackerPlayer: 'self', defender: { subtypes: ['GX'] } });
+      assert.equal(r.won, false);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 4); // 2 prior + 2 for the GX
+      assert.equal(r.prizesRemaining, 2);
+    });
+
+    test('handleKO: GX prizes can complete the win at 6 taken', () => {
+      resetPrizes();
+      awardPrizes('self', 4);
+      const r = handleKO({ attackerPlayer: 'self', defender: { name: 'Ninetales GX' } });
       assert.equal(r.won, true);
-      assert.equal(r.prizeCount, 0);
-      assert.equal(r.prizesTaken, 2); // prior prizes unaffected
-      assert.match(r.reason, /GX/);
+      assert.equal(r.prizeCount, 2);
+      assert.match(r.reason, /prize cards taken/);
     });
 
     test('handleKO: ex awards 2 prizes', () => {

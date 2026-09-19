@@ -48,14 +48,14 @@ The parser's first job is to bucket a card by `supertype` (`'Pokémon' | 'Traine
 | **V** | 2 prizes on KO. | `subtypes` includes `v` | Legacy (SwSh) |
 | **VMAX** | 3 prizes on KO; evolves from a V. | `subtypes` includes `vmax` | Legacy (SwSh) |
 | **VSTAR** | 2 prizes; evolves from a V; has a "VSTAR Power" instead of an ability. | `subtypes` includes `vstar` | Legacy (SwSh) |
-| **GX** | 2 prizes; "GX rule" (KO = you lose the match). | `subtypes` includes `gx` | Legacy (SM) |
+| **GX** | 2 prizes; a "GX attack" (once per game) on the card. | `subtypes` includes `gx` | Legacy (SM) |
 | **Mega Evolution** | 2 prizes; a new (SV) evolution mechanic, often from a non-standard line. | `rarity` includes `mega` | Modern (SV) |
 | **Tera / Terastal** | SV "Terastal" — a Tera Type swap; not a prize modifier. | `subtypes`/text; no dedicated TCGdex field | Modern (SV) |
 
 > **Note:** prize-count derivation lives in `prizesForKO()` (`ko-flow.mjs`) and is
-> an **approximation** built from `rarity` + `subtypes` (ex/double-rare → 3, vmax → 3,
-> vstar/v/mega → 2, default → 1). The ex rule (modern: 3 prizes, i.e. "2 extra" over
-> a standard KO) and the GX "KO'd = lose the match" rule are modeled in `koOutcome()`
+> an **approximation** built from `rarity` + `subtypes` (vmax / mega → 3,
+> ex/gx/v/vstar/double-rare → 2, default → 1). A GX knockout awards 2 prizes
+> like ex — there is no match-loss rule (App. 19); both are modeled in `koOutcome()`
 > + `handleKO()` (`ko-flow.mjs`), exercised by tests in `rules-extended.test.mjs`.
 
 ### A2. Trainer
@@ -101,7 +101,7 @@ exactly these. A full parser needs all of them:
 | Weakness | `weakness {type, value}` | ✅ parsed + applied by `computeAttackDamage()` (`attack-engine.mjs:11`): modern ×2, legacy flat +N; tested in `rules.test.mjs`; wired into live `attack()` (`chat-buttons.js`) |
 | Resistance | `resistance {type, value}` | ✅ parsed + applied by `computeAttackDamage()`; tested; wired into live `attack()` (`chat-buttons.js`) |
 | Retreat cost | `retreatCost` | ✅ live retreat flow: gate (`canPerformAction` + `statusAllowsRetreat` — only Paralyzed blocks) → pay cost (discard N energy, `energiesToDiscardForRetreat()`) → swap active/bench → `markRetreated` → clears Confused (`clearStatuses`); wired via `retreat()` action (`chat-buttons.js`) + P1/P2 buttons + flip-board; tested in `rules-extended.test.mjs` |
-| Attacks | `attacks[]` (`name`, `cost[]`, `damage`, `text`) | ✅ live attack flow: `ensureCardData()` enriches both actives → energy-cost gate (`canPayAttackCost`, ⛔ announce + bail without ending turn) → `computeAttackDamage()` (weakness ×2 / legacy +N, resistance, clamped ≥0) → damage counters placed on opponent's active → KO check (`totalDamage ≥ hp`) → prizes (`handleKO`: GX = match win, else `prizesForKO` + `promotionGuidance`); wired via `attack()` (`chat-buttons.js`); pure functions tested in `rules.test.mjs` / `rules-extended.test.mjs`. Attack `text` effect families are parsed + **executed in solo** via `damage-parser.mjs` helpers inside `attack()` — see D. `attack-effects.mjs` remains an announce-only classifier (`applyAttackEffect` always `executed: false`) and is not the live execution path. |
+| Attacks | `attacks[]` (`name`, `cost[]`, `damage`, `text`) | ✅ live attack flow: `ensureCardData()` enriches both actives → energy-cost gate (`canPayAttackCost`, ⛔ announce + bail without ending turn) → `computeAttackDamage()` (weakness ×2 / legacy +N, resistance, clamped ≥0) → damage counters placed on opponent's active → KO check (`totalDamage ≥ hp`) → prizes (`handleKO`: `prizesForKO` + `promotionGuidance` — a GX knockout is 2 prizes, not a match win); wired via `attack()` (`chat-buttons.js`); pure functions tested in `rules.test.mjs` / `rules-extended.test.mjs`. Attack `text` effect families are parsed + **executed in solo** via `damage-parser.mjs` helpers inside `attack()` — see D. `attack-effects.mjs` remains an announce-only classifier (`applyAttackEffect` always `executed: false`) and is not the live execution path. |
 | Stage | `stage` | ✅ gates `evolve` in `canPerformAction` |
 | Evolves-from | `evolvesFrom` | ✅ live evolution gate in `moveCard()` (`move-card.js`): `canEvolve()` blocks illegal evolutions (turn-1 ban, same-turn ban, stage chain, once-per-turn) before the zone splice; on success `markEvolvedThisTurn()` + `clearStatuses()` + announce; tested in `rules-extended.test.mjs` |
 | Ability | `ability {name, text}` | ✅ all core families executed — see C (live wiring in `chat-buttons.js` / `rules-bridge.js`; `parseAbility()` still emits guidance lines) |
@@ -344,12 +344,11 @@ passes `{ type, family }` objects. **Special-energy card *effects* are classifie
 
 | Rule | Where | Status |
 |---|---|---|
-| KO → prize count by card class | `prizesForKO()` — ex/double-rare→**3**, vmax→3, vstar/v/mega→2, else→1 | ✅ |
+| KO → prize count by card class | `prizesForKO()` — vmax / mega→**3**, ex/gx/v/vstar/double-rare→**2**, else→1 | ✅ |
 | **Win = all 6 prizes taken** | `awardPrizes()` (`won: total >= 6`) — **not** in `checkWinConditions` | ✅ |
 | **Win = opponent has no Pokémon in play** | `checkWinConditions()` (active + bench both 0) | ✅ |
 | **Win = opponent deck-out** | `checkWinConditions()` (`deckCounts[turnPlayer] === 0`) | ✅ |
-| ex "take 2 extra prizes if KO'd" rule | `prizesForKO()` (ex → 3 total) | ✅ |
-| GX "lose the match when KO'd" rule | `koOutcome()` → `{type:'matchLoss'}`, handled in `handleKO()` (`won: true`, reason) | ✅ |
+| GX KO "2 prizes" rule (App. 19) | `prizesForKO()` / `handleKO()` — a GX knockout is a normal 2-prize KO, not a match loss | ✅ |
 | Promotion (bench → active after KO) | `planPromotion()` (`ko-flow.mjs`) decides; `chat-buttons.js` executes — KO'd active → discard, first bench promoted via `moveCard()`; bench KOs never promote | ✅ |
 | Bench limit (5) | `BENCH_LIMIT`, `canAddToBench()` | ✅ |
 
@@ -465,11 +464,11 @@ Ranked roughly by "how much is missing to make a card actually work":
     + `supporterPlayed` flag (`rules-state.mjs`), wired into `moveCard()` before zone
     mutation; Items/Stadiums/Tools/Special Supporters bypass. Tested in
     `rules-extended.test.mjs`.
-10. ~~**ex / GX KO special rules not modeled** (H)~~ — **done**: ex now awards **3** prizes
-    (2 extra) via `prizesForKO()`; GX KO is a match loss via pure `koOutcome()` +
-    `handleKO()` (`won: true`, `reason: 'opponent Pokémon GX was Knocked Out'`).
-    `isExCard`/`isGxCard` use TCGdex `subtypes` with a name-suffix fallback (works
-    before async card data loads). Tested in `rules-extended.test.mjs` (180/180 green).
+10. ~~**ex / GX KO special rules not modeled** (H)~~ — **done**: ex awards **2** prizes
+    via `prizesForKO()`, and a GX knockout also awards **2** prizes (App. 19 — there is
+    no match-loss rule; earlier releases wrongly ended the game). `isExCard`/`isGxCard`
+    use TCGdex `subtypes` with a name-suffix fallback (works before async card data
+    loads). Tested in `rules-extended.test.mjs`.
 
 ---
 

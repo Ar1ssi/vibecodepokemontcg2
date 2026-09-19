@@ -126,6 +126,7 @@ export class GameRoom {
         deckList: Array.isArray(deckList) ? [...deckList] : [],
         zones: createPlayerZones(),
         flags: {},
+        oncePerGame: { vstarUsed: false, gxUsed: false },
       };
       // If turn player wasn't initialized, set to first joined player
       if (!this.state.turn.player) {
@@ -592,6 +593,7 @@ export class GameRoom {
         deckList: [],
         zones: createPlayerZones(),
         flags: {},
+        oncePerGame: { vstarUsed: false, gxUsed: false },
       };
       if (!this.state.turn.player) {
         this.state.turn.player = entry.playerId;
