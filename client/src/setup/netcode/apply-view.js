@@ -9,6 +9,7 @@
  */
 
 import { diffViews } from './view-diff.mjs';
+import { buildMatPickerRequest } from './mat-pick-request.mjs';
 import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
 import { buildCardImage } from '../image-logic/build-card-image.js';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
@@ -59,6 +60,10 @@ let defaultNetcodeContext = {
   // { open({ choice, cards, onResolve }), close() } — the prize fly-up picker
   // (prize-take-prompt.js), injected for the same reason.
   prizePicker: null,
+  // { open({ choice, candidates, cancellable, onResolve, onCancel }), close() } —
+  // the in-play-Pokémon mat picker (mat-picker.js), for choices whose options are
+  // all cards on the board (D19). Injected for the same reason.
+  matPicker: null,
   reconcileHandStacks: null,
   // clearHandStackPositioning(node) — hand-stack-dom.js, injected for the same
   // reason. Undoes the hand stack's inline positioning on a card that left the
@@ -72,6 +77,8 @@ let defaultNetcodeContext = {
 let openPickerChoiceId = null;
 // Same guard for the prize picker.
 let openPrizeChoiceId = null;
+// Same guard for the mat picker.
+let openMatChoiceId = null;
 
 // Options of the last applied view, reused when overlays re-measure on resize.
 let lastOverlayOptions = null;
@@ -156,6 +163,8 @@ export function setDefaultNetcodeContext(ctx = {}) {
     defaultNetcodeContext.choicePicker = ctx.choicePicker;
   if (ctx.prizePicker !== undefined)
     defaultNetcodeContext.prizePicker = ctx.prizePicker;
+  if (ctx.matPicker !== undefined)
+    defaultNetcodeContext.matPicker = ctx.matPicker;
   if (ctx.reconcileHandStacks !== undefined)
     defaultNetcodeContext.reconcileHandStacks = ctx.reconcileHandStacks;
   if (ctx.clearHandStackPositioning !== undefined)
@@ -191,6 +200,7 @@ export function resetRenderState() {
   clearInFlightAffordances();
   openPickerChoiceId = null;
   openPrizeChoiceId = null;
+  openMatChoiceId = null;
   lastOverlayOptions = null;
   defaultNetcodeContext = {
     socket: null,
@@ -203,6 +213,7 @@ export function resetRenderState() {
     holo: null,
     choicePicker: null,
     prizePicker: null,
+    matPicker: null,
     reconcileHandStacks: null,
     clearHandStackPositioning: null,
   };
@@ -1412,6 +1423,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
 
   if (!pendingChoice) {
     closePrizePicker(options);
+    closeMatPicker(options);
     closeChoicePicker(options);
     if (existingModal?.parentNode)
       existingModal.parentNode.removeChild(existingModal);
@@ -1426,6 +1438,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
   if (!isOwner) {
     // Opponent is choosing: show non-interactive waiting banner
     closePrizePicker(options);
+    closeMatPicker(options);
     closeChoicePicker(options);
     if (existingModal?.parentNode)
       existingModal.parentNode.removeChild(existingModal);
@@ -1445,12 +1458,21 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     existingBanner.parentNode.removeChild(existingBanner);
 
   if (openChoiceInPrizePicker(pendingChoice, options)) {
+    closeMatPicker(options);
     closeChoicePicker(options);
     if (existingModal?.parentNode)
       existingModal.parentNode.removeChild(existingModal);
     return;
   }
   closePrizePicker(options);
+
+  if (openChoiceInMatPicker(pendingChoice, options)) {
+    closeChoicePicker(options);
+    if (existingModal?.parentNode)
+      existingModal.parentNode.removeChild(existingModal);
+    return;
+  }
+  closeMatPicker(options);
 
   if (openChoiceInCardPicker(pendingChoice, options)) {
     if (existingModal?.parentNode)
@@ -1649,6 +1671,58 @@ function closePrizePicker(options = {}) {
   if (openPrizeChoiceId == null) return;
   openPrizeChoiceId = null;
   (options.prizePicker || defaultNetcodeContext.prizePicker)?.close?.();
+}
+
+/**
+ * Shows a pendingChoice whose options are all in-play Pokémon by outlining the real
+ * cards on the mat (the legacy openMatPick UI, D19), instead of the card carousel.
+ * Falls back when no picker is injected, an option is not on the board, or the choice
+ * is a multi-pick (the mat picker resolves on one click).
+ *
+ * @returns {boolean} whether the mat picker owns this choice
+ */
+function openChoiceInMatPicker(pendingChoice, options = {}) {
+  const picker = options.matPicker || defaultNetcodeContext.matPicker;
+  if (typeof picker?.open !== 'function') return false;
+  const request = buildMatPickerRequest(pendingChoice, cardRegistry);
+  if (!request) return false;
+  if (openMatChoiceId === pendingChoice.choiceId) return true;
+
+  closeMatPicker(options);
+  openMatChoiceId = pendingChoice.choiceId;
+  try {
+    picker.open({
+      choice: pendingChoice,
+      candidates: request.candidates,
+      cancellable: request.cancellable,
+      onResolve: (selection) => {
+        // Mirrors the card picker: a resolved pick already tore its own UI down,
+        // so a later view that still carries this choice reopens if rejected.
+        openMatChoiceId = null;
+        return submitChoiceSelection(pendingChoice, selection, options);
+      },
+      onCancel: () => {
+        // Only a cancellable choice (min 0) reaches here; the required case hides
+        // Cancel and ignores Escape. Report the decline so the server completes
+        // the effect instead of leaving the choice pending forever.
+        openMatChoiceId = null;
+        if (request.cancellable) {
+          return submitChoiceSelection(pendingChoice, [], options);
+        }
+      },
+    });
+  } catch (err) {
+    openMatChoiceId = null;
+    console.error('[apply-view] mat picker failed, using card picker:', err);
+    return false;
+  }
+  return true;
+}
+
+function closeMatPicker(options = {}) {
+  if (openMatChoiceId == null) return;
+  openMatChoiceId = null;
+  (options.matPicker || defaultNetcodeContext.matPicker)?.close?.();
 }
 
 function closeChoicePicker(options = {}) {
