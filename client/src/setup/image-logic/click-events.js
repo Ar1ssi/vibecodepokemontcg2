@@ -22,6 +22,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
+import { orderAttachedForCarousel } from './carousel-order.mjs';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import {
   openCardInspector,
@@ -385,7 +386,7 @@ export const doubleClick = (event) => {
       if (attachedSlides.length) {
         openCarouselViewer({
           title: card.name || 'Attached Cards',
-          candidates: [...attachedSlides, card],
+          candidates: [...orderAttachedForCarousel(attachedSlides), card],
           initialIndex: attachedSlides.length,
         });
       } else {
