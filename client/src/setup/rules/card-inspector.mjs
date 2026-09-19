@@ -17,14 +17,31 @@
 
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
-import { rulesState, ensureCardData, getStadium, abilityUsed } from '../../../../shared/engine/rules/rules-state.mjs';
+import {
+  rulesState,
+  ensureCardData,
+  getStadium,
+  abilityUsed,
+} from '../../../../shared/engine/rules/rules-state.mjs';
 import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-attack-context.mjs';
-import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
+import {
+  attachedEnergiesFor,
+  stadiumCardFor,
+  abilityUsedFor,
+} from './attack-preview-sources.mjs';
+import {
+  isAuthoritativeDispatchActive,
+  dispatchAuthoritativeUseAbility,
+} from '../netcode/authoritative-dispatch.js';
 import { getZone } from '../zones/get-zone.js';
 import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
-import { openCarouselViewer } from '../image-logic/card-picker.js';
+import {
+  openCarouselViewer,
+  closeCarouselViewer,
+} from '../image-logic/card-picker.js';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -117,11 +134,40 @@ const textWithOrbs = (target, text, className) => {
   }
 };
 
+// The ability banner is deliberately not the Pokémon's type colour: on the card the ability
+// name prints beside a red "Ability" badge that is the same on every card, and keying it to
+// type would make an ability panel look like an attack panel of a different cost.
+const ABILITY_BANNER = '#a52834';
+
+const abilityEl = (ability) => {
+  const section = el(
+    'section',
+    `ptcg-ability${ability.recede ? ' ptcg-ability--recede' : ''}`
+  );
+  section.style.setProperty('--ptcg-banner', ABILITY_BANNER);
+
+  const head = el('div', 'ptcg-atk__head');
+  head.appendChild(el('span', 'ptcg-atk__badge', 'Ability'));
+  head.appendChild(el('span', 'ptcg-atk__name', ability.name));
+  section.appendChild(head);
+
+  if (ability.text) {
+    const body = el('p', 'ptcg-atk__text');
+    textWithOrbs(body, ability.text, 'ptcg-orb ptcg-orb--inline');
+    section.appendChild(body);
+  }
+  if (ability.reason) section.title = ability.reason;
+  return section;
+};
+
 const attackEl = (attack) => {
   const section = el(
     'section',
     `ptcg-atk${attack.recede ? ' ptcg-atk--recede' : ''}`
   );
+  // The delegated click handler resolves which attack was hit from this, so the panel stays
+  // addressable across re-renders that replace the whole chrome subtree.
+  section.dataset.ptcgAttack = String(attack.index);
   section.style.setProperty(
     '--ptcg-banner',
     BANNER[attack.cost[0]] || BANNER_DEFAULT
@@ -177,9 +223,15 @@ const retreatTile = (symbols) =>
   });
 
 /**
- * The overlay pieces. `bandTopPct` is null when the card has no attacks (attackZoneBounds
- * returns null for a zero-attack layout), so the lower block is not drawn at all rather than
- * collapsed into a zero-height strip sitting on the print.
+ * The overlay pieces.
+ *
+ * The stack is anchored at `blockTopPct` (the ability band when the card has an ability, since
+ * that text prints above the attacks) and sized by its own content — it no longer stretches to
+ * the stat band, because a one-attack card used to leave a foot of empty white where the print
+ * should show through. The stat band is positioned separately on the printed weakness strip.
+ *
+ * `blockTopPct` is null when there is nothing to lay out (no attacks and no ability), in which
+ * case no stack is drawn at all.
  */
 const buildChrome = (model) => {
   const chrome = el('div', 'ptcg-chrome');
@@ -192,27 +244,24 @@ const buildChrome = (model) => {
     : `${model.hp} HP`;
   chrome.appendChild(hp);
 
-  if (model.attacks.length && model.bandTopPct != null) {
-    const lower = el('div', 'ptcg-lower');
-    lower.style.top = `${model.bandTopPct}%`;
-    lower.style.bottom = `${model.footH}%`;
-
+  if (model.blockTopPct != null) {
+    const stack = el('div', 'ptcg-stack');
+    stack.style.top = `${model.blockTopPct}%`;
+    if (model.ability) stack.appendChild(abilityEl(model.ability));
     const atks = el('div', 'ptcg-atks');
     for (const attack of model.attacks) atks.appendChild(attackEl(attack));
-    lower.appendChild(atks);
-
-    const stats = el('footer', 'ptcg-stats');
-    stats.appendChild(
-      typeValueTile('weakness', model.weakness, (v) => `x${v}`)
-    );
-    stats.appendChild(
-      typeValueTile('resistance', model.resistance, (v) => `-${v}`)
-    );
-    stats.appendChild(retreatTile(model.retreat));
-    lower.appendChild(stats);
-
-    chrome.appendChild(lower);
+    stack.appendChild(atks);
+    chrome.appendChild(stack);
   }
+
+  const stats = el('footer', 'ptcg-stats');
+  stats.style.bottom = `${model.footH}%`;
+  stats.appendChild(typeValueTile('weakness', model.weakness, (v) => `x${v}`));
+  stats.appendChild(
+    typeValueTile('resistance', model.resistance, (v) => `-${v}`)
+  );
+  stats.appendChild(retreatTile(model.retreat));
+  chrome.appendChild(stats);
 
   if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
   return chrome;
@@ -293,13 +342,19 @@ const applyDim = (wrap, model) => {
  */
 const rerender = (state) => {
   if (!state.wrap.isConnected) return;
-  const model = buildInspectorModel(state.card, state.context || state.getContext());
+  const model = buildInspectorModel(
+    state.card,
+    state.context || state.getContext()
+  );
   const next = buildChrome(model);
   state.wrap.replaceChild(next, state.chrome);
   state.chrome = next;
+  // The delegated handler reads state.model, so refreshing it here is what keeps a click after
+  // a refresh event firing against current payability rather than the paint it opened with.
+  state.model = model;
   applyDim(state.wrap, model);
   placeChrome(next, state.wrap);
-  applyActions(state, model);
+  applyAffordances(state, model);
 };
 
 /**
@@ -323,12 +378,21 @@ export const decorateInspectorSlide = (
   const chrome = buildChrome(model);
   wrap.appendChild(chrome);
 
-  const state = { card, wrap, chrome, getContext, actions, context: null };
+  const state = {
+    card,
+    wrap,
+    chrome,
+    getContext,
+    actions,
+    context: null,
+    model,
+  };
   state.refresh = () => rerender(state);
   states.add(state);
   wireBoundary();
   applyDim(wrap, model);
-  applyActions(state, model);
+  applyAffordances(state, model);
+  wirePanelClicks(state);
   hydrateContext(state);
 
   // Positioned after layout, once the image has its natural size and the slide its final box.
@@ -339,22 +403,50 @@ export const decorateInspectorSlide = (
 };
 
 /**
- * Click a payable attack panel to fire it. Unpayable and spent panels stay inert, carrying the
- * engine's own reason as a tooltip — the same treatment design 008 D4 gave its zones.
+ * Paint the affordances — which panels look clickable. The click itself is delegated from the
+ * wrap (see `wirePanelClicks`), so a re-render that replaces the whole chrome subtree cannot
+ * silently drop a handler.
  */
-const applyActions = (state, model) => {
+const applyAffordances = (state, model) => {
   const handlers = state.actions;
-  const panels = [...state.wrap.querySelectorAll('.ptcg-atk')];
-  panels.forEach((panel, index) => {
-    panel.onclick = null;
-    panel.classList.remove('ptcg-atk--usable');
-    const attack = model.attacks[index];
-    if (!handlers?.onAttack || !attack?.payable || attack.onceUsed) return;
-    panel.classList.add('ptcg-atk--usable');
-    panel.onclick = (event) => {
+
+  state.wrap
+    .querySelector('.ptcg-ability')
+    ?.classList.toggle(
+      'ptcg-ability--usable',
+      Boolean(handlers?.onAbility) && Boolean(model.ability?.usable)
+    );
+
+  state.wrap.querySelectorAll('.ptcg-atk').forEach((panel) => {
+    const attack = model.attacks[Number(panel.dataset.ptcgAttack)];
+    panel.classList.toggle(
+      'ptcg-atk--usable',
+      Boolean(handlers?.onAttack) && Boolean(attack?.usable)
+    );
+  });
+};
+
+/**
+ * One delegated listener for the whole slide. `usable` already folds in payability,
+ * once-per-turn, rules-off and "a benched Pokémon cannot attack" — the model is the only place
+ * that decision is made, so nothing is re-derived here.
+ */
+const wirePanelClicks = (state) => {
+  state.wrap.addEventListener('click', (event) => {
+    const attackPanel = event.target.closest?.('.ptcg-atk[data-ptcg-attack]');
+    if (attackPanel) {
+      const attack =
+        state.model.attacks[Number(attackPanel.dataset.ptcgAttack)];
+      if (!attack?.usable) return;
       event.stopPropagation();
-      handlers.onAttack(index);
-    };
+      state.actions?.onAttack?.(attack.index);
+      return;
+    }
+    if (event.target.closest?.('.ptcg-ability')) {
+      if (!state.model.ability?.usable) return;
+      event.stopPropagation();
+      state.actions?.onAbility?.();
+    }
   });
 };
 
@@ -368,9 +460,10 @@ const energyTypesFor = (card) =>
  * modifier or the once-per-turn flags, so it over-reports unpayable attacks.
  * `resolveLiveContext` replaces it as soon as the async data lands.
  */
-const stampContextFor = (card) => ({
+const stampContextFor = (card, zone = 'active') => ({
   energyTypes: energyTypesFor(card),
   attacker: card,
+  zone,
   damageCtx: {
     attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
   },
@@ -385,14 +478,20 @@ const stampContextFor = (card) => ({
  * deal to the current target. Applying the defender's weakness here would print 500 on a card
  * that says 250 and read as a bug.
  */
-async function resolveLiveContext(card) {
+async function resolveLiveContext(card, zone = 'active') {
   try {
     await ensureCardData(card);
   } catch {
     /* card data not resolved yet — fall back on whatever the stamp carries */
   }
-  const attachedEnergyCards = attachedEnergiesFor(card, getZone('self', 'active').array);
-  const stadiumCard = stadiumCardFor(getStadium(), getAuthoritativeStadiumArray());
+  const attachedEnergyCards = attachedEnergiesFor(
+    card,
+    getZone('self', 'active').array
+  );
+  const stadiumCard = stadiumCardFor(
+    getStadium(),
+    getAuthoritativeStadiumArray()
+  );
   const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks } =
     await resolveAttackContext({
       activeCard: card,
@@ -400,7 +499,11 @@ async function resolveLiveContext(card) {
       ensureCardData,
       stadiumCard,
       abilityUsed: (c) =>
-        abilityUsedFor(c, abilityUsed('self', c), rulesState.flags?.self?.abilitiesUsed),
+        abilityUsedFor(
+          c,
+          abilityUsed('self', c),
+          rulesState.flags?.self?.abilitiesUsed
+        ),
     });
 
   return {
@@ -409,6 +512,7 @@ async function resolveLiveContext(card) {
     abilityUsed: abilityUsedFlag,
     priorAttacks,
     attacker: card,
+    zone,
     damageCtx: {
       attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
       energyCount: energyTypes.length,
@@ -422,7 +526,7 @@ async function resolveLiveContext(card) {
  * still being mounted — the player can close the inspector during the fetch (008 R12).
  */
 const hydrateContext = (state) => {
-  resolveLiveContext(state.card).then(
+  resolveLiveContext(state.card, state.getContext().zone).then(
     (context) => {
       if (!state.wrap.isConnected) return;
       state.context = context;
@@ -430,7 +534,7 @@ const hydrateContext = (state) => {
     },
     () => {
       /* resolution failed — the stamp-derived first paint stays on screen */
-    },
+    }
   );
 };
 
@@ -446,12 +550,16 @@ const hydrateContext = (state) => {
  * @param {() => object} [options.getContext] overrides the first-paint context; the authoritative
  *   one always arrives via `hydrateContext`, so this only changes what shows before then.
  * @param {(attackIndex: number) => void} [options.onAttack] fires a payable attack
+ * @param {() => void} [options.onAbility] uses the card's ability
+ * @param {'active'|'bench'} [options.zone] where the card sits, for the ability dispatch
  */
 export function openCardInspector({
   card,
   attachedSlides = [],
-  getContext = () => stampContextFor(card),
+  zone = 'active',
+  getContext = () => stampContextFor(card, zone),
   onAttack = null,
+  onAbility = () => useAbility(card, zone),
 } = {}) {
   if (!card?.image) return false;
 
@@ -462,7 +570,10 @@ export function openCardInspector({
 
   const decorate = (built, slideCard, index) =>
     index === mainIndex
-      ? decorateInspectorSlide(built, slideCard, getContext, { onAttack })
+      ? decorateInspectorSlide(built, slideCard, getContext, {
+          onAttack,
+          onAbility,
+        })
       : built.node;
 
   openCarouselViewer({
@@ -474,5 +585,35 @@ export function openCardInspector({
   return true;
 }
 
-export const closeCardInspector = teardownAll;
+/**
+ * Use the card's ability — the dispatch design 008's ability zone used, unchanged. Under server
+ * authority the SERVER runs it (and asks for any picks through a pendingChoice); the local step
+ * runner would mutate legacy zone arrays the server never sees.
+ *
+ * Unlike an attack this does not end the turn, so the inspector stays open and re-renders on the
+ * resulting board event — a once-per-turn ability flips to spent, and one that attached Energy
+ * can make a previously unpayable attack payable.
+ */
+const useAbility = (card, zone) => {
+  if (card?.instanceId != null && isAuthoritativeDispatchActive()) {
+    dispatchAuthoritativeUseAbility({
+      user: 'self',
+      emit: true,
+      oInitiator: 'opp',
+      zoneId: zone,
+      index: 0,
+      authoritativeId: card.instanceId,
+    });
+    return;
+  }
+  runAbilitySteps('self', card);
+};
+
+export const closeCardInspector = () => {
+  teardownAll();
+  // Tearing down the state alone leaves the carousel open, and a modal over the board is exactly
+  // how a dispatched attack looks like it never happened. The attack path closes before it fires;
+  // the ability path does not close at all, since using an ability does not end the turn.
+  closeCarouselViewer(null, true);
+};
 export const isCardInspectorOpen = () => states.size > 0;

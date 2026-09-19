@@ -16,10 +16,13 @@
  *    on this Pokémon reads 50, which is what TCG Live shows and what the player will deal.
  */
 
-import { listAttacks } from '../../../../shared/engine/rules/attack-window.mjs';
+import {
+  listAttacks,
+  listAbilities,
+} from '../../../../shared/engine/rules/attack-window.mjs';
 import { parseAttackDamage } from '../../../../shared/engine/rules/damage-parser.mjs';
 import { parseTypeValue } from '../../../../shared/engine/rules/rules-state.mjs';
-import { attackZoneBounds } from './attack-zone-geometry.js';
+import { attackZoneBounds, abilityZoneBounds } from './attack-zone-geometry.js';
 
 const POKEMON_SUPERTYPES = ['Pokémon', 'Pokemon', ''];
 
@@ -143,10 +146,28 @@ const typeValueOf = (card, key) => {
   return null;
 };
 
-const abilityCountOf = (card) => {
-  if (card?.ability?.text) return 1;
-  return Array.isArray(card?.abilities) && card.abilities.length ? 1 : 0;
-};
+/**
+ * The card's real ability, if it has one. Read from either spelling for the same reason as
+ * weakness/resistance: client enrichment sets singular `card.ability`, while server hydration
+ * (`reduce.mjs` cardStats) writes a plural `card.abilities` array.
+ *
+ * TCGdex carries rule-box text — Tera ex, Stellar, "Pokémon Tool" — in that same array, so an
+ * entry is only an ability when it is untyped (already narrowed by the hydration filter) or
+ * explicitly typed `Ability`. A rule box is printed on the card and is not the player's to use,
+ * so it gets no panel.
+ */
+export function rawAbilityOf(card) {
+  const singular = card?.ability;
+  if (singular && typeof singular === 'object' && singular.text)
+    return singular;
+  if (Array.isArray(card?.abilities)) {
+    const found = card.abilities.find(
+      (a) => a?.text && (!a.type || String(a.type).toLowerCase() === 'ability')
+    );
+    if (found) return found;
+  }
+  return null;
+}
 
 /**
  * @param {object} card the preview card — a server stamp (`img.card`) or a legacy zone card
@@ -168,6 +189,8 @@ export function buildInspectorModel(card, ctx = {}) {
     damageCtx = {},
     rulesEnabled = true,
     readOnly = false,
+    abilityUsed = false,
+    zone = 'active',
     attackWindow,
     frameKey = 'default',
   } = ctx;
@@ -180,7 +203,9 @@ export function buildInspectorModel(card, ctx = {}) {
       kind: 'plain',
       name,
       hp,
+      ability: null,
       attacks: [],
+      blockTopPct: null,
       dimLevel: 'none',
       interactive: false,
     };
@@ -191,12 +216,16 @@ export function buildInspectorModel(card, ctx = {}) {
     listAttacks(card, {
       energyTypes,
       rulesEnabled,
-      abilityUsed: Boolean(ctx.abilityUsed),
+      abilityUsed: Boolean(abilityUsed),
       stadiumCostModifier: Number(ctx.stadiumCostModifier) || 0,
     });
 
   const byName = new Map(window.map((w) => [w.name, w]));
   const interactive = rulesEnabled && !readOnly;
+  // A benched Pokémon cannot attack, so its panels are inert — but they are NOT receded and the
+  // card does NOT dim. Greying them or dimming the card would report an energy problem that does
+  // not exist; the reason is positional, and it says so.
+  const attackable = interactive && zone === 'active';
 
   const attacks = (card.attacks || []).map((raw, i) => {
     const { base, printed } = splitDamageLabel(raw?.damage);
@@ -230,14 +259,38 @@ export function buildInspectorModel(card, ctx = {}) {
       printedLabel: printed,
       payable,
       onceUsed,
-      reason: entry?.reason ?? null,
-      // A panel recedes when it is not actionable. Note this is `onceUsed || !payable`,
-      // while the card-level dim keys off payability alone (see dimLevelFor).
-      recede: interactive && (onceUsed || !payable),
+      reason:
+        // `||` not `??`: listAttacks returns '' when there is nothing to explain, and an empty
+        // tooltip is worse than no tooltip.
+        entry?.reason ||
+        (zone === 'bench' ? 'A benched Pokémon cannot attack.' : null),
+      // The renderer wires clicks off `usable` alone, so every gate lives here rather than being
+      // re-derived in the DOM layer.
+      usable: attackable && payable && !onceUsed,
+      recede: attackable && (onceUsed || !payable),
     };
   });
 
-  const abilityCount = abilityCountOf(card);
+  // Usability comes from the shipping primitive, so the once-per-turn wording the engine
+  // enforces is the wording the panel shows. Fed a normalised singular so both spellings work.
+  const rawAbility = rawAbilityOf(card);
+  const abilityInfo = rawAbility
+    ? (listAbilities(
+        { ability: rawAbility },
+        { abilityUsed, rulesEnabled }
+      )[0] ?? null)
+    : null;
+  const ability = abilityInfo
+    ? {
+        name: abilityInfo.name,
+        text: String(rawAbility.text ?? ''),
+        usable: Boolean(abilityInfo.usable) && interactive,
+        reason: abilityInfo.reason ?? null,
+        recede: interactive && !abilityInfo.usable,
+      }
+    : null;
+
+  const abilityCount = ability ? 1 : 0;
   // attackZoneBounds returns null for a card with no attacks (E1/E5), so the band has to
   // be defaulted rather than read off the result.
   const bounds = attackZoneBounds({
@@ -245,6 +298,7 @@ export function buildInspectorModel(card, ctx = {}) {
     index: 0,
     abilityCount,
   });
+  const abilityBounds = abilityZoneBounds({ abilityCount });
 
   return {
     kind: 'pokemon',
@@ -256,15 +310,22 @@ export function buildInspectorModel(card, ctx = {}) {
     evolvesFrom:
       typeof card?.evolvesFrom === 'string' ? card.evolvesFrom : null,
     stage: card?.stage != null ? String(card.stage) : null,
+    ability,
     attacks,
     weakness: typeValueOf(card, 'weakness'),
     resistance: typeValueOf(card, 'resistance'),
     retreat: normalizeRetreatSymbols(card?.retreatCost),
+    // Where the rendered stack starts: the ability band when there is an ability, since that
+    // text prints above the attacks, otherwise the attack band. `bandTopPct` stays the attack
+    // band alone for anything laying out attacks specifically.
+    blockTopPct: abilityBounds?.topPct ?? bounds?.topPct ?? null,
     bandTopPct: bounds?.topPct ?? null,
     bandHeightPct: bounds?.heightPct ?? null,
     footH: bandsForFrame(frameKey).footH,
-    dimLevel: readOnly ? 'none' : dimLevelFor(attacks),
+    dimLevel: readOnly || zone === 'bench' ? 'none' : dimLevelFor(attacks),
     interactive,
+    attackable,
+    zone,
     readOnly,
   };
 }

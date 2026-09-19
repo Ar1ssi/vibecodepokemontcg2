@@ -16,19 +16,17 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
-import {
-  fullViewHost,
-} from '../deck-constructor/hydrate-holo.js';
+import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
 import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
-import {
-  closeCardPreview,
-  openCardPreview,
-} from './full-view.js';
+import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
-import { openCardInspector, closeCardInspector } from '../rules/card-inspector.mjs';
+import {
+  openCardInspector,
+  closeCardInspector,
+} from '../rules/card-inspector.mjs';
 import { attack } from '../../actions/chat-buttons/chat-buttons.js';
 import { resolvePreviewCard } from './preview-card.mjs';
 
@@ -73,7 +71,8 @@ export const coverClick = (event) => {
   // the same carousel viewer used for the discard pile instead of the raw
   // stacked-image zone (that legacy display is still used mid-game below).
   if (event.target.id === 'deckCover') {
-    const preGameOrRulesOff = !rulesState.enabled || rulesState.phase === 'setup';
+    const preGameOrRulesOff =
+      !rulesState.enabled || rulesState.phase === 'setup';
     if (preGameOrRulesOff) {
       event.stopPropagation();
       const user = event.target.user === 'self' ? 'self' : 'opp';
@@ -355,17 +354,23 @@ export const doubleClick = (event) => {
       // main card in the array to land on its right, with initialIndex on the main card's slot.
       const attachedSlides = (card.attachedCards || []).map((attached) => {
         const fullArtSrc = attached.image?.dataset?.energyCardSrc;
-        return fullArtSrc ? { ...attached, image: { src: fullArtSrc } } : attached;
+        return fullArtSrc
+          ? { ...attached, image: { src: fullArtSrc } }
+          : attached;
       });
 
       // D50 (design 013): your own board Pokémon open the inspector — the enlarged scan with the
-      // TCG Live readout over it, attached cards as further slides, and a payable attack fired by
-      // clicking its panel. Opponent's Pokémon, hand and stadium keep the plain scan: payability
-      // and actions are not theirs to show.
-      if (['active', 'bench'].includes(mouseClick.zoneId) && mouseClick.cardUser === 'self') {
+      // TCG Live readout over it, attached cards as further slides, a payable attack fired by
+      // clicking its panel, and the ability fired by clicking its own. Opponent's Pokémon, hand
+      // and stadium keep the plain scan: payability and actions are not theirs to show.
+      if (
+        ['active', 'bench'].includes(mouseClick.zoneId) &&
+        mouseClick.cardUser === 'self'
+      ) {
         openCardInspector({
           card,
           attachedSlides,
+          zone: mouseClick.zoneId,
           onAttack: (index) => {
             closeCardInspector();
             attack(rulesState.turnPlayer, true, index);
