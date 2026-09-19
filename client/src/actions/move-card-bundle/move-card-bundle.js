@@ -1,4 +1,4 @@
-import { systemState } from '../../state.js';
+import { socket, systemState } from '../../state.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
@@ -10,7 +10,26 @@ import {
 import { moveCardMessage } from './move-card-message.js';
 import { moveCard } from './move-card.js';
 import { logSync } from '../../setup/general/sync-logger-bridge.js';
+import { reportMirrorDesync } from '../../setup/netcode/mirror-resync.mjs';
 import { dispatchAuthoritativeMoveCardBundle } from '../../setup/netcode/authoritative-dispatch.js';
+
+/**
+ * A refused relayed move is proof this client's mirror of the peer's zones has drifted.
+ * Hand it to the desync machinery (`mirror-resync.mjs`) so the server can name the zone
+ * and the existing `desync` handler can replay the peer's log — the only other thing that
+ * fixes it is the player reloading the page.
+ *
+ * @returns {boolean} whether the divergence was reported to the server
+ */
+function reportMirrorAbort(reason, oZoneId) {
+  return reportMirrorDesync({
+    socket,
+    roomId: systemState.roomId,
+    getZoneFn: getZone,
+    zoneId: oZoneId,
+    reason,
+  }).sent;
+}
 
 function buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex) {
   const oZone = getZone(user, oZoneId);
@@ -164,6 +183,7 @@ export const moveCardBundle = async (
         relayIndex: index,
         resolvedIndex,
         moving: cardHints.moving,
+        reported: reportMirrorAbort('hint_mismatch', oZoneId),
       });
       return false;
     }
@@ -176,6 +196,7 @@ export const moveCardBundle = async (
         reason: 'missing_card',
         oZoneId,
         resolvedIndex,
+        reported: reportMirrorAbort('missing_card', oZoneId),
       });
       return false;
     }
