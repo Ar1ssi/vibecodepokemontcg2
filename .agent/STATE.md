@@ -4,40 +4,42 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 206
-Focus: PRs #171 (once-per-game GX attack/VSTAR Power), #172 (stadium inspector Use panel) and
-  #173 (rulebook-30c Phases 0–6 + review fixes) are MERGED to `main` (6fab9c2, 34c509a, 813474a).
-  171 was reconciled with 173, not taken wholesale: kept 173's `oncePerGame` state, optional
-  `kind` + subtype inference, and flags mirror; kept 171's attack-command GX gate (`isGxAttack`),
-  spend-on-resolve (also target-choice resume, never Confusion fizzle), view projection, and
-  `instanceId`-optional shape/refs. Dedupe: D76 (card-classify, was `D-cardclassify`), D77
-  (stadium inspector, was a second D61), merged D61 text; I64 (attack panel, was a second I61).
-Active: worktree `C:\Users\SMG26\AppData\Local\Temp\opencode\merge-171-173` on `merge/prs-171-173`
-  @ 813474a + the S206 harness commit, pushed to `main`.
-Next: overdue maintenance (carried since S200): run `.agent/workflows/maintain.md` — DECISIONS is
-  ~140 active lines vs its 50-line cap (archive superseded/expired), journal is ~2270 lines.
-  Also owed: browser e2e for the stadium inspector Use panel (PR #172's open edge rows); I64
-  (attack panel does not grey a spent GX attack); I62/I63 (V-UNION / LEGEND play rules).
+Session: 207
+Focus: pkmncards trainer parse-coverage, worktree `vibe-pkmncards-parse` (`task/pkmncards-parse`):
+  fix cards `parseTrainerEffect()` cannot recognize (the "unrecognizable" bucket).
+Active: unrecognizable 402 → 25 across the 1,348 unique cards (98.1%). Slices 1–5 parse-only
+  (existing steps); slices 6–14 added ~57 NEW step families end-to-end (parser + `describeStep` in
+  `shared/engine/rules/trainer-effects.mjs`; client in
+  `client/src/setup/rules/trainer-execution.js`), plus a PASSIVE_KEYWORDS expansion. Part A wired
+  the 4 Lost Zone cards to the existing `lostZone` zone. Part B rail: mirrors both piles on the
+  right (outside #battleMat), click opens the zone, counts via `occupiedZoneCount`, and ACCEPTS
+  DRAG/DROP via a new explicit `[data-drop-zone]` target path in
+  `client/src/setup/image-logic/drag.js` (rail reuses the board's own dragOver/dragLeave/drop;
+  user-mismatch drops refused). In-mat `#lostZoneCover` kept visible (user choice). Verified:
+  node --check clean, rail test 11/11, full suite 2441/2441, audit buckets unchanged, eslint
+  clean. Buckets: guided 698 / passive-only 321 / automated 295 / unhandled-step 9 /
+  unrecognizable 25. Full step list in the journal (S207 cont. 5–12). ALL UNCOMMITTED.
+Next: (1) MANUAL BROWSER CHECK of rail drag/drop — cross-iframe HTML5 DnD is unverified (no
+  Playwright run; drag starts in a playmat iframe, drops on the host rail). (2) commit everything
+  on `task/pkmncards-parse` when the user approves. (3) behavioral browser check of the new client
+  trainer steps ('/shared/...' specifiers -> not headless; static guard at
+  `client/src/setup/rules/__tests__/trainer-step-parity.test.mjs`). SERVER-EXTENSION BACKLOG at the
+  end of `.agent/journal/2026-09.md`. Remaining 25 are one-offs (rock-paper-scissors, use-an-
+  opponent's-card, ~20 singles). NOTE: no free screen band — the 6%-wide rail overlays the right
+  6% of the sidebox.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- `pnpm test` = D75 globs, 2145/2145 green on merged main. Lint bar: `npx eslint --rule
-  'linebreak-style: off' --rule 'prettier/prettier: off' <files>`; pre-existing errors only
-  (card-search `URL`/`fetch`, evolution `fetch`/no-empty, ko-flow `rulesState`/`defenderBoard`,
-  rules-bridge/chat-buttons no-empty+unused, rules-extended unused imports, reduce.test
-  `getZone`/`findCard`, card-inspector `document`/`requestAnimationFrame`). `pnpm lint` NOT usable.
-- Once-per-game lives on game-scoped `player.oncePerGame` (survives `advanceTurn`; `flags` only
-  mirrors it). `useVStarGX.kind` is OPTIONAL (inferred from `isVstarCard`/`isGxCard`; unclassifiable
-  senders spend both); `instanceId` optional. GX attacks are gated in the `attack` case by
-  `isGxAttack` and spent on resolve only — not on a Confusion fizzle, yes on target-choice resume.
-- `dual-run-bridge.js` maps legacy `VSTARGXFunction [type]` → `kind` and omits `instanceId`
-  (I22 closed); command shape + `validateReferences` accept that omission.
-- Card classification: ONLY `card-classify.mjs` predicates (`isRuleBoxPokemon` = sole rule-box
-  definition; ex/GX name suffixes need a separator, D73; TFHG accepts a modern ex by design, D74).
-- Prism Star discards route through `discardCardToPlayerZone` (D65); Ancient Traits are
-  marker-only (D72). Stadium usability decisions live in `stadiumActivationStatus` (D77).
+- `node_modules` here is a junction to `../vibecodepokemontcg2-main/node_modules` (added S207); full `node --test` across shared/client/server/bot works, as does eslint (CRLF prettier noise only). Delete the junction if the main checkout moves.
+- `parseTrainerEffect` regexes must accept both `Pokémon` and ASCII `Pokemon` — use `pok[ée]mon`.
+- Tools: the server engine (`shared/engine/effects/trainer.mjs`) bypasses the parser and emits
+  `attachTool`; tool passives are wired by `tool-combat.mjs`. Parser tool coverage only affects
+  the client announce path.
+- Server executor (`shared/engine/effects/executor.mjs`) supports only a subset of step types and
+  skips the rest; all S207 new steps + `damageCounters`/`moveEnergy`/`variableDraw` are client-only.
+  Full backlog at the end of the journal (S207 cont. 4).
+- On the base branch `pnpm test` = D75 globs, 2145/2145 green; lint bar is the two-rule npx form.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S206 merge: PRs #171/#172/#173 on `main`; 171+173 once-per-game reconciled; 2145/2145, lint delta nil.
-- S205 review-fix Phase 6: TFHG/tiebreak kept + documented (D74), `pnpm test` → globs (D75); 2126/2126.
-- S193 feature: Stadium double-click → inspector Use panel (`stadiumActivationStatus`, D77); 2012/2012.
+- S207: pkmncards trainer audit + 14 coverage slices incl. ~57 new step families; unrecognizable 402→25 (98.1%), full suite 2437/2437. Lost Zone rail added right of the mat.
+- S206 merge: PRs #171/#172/#173 on `main`; 2145/2145, lint delta nil.

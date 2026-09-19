@@ -1289,3 +1289,1019 @@ import test, { describe } from 'node:test';
       });
     });
     
+describe('unconditional draw precedence over passive fallback', () => {
+  test("Aroma Lady: leading draw 2 executes, recovery stays passive", () => {
+    const r = parseTrainerEffect("Draw 2 cards. If you do, your Active Pokemon recovers from all Special Conditions.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'draw');
+    assert.equal(r.steps[0].count, 2);
+    assert.ok(r.steps.some((s) => s.type === 'passive'));
+  });
+
+  test("Buck's Training: leading draw 2 not swallowed by 'more damage'", () => {
+    const r = parseTrainerEffect("Draw 2 cards. As long as Buck's Training is next to your Active Pokemon, each of your Active Pokemon's attacks does 10 more damage to the Active Pokemon (before applying Weakness and Resistance).");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'draw');
+    assert.equal(r.steps[0].count, 2);
+  });
+
+  test("Professor Kukui: leading draw 2 not swallowed by 'more damage'", () => {
+    const r = parseTrainerEffect("Draw 2 cards. During this turn, your Pokemon's attacks do 20 more damage to your opponent's Active Pokemon (before applying Weakness and Resistance).");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'draw');
+    assert.equal(r.steps[0].count, 2);
+  });
+
+  test("Emcee's Hype: leading draw 2 + conditional bonus announced", () => {
+    const r = parseTrainerEffect("Draw 2 cards. If your opponent has 3 or fewer Prize cards remaining, draw 2 more cards.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'draw');
+    assert.equal(r.steps[0].count, 2);
+    const passive = r.steps.find((s) => s.type === 'passive');
+    assert.ok(passive);
+    assert.ok(passive.detail.toLowerCase().includes('bonus draw'));
+  });
+
+  test("Regression: a leading-draw stadium is still passive, not a one-shot draw", () => {
+    const r = parseTrainerEffect("Once during each player's turn, that player may draw cards until they have 3 cards in their hand.");
+    assert.equal(r.steps.length, 1);
+    assert.equal(r.steps[0].type, 'passive');
+  });
+});
+
+describe('legacy / unrecognizable template coverage', () => {
+  test('Spirit Link: turn-does-not-end is a passive', () => {
+    const r = parseTrainerEffect("Your turn does not end if the Pokemon this card is attached to becomes M Aggron-EX.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'passive');
+    assert.ok(r.steps[0].detail.includes('Spirit Link'));
+  });
+
+  test('tool damage reduction wording is passive', () => {
+    const r = parseTrainerEffect("Any damage done to the Pokemon this card is attached to by attacks from your opponent's Pokemon is reduced by 40 (after applying Weakness and Resistance).");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'passive');
+  });
+
+  test('Metal Saucer: attach {M} Energy from discard (no "basic" wording)', () => {
+    const r = parseTrainerEffect("Attach a {M} Energy card from your discard pile to 1 of your Benched {M} Pokémon.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'attachFromDiscard');
+    assert.equal(r.steps[0].energy, 'Basic {M} Energy');
+    assert.equal(r.steps[0].target, '1 of your Benched {M} Pokémon');
+  });
+
+  test('Blacksmith: attach 2 {R} Energy from discard (multi)', () => {
+    const r = parseTrainerEffect("Attach 2 {R} Energy cards from your discard pile to 1 of your {R} Pokemon.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'attachMultipleFromDiscard');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[0].energy, 'Basic {R} Energy');
+  });
+
+  test('VS Seeker: legacy "search your discard pile … put it into your hand" is recursion', () => {
+    const r = parseTrainerEffect("Search your discard pile for a Supporter card, show it to your opponent, and put it into your hand.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'recursion');
+    assert.equal(r.steps[0].what, 'Supporter');
+    assert.equal(r.steps[0].from, 'discard');
+  });
+
+  test('Junk Arm: discard cost + legacy recursion for a Trainer card', () => {
+    const r = parseTrainerEffect("Discard 2 cards from your hand. Search your discard pile for a Trainer card, show it to your opponent, and put it into your hand.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'discardCost');
+    assert.equal(r.steps[0].count, 2);
+    assert.ok(r.steps.some((s) => s.type === 'recursion' && s.what === 'Trainer'));
+  });
+
+  test('Energy Returner: legacy "search your discard pile … shuffle into deck"', () => {
+    const r = parseTrainerEffect("Search your discard pile for 4 basic Energy cards, show them to your opponent, and shuffle them into your deck.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'shuffleFromDiscard');
+    assert.equal(r.steps[0].what, 'Basic Energy');
+    assert.equal(r.steps[0].count, 4);
+  });
+});
+
+describe('coin-flip legacy variants', () => {
+  test('Crushing Hammer legacy: heads discards opponent Energy (attached wording)', () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, discard an Energy attached to 1 of your opponent's Pokemon.");
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'discardEnergyFromOpponent');
+  });
+
+  test("Pokemon Reversal: heads switches the opponent's Bench", () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, choose 1 of your opponent's Benched Pokemon, and switch it with your opponent's Active Pokemon.");
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'switchOpponent');
+  });
+
+  test('Super Scoop Up: heads returns your Pokemon to hand', () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, return 1 of your Pokemon and all cards attached to it to your hand.");
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'returnPokemonToHand');
+  });
+
+  test('Sleep!: heads puts the Defending Pokemon to Sleep', () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, the Defending Pokemon is now Asleep.");
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'applyStatus');
+    assert.deepEqual(r.steps[0].heads[0].conditions, ['Asleep']);
+  });
+
+  test('Venture Bomb: damage counters heads/tails (own side wording)', () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, put 1 damage counter on 1 of your opponent's Pokemon. If tails, put 1 damage counter on 1 of your Pokemon.");
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'damageCounters');
+    assert.equal(r.steps[0].tails[0].type, 'damageCounters');
+  });
+});
+
+describe('recurring-wording coverage (batch 2)', () => {
+  test('Switch (Item): "switch 1 of your Active" is switchOwn', () => {
+    const r = parseTrainerEffect('Switch 1 of your Active Pokémon with 1 of your Benched Pokémon.');
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'switchOwn');
+  });
+
+  test('Pokémon Circulator / Repel: opponent switches their Active → switchOpponentOut', () => {
+    const r = parseTrainerEffect('Your opponent switches his or her Active Pokémon with 1 of his or her Benched Pokémon.');
+    assert.equal(r.steps[0].type, 'switchOpponentOut');
+  });
+
+  test('Team Flare Grunt: discard Energy attached to opponent Active', () => {
+    const r = parseTrainerEffect("Discard an Energy attached to your opponent's Active Pokémon.");
+    assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+    assert.equal(r.steps[0].energy, 'any Energy');
+  });
+
+  test('Enhanced Hammer: discard Special Energy attached to opponent Pokémon', () => {
+    const r = parseTrainerEffect("Discard a Special Energy attached to 1 of your opponent's Pokémon.");
+    assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+    assert.equal(r.steps[0].energy, 'Special Energy');
+  });
+
+  test('Plumeria: discard-2 cost + discard opponent Energy', () => {
+    const r = parseTrainerEffect("Discard 2 cards from your hand. If you do, discard an Energy attached to 1 of your opponent's Pokémon.");
+    assert.equal(r.steps[0].type, 'discardCost');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[1].type, 'discardEnergyFromOpponent');
+  });
+
+  test('Poppy: move Energy between own Pokémon → moveEnergy', () => {
+    const r = parseTrainerEffect('Move up to 2 Energy from 1 of your Pokémon to another of your Pokémon.');
+    assert.equal(r.steps[0].type, 'moveEnergy');
+  });
+
+  test('Multi Switch: Bench → Active → moveEnergyToActive count 1', () => {
+    const r = parseTrainerEffect('Move an Energy from 1 of your Benched Pokémon to your Active Pokémon.');
+    assert.equal(r.steps[0].type, 'moveEnergyToActive');
+    assert.equal(r.steps[0].count, 1);
+  });
+
+  test('Red Card: opponent shuffles hand into deck, draws 4', () => {
+    const r = parseTrainerEffect('Your opponent shuffles his or her hand into his or her deck and draws 4 cards.');
+    assert.equal(r.steps[0].type, 'opponentShuffleHandDraw');
+    assert.equal(r.steps[0].count, 4);
+  });
+
+  test('Imposter Professor Oak: opponent shuffles hand, draws 7', () => {
+    const r = parseTrainerEffect('Your opponent shuffles his or her hand into his or her deck, then draws 7 cards.');
+    assert.equal(r.steps[0].type, 'opponentShuffleHandDraw');
+    assert.equal(r.steps[0].count, 7);
+  });
+
+  test('Xerosic: discard a Tool or Special Energy from any Pokémon', () => {
+    const r = parseTrainerEffect('Choose a Pokémon Tool or Special Energy card attached to a Pokémon in play (yours or your opponent’s) and discard it.');
+    assert.equal(r.steps[0].type, 'discardFromOpponent');
+  });
+
+  test('Potion: remove 2 damage counters → healAmount', () => {
+    const r = parseTrainerEffect('Remove 2 damage counters from 1 of your Pokémon (remove 1 damage counter if that Pokémon has only 1).');
+    assert.equal(r.steps[0].type, 'healAmount');
+    assert.equal(r.steps[0].amount, 2);
+  });
+
+  test("Bertha's Warmth: remove 5 damage counters from 1 of your Pokémon SP", () => {
+    const r = parseTrainerEffect('Remove 5 damage counters from 1 of your Pokémon SP.');
+    assert.equal(r.steps[0].type, 'healAmount');
+    assert.equal(r.steps[0].amount, 5);
+  });
+
+  test('Reactive tools: "damaged by an opponent / Knocked Out by damage" are passive', () => {
+    const helmet = parseTrainerEffect("If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent's attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.");
+    assert.equal(helmet.recognizable, true);
+    assert.equal(helmet.steps[0].type, 'passive');
+    const punch = parseTrainerEffect("If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent's Pokémon, put 4 damage counters on the Attacking Pokémon.");
+    assert.equal(punch.steps[0].type, 'passive');
+    assert.ok(punch.steps[0].detail.includes('Reactive tool damage'));
+  });
+});
+
+describe('recurring-wording coverage (batch 3)', () => {
+  test('Rare Candy: Stage 1-or-2 evolution wording → evolveStage2', () => {
+    const r = parseTrainerEffect('Choose 1 of your Basic Pokémon in play. If you have a Stage 1 or Stage 2 card that evolves from that Pokémon in your hand, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.)');
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'evolveStage2');
+    assert.equal(r.steps[0].skipStage, 1);
+  });
+
+  test('Pokémon Breeder: matching Basic wording → evolveStage2', () => {
+    const r = parseTrainerEffect('Put a Stage 2 Evolution card from your hand on the matching Basic Pokémon. You can play this card only when you would be allowed to evolve that Pokémon anyway.');
+    assert.equal(r.steps[0].type, 'evolveStage2');
+  });
+
+  test('Startling Megaphone: discard all Tools from each opponent Pokémon', () => {
+    const r = parseTrainerEffect("Discard all Pokémon Tool cards attached to each of your opponent's Pokémon.");
+    assert.equal(r.steps[0].type, 'discardTools');
+    assert.equal(r.steps[0].count, 8);
+  });
+
+  test("Cheren's Care: typed put-into-hand → returnPokemonToHand keepAttached", () => {
+    const r = parseTrainerEffect('Put 1 of your {C} Pokémon that has any damage counters on it and all attached cards into your hand.');
+    assert.equal(r.steps[0].type, 'returnPokemonToHand');
+    assert.equal(r.steps[0].keepAttached, true);
+  });
+
+  test('Poké Turn: return-1-of-your-Pokémon wording → returnPokemonToHand keepAttached', () => {
+    const r = parseTrainerEffect('Return 1 of your Pokémon SP and all cards attached to it to your hand.');
+    assert.equal(r.steps[0].type, 'returnPokemonToHand');
+    assert.equal(r.steps[0].keepAttached, true);
+  });
+
+  test('Super Rod: "back into your deck" + combined Pokémon/basic Energy', () => {
+    const r = parseTrainerEffect('Shuffle 3 in any combination of Pokémon and basic Energy cards from your discard pile back into your deck.');
+    assert.equal(r.steps[0].type, 'shuffleFromDiscard');
+    assert.equal(r.steps[0].count, 3);
+    assert.equal(r.steps[0].what, 'Pokémon or Basic Energy');
+  });
+
+  test("Pokémon Catcher (legacy): player-chosen gust → switchOpponent", () => {
+    const r = parseTrainerEffect("Switch your opponent's Active Pokémon with 1 of his or her Benched Pokémon.");
+    assert.equal(r.steps[0].type, 'switchOpponent');
+  });
+});
+
+describe('new step families (batch 4)', () => {
+  test('Revive: own discard Basic → reviveFromDiscard', () => {
+    const r = parseTrainerEffect('Put 1 Basic Pokémon card from your discard pile onto your Bench. Put damage counters on that Pokémon equal to half its HP (rounded down to the nearest 10).');
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'reviveFromDiscard');
+    assert.equal(r.steps[0].side, 'own');
+  });
+
+  test("Echoing Horn: opponent discard Basic → reviveFromDiscard side opponent", () => {
+    const r = parseTrainerEffect("Put a Basic Pokémon from your opponent's discard pile onto their Bench.");
+    assert.equal(r.steps[0].type, 'reviveFromDiscard');
+    assert.equal(r.steps[0].side, 'opponent');
+  });
+
+  test('Damage Pump: move counters own → own', () => {
+    const r = parseTrainerEffect('Move up to 2 damage counters from 1 of your Pokémon to your other Pokémon in any way you like.');
+    assert.equal(r.steps[0].type, 'moveDamageCounters');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[0].from, 'own');
+    assert.equal(r.steps[0].to, 'own');
+  });
+
+  test('Agatha: move counters ownActive → opponentActive', () => {
+    const r = parseTrainerEffect("Move up to 3 damage counters from your Active Pokémon to your opponent's Active Pokémon.");
+    assert.equal(r.steps[0].type, 'moveDamageCounters');
+    assert.equal(r.steps[0].from, 'ownActive');
+    assert.equal(r.steps[0].to, 'opponentActive');
+  });
+
+  test("Grimsley: move counters opponent → opponent", () => {
+    const r = parseTrainerEffect("Move up to 3 damage counters from 1 of your opponent's Pokémon to another of their Pokémon.");
+    assert.equal(r.steps[0].type, 'moveDamageCounters');
+    assert.equal(r.steps[0].from, 'opponent');
+    assert.equal(r.steps[0].to, 'opponent');
+  });
+
+  test('Hand Scope: bare reveal → lookAtOpponentHand', () => {
+    const r = parseTrainerEffect('Your opponent reveals his or her hand.');
+    assert.equal(r.steps[0].type, 'lookAtOpponentHand');
+  });
+
+  test('Bede: attach a basic Energy from hand', () => {
+    const r = parseTrainerEffect('Attach a basic Energy card from your hand to 1 of your Benched Pokémon.');
+    assert.equal(r.steps[0].type, 'attachFromHand');
+    assert.equal(r.steps[0].count, 1);
+    assert.equal(r.steps[0].energy, 'Basic Energy');
+    assert.equal(r.steps[0].target, '1 of your Benched Pokémon');
+  });
+
+  test('Zinnia: attach up to 2 basic Energy from hand', () => {
+    const r = parseTrainerEffect('You can play this card only if 1 of your Pokémon was Knocked Out during your opponent’s last turn. Attach up to 2 basic Energy cards from your hand to 1 of your {N} Pokémon.');
+    const step = r.steps.find((s) => s.type === 'attachFromHand');
+    assert.ok(step);
+    assert.equal(step.count, 2);
+    assert.equal(step.energy, 'Basic Energy');
+  });
+
+  test('Fighting Cube 01: attach a card that grants an attack', () => {
+    const r = parseTrainerEffect("Attach this card to 1 of your {F} Pokémon in play. That Pokémon may use this card's attack instead of its own. At the end of your turn, discard Fighting Cube 01. {F} → Violent Rage : 10× Flip a number of coins equal to the number of damage counters on this Pokémon.");
+    assert.equal(r.steps[0].type, 'attachAttackTool');
+    assert.equal(r.steps[0].discardAtEndOfTurn, true);
+  });
+
+  test('Town Map: turn your Prizes face up', () => {
+    const r = parseTrainerEffect('Turn all of your Prize cards face up. (Those Prize cards remain face up for the rest of the game.)');
+    assert.equal(r.steps[0].type, 'revealPrizes');
+    assert.equal(r.steps[0].scope, 'own');
+  });
+
+  test('Here Comes Team Rocket!: all players\' Prizes face up', () => {
+    const r = parseTrainerEffect('Each player plays with his or her Prize cards face up for the rest of the game.');
+    assert.equal(r.steps[0].type, 'revealPrizes');
+    assert.equal(r.steps[0].scope, 'all');
+  });
+
+  test('Rotom Dex: count + shuffle Prizes → reshufflePrizes', () => {
+    const r = parseTrainerEffect('After counting your Prize cards, shuffle them into your deck. Then, take that many cards from the top of your deck and put them face down as your Prize cards.');
+    assert.equal(r.steps[0].type, 'reshufflePrizes');
+  });
+
+  test('Peonia: up to 3 Prizes to hand, replace from hand', () => {
+    const r = parseTrainerEffect('Put up to 3 Prize cards into your hand. Then, for each Prize card you put into your hand in this way, put a card from your hand face down as a Prize card.');
+    assert.equal(r.steps[0].type, 'prizeToHand');
+    assert.equal(r.steps[0].count, 3);
+    assert.equal(r.steps[0].replace, true);
+  });
+
+  test('Gladion: put 1 face-down Prize into hand', () => {
+    const r = parseTrainerEffect('Look at your face-down Prize cards and put 1 of them into your hand. Then, shuffle this Gladion into your remaining Prize cards and put them back face down.');
+    assert.equal(r.steps[0].type, 'prizeToHand');
+    assert.equal(r.steps[0].count, 1);
+  });
+});
+
+describe('recurring-wording coverage (batch 5)', () => {
+  test('Penny: typed Basic put-into-hand → returnPokemonToHand keepAttached', () => {
+    const r = parseTrainerEffect('Put 1 of your Basic Pokémon and all attached cards into your hand.');
+    assert.equal(r.steps[0].type, 'returnPokemonToHand');
+    assert.equal(r.steps[0].keepAttached, true);
+  });
+
+  test("Mr. Briney's Compassion: 'return that Pokémon' → returnPokemonToHand", () => {
+    const r = parseTrainerEffect('Choose 1 of your Pokémon in play (excluding Pokémon-ex). Return that Pokémon and all cards attached to it to your hand.');
+    assert.equal(r.steps[0].type, 'returnPokemonToHand');
+    assert.equal(r.steps[0].keepAttached, true);
+  });
+
+  test('Super Scoop Up (legacy): coin heads put-to-hand keeps attached', () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, put 1 of your Pokémon and all attached cards into your hand.');
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'returnPokemonToHand');
+    assert.equal(r.steps[0].heads[0].keepAttached, true);
+  });
+
+  test('Weakness Policy / Windup Arm / Hex Maniac are passive', () => {
+    for (const text of [
+      'The Pokémon this card is attached to has no Weakness.',
+      "The Pokémon this card is attached to can attack even if it's Asleep or Paralyzed.",
+      "Until the end of your opponent's next turn, each Pokémon in play, in each player's hand, and in each player's discard pile has no Abilities.",
+    ]) {
+      const r = parseTrainerEffect(text);
+      assert.equal(r.recognizable, true, text);
+      assert.equal(r.steps[0].type, 'passive', text);
+    }
+  });
+
+  test("Professor Birch: 'draw cards from your deck until you have 6' → drawUntil 6", () => {
+    const r = parseTrainerEffect('Draw cards from your deck until you have 6 cards in your hand.');
+    assert.equal(r.steps[0].type, 'drawUntil');
+    assert.equal(r.steps[0].target, 6);
+  });
+
+  test('Switch (legacy own-bench wording) → switchOwn', () => {
+    const r = parseTrainerEffect('Switch 1 of your own Benched Pokémon with your Active Pokémon.');
+    assert.equal(r.steps[0].type, 'switchOwn');
+  });
+
+  test('Gust of Wind → switchOpponent', () => {
+    const r = parseTrainerEffect("Choose 1 of your opponent's Benched Pokémon and switch it with his or her Active Pokémon.");
+    assert.equal(r.steps[0].type, 'switchOpponent');
+  });
+
+  test('Warp Point → switchOpponentOut + switchOwn', () => {
+    const r = parseTrainerEffect('Your opponent switches 1 of his or her Defending Pokémon with 1 of his or her Benched Pokémon, if any. You switch 1 of your Active Pokémon with 1 of your Benched Pokémon, if any.');
+    assert.deepEqual(r.steps.map((s) => s.type), ['switchOpponentOut', 'switchOwn']);
+  });
+
+  test('Energy Removal 2 (coin) vs Energy Removal (unconditional)', () => {
+    const coin = parseTrainerEffect("Flip a coin. If heads, choose 1 Energy card attached to 1 of your opponent's Pokémon and discard it.");
+    assert.equal(coin.steps[0].type, 'coinFlip');
+    assert.equal(coin.steps[0].heads[0].type, 'discardEnergyFromOpponent');
+    const plain = parseTrainerEffect("Choose 1 Energy card attached to 1 of your opponent's Pokémon and discard it.");
+    assert.equal(plain.steps[0].type, 'discardEnergyFromOpponent');
+  });
+
+  test('Field Blower → discardTools', () => {
+    const r = parseTrainerEffect("Choose up to 2 in any combination of Pokémon Tool cards and Stadium cards in play (yours or your opponent's) and discard them.");
+    assert.equal(r.steps[0].type, 'discardTools');
+  });
+
+  test('Hyper Devolution Spray → devolve', () => {
+    const r = parseTrainerEffect('Choose 1 of your evolved Pokémon. Take the highest Stage Evolution card from that Pokémon and put it into your hand.');
+    assert.equal(r.steps[0].type, 'devolve');
+  });
+
+  test('Full Heal / Double Full Heal → clearStatus', () => {
+    const one = parseTrainerEffect('Remove all Special Conditions from your Active Pokémon.');
+    assert.equal(one.steps[0].type, 'clearStatus');
+    assert.equal(one.steps[0].target, 'yourActive');
+    const many = parseTrainerEffect('Remove all Special Conditions from each of your Active Pokémon.');
+    assert.equal(many.steps[0].target, 'allYourPokémon');
+  });
+
+  test('Paint Roller → discardStadium', () => {
+    const r = parseTrainerEffect('Discard any Stadium card in play. Then, draw a card.');
+    assert.equal(r.steps[0].type, 'discardStadium');
+  });
+
+  test('Max Revive → putDiscardOnTop', () => {
+    const r = parseTrainerEffect('Put a Pokémon from your discard pile on top of your deck.');
+    assert.equal(r.steps[0].type, 'putDiscardOnTop');
+  });
+
+  test('Energy Reset → energyToHand', () => {
+    const r = parseTrainerEffect('Put as many Energy attached to your Pokémon as you like into your hand.');
+    assert.equal(r.steps[0].type, 'energyToHand');
+  });
+
+  test("Surprise Box / Return Label → opponent discard moves", () => {
+    const box = parseTrainerEffect("Put a card from your opponent's discard pile into their hand.");
+    assert.equal(box.steps[0].type, 'opponentDiscardToHand');
+    const label = parseTrainerEffect("Put a card from your opponent's discard pile on the bottom of their deck.");
+    assert.equal(label.steps[0].type, 'opponentDiscardToDeckBottom');
+  });
+
+  test('variableDraw new sources', () => {
+    const p = parseTrainerEffect("Draw a card for each of your opponent's Pokémon in play.");
+    assert.equal(p.steps[0].source, 'opponentPokemonInPlay');
+    const b = parseTrainerEffect("Draw a card for each Benched Pokémon (both yours and your opponent's).");
+    assert.equal(b.steps[0].source, 'allBench');
+    const l = parseTrainerEffect("Draw a card for each of your opponent's Benched Basic Pokémon.");
+    assert.equal(l.steps[0].source, 'opponentBenchBasic');
+  });
+
+  test('Yell Horn / Imakuni? apply status to new targets', () => {
+    const yell = parseTrainerEffect('Both Active Pokémon are now Confused.');
+    assert.equal(yell.steps[0].target, 'bothActiveAll');
+    const imakuni = parseTrainerEffect('Your Active Pokémon is now Confused.');
+    assert.equal(imakuni.steps[0].target, 'ownActive');
+  });
+});
+
+describe('recurring-wording coverage (batch 6)', () => {
+  test('Pokémon Flute: opponent discard Basic → reviveFromDiscard side opponent', () => {
+    const r = parseTrainerEffect("Choose 1 Basic Pokémon card from your opponent's discard pile and put it onto his or her Bench.");
+    assert.equal(r.steps[0].type, 'reviveFromDiscard');
+    assert.equal(r.steps[0].side, 'opponent');
+  });
+
+  test('Recycle: coin heads put a discard card on top of deck', () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, put a card in your discard pile on top of your deck.');
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'putDiscardOnTop');
+  });
+
+  test('Mr. Fuji / Cassius → shufflePokemonIntoDeck', () => {
+    const fuji = parseTrainerEffect('Choose a Pokémon on your Bench. Shuffle it and any cards attached to it into your deck.');
+    assert.equal(fuji.steps[0].type, 'shufflePokemonIntoDeck');
+    const cassius = parseTrainerEffect('Shuffle 1 of your Pokémon and all cards attached to it into your deck.');
+    assert.equal(cassius.steps[0].type, 'shufflePokemonIntoDeck');
+  });
+
+  test("Volo / Giovanni's Exile → discardOwnBenchPokemon", () => {
+    const volo = parseTrainerEffect('Discard 1 of your Benched Pokémon V and all attached cards.');
+    assert.equal(volo.steps[0].type, 'discardOwnBenchPokemon');
+    assert.equal(volo.steps[0].filter, 'V');
+    const exile = parseTrainerEffect("Discard up to 2 of your Benched Pokémon that have no damage counters on them and all cards attached to them.");
+    assert.equal(exile.steps[0].type, 'discardOwnBenchPokemon');
+    assert.equal(exile.steps[0].count, 2);
+  });
+
+  test("Karen / Lysandre's Trump Card → shuffleDiscardIntoDeck", () => {
+    const karen = parseTrainerEffect('Each player shuffles all Pokémon in his or her discard pile into his or her deck.');
+    assert.equal(karen.steps[0].type, 'shuffleDiscardIntoDeck');
+    const trump = parseTrainerEffect("Each player shuffles all cards in his or her discard pile into his or her deck (except for Lysandre's Trump Card).");
+    assert.equal(trump.steps[0].type, 'shuffleDiscardIntoDeck');
+  });
+
+  test("Acerola's Premonition: variableDraw opponentHandTrainer", () => {
+    const r = parseTrainerEffect('Your opponent reveals their hand, and you draw a card for each Trainer card you find there.');
+    assert.equal(r.steps[0].type, 'variableDraw');
+    assert.equal(r.steps[0].source, 'opponentHandTrainer');
+  });
+
+  test('Sabrina: move all Energy between two of your Pokémon → moveEnergy', () => {
+    const r = parseTrainerEffect('Take all Energy cards attached to 1 of your Pokémon with Sabrina in its name and attach them to another 1 of your Pokémon with Sabrina in its name.');
+    assert.equal(r.steps[0].type, 'moveEnergy');
+  });
+
+  test('Super Energy Removal: discard up to 2 Energy from an opponent Pokémon', () => {
+    const r = parseTrainerEffect("Discard 1 Energy card attached to 1 of your own Pokémon in order to choose 1 of your opponent's Pokémon and up to 2 Energy cards attached to it. Discard those Energy cards.");
+    assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
+    assert.equal(r.steps[0].count, 2);
+  });
+
+  test('Master Ball: "look at 7 cards from the top" → lookAtTop count 7', () => {
+    const r = parseTrainerEffect('Look at 7 cards from the top of your deck. You may choose a Basic Pokémon or Evolution card from those cards, show it to your opponent, and put it into your hand. Shuffle the rest into your deck.');
+    assert.equal(r.steps[0].type, 'lookAtTop');
+    assert.equal(r.steps[0].count, 7);
+  });
+});
+
+describe('opponent-hand and mixed coverage (batch 8)', () => {
+  test('Alph Lithograph: bare "LOOK AT YOUR OPPONENTS HAND!"', () => {
+    const r = parseTrainerEffect('LOOK AT YOUR OPPONENTS HAND!');
+    assert.equal(r.steps[0].type, 'lookAtOpponentHand');
+  });
+
+  test('Morty: reveal hand, choose 2, shuffle into deck', () => {
+    const r = parseTrainerEffect("Your opponent reveals their hand. Choose 2 cards you find there. Your opponent shuffles those cards into their deck.");
+    assert.equal(r.steps[0].type, 'opponentHandShuffleDeck');
+    assert.equal(r.steps[0].count, 2);
+  });
+
+  test("Team Rocket's Evil Deeds: choose a card, shuffle, optional draw", () => {
+    const r = parseTrainerEffect("Look at your opponent's hand and choose a card there. Your opponent shuffles that card into his or her deck. Then, your opponent may draw up to 2 cards.");
+    assert.equal(r.steps[0].type, 'opponentHandShuffleDeck');
+    assert.equal(r.steps[0].count, 1);
+    assert.equal(r.steps[0].optionalOpponentDraw, true);
+  });
+
+  test("Rocket's Sneak Attack: choose 1 Trainer, what=Trainer", () => {
+    const r = parseTrainerEffect("Look at your opponent's hand. If he or she has any Trainer cards, choose 1 of them. Your opponent shuffles that card into his or her deck.");
+    assert.equal(r.steps[0].type, 'opponentHandShuffleDeck');
+    assert.equal(r.steps[0].what, 'Trainer');
+  });
+
+  test('Hooligans Jim & Cas: coin heads → shuffle 3 random cards', () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, choose 3 random cards from your opponent's hand. Your opponent reveals those cards and shuffles them into his or her deck.");
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'opponentHandShuffleDeck');
+    assert.equal(r.steps[0].heads[0].count, 3);
+  });
+
+  test("The Rocket's Trap: coin heads → shuffle up to 3 cards", () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, choose up to 3 cards at random from your opponent's hand (don't look at them). Your opponent shuffles those cards into his or her deck.");
+    assert.equal(r.steps[0].heads[0].type, 'opponentHandShuffleDeck');
+    assert.equal(r.steps[0].heads[0].count, 3);
+    assert.equal(r.steps[0].heads[0].upTo, true);
+  });
+
+  test('Life Herb: coin heads → heal 6 + cure', () => {
+    const r = parseTrainerEffect("Flip a coin. If heads, choose 1 of your Pok\u00e9mon, and remove all Special Conditions and 6 damage counters from that Pok\u00e9mon (all if there are less than 6).");
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'healAmount');
+    assert.equal(r.steps[0].heads[0].amount, 6);
+    assert.equal(r.steps[0].heads[0].cure, true);
+  });
+
+  test('Nita: opponent Active Energy to top of deck', () => {
+    const r = parseTrainerEffect("You can play this card only if your opponent's Active Pok\u00e9mon is a Basic Pok\u00e9mon. Put an Energy from your opponent's Active Pok\u00e9mon on top of their deck.");
+    assert.equal(r.steps[0].type, 'opponentActiveEnergyToDeck');
+  });
+
+  test('Bonnie: "Discard that Stadium card" → discardStadium', () => {
+    const r = parseTrainerEffect('You can play this card only if there is any Stadium card in play. Discard that Stadium card.');
+    assert.equal(r.steps[0].type, 'discardStadium');
+  });
+});
+
+describe('each-player and hand-to-bench coverage (batch 9)', () => {
+  test("Erika's Invitation: Basic from opponent hand to their Bench, switch", () => {
+    const r = parseTrainerEffect("Your opponent reveals their hand, and you put a Basic Pok\u00e9mon you find there onto your opponent's Bench. If you put a Pok\u00e9mon onto their Bench in this way, switch in that Pok\u00e9mon to the Active Spot.");
+    assert.equal(r.steps[0].type, 'opponentHandToBenchBasic');
+    assert.equal(r.steps[0].switchActive, true);
+  });
+
+  test('Captivating Poké Puff: any number of Basics to opponent Bench', () => {
+    const r = parseTrainerEffect("Your opponent reveals his or her hand. Put any number of Basic Pok\u00e9mon you find there onto your opponent's Bench.");
+    assert.equal(r.steps[0].type, 'opponentHandToBenchBasic');
+    assert.equal(r.steps[0].anyNumber, true);
+  });
+
+  test("Erika's Perfume: look at hand, put any number of Basics on opponent Bench", () => {
+    const r = parseTrainerEffect("Look at your opponent's hand. If he or she has any Basic Pok\u00e9mon cards there, you may put any number of them onto your opponent's Bench (as long as there's room).");
+    assert.equal(r.steps[0].type, 'opponentHandToBenchBasic');
+    assert.equal(r.steps[0].anyNumber, true);
+  });
+
+  test('Jessie & James: each player discards 2 (opponent first)', () => {
+    const r = parseTrainerEffect('Each player discards 2 cards from their hand. Your opponent discards first.');
+    assert.equal(r.steps[0].type, 'eachPlayerDiscardFromHand');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[0].opponentFirst, true);
+  });
+
+  test('Erika: each player may draw up to 3', () => {
+    const r = parseTrainerEffect('Each player may draw up to 3 cards. You draw first.');
+    assert.equal(r.steps[0].type, 'eachPlayerDraw');
+    assert.equal(r.steps[0].count, 3);
+  });
+
+  test('Seeker: each player returns 1 Benched Pokémon to hand', () => {
+    const r = parseTrainerEffect('Each player returns 1 of his or her Benched Pok\u00e9mon and all cards attached to it to his or her hand. (You return your Pok\u00e9mon first.)');
+    assert.equal(r.steps[0].type, 'eachPlayerReturnBench');
+  });
+
+  test('Wicke: each player shuffles hand in and redraws', () => {
+    const r = parseTrainerEffect('Each player counts the cards in their hand, shuffles those cards into their deck, then draws that many cards.');
+    assert.equal(r.steps[0].type, 'eachPlayerShuffleHandDraw');
+  });
+
+  test('Hugh: each player normalizes hand to 5', () => {
+    const r = parseTrainerEffect('Each player either draws or discard cards until he or she has 5 cards in his or her hand. (Your opponent does this first.)');
+    assert.equal(r.steps[0].type, 'eachPlayerHandToFive');
+    assert.equal(r.steps[0].count, 5);
+    assert.equal(r.steps[0].opponentFirst, true);
+  });
+
+  test('Buddy-Buddy Rescue: each player recovers a Pokémon', () => {
+    const r = parseTrainerEffect('Each player puts a Pok\u00e9mon from his or her discard pile into his or her hand. (Your opponent chooses first.)');
+    assert.equal(r.steps[0].type, 'eachPlayerRecoverPokemon');
+  });
+
+  test("Psychic's Third Eye: look at hand + discard-any-then-draw", () => {
+    const r = parseTrainerEffect('Your opponent reveals his or her hand. Discard as many cards as you like from your hand. Then, draw that many cards.');
+    assert.equal(r.steps[0].type, 'lookAtOpponentHand');
+    assert.equal(r.steps[1].type, 'discardAnyThenDraw');
+  });
+
+  test('Ghetsis: opponent shuffles Items, you draw that many', () => {
+    const r = parseTrainerEffect('Your opponent reveals his or her hand and shuffles all Item cards found there into his or her deck. Then, draw a number of cards equal to the number of Item cards your opponent shuffled into his or her deck.');
+    assert.equal(r.steps[0].type, 'opponentHandShuffleItemsDraw');
+  });
+
+  test('Tropical Tidal Wave: coin heads/tails discard all Trainer cards in play', () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, discard all Trainer and Stadium cards your opponent has in play. If tails, discard all Trainer and Stadium cards you have in play.');
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'discardAllTrainerInPlay');
+    assert.equal(r.steps[0].tails[0].side, 'self');
+  });
+
+  test('Here Comes Team Rocket!: each player turns Prizes face up', () => {
+    const r = parseTrainerEffect('Each player turns all of his or her Prize cards face up. (Those Prize cards remain face up for the rest of the game.)');
+    assert.equal(r.steps[0].type, 'revealPrizes');
+    assert.equal(r.steps[0].scope, 'all');
+  });
+});
+
+describe('legacy mechanisms coverage (batch 10)', () => {
+  test('Team Star Grunt: "Energy attached to" opponent Active → opponentActiveEnergyToDeck', () => {
+    const r = parseTrainerEffect("Put an Energy attached to your opponent's Active Pok\u00e9mon on top of their deck.");
+    assert.equal(r.steps[0].type, 'opponentActiveEnergyToDeck');
+  });
+
+  test('Warp Point: both Active switch out', () => {
+    const r = parseTrainerEffect("Your opponent switches the Defending Pok\u00e9mon with 1 of his or her Benched Pok\u00e9mon, if any; then you switch your Active Pok\u00e9mon with 1 of your Benched Pok\u00e9mon, if any.");
+    assert.equal(r.steps[0].type, 'switchOwn');
+    assert.equal(r.steps[1].type, 'switchOpponentOut');
+  });
+
+  test('Double Gust: both Active switch out', () => {
+    const r = parseTrainerEffect("If you have any Benched Pok\u00e9mon, your opponent chooses 1 of them and switches it with your Active Pok\u00e9mon. Then, if your opponent has any Benched Pok\u00e9mon, choose 1 of them and switch it with his or her Active Pok\u00e9mon.");
+    assert.equal(r.steps[0].type, 'switchOwn');
+    assert.equal(r.steps[1].type, 'switchOpponentOut');
+  });
+
+  test('Random Receiver: reveal-until-Supporter', () => {
+    const r = parseTrainerEffect('Reveal cards from the top of your deck until you reveal a Supporter card. Put it into your hand. Shuffle the other cards back into your deck.');
+    assert.equal(r.steps[0].type, 'revealUntilCard');
+    assert.equal(r.steps[0].what, 'supporter');
+  });
+
+  test('Quick Ball: reveal-until-Pokémon', () => {
+    const r = parseTrainerEffect('Reveal cards from your deck until you reveal a Pok\u00e9mon. Show that Pok\u00e9mon to your opponent and put it into your hand. Shuffle the other revealed cards back into your deck.');
+    assert.equal(r.steps[0].type, 'revealUntilCard');
+    assert.equal(r.steps[0].what, 'pok\u00e9mon');
+  });
+
+  test('Underground Expedition: look at bottom 4, pick 2', () => {
+    const r = parseTrainerEffect('Look at the 4 cards from the bottom of your deck. Choose any 2 cards there and put them into your hand. Put the remaining cards back on the bottom of your deck in any order.');
+    assert.equal(r.steps[0].type, 'lookAtBottom');
+    assert.equal(r.steps[0].count, 4);
+  });
+
+  test('Dusk Ball: look at bottom 7, pick a Pokémon', () => {
+    const r = parseTrainerEffect('Look at the 7 cards from the bottom of your deck. Choose 1 Pok\u00e9mon you find there, show it to your opponent, and put it into your hand. Put the remaining cards back on top of your deck. Shuffle your deck afterward.');
+    assert.equal(r.steps[0].type, 'lookAtBottom');
+    assert.equal(r.steps[0].count, 7);
+  });
+
+  test('Hisuian Heavy Ball: look at face-down prizes', () => {
+    const r = parseTrainerEffect('Look at your face-down Prize cards. You may reveal a Basic Pok\u00e9mon you find there, put it into your hand, and put this Hisuian Heavy Ball in its place as a face-down Prize card.');
+    assert.equal(r.steps[0].type, 'lookAtFaceDownPrize');
+    assert.equal(r.steps[0].what, 'Basic');
+  });
+
+  test('Channeler / Pokémon Ranger: remove all effects of attacks', () => {
+    const channeler = parseTrainerEffect('Remove all effects of attacks on you and each of your Pok\u00e9mon.');
+    assert.equal(channeler.steps[0].type, 'clearAttackEffects');
+    assert.equal(channeler.steps[0].scope, 'own');
+    const ranger = parseTrainerEffect('Remove all effects of attacks on each player and his or her Pok\u00e9mon.');
+    assert.equal(ranger.steps[0].scope, 'all');
+  });
+
+  test('Alph Lithograph: "SHUFFLE YOUR DECK!" → shuffleDeckOnly', () => {
+    const r = parseTrainerEffect('SHUFFLE YOUR DECK!');
+    assert.equal(r.steps[0].type, 'shuffleDeckOnly');
+  });
+
+  test('Alph Lithograph: return Stadium to hand', () => {
+    const r = parseTrainerEffect('RETURN ANY STADIUM CARD IN PLAY TO ITS PLAYERS HAND!');
+    assert.equal(r.steps[0].type, 'returnStadiumToHand');
+  });
+
+  test('Lt. Surge: put Basic from hand as Active', () => {
+    const r = parseTrainerEffect('Put a Basic Pok\u00e9mon card from your hand into play as your Active Pok\u00e9mon. Put your old Active Pok\u00e9mon onto your Bench.');
+    assert.equal(r.steps[0].type, 'putHandBasicAsActive');
+  });
+
+  test('tool passives: Crystal Shard / Rocky Helmet / Lum Berry recognized as passive', () => {
+    const shard = parseTrainerEffect("As long as this card is attached to a Pok\u00e9mon, that Pok\u00e9mon's type is {C}. If that Pok\u00e9mon attacks, discard this card at the end of the turn.");
+    assert.equal(shard.steps[0].type, 'passive');
+    const helmet = parseTrainerEffect("If the Pok\u00e9mon this card is attached to is your Active Pok\u00e9mon and is damage by an opponent's attack (even if that Pok\u00e9mon is Knocked Out), put 2 damage counters on the Attacking Pok\u00e9mon.");
+    assert.equal(helmet.steps[0].type, 'passive');
+    const berry = parseTrainerEffect('At the end of each turn, if the Pok\u00e9mon this card is attached to is affected by any Special Conditions, it recovers from all of them, and discard this card.');
+    assert.equal(berry.steps[0].type, 'passive');
+  });
+});
+
+describe('legacy mechanisms coverage (batch 11)', () => {
+  test('Moomoo Milk: heal 3 per heads', () => {
+    const r = parseTrainerEffect('Choose 1 of your Pok\u00e9mon. Flip 2 coins. For each heads, remove 3 damage counters from that Pok\u00e9mon.');
+    assert.equal(r.steps[0].type, 'healPerHeads');
+    assert.equal(r.steps[0].perHeads, 3);
+  });
+
+  test('Moo-Moo Milk: heal 2 per heads', () => {
+    const r = parseTrainerEffect('Choose 1 of your Pok\u00e9mon. Flip 2 coins. Remove 2 damage counters times the number of heads from that Pok\u00e9mon. If the Pok\u00e9mon has fewer damage counters than that, remove all of them.');
+    assert.equal(r.steps[0].type, 'healPerHeads');
+    assert.equal(r.steps[0].perHeads, 2);
+  });
+
+  test('Tropical Wind: coin heal each Active / Sleep each Active', () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, remove 2 damage counters from each Active Pok\u00e9mon (remove 1 damage counter if a Pok\u00e9mon has only 1). If tails, each Active Pok\u00e9mon is now Asleep.');
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'healEachActive');
+    assert.equal(r.steps[0].tails[0].target, 'bothActiveAll');
+  });
+
+  test("Brock / Erika's Kindness: heal each Pokémon", () => {
+    const brock = parseTrainerEffect('Remove 1 damage counter from each of your Pok\u00e9mon that has any damage counters on it.');
+    assert.equal(brock.steps[0].type, 'healEachActive');
+    assert.equal(brock.steps[0].scope, 'own');
+    const erika = parseTrainerEffect("Remove 2 damage counters from each Pok\u00e9mon (yours and your opponent's) with any damage counters on it. If a Pok\u00e9mon has just 1 damage counter, remove it.");
+    assert.equal(erika.steps[0].scope, 'all');
+  });
+
+  test('Riley / Rival: opponent chooses from the top', () => {
+    const riley = parseTrainerEffect('Reveal the top 5 cards of your deck and have your opponent choose 2 of them. Discard the chosen cards and put the remaining cards into your hand.');
+    assert.equal(riley.steps[0].type, 'opponentChoosesFromTop');
+    assert.equal(riley.steps[0].count, 5);
+    assert.equal(riley.steps[0].chosen, 2);
+    assert.equal(riley.steps[0].chosenTo, 'discard');
+    const rival = parseTrainerEffect('Reveal the top 5 cards of your deck. Your opponent chooses 3 of those cards. Put those cards into your hand and put other 2 cards on top of your deck.');
+    assert.equal(rival.steps[0].chosen, 3);
+    assert.equal(rival.steps[0].restTo, 'top');
+  });
+
+  test('Energy Retrieval / Super Energy Retrieval: trade hand for basic Energy', () => {
+    const er = parseTrainerEffect('Trade 1 of the other cards in your hand for up to 2 basic Energy cards from your discard pile.');
+    assert.equal(er.steps[0].type, 'discardCost');
+    assert.equal(er.steps[0].count, 1);
+    assert.equal(er.steps[1].type, 'recursion');
+    const ser = parseTrainerEffect('Trade 2 of the other cards in your hand for 4 basic Energy cards from your discard pile. If you have fewer than 4 basic Energy cards there, take all of them.');
+    assert.equal(ser.steps[0].count, 2);
+  });
+
+  test("Team Rocket's Handiwork: mill 2 per heads", () => {
+    const r = parseTrainerEffect("Flip 2 coins. For each heads, discard 2 cards from the top of your opponent's deck.");
+    assert.equal(r.steps[0].type, 'millPerHeads');
+    assert.equal(r.steps[0].per, 2);
+  });
+
+  test('Gym Badge: flip until tails, draw per heads', () => {
+    const r = parseTrainerEffect('Flip a coin until you get tails. For each heads, draw a card.');
+    assert.equal(r.steps[0].type, 'flipUntilTailsDraw');
+  });
+
+  test('Tool Retriever: tools to hand', () => {
+    const r = parseTrainerEffect('Choose up to 2 Pok\u00e9mon Tool cards attached to your Pok\u00e9mon and put them into your hand.');
+    assert.equal(r.steps[0].type, 'toolsToHand');
+    assert.equal(r.steps[0].count, 2);
+  });
+
+  test('Switching Cups / Caitlin', () => {
+    assert.equal(parseTrainerEffect('Switch a card from your hand with the top card of your deck.').steps[0].type, 'switchHandWithTop');
+    const caitlin = parseTrainerEffect('Put as many cards from your hand as you like on the bottom of your deck in any order. Then, draw a card for each card you put on the bottom of your deck.');
+    assert.equal(caitlin.steps[0].type, 'putHandBottomThenDraw');
+  });
+
+  test('Team Skull Grunt / Sidney: opponent hand discard', () => {
+    const grunt = parseTrainerEffect('Your opponent reveals their hand. Discard 2 Energy cards from it.');
+    assert.equal(grunt.steps[0].type, 'revealOpponentHandDiscard');
+    assert.equal(grunt.steps[0].what, 'Energy');
+    const sidney = parseTrainerEffect('Your opponent reveals their hand. Discard up to 2 in any combination of Pok\u00e9mon Tool cards, Special Energy cards, and Stadium cards from it.');
+    assert.equal(sidney.steps[0].type, 'revealOpponentHandDiscard');
+  });
+
+  test('Fan of Waves / Eneporter: opponent Special Energy', () => {
+    const fan = parseTrainerEffect("Put a Special Energy attached to 1 of your opponent's Pok\u00e9mon on the bottom of their deck.");
+    assert.equal(fan.steps[0].type, 'sendEnergyToDeckBottom');
+    const ene = parseTrainerEffect("Move a Special Energy from 1 of your opponent's Pok\u00e9mon to another of their Pok\u00e9mon.");
+    assert.equal(ene.steps[0].type, 'moveEnergyOpponent');
+  });
+
+  test('Hypnotoxic Laser: Poison then coin Asleep', () => {
+    const r = parseTrainerEffect("Your opponent's Active Pok\u00e9mon is now Poisoned. Flip a coin. If heads, your opponent's Active Pok\u00e9mon is also Asleep.");
+    assert.equal(r.steps[0].type, 'applyStatus');
+    assert.deepEqual(r.steps[0].conditions, ['Poisoned']);
+    assert.equal(r.steps[1].type, 'coinFlip');
+  });
+
+  test("Professor Cozmo's Discovery: bottom/top draw", () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, draw the bottom 3 cards of your deck. If tails, draw the top 2 cards of your deck.');
+    assert.equal(r.steps[0].heads[0].type, 'drawBottom');
+    assert.equal(r.steps[0].heads[0].count, 3);
+    assert.equal(r.steps[0].tails[0].count, 2);
+  });
+
+  test('Maintenance: shuffle N from hand, then draw', () => {
+    const r = parseTrainerEffect("Shuffle 2 cards from your hand into your deck. (If you can't shuffle 2 cards into your deck, you can't play this card.) Then, draw a card.");
+    assert.equal(r.steps[0].type, 'shuffleHandCardsThenDraw');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[0].draw, 1);
+  });
+
+  test('First Ticket: pre-game passive', () => {
+    const r = parseTrainerEffect("Before you flip a coin to decide who goes first in a game, you may play this card. Don't flip that coin, and you go first.");
+    assert.equal(r.steps[0].type, 'passive');
+  });
+});
+
+describe('legacy mechanisms coverage (batch 12)', () => {
+  test('Ether / Gutsy Pickaxe: reveal top, attach if Energy', () => {
+    const ether = parseTrainerEffect('Reveal the top card of your deck. If that card is a basic Energy card, attach it to 1 of your Pok\u00e9mon. If it is not a basic Energy card, return it to the top of your deck.');
+    assert.equal(ether.steps[0].type, 'revealTopEnergy');
+    const pick = parseTrainerEffect('Reveal the top card of your deck. If that card is a {F} Energy card, attach it to 1 of your Benched Pok\u00e9mon. If it is not a {F} Energy card, put it into your hand.');
+    assert.equal(pick.steps[0].type, 'revealTopEnergy');
+    assert.equal(pick.steps[0].toBench, true);
+  });
+
+  test('Energy Pickup: coin heads attach basic Energy from discard', () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, search your discard pile for a basic Energy card and attach it to 1 of your Pok\u00e9mon.');
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'attachFromDiscard');
+  });
+
+  test('Super Rod / Good Rod: coin recursion / put-on-top', () => {
+    const rod = parseTrainerEffect('Flip a coin. If heads, put an Evolution card from your discard pile, if any, into your hand. If tails, put a Basic Pok\u00e9mon card from your discard pile, if any, into your hand.');
+    assert.equal(rod.steps[0].heads[0].type, 'recursion');
+    assert.equal(rod.steps[0].tails[0].what, 'Basic Pok\u00e9mon');
+    const good = parseTrainerEffect('Flip a coin. If heads, search your discard pile for a Pok\u00e9mon, show it to your opponent, and put it on top of your deck. If tails, search your discard pile for a Trainer card, show it to your opponent, and put it on top of your deck.');
+    assert.equal(good.steps[0].heads[0].type, 'putDiscardOnTop');
+    assert.equal(good.steps[0].tails[0].what, 'Trainer');
+  });
+
+  test('Heal Powder: coin heads cure + remove 2', () => {
+    const r = parseTrainerEffect('Flip a coin. If heads, your Active Pok\u00e9mon is no longer Asleep, Confused, Paralyzed, or Poisoned and remove 2 damage counters from it.');
+    assert.equal(r.steps[0].heads[0].type, 'clearStatus');
+    assert.equal(r.steps[0].heads[1].amount, 2);
+  });
+
+  test('Lure Ball / Fisherman: recursion counts', () => {
+    const lure = parseTrainerEffect('Flip 3 coins. For each heads, choose an Evolution card from your discard pile, show it to your opponent, and put it into your hand.');
+    assert.equal(lure.steps[0].type, 'recursion');
+    assert.equal(lure.steps[0].count, 3);
+    const fish = parseTrainerEffect('Choose 4 basic Energy cards from your discard pile (if there are fewer basic Energy cards than choose, take all of them), show them to your opponent, and put them into your hand.');
+    assert.equal(fish.steps[0].type, 'recursion');
+    assert.equal(fish.steps[0].count, 4);
+  });
+
+  test('Super Energy Removal 2: strip all Energy from an Active', () => {
+    const r = parseTrainerEffect('Flip 2 coins. If both are heads, discard all Energy cards attached to the Defending Pok\u00e9mon. If both are tails, discard all Energy cards attached to your Active Pok\u00e9mon. If 1 is heads and 1 is tails, this card does nothing.');
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'discardAllEnergyFromActive');
+    assert.equal(r.steps[0].heads[0].side, 'opponent');
+  });
+
+  test('Fervor: look at top 3, take Energy', () => {
+    const r = parseTrainerEffect('Show the top 3 cards of your deck to all players. Put any {R} Energy cards there into your hand and discard the rest.');
+    assert.equal(r.steps[0].type, 'lookAtTop');
+    assert.equal(r.steps[0].count, 3);
+  });
+
+  test("Mary's Request: draw 1 plus conditional", () => {
+    const r = parseTrainerEffect("Draw a card. If you don't have any Stage 2 Evolved Pok\u00e9mon in play, draw 2 more cards.");
+    assert.equal(r.steps[0].type, 'draw');
+    assert.equal(r.steps[0].count, 1);
+    assert.equal(r.steps[1].type, 'passive');
+  });
+
+  test('Oracle: choose 2 to top', () => {
+    const r = parseTrainerEffect('Choose 2 cards from your deck and shuffle the rest of your deck. Put the chosen cards on top of your deck in any order.');
+    assert.equal(r.steps[0].type, 'searchToTop');
+    assert.equal(r.steps[0].count, 2);
+  });
+
+  test('Pokémon Center / Pokémon Nurse: heal and discard Energy', () => {
+    const center = parseTrainerEffect('Remove all damage counters from all of your own Pok\u00e9mon with damage counters on them, then discard all Energy cards attached to those Pok\u00e9mon.');
+    assert.equal(center.steps[0].type, 'healAllOwnAndDiscardEnergy');
+    const nurse = parseTrainerEffect('Remove all damage counters from 1 of your Pok\u00e9mon. Then discard all Energy cards attached to it, if any.');
+    assert.equal(nurse.steps[0].type, 'healOneDiscardEnergy');
+  });
+
+  test("Giovanni's Last Resort: heal 1 then discard hand", () => {
+    const r = parseTrainerEffect('Remove all damage counters from 1 of your Pok\u00e9mon with Giovanni in its name. Then discard your hand.');
+    assert.equal(r.steps[0].type, 'heal');
+    assert.equal(r.steps[1].type, 'discardHandThenDraw');
+  });
+
+  test('Koga / Giovanni / Blaine: turn-scoped passives', () => {
+    assert.equal(parseTrainerEffect('If an attack from a Pok\u00e9mon with Koga in its name does damage to a Defending Pok\u00e9mon this turn, that Pok\u00e9mon is then Poisoned.').steps[0].type, 'passive');
+    assert.equal(parseTrainerEffect('Choose 1 of your Pok\u00e9mon in play with Giovanni in its name. For the rest of your turn, you may evolve that Pok\u00e9mon even if you just played or evolved it this turn or if this is your first turn.').steps[0].type, 'passive');
+    assert.equal(parseTrainerEffect('During this turn, instead of attaching your free Energy card, you may instead attach 2 {R} Energy cards to 1 of your Pok\u00e9mon with Blaine in its name.').steps[0].type, 'passive');
+  });
+});
+
+describe('legacy mechanisms coverage (batch 13)', () => {
+  test('Erika / Computer Error: each player draws up to N', () => {
+    const erika = parseTrainerEffect('You may draw up to 3 cards, then your opponent may draw up to 3 cards.');
+    assert.equal(erika.steps[0].type, 'eachPlayerDraw');
+    assert.equal(erika.steps[0].count, 3);
+    const error = parseTrainerEffect('You may draw up to 5 cards, then your opponent may draw up to 5 cards. Your turn is over now (you don\u2019t get to attack).');
+    assert.equal(error.steps[0].count, 5);
+  });
+
+  test('Holon Farmer: discard cost + recycle to top', () => {
+    const r = parseTrainerEffect('Discard a card from your hand. If you can\u2019t discard a card from your hand, you can\u2019t play this card. Search your discard pile for 3 basic Energy cards and any combination of 3 Basic Pok\u00e9mon or Evolution cards, show them to your opponent, and put them on top of your deck.');
+    assert.equal(r.steps[0].type, 'discardCost');
+    assert.equal(r.steps[1].type, 'shuffleFromDiscard');
+  });
+
+  test('Holon Lass: discard cost + dig top for Energy', () => {
+    const r = parseTrainerEffect('Discard a card from your hand. Count the total number of Prize cards left (both yours and your opponent\u2019s). Look at that many cards from the top of your deck, choose as many Energy cards as you like, show them to your opponent, and put them into your hand.');
+    assert.equal(r.steps[0].type, 'discardCost');
+    assert.equal(r.steps[1].type, 'lookAtTop');
+    assert.equal(r.steps[1].pick, 'Energy');
+  });
+
+  test('Poké Healer +: heal 8 and cure', () => {
+    const r = parseTrainerEffect('You may play 2 Pok\u00e9 Healer + at the same time. If you play 1 Pok\u00e9 Healer +, remove 1 damage counter and a Special Condition from 1 of your Active Pok\u00e9mon. If you play 2 Pok\u00e9 Healer +, remove 8 damage counters and all Special Conditions from 1 of your Active Pok\u00e9mon.');
+    assert.equal(r.steps[0].type, 'healAmount');
+    assert.equal(r.steps[0].amount, 8);
+    assert.equal(r.steps[0].cure, true);
+  });
+
+  test('New Pokédex / Pokédex: rearrange the top', () => {
+    assert.equal(parseTrainerEffect('Look at up to 5 cards from the top of your deck and rearrange them as you like.').steps[0].type, 'rearrangeTop');
+    assert.equal(parseTrainerEffect('Shuffle your deck. Then, look at up to 5 cards from the top of your deck and rearrange them as you like.').steps[0].type, 'rearrangeTop');
+  });
+
+  test('Trash Exchange: shuffle discard in, then mill', () => {
+    const r = parseTrainerEffect('Count the number of cards in your discard pile and shuffle them into your deck. Then discard that many cards from the top of your deck.');
+    assert.equal(r.steps[0].type, 'shuffleDiscardThenMill');
+  });
+
+  test('Tormenting Spray: random Supporter discard', () => {
+    const r = parseTrainerEffect('Choose a random card from your opponent\u2019s hand. Your opponent reveals that card. If it\u2019s a Supporter card, discard it.');
+    assert.equal(r.steps[0].type, 'discardRandomOpponentHandIfSupporter');
+  });
+});
+
+describe('Lost Zone cards (batch 14)', () => {
+  test('Lost Vacuum: hand card to Lost Zone, then a Tool/Stadium there', () => {
+    const r = parseTrainerEffect('You can use this card only if you put another card from your hand in the Lost Zone. Choose a Pok\u00e9mon Tool attached to any Pok\u00e9mon, or any Stadium in play, and put it in the Lost Zone.');
+    assert.equal(r.steps[0].type, 'lostZoneCost');
+    assert.equal(r.steps[0].count, 1);
+    assert.equal(r.steps[1].type, 'toolOrStadiumToLostZone');
+  });
+
+  test('Lost Blender: 2 hand cards to the Lost Zone, draw a card', () => {
+    const r = parseTrainerEffect('Put 2 cards from your hand in the Lost Zone. If you do, draw a card.');
+    assert.equal(r.steps[0].type, 'lostZoneCost');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[1].type, 'draw');
+    assert.equal(r.steps[1].count, 1);
+  });
+
+  test('Lost Remover: opponent Special Energy to the Lost Zone', () => {
+    const r = parseTrainerEffect("Put 1 Special Energy card attached to 1 of your opponent\u2019s Pok\u00e9mon in the Lost Zone.");
+    assert.equal(r.steps[0].type, 'sendEnergyToLostZone');
+    assert.equal(r.steps[0].energy, 'Special Energy');
+  });
+
+  test('Lysandre Prism Star: per {R} Pokémon, opponent discard to the Lost Zone', () => {
+    const r = parseTrainerEffect("For each of your {R} Pok\u00e9mon in play, put a card from your opponent\u2019s discard pile in the Lost Zone.");
+    assert.equal(r.steps[0].type, 'opponentDiscardToLostZonePerPokemon');
+    assert.equal(r.steps[0].energyType, '{R}');
+  });
+});

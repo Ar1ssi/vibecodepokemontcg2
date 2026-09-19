@@ -5313,3 +5313,99 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   text-shadow: 0 calc(var(--u) * 0.5) calc(var(--u) * 0.7) rgba(0, 0, 0, 0.45);
   box-shadow: 0 calc(var(--u) * 1.4) calc(var(--u) * 3.6) rgba(0, 0, 0, 0.45);
 }
+
+/* ── Lost Zone rail ─────────────────────────────────────────────────────
+   The Lost Zone lives outside the battle mat, docked to the right edge of
+   the screen (the board stops at 75.5%, the sidebox fills the rest). This
+   host-level rail mirrors both players' Lost Zone piles — top card first —
+   and opens the existing full zone view when a side is clicked. The zone
+   itself still lives in the playmat iframes, so drag/drop and netcode are
+   unchanged; this is a presentation layer only. */
+#lostZoneRail {
+  position: fixed;
+  right: 0;
+  top: 5vh;
+  width: 6%;
+  min-width: 54px;
+  height: 95vh;
+  box-sizing: border-box;
+  padding: 0.6vh 0.35vw;
+  background: rgba(18, 22, 28, 0.92);
+  border-left: 2px solid rgba(90, 110, 188, 0.864);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.6vh;
+  z-index: 1310;
+  transition: width 180ms ease;
+}
+#lostZoneRail.collapsed {
+  width: 2.1%;
+  min-width: 28px;
+}
+#lostZoneRail.collapsed .lost-zone-rail-side {
+  display: none;
+}
+#lostZoneRailToggle {
+  align-self: flex-end;
+  font-size: 1.4vh;
+  font-weight: 700;
+  color: #cdd6f4;
+  background: rgba(90, 110, 188, 0.35);
+  border: 1px solid rgba(90, 110, 188, 0.7);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.2vh 0.5vw;
+}
+.lost-zone-rail-side {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35vh;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.3vh 0.2vw;
+}
+.lost-zone-rail-side:hover {
+  background: rgba(90, 110, 188, 0.25);
+}
+.lost-zone-rail-side.lost-zone-rail-drop {
+  background: rgba(120, 150, 240, 0.45);
+  outline: 2px dashed rgba(180, 200, 255, 0.9);
+  outline-offset: -2px;
+}
+.lost-zone-rail-label {
+  font-size: 1.25vh;
+  font-weight: 700;
+  color: #e6e9f5;
+  text-align: center;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lost-zone-rail-count {
+  margin-left: 0.3vw;
+  color: #9fb0e8;
+}
+.lost-zone-rail-cards {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3vh;
+  scrollbar-width: none;
+}
+.lost-zone-rail-cards img {
+  width: 92%;
+  height: auto;
+  border-radius: 3px;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+}
+body.sidebox-hidden #lostZoneRail {
+  display: none;
+}

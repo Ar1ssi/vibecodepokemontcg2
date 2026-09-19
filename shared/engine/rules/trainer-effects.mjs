@@ -121,6 +121,9 @@ function appendDiscardCost(steps, lower) {
 // Short human description for passive/turn-scoped/conditional effects, chosen
 // from the keyword that matched. Falls back to a generic note.
 function passiveDetail(lower) {
+  if (/draw\s+\d+\s+more cards/.test(lower)) return 'Conditional bonus draw — draw the extra cards when the printed condition is met.';
+  if (lower.includes('your turn does not end')) return 'Spirit Link — your turn continues after Mega Evolving the attached Pokémon.';
+  if (lower.includes('at any time between turns')) return 'Between-turns trigger — resolve it manually when its condition is met.';
   if (lower.includes('more damage')) return 'Turn-scoped attack damage boost — applies automatically.';
   if (lower.includes('less damage')) return 'Passive damage reduction — applies automatically.';
   if (lower.includes('prevent all damage')) return 'Prevents damage / attack effects — applies automatically.';
@@ -129,7 +132,10 @@ function passiveDetail(lower) {
   if (lower.includes('recovers from all special conditions') || lower.includes("can't be affected by any special condition")) {
     return 'Special Condition immunity/recovery — applies automatically while attached.';
   }
-  if (lower.includes('have no abilities')) return 'Negates Abilities — applies automatically.';
+  if (lower.includes('have no abilities') || lower.includes('has no abilities')) return 'Negates Abilities — applies automatically.';
+  if (lower.includes('powers stop working')) return 'Turns off Pokémon Powers until the stated turn ends.';
+  if (lower.includes('has no weakness')) return 'No Weakness — applies automatically while attached.';
+  if (lower.includes('can attack even if')) return 'Attack-while-Asleep/Paralyzed — applies automatically while attached.';
   if (lower.includes('have no effect')) return 'Negates Pokémon Tool effects — applies automatically.';
   if (lower.includes('cost {c} more') || lower.includes('cost {c} less')) return 'Attack cost modifier — applies automatically.';
   if (lower.includes('can evolve into')) return 'Evolution timing modifier — applies automatically.';
@@ -140,12 +146,130 @@ function passiveDetail(lower) {
   if (lower.includes('would be knocked out') && lower.includes('is not knocked out')) return 'KO prevention — applies when the condition is met.';
   if (lower.includes('can use the attack on this card')) return 'Grants an attack — applies while attached.';
   if (lower.includes('costs 1 energy less') || lower.includes('cost 1 energy less')) return 'Attack cost reduction — applies automatically.';
+  if (lower.includes('damage counters on the attacking pokémon')) {
+    return 'Reactive tool damage — when the attached Pokémon is damaged or Knocked Out, put damage counters on the Attacking Pokémon (applied automatically by tool-combat).';
+  }
+  if (lower.includes('damaged by an opponent') || lower.includes('knocked out by damage')) {
+    return 'Reactive tool effect — triggers when the attached Pokémon is damaged or Knocked Out (applied automatically by tool-combat).';
+  }
   return 'Passive / conditional effect — applies automatically or when its condition is met.';
+}
+
+// Keywords that mark a card as a passive / turn-scoped / conditional modifier.
+// Module scope so the leading-action precedence check and the passive fallback
+// share one definition.
+const PASSIVE_KEYWORDS = [
+  'retreat cost',
+  'whenever any player',
+  'is damaged by an attack',
+  'damaged by an opponent',
+  'knocked out by damage',
+  'once during each player',
+  'once during your turn',
+  'once during their turn',
+  'more damage',
+  'less damage',
+  'prevent all damage',
+  'prevent all effects',
+  'any damage done to the pokémon this card is attached to',
+  'is reduced by',
+  'is not affected by',
+  "isn't affected by",
+  'as long as the pokémon this card is attached to',
+  'your turn does not end',
+  'at any time between turns',
+  'more prize cards',
+  'more prize card',
+  'have no abilities',
+  'has no abilities',
+  'powers stop working',
+  'poké-powers or poké-bodies',
+  'has no weakness',
+  'can attack even if',
+  'this card is attached to is a ',
+  'use the attack on this card',
+  'can use any attack from',
+  'maximum hp is',
+  'regardless of the amount or type of energy',
+  'is affected by weakness and resistance',
+  'apply it as x3',
+  'at the end of any turn',
+  'at the end of your turn, remove',
+  'at the end of your turn, draw a card',
+  "an opponent's attack damages it",
+  'have no effect',
+  'cost {c} more',
+  'cost {c} less',
+  'can evolve into',
+  "don't recover",
+  'do not recover',
+  "can't retreat",
+  'can’t retreat',
+  'fewer prize card',
+  'would be knocked out',
+  'can use the attack on this card',
+  'costs 1 energy less',
+  'cost 1 energy less',
+  'recovers from all special conditions',
+  "can't be affected by any special condition",
+  // Tool / attached-card modifiers (batch 10). Reached only after every active
+  // branch fails, so these broad substrings cannot shadow a playable effect.
+  'vstar power',
+  'gx attack on this card',
+  'use the gx attack',
+  'the pokémon this card is attached to',
+  'this card is attached to a pokémon',
+  'is attached to a pokémon',
+  'at the end of each turn',
+  'at the end of your turn',
+  'discard this card at the end of the turn',
+  "don't apply resistance",
+  "don't apply weakness",
+  'attacking pokémon',
+  're-flip',
+  'choose heads or tails',
+  'energy cards attached to that pokémon',
+  'as long as team galactic',
+  'with exp.all attached',
+  'instead of discarding energy',
+  'is then poisoned',
+  'even if you just played',
+  'instead of attaching your free energy',
+  'when your opponent attacks',
+  'you may switch this pokémon',
+  'you may move an energy card attached',
+  'the attack cost of that pokémon',
+  'reduce that damage',
+  'as often as you like during your turn',
+  'pokémon that has an owner',
+  'damage porter',
+  'devoluter',
+];
+
+function isPassiveText(lower) {
+  return PASSIVE_KEYWORDS.some((k) => lower.includes(k)) || /gets \+\d+ hp/.test(lower);
 }
 
 function parseEnergyType(lower) {
   const m = lower.match(/\{([a-z])\}/);
   return m ? `{${m[1].toUpperCase()}}` : null;
+}
+
+// Legacy discard-pile wording ("Search your discard pile for X …") names the
+// target loosely; map it to the closest search filter.
+function discardSearchWhat(lower) {
+  if (lower.includes('pokémon') && lower.includes('energy')) return 'Pokémon or Basic Energy';
+  if (lower.includes('supporter')) return 'Supporter';
+  if (lower.includes('trainer')) return 'Trainer';
+  if (lower.includes('pokémon')) return 'Pokémon';
+  if (lower.includes('basic energy')) return 'Basic Energy';
+  if (lower.includes('energy')) return 'Energy';
+  return 'card';
+}
+
+function discardSearchCount(lower) {
+  const m = lower.match(/\bfor\s+(?:up to\s+)?(\d+)\b/);
+  return m ? Number(m[1]) : 1;
 }
 
 // Boss's Orders, Lisia's Appeal, etc. — optional stage/type words between "Benched" and "Pokémon".
@@ -156,14 +280,15 @@ function matchesSwitchOpponentIn(lower) {
       lower.includes('active spot')) ||
     (lower.includes("switch 1 of your opponent's benched") &&
       lower.includes('pokémon') &&
-      (lower.includes('active pokémon') || lower.includes('active spot') || lower.includes('defending pokémon')))
+      (lower.includes('active pokémon') || lower.includes('active spot') || lower.includes('defending pokémon'))) ||
+    (lower.includes("choose 1 of your opponent's benched pokémon") && lower.includes('switch'))
   );
 }
 
 function appendTrailingDraw(steps, lower) {
   // A trailing draw clause that wasn't consumed by the primary branch.
   // "draw cards until you have N" takes precedence over a bare "draw N".
-  const until = lower.match(/draw\s+cards\s+until\s+you have\s+(\d+)\s+cards?/i);
+  const until = lower.match(/draw\s+cards(?:\s+from\s+your\s+deck)?\s+until\s+you have\s+(\d+)\s+cards?/i);
   if (until) {
     steps.push({ type: 'drawUntil', target: Number(until[1]) });
     return;
@@ -450,6 +575,23 @@ function parseCoinFlipStep(lower) {
     }
   }
 
+  // Energy Pickup — heads: attach a basic Energy from the discard pile
+  if (/if heads, search your discard pile for a basic energy card and attach it/.test(lower)) {
+    return { type: 'coinFlip', heads: [{ type: 'attachFromDiscard', energy: 'Basic Energy', target: '1 of your Pokémon' }], tails: [] };
+  }
+  // Super Rod — heads Evolution / tails Basic from the discard pile to hand
+  if (/if heads, put an evolution card from your discard pile/.test(lower)) {
+    return { type: 'coinFlip', heads: [{ type: 'recursion', what: 'Evolution', from: 'discard' }], tails: [{ type: 'recursion', what: 'Basic Pokémon', from: 'discard' }] };
+  }
+  // Good Rod — heads Pokémon / tails Trainer from discard to top of deck
+  if (/if heads, search your discard pile for a pokémon/.test(lower)) {
+    return { type: 'coinFlip', heads: [{ type: 'putDiscardOnTop', what: 'Pokémon' }], tails: [{ type: 'putDiscardOnTop', what: 'Trainer' }] };
+  }
+  // Heal Powder — heads: cure Special Conditions and remove 2 damage counters
+  if (/if heads, your active pokémon is no longer asleep/.test(lower)) {
+    return { type: 'coinFlip', heads: [{ type: 'clearStatus', target: 'yourActive' }, { type: 'healAmount', amount: 2, target: 'Active Pokémon' }], tails: [] };
+  }
+
   const headsEnergy = lower.match(/if heads,?\s+discard an energy from 1 of your opponent's pokémon/);
   if (headsEnergy) {
     return {
@@ -459,14 +601,82 @@ function parseCoinFlipStep(lower) {
     };
   }
 
-  const headsDmg = lower.match(/if heads,?\s+put\s+(\d+)\s+damage counters on 1 of your opponent's pokémon/);
-  const tailsDmg = lower.match(/if tails,?\s+put\s+(\d+)\s+damage counters on your active pokémon/);
+  const headsDmg = lower.match(/if heads,?\s+put\s+(\d+)\s+damage counters? on 1 of your opponent's pok[ée]mon/);
+  const tailsDmg = lower.match(/if tails,?\s+put\s+(\d+)\s+damage counters? on (?:your active pok[ée]mon|1 of your pok[ée]mon)/);
   if (headsDmg && tailsDmg) {
     return {
       type: 'coinFlip',
       heads: [{ type: 'damageCounters', count: Number(headsDmg[1]), target: "1 of your opponent's Pokémon" }],
       tails: [{ type: 'damageCounters', count: Number(tailsDmg[1]), target: 'your Active Pokémon' }],
     };
+  }
+
+  // Tropical Tidal Wave — heads/tails discard all Trainer cards in play
+  if (/discard all trainer/.test(lower) && /if tails/.test(lower)) {
+    const excludeSupporters = /excluding supporter cards\)? you have in play/.test(lower);
+    return {
+      type: 'coinFlip',
+      heads: [{ type: 'discardAllTrainerInPlay', side: 'opponent', excludeSupporters: false }],
+      tails: [{ type: 'discardAllTrainerInPlay', side: 'self', excludeSupporters }],
+    };
+  }
+
+  // Heads-only legacy variants: discard an opponent's Energy, switch the
+  // opponent, return one of your Pokémon to hand, or put the opponent's Active
+  // to Sleep. (Crushing Hammer, Energy Removal 2, Pokémon Reversal, Super Scoop
+  // Up, Sleep!)
+  if (/if heads/.test(lower)) {
+    // Hooligans Jim & Cas / The Rocket's Trap — random cards from the
+    // opponent's hand shuffled into their deck.
+    const randHand = lower.match(/choose\s+(\d+)\s+random cards? from your opponent'?s? hand/);
+    if (randHand) {
+      return { type: 'coinFlip', heads: [{ type: 'opponentHandShuffleDeck', count: Number(randHand[1]), what: 'card' }], tails: [] };
+    }
+    const upToRandHand = lower.match(/choose up to (\d+) cards? at random from your opponent'?s? hand/);
+    if (upToRandHand) {
+      return { type: 'coinFlip', heads: [{ type: 'opponentHandShuffleDeck', count: Number(upToRandHand[1]), upTo: true, what: 'card' }], tails: [] };
+    }
+    // Life Herb — clear Special Conditions and remove N damage counters.
+    const lifeHerb = lower.match(/remove all special conditions and (\d+) damage counters/);
+    if (lifeHerb) {
+      return { type: 'coinFlip', heads: [{ type: 'healAmount', amount: Number(lifeHerb[1]), target: '1 of your pokémon', cure: true }], tails: [] };
+    }
+    if (/choose 1 energy card attached to 1 of your opponent's pok[ée]mon and discard/.test(lower)) {
+      return {
+        type: 'coinFlip',
+        heads: [{ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: 1, scope: '1 Pokémon' }],
+        tails: [],
+      };
+    }
+    if (/discard an energy/.test(lower) && /opponent's pok[ée]mon/.test(lower)) {
+      return {
+        type: 'coinFlip',
+        heads: [{ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: 1, scope: '1 Pokémon' }],
+        tails: [],
+      };
+    }
+    if (/your opponent switches 1 of (?:his or her|their) active/.test(lower)) {
+      return { type: 'coinFlip', heads: [{ type: 'switchOpponentOut' }], tails: [] };
+    }
+    if (/switch (?:it|that pok[ée]mon) with (?:your opponent's active|the defending pok[ée]mon)/.test(lower) ||
+        (/choose 1 of your opponent's benched pok[ée]mon/.test(lower) && /switch/.test(lower))) {
+      return { type: 'coinFlip', heads: [{ type: 'switchOpponent' }], tails: [] };
+    }
+    if (/put a card (?:in|from) your discard pile on top of your deck/.test(lower)) {
+      return { type: 'coinFlip', heads: [{ type: 'putDiscardOnTop', what: 'card' }], tails: [] };
+    }
+    if (/return 1 of your pok[ée]mon/.test(lower) || /put 1 of your pok[ée]mon/.test(lower)) {
+      const keepAttached = /(?:all attached cards|all cards attached)[^.]*?(?:into|to) your hand/.test(lower) ||
+        lower.includes('and all attached cards');
+      return { type: 'coinFlip', heads: [{ type: 'returnPokemonToHand', keepAttached }], tails: [] };
+    }
+    if (/defending pok[ée]mon is now asleep/.test(lower) || /opponent's active pok[ée]mon is now asleep/.test(lower)) {
+      return {
+        type: 'coinFlip',
+        heads: [{ type: 'applyStatus', target: 'opponentActive', conditions: ['Asleep'] }],
+        tails: [],
+      };
+    }
   }
 
   return null;
@@ -578,6 +788,16 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // Red Card / Imposter Professor Oak — opponent shuffles hand into their deck,
+  // then draws a fixed number (Reset Stamp's "for each Prize card" is variable
+  // and stays unrecognized).
+  if (/your opponent shuffles (?:his or her|their) hand into (?:his or her|their) deck/.test(lower)) {
+    const drawM = lower.match(/draws?\s+(\d+)\s+cards?/);
+    steps.push({ type: 'opponentShuffleHandDraw', count: drawM ? Number(drawM[1]) : 4, prizeCondition: null });
+    appendDiscardCost(steps, lower);
+    return { steps, recognizable: true };
+  }
+
   // search deck → hand/bench/attach (with optional discard cost)
   if (lower.includes('search your deck for')) {
     const parsed = parseSearchDeckParams(lower);
@@ -588,14 +808,16 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // look at top N (Pokégear, Grimsley's Move)
-  if (lower.includes('look at the top')) {
-    const m = lower.match(/top\s+(\d+)\s+cards?/);
+  // look at top N (Pokégear, Grimsley's Move, Master Ball's "look at 7 cards
+  // from the top")
+  if (lower.includes('look at the top') || /look at \d+ cards? from the top/.test(lower)) {
+    const m = lower.match(/top\s+(\d+)\s+cards?/) || lower.match(/look at (\d+) cards? from the top/);
     let pick = 'any';
     if (lower.includes('discard any number of them')) pick = 'discard';
     else if (lower.includes('supporter card')) pick = 'Supporter';
     else if (lower.includes('attach a basic energy')) pick = 'Basic Energy (attach)';
     else if (lower.includes('onto your bench')) pick = 'Darkness Pokémon (bench)';
+    else if (lower.includes('basic pokémon or evolution card')) pick = 'Pokémon or Evolution';
     steps.push({
       type: 'lookAtTop',
       count: m ? Number(m[1]) : 7,
@@ -608,9 +830,9 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // look at bottom N (Dusk Ball)
-  if (lower.includes('look at the bottom')) {
-    const m = lower.match(/bottom\s+(\d+)\s+cards?/);
+  // look at bottom N (Dusk Ball, Underground Expedition)
+  if (lower.includes('look at the bottom') || /look at (?:the )?\d+ cards? from the bottom/.test(lower)) {
+    const m = lower.match(/bottom\s+(\d+)\s+cards?/) || lower.match(/look at (?:the )?(\d+) cards? from the bottom/);
     let pick = 'any';
     if (lower.includes('supporter card')) pick = 'Supporter';
     else if (lower.includes('pokémon')) pick = 'Pokémon';
@@ -643,9 +865,52 @@ function parseTrainerSteps(lower) {
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
-  if (lower.includes('switch your active pokémon with 1 of your benched pokémon') ||
-      lower.includes("switch your active team rocket's pokémon")) {
+  // Warp Point / Double Gust — both Active Pokémon are switched for a Benched
+  // one (each player chooses their own replacement)
+  if (
+    /your opponent switches the defending pokémon with 1 of (?:his or her|their) benched/.test(lower) ||
+    (/switches it with his or her active pokémon/.test(lower) && /you switch 1 of them with your active/.test(lower)) ||
+    (/switches it with your active pokémon/.test(lower) && /switch it with his or her active pokémon/.test(lower))
+  ) {
     steps.push({ type: 'switchOwn' });
+    steps.push({ type: 'switchOpponentOut' });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Warp Point — your opponent switches their Active out, then you switch yours
+  if (/your opponent switches 1 of (?:his or her|their) (?:active|defending) pok[ée]mon/.test(lower) &&
+      /you switch 1 of your active pok[ée]mon/.test(lower)) {
+    steps.push({ type: 'switchOpponentOut' });
+    steps.push({ type: 'switchOwn' });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  if ((lower.includes('switch your active pokémon with 1 of your benched pokémon') ||
+      lower.includes("switch your active team rocket's pokémon") ||
+      lower.includes('switch 1 of your active pokémon with 1 of your benched pokémon') ||
+      lower.includes('switch 1 of your own benched pokémon with your active pokémon') ||
+      lower.includes('switch 1 of your benched pokémon with your active pokémon')) &&
+      !lower.includes('opponent switches') && !lower.includes("opponent's")) {
+    steps.push({ type: 'switchOwn' });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // your opponent switches their own Active out (Pokémon Circulator, Repel).
+  // Coin-flip heads versions are handled earlier.
+  if (/your opponent switches (?:1 of )?(?:his or her|their) (?:active|defending) pok[ée]mon/.test(lower)) {
+    steps.push({ type: 'switchOpponentOut' });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Legacy gust wording — "Switch your opponent's Active Pokémon with 1 of his
+  // or her Benched Pokémon." (Pokémon Catcher). Unlike Repel/Circulator the
+  // player playing the card chooses, so this is switchOpponent.
+  if (/switch your opponent's active pok[ée]mon with (?:1 of )?(?:his or her|their) benched/.test(lower)) {
+    steps.push({ type: 'switchOpponent' });
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
@@ -661,6 +926,30 @@ function parseTrainerSteps(lower) {
     steps.push({ type: 'switchOwn' });
     steps.push({ type: 'switchOpponentOut' });
     appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // legacy recursion — "Search your discard pile for X, show it to your
+  // opponent, and put it into your hand." (VS Seeker, Junk Arm, Fisherman,
+  // Pokémon Rescue). The wording never contains "from your discard pile".
+  if (
+    lower.includes('search your discard pile for') &&
+    /put (?:it|them) into your hand/.test(lower) &&
+    !lower.includes('into your deck')
+  ) {
+    steps.push({ type: 'recursion', what: discardSearchWhat(lower), from: 'discard' });
+    appendDiscardCost(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // legacy discard → deck — "Search your discard pile for X … shuffle them
+  // into your deck." (Energy Returner, Night Maintenance, Palmer's Contribution)
+  if (lower.includes('search your discard pile for') && lower.includes('into your deck')) {
+    steps.push({
+      type: 'shuffleFromDiscard',
+      what: discardSearchWhat(lower).replace(' or Basic Energy', ''),
+      count: discardSearchCount(lower),
+    });
     return { steps, recognizable: true };
   }
 
@@ -701,9 +990,28 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // remove a fixed number of damage counters from one Pokémon (Potion,
+  // Bertha's Warmth). Anchored at the start of the text so coin-flip /
+  // "for each heads" / conditional removals (Moomoo Milk, Life Herb, Hyper
+  // Potion) are not mistaken for an unconditional heal.
+  const removeCounters = lower.match(/^remove (?:up to )?(\d+) damage counters? from 1 of your pokémon/);
+  if (removeCounters) {
+    steps.push({
+      type: 'healAmount',
+      amount: Number(removeCounters[1]),
+      target: '1 of your Pokémon',
+    });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
   // attach multiple from discard (Philippe — up to N typed Energy to one Pokémon)
-  if (lower.includes('attach up to') && lower.includes('from your discard pile')) {
-    const countMatch = lower.match(/attach up to\s+(\d+)/);
+  if (
+    /\battach\s+(?:up to\s+)?\d+\b/.test(lower) &&
+    lower.includes('energy') &&
+    lower.includes('from your discard pile')
+  ) {
+    const countMatch = lower.match(/attach\s+(?:up to\s+)?(\d+)/);
     const count = countMatch ? Number(countMatch[1]) : 2;
     const type = parseEnergyType(lower);
     const energy = type ? `Basic ${type} Energy` : 'Basic Energy';
@@ -716,9 +1024,10 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // attach from discard (Wondrous Patch, Glass Trumpet, N's PP Up)
-  if (lower.includes('attach a basic') && lower.includes('from your discard pile')) {
-    const typedEnergy = lower.match(/attach a basic\s+(\{[a-z]\})\s+energy/);
+  // attach from discard (Wondrous Patch, Glass Trumpet, N's PP Up, Metal
+  // Saucer, Aqua Patch — the older wording omits "basic").
+  if (lower.includes('attach') && lower.includes('energy') && lower.includes('from your discard pile')) {
+    const typedEnergy = lower.match(/attach\s+(?:a\s+)?(?:basic\s+)?(\{[a-z]\})\s+energy/);
     const energy = typedEnergy ? `Basic ${typedEnergy[1].toUpperCase()} Energy` : 'Basic Energy';
     let target;
     if (lower.includes('up to 2') && lower.includes('benched')) target = 'up to 2 of your Benched {C} Pokémon';
@@ -756,8 +1065,9 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // draw until you have N (standalone — Iris's Fighting Spirit, Ariana)
-  if (lower.includes('draw cards until you have')) {
+  // draw until you have N (standalone — Iris's Fighting Spirit, Ariana,
+  // Professor Birch's "draw cards from your deck until you have 6")
+  if (/draw\s+cards(?:\s+from\s+your\s+deck)?\s+until\s+you have/.test(lower)) {
     const all = [...lower.matchAll(/until you have\s+(\d+)\s+cards?/g)].map((x) => Number(x[1]));
     steps.push({
       type: 'drawUntil',
@@ -772,8 +1082,12 @@ function parseTrainerSteps(lower) {
   // These are discrete player actions. They are matched BEFORE the passive
   // fallback and the bare-draw fallback so they are never swallowed.
 
-  // Rare Candy — evolve a Basic directly to Stage 2, skipping Stage 1
-  if (lower.includes('skipping the stage 1') || (lower.includes('stage 2 card in your hand') && lower.includes('evolve'))) {
+  // Rare Candy / Pokémon Breeder — evolve a Basic directly to Stage 2,
+  // skipping Stage 1
+  if (lower.includes('skipping the stage 1') ||
+      (lower.includes('stage 1 or stage 2') && lower.includes('evolves from that pokémon')) ||
+      (lower.includes('stage 2 evolution card from your hand') && lower.includes('matching basic')) ||
+      (lower.includes('stage 2 card in your hand') && lower.includes('evolve'))) {
     steps.push({ type: 'evolveStage2', source: 'hand', skipStage: 1 });
     return { steps, recognizable: true };
   }
@@ -795,17 +1109,49 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // move Energy between your own Pokémon — generic wording (Poppy, Tag Switch,
+  // Lucian's Assignment, Misty's Water Command). Multi Switch moves Bench →
+  // Active and is modelled as moveEnergyToActive.
+  if (lower.startsWith('move') && lower.includes('energy') &&
+      !lower.includes('opponent') && !lower.includes('damage counter')) {
+    if (lower.includes('benched') && lower.includes('active')) {
+      const m = lower.match(/move (?:up to\s+)?(\d+)/);
+      steps.push({ type: 'moveEnergyToActive', count: m ? Number(m[1]) : 1 });
+    } else {
+      steps.push({ type: 'moveEnergy' });
+    }
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Sabrina — move all Energy between two specific Pokémon (modelled as moveEnergy)
+  if (/take all energy cards attached to 1 of your pokémon .*attach them to another/.test(lower)) {
+    steps.push({ type: 'moveEnergy' });
+    return { steps, recognizable: true };
+  }
+
   // Strange Timepiece — devolve an evolved Pokémon. Matched specifically
   // ("devolve 1 of your …") so a Stadium that merely mentions the word
   // (e.g. Dizzying Valley: "…when they evolve or devolve.") stays passive.
-  if (lower.includes('devolve 1 of your')) {
+  if (lower.includes('devolve 1 of your') ||
+      lower.includes('take the highest stage evolution card from that pokémon') ||
+      lower.includes('discard all evolution cards of that stage or higher')) {
     steps.push({ type: 'devolve', target: lower.includes('{p}') ? '1 of your evolved {P} Pokémon' : '1 of your evolved Pokémon' });
     return { steps, recognizable: true };
   }
 
-  // Tool Scrapper — discard up to 2 attached Pokémon Tools
-  if (lower.includes('pokémon tools attached to pokémon')) {
+  // Tool Scrapper / Field Blower — discard up to 2 attached Pokémon Tools
+  // (Field Blower's Stadium half is not modelled here)
+  if (lower.includes('pokémon tools attached to pokémon') ||
+      lower.includes('pokémon tool cards attached to pokémon in play') ||
+      lower.includes('combination of pokémon tool cards and stadium cards in play')) {
     steps.push({ type: 'discardTools', count: 2 });
+    return { steps, recognizable: true };
+  }
+
+  // Startling Megaphone — discard all Tools from each opponent Pokémon
+  if (lower.includes('discard all pokémon tool cards attached to each')) {
+    steps.push({ type: 'discardTools', count: 8 });
     return { steps, recognizable: true };
   }
 
@@ -830,10 +1176,222 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // Scoop Up Cyclone / Professor Turo's Scenario — return Pokémon to hand
-  if (lower.includes('put 1 of your pokémon') && lower.includes('into your hand')) {
-    const keepAttached = lower.includes('all attached cards');
+  // Scoop Up Cyclone / Professor Turo's Scenario / Cheren's Care / Poké Turn /
+  // Penny / Mr. Briney's Compassion / Scoop Up — return one of your Pokémon
+  // (optionally of a type) to your hand
+  const returnYourPokemon =
+    /^(?:put|return) 1 of your (?:basic |\{[a-z]\} )?pokémon/.test(lower) ||
+    /return that pokémon(?: and all cards attached to it)? to your hand/.test(lower) ||
+    /and return its basic pokémon card to your hand/.test(lower);
+  if (returnYourPokemon &&
+      (lower.includes('into your hand') || lower.includes('to your hand'))) {
+    const keepAttached = /(?:all attached cards|all cards attached)[^.]*?(?:into|to) your hand/.test(lower) ||
+      lower.includes('and all attached cards');
     steps.push({ type: 'returnPokemonToHand', keepAttached });
+    return { steps, recognizable: true };
+  }
+
+  // Revive / Echoing Horn / Target Whistle — put a Basic Pokémon from a discard
+  // pile onto a Bench (yours, or the opponent's for the gust tools)
+  if (/put (?:a|1) basic pok[ée]mon(?: card)? from (?:your|your opponent's) discard pile onto/.test(lower) ||
+      /choose 1 basic pok[ée]mon card from your opponent's discard pile and put it onto/.test(lower)) {
+    steps.push({
+      type: 'reviveFromDiscard',
+      what: 'Basic Pokémon',
+      side: lower.includes("opponent's discard pile") ? 'opponent' : 'own',
+    });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Move damage counters between Pokémon (Damage Pump, Agatha, Grimsley,
+  // Damage Mover)
+  {
+    const mv = lower.match(
+      /move (?:up to )?(\d+) damage counters? from (your active pok[ée]mon|1 of your pok[ée]mon|1 of your opponent's pok[ée]mon) to (your other pok[ée]mon|another of your pok[ée]mon|your opponent's active pok[ée]mon|another of their pok[ée]mon)/
+    );
+    if (mv) {
+      const from = mv[2].includes("opponent's") ? 'opponent'
+        : mv[2].includes('active') ? 'ownActive' : 'own';
+      const to = mv[3].includes("opponent's active") ? 'opponentActive'
+        : mv[3].includes('their') ? 'opponent' : 'own';
+      steps.push({ type: 'moveDamageCounters', count: Number(mv[1]), from, to });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Bare reveal of the opponent's hand (Hand Scope, Alph Lithograph)
+  if (/^(?:look at your opponents?['’]?s? hand|your opponent reveals (?:his or her|their) hand)[.!]?$/.test(lower)) {
+    steps.push({ type: 'lookAtOpponentHand' });
+    return { steps, recognizable: true };
+  }
+
+  // Super Potion — discard an own Energy as a cost, then remove damage counters
+  // (the Energy cost is not enforced by the executor)
+  {
+    const potion = lower.match(/in order to remove (?:up to )?(\d+) damage counters/);
+    if (potion) {
+      steps.push({ type: 'healAmount', amount: Number(potion[1]), target: '1 of your Pokémon' });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Attach Energy from your hand (Bede, Brock's Training, Flint's Willpower,
+  // The Masked Royal, Zinnia)
+  {
+    const at = lower.match(/attach (?:up to )?(\d+|a|an)?\s*(basic )?energy cards? from your hand/);
+    if (at) {
+      const raw = at[1] || '1';
+      const count = raw === 'a' || raw === 'an' ? 1 : Number(raw);
+      let target = '1 of your Pokémon';
+      if (lower.includes('benched')) target = '1 of your Benched Pokémon';
+      else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
+      steps.push({ type: 'attachFromHand', count, energy: at[2] ? 'Basic Energy' : 'Energy', target });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Cube / Technical Machine items — attach this card to a Pokémon that may
+  // then use the attack printed on it
+  if (/attach this card to 1 of your .*pok[ée]mon/.test(lower) && lower.includes("this card's attack")) {
+    steps.push({
+      type: 'attachAttackTool',
+      target: '1 of your Pokémon',
+      discardAtEndOfTurn: /at the end of your turn/.test(lower),
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Turn Prize cards face up (Town Map, Here Comes Team Rocket!, Alph Lithograph)
+  if (/turns? (?:all of )?(?:your|his or her|their) prize cards face up/.test(lower) ||
+      /plays with (?:his or her|their) prize cards face up/.test(lower) ||
+      /look at all of your face ?down prize cards/.test(lower)) {
+    steps.push({ type: 'revealPrizes', scope: lower.includes('each player') ? 'all' : 'own' });
+    return { steps, recognizable: true };
+  }
+
+  // Take Prize cards into hand (Peonia, Gladion)
+  if (/put up to (\d+) prize cards? into your hand/.test(lower)) {
+    const m = lower.match(/put up to (\d+) prize cards? into your hand/);
+    steps.push({ type: 'prizeToHand', count: Number(m[1]), replace: lower.includes('face down as a prize card') });
+    return { steps, recognizable: true };
+  }
+  if (lower.includes('put 1 of them into your hand') && lower.includes('face-down prize')) {
+    steps.push({ type: 'prizeToHand', count: 1, replace: false });
+    return { steps, recognizable: true };
+  }
+
+  // Full Heal / Double Full Heal — clear Special Conditions (not coin-based)
+  if (!lower.includes('flip a coin') && !lower.includes('flip 2 coins') &&
+      (/remove all special conditions from (?:your active|each of your active|all of your)/.test(lower) ||
+       /(?:is|are) no longer (?:asleep|confused|paralyzed|poisoned|burned)/.test(lower))) {
+    steps.push({
+      type: 'clearStatus',
+      target: /each of your|all of your pokémon|each player/.test(lower) ? 'allYourPokémon' : 'yourActive',
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Discard a Stadium in play (Paint Roller, Delinquent, Bonnie)
+  if (/(?:discard|remove) any stadium card in play/.test(lower) || /discard that stadium card/.test(lower)) {
+    steps.push({ type: 'discardStadium' });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Alph Lithograph — return a Stadium in play to its owner's hand
+  if (/return any stadium card in play to its player'?s? hand/.test(lower)) {
+    steps.push({ type: 'returnStadiumToHand' });
+    return { steps, recognizable: true };
+  }
+
+  // Alph Lithograph — only "SHUFFLE YOUR DECK!"
+  if (/^\s*shuffle your deck!?\s*$/.test(lower)) {
+    steps.push({ type: 'shuffleDeckOnly' });
+    return { steps, recognizable: true };
+  }
+
+  // Channeler / Pokémon Ranger — remove all effects of attacks
+  if (/remove all effects of attacks on/.test(lower)) {
+    steps.push({ type: 'clearAttackEffects', scope: /each player/.test(lower) ? 'all' : 'own' });
+    return { steps, recognizable: true };
+  }
+
+  // Reveal from the top until you find a card (Random Receiver, Quick Ball, Fast Ball)
+  {
+    const m = lower.match(/reveal cards from (?:the top of )?your deck until you reveal an? ([a-zé ]+?)(?: card)?[.,]/);
+    if (m) {
+      steps.push({ type: 'revealUntilCard', what: m[1].trim() });
+      appendTrailingDraw(steps, lower);
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Hisuian Heavy Ball / Beast Ball — trade a face-down Prize for a revealed card
+  if (/look at your face-down prize cards/.test(lower)) {
+    steps.push({
+      type: 'lookAtFaceDownPrize',
+      what: /ultra beast/.test(lower) ? 'Ultra Beast' : 'Basic',
+      replace: /put this .* in its place/.test(lower),
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Lt. Surge — put a Basic from hand into play as your Active, old Active to Bench
+  if (/put a basic pokémon card from your hand into play as your active pokémon/.test(lower)) {
+    steps.push({ type: 'putHandBasicAsActive' });
+    return { steps, recognizable: true };
+  }
+
+  // Max Revive — put a Pokémon from your discard pile on top of your deck
+  if (/put a pokémon from your discard pile on top of your deck/.test(lower)) {
+    steps.push({ type: 'putDiscardOnTop', what: 'Pokémon' });
+    return { steps, recognizable: true };
+  }
+
+  // Energy Reset / Energy Flow — return attached Energy to hand
+  if (/put as many energy attached to your pokémon as you like into your hand/.test(lower)) {
+    steps.push({ type: 'energyToHand', scope: 'allYour' });
+    return { steps, recognizable: true };
+  }
+  if (/return any number of energy cards attached to it to your hand/.test(lower)) {
+    steps.push({ type: 'energyToHand', scope: 'eachYour' });
+    return { steps, recognizable: true };
+  }
+
+  // Mr. Fuji / Cassius — shuffle one of your Pokémon (and its attachments) into deck
+  if (/shuffle 1 of your pokémon and all cards attached to it into your deck/.test(lower) ||
+      /shuffle it and any cards attached to it into your deck/.test(lower)) {
+    steps.push({ type: 'shufflePokemonIntoDeck' });
+    return { steps, recognizable: true };
+  }
+
+  // Volo / Giovanni's Exile — discard own Benched Pokémon (and attachments)
+  if (/discard 1 of your benched pokémon v and all attached cards/.test(lower)) {
+    steps.push({ type: 'discardOwnBenchPokemon', count: 1, filter: 'V' });
+    return { steps, recognizable: true };
+  }
+  {
+    const exile = lower.match(/discard up to (\d+) of your benched pokémon that have no damage counters/);
+    if (exile) {
+      steps.push({ type: 'discardOwnBenchPokemon', count: Number(exile[1]), filter: 'no damage counters' });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Karen / Lysandre's Trump Card — each player shuffles their discard pile into deck
+  if (/each player shuffles all (?:pokémon|cards) in (?:his or her|their) discard pile into (?:his or her|their) deck/.test(lower)) {
+    steps.push({ type: 'shuffleDiscardIntoDeck', scope: 'each' });
+    return { steps, recognizable: true };
+  }
+
+  // Surprise Box / Return Label — move a card from the opponent's discard pile
+  if (/put a card from your opponent's discard pile into their hand/.test(lower)) {
+    steps.push({ type: 'opponentDiscardToHand' });
+    return { steps, recognizable: true };
+  }
+  if (/put a card from your opponent's discard pile on the bottom of their deck/.test(lower)) {
+    steps.push({ type: 'opponentDiscardToDeckBottom' });
     return { steps, recognizable: true };
   }
 
@@ -861,8 +1419,8 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // Redeemable Ticket — shuffle Prize cards back into deck and redraw
-  if (lower.includes('count your prize cards') && lower.includes('shuffle them')) {
+  // Redeemable Ticket / Rotom Dex — count Prize cards, shuffle into deck, redraw
+  if (/count(?:ing)? your prize cards/.test(lower) && /shuffle (?:them|those cards)/.test(lower)) {
     steps.push({ type: 'reshufflePrizes' });
     return { steps, recognizable: true };
   }
@@ -888,17 +1446,30 @@ function parseTrainerSteps(lower) {
   if (/draw\s+a\s+card\s+for\s+each/.test(lower)) {
     let source;
     if (lower.includes('ancient pokémon in play')) source = 'ancientInPlay';
+    else if (lower.includes("opponent's benched basic pokémon")) source = 'opponentBenchBasic';
     else if (lower.includes("opponent's benched pokémon")) source = 'opponentBench';
     else if (lower.includes('opponent reveals their hand') && lower.includes('pokémon you find')) {
       source = 'opponentHandPokemon';
+    } else if (lower.includes('opponent reveals their hand') && lower.includes('trainer card you find')) {
+      source = 'opponentHandTrainer';
     } else if (lower.includes("opponent's mega evolution pokémon ex in play")) {
       source = 'opponentMegaExInPlay';
+    } else if (lower.includes("opponent's pokémon in play")) {
+      source = 'opponentPokemonInPlay';
+    } else if (lower.includes('for each benched pokémon (both')) {
+      source = 'allBench';
     }
     if (source) {
       steps.push({ type: 'variableDraw', source, per: 'card' });
       appendDiscardCost(steps, lower);
       return { steps, recognizable: true };
     }
+  }
+
+  // Steven's Advice — draw up to a number equal to the opponent's Pokémon in play
+  if (/draw a number of cards up to the number of your opponent's pokémon in play/.test(lower)) {
+    steps.push({ type: 'variableDraw', source: 'opponentPokemonInPlay', per: 'card' });
+    return { steps, recognizable: true };
   }
 
   // Brassius — count hand, shuffle in, draw count+1
@@ -911,9 +1482,10 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
-  // shuffle from discard into deck (Energy Recycler, Sacred Ash, Great Haul Net)
-  if (lower.includes('from your discard pile into your deck')) {
-    const countMatch = lower.match(/shuffle\s+up\s+to\s+(\d+)/);
+  // shuffle from discard into deck (Energy Recycler, Sacred Ash, Great Haul
+  // Net, Super Rod — "from your discard pile back into your deck")
+  if (lower.includes('from your discard pile') && /(?:back )?into your deck/.test(lower)) {
+    const countMatch = lower.match(/shuffle\s+(?:up to\s+)?(\d+)/);
     const count = countMatch ? Number(countMatch[1]) : 5;
     if (lower.includes('choose 1 or both')) {
       const choices = [];
@@ -928,27 +1500,39 @@ function parseTrainerSteps(lower) {
       steps.push({ type: 'shuffleFromDiscard', choices });
     } else {
       let what = 'card';
-      if (lower.includes('basic energy')) what = 'Basic Energy';
+      if (lower.includes('pokémon') && lower.includes('basic energy')) what = 'Pokémon or Basic Energy';
+      else if (lower.includes('basic energy')) what = 'Basic Energy';
       else if (lower.includes('pokémon')) what = 'Pokémon';
       steps.push({ type: 'shuffleFromDiscard', what, count });
     }
     return { steps, recognizable: true };
   }
 
-  // apply Special Conditions (Dangerous Laser, Dark Bell)
-  if (lower.includes(' is now ') || lower.includes(' are now ')) {
-    if (lower.includes("opponent's active pokémon is now")) {
-      const conditions = [];
-      if (lower.includes('burned')) conditions.push('Burned');
-      if (lower.includes('confused')) conditions.push('Confused');
-      if (conditions.length) {
+  // apply Special Conditions (Dangerous Laser, Dark Bell, Yell Horn, Imakuni?)
+  if ((lower.includes(' is now ') || lower.includes(' are now ')) && !lower.includes('flip a coin')) {
+    const conditions = [];
+    if (lower.includes('burned')) conditions.push('Burned');
+    if (lower.includes('confused')) conditions.push('Confused');
+    if (lower.includes('poisoned')) conditions.push('Poisoned');
+    if (lower.includes('asleep')) conditions.push('Asleep');
+    if (lower.includes('paralyzed')) conditions.push('Paralyzed');
+    if (conditions.length) {
+      if (lower.includes("opponent's active pokémon is now") || lower.includes("opponent's active pokémon are now")) {
         steps.push({ type: 'applyStatus', target: 'opponentActive', conditions });
         return { steps, recognizable: true };
       }
-    }
-    if (lower.includes('both active') && lower.includes('non-{d}') && lower.includes('confused')) {
-      steps.push({ type: 'applyStatus', target: 'bothActiveNonDark', conditions: ['Confused'] });
-      return { steps, recognizable: true };
+      if (/both active pokémon are now/.test(lower)) {
+        steps.push({ type: 'applyStatus', target: 'bothActiveAll', conditions });
+        return { steps, recognizable: true };
+      }
+      if (lower.includes('both active') && lower.includes('non-{d}') && lower.includes('confused')) {
+        steps.push({ type: 'applyStatus', target: 'bothActiveNonDark', conditions: ['Confused'] });
+        return { steps, recognizable: true };
+      }
+      if (/your active pokémon is now/.test(lower)) {
+        steps.push({ type: 'applyStatus', target: 'ownActive', conditions });
+        return { steps, recognizable: true };
+      }
     }
   }
 
@@ -969,6 +1553,30 @@ function parseTrainerSteps(lower) {
     const step = { type: 'opponentHandBottom', what };
     if (lower.includes('opponent may draw')) step.optionalOpponentDraw = true;
     steps.push(step);
+    return { steps, recognizable: true };
+  }
+
+  // Morty / Team Rocket's Evil Deeds / Rocket's Sneak Attack — look at (or
+  // reveal) the opponent's hand, then shuffle chosen card(s) into their deck.
+  if (
+    /shuffles? (?:that|those) cards? into (?:his or her|their) deck/.test(lower) &&
+    /(?:look at your opponent'?s? hand|opponent reveals (?:their|his or her) hand)/.test(lower)
+  ) {
+    const m = lower.match(/choose\s+(\d+|up to \d+)\s+(?:cards?|of them)/);
+    const step = {
+      type: 'opponentHandShuffleDeck',
+      count: m ? Number(m[1].replace(/[^0-9]/g, '')) : 1,
+      what: lower.includes('trainer card') ? 'Trainer' : 'card',
+    };
+    if (m && /up to/.test(m[1])) step.upTo = true;
+    if (lower.includes('opponent may draw')) step.optionalOpponentDraw = true;
+    steps.push(step);
+    return { steps, recognizable: true };
+  }
+
+  // Nita — put an Energy from the opponent's Active Pokémon on top of their deck
+  if (/put an energy (?:from|attached to) your opponent'?s? active pokémon on top of (?:their|his or her) deck/.test(lower)) {
+    steps.push({ type: 'opponentActiveEnergyToDeck' });
     return { steps, recognizable: true };
   }
 
@@ -996,6 +1604,83 @@ function parseTrainerSteps(lower) {
       type: 'opponentDiscardUntil',
       count: m ? Number(m[1]) : 3,
     });
+    return { steps, recognizable: true };
+  }
+
+  // Opponent-hand Basic Pokémon placed onto the opponent's Bench (Erika's
+  // Invitation, Captivating Poké Puff, Erika's Perfume)
+  if (
+    /put (?:a|any number of) basic pokémon you find there onto your opponent'?s? bench/.test(lower) ||
+    (/look at your opponent'?s? hand/.test(lower) && /put any number of them onto your opponent'?s? bench/.test(lower))
+  ) {
+    steps.push({
+      type: 'opponentHandToBenchBasic',
+      anyNumber: lower.includes('any number'),
+      switchActive: /switch in that pokémon/.test(lower),
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Jessie & James — each player discards N from hand (opponent first)
+  {
+    const m = lower.match(/each player discards\s+(\d+)\s+cards? from (?:his or her|their) hand/);
+    if (m) {
+      steps.push({ type: 'eachPlayerDiscardFromHand', count: Number(m[1]), opponentFirst: /opponent discards first/.test(lower) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Erika — each player draws up to N (you first)
+  {
+    const m = lower.match(/each player may draw up to\s+(\d+)\s+cards?/);
+    if (m) {
+      steps.push({ type: 'eachPlayerDraw', count: Number(m[1]) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Seeker — each player returns 1 Benched Pokémon (and attachments) to hand
+  if (/each player returns 1 of (?:his or her|their) benched pokémon/.test(lower)) {
+    steps.push({ type: 'eachPlayerReturnBench' });
+    return { steps, recognizable: true };
+  }
+
+  // Wicke — each player shuffles hand into deck, then draws that many
+  if (/each player counts the cards in (?:his or her|their) hand, shuffles those cards into (?:his or her|their) deck, then draws that many/.test(lower)) {
+    steps.push({ type: 'eachPlayerShuffleHandDraw' });
+    return { steps, recognizable: true };
+  }
+
+  // Hugh — each player normalizes their hand to N by drawing or discarding
+  {
+    const m = lower.match(/each player either draws or discards? cards? until (?:he or she|they) has? (\d+) cards/);
+    if (m) {
+      steps.push({ type: 'eachPlayerHandToFive', count: Number(m[1]), opponentFirst: /opponent does this first/.test(lower) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Buddy-Buddy Rescue — each player recovers a Pokémon from their discard
+  if (/each player puts a pokémon from (?:his or her|their) discard pile into (?:his or her|their) hand/.test(lower)) {
+    steps.push({ type: 'eachPlayerRecoverPokemon' });
+    return { steps, recognizable: true };
+  }
+
+  // Psychic's Third Eye / Secret Mission — discard any number from hand, then draw that many
+  if (
+    /discard as many (?:other )?cards as you (?:like|want) from your hand and draw that many/.test(lower) ||
+    /discard as many cards as you like from your hand\.? then,? draw that many/.test(lower)
+  ) {
+    if (/look at your opponent'?s? hand|opponent reveals (?:his or her|their) hand/.test(lower)) {
+      steps.push({ type: 'lookAtOpponentHand' });
+    }
+    steps.push({ type: 'discardAnyThenDraw' });
+    return { steps, recognizable: true };
+  }
+
+  // Ghetsis — opponent shuffles all Item cards from hand into deck; you draw that many
+  if (/shuffles all item cards found there into (?:his or her|their) deck/.test(lower)) {
+    steps.push({ type: 'opponentHandShuffleItemsDraw' });
     return { steps, recognizable: true };
   }
 
@@ -1033,6 +1718,43 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // "Choose 1 Energy card attached to 1 of your opponent's Pokémon and discard
+  // it" (Energy Removal, Energy Removal 2)
+  if (/choose 1 energy card attached to 1 of your opponent's pokémon and discard/.test(lower)) {
+    steps.push({ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: 1, scope: '1 Pokémon' });
+    return { steps, recognizable: true };
+  }
+
+  // Discard an Energy "attached to" an opponent's Pokémon (Team Flare Grunt,
+  // Enhanced Hammer, Plumeria). Optional preceding "discard N cards" cost.
+  const oppAttachedEnergy = lower.match(/discard (?:a|an) (special )?energy (?:card )?attached to (?:1 of )?your opponent/);
+  if (oppAttachedEnergy) {
+    steps.push({
+      type: 'discardEnergyFromOpponent',
+      energy: oppAttachedEnergy[1] ? 'Special Energy' : 'any Energy',
+      count: 1,
+      scope: '1 Pokémon',
+    });
+    appendDiscardCost(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Super Energy Removal — discard up to N Energy from an opponent's Pokémon
+  {
+    const removal = lower.match(/choose 1 of your opponent's pokémon and up to (\d+) energy cards attached to it/);
+    if (removal) {
+      steps.push({ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: Number(removal[1]), scope: '1 Pokémon' });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Xerosic — choose a Tool or Special Energy on any Pokémon and discard it
+  if (lower.includes('choose a pokémon tool or special energy card')) {
+    steps.push({ type: 'discardFromOpponent', target: "a Pokémon Tool or Special Energy card attached to a Pokémon in play" });
+    appendDiscardCost(steps, lower);
+    return { steps, recognizable: true };
+  }
+
   // Rust Syndicate Grunt / generic — discard any Energy from 1 opponent Pokémon
   if (lower.includes('discard an energy from 1 of your opponent')) {
     steps.push({
@@ -1051,44 +1773,340 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // ── legacy mechanisms (batch 11) ────────────────────────────────────────
+  // Moomoo Milk / Moo-Moo Milk — choose 1, flip 2 coins, heal per heads
+  if (/choose 1 of your pokémon\. flip 2 coins/.test(lower) &&
+      /(?:for each heads, remove \d+ damage counters|remove \d+ damage counters times the number of heads)/.test(lower)) {
+    const m = lower.match(/for each heads, remove (\d+) damage counters/) ||
+      lower.match(/remove (\d+) damage counters times the number of heads/);
+    steps.push({ type: 'healPerHeads', coins: 2, perHeads: m ? Number(m[1]) : 3 });
+    return { steps, recognizable: true };
+  }
+
+  // Tropical Wind — coin: heal each Active, else Sleep each Active
+  if (/if heads, remove (\d+) damage counters from each active pokémon/.test(lower) && /if tails/.test(lower)) {
+    const m = lower.match(/if heads, remove (\d+) damage counters from each active pokémon/);
+    steps.push({
+      type: 'coinFlip',
+      heads: [{ type: 'healEachActive', amount: Number(m[1]), scope: 'all' }],
+      tails: [{ type: 'applyStatus', target: 'bothActiveAll', conditions: ['Asleep'] }],
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Brock / Erika's Kindness — remove N damage counters from each Pokémon
+  {
+    const m = lower.match(/remove (\d+) damage counters? from each (?:pokémon|of your pokémon)/);
+    if (m) {
+      steps.push({
+        type: 'healEachActive',
+        amount: Number(m[1]),
+        scope: /yours and your opponent's|each pokémon \(/.test(lower) ? 'all' : 'own',
+      });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Riley / Rival — reveal top N, the opponent picks which to keep
+  {
+    let m = lower.match(/reveal the top (\d+) cards of your deck and have your opponent choose (\d+)/);
+    if (m) {
+      steps.push({
+        type: 'opponentChoosesFromTop',
+        count: Number(m[1]),
+        chosen: Number(m[2]),
+        chosenTo: /discard the chosen/.test(lower) ? 'discard' : 'hand',
+        restTo: /put the remaining cards into your hand/.test(lower) ? 'hand' : 'top',
+      });
+      return { steps, recognizable: true };
+    }
+    m = lower.match(/reveal the top (\d+) cards of your deck\. your opponent chooses (\d+)/);
+    if (m) {
+      steps.push({ type: 'opponentChoosesFromTop', count: Number(m[1]), chosen: Number(m[2]), chosenTo: 'hand', restTo: 'top' });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Energy Retrieval / Super Energy Retrieval — trade hand cards for basic Energy
+  {
+    const m = lower.match(/trade\s+(\d+)\s+of the other cards in your hand for (?:up to )?(\d+) basic energy/);
+    if (m) {
+      steps.push({ type: 'discardCost', count: Number(m[1]) });
+      steps.push({ type: 'recursion', what: 'Basic Energy', from: 'discard' });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Team Rocket's Handiwork — flip 2 coins, mill N per heads
+  {
+    const m = lower.match(/flip 2 coins\. for each heads, discard (\d+) cards? from the top of your opponent's deck/);
+    if (m) {
+      steps.push({ type: 'millPerHeads', coins: 2, per: Number(m[1]) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Gym Badge — flip until tails, draw a card per heads
+  if (/flip a coin until you get tails\. for each heads, draw a card/.test(lower)) {
+    steps.push({ type: 'flipUntilTailsDraw' });
+    return { steps, recognizable: true };
+  }
+
+  // Tool Retriever — return attached Pokémon Tools to hand
+  {
+    const m = lower.match(/choose up to (\d+) pokémon tool cards attached to your pokémon and put them into your hand/);
+    if (m) {
+      steps.push({ type: 'toolsToHand', count: Number(m[1]) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Switching Cups — swap a card in hand with the top card of your deck
+  if (/switch a card from your hand with the top card of your deck/.test(lower)) {
+    steps.push({ type: 'switchHandWithTop' });
+    return { steps, recognizable: true };
+  }
+
+  // Caitlin — put any number from hand on the bottom, draw that many
+  if (/put as many cards from your hand as you like on the bottom of your deck/.test(lower)) {
+    steps.push({ type: 'putHandBottomThenDraw' });
+    return { steps, recognizable: true };
+  }
+
+  // Team Skull Grunt / Sidney — opponent reveals hand; discard Energy / any cards
+  if (/opponent reveals (?:their|his or her) hand\.? discard (\d+) energy cards? from it/.test(lower)) {
+    steps.push({ type: 'revealOpponentHandDiscard', what: 'Energy', count: Number(lower.match(/discard (\d+) energy/)[1]) });
+    return { steps, recognizable: true };
+  }
+  if (/discard up to (\d+) in any combination of/.test(lower)) {
+    steps.push({ type: 'revealOpponentHandDiscard', what: 'card', count: Number(lower.match(/discard up to (\d+)/)[1]) });
+    return { steps, recognizable: true };
+  }
+
+  // Fan of Waves — Special Energy to the bottom of the opponent's deck
+  if (/put a special energy attached to 1 of your opponent's pokémon on the bottom of their deck/.test(lower)) {
+    steps.push({ type: 'sendEnergyToDeckBottom', energy: 'Special Energy' });
+    return { steps, recognizable: true };
+  }
+
+  // Eneporter — move a Special Energy between the opponent's Pokémon
+  if (/move a special energy from 1 of your opponent's pokémon to another of their pokémon/.test(lower)) {
+    steps.push({ type: 'moveEnergyOpponent', energy: 'Special Energy' });
+    return { steps, recognizable: true };
+  }
+
+  // Hypnotoxic Laser — Poison the opponent's Active, then coin for Asleep
+  if (/your opponent's active pokémon is now poisoned\. flip a coin/.test(lower)) {
+    steps.push({ type: 'applyStatus', target: 'opponentActive', conditions: ['Poisoned'] });
+    if (/if heads/.test(lower)) {
+      steps.push({ type: 'coinFlip', heads: [{ type: 'applyStatus', target: 'opponentActive', conditions: ['Asleep'] }], tails: [] });
+    }
+    return { steps, recognizable: true };
+  }
+
+  // Professor Cozmo's Discovery — heads draw the bottom N, tails the top M
+  {
+    const m = lower.match(/if heads, draw the bottom (\d+) cards/);
+    if (m) {
+      const t = lower.match(/if tails, draw the top (\d+) cards/);
+      steps.push({
+        type: 'coinFlip',
+        heads: [{ type: 'drawBottom', count: Number(m[1]) }],
+        tails: [{ type: 'draw', count: t ? Number(t[1]) : 2 }],
+      });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Maintenance — shuffle N cards from hand into deck, then draw
+  {
+    const m = lower.match(/shuffle (\d+)(?: of the other)? cards? from your hand into your deck/);
+    if (m && /draw a card|draw \d+ cards/.test(lower)) {
+      const d = lower.match(/draw (\d+) cards?/);
+      steps.push({ type: 'shuffleHandCardsThenDraw', count: Number(m[1]), draw: d ? Number(d[1]) : 1 });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // First Ticket — pre-game coin: you go first
+  if (/before you flip a coin to decide who goes first/.test(lower)) {
+    steps.push({ type: 'passive', detail: 'Pre-game: you go first (skip the coin flip).' });
+    return { steps, recognizable: true };
+  }
+
+  // ── legacy mechanisms (batch 12) ────────────────────────────────────────
+  // Ether / Gutsy Pickaxe — reveal the top card; attach it if it is Energy
+  {
+    const m = lower.match(/reveal the top card of your deck\. if that card is an? ([a-zé{}]+(?: [a-zé{}]+)?) energy card, attach it to 1 of your (?:benched )?pokémon/);
+    if (m) {
+      steps.push({ type: 'revealTopEnergy', energy: m[1].trim(), toBench: lower.includes('benched pokémon') });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Lure Ball — flip 3 coins, take an Evolution card per heads
+  if (/flip 3 coins\. for each heads, choose an evolution card from your discard pile/.test(lower)) {
+    steps.push({ type: 'recursion', what: 'Evolution', from: 'discard', count: 3, perHeads: true });
+    return { steps, recognizable: true };
+  }
+
+  // Fisherman — take up to 4 basic Energy from the discard pile
+  if (/choose 4 basic energy cards from your discard pile/.test(lower)) {
+    steps.push({ type: 'recursion', what: 'Basic Energy', from: 'discard', count: 4 });
+    return { steps, recognizable: true };
+  }
+
+  // Super Energy Removal 2 — double coin: strip all Energy from an Active
+  if (/if both are heads, discard all energy cards attached to the defending pokémon/.test(lower)) {
+    steps.push({
+      type: 'coinFlip',
+      heads: [{ type: 'discardAllEnergyFromActive', side: 'opponent' }],
+      tails: [{ type: 'discardAllEnergyFromActive', side: 'self' }],
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Fervor — show the top 3, take Energy, discard the rest
+  if (/show the top 3 cards of your deck to all players/.test(lower)) {
+    steps.push({ type: 'lookAtTop', count: 3, pick: 'Energy', destination: 'hand' });
+    return { steps, recognizable: true };
+  }
+
+  // Mary's Request — draw 1, plus 2 more without a Stage 2 in play
+  if (/^draw a card\.? if you don't have any stage 2/.test(lower)) {
+    steps.push({ type: 'draw', count: 1 });
+    steps.push({ type: 'passive', detail: 'Draw 2 more cards if you have no Stage 2 Pokémon in play.' });
+    return { steps, recognizable: true };
+  }
+
+  // Oracle — choose 2 cards from the deck, put them on top
+  {
+    const m = lower.match(/choose (\d+) cards? from your deck and shuffle the rest of your deck/);
+    if (m) {
+      steps.push({ type: 'searchToTop', count: Number(m[1]) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Pokémon Center — heal all your Pokémon, then discard their attached Energy
+  if (/remove all damage counters from all of your own pokémon with damage counters on them, then discard all energy/.test(lower)) {
+    steps.push({ type: 'healAllOwnAndDiscardEnergy' });
+    return { steps, recognizable: true };
+  }
+
+  // Pokémon Nurse — heal 1 Pokémon, then discard its attached Energy
+  if (/remove all damage counters from 1 of your pokémon\. then discard all energy cards attached to it/.test(lower)) {
+    steps.push({ type: 'healOneDiscardEnergy' });
+    return { steps, recognizable: true };
+  }
+
+  // Giovanni's Last Resort — heal 1, then discard your hand
+  if (/remove all damage counters from 1 of your pokémon with giovanni in its name\. then discard your hand/.test(lower)) {
+    steps.push({ type: 'heal', target: 'Giovanni Pokémon' });
+    steps.push({ type: 'discardHandThenDraw', count: 0 });
+    return { steps, recognizable: true };
+  }
+
+  // ── legacy mechanisms (batch 13) ────────────────────────────────────────
+  // Erika / Computer Error — you draw up to N, then the opponent draws up to N
+  {
+    const m = lower.match(/you may draw up to\s+(\d+)\s+cards?,? then your opponent may draw up to\s+(\d+)\s+cards?/);
+    if (m) {
+      steps.push({ type: 'eachPlayerDraw', count: Number(m[1]) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Holon Farmer — discard a card, then recycle basic Energy + Pokémon to the top
+  if (/search your discard pile for 3 basic energy cards and any combination of 3 basic pokémon or evolution cards/.test(lower)) {
+    steps.push({ type: 'discardCost', count: 1 });
+    steps.push({ type: 'shuffleFromDiscard', choices: [{ what: 'Basic Energy', count: 3 }, { what: 'Basic Pokémon', count: 3 }] });
+    return { steps, recognizable: true };
+  }
+
+  // Holon Lass — discard a card, then dig the top for Energy
+  if (/count the total number of prize cards left/.test(lower) && /look at that many cards from the top of your deck, choose as many energy cards/.test(lower)) {
+    steps.push({ type: 'discardCost', count: 1 });
+    steps.push({ type: 'lookAtTop', count: 6, pick: 'Energy', destination: 'hand' });
+    return { steps, recognizable: true };
+  }
+
+  // Poké Healer + — play 2: remove 8 damage counters and all Special Conditions
+  if (/you may play 2 poké healer \+ at the same time/.test(lower)) {
+    steps.push({ type: 'healAmount', amount: 8, target: 'Active Pokémon', cure: true });
+    return { steps, recognizable: true };
+  }
+
+  // New Pokédex / Pokédex — look at the top and rearrange them
+  {
+    const m = lower.match(/look at up to\s+(\d+)\s+cards from the top of your deck and rearrange/);
+    if (m) {
+      steps.push({ type: 'rearrangeTop', count: Number(m[1]) });
+      return { steps, recognizable: true };
+    }
+  }
+
+  // Trash Exchange — shuffle the discard pile in, then mill that many
+  if (/count the number of cards in your discard pile and shuffle them into your deck\. then discard that many cards from the top of your deck/.test(lower)) {
+    steps.push({ type: 'shuffleDiscardThenMill' });
+    return { steps, recognizable: true };
+  }
+
+  // Tormenting Spray — discard a random Supporter from the opponent's hand
+  if (/choose a random card from your opponent's hand\. your opponent reveals that card\. if it's a supporter card, discard it/.test(lower)) {
+    steps.push({ type: 'discardRandomOpponentHandIfSupporter' });
+    return { steps, recognizable: true };
+  }
+
+  // ── Lost Zone cards (batch 14) ──────────────────────────────────────────
+  // Lost Vacuum — hand card to the Lost Zone, then a Tool/Stadium there
+  if (/choose a pokémon tool attached to any pokémon, or any stadium in play, and put it in the lost zone/.test(lower)) {
+    if (/put another card from your hand in the lost zone/.test(lower)) {
+      steps.push({ type: 'lostZoneCost', count: 1 });
+    }
+    steps.push({ type: 'toolOrStadiumToLostZone' });
+    return { steps, recognizable: true };
+  }
+
+  // Lost Blender — 2 hand cards to the Lost Zone, then draw a card
+  if (/put 2 cards from your hand in the lost zone\. if you do, draw a card/.test(lower)) {
+    steps.push({ type: 'lostZoneCost', count: 2 });
+    steps.push({ type: 'draw', count: 1 });
+    return { steps, recognizable: true };
+  }
+
+  // Lost Remover — an opponent's Special Energy to the Lost Zone
+  if (/put 1 special energy card attached to 1 of your opponent's pokémon in the lost zone/.test(lower)) {
+    steps.push({ type: 'sendEnergyToLostZone', energy: 'Special Energy' });
+    return { steps, recognizable: true };
+  }
+
+  // Lysandre Prism Star — one opponent discard card to the Lost Zone per {R} Pokémon
+  if (/for each of your \{r\} pokémon in play, put a card from your opponent's discard pile in the lost zone/.test(lower)) {
+    steps.push({ type: 'opponentDiscardToLostZonePerPokemon', energyType: '{R}' });
+    return { steps, recognizable: true };
+  }
+
   // ── passive / turn-scoped / conditional effects ─────────────────────────
   // Recognized (recognizable: true) but not stepped — they are modifiers or
   // conditional effects that apply automatically or over a turn, and must NOT
   // fall through to the bare-draw branch. A short `detail` is attached so the
   // announcement is descriptive instead of a generic "passive".
-  const passiveKeywords = [
-    'retreat cost',
-    'whenever any player',
-    'is damaged by an attack',
-    'once during each player',
-    'once during your turn',
-    'once during their turn',
-    'more damage',
-    'less damage',
-    'prevent all damage',
-    'more prize cards',
-    'more prize card',
-    'have no abilities',
-    'have no effect',
-    'cost {c} more',
-    'cost {c} less',
-    'can evolve into',
-    "don't recover",
-    'do not recover',
-    "can't retreat",
-    'can’t retreat',
-    'fewer prize card',
-    'would be knocked out',
-    'can use the attack on this card',
-    'costs 1 energy less',
-    'cost 1 energy less',
-    'recovers from all special conditions',
-    "can't be affected by any special condition",
-  ];
-  if (
-    passiveKeywords.some((k) => lower.includes(k)) ||
-    /gets \+\d+ hp/.test(lower)
-  ) {
+
+  // A card whose *primary* clause is an unconditional "Draw N cards." must
+  // still execute that draw, even when a later clause trips a passive keyword
+  // (Aroma Lady, Buck's Training, Professor Kukui, Emcee's Hype). The passive
+  // fallback below otherwise swallowed the whole card.
+  const leadingDraw = lower.match(/^\s*draw\s+(\d+)\s+cards?\b/);
+  if (leadingDraw) {
+    const leadingSteps = [{ type: 'draw', count: Number(leadingDraw[1]) }];
+    if (isPassiveText(lower)) {
+      leadingSteps.push({ type: 'passive', detail: passiveDetail(lower) });
+    }
+    return { steps: leadingSteps, recognizable: true };
+  }
+
+  if (isPassiveText(lower)) {
     return { steps: [{ type: 'passive', detail: passiveDetail(lower) }], recognizable: true };
   }
 
@@ -1165,6 +2183,10 @@ export function describeStep(step) {
         opponentBench: "each of your opponent's Benched Pokémon",
         opponentHandPokemon: 'each Pokémon in your opponent\'s revealed hand',
         opponentMegaExInPlay: "each of your opponent's Mega Evolution Pokémon ex in play",
+        opponentPokemonInPlay: "each of your opponent's Pokémon in play",
+        opponentBenchBasic: "each of your opponent's Benched Basic Pokémon",
+        opponentHandTrainer: "each Trainer card in your opponent's revealed hand",
+        allBench: 'each Benched Pokémon (both players\')',
       };
       return `Draw a card for ${labels[step.source] || 'each matching Pokémon'}.`;
     }
@@ -1185,6 +2207,12 @@ export function describeStep(step) {
       if (step.target === 'bothActiveNonDark') {
         return `Both Active non-{D} Pokémon are now ${cond}.`;
       }
+      if (step.target === 'bothActiveAll') {
+        return `Both Active Pokémon are now ${cond}.`;
+      }
+      if (step.target === 'ownActive') {
+        return `Your Active Pokémon is now ${cond}.`;
+      }
       return `Apply ${cond}.`;
     }
     case 'fossilItem': return `Play this card as if it were a ${step.hp}-HP Basic {C} Pokémon (can't retreat; discard from play any time during your turn).`;
@@ -1201,6 +2229,90 @@ export function describeStep(step) {
       return `Your opponent reveals their hand; discard up to ${step.count} ${step.what} card${step.count > 1 ? 's' : ''} you find there.`;
     case 'opponentHandBottom':
       return `Your opponent reveals their hand; choose a ${step.what} and put it on the bottom of their deck${step.optionalOpponentDraw ? ' (they may draw a card)' : ''}.`;
+    case 'opponentHandShuffleDeck':
+      return `Look at your opponent's hand; ${step.upTo ? 'shuffle up to' : 'shuffle'} ${step.count} ${step.what === 'Trainer' ? 'Trainer card' : 'card'}${step.count > 1 ? 's' : ''} from it into their deck${step.optionalOpponentDraw ? ' (they may draw a card)' : ''}.`;
+    case 'opponentActiveEnergyToDeck':
+      return "Put an Energy from your opponent's Active Pokémon on top of their deck.";
+    case 'opponentHandToBenchBasic':
+      return `Put ${step.anyNumber ? 'any number of' : 'a'} Basic Pokémon from your opponent's hand onto their Bench${step.switchActive ? ', then switch it to the Active Spot' : ''}.`;
+    case 'eachPlayerDiscardFromHand':
+      return `Each player discards ${step.count} card${step.count > 1 ? 's' : ''} from their hand${step.opponentFirst ? ' (opponent first)' : ''}.`;
+    case 'eachPlayerDraw':
+      return `Each player draws up to ${step.count} cards (you draw first).`;
+    case 'eachPlayerReturnBench':
+      return 'Each player returns 1 of their Benched Pokémon and all cards attached to it to their hand.';
+    case 'eachPlayerShuffleHandDraw':
+      return 'Each player shuffles their hand into their deck, then draws that many cards.';
+    case 'eachPlayerHandToFive':
+      return `Each player draws or discards until they have ${step.count} cards in their hand${step.opponentFirst ? ' (opponent first)' : ''}.`;
+    case 'eachPlayerRecoverPokemon':
+      return 'Each player puts a Pokémon from their discard pile into their hand.';
+    case 'discardAnyThenDraw':
+      return 'Discard any number of cards from your hand, then draw that many.';
+    case 'opponentHandShuffleItemsDraw':
+      return 'Your opponent shuffles all Item cards from their hand into their deck; you draw that many cards.';
+    case 'discardAllTrainerInPlay':
+      return `Discard all Trainer cards ${step.side === 'opponent' ? 'your opponent has' : 'you have'} in play${step.excludeSupporters ? ' (excluding Supporter cards)' : ''}.`;
+    case 'returnStadiumToHand':
+      return "Return any Stadium card in play to its owner's hand.";
+    case 'shuffleDeckOnly':
+      return 'Shuffle your deck.';
+    case 'clearAttackEffects':
+      return step.scope === 'all' ? 'Remove all effects of attacks on each player and their Pokémon.' : 'Remove all effects of attacks on you and your Pokémon.';
+    case 'revealUntilCard':
+      return `Reveal cards from the top of your deck until you reveal a ${step.what} card; put it into your hand and shuffle the rest back.`;
+    case 'lookAtFaceDownPrize':
+      return `Look at your face-down Prize cards; you may reveal a ${step.what} card, put it into your hand${step.replace ? ', and put this card in its place' : ''}, then shuffle your prizes.`;
+    case 'putHandBasicAsActive':
+      return 'Put a Basic Pokémon from your hand into play as your Active Pokémon (your old Active moves to the Bench).';
+    case 'healPerHeads':
+      return `Flip ${step.coins} coins; remove ${step.perHeads} damage counters from a chosen Pokémon per heads.`;
+    case 'healEachActive':
+      return `Remove ${step.amount} damage counter${step.amount > 1 ? 's' : ''} from ${step.scope === 'all' ? "each player's Pokémon" : 'each of your Pokémon'} that has damage counters on it.`;
+    case 'opponentChoosesFromTop':
+      return `Reveal the top ${step.count} cards; your opponent picks ${step.chosen} to put into your hand, the rest to the ${step.restTo === 'top' ? 'top of your deck' : 'discard pile'}.`;
+    case 'millPerHeads':
+      return `Flip ${step.coins} coins; discard ${step.per} card${step.per > 1 ? 's' : ''} from the top of your opponent's deck per heads.`;
+    case 'flipUntilTailsDraw':
+      return 'Flip a coin until you get tails; draw a card for each heads.';
+    case 'toolsToHand':
+      return `Choose up to ${step.count} attached Pokémon Tool${step.count > 1 ? 's' : ''} and put them into your hand.`;
+    case 'switchHandWithTop':
+      return 'Switch a card from your hand with the top card of your deck.';
+    case 'putHandBottomThenDraw':
+      return 'Put any number of cards from your hand on the bottom of your deck, then draw that many.';
+    case 'shuffleHandCardsThenDraw':
+      return `Shuffle ${step.count} card${step.count > 1 ? 's' : ''} from your hand into your deck, then draw ${step.draw}.`;
+    case 'drawBottom':
+      return `Draw the bottom ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
+    case 'moveEnergyOpponent':
+      return `Move a ${step.energy} from 1 of your opponent's Pokémon to another of their Pokémon.`;
+    case 'sendEnergyToDeckBottom':
+      return `Put a ${step.energy} attached to 1 of your opponent's Pokémon on the bottom of their deck.`;
+    case 'revealTopEnergy':
+      return `Reveal the top card of your deck; if it is a ${step.energy} Energy card, attach it to 1 of your Pokémon, otherwise put it into your hand.`;
+    case 'discardAllEnergyFromActive':
+      return `Discard all Energy attached to ${step.side === 'opponent' ? "your opponent's Active Pokémon" : 'your Active Pokémon'}.`;
+    case 'searchToTop':
+      return `Choose ${step.count} card${step.count > 1 ? 's' : ''} from your deck, shuffle the rest, then put the chosen card${step.count > 1 ? 's' : ''} on top.`;
+    case 'healAllOwnAndDiscardEnergy':
+      return 'Remove all damage counters from your damaged Pokémon, then discard all Energy attached to them.';
+    case 'healOneDiscardEnergy':
+      return 'Remove all damage counters from 1 of your Pokémon, then discard all Energy attached to it.';
+    case 'rearrangeTop':
+      return `Look at the top ${step.count} cards of your deck and rearrange them as you like.`;
+    case 'shuffleDiscardThenMill':
+      return 'Shuffle your discard pile into your deck, then discard that many cards from the top of your deck.';
+    case 'discardRandomOpponentHandIfSupporter':
+      return "Reveal a random card from your opponent's hand; discard it if it is a Supporter.";
+    case 'lostZoneCost':
+      return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand in the Lost Zone.`;
+    case 'toolOrStadiumToLostZone':
+      return 'Choose a Pokémon Tool attached to any Pokémon, or a Stadium in play, and put it in the Lost Zone.';
+    case 'sendEnergyToLostZone':
+      return `Put a ${step.energy} attached to 1 of your opponent's Pokémon in the Lost Zone.`;
+    case 'opponentDiscardToLostZonePerPokemon':
+      return `For each of your ${step.energyType} Pokémon in play, put a card from your opponent's discard pile in the Lost Zone.`;
     case 'opponentDiscardUntil':
       return `Your opponent discards cards from their hand until they have ${step.count} cards in their hand.`;
     case 'eachPlayerDiscardUntil':
@@ -1216,6 +2328,31 @@ export function describeStep(step) {
       return `Put ${step.count} damage counter${step.count > 1 ? 's' : ''} on ${step.target}.`;
     case 'millSelf':
       return `Discard the top ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
+    case 'reviveFromDiscard':
+      return `Put a ${step.what} from ${step.side === 'opponent' ? "your opponent's" : 'your'} discard pile onto the Bench.`;
+    case 'moveDamageCounters': {
+      const fromLabel = step.from === 'ownActive' ? 'your Active Pokémon'
+        : step.from === 'opponent' ? "your opponent's Pokémon" : '1 of your Pokémon';
+      const toLabel = step.to === 'opponentActive' ? "your opponent's Active Pokémon"
+        : step.to === 'opponent' ? "another of your opponent's Pokémon" : 'another of your Pokémon';
+      return `Move up to ${step.count} damage counter${step.count > 1 ? 's' : ''} from ${fromLabel} to ${toLabel}.`;
+    }
+    case 'lookAtOpponentHand': return "Look at your opponent's hand.";
+    case 'attachFromHand': return `Attach ${step.count > 1 ? `up to ${step.count}` : 'a'} ${step.energy} card${step.count > 1 ? 's' : ''} from your hand to ${step.target}.`;
+    case 'attachAttackTool': return `Attach ${step.target === '1 of your Pokémon' ? 'this card to 1 of your Pokémon' : `this card to ${step.target}`}; it may use the printed attack${step.discardAtEndOfTurn ? ' (discard this card at the end of the turn)' : ''}.`;
+    case 'revealPrizes': return step.scope === 'all' ? 'Turn all players\' Prize cards face up.' : 'Turn your Prize cards face up.';
+    case 'prizeToHand': return `Put up to ${step.count} Prize card${step.count > 1 ? 's' : ''} into your hand${step.replace ? ', then set that many cards from your hand face down as Prizes' : ''}.`;
+    case 'clearStatus': return step.target === 'allYourPokémon'
+      ? 'Remove all Special Conditions from all of your Pokémon.'
+      : 'Remove all Special Conditions from your Active Pokémon.';
+    case 'discardStadium': return 'Discard any Stadium card in play.';
+    case 'putDiscardOnTop': return `Put a ${step.what} from your discard pile on top of your deck.`;
+    case 'energyToHand': return 'Return attached Energy cards to your hand.';
+    case 'opponentDiscardToHand': return "Put a card from your opponent's discard pile into their hand.";
+    case 'opponentDiscardToDeckBottom': return "Put a card from your opponent's discard pile on the bottom of their deck.";
+    case 'shufflePokemonIntoDeck': return 'Choose 1 of your Pokémon and shuffle it and all attached cards into your deck.';
+    case 'discardOwnBenchPokemon': return `Discard ${step.count > 1 ? `up to ${step.count}` : '1'} of your Benched Pokémon${step.filter && step.filter !== 'no damage counters' ? ` ${step.filter}` : ''} and all attached cards.`;
+    case 'shuffleDiscardIntoDeck': return "Each player shuffles the cards in their discard pile into their deck.";
     case 'passive': return step.detail || 'Passive effect — stays in play.';
     case 'searchEvolve': return 'Search your deck for a card that evolves from 1 of your Pokémon and evolve it, then shuffle.';
     case 'prizeBargain': return `Your opponent chooses: each player takes a Prize card, or you draw ${step.drawCount} cards.`;
