@@ -16,6 +16,7 @@ import {
   shouldSuppressClickAfterDrag,
 } from './card-picker-hitbox.mjs';
 import { movePicksInOrder } from './card-picker-moves.mjs';
+import { cardArtSrc } from './card-art-src.mjs';
 
 /** @type {object | null} */
 let pickerState = null;
@@ -82,11 +83,7 @@ const disableNativeDrag = (node) => {
 };
 
 const buildSlideContent = (card) => {
-  const src =
-    card?.image?.src ||
-    (typeof card?.image === 'string' ? card.image : '') ||
-    card?.images?.small ||
-    '';
+  const src = cardArtSrc(card);
   const existingRarity = card?.wrapper?.dataset?.rarity;
   if (existingRarity && src) {
     const wrapper = buildHoloCard(src, existingRarity);
@@ -456,10 +453,7 @@ const renderSlotCards = (state) => {
       const inner = document.createElement('div');
       inner.className = 'card-picker-slot-card-inner';
       const img = document.createElement('img');
-      img.src =
-        card?.image?.src ||
-        (typeof card?.image === 'string' ? card.image : '') ||
-        '';
+      img.src = cardArtSrc(card);
       img.alt = card?.name ?? '';
       img.draggable = false;
       inner.appendChild(img);
