@@ -133,9 +133,11 @@ Full audit of every `⚠️` in `docs/card-types-taxonomy.md`. After this pass t
 only remaining `⚠️` is the legend's own definition of the symbol:
 
 - **A1 prize note (stale)** — claimed the ex "2 extra prizes" and GX "lose the
-  match" rules were ❌. They are implemented: `koOutcome()` + `handleKO()` in
-  `ko-flow.mjs` (ex → 3 prizes, GX → immediate match loss), covered by tests in
-  `rules-extended.test.mjs`. Note reworded ⚠️ → plain note.
+  match" rules were ❌. Correct 30c behaviour (App. 19) is a flat prize count from
+  `prizesForKO()` (`card-classify.mjs`, re-exported by `ko-flow.mjs`): ex/GX → 2
+  prizes, VMAX/TAG TEAM/V-UNION → 3, LEGEND → 2; **no** KO match-loss (there is no
+  "2 extra prizes" rule either), covered by `card-classify.test.mjs`. Note reworded
+  ⚠️ → plain note.
 - **D intro (stale)** — claimed every non-Phase-1 attack family "remains ❌ in
   the live path"; the per-row table below it is fully ✅. Reworded.
 

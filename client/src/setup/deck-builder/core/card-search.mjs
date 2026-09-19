@@ -155,6 +155,9 @@ function normalizeTcgdexCard(card) {
     },
     image,
     rarity: card.rarity,
+    // "Normal" | "Special" (Energy cards only); read by the deck-legality
+    // Basic-Energy exemption and rule-box classification.
+    energyType: card.energyType || '',
     _provider: 'tcgdex',
   };
 }

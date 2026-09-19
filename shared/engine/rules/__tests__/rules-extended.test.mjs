@@ -2,7 +2,7 @@ import test from 'node:test';
     import assert from 'node:assert/strict';
     
     const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail, parseRetreatCost, canPerformAction, openPlayedToBenchWindow, clearPlayedToBenchWindow, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } = await import('../rules-state.mjs');
-    const { prizesForKO, cardHasRuleBox, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
+    const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat, getEffectiveRetreatCost, getEnergyValue } = await import('../retreat.mjs');
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
@@ -22,31 +22,19 @@ import test from 'node:test';
     } = await import('../collect-usable-abilities.mjs');
     
     // ── KO / prizes ──
-    test('prizesForKO: standard = 1, ex = 2, mega = 3, VMAX = 3', () => {
+    test('prizesForKO: standard = 1, ex/mega = 2, VMAX = 3', () => {
       assert.equal(prizesForKO({ rarity: 'Common' }), 1);
       assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 2);
       assert.equal(prizesForKO({ name: 'Cetitan ex' }), 2);
       assert.equal(prizesForKO({ subtypes: ['VMAX'] }), 3);
       assert.equal(prizesForKO({ subtypes: ['VSTAR'] }), 2);
-      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 3);
-      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 3);
+      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 2);
+      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 2);
       assert.equal(prizesForKO({ name: 'Yanmega' }), 1);
       assert.equal(prizesForKO({ name: 'Pikachu V' }), 2);
       assert.equal(prizesForKO({ name: 'Lugia VSTAR' }), 2);
       assert.equal(prizesForKO({ name: 'Mew VMAX' }), 3);
       assert.equal(prizesForKO({ name: 'Mewtwo GX' }), 2);
-    });
-
-    test('cardHasRuleBox: true if awards > 1 prize card', () => {
-      assert.equal(cardHasRuleBox({ name: 'Cetitan ex' }), true);
-      assert.equal(cardHasRuleBox({ name: 'Pikachu V' }), true);
-      assert.equal(cardHasRuleBox({ name: 'Lugia VSTAR' }), true);
-      assert.equal(cardHasRuleBox({ name: 'Mew VMAX' }), true);
-      assert.equal(cardHasRuleBox({ name: 'Mewtwo GX' }), true);
-      assert.equal(cardHasRuleBox({ name: 'Mega Charizard ex' }), true);
-      assert.equal(cardHasRuleBox({ name: 'Pikachu' }), false);
-      assert.equal(cardHasRuleBox({ name: 'Yanmega' }), false);
-      assert.equal(cardHasRuleBox({ name: 'Eevee', rarity: 'Common' }), false);
     });
 
     test('isMegaCard: rarity, subtype, or Mega name — not Yanmega', () => {
@@ -68,21 +56,31 @@ import test from 'node:test';
       assert.equal(isExCard({ name: 'Ninetales GX' }), false);
     });
 
-    test('koOutcome: GX = match loss, otherwise prize counts', () => {
-      assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'matchLoss' });
+    test('koOutcome: every Knockout awards prizes (GX included, no match loss)', () => {
+      assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'prizes', count: 2 });
       assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 2 });
-      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 3 });
+      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 2 });
       assert.deepEqual(koOutcome({ rarity: 'Common' }), { type: 'prizes', count: 1 });
     });
 
-    test('handleKO: KOing a Pokémon GX wins the match immediately (no prizes taken)', () => {
+    test('handleKO: KOing a Pokémon GX awards 2 prizes, not a match loss', () => {
       resetPrizes();
       awardPrizes('self', 2);
       const r = handleKO({ attackerPlayer: 'self', defender: { subtypes: ['GX'] } });
+      assert.equal(r.won, false);
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 4); // prior prizes plus the GX award
+      assert.equal(r.prizesRemaining, 2);
+    });
+
+    test('handleKO: taking all prizes with a GX Knockout wins at 6', () => {
+      resetPrizes();
+      awardPrizes('self', 4);
+      const r = handleKO({ attackerPlayer: 'self', defender: { subtypes: ['GX'] } });
+      assert.equal(r.prizeCount, 2);
+      assert.equal(r.prizesTaken, 6);
       assert.equal(r.won, true);
-      assert.equal(r.prizeCount, 0);
-      assert.equal(r.prizesTaken, 2); // prior prizes unaffected
-      assert.match(r.reason, /GX/);
+      assert.equal(r.reason, 'all prize cards taken');
     });
 
     test('handleKO: ex awards 2 prizes', () => {
@@ -3978,27 +3976,108 @@ import test from 'node:test';
       assert.equal(steps[0].type, 'effectPreventAbility');
     });
 
-    test('parseAbility: "Ω Barrier" — Trainer-card effect prevention names the trigger', () => {
-      const steps = parseAbility(
-        "Whenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon."
-      );
-      const step = steps.find((s) => s.type === 'effectPreventAbility');
+    test('parseAbility: Trainer-prevention wording alone is not an Ancient Trait (App. 23)', () => {
+      const text =
+        "Whenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.";
+      const step = parseAbility(text).find((s) => s.type === 'effectPreventAbility');
       assert.ok(step, 'expected an effectPreventAbility step');
       assert.equal(step.trainerTriggered, true);
+      assert.equal(step.trait, undefined, 'no α/Ω marker → a real Ability, not a trait');
       assert.match(step.guidance, /Trainer card/);
       assert.match(step.guidance, /Pokémon Tools\/Stadium/);
+
+      const marker = parseAbility(`Ω Barrier ${text}`).find(
+        (s) => s.type === 'effectPreventAbility'
+      );
+      assert.equal(marker.trait, 'omega', 'the printed Ω marker tags the trait');
     });
 
-    test('parseAbility: "α Growth" — attach-triggered ability names the trigger, not a manual step', () => {
-      const steps = parseAbility(
-        'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.'
-      );
-      const step = steps.find((s) => s.type === 'attachAbility');
+    test('parseAbility: attach-triggered wording alone is not an Ancient Trait (App. 23)', () => {
+      const text =
+        'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.';
+      const step = parseAbility(text).find((s) => s.type === 'attachAbility');
       assert.ok(step, 'expected an attachAbility step');
       assert.equal(step.triggeredByAttach, true);
+      assert.equal(step.trait, undefined, 'no α/Ω marker → a real Ability, not a trait');
       assert.equal(step.upTo, 2);
       assert.match(step.guidance, /Whenever you attach/);
       assert.match(step.guidance, /triggers automatically/);
+
+      const marker = parseAbility(`α Growth ${text}`).find(
+        (s) => s.type === 'attachAbility'
+      );
+      assert.equal(marker.trait, 'alpha', 'the printed α marker tags the trait');
+    });
+
+    test('App. 23: "have no Abilities" leaves Ancient Traits alone', async () => {
+      const { isAncientTraitAbility } = await import('../abilities.mjs');
+      const { stadiumAbilityBlocked } = await import('../stadium-effects.mjs');
+      const { markStadiumPlayed } = await import('../rules-state.mjs');
+
+      const alpha = {
+        name: 'Venusaur',
+        ability: {
+          name: 'α Growth',
+          text: 'When you attach an Energy card from your hand to this Pokémon, you may attach up to 2 Energy cards from your hand to this Pokémon in any way you like.',
+        },
+      };
+      const omega = {
+        name: 'Aegislash',
+        ability: {
+          name: 'Ω Barrier',
+          text: "Whenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.",
+        },
+      };
+      const real = {
+        name: 'Bellossom',
+        ability: { text: 'Once during your turn, you may draw 2 cards.' },
+      };
+      // Marker-less Abilities whose wording echoes the two canonical traits: a
+      // real Ability, so a "have no Abilities" effect must suppress them (this
+      // is the Phase 3 defect — the old wording fallbacks tagged them as traits).
+      const wordedOmega = {
+        name: 'Sceptile',
+        ability: {
+          text: "Whenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.",
+        },
+      };
+      const wordedAlpha = {
+        name: 'Venusaur',
+        ability: {
+          text: 'When you attach an Energy card from your hand to this Pokémon, you may attach up to 2 Energy cards from your hand to this Pokémon in any way you like.',
+        },
+      };
+
+      assert.equal(isAncientTraitAbility(alpha), true);
+      assert.equal(isAncientTraitAbility(omega), true);
+      assert.equal(isAncientTraitAbility(real), false);
+      assert.equal(isAncientTraitAbility(wordedOmega), false, 'wording alone is not a trait');
+      assert.equal(isAncientTraitAbility(wordedAlpha), false, 'wording alone is not a trait');
+
+      const prev = rulesState.stadium;
+      rulesState.enabled = true;
+      try {
+        markStadiumPlayed('self', {
+          name: "Team Rocket's Watchtower",
+          subtypes: ['Stadium'],
+          text: "Pokémon in play (both yours and your opponent's) have no Abilities.",
+        });
+        assert.equal(stadiumAbilityBlocked(real), true, 'a real Ability is suppressed');
+        assert.equal(
+          stadiumAbilityBlocked(wordedOmega),
+          true,
+          'marker-less Trainer-prevention wording is a real Ability and is suppressed'
+        );
+        assert.equal(
+          stadiumAbilityBlocked(wordedAlpha),
+          true,
+          'marker-less attach-triggered wording is a real Ability and is suppressed'
+        );
+        assert.equal(stadiumAbilityBlocked(alpha), false, 'α Growth is a trait, not an Ability');
+        assert.equal(stadiumAbilityBlocked(omega), false, 'Ω Barrier is a trait, not an Ability');
+      } finally {
+        rulesState.stadium = prev;
+      }
     });
 
     // ── compound ability step orchestration (planAbilitySteps) ──

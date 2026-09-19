@@ -130,6 +130,84 @@ test('the turn player can put damage and a condition on the opponent\'s Active P
   assert.equal(poisoned.error, null);
 });
 
+test('addSpecialCondition on a benched Pokémon is rejected (p.15)', () => {
+  const state = mainPhaseState();
+  state.players.p2.zones.active.push(createCard({ instanceId: 50, name: 'Eevee', hp: 60, ownerId: 'p2' }));
+  state.players.p2.zones.bench.push(createCard({ instanceId: 51, name: 'Pikachu', hp: 60, ownerId: 'p2' }));
+
+  const active = applyCommand(state, {
+    type: 'addSpecialCondition',
+    payload: { instanceId: 50, condition: 'Poisoned' },
+    playerId: 'p1',
+  });
+  assert.equal(active.error, null);
+
+  const benched = applyCommand(active.state, {
+    type: 'addSpecialCondition',
+    payload: { instanceId: 51, condition: 'Poisoned' },
+    playerId: 'p1',
+  });
+  assert.equal(benched.error, 'special_condition_not_active');
+});
+
+function trainerTool(state, playerId, instanceId, name) {
+  const card = createCard({ instanceId, name, ownerId: playerId });
+  card.type = 'Trainer';
+  card.trainerType = 'Tool';
+  state.players[playerId].zones.hand.push(card);
+  return instanceId;
+}
+
+test("a Team Flare Hyper Gear attaches to the opponent's Pokémon-EX (App. 24)", () => {
+  const state = mainPhaseState();
+  const toolId = trainerTool(state, 'p1', 100, 'Head Ringer Team Flare Hyper Gear');
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 50, name: 'Mewtwo-EX', supertype: 'Pokémon', hp: 170, ownerId: 'p2' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: toolId, targetInstanceId: 50 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  const attached = res.state.players.p2.zones.active.find((c) => c.instanceId === toolId);
+  assert.ok(attached, "the Tool lands in the opponent's zone");
+  assert.equal(attached.attachedTo, 50);
+});
+
+test("a normal Tool still cannot be attached to the opponent's Pokémon", () => {
+  const state = mainPhaseState();
+  const toolId = trainerTool(state, 'p1', 101, 'Bravery Charm');
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 50, name: 'Mewtwo-EX', supertype: 'Pokémon', hp: 170, ownerId: 'p2' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: toolId, targetInstanceId: 50 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, 'stale_view');
+});
+
+test("a Team Flare Hyper Gear cannot attach to the opponent's non-EX Pokémon", () => {
+  const state = mainPhaseState();
+  const toolId = trainerTool(state, 'p1', 102, 'Jamming Net Team Flare Hyper Gear');
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 52, name: 'Eevee', supertype: 'Pokémon', hp: 60, ownerId: 'p2' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: toolId, targetInstanceId: 52 },
+    playerId: 'p1',
+  });
+  assert.ok(res.error, 'the attach is rejected');
+  assert.equal(res.state.players.p1.zones.hand.length, 1, 'the Tool stays in hand');
+});
+
 function withDeck(state, playerId, count) {
   for (let i = 0; i < count; i++) {
     state.players[playerId].zones.deck.push(

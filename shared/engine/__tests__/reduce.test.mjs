@@ -4,6 +4,7 @@ import { createGameState, getZone, findCard } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { topPokemonCard, evolvedView } from '../rules/evolved-pokemon.mjs';
+import { addCondition } from '../rules/special-conditions.mjs';
 
 test('applyCommand: Invariant 3 & 7 - pure, total, and stateVersion only increments on success', () => {
   const state = createGameState({
@@ -128,6 +129,37 @@ test('Edge Case 9: Bench full (5 max) rejects move to bench with bench_full', ()
   });
 
   assert.equal(res.error, 'bench_full');
+});
+
+test('moveCard: only Basic Pokémon may be played from hand (30c 2.5)', () => {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn.phase = 'main';
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 1, name: 'Haunter', supertype: 'Pokémon', stage: 'Stage 1' }),
+    createCard({ instanceId: 2, name: 'Kabuto', supertype: 'Pokémon', stage: 'Restored' }),
+    createCard({ instanceId: 3, name: 'Mewtwo V-UNION', supertype: 'Pokémon', stage: 'V-UNION' }),
+    createCard({ instanceId: 4, name: 'Pikachu', supertype: 'Pokémon', stage: 'Basic' })
+  );
+
+  for (const instanceId of [1, 2, 3]) {
+    const res = applyCommand(state, {
+      type: 'moveCard',
+      payload: { instanceId, from: 'hand', to: 'bench' },
+      playerId: 'p1',
+    });
+    assert.match(res.error || '', /Basic/);
+  }
+
+  const basic = applyCommand(state, {
+    type: 'moveCard',
+    payload: { instanceId: 4, from: 'hand', to: 'bench' },
+    playerId: 'p1',
+  });
+  assert.equal(basic.error, null);
+  assert.equal(basic.state.players.p1.zones.bench.length, 1);
 });
 
 test('Edge Case 19: Sandbox mode (rulesEnabled === false) skips legality checks while preserving references', () => {
@@ -428,3 +460,175 @@ test('applyCommand: manual counter and status updates modify card attributes', (
   }).state;
   assert.equal(next.players.p1.zones.active[0].specialCondition, null);
 });
+
+// ── Rulebook 30c 1.3: simultaneous results and the sudden-death tiebreaker ──
+
+const TAILS = { next: () => 0.9, shuffle: (cards) => cards };
+
+// Attacker is one Prize from winning and snipes the defender's only Pokémon in
+// play, so the same Knockout both takes the last prize and empties the board.
+function simultaneousState() {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Mewtwo',
+      hp: 120,
+      attacks: [{ name: 'Psystrike', cost: [], damage: 100 }],
+    })
+  );
+  state.players.p1.zones.deck.push(createCard({ instanceId: 2, name: 'P1 deck card' }));
+  state.players.p1.zones.prizes.push(createCard({ instanceId: 100, name: 'Last prize' }));
+  state.players.p2.zones.active.push(createCard({ instanceId: 10, name: 'Eevee', hp: 60 }));
+  state.players.p2.zones.deck.push(createCard({ instanceId: 12, name: 'P2 deck card' }));
+  for (let i = 0; i < 6; i++) {
+    state.players.p2.zones.prizes.push(createCard({ instanceId: 200 + i, name: 'P2 prize' }));
+  }
+  return state;
+}
+
+function simultaneousKnockout() {
+  return applyCommand(
+    simultaneousState(),
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    TAILS
+  );
+}
+
+test('last prize + empty board on one KO is an outright attacker win (two ways)', () => {
+  const res = simultaneousKnockout();
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.phase, 'ended');
+  assert.equal(res.state.winner, 'p1');
+  assert.equal(res.state.winReason, 'all prize cards taken');
+  // The Prize entitlement is collected on game end; nothing is left owed.
+  assert.equal(res.state.players.p1.zones.prizes.length, 0);
+  assert.equal(res.state.players.p1.flags.prizesOwed, undefined);
+});
+
+// Both players' only Pokémon are Poisoned and faint in the same Checkup: two
+// board-empties and no Prize way, the genuine tie the tiebreak phase is for.
+function genuineTieState() {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  const p1Active = createCard({ instanceId: 1, name: 'Pikachu', hp: 10 });
+  addCondition(p1Active, 'Poisoned');
+  state.players.p1.zones.active.push(p1Active);
+  state.players.p1.zones.deck.push(createCard({ instanceId: 2, name: 'P1 deck card' }));
+  const p2Active = createCard({ instanceId: 10, name: 'Eevee', hp: 10 });
+  addCondition(p2Active, 'Poisoned');
+  state.players.p2.zones.active.push(p2Active);
+  state.players.p2.zones.deck.push(createCard({ instanceId: 12, name: 'P2 deck card' }));
+  for (let i = 0; i < 6; i++) {
+    state.players.p1.zones.prizes.push(createCard({ instanceId: 100 + i, name: 'P1 prize' }));
+    state.players.p2.zones.prizes.push(createCard({ instanceId: 200 + i, name: 'P2 prize' }));
+  }
+  return state;
+}
+
+test('simultaneous win: both boards emptied on one Checkup enters tiebreak, no winner', () => {
+  const detected = applyCommand(
+    genuineTieState(),
+    { type: 'pass', payload: {}, playerId: 'p1' },
+    TAILS
+  );
+  assert.equal(detected.error, null);
+  assert.equal(detected.state.turn.phase, 'tiebreak');
+  assert.equal(detected.state.winner, null);
+  assert.equal(detected.state.winReason, 'simultaneous');
+  assert.deepEqual(detected.state.tiebreak.players, ['p1', 'p2']);
+  assert.ok(detected.events.some((e) => e.type === 'tiebreakStarted'));
+});
+
+test('tiebreak: pass hands the turn over so the opponent can contest the first Prize', () => {
+  const detected = applyCommand(
+    genuineTieState(),
+    { type: 'pass', payload: {}, playerId: 'p1' },
+    TAILS
+  );
+  assert.equal(detected.state.turn.player, 'p1');
+  const res = applyCommand(
+    detected.state,
+    { type: 'pass', payload: {}, playerId: 'p1' },
+    TAILS
+  );
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p2');
+});
+
+test('tiebreak: firstPrizeWins lets the first Prize taken win even without a Knockout entitlement', () => {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.firstPrizeWins = true;
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.prizes.push(createCard({ instanceId: 100, name: 'Prize' }));
+
+  const res = applyCommand(
+    state,
+    { type: 'takePrizes', payload: { count: 1 }, playerId: 'p1' },
+    TAILS
+  );
+  assert.equal(res.error, null);
+  assert.equal(res.state.winner, 'p1');
+  assert.match(res.state.winReason, /tiebreak/);
+});
+
+test('Prism Star KO routes the card to the Lost Zone, not discard (gap #11)', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash' },
+      p2: {
+        username: 'Gary',
+        zones: {
+          bench: [createCard({ instanceId: 50, name: 'Benched Pidgey', hp: 50 })],
+          deck: [createCard({ instanceId: 99, name: 'Deck' })],
+        },
+      },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  const attacker = createCard({
+    instanceId: 1,
+    name: 'Mewtwo',
+    attacks: [{ name: 'Psystrike', cost: [], damage: 250 }],
+  });
+  state.players.p1.zones.active.push(attacker);
+
+  const prismStar = createCard({
+    instanceId: 2,
+    name: '◇ Victini',
+    hp: 70,
+    subtypes: ['Basic'],
+  });
+  state.players.p2.zones.active.push(prismStar);
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+
+  assert.equal(
+    res.state.players.p2.zones.discard.some((c) => c.instanceId === 2),
+    false,
+    'Prism Star must not be in the discard pile'
+  );
+  assert.equal(
+    res.state.players.p2.zones.lostZone.some((c) => c.instanceId === 2),
+    true,
+    'Prism Star must be in the Lost Zone'
+  );
+});
+

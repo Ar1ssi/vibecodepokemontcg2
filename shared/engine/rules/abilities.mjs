@@ -49,6 +49,40 @@ export const isAbilityUsageLimitText = (t) =>
   /can't use more than \d+/.test(t) ||
   /cannot use more than \d+/.test(t);
 
+// App. 23: Ancient Traits are printed with an α (alpha) or Ω (omega) marker and
+// are neither attacks nor Abilities, so effects that block/remove Abilities
+// must not affect them. Returns 'alpha' | 'omega' | null.
+export const ancientTraitIn = (text) => {
+  const t = String(text ?? '').toLowerCase();
+  // Ω/Α lowercase to ω (U+03C9) / α (U+03B1), so check the lowercase forms too —
+  // a check for the uppercase codepoints after `.toLowerCase()` can never match.
+  if (t.includes('\u03c9') || t.includes('\u03a9')) return 'omega';
+  if (t.includes('\u03b1') || t.includes('\u0391')) return 'alpha';
+  if (t.includes('ancient trait')) return 'alpha';
+  return null;
+};
+
+/** True when a parsed ability step came from an Ancient Trait, not an Ability. */
+export function isAncientTraitStep(step) {
+  return Boolean(step?.trait);
+}
+
+/**
+ * True when every parsed ability step on a card is an Ancient Trait, i.e. the
+ * card has no real Ability for a "no Abilities" effect to suppress.
+ */
+export function isAncientTraitAbility(card) {
+  const name = typeof card?.ability?.name === 'string' ? card.ability.name : '';
+  const text =
+    card?.ability?.text ??
+    card?.abilityText ??
+    card?.text ??
+    card?.effect ??
+    '';
+  const steps = parseAbility(`${name} ${text}`.trim());
+  return steps.length > 0 && steps.every((s) => s.trait);
+}
+
 // Discard-from-your-hand costs that affect the opponent are NOT opponent-disrupt.
 const isSelfHandDiscardCost = (t) =>
   t.includes('discard') &&
@@ -339,14 +373,16 @@ export function parseAbility(text = '') {
   )) {
     const fromDiscard = lower.includes('from your discard pile');
     const upTo = lower.match(/(?:attach|put)\s+up to\s+(\d+)/)?.[1] || null;
-    // "α Growth"-style Ancient Trait phrasing: "When you attach an Energy
-    // card from your hand to this Pokémon ... you may attach N Energy
-    // cards" — a passive trigger off your normal attach, not a separate
-    // once-per-turn manual action.
+    // "When you attach an Energy card from your hand to this Pokémon ... you
+    // may attach N Energy cards" — a passive trigger off your normal attach,
+    // not a separate once-per-turn manual action. The trigger wording alone is
+    // a real Ability; only the printed α/Ω marker makes it an Ancient Trait
+    // (App. 23 — the wording is not a marker).
     const mayAttach = lower.match(/may attach\s+(\d+)/)?.[1] || null;
     const basic = lower.includes('basic');
     const energyType = parseEnergyTypeHint(lower);
     const triggeredByAttach = /when(?:ever)?\s+you attach an?\s+energy/.test(lower);
+    const trait = ancientTraitIn(lower);
     steps.push({
       type: 'attachAbility',
       fromDiscard,
@@ -354,6 +390,7 @@ export function parseAbility(text = '') {
       basic,
       energyType,
       triggeredByAttach,
+      ...(trait ? { trait } : {}),
       guidance: fromDiscard
         ? 'Once during your turn: attach Energy from your discard pile.'
         : triggeredByAttach
@@ -780,17 +817,20 @@ export function parseAbility(text = '') {
       (lower.includes('effect') || lower.includes('ability') || lower.includes('attack'))) ||
     (lower.includes('active spot') && lower.includes('no abilities')))
   ) {
-    // "Ω Barrier"-style Ancient Trait phrasing: "Whenever your opponent
-    // plays a Trainer card ..., prevent all effects of that card done to
-    // this Pokémon" — scope the guidance to Trainer-card effects specifically
-    // instead of the generic catch-all.
+    // "Whenever your opponent plays a Trainer card ..., prevent all effects of
+    // that card done to this Pokémon" — scope the guidance to Trainer-card
+    // effects specifically instead of the generic catch-all. As above, the
+    // trigger wording is a real Ability; only the printed α/Ω marker makes it
+    // an Ancient Trait (App. 23).
     const trainerTriggered = /(?:whenever|when)\s+your opponent plays a trainer card/.test(lower);
     const toolStadiumExcluded =
       trainerTriggered && lower.includes('excluding') &&
       (lower.includes('pokémon tool') || lower.includes('pokemon tool') || lower.includes('stadium'));
+    const trait = ancientTraitIn(lower);
     steps.push({
       type: 'effectPreventAbility',
       trainerTriggered,
+      ...(trait ? { trait } : {}),
       guidance: trainerTriggered
         ? `Whenever your opponent plays a Trainer card${toolStadiumExcluded ? ' (excluding Pokémon Tools/Stadium)' : ''}: prevent all effects of that card done to this Pokémon.`
         : 'Passive: prevent or negate effects/abilities as described.',

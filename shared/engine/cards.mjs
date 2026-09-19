@@ -151,10 +151,23 @@ const collapseStage = (s) =>
   String(s || '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
-const NON_BASIC_STAGES = new Set(['stage1', 'stage2', 'vmax', 'vstar', 'mega']);
+const NON_BASIC_STAGES = new Set([
+  'stage1',
+  'stage2',
+  'vmax',
+  'vstar',
+  'mega',
+  'vunion',
+  'restored',
+  'break',
+  'legend',
+]);
 
 export function isBasicPokemon(card) {
   if (!isPokemon(card)) return false;
+  // Pokémon LEGEND are played as a two-card pair, never from hand as a Basic
+  // (glossary / App. 21) — the name marker is the reliable signal.
+  if (/\blegend\b/i.test(String(card.name || ''))) return false;
   const stage = collapseStage(card.stage || card.subtypes?.[0] || 'Basic');
   if (NON_BASIC_STAGES.has(stage)) {
     return false;

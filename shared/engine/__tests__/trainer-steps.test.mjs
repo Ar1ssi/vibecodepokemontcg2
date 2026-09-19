@@ -678,6 +678,71 @@ test("turn 1: the player going first can't play a Supporter", () => {
   assert.equal(res.error, "The player going first can't play a Supporter on turn 1.");
 });
 
+test('Prism Star routing: milled, overwritten-Stadium and attached cards reach the Lost Zone', () => {
+  // App. 17: a Prism Star card that would go to the discard pile goes to the Lost Zone instead.
+
+  // (a) millSelf: "discard the top N of your deck".
+  const mill = setup();
+  const prism = card({ name: '◇ Victini', supertype: 'Pokémon', hp: 70, stage: 'Basic' });
+  mill.p1.zones.deck.push(prism, card({ name: 'x' }), card({ name: 'y' }));
+  const milled = play(mill, 'Discard the top 3 cards of your deck.').res;
+  assert.ok(zone(milled, 'p1', 'lostZone').some((c) => c.instanceId === prism.instanceId));
+  assert.ok(!zone(milled, 'p1', 'discard').some((c) => c.instanceId === prism.instanceId));
+
+  // (b) Stadium overwrite: the old Prism Star Stadium is discarded by the new one.
+  const stadium = setup();
+  const prismStadium = card({
+    name: '◇ Black Market',
+    type: 'Trainer',
+    trainerType: 'Stadium',
+    subtypes: ['Prism Star'],
+    ownerId: 'p1',
+  });
+  stadium.state.stadium = prismStadium;
+  const cage = card({
+    name: 'Battle Cage',
+    type: 'Trainer',
+    trainerType: 'Stadium',
+    text: 'Prevent all damage counters from being placed on Benched Pokémon by effects of attacks.',
+  });
+  stadium.p1.zones.hand.push(cage);
+  const placed = applyCommand(stadium.state, {
+    type: 'moveCard',
+    payload: { instanceId: cage.instanceId, from: 'hand', to: 'board' },
+    playerId: 'p1',
+  }, stadium.rng);
+  assert.equal(placed.state.stadium.instanceId, cage.instanceId);
+  assert.ok(zone(placed, 'p1', 'lostZone').some((c) => c.instanceId === prismStadium.instanceId));
+
+  // (c) returnPokemonToHand (Professor Turo's Scenario): attached Prism Star Energy is discarded.
+  const turo = setup();
+  const tRalts = turo.p1.zones.active[0];
+  const prismEnergy = energy('◇ Beast Energy', { subtypes: ['Special', 'Prism Star'] });
+  prismEnergy.attachedTo = tRalts.instanceId;
+  turo.p1.zones.active.push(prismEnergy);
+  turo.p1.zones.bench.push(pokemon('only'));
+  const t = play(turo, 'Put 1 of your Pokémon into your hand. (Discard all cards attached to that Pokémon.)').res;
+  const tDone = resolve(turo, t, [tRalts.instanceId]);
+  assert.ok(zone(tDone, 'p1', 'lostZone').some((c) => c.instanceId === prismEnergy.instanceId));
+  assert.ok(!zone(tDone, 'p1', 'discard').some((c) => c.instanceId === prismEnergy.instanceId));
+});
+
+test('Prism Star routing: swapWithDiscard sends the replaced Prism Star to the Lost Zone', () => {
+  const game = setup();
+  const prism = pokemon('◇ Volcanion', { subtypes: ['Prism Star'] });
+  game.p1.zones.bench.push(prism);
+  const replacement = pokemon('Mimikyu');
+  game.p1.zones.discard.push(replacement);
+  const { res } = play(
+    game,
+    'Choose a Basic Pokémon in your discard pile and switch it with 1 of your Basic Pokémon in play. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.'
+  );
+  const picked = resolve(game, res, [replacement.instanceId]);
+  const done = resolve(game, picked, [prism.instanceId]);
+  assert.ok(zone(done, 'p1', 'lostZone').some((c) => c.instanceId === prism.instanceId));
+  assert.ok(!zone(done, 'p1', 'discard').some((c) => c.instanceId === prism.instanceId));
+});
+
 test('cardStats applies evolvesFrom and abilities to server cards', () => {
   const game = setup();
   const kirlia = pokemon('Kirlia', { syncInstance: 9 });

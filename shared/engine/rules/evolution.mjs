@@ -4,6 +4,10 @@
 
 import { rulesState, ensureCardData, cardDataCache, fetchCardDetail } from './rules-state.mjs';
 import { getStadiumEvolutionSpeed } from './stadium-effects.mjs';
+import {
+  isModernMegaCard,
+  isLegacyMegaCard as isLegacyMegaOrPrimalCard,
+} from './card-classify.mjs';
 
 export const STAGE1_EVOLVES_FROM = new Map([
   ['piloswine', 'swinub'],
@@ -83,9 +87,19 @@ export const STAGE1_EVOLVES_FROM = new Map([
 ]);
 
 /**
- * Normalizes a Pokémon name for evolution chain matching by stripping
- * card-type suffixes like "ex", "EX", "-EX", "GX", "VMAX", "VSTAR", "V",
- * accents, and non-alphanumerics.
+ * Normalizes a Pokémon name for EVOLUTION matching (p.21 + App. 9/13):
+ * - Level is not part of the name: `Gengar`, `Gengar LV.43` and `Gengar LV.X`
+ *   are one species.
+ * - `VMAX`/`VSTAR` collapse to `V`, never disappear: `Lapras VMAX` === `Lapras
+ *   V` but !== `Lapras` (a VMAX can only evolve from a V).
+ * - `ex`/`GX` are stripped — species identity ignores those suffixes.
+ * - Owner/form words (`Alolan Meowth`, `Rocket's Meowth`) and `Team Plasma`
+ *   are preserved (App. 2/14/27), accents folded.
+ *
+ * This is deliberately NOT the same as `deck-validation.mjs`'s
+ * `officialCardName`: the 4-copy limit keeps `ex`/`V`/`GX`/form suffixes
+ * because they ARE part of the name for that rule, while stripping the
+ * `Team Plasma ` prefix. Level stripping is the shared part.
  */
 export function cleanPokemonName(name) {
   if (!name) return '';
@@ -94,7 +108,12 @@ export function cleanPokemonName(name) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/(?:[-\s]+|\b)(?:ex|gx|vmax|vstar|v)\b/gi, '')
+    // Level marker ("LV.43", "LV. X") is not part of the name.
+    .replace(/\blv\.\s*(?:x|\d+)\b/gi, '')
+    // VMAX/VSTAR are V for evolution matching — keep the V, don't erase it.
+    .replace(/\b(?:vmax|vstar)\b/gi, 'v')
+    // ex/GX are not species identity.
+    .replace(/\b(?:ex|gx)\b/gi, '')
     .replace(/[^a-z0-9]/g, '');
 }
 
@@ -296,6 +315,9 @@ export function normalizeStage(stage) {
   if (s === 'stage1' || s.startsWith('stage1')) return 'Stage 1';
   if (s === 'stage2' || s.startsWith('stage2')) return 'Stage 2';
   if (s === 'mega' || s.startsWith('mega')) return 'Stage 1';
+  // BREAK Evolution is an Evolution (not Basic); it keeps the previous
+  // Evolution's stats and attacks (see evolved-pokemon.mjs).
+  if (s === 'break' || s.startsWith('break')) return 'BREAK';
   return null;
 }
 
@@ -340,28 +362,9 @@ export function markEvolvedThisTurn(player, targetCardOrName) {
 // "<Name> Spirit Link" Trainer card is already attached to that Pokémon.
 // Legacy naming only ("M "/"Primal " prefix) — the modern (2025+) "Mega
 // <Name> ex" line uses a different, unrelated mechanic and must NOT trigger
-// this turn-end (isModernMegaCard excludes it below).
-const LEGACY_MEGA_OR_PRIMAL_NAME = /^(?:m|primal)\s+\S/i;
-
-export function isModernMegaCard(card = {}) {
-  const rarity = String(card?.rarity || '').toLowerCase();
-  if (rarity.includes('mega')) return true;
-  const subtypes = Array.isArray(card?.subtypes)
-    ? card.subtypes.map((s) => String(s).toLowerCase())
-    : [];
-  if (subtypes.some((s) => s.includes('mega'))) return true;
-  // Full word "mega" (modern cards spell it out) — the legacy abbreviation
-  // is "M " (single letter), which this word-boundary regex does not match.
-  return /\bmega\b/i.test(String(card?.name || ''));
-}
-
-export function isLegacyMegaOrPrimalCard(card = {}) {
-  const name = String(card?.name || '').trim();
-  if (!name) return false;
-  if (!LEGACY_MEGA_OR_PRIMAL_NAME.test(name)) return false;
-  if (isModernMegaCard(card)) return false;
-  return true;
-}
+// this turn-end. The two predicates live in card-classify.mjs now (rulebook
+// 30c Phase 0) and are re-exported for existing importers.
+export { isModernMegaCard, isLegacyMegaOrPrimalCard };
 
 // Spirit Link cards are named "<Species> Spirit Link" and attach to the
 // Basic/EX Pokémon they cover. Match on the evolving card's base species
@@ -391,16 +394,28 @@ export function requiresTurnEndOnEvolve(evolvingCard, baseCardInPlay) {
 }
 
 // Playing a Pokémon from hand onto Active/Bench (not evolving onto one
-    // already in play) is limited to Basic stage.
+    // already in play) is limited to Basic stage. Restored Pokémon (Fossil
+    // items only), BREAK Evolution cards and V-UNION pieces are never played
+    // from hand, so reject their stage markers too.
     export async function canPlayPokemonFromHand(pokemonCard) {
       if (!rulesState.enabled) return { allowed: true };
 
       await ensureCardData(pokemonCard);
       const stage = normalizeStage(pokemonCard.stage);
-      if (stage === 'Stage 1' || stage === 'Stage 2') {
+      const collapsed = String(pokemonCard.stage || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+      const notPlayableFromHand =
+        stage === 'Stage 1' ||
+        stage === 'Stage 2' ||
+        stage === 'BREAK' ||
+        collapsed === 'restored' ||
+        collapsed === 'vunion';
+      if (notPlayableFromHand) {
+        const label = stage || String(pokemonCard.stage || '').trim();
         return {
           allowed: false,
-          reason: `${pokemonCard.name} is a ${stage} Pokémon — only Basic Pokémon can be played from your hand.`,
+          reason: `${pokemonCard.name} is a ${label} Pokémon — only Basic Pokémon can be played from your hand.`,
         };
       }
       return { allowed: true };

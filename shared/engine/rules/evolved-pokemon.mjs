@@ -6,7 +6,7 @@
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from './evolution.mjs';
 
-const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2 };
+const STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, BREAK: 3 };
 
 const PRINTED_FIELDS = [
   'name',
@@ -26,6 +26,12 @@ function stageRank(card) {
   return STAGE_RANK[normalizeStage(card?.stage) || 'Basic'] ?? 0;
 }
 
+function stackEvolutions(zoneCards, root) {
+  return (zoneCards || []).filter(
+    (c) => c.attachedTo === root.instanceId && isPokemon(c)
+  );
+}
+
 /**
  * @param {object[]} zoneCards Cards in the zone holding the root (active or bench)
  * @param {object} root The in-play Pokémon (a card with no attachedTo)
@@ -33,17 +39,44 @@ function stageRank(card) {
  */
 export function topPokemonCard(zoneCards, root) {
   if (!root) return root;
-  const evolutions = (zoneCards || []).filter(
-    (c) => c.attachedTo === root.instanceId && isPokemon(c)
-  );
-  return evolutions.reduce(
+  return stackEvolutions(zoneCards, root).reduce(
     (top, card) => (stageRank(card) >= stageRank(top) ? card : top),
     root
   );
 }
 
+// The highest-stage card below the top, i.e. the Pokémon a BREAK card
+// evolved from (root when the stack has no other evolution).
+function previousTopPokemonCard(zoneCards, root, top) {
+  return stackEvolutions(zoneCards, root)
+    .filter((card) => card !== top)
+    .reduce((best, card) => (stageRank(card) >= stageRank(best) ? card : best), root);
+}
+
+// Union of two printed entry lists (attacks / abilities), with the top card's
+// own entry replacing the base's on a name collision.
+function mergeNamedEntries(baseEntries, topEntries) {
+  const merged = Array.isArray(baseEntries) ? [...baseEntries] : [];
+  for (const entry of Array.isArray(topEntries) ? topEntries : []) {
+    const name = String(entry?.name ?? '').toLowerCase();
+    const idx = merged.findIndex(
+      (existing) => String(existing?.name ?? '').toLowerCase() === name
+    );
+    if (idx >= 0) merged[idx] = entry;
+    else merged.push(entry);
+  }
+  return merged;
+}
+
+const isEmptyField = (value) =>
+  value === undefined ||
+  value === null ||
+  (Array.isArray(value) && value.length === 0);
+
 /**
  * Read-only view of an in-play Pokémon: the root's state with the top card's printed stats.
+ * A BREAK Evolution keeps the previous Evolution's attacks, Ability, Weakness,
+ * Resistance and Retreat Cost (its own entries win on collision).
  * Never write through it; write damage and conditions to the root.
  */
 export function evolvedView(zoneCards, root) {
@@ -52,6 +85,14 @@ export function evolvedView(zoneCards, root) {
   const view = { ...root };
   for (const field of PRINTED_FIELDS) {
     if (top[field] !== undefined && top[field] !== null) view[field] = top[field];
+  }
+  if (normalizeStage(top.stage) === 'BREAK') {
+    const base = previousTopPokemonCard(zoneCards, root, top);
+    view.attacks = mergeNamedEntries(base?.attacks, top.attacks);
+    view.abilities = mergeNamedEntries(base?.abilities, top.abilities);
+    for (const field of ['weakness', 'resistance', 'retreatCost']) {
+      if (isEmptyField(top[field])) view[field] = base?.[field];
+    }
   }
   return view;
 }

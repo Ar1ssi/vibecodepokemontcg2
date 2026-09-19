@@ -1,7 +1,7 @@
 // Shared deck/discard search filtering (trainers, abilities, attacks).
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
-import { cardHasRuleBox } from './ko-flow.mjs';
+import { isRuleBoxPokemon } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const SYMBOL_TO_TYPE = {
@@ -124,14 +124,14 @@ export function matchesSearch(card, what = '') {
       w.includes("without a rule box") ||
       w.includes("no rule box") ||
       w.includes("non-rule box");
-    if (noRuleBox && cardHasRuleBox(card)) return false;
+    if (noRuleBox && isRuleBoxPokemon(card)) return false;
 
     const withRuleBox =
       !noRuleBox &&
       (w.includes("with a rule box") ||
         w.includes("has a rule box") ||
         w.includes("rule box"));
-    if (withRuleBox && !cardHasRuleBox(card)) return false;
+    if (withRuleBox && !isRuleBoxPokemon(card)) return false;
 
     const normStage = normalizeStage(card.stage);
     const effectiveStage = normStage || (card.stage ? card.stage : 'Basic');

@@ -94,6 +94,8 @@ import test from 'node:test';
       assert.equal(normalizeStage('Stage1'), 'Stage 1');
       assert.equal(normalizeStage('STAGE 2'), 'Stage 2');
       assert.equal(normalizeStage('stage2'), 'Stage 2');
+      assert.equal(normalizeStage('BREAK'), 'BREAK');
+      assert.equal(normalizeStage('Break'), 'BREAK');
       assert.equal(normalizeStage(null), null);
       assert.equal(normalizeStage(undefined), null);
     });
@@ -130,6 +132,20 @@ import test from 'node:test';
       rulesState.enabled = false;
       const r = await canPlayPokemonFromHand({ name: 'Haunter', stage: 'Stage 1' });
       assert.equal(r.allowed, true);
+    });
+
+    test('canPlayPokemonFromHand blocks Restored, BREAK and V-UNION Pokémon', async () => {
+      rulesState.enabled = true;
+      const restored = await canPlayPokemonFromHand({ name: 'Kabuto', stage: 'Restored' });
+      assert.equal(restored.allowed, false);
+      assert.ok(restored.reason.includes('Restored'));
+
+      const breakCard = await canPlayPokemonFromHand({ name: 'Snorlax BREAK', stage: 'BREAK' });
+      assert.equal(breakCard.allowed, false);
+      assert.ok(breakCard.reason.includes('BREAK'));
+
+      const vunion = await canPlayPokemonFromHand({ name: 'Mewtwo V-UNION', stage: 'V-UNION' });
+      assert.equal(vunion.allowed, false);
     });
     
     // ── abilities ──
@@ -275,9 +291,15 @@ import test from 'node:test';
       assert.equal(cleanPokemonName('Charizard ex'), 'charizard');
       assert.equal(cleanPokemonName('Charizard-EX'), 'charizard');
       assert.equal(cleanPokemonName('Charizard EX'), 'charizard');
-      assert.equal(cleanPokemonName('Mewtwo VSTAR'), 'mewtwo');
-      assert.equal(cleanPokemonName('Pikachu VMAX'), 'pikachu');
+      // VMAX/VSTAR collapse to V, they are not erased (App. 9/13).
+      assert.equal(cleanPokemonName('Mewtwo VSTAR'), 'mewtwov');
+      assert.equal(cleanPokemonName('Pikachu VMAX'), 'pikachuv');
+      assert.equal(cleanPokemonName('Lapras V'), 'laprasv');
       assert.equal(cleanPokemonName('Lugia GX'), 'lugia');
+      // Level is not part of the name (p.21).
+      assert.equal(cleanPokemonName('Gengar LV.43'), 'gengar');
+      assert.equal(cleanPokemonName('Gengar LV.X'), 'gengar');
+      assert.equal(cleanPokemonName('Gengar'), 'gengar');
       assert.equal(cleanPokemonName('Flabébé'), 'flabebe');
 
       // Preserves words beginning with "ex"
@@ -297,6 +319,18 @@ import test from 'node:test';
       assert.equal(pokemonNamesMatch('Exeggcute', 'Exeggutor'), false);
       assert.equal(pokemonNamesMatch('Pikachu', 'Raichu'), false);
       assert.equal(pokemonNamesMatch('', 'Charizard'), false);
+    });
+
+    test('pokemonNamesMatch: V-stages and levels follow the rulebook name rules (gap #17)', () => {
+      // A VMAX/VSTAR evolves from a V (App. 9/13): same species, but not the Basic.
+      assert.equal(pokemonNamesMatch('Lapras VMAX', 'Lapras V'), true);
+      assert.equal(pokemonNamesMatch('Lapras VSTAR', 'Lapras V'), true);
+      assert.equal(pokemonNamesMatch('Lapras VMAX', 'Lapras'), false);
+      assert.equal(pokemonNamesMatch('Pikachu V', 'Pikachu'), false);
+
+      // Level is not part of the name (p.21).
+      assert.equal(pokemonNamesMatch('Gengar', 'Gengar LV.43'), true);
+      assert.equal(pokemonNamesMatch('Gengar LV.43', 'Gengar LV.X'), true);
     });
 
     test('normalizeStage supports EX stage strings and MEGA', () => {

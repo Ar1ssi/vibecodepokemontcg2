@@ -8,6 +8,7 @@ import {
   isPokemon,
   isEnergy,
   isTrainer,
+  isBasicPokemon,
 } from '../cards.mjs';
 
 test('createCard initializes standard defaults', () => {
@@ -104,6 +105,38 @@ test('describeCard returns readable formatted string', () => {
   });
   assert.equal(describeCard(card), 'Pikipek (SUM #106) [#42]');
   assert.equal(describeCard(null), 'Empty');
+});
+
+test('isBasicPokemon rejects V-UNION, Restored and BREAK stages', () => {
+  const stage = (s) =>
+    createCard({ name: 'Test', supertype: 'Pokémon', stage: s });
+
+  assert.equal(isBasicPokemon(stage('Basic')), true);
+  assert.equal(isBasicPokemon(stage('V-UNION')), false);
+  assert.equal(isBasicPokemon(stage('Restored')), false);
+  assert.equal(isBasicPokemon(stage('BREAK')), false);
+});
+
+test('isBasicPokemon rejects V-UNION, Restored and BREAK subtypes', () => {
+  const subtype = (s) =>
+    createCard({ name: 'Test', supertype: 'Pokémon', subtypes: [s] });
+
+  assert.equal(isBasicPokemon(subtype('V-UNION')), false);
+  assert.equal(isBasicPokemon(subtype('Restored')), false);
+  assert.equal(isBasicPokemon(subtype('BREAK')), false);
+});
+
+test('isBasicPokemon rejects Pokémon LEGEND (glossary / App. 21)', () => {
+  const stage = (s) =>
+    createCard({ name: 'Test', supertype: 'Pokémon', stage: s });
+
+  assert.equal(isBasicPokemon(stage('LEGEND')), false);
+  // TCGdex LEGEND cards carry no `stage`; the name marker must still exclude them.
+  assert.equal(
+    isBasicPokemon(createCard({ name: 'Lugia LEGEND', supertype: 'Pokémon', hp: 130 })),
+    false
+  );
+  assert.equal(isBasicPokemon(stage('Basic')), true);
 });
 
 test('isPokemon, isEnergy, isTrainer predicates', () => {

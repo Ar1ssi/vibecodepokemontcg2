@@ -6,7 +6,7 @@
  * Pure and DOM-free: randomness only through ctx.activeRng (Invariant 6).
  */
 
-import { findCard } from '../state.mjs';
+import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -102,7 +102,7 @@ function discardCard(draft, card, events) {
   if (!owner) return;
   removeFromZones(owner, card);
   card.attachedTo = null;
-  owner.zones.discard.push(card);
+  discardCardToPlayerZone(owner, card);
   events.push({
     type: 'cardsDiscarded',
     playerId: owner.playerId,
@@ -268,7 +268,7 @@ function countShuffleDrawPlus(ctx) {
 function millSelf(ctx) {
   const { player, step } = ctx;
   const milled = player.zones.deck.splice(0, step.count || 1);
-  player.zones.discard.push(...milled);
+  for (const card of milled) discardCardToPlayerZone(player, card);
   ctx.events.push({
     type: 'cardsDiscarded',
     playerId: player.playerId,
@@ -331,8 +331,10 @@ function lookAtDeckEnd(ctx, fromBottom) {
   if (ctx.selection) {
     const chosen = pickById(viewed, ctx.selection);
     if (pick === 'discard') {
-      for (const card of chosen) removeFromZones(player, card);
-      player.zones.discard.push(...chosen);
+      for (const card of chosen) {
+        removeFromZones(player, card);
+        discardCardToPlayerZone(player, card);
+      }
       ctx.events.push({
         type: 'cardsDiscarded',
         playerId: player.playerId,
@@ -767,7 +769,8 @@ function returnPokemonToHand(ctx) {
       removeFromZones(player, card);
       card.attachedTo = null;
       const keep = step.keepAttached || isPokemon(card);
-      (keep ? player.zones.hand : player.zones.discard).push(card);
+      if (keep) player.zones.hand.push(card);
+      else discardCardToPlayerZone(player, card);
     }
     ctx.events.push({ type: 'cardMoved', instanceId: root.instanceId, from: wasActive ? 'active' : 'bench', to: 'hand', playerId: player.playerId });
     if (!wasActive) return null;
@@ -831,7 +834,7 @@ function swapWithDiscard(ctx) {
     for (const card of attachedCards(player, outgoing.instanceId)) card.attachedTo = incoming.instanceId;
     outgoing.damage = 0;
     clearConditions(outgoing);
-    player.zones.discard.push(outgoing);
+    discardCardToPlayerZone(player, outgoing);
     ctx.events.push({ type: 'pokemonSwapped', playerId: player.playerId, instanceId: incoming.instanceId, replacedInstanceId: outgoing.instanceId });
     return null;
   }
@@ -1014,8 +1017,10 @@ function askDiscardDownTo(ctx, target, count, memo) {
 
 function discardSelectedFromHand(ctx, target) {
   const chosen = pickById(target.zones.hand, ctx.selection);
-  for (const card of chosen) removeFromZones(target, card);
-  target.zones.discard.push(...chosen);
+  for (const card of chosen) {
+    removeFromZones(target, card);
+    discardCardToPlayerZone(target, card);
+  }
   ctx.events.push({
     type: 'cardsDiscarded',
     playerId: target.playerId,

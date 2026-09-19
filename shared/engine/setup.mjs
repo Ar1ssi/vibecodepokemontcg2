@@ -19,6 +19,31 @@ export function hasBasicPokemon(hand = []) {
 }
 
 /**
+ * Net mulligan bonus draws owed to each player. Officially every opponent
+ * draws one card per mulligan a player takes, so for each ordered pair only
+ * the difference in mulligan counts is owed; lockstep mulligans cancel out.
+ *
+ * @param {Record<string, number>} mulligans Mulligans taken per player
+ * @param {string[]} [playerIds] Defaults to the mulligan map's keys
+ * @returns {Record<string, number>} Cards owed to each player
+ */
+export function mulliganBonusDraws(
+  mulligans = {},
+  playerIds = Object.keys(mulligans)
+) {
+  const owed = {};
+  for (const pid of playerIds) owed[pid] = 0;
+  for (const pid of playerIds) {
+    for (const otherPid of playerIds) {
+      if (otherPid === pid) continue;
+      const diff = (mulligans[pid] || 0) - (mulligans[otherPid] || 0);
+      if (diff > 0) owed[otherPid] += diff;
+    }
+  }
+  return owed;
+}
+
+/**
  * Executes deterministic setup sequence for GameState:
  * 1. Shuffles each player's deck using rng.shuffle().
  * 2. Deals 7 cards to hand and 6 cards to prizes.
@@ -31,13 +56,15 @@ export function hasBasicPokemon(hand = []) {
  * @param {string} [options.firstPlayerId]
  * @param {object} [options.rng] Seeded PRNG instance
  * @param {number} [options.maxMulligans=10] Guard against infinite loops on decks with no basics
+ * @param {boolean} [options.firstPrizeWins=false] Sudden-death tiebreaker: the first
+ *   player to take a Prize card wins (sets `state.firstPrizeWins`)
  * @returns {{
  *   state: object,
  *   events: object[],
  *   mulligans: Record<string, number>
  * }}
  */
-export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligans = 10 } = {}) {
+export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligans = 10, firstPrizeWins = false } = {}) {
   if (!state || typeof state !== 'object') {
     throw new Error('setupGame requires a valid GameState');
   }
@@ -114,21 +141,28 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
         playerId: pid,
         mulliganCount: mulligans[pid],
       });
+    }
+  }
 
-      // Award bonus draw to opponents
-      for (const otherPid of playerIds) {
-        if (otherPid === pid) continue;
-        const opponent = state.players[otherPid];
-        if (opponent.zones?.deck?.length > 0) {
-          const [bonusCard] = opponent.zones.deck.splice(0, 1);
-          opponent.zones.hand.push(bonusCard);
-          events.push({
-            type: 'bonusDrawAwarded',
-            playerId: otherPid,
-            sourcePlayerId: pid,
-          });
-        }
-      }
+  // Step 3b: net mulligan bonus draws. Each opponent draws one card per
+  // mulligan, but two players who mulligan the same number of times cancel
+  // out; only the net difference between each pair is actually owed. Awarding
+  // inside the loop (pre-30c) over-awarded both players on lockstep mulligans.
+  const bonuses = mulliganBonusDraws(mulligans, playerIds);
+  for (const pid of playerIds) {
+    const opponent = state.players[pid];
+    const source = playerIds.find(
+      (other) => other !== pid && (mulligans[other] || 0) > (mulligans[pid] || 0)
+    );
+    for (let i = 0; i < bonuses[pid]; i++) {
+      if (!(opponent.zones?.deck?.length > 0)) break;
+      const [bonusCard] = opponent.zones.deck.splice(0, 1);
+      opponent.zones.hand.push(bonusCard);
+      events.push({
+        type: 'bonusDrawAwarded',
+        playerId: pid,
+        sourcePlayerId: source,
+      });
     }
   }
 
@@ -181,7 +215,16 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     type: 'gameSetupCompleted',
     starter,
     mulligans,
+    firstPrizeWins: Boolean(firstPrizeWins),
   });
+
+  // Sudden-death tiebreaker: whoever takes the first Prize card wins. The
+  // reducer reads this to end the game on the first `takePrizes`.
+  if (firstPrizeWins) {
+    state.firstPrizeWins = true;
+  } else if ('firstPrizeWins' in state) {
+    delete state.firstPrizeWins;
+  }
 
   if (typeof activeRng.cursor === 'number') {
     state.rngCursor = activeRng.cursor;

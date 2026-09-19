@@ -5,7 +5,11 @@
 
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { executeSteps } from './executor.mjs';
-import { findCard, attachmentHostId } from '../state.mjs';
+import {
+  findCard,
+  attachmentHostId,
+  discardCardToPlayerZone,
+} from '../state.mjs';
 import { isToolCard, isStadiumCard as isStadium } from './trainer-steps.mjs';
 
 /**
@@ -59,13 +63,14 @@ export function discardCurrentStadium(draft, events = [], initiatorPlayerId = nu
 
   if (owner) {
     oldStadium.attachedTo = null;
-    owner.zones.discard.push(oldStadium);
+    // A Prism Star Stadium goes to the Lost Zone, not the discard pile (App. 17).
+    const to = discardCardToPlayerZone(owner, oldStadium);
     if (Array.isArray(events)) {
       events.push({
         type: 'cardMoved',
         instanceId: oldStadium.instanceId,
         from: 'stadium',
-        to: 'discard',
+        to,
         playerId: owner.playerId,
       });
     }
@@ -156,7 +161,7 @@ export function executeTrainer(draft, {
             if (p.flags) p.flags.stadiumUsedThisTurn = false;
           }
         } else {
-          ownerPlayer.zones.discard.push(foundBoardCard);
+          discardCardToPlayerZone(ownerPlayer, foundBoardCard);
         }
       }
     }
@@ -254,7 +259,7 @@ export function executeTrainer(draft, {
     const bIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);
     if (bIdx >= 0) {
       const [boardCard] = player.zones.board.splice(bIdx, 1);
-      player.zones.discard.push(boardCard);
+      discardCardToPlayerZone(player, boardCard);
     }
     draft.pendingChoice = null;
     return { pendingChoice: null, completed: true };
@@ -280,7 +285,7 @@ export function executeTrainer(draft, {
   const bIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);
   if (bIdx >= 0) {
     const [boardCard] = player.zones.board.splice(bIdx, 1);
-    player.zones.discard.push(boardCard);
+    discardCardToPlayerZone(player, boardCard);
   }
 
   draft.pendingChoice = null;

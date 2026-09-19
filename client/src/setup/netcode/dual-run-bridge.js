@@ -815,11 +815,15 @@ export function translateActionToCmd(action, parameters = []) {
     }
 
     case 'VSTARGXFunction': {
-      const [instanceId] = parameters;
+      // Legacy VSTAR-GX.js sends [type] ('GX' | 'VSTAR') and no card identity
+      // (I22). Carry the once-per-game discriminator so the server can spend
+      // the matching allowance; instanceId remains unresolved.
+      const [type] = parameters;
       return {
         type: 'useVStarGX',
         payload: {
-          instanceId: Number(instanceId) || 0,
+          instanceId: 0,
+          kind: type === 'GX' ? 'gx' : 'vstar',
         },
       };
     }

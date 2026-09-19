@@ -20,8 +20,10 @@ import {
   isExCard,
   isGxCard,
   isMegaCard,
-  cardHasRuleBox as baseCardHasRuleBox,
-} from './ko-flow.mjs';
+  isVCard,
+  isTeraCard,
+  isRuleBoxPokemon,
+} from './card-classify.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 
 const lower = (v) =>
@@ -48,44 +50,18 @@ const TYPE_LETTER = {
   c: 'colorless',
 };
 
-export { isExCard, isGxCard, isMegaCard, isPokemonToolCard, attachedTools };
-
-export function cardHasRuleBox(card) {
-  if (!card) return false;
-  return baseCardHasRuleBox(card);
-}
+export {
+  isExCard,
+  isGxCard,
+  isMegaCard,
+  isVCard,
+  isTeraCard,
+  isPokemonToolCard,
+  attachedTools,
+};
 
 export function attackerTypes(attacker) {
   return (attacker?.types || []).map((t) => String(t).toLowerCase());
-}
-
-export function isVCard(card = {}) {
-  if (!card) return false;
-  const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  if (
-    subs.includes('v') ||
-    subs.includes('vstar') ||
-    subs.includes('vmax') ||
-    subs.includes('v-union')
-  )
-    return true;
-  const name = String(card.name || '')
-    .toLowerCase()
-    .trim();
-  return /(?:^|\s)v(?:star|max|-union)?$/i.test(name) || /\bv\b/i.test(name);
-}
-
-export function isTeraCard(card = {}) {
-  if (!card) return false;
-  const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  if (subs.includes('tera')) return true;
-  const text = textOf(card);
-  if (
-    text.includes('tera: as long as this pokémon is on your bench') ||
-    text.includes('tera rule')
-  )
-    return true;
-  return /\btera\b/i.test(String(card.name || ''));
 }
 
 export function cardHasAbility(card = {}) {
@@ -263,7 +239,7 @@ function bonusForTool(
     return 0;
   if (
     /doesn'?t have a rule box|do not have a rule box/i.test(t) &&
-    cardHasRuleBox(attacker)
+    isRuleBoxPokemon(attacker)
   )
     return 0;
   const attackerPoisoned = (attacker?.conditions || []).includes('Poisoned');
