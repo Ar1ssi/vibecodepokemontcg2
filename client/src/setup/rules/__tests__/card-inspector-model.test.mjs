@@ -532,3 +532,45 @@ test('model: zone defaults to active', () => {
   assert.equal(buildInspectorModel(CHARMANDER, {}).zone, 'active');
   assert.equal(buildInspectorModel(CHARMANDER, {}).attackable, true);
 });
+
+// ── positional abilities (design 015) ──────────────────────────────────────
+// The panel is faithful to the engine by design, so once `listAbilities` became zone-aware the
+// inspector has to stop offering a positional ability from the Bench. Contrast Agile above: it is
+// not positional, so its bench test still expects usable.
+const SLEEPY_HYPNOSIS = {
+  ...CHARMANDER,
+  name: 'Hypno',
+  ability: {
+    name: 'Sleepy Aura',
+    text: "Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent's Active Pokémon Asleep.",
+  },
+};
+
+test('model: a positional ability is not usable from the bench (015)', () => {
+  const m = buildInspectorModel(SLEEPY_HYPNOSIS, {
+    energyTypes: ['Fire'],
+    zone: 'bench',
+  });
+  assert.equal(m.ability.usable, false);
+  assert.equal(m.ability.recede, true);
+  assert.match(m.ability.reason, /active spot/i);
+});
+
+test('model: the same positional ability is usable from the active spot (015)', () => {
+  const m = buildInspectorModel(SLEEPY_HYPNOSIS, {
+    energyTypes: ['Fire'],
+    zone: 'active',
+  });
+  assert.equal(m.ability.usable, true);
+  assert.equal(m.ability.recede, false);
+});
+
+test('model: a positional ability does not dim the bench (015)', () => {
+  // The card is out of position, not short of energy — dimming would report a problem that
+  // does not exist, the same reasoning the bench dim rule already uses for attacks.
+  const m = buildInspectorModel(SLEEPY_HYPNOSIS, {
+    energyTypes: [],
+    zone: 'bench',
+  });
+  assert.equal(m.dimLevel, 'none');
+});

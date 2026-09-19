@@ -49,6 +49,7 @@ import {
   parseThorns,
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
+  requiresActiveSpot,
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -1600,6 +1601,15 @@ export function validateLegality(state, command) {
           player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
         ) {
           return { allowed: false, reason: 'Ability already used this turn.' };
+        }
+        // An ability printed as a conditional on this Pokémon's position cannot be activated from
+        // the Bench. The inspector already greys the panel, so this catches a stale or crafted
+        // click that never went through it.
+        if (cardRef.zoneId !== 'active' && requiresActiveSpot(cardRef.card)) {
+          return {
+            allowed: false,
+            reason: 'This ability can only be used from the Active Spot.',
+          };
         }
       }
       return { allowed: true };

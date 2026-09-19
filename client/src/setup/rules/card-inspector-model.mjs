@@ -271,13 +271,14 @@ export function buildInspectorModel(card, ctx = {}) {
     };
   });
 
-  // Usability comes from the shipping primitive, so the once-per-turn wording the engine
-  // enforces is the wording the panel shows. Fed a normalised singular so both spellings work.
+  // Usability comes from the shipping primitive, so the once-per-turn wording the engine enforces
+  // — and the spot the card occupies — are what the panel shows. Fed a normalised singular so both
+  // spellings work.
   const rawAbility = rawAbilityOf(card);
   const abilityInfo = rawAbility
     ? (listAbilities(
         { ability: rawAbility },
-        { abilityUsed, rulesEnabled }
+        { abilityUsed, rulesEnabled, zone }
       )[0] ?? null)
     : null;
   const ability = abilityInfo

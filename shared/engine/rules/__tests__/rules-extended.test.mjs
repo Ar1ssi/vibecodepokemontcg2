@@ -12,7 +12,7 @@ import test from 'node:test';
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
     const {
       isUsableAbilityCard,
@@ -3158,6 +3158,124 @@ import test from 'node:test';
     test('listAbilities: no ability → empty list', () => {
       assert.deepEqual(listAbilities({ name: 'T' }), []);
       assert.deepEqual(listAbilities({ name: 'T', ability: undefined }), []);
+    });
+
+    // ── zone-aware ability activation (design 015) ──
+    // The gap this closes: the primitive used to answer "usable" for a card printed
+    // "Once during your turn, if this Pokémon is in the Active Spot, …" no matter where it sat,
+    // so the inspector offered the panel from the Bench and the server accepted the dispatch.
+    test('listAbilities: a positional ability is refused from the Bench', () => {
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'Sleepy Aura',
+          text: "Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent's Active Pokémon Asleep.",
+        },
+      };
+      const active = listAbilities(card, { zone: 'active' });
+      assert.equal(active[0].usable, true);
+      assert.equal(active[0].reason, '');
+
+      const bench = listAbilities(card, { zone: 'bench' });
+      assert.equal(bench[0].usable, false);
+      assert.match(bench[0].reason, /active spot/i);
+    });
+
+    test('listAbilities: an omitted zone keeps the active-spot behavior', () => {
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'A',
+          text: 'If this Pokémon is in the Active Spot, draw a card.',
+        },
+      };
+      // Every pre-015 caller passes no zone; none of them may change behavior.
+      assert.equal(listAbilities(card)[0].usable, true);
+      assert.equal(listAbilities(card, {})[0].usable, true);
+    });
+
+    test('listAbilities: a non-positional ability still works from the Bench', () => {
+      const card = {
+        name: 'Charmander',
+        ability: {
+          name: 'Agile',
+          text: 'If this Pokémon has no Energy attached, it has no Weakness.',
+        },
+      };
+      assert.equal(requiresActiveSpot(card), false);
+      assert.equal(listAbilities(card, { zone: 'bench' })[0].usable, true);
+    });
+
+    test('listAbilities: an on-move trigger is NOT position-restricted', () => {
+      // "moves from your Bench to the Active Spot" fires ON the move and is legal from the Bench —
+      // matching a bare mention of the Active Spot here would disable a legal ability.
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'Shift',
+          text: 'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may move an Energy.',
+        },
+      };
+      assert.equal(requiresActiveSpot(card), false);
+      assert.equal(listAbilities(card, { zone: 'bench' })[0].usable, true);
+    });
+
+    test('listAbilities: a passive naming the Active Spot is NOT position-restricted', () => {
+      // A passive is not activated at all, so this predicate must not claim to gate it.
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'Tera',
+          text: 'As long as this Pokémon is in the Active Spot, Pokémon with a Rule Box in play have no Abilities.',
+        },
+      };
+      assert.equal(requiresActiveSpot(card), false);
+    });
+
+    test('requiresActiveSpot: "Pokemon" without the accent still matches', () => {
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'A',
+          text: 'If this Pokemon is in the Active Spot, draw a card.',
+        },
+      };
+      assert.equal(requiresActiveSpot(card), true);
+      assert.equal(listAbilities(card, { zone: 'bench' })[0].usable, false);
+    });
+
+    test('listAbilities: a spent once-per-turn ability reports "used", not position', () => {
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'A',
+          text: 'Once during your turn, if this Pokémon is in the Active Spot, draw a card.',
+        },
+      };
+      const bench = listAbilities(card, { zone: 'bench', abilityUsed: true });
+      assert.equal(bench[0].usable, false);
+      assert.match(bench[0].reason, /once per turn/i);
+    });
+
+    test('listAbilities: rules off ignores position', () => {
+      const card = {
+        name: 'T',
+        ability: {
+          name: 'A',
+          text: 'If this Pokémon is in the Active Spot, draw a card.',
+        },
+      };
+      assert.equal(
+        listAbilities(card, { zone: 'bench', rulesEnabled: false })[0].usable,
+        true
+      );
+    });
+
+    test('requiresActiveSpot: absent and malformed cards are false', () => {
+      assert.equal(requiresActiveSpot(null), false);
+      assert.equal(requiresActiveSpot({}), false);
+      assert.equal(requiresActiveSpot({ ability: {} }), false);
+      assert.equal(requiresActiveSpot({ name: 'T' }), false);
     });
 
     test('listUsableActions: combines attacks + abilities', () => {

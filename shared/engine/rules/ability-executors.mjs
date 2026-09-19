@@ -16,6 +16,20 @@ const textOf = (card) =>
     card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
   );
 
+// --- position ----------------------------------------------------------
+
+// Whether the ability is printed as a conditional on THIS Pokémon's position, which gates where it
+// may be activated from. The wording has to be the restrictive clause, not a bare mention of the
+// Active Spot: "when this Pokémon moves from your Bench to the Active Spot" is a trigger that fires
+// on the move and stays legal from the Bench, and "As long as this Pokémon is in the Active Spot …"
+// is a passive with nothing to activate. Matching either of those would disable a legal ability,
+// which costs more than the over-permissive behavior this replaces.
+const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active)\b/;
+
+export function requiresActiveSpot(card) {
+  return ACTIVE_SPOT_CLAUSE.test(textOf(card));
+}
+
 // --- passive -----------------------------------------------------------
 
 // How many cost symbols a passive ability removes from attacks.
