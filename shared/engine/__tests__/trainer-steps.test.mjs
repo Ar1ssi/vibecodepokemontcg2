@@ -592,6 +592,40 @@ test('Tool dropped on the board asks for a target; Stadium dropped on the board 
   assert.equal(zone(placed, 'p1', 'discard').length, 0);
 });
 
+test('Tool played onto a stacked evolution attaches to the Basic', () => {
+  // The client names the card the player dropped on — the visible Evolution — while
+  // `attachedTools`/tool-combat read `attachedTo === <stack root>` (D40).
+  const game = setup();
+  const balloon = tool();
+  const basic = pokemon('Froakie');
+  const stage1 = pokemon('Frogadier', {
+    stage: 'Stage 1',
+    evolvesFrom: 'Froakie',
+    attachedTo: basic.instanceId,
+  });
+  game.p1.zones.bench.push(basic, stage1);
+  game.p1.zones.hand.push(balloon);
+
+  const res = applyCommand(
+    game.state,
+    {
+      type: 'playTrainer',
+      payload: {
+        instanceId: balloon.instanceId,
+        targetInstanceId: stage1.instanceId,
+      },
+      playerId: 'p1',
+    },
+    game.rng
+  );
+
+  assert.equal(res.error, null);
+  const attached = zone(res, 'p1', 'bench').find(
+    (c) => c.instanceId === balloon.instanceId
+  );
+  assert.equal(attached.attachedTo, basic.instanceId);
+});
+
 test("turn 1: the player going first can't play a Supporter", () => {
   const game = setup();
   game.state.turn.number = 1;
