@@ -222,7 +222,10 @@ export function parseStadiumHealTypes(clause) {
 
 /**
  * Once-per-turn stadium effect descriptor.
- * Returns { kind, n, cost?, condition?, typeFilter?, types?, searchFilter?, destination? } or null.
+ * Returns {
+ *   kind, n, cost?, condition?, typeFilter?, types?, targetType?,
+ *   searchFilter?, destination?, turnEnds?
+ * } or null.
  */
 export function parseStadiumOncePerTurn(card) {
   const t = textOf(card);
@@ -235,12 +238,36 @@ export function parseStadiumOncePerTurn(card) {
   if (/supporter card that has "team rocket" in its name/.test(t)) {
     base.condition = { type: 'named-supporter', contains: 'team rocket' };
   }
+  // "...their turn ends" (Lumiose City) — the activation is paid for by ending
+  // the turn, so the execution layer must advance the turn once it resolves.
+  if (/turn ends/.test(t)) {
+    base.turnEnds = true;
+  }
   if (/discard an energy card from their hand/.test(t)) {
     base.cost = { type: 'discard-energy', n: 1 };
   }
   const discardHand = t.match(/discard (\d+) cards? from their hand/);
   if (discardHand) {
     base.cost = { type: 'discard-hand', n: parseInt(discardHand[1], 10) || 2 };
+  }
+  // Typed Energy discard, e.g. Scorched Earth: "discard a Fire or Fighting
+  // Energy card from his or her hand". The clause between "discard" and
+  // "from … hand" must name Energy; extract every type word/symbol in it.
+  const typedEnergyClause = t.match(
+    /discard ([a-z0-9 {}\s,]+?) from (?:their|his or her|your) hand/
+  );
+  if (typedEnergyClause && /energy card/.test(typedEnergyClause[1])) {
+    const clause = typedEnergyClause[1];
+    const types = HEAL_TYPE_WORDS.filter((w) =>
+      new RegExp(`\\b${w}\\b`).test(clause)
+    );
+    for (const m of clause.matchAll(/\{([a-z])\}/g)) {
+      const type = HEAL_TYPE_SYMBOLS[m[1]];
+      if (type && !types.includes(type)) types.push(type);
+    }
+    if (types.length) {
+      base.cost = { type: 'discard-energy', n: 1, types };
+    }
   }
 
   if (/put a card from their hand on top of their deck/.test(t)) {
@@ -293,6 +320,8 @@ export function parseStadiumOncePerTurn(card) {
       n: parseInt(fusion[1], 10) || 2,
       searchFilter: fusion[2],
       searchWhat: 'item',
+      // Fossil Quarry puts the "Antique" Items directly onto the Bench.
+      destination: /onto their bench/.test(t) ? 'bench' : 'hand',
     };
   }
   if (/search.*marnie's pokémon/.test(t)) {
@@ -308,8 +337,41 @@ export function parseStadiumOncePerTurn(card) {
     const m = t.match(/up to (\d+)/);
     return { ...base, kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
   }
+  // Levincia: "put up to 2 Basic {L} Energy cards from their discard pile into
+  // their hand." A discard-pile recovery, not a deck search — must precede the
+  // generic search fallback that would otherwise search the deck for 1 card.
+  const recoverEnergy = t.match(
+    /put up to (\d+) basic \{([a-z])\} energy cards? from (?:their|your) discard pile into (?:their|your) hand/
+  );
+  if (recoverEnergy) {
+    const type = HEAL_TYPE_SYMBOLS[recoverEnergy[2]];
+    return {
+      ...base,
+      kind: 'recover-energy',
+      n: parseInt(recoverEnergy[1], 10) || 1,
+      ...(type ? { typeFilter: type } : {}),
+    };
+  }
+  // Mystery Garden: "discard an Energy card … in order to draw cards until they
+  // have as many cards in their hand as they have {P} Pokémon in play." The
+  // draw has no printed count — the target is a live board count, so a fixed
+  // `n` would silently draw 1.
+  const untilHandSize = t.match(
+    /draws? cards? until (?:they|you) have as many cards in (?:their|your) hand as (?:they|you) have \{([a-z])\} pok[eé]mon in play/
+  );
+  if (untilHandSize) {
+    const type = HEAL_TYPE_SYMBOLS[untilHandSize[1]];
+    return {
+      ...base,
+      kind: 'draw-until-type',
+      n: null,
+      ...(type ? { targetType: type } : {}),
+      cost: base.cost || { type: 'discard-energy', n: 1 },
+    };
+  }
   if (/discard/.test(t) && /draw/.test(t)) {
-    const dm = t.match(/draw (?:up to )?(\d+|a card)/);
+    // Third-person "draws N" (Scorched Earth) as well as "draw N".
+    const dm = t.match(/draws? (?:up to )?(\d+|a card)/);
     const n = !dm || dm[1] === 'a card' ? 1 : parseInt(dm[1], 10) || 1;
     return {
       ...base,
@@ -318,9 +380,12 @@ export function parseStadiumOncePerTurn(card) {
       cost: base.cost || { type: 'discard-hand', n: 2 },
     };
   }
-  if (/draw/.test(t)) {
-    const m = t.match(/draw (?:up to )?(\d+)/);
-    return { ...base, kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
+  if (/draws?\b/.test(t)) {
+    // Third-person "draws N" / "draws a card" as well as "draw N" (Scorched
+    // Earth class — no discard cost). Missing "draws" here silently drew 1.
+    const m = t.match(/draws? (?:up to )?(\d+|a card)/);
+    const n = !m || m[1] === 'a card' ? 1 : parseInt(m[1], 10) || 1;
+    return { ...base, kind: 'draw', n };
   }
   if (/search|look through|find/.test(t)) {
     return { ...base, kind: 'search', n: 1 };
@@ -1043,7 +1108,7 @@ export function applyStadiumEffect(card) {
       return {
         family,
         executed: true,
-        message: `◈ ${description} → ${parsed ? `${parsed.kind} (${parsed.n})` : 'see card text'}.`,
+        message: `◈ ${description} → ${parsed ? `${parsed.kind} (${parsed.n ?? '—'})` : 'see card text'}.`,
         results,
       };
     }

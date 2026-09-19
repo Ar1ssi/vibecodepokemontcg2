@@ -57,7 +57,7 @@ import {
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
-import { createPendingChoice } from './effects/executor.mjs';
+import { createPendingChoice, attachToRoot } from './effects/executor.mjs';
 import { executeStadium } from './effects/stadium.mjs';
 import {
   parseStadiumOncePerTurn,
@@ -101,6 +101,7 @@ import {
   parseNextTurnLock,
   parseAttackEnergyDiscard,
 } from './rules/attack-effects.mjs';
+import { matchesSearch } from './rules/search-match.mjs';
 
 /**
  * Coin flips an attack's own printed text calls for, rolled from the command's RNG so a
@@ -1070,6 +1071,21 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     player: nextPlayerId,
     number: draft.turn.number,
   });
+}
+
+/**
+ * Ends the acting player's turn from inside a card effect (Lumiose City: "If a
+ * player searches their deck in this way, their turn ends."). Mirrors the `pass`
+ * path — Checkup first, then advance only while the game is still live.
+ */
+function endTurnFromEffect(draft, { playerId, activeRng, events }) {
+  if (isGameConcluded(draft)) return;
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  if (!oppId) return;
+  resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+  if (!isGameConcluded(draft)) {
+    advanceTurn(draft, { nextPlayerId: oppId, events });
+  }
 }
 
 /**
@@ -3131,17 +3147,25 @@ export function applyCommand(state, command, rng = null) {
           searchClause.destination === 'bench'
             ? Math.max(0, 5 - benchCount)
             : searchClause.count || 1;
-        if (maxAllowed > 0) {
+        // Server-side filter: only offer cards the clause actually names. Without
+        // this the pendingChoice exposed the whole deck (any card pickable) and
+        // the client carousel showed every card too.
+        const matches = attackerPlayer.zones.deck.filter((c) =>
+          matchesSearch(c, searchClause.what)
+        );
+        if (maxAllowed > 0 && matches.length > 0) {
           draft.pendingChoice = createPendingChoice({
             player: playerId,
             source: 'attack',
             prompt: `Search your deck for up to ${Math.min(searchClause.count || 1, maxAllowed)} ${searchClause.what || 'cards'}.`,
-            options: attackerPlayer.zones.deck.map((c) => ({
+            // src is required for the client's card picker: apply-view's
+            // openChoiceInCardPicker only uses the carousel when every option
+            // carries art, otherwise it falls back to the face-down grid modal.
+            options: matches.map((c) => ({
               instanceId: c.instanceId,
               name: c.name,
-              supertype: c.supertype,
-              subtypes: c.subtypes,
-              stage: c.stage,
+              src: c.src || '',
+              type: c.type || '',
             })),
             min: 0,
             max: Math.min(searchClause.count || 1, maxAllowed),
@@ -3149,6 +3173,7 @@ export function applyCommand(state, command, rng = null) {
               effectType: 'attack',
               initiatorPlayerId: playerId,
               oppId,
+              attackerId: attacker?.instanceId,
               searchParams: searchClause,
             },
           });
@@ -3455,11 +3480,15 @@ export function applyCommand(state, command, rng = null) {
     }
 
     case 'stadium-effect': {
-      executeStadium(draft, {
+      const result = executeStadium(draft, {
         playerId,
         activeRng,
         events,
       });
+      // Lumiose City: the activation ends the turn once it resolves.
+      if (result?.turnEnds && !result.pendingChoice) {
+        endTurnFromEffect(draft, { playerId, activeRng, events });
+      }
       break;
     }
 
@@ -3536,13 +3565,20 @@ export function applyCommand(state, command, rng = null) {
         });
         draft.pendingChoice = null;
       } else if (token.effectType === 'stadium') {
-        executeStadium(draft, {
+        const result = executeStadium(draft, {
           playerId: initiatorPlayerId,
           activeRng,
           events,
           selection: payload.selection,
           resumeToken: token,
         });
+        if (result?.turnEnds && !result.pendingChoice) {
+          endTurnFromEffect(draft, {
+            playerId: initiatorPlayerId,
+            activeRng,
+            events,
+          });
+        }
       } else if (token.effectType === 'attack') {
         // Chosen-target attack: the player clicked the opponent Pokémon to damage.
         // The rest of the attack's effects already ran before the suspension.
@@ -3624,6 +3660,16 @@ export function applyCommand(state, command, rng = null) {
           ? payload.selection
           : [];
         const dest = token.searchParams?.destination || 'hand';
+        // "attach it to this Pokémon" (Charge): the searched Energy goes onto the
+        // attacker, not into hand. Falls back to the active Pokémon when the
+        // attacker id is missing.
+        const attachTarget =
+          dest === 'attach'
+            ? token.attackerId != null
+              ? findCard(draft, token.attackerId)?.card ||
+                player.zones.active?.find((c) => !c.attachedTo)
+              : player.zones.active?.find((c) => !c.attachedTo)
+            : null;
 
         for (const sel of selection) {
           const instId = typeof sel === 'object' ? sel.instanceId : sel;
@@ -3632,7 +3678,10 @@ export function applyCommand(state, command, rng = null) {
           );
           if (idx >= 0) {
             const [card] = player.zones.deck.splice(idx, 1);
-            if (dest === 'bench') {
+            if (dest === 'attach' && attachTarget) {
+              card.enteredPlayTurn = draft.turn.number;
+              attachToRoot(player, card, attachTarget, events);
+            } else if (dest === 'bench') {
               card.enteredPlayTurn = draft.turn.number;
               player.zones.bench.push(card);
               events.push({

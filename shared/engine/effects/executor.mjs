@@ -20,6 +20,27 @@ import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
 export const MAX_EFFECT_STEPS = 200;
 
 /**
+ * Whether a card can satisfy a discard-cost Energy-type filter. Basic Energy
+ * cards carry their type in the printed name ("Fire Energy"); some printings
+ * also set `types`. A null/empty filter matches any card.
+ *
+ * @param {object} card
+ * @param {string[]|null|undefined} energyTypes lowercase type names
+ * @returns {boolean}
+ */
+export function matchesEnergyTypeFilter(card, energyTypes) {
+  if (!Array.isArray(energyTypes) || energyTypes.length === 0) return true;
+  const name = String(card?.name || '').toLowerCase();
+  const types = (Array.isArray(card?.types) ? card.types : []).map((t) =>
+    String(t).toLowerCase()
+  );
+  return energyTypes.some((type) => {
+    const t = String(type).toLowerCase();
+    return types.includes(t) || name.includes(t);
+  });
+}
+
+/**
  * Deterministically creates a PendingChoice without Math.random (Invariant 6).
  */
 export function createPendingChoice({
@@ -69,7 +90,7 @@ function inPlayRoots(player) {
   return [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => !c.attachedTo);
 }
 
-function attachToRoot(player, card, root, events) {
+export function attachToRoot(player, card, root, events) {
   for (const zone of [player.zones.deck, player.zones.discard, player.zones.hand]) {
     const i = (zone || []).indexOf(card);
     if (i >= 0) zone.splice(i, 1);
@@ -213,9 +234,16 @@ export function executeSteps(draft, {
           break;
         }
 
-        // Needs input: prompt player to discard N cards
+        // Needs input: prompt player to discard N cards. An Energy-discard cost
+        // (`energyOnly`) must not offer a non-Energy card just because the cost
+        // names a type loosely ("discard an Energy card").
+        const isEnergyCard = (c) =>
+          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
         const candidates = (player.zones.hand || []).filter(
-          (c) => c.instanceId !== sourceCard?.instanceId
+          (c) =>
+            c.instanceId !== sourceCard?.instanceId &&
+            matchesEnergyTypeFilter(c, step.energyTypes) &&
+            (!step.energyOnly || isEnergyCard(c))
         );
         const count = step.count || 1;
         const choice = createPendingChoice({
@@ -247,6 +275,12 @@ export function executeSteps(draft, {
         const what = step.what || step.searchTarget || 'card';
         const dest = step.destination || 'hand';
         const maxCount = step.count || 1;
+        const nameFilter = step.nameFilter
+          ? String(step.nameFilter).toLowerCase()
+          : null;
+        const cardMatches = (c) =>
+          matchesSearch(c, what) &&
+          (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter));
 
         const attachKey = `${idx}:searchAttach`;
         if (stepSelection && context[attachKey]) {
@@ -356,7 +390,7 @@ export function executeSteps(draft, {
 
         // Needs input: filter deck candidates
         const deck = player.zones.deck || [];
-        const matches = deck.filter((c) => matchesSearch(c, what));
+        const matches = deck.filter(cardMatches);
 
         if (matches.length === 0) {
           // Fail to find in private zone: shuffle deck and continue
@@ -434,7 +468,18 @@ export function executeSteps(draft, {
       }
 
       case 'drawUntil': {
-        const target = step.target || 5;
+        let target = step.target || 5;
+        // Mystery Garden: target hand size is the live count of the player's
+        // in-play Pokémon of a given type ("as many … as they have {P} Pokémon
+        // in play"), not a printed number.
+        if (step.targetType) {
+          const want = String(step.targetType).toLowerCase();
+          target = inPlayRoots(player).filter((c) =>
+            (Array.isArray(c.types) ? c.types : [])
+              .map((v) => String(v).toLowerCase())
+              .includes(want)
+          ).length;
+        }
         const hand = player.zones.hand || [];
         const deck = player.zones.deck || [];
         const needed = Math.max(0, target - hand.length);
@@ -994,6 +1039,70 @@ export function executeSteps(draft, {
           }
         }
         break;
+      }
+
+      case 'recoverEnergy':
+      case 'recoverFromDiscard': {
+        const discard = player.zones.discard || [];
+        const maxCount = step.count || 1;
+        const energyTypes =
+          step.energyTypes || (step.typeFilter ? [step.typeFilter] : null);
+        const isEnergy = (c) =>
+          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
+        const candidates = discard.filter(
+          (c) => isEnergy(c) && matchesEnergyTypeFilter(c, energyTypes)
+        );
+
+        if (stepSelection) {
+          // Resume: move the chosen discard-pile Energy into the hand.
+          for (const sId of stepSelection) {
+            const dIdx = discard.findIndex((c) => c.instanceId === sId);
+            if (dIdx >= 0) {
+              const [c] = discard.splice(dIdx, 1);
+              (player.zones.hand || []).push(c);
+              events.push({
+                type: 'cardMoved',
+                instanceId: c.instanceId,
+                from: 'discard',
+                to: 'hand',
+                playerId,
+              });
+            }
+          }
+          break;
+        }
+
+        if (candidates.length === 0) {
+          events.push({
+            type: 'effectStepSkipped',
+            reason: 'no_matching_energy_in_discard',
+            step: step.type,
+          });
+          break;
+        }
+
+        const max = Math.min(maxCount, candidates.length);
+        const choice = createPendingChoice({
+          player: playerId,
+          prompt: `${sourceCard?.name || 'Recover'}: Select up to ${max} Energy card${max > 1 ? 's' : ''} from your discard pile`,
+          source: sourceCard?.name || '',
+          options: candidates,
+          min: 0,
+          max,
+          cancellable: true,
+          stateVersion: draft.stateVersion,
+          stepIndex: idx,
+          resumeToken: {
+            effectType,
+            sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
+            stepIndex: idx,
+            steps,
+            context,
+            budgetCount: budget.count,
+          },
+        });
+        return { pendingChoice: choice, completed: false };
       }
 
       case 'attachFromDiscard': {

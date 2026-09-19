@@ -81,6 +81,242 @@ test('stadium: activating stadium effect draws cards and tracks once-per-turn li
   assert.equal(res3.error, 'Stadium effect already used this turn.');
 });
 
+const energyCard = (instanceId, name, types) =>
+  createCard({ instanceId, name, supertype: 'Energy', type: 'Energy', types });
+
+const SCORCHED_EARTH_TEXT =
+  "Once during each player's turn, that player may discard a Fire or Fighting Energy card from his or her hand. If that player does so, he or she draws 2 cards.";
+
+const trainerStub = (instanceId, name) =>
+  createCard({ instanceId, name, supertype: 'Trainer', type: 'Trainer' });
+
+test('stadium: Scorched Earth discards a Fire/Fighting Energy from hand then draws 2', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 54,
+    name: 'Scorched Earth',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: SCORCHED_EARTH_TEXT,
+  });
+  state.players.p1.zones.hand.push(
+    energyCard(90, 'Fire Energy', ['Fire']),
+    energyCard(91, 'Fighting Energy', ['Fighting']),
+    energyCard(92, 'Water Energy', ['Water']),
+    trainerStub(93, "Professor's Research")
+  );
+  state.players.p1.zones.deck.push(trainerStub(100, 'Card A'), trainerStub(101, 'Card B'));
+
+  const res1 = activate(state, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+  // Only the Fire/Fighting Energy are legal discard choices.
+  assert.deepEqual(optionIds(res1).sort((a, b) => a - b), [90, 91]);
+
+  const res2 = resolveChoice(res1, [91], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.pendingChoice, null);
+  const p1 = res2.state.players.p1;
+  assert.equal(p1.zones.discard.length, 1);
+  assert.equal(p1.zones.discard[0].instanceId, 91);
+  assert.equal(p1.zones.hand.length, 5);
+  assert.equal(p1.zones.deck.length, 0);
+  assert.equal(p1.flags.stadiumUsedThisTurn, true);
+});
+
+test('stadium: Scorched Earth is a no-op (and not consumed) with no Fire/Fighting Energy in hand', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 55,
+    name: 'Scorched Earth',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: SCORCHED_EARTH_TEXT,
+  });
+  state.players.p1.zones.hand.push(
+    energyCard(92, 'Water Energy', ['Water']),
+    trainerStub(93, "Professor's Research")
+  );
+  state.players.p1.zones.deck.push(trainerStub(100, 'Card A'), trainerStub(101, 'Card B'));
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 2);
+  assert.ok(!res.state.players.p1.flags.stadiumUsedThisTurn);
+});
+
+const MYSTERY_GARDEN_TEXT =
+  "Once during each player's turn, that player may discard an Energy card from their hand in order to draw cards until they have as many cards in their hand as they have {P} Pokémon in play.";
+
+test('stadium: Mystery Garden discards an Energy then draws until hand size equals {P} Pokémon in play', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 56,
+    name: 'Mystery Garden',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: MYSTERY_GARDEN_TEXT,
+  });
+  const mon = (instanceId, name, types) =>
+    createCard({ instanceId, name, hp: 100, stage: 'Basic', supertype: 'Pokémon', types });
+  state.players.p1.zones.active.push(mon(80, 'Mewtwo', ['Psychic']));
+  state.players.p1.zones.bench.push(mon(81, 'Ralts', ['Psychic']));
+  state.players.p1.zones.hand.push(
+    energyCard(90, 'Psychic Energy', ['Psychic']),
+    trainerStub(91, 'Card X')
+  );
+  state.players.p1.zones.deck.push(
+    trainerStub(100, 'D1'),
+    trainerStub(101, 'D2'),
+    trainerStub(102, 'D3')
+  );
+
+  const res1 = activate(state, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+  // Only the Energy may pay the cost — the trainer in hand is not a legal pick.
+  assert.deepEqual(optionIds(res1), [90]);
+
+  const res2 = resolveChoice(res1, [90], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.pendingChoice, null);
+  const p1 = res2.state.players.p1;
+  assert.equal(p1.zones.discard.length, 1);
+  // hand was [Energy, trainer] → discard Energy → 1 card; target = 2 psychic
+  // Pokémon in play → draw 1 more.
+  assert.equal(p1.zones.hand.length, 2);
+  assert.equal(p1.zones.deck.length, 2);
+  assert.equal(p1.flags.stadiumUsedThisTurn, true);
+});
+
+const LEVINCIA_TEXT =
+  "Once during each player's turn, that player may put up to 2 Basic {L} Energy cards from their discard pile into their hand.";
+
+test('stadium: Levincia recovers up to 2 Basic {L} Energy from discard to hand', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 57,
+    name: 'Levincia',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: LEVINCIA_TEXT,
+  });
+  state.players.p1.zones.discard.push(
+    energyCard(90, 'Lightning Energy', ['Lightning']),
+    energyCard(91, 'Water Energy', ['Water']),
+    energyCard(92, 'Lightning Energy', ['Lightning'])
+  );
+
+  const res1 = activate(state, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+  assert.deepEqual(optionIds(res1).sort((a, b) => a - b), [90, 92]);
+
+  const res2 = resolveChoice(res1, [90, 92], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.pendingChoice, null);
+  const p1 = res2.state.players.p1;
+  assert.equal(p1.zones.hand.length, 2);
+  assert.equal(p1.zones.discard.length, 1);
+  assert.equal(p1.zones.discard[0].instanceId, 91);
+  assert.equal(p1.flags.stadiumUsedThisTurn, true);
+});
+
+const FOSSIL_QUARRY_TEXT =
+  'Once during each player\'s turn, that player may search their deck for up to 2 Item cards that have "Antique" in their name and put them onto their Bench. Then, that player shuffles their deck.';
+
+test('stadium: Fossil Quarry searches "Antique" Items onto the Bench, not to hand', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 58,
+    name: 'Fossil Quarry',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: FOSSIL_QUARRY_TEXT,
+  });
+  const item = (instanceId, name) =>
+    createCard({
+      instanceId,
+      name,
+      supertype: 'Trainer',
+      type: 'Trainer',
+      trainerType: 'Item',
+      subtypes: ['Item'],
+    });
+  state.players.p1.zones.deck.push(
+    item(90, 'Antique Cover Fossil'),
+    item(91, 'Antique Root Fossil'),
+    item(92, 'Nest Ball')
+  );
+
+  const res1 = activate(state, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+  assert.deepEqual(optionIds(res1).sort((a, b) => a - b), [90, 91]);
+
+  const res2 = resolveChoice(res1, [90, 91], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.pendingChoice, null);
+  const p1 = res2.state.players.p1;
+  assert.equal(p1.zones.bench.length, 2);
+  assert.equal(p1.zones.hand.length, 0);
+  assert.equal(p1.zones.deck.length, 1);
+  assert.equal(p1.flags.stadiumUsedThisTurn, true);
+});
+
+const LUMIOSE_CITY_TEXT =
+  "Once during each player's turn, that player may search their deck for a Basic Pokémon and put it onto their Bench. Then, that player shuffles their deck. If a player searches their deck in this way, their turn ends.";
+
+test('stadium: Lumiose City searches a Basic to the Bench then ends the turn', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 59,
+    name: 'Lumiose City',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: LUMIOSE_CITY_TEXT,
+  });
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 70, name: 'Charmander', hp: 70, stage: 'Basic', supertype: 'Pokémon' })
+  );
+  // The incoming player must be able to draw at start of turn.
+  state.players.p2.zones.deck.push(trainerStub(200, 'P2 card'));
+
+  const res1 = activate(state, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+  assert.equal(res1.state.turn.player, 'p1');
+
+  const res2 = resolveChoice(res1, [70], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.pendingChoice, null);
+  assert.equal(res2.state.players.p1.zones.bench.length, 1);
+  assert.equal(res2.state.turn.player, 'p2');
+});
+
+test('stadium: Lumiose City declining the search does not end the turn', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 60,
+    name: 'Lumiose City',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: LUMIOSE_CITY_TEXT,
+  });
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 70, name: 'Charmander', hp: 70, stage: 'Basic', supertype: 'Pokémon' })
+  );
+
+  const res1 = activate(state, rng);
+  assert.ok(res1.pendingChoice);
+  const res2 = resolveChoice(res1, [], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.pendingChoice, null);
+  assert.equal(res2.state.players.p1.zones.bench.length, 0);
+  assert.equal(res2.state.turn.player, 'p1');
+});
+
 const ROUGH_SEAS_TEXT =
   "Once during each player's turn, that player may heal 30 damage from each of their Water Pokémon and Lightning Pokémon.";
 

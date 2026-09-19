@@ -4149,9 +4149,18 @@ const payStadiumCost = (user, cost) => {
   if (!cost) return true;
   const hand = getZone(user, 'hand');
   if (cost.type === 'discard-energy') {
-    const idx = hand.array.findIndex((c) => c.type === 'Energy');
+    const typeFilter = Array.isArray(cost.types) && cost.types.length
+      ? cost.types.map((t) => String(t).toLowerCase())
+      : null;
+    const matchesType = (c) => {
+      if (!typeFilter) return true;
+      const name = String(c.name || '').toLowerCase();
+      const types = (c.types || []).map((t) => String(t).toLowerCase());
+      return typeFilter.some((t) => name.includes(t) || types.includes(t));
+    };
+    const idx = hand.array.findIndex((c) => c.type === 'Energy' && matchesType(c));
     if (idx < 0) {
-      appendMessage(user, '⛔ No Energy in hand to discard.', 'announcement', false);
+      appendMessage(user, '⛔ No matching Energy in hand to discard.', 'announcement', false);
       return false;
     }
     moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
@@ -4659,16 +4668,20 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search-bench' });
+      // Lumiose City: only a search actually performed ends the turn.
+      if (action.turnEnds && rulesState.enabled) endTurnWithBanner(user, {});
       break;
     }
     case 'search-hand': {
       const deck = getZone(user, 'deck');
+      // Fossil Quarry puts the searched "Antique" Items onto the Bench.
+      const dest = action.destination === 'bench' ? 'bench' : 'hand';
       let moved = 0;
       const want = action.n || 1;
       for (let i = 0; i < deck.array.length && moved < want; ) {
         await ensureCardData(deck.array[i]);
         if (matchesStadiumSearch(deck.array[i], action)) {
-          await moveCardBundle(user, user, 'deck', 'hand', i, false, 'move');
+          await moveCardBundle(user, user, 'deck', dest, i, false, 'move');
           moved++;
         } else {
           i++;
@@ -4677,13 +4690,66 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       appendMessage(
         user,
         moved
-          ? `🔍 ${card.name}: found ${moved} card(s) → hand.`
+          ? `🔍 ${card.name}: found ${moved} card(s) → ${dest}.`
           : `🔍 ${card.name}: no matching cards in deck.`,
         'announcement',
         false
       );
       shuffleZone(user, user, 'deck');
-      finishStadiumAction(user, card, emit, { action: 'search-hand', n: moved });
+      finishStadiumAction(user, card, emit, { action: 'search-hand', n: moved, destination: dest });
+      break;
+    }
+    case 'recover-energy': {
+      const discard = getZone(user, 'discard');
+      const want = action.n || 1;
+      const typeFilter = action.typeFilter
+        ? [String(action.typeFilter).toLowerCase()]
+        : null;
+      let moved = 0;
+      for (let i = 0; i < discard.array.length && moved < want; ) {
+        const c = discard.array[i];
+        const nameL = String(c.name || '').toLowerCase();
+        const isEnergy =
+          String(c.type || '').toLowerCase().includes('energy') ||
+          nameL.includes('energy');
+        const types = (c.types || []).map((t) => String(t).toLowerCase());
+        const matchesType =
+          !typeFilter || typeFilter.some((t) => types.includes(t) || nameL.includes(t));
+        if (isEnergy && matchesType) {
+          await moveCardBundle(user, user, 'discard', 'hand', i, false, 'move');
+          moved++;
+        } else {
+          i++;
+        }
+      }
+      appendMessage(
+        user,
+        moved
+          ? `◈ ${card.name}: Recovered ${moved} Energy card(s) from your discard pile.`
+          : `🔍 ${card.name}: no matching Energy in your discard pile.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'recover-energy', n: moved });
+      break;
+    }
+    case 'draw-until-type': {
+      // Mystery Garden: draw until hand size equals the count of matching
+      // Pokémon in play (e.g. {P} Pokémon), which is only known at runtime.
+      const inPlay = pokemonInPlayForUser(user);
+      const target = action.targetType
+        ? inPlay.filter((c) => pokemonMatchesType(c, action.targetType)).length
+        : 0;
+      const hand = getZone(user, 'hand');
+      const need = Math.max(0, target - hand.array.length);
+      if (need > 0) draw(user, user, need, emit);
+      appendMessage(
+        user,
+        `◈ ${card.name}: Drew ${need} card(s) to reach ${target} (your ${action.targetType || 'matching'} Pokémon in play).`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'draw-until-type', n: need });
       break;
     }
     case 'discard-draw':

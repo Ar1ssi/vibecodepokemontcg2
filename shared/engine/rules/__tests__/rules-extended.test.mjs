@@ -1002,6 +1002,79 @@ import test from 'node:test';
       assert.equal(factory.condition.type, 'named-supporter');
     });
 
+    test('parseStadiumOncePerTurn: Scorched Earth discards Fire/Fighting Energy and draws 2', () => {
+      const scorched = {
+        type: 'Stadium',
+        name: 'Scorched Earth',
+        text: "Once during each player's turn, that player may discard a Fire or Fighting Energy card from his or her hand. If that player does so, he or she draws 2 cards.",
+      };
+      const parsed = parseStadiumOncePerTurn(scorched);
+      assert.equal(parsed.kind, 'discard-draw');
+      assert.equal(parsed.n, 2);
+      assert.equal(parsed.cost.type, 'discard-energy');
+      assert.deepEqual(parsed.cost.types, ['fire', 'fighting']);
+    });
+
+    test('parseStadiumOncePerTurn: Mystery Garden draws until hand size equals {P} Pokémon in play', () => {
+      const parsed = parseStadiumOncePerTurn({
+        type: 'Stadium',
+        name: 'Mystery Garden',
+        text: "Once during each player's turn, that player may discard an Energy card from their hand in order to draw cards until they have as many cards in their hand as they have {P} Pokémon in play.",
+      });
+      assert.equal(parsed.kind, 'draw-until-type');
+      assert.equal(parsed.targetType, 'psychic');
+      assert.equal(parsed.n, null);
+      assert.equal(parsed.cost.type, 'discard-energy');
+    });
+
+    test('parseStadiumOncePerTurn: Levincia recovers Basic {L} Energy from the discard pile', () => {
+      const parsed = parseStadiumOncePerTurn({
+        type: 'Stadium',
+        name: 'Levincia',
+        text: "Once during each player's turn, that player may put up to 2 Basic {L} Energy cards from their discard pile into their hand.",
+      });
+      assert.equal(parsed.kind, 'recover-energy');
+      assert.equal(parsed.n, 2);
+      assert.equal(parsed.typeFilter, 'lightning');
+    });
+
+    test('parseStadiumOncePerTurn: Fossil Quarry searches "Antique" Items onto the Bench', () => {
+      const parsed = parseStadiumOncePerTurn({
+        type: 'Stadium',
+        name: 'Fossil Quarry',
+        text: 'Once during each player\'s turn, that player may search their deck for up to 2 Item cards that have "Antique" in their name and put them onto their Bench. Then, that player shuffles their deck.',
+      });
+      assert.equal(parsed.kind, 'search-hand');
+      assert.equal(parsed.n, 2);
+      assert.equal(parsed.searchWhat, 'item');
+      assert.equal(parsed.searchFilter, 'antique');
+      assert.equal(parsed.destination, 'bench');
+    });
+
+    test('parseStadiumOncePerTurn: Lumiose City flags turnEnds, third-person "draws N" parses', () => {
+      const lumiose = parseStadiumOncePerTurn({
+        type: 'Stadium',
+        name: 'Lumiose City',
+        text: "Once during each player's turn, that player may search their deck for a Basic Pokémon and put it onto their Bench. Then, that player shuffles their deck. If a player searches their deck in this way, their turn ends.",
+      });
+      assert.equal(lumiose.kind, 'search-bench');
+      assert.equal(lumiose.turnEnds, true);
+      const draws = parseStadiumOncePerTurn({
+        type: 'Stadium',
+        name: 'X',
+        text: "Once during each player's turn, that player may draw 3 cards.",
+      });
+      assert.equal(draws.kind, 'draw');
+      assert.equal(draws.n, 3);
+      const drawsSingular = parseStadiumOncePerTurn({
+        type: 'Stadium',
+        name: 'Y',
+        text: "Once during each player's turn, that player may draw a card.",
+      });
+      assert.equal(drawsSingular.kind, 'draw');
+      assert.equal(drawsSingular.n, 1);
+    });
+
     test('Grand Tree: once-per-turn search-evolve, including Stage 2 chain', () => {
       const tree = {
         name: 'Grand Tree',
@@ -1619,6 +1692,17 @@ import test from 'node:test';
         what: 'Item',
         count: 1,
         destination: 'hand',
+      });
+
+      // Thundurus' Charge: word-form energy type, no {L} symbol, no "Basic",
+      // and "attach it to this Pokémon" (not "attach them to 1 of your…").
+      // Regression: this previously parsed as { what: 'card' } → whole deck.
+      const charge =
+        'Search your deck for a Lightning Energy card and attach it to this Pokémon. Shuffle your deck afterward.';
+      assert.deepEqual(parseAttackSearchClause(charge), {
+        what: 'Basic Lightning Energy',
+        count: 1,
+        destination: 'attach',
       });
 
       assert.equal(parseAttackSearchClause('Flip a coin. If heads, this attack does 30 more damage.'), null);
