@@ -5,7 +5,12 @@
 
 import { canPayAttackCost, expandEnergyEntries } from './attack-engine.mjs';
 import { oncePerTurnClause } from './damage-parser.mjs';
-import { passiveCostDiscount, applyCostDiscount, parseAttackInheritance } from './ability-executors.mjs';
+import {
+  passiveCostDiscount,
+  applyCostDiscount,
+  parseAttackInheritance,
+  requiresActiveSpot,
+} from './ability-executors.mjs';
 import { parseStadiumCostModifier } from './stadium-effects.mjs';
 
 /**
@@ -83,19 +88,24 @@ export function listAttacks(card, opts = {}) {
 }
 
 /**
- * Build the list of usable abilities for a card (active or benched).
+ * Build the list of usable abilities for a card.
+ *
+ * `zone` is what makes this position-aware: an ability printed as a conditional on this Pokémon's
+ * position ("if this Pokémon is in the Active Spot") cannot be activated from the Bench. It
+ * defaults to 'active' so every caller with no zone to offer keeps today's behavior.
  *
  * @param {object} card   - the Pokémon card with an `.ability`
- * @param {object} opts   - { abilityUsed, rulesEnabled }
+ * @param {object} opts   - { abilityUsed, rulesEnabled, zone }
  * @returns {Array<{name, text, usable, reason}>}
  */
 export function listAbilities(card, opts = {}) {
-  const { abilityUsed = false, rulesEnabled = true } = opts;
+  const { abilityUsed = false, rulesEnabled = true, zone = 'active' } = opts;
   const ability = card.ability;
   if (!ability) return [];
 
   const oncePerTurn = /once during your turn/i.test(ability.text || '');
   const used = rulesEnabled && oncePerTurn && abilityUsed;
+  const offSpot = rulesEnabled && zone !== 'active' && requiresActiveSpot(card);
 
   return [
     {
@@ -103,8 +113,14 @@ export function listAbilities(card, opts = {}) {
       text: ability.text || '',
       oncePerTurn,
       used,
-      usable: !used,
-      reason: used ? 'Already used this turn (once per turn).' : '',
+      usable: !used && !offSpot,
+      // `used` wins the slot: it is the more specific state, and a card that has already spent a
+      // once-per-turn ability reads the same from either spot.
+      reason: used
+        ? 'Already used this turn (once per turn).'
+        : offSpot
+          ? 'This ability can only be used from the Active Spot.'
+          : '',
     },
   ];
 }

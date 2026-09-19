@@ -156,3 +156,84 @@ test('ability: two Pokémon sharing a name track "used" independently (I48)', ()
   assert.equal(res2.error, null);
   assert.equal(res2.state.players.p1.zones.hand.length, 4);
 });
+
+// ── design 015: an Active-Spot ability cannot be activated from the Bench ──
+// The inspector greys the panel, but a stale or hand-built command never goes through it, so the
+// rule has to hold in the engine too. Before this guard, validateLegality checked only the
+// once-per-turn flags and the dispatch was accepted from anywhere.
+const SLEEPY_AURA =
+  "Once during your turn, if this Pokémon is in the Active Spot, you may make your opponent's Active Pokémon Asleep.";
+const makeHypno = (instanceId) =>
+  createCard({
+    instanceId,
+    name: 'Hypno',
+    hp: 110,
+    supertype: 'Pokémon',
+    abilityText: SLEEPY_AURA,
+    abilities: [{ name: 'Sleepy Aura', type: 'Ability', text: SLEEPY_AURA }],
+  });
+
+test('ability: an Active-Spot ability is refused from the Bench', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.bench.push(makeHypno(30));
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 30 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, 'This ability can only be used from the Active Spot.');
+  assert.equal(res.events.length, 0);
+  assert.ok(!res.state.players.p1.zones.bench[0].abilityUsed);
+});
+
+test('ability: the same Active-Spot ability is allowed from the Active', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(makeHypno(31));
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 31 },
+    playerId: 'p1',
+  }, rng);
+
+  // The guard must not block the legal position. What the effect engine then does with the
+  // status condition is out of scope here.
+  assert.notEqual(
+    res.error,
+    'This ability can only be used from the Active Spot.'
+  );
+});
+
+test('ability: a non-positional ability from the Bench is unaffected by the guard', () => {
+  const { state, rng } = setupGame();
+  const kirlia = createCard({
+    instanceId: 32,
+    name: 'Kirlia',
+    hp: 80,
+    supertype: 'Pokémon',
+    abilityText: 'Refinement: Once during your turn, you may draw 2 cards.',
+    abilities: [
+      {
+        name: 'Refinement',
+        type: 'Ability',
+        text: 'Refinement: Once during your turn, you may draw 2 cards.',
+      },
+    ],
+  });
+  state.players.p1.zones.bench.push(kirlia);
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 201 }),
+    createCard({ instanceId: 202 })
+  );
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 32 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 2);
+});
