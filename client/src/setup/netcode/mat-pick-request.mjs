@@ -10,7 +10,8 @@
 
 const PLAY_ZONES = new Set(['active', 'bench']);
 
-const clampMax = (value) => (Number.isInteger(value) && value >= 0 ? value : 1);
+const clampCount = (value, fallback) =>
+  Number.isInteger(value) && value >= 0 ? value : fallback;
 
 // An in-play Pokémon root: a board-zone card that is not attached under another
 // card. Attached Energy/Tools share the zone array but are not mat targets (the
@@ -23,21 +24,25 @@ function isInPlayPokemon(record) {
 /**
  * @param {object} choice PendingChoice from the authoritative view
  * @param {Map<number, {instanceId:number, element:any, zone:string, card?:object, holoCard?:object}>} registry
- * @returns {{title:string, candidates:Array, cancellable:boolean}|null} mat-picker args,
- *   or null when the choice is not a single in-play-Pokémon pick.
+ * @returns {{title:string, candidates:Array, cancellable:boolean, min:number, max:number}|null}
+ *   mat-picker args, or null when the choice is not an in-play-Pokémon pick.
  */
 export function buildMatPickerRequest(choice, registry) {
   const options = Array.isArray(choice?.options) ? choice.options : [];
   if (options.length === 0) return null;
-  // The mat picker resolves on one click; multi-picks need the card picker/modal.
-  if (clampMax(choice.max) !== 1) return null;
 
   const records = options.map((opt) => registry?.get?.(opt.instanceId));
   if (records.some((record) => !isInPlayPokemon(record))) {
     return null;
   }
 
-  const min = Number.isInteger(choice.min) && choice.min >= 0 ? choice.min : 1;
+  const minRaw = clampCount(choice.min, 1);
+  const maxRaw = clampCount(choice.max, 1);
+  const min = Math.min(minRaw, options.length);
+  // The mat picker toggles cards and confirms; a multi-pick is allowed here, so
+  // the same request shape covers both single-click and choose-N choices.
+  const max = Math.max(min, Math.min(Math.max(maxRaw, 1), options.length));
+
   return {
     title: choice.prompt || 'Choose a Pokémon',
     candidates: records.map((record, i) => ({
@@ -49,5 +54,7 @@ export function buildMatPickerRequest(choice, registry) {
     // A required pick (min ≥ 1) cannot be declined; only an optional choice gets
     // the Cancel affordance and reports an empty selection.
     cancellable: min === 0,
+    min,
+    max,
   };
 }

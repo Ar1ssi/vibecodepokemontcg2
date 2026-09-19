@@ -2182,6 +2182,29 @@ test('mat choice: in-play options open the mat picker once, not the card picker 
   assert.deepEqual(resolved, [{ choiceId: 'choice_p1_mat_9', selection: [11] }]);
 });
 
+test('mat choice: a max > 1 in-play choice accepts a multi-card selection', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    matPicker,
+    onResolveChoice: (sel) => resolved.push(sel),
+  };
+
+  applyView(matBoardView(1), [], opts);
+  const multi = { ...MAT_CHOICE, choiceId: 'choice_p1_mat_multi', min: 1, max: 2 };
+  applyView(matBoardView(2, multi), [], opts);
+
+  assert.equal(matPicker.opened.length, 1);
+  assert.equal(matPicker.opened[0].max, 2);
+  await matPicker.opened[0].onResolve([10, 11]);
+  assert.deepEqual(resolved, [
+    { choiceId: 'choice_p1_mat_multi', selection: [10, 11] },
+  ]);
+});
+
 test('mat choice: closes when the choice passes to the opponent', () => {
   const { doc, mockGetZone } = setupMockDom();
   const matPicker = fakeChoicePicker();

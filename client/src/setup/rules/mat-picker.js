@@ -7,6 +7,9 @@
  * (holo-wrapper aware) and resolved on a capture-phase document click, across the
  * top document and both playmat iframe documents. Resolving reports the picked
  * candidate; it never moves anything (the server/legacy caller owns the move).
+ *
+ * Single-pick (`max <= 1`) resolves on the first click. Multi-pick (`max > 1`)
+ * toggles cards and requires a Confirm click, enforcing `min..max` selections.
  */
 
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
@@ -20,6 +23,9 @@ import {
 
 let activeMatPick = null;
 
+const OUTLINE_IDLE = '#ffd23f';
+const OUTLINE_SELECTED = '#38d66b';
+
 /**
  * Silently tears down any mat pick currently open (idempotent), without invoking
  * its onCancel. Used when a server choice clears or passes to the opponent, or a
@@ -31,22 +37,28 @@ export function dismissMatPick() {
 }
 
 /**
- * Highlights the candidate cards on the mat and resolves on the first click.
+ * Highlights the candidate cards on the mat and reports the picked card(s).
  *
  * @param {object}   params
  * @param {string}   params.title
  * @param {Array<{instanceId:number, name?:string, image:any, wrapper?:any}>} params.candidates
- * @param {(card:any)=>void} params.onPick
+ * @param {(card:any)=>void} [params.onPick] single-pick resolve (`max <= 1`)
+ * @param {(cards:any[])=>void} [params.onConfirm] multi-pick resolve (`max > 1`)
  * @param {()=>void} [params.onCancel]
  * @param {boolean}  [params.cancellable=true] false hides Cancel and ignores Escape
  *   (a required server choice cannot be declined).
+ * @param {number}   [params.min=1]
+ * @param {number}   [params.max=1]
  */
 export function openMatPick({
   title,
   candidates,
   onPick,
+  onConfirm,
   onCancel,
   cancellable = true,
+  min = 1,
+  max = 1,
 }) {
   dismissMatPick();
 
@@ -57,6 +69,11 @@ export function openMatPick({
     onCancel?.();
     return;
   }
+
+  const minCount = Number.isInteger(min) && min > 0 ? min : 1;
+  const maxCount =
+    Number.isInteger(max) && max >= minCount ? max : minCount;
+  const multiSelect = maxCount > 1 && typeof onConfirm === 'function';
 
   const banner = document.createElement('div');
   banner.className = 'mat-pick-banner';
@@ -78,23 +95,41 @@ export function openMatPick({
   });
   const label = document.createElement('span');
   label.textContent = title;
+  banner.append(label);
+
+  const countLabel = multiSelect ? document.createElement('span') : null;
+  if (countLabel) {
+    countLabel.className = 'mat-pick-count';
+    Object.assign(countLabel.style, { opacity: '0.85' });
+    banner.appendChild(countLabel);
+  }
+
+  const buttonStyle = {
+    background: '#3a3a42',
+    color: '#fff',
+    border: '1px solid #55555f',
+    borderRadius: '5px',
+    padding: '3px 10px',
+    cursor: 'pointer',
+  };
+
+  let confirmBtn = null;
+  if (multiSelect) {
+    confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.textContent = 'Confirm';
+    Object.assign(confirmBtn.style, buttonStyle);
+    banner.appendChild(confirmBtn);
+  }
 
   let cancelBtn = null;
   if (cancellable) {
     cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.textContent = 'Cancel';
-    Object.assign(cancelBtn.style, {
-      background: '#3a3a42',
-      color: '#fff',
-      border: '1px solid #55555f',
-      borderRadius: '5px',
-      padding: '3px 10px',
-      cursor: 'pointer',
-    });
+    Object.assign(cancelBtn.style, buttonStyle);
+    banner.appendChild(cancelBtn);
   }
-  banner.append(label);
-  if (cancelBtn) banner.appendChild(cancelBtn);
   document.body.appendChild(banner);
 
   const restoreElements = new Map();
@@ -111,27 +146,53 @@ export function openMatPick({
     return restoreElements.get(el);
   };
 
-  for (const { targetEl, img } of entries) {
+  const paint = (entry, selected) => {
+    const color = selected ? OUTLINE_SELECTED : OUTLINE_IDLE;
+    for (const el of [entry.targetEl, entry.img]) {
+      if (!el?.style) continue;
+      el.style.outline = `4px solid ${color}`;
+      el.style.outlineOffset = '2px';
+    }
+  };
+
+  for (const entry of entries) {
+    const { targetEl, img } = entry;
     if (targetEl) {
       getRestore(targetEl);
-      if (targetEl.style) {
-        targetEl.style.outline = '4px solid #ffd23f';
-        targetEl.style.outlineOffset = '2px';
-        targetEl.style.cursor = 'pointer';
-      }
+      if (targetEl.style) targetEl.style.cursor = 'pointer';
       targetEl.dataset.matPick = '1';
     }
     if (img) {
       getRestore(img);
-      if (img.style && img !== targetEl) {
-        img.style.outline = '4px solid #ffd23f';
-        img.style.outlineOffset = '2px';
-        img.style.cursor = 'pointer';
-      }
+      if (img.style && img !== targetEl) img.style.cursor = 'pointer';
       img.draggable = false;
       img.dataset.matPick = '1';
     }
+    paint(entry, false);
   }
+
+  const selected = new Set();
+  const updateCount = () => {
+    if (countLabel)
+      countLabel.textContent = `(${selected.size}/${maxCount})`;
+    if (confirmBtn)
+      confirmBtn.disabled = selected.size < minCount || selected.size > maxCount;
+  };
+  updateCount();
+
+  const toggle = (card) => {
+    const entry = entries.find((e) => e.card === card);
+    if (!entry) return;
+    if (selected.has(card)) {
+      selected.delete(card);
+      paint(entry, false);
+    } else {
+      if (selected.size >= maxCount) return;
+      selected.add(card);
+      paint(entry, true);
+    }
+    updateCount();
+  };
 
   const targetDocs = new Set();
   if (typeof document !== 'undefined' && document) targetDocs.add(document);
@@ -174,11 +235,21 @@ export function openMatPick({
   }
 
   let resolved = false;
-  const finish = (card) => {
+  const finishOne = (card) => {
     if (resolved) return;
     resolved = true;
     cleanup();
-    onPick(card);
+    onPick?.(card);
+  };
+  const confirm = () => {
+    if (resolved) return;
+    if (selected.size < minCount || selected.size > maxCount) return;
+    const cards = entries
+      .filter((e) => selected.has(e.card))
+      .map((e) => e.card);
+    resolved = true;
+    cleanup();
+    onConfirm(cards);
   };
   const cancel = () => {
     if (resolved) return;
@@ -192,17 +263,24 @@ export function openMatPick({
     cleanup();
   };
 
+  const handleHit = (hitCard) => {
+    if (!hitCard) return;
+    if (multiSelect) toggle(hitCard);
+    else finishOne(hitCard);
+  };
+
   const onDocClick = (event) => {
     if (banner.contains(event.target)) {
       event.preventDefault();
       event.stopPropagation();
-      if (cancelBtn && event.target === cancelBtn) cancel();
+      if (confirmBtn && event.target === confirmBtn) confirm();
+      else if (cancelBtn && event.target === cancelBtn) cancel();
       return;
     }
     const hitCard = findMatPickHit(entries, event.target);
     event.preventDefault();
     event.stopPropagation();
-    if (hitCard) finish(hitCard);
+    handleHit(hitCard);
   };
 
   const onDirectClick = (event) => {
@@ -211,13 +289,16 @@ export function openMatPick({
     const hitCard =
       findMatPickHit(entries, event.currentTarget) ||
       findMatPickHit(entries, event.target);
-    if (hitCard) finish(hitCard);
+    handleHit(hitCard);
   };
 
   const onKeyDown = (event) => {
     if (event.key === 'Escape' && cancellable) {
       event.preventDefault();
       cancel();
+    } else if (event.key === 'Enter' && multiSelect) {
+      event.preventDefault();
+      confirm();
     }
   };
 

@@ -39,8 +39,9 @@ slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAct
 imported. Fails open to the legacy body when a command cannot be translated (D12)
 client/src/setup/netcode/prize-picker-adapter.js — injected `prizePicker`: shows a server prize pendingChoice as the fly-up prize fan (actions/zones/prize-take-prompt.js, D46)
 client/src/setup/netcode/mat-picker-adapter.js + mat-pick-request.mjs — injected `matPicker`:
-  routes a server pendingChoice whose options are all in-play Pokémon to the legacy click-the-card
-  UI (`rules/mat-picker.js`) instead of the carousel (design 016, D59)
+  routes a server pendingChoice whose options are all in-play Pokémon (single- OR multi-pick)
+  to the legacy click-the-card UI (`rules/mat-picker.js`) instead of the carousel (design 016/017,
+  D59/D60); covers retreat, Escape Rope, Boss's Orders/Switch, heals, and attack snipes
 client/src/setup/netcode/manual-card-commands.mjs — pure planner for the manual board tools
   (damage/conditions/rotate/type/ability marker) from a registry card; manual-card-dispatch.js emits them
 client/src/setup/netcode/deck-peek.js + deck-peek-request.mjs — "look at top/bottom N cards":

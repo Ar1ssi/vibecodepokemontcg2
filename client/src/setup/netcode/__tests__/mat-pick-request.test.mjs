@@ -90,21 +90,35 @@ test('mixed option set falls back (one off-mat option disqualifies the whole cho
   );
 });
 
-test('multi-pick choices never use the single-click mat picker', () => {
-  assert.equal(
-    buildMatPickerRequest(
-      choice({ max: 2 }),
-      registryOf([record(1, 'active'), record(2, 'bench')])
-    ),
-    null
+test('multi-pick in-play choices keep the mat picker with a max > 1', () => {
+  const req = buildMatPickerRequest(
+    choice({ max: 2 }),
+    registryOf([record(1, 'active'), record(2, 'bench')])
   );
-  // Missing/invalid max defaults to the single-pick path.
-  assert.ok(
-    buildMatPickerRequest(
-      choice({ max: undefined }),
-      registryOf([record(1, 'active'), record(2, 'bench')])
-    )
+  assert.ok(req);
+  assert.equal(req.min, 1);
+  assert.equal(req.max, 2);
+  assert.equal(req.cancellable, false);
+});
+
+test('an "up to N" in-play choice is cancellable and bounded by the option count', () => {
+  const req = buildMatPickerRequest(
+    choice({ min: 0, max: 5 }),
+    registryOf([record(1, 'active'), record(2, 'bench')])
   );
+  assert.ok(req);
+  assert.equal(req.min, 0);
+  assert.equal(req.max, 2);
+  assert.equal(req.cancellable, true);
+});
+
+test('missing/invalid max defaults to the single-pick path', () => {
+  const req = buildMatPickerRequest(
+    choice({ max: undefined }),
+    registryOf([record(1, 'active'), record(2, 'bench')])
+  );
+  assert.ok(req);
+  assert.equal(req.max, 1);
 });
 
 test('an optional (cancellable) in-play choice keeps the decline affordance', () => {

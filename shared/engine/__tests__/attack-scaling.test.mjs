@@ -177,7 +177,7 @@ test('bench damage with an empty bench fizzles instead of throwing', () => {
   assert.equal(fizzle[0].reason, 'no-benched-pokemon');
 });
 
-test('single-target bench damage auto-picks the first benched Pokémon', () => {
+test('single-target bench damage lets the player choose which benched Pokémon (D19)', () => {
   const state = twoBoards({
     attack: {
       name: 'Sniping Shot',
@@ -191,11 +191,113 @@ test('single-target bench damage auto-picks the first benched Pokémon', () => {
 
   const res = attack(state);
 
-  assert.equal(damageOf(res.state, 'p2', 'bench', 200), 30);
+  // Base damage still lands on the Active; the bench target is suspended as a choice.
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 40);
+  const choice = res.pendingChoice;
+  assert.ok(choice, 'choosing a bench target must raise a choice');
+  assert.equal(choice.player, 'p1');
+  assert.equal(choice.min, 1);
+  assert.equal(choice.max, 1);
+  assert.deepEqual(
+    choice.options.map((o) => o.instanceId),
+    [200, 201]
+  );
+  assert.equal(choice.resumeToken.effectType, 'attack');
+  assert.equal(damageOf(res.state, 'p2', 'bench', 200), 0);
   assert.equal(damageOf(res.state, 'p2', 'bench', 201), 0);
-  const [benchEvent] = eventsOfType(res, 'benchDamaged');
-  assert.equal(benchEvent.instanceId, 200);
-  assert.equal(benchEvent.auto, true); // 2 candidates → heuristic pick
+
+  const resolved = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: [201] },
+    playerId: 'p1',
+  });
+  assert.equal(resolved.error, null);
+  assert.equal(damageOf(resolved.state, 'p2', 'bench', 201), 30);
+  assert.equal(damageOf(resolved.state, 'p2', 'bench', 200), 0);
+  assert.equal(resolved.state.pendingChoice, null);
+  // The attack auto-ended the turn after the choice resolved.
+  assert.equal(resolved.state.turn.player, 'p2');
+});
+
+test('single bench target still auto-applies without a choice', () => {
+  const state = twoBoards({
+    attack: {
+      name: 'Sniping Shot',
+      cost: [],
+      damage: 0,
+      text: "This attack does 30 damage to 1 of your opponent's Benched Pokémon.",
+    },
+    oppBench: 1,
+    defenderHp: 400,
+  });
+
+  const res = attack(state);
+
+  assert.equal(res.pendingChoice, null);
+  assert.equal(damageOf(res.state, 'p2', 'bench', 200), 30);
+});
+
+test('"1 of your opponent\'s Pokémon" offers the Active and the Bench, W/R-free on the bench', () => {
+  const state = twoBoards({
+    attack: {
+      name: 'Pokémon Snipe',
+      cost: [],
+      damage: 0,
+      text: "This attack does 30 damage to 1 of your opponent's Pokémon.",
+    },
+    oppBench: 1,
+    defenderHp: 400,
+  });
+
+  const res = attack(state);
+  const choice = res.pendingChoice;
+  assert.ok(choice);
+  assert.deepEqual(
+    choice.options.map((o) => o.instanceId),
+    [20, 200]
+  );
+
+  const resolved = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: [200] },
+    playerId: 'p1',
+  });
+  assert.equal(resolved.error, null);
+  assert.equal(damageOf(resolved.state, 'p2', 'bench', 200), 30);
+  assert.equal(damageOf(resolved.state, 'p2', 'active', 20), 0);
+});
+
+test('"choose N of your opponent\'s Pokémon and put M damage counters on each" is a multi-pick', () => {
+  const state = twoBoards({
+    attack: {
+      name: 'Counter Spread',
+      cost: [],
+      damage: 0,
+      text: "Choose 2 of your opponent's Pokémon and put 1 damage counter on each.",
+    },
+    oppBench: 2,
+    defenderHp: 400,
+  });
+
+  const res = attack(state);
+  const choice = res.pendingChoice;
+  assert.ok(choice, 'expected a multi-target choice');
+  assert.equal(choice.min, 2);
+  assert.equal(choice.max, 2);
+  assert.deepEqual(
+    choice.options.map((o) => o.instanceId),
+    [20, 200, 201]
+  );
+
+  const resolved = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: [20, 201] },
+    playerId: 'p1',
+  });
+  assert.equal(resolved.error, null);
+  assert.equal(damageOf(resolved.state, 'p2', 'active', 20), 10);
+  assert.equal(damageOf(resolved.state, 'p2', 'bench', 201), 10);
+  assert.equal(damageOf(resolved.state, 'p2', 'bench', 200), 0);
 });
 
 test('coin-flip damage: heads and tails resolve from the command RNG', () => {
@@ -291,4 +393,71 @@ test('a scaling attack with no defender still ends the turn without error', () =
 
   assert.ok(!res.error, `unexpected error: ${res.error}`);
   assert.equal(res.events.some((e) => e.type === 'attackExecuted'), true);
+});
+
+test('"put N counters in any way you like" places them one click at a time', () => {
+  const state = twoBoards({
+    attack: {
+      name: 'Counter Rain',
+      cost: [],
+      damage: 0,
+      text: "Put 3 damage counters on your opponent's Pokémon in any way you like.",
+    },
+    oppBench: 1,
+    defenderHp: 400,
+  });
+
+  let res = attack(state);
+  assert.ok(res.pendingChoice, 'expected the first placement choice');
+  assert.equal(res.pendingChoice.min, 1);
+  assert.equal(res.pendingChoice.max, 1);
+  assert.match(res.pendingChoice.prompt, /3 left/);
+
+  res = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [20] },
+    playerId: 'p1',
+  });
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 10);
+  assert.ok(res.pendingChoice);
+  assert.match(res.pendingChoice.prompt, /2 left/);
+
+  // Second counter on the bench, third back on the bench again (duplicates allowed).
+  res = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [200] },
+    playerId: 'p1',
+  });
+  assert.equal(damageOf(res.state, 'p2', 'bench', 200), 10);
+  assert.ok(res.pendingChoice);
+  assert.match(res.pendingChoice.prompt, /1 left/);
+
+  res = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [200] },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 10);
+  assert.equal(damageOf(res.state, 'p2', 'bench', 200), 20);
+  assert.equal(res.state.turn.player, 'p2');
+});
+
+test('"in any way you like" with only the Active available auto-places every counter', () => {
+  const state = twoBoards({
+    attack: {
+      name: 'Counter Rain',
+      cost: [],
+      damage: 0,
+      text: "Put 3 damage counters on your opponent's Pokémon in any way you like.",
+    },
+    oppBench: 0,
+    defenderHp: 400,
+  });
+
+  const res = attack(state);
+
+  assert.equal(res.pendingChoice, null);
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 30);
 });

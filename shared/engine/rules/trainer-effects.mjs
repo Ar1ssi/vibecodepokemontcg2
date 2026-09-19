@@ -569,6 +569,20 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // Escape Rope: each player switches their own Active with a Benched Pokémon, and
+  // the player who played the card switches first. Modelled as two sequential switch
+  // steps so each seat gets its own click-the-card choice (server authority) / picker.
+  if (
+    /each player switches (?:their|his or her) active pok[ée]mon with 1 of (?:their|his or her) benched pok[ée]mon/.test(
+      lower
+    )
+  ) {
+    steps.push({ type: 'switchOwn' });
+    steps.push({ type: 'switchOpponentOut' });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
   // recursion from discard (Night Stretcher, Lana's Aid)
   if (lower.includes('from your discard pile into your hand')) {
     let what = 'card';

@@ -1676,8 +1676,8 @@ function closePrizePicker(options = {}) {
 /**
  * Shows a pendingChoice whose options are all in-play Pokémon by outlining the real
  * cards on the mat (the legacy openMatPick UI, D19), instead of the card carousel.
- * Falls back when no picker is injected, an option is not on the board, or the choice
- * is a multi-pick (the mat picker resolves on one click).
+ * Single-pick resolves on click; multi-pick toggles cards and confirms. Falls back
+ * when no picker is injected or an option is not on the board.
  *
  * @returns {boolean} whether the mat picker owns this choice
  */
@@ -1695,6 +1695,8 @@ function openChoiceInMatPicker(pendingChoice, options = {}) {
       choice: pendingChoice,
       candidates: request.candidates,
       cancellable: request.cancellable,
+      min: request.min,
+      max: request.max,
       onResolve: (selection) => {
         // Mirrors the card picker: a resolved pick already tore its own UI down,
         // so a later view that still carries this choice reopens if rejected.

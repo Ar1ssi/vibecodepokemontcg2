@@ -10,12 +10,15 @@
 import { openMatPick, dismissMatPick } from '../rules/mat-picker.js';
 
 export const MAT_PICKER = {
-  open({ choice, candidates, cancellable, onResolve, onCancel }) {
+  open({ choice, candidates, cancellable, min, max, onResolve, onCancel }) {
     openMatPick({
       title: choice.prompt || 'Choose a Pokémon',
       candidates,
+      min,
+      max,
       cancellable: cancellable !== false,
       onPick: (card) => onResolve([card.instanceId]),
+      onConfirm: (cards) => onResolve(cards.map((card) => card.instanceId)),
       onCancel,
     });
   },
