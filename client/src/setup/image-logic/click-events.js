@@ -22,13 +22,9 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
-import {
-  rulesState,
-  canPerformAction,
-} from '/shared/engine/rules/rules-state.mjs';
-import { benchCardHasAbility } from '/shared/engine/rules/collect-usable-abilities.mjs';
-import { shouldOpenAttackPreview } from '../rules/attack-preview-gate.js';
-import { openAttackPreview } from '../rules/attack-preview.js';
+import { rulesState } from '/shared/engine/rules/rules-state.mjs';
+import { openCardInspector, closeCardInspector } from '../rules/card-inspector.mjs';
+import { attack } from '../../actions/chat-buttons/chat-buttons.js';
 import { resolvePreviewCard } from './preview-card.mjs';
 
 export const identifyCard = (event) => {
@@ -300,36 +296,10 @@ export const imageClick = (event) => {
       'move'
     );
   } else {
-    // Design 008 (D1/D6): a plain click on your own active or an
-    // ability-bearing benched Pokémon opens the TCG Live-style attack/ability
-    // preview instead of the usual select-to-move highlight. Gated here,
-    // after the selectHighlight branch above, so attaching Energy or
-    // promoting from bench (R1) is untouched.
-    if (rulesState.enabled) {
-      // Server-rendered cards are not in the legacy zone arrays
-      // (mouseClick.card is null in multiplayer); use the stamped card data,
-      // the same fallback double-click uses.
-      const previewCard = resolvePreviewCard(mouseClick.card, event.target);
-      const decision = shouldOpenAttackPreview({
-        zoneId: mouseClick.zoneId,
-        cardUser: mouseClick.cardUser,
-        hasSelectHighlight: false,
-        hasAbility:
-          mouseClick.zoneId === 'bench'
-            ? benchCardHasAbility(previewCard)
-            : false,
-        gate: canPerformAction({ user: mouseClick.cardUser, action: 'attack' }),
-      });
-      if (decision === 'attack' && previewCard?.image) {
-        openAttackPreview(previewCard, previewCard.image, { zone: 'active' });
-        return;
-      }
-      if (decision === 'ability' && previewCard?.image) {
-        openAttackPreview(previewCard, previewCard.image, { zone: 'bench' });
-        return;
-      }
-    }
-
+    // D50 (design 013): single-click is select-to-move again. Design 008 had it open the attack
+    // preview, which collided with `dblclick` on these same nodes — a double-click fired two
+    // clicks first, popping, re-popping and then tearing down the overlay before the carousel
+    // replaced it. Selection of your own active is also what 008 made unreachable (its R3).
     closePopups(event); //need both because of highlights condition in the if block above
     // Select-to-move resolves the card through the legacy zone arrays, which a
     // server-authoritative game never populates — nothing to select there.
@@ -372,30 +342,41 @@ export const doubleClick = (event) => {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
-      // Card carries energies/tools: same zoom, but the attached cards ride
-      // along as further carousel slides (PTCG Live-style, like the discard
-      // pile viewer) — scroll/swipe right to see them, left to return to
-      // the main card. Read-only: dragging one out means closing first.
-      if (card.attachedCards?.length) {
-        // Attached Energy is rendered on the mat as a small round token
-        // (attach-card.js swaps image.src to the icon and stashes the full
-        // card art in dataset.energyCardSrc) — show the real card art in the
-        // carousel slide, then revert automatically since we never touch the
-        // board's own <img>, just a read-only stand-in object here.
-        // Carousel slide N sits to the right of slide N+1 (higher index =
-        // further left, see computeSlideLayout's `virtualIndex - slideIndex`),
-        // so the attached cards go BEFORE the main card in the array to land
-        // on its right, with initialIndex pointing at the main card's slot.
-        const attachedSlides = card.attachedCards.map((attached) => {
-          const fullArtSrc = attached.image?.dataset?.energyCardSrc;
-          return fullArtSrc
-            ? { ...attached, image: { src: fullArtSrc } }
-            : attached;
+      // Attached Energy is rendered on the mat as a small round token (attach-card.js swaps
+      // image.src to the icon and stashes the full card art in dataset.energyCardSrc) — show
+      // the real card art in the carousel slide, then revert automatically since we never touch
+      // the board's own <img>, just a read-only stand-in object here.
+      // Carousel slide N sits to the right of slide N+1 (higher index = further left, see
+      // computeSlideLayout's `virtualIndex - slideIndex`), so the attached cards go BEFORE the
+      // main card in the array to land on its right, with initialIndex on the main card's slot.
+      const attachedSlides = (card.attachedCards || []).map((attached) => {
+        const fullArtSrc = attached.image?.dataset?.energyCardSrc;
+        return fullArtSrc ? { ...attached, image: { src: fullArtSrc } } : attached;
+      });
+
+      // D50 (design 013): your own board Pokémon open the inspector — the enlarged scan with the
+      // TCG Live readout over it, attached cards as further slides, and a payable attack fired by
+      // clicking its panel. Opponent's Pokémon, hand and stadium keep the plain scan: payability
+      // and actions are not theirs to show.
+      if (['active', 'bench'].includes(mouseClick.zoneId) && mouseClick.cardUser === 'self') {
+        openCardInspector({
+          card,
+          attachedSlides,
+          onAttack: (index) => {
+            closeCardInspector();
+            attack(rulesState.turnPlayer, true, index);
+          },
         });
-        const carouselCards = [...attachedSlides, card];
+        return;
+      }
+
+      // Card carries energies/tools: same zoom, but the attached cards ride along as further
+      // carousel slides (PTCG Live-style, like the discard pile viewer) — scroll/swipe right to
+      // see them, left to return to the main card. Read-only: dragging one out means closing first.
+      if (attachedSlides.length) {
         openCarouselViewer({
           title: card.name || 'Attached Cards',
-          candidates: carouselCards,
+          candidates: [...attachedSlides, card],
           initialIndex: attachedSlides.length,
         });
       } else {

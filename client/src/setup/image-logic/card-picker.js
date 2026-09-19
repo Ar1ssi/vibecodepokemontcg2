@@ -781,9 +781,13 @@ const setCandidateList = (state, candidates) => {
     badge.hidden = true;
     slide.appendChild(badge);
 
-    const { node, holoWrapper } = buildSlideContent(card);
-    slide.appendChild(node);
-    if (holoWrapper) slide.holoWrapper = holoWrapper;
+    const built = buildSlideContent(card);
+    // The decorator may return a replacement node (design 013 wraps the card in a
+    // positioned container holding the inspector chrome); holoWrapper is read off the
+    // build result, not the replacement, so the sync keeps pointing at the real card.
+    const decorated = state.decorate ? state.decorate(built, card, i) : null;
+    slide.appendChild(decorated ?? built.node);
+    if (built.holoWrapper) slide.holoWrapper = built.holoWrapper;
 
     slide.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -1062,6 +1066,12 @@ export const openCardPicker = async ({
   onPick,
   onConfirm,
   onCancel,
+  // Optional per-slide decoration (design 013). Lets a caller overlay its own chrome on
+  // a slide without this shared picker knowing anything about what the chrome means — it
+  // also serves the discard pile, deck, prizes and trainer pickers. The decorator receives
+  // the buildSlideContent() result and must keep `holoWrapper` inside the node it returns,
+  // or slideWrapper() and the holo hover sync break.
+  decorate = null,
 }) => {
   closeCardPreview(null, true);
   closeCardPicker(null, true);
@@ -1257,6 +1267,7 @@ export const openCardPicker = async ({
     slotAssignments: Array(maxSel).fill(null),
     minCount: minSel,
     maxCount: maxSel,
+    decorate,
     pickOnly,
     zoneFrom,
     destination,
@@ -1379,6 +1390,7 @@ export const openCarouselViewer = async ({
   title = 'Discard Pile',
   candidates,
   initialIndex = 0,
+  decorate = null,
 }) => {
   await openCardPicker({
     title,
@@ -1387,6 +1399,7 @@ export const openCarouselViewer = async ({
     initialIndex,
     minCount: 0,
     maxCount: 0,
+    decorate,
   });
 };
 

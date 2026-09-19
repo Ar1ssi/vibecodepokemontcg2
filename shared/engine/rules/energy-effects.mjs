@@ -235,7 +235,12 @@ export function effectiveEnergyType(card) {
 }
 
 // Printed {R}/{W}/… symbols → TCG type names (trainer search filters).
-const ENERGY_SYMBOL_TO_TYPE = {
+// Exported for design 013: the card inspector renders these glyphs as energy orbs
+// in attack text, so it resolves them through this map rather than a copy of it.
+// Note the values are lowercase and there is no dragon/fairy entry — a {N}/{Y}
+// glyph is deliberately unmatched here, and callers that need a display name must
+// supply their own fallback.
+export const ENERGY_SYMBOL_TO_TYPE = {
   c: 'colorless',
   g: 'grass',
   r: 'fire',

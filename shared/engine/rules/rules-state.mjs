@@ -443,7 +443,10 @@
       return Number.isFinite(n) && n >= 0 ? n : 0;
     };
 
-    const parseTypeValue = (wr) => {
+    // Exported for design 013: the card inspector renders weakness/resistance and
+    // needs the same { type, value } normalisation the enrichment path uses, so it
+    // reads this rather than a third copy.
+    export const parseTypeValue = (wr) => {
       if (!wr) return null;
       return { type: wr.type, value: Number(String(wr.value).replace(/[^0-9-]/g, '')) || 0 };
     };
