@@ -16,6 +16,27 @@ const SYMBOL_TO_TYPE = {
   m: 'Metal',
 };
 
+// Word-form Pokémon types ("a Water Pokémon", "Basic Psychic Pokémon") as they
+// appear on trainer/attack search clauses. Kept in sync with pokemonMatchesEnergyType,
+// which understands both 'Darkness' and the data's 'Dark' spelling.
+export const WORD_POKEMON_TYPES = {
+  grass: 'Grass',
+  fire: 'Fire',
+  water: 'Water',
+  lightning: 'Lightning',
+  psychic: 'Psychic',
+  fighting: 'Fighting',
+  darkness: 'Darkness',
+  dark: 'Darkness',
+  metal: 'Metal',
+  dragon: 'Dragon',
+  colorless: 'Colorless',
+  fairy: 'Fairy',
+};
+
+const POKEMON_TYPE_WORD_RE =
+  /\b(grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|dragon|colorless|fairy)\b/i;
+
 export function isPokemonCard(card) {
   if (card?.hp) return true;
   const t = String(
@@ -132,6 +153,12 @@ export function matchesSearch(card, what = '') {
       if (typeName) return matchesBasicPokemonType(card, typeName);
     }
     if (w.includes('basic') && effectiveStage !== 'Basic') return false;
+    // Word-form type qualifier ("Water Pokémon", "Basic Psychic Pokémon");
+    // symbol forms ("Basic {W} Pokémon") are handled above.
+    const typedWord = what.match(POKEMON_TYPE_WORD_RE);
+    if (typedWord) {
+      return pokemonMatchesEnergyType(card, WORD_POKEMON_TYPES[typedWord[1].toLowerCase()]);
+    }
     const hpCap = what.match(/[≤<]\s*(\d+)\s*hp/i);
     if (hpCap) return matchesHpCap(card, Number(hpCap[1]));
     const hpOrLess = what.match(/(\d+)\s*hp\s*or\s*less/i);

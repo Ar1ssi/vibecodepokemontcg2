@@ -819,6 +819,47 @@ import test, { describe } from 'node:test';
         assert.equal(matchesSearch(basic, 'Stage 2 Pokémon'), false);
         assert.equal(matchesSearch(stage1, 'Stage 2 Pokémon'), false);
       });
+
+      // Regression: Dive Ball's "a Water Pokémon" fell through to the generic
+      // 'Pokémon' filter, so its picker offered every Pokémon in the deck.
+      test('Dive Ball: search target keeps the Water type', () => {
+        const r = parseTrainerEffect(
+          'Search your deck for a Water Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.'
+        );
+        assert.equal(r.recognizable, true);
+        assert.equal(r.steps[0].type, 'searchDeck');
+        assert.equal(r.steps[0].what, 'Water Pokémon');
+        assert.equal(r.steps[0].count, 1);
+        assert.equal(r.steps[0].destination, 'hand');
+        assert.equal(r.steps[0].reveal, true);
+      });
+
+      test('Dive Ball: matchesSearch only matches Water Pokémon', () => {
+        const water = { hp: 70, types: ['Water'], name: 'Squirtle' };
+        const fire = { hp: 70, types: ['Fire'], name: 'Charmander' };
+        const trainer = { hp: null, supertype: 'Trainer', name: 'Dive Ball' };
+        assert.equal(matchesSearch(water, 'Water Pokémon'), true);
+        assert.equal(matchesSearch(fire, 'Water Pokémon'), false);
+        assert.equal(matchesSearch(trainer, 'Water Pokémon'), false);
+        // The untyped fallback is unchanged: a generic Pokémon search still sees all types.
+        assert.equal(matchesSearch(water, 'Pokémon'), true);
+        assert.equal(matchesSearch(fire, 'Pokémon'), true);
+      });
+
+      test('Basic <type> Pokémon search filters both stage and type', () => {
+        const r = parseTrainerEffect(
+          'Search your deck for up to 2 Basic Psychic Pokémon and put them onto your Bench. Then, shuffle your deck.'
+        );
+        assert.equal(r.steps[0].what, 'Basic Psychic Pokémon');
+        assert.equal(r.steps[0].count, 2);
+        assert.equal(r.steps[0].destination, 'bench');
+        const ralts = { hp: 60, stage: 'Basic', types: ['Psychic'], name: 'Ralts' };
+        const squirtle = { hp: 60, stage: 'Basic', types: ['Water'], name: 'Squirtle' };
+        const kirlia = { hp: 80, stage: 'Stage 1', types: ['Psychic'], name: 'Kirlia' };
+        assert.equal(matchesSearch(ralts, 'Basic Psychic Pokémon'), true);
+        assert.equal(matchesSearch(squirtle, 'Basic Psychic Pokémon'), false);
+        assert.equal(matchesSearch(kirlia, 'Basic Psychic Pokémon'), false);
+      });
     });
     describe('draw shuffle status families', () => {
       test('Awakening Drum: variableDraw ancientInPlay', () => {
