@@ -240,12 +240,13 @@ try {
   });
   T('12. Energy slide has no inspector chrome', energySlideHasChrome === false);
 
-  // 9. Click payable attack -> Executes and closes
+  // 9. Click payable attack -> Executes and closes.
+  // Real input (locator.click), NOT el.click(): a programmatic click dispatches
+  // no pointerdown, so the carousel never sets pointer capture and the click
+  // bubbles normally. A real press captures the pointer and the browser then
+  // delivers the click to the capturing stage — the bug this step guards.
   console.log('Testing attack click execution...');
-  await actor.page.evaluate(() => {
-    const el = document.querySelector('.ptcg-atk.ptcg-atk--usable');
-    if (el) el.click();
-  });
+  await actor.page.locator('.ptcg-atk.ptcg-atk--usable').first().click();
   await actor.page.waitForTimeout(600);
 
   const closedAfterAttack = !(await actor.page.locator('#cardPickerOverlay').isVisible().catch(() => false));

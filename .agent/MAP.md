@@ -93,6 +93,9 @@ client/src/**/__tests__/*.mjs — plain `node --test`, no jsdom; `pnpm test` (12
 two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
+test-card-inspector-e2e.mjs — Playwright two-browser design-013 card-inspector gate
+  (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the
+  attack panel with REAL input (locator.click), so it catches pointer-capture regressions el.click() hides
 *-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
 bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
   scaffold + greedy scorer), driven by playtest-bot.mjs via __ptcg observe/options/act

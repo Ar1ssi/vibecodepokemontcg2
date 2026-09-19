@@ -808,7 +808,12 @@ const setCandidateList = (state, candidates) => {
 
 const isSwipeBlockedTarget = (target) =>
   target.closest(
-    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-slot-row, .card-picker-bottom-bar, button, a'
+    // `.ptcg-chrome` is the design-013 card inspector overlay. It is not a swipe
+    // surface: a pointerdown here must NOT set pointer capture, because the
+    // browser then dispatches the follow-up `click` to the capturing stage
+    // instead of the attack/ability panel, and the inspector's delegated
+    // listener (a stage descendant) never fires — a silent dead click.
+    '.discard-pile-nav, .card-picker-done, .card-picker-cancel, .card-picker-filter, .card-picker-drop-slot, .card-picker-slot-row, .card-picker-bottom-bar, .ptcg-chrome, button, a'
   );
 
 const attachSwipe = (state) => {

@@ -4,34 +4,37 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 182
-Focus: "make the engine not zone-agnostic on abilities" — Active-Spot abilities now gated in the
-  engine, the server and the panel. PR #159 open.
-Active: worktree `.qwen/worktrees/ability-zone` (`fix/ability-zone-restriction`), clean and pushed.
-Next: Note S179's warning is now stale (`pnpm install` in a worktree takes 6s and makes the full
-  gate runnable). Outstanding from S181/S182: neither has been browser-verified under
-  `SERVER_AUTHORITATIVE=1` — for PR #159, double-click a benched Pokémon with a positional ability
-  and confirm the panel is greyed and the server refuses the dispatch.
-Blocked: none.
+Session: 189
+Focus: "the attack window doesn't operate" — the carousel's `stage.setPointerCapture()` retargets the
+  follow-up `click` to the stage, so the inspector's delegated listener (a stage descendant) never
+  fired. Fixed by adding `.ptcg-chrome` to `isSwipeBlockedTarget`; the inspector e2e now uses real input.
+Active: primary folder on `main` @ 143d3a6 + uncommitted: S189 `image-logic/card-picker.js` (guard),
+  `test-card-inspector-e2e.mjs` (real-input step 9), `package.json` (`test:inspector`); prior S188 holo
+  (`deck-builder/core/holo.mjs` + test), S183 `rules/rules-bridge.js`, S184 `zones/hand-stack-dom.js`
+  (+ its test), and the .agent docs.
+Next: commit S189 (and the still-uncommitted S188/S183/S184 work) — none of it is on a branch/PR yet.
+  Then merge PR #165 (`fix/holo-reduced-motion-drift`). S183's rules-bridge gate is still owed:
+  `flip-gate-test.mjs`'s `playFromHand` throws under SERVER_AUTHORITATIVE, so it needs real UI drags
+  or `__ptcg.act`. Verify against origin/main, never a push: #164 once orphaned a mid-flight commit.
+Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- A positional ability is now refused from the Bench by the ENGINE (`requiresActiveSpot` in
-  `ability-executors.mjs`), not only by the panel. `listAbilities` takes an optional `zone`
-  (default `'active'`) — a caller that passes a wrong zone now changes gameplay, not just UI.
-- The predicate is deliberately NARROW: only "if this Pokémon is in the Active Spot" / "…is active".
-  Do NOT broaden it to a bare mention of the Active Spot — that also matches the on-move trigger
-  ("when this Pokémon moves from your Bench to the Active Spot") and the "As long as…" passive, both
-  legal from the Bench. A false positive silently breaks a legal ability.
-- `useVStarGX` shares the active/bench reachability but its legality case resolves no card, so it is
-  NOT covered by that guard (I60).
-- The card scan is the background and stays visible (C1). Dimming uses filter (C2), never opacity —
-  translucent panels let the printed card ghost back through.
-- Legacy zone arrays are EMPTY under SERVER_AUTHORITATIVE 2P. Read `getAuthoritativeZoneArray` /
-  `cardRegistry` and address cards by instanceId (D12, D47).
+- Carousel clicks: `stage.setPointerCapture()` makes the browser deliver the follow-up `click` to the
+  capturing stage, so a bubbling listener on carousel-slide content never fires. Interactive slide
+  content must be in `isSwipeBlockedTarget` (`card-picker.js`). Verify with REAL input — `el.click()`
+  dispatches no pointerdown and hides it (it did for S180's "working attack click" and PR #163).
+- The holo must NEVER consult `prefers-reduced-motion` again (D56): drift amplitude is unconditional,
+  and this machine reports reduce, so a re-added gate freezes every card. Measure with Playwright
+  `reducedMotion: null` — its default 'no-preference' emulation masks the OS value.
+- Under SERVER_AUTHORITATIVE the legacy zone arrays are EMPTY, so `__ptcg.playFromHand` dies in
+  `moveCardMessage`; read `getAuthoritativeZoneArray`/`cardRegistry` and address cards by instanceId.
+- The opening sequence must gate on state, never a sleep: `waitForOpeningHand` + the `openingStarted`
+  latch (D52); under server authority the server already dealt.
+- `pnpm test` is an explicit file list (a new test file runs only once listed). Gate 1965/1965 green as
+  of S189; `pnpm lint` still repo-wide red on CRLF (`core.autocrlf=true`) plus pre-existing `no-undef`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S182 2026-09-19 patch: Active-Spot abilities refused from the Bench in engine + server + panel
-  (PR #159, design 015, D54).
-- S181 2026-09-19 patch: `passiveCostDiscount` no longer discounts attacks for merely mentioning
-  Energy — committed then, but it only reached main now, inside PR #159 (see the S182 journal entry).
-- S179 2026-09-19 feature: TCG Live card inspector on double-click (PR #153, design 013, D53).
+- S189 2026-09-19 debug: attack-panel clicks now reach the inspector's handler (pointer-capture fix);
+  real-input e2e step 13 red→green, 1965/1965.
+- S188 2026-09-19 patch: the foil drifts even when the OS asks for reduced motion (D56, PR #165).
+- S187 2026-09-19 merge: PRs #162/#163/#164 to main, primary checkout un-stuck and synced.
