@@ -595,7 +595,14 @@ export function openCardInspector({
  * can make a previously unpayable attack payable.
  */
 const useAbility = (card, zone) => {
-  if (card?.instanceId != null && isAuthoritativeDispatchActive()) {
+  // `dispatchAuthoritativeUseAbility` fails OPEN by contract: a false return means "this action
+  // was not dispatched", and the gated call site must then run its legacy body (see
+  // emitAuthoritativeCommand in authoritative-dispatch.js). Returning regardless discarded every
+  // refused dispatch — no command sent, no chat line, nothing on the board, which is
+  // indistinguishable from a dead click.
+  if (
+    card?.instanceId != null &&
+    isAuthoritativeDispatchActive() &&
     dispatchAuthoritativeUseAbility({
       user: 'self',
       emit: true,
@@ -603,7 +610,8 @@ const useAbility = (card, zone) => {
       zoneId: zone,
       index: 0,
       authoritativeId: card.instanceId,
-    });
+    })
+  ) {
     return;
   }
   runAbilitySteps('self', card);
