@@ -536,10 +536,17 @@ export const COMMAND_SCHEMAS = {
         return { valid: false, reason: 'Payload must be an object' };
       }
       if (
-        typeof payload.instanceId !== 'number' ||
-        !Number.isInteger(payload.instanceId)
+        payload.instanceId != null &&
+        (typeof payload.instanceId !== 'number' ||
+          !Number.isInteger(payload.instanceId))
       ) {
-        return { valid: false, reason: 'instanceId must be an integer' };
+        return {
+          valid: false,
+          reason: 'instanceId must be an integer when provided',
+        };
+      }
+      if (payload.kind !== 'vstar' && payload.kind !== 'gx') {
+        return { valid: false, reason: "kind must be 'vstar' or 'gx'" };
       }
       return { valid: true };
     },

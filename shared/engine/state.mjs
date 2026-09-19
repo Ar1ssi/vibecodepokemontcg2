@@ -78,6 +78,13 @@ export function createGameState({
       deckList: Array.isArray(pData.deckList) ? [...pData.deckList] : [],
       zones: createPlayerZones(),
       flags: { ...(pData.flags || {}) },
+      // Game-scoped markers. advanceTurn rebuilds `flags` wholesale every turn,
+      // so the once-per-game limits (App. 9/19) must live outside it.
+      oncePerGame: {
+        vstarUsed: false,
+        gxUsed: false,
+        ...(pData.oncePerGame || {}),
+      },
     };
 
     // If initial cards were provided for any zone
@@ -292,6 +299,11 @@ export function cloneGameState(state) {
     cloned.players[id] = {
       ...player,
       flags: { ...player.flags },
+      oncePerGame: {
+        vstarUsed: false,
+        gxUsed: false,
+        ...(player.oncePerGame || {}),
+      },
       deckList: Array.isArray(player.deckList) ? [...player.deckList] : [],
       zones: {},
     };

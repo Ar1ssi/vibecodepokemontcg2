@@ -909,6 +909,14 @@ export function oncePerTurnClause(attackText) {
   return /once during your turn/i.test(String(attackText || ''));
 }
 
+// Whether an attack is a GX attack (App. 19): the printed name carries the GX
+// marker as its final token ("Blaze Burn GX", "Double Blaze-GX"). A player may
+// use only one GX attack per game; this is the classifier that gate reads.
+export function isGxAttack(attack) {
+  const name = typeof attack === 'string' ? attack : String(attack?.name ?? '');
+  return /(?:^|[\s-])GX$/i.test(name.trim());
+}
+
 // Per-Pokémon damage dealt to ALL of the opponent's Benched Pokémon
 // (taxonomy §D multi-target family). Matches the common printed forms:
 // "Do 10 damage to each of your opponent's Benched Pokémon", "20 damage to

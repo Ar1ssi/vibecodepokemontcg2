@@ -33,6 +33,7 @@ import {
   attackTargetClause,
   opponentCounterClause,
   parseAttackSearchClause,
+  isGxAttack,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -1034,6 +1035,20 @@ function setGameEnded(draft, { winner, reason, events }) {
 }
 
 /**
+ * Per-player, per-game markers (App. 9/19). Unlike `player.flags`, advanceTurn never
+ * rebuilds this object, so the GX-attack and VSTAR Power limits survive the turn.
+ * Lazily initialised so states that predate the field (old snapshots, tests) still work.
+ */
+function ensureOncePerGame(draft, playerId) {
+  const player = draft?.players?.[playerId];
+  if (!player) return null;
+  if (!player.oncePerGame) {
+    player.oncePerGame = { vstarUsed: false, gxUsed: false };
+  }
+  return player.oncePerGame;
+}
+
+/**
  * Validates reference integrity of instanceIds in command payload (Step 3).
  *
  * @param {object} state
@@ -1212,9 +1227,24 @@ function validateReferences(state, command) {
       return { valid: true };
     }
 
-    case 'useAbility':
-    case 'useVStarGX': {
+    case 'useAbility': {
       const cardRef = findCard(state, payload?.instanceId);
+      if (
+        !cardRef ||
+        !['active', 'bench'].includes(cardRef.zoneId) ||
+        cardRef.playerId !== playerId
+      ) {
+        return { valid: false, error: 'stale_view' };
+      }
+      return { valid: true };
+    }
+
+    // The VSTAR/GX marker is a per-player, per-game flag (App. 9/19), not a card action,
+    // so it needs no card identity. When a caller does name a card, still verify it is
+    // the player's and in play (legacy UI passes the active; the flag path may pass none).
+    case 'useVStarGX': {
+      if (payload?.instanceId == null) return { valid: true };
+      const cardRef = findCard(state, payload.instanceId);
       if (
         !cardRef ||
         !['active', 'bench'].includes(cardRef.zoneId) ||
@@ -1605,6 +1635,14 @@ export function validateLegality(state, command) {
       }
       const atkIdx = payload?.attackIndex ?? 0;
       const attack = inPlayView(state, active).attacks?.[atkIdx];
+      // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
+      // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide.
+      if (isGxAttack(attack) && player.oncePerGame?.gxUsed) {
+        return {
+          allowed: false,
+          reason: 'Only one GX attack can be used per game.',
+        };
+      }
       if (
         active.cannotAttackUntilTurn &&
         active.cannotAttackUntilTurn >= (state.turn?.number || 1)
@@ -1857,10 +1895,23 @@ export function validateLegality(state, command) {
     }
 
     case 'useVStarGX': {
-      if (player.flags?.vstarUsed || player.flags?.gxUsed) {
+      // Independent once-per-game limits (App. 9/19): the VSTAR Power and the GX attack
+      // do not consume each other's allowance. Guarded here too because validateLegality
+      // is exported and callable without applyCommand's shape check.
+      if (payload.kind !== 'gx' && payload.kind !== 'vstar') {
+        return { allowed: false, reason: "kind must be 'vstar' or 'gx'." };
+      }
+      const used =
+        payload.kind === 'gx'
+          ? player.oncePerGame?.gxUsed
+          : player.oncePerGame?.vstarUsed;
+      if (used) {
         return {
           allowed: false,
-          reason: 'VSTAR / GX attack or ability already used this game.',
+          reason:
+            payload.kind === 'gx'
+              ? 'Only one GX attack can be used per game.'
+              : 'Only one VSTAR Power can be used per game.',
         };
       }
       return { allowed: true };
@@ -2980,6 +3031,21 @@ export function applyCommand(state, command, rng = null) {
         playerId,
       });
 
+      // App. 19: using a GX attack spends the player's single GX attack for the game.
+      // Set here, on the resolving path only — a Confused fizzle above never reaches it.
+      if (isGxAttack(attack)) {
+        const oncePerGame = ensureOncePerGame(draft, playerId);
+        if (oncePerGame && !oncePerGame.gxUsed) {
+          oncePerGame.gxUsed = true;
+          events.push({
+            type: 'gxAttackUsed',
+            playerId,
+            instanceId: attacker?.instanceId,
+            attackName: attack.name,
+          });
+        }
+      }
+
       if (!attackerPlayer.flags) attackerPlayer.flags = {};
       attackerPlayer.flags.attackerAttacked = true;
 
@@ -3175,13 +3241,17 @@ export function applyCommand(state, command, rng = null) {
     }
 
     case 'useVStarGX': {
-      if (!draft.players[playerId].flags) draft.players[playerId].flags = {};
-      draft.players[playerId].flags.vstarUsed = true;
-      draft.players[playerId].flags.gxUsed = true;
+      const oncePerGame = ensureOncePerGame(draft, playerId);
+      if (oncePerGame) {
+        if (payload.kind === 'gx') oncePerGame.gxUsed = true;
+        else oncePerGame.vstarUsed = true;
+      }
       events.push({
-        type: 'vstarUsed',
+        type: payload.kind === 'gx' ? 'gxAttackUsed' : 'vstarUsed',
         playerId,
-        instanceId: payload.instanceId,
+        ...(payload.instanceId != null
+          ? { instanceId: payload.instanceId }
+          : {}),
       });
       break;
     }
@@ -3289,6 +3359,18 @@ export function applyCommand(state, command, rng = null) {
             benchDealt: dealt,
             playerId: initiatorPlayerId,
           });
+          // The suspended attack was a GX attack; spend the limit on resolution too.
+          if (isGxAttack(token.effectiveAttack)) {
+            const oncePerGame = ensureOncePerGame(draft, initiatorPlayerId);
+            if (oncePerGame && !oncePerGame.gxUsed) {
+              oncePerGame.gxUsed = true;
+              events.push({
+                type: 'gxAttackUsed',
+                playerId: initiatorPlayerId,
+                attackName: token.effectiveAttack?.name,
+              });
+            }
+          }
           if (targetPlayer) {
             if (!targetPlayer.flags) targetPlayer.flags = {};
             targetPlayer.flags.attackerAttacked = true;

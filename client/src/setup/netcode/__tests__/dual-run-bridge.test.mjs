@@ -706,3 +706,26 @@ test('playRandomCardFaceDown translates only its object form, to an empty payloa
   assert.equal(translateActionToCmd('playRandomCardFaceDown', ['opp', 2]), null);
   assert.equal(translateActionToCmd('playRandomCardFaceDown', []), null);
 });
+
+// Design 018: the legacy VSTAR/GX marker carries a type; the command carries the
+// independent once-per-game `kind` discriminator.
+test('VSTARGXFunction maps the legacy type to the useVStarGX kind', () => {
+  const gx = translateActionToCmd('VSTARGXFunction', ['GX']);
+  assert.deepEqual(gx, { type: 'useVStarGX', payload: { kind: 'gx' } });
+  assert.equal(validateCommandShape(gx).valid, true);
+
+  const vstar = translateActionToCmd('VSTARGXFunction', ['VSTAR']);
+  assert.deepEqual(vstar, { type: 'useVStarGX', payload: { kind: 'vstar' } });
+  assert.equal(validateCommandShape(vstar).valid, true);
+});
+
+test('VSTARGXFunction tolerates a missing/non-array parameter list and defaults to VSTAR', () => {
+  assert.deepEqual(translateActionToCmd('VSTARGXFunction', null), {
+    type: 'useVStarGX',
+    payload: { kind: 'vstar' },
+  });
+  assert.deepEqual(translateActionToCmd('VSTARGXFunction', []), {
+    type: 'useVStarGX',
+    payload: { kind: 'vstar' },
+  });
+});

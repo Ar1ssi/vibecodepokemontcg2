@@ -815,11 +815,18 @@ export function translateActionToCmd(action, parameters = []) {
     }
 
     case 'VSTARGXFunction': {
-      const [instanceId] = parameters;
+      // Legacy VSTAR-GX.js sends [type] ('GX' | 'VSTAR'); the marker carries the
+      // independent once-per-game limit (App. 9/19), so pass the discriminator through.
+      const args = Array.isArray(parameters) ? parameters : [];
+      const [type, instanceId] = args;
+      const kind = String(type || '').toUpperCase() === 'GX' ? 'gx' : 'vstar';
       return {
         type: 'useVStarGX',
         payload: {
-          instanceId: Number(instanceId) || 0,
+          kind,
+          ...(instanceId != null
+            ? { instanceId: Number(instanceId) || 0 }
+            : {}),
         },
       };
     }

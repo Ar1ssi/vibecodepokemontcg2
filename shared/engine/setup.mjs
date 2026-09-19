@@ -160,6 +160,11 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
       abilitiesUsed: {},
       evolved: {},
     };
+    // Once-per-game limits (App. 9/19) are game-scoped and reset only here.
+    state.players[pid].oncePerGame = {
+      vstarUsed: false,
+      gxUsed: false,
+    };
   }
 
   if (starter) {

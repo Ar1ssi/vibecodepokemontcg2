@@ -39,6 +39,18 @@ function boardCard(card) {
 }
 
 /**
+ * The client-visible per-player flags. `oncePerGame` (App. 9/19 GX/VSTAR limits) is
+ * game-scoped server state; it is projected here so the existing client buttons, which
+ * read `flags.vstarUsed`/`flags.gxUsed`, keep their wire shape.
+ *
+ * @param {object} player
+ * @returns {object}
+ */
+function playerFlags(player) {
+  return { ...(player?.flags || {}), ...(player?.oncePerGame || {}) };
+}
+
+/**
  * Redacts a player's zones for the owner ('you').
  *
  * @param {object} player
@@ -160,7 +172,7 @@ export function viewFor(state, playerId) {
       spectatorPlayers[id] = {
         playerId: id,
         username: player.username,
-        flags: { ...player.flags },
+        flags: playerFlags(player),
         zones: redactSpectatorZones(player),
       };
     }
@@ -183,14 +195,14 @@ export function viewFor(state, playerId) {
     you: {
       playerId,
       username: owner.username,
-      flags: { ...owner.flags },
+      flags: playerFlags(owner),
       zones: redactOwnerZones(owner),
     },
     them: opponent
       ? {
           playerId: opponent.playerId,
           username: opponent.username,
-          flags: { ...opponent.flags },
+          flags: playerFlags(opponent),
           zones: redactOpponentZones(opponent),
         }
       : null,

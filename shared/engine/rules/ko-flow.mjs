@@ -40,7 +40,7 @@
 
     // How many prizes does knocking out this card award?
     // Mega (including Mega ex) = 3; VMAX = 3; ex / GX / Double Rare = 2;
-    // V / VSTAR = 2; standard = 1. (GX matchLoss handled in `koOutcome`.)
+    // V / VSTAR = 2; standard = 1.
     export function prizesForKO(card = {}) {
       const rarity = String(card.rarity || '').toLowerCase();
       const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(s => String(s).toLowerCase()) : [];
@@ -60,12 +60,11 @@
       return prizesForKO(card) > 1;
     }
 
-    // Special KO outcome for a card, per official rules.
-    //  - GX: the player who had the GX LOSES the match when it is KO'd.
-    //  - everything else: award `count` prize cards (ex = 2, mega = 3; see prizesForKO).
-    // Returns { type: 'matchLoss' } | { type: 'prizes', count: number }
+    // Prize cards awarded for a KO, per official rules (App. 16/19/26):
+    //  - GX: 2 prizes, exactly like ex — there is no match-loss rule.
+    //  - everything else: `prizesForKO` (VMAX/TAG TEAM/V-UNION = 3, ex/V/VSTAR = 2, …).
+    // Returns { type: 'prizes', count: number }
     export function koOutcome(card = {}) {
-      if (isGxCard(card)) return { type: 'matchLoss' };
       return { type: 'prizes', count: prizesForKO(card) };
     }
     
@@ -105,20 +104,7 @@
     // Called when the attack engine reports a KO. Handles prize award + any
     // win check. Returns an announcement payload for the UI.
     export function handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride }) {
-      const outcome = koOutcome(defender);
-      // GX rule: KO'ing the opponent's Pokémon GX wins the match immediately
-      // (no prizes are taken for the GX knockout itself).
-      if (outcome.type === 'matchLoss') {
-        const taken = prizeState[attackerPlayer]?.taken || 0;
-        return {
-          prizeCount: 0,
-          prizesTaken: taken,
-          prizesRemaining: Math.max(0, 6 - taken),
-          won: true,
-          reason: 'opponent Pokémon GX was Knocked Out',
-        };
-      }
-      const prizeCount = prizeCountOverride ?? outcome.count;
+      const prizeCount = prizeCountOverride ?? prizesForKO(defender);
       const award = awardPrizes(attackerPlayer, prizeCount);
       return {
         prizeCount,
