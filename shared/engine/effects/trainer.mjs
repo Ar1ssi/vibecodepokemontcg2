@@ -5,7 +5,7 @@
 
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { executeSteps } from './executor.mjs';
-import { findCard } from '../state.mjs';
+import { findCard, attachmentHostId } from '../state.mjs';
 import { isToolCard, isStadiumCard as isStadium } from './trainer-steps.mjs';
 
 /**
@@ -203,13 +203,17 @@ export function executeTrainer(draft, {
 
   // Tool attachment: attach to target in play
   if (isToolCard(card) && targetInstanceId != null) {
-    const targetRef = findCard(draft, targetInstanceId);
-    if (targetRef && ['active', 'bench'].includes(targetRef.zoneId) && targetRef.playerId === playerId) {
+    // Store against the stack root (D40), like applyCommand's attachCard: the client sends the
+    // card the player sees, which for a stacked Pokémon is the top Evolution, while
+    // `attachedTools`/tool-combat and every `attachedTo === <root>` lookup read the Basic.
+    const hostId = attachmentHostId(draft, targetInstanceId);
+    const hostRef = findCard(draft, hostId);
+    if (hostRef && ['active', 'bench'].includes(hostRef.zoneId) && hostRef.playerId === playerId) {
       const boardIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);
       if (boardIdx >= 0) {
         const [toolCard] = player.zones.board.splice(boardIdx, 1);
-        toolCard.attachedTo = targetInstanceId;
-        const targetZone = player.zones[targetRef.zoneId];
+        toolCard.attachedTo = hostId;
+        const targetZone = player.zones[hostRef.zoneId];
         targetZone.push(toolCard);
         events.push({
           type: 'cardAttached',

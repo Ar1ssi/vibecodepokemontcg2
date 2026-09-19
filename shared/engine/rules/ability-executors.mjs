@@ -20,11 +20,24 @@ const textOf = (card) =>
 
 // How many cost symbols a passive ability removes from attacks.
 // "reduce the cost … by 1" / "attacks cost 1 less" → 1; "cost less" → 1.
+//
+// The text has to actually describe a REDUCTION. This previously matched on /(cost|energy)/ and
+// then returned 1 whenever no number was found, so every ability that merely mentioned Energy
+// granted a free symbol off every attack: Charmander's Agile ("If this Pokémon has no Energy
+// attached, it has no Weakness") made its Live Coal payable with zero Energy attached. A
+// false positive here silently removes a cost from combat, which is far worse than missing an
+// exotic wording, so the reduction verb is now required rather than assumed.
 export function passiveCostDiscount(card) {
   const t = textOf(card);
   if (!t) return 0;
-  if (!/(cost|energy)/.test(t)) return 0;
-  const by = t.match(/(?:by|less)\s*(\d+)/) || t.match(/(\d+)\s+less/);
+  if (!/(less|fewer|reduc|decrease|lower)/.test(t)) return 0;
+  // …and it has to be an ATTACK cost. "The Retreat Cost of this Pokémon is 1 less" is a retreat
+  // modifier — parseRetreatCostModifier owns that — and reading it here would discount attacks.
+  if (/retreat/.test(t) && !/attack/.test(t)) return 0;
+  if (!/(cost|energy|attack)/.test(t)) return 0;
+  const by =
+    t.match(/(?:by|less|fewer)\s*(\d+)/) ||
+    t.match(/(\d+)\s+(?:less|fewer)/);
   if (by) return parseInt(by[1], 10) || 1;
   return 1;
 }

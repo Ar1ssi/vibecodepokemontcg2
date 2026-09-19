@@ -5152,10 +5152,12 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 }
 .ptcg-hp__orb { width: calc(var(--u) * 7.7); height: calc(var(--u) * 7.7); }
 
-/* No backing and no gaps: the panels tile the printed attack box edge-to-edge and
-   the tiles tile the printed weakness strip edge-to-edge. top/bottom come from the
-   model (attackZoneBounds + the frame's foot), so the printed foot stays visible. */
-.ptcg-lower {
+/* The stack is anchored at the top of the printed text block (ability band when the card has
+   one, since that text prints above the attacks) and sized by its CONTENT. It must not stretch:
+   an earlier revision gave the panels `flex: 1` to absorb the slack, which on a one-attack card
+   painted a foot of empty white over the artwork instead of letting the card show through.
+   top comes from the model; there is deliberately no bottom. */
+.ptcg-stack {
   position: absolute;
   left: 0;
   right: 0;
@@ -5163,27 +5165,39 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   flex-direction: column;
 }
 .ptcg-atks {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.ptcg-atk {
-  flex: 1;
-  min-height: 0;
+.ptcg-atk,
+.ptcg-ability {
   display: flex;
   flex-direction: column;
   background: #fff;
   border-top: 1px solid #d9d2c5;
   pointer-events: auto;
 }
-.ptcg-atk:first-child { border-top: 0; }
+.ptcg-stack > .ptcg-ability:first-child,
+.ptcg-atks > .ptcg-atk:first-child { border-top: 0; }
 .ptcg-atk__head {
   display: flex;
   align-items: center;
   gap: calc(var(--u) * 1.4);
   background: var(--ptcg-banner, #8e8e93);
   padding: calc(var(--u) * 1.4) calc(var(--u) * 2.3);
+}
+/* The printed card carries a red "Ability" badge before the name; without it an ability panel
+   is indistinguishable from an attack that happens to have no damage. */
+.ptcg-atk__badge {
+  flex: 0 0 auto;
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: calc(var(--u) * 2);
+  padding: calc(var(--u) * 0.4) calc(var(--u) * 1.6);
+  white-space: nowrap;
 }
 .ptcg-atk__name {
   flex: 1;
@@ -5203,25 +5217,34 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   min-width: calc(var(--u) * 6.4);
   text-align: right;
 }
-/* Panels absorb the block's leftover height and centre their text in it, so the region
-   from the printed attack box down to the tiles stays continuously opaque. */
+/* Natural height — the panel is as tall as its text, so the card shows in whatever is left
+   below the stack rather than being covered by an opaque void. */
 .ptcg-atk__text {
-  flex: 1;
-  display: flex;
-  align-items: center;
   margin: 0;
   padding: calc(var(--u) * 1.4) calc(var(--u) * 2.3);
   font-size: calc(var(--u) * 2.7);
   line-height: 1.45;
   color: #1c2530;
 }
-.ptcg-atk--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
-.ptcg-atk--usable { cursor: pointer; }
-.ptcg-atk--usable:hover { box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85); }
+.ptcg-atk--recede,
+.ptcg-ability--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
+.ptcg-atk--usable,
+.ptcg-ability--usable { cursor: pointer; }
+.ptcg-atk--usable:hover,
+.ptcg-ability--usable:hover {
+  box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85);
+}
 
-/* Flush on the printed weakness strip they replace; hairline dividers keep them
-   reading as three separate pieces without gaps that let the print through. */
-.ptcg-stats { flex: 0 0 auto; display: flex; pointer-events: auto; }
+/* Its own band on the printed weakness strip, pinned from the bottom so the space between it
+   and the text stack stays card instead of fill. Hairline dividers keep the tiles reading as
+   three separate pieces without gaps that let the print through. */
+.ptcg-stats {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  pointer-events: auto;
+}
 .ptcg-stat {
   flex: 1;
   min-width: 0;

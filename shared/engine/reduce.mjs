@@ -4,7 +4,12 @@
  * Enforces Invariants 2, 3, 6, 7, 8.
  */
 
-import { cloneGameState, findCard, createGameState } from './state.mjs';
+import {
+  cloneGameState,
+  findCard,
+  createGameState,
+  attachmentHostId,
+} from './state.mjs';
 import {
   isEnergy,
   isPokemon,
@@ -1938,6 +1943,14 @@ export function applyCommand(state, command, rng = null) {
     case 'attachCard': {
       const cardRef = findCard(draft, payload.instanceId);
       const targetRef = findCard(draft, payload.targetInstanceId);
+      // Attachment and evolve both land on the stack ROOT (D40): the client addresses the
+      // card the player sees, which for a stacked Pokémon is the top Evolution, while every
+      // `attachedTo === <root>` lookup and `topPokemonCard` read the Basic. Evolution
+      // turn metadata and Special Conditions are per-Pokémon, and conditions live on the
+      // root, so they follow the host too. Events keep the payload id the client sent.
+      const hostRef =
+        findCard(draft, attachmentHostId(draft, payload.targetInstanceId)) ||
+        targetRef;
 
       if (cardRef && targetRef) {
         // Splice card out of its origin zone
@@ -1950,10 +1963,10 @@ export function applyCommand(state, command, rng = null) {
         }
 
         // Set attachment pointer
-        cardRef.card.attachedTo = payload.targetInstanceId;
+        cardRef.card.attachedTo = hostRef.card.instanceId;
 
         // Add to target's zone
-        const destZone = draft.players[playerId].zones[targetRef.zoneId];
+        const destZone = draft.players[playerId].zones[hostRef.zoneId];
         destZone.push(cardRef.card);
 
         // Update turn energy attachment flag if energy
@@ -1972,8 +1985,8 @@ export function applyCommand(state, command, rng = null) {
           draft.players[playerId].flags.evolved[payload.targetInstanceId] =
             true;
           cardRef.card.enteredPlayTurn = draft.turn.number;
-          targetRef.card.lastEvolvedTurn = draft.turn.number;
-          clearConditions(targetRef.card);
+          hostRef.card.lastEvolvedTurn = draft.turn.number;
+          clearConditions(hostRef.card);
           events.push({
             type: 'pokemonEvolved',
             playerId,

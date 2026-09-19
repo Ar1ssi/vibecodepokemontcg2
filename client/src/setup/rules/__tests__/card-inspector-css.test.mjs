@@ -56,7 +56,7 @@ describe('013 C1 — the card scan stays the background', () => {
   // and it read as a large empty band hiding the card.
   for (const selector of [
     '.ptcg-chrome',
-    '.ptcg-lower',
+    '.ptcg-stack',
     '.ptcg-atks',
     '.ptcg-stats',
   ]) {
@@ -72,7 +72,7 @@ describe('013 C1 — the card scan stays the background', () => {
   }
 
   // …and the pieces that DO replace print must actually be opaque, or the print shows twice.
-  for (const selector of ['.ptcg-atk', '.ptcg-stat']) {
+  for (const selector of ['.ptcg-atk', '.ptcg-ability', '.ptcg-stat']) {
     it(`${selector} is opaque so it covers the print it replaces`, () => {
       const decls = body(selector);
       assert.ok(decls, `${selector} is missing from index.css`);
@@ -83,6 +83,50 @@ describe('013 C1 — the card scan stays the background', () => {
       );
     });
   }
+});
+
+// The stack is sized by its content. An earlier revision stretched the panels with `flex: 1` to
+// absorb the leftover height, which on a one-attack card painted a foot of empty white over the
+// artwork — the user asked for the card to show there instead.
+describe('013 — the text stack is content-sized, not stretched', () => {
+  for (const selector of [
+    '.ptcg-stack',
+    '.ptcg-atks',
+    '.ptcg-atk',
+    '.ptcg-atk__text',
+  ]) {
+    it(`${selector} declares no flex grow`, () => {
+      const decls = body(selector);
+      assert.ok(decls, `${selector} is missing from index.css`);
+      assert.doesNotMatch(
+        decls,
+        /(^|[;\s])flex\s*:\s*1/i,
+        `${selector} must not grow — stretching it re-creates the opaque void over the card`
+      );
+    });
+  }
+
+  it('the stack carries no bottom anchor', () => {
+    // `top` is set inline by card-inspector.mjs from blockTopPct, so it is not asserted here;
+    // the guard that matters is the absence of a bottom, which would re-stretch the stack.
+    const decls = body('.ptcg-stack');
+    assert.doesNotMatch(
+      decls,
+      /(^|[;\s])bottom\s*:/i,
+      'a bottom anchor would re-stretch the stack to the stat band'
+    );
+  });
+
+  it('the stat band is pinned from the bottom, independently of the stack', () => {
+    const decls = body('.ptcg-stats');
+    assert.ok(decls, '.ptcg-stats is missing from index.css');
+    assert.match(decls, /position\s*:\s*absolute/i);
+    assert.doesNotMatch(
+      decls,
+      /(^|[;\s])top\s*:/i,
+      'a top anchor would fight the bottom one now the stack no longer sizes the band'
+    );
+  });
 });
 
 describe('013 C5 — the rules live where the chrome is mounted', () => {
