@@ -130,7 +130,7 @@ export const readyUp = async (user, emit = true) => {
       }
       appendMessage(
         '',
-        'Prompt: Both players, move a Basic Pokémon from your hand to your Active Spot before starting turn 1.',
+        'Prompt: Both players, choose a Basic Pokémon from your hand for your Active Spot before starting turn 1.',
         'announcement',
         false
       );

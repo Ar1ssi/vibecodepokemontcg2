@@ -18,6 +18,11 @@ export const clearZoneImages = (zone, zoneId) => {
     return;
   }
   removeImages(zone.element);
+  if (zoneId === 'hand' && zone?.element) {
+    zone.element
+      .querySelectorAll('.hand-card-stack')
+      .forEach((el) => el.remove());
+  }
 };
 
 /** Appends a legacy card image to its zone; false when the zone is server-drawn. */

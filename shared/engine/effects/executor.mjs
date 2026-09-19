@@ -191,7 +191,8 @@ export function executeSteps(draft, {
     }
 
     switch (step.type) {
-      case 'discardCost': {
+      case 'discardCost':
+      case 'discardCostAbility': {
         if (stepSelection) {
           // Resume: discard the selected cards
           const hand = player.zones.hand || [];
@@ -587,6 +588,71 @@ export function executeSteps(draft, {
       case 'switchOwn':
       case 'switchAbility':
       case 'switch': {
+        if (step.target === 'opponent') {
+          if (!opponent) break;
+          const oppBench = (opponent.zones.bench || []).filter(
+            (c) => !c.attachedTo && (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c))
+          );
+          const oppActive = (opponent.zones.active || []).find((c) => !c.attachedTo);
+          if (!oppActive || oppBench.length === 0) {
+            events.push({ type: 'effectStepSkipped', reason: 'no_opponent_bench', step: step.type });
+            break;
+          }
+          let chosenBenchId = null;
+          if (stepSelection && stepSelection.length > 0) {
+            chosenBenchId = stepSelection[0];
+          } else if (oppBench.length === 1) {
+            chosenBenchId = oppBench[0].instanceId;
+          } else {
+            const choice = createPendingChoice({
+              player: playerId,
+              prompt: `${sourceCard?.name || 'Gust'}: Select opponent's Benched Pokémon to switch to Active`,
+              source: sourceCard?.name || '',
+              options: oppBench,
+              min: 1,
+              max: 1,
+              cancellable: false,
+              stateVersion: draft.stateVersion,
+              stepIndex: idx,
+              resumeToken: {
+                effectType,
+                sourceInstanceId: sourceCard?.instanceId,
+                initiatorPlayerId: playerId,
+                stepIndex: idx,
+                steps,
+                context,
+                budgetCount: budget.count,
+              },
+            });
+            return { pendingChoice: choice, completed: false };
+          }
+          const benchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
+          if (benchCard) {
+            for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
+              const c = opponent.zones.active[i];
+              if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
+                opponent.zones.active.splice(i, 1);
+                opponent.zones.bench.push(c);
+              }
+            }
+            for (let i = opponent.zones.bench.length - 1; i >= 0; i--) {
+              const c = opponent.zones.bench[i];
+              if (c.instanceId === benchCard.instanceId || c.attachedTo === benchCard.instanceId) {
+                opponent.zones.bench.splice(i, 1);
+                opponent.zones.active.push(c);
+              }
+            }
+            clearConditions(oppActive);
+            events.push({
+              type: 'cardSwitched',
+              playerId: opponent.playerId,
+              activeId: oppActive.instanceId,
+              benchId: benchCard.instanceId,
+            });
+          }
+          break;
+        }
+
         const bench = (player.zones.bench || []).filter((c) => !c.attachedTo);
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
         if (!active || bench.length === 0) {
@@ -906,7 +972,8 @@ export function executeSteps(draft, {
         break;
       }
 
-      case 'applyStatus': {
+      case 'applyStatus':
+      case 'statusAbility': {
         const targetSide = step.target === 'bothActiveNonDark' || step.target === 'opponentActive' ? opponent : player;
         const targetActive = targetSide?.zones?.active?.find((c) => !c.attachedTo);
         if (targetActive) {

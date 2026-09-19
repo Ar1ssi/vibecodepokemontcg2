@@ -72,7 +72,16 @@ function extractStats(card) {
     stats.evolvesFrom = String(card.evolvesFrom);
     hasAny = true;
   }
-  if (card.ability?.text) {
+  if (Array.isArray(card.abilities) && card.abilities.length > 0) {
+    stats.abilities = card.abilities
+      .filter((a) => a && (typeof a === 'string' || typeof a.text === 'string'))
+      .map((a) =>
+        typeof a === 'string'
+          ? { name: '', text: a }
+          : { name: String(a.name || ''), text: String(a.text || '') }
+      );
+    hasAny = true;
+  } else if (card.ability?.text) {
     stats.abilities = [{ name: String(card.ability.name || ''), text: String(card.ability.text) }];
     hasAny = true;
   }

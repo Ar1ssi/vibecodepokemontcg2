@@ -25,6 +25,7 @@
       turnPlayer: 'self',      // whose turn: 'self' | 'opp'
       turnNumber: 0,
       phase: 'setup',          // setup | draw | main | attack | ended
+      startingActiveDone: false,
       // Stadium currently on the field (both players share it): { user, card } | null
       stadium: null,
       mulligansResolved: false, // guard: mulligan execution runs at most once per game
@@ -376,6 +377,29 @@
         }
       }
       if (!card?.id) return card;
+      if (card.id.startsWith('e2e-') || card.set === 'e2e') {
+        const data = {
+          hp: card.hp || 60,
+          types: card.types || ['Colorless'],
+          weakness: card.weakness ?? null,
+          resistance: card.resistance ?? null,
+          retreatCost: card.retreatCost ?? 1,
+          attacks: Array.isArray(card.attacks) && card.attacks.length > 0
+            ? card.attacks
+            : [{ name: 'Tackle', damage: '10', text: '' }],
+          stage: card.stage || 'Basic',
+          evolvesFrom: null,
+          ability: null,
+          subtypes: card.subtypes || [],
+          trainerType: null,
+          rarity: '',
+          effect: null,
+          text: null,
+        };
+        cardDataCache.set(card.id, data);
+        applyEnrichedData(card, data);
+        return card;
+      }
       if (cardDataCache.has(card.id)) {
         applyEnrichedData(card, cardDataCache.get(card.id));
         return card;
@@ -440,6 +464,7 @@
       rulesState.phase = 'setup';
       rulesState.turnNumber = 0;
       rulesState.turnPlayer = 'self';
+      rulesState.startingActiveDone = false;
       rulesState.stadium = null;
       rulesState.mulligansResolved = false;
       rulesState.attackExecuting = false;
@@ -458,6 +483,7 @@
       rulesState.turnNumber = 0;
       rulesState.turnPlayer = firstPlayer === 'opp' ? 'opp' : 'self';
       rulesState.phase = 'draw';
+      rulesState.startingActiveDone = false;
       rulesState.stadium = null; // new game: nothing on the stadium field
       rulesState.mulligansResolved = false;
       rulesState.pendingEffects = { self: [], opp: [] };
@@ -469,6 +495,7 @@
     }
 
     export function beginTurn(player) {
+      rulesState.startingActiveDone = true;
       rulesState.turnPlayer = player;
       rulesState.turnNumber += 1;
       if (!rulesState.playerTurnCount) {
@@ -545,6 +572,7 @@
       turnNumber = 0,
       lastDrawnTurn = 0,
     } = {}) {
+      if (turnNumber < 1) return false;
       if (lastDrawnTurn && Number(lastDrawnTurn) === Number(turnNumber)) return false;
       return Boolean(enabled) && !drewThisTurn && Number(deckCount) > 0;
     }
@@ -678,9 +706,12 @@
       const S = rulesState;
       const isYourTurn = user === S.turnPlayer;
     
-      // during setup nobody acts except via the setup flow
-      if (S.phase === 'setup') {
-        return { allowed: false, reason: 'Set up the game first (Set Up button).' };
+      // during setup nobody acts except via the setup flow (e.g. setting starting active)
+      if (S.phase === 'setup' || S.turnNumber === 0 || (!S.startingActiveDone && S.turnNumber < 1)) {
+        if (action === 'moveCard' && targetZoneId === 'active') {
+          return { allowed: true };
+        }
+        return { allowed: false, reason: 'Choose your Starting Active Pokémon before starting turn 1.' };
       }
       if (S.phase === 'ended') {
         return { allowed: false, reason: 'Game is over.' };
@@ -697,7 +728,13 @@
           return { allowed: false, reason: "Deck is private — only card effects may search it." };
     
         case 'moveCard': {
-          if (!isYourTurn) {
+          if (
+            !isYourTurn &&
+            !(
+              targetZoneId === 'active' &&
+              (S.phase === 'setup' || S.turnNumber === 0 || (!S.startingActiveDone && S.turnNumber < 1))
+            )
+          ) {
             return { allowed: false, reason: "It's not your turn." };
           }
           if (S.phase === 'attack') {

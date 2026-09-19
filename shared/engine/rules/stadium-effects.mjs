@@ -6,7 +6,11 @@
 // `ability-executors.mjs`.
 
 import { rulesState, getStadium } from './rules-state.mjs';
-import { attachedTools, parseHpBonus, applyHpBonus } from './ability-executors.mjs';
+import {
+  attachedTools,
+  parseHpBonus,
+  applyHpBonus,
+} from './ability-executors.mjs';
 import { pokemonNamesMatch } from './evolution.mjs';
 //
 // Layers:
@@ -20,12 +24,12 @@ import { pokemonNamesMatch } from './evolution.mjs';
 
 // Effect families a Stadium can be classified into.
 export const STADIUM_EFFECT_FAMILIES = [
-  'setup-once',      // one-shot "when you play this card" effect
-  'once-per-turn',   // repeatable once per turn (e.g. Safari Zone search)
+  'setup-once', // one-shot "when you play this card" effect
+  'once-per-turn', // repeatable once per turn (e.g. Safari Zone search)
   'continuous-both', // always-on modifier affecting both players
   'opponent-affected', // ongoing effect primarily aimed at the opponent
-  'none',            // Stadium with no recognized effect (rare)
-  'unknown',         // Stadium we can't place
+  'none', // Stadium with no recognized effect (rare)
+  'unknown', // Stadium we can't place
 ];
 
 // Normalize curly quotes to straight so keyword checks work on card text.
@@ -37,7 +41,8 @@ const lower = (v) =>
 const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
-const textOf = (card) => lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
+const textOf = (card) =>
+  lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
 
 const isStadiumCard = (card) => {
   if (!card) return false;
@@ -49,11 +54,17 @@ const isStadiumCard = (card) => {
   const name = lower(card.name);
   // Name fallbacks for deck-import stubs before TCGdex subtypes load.
   // "Grand Tree" is a Stadium but matches none of the older zone/rooftop hints.
-  if (name.includes('zone') || name.includes('rooftop') || name === 'grand tree') {
+  if (
+    name.includes('zone') ||
+    name.includes('rooftop') ||
+    name === 'grand tree'
+  ) {
     return true;
   }
   const t = textOf(card);
-  return t.includes('this stadium stays in play') || t.includes('if another stadium');
+  return (
+    t.includes('this stadium stays in play') || t.includes('if another stadium')
+  );
 };
 
 export { isStadiumCard };
@@ -62,7 +73,8 @@ export { isStadiumCard };
 // either} player's turn" phrasing (e.g. Grand Tree), which is semantically
 // the same repeatable-once-per-turn trigger but doesn't contain the literal
 // substring "once per turn".
-const ONCE_PER_TURN_RE = /once per turn|once during (?:each|your|either) player'?s turn/;
+const ONCE_PER_TURN_RE =
+  /once per turn|once during (?:each|your|either) player'?s turn/;
 
 const BOTH_PLAYERS_RE =
   /both players|each player|both active pokémon|both yours and your opponent'?s/;
@@ -201,10 +213,16 @@ export function parseStadiumOncePerTurn(card) {
   if (/put a card from their hand on top of their deck/.test(t)) {
     return { ...base, kind: 'hand-to-deck-top', n: 1 };
   }
-  if (/switch their active \{w\}/.test(t) || /switch their active.*\{w\}/.test(t)) {
+  if (
+    /switch their active \{w\}/.test(t) ||
+    /switch their active.*\{w\}/.test(t)
+  ) {
     return { ...base, kind: 'switch-type', typeFilter: 'water' };
   }
-  if (/put up to (\d+) basic \{l\} energy/.test(t) && /discard.*bench/.test(t)) {
+  if (
+    /put up to (\d+) basic \{l\} energy/.test(t) &&
+    /discard.*bench/.test(t)
+  ) {
     const m = t.match(/put up to (\d+)/);
     return {
       ...base,
@@ -213,7 +231,10 @@ export function parseStadiumOncePerTurn(card) {
       typeFilter: 'lightning',
     };
   }
-  if (/heal 10 damage from each of their pokémon/.test(t) || /heal 10 damage from each/.test(t)) {
+  if (
+    /heal 10 damage from each of their pokémon/.test(t) ||
+    /heal 10 damage from each/.test(t)
+  ) {
     return { ...base, kind: 'heal-all', n: 10 };
   }
   if (/search/.test(t) && /evolv/.test(t)) {
@@ -238,7 +259,13 @@ export function parseStadiumOncePerTurn(card) {
     };
   }
   if (/search.*marnie's pokémon/.test(t)) {
-    return { ...base, kind: 'search-hand', n: 1, searchFilter: "marnie's", searchWhat: 'pokemon' };
+    return {
+      ...base,
+      kind: 'search-hand',
+      n: 1,
+      searchFilter: "marnie's",
+      searchWhat: 'pokemon',
+    };
   }
   if (/attach/.test(t) && /energy/.test(t)) {
     const m = t.match(/up to (\d+)/);
@@ -271,10 +298,13 @@ export function parseStadiumOncePerTurn(card) {
 /** Whether a once-per-turn stadium condition is met for this player. */
 export function stadiumOnceConditionMet(condition, playerFlags = {}) {
   if (!condition) return true;
-  if (condition.type === 'supporter-played') return !!playerFlags.supporterPlayed;
+  if (condition.type === 'supporter-played')
+    return !!playerFlags.supporterPlayed;
   if (condition.type === 'named-supporter') {
     const name = String(playerFlags.lastSupporterName || '').toLowerCase();
-    return !!name && name.includes(String(condition.contains || '').toLowerCase());
+    return (
+      !!name && name.includes(String(condition.contains || '').toLowerCase())
+    );
   }
   return true;
 }
@@ -291,14 +321,21 @@ export function matchesStadiumEvolveSearch(deckCard, inPlayPokemon = []) {
 export function matchesStadiumSearch(card, { searchWhat, searchFilter } = {}) {
   if (!card) return false;
   const name = lower(card.name || '');
-  if (searchFilter && !name.includes(String(searchFilter).toLowerCase())) return false;
+  if (searchFilter && !name.includes(String(searchFilter).toLowerCase()))
+    return false;
   const type = lower(card.type || '');
   const sub = (card.subtypes || []).map(lower);
   if (searchWhat === 'basic pokemon') {
-    return type.includes('pok') && (sub.includes('basic') || lower(card.stage) === 'basic' || !card.stage);
+    return (
+      type.includes('pok') &&
+      (sub.includes('basic') || lower(card.stage) === 'basic' || !card.stage)
+    );
   }
   if (searchWhat === 'item') {
-    return type.includes('trainer') && (sub.includes('item') || lower(card.trainerType) === 'item');
+    return (
+      type.includes('trainer') &&
+      (sub.includes('item') || lower(card.trainerType) === 'item')
+    );
   }
   if (searchWhat === 'pokemon') return type.includes('pok');
   return true;
@@ -337,7 +374,8 @@ export function parseStadiumDamagePreventionDetail(card) {
   let zone = 'any';
   if (/benched pokémon|on the bench|from the bench/.test(t)) zone = 'bench';
   else if (/active pokémon|your active|the active/.test(t)) zone = 'active';
-  const ruleBoxOnly = /don't have a rule box|without a rule box|non-rule box/.test(t);
+  const ruleBoxOnly =
+    /don't have a rule box|without a rule box|non-rule box/.test(t);
   let amount = Infinity;
   if (!/all damage|all\s+damage/.test(t)) {
     const m = t.match(/(\d+)\s*(?:damage|poison|special)/);
@@ -353,7 +391,10 @@ export function parseStadiumDamagePrevention(card) {
 }
 
 /** Whether stadium prevention applies to a defender in `zoneId`. */
-export function stadiumPreventionApplies(stadiumCard, { zoneId = 'active', defender = null } = {}) {
+export function stadiumPreventionApplies(
+  stadiumCard,
+  { zoneId = 'active', defender = null } = {}
+) {
   const d = parseStadiumDamagePreventionDetail(stadiumCard);
   if (!d) return false;
   if (d.zone === 'bench' && zoneId !== 'bench') return false;
@@ -380,7 +421,8 @@ export function stadiumFilterMatches(card, stadiumCard) {
   if (!name) return false;
   if (/steven's pokémon/.test(t) && !name.includes('steven')) return false;
   if (/hop's pokémon/.test(t) && !name.includes('hop')) return false;
-  if (/n's pokémon/.test(t) && !/\bn's\b/.test(name) && !name.startsWith("n ")) return false;
+  if (/n's pokémon/.test(t) && !/\bn's\b/.test(name) && !name.startsWith('n '))
+    return false;
   if (/\{c\} pokémon/.test(t)) {
     const types = (card?.types || []).map(lower);
     if (types.length && !types.includes('colorless')) return false;
@@ -411,14 +453,28 @@ export function stadiumFilterMatches(card, stadiumCard) {
     if (stage && stage !== 'basic') return false;
   }
   if (/each psyduck/.test(t) && !name.includes('psyduck')) return false;
-  if (/tera pokémon/.test(t) && !(card?.subtypes || []).map(lower).includes('tera')) return false;
+  if (
+    /tera pokémon/.test(t) &&
+    !(card?.subtypes || []).map(lower).includes('tera')
+  )
+    return false;
   return true;
 }
 
 export function pokemonHasRuleBox(card) {
   const sub = (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
   return sub.some((s) =>
-    ['ex', 'gx', 'v', 'vstar', 'vmax', 'tera', 'radiant', 'prism star', 'ace spec'].includes(s)
+    [
+      'ex',
+      'gx',
+      'v',
+      'vstar',
+      'vmax',
+      'tera',
+      'radiant',
+      'prism star',
+      'ace spec',
+    ].includes(s)
   );
 }
 
@@ -474,12 +530,15 @@ export function parseStadiumHpModifier(card) {
   const negSigned = t.match(/(?:gets?\s*)?-\s*(\d+)\s*hp/);
   if (negSigned) return -parseInt(negSigned[1], 10);
   if (/(less|decrease|reduc|lower)/.test(t)) {
-    const m = t.match(/(\d+)\s*(?:less|hp)|decreases? by\s*(\d+)|reduced by\s*(\d+)/);
+    const m = t.match(
+      /(\d+)\s*(?:less|hp)|decreases? by\s*(\d+)|reduced by\s*(\d+)/
+    );
     const n = m ? parseInt(m[1] || m[2] || m[3], 10) : 10;
     return -(n || 10);
   }
-  const m =
-    t.match(/\+\s*(\d+)\s*(?:hp|more hp)|hp\s*(?:increases?|goes? up|raises?)\s*by\s*(\d+)|(\d+)\s*more hp/);
+  const m = t.match(
+    /\+\s*(\d+)\s*(?:hp|more hp)|hp\s*(?:increases?|goes? up|raises?)\s*by\s*(\d+)|(\d+)\s*more hp/
+  );
   const n = m ? parseInt(m[1] || m[2] || m[3], 10) : 0;
   return n || 0;
 }
@@ -503,9 +562,18 @@ function stadiumTargetScope(stadiumCard) {
  * Determine the HP bonus applicable to a given player's Pokémon from the
  * current stadium. Returns a number (positive or negative, 0 if none).
  */
-export function getStadiumHpBonus(targetPlayer, pokemon = null) {
-  if (!rulesState.enabled) return 0;
-  const stadium = getStadium();
+export function getStadiumHpBonus(
+  targetPlayer,
+  pokemon = null,
+  stadiumOverride = null
+) {
+  const stadium = stadiumOverride
+    ? stadiumOverride.card
+      ? stadiumOverride
+      : { card: stadiumOverride, user: stadiumOverride.ownerId }
+    : rulesState.enabled
+      ? getStadium()
+      : null;
   if (!stadium?.card) return 0;
   const bonus = parseStadiumHpModifier(stadium.card);
   if (bonus === 0) return 0;
@@ -519,13 +587,23 @@ export function getStadiumHpBonus(targetPlayer, pokemon = null) {
 /**
  * Compute effective HP for a Pokémon given a base HP and the target player.
  * Optional zoneCards includes attached Tools for HP bonuses (Hero's Cape, etc.).
+ * Optional stadiumOverride provides the server draft.stadium without relying on rulesState.
  * Clamped to ≥ 1 so a −HP modifier can't make a Pokémon have 0 HP.
  */
-export function effectiveHp(baseHp, targetPlayer, pokemon = null, zoneCards = null) {
+export function effectiveHp(
+  baseHp,
+  targetPlayer,
+  pokemon = null,
+  zoneCards = null,
+  stadiumOverride = null
+) {
   const base = baseHp || 0;
   if (!base) return 0;
-  let total = base + getStadiumHpBonus(targetPlayer, pokemon);
-  if (zoneCards?.length && pokemon && !stadiumBlocksToolEffects()) {
+  let total = base + getStadiumHpBonus(targetPlayer, pokemon, stadiumOverride);
+  const blockTools = stadiumOverride
+    ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)
+    : stadiumBlocksToolEffects();
+  if (zoneCards?.length && pokemon && !blockTools) {
     for (const tool of attachedTools(pokemon, zoneCards)) {
       total = applyHpBonus(total, parseHpBonus(tool).bonus);
     }
@@ -607,7 +685,8 @@ export function getStadiumEvolutionSpeed(targetPlayer, pokemon = null) {
 export function parseStadiumRetreatModifier(card) {
   const t = textOf(card);
   if (!t || !/retreat cost|retreat/.test(t)) return 0;
-  if (/no retreat cost|retreat cost of 0|retreat for free/.test(t)) return -Infinity;
+  if (/no retreat cost|retreat cost of 0|retreat for free/.test(t))
+    return -Infinity;
   if (/(less|reduc|lower)/.test(t)) {
     const m = t.match(/(?:by|less)\s*(\d+)|(\d+)\s+less/);
     return -(m ? parseInt(m[1] || m[2], 10) || 1 : 1);
@@ -616,16 +695,22 @@ export function parseStadiumRetreatModifier(card) {
 }
 
 /** Effective retreat cost for a Pokémon with the current stadium in play. */
-export function getStadiumRetreatCost(baseRetreat, pokemon, targetPlayer) {
-  if (!rulesState.enabled) return baseRetreat;
-  const stadium = getStadium();
-  if (!stadium?.card) return baseRetreat;
-  const delta = parseStadiumRetreatModifier(stadium.card);
+export function getStadiumRetreatCost(
+  baseRetreat,
+  pokemon,
+  targetPlayer,
+  stadiumOverride = null
+) {
+  const stadium = stadiumOverride || (rulesState.enabled ? getStadium() : null);
+  const card = stadium?.card || stadium;
+  if (!card) return baseRetreat;
+  const delta = parseStadiumRetreatModifier(card);
   if (delta === 0) return baseRetreat;
-  if (!stadiumFilterMatches(pokemon, stadium.card)) return baseRetreat;
-  const scope = stadiumTargetScope(stadium.card);
-  if (scope === 'opponent' && targetPlayer === stadium.user) return baseRetreat;
-  if (scope === 'owner' && targetPlayer !== stadium.user) return baseRetreat;
+  if (!stadiumFilterMatches(pokemon, card)) return baseRetreat;
+  const scope = stadiumTargetScope(card);
+  const stadiumUser = stadium?.user ?? stadium?.playedBy;
+  if (scope === 'opponent' && targetPlayer === stadiumUser) return baseRetreat;
+  if (scope === 'owner' && targetPlayer !== stadiumUser) return baseRetreat;
   if (delta === -Infinity) return 0;
   return Math.max(0, baseRetreat + delta);
 }
@@ -673,7 +758,11 @@ export function isStadiumStatusImmunity(card) {
 /** Dizzying Valley: Confused Pokémon don't recover on evolve/devolve. */
 export function isStadiumConfusedPersist(card) {
   const t = textOf(card);
-  return /confused pokémon/.test(t) && /don'?t recover/.test(t) && /evolve|devolve/.test(t);
+  return (
+    /confused pokémon/.test(t) &&
+    /don'?t recover/.test(t) &&
+    /evolve|devolve/.test(t)
+  );
 }
 
 /** Area Zero Underdepths-style bench limit (null = default 5). */
@@ -722,7 +811,11 @@ export function getStadiumDamageReduction(defender, targetPlayer) {
   return amount;
 }
 
-export function stadiumBlocksToolEffects() {
+export function stadiumBlocksToolEffects(stadiumOverride = null) {
+  if (stadiumOverride) {
+    const card = stadiumOverride.card || stadiumOverride;
+    return card ? isStadiumToolNegation(card) : false;
+  }
   if (!rulesState.enabled) return false;
   const stadium = getStadium()?.card;
   return stadium ? isStadiumToolNegation(stadium) : false;
@@ -800,7 +893,8 @@ function collectPassiveStadiumResults(card) {
   const prevention = parseStadiumDamagePreventionDetail(card);
   if (prevention) results.push({ action: 'damage-prevention', ...prevention });
   const reduction = parseStadiumDamageReduction(card);
-  if (reduction > 0) results.push({ action: 'damage-reduction', amount: reduction });
+  if (reduction > 0)
+    results.push({ action: 'damage-reduction', amount: reduction });
   if (isStadiumRetreatPrevention(card)) {
     results.push({ action: 'retreat-prevention', target: 'opponent' });
   }
@@ -808,25 +902,34 @@ function collectPassiveStadiumResults(card) {
   const hpMod = parseStadiumHpModifier(card);
   if (hpMod !== 0) results.push({ action: 'hp-modifier', amount: hpMod });
   const evo = parseStadiumEvolutionSpeed(card);
-  if (evo.relaxTurnGate || evo.costReduce > 0) results.push({ action: 'evolution-speed', ...evo });
+  if (evo.relaxTurnGate || evo.costReduce > 0)
+    results.push({ action: 'evolution-speed', ...evo });
   const retreatMod = parseStadiumRetreatModifier(card);
-  if (retreatMod !== 0) results.push({ action: 'retreat-modifier', delta: retreatMod });
+  if (retreatMod !== 0)
+    results.push({ action: 'retreat-modifier', delta: retreatMod });
   const benchDmg = parseStadiumBenchDamageOnPlay(card);
-  if (benchDmg) results.push({ action: 'bench-damage-on-play', amount: benchDmg });
+  if (benchDmg)
+    results.push({ action: 'bench-damage-on-play', amount: benchDmg });
   const atkBonus = parseStadiumAttackDamageBonus(card);
-  if (atkBonus > 0) results.push({ action: 'attack-damage-bonus', amount: atkBonus });
-  if (isStadiumStatusImmunity(card)) results.push({ action: 'status-immunity' });
-  if (isStadiumConfusedPersist(card)) results.push({ action: 'confused-persist' });
+  if (atkBonus > 0)
+    results.push({ action: 'attack-damage-bonus', amount: atkBonus });
+  if (isStadiumStatusImmunity(card))
+    results.push({ action: 'status-immunity' });
+  if (isStadiumConfusedPersist(card))
+    results.push({ action: 'confused-persist' });
   const benchLimit = parseStadiumBenchLimit(card);
   if (benchLimit) results.push({ action: 'bench-limit', limit: benchLimit });
   const costMod = parseStadiumCostModifier(card);
   if (costMod > 0) results.push({ action: 'cost-modifier', amount: costMod });
   if (isStadiumToolNegation(card)) results.push({ action: 'tool-negation' });
-  if (isStadiumAbilityNegation(card)) results.push({ action: 'ability-negation' });
+  if (isStadiumAbilityNegation(card))
+    results.push({ action: 'ability-negation' });
   const checkupPoison = parseStadiumCheckupPoisonBonus(card);
-  if (checkupPoison > 0) results.push({ action: 'checkup-poison', amount: checkupPoison });
+  if (checkupPoison > 0)
+    results.push({ action: 'checkup-poison', amount: checkupPoison });
   const costInc = parseStadiumAttackCostIncrease(card);
-  if (costInc > 0) results.push({ action: 'attack-cost-increase', amount: costInc });
+  if (costInc > 0)
+    results.push({ action: 'attack-cost-increase', amount: costInc });
   return results;
 }
 

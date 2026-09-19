@@ -118,9 +118,12 @@ function parseEnergyType(lower) {
 // Boss's Orders, Lisia's Appeal, etc. — optional stage/type words between "Benched" and "Pokémon".
 function matchesSwitchOpponentIn(lower) {
   return (
-    lower.includes("switch in 1 of your opponent's benched") &&
-    lower.includes('pokémon') &&
-    lower.includes('active spot')
+    (lower.includes("switch in 1 of your opponent's benched") &&
+      lower.includes('pokémon') &&
+      lower.includes('active spot')) ||
+    (lower.includes("switch 1 of your opponent's benched") &&
+      lower.includes('pokémon') &&
+      (lower.includes('active pokémon') || lower.includes('active spot') || lower.includes('defending pokémon')))
   );
 }
 

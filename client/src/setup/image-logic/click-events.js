@@ -16,15 +16,10 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
-import {
-  fullViewHost,
-} from '../deck-constructor/hydrate-holo.js';
+import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
 import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
-import {
-  closeCardPreview,
-  openCardPreview,
-} from './full-view.js';
+import { closeCardPreview, openCardPreview } from './full-view.js';
 import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
@@ -73,7 +68,8 @@ export const coverClick = (event) => {
   // the same carousel viewer used for the discard pile instead of the raw
   // stacked-image zone (that legacy display is still used mid-game below).
   if (event.target.id === 'deckCover') {
-    const preGameOrRulesOff = !rulesState.enabled || rulesState.phase === 'setup';
+    const preGameOrRulesOff =
+      !rulesState.enabled || rulesState.phase === 'setup';
     if (preGameOrRulesOff) {
       event.stopPropagation();
       const user = event.target.user === 'self' ? 'self' : 'opp';
@@ -237,7 +233,7 @@ export const openCardContextMenu = (event) => {
     ) {
       cardContextMenu.style.left = `${targetRect.left - cardContextMenu.clientWidth}px`;
       cardContextMenu.style.top = `${targetRect.top + offsetHeight}px`;
-    } else if (event.target.parentElement.id === 'hand') {
+    } else if (event.target.closest('#hand')) {
       cardContextMenu.style.left = `${targetRect.left}px`;
       cardContextMenu.style.top = `${targetRect.top + offsetHeight - cardContextMenu.offsetHeight}px`;
     } else if (event.target.parentElement.id === 'prizes') {

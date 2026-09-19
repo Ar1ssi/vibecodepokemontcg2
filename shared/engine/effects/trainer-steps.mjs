@@ -220,6 +220,26 @@ function putHandOnBottom(ctx) {
   });
 }
 
+function putHandOnTop(ctx) {
+  const { player, step } = ctx;
+  const hand = player.zones.hand;
+  if (ctx.selection) {
+    const chosen = pickById(hand, ctx.selection);
+    for (const card of chosen) removeFromZones(player, card);
+    player.zones.deck.unshift(...chosen);
+    ctx.events.push({ type: 'cardsMovedToDeckTop', count: chosen.length, playerId: player.playerId });
+    return null;
+  }
+  const count = Math.min(step.count || 1, hand.length);
+  if (count === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Put ${count} card${count > 1 ? 's' : ''} from your hand on top of your deck`,
+    options: hand,
+    min: count,
+    max: count,
+  });
+}
+
 function opponentShuffleHandDraw(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -429,7 +449,8 @@ function searchDeckSequence(ctx) {
 // Rare Candy: a Stage 2 from hand onto a Basic in play, skipping Stage 1.
 function evolveStage2(ctx) {
   const { player } = ctx;
-  const options = rareCandyOptions(player, ownedCards(player));
+  const turnNumber = ctx.draft?.turn?.number;
+  const options = rareCandyOptions(player, ownedCards(player), turnNumber);
   const optionFor = (stage2Id) => options.find((option) => option.stage2.instanceId === stage2Id);
 
   if (ctx.memo?.phase === 'basic') {
@@ -438,6 +459,14 @@ function evolveStage2(ctx) {
     if (!option || !basic) return skip(ctx, 'target_not_found');
     const stage2 = option.stage2;
     attachTo(player, stage2, basic, ctx.events);
+    if (turnNumber != null) {
+      stage2.enteredPlayTurn = turnNumber;
+      basic.lastEvolvedTurn = turnNumber;
+    }
+    clearConditions(basic);
+    if (!player.flags) player.flags = {};
+    if (!player.flags.evolved) player.flags.evolved = {};
+    player.flags.evolved[basic.instanceId] = true;
     ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: stage2.instanceId, targetInstanceId: basic.instanceId });
     return null;
   }
@@ -1033,19 +1062,67 @@ function evolvesFromTop(player, card) {
 }
 
 // Salvatore: search the deck for an Evolution card and put it onto the Pokémon it evolves from.
+// Grand Tree sets `step.chainStage2`, which offers the matching Stage 2 from the deck as a second,
+// chained evolve onto the same Pokémon (printed exception on that card).
 function searchEvolve(ctx) {
   const { player, step } = ctx;
   const deck = player.zones.deck;
 
+  const evolveOnto = (card, root) => {
+    attachTo(player, card, root, ctx.events);
+    const turnNumber = ctx.draft?.turn?.number;
+    if (turnNumber != null) {
+      card.enteredPlayTurn = turnNumber;
+      root.lastEvolvedTurn = turnNumber;
+    }
+    clearConditions(root);
+    if (!player.flags) player.flags = {};
+    if (!player.flags.evolved) player.flags.evolved = {};
+    player.flags.evolved[root.instanceId] = true;
+    ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: card.instanceId, targetInstanceId: root.instanceId });
+  };
+
+  // The chained step: the deck's Stage 2 for the card just put into play, onto the same root.
+  // Declining, or having no match, ends the chain. The deck is shuffled once, when it ends.
+  const chainStage2 = (evolvedCard, root) => {
+    if (!step.chainStage2) {
+      shuffleDeck(player, ctx);
+      return null;
+    }
+    const evolvedName = String(evolvedCard.name || '').toLowerCase();
+    const candidates = deck.filter(
+      (c) => isPokemon(c) && evolvedName && String(c.evolvesFrom || '').toLowerCase() === evolvedName
+    );
+    if (candidates.length === 0) {
+      shuffleDeck(player, ctx);
+      return null;
+    }
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Select a Stage 2 that evolves from ${evolvedCard.name}`,
+      options: candidates,
+      min: 0,
+      max: 1,
+      memo: { phase: 'stage2', rootId: root.instanceId },
+    });
+  };
+
+  if (ctx.memo?.phase === 'stage2') {
+    const card = deck.find((c) => c.instanceId === ctx.selection?.[0]);
+    const root = rootsOf(player).find((c) => c.instanceId === ctx.memo.rootId);
+    if (card && root) evolveOnto(card, root);
+    shuffleDeck(player, ctx);
+    return null;
+  }
+
   if (ctx.memo?.phase === 'target') {
     const card = deck.find((c) => c.instanceId === ctx.memo.cardId);
     const root = card && evolvesFromTop(player, card).find((c) => c.instanceId === ctx.selection?.[0]);
-    if (card && root) {
-      attachTo(player, card, root, ctx.events);
-      ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: card.instanceId, targetInstanceId: root.instanceId });
+    if (!card || !root) {
+      shuffleDeck(player, ctx);
+      return null;
     }
-    shuffleDeck(player, ctx);
-    return null;
+    evolveOnto(card, root);
+    return chainStage2(card, root);
   }
 
   const candidates = deck.filter(
@@ -1060,10 +1137,8 @@ function searchEvolve(ctx) {
     }
     const roots = evolvesFromTop(player, card);
     if (roots.length === 1) {
-      attachTo(player, card, roots[0], ctx.events);
-      ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: card.instanceId, targetInstanceId: roots[0].instanceId });
-      shuffleDeck(player, ctx);
-      return null;
+      evolveOnto(card, roots[0]);
+      return chainStage2(card, roots[0]);
     }
     return ctx.ask({
       prompt: `${sourceName(ctx, 'Trainer')}: Choose the Pokémon to evolve into ${card.name}`,
@@ -1185,6 +1260,7 @@ export const EXTRA_STEP_HANDLERS = {
   searchAttachEach,
   opponentDraw,
   putHandOnBottom,
+  putHandOnTop,
   opponentShuffleHandDraw,
   opponentCountShuffleDraw,
   countShuffleDrawPlus,
@@ -1192,6 +1268,7 @@ export const EXTRA_STEP_HANDLERS = {
   reshufflePrizes,
   variableDraw,
   lookAtTop: (ctx) => lookAtDeckEnd(ctx, false),
+  lookAtTopAbility: (ctx) => lookAtDeckEnd(ctx, false),
   lookAtBottom: (ctx) => lookAtDeckEnd(ctx, true),
   searchDeckSequence,
   evolveStage2,

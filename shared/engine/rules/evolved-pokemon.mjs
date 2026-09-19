@@ -83,10 +83,14 @@ export function stage2EvolvesFromBasic(stage2, basic, knownCards = []) {
  * @param {object[]} knownCards See stage2EvolvesFromBasic
  * @returns {{stage2: object, basics: object[]}[]} Only entries with at least one Basic
  */
-export function rareCandyOptions(player, knownCards = []) {
+export function rareCandyOptions(player, knownCards = [], turnNumber = null) {
   const inPlay = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
   const basics = inPlay.filter(
-    (c) => !c.attachedTo && topPokemonCard(inPlay, c) === c && (normalizeStage(c.stage) || 'Basic') === 'Basic'
+    (c) =>
+      !c.attachedTo &&
+      topPokemonCard(inPlay, c) === c &&
+      (normalizeStage(c.stage) || 'Basic') === 'Basic' &&
+      (turnNumber == null || c.enteredPlayTurn == null || c.enteredPlayTurn !== turnNumber)
   );
   return (player?.zones?.hand || [])
     .filter((c) => isPokemon(c) && normalizeStage(c.stage) === 'Stage 2')
@@ -109,11 +113,11 @@ export function ownedCards(player) {
  * Counts that decide whether a targeted Trainer has anything to act on
  * (trainer-play-conditions.mjs), from a server-state player.
  */
-export function trainerTargetCounts(player, knownCards = []) {
+export function trainerTargetCounts(player, knownCards = [], turnNumber = null) {
   const inPlay = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
   const roots = inPlay.filter((c) => !c.attachedTo);
   return {
-    rareCandyOptionCount: rareCandyOptions(player, knownCards).length,
+    rareCandyOptionCount: rareCandyOptions(player, knownCards, turnNumber).length,
     toolTargetCount: roots.filter(
       (root) => !inPlay.some((c) => c.attachedTo === root.instanceId && isToolKind(c))
     ).length,

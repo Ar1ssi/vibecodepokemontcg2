@@ -11,7 +11,11 @@ import { updateCount } from '../general/count.js';
 import { hideCard, revealCard } from '../general/reveal-and-hide.js';
 import { sort } from '../zones/general.js';
 import { attachCard } from './attach-card.js';
-import { hydrateHolo, imageAnchor, unhydrateHolo } from '../../setup/deck-constructor/hydrate-holo.js';
+import {
+  hydrateHolo,
+  imageAnchor,
+  unhydrateHolo,
+} from '../../setup/deck-constructor/hydrate-holo.js';
 import { legacyDomSuppressed } from '../../setup/netcode/server-rendered-zones.mjs';
 import { autoMoveActiveBenchCard } from './auto-move-active-bench-card.js';
 import { decreaseCardLayer } from './decrease-card-layer.js';
@@ -21,12 +25,37 @@ import { relocateAttachedCards } from './relocate-attached-cards.js';
 import { updateAttachedCardsPosition } from './update-attached-cards-position.js';
 import { updateCounters } from './update-counters.js';
 import { updateDestinationCover, updateOriginCover } from './update-cover.js';
-import { discardStadiumCardFromField, updateStadiumCard } from './update-stadium-card.js';
+import {
+  discardStadiumCardFromField,
+  updateStadiumCard,
+} from './update-stadium-card.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
-import { rulesState, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, ensureCardData, getStadium, canPerformAction, openPlayedToBenchWindow, clearPlayedToBenchWindow } from '/shared/engine/rules/rules-state.mjs';
-import { canEvolve, canPlayPokemonFromHand, markEvolvedThisTurn, requiresTurnEndOnEvolve } from '/shared/engine/rules/evolution.mjs';
-import { clearUntilLeavesActive, clearActiveSpotPendingEffects } from '/shared/engine/rules/attack-pending-effects.mjs';
-import { clearStatuses, getStatus, applyStatus } from '/shared/engine/rules/status.mjs';
+import {
+  rulesState,
+  markSupporterPlayed,
+  supporterPlayGate,
+  markStadiumPlayed,
+  ensureCardData,
+  getStadium,
+  canPerformAction,
+  openPlayedToBenchWindow,
+  clearPlayedToBenchWindow,
+} from '/shared/engine/rules/rules-state.mjs';
+import {
+  canEvolve,
+  canPlayPokemonFromHand,
+  markEvolvedThisTurn,
+  requiresTurnEndOnEvolve,
+} from '/shared/engine/rules/evolution.mjs';
+import {
+  clearUntilLeavesActive,
+  clearActiveSpotPendingEffects,
+} from '/shared/engine/rules/attack-pending-effects.mjs';
+import {
+  clearStatuses,
+  getStatus,
+  applyStatus,
+} from '/shared/engine/rules/status.mjs';
 import {
   describeStadiumEffect,
   isStadiumCard,
@@ -41,12 +70,16 @@ import {
   stadiumBlocksStatusApplication,
 } from '/shared/engine/rules/stadium-effects.mjs';
 import { canAddToBench } from '/shared/engine/rules/ko-flow.mjs';
-import { countBenchPokemon, isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import {
+  countBenchPokemon,
+  isBoardPokemon,
+} from '/shared/engine/zones/active-pokemon.mjs';
 import { pokemonHasLockedEnergy } from '/shared/engine/rules/energy-effects.mjs';
 import { blocksItemPlay } from '/shared/engine/rules/ability-executors.mjs';
 import { shouldNitroReturnToHand } from '/shared/engine/rules/special-energy-effects.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
+import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
 
 const pokemonInPlay = (user) =>
   [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
@@ -55,7 +88,11 @@ const pokemonInPlay = (user) =>
 
 const benchLimitFor = (user, extraPokemon = null) => {
   let inPlay = pokemonInPlay(user);
-  if (extraPokemon && extraPokemon.type === 'Pokémon' && !inPlay.includes(extraPokemon)) {
+  if (
+    extraPokemon &&
+    extraPokemon.type === 'Pokémon' &&
+    !inPlay.includes(extraPokemon)
+  ) {
     inPlay = [...inPlay, extraPokemon];
   }
   return getEffectiveBenchLimit(playerHasTeraInPlay(inPlay));
@@ -151,7 +188,9 @@ export const moveCard = async (
   // where the card would occupy a slot on its own.
   if (dZoneId === 'bench' && !targetCard) {
     await ensureCardData(movingCard);
-    const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
+    const subtypes = (movingCard.subtypes || []).map((s) =>
+      String(s).toLowerCase()
+    );
     const cardType = String(movingCard.type || '').toLowerCase();
     const isItemOrSupporter =
       cardType === 'item' ||
@@ -210,9 +249,16 @@ export const moveCard = async (
   }
 
   // ── rules: Item play blocked by opponent Active (effect-prevent family) ─
-  if (rulesState.enabled && !syncReplay && oZoneId === 'hand' && dZoneId === 'board') {
+  if (
+    rulesState.enabled &&
+    !syncReplay &&
+    oZoneId === 'hand' &&
+    dZoneId === 'board'
+  ) {
     await ensureCardData(movingCard);
-    const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
+    const subtypes = (movingCard.subtypes || []).map((s) =>
+      String(s).toLowerCase()
+    );
     const isItem =
       String(movingCard.type || '').toLowerCase() === 'item' ||
       subtypes.includes('item');
@@ -250,14 +296,21 @@ export const moveCard = async (
     oZoneId === 'hand' &&
     dZoneId === 'board'
   ) {
-    const subtypes = (movingCard.subtypes || []).map((s) => String(s).toLowerCase());
+    const subtypes = (movingCard.subtypes || []).map((s) =>
+      String(s).toLowerCase()
+    );
     const isSupporter =
       String(movingCard.type || '').toLowerCase() === 'supporter' ||
       subtypes.includes('supporter');
     if (isSupporter) {
       const supporterGate = canPerformAction({ user, action: 'playSupporter' });
       if (!supporterGate.allowed) {
-        appendMessage(user, `⛔ ${supporterGate.reason}`, 'announcement', false);
+        appendMessage(
+          user,
+          `⛔ ${supporterGate.reason}`,
+          'announcement',
+          false
+        );
         return;
       }
     }
@@ -267,7 +320,12 @@ export const moveCard = async (
       supporterPlayed: rulesState.flags[user]?.supporterPlayed,
     });
     if (!gate.allowed) {
-      appendMessage(user, `⛔ ${movingCard.name}: ${gate.reason}`, 'announcement', false);
+      appendMessage(
+        user,
+        `⛔ ${movingCard.name}: ${gate.reason}`,
+        'announcement',
+        false
+      );
       return { destZoneId, ok: false };
     }
     if (isSupporter) markSupporterPlayed(user, movingCard.name);
@@ -289,13 +347,22 @@ export const moveCard = async (
             'announcement',
             false
           );
-          await discardStadiumCardFromField(displaced.user, displaced.card, initiator);
+          await discardStadiumCardFromField(
+            displaced.user,
+            displaced.card,
+            initiator
+          );
           if (parseStadiumBenchLimit(displaced.card)) {
             await enforceBenchLimit(user);
             await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
           }
         }
-        appendMessage(user, describeStadiumEffect(movingCard), 'announcement', false);
+        appendMessage(
+          user,
+          describeStadiumEffect(movingCard),
+          'announcement',
+          false
+        );
         const drawN = parseStadiumSetupDraw(movingCard);
         if (drawN && classifyStadiumEffect(movingCard) === 'setup-once') {
           draw(user, user, drawN, true);
@@ -364,11 +431,18 @@ export const moveCard = async (
       appendMessage(user, `⛔ ${evolveGate.reason}`, 'announcement', false);
       return;
     }
-    const wasPlayedThisTurn = targetCard.enteredPlayTurn === rulesState.turnNumber;
-    const evoCheck = await canEvolve(user, targetCard, movingCard, wasPlayedThisTurn, {
-      isRareCandy,
-      bypassJustEvolvedGate,
-    });
+    const wasPlayedThisTurn =
+      targetCard.enteredPlayTurn === rulesState.turnNumber;
+    const evoCheck = await canEvolve(
+      user,
+      targetCard,
+      movingCard,
+      wasPlayedThisTurn,
+      {
+        isRareCandy,
+        bypassJustEvolvedGate,
+      }
+    );
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
       return { destZoneId, ok: false };
@@ -428,7 +502,7 @@ export const moveCard = async (
     movingCard.image?.relative
   ) {
     const hostPokemon = oZone.array.find(
-      (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative,
+      (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative
     );
     if (shouldNitroReturnToHand(movingCard, hostPokemon, true)) {
       destZoneId = 'hand';
@@ -437,7 +511,7 @@ export const moveCard = async (
         user,
         `🔥 ${movingCard.name} returns to your hand (Nitro Fire Energy).`,
         'announcement',
-        false,
+        false
       );
     }
   }
@@ -491,7 +565,8 @@ export const moveCard = async (
     systemState.isTwoPlayer &&
     systemState.initiator !== user;
   const isFaceDownCard =
-    movingCard.image.faceDown && ['active', 'bench', 'board', 'stadium'].includes(dZoneId);
+    movingCard.image.faceDown &&
+    ['active', 'bench', 'board', 'stadium'].includes(dZoneId);
   const mirrorPlayVisible =
     syncReplay && ['active', 'bench', 'board', 'stadium'].includes(dZoneId);
 
@@ -541,7 +616,12 @@ export const moveCard = async (
         ) {
           applyStatus(user, evoKey, 'confused');
         }
-        appendMessage(user, `${movingCard.name} evolved onto ${targetCard.name}!`, 'announcement', false);
+        appendMessage(
+          user,
+          `${movingCard.name} evolved onto ${targetCard.name}!`,
+          'announcement',
+          false
+        );
         document.dispatchEvent(
           new CustomEvent('rules-opponent-evolved', {
             detail: { user, evolvedCard: movingCard, zoneId: dZoneId },
@@ -554,7 +634,11 @@ export const moveCard = async (
             'announcement',
             false
           );
-          document.dispatchEvent(new CustomEvent('rules-mega-evolution-forces-turn-end', { detail: { user } }));
+          document.dispatchEvent(
+            new CustomEvent('rules-mega-evolution-forces-turn-end', {
+              detail: { user },
+            })
+          );
         }
       }
     } else {
@@ -569,7 +653,7 @@ export const moveCard = async (
               fromZone: oZoneId,
               toZone: dZoneId,
             },
-          }),
+          })
         );
       }
     }
@@ -580,7 +664,10 @@ export const moveCard = async (
     //special initialization is needed for cards in the active and bench since pokemon has its own container with its attached cards
     if (activeOrBenchZone.includes(dZoneId)) {
       initializeActiveBenchCard(user, movingCard, dZoneId, dZone);
-      if (movingCard.type === 'Pokémon' && !activeOrBenchZone.includes(oZoneId)) {
+      if (
+        movingCard.type === 'Pokémon' &&
+        !activeOrBenchZone.includes(oZoneId)
+      ) {
         // Moving active<->bench (swap, promotion after knockout) isn't a
         // fresh play — the Pokémon was already in play, so it stays
         // evolve-eligible instead of re-triggering the just-played gate.
@@ -609,7 +696,8 @@ export const moveCard = async (
         : null;
       if (dZoneId === 'stadium') unhydrateHolo(movingCard);
       dZone.element.appendChild(movingCard.image);
-      if (['hand', 'prizes', 'discard', 'lostZone', 'board'].includes(dZoneId)) hydrateHolo(movingCard);
+      if (['hand', 'prizes', 'discard', 'lostZone', 'board'].includes(dZoneId))
+        hydrateHolo(movingCard);
       if (
         handFlight &&
         // The mirror of the opponent's live draw sets syncReplay too
@@ -687,7 +775,9 @@ export const moveCard = async (
 
   //reset type classification of the card if the card is no longer in play
   if (
-    !['active', 'board', 'bench', 'stadium', 'attachedCards'].includes(dZoneId) &&
+    !['active', 'board', 'bench', 'stadium', 'attachedCards'].includes(
+      dZoneId
+    ) &&
     movingCard.type2
   ) {
     movingCard.type = movingCard.type2;
@@ -769,9 +859,17 @@ export const moveCard = async (
     }
   }
 
-  if (!syncReplay && rulesState.enabled && parseStadiumBenchLimit(getStadium()?.card)) {
+  if (
+    !syncReplay &&
+    rulesState.enabled &&
+    parseStadiumBenchLimit(getStadium()?.card)
+  ) {
     await enforceBenchLimit(user);
     await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
+  }
+
+  if (oZoneId === 'hand' || dZoneId === 'hand') {
+    reconcileHandStacks(user);
   }
 
   return { destZoneId, ok: true };
