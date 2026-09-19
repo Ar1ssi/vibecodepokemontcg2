@@ -9,11 +9,13 @@ import {
   findCard,
   createGameState,
   attachmentHostId,
+  discardCardToPlayerZone,
 } from './state.mjs';
 import {
   isEnergy,
   isPokemon,
   isTrainer,
+  isBasicPokemon,
   getRetreatCostCount,
   createCard,
   mintInstanceId,
@@ -64,8 +66,13 @@ import {
   getStadiumRetreatCost,
   isStadiumRetreatPrevention,
   isStadiumToolNegation,
-  pokemonHasRuleBox,
 } from './rules/stadium-effects.mjs';
+import {
+  isRuleBoxPokemon,
+  isGxCard,
+  isVstarCard,
+  isTeamFlareHyperGearCard,
+} from './rules/card-classify.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import {
@@ -74,7 +81,11 @@ import {
   ownedCards,
   topPokemonCard,
 } from './rules/evolved-pokemon.mjs';
-import { normalizeStage, pokemonNamesMatch } from './rules/evolution.mjs';
+import {
+  normalizeStage,
+  pokemonNamesMatch,
+  requiresTurnEndOnEvolve,
+} from './rules/evolution.mjs';
 import {
   addCondition,
   removeCondition,
@@ -206,8 +217,7 @@ function discardCardFromPlayerZone(draft, instanceId, playerId) {
     if (idx !== -1) {
       const [removed] = zone.splice(idx, 1);
       removed.attachedTo = null;
-      if (!player.zones.discard) player.zones.discard = [];
-      player.zones.discard.push(removed);
+      discardCardToPlayerZone(player, removed);
       return removed;
     }
   }
@@ -508,7 +518,7 @@ function handleKnockout(
   // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
-  const victimDiscard = draft.players[victimPlayerId]?.zones?.discard || [];
+  const victimPlayer = draft.players[victimPlayerId];
 
   const wasActive = victimActive.some(
     (c) => c.instanceId === victim.instanceId
@@ -572,7 +582,8 @@ function handleKnockout(
         c.damage = 0;
         clearConditions(c);
         c.attachedTo = null;
-        victimDiscard.push(c);
+        // Prism Star cards go to the Lost Zone instead of discard (App. 17).
+        discardCardToPlayerZone(victimPlayer, c);
       }
     }
   }
@@ -607,25 +618,54 @@ function handleKnockout(
     }
   }
 
-  // Win condition checks. An entitlement covering every remaining prize is the win
-  // condition even though the cards only reach hand when the command settles, and it
-  // must be reported ahead of the victim's no-Pokémon loss.
-  if (attackerPrizes.length <= (attacker?.flags?.prizesOwed || 0)) {
+  // Win condition checks (rulebook 30c 1.3a / p.21 "both players win at the same
+  // time"). Count how many ways each player wins on this Knockout, then compare:
+  // the side with more ways wins outright, and only an equal non-zero count is a
+  // genuine tie. Taking the last prize *and* emptying the victim's board is two
+  // ways for the attacker, not a draw; and a self-KO that empties the attacker's
+  // own board is a way for the victim.
+  const attackerWinsByPrizes =
+    attackerPrizes.length <= (attacker?.flags?.prizesOwed || 0);
+  const remainingActive = victimActive.filter((c) => !c.attachedTo);
+  const remainingBench = victimBench.filter((c) => !c.attachedTo);
+  const victimWiped =
+    remainingActive.length === 0 && remainingBench.length === 0;
+
+  const attackerOwnActive = attacker?.zones?.active || [];
+  const attackerOwnBench = attacker?.zones?.bench || [];
+  const attackerWiped =
+    attackerOwnActive.filter((c) => !c.attachedTo).length === 0 &&
+    attackerOwnBench.filter((c) => !c.attachedTo).length === 0;
+
+  const attackerWays = (attackerWinsByPrizes ? 1 : 0) + (victimWiped ? 1 : 0);
+  const victimWays = attackerWiped ? 1 : 0;
+
+  if (attackerWays > victimWays) {
     setGameEnded(draft, {
       winner: attackerPlayerId,
-      reason: 'all prize cards taken',
+      reason: attackerWinsByPrizes
+        ? 'all prize cards taken'
+        : 'no Pokémon in play',
       events,
     });
-  } else {
-    const remainingActive = victimActive.filter((c) => !c.attachedTo);
-    const remainingBench = victimBench.filter((c) => !c.attachedTo);
-    if (remainingActive.length === 0 && remainingBench.length === 0) {
-      setGameEnded(draft, {
-        winner: attackerPlayerId,
-        reason: 'no Pokémon in play',
-        events,
-      });
-    }
+  } else if (victimWays > attackerWays) {
+    setGameEnded(draft, {
+      winner: victimPlayerId,
+      reason: 'no Pokémon in play',
+      events,
+    });
+  } else if (attackerWays > 0) {
+    setGameEnded(draft, {
+      simultaneous: [attackerPlayerId, victimPlayerId],
+      ways: {
+        [attackerPlayerId]: [
+          ...(attackerWinsByPrizes ? ['all prize cards taken'] : []),
+          ...(victimWiped ? ['no Pokémon in play'] : []),
+        ],
+        [victimPlayerId]: attackerWiped ? ['no Pokémon in play'] : [],
+      },
+      events,
+    });
   }
 }
 
@@ -786,6 +826,9 @@ function settlePrizeEntitlements(draft, { events }) {
   );
   if (owedPlayerIds.length === 0) return;
 
+  // The tiebreaker is a fresh race; the original match's entitlements are void.
+  if (draft.turn?.phase === 'tiebreak') return;
+
   if (draft.turn?.phase === 'ended') {
     for (const pid of owedPlayerIds)
       collectPrizeEntitlement(draft, { playerId: pid, events });
@@ -873,12 +916,12 @@ function applyRetreatSwap(
       if (idx >= 0) {
         const [discarded] = player.zones.active.splice(idx, 1);
         discarded.attachedTo = null;
-        player.zones.discard.push(discarded);
+        const to = discardCardToPlayerZone(player, discarded);
         events.push({
           type: 'cardMoved',
           instanceId: id,
           from: 'active',
-          to: 'discard',
+          to,
           playerId,
         });
       }
@@ -894,13 +937,13 @@ function applyRetreatSwap(
       if (card.attachedTo === active.instanceId && isEnergy(card)) {
         player.zones.active.splice(i, 1);
         card.attachedTo = null;
-        player.zones.discard.push(card);
+        const to = discardCardToPlayerZone(player, card);
         discardedCount++;
         events.push({
           type: 'cardMoved',
           instanceId: card.instanceId,
           from: 'active',
-          to: 'discard',
+          to,
           playerId,
         });
       }
@@ -966,6 +1009,9 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.
   const prizesOwed = draft.players[nextPlayerId].flags?.prizesOwed;
+  // Once-per-game allowances live outside `flags` (which this function
+  // rebuilds), so mirror them back in for the client's special-move buttons.
+  const oncePerGame = draft.players[nextPlayerId].oncePerGame || {};
 
   draft.turn.player = nextPlayerId;
   draft.turn.number = (draft.turn.number || 1) + 1;
@@ -984,6 +1030,8 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     abilitiesUsed: {},
     evolved: {},
     briarActive: false,
+    vstarUsed: Boolean(oncePerGame.vstarUsed),
+    gxUsed: Boolean(oncePerGame.gxUsed),
     ...(prizesOwed ? { prizesOwed } : {}),
   };
   for (const p of Object.values(draft.players || {})) {
@@ -1025,9 +1073,31 @@ function advanceTurn(draft, { nextPlayerId, events }) {
 }
 
 /**
- * Marks game as ended with winner and reason.
+ * Marks game as ended with winner and reason, or — when both players satisfy a
+ * win condition on the same Knockout — enters the sudden-death `tiebreak`
+ * phase with no winner (rulebook 30c 1.3a).
  */
-function setGameEnded(draft, { winner, reason, events }) {
+function setGameEnded(draft, { winner, reason, simultaneous, ways, events }) {
+  if (Array.isArray(simultaneous) && simultaneous.length === 2) {
+    const [a, b] = simultaneous;
+    draft.turn.phase = 'tiebreak';
+    draft.winner = null;
+    draft.winReason = 'simultaneous';
+    // Sudden death: the first Prize taken from here wins, including after the
+    // interim `pass` hand-over that flips the turn back to `main` (1.2). The
+    // fresh six-prize mat is a tracked follow-up; this flag is the interim
+    // "first Prize wins" rule, the same one `setupGame({ firstPrizeWins })` sets.
+    draft.firstPrizeWins = true;
+    draft.tiebreak = {
+      players: [a, b],
+      ways: {
+        [a]: [...(ways?.[a] || [])],
+        [b]: [...(ways?.[b] || [])],
+      },
+    };
+    events.push({ type: 'tiebreakStarted', players: [a, b] });
+    return;
+  }
   draft.turn.phase = 'ended';
   draft.winner = winner;
   draft.winReason = reason;
@@ -1046,6 +1116,26 @@ function ensureOncePerGame(draft, playerId) {
     player.oncePerGame = { vstarUsed: false, gxUsed: false };
   }
   return player.oncePerGame;
+}
+
+/**
+ * Whether the game has stopped resolving normal play — either finished or
+ * awaiting its sudden-death tiebreaker. Start/end-of-turn hooks must not fire
+ * once this is true.
+ */
+function isGameConcluded(draft) {
+  const phase = draft?.turn?.phase;
+  return phase === 'ended' || phase === 'tiebreak';
+}
+
+/**
+ * Whether the game has no legal play left at all. Unlike `isGameConcluded`,
+ * this excludes `tiebreak`: during a sudden-death tiebreak a `pass` may still
+ * hand the turn over (1.2), so only a decided-but-unresolved `ended` state
+ * freezes the game.
+ */
+function isGameFrozen(draft) {
+  return draft?.turn?.phase === 'ended';
 }
 
 /**
@@ -1081,8 +1171,18 @@ function validateReferences(state, command) {
       if (!cardRef || !targetRef) {
         return { valid: false, error: 'stale_view' };
       }
-      // Attached card and target card must belong to acting player
-      if (cardRef.playerId !== playerId || targetRef.playerId !== playerId) {
+      // Attached card and target card must belong to acting player, except a
+      // Team Flare Hyper Gear, which attaches to the OPPONENT's Pokémon-EX
+      // (App. 24).
+      const teamFlareToOpponent =
+        cardRef.playerId === playerId &&
+        targetRef.playerId !== playerId &&
+        isTeamFlareHyperGearCard(cardRef.card) &&
+        isExCard(targetRef.card);
+      if (
+        cardRef.playerId !== playerId ||
+        (targetRef.playerId !== playerId && !teamFlareToOpponent)
+      ) {
         return { valid: false, error: 'stale_view' };
       }
       // Target must be in play (active or bench)
@@ -1104,6 +1204,12 @@ function validateReferences(state, command) {
       const cardRef = findCard(state, payload.instanceId);
       if (!cardRef) {
         return { valid: false, error: 'stale_view' };
+      }
+      // Special Conditions can only be placed on the Active Pokémon (p.15);
+      // parsed card effects already target the Active, so this closes the
+      // manual-tool hole.
+      if (type === 'addSpecialCondition' && cardRef.zoneId !== 'active') {
+        return { valid: false, error: 'special_condition_not_active' };
       }
       // In sandbox / manual mode, counter updates on opponent's cards are only allowed on public in-play zones
       if (
@@ -1334,7 +1440,7 @@ export function validateLegality(state, command) {
   }
 
   // Turn phase validation
-  if (state.turn?.phase === 'ended') {
+  if (isGameFrozen(state)) {
     return { allowed: false, reason: 'Game is over.' };
   }
   if (type === 'setup') {
@@ -1430,6 +1536,23 @@ export function validateLegality(state, command) {
     }
   }
 
+  // A genuine tie (both boards empty) enters the `tiebreak` phase to resolve the
+  // winner on the next Prize taken; it is a resolution prompt, not normal play,
+  // so board actions are rejected until `takePrizes` or `pass` resolves it (1.2).
+  // `pass`, `takeTurn` and `takePrizes` stay legal.
+  if (
+    state.turn?.phase === 'tiebreak' &&
+    [
+      'attack',
+      'moveCard',
+      'attachCard',
+      'playTrainer',
+      'useAbility',
+    ].includes(type)
+  ) {
+    return { allowed: false, reason: 'tiebreak_pending' };
+  }
+
   switch (type) {
     case 'draw': {
       const deck = player.zones?.deck || [];
@@ -1464,6 +1587,22 @@ export function validateLegality(state, command) {
         const activePokemonCount = active.filter((c) => !c.attachedTo).length;
         if (activePokemonCount >= 1) {
           return { allowed: false, reason: 'active_occupied' };
+        }
+      }
+
+      // Playing a Pokémon from hand is Basic-only. isBasicPokemon now rejects
+      // V-UNION / Restored / BREAK (rulebook 30c 2.2/2.5); unknown-stage cards
+      // still default to Basic so async-unenriched cards stay playable.
+      if (
+        payload.from === 'hand' &&
+        (payload.to === 'bench' || payload.to === 'active')
+      ) {
+        const cardRef = findCard(state, payload.instanceId);
+        if (cardRef && isPokemon(cardRef.card) && !isBasicPokemon(cardRef.card)) {
+          return {
+            allowed: false,
+            reason: 'Only Basic Pokémon can be played from your hand.',
+          };
         }
       }
 
@@ -1506,7 +1645,7 @@ export function validateLegality(state, command) {
               if (accel.benchedOnly && targetRef.zoneId !== 'bench') {
                 continue;
               }
-              if (accel.noRuleBox && pokemonHasRuleBox(targetPokemon)) {
+              if (accel.noRuleBox && isRuleBoxPokemon(targetPokemon)) {
                 continue;
               }
               if (accel.targetType) {
@@ -1538,6 +1677,17 @@ export function validateLegality(state, command) {
             allowed: false,
             reason: 'Can only attach a Pokémon Tool to a Pokémon in play.',
           };
+        }
+        // Team Flare Hyper Gear is the exception that attaches to the
+        // opponent's Pokémon-EX (App. 24) — enforce both halves here.
+        if (isTeamFlareHyperGearCard(cardRef.card)) {
+          if (targetRef.playerId === playerId || !isExCard(targetRef.card)) {
+            return {
+              allowed: false,
+              reason:
+                "Team Flare Hyper Gear must be attached to your opponent's Pokémon-EX.",
+            };
+          }
         }
         const targetZoneCards =
           targetRef.player?.zones?.[targetRef.zoneId] || [];
@@ -1783,7 +1933,7 @@ export function validateLegality(state, command) {
       if (!Number.isInteger(count) || count < 1) {
         return { allowed: false, reason: 'Invalid prize count.' };
       }
-      if (count > owed) {
+      if (count > owed && !tiebreakActive(state)) {
         return {
           allowed: false,
           reason: 'No Knockout has awarded you that many prize cards.',
@@ -1797,7 +1947,7 @@ export function validateLegality(state, command) {
 
     case 'takePrizesByIndex': {
       const count = payload?.indices?.length || 0;
-      if (count > (player.flags?.prizesOwed || 0)) {
+      if (count > (player.flags?.prizesOwed || 0) && !tiebreakActive(state)) {
         return {
           allowed: false,
           reason: 'No Knockout has awarded you that many prize cards.',
@@ -1895,23 +2045,20 @@ export function validateLegality(state, command) {
     }
 
     case 'useVStarGX': {
-      // Independent once-per-game limits (App. 9/19): the VSTAR Power and the GX attack
-      // do not consume each other's allowance. Guarded here too because validateLegality
-      // is exported and callable without applyCommand's shape check.
-      if (payload.kind !== 'gx' && payload.kind !== 'vstar') {
-        return { allowed: false, reason: "kind must be 'vstar' or 'gx'." };
-      }
-      const used =
-        payload.kind === 'gx'
-          ? player.oncePerGame?.gxUsed
-          : player.oncePerGame?.vstarUsed;
-      if (used) {
+      // Independent once-per-game limits (App. 9/19): the VSTAR Power and the GX
+      // attack do not consume each other's allowance. `kind` is inferred from the
+      // source card when the sender omits it; a null kind is the legacy fallback
+      // (no discriminator and no classifiable card), which checks both allowances.
+      const kind = effectiveOncePerGameKind(state, command);
+      if (oncePerGameUsed(player, kind)) {
         return {
           allowed: false,
           reason:
-            payload.kind === 'gx'
+            kind === 'gx'
               ? 'Only one GX attack can be used per game.'
-              : 'Only one VSTAR Power can be used per game.',
+              : kind === 'vstar'
+                ? 'VSTAR Power already used this game.'
+                : 'VSTAR / GX attack or ability already used this game.',
         };
       }
       return { allowed: true };
@@ -1920,6 +2067,37 @@ export function validateLegality(state, command) {
     default:
       return { allowed: true };
   }
+}
+
+/**
+ * Which once-per-game allowance a `useVStarGX` command spends: the explicit
+ * `payload.kind` when the sender provides it, otherwise the source card's
+ * subtype (a VSTAR Power vs a GX attack). Returns null when neither is
+ * establishable, in which case the legacy both-flags behaviour applies.
+ */
+function effectiveOncePerGameKind(state, command) {
+  const kind = command?.payload?.kind;
+  if (kind === 'vstar' || kind === 'gx') return kind;
+  const card = findCard(state, command?.payload?.instanceId)?.card;
+  if (isVstarCard(card)) return 'vstar';
+  if (isGxCard(card)) return 'gx';
+  return null;
+}
+
+function oncePerGameUsed(player, kind) {
+  const used = player?.oncePerGame || player?.flags || {};
+  if (kind === 'vstar') return Boolean(used.vstarUsed);
+  if (kind === 'gx') return Boolean(used.gxUsed);
+  return Boolean(used.vstarUsed || used.gxUsed);
+}
+
+/**
+ * Whether the game is in a sudden-death tiebreaker where the first Prize card
+ * taken wins: either the detected draw's `tiebreak` phase or a fresh tiebreak
+ * game flagged by `setupGame({ firstPrizeWins: true })`.
+ */
+function tiebreakActive(state) {
+  return state?.turn?.phase === 'tiebreak' || state?.firstPrizeWins === true;
 }
 
 /**
@@ -2247,8 +2425,9 @@ export function applyCommand(state, command, rng = null) {
         // Set attachment pointer
         cardRef.card.attachedTo = hostRef.card.instanceId;
 
-        // Add to target's zone
-        const destZone = draft.players[playerId].zones[hostRef.zoneId];
+        // Add to the HOST's zone, not the actor's: a Team Flare Hyper Gear is
+        // played by you but attaches to the opponent's Pokémon-EX (App. 24).
+        const destZone = draft.players[hostRef.playerId].zones[hostRef.zoneId];
         destZone.push(cardRef.card);
 
         // Update turn energy attachment flag if energy
@@ -2275,6 +2454,30 @@ export function applyCommand(state, command, rng = null) {
             instanceId: payload.instanceId,
             targetInstanceId: payload.targetInstanceId,
           });
+
+          // Gen 6 Mega Evolution / Primal Reversion: the evolve ends the turn
+          // immediately unless the matching Spirit Link is already attached
+          // (rulebook 30c 1.4). The reducer is the authority; the client only
+          // mirrored this before.
+          const attachedCards = destZone.filter(
+            (c) => c.attachedTo === hostRef.card.instanceId
+          );
+          if (
+            requiresTurnEndOnEvolve(cardRef.card, {
+              ...hostRef.card,
+              attachedCards,
+            })
+          ) {
+            const megaOppId = Object.keys(draft.players || {}).find(
+              (id) => id !== playerId
+            );
+            events.push({
+              type: 'turnEndedByMegaEvolve',
+              playerId,
+              instanceId: payload.instanceId,
+            });
+            advanceTurn(draft, { nextPlayerId: megaOppId, events });
+          }
         }
 
         events.push({
@@ -2481,13 +2684,13 @@ export function applyCommand(state, command, rng = null) {
           if (!attackerPlayer.flags) attackerPlayer.flags = {};
           attackerPlayer.flags.attackerAttacked = true;
 
-          if (draft.turn.phase !== 'ended') {
+          if (!isGameConcluded(draft)) {
             resolveCheckup(draft, {
               rng: activeRng,
               events,
               endingPlayerId: playerId,
             });
-            if (draft.turn.phase !== 'ended') {
+            if (!isGameConcluded(draft)) {
               advanceTurn(draft, { nextPlayerId: oppId, events });
             }
           }
@@ -2884,12 +3087,15 @@ export function applyCommand(state, command, rng = null) {
               1
             );
             discarded.attachedTo = null;
-            draft.players[playerId].zones.discard.push(discarded);
+            const to = discardCardToPlayerZone(
+              draft.players[playerId],
+              discarded
+            );
             events.push({
               type: 'cardMoved',
               instanceId: card.instanceId,
               from: 'active',
-              to: 'discard',
+              to,
               playerId,
               reason: 'attack-energy-discard',
             });
@@ -3050,13 +3256,13 @@ export function applyCommand(state, command, rng = null) {
       attackerPlayer.flags.attackerAttacked = true;
 
       // Auto-end turn after attacking (unless paused by pendingChoice)
-      if (!searchTriggered && draft.turn.phase !== 'ended') {
+      if (!searchTriggered && !isGameConcluded(draft)) {
         resolveCheckup(draft, {
           rng: activeRng,
           events,
           endingPlayerId: playerId,
         });
-        if (draft.turn.phase !== 'ended') {
+        if (!isGameConcluded(draft)) {
           advanceTurn(draft, { nextPlayerId: oppId, events });
         }
       }
@@ -3108,12 +3314,17 @@ export function applyCommand(state, command, rng = null) {
       const oppId = Object.keys(draft.players || {}).find(
         (id) => id !== playerId
       );
+      // A pass issued during the sudden-death tiebreak hands the turn over so
+      // the opponent can contest the first Prize (1.2). A Checkup that *creates*
+      // a tie in this same command must not advance, or the tie would never be
+      // resolvable — hence the entry-phase snapshot.
+      const wasTiebreak = draft.turn?.phase === 'tiebreak';
       resolveCheckup(draft, {
         rng: activeRng,
         events,
         endingPlayerId: playerId,
       });
-      if (draft.turn.phase !== 'ended') {
+      if (wasTiebreak || !isGameConcluded(draft)) {
         advanceTurn(draft, { nextPlayerId: oppId, events });
       }
       break;
@@ -3136,7 +3347,13 @@ export function applyCommand(state, command, rng = null) {
         cards: drawnPrizes.map((c) => ({ instanceId: c.instanceId })),
       });
 
-      if (prizes.length === 0) {
+      if (tiebreakActive(draft) && actualCount > 0) {
+        setGameEnded(draft, {
+          winner: playerId,
+          reason: 'tiebreak: first Prize card taken',
+          events,
+        });
+      } else if (prizes.length === 0) {
         setGameEnded(draft, {
           winner: playerId,
           reason: 'all prize cards taken',
@@ -3168,7 +3385,13 @@ export function applyCommand(state, command, rng = null) {
         cards: taken.map((c) => ({ instanceId: c.instanceId })),
       });
 
-      if (prizes.length === 0) {
+      if (tiebreakActive(draft) && taken.length > 0) {
+        setGameEnded(draft, {
+          winner: playerId,
+          reason: 'tiebreak: first Prize card taken',
+          events,
+        });
+      } else if (prizes.length === 0) {
         setGameEnded(draft, {
           winner: playerId,
           reason: 'all prize cards taken',
@@ -3241,17 +3464,26 @@ export function applyCommand(state, command, rng = null) {
     }
 
     case 'useVStarGX': {
+      const kind = effectiveOncePerGameKind(draft, command);
       const oncePerGame = ensureOncePerGame(draft, playerId);
-      if (oncePerGame) {
-        if (payload.kind === 'gx') oncePerGame.gxUsed = true;
-        else oncePerGame.vstarUsed = true;
+      const user = draft.players[playerId];
+      if (!user.flags) user.flags = {};
+      // `kind === null` is the legacy fallback: no discriminator and no
+      // classifiable source card, so spend both allowances as before. The
+      // flags mirror keeps the client's special-move buttons greyed.
+      if (kind !== 'gx') {
+        if (oncePerGame) oncePerGame.vstarUsed = true;
+        user.flags.vstarUsed = true;
+      }
+      if (kind !== 'vstar') {
+        if (oncePerGame) oncePerGame.gxUsed = true;
+        user.flags.gxUsed = true;
       }
       events.push({
-        type: payload.kind === 'gx' ? 'gxAttackUsed' : 'vstarUsed',
+        type: 'vstarUsed',
         playerId,
-        ...(payload.instanceId != null
-          ? { instanceId: payload.instanceId }
-          : {}),
+        instanceId: payload.instanceId,
+        kind,
       });
       break;
     }
@@ -3375,13 +3607,13 @@ export function applyCommand(state, command, rng = null) {
             if (!targetPlayer.flags) targetPlayer.flags = {};
             targetPlayer.flags.attackerAttacked = true;
           }
-          if (draft.turn.phase !== 'ended') {
+          if (!isGameConcluded(draft)) {
             resolveCheckup(draft, {
               rng: activeRng,
               events,
               endingPlayerId: initiatorPlayerId,
             });
-            if (draft.turn.phase !== 'ended') {
+            if (!isGameConcluded(draft)) {
               advanceTurn(draft, { nextPlayerId: token.oppId, events });
             }
           }
@@ -3432,13 +3664,13 @@ export function applyCommand(state, command, rng = null) {
 
         draft.pendingChoice = null;
 
-        if (draft.turn.phase !== 'ended') {
+        if (!isGameConcluded(draft)) {
           resolveCheckup(draft, {
             rng: activeRng,
             events,
             endingPlayerId: initiatorPlayerId,
           });
-          if (draft.turn.phase !== 'ended') {
+          if (!isGameConcluded(draft)) {
             advanceTurn(draft, { nextPlayerId: token.oppId, events });
           }
         }
@@ -3552,14 +3784,27 @@ export function applyCommand(state, command, rng = null) {
     case 'discardAll': {
       const player = draft.players[playerId];
       const moved = player.zones[payload.zoneId].splice(0);
-      player.zones.discard.push(...moved);
-      events.push({
-        type: 'zoneMoved',
-        from: payload.zoneId,
-        to: 'discard',
-        count: moved.length,
-        playerId,
-      });
+      // Prism Star cards route to the Lost Zone (App. 17); the rest to discard.
+      const routed = { discard: 0, lostZone: 0 };
+      for (const card of moved) routed[discardCardToPlayerZone(player, card)]++;
+      if (routed.discard > 0) {
+        events.push({
+          type: 'zoneMoved',
+          from: payload.zoneId,
+          to: 'discard',
+          count: routed.discard,
+          playerId,
+        });
+      }
+      if (routed.lostZone > 0) {
+        events.push({
+          type: 'zoneMoved',
+          from: payload.zoneId,
+          to: 'lostZone',
+          count: routed.lostZone,
+          playerId,
+        });
+      }
       break;
     }
 
@@ -3617,7 +3862,7 @@ export function applyCommand(state, command, rng = null) {
       const player = draft.players[playerId];
       const hand = player.zones.hand;
       const discarded = hand.splice(0);
-      player.zones.discard.push(...discarded);
+      for (const card of discarded) discardCardToPlayerZone(player, card);
       const count = Math.min(payload.count ?? 0, player.zones.deck.length);
       const drawn = player.zones.deck.splice(0, count);
       hand.push(...drawn);
@@ -3746,14 +3991,26 @@ export function applyCommand(state, command, rng = null) {
     case 'discardBoard': {
       const player = draft.players[playerId];
       const moved = player.zones.board.splice(0);
-      player.zones.discard.push(...moved);
-      events.push({
-        type: 'zoneMoved',
-        from: 'board',
-        to: 'discard',
-        count: moved.length,
-        playerId,
-      });
+      const routed = { discard: 0, lostZone: 0 };
+      for (const card of moved) routed[discardCardToPlayerZone(player, card)]++;
+      if (routed.discard > 0) {
+        events.push({
+          type: 'zoneMoved',
+          from: 'board',
+          to: 'discard',
+          count: routed.discard,
+          playerId,
+        });
+      }
+      if (routed.lostZone > 0) {
+        events.push({
+          type: 'zoneMoved',
+          from: 'board',
+          to: 'lostZone',
+          count: routed.lostZone,
+          playerId,
+        });
+      }
       break;
     }
 

@@ -815,8 +815,9 @@ export function translateActionToCmd(action, parameters = []) {
     }
 
     case 'VSTARGXFunction': {
-      // Legacy VSTAR-GX.js sends [type] ('GX' | 'VSTAR'); the marker carries the
-      // independent once-per-game limit (App. 9/19), so pass the discriminator through.
+      // Legacy VSTAR-GX.js sends [type] ('GX' | 'VSTAR') and no card identity
+      // (I22). Carry the once-per-game discriminator so the server can spend
+      // the matching allowance; instanceId is optional and the flag is per-player.
       const args = Array.isArray(parameters) ? parameters : [];
       const [type, instanceId] = args;
       const kind = String(type || '').toUpperCase() === 'GX' ? 'gx' : 'vstar';

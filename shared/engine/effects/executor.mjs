@@ -10,7 +10,7 @@
  * - 15: Step budget (MAX_STEPS = 200) prevents infinite recursion
  */
 
-import { findCard } from '../state.mjs';
+import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
@@ -201,7 +201,7 @@ export function executeSteps(draft, {
             const hIdx = hand.findIndex((c) => c.instanceId === sId);
             if (hIdx >= 0) {
               const [c] = hand.splice(hIdx, 1);
-              player.zones.discard.push(c);
+              discardCardToPlayerZone(player, c);
               discarded.push(c);
             }
           }
@@ -454,10 +454,9 @@ export function executeSteps(draft, {
 
       case 'discardHandThenDraw': {
         const hand = player.zones.hand || [];
-        const discard = player.zones.discard || [];
         const deck = player.zones.deck || [];
         const discarded = hand.splice(0, hand.length);
-        discard.push(...discarded);
+        for (const c of discarded) discardCardToPlayerZone(player, c);
         events.push({
           type: 'cardsDiscarded',
           playerId,

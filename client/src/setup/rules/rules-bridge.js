@@ -32,6 +32,7 @@
     } from '/shared/engine/rules/rules-state.mjs';
     import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
     import { handleKO, checkWinConditions, occupiedZoneCount, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
+import { isPrismStarCard } from '/shared/engine/rules/card-classify.mjs';
     import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from '/shared/engine/rules/status.mjs';
 import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
@@ -341,6 +342,13 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
         });
         if (win.over) {
           rulesState.phase = 'ended';
+          if (win.simultaneous) {
+            const drawReason =
+              'Simultaneous knockout — the game is a draw (tiebreaker not supported in this mode).';
+            appendMessage('', `⚔️ ${drawReason}`, 'announcement', false);
+            document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason: drawReason } }));
+            return true;
+          }
           const reason = `Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`;
           appendMessage('', `🏆 ${reason}`, 'announcement', false);
           document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
@@ -1382,7 +1390,9 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
                   }
 
                   const who = player === 'self' ? 'Your' : "Opponent's";
-                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to discard${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
+                  // Prism Star cards go to the Lost Zone, not the discard pile (App. 17).
+                  const koDestination = isPrismStarCard(card) ? 'lostZone' : 'discard';
+                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to ${koDestination === 'lostZone' ? 'the Lost Zone' : 'discard'}${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
     
                   playAttackFeedback(true);
     
@@ -1406,8 +1416,8 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
                       try {
                         const idx = zone.array.indexOf(card);
                         if (idx >= 0) {
-                          moveCardBundle('self', 'self', zoneId, 'discard', idx, false, 'move');
-                          appendMessage('', "auto: KO'd Pokémon moved to discard", 'announcement', false);
+                          moveCardBundle('self', 'self', zoneId, koDestination, idx, false, 'move');
+                          appendMessage('', `auto: KO'd Pokémon moved to ${koDestination === 'lostZone' ? 'the Lost Zone' : 'discard'}`, 'announcement', false);
                         }
                       } catch {}
                     });

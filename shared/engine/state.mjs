@@ -5,6 +5,7 @@
 
 import { hashBoardSnapshot, hashZoneMap } from './zones/zone-hash.mjs';
 import { cloneCard, createCard } from './cards.mjs';
+import { isPrismStarCard } from './rules/card-classify.mjs';
 
 export const PLAYER_ZONES = [
   'deck',
@@ -28,6 +29,22 @@ export function createPlayerZones() {
     zones[zone] = [];
   }
   return zones;
+}
+
+/**
+ * Puts a card that would be discarded into the discard pile — except a Prism
+ * Star card, which goes to the Lost Zone instead (App. 17). Mutates the
+ * player's zones and returns the destination zone key.
+ *
+ * @param {{ zones: Record<string, object[]> }} player
+ * @param {object} card
+ * @returns {'discard' | 'lostZone'}
+ */
+export function discardCardToPlayerZone(player, card) {
+  const zoneKey = isPrismStarCard(card) ? 'lostZone' : 'discard';
+  if (!Array.isArray(player.zones[zoneKey])) player.zones[zoneKey] = [];
+  player.zones[zoneKey].push(card);
+  return zoneKey;
 }
 
 /**
@@ -78,13 +95,13 @@ export function createGameState({
       deckList: Array.isArray(pData.deckList) ? [...pData.deckList] : [],
       zones: createPlayerZones(),
       flags: { ...(pData.flags || {}) },
-      // Game-scoped markers. advanceTurn rebuilds `flags` wholesale every turn,
-      // so the once-per-game limits (App. 9/19) must live outside it.
-      oncePerGame: {
-        vstarUsed: false,
-        gxUsed: false,
-        ...(pData.oncePerGame || {}),
-      },
+        // Per-player, per-game once-only allowances. Unlike `flags`, this object
+        // survives `advanceTurn`'s flags reset (rulebook 30c 1.2): a VSTAR Power
+        // and a GX attack are each once per game, independently.
+        oncePerGame: {
+          vstarUsed: Boolean(pData.oncePerGame?.vstarUsed),
+          gxUsed: Boolean(pData.oncePerGame?.gxUsed),
+        },
     };
 
     // If initial cards were provided for any zone
@@ -299,11 +316,10 @@ export function cloneGameState(state) {
     cloned.players[id] = {
       ...player,
       flags: { ...player.flags },
-      oncePerGame: {
-        vstarUsed: false,
-        gxUsed: false,
-        ...(player.oncePerGame || {}),
-      },
+        oncePerGame: {
+          vstarUsed: Boolean(player.oncePerGame?.vstarUsed),
+          gxUsed: Boolean(player.oncePerGame?.gxUsed),
+        },
       deckList: Array.isArray(player.deckList) ? [...player.deckList] : [],
       zones: {},
     };

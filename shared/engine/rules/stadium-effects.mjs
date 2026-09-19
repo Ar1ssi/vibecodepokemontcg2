@@ -12,6 +12,8 @@ import {
   applyHpBonus,
 } from './ability-executors.mjs';
 import { pokemonNamesMatch } from './evolution.mjs';
+import { isAncientTraitAbility } from './abilities.mjs';
+import { isRuleBoxPokemon, isTeraCard } from './card-classify.mjs';
 //
 // Layers:
 //   - `classifyStadiumEffect` — buckets a card into an effect family.
@@ -376,10 +378,9 @@ export function matchesStadiumSearch(card, { searchWhat, searchFilter } = {}) {
   return true;
 }
 
-export function isTeraCard(card) {
-  if (!card) return false;
-  return (card.subtypes || []).map(lower).includes('tera');
-}
+// Tera detection now lives in card-classify.mjs; re-exported for this
+// module's existing importers.
+export { isTeraCard };
 
 /** Bench limit for a player (5 default; 8 when Area Zero + any Tera in play). */
 export function getEffectiveBenchLimit(hasTeraInPlay) {
@@ -434,7 +435,7 @@ export function stadiumPreventionApplies(
   if (!d) return false;
   if (d.zone === 'bench' && zoneId !== 'bench') return false;
   if (d.zone === 'active' && zoneId !== 'active') return false;
-  if (d.ruleBoxOnly && defender && pokemonHasRuleBox(defender)) return false;
+  if (d.ruleBoxOnly && defender && isRuleBoxPokemon(defender)) return false;
   return true;
 }
 
@@ -494,23 +495,6 @@ export function stadiumFilterMatches(card, stadiumCard) {
   )
     return false;
   return true;
-}
-
-export function pokemonHasRuleBox(card) {
-  const sub = (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
-  return sub.some((s) =>
-    [
-      'ex',
-      'gx',
-      'v',
-      'vstar',
-      'vmax',
-      'tera',
-      'radiant',
-      'prism star',
-      'ace spec',
-    ].includes(s)
-  );
 }
 
 /**
@@ -872,7 +856,11 @@ export function stadiumAbilityBlocked(pokemon) {
   if (!rulesState.enabled || !pokemon) return false;
   const stadium = getStadium()?.card;
   if (!stadium || !isStadiumAbilityNegation(stadium)) return false;
-  return stadiumFilterMatches(pokemon, stadium);
+  if (!stadiumFilterMatches(pokemon, stadium)) return false;
+  // App. 23: Ancient Traits are not Abilities — a "no Abilities" effect leaves
+  // an α-Growth / Ω-Barrier trait alone.
+  if (isAncientTraitAbility(pokemon)) return false;
+  return true;
 }
 
 /** Perilous Jungle: extra poison damage during Pokémon Checkup. */

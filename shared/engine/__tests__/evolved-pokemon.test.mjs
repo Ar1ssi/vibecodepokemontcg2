@@ -51,6 +51,56 @@ test('evolvedView: an unevolved Pokémon is returned as is', () => {
   assert.equal(evolvedView([], null), null);
 });
 
+test('evolvedView: a BREAK card inherits the previous evolution and adds its own', () => {
+  const basic = pokemon({ instanceId: 1, name: 'Snorlax', hp: 120 });
+  const stage1 = pokemon({
+    instanceId: 2,
+    name: 'Snorlax',
+    stage: 'Stage 1',
+    hp: 140,
+    attachedTo: 1,
+    attacks: [
+      { name: 'Body Slam', damage: 30 },
+      { name: 'Big Appetite', damage: 10 },
+    ],
+    weakness: { type: 'Fighting', value: 2 },
+    retreatCost: ['Colorless', 'Colorless', 'Colorless'],
+  });
+  const breakCard = pokemon({
+    instanceId: 3,
+    name: 'Snorlax BREAK',
+    stage: 'BREAK',
+    hp: 180,
+    attachedTo: 1,
+    attacks: [{ name: 'Big Appetite', damage: 180 }],
+    abilities: [{ name: 'Break Ability' }],
+  });
+  const zone = [basic, stage1, breakCard];
+
+  assert.equal(topPokemonCard(zone, basic), breakCard);
+  const view = evolvedView(zone, basic);
+  assert.equal(view.name, 'Snorlax BREAK');
+  assert.equal(view.hp, 180);
+  assert.equal(view.instanceId, 1, 'state stays on the root');
+  assert.deepEqual(
+    view.attacks,
+    [
+      { name: 'Body Slam', damage: 30 },
+      { name: 'Big Appetite', damage: 180 },
+    ],
+    "the BREAK's own attack wins on a name collision"
+  );
+  assert.deepEqual(view.abilities, [{ name: 'Break Ability' }]);
+  assert.deepEqual(view.weakness, { type: 'Fighting', value: 2 });
+  assert.deepEqual(view.retreatCost, ['Colorless', 'Colorless', 'Colorless']);
+  assert.equal(stage1.name, 'Snorlax', 'the base card is not modified');
+});
+
+test('isBasicPokemon: a BREAK stage card is not Basic', async () => {
+  const { isBasicPokemon } = await import('../cards.mjs');
+  assert.equal(isBasicPokemon(pokemon({ name: 'Snorlax BREAK', stage: 'BREAK' })), false);
+});
+
 test('attack: an evolved Pokémon attacks with the Evolution card attacks', () => {
   const state = game();
   const basic = pokemon({ instanceId: 1, name: 'Charmander', hp: 70, attacks: [{ name: 'Ember', cost: [], damage: 10 }] });
@@ -193,4 +243,61 @@ test('playTrainer: server rejects Rare Candy with no Stage 2 in hand', () => {
 
   const res = applyCommand(state, { type: 'playTrainer', payload: { instanceId: 60 }, playerId: 'p1' });
   assert.match(res.error || '', /Stage 2/);
+});
+
+// ── Rulebook 30c 1.4: server enforces the legacy Mega/Primal turn-end ──
+
+function evolve(state, evo, base) {
+  return applyCommand(
+    state,
+    { type: 'attachCard', payload: { instanceId: evo, targetInstanceId: base }, playerId: 'p1' }
+  );
+}
+
+function megaGame(baseName, baseProps = {}) {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({ instanceId: 1, name: baseName, hp: 180, ...baseProps })
+  );
+  return state;
+}
+
+test('evolve: a legacy M Venusaur-EX ends the turn when no Spirit Link is attached', () => {
+  const state = megaGame('Venusaur-EX');
+  state.players.p1.zones.hand.push(
+    pokemon({ instanceId: 2, name: 'M Venusaur-EX', stage: 'Stage 1', hp: 230, evolvesFrom: 'Venusaur-EX' })
+  );
+
+  const res = evolve(state, 2, 1);
+  assert.equal(res.error, null);
+  assert.ok(res.events.some((e) => e.type === 'turnEndedByMegaEvolve'));
+  assert.equal(res.state.turn.player, 'p2', 'the Mega Evolution ends the turn');
+  assert.equal(res.state.turn.number, 4);
+});
+
+test('evolve: a matching Spirit Link keeps the turn after a legacy Mega Evolution', () => {
+  const state = megaGame('Venusaur-EX');
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 3, name: 'Venusaur Spirit Link', supertype: 'Trainer', trainerType: 'Tool', attachedTo: 1 })
+  );
+  state.players.p1.zones.hand.push(
+    pokemon({ instanceId: 2, name: 'M Venusaur-EX', stage: 'Stage 1', hp: 230, evolvesFrom: 'Venusaur-EX' })
+  );
+
+  const res = evolve(state, 2, 1);
+  assert.equal(res.error, null);
+  assert.ok(!res.events.some((e) => e.type === 'turnEndedByMegaEvolve'));
+  assert.equal(res.state.turn.player, 'p1', 'the Spirit Link suppresses the turn-end');
+});
+
+test('evolve: a modern Mega Venusaur ex does not end the turn', () => {
+  const state = megaGame('Venusaur ex');
+  state.players.p1.zones.hand.push(
+    pokemon({ instanceId: 2, name: 'Mega Venusaur ex', stage: 'Stage 1', hp: 280, evolvesFrom: 'Venusaur ex' })
+  );
+
+  const res = evolve(state, 2, 1);
+  assert.equal(res.error, null);
+  assert.ok(!res.events.some((e) => e.type === 'turnEndedByMegaEvolve'));
+  assert.equal(res.state.turn.player, 'p1');
 });

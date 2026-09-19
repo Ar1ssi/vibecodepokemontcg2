@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
-import { setupGame } from '../setup.mjs';
+import { setupGame, mulliganBonusDraws } from '../setup.mjs';
 
 function createTestDeck(hasBasics = true) {
   const cards = [];
@@ -85,6 +85,44 @@ test('setupGame: evaluates mulligans when player has no basic Pokemon and awards
   assert.equal(mulliganEvents.length, mulligans.p1);
 });
 
+test('mulliganBonusDraws: only the net extra mulligans are owed', () => {
+  assert.deepEqual(mulliganBonusDraws({ p1: 2, p2: 2 }, ['p1', 'p2']), {
+    p1: 0,
+    p2: 0,
+  });
+  assert.deepEqual(mulliganBonusDraws({ p1: 2, p2: 0 }, ['p1', 'p2']), {
+    p1: 0,
+    p2: 2,
+  });
+  assert.deepEqual(mulliganBonusDraws({ p1: 2, p2: 1 }, ['p1', 'p2']), {
+    p1: 0,
+    p2: 1,
+  });
+  assert.deepEqual(mulliganBonusDraws({ p1: 0, p2: 2 }, ['p1', 'p2']), {
+    p1: 2,
+    p2: 0,
+  });
+});
+
+test('setupGame: lockstep mulligans award no bonus draws', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'NoBasicsA', zones: { deck: createTestDeck(false) } },
+      p2: { username: 'NoBasicsB', zones: { deck: createTestDeck(false) } },
+    },
+    seed: 321,
+  });
+
+  const { mulligans, events } = setupGame(state, { maxMulligans: 2 });
+
+  assert.equal(mulligans.p1, 2);
+  assert.equal(mulligans.p2, 2);
+  const starterBonus = state.turn.player === 'p1' ? [1, 0] : [0, 1];
+  assert.equal(state.players.p1.zones.hand.length, 7 + starterBonus[0]);
+  assert.equal(state.players.p2.zones.hand.length, 7 + starterBonus[1]);
+  assert.equal(events.filter((e) => e.type === 'bonusDrawAwarded').length, 0);
+});
+
 test('setupGame: respects explicit firstPlayerId and deterministic seed', () => {
   const state1 = createGameState({
     players: {
@@ -119,4 +157,40 @@ test('setupGame: respects explicit firstPlayerId and deterministic seed', () => 
 
   setupGame(state3);
   assert.equal(state3.turn.player, starterWithoutOption);
+});
+
+test('setupGame: firstPrizeWins builds a playable sudden-death tiebreak game', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', zones: { deck: createTestDeck(true) } },
+      p2: { username: 'Gary', zones: { deck: createTestDeck(true) } },
+    },
+    seed: 7,
+  });
+
+  const { events } = setupGame(state, { firstPlayerId: 'p1', firstPrizeWins: true });
+
+  assert.equal(state.firstPrizeWins, true);
+  assert.equal(state.turn.phase, 'main');
+  assert.equal(state.turn.player, 'p1');
+  assert.ok(state.players.p1.zones.hand.length >= 7);
+  assert.ok(state.players.p2.zones.hand.length >= 7);
+  assert.equal(state.players.p1.zones.prizes.length, 6);
+  assert.equal(state.players.p2.zones.prizes.length, 6);
+  assert.ok(
+    events.some((e) => e.type === 'gameSetupCompleted' && e.firstPrizeWins === true)
+  );
+});
+
+test('setupGame: a normal setup clears any stale firstPrizeWins flag', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', zones: { deck: createTestDeck(true) } },
+      p2: { username: 'Gary', zones: { deck: createTestDeck(true) } },
+    },
+    seed: 7,
+  });
+  state.firstPrizeWins = true;
+  setupGame(state);
+  assert.equal('firstPrizeWins' in state, false);
 });

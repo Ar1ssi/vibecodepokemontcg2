@@ -485,10 +485,14 @@ test("effectiveHp: attached Tool (Hero's Cape) prevents knockout when damage equ
     0,
     'Squirtle should be knocked out without tool'
   );
-  assert.ok(
-    resKo.events.some((e) => e.type === 'prizesTaken'),
-    'Should award prize on KO'
-  );
+  // Taking the last prize while emptying the defender's board is a two-way
+  // attacker win (rulebook 30c 1.3a): the game ends immediately for p1 and the
+  // prize is collected, rather than held for a tiebreaker.
+  assert.equal(resKo.state.turn.phase, 'ended');
+  assert.equal(resKo.state.winner, 'p1');
+  assert.equal(resKo.state.winReason, 'all prize cards taken');
+  assert.equal(resKo.state.players.p1.zones.prizes.length, 0);
+  assert.equal(resKo.state.players.p1.flags.prizesOwed, undefined);
 
   // Third test: 170 damage against Squirtle with Hero's Cape -> should knock out
   const stateBigHit = setupGame();
@@ -509,10 +513,11 @@ test("effectiveHp: attached Tool (Hero's Cape) prevents knockout when damage equ
     0,
     'Squirtle should be knocked out at 170 HP'
   );
-  assert.ok(
-    resBigKo.events.some((e) => e.type === 'prizesTaken'),
-    'Should award prize on KO'
-  );
+  assert.equal(resBigKo.state.turn.phase, 'ended');
+  assert.equal(resBigKo.state.winner, 'p1');
+  assert.equal(resBigKo.state.winReason, 'all prize cards taken');
+  assert.equal(resBigKo.state.players.p1.zones.prizes.length, 0);
+  assert.equal(resBigKo.state.players.p1.flags.prizesOwed, undefined);
 });
 
 test('attack heal: heals damage from attacker and emits damageUpdated event', () => {

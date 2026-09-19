@@ -2,7 +2,17 @@
     // and detect win conditions (all prizes taken / no Pokémon left / deck-out).
     
     import { rulesState } from './rules-state.mjs';
-    
+    import {
+      isExCard,
+      isGxCard,
+      isMegaCard,
+      prizesForKO,
+    } from './card-classify.mjs';
+
+    // Card classification now lives in one place (rulebook 30c Phase 0).
+    // Re-exported here so existing ko-flow.mjs importers keep working.
+    export { isExCard, isGxCard, isMegaCard, prizesForKO };
+
     // prize state per player (prizes they have TAKEN, 0..6)
     export const prizeState = {
       self: { taken: 0 },
@@ -14,56 +24,10 @@
       prizeState.opp.taken = 0;
     }
     
-    // Card-class helpers (subtypes from TCGdex, with a name-suffix fallback
-    // because `subtypes` only exists after the async `ensureCardData` loads).
-    export function isExCard(card = {}) {
-      const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(s => String(s).toLowerCase()) : [];
-      if (subtypes.includes('ex')) return true;
-      return String(card.name || '').toLowerCase().endsWith('ex');
-    }
-
-    export function isGxCard(card = {}) {
-      const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(s => String(s).toLowerCase()) : [];
-      if (subtypes.includes('gx')) return true;
-      return String(card.name || '').toLowerCase().endsWith('gx');
-    }
-
-    export function isMegaCard(card = {}) {
-      const rarity = String(card.rarity || '').toLowerCase();
-      if (rarity.includes('mega')) return true;
-      const subtypes = Array.isArray(card.subtypes)
-        ? card.subtypes.map((s) => String(s).toLowerCase())
-        : [];
-      if (subtypes.some((s) => s.includes('mega'))) return true;
-      return /\bmega\b/.test(String(card.name || '').toLowerCase());
-    }
-
-    // How many prizes does knocking out this card award?
-    // Mega (including Mega ex) = 3; VMAX = 3; ex / GX / Double Rare = 2;
-    // V / VSTAR = 2; standard = 1.
-    export function prizesForKO(card = {}) {
-      const rarity = String(card.rarity || '').toLowerCase();
-      const subtypes = Array.isArray(card.subtypes) ? card.subtypes.map(s => String(s).toLowerCase()) : [];
-      const name = String(card.name || '').toLowerCase().trim();
-      const isVmax = subtypes.includes('vmax') || /(?:^|\s)vmax$/i.test(name);
-      const isVstar = subtypes.includes('vstar') || /(?:^|\s)vstar$/i.test(name);
-      const isV = subtypes.includes('v') || /(?:^|\s)v$/i.test(name);
-      if (isMegaCard(card) || isVmax) return 3;
-      if (isExCard(card) || isGxCard(card) || rarity.includes('double rare')) return 2;
-      if (isVstar || isV) return 2;
-      return 1;
-    }
-
-    // A simple check for rule box pokemon is if they give more than 1 prize card.
-    export function cardHasRuleBox(card = {}) {
-      if (!card) return false;
-      return prizesForKO(card) > 1;
-    }
-
-    // Prize cards awarded for a KO, per official rules (App. 16/19/26):
-    //  - GX: 2 prizes, exactly like ex — there is no match-loss rule.
-    //  - everything else: `prizesForKO` (VMAX/TAG TEAM/V-UNION = 3, ex/V/VSTAR = 2, …).
-    // Returns { type: 'prizes', count: number }
+    // KO outcome for a card, per official rules: a Knockout always awards
+    // prize cards, counted by prizesForKO (ex/GX/... = 2, VMAX/TAG TEAM/V-UNION
+    // = 3). There is no match-loss-on-KO rule; a GX Knockout is worth 2 prizes.
+    // Returns { type: 'prizes', count: number }.
     export function koOutcome(card = {}) {
       return { type: 'prizes', count: prizesForKO(card) };
     }
@@ -90,12 +54,19 @@
       if (deckCounts && deckCounts[turnPlayer] === 0) {
         return { over: true, winner: turnPlayer === 'self' ? 'opp' : 'self', reason: 'deck-out' };
       }
-      // no Pokémon in play (active + bench empty) = loss for that player
+      // no Pokémon in play (active + bench empty) = loss for that player.
+      // If BOTH players are simultaneously emptied, neither wins outright:
+      // report the draw so the caller can start a sudden-death tiebreaker.
       if (activeCounts) {
-        for (const p of ['self', 'opp']) {
-          if ((activeCounts[p]?.active || 0) + (activeCounts[p]?.bench || 0) === 0) {
-            return { over: true, winner: p === 'self' ? 'opp' : 'self', reason: 'no Pokémon in play' };
-          }
+        const emptyPlayers = ['self', 'opp'].filter(
+          (p) => (activeCounts[p]?.active || 0) + (activeCounts[p]?.bench || 0) === 0
+        );
+        if (emptyPlayers.length === 2) {
+          return { over: true, simultaneous: ['self', 'opp'], reason: 'no Pokémon in play' };
+        }
+        if (emptyPlayers.length === 1) {
+          const p = emptyPlayers[0];
+          return { over: true, winner: p === 'self' ? 'opp' : 'self', reason: 'no Pokémon in play' };
         }
       }
       return { over: false };
@@ -104,6 +75,9 @@
     // Called when the attack engine reports a KO. Handles prize award + any
     // win check. Returns an announcement payload for the UI.
     export function handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride }) {
+      // A Knockout always awards prizes (GX included: 2). The attacker only
+      // wins when the award reaches all 6; simultaneous board-empties are
+      // detected separately by checkWinConditions.
       const prizeCount = prizeCountOverride ?? prizesForKO(defender);
       const award = awardPrizes(attackerPlayer, prizeCount);
       return {

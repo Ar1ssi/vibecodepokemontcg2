@@ -49,6 +49,7 @@ import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions, occupiedZoneCount } from '/shared/engine/rules/ko-flow.mjs';
+import { isPrismStarCard } from '/shared/engine/rules/card-classify.mjs';
 import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '/shared/engine/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
@@ -414,6 +415,13 @@ export function evaluateWinCondition(turnPlayer = rulesState.turnPlayer) {
     });
     if (win.over) {
       rulesState.phase = 'ended';
+      if (win.simultaneous) {
+        const drawReason =
+          'Simultaneous knockout — the game is a draw (tiebreaker not supported in this mode).';
+        appendMessage('', `⚔️ ${drawReason}`, 'announcement', false);
+        document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason: drawReason } }));
+        return true;
+      }
       const reason = `Game over — ${win.winner === 'self' ? 'you win' : 'opponent wins'} (${win.reason})`;
       appendMessage('', `🏆 ${reason}`, 'announcement', false);
       document.dispatchEvent(new CustomEvent('rules-game-ended', { detail: { reason } }));
@@ -1191,7 +1199,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             const plan = planPromotion(true, benchCount);
             if (plan.promote) {
               const oldActiveName = oppActive.name || 'The active Pokémon';
-              moveCard(oppPlayer, user, 'active', 'discard', 0);
+              const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
+              moveCard(oppPlayer, user, 'active', koDestination, 0);
               moveCard(oppPlayer, user, 'bench', 'active', 0);
               const newActive = getZone(oppPlayer, 'active').array[0];
               appendMessage(
@@ -1202,7 +1211,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               );
             } else {
               const oldActiveName = oppActive.name || 'The active Pokémon';
-              moveCard(oppPlayer, user, 'active', 'discard', 0);
+              const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
+              moveCard(oppPlayer, user, 'active', koDestination, 0);
               appendMessage(
                 user,
                 `💀 ${oldActiveName} was Knocked Out!`,
@@ -1435,7 +1445,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               const plan = planPromotion(true, benchCount);
               if (plan.promote) {
                 const oldActiveName = oppActive.name || 'The active Pokémon';
-                moveCard(oppPlayer, user, 'active', 'discard', 0);
+                const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
+                moveCard(oppPlayer, user, 'active', koDestination, 0);
                 moveCard(oppPlayer, user, 'bench', 'active', 0);
                 const newActive = getZone(oppPlayer, 'active').array[0];
                 appendMessage(

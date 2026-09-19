@@ -545,7 +545,14 @@ export const COMMAND_SCHEMAS = {
           reason: 'instanceId must be an integer when provided',
         };
       }
-      if (payload.kind !== 'vstar' && payload.kind !== 'gx') {
+      // VSTAR Powers and GX attacks have separate once-per-game allowances.
+      // `kind` is optional (legacy senders omit it); when present it must name
+      // which allowance the command spends.
+      if (
+        payload.kind !== undefined &&
+        payload.kind !== 'vstar' &&
+        payload.kind !== 'gx'
+      ) {
         return { valid: false, reason: "kind must be 'vstar' or 'gx'" };
       }
       return { valid: true };

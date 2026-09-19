@@ -5,10 +5,11 @@ import {
   DECK_FORMATS,
   detectDeckFormat,
   isPocketCard,
+  officialCardName,
   validateDeck,
 } from '../core/deck-validation.mjs';
 
-function makeGroup({ name, count, supertype = 'Pokémon', pocket = false }) {
+function makeGroup({ name, count, supertype = 'Pokémon', pocket = false, extra = {} }) {
   const image = pocket
     ? `https://example.com/tcgp/${name}.png`
     : `https://example.com/tcg/${name}.png`;
@@ -24,6 +25,7 @@ function makeGroup({ name, count, supertype = 'Pokémon', pocket = false }) {
             name,
             supertype,
             image,
+            ...extra,
           },
         },
       ],
@@ -186,4 +188,202 @@ test('detectDeckFormat: equal pocket and TCG → TCG (tie defaults to TCG)', () 
 
 test('detectDeckFormat: empty deck → TCG', () => {
   assert.equal(detectDeckFormat({}), DECK_FORMATS.TCG);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3: deck-legality suite
+// ---------------------------------------------------------------------------
+
+test('deck with no Basic Pokémon is rejected (gap #6)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Haunter', count: 4, extra: { stage: 'Stage1' } }),
+    makeGroup({ name: 'Gengar', count: 4, extra: { stage: 'Stage2' } }),
+    makeGroup({ name: 'Lightning Energy', count: 52, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.equal(result.isValid, false);
+  assert.ok(result.errors.some((e) => e.includes('at least one Basic Pokémon')));
+});
+
+test('deck with a Basic Pokémon satisfies the Basic requirement (gap #6)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 56, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.equal(
+    result.errors.some((e) => e.includes('Basic Pokémon')),
+    false
+  );
+});
+
+test('Special Energy is subject to the copy limit (gap #7)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({
+      name: 'Double Turbo Energy',
+      count: 6,
+      supertype: 'Energy',
+      extra: { energyType: 'Special' },
+    }),
+    makeGroup({ name: 'Lightning Energy', count: 50, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('Double Turbo Energy has 6 copies (max 4).')));
+});
+
+test('Special Energy subtype is subject to the copy limit (gap #7)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({
+      name: 'Jet Energy',
+      count: 5,
+      supertype: 'Energy',
+      extra: { subtypes: ['Special'] },
+    }),
+    makeGroup({ name: 'Lightning Energy', count: 51, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('Jet Energy has 5 copies (max 4).')));
+});
+
+test('Basic Energy remains exempt from the copy limit (gap #7)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 40, supertype: 'Energy' }),
+    makeGroup({ name: 'Fire Energy', count: 16, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.equal(
+    result.errors.some((e) => e.includes('copies (max 4)')),
+    false
+  );
+});
+
+test('officialCardName strips Level and Team Plasma but keeps owner/form (gap #8)', () => {
+  assert.equal(officialCardName({ name: 'Gengar LV.43' }), 'Gengar');
+  assert.equal(officialCardName({ name: 'Gengar LV.X' }), 'Gengar');
+  assert.equal(officialCardName({ name: 'Team Plasma Liepard' }), 'Liepard');
+  assert.equal(officialCardName({ name: 'Alolan Meowth' }), 'Alolan Meowth');
+  assert.equal(officialCardName({ name: "Rocket's Meowth" }), "Rocket's Meowth");
+});
+
+test('copy limit groups Level variants under one official name (gap #8)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Gengar', count: 4, extra: { stage: 'Stage2' } }),
+    makeGroup({ name: 'Gengar LV.43', count: 1, extra: { stage: 'Stage2' } }),
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 51, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('Gengar has 5 copies (max 4).')));
+});
+
+test('copy limit groups Team Plasma under the base name (gap #8)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Liepard', count: 3, extra: { stage: 'Stage1' } }),
+    makeGroup({ name: 'Team Plasma Liepard', count: 2, extra: { stage: 'Stage1' } }),
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 51, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('Liepard has 5 copies (max 4).')));
+});
+
+test('owner/form names are not merged for the copy limit (gap #8)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Alolan Meowth', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Meowth', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 52, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.equal(
+    result.errors.some((e) => e.includes('copies (max 4)')),
+    false
+  );
+});
+
+test('more than one ACE SPEC total is rejected (gap #9)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({
+      name: 'Prime Catcher',
+      count: 1,
+      supertype: 'Trainer',
+      extra: { subtypes: ['Item', 'ACE SPEC'] },
+    }),
+    makeGroup({
+      name: 'Computer Search',
+      count: 1,
+      supertype: 'Trainer',
+      extra: { rarity: 'ACE SPEC Rare' },
+    }),
+    makeGroup({ name: 'Lightning Energy', count: 54, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('only 1 ACE SPEC card')));
+});
+
+test('more than one Radiant Pokémon is rejected (gap #10)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Radiant Greninja', count: 1, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Radiant Charizard', count: 1, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 54, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('only 1 Radiant Pokémon')));
+});
+
+test('two Prism Star copies of the same name are rejected (gap #11)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: '◇ Victini', count: 2, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 54, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('Prism Star')));
+});
+
+test('different Prism Star names may coexist (gap #11)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({ name: '◇ Victini', count: 1, extra: { stage: 'Basic' } }),
+    makeGroup({ name: '◇ Shaymin', count: 1, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 54, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.equal(
+    result.errors.some((e) => e.includes('Prism Star')),
+    false
+  );
+});
+
+test('one ACE SPEC and one Radiant are legal (gaps #9, #10)', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } }),
+    makeGroup({
+      name: 'Prime Catcher',
+      count: 1,
+      supertype: 'Trainer',
+      extra: { subtypes: ['Item', 'ACE SPEC'] },
+    }),
+    makeGroup({ name: 'Radiant Greninja', count: 1, extra: { stage: 'Basic' } }),
+    makeGroup({ name: 'Lightning Energy', count: 54, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.equal(result.isValid, true, result.errors.join('; '));
 });
