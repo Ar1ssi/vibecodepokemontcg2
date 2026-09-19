@@ -796,7 +796,7 @@ export function eachPlayerDrawCount(attackText) {
 export function opponentCounterClause(attackText) {
   const t = String(attackText || '');
   let m =
-    /choose (\d+) of your opponent's pok[ée]mon and put (\d+) damage counters on each/i.exec(
+    /choose (\d+) of your opponent's pok[ée]mon and put (\d+) damage counters? on each/i.exec(
       t
     );
   if (m) {
@@ -921,6 +921,25 @@ export function allBenchDamage(attackText) {
   if (!/to (?:each|every|all)\b[^.;]*benched pok[ée]mon/i.test(text)) return 0;
   const m = /(\d+)\s*damage\s+to\s+(?:each|every|all)\b/i.exec(text);
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+}
+
+// A printed attack clause that lets the player choose WHICH of the opponent's
+// Pokémon take damage — "This attack does N damage to M of your opponent's
+// Pokémon" / "…to 1 of your opponent's Benched Pokémon". Returns
+// { kind: 'damage', amount, count, scope } or null. `scope` is 'bench' when the
+// text names the Bench, otherwise 'any' (Active or Bench). Pure.
+export function attackTargetClause(attackText) {
+  const t = String(attackText || '');
+  const m = /does (\d+) damage to (\d+) of your opponent's (benched )?pok[ée]mon/i.exec(
+    t
+  );
+  if (!m) return null;
+  return {
+    kind: 'damage',
+    amount: Math.max(0, parseInt(m[1], 10) || 0),
+    count: Math.max(1, parseInt(m[2], 10) || 1),
+    scope: m[3] ? 'bench' : 'any',
+  };
 }
 
 // Parse a printed "discard Energy to scale damage" clause

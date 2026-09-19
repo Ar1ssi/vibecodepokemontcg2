@@ -1,5 +1,5 @@
 /**
- * Helper logic for openMatPick in trainer-execution.js.
+ * Helper logic for openMatPick in mat-picker.js.
  * Handles DOM target resolution and click hit-testing for cards on the mat.
  *
  * When a card in play is holo-hydrated, card.image (the bare <img>) is nested

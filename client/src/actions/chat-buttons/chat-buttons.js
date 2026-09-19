@@ -43,7 +43,7 @@ import {
 } from '/shared/engine/rules/tool-combat.mjs';
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { canEvolve, markEvolvedThisTurn, normalizeStage, pokemonNamesMatch } from '/shared/engine/rules/evolution.mjs';
-import { parseAttackDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
+import { parseAttackDamage, healTarget, planHeal, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, mirrorHealClause, copyAttackScope, retaliateCount, returnSelfClause, deferredDamageCount, lookOpponentDeckCount, lookOwnDeckCount, eachPlayerDrawCount, opponentCounterClause, attackTargetClause, devolveActiveClause, bothActiveKoClause, specialEnergyKoClause, nextTurnBonusClause, devolveOpponentClause, recoverAllStatusClause, hpCapRemaining, returnOpponentEnergyClause, returnOpponentEnergyCount, benchExactKoThreshold } from '/shared/engine/rules/damage-parser.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
@@ -1536,15 +1536,14 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
 
         // Bench damage (taxonomy §D bench family): apply the printed bench
         // damage to one of the opponent's benched Pokémon. Exactly one
-        // benched → auto-apply; multiple → first (announced heuristic);
+        // benched → auto-apply; multiple → click the real Bench card (D19);
         // none → fizzle announcement. KO on the benched Pokémon still
         // awards prizes and triggers promotion guidance.
         if (parsed?.bench > 0) {
           const oppBench = getZone(oppPlayer, 'bench').array
             .map((card, idx) => ({ card, idx }))
             .filter(({ card }) => card.type === 'Pokémon');
-          const plan = planBenchTarget(oppBench.length);
-          if (plan === null) {
+          if (oppBench.length === 0) {
             appendMessage(
               user,
               `💤 ${atk.name}'s bench damage fizzles — opponent has no benched Pokémon.`,
@@ -1552,16 +1551,21 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               false
             );
           } else {
-            const { card: benchTarget, idx: benchIdx } = oppBench[0];
-            const hitName = benchTarget?.name || 'a benched Pokémon';
-            if (plan === -1) {
-              appendMessage(
-                user,
-                `🎯 Applying bench damage to the first benched Pokémon (${oppBench.length} available).`,
-                'announcement',
-                false
-              );
+            let chosen = oppBench[0];
+            if (oppBench.length > 1) {
+              const { openMatPick } = await import('../../setup/rules/mat-picker.js');
+              const picked = await new Promise((resolve) => {
+                openMatPick({
+                  title: `${atk.name} — click the opponent's Bench Pokémon to damage`,
+                  candidates: oppBench.map((o) => o.card),
+                  onPick: (c) => resolve(c),
+                  onCancel: () => resolve(null),
+                });
+              });
+              chosen = oppBench.find((o) => o.card === picked) || oppBench[0];
             }
+            const { card: benchTarget, idx: benchIdx } = chosen;
+            const hitName = benchTarget?.name || 'a benched Pokémon';
             placeSelfDamage(oppPlayer, 'bench', benchIdx, parsed.bench);
             const benchZone = getZone(oppPlayer, 'bench');
             const benchHp = effectiveHp(
@@ -1658,6 +1662,113 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 );
               }
             }
+          }
+        }
+
+        // Chosen-target damage/counters ("1 of your opponent's Pokémon",
+        // "choose N … put M counters on each", "…in any way you like"). The
+        // bench-only clause above already ran; this covers Active-or-Bench and
+        // counter placement via click-to-select (D19).
+        const anyTargetClause = (() => {
+          const c = attackTargetClause(atk.text);
+          return c && c.scope !== 'bench' ? c : null;
+        })();
+        const counterClause = anyTargetClause ? null : opponentCounterClause(atk.text);
+        if (anyTargetClause || counterClause) {
+          const activeCard = getZone(oppPlayer, 'active').array.find(
+            (c) => c.type === 'Pokémon' && !c.image?.attached
+          );
+          const benchRoots = getZone(oppPlayer, 'bench').array.filter(
+            (c) => c.type === 'Pokémon' && !c.image?.attached
+          );
+          const activeOnly = counterClause?.mode === 'active';
+          const candidates = activeOnly
+            ? [activeCard].filter(Boolean)
+            : [activeCard, ...benchRoots].filter(Boolean);
+
+          const applyToOpp = async (card, dmg) => {
+            const zoneId = getZone(oppPlayer, 'active').array.includes(card)
+              ? 'active'
+              : 'bench';
+            const z = getZone(oppPlayer, zoneId);
+            const idx = z.array.indexOf(card);
+            if (idx < 0 || dmg <= 0) return;
+            placeSelfDamage(oppPlayer, zoneId, idx, dmg);
+            const hp = effectiveHp(card.hp ?? 0, oppPlayer, card, z.array);
+            const dmgEl = z.array[idx]?.image?.damageCounter;
+            const cur = dmgEl ? parseInt(dmgEl.textContent || '0', 10) || 0 : 0;
+            if (hp > 0 && cur >= hp) {
+              const ko = koWithToolPrizes(user, card, z);
+              if (ko.won) {
+                appendMessage(user, '🏆 Victory!', 'announcement', false);
+              } else {
+                appendMessage(
+                  user,
+                  `🎯 KO! ${card.name || 'Pokémon'} — ${ko.prizeCount} prize${ko.prizeCount !== 1 ? 's' : ''} taken.`,
+                  'announcement',
+                  false
+                );
+                await _takePrizesWithPicker(user, ko.prizeCount);
+              }
+            } else {
+              appendMessage(
+                user,
+                `💥 ${dmg} damage to ${card.name || 'Pokémon'}!`,
+                'announcement',
+                false
+              );
+            }
+          };
+
+          const { openMatPick } = await import('../../setup/rules/mat-picker.js');
+          const pickOne = () =>
+            new Promise((resolve) => {
+              openMatPick({
+                title: `${atk.name} — click the opponent's Pokémon`,
+                candidates,
+                onPick: (c) => resolve(c),
+                onCancel: () => resolve(null),
+              });
+            });
+          const pickMany = (count) =>
+            new Promise((resolve) => {
+              openMatPick({
+                title: `${atk.name} — click ${count} of the opponent's Pokémon`,
+                candidates,
+                min: count,
+                max: count,
+                onConfirm: (cards) => resolve(cards),
+                onCancel: () => resolve([]),
+              });
+            });
+
+          if (candidates.length === 0) {
+            appendMessage(
+              user,
+              `💤 ${atk.name}'s target fizzles — opponent has no Pokémon in play.`,
+              'announcement',
+              false
+            );
+          } else if (counterClause) {
+            if (/in any way/i.test(atk.text || '')) {
+              for (let i = 0; i < counterClause.count; i++) {
+                const pick = await pickOne();
+                if (!pick) break;
+                await applyToOpp(pick, 10);
+              }
+            } else if (counterClause.mode === 'multi') {
+              const picks = await pickMany(counterClause.targets);
+              for (const p of picks) await applyToOpp(p, counterClause.count * 10);
+            } else {
+              const pick = await pickOne();
+              if (pick) await applyToOpp(pick, counterClause.count * 10);
+            }
+          } else if (anyTargetClause.count > 1) {
+            const picks = await pickMany(anyTargetClause.count);
+            for (const p of picks) await applyToOpp(p, anyTargetClause.amount);
+          } else {
+            const pick = await pickOne();
+            if (pick) await applyToOpp(pick, anyTargetClause.amount);
           }
         }
 
@@ -2328,6 +2439,31 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
       return;
     }
 
+    // Button-triggered retreat with more than one candidate: let the player click
+    // the real Bench card on the mat (the same UI trainer switches use, D19). A
+    // drag-to-retreat supplies `targetBenchImage`; the peer's replay supplies an
+    // index hint, and neither should prompt again.
+    let pickedBenchCard = null;
+    if (
+      !targetBenchImage &&
+      targetBenchIndexHint == null &&
+      !isMirrorReplay &&
+      countBenchPokemon(bench) > 1
+    ) {
+      const { openMatPick } = await import('../../setup/rules/mat-picker.js');
+      pickedBenchCard = await new Promise((resolve) => {
+        openMatPick({
+          title: `${active?.name || 'Retreat'} — click the Bench Pokémon to switch in`,
+          candidates: (bench.array || []).filter(
+            (c) => c && !c.image?.attached
+          ),
+          onPick: (c) => resolve(c),
+          onCancel: () => resolve(null),
+        });
+      });
+      if (!pickedBenchCard) return;
+    }
+
     // Attached energies check
     const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
     for (const e of attachedEnergies) {
@@ -2398,7 +2534,9 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
     // call, so the bench never exceeds its limit at any point.
     const benchBeforeSwap = getZone(user, 'bench');
     let benchIdx = -1;
-    if (targetBenchImage) {
+    if (pickedBenchCard) {
+      benchIdx = benchBeforeSwap.array.indexOf(pickedBenchCard);
+    } else if (targetBenchImage) {
       benchIdx = benchBeforeSwap.array.findIndex((c) => c.image === targetBenchImage);
     } else if (
       targetBenchIndexHint != null &&
@@ -4462,17 +4600,22 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     }
     case 'heal-all': {
       const n = action.n || 10;
+      const typeFilter = Array.isArray(action.types) && action.types.length ? action.types : null;
       let healed = 0;
       for (const zoneId of ['active', 'bench']) {
         const zone = getZone(user, zoneId);
         for (let i = 0; i < zone.array.length; i++) {
-          if (zone.array[i]?.type !== 'Pokémon') continue;
+          const mon = zone.array[i];
+          if (mon?.type !== 'Pokémon') continue;
+          if (typeFilter && !typeFilter.some((ty) => pokemonMatchesType(mon, ty))) continue;
           removeDamageCounter(user, zoneId, i, n, emit);
           healed++;
         }
       }
-      appendMessage(user, `💚 ${card.name}: Healed ${n} damage from each of your Pokémon (${healed} total).`, 'announcement', false);
-      finishStadiumAction(user, card, emit, { action: 'heal-all', n });
+      const scope = typeFilter ? typeFilter.join(' and ') : '';
+      const noun = typeFilter ? `${scope} Pokémon` : 'Pokémon';
+      appendMessage(user, `💚 ${card.name}: Healed ${n} damage from each of your ${noun} (${healed} total).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'heal-all', n, ...(typeFilter ? { types: typeFilter } : {}) });
       break;
     }
     case 'search-bench': {

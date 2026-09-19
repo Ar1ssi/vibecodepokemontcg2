@@ -2125,3 +2125,143 @@ test('prize choice: a chosen prize hidden by the fan is shown again once it reac
   );
   assert.equal(img.classList.contains('draw-flight-source'), false);
 });
+
+// A trainer/stadium choice whose options are all in-play Pokémon opens the mat
+// picker (click the real card) instead of the card carousel (D19).
+const MAT_CHOICE = {
+  choiceId: 'choice_p1_mat_9',
+  player: 'p1',
+  prompt: 'Rare Candy: Choose the Basic Pokémon Swinub evolves from',
+  options: [{ instanceId: 10, name: 'Swinub' }, { instanceId: 11, name: 'Budew' }],
+  min: 1,
+  max: 1,
+  cancellable: false,
+  resumeToken: { effectType: 'trainer', initiatorPlayerId: 'p1' },
+};
+
+const matBoardView = (stateVersion, pendingChoice = null) => ({
+  stateVersion,
+  pendingChoice,
+  you: {
+    playerId: 'p1',
+    zones: {
+      active: [{ instanceId: 10, name: 'Swinub', src: '/s.png' }],
+      bench: [{ instanceId: 11, name: 'Budew', src: '/b.png' }],
+    },
+  },
+  them: { playerId: 'p2', zones: {} },
+});
+
+test('mat choice: in-play options open the mat picker once, not the card picker or modal', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const choicePicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    matPicker,
+    choicePicker,
+    onResolveChoice: (sel) => resolved.push(sel),
+  };
+
+  applyView(matBoardView(1), [], opts);
+  applyView(matBoardView(2, MAT_CHOICE), [], opts);
+  applyView(matBoardView(3, MAT_CHOICE), [], opts);
+
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  assert.equal(choicePicker.opened.length, 0);
+  assert.equal(matPicker.opened.length, 1, 're-applied view does not reopen the mat picker');
+  const request = matPicker.opened[0];
+  assert.equal(request.cancellable, false);
+  assert.deepEqual(request.candidates.map((c) => c.instanceId), [10, 11]);
+  assert.equal(request.candidates[0].image, getCardRegistry().get(10).element);
+  assert.equal(request.candidates[0].name, 'Swinub');
+
+  await request.onResolve([11]);
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_mat_9', selection: [11] }]);
+});
+
+test('mat choice: a max > 1 in-play choice accepts a multi-card selection', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    matPicker,
+    onResolveChoice: (sel) => resolved.push(sel),
+  };
+
+  applyView(matBoardView(1), [], opts);
+  const multi = { ...MAT_CHOICE, choiceId: 'choice_p1_mat_multi', min: 1, max: 2 };
+  applyView(matBoardView(2, multi), [], opts);
+
+  assert.equal(matPicker.opened.length, 1);
+  assert.equal(matPicker.opened[0].max, 2);
+  await matPicker.opened[0].onResolve([10, 11]);
+  assert.deepEqual(resolved, [
+    { choiceId: 'choice_p1_mat_multi', selection: [10, 11] },
+  ]);
+});
+
+test('mat choice: closes when the choice passes to the opponent', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = { document: doc, getZone: mockGetZone, matPicker, onResolveChoice: (sel) => resolved.push(sel) };
+
+  applyView(matBoardView(1), [], opts);
+  applyView(matBoardView(2, MAT_CHOICE), [], opts);
+  applyView(matBoardView(3, { ...MAT_CHOICE, player: 'p2' }), [], opts);
+
+  assert.equal(matPicker.closed, 1);
+  // Teardown on pass-to-opponent is silent: it must not report a decline.
+  assert.deepEqual(resolved, []);
+  assert.ok(doc.getElementById('netcodeChoiceBanner'));
+});
+
+test('mat choice: a hand option keeps the card picker (not every in-play-looking choice is a mat choice)', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const choicePicker = fakeChoicePicker();
+  const opts = { document: doc, getZone: mockGetZone, matPicker, choicePicker };
+
+  applyView(matBoardView(1), [], opts);
+  const mixed = { ...MAT_CHOICE, options: [{ instanceId: 10, name: 'Swinub', src: '/s.png' }, { instanceId: 99, name: 'Ultra Ball', src: '/u.png' }] };
+  applyView(matBoardView(2, mixed), [], opts);
+
+  assert.equal(matPicker.opened.length, 0);
+  assert.equal(choicePicker.opened.length, 1);
+});
+
+test('mat choice: adapter failure falls back to the modal', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const throwing = {
+    open() {
+      throw new Error('boom');
+    },
+    close() {},
+  };
+  const opts = { document: doc, getZone: mockGetZone, matPicker: throwing };
+
+  applyView(matBoardView(1), [], opts);
+  applyView(matBoardView(2, MAT_CHOICE), [], opts);
+
+  assert.ok(doc.getElementById('netcodeChoiceModal'));
+});
+
+test('mat choice: declining an optional pick reports an empty selection; a required pick cannot be declined', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const matPicker = fakeChoicePicker();
+  const resolved = [];
+  const opts = { document: doc, getZone: mockGetZone, matPicker, onResolveChoice: (sel) => resolved.push(sel) };
+
+  applyView(matBoardView(1), [], opts);
+  const optional = { ...MAT_CHOICE, min: 0, cancellable: true };
+  applyView(matBoardView(2, optional), [], opts);
+  assert.equal(matPicker.opened[0].cancellable, true);
+  await matPicker.opened[0].onCancel();
+  assert.deepEqual(resolved, [{ choiceId: 'choice_p1_mat_9', selection: [] }]);
+});
+

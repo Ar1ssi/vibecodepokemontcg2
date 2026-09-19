@@ -384,6 +384,12 @@ export const DRIFT = Object.freeze({
   periodYMs: 13000,
 });
 
+// The board/hand sweep: the drift above with no cursor hold and no visible
+// tilt. Surfaces standing in for a mat card (the double-click preview) reuse
+// this so their foil flows exactly like the board's instead of tracking the
+// pointer while it is over the card.
+export const MAT_HOLO_OPTIONS = Object.freeze({ auto: true, tilt: false });
+
 const unitTilt = (value) => (Number.isFinite(value) ? clamp(value, -1, 1) : 0);
 
 const tiltAmountOf = (tiltX, tiltY) =>
@@ -417,13 +423,12 @@ export function driftTilt(nowMs, amplitude = DRIFT.amplitude) {
   };
 }
 
-const prefersReducedMotion = () =>
-  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-
 // ── animation loop ───────────────────────────────────────────────────
 // Interactive (previews, picker): the cursor tilts the card on simey's rotate
-// spring; the light then follows the card's rotation. Auto (board, hand): the
-// virtual angle drifts; the card only rotates visibly when `tilt` is set.
+// spring; the light then follows the card's rotation, and the idle drift below
+// keeps the foil moving whenever the cursor is not holding it. Auto (board,
+// hand): the virtual angle drifts; the card only rotates visibly when `tilt` is
+// set.
 const activeAnimations = new WeakMap();
 
 const SPRING_INTERACT_SETTINGS = { stiffness: 0.066, damping: 0.25 };
@@ -437,12 +442,18 @@ export function startHoloAnimation(
   stopHoloAnimation(card);
 
   const springRotate = new Spring({ x: 0, y: 0 }, SPRING_INTERACT_SETTINGS);
-  const driftAmplitude = auto && !prefersReducedMotion() ? DRIFT.amplitude : 0;
+  // The OS "reduce motion" preference deliberately does NOT still the foil:
+  // zeroing the amplitude left every card frozen on the neutral pose, which
+  // reads as a broken effect rather than a calmer one (user decision, D54).
+  const driftAmplitude = DRIFT.amplitude;
   const driftOffsetMs = phaseOffset * DRIFT.periodXMs;
 
   let rafId = null;
   let running = true;
   let interactEndTimer = null;
+  // Interactive only: true while the cursor is holding the card (and therefore
+  // the light). The idle drift is suspended for exactly that window.
+  let hovering = false;
 
   const setRotateTarget = (target, settings) => {
     springRotate.stiffness = settings.stiffness;
@@ -458,6 +469,7 @@ export function startHoloAnimation(
     if (!tilt) return;
     const rect = card.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
+    hovering = true;
     const percentX = clamp(
       round((100 / rect.width) * (event.clientX - rect.left))
     );
@@ -512,6 +524,14 @@ export function startHoloAnimation(
       tiltX: springRotate.current.x / MAX_ROTATE_X,
       tiltY: springRotate.current.y / MAX_ROTATE_Y,
     };
+    // A card the cursor is not holding drifts the light on its own. Interactive
+    // mode otherwise derives the light from the rotate spring alone, and a card
+    // the cursor never moves over (a preview, a picker slide) holds the neutral
+    // pose forever — the foil looks paused on its first frame.
+    const flat = springRotate.current.x === 0 && springRotate.current.y === 0;
+    if (!auto && !hovering && flat) {
+      lightTilt = driftTilt(now + driftOffsetMs, driftAmplitude);
+    }
     applyVars(
       computeLightVars(lightTilt ?? rotateTilt),
       springRotate.current.x,
@@ -523,7 +543,10 @@ export function startHoloAnimation(
 
   const onPointerEnter = (event) => interact(event);
   const onPointerMove = (event) => interact(event);
-  const onPointerLeave = () => interactEnd(500);
+  const onPointerLeave = () => {
+    hovering = false;
+    interactEnd(500);
+  };
 
   const hitTarget = card;
   const innerImg = card.querySelector('img');

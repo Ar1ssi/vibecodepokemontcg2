@@ -44,12 +44,16 @@ import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-tabl
 import { COVER_IMAGE_LISTENERS } from '../../setup/image-logic/cover-listener-table.js';
 import { sortZoneCardsForRender } from '../../setup/netcode/hand-sort-context.js';
 import { CHOICE_PICKER } from '../../setup/netcode/choice-picker-adapter.js';
+import { MAT_PICKER } from '../../setup/netcode/mat-picker-adapter.js';
 import { PRIZE_PICKER } from '../../setup/netcode/prize-picker-adapter.js';
 import {
   hydrateHolo,
   unhydrateHolo,
 } from '../../setup/deck-constructor/hydrate-holo.js';
-import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
+import {
+  clearHandStackPositioning,
+  reconcileHandStacks,
+} from '../../setup/zones/hand-stack-dom.js';
 import { setInstanceMap } from '../../setup/netcode/dual-run-bridge.js';
 import { setDealOrder } from '../../setup/netcode/deal-order.js';
 import { registerTurnOrderCallListeners } from '../../setup/netcode/turn-order-call.js';
@@ -265,7 +269,9 @@ const seedNetcodeContext = () => {
     holo: { hydrate: hydrateHolo, unhydrate: unhydrateHolo },
     choicePicker: CHOICE_PICKER,
     prizePicker: PRIZE_PICKER,
+    matPicker: MAT_PICKER,
     reconcileHandStacks,
+    clearHandStackPositioning,
   });
   // Design 003 slice 1: the authoritative gate needs the same two browser-only
   // dependencies `apply-view.js` does, injected for the same reason

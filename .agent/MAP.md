@@ -38,6 +38,10 @@ client/src/setup/netcode/authoritative-dispatch.js — gated-action dispatch pri
 slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAction injected, not
 imported. Fails open to the legacy body when a command cannot be translated (D12)
 client/src/setup/netcode/prize-picker-adapter.js — injected `prizePicker`: shows a server prize pendingChoice as the fly-up prize fan (actions/zones/prize-take-prompt.js, D46)
+client/src/setup/netcode/mat-picker-adapter.js + mat-pick-request.mjs — injected `matPicker`:
+  routes a server pendingChoice whose options are all in-play Pokémon (single- OR multi-pick)
+  to the legacy click-the-card UI (`rules/mat-picker.js`) instead of the carousel (design 016/017,
+  D59/D60); covers retreat, Escape Rope, Boss's Orders/Switch, heals, and attack snipes
 client/src/setup/netcode/manual-card-commands.mjs — pure planner for the manual board tools
   (damage/conditions/rotate/type/ability marker) from a registry card; manual-card-dispatch.js emits them
 client/src/setup/netcode/deck-peek.js + deck-peek-request.mjs — "look at top/bottom N cards":
@@ -93,6 +97,9 @@ client/src/**/__tests__/*.mjs — plain `node --test`, no jsdom; `pnpm test` (12
 two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
+test-card-inspector-e2e.mjs — Playwright two-browser design-013 card-inspector gate
+  (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the
+  attack panel with REAL input (locator.click), so it catches pointer-capture regressions el.click() hides
 *-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
 bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
   scaffold + greedy scorer), driven by playtest-bot.mjs via __ptcg observe/options/act

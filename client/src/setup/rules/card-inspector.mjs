@@ -42,6 +42,7 @@ import {
   openCarouselViewer,
   closeCarouselViewer,
 } from '../image-logic/card-picker.js';
+import { orderAttachedForCarousel } from '../image-logic/carousel-order.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -565,7 +566,7 @@ export function openCardInspector({
 
   // Carousel slide N sits to the right of slide N+1, so the attached cards go BEFORE the main
   // card and initialIndex points at the main card's slot.
-  const slides = [...attachedSlides, card];
+  const slides = [...orderAttachedForCarousel(attachedSlides), card];
   const mainIndex = slides.length - 1;
 
   const decorate = (built, slideCard, index) =>
@@ -595,7 +596,14 @@ export function openCardInspector({
  * can make a previously unpayable attack payable.
  */
 const useAbility = (card, zone) => {
-  if (card?.instanceId != null && isAuthoritativeDispatchActive()) {
+  // `dispatchAuthoritativeUseAbility` fails OPEN by contract: a false return means "this action
+  // was not dispatched", and the gated call site must then run its legacy body (see
+  // emitAuthoritativeCommand in authoritative-dispatch.js). Returning regardless discarded every
+  // refused dispatch — no command sent, no chat line, nothing on the board, which is
+  // indistinguishable from a dead click.
+  if (
+    card?.instanceId != null &&
+    isAuthoritativeDispatchActive() &&
     dispatchAuthoritativeUseAbility({
       user: 'self',
       emit: true,
@@ -603,7 +611,8 @@ const useAbility = (card, zone) => {
       zoneId: zone,
       index: 0,
       authoritativeId: card.instanceId,
-    });
+    })
+  ) {
     return;
   }
   runAbilitySteps('self', card);

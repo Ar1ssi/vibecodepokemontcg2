@@ -4,34 +4,46 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 182
-Focus: "make the engine not zone-agnostic on abilities" — Active-Spot abilities now gated in the
-  engine, the server and the panel. PR #159 open.
-Active: worktree `.qwen/worktrees/ability-zone` (`fix/ability-zone-restriction`), clean and pushed.
-Next: Note S179's warning is now stale (`pnpm install` in a worktree takes 6s and makes the full
-  gate runnable). Outstanding from S181/S182: neither has been browser-verified under
-  `SERVER_AUTHORITATIVE=1` — for PR #159, double-click a benched Pokémon with a positional ability
-  and confirm the panel is greyed and the server refuses the dispatch.
-Blocked: none.
+Session: 192
+Focus: Made EVERY effect that chooses in-play Pokémon route to the mat picker (D60, supersedes
+  D59's max===1 gate): mat picker now multi-selects; retreat (2+ bench) raises a choice; Escape
+  Rope parses to switchOwn+switchOpponentOut; attack snipes/counter-placement raise an attack-target
+  choice, including "in any way you like" placed one counter per click. Boss/Switch/heal already
+  worked; damage-to-all-bench spread is intentionally automatic. Legacy chat-buttons.js retreat +
+  attack snipes/counters also use openMatPick. Server-authoritative path is the tested one.
+Active: worktree `C:\Users\SMG26\Downloads\vibe-mat-picker-server` on `feature/server-mat-picker`
+  @ 48e612d (PR #170), with UNCOMMITTED S192 edits: `rules/mat-picker.js`, `mat-pick-request.mjs`,
+  `mat-picker-adapter.js`, `apply-view.js`, `shared/engine/reduce.mjs`, `rules/damage-parser.mjs`,
+  `rules/trainer-effects.mjs`, `client/src/actions/chat-buttons/chat-buttons.js`,
+  `client/src/setup/image-logic/drag.js`, tests, `.agent/designs/017-*.md`, DECISIONS/MAP/STATE/journal.
+Next: commit and push S192 onto the PR #170 branch. Then PR #170 merge. Primary checkout still on
+  `main` @ ce0cc55 with uncommitted S190 holo + S183/S184/S188/S189 work — none on a branch yet.
+  Legacy chat-buttons.js changes are syntax/lint-checked only (no unit/live harness); W/R is not
+  applied to chosen snipe targets on either path.
+Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- A positional ability is now refused from the Bench by the ENGINE (`requiresActiveSpot` in
-  `ability-executors.mjs`), not only by the panel. `listAbilities` takes an optional `zone`
-  (default `'active'`) — a caller that passes a wrong zone now changes gameplay, not just UI.
-- The predicate is deliberately NARROW: only "if this Pokémon is in the Active Spot" / "…is active".
-  Do NOT broaden it to a bare mention of the Active Spot — that also matches the on-move trigger
-  ("when this Pokémon moves from your Bench to the Active Spot") and the "As long as…" passive, both
-  legal from the Bench. A false positive silently breaks a legal ability.
-- `useVStarGX` shares the active/bench reachability but its legality case resolves no card, so it is
-  NOT covered by that guard (I60).
-- The card scan is the background and stays visible (C1). Dimming uses filter (C2), never opacity —
-  translucent panels let the printed card ghost back through.
-- Legacy zone arrays are EMPTY under SERVER_AUTHORITATIVE 2P. Read `getAuthoritativeZoneArray` /
-  `cardRegistry` and address cards by instanceId (D12, D47).
+- Server mat pick (design 016/017, D59/D60): `apply-view.js` routes a PendingChoice to the mat
+  picker when every option is an in-play Pokémon root (`cardRegistry` record: `zone ∈ active|bench`,
+  `card.attachedTo == null`, `.element`) at ANY `max`; `mat-picker.js` toggles for `max>1` and needs
+  Confirm. `MAT_PICKER.close()` is a SILENT `dismissMatPick()` — only user Cancel/Escape calls
+  `onCancel`.
+- Attack target choices are `resumeToken.effectType:'attack'` with `token.attackTarget`; the resume
+  branch in `reduce.mjs` applies the damage then emits `attackExecuted` and ends the turn. The
+  target block runs AFTER draw/energy/locks/search so a suspension never drops them; a
+  `distributable` clause re-suspends one counter at a time (`remaining`).
+- Carousel clicks: `stage.setPointerCapture()` retargets the follow-up `click` to the stage;
+  interactive slide content must be in `isSwipeBlockedTarget` (`card-picker.js`). Verify with REAL
+  input — `el.click()` hides it.
+- Under SERVER_AUTHORITATIVE the legacy zone arrays are EMPTY; read
+  `getAuthoritativeZoneArray`/`cardRegistry` and address cards by instanceId.
+- `pnpm test` is an explicit file list (a new test file runs only once listed). Gate 1989/1989 green
+  as of S192; `pnpm lint` still repo-wide red on CRLF (`core.autocrlf=true`) plus pre-existing
+  `no-undef` (`dmg` in `chat-buttons.js`) and `no-useless-escape` in `trainer-effects.mjs:182/188`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S182 2026-09-19 patch: Active-Spot abilities refused from the Bench in engine + server + panel
-  (PR #159, design 015, D54).
-- S181 2026-09-19 patch: `passiveCostDiscount` no longer discounts attacks for merely mentioning
-  Energy — committed then, but it only reached main now, inside PR #159 (see the S182 journal entry).
-- S179 2026-09-19 feature: TCG Live card inspector on double-click (PR #153, design 013, D53).
+- S192 2026-09-19 feature: mat picker multi-select + retreat/Escape Rope/attack-target choices +
+  "in any way" counter distribution, netcode and legacy (design 017, D60); pnpm test 1989/1989.
+- S191 2026-09-19 feature: in-play-Pokémon server choices use the mat picker (design 016, D59,
+  PR #170); pnpm test 1978/1978, live 2P probe passed.
+- S190 2026-09-19 patch (primary, uncommitted): double-click preview foil flows like the mat (D58).

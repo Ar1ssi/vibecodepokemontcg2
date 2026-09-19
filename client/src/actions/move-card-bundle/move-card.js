@@ -12,6 +12,7 @@ import { hideCard, revealCard } from '../general/reveal-and-hide.js';
 import { sort } from '../zones/general.js';
 import { attachCard } from './attach-card.js';
 import {
+  cardNode,
   hydrateHolo,
   imageAnchor,
   unhydrateHolo,
@@ -79,7 +80,10 @@ import { blocksItemPlay } from '/shared/engine/rules/ability-executors.mjs';
 import { shouldNitroReturnToHand } from '/shared/engine/rules/special-energy-effects.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
-import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
+import {
+  clearHandStackPositioning,
+  reconcileHandStacks,
+} from '../../setup/zones/hand-stack-dom.js';
 
 const pokemonInPlay = (user) =>
   [...getZone(user, 'active').array, ...getZone(user, 'bench').array].filter(
@@ -663,6 +667,11 @@ export const moveCard = async (
 
     //special initialization is needed for cards in the active and bench since pokemon has its own container with its attached cards
     if (activeOrBenchZone.includes(dZoneId)) {
+      // A card out of a duplicate hand stack still carries that stack's inline
+      // positioning, which outranks `.play-container img` / `.play-container .mat-holo`
+      // and would leave it not drawing where its slot is (see hand-stack-dom.js).
+      clearHandStackPositioning(cardNode(movingCard));
+      clearHandStackPositioning(movingCard.image);
       initializeActiveBenchCard(user, movingCard, dZoneId, dZone);
       if (
         movingCard.type === 'Pokémon' &&

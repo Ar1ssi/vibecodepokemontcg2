@@ -7,6 +7,7 @@ import {
   computeLightVars,
   driftTilt,
   DRIFT,
+  MAT_HOLO_OPTIONS,
   cardEraFromImageUrl,
   foilMaskUrl,
   LIGHT,
@@ -345,7 +346,7 @@ describe('startHoloAnimation', () => {
     stopHoloAnimation(card);
   });
 
-  it('reduced motion freezes the board drift', () => {
+  it('the OS reduce-motion preference does not still the board drift', () => {
     global.matchMedia = () => ({ matches: true });
     const card = createFakeElement();
     startHoloAnimation(card, { auto: true, tilt: false });
@@ -353,8 +354,7 @@ describe('startHoloAnimation', () => {
     const first = card.properties['--pointer-x'];
     runFrame(3000);
 
-    assert.equal(card.properties['--pointer-x'], first);
-    assert.equal(first, `${LIGHT.originX.toFixed(2)}%`);
+    assert.notEqual(card.properties['--pointer-x'], first);
     stopHoloAnimation(card);
   });
 
@@ -364,14 +364,87 @@ describe('startHoloAnimation', () => {
     card.dispatch('pointermove', { clientX: 0, clientY: 0 });
     runFrames(200);
 
+    // The cursor cannot drive the light without tilt, so it stays on the drift.
+    const drifted = computeLightVars(driftTilt(199 * 16));
     assert.equal(
       card.properties['--pointer-x'],
-      `${LIGHT.originX.toFixed(2)}%`
+      `${drifted.pointerX.toFixed(2)}%`
     );
     assert.equal(
       card.properties['--pointer-y'],
-      `${LIGHT.originY.toFixed(2)}%`
+      `${drifted.pointerY.toFixed(2)}%`
     );
+    assert.equal(card.properties['--rotate-x'], '0.00deg');
+    stopHoloAnimation(card);
+  });
+
+  it('an unhovered interactive card (preview) drifts the light', () => {
+    const card = createFakeElement();
+    startHoloAnimation(card);
+    runFrame(0);
+    const first = card.properties['--pointer-x'];
+    runFrame(3000);
+
+    assert.notEqual(card.properties['--pointer-x'], first);
+    assert.notEqual(card.properties['--background-x'], '50.00%');
+    // Drift moves the light only — it never tilts the card.
+    assert.equal(card.properties['--rotate-x'], '0.00deg');
+    assert.equal(card.properties['--rotate-y'], '0.00deg');
+    stopHoloAnimation(card);
+  });
+
+  it('the cursor holds the light and the drift resumes once the card is flat', () => {
+    const realSetTimeout = global.setTimeout;
+    let leaveTimer = null;
+    global.setTimeout = (fn) => {
+      leaveTimer = fn;
+      return 1;
+    };
+    try {
+      const card = createFakeElement();
+      startHoloAnimation(card);
+      card.dispatch('pointerenter', { clientX: 100, clientY: 70 });
+      card.dispatch('pointermove', { clientX: 100, clientY: 70 });
+      runFrames(600);
+
+      const held = computeLightVars({ tiltX: -1, tiltY: 0 });
+      assert.equal(
+        card.properties['--pointer-x'],
+        `${held.pointerX.toFixed(2)}%`
+      );
+
+      card.dispatch('pointerleave', {});
+      assert.ok(leaveTimer, 'leaving arms the spring-back snap');
+      leaveTimer();
+      // The spring-back is deliberately gentle — run it out so the card is flat
+      // again, then the idle drift owns the light (never the flat pose).
+      const frames = 300;
+      const lastFrame = 700 + (frames - 1) * 16;
+      for (let i = 0; i < frames; i += 1) runFrame(700 + i * 16);
+
+      const flat = computeLightVars({ tiltX: 0, tiltY: 0 });
+      const drifted = computeLightVars(driftTilt(lastFrame));
+      assert.notEqual(drifted.pointerX, flat.pointerX);
+      assert.equal(
+        card.properties['--pointer-x'],
+        `${drifted.pointerX.toFixed(2)}%`
+      );
+      assert.equal(card.properties['--rotate-x'], '0.00deg');
+      stopHoloAnimation(card);
+    } finally {
+      global.setTimeout = realSetTimeout;
+    }
+  });
+
+  it('the OS reduce-motion preference does not still the interactive drift', () => {
+    global.matchMedia = () => ({ matches: true });
+    const card = createFakeElement();
+    startHoloAnimation(card);
+    runFrame(0);
+    const first = card.properties['--pointer-x'];
+    runFrame(3000);
+
+    assert.notEqual(card.properties['--pointer-x'], first);
     stopHoloAnimation(card);
   });
 
@@ -427,6 +500,27 @@ describe('startHoloAnimation', () => {
     assert.equal(card.listeners.get('pointerleave').size, 1);
     stopHoloAnimation(card);
     assert.equal(card.listeners.get('pointermove').size, 0);
+  });
+});
+
+describe('MAT_HOLO_OPTIONS (mat-style flow)', () => {
+  it('is the drift-only sweep the board uses', () => {
+    assert.deepEqual(MAT_HOLO_OPTIONS, { auto: true, tilt: false });
+  });
+
+  it('sweeps without tilting and attaches no cursor listeners', () => {
+    const card = createFakeElement();
+    startHoloAnimation(card, MAT_HOLO_OPTIONS);
+    runFrame(0);
+    const first = card.properties['--pointer-x'];
+
+    card.dispatch('pointermove', { clientX: 100, clientY: 0 });
+    runFrame(3000);
+
+    assert.equal(card.listeners.get('pointermove'), undefined);
+    assert.equal(card.properties['--rotate-x'], '0.00deg');
+    assert.notEqual(card.properties['--pointer-x'], first);
+    stopHoloAnimation(card);
   });
 });
 

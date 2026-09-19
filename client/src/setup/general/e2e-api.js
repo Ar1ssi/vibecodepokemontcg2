@@ -6,6 +6,7 @@ import {
   getAuthoritativeZoneArray,
   getAuthoritativeStadiumArray,
   getLastRenderedVersion,
+  getCardRegistry,
   hasAuthoritativeView,
 } from '../netcode/apply-view.js';
 import { rulesState, ensureCardData } from '/shared/engine/rules/rules-state.mjs';
@@ -150,19 +151,39 @@ function attachedCardsFor(user, zoneId, card) {
 // openMatPick highlights in-play Pokémon on the mat itself instead of opening a modal,
 // styling their live `card.image` DOM node with a yellow outline and resolving on a
 // document-level click on that node (see openMatPick, client/src/setup/rules/
-// trainer-execution.js). It keeps no exported state, so this reads the same signal the
+// mat-picker.js). It keeps no exported state, so this reads the same signal the
 // human eye reads (the outline) rather than touching that gameplay file, and resolves a
 // pick the same way a human would (`img.click()`), never a synthetic engine call.
 const MAT_PICK_OUTLINE = 'ffd23f';
 
+// openMatPick marks every outlined node with data-mat-pick="1"; the inline outline
+// is normalized by the browser (rgb(255, 210, 63)) so it can't be string-matched.
+function isMatPickNode(img) {
+  if (!img) return false;
+  if (img.dataset?.matPick === '1') return true;
+  return img.style?.outline?.includes(MAT_PICK_OUTLINE);
+}
+
 function matPickCandidates() {
   const found = [];
+  const seen = new Set();
+  const add = (node, name, instanceId) => {
+    if (seen.has(node)) return;
+    seen.add(node);
+    found.push({ name: name || '', img: node, instanceId });
+  };
+  // Server-authoritative mat pick (mat-picker-adapter.js) outlines the apply-view
+  // rendered element, which lives in the registry, not in legacy card.image.
+  for (const record of getCardRegistry().values()) {
+    if (isMatPickNode(record?.element)) {
+      add(record.element, record.card?.name, record.instanceId);
+    }
+  }
   for (const user of ['self', 'opp']) {
     for (const zoneId of ['active', 'bench']) {
       for (const card of boardPokemon(user, zoneId)) {
-        const img = card?.image;
-        if (img?.style?.outline?.includes(MAT_PICK_OUTLINE)) {
-          found.push({ name: card.name || '', img });
+        if (isMatPickNode(card?.image)) {
+          add(card.image, card.name, card.instanceId);
         }
       }
     }

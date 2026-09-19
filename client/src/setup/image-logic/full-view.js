@@ -1,5 +1,6 @@
 import {
   buildHoloCard,
+  MAT_HOLO_OPTIONS,
   resolveHoloEffect,
   startHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
@@ -37,11 +38,13 @@ export const resolvePreviewSleeveSrc = (card, image) => {
   return cardBackSrcForUser(user) || DEFAULT_SLEEVE;
 };
 
-// Floating previews (deck-list/search zoom) have a real cursor to track, unlike
-// mat/hand cards — use real pointer-tracked hover, not the auto-sweep.
-const startPreviewHolo = (wrapper) => {
+// Deck-list/search previews have a real cursor to track — real
+// pointer-tracked hover, not the auto-sweep. A preview cloned from a mat card
+// (double-click) keeps the board's auto-sweep instead, so it flows the way the
+// card did on the mat rather than tilting to the pointer.
+const startPreviewHolo = (wrapper, matHolo = false) => {
   if (!wrapper) return;
-  startHoloAnimation(wrapper);
+  startHoloAnimation(wrapper, matHolo ? MAT_HOLO_OPTIONS : undefined);
 };
 
 const hideCardCounters = (image) => {
@@ -169,6 +172,7 @@ export const openCardPreview = (targetImage, card) => {
     sleeveSrc: resolvePreviewSleeveSrc(card, targetImage),
     cloneFrom: card?.wrapper ?? (anchor.classList?.contains('mat-holo') ? anchor : null),
     hideSource: true,
+    matHolo: true,
     onClosed: () => {
       anchor.style.visibility = '';
       showCardCounters(targetImage);
@@ -189,6 +193,7 @@ export const openFloatingCardPreview = ({
   sleeveSrc = DEFAULT_SLEEVE,
   cloneFrom = null,
   hideSource = false,
+  matHolo = false,
   onClosed = null,
   onOpened = null,
   interactive = false,
@@ -237,7 +242,7 @@ export const openFloatingCardPreview = ({
   const restoreSource = hideSource ? hidePreviewSource(sourceEl) : () => {};
 
   if (wrapper) {
-    startPreviewHolo(wrapper);
+    startPreviewHolo(wrapper, matHolo);
   }
 
   // R6: zone clicks (attack-preview.js) must gate on the pop animation
