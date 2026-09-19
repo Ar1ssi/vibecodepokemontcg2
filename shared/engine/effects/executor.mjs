@@ -875,6 +875,9 @@ export function executeSteps(draft, {
         // 'heal' with no amount is "heal all damage" (Wally's Compassion).
         const healAmt = step.amount ?? (step.type === 'heal' ? Infinity : 30);
         // Edge Case 10: re-resolve damaged in-play Pokemon dynamically
+        const typeFilter = Array.isArray(step.types) && step.types.length
+          ? step.types.map((ty) => String(ty).toLowerCase())
+          : null;
         const inPlay = [
           ...(player.zones.active || []),
           ...(player.zones.bench || []),
@@ -882,6 +885,8 @@ export function executeSteps(draft, {
           (c) =>
             !c.attachedTo &&
             ((c.damage || 0) > 0 || (step.cure && hasAnyCondition(c))) &&
+            (!typeFilter ||
+              (c.types || []).some((ty) => typeFilter.includes(String(ty).toLowerCase()))) &&
             rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target)
         );
 

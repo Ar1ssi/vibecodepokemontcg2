@@ -42,6 +42,7 @@ import {
   openCarouselViewer,
   closeCarouselViewer,
 } from '../image-logic/card-picker.js';
+import { orderAttachedForCarousel } from '../image-logic/carousel-order.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -565,7 +566,7 @@ export function openCardInspector({
 
   // Carousel slide N sits to the right of slide N+1, so the attached cards go BEFORE the main
   // card and initialIndex points at the main card's slot.
-  const slides = [...attachedSlides, card];
+  const slides = [...orderAttachedForCarousel(attachedSlides), card];
   const mainIndex = slides.length - 1;
 
   const decorate = (built, slideCard, index) =>
