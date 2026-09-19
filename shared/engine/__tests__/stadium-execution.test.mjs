@@ -81,6 +81,38 @@ test('stadium: activating stadium effect draws cards and tracks once-per-turn li
   assert.equal(res3.error, 'Stadium effect already used this turn.');
 });
 
+const ROUGH_SEAS_TEXT =
+  "Once during each player's turn, that player may heal 30 damage from each of their Water Pokémon and Lightning Pokémon.";
+
+test('stadium: Rough Seas heals 30 from each Water/Lightning Pokémon (Active and Bench) and leaves other types', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 52,
+    name: 'Rough Seas',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: ROUGH_SEAS_TEXT,
+  });
+  const mk = (instanceId, name, types, damage) =>
+    createCard({ instanceId, name, hp: 120, stage: 'Basic', supertype: 'Pokémon', types, damage });
+  state.players.p1.zones.active.push(mk(80, 'Blastoise', ['Water'], 50));
+  state.players.p1.zones.bench.push(
+    mk(81, 'Pikachu', ['Lightning'], 20),
+    mk(82, 'Charmander', ['Fire'], 40),
+    mk(83, 'Squirtle', ['Water'], 0)
+  );
+
+  const res = activate(state, rng);
+
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(cardInPlay(res.state, 80).damage, 20);
+  assert.equal(cardInPlay(res.state, 81).damage, 0);
+  assert.equal(cardInPlay(res.state, 82).damage, 40);
+  assert.equal(cardInPlay(res.state, 83).damage, 0);
+  assert.equal(res.state.players.p1.flags.stadiumUsedThisTurn, true);
+});
+
 const GRAND_TREE_TEXT =
   "Once during each player's turn, that player may search their deck for a Stage 1 Pokémon that evolves from 1 of their Pokémon in play and put it onto that Pokémon to evolve it. If that Pokémon evolved during this turn, that player may search their deck for a Stage 2 Pokémon that evolves from that Pokémon and put it onto that Pokémon to evolve it. Then, that player shuffles their deck.";
 

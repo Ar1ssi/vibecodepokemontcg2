@@ -187,9 +187,40 @@ export function parseStadiumSetupDraw(card) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+// Pokémon type words that can appear in a stadium's "each of their … Pokémon"
+// heal clause, and the symbol letters TCG text uses in their place ({W}, {L}).
+const HEAL_TYPE_WORDS = [
+  'grass', 'fire', 'water', 'lightning', 'psychic', 'fighting',
+  'darkness', 'metal', 'dragon', 'fairy', 'colorless',
+];
+const HEAL_TYPE_SYMBOLS = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting',
+  d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy', c: 'colorless',
+};
+
+/** Pokémon types named in a heal clause, e.g. "water pokémon and lightning pokémon". */
+export function parseStadiumHealTypes(clause) {
+  const body = lower(clause);
+  const types = [];
+  const add = (type) => {
+    if (type && !types.includes(type)) types.push(type);
+  };
+  for (const m of body.matchAll(/\{([a-z])\}/g)) add(HEAL_TYPE_SYMBOLS[m[1]]);
+  const words = body.replace(/\{[a-z]\}/g, ' ');
+  for (const word of HEAL_TYPE_WORDS) {
+    if (new RegExp(`\\b${word}\\b`).test(words)) add(word);
+  }
+  // "Dark Pokémon" is printed for the Darkness type; never keep both spellings.
+  if (types.includes('darkness')) {
+    const i = types.indexOf('dark');
+    if (i >= 0) types.splice(i, 1);
+  }
+  return types;
+}
+
 /**
  * Once-per-turn stadium effect descriptor.
- * Returns { kind, n, cost?, condition?, typeFilter?, searchFilter?, destination? } or null.
+ * Returns { kind, n, cost?, condition?, typeFilter?, types?, searchFilter?, destination? } or null.
  */
 export function parseStadiumOncePerTurn(card) {
   const t = textOf(card);
@@ -231,11 +262,15 @@ export function parseStadiumOncePerTurn(card) {
       typeFilter: 'lightning',
     };
   }
-  if (
-    /heal 10 damage from each of their pokémon/.test(t) ||
-    /heal 10 damage from each/.test(t)
-  ) {
-    return { ...base, kind: 'heal-all', n: 10 };
+  const healEach = t.match(/heal (\d+) damage from each(?: of their)? ([^.]+)/);
+  if (healEach) {
+    const types = parseStadiumHealTypes(healEach[2]);
+    return {
+      ...base,
+      kind: 'heal-all',
+      n: parseInt(healEach[1], 10),
+      ...(types.length ? { types } : {}),
+    };
   }
   if (/search/.test(t) && /evolv/.test(t)) {
     return {

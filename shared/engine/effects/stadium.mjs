@@ -98,7 +98,12 @@ export function executeStadium(draft, {
     } else if (opt.kind === 'draw') {
       steps.push({ type: 'draw', count: opt.n || 1 });
     } else if (opt.kind === 'heal-all') {
-      steps.push({ type: 'heal', amount: opt.n || 10 });
+      steps.push({
+        type: 'heal',
+        amount: opt.n || 10,
+        target: 'each of your Pokémon',
+        ...(opt.types ? { types: opt.types } : {}),
+      });
     } else if (opt.kind === 'heal') {
       steps.push({ type: 'healAmount', amount: opt.n || 10, target: 'Active Pokémon' });
     } else if (opt.kind === 'discard-draw') {
