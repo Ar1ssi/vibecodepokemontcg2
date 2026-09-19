@@ -38,6 +38,44 @@ const hasDamageCounterPlacement = (t) =>
   /\bdamage counters?\s+(?:on|to|onto)\b/.test(t) ||
   /(?:place|move)\s+(?:up to\s+)?\d+\s+damage counters?\s+on\b/.test(t);
 
+// Continuous "damage from this Pokémon's attacks ignores effects/Resistance
+// on the Defending Pokémon" (Azure Seas, Bladed Armament, Despotic Fang, …).
+const ignoresDefenderEffects = (t) =>
+  /(?:isn't|aren't|is not|are not) affected by (?:any )?effects? on/.test(t) ||
+  /(?:isn't|aren't|is not|are not) affected by resistance/.test(t);
+
+// Borrowing another Pokémon's printed attacks ("can use the attacks of any …",
+// "can use any attack from any …", "can use X's attack as its own").
+// Excludes the previous-Evolution case, which has its own family + step.
+const canUseAttacksOf = (t) =>
+  (/\bcan use the attacks? of\b/.test(t) ||
+    /can use any attack from any/.test(t) ||
+    /\bcan use [^.]*'s attack\b/.test(t)) &&
+  !t.includes('previous evolution');
+
+// Extra attacks per turn ("may attack twice a turn", Festival Lead, Ω Barrage).
+const attacksTwice = (t) =>
+  /may attack twice/.test(t) ||
+  /attack twice (?:a|each) turn/.test(t) ||
+  /may use an attack it has twice/.test(t);
+
+// Special-Condition immunity that never names a specific condition.
+const specialConditionImmunity = (t) =>
+  !t.includes('retreat') &&
+  (/(?:can't|cannot|can not) be affected by (?:any )?special condition/.test(t) ||
+    /recover(?:s)? from all special condition/.test(t) ||
+    /remove any special condition/.test(t));
+
+// Type-changing continuous text ("it is {F} and {P} type", "type is the same…",
+// "in addition to its existing types", "provides … Energy of every type").
+const typeChangeText = (t) =>
+  /\bit is (?:a )?\{[a-z]\}/.test(t) ||
+  /\btype is (?:the same|now|both|also|\{[a-z]\})/.test(t) ||
+  /same type as/.test(t) ||
+  /in addition to its existing type/.test(t) ||
+  /provides? .*energy of every type/.test(t) ||
+  /is both \{[a-z]\} and \{[a-z]\}/.test(t);
+
 // Bench ↔ Active swap wording ("switch … Benched … with your Active …").
 export const isBenchActiveSwitchText = (t) =>
   t.includes('switch') &&
@@ -260,7 +298,8 @@ export function parseAbility(text = '') {
     lower.includes('search your deck') ||
     lower.includes('look through your deck') ||
     (lower.includes('find') && lower.includes('from your deck')) ||
-    (lower.includes('up to') && lower.includes('from your deck') && lower.includes('into your hand'))
+    (lower.includes('up to') && lower.includes('from your deck') && lower.includes('into your hand')) ||
+    (lower.includes('from your deck') && lower.includes('into your hand'))
   ) {
     const parsed = parseAbilitySearchParams(lower);
     const what = parsed.what;
@@ -404,17 +443,23 @@ export function parseAbility(text = '') {
   // Bench → Active promotion trigger (Lustrous Assist, Tachyon Bits, …)
   const hasPromotionTrigger =
     lower.includes('moves from your bench to the active spot') ||
-    lower.includes('move from your bench to the active spot');
+    lower.includes('move from your bench to the active spot') ||
+    lower.includes('moves from your bench to become your active pokémon') ||
+    lower.includes('move from your bench to become your active pokémon');
 
   // ── 6. Move energy between Pokémon ──────────────────────────────────────
   if (
     !hasPromotionTrigger &&
+    !lower.includes('knocked out') &&
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     (lower.includes('to 1 of your') ||
       lower.includes('to another') ||
       lower.includes('to a different') ||
-      lower.includes('to your active'))
+      lower.includes('to your active') ||
+      lower.includes('to this pokémon') ||
+      lower.includes('to this pokemon') ||
+      lower.includes('to your benched'))
   ) {
     const upTo = lower.match(/move\s+(?:up to\s+)?(\d+)\s+energy/)?.[1] || null;
     const unlimited = lower.includes('as often as you like');
@@ -438,7 +483,8 @@ export function parseAbility(text = '') {
   if (
     lower.includes('discard') &&
     lower.includes('from your hand') &&
-    lower.includes('energy')
+    lower.includes('energy') &&
+    !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower)
   ) {
     const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
     const count = countMatch ? Number(countMatch[1]) : 1;
@@ -467,7 +513,11 @@ export function parseAbility(text = '') {
     hasWord(lower, 'move') &&
     lower.includes('damage counter') &&
     lower.includes('from') &&
-    (lower.includes('to another') || lower.includes('onto another'));
+    (lower.includes('to another') ||
+      lower.includes('onto another') ||
+      lower.includes('to this pokémon') ||
+      lower.includes('to this pokemon') ||
+      /to 1 of your (?!opponent)/.test(lower));
 
   // ── 8. Move / place / put damage counters (before KO-recursion false positives) ──
   if (
@@ -480,7 +530,13 @@ export function parseAbility(text = '') {
       hasDamageCounterPlacement(lower) ||
       lower.includes('on this pokémon') ||
       lower.includes('on this pokemon') ||
-      lower.includes('on 1 of your opponent'))
+      lower.includes('on 1 of your opponent') ||
+      (hasWord(lower, 'move') &&
+        lower.includes('from') &&
+        (lower.includes('to this pokémon') ||
+          lower.includes('to this pokemon') ||
+          lower.includes('to 1 of your opponent') ||
+          lower.includes('to your opponent'))))
   ) {
     const upToMatch = lower.match(/(?:move|place|put)\s+up to\s+(\d+)\s+damage/);
     const exactMatch = lower.match(/(?:move|place|put)\s+(\d+)\s+damage/);
@@ -551,20 +607,24 @@ export function parseAbility(text = '') {
   if (
     lower.includes('opponent') &&
     !isSelfHandDiscardCost(lower) &&
-    (lower.includes('discard') || lower.includes('shuffle') ||
-     (lower.includes('put') && lower.includes('into their hand')))
+    (lower.includes('discard') || lower.includes('shuffle') || lower.includes('reveal') ||
+     (lower.includes('put') && (lower.includes('into their hand') || lower.includes("into your opponent's hand"))))
   ) {
     const n = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+cards?/)?.[1] || null;
     const returnToHand = lower.includes('into their hand');
+    const revealHand = lower.includes('reveal');
     steps.push({
       type: 'opponentDisruptAbility',
       count: n ? Number(n) : null,
       returnToHand,
-      guidance: returnToHand
-        ? 'Once during your turn: return a card/Energy from your opponent\'s Pokémon to their hand (as described).'
-        : n
-          ? `Once during your turn: discard up to ${n} cards from your opponent (as described).`
-          : 'Once during your turn: disrupt your opponent as described (discard/shuffle).',
+      revealHand,
+      guidance: revealHand
+        ? 'Once during your turn: have your opponent reveal their hand (as described).'
+        : returnToHand
+          ? 'Once during your turn: return a card/Energy from your opponent\'s Pokémon to their hand (as described).'
+          : n
+            ? `Once during your turn: discard up to ${n} cards from your opponent (as described).`
+            : 'Once during your turn: disrupt your opponent as described (discard/shuffle).',
     });
   }
 
@@ -584,6 +644,20 @@ export function parseAbility(text = '') {
     });
   }
 
+  // Discard pile → top of deck (Munchlax Snack Search, Florges Wondrous Gift).
+  if (
+    lower.includes('discard pile') &&
+    /top of your deck/.test(lower) &&
+    (hasWord(lower, 'put') || lower.includes('place'))
+  ) {
+    steps.push({
+      type: 'recursionAbility',
+      coinFlip: lower.includes('flip a coin'),
+      itemOnly: lower.includes('item card'),
+      guidance: 'Once during your turn: put a card from your discard pile on top of your deck (as described).',
+    });
+  }
+
   // ── 11. Evolve (put an evolution card onto this Pokémon) ────────────────
   if (
     lower.includes('evolve') &&
@@ -596,13 +670,18 @@ export function parseAbility(text = '') {
   }
 
   // ── 12. Look at top of deck ─────────────────────────────────────────────
-  if (lower.includes('look at the top')) {
-    const n = lower.match(/top\s+(\d+)\s+cards?/)?.[1] || null;
+  if (lower.includes('look at the top') || /look at \d+ cards? from the top/.test(lower)) {
+    const n =
+      lower.match(/top\s+(\d+)\s+cards?/)?.[1] ||
+      lower.match(/(\d+)\s+cards? from the top/)?.[1] ||
+      null;
+    const opponent = lower.includes("opponent's deck");
     steps.push({
       type: 'lookAtTopAbility',
       count: n ? Number(n) : null,
+      opponent,
       guidance: n
-        ? `Once during your turn: look at the top ${n} cards of your deck (take what qualifies, shuffle the rest).`
+        ? `Once during your turn: look at the top ${n} cards of ${opponent ? "your opponent's" : 'your'} deck (as described).`
         : 'Once during your turn: look at the top of your deck (as described).',
     });
   }
@@ -688,8 +767,13 @@ export function parseAbility(text = '') {
   }
 
   // ── 17. Retreat cost modifier ───────────────────────────────────────────
-  if (lower.includes('retreat cost')) {
-    const increased = lower.includes('more') || lower.includes('increase');
+  if (
+    lower.includes('retreat cost') ||
+    /(?:less|more|no energy cost|free) to retreat/.test(lower) ||
+    (/\bpay\b/.test(lower) && lower.includes('to retreat'))
+  ) {
+    const increased =
+      lower.includes('more') || lower.includes('increase') || lower.includes('additional');
     steps.push({
       type: 'retreatCostAbility',
       increased,
@@ -702,7 +786,7 @@ export function parseAbility(text = '') {
   // ── 18. Cost discount (ignore energy in cost) ───────────────────────────
   if (
     (lower.includes('cost') || lower.includes('energy')) &&
-    (lower.includes('less') || lower.includes('ignore') || lower.includes('reduce')) &&
+    (lower.includes('less') || lower.includes('ignore') || lower.includes('reduce') || lower.includes('more')) &&
     lower.includes('attack')
   ) {
     steps.push({
@@ -718,6 +802,8 @@ export function parseAbility(text = '') {
       lower.includes('increase') ||
       lower.includes('treated as') ||
       lower.includes('gets +') ||
+      /maximum hp|max hp/.test(lower) ||
+      /-\d+\s+hp/.test(lower) ||
       /\+\d+\s+hp/.test(lower))
   ) {
     const bonus =
@@ -735,20 +821,25 @@ export function parseAbility(text = '') {
     });
   }
 
-  // ── 20. Weakness change ─────────────────────────────────────────────────
-  if (lower.includes('weakness')) {
+  // ── 20. Weakness / Resistance change ────────────────────────────────────
+  if (
+    (lower.includes('weakness') || lower.includes('resistance')) &&
+    !ignoresDefenderEffects(lower)
+  ) {
     steps.push({
       type: 'weaknessAbility',
-      guidance: 'Passive: modifies this Pokémon\'s Weakness as described.',
+      guidance: 'Passive: modifies this Pokémon\'s Weakness/Resistance as described.',
     });
   }
 
   // ── 21. Damage reduction ────────────────────────────────────────────────
   if (
-    (lower.includes('less damage') || lower.includes('reduce damage') || lower.includes('damage dealt to')) &&
-    lower.includes('this pokémon')
+    lower.includes('less damage') ||
+    lower.includes('reduce damage') ||
+    lower.includes('damage dealt to') ||
+    /damage (?:done|dealt) to [^.]*is reduced/.test(lower)
   ) {
-    const amount = lower.match(/(\d+)\s+less\s+damage/)?.[1] || lower.match(/reduce.*?(\d+)/)?.[1] || null;
+    const amount = lower.match(/(\d+)\s+less\s+damage/)?.[1] || lower.match(/reduce.*?(\d+)/)?.[1] || lower.match(/reduced by\s+(\d+)/)?.[1] || null;
     steps.push({
       type: 'damageReductionAbility',
       amount: amount ? Number(amount) : null,
@@ -790,6 +881,15 @@ export function parseAbility(text = '') {
     });
   }
 
+  // Bench protection (Aurora Veil: Benched Pokémon take no damage from attacks).
+  if (/benched pok[eé]mon (?:do not|don't|does not|doesn't) take damage/.test(lower)) {
+    steps.push({
+      type: 'damagePreventAbility',
+      bench: true,
+      guidance: "Passive: your Benched Pokémon take no damage from (and aren't affected by) attacks (as described).",
+    });
+  }
+
   // ── 25. Tool cap / extra Tool slot ──────────────────────────────────────
   if (lower.includes('tool') && (lower.includes('attach') || lower.includes('slot') || lower.includes('more'))) {
     steps.push({
@@ -799,7 +899,14 @@ export function parseAbility(text = '') {
   }
 
   // ── 26. Prize modification ──────────────────────────────────────────────
-  if (lower.includes('prize card') && (lower.includes('less') || lower.includes('fewer') || lower.includes('more') || lower.includes('extra'))) {
+  if (
+    lower.includes('prize card') &&
+    (lower.includes('less') ||
+      lower.includes('fewer') ||
+      lower.includes('more') ||
+      lower.includes('extra') ||
+      /doesn'?t take any prize|does not take any prize/.test(lower))
+  ) {
     steps.push({
       type: 'prizeModifyAbility',
       guidance: 'Passive: modifies the number of Prize cards taken when this Pokémon is Knocked Out (as described).',
@@ -812,10 +919,23 @@ export function parseAbility(text = '') {
     (((lower.includes('prevent') ||
       lower.includes("can't") ||
       lower.includes('have no effect') ||
+      lower.includes('has no effect') ||
       lower.includes('have no abilities') ||
-      lower.includes('has no abilities')) &&
-      (lower.includes('effect') || lower.includes('ability') || lower.includes('attack'))) ||
-    (lower.includes('active spot') && lower.includes('no abilities')))
+      lower.includes('has no abilities') ||
+      lower.includes('lose any abilit')) &&
+      (lower.includes('effect') ||
+        lower.includes('ability') ||
+        lower.includes('abilities') ||
+        lower.includes('attack') ||
+        lower.includes('poké-power') ||
+        lower.includes('poké-powers') ||
+        lower.includes('poké-body') ||
+        lower.includes('poké-bodies') ||
+        lower.includes('poke-power') ||
+        lower.includes('poke-powers') ||
+        lower.includes('poke-body') ||
+        lower.includes('poke-bodies'))) ||
+    (lower.includes('active spot') && lower.includes('no abilit')))
   ) {
     // "Whenever your opponent plays a Trainer card ..., prevent all effects of
     // that card done to this Pokémon" — scope the guidance to Trainer-card
@@ -844,12 +964,13 @@ export function parseAbility(text = '') {
       lower.includes('x2') ||
       lower.includes('counts as') ||
       lower.includes('treated as') ||
-      (lower.includes('provides') &&
+      /instead of (?:its|their) usual type/.test(lower) ||
+      (/\bprovide[sd]?\b/.test(lower) &&
         (/\{[a-z]\}\{[a-z]\}/.test(lower) || lower.includes('basic'))))
   ) {
     steps.push({
       type: 'energyMultiplierAbility',
-      guidance: 'Passive: Energy attached to this Pokémon counts as more (as described).',
+      guidance: 'Passive: Energy attached to this Pokémon counts as/provides another type (as described).',
     });
   }
 
@@ -957,6 +1078,507 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'firstTurnAttackAbility',
       guidance: 'Passive: this Pokémon can use attacks during your first turn (as described).',
+    });
+  }
+
+  // ── 35. Continuous type change ──────────────────────────────────────────
+  if (
+    typeChangeText(lower) ||
+    /\b(?:is|are)\s+\{[a-z]\}(?:\s*,\s*\{[a-z]\})+(?:\s*,?\s*and\s+\{[a-z]\})?\s*type/.test(lower) ||
+    /treat .* as a pok[eé]mon that has δ/.test(lower)
+  ) {
+    steps.push({
+      type: 'typeChangeAbility',
+      guidance: 'Passive: this Pokémon\'s type changes while the stated condition holds (as described).',
+    });
+  }
+
+  // ── 36. Special-Condition immunity ──────────────────────────────────────
+  if (specialConditionImmunity(lower)) {
+    steps.push({
+      type: 'statusImmunityAbility',
+      guidance: 'Passive: this Pokémon can\'t be affected by Special Conditions (as described).',
+    });
+  }
+
+  // ── 37. Attack copying (borrow another Pokémon's attacks) ───────────────
+  if (canUseAttacksOf(lower)) {
+    steps.push({
+      type: 'attackCopyAbility',
+      guidance: 'Passive: this Pokémon can use the listed Pokémon\'s attacks (Energy still required, as described).',
+    });
+  }
+
+  // ── 38. Extra attacks per turn ──────────────────────────────────────────
+  if (attacksTwice(lower)) {
+    steps.push({
+      type: 'extraAttackAbility',
+      guidance: 'Passive: this Pokémon may attack twice during your turn (as described).',
+    });
+  }
+
+  // ── 39. Attacks ignore effects on the Defending Pokémon ─────────────────
+  if (ignoresDefenderEffects(lower)) {
+    steps.push({
+      type: 'ignoreDefenderEffectsAbility',
+      guidance: 'Passive: damage from this Pokémon\'s attacks isn\'t affected by effects on the Defending Pokémon (as described).',
+    });
+  }
+
+  // ── 40. Evolve during first turn / turn played (Δ Evolution) ────────────
+  if (
+    lower.includes('evolve') &&
+    (/first turn or the turn you play/.test(lower) ||
+      /evolve during the turn you play/.test(lower))
+  ) {
+    steps.push({
+      type: 'evolvePermissionAbility',
+      guidance: 'Passive: you may evolve this Pokémon during your first turn or the turn it was played (Δ Evolution).',
+    });
+  }
+
+  // ── 41. When-drawn placement (Top Entry) ────────────────────────────────
+  if (lower.includes('if you drew this pokémon from your deck')) {
+    steps.push({
+      type: 'whenDrawnAbility',
+      guidance: 'When you draw this Pokémon at the start of your turn: you may put it onto your Bench (as described).',
+    });
+  }
+
+  // ── 42. Hand ↔ top-of-deck swap (Primate Wisdom) ────────────────────────
+  if (
+    (lower.includes('switch') &&
+      lower.includes('card from your hand') &&
+      lower.includes('top card of your deck')) ||
+    /shuffles? (?:his or her|their|your) hand into (?:his or her|their|your) deck/.test(lower)
+  ) {
+    steps.push({
+      type: 'handDeckSwapAbility',
+      guidance: 'Once during your turn: switch a card from your hand with the top card of your deck (as described).',
+    });
+  }
+
+  // ── 43. Discard pile → Bench (recursion) ────────────────────────────────
+  if (lower.includes('discard pile') && lower.includes('onto your bench')) {
+    steps.push({
+      type: 'benchFromDiscardAbility',
+      guidance: 'Once during your turn: put Pokémon from your discard pile onto your Bench (as described).',
+    });
+  }
+
+  // ── 44. Draw until hand matches a board count (variable) ────────────────
+  if (lower.includes('draw cards until you have as many')) {
+    steps.push({
+      type: 'drawVariableAbility',
+      guidance: 'Once during your turn: draw until your hand has as many cards as described (see card text).',
+    });
+  }
+
+  // ── 45. Shuffle this Pokémon into the deck (self-return) ────────────────
+  if (
+    (/\bshuffle\b[^.]*into your deck/.test(lower) && lower.includes('this pokémon')) ||
+    /put this pok[eé]mon on (?:the )?(?:bottom|top) of your deck/.test(lower) ||
+    /discard all cards (?:attached to |from )[^.]*and put [^.]* on (?:the )?(?:bottom|top) of your deck/.test(lower) ||
+    /shuffle that pok[eé]mon back into your deck/.test(lower)
+  ) {
+    steps.push({
+      type: 'returnSelfToDeckAbility',
+      guidance: 'Once during your turn: shuffle this Pokémon and its attached cards into your deck (as described).',
+    });
+  }
+
+  // ── 46. Summon restriction (Zero to Hero) ───────────────────────────────
+  if (lower.includes('put this pokémon into play only with the effect')) {
+    steps.push({
+      type: 'summonRestrictionAbility',
+      guidance: 'Passive: this Pokémon can only be put into play by the stated effect (as described).',
+    });
+  }
+
+  // ── 47. Card-play / evolve locks (continuous) ───────────────────────────
+  const canPlayLock = /can'?t play [^.]*from (?:his or her|their) hand/.test(lower);
+  const eachPlayerLock =
+    /(?:each player|neither player) can'?t play any/.test(lower) || lower.includes('each play');
+  const neitherCanPlay = /neither player can play/.test(lower);
+  if (canPlayLock || eachPlayerLock || neitherCanPlay) {
+    const evolveLock = lower.includes('to evolve');
+    if (evolveLock) {
+      steps.push({
+        type: 'evolveLockAbility',
+        eachPlayer: eachPlayerLock || neitherCanPlay,
+        benchOnly: lower.includes('benched'),
+        guidance: `Passive: ${eachPlayerLock || neitherCanPlay ? 'each player' : 'your opponent'} can't play Pokémon to evolve${lower.includes('benched') ? ' Benched Pokémon' : ' Pokémon in play'} (as described).`,
+      });
+    } else {
+      const cards = [];
+      if (lower.includes('item card')) cards.push('Item');
+      if (lower.includes('pokémon tool')) cards.push('Pokémon Tool');
+      if (lower.includes('supporter')) cards.push('Supporter');
+      if (lower.includes('stadium')) cards.push('Stadium');
+      if (lower.includes('special energy')) cards.push('Special Energy');
+      if (lower.includes('ace spec')) cards.push('ACE SPEC');
+      if (!cards.length && lower.includes('trainer')) cards.push('Trainer');
+      if (!cards.length && lower.includes('pokémon')) cards.push('Pokémon');
+      steps.push({
+        type: 'playLockAbility',
+        eachPlayer: eachPlayerLock || neitherCanPlay,
+        cards: cards.length ? cards : ['card'],
+        guidance: `Passive: ${eachPlayerLock || neitherCanPlay ? 'each player' : 'your opponent'} can't play ${cards.length ? cards.join('/') : 'the listed cards'} from hand (as described).`,
+      });
+    }
+  }
+
+  // ── 48. Retreat locks (continuous) ──────────────────────────────────────
+  if (/(?:opponent's|defending)[^.]*can'?t retreat/.test(lower)) {
+    steps.push({
+      type: 'retreatLockAbility',
+      conditioned: lower.includes('special condition'),
+      guidance: lower.includes('special condition')
+        ? "Passive: your opponent's Pokémon affected by Special Conditions can't retreat (as described)."
+        : "Passive: the opponent's Active Pokémon can't retreat (as described).",
+    });
+  }
+
+  // ── 49. Ability suppression / ignore (continuous) ───────────────────────
+  if (
+    /ignore all pok[eé]-powers and pok[eé]-bodies/.test(lower) ||
+    /ignore all pok[eé]mon powers/.test(lower) ||
+    (/has a pok[eé]mon power/.test(lower) && /that power stops working/.test(lower))
+  ) {
+    steps.push({
+      type: 'powerSuppressAbility',
+      guidance: 'Passive: suppresses or ignores the stated Abilities/Poké-Powers (as described).',
+    });
+  }
+
+  // ── 50. Damage-counter movement lock (continuous) ───────────────────────
+  if (/damage counters?[^.]*can'?t be moved/.test(lower)) {
+    steps.push({
+      type: 'damageCounterLockAbility',
+      guidance: "Passive: damage counters can't be moved between Pokémon (as described).",
+    });
+  }
+
+  // ── 51. Move Energy onto this Pokémon / opponent's / on KO ──────────────
+  if (
+    hasWord(lower, 'move') &&
+    lower.includes('energy') &&
+    !steps.some((s) => s.type === 'moveEnergyAbility')
+  ) {
+    if (/from your opponent's active pok[eé]mon to/.test(lower)) {
+      steps.push({
+        type: 'moveOpponentEnergyAbility',
+        coinFlip: lower.includes('flip a coin'),
+        guidance: "Once during your turn: move an Energy from your opponent's Active Pokémon to their Bench (as described).",
+      });
+    } else if (lower.includes('knocked out') && lower.includes('opponent')) {
+      steps.push({
+        type: 'energyOnKoAbility',
+        basic: lower.includes('basic'),
+        upTo: lower.match(/move\s+up to\s+(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        guidance: lower.includes('benched')
+          ? 'When this Pokémon is Knocked Out: move Energy from it to your Benched Pokémon (as described).'
+          : 'When 1 of your Pokémon is Knocked Out: move Energy from it to this Pokémon (as described).',
+      });
+    } else if (lower.includes('to this pokémon') || lower.includes('to this pokemon')) {
+      steps.push({
+        type: 'moveEnergyAbility',
+        upTo: lower.match(/move\s+(?:up to\s+)?(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        unlimited: lower.includes('as often as you like') || lower.includes('any number'),
+        energyType: parseEnergyTypeHint(lower),
+        basic: lower.includes('basic'),
+        guidance: 'Once during your turn: move Energy from your other Pokémon to this Pokémon (as described).',
+      });
+    } else if (lower.includes('to your benched')) {
+      steps.push({
+        type: 'moveEnergyAbility',
+        upTo: lower.match(/move\s+up to\s+(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        basic: lower.includes('basic'),
+        guidance: 'Move Energy from this Pokémon to your Benched Pokémon (as described).',
+      });
+    }
+  }
+
+  // ── 52. Energy type swap with the discard pile (Second Coat) ────────────
+  if (/switch .*energy .*with .*energy/.test(lower) && lower.includes('discard pile')) {
+    steps.push({
+      type: 'energySwapAbility',
+      basic: lower.includes('basic'),
+      guidance: 'Once during your turn: swap an attached basic Energy with a different basic Energy from your discard pile (as described).',
+    });
+  }
+
+  // ── 53. Transform / replace this Pokémon (Stance Change, V Transformation, Schooling, Form Variation, Phantom Transformation) ──
+  if (
+    (/switch this pok[eé]mon with/.test(lower) &&
+      (lower.includes('in your hand') || lower.includes('discard pile'))) ||
+    (/switch it with/.test(lower) && lower.includes('discard pile')) ||
+    /put a basic pok[eé]mon from your hand on top of this pok[eé]mon/.test(lower) ||
+    /put the chosen pok[eé]mon in its place/.test(lower)
+  ) {
+    steps.push({
+      type: 'transformAbility',
+      fromDiscard: lower.includes('discard pile'),
+      guidance:
+        'Once during your turn: replace this Pokémon with the named card (attached cards, counters and conditions remain, as described).',
+    });
+  }
+
+  // ── 54. Recover / transfer Special Conditions ───────────────────────────
+  if (
+    /recover(?:s|ed)? from all special conditions?/.test(lower) ||
+    /remove (?:all |a |1 |that )?special conditions?/.test(lower)
+  ) {
+    steps.push({
+      type: 'recoverStatusAbility',
+      guidance: 'Once during your turn: remove/recover from Special Conditions (as described).',
+    });
+  }
+  if (/choose 1 special condition/.test(lower) && /defending pok[eé]mon is now affected/.test(lower)) {
+    steps.push({
+      type: 'transferStatusAbility',
+      guidance: 'Once during your turn: move a Special Condition from your Pokémon to the Defending Pokémon (as described).',
+    });
+  }
+
+  // ── 55. Win condition (Unown MISSING / HAND) ────────────────────────────
+  if (/you win this game/.test(lower)) {
+    steps.push({
+      type: 'winGameAbility',
+      guidance: 'Once during your turn: if the stated condition holds, you win this game (as described).',
+    });
+  }
+
+  // ── 56. Lost Zone from the top of the deck (Darkness Send) ──────────────
+  if (/lost zone/.test(lower) && /top card/.test(lower) && lower.includes('flip')) {
+    steps.push({
+      type: 'lostZoneFromDeckAbility',
+      guidance: "Once during your turn: flip coins — put the top card(s) of your opponent's deck in the Lost Zone (as described).",
+    });
+  }
+
+  // ── 57. Peek at the opponent's deck / hand ──────────────────────────────
+  if (/look at \d+ cards? from the top of your opponent's deck/.test(lower)) {
+    steps.push({
+      type: 'deckPeekAbility',
+      target: 'opponentDeck',
+      count: Number(lower.match(/(\d+)\s+cards? from the top/)?.[1] || 0) || null,
+      guidance: "Once during your turn: look at the top cards of your opponent's deck and put them back in the same order (as described).",
+    });
+  } else if (lower.includes("look at your opponent's hand")) {
+    steps.push({
+      type: 'deckPeekAbility',
+      target: 'opponentHand',
+      guidance: "Once during your turn: look at your opponent's hand (as described).",
+    });
+  }
+  if (/put the top card of your opponent's deck on the bottom/.test(lower)) {
+    steps.push({
+      type: 'deckPlaceAbility',
+      to: 'bottom',
+      guidance: "Once during your turn: put the top card of your opponent's deck on the bottom without looking (as described).",
+    });
+  }
+  if (/plays with (?:his or her|their) hand face up/.test(lower)) {
+    steps.push({
+      type: 'deckPeekAbility',
+      target: 'opponentHandRevealed',
+      guidance: "Passive: your opponent plays with their hand revealed (as described).",
+    });
+  }
+
+  // ── 58. Discard any number of cards, then draw that many (Conversion Star) ──
+  if (/discard any number of cards from your hand/.test(lower) && lower.includes('draw that many')) {
+    steps.push({
+      type: 'discardForDrawAbility',
+      guidance: 'Once during your turn: discard any number of cards from your hand, then draw that many (as described).',
+    });
+  }
+
+  // ── 59. Self-attach as a Special Energy (Battery, Buzzap Thunder) ───────
+  if (
+    /attach this card from your hand to 1 of your/.test(lower) ||
+    /knock out this pok[eé]mon and attach it/.test(lower)
+  ) {
+    steps.push({
+      type: 'selfAttachEnergyAbility',
+      knockOutSelf: /knock out this pok[eé]mon/.test(lower),
+      guidance: /knock out this pok[eé]mon/.test(lower)
+        ? 'Once during your turn: Knock Out this Pokémon and attach it to one of your Pokémon as a Special Energy card (as described).'
+        : 'Once during your turn: attach this card from your hand as a Special Energy card (as described).',
+    });
+  }
+
+  // ── 60. Return this Pokémon to hand / put it on the deck ────────────────
+  if (/return [^.]*and all cards attached to it to your hand/.test(lower)) {
+    steps.push({
+      type: 'returnSelfToHandAbility',
+      coinFlip: lower.includes('flip a coin'),
+      guidance: 'Once during your turn: return this Pokémon and all attached cards to your hand (as described).',
+    });
+  }
+
+  // ── 61. Put this Pokémon onto the Bench / swap with the Active ──────────
+  if (
+    (/put this pok[eé]mon onto your bench/.test(lower) ||
+      /play this pok[eé]mon onto your bench/.test(lower) ||
+      /play this pok[eé]mon as your new active pok[eé]mon/.test(lower)) &&
+    !lower.includes('when you play')
+  ) {
+    steps.push({
+      type: 'selfBenchPlacementAbility',
+      swapActive: /move your active pok[eé]mon to your bench/.test(lower),
+      guidance: /move your active pok[eé]mon to your bench/.test(lower)
+        ? 'Once during your turn: move your Active Pokémon to the Bench and put this Pokémon in the Active Spot (as described).'
+        : 'Once during your turn: put this Pokémon from your hand onto your Bench (as described).',
+    });
+  }
+
+  // ── 62. Stadium manipulation (Crush Chance, Resetting Hole, Teleport Room) ──
+  if (/discard (?:any|a) stadium card in play/.test(lower)) {
+    steps.push({
+      type: 'stadiumManipAbility',
+      replace: /put a stadium card with a different name from your discard pile into play/.test(lower),
+      discardSelf: /discard this pok[eé]mon/.test(lower),
+      guidance: /put a stadium card with a different name/.test(lower)
+        ? 'Once during your turn: discard the Stadium in play, then put a different Stadium from your discard pile into play (as described).'
+        : 'Once during your turn: discard a Stadium card in play (as described).',
+    });
+  }
+
+  // ── 63. Energy provides a different type / has no effect (Chlorophyll, Spectral Breach) ──
+  if (
+    /energy cards? that provide only .* provide .* instead/.test(lower) ||
+    /all special energy attached .* provide .* and have no other effect/.test(lower)
+  ) {
+    steps.push({
+      type: 'energyTypeChangeAbility',
+      guidance: 'Passive: the stated Energy provides a different type (or has no other effect) as described.',
+    });
+  }
+
+  // ── 64. Attack-cost modification (Insight, Tuning Echo, Star Light, Δ Aura, Glistening Bubbles) ──
+  if (
+    /attack cost/.test(lower) ||
+    /ignore all energy in the cost/.test(lower) ||
+    /pays .* less energy to use/.test(lower) ||
+    /can use the [^.]* attack for \{/.test(lower)
+  ) {
+    steps.push({
+      type: 'attackCostAbility',
+      guidance: 'Passive: modifies the Energy cost of the stated attack(s) (as described).',
+    });
+  }
+
+  // ── 65. Coin-flip control (Victory Star, Contrary/Unlucky Wind, Pattern Distraction) ──
+  if (
+    /after you flip any coins for an attack[^.]*begin flipping those coins again/.test(lower) ||
+    /whenever your opponent flips a coin[^.]*treat it as tails/.test(lower) ||
+    (/flips a coin/.test(lower) && /that attack does nothing/.test(lower))
+  ) {
+    steps.push({
+      type: 'coinFlipControlAbility',
+      reroll: /begin flipping those coins again/.test(lower),
+      opponentTails: /treat it as tails/.test(lower),
+      attackFail: /that attack does nothing/.test(lower),
+      guidance: /begin flipping those coins again/.test(lower)
+        ? 'Once during your turn: ignore the results of an attack\'s coin flips and reroll them (as described).'
+        : /treat it as tails/.test(lower)
+          ? 'Passive: your opponent\'s coin flips are treated as tails (as described).'
+          : 'Passive: your opponent flips a coin when attacking — tails means the attack does nothing (as described).',
+    });
+  }
+
+  // ── 66. Misc one-off continuous / trigger abilities ─────────────────────
+  if (/you may play 2 supporter cards/.test(lower)) {
+    steps.push({
+      type: 'playExtraSupporterAbility',
+      guidance: 'Passive: you may play 2 Supporter cards during your turn (as described).',
+    });
+  }
+  if (/your turn does not end when you use/.test(lower)) {
+    steps.push({
+      type: 'turnNotEndAbility',
+      guidance: 'Passive: your turn does not end when you use the stated card (as described).',
+    });
+  }
+  if (/at the beginning of the game, you go first/.test(lower)) {
+    steps.push({
+      type: 'goFirstAbility',
+      guidance: 'Passive: if this Pokémon is your Active Pokémon at the start of the game, you go first (as described).',
+    });
+  }
+  if (/do \d+ of that damage to/.test(lower) && lower.includes('benched')) {
+    steps.push({
+      type: 'benchGuardAbility',
+      guidance: 'Passive: damage done to your Benched Pokémon may be redirected to this Benched Pokémon (as described).',
+    });
+  }
+  if (
+    /attach [^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower) ||
+    /you must discard an energy card attached/.test(lower)
+  ) {
+    steps.push({
+      type: 'attachRestrictionAbility',
+      guidance: 'Passive: attaching the stated Energy from your hand to this Pokémon requires discarding an Energy attached to it (as described).',
+    });
+  }
+  if (/attach any technical machine/.test(lower)) {
+    steps.push({
+      type: 'attachPermissionAbility',
+      guidance: 'Passive: you may attach any Technical Machine to this Pokémon (as described).',
+    });
+  }
+  if (/hold this card and throw it/.test(lower)) {
+    steps.push({
+      type: 'jokeAbility',
+      guidance: 'Joke ability: printed for fun — no game effect.',
+    });
+  }
+  if (/search your discard pile for a .* and attach it to/.test(lower)) {
+    steps.push({
+      type: 'searchDiscardAttachAbility',
+      energyType: parseEnergyTypeHint(lower),
+      basic: lower.includes('basic'),
+      guidance: 'Once during your turn: search your discard pile for a card and attach it to this Pokémon (as described).',
+    });
+  }
+  if (/discard your other benched pok[eé]mon/.test(lower)) {
+    steps.push({
+      type: 'discardBenchAbility',
+      guidance: 'Once during your turn: keep the chosen Benched Pokémon and discard your other Benched Pokémon (as described).',
+    });
+  }
+  if (/shuffles all cards in play/.test(lower)) {
+    steps.push({
+      type: 'resetInPlayAbility',
+      guidance: 'Once per game: each player shuffles the stated cards in play into their deck (as described).',
+    });
+  }
+  if (/use the effect of a supporter card you find there/.test(lower)) {
+    steps.push({
+      type: 'useSupporterAbility',
+      guidance: "Once during your turn: use the effect of a Supporter card in your opponent's hand (as described).",
+    });
+  }
+  if (/discard the top card of your opponent's deck/.test(lower)) {
+    steps.push({
+      type: 'discardOpponentDeckAbility',
+      guidance: "Once during your turn: discard the top card of your opponent's deck (as described).",
+    });
+  }
+  if (/defending pok[eé]mon retreats/.test(lower) && lower.includes('discard')) {
+    steps.push({
+      type: 'opponentDisruptAbility',
+      onRetreat: true,
+      guidance: 'Passive: when the Defending Pokémon retreats, discard the Energy attached to it (as described).',
+    });
+  }
+  if (/damaged by an opponent's attack/.test(lower) && lower.includes("into your opponent's hand")) {
+    steps.push({
+      type: 'opponentDisruptAbility',
+      returnToHand: true,
+      guidance: "Passive: when this Pokémon is damaged, put an Energy from the Attacking Pokémon into your opponent's hand (as described).",
     });
   }
 

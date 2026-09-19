@@ -7,7 +7,7 @@
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
 server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQLite DB); entry: server/server.js
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
-scripts/ — admin and asset utility scripts (stadium audit, mat generator, scraper)
+scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
 tools/ — internal dev tools, sync log comparison, asset mappings
 
 <!-- Netcode/rules detail below verified S2 while designing 001. Deck-builder, image-logic,
