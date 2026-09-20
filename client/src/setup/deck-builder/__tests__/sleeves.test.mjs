@@ -25,19 +25,31 @@ import test from 'node:test';
       }
     });
 
-    test('coin catalog: all 942 Pokemon coins with data', async () => {
+    test('coin catalog: all 939 Pokemon coins with data', async () => {
       const {
+        COIN_MATERIALS,
         getCoins,
       } = await import('../core/coins.mjs');
       const coins = getCoins();
-      assert.equal(coins.length, 942);
+      assert.equal(coins.length, 939);
 
+      const ids = new Set();
       for (const coin of coins) {
         assert.ok(coin.id, `missing id: ${coin.name}`);
         assert.ok(coin.name, `missing name: ${coin.id}`);
         assert.ok(coin.url, `bad url: ${coin.id}`);
+        assert.ok(coin.thumb, `missing thumb: ${coin.id}`);
         assert.ok(coin.material, `missing material: ${coin.id}`);
+        assert.ok(
+          COIN_MATERIALS.includes(coin.material),
+          `unknown material "${coin.material}": ${coin.id}`
+        );
+        assert.ok(!/\bdate\b/i.test(coin.release || ''), `unclean release: ${coin.id}`);
+        assert.ok(!ids.has(coin.id), `duplicate id: ${coin.id}`);
+        ids.add(coin.id);
       }
+
+      assert.equal(ids.size, coins.length);
     });
     
     test('sleeve catalog entries are clones', () => {

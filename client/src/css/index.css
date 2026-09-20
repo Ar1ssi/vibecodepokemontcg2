@@ -4513,6 +4513,18 @@ body.side-menu-collapsed #oppResizer {
           transparent 72%);
       mix-blend-mode: overlay;
     }
+    /* METAL: neutral cast-metal sheen (cooler and flatter than silver) */
+    .coin-mat-metal .coin-face::after {
+      background:
+        radial-gradient(ellipse 76% 12% at var(--coin-x) var(--coin-y),
+          rgba(235, 238, 242, 0.3) 0%,
+          rgba(150, 158, 168, 0.1) 38%,
+          transparent 64%),
+        radial-gradient(ellipse 14% 9% at calc(var(--coin-x) - 10%) calc(var(--coin-y) - 12%),
+          rgba(255, 255, 255, 0.16) 0%,
+          transparent 72%);
+      mix-blend-mode: overlay;
+    }
     /* ENAMEL: satin paint, not wet lacquer */
     .coin-mat-enamel .coin-face::after {
       background:
@@ -4565,6 +4577,15 @@ body.side-menu-collapsed #oppResizer {
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
     }
+    .coin-cell-meta {
+      font-size: 1vh;
+      text-align: center;
+      opacity: 0.5;
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .native-deck-builder-coin-preview {
       display: flex;
       align-items: center;
@@ -4584,6 +4605,25 @@ body.side-menu-collapsed #oppResizer {
     .native-deck-builder-coin-preview-text strong { font-size: 1.7vh; }
     .native-deck-builder-coin-preview-text span { font-size: 1.3vh; opacity: 0.7; }
     .native-deck-builder-coin-preview-none { font-size: 1.4vh; opacity: 0.6; font-style: italic; }
+    .native-deck-builder-coin-preview-missing { font-size: 1.2vh; opacity: 0.6; font-style: italic; }
+    .coin-region-filter {
+      font-size: 1.2vh;
+      padding: 0.4vh 0.5vw;
+      border-radius: 6px;
+      border: 1px solid rgba(65, 91, 168, 0.3);
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+    }
+    .coin-image-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 1.2vh;
+      opacity: 0.85;
+      cursor: pointer;
+      user-select: none;
+    }
     .native-deck-builder-coin-empty { grid-column: 1 / -1; text-align: center; opacity: 0.6; padding: 3vh 0; font-style: italic; }
     .coin-material-filter {
       display: flex;
@@ -4625,6 +4665,9 @@ body.side-menu-collapsed #oppResizer {
     }
     .coin-mat-silver .coin-face {
       background: conic-gradient(from 210deg, #c5ccd6, #5c636e 25%, #dce2ea 50%, #4a515b 75%, #c5ccd6);
+    }
+    .coin-mat-metal .coin-face {
+      background: conic-gradient(from 210deg, #cfd4da, #6b7280 25%, #e6e9ee 50%, #565c66 75%, #cfd4da);
     }
     
     /* ── TCG Live-style coin toss ─────────────────────────────────────────

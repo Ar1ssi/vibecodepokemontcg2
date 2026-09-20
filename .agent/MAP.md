@@ -9,6 +9,9 @@ server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQL
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
 tools/ — internal dev tools, sync log comparison, asset mappings
+client/src/setup/deck-builder/core/coins.mjs — coin catalog (939, unique ids); normalize via
+  scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
+  client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link)
 
 <!-- Netcode/rules detail below verified S2 while designing 001. Deck-builder, image-logic,
      sizing, and initialization subtrees remain unmapped at this depth. -->

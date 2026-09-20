@@ -1,6 +1,9 @@
 import {
-      filterCoinsByName,
+      filterCoins,
       getCoins,
+      getCoinStats,
+      groupCoinsByRelease,
+      isPlaceholderCoin,
     } from '../../../setup/deck-builder/core/coins.mjs';
     
     const escapeHtml = (value = '') => String(value)
@@ -11,12 +14,11 @@ import {
       .replaceAll("'", '&#39;');
     
     /**
-     * Coin picker for the Customize tab. Renders a circular gallery of all
-     * Gen IX coins with material-adapted metallic effects (gold/silver get
-     * hard specular sweeps; enamel gets a soft sheen). Coins flip on click
-     * to show the TM back; double-click (or the Select button in preview)
-     * selects the coin for the deck. Mouse tracking drives the specular
-     * highlight like the holofoil cards.
+     * Coin picker for the Customize tab. Renders a circular gallery of the
+     * whole catalog (Gens I-IX) with material-adapted metallic effects
+     * (gold/silver/metal get specular sweeps; enamel gets a soft sheen).
+     * Filterable by name, material, region, and image availability. Coins
+     * flip on click to show the back; clicking a cell selects the coin.
      */
     export const initializeDeckBuilderCoinPicker = ({
       panelEl,
@@ -25,24 +27,58 @@ import {
       if (!panelEl) return null;
     
       const coins = getCoins();
+      const stats = getCoinStats(coins);
+      const releaseVariantCounts = new Map(
+        groupCoinsByRelease(coins).map((group) => [group.release, group.count])
+      );
       let selectedId = null;
       let filterTerm = '';
       let materialFilter = 'all';
-    
+      let regionFilter = 'all';
+      let hasImageOnly = false;
+
+      const MATERIAL_LABELS = {
+        all: 'All',
+        gold: 'Gold',
+        silver: 'Silver',
+        metal: 'Metal',
+        enamel: 'Color',
+        cardboard: 'Cardboard',
+      };
+      const materialButtons = ['all', 'gold', 'silver', 'metal', 'enamel', 'cardboard']
+        .map((mat) => {
+          const count = mat === 'all' ? stats.total : (stats.byMaterial[mat] ?? 0);
+          const active = mat === 'all' ? ' class="active"' : '';
+          return `    <button data-mat="${mat}"${active}>${MATERIAL_LABELS[mat]} (${count})</button>`;
+        })
+        .join('');
+
+      const regions = Object.keys(stats.byRegion)
+        .filter((region) => region !== 'unknown')
+        .sort((a, b) => a.localeCompare(b));
+      const regionOptions = [
+        '    <option value="all">All regions</option>',
+        ...regions.map(
+          (region) =>
+            `    <option value="${escapeHtml(region)}">${escapeHtml(region)} (${stats.byRegion[region]})</option>`
+        ),
+      ].join('');
+
       panelEl.innerHTML = [
         '<div class="native-deck-builder-section-title-row">',
         '  <div class="native-deck-builder-section-title-wrap">',
         '    <div class="native-deck-builder-section-title">Coin</div>',
-        '    <span class="native-deck-builder-set-browser-series-tag">Generation IX · 200</span>',
+        `    <span class="native-deck-builder-set-browser-series-tag">All generations · ${stats.total}</span>`,
         '  </div>',
         '  <div class="coin-material-filter">',
-        '    <button data-mat="all" class="active">All</button>',
-        '    <button data-mat="gold">Gold</button>',
-        '    <button data-mat="silver">Silver</button>',
-        '    <button data-mat="enamel">Color</button>',
+        materialButtons,
         '  </div>',
         '  <input class="native-deck-builder-coin-filter" type="text"',
         '    placeholder="Filter coins..." aria-label="Filter coins by name" />',
+        '  <select class="coin-region-filter" aria-label="Filter coins by region">',
+        regionOptions,
+        '  </select>',
+        '  <label class="coin-image-toggle"><input type="checkbox" class="coin-image-only" /> Only with images</label>',
         '</div>',
         '<div class="native-deck-builder-coin-preview"></div>',
         '<div class="native-deck-builder-coin-gallery"></div>',
@@ -51,6 +87,8 @@ import {
       const previewEl = panelEl.querySelector('.native-deck-builder-coin-preview');
       const galleryEl = panelEl.querySelector('.native-deck-builder-coin-gallery');
       const filterInput = panelEl.querySelector('.native-deck-builder-coin-filter');
+      const regionSelect = panelEl.querySelector('.coin-region-filter');
+      const imageOnlyInput = panelEl.querySelector('.coin-image-only');
     
       const renderPreview = () => {
         const coin = coins.find((c) => c.id === selectedId) || null;
@@ -58,6 +96,25 @@ import {
           previewEl.innerHTML = '<span class="native-deck-builder-coin-preview-none">No coin selected — flips will use the default.</span>';
           return;
         }
+        const variantCount = releaseVariantCounts.get(coin.release) || 0;
+        const finishLabel =
+          coin.material === 'enamel'
+            ? 'Colored enamel'
+            : coin.material.charAt(0).toUpperCase() + coin.material.slice(1) + ' finish';
+        const metaLines = [`  <span>${finishLabel} · click coin to toss</span>`];
+        if (coin.release) {
+          metaLines.push(
+            `  <span>${escapeHtml(coin.release)}${variantCount > 1 ? ` · ${variantCount} variants` : ''}</span>`
+          );
+        }
+        const regionDate = [coin.region, coin.releaseDate].filter(Boolean).join(' · ');
+        if (regionDate) metaLines.push(`  <span>${escapeHtml(regionDate)}</span>`);
+        if (isPlaceholderCoin(coin)) {
+          metaLines.push(
+            '  <span class="native-deck-builder-coin-preview-missing">No scan available yet</span>'
+          );
+        }
+
         previewEl.innerHTML = [
           `<span class="coin-toss-wrap" data-coin-toss>`,
       `<div class="coin-3d coin-mat-${coin.material}" data-coin-preview>`,
@@ -67,7 +124,7 @@ import {
           `</span>`,
           `<div class="native-deck-builder-coin-preview-text">`,
           `  <strong>${escapeHtml(coin.name)}</strong>`,
-          `  <span>${coin.material === 'enamel' ? 'Colored enamel' : coin.material.charAt(0).toUpperCase() + coin.material.slice(1) + ' finish'} · click coin to toss</span>`,
+          ...metaLines,
           `</div>`,
         ].join('');
         wirePreviewCoin();
@@ -107,10 +164,12 @@ import {
       };
     
       const renderGallery = () => {
-        let visible = filterCoinsByName(coins, filterTerm);
-        if (materialFilter !== 'all') {
-          visible = visible.filter((c) => c.material === materialFilter);
-        }
+        const visible = filterCoins(coins, {
+          term: filterTerm,
+          material: materialFilter,
+          region: regionFilter,
+          hasImage: hasImageOnly,
+        });
         if (visible.length === 0) {
           galleryEl.innerHTML = '<div class="native-deck-builder-coin-empty">No coins match.</div>';
           return;
@@ -126,6 +185,9 @@ import {
               `    <span class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="" loading="lazy" /></span>`,
               `  </span>`,
               `  <span class="coin-cell-name">${escapeHtml(coin.name)}</span>`,
+              coin.region || coin.releaseDate
+                ? `  <span class="coin-cell-meta">${escapeHtml([coin.region, coin.releaseDate].filter(Boolean).join(' · '))}</span>`
+                : '',
               `</button>`,
             ].join('');
           })
@@ -160,6 +222,16 @@ import {
     
       filterInput.addEventListener('input', () => {
         filterTerm = filterInput.value;
+        renderGallery();
+      });
+    
+      regionSelect.addEventListener('change', () => {
+        regionFilter = regionSelect.value;
+        renderGallery();
+      });
+    
+      imageOnlyInput.addEventListener('change', () => {
+        hasImageOnly = imageOnlyInput.checked;
         renderGallery();
       });
     

@@ -1,10 +1,10 @@
-// Merged coin catalog: 202 existing + 740 new
-// Generated from Bulbapedia scrape + existing coins
-// Updated 2026-09-20T12:43:21.449Z
+// Coin catalog: 202 launch-era (Gen IX) + 737 historical (Gens I-VIII).
+// Generated from a Bulbapedia scrape; normalize/rewrite with
+// `node scripts/normalize-coin-catalog.mjs`.
 
 const COIN_BACK_URL = "src/assets/coins/coin-back.png";
 
-const GEN_IX_COINS = [
+const COIN_CATALOG = [
  {
   "id": "PRC_Red_Primal_Groudon_Coin",
   "url": "src/assets/coins/PRC_Red_Primal_Groudon_Coin.png",
@@ -213,7 +213,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/WCS23_Metal_Pikachu_Coin.jpg",
   "thumb": "src/assets/coins/WCS23_Metal_Pikachu_Coin.jpg",
   "name": "WCS23 Metal Pikachu",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "WCS23_Yokohama_Pikachu_Coin",
@@ -353,7 +353,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/151MT_Gray_Metal_Coin.jpg",
   "thumb": "src/assets/coins/151MT_Gray_Metal_Coin.jpg",
   "name": "151MT Gray Metal",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "151MT_Gold_Dragon_Coin",
@@ -472,7 +472,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/IC24_Metal_Armarouge_Ceruledge_Coin.jpg",
   "thumb": "src/assets/coins/IC24_Metal_Armarouge_Ceruledge_Coin.jpg",
   "name": "IC24 Metal Armarouge Ceruledge",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "IPTC_Pink_Iono_Coin",
@@ -549,14 +549,14 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/WCS24_Metal_Pikachu_Coin.png",
   "thumb": "src/assets/coins/WCS24_Metal_Pikachu_Coin.png",
   "name": "WCS24 Metal Pikachu",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "WCS24_Metal_Munchlax_Coin",
   "url": "src/assets/coins/WCS24_Metal_Munchlax_Coin.jpg",
   "thumb": "src/assets/coins/WCS24_Metal_Munchlax_Coin.jpg",
   "name": "WCS24 Metal Munchlax",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "WCS24_Gift_Pikachu_Coin",
@@ -570,7 +570,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/WCS24_Metal_Squirtle_Coin.png",
   "thumb": "src/assets/coins/WCS24_Metal_Squirtle_Coin.png",
   "name": "WCS24 Metal Squirtle",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "HC2024_Blue_Chien-Pao_Coin",
@@ -801,7 +801,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/CSVH1_Cardboard_ex_Coin.png",
   "thumb": "src/assets/coins/CSVH1_Cardboard_ex_Coin.png",
   "name": "CSVH1 Cardboard ex",
-  "material": "enamel"
+  "material": "cardboard"
  },
  {
   "id": "CFS_Green_N_Coin",
@@ -878,7 +878,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/EUIC_Metal_Ogerpon_Coin.png",
   "thumb": "src/assets/coins/EUIC_Metal_Ogerpon_Coin.png",
   "name": "EUIC Metal Ogerpon",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "PREBL_Gold_Eevee_Coin",
@@ -1004,7 +1004,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/WCS25_Metal_Jigglypuff_Coin.png",
   "thumb": "src/assets/coins/WCS25_Metal_Jigglypuff_Coin.png",
   "name": "WCS25 Metal Jigglypuff",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "WCS25_Staff_Toedscool_Coin",
@@ -1046,21 +1046,21 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/BeijingMasters_Metal_Gholdengo_Coin.png",
   "thumb": "src/assets/coins/BeijingMasters_Metal_Gholdengo_Coin.png",
   "name": "BeijingMasters Metal Gholdengo",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "BeijingMasters_Metal_Pikachu_Coin",
   "url": "src/assets/coins/BeijingMasters_Metal_Pikachu_Coin.png",
   "thumb": "src/assets/coins/BeijingMasters_Metal_Pikachu_Coin.png",
   "name": "BeijingMasters Metal Pikachu",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "BeijingMasters_Metal_Garganacl_Coin",
   "url": "src/assets/coins/BeijingMasters_Metal_Garganacl_Coin.png",
   "thumb": "src/assets/coins/BeijingMasters_Metal_Garganacl_Coin.png",
   "name": "BeijingMasters Metal Garganacl",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "MEGETB_Blue_Mega_Lucario_Coin",
@@ -1151,7 +1151,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/UPC_Metal_Mega_Charizard_X_Coin.png",
   "thumb": "src/assets/coins/UPC_Metal_Mega_Charizard_X_Coin.png",
   "name": "UPC Metal Mega Charizard X",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "F2025CC_Silver_Mega_Lucario_Coin",
@@ -1165,42 +1165,42 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/ShenzhenMasters_Metal_Dragapult_Coin.png",
   "thumb": "src/assets/coins/ShenzhenMasters_Metal_Dragapult_Coin.png",
   "name": "ShenzhenMasters Metal Dragapult",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "ShenzhenMasters_Metal_Mewtwo_Coin",
   "url": "src/assets/coins/ShenzhenMasters_Metal_Mewtwo_Coin.png",
   "thumb": "src/assets/coins/ShenzhenMasters_Metal_Mewtwo_Coin.png",
   "name": "ShenzhenMasters Metal Mewtwo",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "ShenzhenMasters_Metal_Porygon_Coin",
   "url": "src/assets/coins/ShenzhenMasters_Metal_Porygon_Coin.png",
   "thumb": "src/assets/coins/ShenzhenMasters_Metal_Porygon_Coin.png",
   "name": "ShenzhenMasters Metal Porygon",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "ShenzhenMasters_Metal_Zapdos_Coin",
   "url": "src/assets/coins/ShenzhenMasters_Metal_Zapdos_Coin.png",
   "thumb": "src/assets/coins/ShenzhenMasters_Metal_Zapdos_Coin.png",
   "name": "ShenzhenMasters Metal Zapdos",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "ShenzhenMasters_Metal_Pikachu_Coin",
   "url": "src/assets/coins/ShenzhenMasters_Metal_Pikachu_Coin.png",
   "thumb": "src/assets/coins/ShenzhenMasters_Metal_Pikachu_Coin.png",
   "name": "ShenzhenMasters Metal Pikachu",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "ShenzhenMasters_Metal_Ampharos_Coin",
   "url": "src/assets/coins/ShenzhenMasters_Metal_Ampharos_Coin.png",
   "thumb": "src/assets/coins/ShenzhenMasters_Metal_Ampharos_Coin.png",
   "name": "ShenzhenMasters Metal Ampharos",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "CTVM_Orange_Mega_Charizard_Y_Coin",
@@ -1326,7 +1326,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/EUIC_Metal_Mega_Charizard_X_Coin.png",
   "thumb": "src/assets/coins/EUIC_Metal_Mega_Charizard_X_Coin.png",
   "name": "EUIC Metal Mega Charizard X",
-  "material": "enamel"
+  "material": "metal"
  },
  {
   "id": "ASCETB_Yellow_Mega_Dragonite_Coin",
@@ -1425,18 +1425,18 @@ const GEN_IX_COINS = [
   "thumb": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "name": "Regular-sized, Silver Splotch Holofoil, C/G/M",
   "material": "silver",
-  "release": "date\tOctober 20, 1996",
+  "release": "October 20, 1996",
   "releaseDate": "October 20, 1996",
   "region": "Japan",
   "description": "Regular-sized, Silver Splotch Holofoil, C/G/M Trademark Black-backed Coin featuring Chansey released within the Japanese Starter Deck October 20, 1996; later included in the Gift Pack December 12, 199"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_SILVER",
+  "id": "DATE_OCTOBER_REGULARSIZED_SILVER_19961020",
   "url": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "thumb": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "name": "Regular-sized, Silver Splotch Holofoil, C/G",
   "material": "silver",
-  "release": "date\tOctober 20, 1996",
+  "release": "October 20, 1996",
   "releaseDate": "October 20, 1996",
   "region": "Japan",
   "description": "Regular-sized, Silver Splotch Holofoil, C/G Trademark Black-backed Coin featuring Chansey released within later shipments of the Japanese Starter Deck October 20, 1996; later included in later shipmen"
@@ -1447,7 +1447,7 @@ const GEN_IX_COINS = [
   "thumb": "https://archives.bulbagarden.net/media/upload/e/e2/PCG_Gold_Chansey_Coin.png/PCG_Gold_Chansey_Coin.png",
   "name": "Regular-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tJune 14, 1997",
+  "release": "June 14, 1997",
   "releaseDate": "June 14, 1997",
   "region": "Japan",
   "description": "Regular-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Chansey released for participating in the Japanese Pokémon Card Game Official Tournament held on June 14-15, 1997 in Chiba"
@@ -1458,18 +1458,18 @@ const GEN_IX_COINS = [
   "thumb": "https://archives.bulbagarden.net/media/upload/d/da/NCG_Brown_Onix_Coin.png/NCG_Brown_Onix_Coin.png",
   "name": "Regular-sized, Brown Circles Holofoil, C/G/M",
   "material": "enamel",
-  "release": "date\tApril 26, 1998",
+  "release": "April 26, 1998",
   "releaseDate": "April 26, 1998",
   "region": "Japan",
   "description": "Regular-sized, Brown Circles Holofoil, C/G/M Trademark Black-backed Coin featuring Onix released within the Japanese Nivi City Gym April 26, 1998"
  },
  {
-  "id": "DATE_APRIL_REGULARSIZED_BROWN",
+  "id": "DATE_APRIL_REGULARSIZED_BROWN_19980426",
   "url": "https://archives.bulbagarden.net/media/upload/d/da/NCG_Brown_Onix_Coin.png/NCG_Brown_Onix_Coin.png",
   "thumb": "https://archives.bulbagarden.net/media/upload/d/da/NCG_Brown_Onix_Coin.png/NCG_Brown_Onix_Coin.png",
   "name": "Regular-sized, Brown Circles Holofoil, C/G",
   "material": "enamel",
-  "release": "date\tApril 26, 1998",
+  "release": "April 26, 1998",
   "releaseDate": "April 26, 1998",
   "region": "Japan",
   "description": "Regular-sized, Brown Circles Holofoil, C/G Trademark Black-backed Coin featuring Onix released within later shipments of the Japanese Nivi City Gym April 26, 1998"
@@ -1557,7 +1557,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 4, 1998",
+  "release": "December 4, 1998",
   "releaseDate": "December 4, 1998",
   "region": "Japan",
   "description": "Regular-sized, Green Rainbow Holofoil, Black-backed Coin featuring Chansey released as one of two coins available within the Japanese Quick Starter Gift Set December 4, 1998"
@@ -1567,8 +1567,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_CARDBOARD_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_CARDBOARD_SILVER.jpg",
   "name": "Cardboard Silver Coin featuring Chansey",
-  "material": "silver",
-  "release": "date\tJanuary 9, 1999",
+  "material": "cardboard",
+  "release": "January 9, 1999",
   "releaseDate": "January 9, 1999",
   "region": "North America",
   "description": "Cardboard Silver Coin featuring Chansey released within the Base Set Theme Decks Blackout, Brushfire, Overgrowth, and Zap! January 9, 1999; comes in six varieties, three with the original Wizards back"
@@ -1579,7 +1579,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_CARDBOARD_COIN.jpg",
   "name": "Cardboard Coin featuring Pikachu awarded",
   "material": "cardboard",
-  "release": "date\tJanuary 9, 1999",
+  "release": "January 9, 1999",
   "releaseDate": "January 9, 1999",
   "region": "North America",
   "description": "Cardboard Coin featuring Pikachu awarded to those who participated in Pokémon League during the first League Cycle held starting after the release of Base Set in 1999."
@@ -1623,7 +1623,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_BROWN.jpg",
   "name": "Regular-sized, Brown Pixel Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 25, 1999",
+  "release": "June 25, 1999",
   "releaseDate": "June 25, 1999",
   "region": "Japan",
   "description": "Regular-sized, Brown Pixel Holofoil, Black-backed Coin featuring Doduo available to those who earned 400 points via the Pokémon Card Fan Club GET Point System starting June 25, 1999 with the release o"
@@ -1634,7 +1634,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 1999",
+  "release": "July 10, 1999",
   "releaseDate": "July 10, 1999",
   "region": "Japan",
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Exeggutor released as one of two coins available for earning 5 Play Points in events at the Japanese Challenge Road '99 held on June 1"
@@ -1645,7 +1645,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PURPLE.jpg",
   "name": "Regular-sized, Purple Glitter Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 1999",
+  "release": "July 10, 1999",
   "releaseDate": "July 10, 1999",
   "region": "Japan",
   "description": "Regular-sized, Purple Glitter Holofoil, Black-backed Coin featuring Mewtwo released as one of two coins available for earning 5 Play Points in events at the Japanese Challenge Road '99 held on June 10"
@@ -1656,7 +1656,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BROWN.jpg",
   "name": "Regular-sized, Brown Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 1999",
+  "release": "July 10, 1999",
   "releaseDate": "July 10, 1999",
   "region": "Japan",
   "description": "Regular-sized, Brown Mirror Holofoil, Black-backed Coin featuring Doduo awarded to those who won three matches in a row in the Doduo Tag side event at Japanese Challenge Road '99 held on June 10-11, 1"
@@ -1667,7 +1667,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, C/G",
   "material": "enamel",
-  "release": "date\tJuly 30, 1999",
+  "release": "July 30, 1999",
   "releaseDate": "July 30, 1999",
   "region": "Japan",
   "description": "Regular-sized, Pink Mirror Holofoil, C/G Trademark Black-backed Coin featuring Chansey released within the Japanese Intro Pack July 30, 1999"
@@ -1677,8 +1677,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_JULY_CARDBOARD_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_CARDBOARD_SILVER.jpg",
   "name": "Cardboard Silver Coin featuring Eevee",
-  "material": "silver",
-  "release": "date\tJuly 30, 1999",
+  "material": "cardboard",
+  "release": "July 30, 1999",
   "releaseDate": "July 30, 1999",
   "region": "Japan",
   "description": "Cardboard Silver Coin featuring Eevee released within the Starter Gift Set in between the release of Jungle and Fossil Autumn 1999; comes in two varieties, Mirror Holofoil and Starlight Holofoil"
@@ -1689,7 +1689,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_CARDBOARD_BROWN.jpg",
   "name": "Cardboard Brown Coin featuring Aerodactyl",
   "material": "cardboard",
-  "release": "date\tOctober 10, 1999",
+  "release": "October 10, 1999",
   "releaseDate": "October 10, 1999",
   "region": "North America",
   "description": "Cardboard Brown Coin featuring Aerodactyl released within the Fossil Theme Decks BodyGuard and LockDown October 10, 1999; comes in four varieties, Light-Brown Mirror Holofoil, Light-Brown Starlight Ho"
@@ -1700,7 +1700,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_CARDBOARD_YELLOW.jpg",
   "name": "Cardboard Yellow Coin featuring Pikachu",
   "material": "cardboard",
-  "release": "date\tFebruary 24, 2000",
+  "release": "February 24, 2000",
   "releaseDate": "February 24, 2000",
   "region": "North America",
   "description": "Cardboard Yellow Coin featuring Pikachu released within the Base Set 2 Theme Decks 2-Player CD-ROM Starter Set, Grass Chopper, Hot Water, Lightning Bug, and Psych Out February 24, 2000; comes in two v"
@@ -1710,8 +1710,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_CARDBOARD_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_CARDBOARD_SILVER.jpg",
   "name": "Cardboard Silver Coin featuring Meowth",
-  "material": "silver",
-  "release": "date\tApril 24, 2000",
+  "material": "cardboard",
+  "release": "April 24, 2000",
   "releaseDate": "April 24, 2000",
   "region": "North America",
   "description": "Cardboard Silver Coin featuring Meowth released within the Team Rocket Theme Decks Trouble and Devastation April 24, 2000; comes in two varieties, one as a Cosmos Holofoil and one as a Starlight Holof"
@@ -1722,7 +1722,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_CARDBOARD_BLUE.jpg",
   "name": "Cardboard Blue Coin featuring Starmie",
   "material": "cardboard",
-  "release": "date\tAugust 14, 2000",
+  "release": "August 14, 2000",
   "releaseDate": "August 14, 2000",
   "region": "North America",
   "description": "Cardboard Blue Coin featuring Starmie released within the Gym Heroes Theme Decks Brock, Misty, Lt. Surge, and Erika August 14, 2000; comes in two varieties, one as a Cosmos Holofoil and one as a Starl"
@@ -1732,8 +1732,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_AUTUMN_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUTUMN_METAL_COIN.jpg",
   "name": "Metal Coin featuring Pikachu released",
-  "material": "enamel",
-  "release": "date\tAutumn 2000",
+  "material": "metal",
+  "release": "Autumn 2000",
   "releaseDate": "Autumn 2000",
   "region": "North America",
   "description": "Metal Coin featuring Pikachu released within the Thunderstorm Gift Set Autumn 2000 in between the release of Gym Heroes and Gym Challenge"
@@ -1777,7 +1777,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BRONZE.jpg",
   "name": "Regular-sized, Bronze Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 1, 2000",
+  "release": "July 1, 2000",
   "releaseDate": "July 1, 2000",
   "region": "Japan",
   "description": "Regular-sized, Bronze Mirror Holofoil, Black-backed Coin featuring Xatu released as one of two coins given to those who participated in events at the Pokémon World Challenge tournament held on July 1-"
@@ -1788,7 +1788,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_YELLOW.jpg",
   "name": "Regular-sized, Yellow Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 1, 2000",
+  "release": "July 1, 2000",
   "releaseDate": "July 1, 2000",
   "region": "Japan",
   "description": "Regular-sized, Yellow Non Holofoil, Black-backed Coin featuring Pichu released as one of two coins given to those who participated in events at the Pokémon World Challenge tournament held on July 1-2,"
@@ -1798,8 +1798,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Lugia released",
-  "material": "enamel",
-  "release": "date\tDecember 16, 2000",
+  "material": "metal",
+  "release": "December 16, 2000",
   "releaseDate": "December 16, 2000",
   "region": "North America",
   "description": "Metal Coin featuring Lugia released within each Theme Deck starting from Neo Genesis December 16, 2000 until Aquapolis January 15, 2003; comes in two varieties: one with a 2001 Wizards Copyright and o"
@@ -1810,7 +1810,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, Pokémon",
   "material": "enamel",
-  "release": "date\tApril 6, 2001",
+  "release": "April 6, 2001",
   "releaseDate": "April 6, 2001",
   "region": "Japan",
   "description": "Regular-sized, Pink Mirror Holofoil, Pokémon Card Game Black-backed Coin featuring Chansey released within the Japanese Intro Pack Neo April 6, 2001"
@@ -1832,7 +1832,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 20, 2001",
+  "release": "July 20, 2001",
   "releaseDate": "July 20, 2001",
   "region": "Japan",
   "description": "Regular-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Lugia released as one of two coins given to those who participated in events at the Neo Summer Road tournament held on July 20, 2001 i"
@@ -1843,7 +1843,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 20, 2001",
+  "release": "July 20, 2001",
   "releaseDate": "July 20, 2001",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring the Pokémon Trading Card Game emblem released as one of two coins given to those who participated in events at the Neo Summer Road tou"
@@ -1854,7 +1854,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_AQUA.jpg",
   "name": "Regular-sized, Aqua Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 7, 2001",
+  "release": "July 7, 2001",
   "releaseDate": "July 7, 2001",
   "region": "Japan",
   "description": "Regular-sized, Aqua Rainbow Holofoil, Black-backed Coin featuring Celebi released within the Japanese Leaders Pokémon Theater Limited Edition July 7, 2001"
@@ -1865,7 +1865,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, White-backed",
   "material": "enamel",
-  "release": "date\tAugust 19, 2001",
+  "release": "August 19, 2001",
   "releaseDate": "August 19, 2001",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, White-backed Coin featuring the Pokémon VS emblem given to those who participated in events at the Pokémon VS release tournaments held starting August 19, 2001"
@@ -1876,7 +1876,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, Pokémon",
   "material": "enamel",
-  "release": "date\tDecember 1, 2001",
+  "release": "December 1, 2001",
   "releaseDate": "December 1, 2001",
   "region": "Japan",
   "description": "Regular-sized, Pink Mirror Holofoil, Pokémon Card Game Black-backed Coin featuring Blissey released within the Japanese Pokémon-e Starter Deck December 1, 2001"
@@ -1887,7 +1887,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Splotch Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJanuary 3, 2002",
+  "release": "January 3, 2002",
   "releaseDate": "January 3, 2002",
   "region": "Japan",
   "description": "Regular-sized, Silver Splotch Holofoil, Black-backed Coin featuring the Pokémon Center emblem released together with the P Promo Pokémon Center Tokyo given to those who made any purchase at the Tokyo "
@@ -1898,7 +1898,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_CARDBOARD.jpg",
   "name": "Regular-sized, Cardboard Coin featuring Pikachu",
   "material": "cardboard",
-  "release": "date\tJanuary 26, 2002",
+  "release": "January 26, 2002",
   "releaseDate": "January 26, 2002",
   "region": "Japan",
   "description": "Regular-sized, Cardboard Coin featuring Pikachu released as an insert within the Japanese McDonald's Pokémon-e Minimum Pack starting January 26, 2002"
@@ -1920,7 +1920,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 31, 2003",
+  "release": "January 31, 2003",
   "releaseDate": "January 31, 2003",
   "region": "Japan",
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Treecko released within the Japanese Treecko Constructed Starter Deck January 31, 2003"
@@ -1931,7 +1931,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_ORANGE.jpg",
   "name": "Regular-sized, Orange Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 31, 2003",
+  "release": "January 31, 2003",
   "releaseDate": "January 31, 2003",
   "region": "Japan",
   "description": "Regular-sized, Orange Mirror Holofoil, Black-backed Coin featuring Torchic released within the Japanese Torchic Constructed Starter Deck January 31, 2003; later released within the Dark Blast Theme De"
@@ -1942,7 +1942,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 31, 2003",
+  "release": "January 31, 2003",
   "releaseDate": "January 31, 2003",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Mudkip released within the Japanese Mudkip Constructed Starter Deck January 31, 2003"
@@ -1952,7 +1952,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/MUDKIP_CONSTRUCTED_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/MUDKIP_CONSTRUCTED_METAL_COIN.jpg",
   "name": "Metal Coin featuring Rayquaza distributed",
-  "material": "enamel",
+  "material": "metal",
   "release": "Mudkip Constructed Starter Deck",
   "releaseDate": "March 23, 2003",
   "region": "Japan",
@@ -1963,8 +1963,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_METAL_COIN.jpg",
   "name": "Metal Coin featuring Latios given",
-  "material": "enamel",
-  "release": "date\tApril 18, 2003",
+  "material": "metal",
+  "release": "April 18, 2003",
   "releaseDate": "April 18, 2003",
   "region": "Japan",
   "description": "Metal Coin featuring Latios given to those who traded in a voucher available via CoroCoro at the Spring 2003 Gym Official Tournaments held starting April 18, 2003"
@@ -1986,7 +1986,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 18, 2003",
+  "release": "June 18, 2003",
   "releaseDate": "June 18, 2003",
   "region": "North America",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Mudkip released within the English Sapphire Theme Deck June 18, 2003"
@@ -2003,23 +2003,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Flygon released within the Japanese Flygon Constructed Starter Deck June 25, 2003; later released in the English WindBlast Theme Deck "
  },
  {
-  "id": "DATE_JUNE_REGULARSIZED_BLUE",
+  "id": "DATE_JUNE_REGULARSIZED_BLUE_20030625",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 25, 2003",
+  "release": "June 25, 2003",
   "releaseDate": "June 25, 2003",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Salamence released within the Japanese Salamence Constructed Starter Deck June 25, 2003; later released in the English FireFang Theme D"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20030719",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 19, 2003",
+  "release": "July 19, 2003",
   "releaseDate": "July 19, 2003",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Jirachi released within the Japanese Movie Commemoration VS Pack July 19, 2003"
@@ -2041,7 +2041,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 17, 2003",
+  "release": "September 17, 2003",
   "releaseDate": "September 17, 2003",
   "region": "North America",
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Treecko released within the English Oasis Theme Deck September 17, 2003"
@@ -2052,7 +2052,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_ORANGE.jpg",
   "name": "Regular-sized, Orange Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 17, 2003",
+  "release": "September 17, 2003",
   "releaseDate": "September 17, 2003",
   "region": "North America",
   "description": "Regular-sized, Orange Non Holofoil, Black-backed Coin featuring the Team Magma emblem released within the Japanese Magma Deck Kit October 24, 2003; later released in the English Team Magma Theme Deck "
@@ -2063,7 +2063,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 24, 2003",
+  "release": "October 24, 2003",
   "releaseDate": "October 24, 2003",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring the Team Aqua emblem released within the Japanese Aqua Deck Kit October 24, 2003; later released in the English Team Aqua Theme Deck March"
@@ -2073,8 +2073,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Latias given",
-  "material": "enamel",
-  "release": "date\tOctober 24, 2003",
+  "material": "metal",
+  "release": "October 24, 2003",
   "releaseDate": "October 24, 2003",
   "region": "Japan",
   "description": "Metal Coin featuring Latias given to those who traded in a voucher available via CoroCoro at the Autumn 2003 Gym Official Tournaments held starting October 24, 2003"
@@ -2095,19 +2095,19 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_METAL_COIN.jpg",
   "name": "Metal Coin featuring Absol distributed",
-  "material": "enamel",
-  "release": "date\tJanuary 2004",
+  "material": "metal",
+  "release": "January 2004",
   "releaseDate": "January 2004",
   "region": "Japan",
   "description": "Metal Coin featuring Absol distributed within the Official Player's Kit rewarded to returning players of the PLAY Promotional EXP Program for season 2 in January 2004 and season 3 in January 2005"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_SILVER",
+  "id": "DATE_JANUARY_REGULARSIZED_SILVER_20040116",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJanuary 16, 2004",
+  "release": "January 16, 2004",
   "releaseDate": "January 16, 2004",
   "region": "Japan",
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring Metagross released within the Japanese Metagross Constructed Starter Deck January 16, 2004"
@@ -2118,7 +2118,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 19, 2004",
+  "release": "March 19, 2004",
   "releaseDate": "March 19, 2004",
   "region": "Japan",
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Bulbasaur released within the Japanese Venusaur Random Constructed Starter Deck March 19, 2004; later released within the English LeafGre"
@@ -2129,7 +2129,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 19, 2004",
+  "release": "March 19, 2004",
   "releaseDate": "March 19, 2004",
   "region": "Japan",
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Charmander released within the Japanese Charizard Random Constructed Starter Deck March 19, 2004; later released within the English FireRed"
@@ -2140,7 +2140,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 19, 2004",
+  "release": "March 19, 2004",
   "releaseDate": "March 19, 2004",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Squirtle released within the Japanese Blastoise Random Constructed Starter Deck March 19, 2004"
@@ -2162,7 +2162,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 2004",
+  "release": "June 2004",
   "releaseDate": "June 2004",
   "region": "North America",
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Celebi released within the English Forest Guardian Theme Deck June 14, 2004"
@@ -2195,29 +2195,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Glitter Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJuly 1, 2004",
+  "release": "July 1, 2004",
   "releaseDate": "July 1, 2004",
   "region": "Japan",
   "description": "Regular-sized, Silver Glitter Holofoil, Black-backed Coin featuring Rayquaza released within the Japanese Rayquaza Constructed Starter Deck July 1, 2004; later released within the English Jetstream Th"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_SILVER",
+  "id": "DATE_JULY_REGULARSIZED_SILVER_20040717",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJuly 17, 2004",
+  "release": "July 17, 2004",
   "releaseDate": "July 17, 2004",
   "region": "Japan",
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring Munchlax released within the Japanese Movie Commemoration VS Pack: Sky-Splitting Deoxys July 17, 2004"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_SILVER",
+  "id": "DATE_OCTOBER_REGULARSIZED_SILVER_20041015",
   "url": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "thumb": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tOctober 15, 2004",
+  "release": "October 15, 2004",
   "releaseDate": "October 15, 2004",
   "region": "Japan",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring the Team Rocket emblem released within the Japanese Black Deck Kit October 15, 2004; later released within the English Jessie Th"
@@ -2228,7 +2228,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 15, 2004",
+  "release": "October 15, 2004",
   "releaseDate": "October 15, 2004",
   "region": "Japan",
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring the Team Rocket emblem released within the Japanese Silver Deck Kit October 15, 2004; later released within the English James Theme Deck No"
@@ -2239,7 +2239,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 18, 2004",
+  "release": "October 18, 2004",
   "releaseDate": "October 18, 2004",
   "region": "North America",
   "description": "Regular-sized, Pink Mirror Holofoil, Black-backed Coin featuring Blissey released within the English EX Battle Stadium October 18, 2004"
@@ -2272,7 +2272,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 16, 2005",
+  "release": "January 16, 2005",
   "releaseDate": "January 16, 2005",
   "region": "Japan",
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Energy symbols released within the Japanese Fire Quick Construction Pack January 16, 2005"
@@ -2294,7 +2294,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_YELLOW.jpg",
   "name": "Regular-sized, Yellow Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 16, 2005",
+  "release": "January 16, 2005",
   "releaseDate": "January 16, 2005",
   "region": "Japan",
   "description": "Regular-sized, Yellow Non Holofoil, Black-backed Coin featuring Energy symbols released within the Japanese Lightning Quick Construction Pack January 16, 2005"
@@ -2305,51 +2305,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_PURPLE.jpg",
   "name": "Regular-sized, Purple Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 16, 2005",
+  "release": "January 16, 2005",
   "releaseDate": "January 16, 2005",
   "region": "Japan",
   "description": "Regular-sized, Purple Non Holofoil, Black-backed Coin featuring Energy symbols released within the Japanese Psychic Quick Construction Pack January 16, 2005"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_ORANGE",
+  "id": "DATE_JANUARY_REGULARSIZED_ORANGE_20050116",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_ORANGE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_ORANGE.jpg",
   "name": "Regular-sized, Orange Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 16, 2005",
+  "release": "January 16, 2005",
   "releaseDate": "January 16, 2005",
   "region": "Japan",
   "description": "Regular-sized, Orange Non Holofoil, Black-backed Coin featuring Energy symbols released within the Japanese Fighting Quick Construction Pack January 16, 2005"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_GREEN",
+  "id": "DATE_MARCH_REGULARSIZED_GREEN_20050305",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 5, 2005",
+  "release": "March 5, 2005",
   "releaseDate": "March 5, 2005",
   "region": "Japan",
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Chikorita released within the Japanese Meganium Constructed Starter Deck March 5, 2005"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_RED",
+  "id": "DATE_MARCH_REGULARSIZED_RED_20050305",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 5, 2005",
+  "release": "March 5, 2005",
   "releaseDate": "March 5, 2005",
   "region": "Japan",
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Cyndaquil released within the Japanese Typhlosion Constructed Starter Deck March 5, 2005; later released within the English Shadow Blaze Th"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_BLUE",
+  "id": "DATE_MARCH_REGULARSIZED_BLUE_20050305",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 5, 2005",
+  "release": "March 5, 2005",
   "releaseDate": "March 5, 2005",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Totodile released within the Japanese Feraligatr Constructed Starter Deck March 5, 2005; later released within the English Power Wave Them"
@@ -2359,8 +2359,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_MAY_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_METAL_COIN.jpg",
   "name": "Metal Coin featuring Rayquaza awarded",
-  "material": "enamel",
-  "release": "date\tMay 2005",
+  "material": "metal",
+  "release": "May 2005",
   "releaseDate": "May 2005",
   "region": "North America",
   "description": "Metal Coin featuring Rayquaza awarded through Player Rewards May 2005; later awarded via subsequent Play! Pokémon events"
@@ -2371,7 +2371,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 2005",
+  "release": "May 2005",
   "releaseDate": "May 2005",
   "region": "North America",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring the Energy symbols released within the English Hydrobloom Theme Deck May 9, 2005 and as one of four possible coins included in the EX T"
@@ -2382,7 +2382,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 9, 2005",
+  "release": "May 9, 2005",
   "releaseDate": "May 9, 2005",
   "region": "North America",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring the Energy symbols released within the English Wildfire Theme Deck May 9, 2005, as one of four possible coins included in the EX Traine"
@@ -2393,7 +2393,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 30, 2005",
+  "release": "June 30, 2005",
   "releaseDate": "June 30, 2005",
   "region": "Japan",
   "description": "Regular-sized, Pink Non Holofoil, Black-backed Coin featuring Mew released within the Japanese Mirage's Mew Constructed Starter Deck June 30, 2005"
@@ -2410,12 +2410,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring the Energy symbols released within the Japanese Master Kit July 15, 2005; later released in the EX Power Keepers Blisters February 14, 2"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_BLUE",
+  "id": "DATE_JULY_REGULARSIZED_BLUE_20050716",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 16, 2005",
+  "release": "July 16, 2005",
   "releaseDate": "July 16, 2005",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Lucario released within the Japanese Movie Commemoration VS Pack: Aura's Lucario July 16, 2005"
@@ -2425,8 +2425,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "name": "Metal Coin featuring Charizard awarded",
-  "material": "enamel",
-  "release": "date\tAugust 19, 2005",
+  "material": "metal",
+  "release": "August 19, 2005",
   "releaseDate": "August 19, 2005",
   "region": "North America",
   "description": "Metal Coin featuring Charizard awarded at the 2005 World Championships August 19-21, 2005"
@@ -2437,7 +2437,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_ORANGE.jpg",
   "name": "Regular-sized, Orange Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 19, 2005",
+  "release": "August 19, 2005",
   "releaseDate": "August 19, 2005",
   "region": "North America",
   "description": "Regular-sized, Orange Mirror Holofoil, Black-backed Coin featuring the Energy symbols released within the English Golden Sky Theme Deck August 22, 2005"
@@ -2492,7 +2492,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BRONZE.jpg",
   "name": "Regular-sized, Bronze Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 16, 2005",
+  "release": "November 16, 2005",
   "releaseDate": "November 16, 2005",
   "region": "Japan",
   "description": "Regular-sized, Bronze Non Holofoil, Black-backed Coin featuring Pikachu released within the Japanese Gift Box Mew • Lucario November 16, 2005"
@@ -2531,23 +2531,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Groudon released within the Japanese Earth's Groudon ex Constructed Starter Deck March 3, 2006 exclusively at Pokémon Centers, with a gener"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_BLUE",
+  "id": "DATE_MARCH_REGULARSIZED_BLUE_20060303",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 3, 2006",
+  "release": "March 3, 2006",
   "releaseDate": "March 3, 2006",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Kyogre released within the Japanese Ocean's Kyogre ex Constructed Starter Deck March 3, 2006 exclusively at Pokémon Centers, with a genera"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_GOLD",
+  "id": "DATE_MAY_REGULARSIZED_GOLD_20060503",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 3, 2006",
+  "release": "May 3, 2006",
   "releaseDate": "May 3, 2006",
   "region": "North America",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Flygon released within the English FireMist Theme Deck May 3, 2006"
@@ -2558,7 +2558,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 3, 2006",
+  "release": "May 3, 2006",
   "releaseDate": "May 3, 2006",
   "region": "North America",
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring Rayquaza released within the English FloodRush Theme Deck May 3, 2006"
@@ -2580,18 +2580,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Smoke Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJune 29, 2006",
+  "release": "June 29, 2006",
   "releaseDate": "June 29, 2006",
   "region": "Japan",
   "description": "Regular-sized, Silver Smoke Holofoil, Black-backed Coin featuring Gardevoir released within the Japanese Imprison! Gardevoir ex Constructed Standard Deck June 29, 2006; later included in the English E"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_BLUE",
+  "id": "DATE_JULY_REGULARSIZED_BLUE_20060715",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 15, 2006",
+  "release": "July 15, 2006",
   "releaseDate": "July 15, 2006",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Manaphy released within the Japanese Movie Commemoration VS Pack: Sea's Manaphy July 15, 2006"
@@ -2602,7 +2602,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 30, 2006",
+  "release": "August 30, 2006",
   "releaseDate": "August 30, 2006",
   "region": "North America",
   "description": "Regular-sized, Silver Mirror Holofoil, Black-backed Coin featuring Metagross released within the English EX Crystal Guardians Blisters August 30, 2006"
@@ -2613,7 +2613,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BRONZE.jpg",
   "name": "Regular-sized, Bronze Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 30, 2006",
+  "release": "August 30, 2006",
   "releaseDate": "August 30, 2006",
   "region": "North America",
   "description": "Regular-sized, Bronze Mirror Holofoil, Black-backed Coin featuring Pikachu released within the English EX Crystal Guardians Blisters August 30, 2006"
@@ -2668,7 +2668,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Mirror Cracked Ice",
   "material": "silver",
-  "release": "date\tNovember 30, 2006",
+  "release": "November 30, 2006",
   "releaseDate": "November 30, 2006",
   "region": "Japan",
   "description": "Regular-sized, Silver Mirror Cracked Ice Holofoil, Black-backed Coin featuring right-facing Dialga released within the Japanese Random Construction Starter Deck November 30, 2006"
@@ -2679,7 +2679,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 30, 2006",
+  "release": "November 30, 2006",
   "releaseDate": "November 30, 2006",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Dialga awarded to those who won Japanese Battle Road tournaments starting after November 30, 2006"
@@ -2701,7 +2701,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_BROWN.jpg",
   "name": "Regular-sized, Brown Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 2, 2007",
+  "release": "March 2, 2007",
   "releaseDate": "March 2, 2007",
   "region": "Japan",
   "description": "Regular-sized, Brown Mirror Holofoil, Black-backed Coin featuring Cranidos released within the Japanese Rampardos the Attacker March 2, 2007; later included in the English Skull Charge Theme Deck Augu"
@@ -2712,7 +2712,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMarch 2, 2007",
+  "release": "March 2, 2007",
   "releaseDate": "March 2, 2007",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Palkia awarded to those who won Japanese Battle Road tournaments starting after March 2, 2007"
@@ -2762,23 +2762,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring left-facing Dialga released within the English Diamond & Pearl Blister Packs May 23, 2007"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20070523",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Cracked Ice",
   "material": "silver",
-  "release": "date\tMay 23, 2007",
+  "release": "May 23, 2007",
   "releaseDate": "May 23, 2007",
   "region": "North America",
   "description": "Regular-sized, Silver Rainbow Cracked Ice Holofoil, Black-backed Coin featuring right-facing Dialga released within the English Diamond & Pearl Blister Packs May 23, 2007; later awarded to those who p"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20070523_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 23, 2007",
+  "release": "May 23, 2007",
   "releaseDate": "May 23, 2007",
   "region": "North America",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Palkia released within the English Diamond & Pearl Blister Packs May 23, 2007"
@@ -2806,23 +2806,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Dialga released within the Japanese Dialga LV.X Constructed Standard Deck July 5, 2007; later included in the English Eternal Time Theme D"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_PINK",
+  "id": "DATE_JULY_REGULARSIZED_PINK_20070705",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 5, 2007",
+  "release": "July 5, 2007",
   "releaseDate": "July 5, 2007",
   "region": "Japan",
   "description": "Regular-sized, Pink Non Holofoil, Black-backed Coin featuring Palkia released within the Japanese Palkia LV.X Constructed Standard Deck July 5, 2007; later included in the English Infinite Space Theme"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20070705",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 5, 2007",
+  "release": "July 5, 2007",
   "releaseDate": "July 5, 2007",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Lucario awarded to those who won Japanese Battle Road tournaments starting after July 5, 2007"
@@ -2833,18 +2833,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 22, 2007",
+  "release": "August 22, 2007",
   "releaseDate": "August 22, 2007",
   "region": "North America",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Shieldon released within the English Mysterious Treasures Blister Packs August 22, 2007"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_BLUE",
+  "id": "DATE_AUGUST_REGULARSIZED_BLUE_20070822",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 22, 2007",
+  "release": "August 22, 2007",
   "releaseDate": "August 22, 2007",
   "region": "North America",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Cranidos released within the English Mysterious Treasures Blister Packs August 22, 2007"
@@ -2855,7 +2855,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tSeptember 2007",
+  "release": "September 2007",
   "releaseDate": "September 2007",
   "region": "North America",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Manaphy released within the English Diamond & Pearl Trainer Kit September 2007"
@@ -2877,18 +2877,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 26, 2007",
+  "release": "October 26, 2007",
   "releaseDate": "October 26, 2007",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Magmortar and Electivire awarded to those who won Japanese Battle Road tournaments starting after October 26, 2007"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_NOVEMBER_REGULARSIZED_GOLD_20071107",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 7, 2007",
+  "release": "November 7, 2007",
   "releaseDate": "November 7, 2007",
   "region": "North America",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Munchlax released within the English Powerhouse Theme Deck November 7, 2007"
@@ -2916,12 +2916,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Red Confetti Holofoil, Black-backed Coin featuring Magmortar and Electivire released within the English Secret Wonders Blister Packs November 7, 2007"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_NOVEMBER_REGULARSIZED_GOLD_20071107_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Confetti Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 7, 2007",
+  "release": "November 7, 2007",
   "releaseDate": "November 7, 2007",
   "region": "North America",
   "description": "Regular-sized, Gold Confetti Holofoil, Black-backed Coin featuring Magmortar and Electivire released within the English Secret Wonders Blister Packs November 7, 2007"
@@ -2938,7 +2938,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Turtwig, Chimchar, and Piplup released within the Japanese Entry Pack '08 November 30, 2007"
  },
  {
-  "id": "ENTRY_PACK_REGULARSIZED_SILVER",
+  "id": "ENTRY_PACK_REGULARSIZED_SILVER_20080213",
   "url": "src/assets/coins/bulbapedia/ENTRY_PACK_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/ENTRY_PACK_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Glitter Holofoil, Black-backed",
@@ -2954,7 +2954,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Glitter Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tFebruary 13, 2008",
+  "release": "February 13, 2008",
   "releaseDate": "February 13, 2008",
   "region": "North America",
   "description": "Regular-sized, Silver Glitter Holofoil, Black-backed Coin featuring Palkia released within the English Great Encounters Blister Packs February 13, 2008"
@@ -2971,23 +2971,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Smoke Holofoil, Black-backed Coin featuring Gliscor and Mewtwo released within the Japanese Heatran vs Regigigas Deck Kit March 14, 2008"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_GOLD",
+  "id": "DATE_MARCH_REGULARSIZED_GOLD_20080314",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMarch 14, 2008",
+  "release": "March 14, 2008",
   "releaseDate": "March 14, 2008",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Mewtwo and Gliscor awarded to those who won Japanese Battle Road tournaments starting after March 14, 2008"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_GOLD",
+  "id": "DATE_MAY_REGULARSIZED_GOLD_20080521",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 21, 2008",
+  "release": "May 21, 2008",
   "releaseDate": "May 21, 2008",
   "region": "North America",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Turtwig, Chimchar, and Piplup released within the English Polar Frost Theme Deck May 21, 2008"
@@ -3015,45 +3015,45 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Lucario released within the English Majestic Dawn Blister Packs May 21, 2008"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20080710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 10, 2008",
+  "release": "July 10, 2008",
   "releaseDate": "July 10, 2008",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Kyogre awarded to those who won Japanese Battle Road tournaments starting after July 10, 2008"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GREEN",
+  "id": "DATE_JULY_REGULARSIZED_GREEN_20080710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2008",
+  "release": "July 10, 2008",
   "releaseDate": "July 10, 2008",
   "region": "Japan",
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Shaymin released within the Japanese Giratina vs Dialga Deck Kit July 10, 2008; later included in the English Flourish Theme Deck Februar"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_SILVER",
+  "id": "DATE_AUGUST_REGULARSIZED_SILVER_200808",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Speckle Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 2008",
+  "release": "August 2008",
   "releaseDate": "August 2008",
   "region": "Japan",
   "description": "Regular-sized, Silver Speckle Holofoil, Black-backed Coin featuring Turtwig, Chimchar, and Piplup awarded upon reaching the Second Stage of the Summer Break Competition Campaign 2008 held in August 20"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_SILVER",
+  "id": "DATE_AUGUST_REGULARSIZED_SILVER_20080820",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tAugust 20, 2008",
+  "release": "August 20, 2008",
   "releaseDate": "August 20, 2008",
   "region": "North America",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Gliscor and Mewtwo released within the English Bombardment Theme Deck August 20, 2008"
@@ -3063,7 +3063,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/BOMBARDMENT_REGULARSIZED_BROWN_NON.jpg",
   "thumb": "src/assets/coins/bulbapedia/BOMBARDMENT_REGULARSIZED_BROWN_NON.jpg",
   "name": "Regular-sized, Brown Non Holofoil, Black-backed",
-  "material": "enamel",
+  "material": "metal",
   "release": "Bombardment",
   "releaseDate": "August 20, 2008",
   "region": "North America",
@@ -3141,18 +3141,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tDecember 26, 2008",
+  "release": "December 26, 2008",
   "releaseDate": "December 26, 2008",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Infernape and Gallade released within the Japanese Infernape vs Gallade SP Deck Kit December 26, 2008 ; later included in the English "
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_SILVER",
+  "id": "DATE_FEBRUARY_REGULARSIZED_SILVER_20090211",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tFebruary 11, 2009",
+  "release": "February 11, 2009",
   "releaseDate": "February 11, 2009",
   "region": "North America",
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Shaymin released within the English Rebellion Theme Deck February 11, 2009"
@@ -3174,7 +3174,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tMarch 6, 2009",
+  "release": "March 6, 2009",
   "releaseDate": "March 6, 2009",
   "region": "Japan",
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Garchomp and Charizard released within the Japanese Garchomp vs Charizard SP Deck Kit March 6, 2009; later included in the English"
@@ -3185,18 +3185,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Splotch Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 4, 2009",
+  "release": "April 4, 2009",
   "releaseDate": "April 4, 2009",
   "region": "Japan",
   "description": "Regular-sized, Silver Splotch Holofoil, Black-backed Coin featuring Charmander released during the fourth distribution of commemorative promotional cards during the Pokémon 10th Anniversary celebratio"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20090520",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Confetti Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 20, 2009",
+  "release": "May 20, 2009",
   "releaseDate": "May 20, 2009",
   "region": "North America",
   "description": "Regular-sized, Silver Confetti Holofoil, Black-backed Coin featuring Infernape and Gallade released within the English Drill Point Theme Deck May 20, 2009"
@@ -3213,34 +3213,34 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Arceus released within the Japanese Arceus LV.X Deck: Grass & Fire Theme Deck July 8, 2009"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_SILVER",
+  "id": "DATE_JULY_REGULARSIZED_SILVER_20090708",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Smoke Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJuly 8, 2009",
+  "release": "July 8, 2009",
   "releaseDate": "July 8, 2009",
   "region": "Japan",
   "description": "Regular-sized, Silver Smoke Holofoil, Black-backed Coin featuring Arceus released within the Japanese Arceus LV.X Deck: Lightning & Psychic Theme Deck July 8, 2009"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20090708",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Glitter Holofoil, ®",
   "material": "gold",
-  "release": "date\tJuly 8, 2009",
+  "release": "July 8, 2009",
   "releaseDate": "July 8, 2009",
   "region": "Japan",
   "description": "Regular-sized, Gold Glitter Holofoil, ® Trademark Black-backed Coin featuring Arceus awarded to those who won Japanese Battle Road tournaments starting after July 8, 2009"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20090711",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Glitter Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 11, 2009",
+  "release": "July 11, 2009",
   "releaseDate": "July 11, 2009",
   "region": "Japan",
   "description": "Regular-sized, Gold Glitter Holofoil, Black-backed Coin featuring Arceus awarded to those who participated in the Japanese Battle Tour 09 starting July 11, 2009"
@@ -3361,18 +3361,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tFebruary 11, 2010",
+  "release": "February 11, 2010",
   "releaseDate": "February 11, 2010",
   "region": "Japan",
   "description": "Regular-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Tyranitar released within the Japanese Tyranitar Constructed Standard Deck February 11, 2010; later included within the English Ch"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_201005",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Speckle Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 2010",
+  "release": "May 2010",
   "releaseDate": "May 2010",
   "region": "North America",
   "description": "Regular-sized, Silver Speckle Holofoil, Black-backed Coin featuring Pikachu released as one of three possible coins within the English HS Trainer Kit May 2010"
@@ -3394,40 +3394,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 13, 2010",
+  "release": "May 13, 2010",
   "releaseDate": "May 13, 2010",
   "region": "South Korea",
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Turtwig, Chimchar, and Piplup released within the Korean Start of an Adventure Blister Packs May 13, 2010"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_BLUE",
+  "id": "DATE_MAY_REGULARSIZED_BLUE_20100513",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 13, 2010",
+  "release": "May 13, 2010",
   "releaseDate": "May 13, 2010",
   "region": "South Korea",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Turtwig, Chimchar, and Piplup released within the Korean Start of an Adventure Blister Packs May 13, 2010"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_GOLD",
+  "id": "DATE_AUGUST_REGULARSIZED_GOLD_20100818",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 18, 2010",
+  "release": "August 18, 2010",
   "releaseDate": "August 18, 2010",
   "region": "North America",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Cyndaquil released within the English Daybreak Theme Deck August 18, 2010"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_SILVER",
+  "id": "DATE_AUGUST_REGULARSIZED_SILVER_20100818",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 18, 2010",
+  "release": "August 18, 2010",
   "releaseDate": "August 18, 2010",
   "region": "North America",
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring Chikorita released within the English Nightfall Theme Deck August 18, 2010"
@@ -3460,7 +3460,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tAugust 19, 2010",
+  "release": "August 19, 2010",
   "releaseDate": "August 19, 2010",
   "region": "South Korea",
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Palkia released within the Korean Space-Time Clash Blister Packs August 19, 2010"
@@ -3504,18 +3504,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 9, 2011",
+  "release": "February 9, 2011",
   "releaseDate": "February 9, 2011",
   "region": "North America",
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Rayquaza released within the English Recon Theme Deck February 9, 2011"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_SILVER",
+  "id": "DATE_OCTOBER_REGULARSIZED_SILVER_20101029",
   "url": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "thumb": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "name": "Regular-sized, Silver Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 29, 2010",
+  "release": "October 29, 2010",
   "releaseDate": "October 29, 2010",
   "region": "Japan",
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Beginning Set October 29, 2010"
@@ -3543,7 +3543,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Star-Imprint Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Beginning Set DX November 20, 2010"
  },
  {
-  "id": "BEGINNING_SET_REGULARSIZED_PINK",
+  "id": "BEGINNING_SET_REGULARSIZED_PINK_20101120",
   "url": "src/assets/coins/bulbapedia/BEGINNING_SET_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/BEGINNING_SET_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
@@ -3554,23 +3554,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Beginning Set DX for Girls November 20, 2010"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_GREEN",
+  "id": "DATE_JANUARY_REGULARSIZED_GREEN_20110101",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, Japanese",
   "material": "enamel",
-  "release": "date\tJanuary 1, 2011",
+  "release": "January 1, 2011",
   "releaseDate": "January 1, 2011",
   "region": "Japan",
   "description": "Regular-sized, Green Mirror Holofoil, Japanese ® Trademark Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Lawson Original Coin Set January 1, 2011"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_RED",
+  "id": "DATE_JANUARY_REGULARSIZED_RED_20110101",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Mirror Holofoil, Japanese",
   "material": "enamel",
-  "release": "date\tJanuary 1, 2011",
+  "release": "January 1, 2011",
   "releaseDate": "January 1, 2011",
   "region": "Japan",
   "description": "Regular-sized, Red Mirror Holofoil, Japanese ® Trademark Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Lawson Original Coin Set January 1, 2011"
@@ -3581,7 +3581,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, English",
   "material": "enamel",
-  "release": "date\tApril 6, 2011",
+  "release": "April 6, 2011",
   "releaseDate": "April 6, 2011",
   "region": "North America",
   "description": "Regular-sized, Green Mirror Holofoil, English ™ Trademark Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the English Green Tornado Theme Deck April 6, 2011"
@@ -3653,7 +3653,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Korean Evolution of Water Half Deck May 3, 2011"
  },
  {
-  "id": "EVOLUTION_OF_REGULARSIZED_RED",
+  "id": "EVOLUTION_OF_REGULARSIZED_RED_20110617",
   "url": "src/assets/coins/bulbapedia/EVOLUTION_OF_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/EVOLUTION_OF_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Confetti Holofoil, Japanese",
@@ -3664,12 +3664,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Red Confetti Holofoil, Japanese ® Trademark Black-backed Coin featuring Victini released within the Battle Theme Deck: Victini in Japan June 17, 2011 and in South Korea November 10, 201"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_SILVER",
+  "id": "DATE_AUGUST_REGULARSIZED_SILVER_20110805",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 5, 2011",
+  "release": "August 5, 2011",
   "releaseDate": "August 5, 2011",
   "region": "Japan",
   "description": "Regular-sized, Silver Pixel Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Beginning Set + August 5, 2011"
@@ -3719,34 +3719,34 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Confetti Holofoil, Black-backed Coin featuring Energy symbols released within the English Black & White Trainer Kit September 2011"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_GOLD",
+  "id": "DATE_OCTOBER_REGULARSIZED_GOLD_20111020",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 20, 2011",
+  "release": "October 20, 2011",
   "releaseDate": "October 20, 2011",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring the 15th Anniversary released within the Japanese Pokémon Card Game 15th Anniversary Premium Box October 20, 2011"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_GOLD",
+  "id": "DATE_OCTOBER_REGULARSIZED_GOLD_20111021",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 21, 2011",
+  "release": "October 21, 2011",
   "releaseDate": "October 21, 2011",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Reshiram released within the Japanese Reshiram-EX Battle Strength Deck October 21, 2011"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_GOLD",
+  "id": "DATE_OCTOBER_REGULARSIZED_GOLD_20111021_2",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Speckle Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 21, 2011",
+  "release": "October 21, 2011",
   "releaseDate": "October 21, 2011",
   "region": "Japan",
   "description": "Regular-sized, Gold Speckle Holofoil, Black-backed Coin featuring Zekrom released within the Japanese Zekrom-EX Battle Strength Deck October 21, 2011"
@@ -3785,34 +3785,34 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Red Confetti Holofoil, English ™ Trademark Black-backed Coin featuring Victini released within the English Noble Victories Blisters November 16, 2011; later included in XY Two Pack Blis"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER_20111105",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Non Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 5, 2011",
+  "release": "November 5, 2011",
   "releaseDate": "November 5, 2011",
   "region": "Japan",
   "description": "Regular-sized, Silver Non Holofoil, Black-backed Coin featuring the 15th Anniversary released for participating in the Japanese Battle Carnival Autumn 2011 held on November 5-6, 2011 in Osaka, and Nov"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER_20111118",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Crosshatch Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 18, 2011",
+  "release": "November 18, 2011",
   "releaseDate": "November 18, 2011",
   "region": "Japan",
   "description": "Regular-sized, Silver Crosshatch Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Japanese Beginning Set Pikachu Version November 18, 2011"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER_20111118_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Sheen Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 18, 2011",
+  "release": "November 18, 2011",
   "releaseDate": "November 18, 2011",
   "region": "Japan",
   "description": "Regular-sized, Silver Sheen Holofoil, Black-backed Coin featuring a VS design released within the Japanese Battle Gift Set: Thundurus vs Tornadus November 18, 2011"
@@ -3823,7 +3823,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 23, 2011",
+  "release": "December 23, 2011",
   "releaseDate": "December 23, 2011",
   "region": "Japan",
   "description": "Regular-sized, Red Mirror Holofoil, Black-backed Coin featuring Reshiram released within the Japanese Dark Rush Lawson Original Coin Set December 23, 2011"
@@ -3834,7 +3834,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 23, 2011",
+  "release": "December 23, 2011",
   "releaseDate": "December 23, 2011",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Zekrom released within the Japanese Dark Rush Lawson Original Coin Set December 23, 2011"
@@ -3856,7 +3856,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_WHITE.jpg",
   "name": "Regular-sized, White Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 8, 2012",
+  "release": "February 8, 2012",
   "releaseDate": "February 8, 2012",
   "region": "North America",
   "description": "Regular-sized, White Non Holofoil, Black-backed Coin featuring Reshiram and Zekrom released within the Voltage Vortex Theme Deck February 8, 2012"
@@ -3873,12 +3873,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Mirror Holofoil, Maroon-backed Coin featuring Munna released within the Meowth and Luxio Blister Packs of the English Next Destinies Blisters February 8, 2012"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_GREEN",
+  "id": "DATE_FEBRUARY_REGULARSIZED_GREEN_20120208",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 8, 2012",
+  "release": "February 8, 2012",
   "releaseDate": "February 8, 2012",
   "region": "North America",
   "description": "Regular-sized, Green Speckle Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Klinklang and Gigalith Blister Packs of the English Next Destinies Blisters February 8"
@@ -3889,18 +3889,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 8, 2012",
+  "release": "February 8, 2012",
   "releaseDate": "February 8, 2012",
   "region": "North America",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Klinklang and Gigalith Blister Packs of the English Next Destinies Blisters February 8, "
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_BLUE",
+  "id": "DATE_FEBRUARY_REGULARSIZED_BLUE_20120208",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 8, 2012",
+  "release": "February 8, 2012",
   "releaseDate": "February 8, 2012",
   "region": "North America",
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring Snivy, Tepig, and Oshawott released within the Klinklang and Gigalith Blister Packs of the English Next Destinies Blisters February 8,"
@@ -3911,29 +3911,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_TEAL.jpg",
   "name": "Regular-sized, Teal Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tApril 2012",
+  "release": "April 2012",
   "releaseDate": "April 2012",
   "region": "Japan",
   "description": "Regular-sized, Teal Non Holofoil, Black-backed Coin featuring Rayquaza released for participating in the Japanese Garchomp & Hydreigon Cup held in April 2012"
  },
  {
-  "id": "DATE_APRIL_REGULARSIZED_SILVER",
+  "id": "DATE_APRIL_REGULARSIZED_SILVER_20120412",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Tinsel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 12, 2012",
+  "release": "April 12, 2012",
   "releaseDate": "April 12, 2012",
   "region": "South Korea",
   "description": "Regular-sized, Silver Tinsel Holofoil, Black-backed Coin featuring Reshiram released within the Korean Reshiram-EX Battle Strength Deck April 12, 2012"
  },
  {
-  "id": "DATE_APRIL_REGULARSIZED_SILVER",
+  "id": "DATE_APRIL_REGULARSIZED_SILVER_20120412_2",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Tinsel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 12, 2012",
+  "release": "April 12, 2012",
   "releaseDate": "April 12, 2012",
   "region": "South Korea",
   "description": "Regular-sized, Silver Tinsel Holofoil, Black-backed Coin featuring Zekrom released within the Korean Zekrom-EX Battle Strength Deck April 12, 2012"
@@ -3961,34 +3961,34 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Tinsel Holofoil, Black-backed Coin featuring Rayquaza released for participating in the Japanese Battle Carnival Spring 2012 held on May 3, 2012 in Sendai, May 12–13 in Yokohama,"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20120509",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Red-backed",
   "material": "silver",
-  "release": "date\tMay 9, 2012",
+  "release": "May 9, 2012",
   "releaseDate": "May 9, 2012",
   "region": "North America",
   "description": "Regular-sized, Silver Rainbow Holofoil, Red-backed Coin featuring Zoroark released within the Raiders Theme Deck May 9, 2012; later released within Boundaries Crossed Three Pack Blisters November 7, 2"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_RED",
+  "id": "DATE_MAY_REGULARSIZED_RED_20120509",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 9, 2012",
+  "release": "May 9, 2012",
   "releaseDate": "May 9, 2012",
   "region": "North America",
   "description": "Regular-sized, Red Mirror Holofoil, Black-backed Coin featuring Zoroark released within the Shadows Theme Deck May 9, 2012; later included in XY Three Pack Blisters February 5, 2014"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20120509_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Mirror Holofoil, White-backed",
   "material": "silver",
-  "release": "date\tMay 9, 2012",
+  "release": "May 9, 2012",
   "releaseDate": "May 9, 2012",
   "region": "North America",
   "description": "Regular-sized, Silver Mirror Holofoil, White-backed Coin featuring Reshiram and Zekrom released within the Dark Explorers Three Pack Blisters May 9, 2012"
@@ -4038,12 +4038,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring Black Kyurem released within the Black Kyurem-EX Battle Strength Deck in Japan October 19, 2012 and in South Korea April 4, 2013"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_RED",
+  "id": "DATE_OCTOBER_REGULARSIZED_RED_20121019",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 19, 2012",
+  "release": "October 19, 2012",
   "releaseDate": "October 19, 2012",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring White Kyurem released within the White Kyurem-EX Battle Strength Deck in Japan October 19, 2012 and in South Korea April 4, 2013"
@@ -4054,18 +4054,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Sheen Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 4, 2012",
+  "release": "November 4, 2012",
   "releaseDate": "November 4, 2012",
   "region": "Japan",
   "description": "Regular-sized, Blue Sheen Holofoil, Black-backed Coin featuring the Team Plasma emblem released for participating in the Japanese Battle Carnival Autumn 2012 held on November 4, 2012 in Sapporo, Novem"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE_20121107",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tNovember 7, 2012",
+  "release": "November 7, 2012",
   "releaseDate": "November 7, 2012",
   "region": "North America",
   "description": "Regular-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Black Kyurem released within the Ice Shock Theme Deck November 7, 2012"
@@ -4098,7 +4098,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 16, 2012",
+  "release": "November 16, 2012",
   "releaseDate": "November 16, 2012",
   "region": "Japan",
   "description": "Regular-sized, Pink Speckle Holofoil, Black-backed Coin featuring Audino released within the Japanese Everyone's Exciting Battle November 16, 2012"
@@ -4115,23 +4115,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring the Team Plasma emblem released within the Japanese Expansion Pack Team Plasma Set December 2012"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20121215",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Sheen Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 15, 2012",
+  "release": "December 15, 2012",
   "releaseDate": "December 15, 2012",
   "region": "Japan",
   "description": "Regular-sized, Blue Sheen Holofoil, Black-backed Coin featuring Deoxys awarded upon winning 1 battle during the Team Plasma Control events held in commemoration of the release of the Spiral Force & Th"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_BLUE",
+  "id": "DATE_FEBRUARY_REGULARSIZED_BLUE_20130206",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 6, 2013",
+  "release": "February 6, 2013",
   "releaseDate": "February 6, 2013",
   "region": "North America",
   "description": "Regular-sized, Blue Rainbow Holofoil, Black-backed Coin featuring the Team Plasma emblem released within the Plasma Claw Theme Deck February 6, 2013"
@@ -4175,29 +4175,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Sheen Holofoil, Orange-backed",
   "material": "silver",
-  "release": "date\tMay 8, 2013",
+  "release": "May 8, 2013",
   "releaseDate": "May 8, 2013",
   "region": "North America",
   "description": "Large-sized, Silver Sheen Holofoil, Orange-backed Coin featuring Deoxys released within the Frost Ray Theme Deck May 8, 2013"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20130508",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Blue-backed",
   "material": "silver",
-  "release": "date\tMay 8, 2013",
+  "release": "May 8, 2013",
   "releaseDate": "May 8, 2013",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Blue-backed Coin featuring Deoxys released within the Psy Crusher Theme Deck May 8, 2013"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_BLUE",
+  "id": "DATE_MAY_REGULARSIZED_BLUE_20130508",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, White-backed",
   "material": "enamel",
-  "release": "date\tMay 8, 2013",
+  "release": "May 8, 2013",
   "releaseDate": "May 8, 2013",
   "region": "North America",
   "description": "Regular-sized, Blue Mirror Holofoil, White-backed Coin featuring the Team Plasma emblem released within the Team Plasma Box May 29, 2013"
@@ -4214,7 +4214,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Mirror Holofoil, Blue-backed Coin featuring the Team Plasma emblem released within the Team Plasma Box May 29, 2013"
  },
  {
-  "id": "TEAM_PLASMA_REGULARSIZED_SILVER",
+  "id": "TEAM_PLASMA_REGULARSIZED_SILVER_20130613",
   "url": "src/assets/coins/bulbapedia/TEAM_PLASMA_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/TEAM_PLASMA_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Confetti Holofoil, Black-backed",
@@ -4241,7 +4241,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 14, 2013",
+  "release": "August 14, 2013",
   "releaseDate": "August 14, 2013",
   "region": "North America",
   "description": "Large-sized, Purple Mirror Holofoil, Black-backed Coin featuring Genesect released within the Mind Wipe Theme Deck August 14, 2013"
@@ -4252,18 +4252,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Ovals Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 14, 2013",
+  "release": "August 14, 2013",
   "releaseDate": "August 14, 2013",
   "region": "North America",
   "description": "Large-sized, Silver Ovals Holofoil, Black-backed Coin featuring Genesect released within the Solar Strike Theme Deck August 14, 2013"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_GOLD",
+  "id": "DATE_AUGUST_REGULARSIZED_GOLD_20130814",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Japanese",
   "material": "gold",
-  "release": "date\tAugust 14, 2013",
+  "release": "August 14, 2013",
   "releaseDate": "August 14, 2013",
   "region": "North America",
   "description": "Regular-sized, Gold Non Holofoil, Japanese ® Trademark Black-backed Coin featuring Pikachu released for winning three matches in a row in the Japanese Pokémon Game Show TCG tournament held on August 1"
@@ -4274,7 +4274,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 25, 2013",
+  "release": "September 25, 2013",
   "releaseDate": "September 25, 2013",
   "region": "North America",
   "description": "Large-sized, Red Mirror Holofoil, Black-backed Coin featuring Genesect released within the Red Genesect Collection Theme Deck September 25, 2013"
@@ -4296,7 +4296,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 8, 2013",
+  "release": "November 8, 2013",
   "releaseDate": "November 8, 2013",
   "region": "North America",
   "description": "Large-sized, Green Rainbow Holofoil, Black-backed Coin featuring Chespin released within the Chespin Deck of the Kalos Starter Set November 8, 2013; later released within Chespin Kalos Starter Collect"
@@ -4307,7 +4307,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 8, 2013",
+  "release": "November 8, 2013",
   "releaseDate": "November 8, 2013",
   "region": "North America",
   "description": "Large-sized, Red Rainbow Holofoil, Black-backed Coin featuring Fennekin released within the Fennekin Deck of the Kalos Starter Set November 8, 2013; later released within Fennekin Kalos Starter Collec"
@@ -4318,18 +4318,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 8, 2013",
+  "release": "November 8, 2013",
   "releaseDate": "November 8, 2013",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Froakie released within the Froakie Deck of the Kalos Starter Set November 8, 2013; later released within Froakie Kalos Starter Collecti"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER_20131108",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Sheen Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 8, 2013",
+  "release": "November 8, 2013",
   "releaseDate": "November 8, 2013",
   "region": "Japan",
   "description": "Regular-sized, Silver Sheen Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the XY Beginning Set November 8, 2013"
@@ -4357,7 +4357,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Red Mirror Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the XY Beginning Set DX November 15, 2013"
  },
  {
-  "id": "XY_BEGINNING_REGULARSIZED_PINK",
+  "id": "XY_BEGINNING_REGULARSIZED_PINK_20131115",
   "url": "src/assets/coins/bulbapedia/XY_BEGINNING_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/XY_BEGINNING_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Speckle Holofoil, Black-backed",
@@ -4368,23 +4368,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Pink Speckle Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the XY Beginning Set DX for Girls November 15, 2013"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_RED",
+  "id": "DATE_DECEMBER_REGULARSIZED_RED_20131213",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 13, 2013",
+  "release": "December 13, 2013",
   "releaseDate": "December 13, 2013",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the Lawson Limited Pokémon Coin Set December 13, 2013"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20131213",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 13, 2013",
+  "release": "December 13, 2013",
   "releaseDate": "December 13, 2013",
   "region": "Japan",
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the Lawson Limited Pokémon Coin Set December 13, 2013"
@@ -4395,7 +4395,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tFebruary 5, 2014",
+  "release": "February 5, 2014",
   "releaseDate": "February 5, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Blue-backed Coin featuring Xerneas released within the Resilient Life Theme Deck February 5, 2014"
@@ -4423,7 +4423,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Green Non Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the Korean Evolution of Chespin Half Deck March 4, 2014"
  },
  {
-  "id": "EVOLUTION_OF_REGULARSIZED_RED",
+  "id": "EVOLUTION_OF_REGULARSIZED_RED_20140304",
   "url": "src/assets/coins/bulbapedia/EVOLUTION_OF_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/EVOLUTION_OF_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
@@ -4434,7 +4434,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within the Korean Evolution of Fennekin Half Deck March 4, 2014"
  },
  {
-  "id": "EVOLUTION_OF_REGULARSIZED_BLUE",
+  "id": "EVOLUTION_OF_REGULARSIZED_BLUE_20140304",
   "url": "src/assets/coins/bulbapedia/EVOLUTION_OF_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/EVOLUTION_OF_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
@@ -4472,18 +4472,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tApril 1, 2014",
+  "release": "April 1, 2014",
   "releaseDate": "April 1, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Xerneas released within limited later shipments of the XY Blisters April 1, 2014; given a wider release within the Flashfire Blist"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20140401",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tApril 1, 2014",
+  "release": "April 1, 2014",
   "releaseDate": "April 1, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Yveltal released within limited later shipments of the XY Blisters April 1, 2014; given a wider release within the Flashfire Blist"
@@ -4494,7 +4494,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tApril 1, 2014",
+  "release": "April 1, 2014",
   "releaseDate": "April 1, 2014",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Pikachu released within later shipments of the XY Blisters April 1, 2014; later released as one of several coins randomly included within"
@@ -4505,7 +4505,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 3, 2014",
+  "release": "May 3, 2014",
   "releaseDate": "May 3, 2014",
   "region": "North America",
   "description": "Large-sized, Red Mirror Holofoil, Black-backed Coin featuring the Pokémon Professor symbol released upon participation at the Professor Cup of the International 2014 National Championships, starting i"
@@ -4516,7 +4516,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 7, 2014",
+  "release": "May 7, 2014",
   "releaseDate": "May 7, 2014",
   "region": "North America",
   "description": "Large-sized, Orange Rainbow Holofoil, Black-backed Coin featuring Mega Charizard Y released within the Brilliant Thunder Theme Deck May 7, 2014"
@@ -4544,12 +4544,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Gold Non Holofoil, Black-backed Coin featuring Mega Charizard Y released within the Flashfire Blisters May 7, 2014"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20140507",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 7, 2014",
+  "release": "May 7, 2014",
   "releaseDate": "May 7, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Deoxys released within later shipments of the Kanto First Partner Evolutions XY Blisters May 7, 2014"
@@ -4593,7 +4593,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Yellow-backed",
   "material": "silver",
-  "release": "date\tJune 12, 2014",
+  "release": "June 12, 2014",
   "releaseDate": "June 12, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Yellow-backed Coin featuring Pikachu released within later shipments of the Flashfire Three Pack Blisters June 12, 2014; released again in later shipments of the E"
@@ -4604,13 +4604,13 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Sheen Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 12, 2014",
+  "release": "June 12, 2014",
   "releaseDate": "June 12, 2014",
   "region": "North America",
   "description": "Large-sized, Blue Sheen Holofoil, Black-backed Coin featuring Xerneas released within later shipments of the XY Single Pack Blisters June 12, 2014"
  },
  {
-  "id": "XY_SINGLE_LARGESIZED_RED",
+  "id": "XY_SINGLE_LARGESIZED_RED_20140612",
   "url": "src/assets/coins/bulbapedia/XY_SINGLE_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/XY_SINGLE_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Smoke Holofoil, Black-backed",
@@ -4626,18 +4626,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 2014",
+  "release": "July 2014",
   "releaseDate": "July 2014",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Chespin, Fennekin, and Froakie released within later shipments of the XY Trainer Kit during July 2014; later released as one of several c"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_SILVER",
+  "id": "DATE_AUGUST_LARGESIZED_SILVER_20140813",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Confetti Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 13, 2014",
+  "release": "August 13, 2014",
   "releaseDate": "August 13, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Confetti Holofoil, Black-backed Coin featuring Mega Lucario released within the Enchanted Echo Theme Deck August 13, 2014"
@@ -4703,7 +4703,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 22, 2014",
+  "release": "October 22, 2014",
   "releaseDate": "October 22, 2014",
   "region": "North America",
   "description": "Large-sized, Blue Confetti Holofoil, Black-backed Coin featuring Xerneas released within the Battle Arena Decks: Xerneas vs. Yveltal October 22, 2014"
@@ -4725,7 +4725,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tNovember 5, 2014",
+  "release": "November 5, 2014",
   "releaseDate": "November 5, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Gengar released within the Burning Winds Theme Deck November 5, 2014"
@@ -4753,34 +4753,34 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Pixel Holofoil, Black-backed Coin featuring Xerneas and Yveltal released within the Super Legend Set: Xerneas-EX & Yveltal-EX November 14, 2014"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20141124",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 24, 2014",
+  "release": "November 24, 2014",
   "releaseDate": "November 24, 2014",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Metagross released within the Mega Metagross-EX Premium Collection November 24, 2014"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20141213",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 13, 2014",
+  "release": "December 13, 2014",
   "releaseDate": "December 13, 2014",
   "region": "Japan",
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring Kyogre released within the Lawson Limited Pokémon Coin Set Groudon & Kyogre December 13, 2014"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_RED",
+  "id": "DATE_DECEMBER_REGULARSIZED_RED_20141213",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 13, 2014",
+  "release": "December 13, 2014",
   "releaseDate": "December 13, 2014",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring Groudon released within the Lawson Limited Pokémon Coin Set Groudon & Kyogre December 13, 2014"
@@ -4791,7 +4791,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJanuary 5, 2015",
+  "release": "January 5, 2015",
   "releaseDate": "January 5, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Diancie released within the Mega Diancie-EX Premium Collection January 5, 2015"
@@ -4830,34 +4830,34 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Chespin released within the Primal Clash Blisters February 4, 2015; later included in the Roaring Skies Blisters May 6, 2015 and A"
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_SILVER",
+  "id": "DATE_FEBRUARY_LARGESIZED_SILVER_20150204",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tFebruary 4, 2015",
+  "release": "February 4, 2015",
   "releaseDate": "February 4, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Fennekin released within the Primal Clash Blisters February 4, 2015; later included in the Roaring Skies Blisters May 6, 2015 and "
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_SILVER",
+  "id": "DATE_FEBRUARY_LARGESIZED_SILVER_20150204_2",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tFebruary 4, 2015",
+  "release": "February 4, 2015",
   "releaseDate": "February 4, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Froakie released within the Primal Clash Blisters February 4, 2015; later included in the Roaring Skies Blisters May 6, 2015 and A"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_GOLD",
+  "id": "DATE_MARCH_REGULARSIZED_GOLD_20150314",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMarch 14, 2015",
+  "release": "March 14, 2015",
   "releaseDate": "March 14, 2015",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Mega Rayquaza released within the M Rayquaza-EX Mega Battle Deck in Japan March 14, 2015 and in South Korea June 4, 2015"
@@ -4868,7 +4868,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 25, 2015",
+  "release": "March 25, 2015",
   "releaseDate": "March 25, 2015",
   "region": "North America",
   "description": "Large-sized, Blue Mirror Holofoil, Black-backed Coin featuring the Team Aqua emblem released within the Double Crisis Blisters March 25, 2015"
@@ -4896,18 +4896,18 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Teal Non Holofoil, Black-backed Coin featuring Metagross released within later shipments of the Mega Metagross-EX Premium Collection starting April 2015"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20150429",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 29, 2015",
+  "release": "April 29, 2015",
   "releaseDate": "April 29, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Treecko, Torchic, and Mudkip released within the XY Trainer Kit: Latias & Latios April 29, 2015"
  },
  {
-  "id": "XY_TRAINER_REGULARSIZED_GOLD",
+  "id": "XY_TRAINER_REGULARSIZED_GOLD_20150505",
   "url": "src/assets/coins/bulbapedia/XY_TRAINER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/XY_TRAINER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Cracked Ice Holofoil,",
@@ -4923,7 +4923,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 6, 2015",
+  "release": "May 6, 2015",
   "releaseDate": "May 6, 2015",
   "region": "North America",
   "description": "Large-sized, Green Mirror Holofoil, Black-backed Coin featuring Mega Rayquaza released within the Aurora Blast Theme Deck May 6, 2015; subsequently released within later shipments of the Roaring Skies"
@@ -4934,18 +4934,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 6, 2015",
+  "release": "May 6, 2015",
   "releaseDate": "May 6, 2015",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Mega Rayquaza released within the Storm Rider Theme Deck May 6, 2015; subsequently released within later shipments of the Roaring Skies S"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20150529",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 29, 2015",
+  "release": "May 29, 2015",
   "releaseDate": "May 29, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Absol released within the Mega Absol-EX Premium Collection May 29, 2015"
@@ -4967,40 +4967,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 1, 2015",
+  "release": "August 1, 2015",
   "releaseDate": "August 1, 2015",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Treecko, Torchic, and Mudkip released within later shipments of the XY Trainer Kit: Latias & Latios starting August 1, 2015"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_SILVER",
+  "id": "DATE_AUGUST_LARGESIZED_SILVER_20150812",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 12, 2015",
+  "release": "August 12, 2015",
   "releaseDate": "August 12, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Primal Kyogre released as one of three coins randomly included within the Iron Tide and Stone Heart Theme Decks August 12, 2015"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_SILVER",
+  "id": "DATE_AUGUST_LARGESIZED_SILVER_20150812_2",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 12, 2015",
+  "release": "August 12, 2015",
   "releaseDate": "August 12, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Primal Groudon released as one of three coins randomly included within the Iron Tide and Stone Heart Theme Decks August 12, 2015"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_SILVER",
+  "id": "DATE_AUGUST_LARGESIZED_SILVER_20150812_3",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 12, 2015",
+  "release": "August 12, 2015",
   "releaseDate": "August 12, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Mega Rayquaza released as one of three coins randomly included within the Iron Tide and Stone Heart Theme Decks August 12, 2015"
@@ -5011,13 +5011,13 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 19, 2015",
+  "release": "August 19, 2015",
   "releaseDate": "August 19, 2015",
   "region": "North America",
   "description": "Large-sized, Blue Confetti Holofoil, Black-backed Coin featuring the Team Aqua emblem within later shipments of the Double Crisis Blisters August 19, 2015"
  },
  {
-  "id": "DOUBLE_CRISIS_LARGESIZED_RED",
+  "id": "DOUBLE_CRISIS_LARGESIZED_RED_20150819",
   "url": "src/assets/coins/bulbapedia/DOUBLE_CRISIS_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DOUBLE_CRISIS_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Cracked Ice Holofoil,",
@@ -5028,12 +5028,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Red Cracked Ice Holofoil, Black-backed Coin featuring the Team Magma emblem within later shipments of the Double Crisis Blisters August 19, 2015"
  },
  {
-  "id": "DATE_OCTOBER_REGULARSIZED_SILVER",
+  "id": "DATE_OCTOBER_REGULARSIZED_SILVER_20151009",
   "url": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "thumb": "https://archives.bulbagarden.net/media/upload/c/cb/SP_Silver_Chansey_Coin.png/SP_Silver_Chansey_Coin.png",
   "name": "Regular-sized, Silver Prism Holofoil Coin",
   "material": "gold",
-  "release": "date\tOctober 9, 2015",
+  "release": "October 9, 2015",
   "releaseDate": "October 9, 2015",
   "region": "Japan",
   "description": "Regular-sized, Silver Prism Holofoil Coin featuring Golduck and Palkia released within the Golduck BREAK + Palkia-EX Combo Deck in Japan October 9, 2015 and in South Korea November 19, 2015"
@@ -5044,18 +5044,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 19, 2015",
+  "release": "October 19, 2015",
   "releaseDate": "October 19, 2015",
   "region": "North America",
   "description": "Large-sized, Orange Rainbow Holofoil, Black-backed Coin featuring Mega Blaziken released within the Mega Blaziken-EX Premium Collection October 19, 2015"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_BLUE",
+  "id": "DATE_OCTOBER_LARGESIZED_BLUE_20151019",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 19, 2015",
+  "release": "October 19, 2015",
   "releaseDate": "October 19, 2015",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Mega Swampert released within the Mega Swampert-EX Premium Collection October 19, 2015"
@@ -5066,7 +5066,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Pixel Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 21, 2015",
+  "release": "October 21, 2015",
   "releaseDate": "October 21, 2015",
   "region": "North America",
   "description": "Large-sized, Red Pixel Holofoil, Black-backed Coin featuring Zoroark released as one of two coins available within the Battle Arena Decks: Mewtwo vs. Darkrai October 21, 2015; subsequently released wi"
@@ -5077,7 +5077,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 21, 2015",
+  "release": "October 21, 2015",
   "releaseDate": "October 21, 2015",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Zoroark released as one of two coins available within the Battle Arena Decks: Mewtwo vs. Darkrai October 21, 2015"
@@ -5088,7 +5088,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_PINK.jpg",
   "name": "Large-sized, Pink Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 4, 2015",
+  "release": "November 4, 2015",
   "releaseDate": "November 4, 2015",
   "region": "North America",
   "description": "Large-sized, Pink Rainbow Holofoil, Black-backed Coin featuring Mega Mewtwo Y released within the Burning Spark Theme Deck November 4, 2015"
@@ -5127,45 +5127,45 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Rainbow Cracked Ice Holofoil Coin featuring Pikachu released as a free gift until supplies lasted for spending at least ¥2000 at the Pokémon Centers for the Japanese 2016 Start Dash Cam"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20151226",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Speckle Holofoil Coin",
   "material": "enamel",
-  "release": "date\tDecember 26, 2015",
+  "release": "December 26, 2015",
   "releaseDate": "December 26, 2015",
   "region": "Japan",
   "description": "Regular-sized, Blue Speckle Holofoil Coin featuring Manaphy released as a free gift until supplies lasted for spending at least ¥2000 at the Pokémon Centers for the Japanese 2016 Start Dash Campaign s"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_DECEMBER_REGULARSIZED_GREEN_20151226",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Speckle Holofoil Coin",
   "material": "enamel",
-  "release": "date\tDecember 26, 2015",
+  "release": "December 26, 2015",
   "releaseDate": "December 26, 2015",
   "region": "Japan",
   "description": "Regular-sized, Green Speckle Holofoil Coin featuring Shaymin released as a free gift until supplies lasted for spending at least ¥2000 at the Pokémon Centers for the Japanese 2016 Start Dash Campaign "
  },
  {
-  "id": "DATE_JANUARY_LARGESIZED_SILVER",
+  "id": "DATE_JANUARY_LARGESIZED_SILVER_20160103",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJanuary 3, 2016",
+  "release": "January 3, 2016",
   "releaseDate": "January 3, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Aerodactyl released within the Mega Aerodactyl-EX Premium Collection January 3, 2016; later released within some copies of th"
  },
  {
-  "id": "DATE_JANUARY_LARGESIZED_SILVER",
+  "id": "DATE_JANUARY_LARGESIZED_SILVER_201601",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJanuary 2016",
+  "release": "January 2016",
   "releaseDate": "January 2016",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Mewtwo Y released within later shipments of the Burning Spark Theme Deck January 2016"
@@ -5182,12 +5182,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Mega Mewtwo X released within later shipments of the Night Striker Theme Deck January 2016"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_RED",
+  "id": "DATE_JANUARY_REGULARSIZED_RED_20160116",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil Coin",
   "material": "enamel",
-  "release": "date\tJanuary 16, 2016",
+  "release": "January 16, 2016",
   "releaseDate": "January 16, 2016",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil Coin featuring Charmander released as a prize for earning 3 points at the Pokémon Center Mega Battle + Creatures Challenge held in Pokémon Centers across Japan duri"
@@ -5198,7 +5198,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 3, 2016",
+  "release": "February 3, 2016",
   "releaseDate": "February 3, 2016",
   "region": "North America",
   "description": "Large-sized, Red Non Holofoil, Black-backed Coin featuring Mega Gyarados released within the Wave Slasher Theme Deck February 3, 2016"
@@ -5248,12 +5248,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Orange Rainbow Holofoil, Black-backed Coin featuring Victini released within the BREAKpoint Blisters February 3, 2016; subsequently released within later shipments of the Steam Siege Blis"
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_SILVER",
+  "id": "DATE_FEBRUARY_LARGESIZED_SILVER_20160203",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, error",
   "material": "silver",
-  "release": "date\tFebruary 3, 2016",
+  "release": "February 3, 2016",
   "releaseDate": "February 3, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, error upside-down back, Black-backed Coin featuring Genesect released within the BREAKpoint Blisters February 3, 2016"
@@ -5286,40 +5286,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Crosshatch Holofoil Coin",
   "material": "silver",
-  "release": "date\tMarch 18, 2016",
+  "release": "March 18, 2016",
   "releaseDate": "March 18, 2016",
   "region": "Japan",
   "description": "Regular-sized, Silver Crosshatch Holofoil Coin featuring Zygarde Complete Forme released within the Zygarde-EX Perfect Battle Deck in Japan March 18, 2016 and in South Korea April 5, 2016"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_SILVER",
+  "id": "DATE_MARCH_REGULARSIZED_SILVER_20160318",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Speckle Holofoil Coin",
   "material": "silver",
-  "release": "date\tMarch 18, 2016",
+  "release": "March 18, 2016",
   "releaseDate": "March 18, 2016",
   "region": "Japan",
   "description": "Regular-sized, Silver Speckle Holofoil Coin featuring Mega Audino released within the M Audino-EX Mega Battle Deck in Japan March 18, 2016 and in South Korea June 22, 2016"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20160427",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 27, 2016",
+  "release": "April 27, 2016",
   "releaseDate": "April 27, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Pikachu released within the XY Trainer Kit: Pikachu Libre & Suicune April 27, 2016"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20160502",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 2, 2016",
+  "release": "May 2, 2016",
   "releaseDate": "May 2, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Mawile released within the Mega Mawile-EX Premium Collection May 2, 2016"
@@ -5347,7 +5347,7 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Red Cracked Ice Holofoil, Black-backed Coin featuring Mega Gyarados released within later shipments of the Wave Slasher Theme Deck May 2, 2016"
  },
  {
-  "id": "WAVE_SLASHER_LARGESIZED_SILVER",
+  "id": "WAVE_SLASHER_LARGESIZED_SILVER_20160502",
   "url": "src/assets/coins/bulbapedia/WAVE_SLASHER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/WAVE_SLASHER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
@@ -5358,7 +5358,7 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Gyarados released within later shipments of the Electric Eye Theme Deck May 2, 2016"
  },
  {
-  "id": "ELECTRIC_EYE_LARGESIZED_SILVER",
+  "id": "ELECTRIC_EYE_LARGESIZED_SILVER_20160502",
   "url": "src/assets/coins/bulbapedia/ELECTRIC_EYE_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/ELECTRIC_EYE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
@@ -5369,7 +5369,7 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Mega Gyarados released within later shipments of the Electric Eye Theme Deck May 2, 2016"
  },
  {
-  "id": "ELECTRIC_EYE_LARGESIZED_SILVER",
+  "id": "ELECTRIC_EYE_LARGESIZED_SILVER_20160502_2",
   "url": "src/assets/coins/bulbapedia/ELECTRIC_EYE_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/ELECTRIC_EYE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
@@ -5380,12 +5380,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Cracked Ice Holofoil, Blue-backed Coin featuring Lugia released within the Sky Guardian Theme Deck May 2, 2016"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20160502_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 2, 2016",
+  "release": "May 2, 2016",
   "releaseDate": "May 2, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Green-backed Coin featuring Zygarde released within the Battle Ruler Theme Deck May 2, 2016"
@@ -5402,78 +5402,78 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Chespin released within the Fates Collide Single Pack Blisters May 2, 2016; later released as one of three coins randomly included in XY "
  },
  {
-  "id": "DATE_MAY_LARGESIZED_GOLD",
+  "id": "DATE_MAY_LARGESIZED_GOLD_20160502",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 2, 2016",
+  "release": "May 2, 2016",
   "releaseDate": "May 2, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Fennekin released within the Fates Collide Single Pack Blisters May 2, 2016; later released as one of three coins randomly included in XY"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_GOLD",
+  "id": "DATE_MAY_LARGESIZED_GOLD_20160502_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 2, 2016",
+  "release": "May 2, 2016",
   "releaseDate": "May 2, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Froakie released within the Fates Collide Single Pack Blisters May 2, 2016; later released as one of three coins randomly included in XY "
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_GOLD",
+  "id": "DATE_MAY_REGULARSIZED_GOLD_20160505",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 5, 2016",
+  "release": "May 5, 2016",
   "releaseDate": "May 5, 2016",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Squirtle released for participating in the Japanese Kamex Mega Battle held on May 5, 2016 in Nagoya; May 15 in Osaka; May 21-22 in Chib"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_GOLD",
+  "id": "DATE_MAY_REGULARSIZED_GOLD_20160505_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 5, 2016",
+  "release": "May 5, 2016",
   "releaseDate": "May 5, 2016",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Blastoise released for participating in the Japanese Kamex Mega Battle held on May 5, 2016 in Nagoya; May 15 in Osaka; May 21-22 in Chi"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20160723",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 23, 2016",
+  "release": "July 23, 2016",
   "releaseDate": "July 23, 2016",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Pikachu released as one of three coins for earning 6 Play Points in the Japanese Pokémon Center Mega Battle held at participating Poké"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GREEN",
+  "id": "DATE_JULY_REGULARSIZED_GREEN_20160723",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 23, 2016",
+  "release": "July 23, 2016",
   "releaseDate": "July 23, 2016",
   "region": "Japan",
   "description": "Regular-sized, Green Speckle Holofoil, Black-backed Coin featuring Gardevoir released as one of three coins for earning 6 Play Points in the Japanese Pokémon Center Mega Battle held at participating P"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_GOLD",
+  "id": "DATE_AUGUST_LARGESIZED_GOLD_20160803",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 3, 2016",
+  "release": "August 3, 2016",
   "releaseDate": "August 3, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Non Holofoil, Black-backed Coin featuring Hoopa Unbound released within the Ring of Lightning Theme Deck August 3, 2016"
@@ -5506,18 +5506,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tSeptember 16, 2016",
+  "release": "September 16, 2016",
   "releaseDate": "September 16, 2016",
   "region": "Japan",
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Mew released as one of three coins for purchasing an Expansion Pack 20th Anniversary Booster Box starting September 16, 2016"
  },
  {
-  "id": "DATE_SEPTEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_SEPTEMBER_REGULARSIZED_GREEN_20160916",
   "url": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 16, 2016",
+  "release": "September 16, 2016",
   "releaseDate": "September 16, 2016",
   "region": "Japan",
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Bulbasaur released as one of three coins for purchasing an Expansion Pack 20th Anniversary Booster Box starting September 16, 2016"
@@ -5528,7 +5528,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 21, 2016",
+  "release": "September 21, 2016",
   "releaseDate": "September 21, 2016",
   "region": "North America",
   "description": "Large-sized, Green Mirror Holofoil, Black-backed Coin featuring Rayquaza released within the Battle Arena Decks: Rayquaza vs. Keldeo September 21, 2016"
@@ -5539,51 +5539,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 21, 2016",
+  "release": "September 21, 2016",
   "releaseDate": "September 21, 2016",
   "region": "North America",
   "description": "Large-sized, Blue Mirror Holofoil, Black-backed Coin featuring Blastoise released within the Battle Arena Decks: Rayquaza vs. Keldeo September 21, 2016; later released within the Blastoise-GX Premium "
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161001",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 1, 2016",
+  "release": "October 1, 2016",
   "releaseDate": "October 1, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Xerneas released within later shipments of the Steam Siege Single Pack Blisters October 1, 2016; released again as one of several coins"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161001_2",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 1, 2016",
+  "release": "October 1, 2016",
   "releaseDate": "October 1, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Yveltal released within later shipments of the Steam Siege Single Pack Blisters October 1, 2016; released again as one of several coins"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_RED",
+  "id": "DATE_OCTOBER_LARGESIZED_RED_20161001",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Pixel Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 1, 2016",
+  "release": "October 1, 2016",
   "releaseDate": "October 1, 2016",
   "region": "North America",
   "description": "Large-sized, Red Pixel Holofoil, Black-backed Coin featuring Deoxys released as one of several coins randomly included within later shipments of the Steam Siege Blisters October 1, 2016; subsequently "
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161001_3",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Corrected",
   "material": "silver",
-  "release": "date\tOctober 1, 2016",
+  "release": "October 1, 2016",
   "releaseDate": "October 1, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, Corrected Black-backed Coin featuring Genesect released within later shipments of the Steam Siege Blisters October 1, 2016, as one of several coins randomly include"
@@ -5594,7 +5594,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BRONZE.jpg",
   "name": "Large-sized, Bronze Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 5, 2016",
+  "release": "October 5, 2016",
   "releaseDate": "October 5, 2016",
   "region": "North America",
   "description": "Large-sized, Bronze Mirror Holofoil, Black-backed Coin featuring Pikachu released within the Dragon Single Pack Blisters October 5, 2016"
@@ -5616,13 +5616,13 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tOctober 5, 2016",
+  "release": "October 5, 2016",
   "releaseDate": "October 5, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Hoopa Unbound released within later shipments of the Ring of Lightning Theme Deck October 5, 2016"
  },
  {
-  "id": "RING_OF_LARGESIZED_RED",
+  "id": "RING_OF_LARGESIZED_RED_20161005",
   "url": "src/assets/coins/bulbapedia/RING_OF_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/RING_OF_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Cracked Ice Holofoil,",
@@ -5644,12 +5644,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Red Pixel Holofoil, Black-backed Coin featuring Volcanion released within later shipments of the Gears of Fire Theme Deck October 5, 2016"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161025",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 25, 2016",
+  "release": "October 25, 2016",
   "releaseDate": "October 25, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring the Team Plasma emblem released within the Articuno Legendary Battle Deck, Zapdos Legendary Battle Deck, and Moltres Legendary Battle D"
@@ -5660,18 +5660,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_PINK.jpg",
   "name": "Large-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Chansey released within the Mewtwo Mayhem Theme Deck at Toys \"R\" Us October 30, 2016, elsewhere on November 2, 2016"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161030",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Starlight Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Starlight Holofoil, Black-backed Coin featuring Chansey released within the Pikachu Power Theme Deck at Toys \"R\" Us October 30, 2016"
@@ -5688,12 +5688,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Red Rainbow Holofoil, Black-backed Coin featuring Deoxys released as one of several coins randomly included within the Evolutions Blisters October 30, 2016"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_BRONZE",
+  "id": "DATE_OCTOBER_LARGESIZED_BRONZE_20161030",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BRONZE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BRONZE.jpg",
   "name": "Large-sized, Bronze Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Bronze Non Holofoil, Black-backed Coin featuring Victini released as one of several coins randomly included within the Evolutions Blisters October 30, 2016; later released within the seco"
@@ -5704,62 +5704,62 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Pixel Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Purple Pixel Holofoil, Black-backed Coin featuring Genesect released as one of several coins randomly included within the Evolutions Blisters October 30, 2016"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161030_2",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Chespin released as one of several coins randomly included within the Evolutions Blisters October 30, 2016"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161030_3",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Fennekin released as one of several coins randomly included within the Evolutions Blisters October 30, 2016"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20161030_4",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 30, 2016",
+  "release": "October 30, 2016",
   "releaseDate": "October 30, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Froakie released as one of several coins randomly included within the Evolutions Blisters October 30, 2016; later included as one of f"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20161101",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tNovember 1, 2016",
+  "release": "November 1, 2016",
   "releaseDate": "November 1, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Beedrill released within the Mega Beedrill-EX Premium Collection November 1, 2016"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20161101_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 1, 2016",
+  "release": "November 1, 2016",
   "releaseDate": "November 1, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Mega Beedrill released within the Mega Beedrill-EX Premium Collection November 1, 2016"
@@ -5798,12 +5798,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Mega Absol released within later shipments of the Mega Absol-EX Premium Collection November 3, 2016"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20161118",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 18, 2016",
+  "release": "November 18, 2016",
   "releaseDate": "November 18, 2016",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Mega Gengar released within the Collector Chest 2016 November 18, 2016"
@@ -5825,7 +5825,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 18, 2016",
+  "release": "November 18, 2016",
   "releaseDate": "November 18, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Mega Garchomp released within the Mega Garchomp-EX Premium Collection November 18, 2016"
@@ -5836,7 +5836,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tDecember 1, 2016",
+  "release": "December 1, 2016",
   "releaseDate": "December 1, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Primal Groudon released within the Giratina Three Pack Blister December 1, 2016"
@@ -5853,7 +5853,7 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Primal Kyogre released within the Giratina Three Pack Blister December 1, 2016"
  },
  {
-  "id": "GIRATINA_THREE_LARGESIZED_GOLD",
+  "id": "GIRATINA_THREE_LARGESIZED_GOLD_20161201",
   "url": "src/assets/coins/bulbapedia/GIRATINA_THREE_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/GIRATINA_THREE_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
@@ -5868,41 +5868,41 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_METAL_COIN.jpg",
   "name": "Metal Coin featuring the Team",
-  "material": "enamel",
-  "release": "date\tFebruary 2017",
+  "material": "metal",
+  "release": "February 2017",
   "releaseDate": "February 2017",
   "region": "Japan",
   "description": "Metal Coin featuring the Team Rocket emblem on the obverse and a Poké Ball on the reverse, released within the 20th Anniversary Team Rocket Special Case February 2017"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_DECEMBER_REGULARSIZED_GREEN_20161209",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 9, 2016",
+  "release": "December 9, 2016",
   "releaseDate": "December 9, 2016",
   "region": "Japan",
   "description": "Regular-sized, Green Speckle Holofoil, Black-backed Coin featuring Rowlet, Litten, and Popplio released within the Decidueye-GX Starter Set Grass in Japan December 9, 2016 and in South Korea January 1"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_RED",
+  "id": "DATE_DECEMBER_REGULARSIZED_RED_20161209",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 9, 2016",
+  "release": "December 9, 2016",
   "releaseDate": "December 9, 2016",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring Rowlet, Litten, and Popplio released within the Incineroar-GX Starter Set Fire in Japan December 9, 2016 and in South Korea January 12,"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20161209",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 9, 2016",
+  "release": "December 9, 2016",
   "releaseDate": "December 9, 2016",
   "region": "Japan",
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring Rowlet, Litten, and Popplio released within the Primarina-GX Starter Set Water in Japan December 9, 2016 and in South Korea January 12"
@@ -5913,18 +5913,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tDecember 9, 2016",
+  "release": "December 9, 2016",
   "releaseDate": "December 9, 2016",
   "region": "Japan",
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring an octagonal Poké Ball design released within the Japanese Premium Trainer Box December 9, 2016; later released within the Korean Ly"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_DECEMBER_REGULARSIZED_GOLD_20161223",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Speckle Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tDecember 23, 2016",
+  "release": "December 23, 2016",
   "releaseDate": "December 23, 2016",
   "region": "Japan",
   "description": "Regular-sized, Gold Speckle Holofoil, Black-backed Coin featuring Rowlet, Litten, and Popplio given to participants who battled with all three of the Decidueye-GX, Incineroar-GX, and the Primarina-GX "
@@ -5935,18 +5935,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 3, 2017",
+  "release": "February 3, 2017",
   "releaseDate": "February 3, 2017",
   "region": "North America",
   "description": "Large-sized, Green Rainbow Holofoil, Black-backed Coin featuring Rowlet released within the Forest Shadow Theme Deck February 3, 2017; later released within the Celestial Storm Two Pack Blister August"
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_RED",
+  "id": "DATE_FEBRUARY_LARGESIZED_RED_20170203",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 3, 2017",
+  "release": "February 3, 2017",
   "releaseDate": "February 3, 2017",
   "region": "North America",
   "description": "Large-sized, Red Rainbow Holofoil, Black-backed Coin featuring Litten released within the Roaring Heat Theme Deck February 3, 2017"
@@ -5957,95 +5957,95 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 3, 2017",
+  "release": "February 3, 2017",
   "releaseDate": "February 3, 2017",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Popplio released within the Bright Tide Theme Deck February 3, 2017; later included as one of four possible coins within the Mini Collec"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_SILVER",
+  "id": "DATE_MARCH_REGULARSIZED_SILVER_20170317",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Lath Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMarch 17, 2017",
+  "release": "March 17, 2017",
   "releaseDate": "March 17, 2017",
   "region": "Japan",
   "description": "Regular-sized, Silver Lath Holofoil, Black-backed Coin featuring Tapu Bulu released within the Tapu Bulu-GX Enhanced Starter Set in Japan March 17, 2017 and in South Korea April 27, 2017"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20170407",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 7, 2017",
+  "release": "April 7, 2017",
   "releaseDate": "April 7, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Rowlet, Litten, and Popplio released within the Spring 2017 Collector Chest April 7, 2017"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20170407_2",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tApril 7, 2017",
+  "release": "April 7, 2017",
   "releaseDate": "April 7, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Camerupt released within the Mega Camerupt-EX Premium Collection April 7, 2017"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20170407_3",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tApril 7, 2017",
+  "release": "April 7, 2017",
   "releaseDate": "April 7, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Sharpedo released within the Mega Sharpedo-EX Premium Collection April 7, 2017"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_GOLD",
+  "id": "DATE_APRIL_LARGESIZED_GOLD_20160417",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tApril 17, 2016",
+  "release": "April 17, 2016",
   "releaseDate": "April 17, 2016",
   "region": "North America",
   "description": "Large-sized, Gold Non Holofoil, Black-backed Coin featuring Victini included as one of three possible coins within the Sun & Moon Two Pack Blister April 17, 2017; later released as one of two coins wi"
  },
  {
-  "id": "DATE_APRIL_REGULARSIZED_SILVER",
+  "id": "DATE_APRIL_REGULARSIZED_SILVER_20170421",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Speckle Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 21, 2017",
+  "release": "April 21, 2017",
   "releaseDate": "April 21, 2017",
   "region": "Japan",
   "description": "Regular-sized, Silver Speckle Holofoil, Black-backed Coin featuring Rotom Pokédex released within the Ash vs Team Rocket Deck Kit in Japan April 21, 2017 and in South Korea September 28, 2017"
  },
  {
-  "id": "DATE_APRIL_LARGESIZED_SILVER",
+  "id": "DATE_APRIL_LARGESIZED_SILVER_20170421",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 21, 2017",
+  "release": "April 21, 2017",
   "releaseDate": "April 21, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Alolan Raichu released within the Sun & Moon Trainer Kit: Lycanroc & Alolan Raichu April 21, 2017; later released as one of two coins "
  },
  {
-  "id": "DATE_MAY_LARGESIZED_ORANGE",
+  "id": "DATE_MAY_LARGESIZED_ORANGE_20170505",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_ORANGE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 5, 2017",
+  "release": "May 5, 2017",
   "releaseDate": "May 5, 2017",
   "region": "North America",
   "description": "Large-sized, Orange Rainbow Holofoil, Black-backed Coin featuring Solgaleo released within the Steel Sun Theme Deck May 5, 2017; later released as a possible coin within early 2020 shipments of the Ka"
@@ -6056,29 +6056,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 5, 2017",
+  "release": "May 5, 2017",
   "releaseDate": "May 5, 2017",
   "region": "North America",
   "description": "Large-sized, Purple Rainbow Holofoil, Black-backed Coin featuring Lunala released within the Hidden Moon Theme Deck May 5, 2017; later released as a possible coin within the fourth series of Poké Ball"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20170505",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 5, 2017",
+  "release": "May 5, 2017",
   "releaseDate": "May 5, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Metagross released within the Guardians Rising Blisters May 5, 2017; later released within some versions of Burning Shadows Three Pack"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20170505_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 5, 2017",
+  "release": "May 5, 2017",
   "releaseDate": "May 5, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Lugia released within the Lugia Legendary Battle Deck May 5, 2017"
@@ -6106,12 +6106,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Eevee given to customers who purchased 5 booster packs as part of the Eevee and Colorful Friends campaign at all Pokémon Centers and Po"
  },
  {
-  "id": "DATE_JUNE_LARGESIZED_SILVER",
+  "id": "DATE_JUNE_LARGESIZED_SILVER_20170602",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJune 2, 2017",
+  "release": "June 2, 2017",
   "releaseDate": "June 2, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Mega Tyranitar released within the Mega Tyranitar-EX Premium Collection June 2, 2017; later released as a possible coin within the"
@@ -6122,7 +6122,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tJune 16, 2017",
+  "release": "June 16, 2017",
   "releaseDate": "June 16, 2017",
   "region": "North America",
   "description": "Large-sized, Green Cracked Ice Holofoil, Black-backed Coin featuring Decidueye released within the Decidueye-GX Premium Collection June 16, 2017"
@@ -6150,12 +6150,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Primarina released within the Primarina-GX Premium Collection June 16, 2017"
  },
  {
-  "id": "DATE_JUNE_LARGESIZED_BLUE",
+  "id": "DATE_JUNE_LARGESIZED_BLUE_20170616",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 16, 2017",
+  "release": "June 16, 2017",
   "releaseDate": "June 16, 2017",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Black Kyurem released within the Battle Arena Decks: Black Kyurem vs. White Kyurem June 16, 2017"
@@ -6166,18 +6166,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 16, 2017",
+  "release": "June 16, 2017",
   "releaseDate": "June 16, 2017",
   "region": "North America",
   "description": "Large-sized, Red Rainbow Holofoil, Black-backed Coin featuring White Kyurem released within the Battle Arena Decks: Black Kyurem vs. White Kyurem June 16, 2017"
  },
  {
-  "id": "DATE_JUNE_LARGESIZED_SILVER",
+  "id": "DATE_JUNE_LARGESIZED_SILVER_201706",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJune 2017",
+  "release": "June 2017",
   "releaseDate": "June 2017",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Genesect released within the XY Premium Checklane Blisters June 2017; later released as one of two coins within the Kanto Friends Mini"
@@ -6187,8 +6187,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_METAL_COIN.jpg",
   "name": "Metal Coin featuring Lillie on",
-  "material": "enamel",
-  "release": "date\tJune 17, 2017",
+  "material": "metal",
+  "release": "June 17, 2017",
   "releaseDate": "June 17, 2017",
   "region": "Japan",
   "description": "Metal Coin featuring Lillie on the obverse and Cosmog on the reverse, released within the Lillie & Cosmog Special Box in Japan June 16, 2017"
@@ -6210,7 +6210,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 14, 2017",
+  "release": "July 14, 2017",
   "releaseDate": "July 14, 2017",
   "region": "North America",
   "description": "Large-sized, Purple Rainbow Holofoil, Black-backed Coin featuring Espeon released within the Espeon-GX Premium Collection July 14, 2017; later released as one of several coins randomly included within"
@@ -6221,7 +6221,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_LARGESIZED_GRAY.jpg",
   "name": "Large-sized, Gray Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 14, 2017",
+  "release": "July 14, 2017",
   "releaseDate": "July 14, 2017",
   "region": "North America",
   "description": "Large-sized, Gray Rainbow Holofoil, Black-backed Coin featuring Umbreon released within the Umbreon-GX Premium Collection July 14, 2017; later released as one of several coins randomly included within"
@@ -6232,29 +6232,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Frosted Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 4, 2017",
+  "release": "August 4, 2017",
   "releaseDate": "August 4, 2017",
   "region": "North America",
   "description": "Large-sized, Orange Frosted Holofoil, Black-backed Coin featuring Lycanroc released within the Rock Steady Theme Deck August 4, 2017; later included as one of four possible coins within the Mini Colle"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_BLUE",
+  "id": "DATE_AUGUST_LARGESIZED_BLUE_20170804",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Bubbled Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 4, 2017",
+  "release": "August 4, 2017",
   "releaseDate": "August 4, 2017",
   "region": "North America",
   "description": "Large-sized, Blue Bubbled Holofoil, Black-backed Coin featuring Alolan Ninetales released within the Luminous Frost Theme Deck August 4, 2017; later released within the Team Up Three Pack Blisters Feb"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_BLUE",
+  "id": "DATE_AUGUST_LARGESIZED_BLUE_20170804_2",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 4, 2017",
+  "release": "August 4, 2017",
   "releaseDate": "August 4, 2017",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Lucario released within the Burning Shadows Blisters August 4, 2017; later released within the Cosmic Eclipse Single Pack Blisters Novem"
@@ -6265,62 +6265,62 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 24, 2017",
+  "release": "September 24, 2017",
   "releaseDate": "September 24, 2017",
   "region": "North America",
   "description": "Large-sized, Orange Mirror Holofoil, Black-backed Coin featuring Charizard released within the Charizard-GX Premium Collection September 24, 2017 at Target stores and at other retailers starting Octob"
  },
  {
-  "id": "DATE_OCTOBER_METAL_COIN",
+  "id": "DATE_OCTOBER_METAL_COIN_20171021",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Vulpix on",
-  "material": "enamel",
-  "release": "date\tOctober 21, 2017",
+  "material": "metal",
+  "release": "October 21, 2017",
   "releaseDate": "October 21, 2017",
   "region": "Japan",
   "description": "Metal Coin featuring Vulpix on the obverse and Alolan Vulpix on the reverse, released within the Vulpix's Crystal Season Special Box in Japan September 24, 2017"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20171103",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Hydreigon released within the Destruction Fang Theme Deck November 3, 2017; later released within the Unbroken Bonds Three Pack Blister"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GOLD",
+  "id": "DATE_NOVEMBER_LARGESIZED_GOLD_20171103",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Kommo-o released within the Clanging Thunder Theme Deck November 3, 2017; later released within the Cosmic Eclipse Three Pack Blisters No"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GREEN",
+  "id": "DATE_NOVEMBER_LARGESIZED_GREEN_20171103",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Green Rainbow Holofoil, Black-backed Coin featuring Shaymin released within the Crimson Invasion Three Pack Blisters November 3, 2017; later released as a possible coin within the Jirachi"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20171103_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Sheen Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Sheen Holofoil, Black-backed Coin featuring Deoxys released within the Crimson Invasion Single Pack Blisters November 3, 2017; later released as a possible coin within the first se"
@@ -6331,51 +6331,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_TEAL.jpg",
   "name": "Large-sized, Teal Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Teal Mirror Holofoil, Black-backed Coin featuring Manaphy released within the Crimson Invasion Single Pack Blisters November 3, 2017; later released as a possible coin within the first se"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20171103_3",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Zoroark released within the Shining Legends Special Collection—Zoroark-GX November 3, 2017; later released as a possible coin within t"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_RED",
+  "id": "DATE_NOVEMBER_LARGESIZED_RED_20171103",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Red Mirror Holofoil, Black-backed Coin featuring Buzzwole released within the Ultra Beasts GX Premium Collection—Buzzwole & Xurkitree November 3, 2017"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20171103_4",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 3, 2017",
+  "release": "November 3, 2017",
   "releaseDate": "November 3, 2017",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Pheromosa released within the Ultra Beasts GX Premium Collection—Pheromosa & Celesteela November 3, 2017"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_NOVEMBER_REGULARSIZED_SILVER_20171110",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Glitter Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tNovember 10, 2017",
+  "release": "November 10, 2017",
   "releaseDate": "November 10, 2017",
   "region": "Japan",
   "description": "Regular-sized, Silver Glitter Holofoil, Black-backed Coin featuring Cosmog released within the Solgaleo-GX & Lunala-GX Legendary Starter Set in Japan November 10, 2017 and in South Korea February 9, 2"
@@ -6386,7 +6386,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "name": "Large-sized, Light Blue Mirror Holofoil,",
   "material": "enamel",
-  "release": "date\tNovember 17, 2017",
+  "release": "November 17, 2017",
   "releaseDate": "November 17, 2017",
   "region": "North America",
   "description": "Large-sized, Light Blue Mirror Holofoil, Black-backed Coin featuring Mew released within the Shining Legends Collector Chest November 17, 2017"
@@ -6396,30 +6396,30 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Pikachu's face",
-  "material": "enamel",
-  "release": "date\tNovember 17, 2017",
+  "material": "metal",
+  "release": "November 17, 2017",
   "releaseDate": "November 17, 2017",
   "region": "North America",
   "description": "Metal Coin featuring Pikachu's face on the obverse and its tail on the reverse, released within the Premium Trainer's XY Collection November 17, 2017"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_NOVEMBER_REGULARSIZED_GOLD_20171126",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 26, 2017",
+  "release": "November 26, 2017",
   "releaseDate": "November 26, 2017",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring a VS design that could be redeemed for 1 Play Point by participating in side events held at the 1st Certified Champion's League 2018 To"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_DECEMBER_REGULARSIZED_SILVER_20171208",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tDecember 8, 2017",
+  "release": "December 8, 2017",
   "releaseDate": "December 8, 2017",
   "region": "Japan",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring an octagonal Poké Ball design released within the Ultra Sun & Ultra Moon Premium Trainer Box December 8, 2017"
@@ -6430,7 +6430,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_LARGESIZED_YELLOW.jpg",
   "name": "Large-sized, Yellow Pixel Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 5, 2018",
+  "release": "January 5, 2018",
   "releaseDate": "January 5, 2018",
   "region": "North America",
   "description": "Large-sized, Yellow Pixel Holofoil, Black-backed Coin featuring Raichu released within the Shining Legends Special Collection—Raichu-GX January 5, 2018"
@@ -6441,7 +6441,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_YELLOW.jpg",
   "name": "Large-sized, Yellow Gold Mirror Holofoil,",
   "material": "gold",
-  "release": "date\tFebruary 2, 2018",
+  "release": "February 2, 2018",
   "releaseDate": "February 2, 2018",
   "region": "North America",
   "description": "Large-sized, Yellow Gold Mirror Holofoil, Black-backed Coin featuring Garchomp released within the Mach Strike Theme Deck February 2, 2018"
@@ -6474,18 +6474,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_PINK.jpg",
   "name": "Large-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tFebruary 2, 2018",
+  "release": "February 2, 2018",
   "releaseDate": "February 2, 2018",
   "region": "North America",
   "description": "Large-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Palkia released within the Ultra Prism Single Pack Blisters February 2, 2018; later released within 2020 shipments of the Kanto Frie"
  },
  {
-  "id": "DATE_FEBRUARY_METAL_COIN",
+  "id": "DATE_FEBRUARY_METAL_COIN_20180210",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_METAL_COIN.jpg",
   "name": "Metal Coin featuring Mimikyu in",
-  "material": "enamel",
-  "release": "date\tFebruary 10, 2018",
+  "material": "metal",
+  "release": "February 10, 2018",
   "releaseDate": "February 10, 2018",
   "region": "Japan",
   "description": "Metal Coin featuring Mimikyu in its Disguised Form on the obverse and its Busted Form on the reverse, released within the It's Mimikyu Special Box February 10, 2018"
@@ -6496,7 +6496,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMarch 23, 2018",
+  "release": "March 23, 2018",
   "releaseDate": "March 23, 2018",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Lycanroc released within the Spring 2018 Collector Chest March 23, 2018"
@@ -6529,7 +6529,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_LIGHT.jpg",
   "name": "Large-sized, Light Gold Mirror Holofoil,",
   "material": "gold",
-  "release": "date\tMay 4, 2018",
+  "release": "May 4, 2018",
   "releaseDate": "May 4, 2018",
   "region": "North America",
   "description": "Large-sized, Light Gold Mirror Holofoil, Black-backed Coin featuring Lycanroc released within the Twilight Rogue Theme Deck May 4, 2018; later released as one of several coins randomly included within"
@@ -6540,51 +6540,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 4, 2018",
+  "release": "May 4, 2018",
   "releaseDate": "May 4, 2018",
   "region": "North America",
   "description": "Large-sized, Blue Mirror Holofoil, Black-backed Coin featuring Xerneas released within the Forbidden Light Three Pack Blisters May 4, 2018; subsequently released within late 2020 shipments of the Kant"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_RED",
+  "id": "DATE_MAY_LARGESIZED_RED_20180504",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 4, 2018",
+  "release": "May 4, 2018",
   "releaseDate": "May 4, 2018",
   "region": "North America",
   "description": "Large-sized, Red Mirror Holofoil, Black-backed Coin featuring Yveltal released within the Forbidden Light Single Pack Blisters May 4, 2018"
  },
  {
-  "id": "DATE_JUNE_LARGESIZED_SILVER",
+  "id": "DATE_JUNE_LARGESIZED_SILVER_20180601",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJune 1, 2018",
+  "release": "June 1, 2018",
   "releaseDate": "June 1, 2018",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Rotom Pokédex released within the Sun & Moon Trainer Kit: Alolan Sandslash & Alolan Ninetales June 1, 2018"
  },
  {
-  "id": "DATE_JULY_LARGESIZED_GOLD",
+  "id": "DATE_JULY_LARGESIZED_GOLD_20180706",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 6, 2018",
+  "release": "July 6, 2018",
   "releaseDate": "July 6, 2018",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Landorus released within the Forces of Nature GX Premium Collection July 6, 2018"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_BLUE",
+  "id": "DATE_JULY_REGULARSIZED_BLUE_20180713",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 13, 2018",
+  "release": "July 13, 2018",
   "releaseDate": "July 13, 2018",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Metagross released as part of the TSUTAYA Pokémon Card Step Up Campaign in Japan starting July 13, 2018"
@@ -6595,7 +6595,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_INDIGO.jpg",
   "name": "Regular-sized, Indigo Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 13, 2018",
+  "release": "July 13, 2018",
   "releaseDate": "July 13, 2018",
   "region": "Japan",
   "description": "Regular-sized, Indigo Mirror Holofoil, Black-backed Coin featuring Energy symbols awarded to those who purchased one of the nine GX Starter Decks at participating stores as part of the Pokémon Card Fr"
@@ -6606,18 +6606,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 3, 2018",
+  "release": "August 3, 2018",
   "releaseDate": "August 3, 2018",
   "region": "North America",
   "description": "Large-sized, Green Rainbow Holofoil, Black-backed Coin featuring Sceptile released within the Leaf Charge Theme Deck August 3, 2018; later released as one of several coins randomly included within the"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_BLUE",
+  "id": "DATE_AUGUST_LARGESIZED_BLUE_20180803",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 3, 2018",
+  "release": "August 3, 2018",
   "releaseDate": "August 3, 2018",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Swampert released within the Hydro Fury Theme Deck August 3, 2018; released again as one of five posible coins within the Galar Pals Min"
@@ -6628,18 +6628,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 3, 2018",
+  "release": "August 3, 2018",
   "releaseDate": "August 3, 2018",
   "region": "North America",
   "description": "Large-sized, Red Mirror Holofoil, Black-backed Coin featuring Groudon released within the Celestial Storm Single Pack Blisters August 3, 2018"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_BLUE",
+  "id": "DATE_AUGUST_LARGESIZED_BLUE_20180803_2",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 3, 2018",
+  "release": "August 3, 2018",
   "releaseDate": "August 3, 2018",
   "region": "North America",
   "description": "Large-sized, Blue Mirror Holofoil, Black-backed Coin featuring Kyogre released within the Celestial Storm Three Pack Blisters August 3, 2018"
@@ -6649,7 +6649,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/CELESTIAL_STORM_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/CELESTIAL_STORM_METAL_COIN.jpg",
   "name": "Metal Coin featuring Pikachu available",
-  "material": "enamel",
+  "material": "metal",
   "release": "Celestial Storm Three Pack Blisters",
   "releaseDate": "August 24, 2018",
   "region": "North America",
@@ -6667,12 +6667,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Gray Rainbow Holofoil, Black-backed Coin featuring Mega Charizard X released within the Battle Arena Deck—Mega Charizard X September 7, 2018"
  },
  {
-  "id": "DATE_SEPTEMBER_LARGESIZED_BLUE",
+  "id": "DATE_SEPTEMBER_LARGESIZED_BLUE_20180907",
   "url": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 7, 2018",
+  "release": "September 7, 2018",
   "releaseDate": "September 7, 2018",
   "region": "North America",
   "description": "Large-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Mega Blastoise released within the Battle Arena Deck—Mega Blastoise September 7, 2018"
@@ -6683,7 +6683,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 2018",
+  "release": "September 2018",
   "releaseDate": "September 2018",
   "region": "Japan",
   "description": "Regular-sized, Red Rainbow Holofoil, Black-backed Coin featuring Lucario available as a Championship Point redemption prize in Japan following the culmination of the 2017-2018 season"
@@ -6694,7 +6694,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tSeptember 2018",
+  "release": "September 2018",
   "releaseDate": "September 2018",
   "region": "Japan",
   "description": "Regular-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Manaphy available as a Championship Point redemption prize in Japan following the culmination of the 2017-2018 season"
@@ -6705,84 +6705,84 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_PALE.jpg",
   "name": "Large-sized, Pale Blue Rainbow Holofoil,",
   "material": "enamel",
-  "release": "date\tOctober 26, 2018",
+  "release": "October 26, 2018",
   "releaseDate": "October 26, 2018",
   "region": "North America",
   "description": "Large-sized, Pale Blue Rainbow Holofoil, Black-backed Coin featuring Kyurem released within the Dragon Majesty Legends of Unova GX Premium Collection October 26, 2018"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_BRONZE",
+  "id": "DATE_NOVEMBER_REGULARSIZED_BRONZE_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BRONZE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BRONZE.jpg",
   "name": "Regular-sized, Bronze Gold Rainbow Holofoil,",
   "material": "gold",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "Japan",
   "description": "Regular-sized, Bronze Gold Rainbow Holofoil, ® Trademark Black-backed Coin featuring Pikachu awarded as one of two coins available to those who participated in the GX Ultra Shiny Battle events from No"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Sheen Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "Japan",
   "description": "Regular-sized, Blue Sheen Holofoil, Black-backed Coin featuring Zekrom awarded as one of two coins available to those who participated in the GX Ultra Shiny Battle events from November 2, 2018 to Dece"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_RED",
+  "id": "DATE_NOVEMBER_LARGESIZED_RED_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "North America",
   "description": "Large-sized, Red Mirror Holofoil, Black-backed Coin featuring Entei released within the Blazing Volcano Theme Deck November 2, 2018; subsequently released within late 2020 shipments of the Kanto Power"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_LIGHT",
+  "id": "DATE_NOVEMBER_LARGESIZED_LIGHT_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "name": "Large-sized, Light Gold Mirror Holofoil,",
   "material": "gold",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "North America",
   "description": "Large-sized, Light Gold Mirror Holofoil, Black-backed Coin featuring Raikou released within the Storm Caller Theme Deck November 2, 2018; later released as one of four posible coins within the Galar P"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_SILVER",
+  "id": "DATE_NOVEMBER_LARGESIZED_SILVER_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "North America",
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Lugia released within the Lost Thunder Single Pack Blisters November 2, 2018; later released as a possible coin within the Vivid V"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GOLD",
+  "id": "DATE_NOVEMBER_LARGESIZED_GOLD_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Ho-Oh released within the Lost Thunder Three Pack Blisters November 2, 2018"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_PINK",
+  "id": "DATE_NOVEMBER_LARGESIZED_PINK_20181102",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_PINK.jpg",
   "name": "Large-sized, Pink Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 2, 2018",
+  "release": "November 2, 2018",
   "releaseDate": "November 2, 2018",
   "region": "North America",
   "description": "Large-sized, Pink Mirror Holofoil, Black-backed Coin featuring Tapu Lele released within the Island Guardians GX Premium Collection November 2, 2018; later released as a possible coin within the fourt"
@@ -6793,18 +6793,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 6, 2018",
+  "release": "November 6, 2018",
   "releaseDate": "November 6, 2018",
   "region": "North America",
   "description": "Large-sized, Purple Rainbow Holofoil, Black-backed Coin featuring Tapu Fini released within the Island Guardians GX Premium Pin Collection November 6, 2018"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GOLD",
+  "id": "DATE_NOVEMBER_LARGESIZED_GOLD_20181116",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 16, 2018",
+  "release": "November 16, 2018",
   "releaseDate": "November 16, 2018",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Eevee released within the Fall 2018 Collector Chest November 16, 2018"
@@ -6821,12 +6821,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Salamence released within the Dragon Majesty Special Collection—Salamence-GX November 16, 2018"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GOLD",
+  "id": "DATE_NOVEMBER_LARGESIZED_GOLD_20181116_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tNovember 16, 2018",
+  "release": "November 16, 2018",
   "releaseDate": "November 16, 2018",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring White Kyurem released within the Dragon Majesty Special Collection—White Kyurem-GX November 16, 2018"
@@ -6837,7 +6837,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tNovember 16, 2018",
+  "release": "November 16, 2018",
   "releaseDate": "November 16, 2018",
   "region": "North America",
   "description": "Large-sized, Orange Cracked Ice Holofoil, Black-backed Coin featuring Solgaleo released as a possible coin within the second series of Poké Ball Tins November 16, 2018"
@@ -6848,18 +6848,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 23, 2018",
+  "release": "November 23, 2018",
   "releaseDate": "November 23, 2018",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring Eevee released within the Flareon-GX Starter Set Fire in Japan November 23, 2018 and in South Korea November 29, 2018"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE_20181123",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 23, 2018",
+  "release": "November 23, 2018",
   "releaseDate": "November 23, 2018",
   "region": "Japan",
   "description": "Regular-sized, Blue Speckle Holofoil, Black-backed Coin featuring Eevee released within the Vaporeon-GX Starter Set Water in Japan November 23, 2018 and in South Korea November 29, 2018"
@@ -6870,18 +6870,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_YELLOW.jpg",
   "name": "Regular-sized, Yellow Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 23, 2018",
+  "release": "November 23, 2018",
   "releaseDate": "November 23, 2018",
   "region": "Japan",
   "description": "Regular-sized, Yellow Speckle Holofoil, Black-backed Coin featuring Eevee released within the Jolteon-GX Starter Set Lightning in Japan November 23, 2018 and in South Korea November 29, 2018"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_DECEMBER_REGULARSIZED_GOLD_20181207",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tDecember 7, 2018",
+  "release": "December 7, 2018",
   "releaseDate": "December 7, 2018",
   "region": "Japan",
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring an octagonal Poké Ball design released within the TAG TEAM GX Premium Trainer Box December 7, 2018"
@@ -6892,18 +6892,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_BROWN.jpg",
   "name": "Regular-sized, Brown Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 25, 2019",
+  "release": "January 25, 2019",
   "releaseDate": "January 25, 2019",
   "region": "Japan",
   "description": "Regular-sized, Brown Mirror Holofoil, Black-backed Coin featuring Brock released within the Japanese Brock of Pewter City Gym Trainer Battle Deck January 25, 2019; later released within the Korean Oni"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_BLUE",
+  "id": "DATE_JANUARY_REGULARSIZED_BLUE_20190125",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 25, 2019",
+  "release": "January 25, 2019",
   "releaseDate": "January 25, 2019",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Misty released within the Japanese Misty of Cerulean City Gym Trainer Battle Deck January 25, 2019; later released within the Korean St"
@@ -6914,40 +6914,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tFebruary 1, 2019",
+  "release": "February 1, 2019",
   "releaseDate": "February 1, 2019",
   "region": "North America",
   "description": "Large-sized, Orange Cracked Ice Holofoil, Black-backed Coin featuring Charizard released within the Relentless Flame Theme Deck February 1, 2019; subsequently released as a possible coin in Trade and "
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_BLUE",
+  "id": "DATE_FEBRUARY_LARGESIZED_BLUE_20190201",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tFebruary 1, 2019",
+  "release": "February 1, 2019",
   "releaseDate": "February 1, 2019",
   "region": "North America",
   "description": "Large-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Blastoise released within the Torrential Cannon Theme Deck February 1, 2019; subsequently released within late 2020 shipments of the"
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_RED",
+  "id": "DATE_FEBRUARY_LARGESIZED_RED_20190201",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tFebruary 1, 2019",
+  "release": "February 1, 2019",
   "releaseDate": "February 1, 2019",
   "region": "North America",
   "description": "Large-sized, Red Cracked Ice Holofoil, Black-backed Coin featuring Litten released within the Team Up Single Pack Blisters February 1, 2019 and later Team Up Stage 1 Blisters; subsequently released as"
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_GREEN",
+  "id": "DATE_FEBRUARY_LARGESIZED_GREEN_20190223",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tFebruary 23, 2019",
+  "release": "February 23, 2019",
   "releaseDate": "February 23, 2019",
   "region": "North America",
   "description": "Large-sized, Green Cracked Ice Holofoil, Black-backed Coin featuring Rowlet released as a possible coin in Trade & Play Day Kits from February 23, 2019; later released within the Unified Minds Three P"
@@ -6958,7 +6958,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 23, 2019",
+  "release": "February 23, 2019",
   "releaseDate": "February 23, 2019",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Garchomp released as a possible coin in Trade & Play Day Kits from February 23, 2019; later released within Sword & Shield Three Pack Bli"
@@ -6969,73 +6969,73 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_EXTRALARGESIZED_CARDBOARD.jpg",
   "name": "Extra-large-sized, cardboard Coin featuring Pikachu",
   "material": "cardboard",
-  "release": "date\tMarch 15, 2019",
+  "release": "March 15, 2019",
   "releaseDate": "March 15, 2019",
   "region": "Japan",
   "description": "Extra-large-sized, cardboard Coin featuring Pikachu released within the Sun & Moon Family Pokémon Card Game set in Japan March 15, 2019 and in South Korea May 3, 2019"
  },
  {
-  "id": "DATE_MARCH_LARGESIZED_SILVER",
+  "id": "DATE_MARCH_LARGESIZED_SILVER_20190329",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMarch 29, 2019",
+  "release": "March 29, 2019",
   "releaseDate": "March 29, 2019",
   "region": "Europe",
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Detective Pikachu's hat released within the Detective Pikachu Collector Chest March 29, 2019 (Europe) or April 6, 2019 (North America), "
  },
  {
-  "id": "DATE_APRIL_METAL_COIN",
+  "id": "DATE_APRIL_METAL_COIN_20190406",
   "url": "src/assets/coins/bulbapedia/DATE_APRIL_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_METAL_COIN.jpg",
   "name": "Metal Coin featuring Detective Pikachu's",
-  "material": "enamel",
-  "release": "date\tApril 6, 2019",
+  "material": "metal",
+  "release": "April 6, 2019",
   "releaseDate": "April 6, 2019",
   "region": "North America",
   "description": "Metal Coin featuring Detective Pikachu's hat on the obverse and a Pikachu tail-themed magnifying glass on the reverse, released within the Detective Pikachu Charizard-GX Special Case File April 6, 201"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_PURPLE",
+  "id": "DATE_MAY_LARGESIZED_PURPLE_20190503",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_PURPLE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 3, 2019",
+  "release": "May 3, 2019",
   "releaseDate": "May 3, 2019",
   "region": "North America",
   "description": "Large-sized, Purple Mirror Holofoil, Black-backed Coin featuring Mewtwo released within the Battle Mind Theme Deck May 3, 2019; later released as one of several coins randomly included within the Rebe"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_LIGHT",
+  "id": "DATE_MAY_LARGESIZED_LIGHT_20190503",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_LIGHT.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_LIGHT.jpg",
   "name": "Large-sized, Light Gold Mirror Holofoil,",
   "material": "gold",
-  "release": "date\tMay 3, 2019",
+  "release": "May 3, 2019",
   "releaseDate": "May 3, 2019",
   "region": "North America",
   "description": "Large-sized, Light Gold Mirror Holofoil, Black-backed Coin featuring Zeraora released within the Lightning Loop Theme Deck May 3, 2019; later released as one of several coins randomly included within "
  },
  {
-  "id": "DATE_MAY_LARGESIZED_BLUE",
+  "id": "DATE_MAY_LARGESIZED_BLUE_20190503",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tMay 3, 2019",
+  "release": "May 3, 2019",
   "releaseDate": "May 3, 2019",
   "region": "North America",
   "description": "Large-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Popplio released within the Unbroken Bonds Single Pack Blisters May 3, 2019 and later Unbroken Bonds Stage 1 Blisters; released agai"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20190503",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Pixel Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 3, 2019",
+  "release": "May 3, 2019",
   "releaseDate": "May 3, 2019",
   "region": "North America",
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Pikachu released within the Let's Play, Pikachu! Theme Deck May 3, 2019"
@@ -7052,7 +7052,7 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Pixel Holofoil, Black-backed Coin featuring Eevee released within the Let's Play, Eevee! Theme Deck May 3, 2019"
  },
  {
-  "id": "LETS_PLAY_LARGESIZED_SILVER",
+  "id": "LETS_PLAY_LARGESIZED_SILVER_20190503",
   "url": "src/assets/coins/bulbapedia/LETS_PLAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/LETS_PLAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
@@ -7074,67 +7074,67 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Psychedelic Holofoil, ® Trademark Black-backed Coin featuring Espeon and Deoxys released within the Espeon & Deoxys-GX TAG TEAM GX Starter Set in Japan May 31, 2019"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20190531",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 31, 2019",
+  "release": "May 31, 2019",
   "releaseDate": "May 31, 2019",
   "region": "Japan",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, ® Trademark Black-backed Coin featuring Umbreon and Darkrai released within the Umbreon & Darkrai-GX TAG TEAM GX Starter Set in Japan May 31, 2019"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20190713",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, ™",
   "material": "gold",
-  "release": "date\tJuly 13, 2019",
+  "release": "July 13, 2019",
   "releaseDate": "July 13, 2019",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, ™ Trademark Black-backed Coin featuring Energy symbols awarded to participants of the Pokémon Card Game Battle Event held nationwide in Japan starting July 13 to Augu"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_SILVER",
+  "id": "DATE_JULY_REGULARSIZED_SILVER_20190718",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Psychedelic Holofoil, ™",
   "material": "silver",
-  "release": "date\tJuly 18, 2019",
+  "release": "July 18, 2019",
   "releaseDate": "July 18, 2019",
   "region": "South Korea",
   "description": "Regular-sized, Silver Psychedelic Holofoil, ™ Trademark Black-backed Coin featuring Espeon and Deoxys released within the Korean Espeon & Deoxys-GX TAG TEAM GX Starter Set in South Korea July 18, 2019"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_SILVER",
+  "id": "DATE_JULY_REGULARSIZED_SILVER_20190718_2",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJuly 18, 2019",
+  "release": "July 18, 2019",
   "releaseDate": "July 18, 2019",
   "region": "South Korea",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, ™ Trademark Black-backed Coin featuring Umbreon and Darkrai released within the Korean Umbreon & Darkrai-GX TAG TEAM GX Starter Set in South Korea July 18, "
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_BLUE",
+  "id": "DATE_AUGUST_REGULARSIZED_BLUE_20190802",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tAugust 2, 2019",
+  "release": "August 2, 2019",
   "releaseDate": "August 2, 2019",
   "region": "Japan",
   "description": "Regular-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Cosmog released in special Dream League box sets sold through Amazon starting August 2, 2019"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_SILVER",
+  "id": "DATE_AUGUST_REGULARSIZED_SILVER_20190802",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 2, 2019",
+  "release": "August 2, 2019",
   "releaseDate": "August 2, 2019",
   "region": "Japan",
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Reshiram given to customers who purchased ¥2000 worth of Pokémon Trading Card Game merchandise as part of the Yamada Denki Pokémon C"
@@ -7145,18 +7145,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GRAY.jpg",
   "name": "Large-sized, Gray Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 2, 2019",
+  "release": "August 2, 2019",
   "releaseDate": "August 2, 2019",
   "region": "North America",
   "description": "Large-sized, Gray Rainbow Holofoil, Black-backed Coin featuring Necrozma released within the Laser Focus Theme Deck August 2, 2019"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_GOLD",
+  "id": "DATE_AUGUST_LARGESIZED_GOLD_20190802",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 2, 2019",
+  "release": "August 2, 2019",
   "releaseDate": "August 2, 2019",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Dragonite released within the Soaring Storm Theme Deck August 2, 2019"
@@ -7178,7 +7178,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 8, 2019",
+  "release": "August 8, 2019",
   "releaseDate": "August 8, 2019",
   "region": "Indonesia",
   "description": "Regular-sized, Green Confetti Holofoil, Black-backed Coin featuring Bulbasaur awarded to those who attended the First Impact Grand Launch Event was held in Jakarta, Indonesia from August 8 to August 1"
@@ -7189,62 +7189,62 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 8, 2019",
+  "release": "August 8, 2019",
   "releaseDate": "August 8, 2019",
   "region": "Indonesia",
   "description": "Regular-sized, Red Confetti Holofoil, Black-backed Coin featuring Charmander awarded to those who attended the First Impact Grand Launch Event was held in Jakarta, Indonesia from August 8 to August 11"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_BLUE",
+  "id": "DATE_AUGUST_REGULARSIZED_BLUE_20190808",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 8, 2019",
+  "release": "August 8, 2019",
   "releaseDate": "August 8, 2019",
   "region": "Indonesia",
   "description": "Regular-sized, Blue Confetti Holofoil, Black-backed Coin featuring Squirtle awarded to those who attended the First Impact Grand Launch Event was held in Jakarta, Indonesia from August 8 to August 11,"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_GOLD",
+  "id": "DATE_AUGUST_REGULARSIZED_GOLD_20190808",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Confetti Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 8, 2019",
+  "release": "August 8, 2019",
   "releaseDate": "August 8, 2019",
   "region": "Indonesia",
   "description": "Regular-sized, Gold Confetti Holofoil, Black-backed Coin featuring Pikachu awarded to those who attended the First Impact Grand Launch Event was held in Jakarta, Indonesia from August 8 to August 11, "
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_PINK",
+  "id": "DATE_AUGUST_REGULARSIZED_PINK_20190808",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 8, 2019",
+  "release": "August 8, 2019",
   "releaseDate": "August 8, 2019",
   "region": "Indonesia",
   "description": "Regular-sized, Pink Confetti Holofoil, Black-backed Coin featuring Mew awarded to those who attended the First Impact Grand Launch Event was held in Jakarta, Indonesia from August 8 to August 11, 2019"
  },
  {
-  "id": "DATE_AUGUST_REGULARSIZED_SILVER",
+  "id": "DATE_AUGUST_REGULARSIZED_SILVER_20190816",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 16, 2019",
+  "release": "August 16, 2019",
   "releaseDate": "August 16, 2019",
   "region": "Japan",
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring a Poké Ball design released within the Limited Collection Master Battle Set August 16, 2019"
  },
  {
-  "id": "DATE_AUGUST_METAL_COIN",
+  "id": "DATE_AUGUST_METAL_COIN_20190816",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "name": "Metal Coin featuring Pikachu available",
-  "material": "enamel",
-  "release": "date\tAugust 16, 2019",
+  "material": "metal",
+  "release": "August 16, 2019",
   "releaseDate": "August 16, 2019",
   "region": "North America",
   "description": "Metal Coin featuring Pikachu available for purchase at the 2019 World Championships starting August 16, 2019"
@@ -7266,40 +7266,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tOctober 4, 2019",
+  "release": "October 4, 2019",
   "releaseDate": "October 4, 2019",
   "region": "North America",
   "description": "Large-sized, Green Cracked Ice Holofoil, Black-backed Coin featuring Rayquaza released within the Battle Arena Deck—Rayquaza-GX October 4, 2019"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_GOLD",
+  "id": "DATE_OCTOBER_LARGESIZED_GOLD_20191004",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tOctober 4, 2019",
+  "release": "October 4, 2019",
   "releaseDate": "October 4, 2019",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Ultra Necrozma released within the Battle Arena Deck—Ultra Necrozma-GX October 4, 2019"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_RED",
+  "id": "DATE_NOVEMBER_LARGESIZED_RED_20191101",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_RED.jpg",
   "name": "Large-sized, Red Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tNovember 1, 2019",
+  "release": "November 1, 2019",
   "releaseDate": "November 1, 2019",
   "region": "North America",
   "description": "Large-sized, Red Cracked Ice Holofoil, Black-backed Coin featuring Groudon released within the Towering Heights Theme Deck November 1, 2019; later released within 2021 shipments of the Kanto Power Min"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_LIGHT",
+  "id": "DATE_NOVEMBER_LARGESIZED_LIGHT_20191101",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "name": "Large-sized, Light Blue Cracked Ice",
   "material": "enamel",
-  "release": "date\tNovember 1, 2019",
+  "release": "November 1, 2019",
   "releaseDate": "November 1, 2019",
   "region": "North America",
   "description": "Large-sized, Light Blue Cracked Ice Holofoil, Black-backed Coin featuring Kyogre released within the Unseen Depths Theme Deck November 1, 2019"
@@ -7316,12 +7316,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Pink Rainbow Holofoil, Black-backed Coin featuring Mew released within the Fall 2019 Collector Chest November 22, 2019; later released as a possible coin within the sixth series of Poké B"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_ORANGE",
+  "id": "DATE_NOVEMBER_LARGESIZED_ORANGE_20191122",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_ORANGE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tNovember 22, 2019",
+  "release": "November 22, 2019",
   "releaseDate": "November 22, 2019",
   "region": "North America",
   "description": "Large-sized, Orange Cracked Ice Holofoil, Black-backed Coin featuring Charizard and Braixen released within the Tag Team Generations Premium Collection November 22, 2019"
@@ -7332,13 +7332,13 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Starlight Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tDecember 6, 2019",
+  "release": "December 6, 2019",
   "releaseDate": "December 6, 2019",
   "region": "North America",
   "description": "Large-sized, Silver Starlight Holofoil, Black-backed Coin featuring Pikachu released within the Let's Play Pokémon Box December 6, 2019"
  },
  {
-  "id": "LETS_PLAY_LARGESIZED_SILVER",
+  "id": "LETS_PLAY_LARGESIZED_SILVER_20191206",
   "url": "src/assets/coins/bulbapedia/LETS_PLAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/LETS_PLAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Starlight Holofoil, Black-backed",
@@ -7349,7 +7349,7 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Starlight Holofoil, Black-backed Coin featuring Eevee released within the Let's Play Pokémon Box December 6, 2019"
  },
  {
-  "id": "LETS_PLAY_REGULARSIZED_SILVER",
+  "id": "LETS_PLAY_REGULARSIZED_SILVER_20191129",
   "url": "src/assets/coins/bulbapedia/LETS_PLAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/LETS_PLAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
@@ -7371,7 +7371,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Smoke Holofoil, Black-backed Coin featuring Scorbunny released within the V Starter Set Fire November 29, 2019"
  },
  {
-  "id": "V_STARTER_REGULARSIZED_SILVER",
+  "id": "V_STARTER_REGULARSIZED_SILVER_20191129",
   "url": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Glitter Holofoil, Black-backed",
@@ -7382,7 +7382,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Glitter Holofoil, Black-backed Coin featuring Sobble released within the V Starter Set Water November 29, 2019"
  },
  {
-  "id": "V_STARTER_REGULARSIZED_SILVER",
+  "id": "V_STARTER_REGULARSIZED_SILVER_20191129_2",
   "url": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Lightning Holofoil, Black-backed",
@@ -7393,7 +7393,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Lightning Holofoil, Black-backed Coin featuring Morpeko released within the V Starter Set Lightning November 29, 2019"
  },
  {
-  "id": "V_STARTER_REGULARSIZED_SILVER",
+  "id": "V_STARTER_REGULARSIZED_SILVER_20191129_3",
   "url": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Pixel Holofoil, Black-backed",
@@ -7404,7 +7404,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Pixel Holofoil, Black-backed Coin featuring Stonjourner released within the V Starter Set Fighting November 29, 2019"
  },
  {
-  "id": "V_STARTER_REGULARSIZED_SILVER",
+  "id": "V_STARTER_REGULARSIZED_SILVER_20191206",
   "url": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/V_STARTER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
@@ -7415,12 +7415,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring the Pokémon V symbol released within the Sword & Shield Premium Trainer Box December 6, 2019"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_YELLOW",
+  "id": "DATE_JANUARY_REGULARSIZED_YELLOW_20200104",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_YELLOW.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_YELLOW.jpg",
   "name": "Regular-sized, Yellow Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 4, 2020",
+  "release": "January 4, 2020",
   "releaseDate": "January 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Yellow Speckle Holofoil, Black-backed Coin featuring Victini given away with the purchase of at least ¥1,500 worth of eligible TCG products at participating Yamada Denki stores from Jan"
@@ -7431,18 +7431,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 7, 2020",
+  "release": "February 7, 2020",
   "releaseDate": "February 7, 2020",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Grookey, Scorbunny, and Sobble included in copies of Sword & Shield Coin Albums given away with the purchase of at least 2 VMAX Rising "
  },
  {
-  "id": "DATE_FEBRUARY_LARGESIZED_GREEN",
+  "id": "DATE_FEBRUARY_LARGESIZED_GREEN_20200207",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 7, 2020",
+  "release": "February 7, 2020",
   "releaseDate": "February 7, 2020",
   "region": "North America",
   "description": "Large-sized, Green Mirror Holofoil, Black-backed Coin featuring Grookey released within the Rillaboom Theme Deck February 7, 2020"
@@ -7481,12 +7481,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Glitter Holofoil, Black-backed Coin featuring Gigantamax Charizard released within the Charizard VMAX Starter Set March 27, 2020; later available in a second version of the set i"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_SILVER",
+  "id": "DATE_MARCH_REGULARSIZED_SILVER_20200327",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Glitter Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMarch 27, 2020",
+  "release": "March 27, 2020",
   "releaseDate": "March 27, 2020",
   "region": "Japan",
   "description": "Regular-sized, Silver Glitter Holofoil, Black-backed Coin featuring Gigantamax Grimmsnarl released within the Grimmsnarl VMAX Starter Set March 27, 2020"
@@ -7536,12 +7536,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Zacian released within the Zacian Theme Deck May 1, 2020"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_GOLD",
+  "id": "DATE_MAY_LARGESIZED_GOLD_20200501",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMay 1, 2020",
+  "release": "May 1, 2020",
   "releaseDate": "May 1, 2020",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Zamazenta released within the Zamazenta Theme Deck May 1, 2020"
@@ -7558,12 +7558,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Orange Mirror Holofoil, Black-backed Coin featuring Therian Forme Landorus released within the French Rebel Clash Three Pack Blisters May 1, 2020"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_GOLD",
+  "id": "DATE_MAY_LARGESIZED_GOLD_20200501_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tMay 1, 2020",
+  "release": "May 1, 2020",
   "releaseDate": "May 1, 2020",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Raichu released within the Rebel Clash Three Pack Blisters May 1, 2020; later released as a possible coin within the fifth series of"
@@ -7574,7 +7574,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJune 21, 2020",
+  "release": "June 21, 2020",
   "releaseDate": "June 21, 2020",
   "region": "North America",
   "description": "Jumbo-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Pikachu, Charizard, and Mewtwo released within the Battle Academy 2020 June 21, 2020"
@@ -7596,18 +7596,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_LARGESIZED_ORANGE.jpg",
   "name": "Large-sized, Orange Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 3, 2020",
+  "release": "July 3, 2020",
   "releaseDate": "July 3, 2020",
   "region": "North America",
   "description": "Large-sized, Orange Rainbow Holofoil, Black-backed Coin featuring Volcanion released as a possible coin within the fifth series of Poké Ball Tins July 3, 2020; later released as a possible coin within"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_PINK",
+  "id": "DATE_JULY_REGULARSIZED_PINK_20200710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Pink Mirror Holofoil, Black-backed Coin featuring Marnie released within the Legendary Heartbeat Pokémon Card Gym Set July 10, 2020"
@@ -7629,51 +7629,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Red Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction at"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_BLUE",
+  "id": "DATE_JULY_REGULARSIZED_BLUE_20200710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Blue Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction a"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_YELLOW",
+  "id": "DATE_JULY_REGULARSIZED_YELLOW_20200710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_YELLOW.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_YELLOW.jpg",
   "name": "Regular-sized, Yellow Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Yellow Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_PURPLE",
+  "id": "DATE_JULY_REGULARSIZED_PURPLE_20200710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PURPLE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_PURPLE.jpg",
   "name": "Regular-sized, Purple Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Purple Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_BROWN",
+  "id": "DATE_JULY_REGULARSIZED_BROWN_20200710",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BROWN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_BROWN.jpg",
   "name": "Regular-sized, Brown Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Brown Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction "
@@ -7684,7 +7684,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_DARK.jpg",
   "name": "Regular-sized, Dark Gray Non Holofoil,",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Dark Gray Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transact"
@@ -7695,7 +7695,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GRAY.jpg",
   "name": "Regular-sized, Gray Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, Gray Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction a"
@@ -7706,29 +7706,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_WHITE.jpg",
   "name": "Regular-sized, White Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 10, 2020",
+  "release": "July 10, 2020",
   "releaseDate": "July 10, 2020",
   "region": "Japan",
   "description": "Regular-sized, White Non Holofoil, Black-backed Coin featuring Eevee; one of nine randomly included in playmat and coin sets given away with the purchase of any two V Starter Decks in one transaction "
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_RED",
+  "id": "DATE_JULY_REGULARSIZED_RED_20200714",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 14, 2020",
+  "release": "July 14, 2020",
   "releaseDate": "July 14, 2020",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring Pikachu included in special Pokémon Lotte Candy Assortment bags July 14, 2020"
  },
  {
-  "id": "DATE_AUGUST_LARGESIZED_BLUE",
+  "id": "DATE_AUGUST_LARGESIZED_BLUE_20200814",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 14, 2020",
+  "release": "August 14, 2020",
   "releaseDate": "August 14, 2020",
   "region": "North America",
   "description": "Large-sized, Blue Mirror Holofoil, Black-backed Coin featuring Galarian Darmanitan included in the Galarian Darmanitan Theme Deck August 14, 2020"
@@ -7750,7 +7750,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_EMERALD.jpg",
   "name": "Large-sized, Emerald Green Rainbow Holofoil,",
   "material": "enamel",
-  "release": "date\tAugust 14, 2020",
+  "release": "August 14, 2020",
   "releaseDate": "August 14, 2020",
   "region": "North America",
   "description": "Large-sized, Emerald Green Rainbow Holofoil, Black-backed Coin featuring Shaymin released within the Darkness Ablaze Single Pack and Premium Checklane Blisters August 14, 2020 and subsequent Darkness "
@@ -7761,7 +7761,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_LARGESIZED_TEAL.jpg",
   "name": "Large-sized, Teal Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 14, 2020",
+  "release": "August 14, 2020",
   "releaseDate": "August 14, 2020",
   "region": "North America",
   "description": "Large-sized, Teal Rainbow Holofoil, Black-backed Coin featuring Manaphy released within the Darkness Ablaze Three Pack Blisters August 14, 2020; later released within the Shining Fates Mini Tins March"
@@ -7772,18 +7772,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_EARLY_REGULARSIZED_WHITE.jpg",
   "name": "Regular-sized, White Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tEarly November 2020",
+  "release": "Early November 2020",
   "releaseDate": "Early November 2020",
   "region": "Japan",
   "description": "Regular-sized, White Non Holofoil, Black-backed Coin featuring Pikachu included with every Pokémon Card Game ZOZOTOWN Collection order from the ZOZOTOWN online store. Items could be ordered between Au"
  },
  {
-  "id": "DATE_EARLY_REGULARSIZED_WHITE",
+  "id": "DATE_EARLY_REGULARSIZED_WHITE_2020",
   "url": "src/assets/coins/bulbapedia/DATE_EARLY_REGULARSIZED_WHITE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_EARLY_REGULARSIZED_WHITE.jpg",
   "name": "Regular-sized, White Non Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tEarly November 2020",
+  "release": "Early November 2020",
   "releaseDate": "Early November 2020",
   "region": "Japan",
   "description": "Regular-sized, White Non Holofoil, Black-backed Coin featuring Mew included with every Pokémon Card Game ZOZOTOWN Collection order from the ZOZOTOWN online store. Items could be ordered between August"
@@ -7794,7 +7794,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_BRONZE.jpg",
   "name": "Regular-sized, Bronze Gold Rainbow Holofoil,",
   "material": "gold",
-  "release": "date\tSeptember 18, 2020",
+  "release": "September 18, 2020",
   "releaseDate": "September 18, 2020",
   "region": "Japan",
   "description": "Regular-sized, Bronze Gold Rainbow Holofoil, ™ Trademark Black-backed Coin featuring Pikachu released within the Amazing Volt Tackle Gigantic Pack Set September 18, 2020"
@@ -7805,18 +7805,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tSeptember 4, 2020",
+  "release": "September 4, 2020",
   "releaseDate": "September 4, 2020",
   "region": "North America",
   "description": "Jumbo-sized, Silver Mirror Holofoil, Black-backed Coin featuring Eternatus included in North American versions of the Eternatus VMAX Premium Collection September 4, 2020"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_BLUE",
+  "id": "DATE_OCTOBER_LARGESIZED_BLUE_20201002",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Sheen Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 2, 2020",
+  "release": "October 2, 2020",
   "releaseDate": "October 2, 2020",
   "region": "North America",
   "description": "Large-sized, Blue Sheen Holofoil, Black-backed Coin featuring Blastoise released as one of three possible coins within the Galar Power Mini Tins October 2, 2020"
@@ -7833,23 +7833,23 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Purple Rainbow Holofoil, Black-backed Coin featuring Mewtwo released as one of three possible coins within the Galar Power Mini Tins October 2, 2020; later released within the Shining Fat"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_PINK",
+  "id": "DATE_NOVEMBER_LARGESIZED_PINK_20201101",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_PINK.jpg",
   "name": "Large-sized, Pink Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 1, 2020",
+  "release": "November 1, 2020",
   "releaseDate": "November 1, 2020",
   "region": "North America",
   "description": "Large-sized, Pink Mirror Holofoil, Black-backed Coin featuring Togepi, Cleffa, and Igglybuff included in the Small but Mighty Premium Collection November 1, 2020"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GOLD",
+  "id": "DATE_NOVEMBER_LARGESIZED_GOLD_20201113",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tNovember 13, 2020",
+  "release": "November 13, 2020",
   "releaseDate": "November 13, 2020",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Charizard included in the Charizard Theme Deck November 13, 2020"
@@ -7877,12 +7877,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Kommo-o released as a possible coin within the Vivid Voltage Three Pack Blisters November 13, 2020"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_GOLD",
+  "id": "DATE_NOVEMBER_LARGESIZED_GOLD_20201113_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tNovember 13, 2020",
+  "release": "November 13, 2020",
   "releaseDate": "November 13, 2020",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Gigantamax Charizard included in the Fall 2020 Collector Chest November 13, 2020"
@@ -7899,23 +7899,23 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Nessa released within the Nessa Shiny Star V Set November 20, 2020"
  },
  {
-  "id": "DATE_NOVEMBER_METAL_COIN",
+  "id": "DATE_NOVEMBER_METAL_COIN_20201120",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Zacian released",
-  "material": "enamel",
-  "release": "date\tNovember 20, 2020",
+  "material": "metal",
+  "release": "November 20, 2020",
   "releaseDate": "November 20, 2020",
   "region": "North America",
   "description": "Metal Coin featuring Zacian released within the Sword & Shield Ultra-Premium Collection—Zacian & Zamazenta November 20, 2020; later available in the Sword & Shield Elite Trainer Box Plus—Zacian outsid"
  },
  {
-  "id": "DATE_NOVEMBER_METAL_COIN",
+  "id": "DATE_NOVEMBER_METAL_COIN_20201120_2",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Zamazenta released",
-  "material": "enamel",
-  "release": "date\tNovember 20, 2020",
+  "material": "metal",
+  "release": "November 20, 2020",
   "releaseDate": "November 20, 2020",
   "region": "North America",
   "description": "Metal Coin featuring Zamazenta released within the Sword & Shield Ultra-Premium Collection—Zacian & Zamazenta November 20, 2020; later available in the Sword & Shield Elite Trainer Box Plus—Zamazenta "
@@ -7926,7 +7926,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tNovember 20, 2020",
+  "release": "November 20, 2020",
   "releaseDate": "November 20, 2020",
   "region": "North America",
   "description": "Jumbo-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Grookey, Scorbunny, and Sobble released within the Galar Sidekicks Premium Collection November 20, 2020"
@@ -7937,29 +7937,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_LATE_LARGESIZED_BLUE.jpg",
   "name": "Large-sized, Blue Bubbled Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tLate November 2020",
+  "release": "Late November 2020",
   "releaseDate": "Late November 2020",
   "region": "North America",
   "description": "Large-sized, Blue Bubbled Holofoil, Black-backed Coin featuring Manaphy released as a possible coin within the Vivid Voltage Stage 1 Blisters late November 2020"
  },
  {
-  "id": "DATE_DECEMBER_LARGESIZED_SILVER",
+  "id": "DATE_DECEMBER_LARGESIZED_SILVER_202012",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Starlight Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tDecember 2020",
+  "release": "December 2020",
   "releaseDate": "December 2020",
   "region": "North America",
   "description": "Large-sized, Silver Starlight Holofoil, Black-backed Coin featuring Grookey, Scorbunny, and Sobble released within the Spring 2020 Collector Chest of the Poké Ball Tin & Collector Chest 2-Pack repacka"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_DECEMBER_REGULARSIZED_GREEN_20201204",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Green Speckle Holofoil, Black-backed Coin featuring Gigantamax Venusaur released within the Venusaur VMAX Starter Set December 4, 2020"
@@ -7987,56 +7987,56 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Pikachu; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_PINK",
+  "id": "DATE_DECEMBER_REGULARSIZED_PINK_20201204",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Pink Confetti Holofoil, Black-backed Coin featuring Galarian Ponyta; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_DECEMBER_REGULARSIZED_GREEN_20201204_2",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Rillaboom; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_RED",
+  "id": "DATE_DECEMBER_REGULARSIZED_RED_20201204",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Red Mirror Holofoil, Black-backed Coin featuring Cinderace; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20201204",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Inteleon; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_DECEMBER_REGULARSIZED_SILVER_20201204",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Speckle Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Silver Speckle Holofoil, Black-backed Coin featuring Wooloo; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
@@ -8047,95 +8047,95 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_YELLOW.jpg",
   "name": "Regular-sized, Yellow Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Yellow Cracked Ice Holofoil, Black-backed Coin featuring Yamper; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_DECEMBER_REGULARSIZED_SILVER_20201204_2",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Zacian; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_DECEMBER_REGULARSIZED_SILVER_20201204_3",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Zamazenta; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_PINK",
+  "id": "DATE_DECEMBER_REGULARSIZED_PINK_20201204_2",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tDecember 4, 2020",
+  "release": "December 4, 2020",
   "releaseDate": "December 4, 2020",
   "region": "Japan",
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Eternatus; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 4, 2020"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_DECEMBER_REGULARSIZED_GOLD_20201205",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Speckle Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tDecember 5, 2020",
+  "release": "December 5, 2020",
   "releaseDate": "December 5, 2020",
   "region": "Japan",
   "description": "Regular-sized, Gold Speckle Holofoil, Black-backed Coin featuring Eevee given to participants of V Starter Deck Beginner Enhanced Battle events held at participating Pokémon Card Gym venues from Decem"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_PINK",
+  "id": "DATE_DECEMBER_REGULARSIZED_PINK_20201218",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tDecember 18, 2020",
+  "release": "December 18, 2020",
   "releaseDate": "December 18, 2020",
   "region": "Japan",
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Celebi released within the Forest of Okoya Celebi & Zarude Special Advance Ticket 7-Eleven Set December 18, 2020"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_RED",
+  "id": "DATE_JANUARY_REGULARSIZED_RED_20210122",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Speckle Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 22, 2021",
+  "release": "January 22, 2021",
   "releaseDate": "January 22, 2021",
   "region": "Japan",
   "description": "Regular-sized, Red Speckle Holofoil, Black-backed Coin featuring the Pokémon V symbol released within the Single Strike Premium Trainer Box January 22, 2021"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_BLUE",
+  "id": "DATE_JANUARY_REGULARSIZED_BLUE_20210122",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tJanuary 22, 2021",
+  "release": "January 22, 2021",
   "releaseDate": "January 22, 2021",
   "region": "Japan",
   "description": "Regular-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring the Pokémon V symbol released within the Rapid Strike Premium Trainer Box January 22, 2021"
  },
  {
-  "id": "DATE_JANUARY_REGULARSIZED_RED",
+  "id": "DATE_JANUARY_REGULARSIZED_RED_20210129",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_RED.jpg",
   "name": "Regular-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJanuary 29, 2021",
+  "release": "January 29, 2021",
   "releaseDate": "January 29, 2021",
   "region": "Hong Kong/Taiwan",
   "description": "Regular-sized, Red Mirror Holofoil, Black-backed Coin featuring a Poké Ball design included in the Traditional Chinese Premium Strength Box in Hong Kong and Taiwan January 29, 2021"
@@ -8146,7 +8146,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Confetti Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJanuary 29, 2021",
+  "release": "January 29, 2021",
   "releaseDate": "January 29, 2021",
   "region": "Hong Kong/Taiwan",
   "description": "Regular-sized, Gold Confetti Holofoil, Black-backed Coin featuring Pikachu included in the Traditional Chinese Premium Strength Box in Hong Kong and Taiwan January 29, 2021"
@@ -8157,7 +8157,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_GREEN.jpg",
   "name": "Jumbo-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 5, 2021",
+  "release": "February 5, 2021",
   "releaseDate": "February 5, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Green Mirror Holofoil, Black-backed Coin featuring Venusaur included in the Venusaur V Battle Deck and V Battle Deck—Venusaur vs. Blastoise February 5, 2021"
@@ -8168,29 +8168,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_BLUE.jpg",
   "name": "Jumbo-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 5, 2021",
+  "release": "February 5, 2021",
   "releaseDate": "February 5, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Blue Mirror Holofoil, Black-backed Coin featuring Blastoise included in the Blastoise V Battle Deck and V Battle Deck—Venusaur vs. Blastoise February 5, 2021"
  },
  {
-  "id": "DATE_MARCH_LARGESIZED_SILVER",
+  "id": "DATE_MARCH_LARGESIZED_SILVER_20210305",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Starlight Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMarch 5, 2021",
+  "release": "March 5, 2021",
   "releaseDate": "March 5, 2021",
   "region": "North America",
   "description": "Large-sized, Silver Starlight Holofoil, Black-backed Coin featuring Hydreigon released within the Shining Fates Mini Tins March 5, 2021; later released within 2021 shipments of the Kanto Power Mini Ti"
  },
  {
-  "id": "DATE_MARCH_LARGESIZED_SILVER",
+  "id": "DATE_MARCH_LARGESIZED_SILVER_20210305_2",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMarch 5, 2021",
+  "release": "March 5, 2021",
   "releaseDate": "March 5, 2021",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Entei released within the Shining Fates Mini Tins March 5, 2021; later released as a possible coin within the Fusion Strike Three Pack"
@@ -8201,7 +8201,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_PINK.jpg",
   "name": "Jumbo-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tMarch 5, 2021",
+  "release": "March 5, 2021",
   "releaseDate": "March 5, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Crobat included in the Shining Fates Premium Collection—Shiny Crobat VMAX March 5, 2021"
@@ -8212,7 +8212,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_BLUE.jpg",
   "name": "Jumbo-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tMarch 5, 2021",
+  "release": "March 5, 2021",
   "releaseDate": "March 5, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Dragapult included in the Shining Fates Premium Collection—Shiny Dragapult VMAX March 5, 2021"
@@ -8223,7 +8223,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tMarch 19, 2021",
+  "release": "March 19, 2021",
   "releaseDate": "March 19, 2021",
   "region": "North America",
   "description": "Large-sized, Purple Cracked Ice Holofoil, Black-backed Coin featuring Mewtwo released as a possible coin within the Battle Styles Single Pack Blisters March 19, 2021"
@@ -8234,18 +8234,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_RED.jpg",
   "name": "Jumbo-sized, Red Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tMarch 19, 2021",
+  "release": "March 19, 2021",
   "releaseDate": "March 19, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Red Cracked Ice Holofoil, Black-backed Coin featuring Gigantamax Single Strike Style Urshifu included in the Spring 2021 Collector Chest March 19, 2021"
  },
  {
-  "id": "DATE_MARCH_JUMBOSIZED_BLUE",
+  "id": "DATE_MARCH_JUMBOSIZED_BLUE_20210319",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_BLUE.jpg",
   "name": "Jumbo-sized, Blue Wave Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMarch 19, 2021",
+  "release": "March 19, 2021",
   "releaseDate": "March 19, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Blue Wave Holofoil, Black-backed Coin featuring Gigantamax Rapid Strike Style Urshifu included in the Spring 2021 Collector Chest March 19, 2021"
@@ -8256,7 +8256,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 23, 2021",
+  "release": "April 23, 2021",
   "releaseDate": "April 23, 2021",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Calyrex released as one of two coins randomly included within the Silver Lance & Jet-Black Spirit Jumbo Pack Set April 23, 2021"
@@ -8267,7 +8267,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_APRIL_REGULARSIZED_PURPLE.jpg",
   "name": "Regular-sized, Purple Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tApril 23, 2021",
+  "release": "April 23, 2021",
   "releaseDate": "April 23, 2021",
   "region": "Japan",
   "description": "Regular-sized, Purple Mirror Holofoil, Black-backed Coin featuring Calyrex released as one of two coins randomly included within the Silver Lance & Jet-Black Spirit Jumbo Pack Set April 23, 2021"
@@ -8278,7 +8278,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_JUMBOSIZED_ORANGE.jpg",
   "name": "Jumbo-sized, Orange Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 7, 2021",
+  "release": "May 7, 2021",
   "releaseDate": "May 7, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Orange Mirror Holofoil, Black-backed Coin featuring Victini included in the Victini V Battle Deck and V Battle Deck—Victini vs. Gardevoir May 7, 2021"
@@ -8289,51 +8289,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_JUMBOSIZED_PURPLE.jpg",
   "name": "Jumbo-sized, Purple Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 7, 2021",
+  "release": "May 7, 2021",
   "releaseDate": "May 7, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Purple Mirror Holofoil, Black-backed Coin featuring Gardevoir included in the Gardevoir V Battle Deck and V Battle Deck—Victini vs. Gardevoir May 7, 2021"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20210528",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMay 28, 2021",
+  "release": "May 28, 2021",
   "releaseDate": "May 28, 2021",
   "region": "Japan",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Gigantamax Gengar included in the Gengar High-Class Decks May 28, 2021"
  },
  {
-  "id": "DATE_MAY_REGULARSIZED_SILVER",
+  "id": "DATE_MAY_REGULARSIZED_SILVER_20210528_2",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Psychedelic Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 28, 2021",
+  "release": "May 28, 2021",
   "releaseDate": "May 28, 2021",
   "region": "Japan",
   "description": "Regular-sized, Silver Psychedelic Holofoil, Black-backed Coin featuring Gigantamax Inteleon included in the Inteleon High-Class Decks May 28, 2021"
  },
  {
-  "id": "DATE_JUNE_JUMBOSIZED_SILVER",
+  "id": "DATE_JUNE_JUMBOSIZED_SILVER_20210618",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJune 18, 2021",
+  "release": "June 18, 2021",
   "releaseDate": "June 18, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Silver Cracked Ice Holofoil, Blue-backed Coin featuring Calyrex released within the Chilling Reign Pokémon Center Elite Trainer Box June 18, 2021"
  },
  {
-  "id": "DATE_JUNE_JUMBOSIZED_SILVER",
+  "id": "DATE_JUNE_JUMBOSIZED_SILVER_20210618_2",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tJune 18, 2021",
+  "release": "June 18, 2021",
   "releaseDate": "June 18, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Silver Cracked Ice Holofoil, Purple-backed Coin featuring Calyrex released within the Chilling Reign Pokémon Center Elite Trainer Box June 18, 2021"
@@ -8344,29 +8344,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_PURPLE.jpg",
   "name": "Large-sized, Purple Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 18, 2021",
+  "release": "June 18, 2021",
   "releaseDate": "June 18, 2021",
   "region": "North America",
   "description": "Large-sized, Purple Rainbow Holofoil, Black-backed Coin featuring Genesect released as a possible coin within the three Chilling Reign Blister variants available June 18, 2021 and subsequent Chilling "
  },
  {
-  "id": "DATE_JUNE_LARGESIZED_GREEN",
+  "id": "DATE_JUNE_LARGESIZED_GREEN_20210618",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_GREEN.jpg",
   "name": "Large-sized, Green Sheen Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 18, 2021",
+  "release": "June 18, 2021",
   "releaseDate": "June 18, 2021",
   "region": "North America",
   "description": "Large-sized, Green Sheen Holofoil, Black-backed Coin featuring Rayquaza released as a possible coin within the Chilling Reign Three Pack and Single Pack June 18, 2021 and subsequent Chilling Reign Sta"
  },
  {
-  "id": "DATE_JUNE_LARGESIZED_SILVER",
+  "id": "DATE_JUNE_LARGESIZED_SILVER_20210618",
   "url": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJune 18, 2021",
+  "release": "June 18, 2021",
   "releaseDate": "June 18, 2021",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Lucario released as a possible coin within the Chilling Reign Three Pack Blisters June 18, 2021; later released as a possible coin wit"
@@ -8377,18 +8377,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_CARDBOARD_CONFETTI.jpg",
   "name": "Cardboard Confetti Non-Holofoil Coin featuring",
   "material": "cardboard",
-  "release": "date\tJuly 9, 2021",
+  "release": "July 9, 2021",
   "releaseDate": "July 9, 2021",
   "region": "Japan",
   "description": "Cardboard Confetti Non-Holofoil Coin featuring Pikachu released within the Sword & Shield Family Pokémon Card Game July 9, 2021"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20210709",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-Sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tJuly 9, 2021",
+  "release": "July 9, 2021",
   "releaseDate": "July 9, 2021",
   "region": "Japan",
   "description": "Regular-Sized, Gold Cracked Ice Holofoil, Black-Backed Coin featuring Pikachu released within the Sword & Shield Family Pokémon Card Game Anytime, Anywhere Version July 9, 2021"
@@ -8399,7 +8399,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MIDJULY_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tMid-July 2021",
+  "release": "Mid-July 2021",
   "releaseDate": "Mid-July 2021",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Alolan Raichu released as a possible coin within Chilling Reign Two Pack Blisters in mid-July 2021"
@@ -8410,7 +8410,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_JUMBOSIZED_PINK.jpg",
   "name": "Jumbo-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tAugust 6, 2021",
+  "release": "August 6, 2021",
   "releaseDate": "August 6, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Marnie included in the Marnie Premium Tournament Collection August 6, 2021"
@@ -8443,7 +8443,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Rainbow Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tAugust 27, 2021",
+  "release": "August 27, 2021",
   "releaseDate": "August 27, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Gold Rainbow Holofoil, Black-backed Coin featuring Jolteon, Flareon, Umbreon, and Leafeon released within the Evolving Skies Pokémon Center Elite Trainer Box August 27, 2021"
@@ -8454,18 +8454,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tAugust 27, 2021",
+  "release": "August 27, 2021",
   "releaseDate": "August 27, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Vaporeon, Espeon, Glaceon, and Sylveon released within the Evolving Skies Pokémon Center Elite Trainer Box August 27, 2021"
  },
  {
-  "id": "DATE_OCTOBER_LARGESIZED_SILVER",
+  "id": "DATE_OCTOBER_LARGESIZED_SILVER_20211008",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Large-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Alolan Ninetales released within later shipments of the Chilling Reign Premium Checklane Blisters starting October 8, 2021; later rele"
@@ -8476,18 +8476,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_BRONZE.jpg",
   "name": "Jumbo-sized, Bronze Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Bronze Mirror Holofoil, Black-backed Coin featuring Noivern released within the Noivern V Battle Deck and V Battle Deck—Rayquaza vs. Noivern October 8, 2021"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_BRONZE",
+  "id": "DATE_OCTOBER_JUMBOSIZED_BRONZE_20211008",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_BRONZE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_BRONZE.jpg",
   "name": "Jumbo-sized, Bronze Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Bronze Mirror Holofoil, Black-backed Coin featuring Rayquaza released within the Rayquaza V Battle Deck and V Battle Deck—Rayquaza vs. Noivern October 8, 2021"
@@ -8498,40 +8498,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Pixel Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Gold Pixel Holofoil, Black-backed Coin featuring Charizard released within the Celebrations Special Collection—V Memories October 8, 2021"
  },
  {
-  "id": "DATE_OCTOBER_METAL_COIN",
+  "id": "DATE_OCTOBER_METAL_COIN_20211008",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring the Pikachu",
-  "material": "enamel",
-  "release": "date\tOctober 8, 2021",
+  "material": "metal",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Metal Coin featuring the Pikachu 25th Anniversary emblem released within the Celebrations Pokémon Center Elite Trainer Box and the Celebrations Ultra-Premium Collection October 8, 2021"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD",
+  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD_20211008",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Sheen Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Gold Sheen Holofoil, Black-backed Coin featuring the Pikachu 25th Anniversary emblem released within the Celebrations Collection—Dragapult Prime October 8, 2021"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD",
+  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD_20211008_2",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Starlight Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Gold Starlight Holofoil, Black-backed Coin featuring the Pikachu 25th Anniversary emblem released within the Celebrations Collector Chest October 8, 2021"
@@ -8542,7 +8542,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Starlight Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 8, 2021",
+  "release": "October 8, 2021",
   "releaseDate": "October 8, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Silver Starlight Holofoil, Black-backed Coin featuring the Pikachu 25th Anniversary emblem released within the Celebrations Mini Tins October 8, 2021"
@@ -8570,34 +8570,34 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Silver Splotch Holofoil, ™ Trademark Black-backed Coin featuring Chansey released within the Japanese 25th Anniversary Collection Special Set October 22, 2021"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_NOVEMBER_REGULARSIZED_BLUE_20211105",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 5, 2021",
+  "release": "November 5, 2021",
   "releaseDate": "November 5, 2021",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Zacian included in the Zacian & Zamazenta vs Eternatus Special Deck Set November 5, 2021"
  },
  {
-  "id": "DATE_NOVEMBER_REGULARSIZED_PINK",
+  "id": "DATE_NOVEMBER_REGULARSIZED_PINK_20211105",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 5, 2021",
+  "release": "November 5, 2021",
   "releaseDate": "November 5, 2021",
   "region": "Japan",
   "description": "Regular-sized, Pink Mirror Holofoil, Black-backed Coin featuring Zamazenta included in the Zacian & Zamazenta vs Eternatus Special Deck Set November 5, 2021"
  },
  {
-  "id": "DATE_NOVEMBER_LARGESIZED_LIGHT",
+  "id": "DATE_NOVEMBER_LARGESIZED_LIGHT_20211112",
   "url": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_LARGESIZED_LIGHT.jpg",
   "name": "Large-sized, Light Gold Mirror Holofoil,",
   "material": "gold",
-  "release": "date\tNovember 12, 2021",
+  "release": "November 12, 2021",
   "releaseDate": "November 12, 2021",
   "region": "North America",
   "description": "Large-sized, Light Gold Mirror Holofoil, Black-backed Coin featuring Dragonite released within the Fusion Strike Three Pack and Single Pack Blisters November 12, 2021; later released in 2021 shipments"
@@ -8608,7 +8608,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_JUMBOSIZED_PINK.jpg",
   "name": "Jumbo-sized, Pink Smoke Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 12, 2021",
+  "release": "November 12, 2021",
   "releaseDate": "November 12, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Pink Smoke Holofoil, Black-backed Coin featuring Mew released within the Fusion Strike Pokémon Center Elite Trainer Box November 12, 2021"
@@ -8619,40 +8619,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_JUMBOSIZED_LIGHT.jpg",
   "name": "Jumbo-sized, Light Gold Rainbow Holofoil,",
   "material": "gold",
-  "release": "date\tDecember 3, 2021",
+  "release": "December 3, 2021",
   "releaseDate": "December 3, 2021",
   "region": "North America",
   "description": "Jumbo-sized, Light Gold Rainbow Holofoil, Black-backed Coin featuring Vaporeon, Jolteon, and Flareon released within the Vaporeon VMAX Premium Collection, Jolteon VMAX Premium Collection, and Flareon "
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_DECEMBER_REGULARSIZED_GOLD_20211216",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Eevee; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and on the"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_PINK",
+  "id": "DATE_DECEMBER_REGULARSIZED_PINK_20211216",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Pink Confetti Holofoil, Black-backed Coin featuring Morpeko; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and on"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_DECEMBER_REGULARSIZED_GREEN_20211216",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Green Mirror Holofoil, Black-backed Coin featuring Turtwig; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and on "
@@ -8663,84 +8663,84 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_ORANGE.jpg",
   "name": "Regular-sized, Orange Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Orange Mirror Holofoil, Black-backed Coin featuring Chimchar; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and o"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20211216",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Blue Mirror Holofoil, Black-backed Coin featuring Piplup; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and on th"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_PINK",
+  "id": "DATE_DECEMBER_REGULARSIZED_PINK_20211216_2",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Pink Mirror Holofoil, Black-backed Coin featuring Sylveon; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and on t"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GREEN",
+  "id": "DATE_DECEMBER_REGULARSIZED_GREEN_20211216_2",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Green Cracked Ice Holofoil, Black-backed Coin featuring Rayquaza; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 a"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_BLUE",
+  "id": "DATE_DECEMBER_REGULARSIZED_BLUE_20211216_2",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_BLUE.jpg",
   "name": "Regular-sized, Blue Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Dialga; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and "
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_PINK",
+  "id": "DATE_DECEMBER_REGULARSIZED_PINK_20211216_3",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_PINK.jpg",
   "name": "Regular-sized, Pink Cracked Ice Holofoil,",
   "material": "enamel",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Palkia; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 and "
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_SILVER",
+  "id": "DATE_DECEMBER_REGULARSIZED_SILVER_20211216",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tDecember 16, 2021",
+  "release": "December 16, 2021",
   "releaseDate": "December 16, 2021",
   "region": "Japan",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Arceus; one of ten available from capsule toy vending machines present at Pokémon Centers across Japan from December 16, 2021 an"
  },
  {
-  "id": "DATE_DECEMBER_REGULARSIZED_GOLD",
+  "id": "DATE_DECEMBER_REGULARSIZED_GOLD_20211217",
   "url": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_DECEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Japanese",
   "material": "gold",
-  "release": "date\tDecember 17, 2021",
+  "release": "December 17, 2021",
   "releaseDate": "December 17, 2021",
   "region": "Japan",
   "description": "Regular-sized, Gold Non Holofoil, Japanese ™ Trademark Black-backed Coin featuring Pikachu available within a sealed paper playmat given away at Pokémon Centers to promote the Start Deck 100 until sup"
@@ -8751,51 +8751,51 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tJanuary 11, 2022",
+  "release": "January 11, 2022",
   "releaseDate": "January 11, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Mirror Holofoil, Black-backed Coin featuring Blastoise released within the Fusion Strike Two Pack Blisters January 11, 2022; later released within the Brilliant Stars Three Pack Bl"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD",
+  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD_20220204",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 4, 2022",
+  "release": "February 4, 2022",
   "releaseDate": "February 4, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Chansey released within the Pokémon Coin Album February 5, 2022"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD",
+  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD_20220204_2",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 4, 2022",
+  "release": "February 4, 2022",
   "releaseDate": "February 4, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Eevee released within the Pokémon Coin Album February 5, 2022"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD",
+  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD_20220204_3",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 4, 2022",
+  "release": "February 4, 2022",
   "releaseDate": "February 4, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Gardevoir released within the Pokémon Coin Album February 5, 2022"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD",
+  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD_20220204_4",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 4, 2022",
+  "release": "February 4, 2022",
   "releaseDate": "February 4, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Umbreon and Darkrai released within the Pokémon Coin Album February 5, 2022"
@@ -8812,12 +8812,12 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Mew released within the Pokémon Coin Album February 5, 2022"
  },
  {
-  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD",
+  "id": "DATE_FEBRUARY_REGULARSIZED_GOLD_20220204_5",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Speckle Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 4, 2022",
+  "release": "February 4, 2022",
   "releaseDate": "February 4, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Speckle Holofoil, Black-backed Coin featuring the Pokémon V symbol released within the VSTAR Premium Trainer Box January 14, 2022"
@@ -8828,7 +8828,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJanuary 21, 2022",
+  "release": "January 21, 2022",
   "releaseDate": "January 21, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Gold Mirror Holofoil, Black-backed Coin featuring Venusaur released within the Sword & Shield Knock Out Collection January 21, 2022; later released within the Brilliant Stars Single Pack,"
@@ -8839,7 +8839,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tFebruary 25, 2022",
+  "release": "February 25, 2022",
   "releaseDate": "February 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Gold Mirror Holofoil, Black-backed Coin featuring Pikachu released within the Brilliant Stars Three Pack and Single Pack Blisters, as well as the Lightning Stacking Tin February 25, 2022;"
@@ -8850,18 +8850,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tFebruary 25, 2022",
+  "release": "February 25, 2022",
   "releaseDate": "February 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Mirror Holofoil, Black-backed Coin featuring Eevee included within the Brilliant Stars Single Pack Blisters February 25, 2022; later released within the eighth series of Poké Ball "
  },
  {
-  "id": "DATE_FEBRUARY_JUMBOSIZED_SILVER",
+  "id": "DATE_FEBRUARY_JUMBOSIZED_SILVER_20220225",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Rainbow Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tFebruary 25, 2022",
+  "release": "February 25, 2022",
   "releaseDate": "February 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Rainbow Holofoil, Black-backed Coin featuring Arceus released within the Brilliant Stars Pokémon Center Elite Trainer Box February 25, 2022"
@@ -8872,29 +8872,29 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_BRONZE.jpg",
   "name": "Jumbo-sized, Bronze Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tFebruary 25, 2022",
+  "release": "February 25, 2022",
   "releaseDate": "February 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Bronze Mirror Holofoil, Black-backed Coin featuring Lycanroc released within the Lycanroc V Battle Deck and V Battle Deck—Lycanroc vs. Corviknight February 25, 2022"
  },
  {
-  "id": "DATE_FEBRUARY_JUMBOSIZED_SILVER",
+  "id": "DATE_FEBRUARY_JUMBOSIZED_SILVER_20220225_2",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tFebruary 25, 2022",
+  "release": "February 25, 2022",
   "releaseDate": "February 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Mirror Holofoil, Black-backed Coin featuring Corviknight released within the Corviknight V Battle Deck and V Battle Deck—Lycanroc vs. Corviknight February 25, 2022"
  },
  {
-  "id": "DATE_FEBRUARY_JUMBOSIZED_SILVER",
+  "id": "DATE_FEBRUARY_JUMBOSIZED_SILVER_20220225_3",
   "url": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_FEBRUARY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tFebruary 25, 2022",
+  "release": "February 25, 2022",
   "releaseDate": "February 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Mirror Holofoil, Black-backed Coin featuring Grookey released within the Grass Stacking Tin February 25, 2022"
@@ -8955,12 +8955,12 @@ const GEN_IX_COINS = [
   "description": "Large-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Suicune released as a possible coin within later shipments of the Galar Power Mini Tins March 2022"
  },
  {
-  "id": "DATE_MARCH_REGULARSIZED_SILVER",
+  "id": "DATE_MARCH_REGULARSIZED_SILVER_202203",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_REGULARSIZED_SILVER.jpg",
   "name": "Regular-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMarch 2022",
+  "release": "March 2022",
   "releaseDate": "March 2022",
   "region": "Japan",
   "description": "Regular-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring the Pokémon V symbol released within the Start Deck 100 CoroCoro Comic Version March 2022"
@@ -8971,7 +8971,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Speckle Holofoil, White-backed",
   "material": "silver",
-  "release": "date\tMarch 25, 2022",
+  "release": "March 25, 2022",
   "releaseDate": "March 25, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Speckle Holofoil, White-backed Coin featuring Arceus released within the Collector Bundle March 25, 2022"
@@ -8999,12 +8999,12 @@ const GEN_IX_COINS = [
   "description": "Jumbo-sized, Blue Rainbow Holofoil, Black-backed Coin featuring Lucario included in North American versions of the Lucario VSTAR Premium Collection April 8, 2022"
  },
  {
-  "id": "DATE_MAY_LARGESIZED_SILVER",
+  "id": "DATE_MAY_LARGESIZED_SILVER_20220506",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Speckle Holofoil, White-backed",
   "material": "silver",
-  "release": "date\tMay 6, 2022",
+  "release": "May 6, 2022",
   "releaseDate": "May 6, 2022",
   "region": "North America",
   "description": "Large-sized, Silver Speckle Holofoil, White-backed Coin featuring Arceus released within the Spring 2022 Collector Chest May 6, 2022"
@@ -9026,18 +9026,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 27, 2022",
+  "release": "May 27, 2022",
   "releaseDate": "May 27, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Mirror Holofoil, Black-backed Coin featuring Zeraora released within the Astral Radiance Single Pack, Premium Checklane, and Stage 1 Blisters May 27, 2022; later released within th"
  },
  {
-  "id": "DATE_MAY_JUMBOSIZED_SILVER",
+  "id": "DATE_MAY_JUMBOSIZED_SILVER_20220527",
   "url": "src/assets/coins/bulbapedia/DATE_MAY_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Spray Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tMay 27, 2022",
+  "release": "May 27, 2022",
   "releaseDate": "May 27, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Spray Holofoil, Black-backed Coin featuring Darkrai released within the Astral Radiance Pokémon Center Elite Trainer Box May 27, 2022"
@@ -9048,7 +9048,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MAY_JUMBOSIZED_BRONZE.jpg",
   "name": "Jumbo-sized, Bronze Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tMay 27, 2022",
+  "release": "May 27, 2022",
   "releaseDate": "May 27, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Bronze Rainbow Holofoil, Black-backed Coin featuring Kleavor included in North American versions of the Kleavor VSTAR Premium Collection May 27, 2022"
@@ -9059,18 +9059,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_MIDJUNE_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tMid-June 2022",
+  "release": "Mid-June 2022",
   "releaseDate": "Mid-June 2022",
   "region": "North America",
   "description": "Large-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Raikou released as a possible coin within the Poké Ball Tin 5-Pack mid-June 2022; later released within the Lucario V & Tyranitar V "
  },
  {
-  "id": "DATE_JUNE_REGULARSIZED_GOLD",
+  "id": "DATE_JUNE_REGULARSIZED_GOLD_20220617",
   "url": "https://archives.bulbagarden.net/media/upload/e/e2/PCG_Gold_Chansey_Coin.png/PCG_Gold_Chansey_Coin.png",
   "thumb": "https://archives.bulbagarden.net/media/upload/e/e2/PCG_Gold_Chansey_Coin.png/PCG_Gold_Chansey_Coin.png",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJune 17, 2022",
+  "release": "June 17, 2022",
   "releaseDate": "June 17, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring a PokéCoin design included within the Pokémon GO Special Set June 17, 2022"
@@ -9081,7 +9081,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JUNE_JUMBOSIZED_EMERALD.jpg",
   "name": "Jumbo-sized, Emerald Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJune 17, 2022",
+  "release": "June 17, 2022",
   "releaseDate": "June 17, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Emerald Rainbow Holofoil, Black-backed Coin featuring Professor Juniper included in the Professor Juniper Premium Tournament Collection June 17, 2022"
@@ -9091,8 +9091,8 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/DATE_JULY_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_METAL_COIN.jpg",
   "name": "Metal Coin featuring Mewtwo released",
-  "material": "enamel",
-  "release": "date\tJuly 1, 2022",
+  "material": "metal",
+  "release": "July 1, 2022",
   "releaseDate": "July 1, 2022",
   "region": "North America",
   "description": "Metal Coin featuring Mewtwo released within the Pokémon GO Pokémon Center Elite Trainer Box Plus July 1, 2022"
@@ -9103,7 +9103,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_JUMBOSIZED_PURPLE.jpg",
   "name": "Jumbo-sized, Purple Rainbow Holofoil, White-backed",
   "material": "silver",
-  "release": "date\tJuly 1, 2022",
+  "release": "July 1, 2022",
   "releaseDate": "July 1, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Purple Rainbow Holofoil, White-backed Coin featuring Mewtwo released within the Pokémon GO Mewtwo V Battle Deck and Pokémon GO V Battle Deck—Mewtwo vs. Melmetal July 1, 2022"
@@ -9114,18 +9114,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_JUMBOSIZED_GRAY.jpg",
   "name": "Jumbo-sized, Gray Rainbow Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tJuly 1, 2022",
+  "release": "July 1, 2022",
   "releaseDate": "July 1, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Gray Rainbow Holofoil, Black-backed Coin featuring Melmetal released within the Pokémon GO Melmetal V Battle Deck and Pokémon GO V Battle Deck—Mewtwo vs. Melmetal July 1, 2022"
  },
  {
-  "id": "DATE_JULY_REGULARSIZED_GOLD",
+  "id": "DATE_JULY_REGULARSIZED_GOLD_20220715",
   "url": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JULY_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tJuly 15, 2022",
+  "release": "July 15, 2022",
   "releaseDate": "July 15, 2022",
   "region": "Japan",
   "description": "Regular-sized, Gold Mirror Holofoil, Black-backed Coin featuring Zeraora included in the Zeraora VSTAR & VMAX High-Class Deck July 15, 2022"
@@ -9164,7 +9164,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Cardboard Coin featuring Smeargle included as one of six coins available for the McDonald's Collection 2022 starting August 3, 2022"
  },
  {
-  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD",
+  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD_20220803",
   "url": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "thumb": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "name": "Regular-sized, Cardboard Coin featuring Pikachu",
@@ -9175,7 +9175,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Cardboard Coin featuring Pikachu included as one of six coins available for the McDonald's Collection 2022 starting August 3, 2022"
  },
  {
-  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD",
+  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD_20220803_2",
   "url": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "thumb": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "name": "Regular-sized, Cardboard Coin featuring Victini",
@@ -9186,7 +9186,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Cardboard Coin featuring Victini included as one of six coins available for the McDonald's Collection 2022 starting August 3, 2022"
  },
  {
-  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD",
+  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD_20220803_3",
   "url": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "thumb": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "name": "Regular-sized, Cardboard Coin featuring Gossifleur",
@@ -9197,7 +9197,7 @@ const GEN_IX_COINS = [
   "description": "Regular-sized, Cardboard Coin featuring Gossifleur included as one of six coins available for the McDonald's Collection 2022 starting August 3, 2022"
  },
  {
-  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD",
+  "id": "MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD_20220803_4",
   "url": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "thumb": "src/assets/coins/bulbapedia/MCDONALDS_COLLECTION_REGULARSIZED_CARDBOARD.jpg",
   "name": "Regular-sized, Cardboard Coin featuring Growlithe",
@@ -9230,56 +9230,23 @@ const GEN_IX_COINS = [
   "description": "Jumbo-sized, Light Gold Mirror Holofoil, Black-backed Coin featuring Sirfetch'd released within the Astral Radiance Two Pack Blister August 8, 2022; later released within the Lost Origin Three Pack Bl"
  },
  {
-  "id": "DATE_AUGUST_METAL_COIN",
+  "id": "DATE_AUGUST_METAL_COIN_20220818",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "name": "Metal Coin featuring Pikachu available",
-  "material": "enamel",
-  "release": "date\tAugust 18, 2022",
+  "material": "metal",
+  "release": "August 18, 2022",
   "releaseDate": "August 18, 2022",
   "region": "Europe",
   "description": "Metal Coin featuring Pikachu available for purchase at the 2022 World Championships starting August 18, 2022"
  },
  {
-  "id": "DATE_AUGUST_METAL_COIN",
-  "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
-  "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
-  "name": "Metal Coin featuring Pikachu available",
-  "material": "enamel",
-  "release": "date\tAugust 18, 2022",
-  "releaseDate": "August 18, 2022",
-  "region": "Europe",
-  "description": "Metal Coin featuring Pikachu available for purchase at the 2022 World Championships starting August 18, 2022"
- },
- {
-  "id": "DATE_AUGUST_METAL_COIN",
-  "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
-  "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
-  "name": "Metal Coin featuring Pikachu available",
-  "material": "enamel",
-  "release": "date\tAugust 18, 2022",
-  "releaseDate": "August 18, 2022",
-  "region": "Europe",
-  "description": "Metal Coin featuring Pikachu available for purchase at the 2022 World Championships starting August 18, 2022"
- },
- {
-  "id": "DATE_AUGUST_METAL_COIN",
-  "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
-  "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
-  "name": "Metal Coin featuring Pikachu available",
-  "material": "enamel",
-  "release": "date\tAugust 18, 2022",
-  "releaseDate": "August 18, 2022",
-  "region": "Europe",
-  "description": "Metal Coin featuring Pikachu available for purchase at the 2022 World Championships starting August 18, 2022"
- },
- {
-  "id": "DATE_AUGUST_METAL_COIN",
+  "id": "DATE_AUGUST_METAL_COIN_20220818_2",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_METAL_COIN.jpg",
   "name": "Metal Coin featuring Roserade available",
-  "material": "enamel",
-  "release": "date\tAugust 18, 2022",
+  "material": "metal",
+  "release": "August 18, 2022",
   "releaseDate": "August 18, 2022",
   "region": "Europe",
   "description": "Metal Coin featuring Roserade available to staff of the 2022 World Championships starting August 18, 2022"
@@ -9290,7 +9257,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_JUMBOSIZED_BLUE.jpg",
   "name": "Jumbo-sized, Blue Bubbled Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 18, 2022",
+  "release": "August 18, 2022",
   "releaseDate": "August 18, 2022",
   "region": "Europe",
   "description": "Jumbo-sized, Blue Bubbled Holofoil, Black-backed Coin featuring Eiscue released within the Holiday Calendar 2022 September 1, 2022"
@@ -9323,7 +9290,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_SILVER.jpg",
   "name": "Large-sized, Silver Mirror Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tSeptember 13, 2022",
+  "release": "September 13, 2022",
   "releaseDate": "September 13, 2022",
   "region": "North America",
   "description": "Large-sized, Silver Mirror Holofoil, Black-backed Coin featuring Lucario released within the Lucario V & Tyranitar V Heavy Hitters Premium Collection September 13, 2022"
@@ -9334,40 +9301,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_LARGESIZED_GOLD.jpg",
   "name": "Large-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tSeptember 13, 2022",
+  "release": "September 13, 2022",
   "releaseDate": "September 13, 2022",
   "region": "North America",
   "description": "Large-sized, Gold Mirror Holofoil, Black-backed Coin featuring Tyranitar released within the Lucario V & Tyranitar V Heavy Hitters Premium Collection September 13, 2022"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_SILVER",
+  "id": "DATE_OCTOBER_JUMBOSIZED_SILVER_20221007",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Rainbow Holofoil, Blue-backed",
   "material": "silver",
-  "release": "date\tOctober 7, 2022",
+  "release": "October 7, 2022",
   "releaseDate": "October 7, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Rainbow Holofoil, Blue-backed Coin featuring Origin Forme Dialga released within the North American Origin Forme Dialga VSTAR Premium Collection October 7, 2022; later included in "
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_SILVER",
+  "id": "DATE_OCTOBER_JUMBOSIZED_SILVER_20221007_2",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Rainbow Holofoil, Pink-backed",
   "material": "silver",
-  "release": "date\tOctober 7, 2022",
+  "release": "October 7, 2022",
   "releaseDate": "October 7, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Rainbow Holofoil, Pink-backed Coin featuring Origin Forme Palkia released within the North American Origin Forme Palkia VSTAR Premium Collection October 7, 2022; subsequently inclu"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD",
+  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD_20221014",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Cracked Ice Holofoil,",
   "material": "gold",
-  "release": "date\tOctober 14, 2022",
+  "release": "October 14, 2022",
   "releaseDate": "October 14, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Gold Cracked Ice Holofoil, Black-backed Coin featuring Zeraora released within the Zeraora V Battle Deck and V Battle Deck—Zeraora vs. Deoxys October 14, 2022"
@@ -9378,40 +9345,40 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_RED.jpg",
   "name": "Jumbo-sized, Red Mirror Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tOctober 14, 2022",
+  "release": "October 14, 2022",
   "releaseDate": "October 14, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Red Mirror Holofoil, Black-backed Coin featuring Deoxys released within the Deoxys V Battle Deck and V Battle Deck—Zeraora vs. Deoxys October 14, 2022"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_SILVER",
+  "id": "DATE_OCTOBER_JUMBOSIZED_SILVER_20221028",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Smoke Holofoil, Black-backed",
   "material": "silver",
-  "release": "date\tOctober 28, 2022",
+  "release": "October 28, 2022",
   "releaseDate": "October 28, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Silver Smoke Holofoil, Black-backed Coin featuring Hisuian Zoroark released within the North American Hisuian Zoroark VSTAR Premium Collection October 28, 2022"
  },
  {
-  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD",
+  "id": "DATE_OCTOBER_JUMBOSIZED_GOLD_20221028",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_JUMBOSIZED_GOLD.jpg",
   "name": "Jumbo-sized, Gold Mirror Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tOctober 28, 2022",
+  "release": "October 28, 2022",
   "releaseDate": "October 28, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Gold Mirror Holofoil, Black-backed Coin featuring Scorbunny released within the Fire Stacking Tin October 28, 2022; later released as a possible coin within the Galar Pals Mini Tin 5-Pack"
  },
  {
-  "id": "DATE_OCTOBER_METAL_COIN",
+  "id": "DATE_OCTOBER_METAL_COIN_20221028",
   "url": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_OCTOBER_METAL_COIN.jpg",
   "name": "Metal Coin featuring Charizard released",
-  "material": "enamel",
-  "release": "date\tOctober 28, 2022",
+  "material": "metal",
+  "release": "October 28, 2022",
   "releaseDate": "October 28, 2022",
   "region": "North America",
   "description": "Metal Coin featuring Charizard released within the Sword & Shield Ultra-Premium Collection—Charizard October 28, 2022"
@@ -9421,7 +9388,7 @@ const GEN_IX_COINS = [
   "url": "src/assets/coins/bulbapedia/SWORD__METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/SWORD__METAL_COIN.jpg",
   "name": "Metal Coin featuring Arceus released",
-  "material": "enamel",
+  "material": "metal",
   "release": "Sword & Shield Ultra-Premium Collection—Charizard",
   "releaseDate": "November 4, 2022",
   "region": "North America",
@@ -9444,7 +9411,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_REGULARSIZED_GREEN.jpg",
   "name": "Regular-sized, Green Confetti Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tNovember 5, 2022",
+  "release": "November 5, 2022",
   "releaseDate": "November 5, 2022",
   "region": "Japan",
   "description": "Regular-sized, Green Confetti Holofoil, Black-backed Coin featuring Rayquaza included in the Charizard VSTAR vs Rayquaza VMAX Special Deck Set Novmber 5, 2022"
@@ -9455,18 +9422,18 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_NOVEMBER_JUMBOSIZED_BLUE.jpg",
   "name": "Jumbo-sized, Blue Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tNovember 11, 2022",
+  "release": "November 11, 2022",
   "releaseDate": "November 11, 2022",
   "region": "North America",
   "description": "Jumbo-sized, Blue Cracked Ice Holofoil, Black-backed Coin featuring Alolan Vulpix released within the Silver Tempest Pokémon Center Elite Trainer Box November 11, 2022"
  },
  {
-  "id": "DATE_JANUARY_METAL_COIN",
+  "id": "DATE_JANUARY_METAL_COIN_20230120",
   "url": "src/assets/coins/bulbapedia/DATE_JANUARY_METAL_COIN.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_JANUARY_METAL_COIN.jpg",
   "name": "Metal Coin featuring Lucario released",
-  "material": "enamel",
-  "release": "date\tJanuary 20, 2023",
+  "material": "metal",
+  "release": "January 20, 2023",
   "releaseDate": "January 20, 2023",
   "region": "North America",
   "description": "Metal Coin featuring Lucario released within the Crown Zenith Pokémon Center Elite Trainer Box Plus January 20, 2023"
@@ -9494,23 +9461,23 @@ const GEN_IX_COINS = [
   "description": "Jumbo-sized, Pink Cracked Ice Holofoil, Black-backed Coin featuring Klara included in the Klara Premium Tournament Collection March 24, 2023"
  },
  {
-  "id": "DATE_MARCH_JUMBOSIZED_SILVER",
+  "id": "DATE_MARCH_JUMBOSIZED_SILVER_20230324",
   "url": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_SILVER.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_MARCH_JUMBOSIZED_SILVER.jpg",
   "name": "Jumbo-sized, Silver Cracked Ice Holofoil,",
   "material": "silver",
-  "release": "date\tMarch 24, 2023",
+  "release": "March 24, 2023",
   "releaseDate": "March 24, 2023",
   "region": "North America",
   "description": "Jumbo-sized, Silver Cracked Ice Holofoil, Black-backed Coin featuring Cyrus included in the Cyrus Premium Tournament Collection March 24, 2023"
  },
  {
-  "id": "DATE_AUGUST_JUMBOSIZED_BLUE",
+  "id": "DATE_AUGUST_JUMBOSIZED_BLUE_20230804",
   "url": "src/assets/coins/bulbapedia/DATE_AUGUST_JUMBOSIZED_BLUE.jpg",
   "thumb": "src/assets/coins/bulbapedia/DATE_AUGUST_JUMBOSIZED_BLUE.jpg",
   "name": "Jumbo-sized, Blue Wave Holofoil, Black-backed",
   "material": "enamel",
-  "release": "date\tAugust 4, 2023",
+  "release": "August 4, 2023",
   "releaseDate": "August 4, 2023",
   "region": "North America",
   "description": "Jumbo-sized, Blue Wave Holofoil, Black-backed Coin featuring Lugia included in the Crown Zenith Special Collection—Unown V & Lugia V August 4, 2023"
@@ -9521,7 +9488,7 @@ const GEN_IX_COINS = [
   "thumb": "src/assets/coins/bulbapedia/DATE_SEPTEMBER_REGULARSIZED_GOLD.jpg",
   "name": "Regular-sized, Gold Non Holofoil, Black-backed",
   "material": "gold",
-  "release": "date\tSeptember 9, 2023",
+  "release": "September 9, 2023",
   "releaseDate": "September 9, 2023",
   "region": "Mainland China",
   "description": "Regular-sized, Gold Non Holofoil, Black-backed Coin featuring Rayquaza released within the Golden Energy Theme Pack starting September 9, 2023"
@@ -9561,17 +9528,96 @@ const GEN_IX_COINS = [
  }
 ];
 
+export const COIN_MATERIALS = ['gold', 'silver', 'metal', 'enamel', 'cardboard'];
+
 export function getCoins() {
-  return GEN_IX_COINS.map((c) => ({ ...c }));
+  return COIN_CATALOG.map((c) => ({ ...c }));
 }
 
 export function getCoinById(id) {
-  const coin = GEN_IX_COINS.find((c) => c.id === id);
+  const coin = COIN_CATALOG.find((c) => c.id === id);
   return coin ? { ...coin } : null;
+}
+
+/** True when the coin's art is only a placeholder path (no downloaded scan). */
+export function isPlaceholderCoin(coin) {
+  return /\/coins\/bulbapedia\//.test(String(coin?.url ?? ''));
 }
 
 export function filterCoinsByName(coins = [], term = '') {
   const needle = String(term || '').trim().toLowerCase();
   if (!needle) return [...coins];
-  return coins.filter((c) => c.name.toLowerCase().includes(needle));
+  return coins.filter((c) => String(c.name ?? '').toLowerCase().includes(needle));
+}
+
+/**
+ * Faceted filter over a coin list. Every facet is optional; omitted/`'all'`
+ * facets are ignored. Matching is case-insensitive for `material`/`region`.
+ */
+export function filterCoins(coins = [], { term = '', material = 'all', region = 'all', hasImage = false } = {}) {
+  const needle = String(term || '').trim().toLowerCase();
+  const mat = String(material || 'all').toLowerCase();
+  const reg = String(region || 'all').toLowerCase();
+
+  return coins.filter((coin) => {
+    if (needle && !String(coin.name ?? '').toLowerCase().includes(needle)) return false;
+    if (mat !== 'all' && String(coin.material ?? '').toLowerCase() !== mat) return false;
+    if (reg !== 'all' && String(coin.region ?? '').toLowerCase() !== reg) return false;
+    if (hasImage && isPlaceholderCoin(coin)) return false;
+    return true;
+  });
+}
+
+/**
+ * Group coins that share a release into variant clusters.
+ * Coins without a release are omitted. Sorted by variant count desc, then release.
+ */
+export function groupCoinsByRelease(coins = []) {
+  const groups = new Map();
+  for (const coin of coins) {
+    const release = String(coin.release ?? '').trim();
+    if (!release) continue;
+    if (!groups.has(release)) {
+      groups.set(release, {
+        release,
+        region: coin.region ?? '',
+        releaseDate: coin.releaseDate ?? '',
+        count: 0,
+        coinIds: [],
+      });
+    }
+    const group = groups.get(release);
+    group.count += 1;
+    group.coinIds.push(coin.id);
+    if (!group.region && coin.region) group.region = coin.region;
+    if (!group.releaseDate && coin.releaseDate) group.releaseDate = coin.releaseDate;
+  }
+
+  return [...groups.values()].sort(
+    (a, b) => b.count - a.count || a.release.localeCompare(b.release)
+  );
+}
+
+/** Aggregate counts for the catalog or a filtered subset. */
+export function getCoinStats(coins = []) {
+  const byMaterial = {};
+  const byRegion = {};
+  let placeholders = 0;
+
+  for (const coin of coins) {
+    const material = String(coin?.material ?? 'unknown');
+    const region = String(coin?.region ?? 'unknown');
+    byMaterial[material] = (byMaterial[material] ?? 0) + 1;
+    byRegion[region] = (byRegion[region] ?? 0) + 1;
+    if (isPlaceholderCoin(coin)) placeholders += 1;
+  }
+
+  return {
+    total: coins.length,
+    byMaterial,
+    byRegion,
+    releaseGroups: groupCoinsByRelease(coins).length,
+    withImage: coins.length - placeholders,
+    placeholders,
+  };
 }
