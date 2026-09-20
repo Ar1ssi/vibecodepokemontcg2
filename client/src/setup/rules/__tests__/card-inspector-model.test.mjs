@@ -636,3 +636,37 @@ test('model: a continuous Stadium shows text but is never usable (018)', () => {
   assert.equal(m.recede, false);
   assert.match(m.reason, /Continuous/);
 });
+
+test('model: Stadium extras render after printed attacks with merged indices', () => {
+  const card = {
+    name: 'Ivysaur',
+    supertype: 'Pokémon',
+    type: 'Grass',
+    types: ['Grass'],
+    hp: 100,
+    stage: 'Stage 1',
+    attacks: [{ name: 'Vine Whip', cost: ['Grass'], damage: 30 }],
+  };
+  const m = buildInspectorModel(card, {
+    energyTypes: [],
+    zone: 'active',
+    extraAttacks: [
+      { name: 'Tackle', cost: [], damage: 10, inherited: true },
+      { name: 'Vine Whip', cost: ['Grass'], damage: 30, inherited: true },
+    ],
+  });
+  // The printed attack wins the name collision; the merged index is the list
+  // position the server resolves an `attackIndex` against.
+  assert.deepEqual(
+    m.attacks.map((a) => a.name),
+    ['Vine Whip', 'Tackle']
+  );
+  assert.deepEqual(
+    m.attacks.map((a) => a.index),
+    [0, 1]
+  );
+  // Tackle is free, so the extra is payable even with no Energy attached.
+  assert.equal(m.attacks[1].payable, true);
+  assert.equal(m.attacks[1].usable, true);
+  assert.equal(m.attacks[0].payable, false);
+});
