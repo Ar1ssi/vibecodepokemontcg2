@@ -520,6 +520,63 @@ test("effectiveHp: attached Tool (Hero's Cape) prevents knockout when damage equ
   assert.equal(resBigKo.state.players.p1.flags.prizesOwed, undefined);
 });
 
+test('handleKnockout: attached Legacy Energy reduces prizes owed by 1', () => {
+  // Full prize row so the KO does not end the game and prizesOwed is observable.
+  const state = setupGame();
+  state.players.p1.zones.prizes = Array.from({ length: 6 }, (_, i) =>
+    createCard({ instanceId: 200 + i, name: `Prize ${i + 1}` })
+  );
+  state.players.p2.zones.active.push(
+    createCard({
+      instanceId: 300,
+      name: 'Legacy Energy',
+      type: 'Energy',
+      subtypes: ['Special Energy'],
+      attachedTo: 2,
+      text: "If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent's Pokémon, that player takes 1 fewer Prize card.",
+    })
+  );
+  state.players.p1.zones.active[0].attacks.push({
+    name: 'Big Shock',
+    damage: 100,
+    cost: ['Lightning'],
+  });
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(
+    res.state.players.p1.flags.prizesOwed,
+    0,
+    'the single KO prize is reduced to 0 by Legacy Energy'
+  );
+  assert.equal(
+    res.state.players.p1.zones.prizes.length,
+    6,
+    'no prize is collected when Legacy Energy reduces the count to 0'
+  );
+
+  // Control: same KO without Legacy Energy collects the full 1 prize.
+  const control = setupGame();
+  control.players.p1.zones.prizes = Array.from({ length: 6 }, (_, i) =>
+    createCard({ instanceId: 200 + i, name: `Prize ${i + 1}` })
+  );
+  control.players.p1.zones.active[0].attacks.push({
+    name: 'Big Shock',
+    damage: 100,
+    cost: ['Lightning'],
+  });
+  const resControl = applyCommand(control, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(resControl.state.players.p1.zones.prizes.length, 5);
+});
+
 test('attack heal: heals damage from attacker and emits damageUpdated event', () => {
   const state = setupGame();
   const attacker = state.players.p1.zones.active[0];

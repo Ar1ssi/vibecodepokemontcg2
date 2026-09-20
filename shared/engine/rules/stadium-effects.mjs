@@ -17,6 +17,7 @@ import { isPokemon } from '../cards.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
 import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard } from './card-classify.mjs';
 import { isDeltaSpecies } from './energy-effects.mjs';
+import { getSpecialEnergyHpBonus } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
 //
 // Layers:
@@ -1556,6 +1557,10 @@ export function effectiveHp(
   const base = baseHp || 0;
   if (!base) return 0;
   let total = base + getStadiumHpBonus(targetPlayer, pokemon, stadiumOverride);
+  // Special-energy +HP modifiers (Growing Grass, Heat, …): taxonomy §F Gap #4c.
+  if (zoneCards?.length && pokemon) {
+    total += getSpecialEnergyHpBonus(pokemon, zoneCards);
+  }
   const blockTools = stadiumOverride
     ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)
     : stadiumBlocksToolEffects();

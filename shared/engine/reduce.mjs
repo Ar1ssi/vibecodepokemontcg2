@@ -58,6 +58,15 @@ import {
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot } from './effects/executor.mjs';
+import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
+import {
+  runSpecialEnergyTriggers,
+  runEndOfTurnSpecialEnergies,
+  resolveSpecialEnergyDiscard,
+  resolveSpecialEnergyKnockout,
+  resumeSpecialEnergyTrigger,
+  SPECIAL_ENERGY_EFFECT,
+} from './effects/special-energy.mjs';
 import { executeStadium } from './effects/stadium.mjs';
 import {
   parseStadiumOncePerTurn,
@@ -566,14 +575,27 @@ function handleKnockout(
       : [victim];
 
   const basePrizeCount = prizesForKO(inPlayView(draft, victim));
+  // Legacy Energy: the once-per-game reduction may already be spent.
+  const legacyEnergyAttached = victimZoneCards.some(
+    (c) =>
+      c.attachedTo === victim.instanceId &&
+      isSpecialEnergyCard(c) &&
+      hasOncePerGameSpecialEnergyEffect(c)
+  );
+  const legacyUsed = !!victimPlayer?.flags?.legacyPrizeReductionUsed;
   let prizeCount = toolPrizeCountAdjust(
     victim,
     victimZoneCards,
     basePrizeCount,
     {
       stadium: draft.stadium,
+      skipSpecialEnergy: legacyUsed,
     }
   );
+  if (legacyEnergyAttached && !legacyUsed) {
+    if (!victimPlayer.flags) victimPlayer.flags = {};
+    victimPlayer.flags.legacyPrizeReductionUsed = true;
+  }
 
   const attacker = draft.players[attackerPlayerId];
   if (attacker?.flags?.briarActive) {
@@ -609,6 +631,15 @@ function handleKnockout(
   // of the discard pile — attached cards are still discarded (card text).
   const lostCity = isStadiumLostCity(draft.stadium?.card || draft.stadium);
 
+  // Special-energy on-knockout triggers (Splash/Rescue return the Pokémon to
+  // hand; Gift draws until 7). Attached cards still go to the discard pile.
+  const koZoneRef = findCard(draft, victim.instanceId);
+  const koSpecial = resolveSpecialEnergyKnockout(draft, {
+    host: victim,
+    hostPlayerId: victimPlayerId,
+    hostZoneId: koZoneRef?.zoneId || (wasActive ? 'active' : 'bench'),
+  });
+
   if (targetZone) {
     for (let i = targetZone.length - 1; i >= 0; i--) {
       const c = targetZone[i];
@@ -625,10 +656,56 @@ function handleKnockout(
             victimPlayer.zones.lostZone = [];
           }
           victimPlayer.zones.lostZone.push(c);
+        } else if (koSpecial.returnToHand && c.instanceId === victim.instanceId) {
+          victimPlayer.zones.hand.push(c);
+          events.push({
+            type: 'cardMoved',
+            instanceId: c.instanceId,
+            from: koZoneRef?.zoneId || 'active',
+            to: 'hand',
+            playerId: victimPlayerId,
+          });
+        } else if (
+          c.instanceId !== victim.instanceId &&
+          isSpecialEnergyCard(c) &&
+          resolveSpecialEnergyDiscard(draft, {
+            energy: c,
+            host: victim,
+            hostPlayerId: victimPlayerId,
+            hostZoneId: koZoneRef?.zoneId || 'active',
+            events,
+          }) === 'hand'
+        ) {
+          // Recycle Energy attached to a KO'd Pokémon still returns to hand.
+          victimPlayer.zones.hand.push(c);
+          events.push({
+            type: 'cardMoved',
+            instanceId: c.instanceId,
+            from: koZoneRef?.zoneId || 'active',
+            to: 'hand',
+            playerId: victimPlayerId,
+          });
         } else {
           // Prism Star cards go to the Lost Zone instead of discard (App. 17).
           discardCardToPlayerZone(victimPlayer, c);
         }
+      }
+    }
+  }
+
+  if (koSpecial.drawUntil > 0) {
+    const hand = victimPlayer.zones.hand;
+    const need = Math.max(0, koSpecial.drawUntil - hand.length);
+    if (need > 0) {
+      const drawn = victimPlayer.zones.deck.splice(0, Math.min(need, victimPlayer.zones.deck.length));
+      hand.push(...drawn);
+      if (drawn.length) {
+        events.push({
+          type: 'cardsDrawn',
+          count: drawn.length,
+          playerId: victimPlayerId,
+          cards: drawn.map((c) => c.instanceId),
+        });
       }
     }
   }
@@ -836,6 +913,10 @@ function resolveCheckup(
 
   // Between-turns Stadium damage resolves after Pokémon Checkup.
   applyBetweenTurnsStadiumDamage(draft, { events });
+
+  // End-of-turn special-energy effects (legacy Darkness Energy): "at the end of
+  // every turn" applies to both players' in-play Pokémon.
+  runEndOfTurnSpecialEnergies(draft, { events });
 }
 
 /**
@@ -2377,6 +2458,11 @@ function resolveAttackEffectPhase(draft, ctx) {
     flips,
   } = ctx;
 
+  // Marks that an attack's effect phase is resolving so on-discard reattach
+  // triggers (Boomerang/Burning) fire only for attack-driven discards. Cleared
+  // in the applyCommand tail.
+  draft.__attackEffectPhase = true;
+
       const parsed = parseAttackDamage(
         attack,
         attackerView,
@@ -2452,6 +2538,20 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
 
         if (dmgDealt > 0) {
+          // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
+          // Energy, Lucky Energy). Resolved before the KO sweep so an energy on
+          // a Pokémon that is Knocked Out still fires ("even if Knocked Out").
+          const defenderZoneRef = findCard(draft, defender.instanceId);
+          runSpecialEnergyTriggers(draft, {
+            trigger: 'damaged',
+            host: defender,
+            hostPlayerId: defenderPlayerId,
+            hostZoneId: defenderZoneRef?.zoneId || 'active',
+            attacker,
+            attackerPlayerId: playerId,
+            events,
+          });
+
           const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
           const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
 
@@ -3084,6 +3184,29 @@ export function applyCommand(state, command, rng = null) {
       }
 
       if (card) {
+        // Special-energy on-discard: Recycle Energy returns to hand instead of
+        // the discard pile. (Reattach is attack-only and handled by the effect
+        // executor, not this client-driven move.)
+        let discardRedirect = null;
+        if (
+          payload.to === 'discard' &&
+          ['active', 'bench'].includes(payload.from) &&
+          isEnergy(card) &&
+          isSpecialEnergyCard(card) &&
+          card.attachedTo != null
+        ) {
+          const host = findCard(draft, card.attachedTo)?.card;
+          const hostRef = host ? findCard(draft, host.instanceId) : null;
+          const resolution = resolveSpecialEnergyDiscard(draft, {
+            energy: card,
+            host,
+            hostPlayerId: hostRef?.playerId,
+            hostZoneId: hostRef?.zoneId,
+            events,
+          });
+          if (resolution === 'hand') discardRedirect = 'hand';
+        }
+
         if (payload.to === 'stadium') {
           if (draft.stadium && draft.stadium.instanceId !== card.instanceId) {
             discardCurrentStadium(draft, events, playerId);
@@ -3094,6 +3217,16 @@ export function applyCommand(state, command, rng = null) {
           for (const p of Object.values(draft.players || {})) {
             if (p.flags) p.flags.stadiumUsedThisTurn = false;
           }
+        } else if (discardRedirect === 'hand') {
+          card.attachedTo = null;
+          draft.players[playerId].zones.hand.push(card);
+          events.push({
+            type: 'cardMoved',
+            instanceId: card.instanceId,
+            from: payload.from,
+            to: 'hand',
+            playerId,
+          });
         } else {
           const destZone = draft.players[playerId].zones[payload.to];
           if (
@@ -3256,6 +3389,15 @@ export function applyCommand(state, command, rng = null) {
             targetInstanceId: payload.targetInstanceId,
           });
 
+          // Special-energy on-evolve triggers (e.g. Regenerative Energy heal).
+          runSpecialEnergyTriggers(draft, {
+            trigger: 'evolve',
+            host: hostRef.card,
+            hostPlayerId: hostRef.playerId,
+            hostZoneId: hostRef.zoneId,
+            events,
+          });
+
           // Gen 6 Mega Evolution / Primal Reversion: the evolve ends the turn
           // immediately unless the matching Spirit Link is already attached
           // (rulebook 30c 1.4). The reducer is the authority; the client only
@@ -3287,6 +3429,21 @@ export function applyCommand(state, command, rng = null) {
           targetInstanceId: payload.targetInstanceId,
           playerId,
         });
+
+        // Special-energy on-attach triggers (draw/search/heal/damage/switch/
+        // devolve/return-basic-energy). A search or switch may suspend the
+        // command on a PendingChoice, resumed via resolveChoice.
+        if (isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
+          runSpecialEnergyTriggers(draft, {
+            trigger: 'attach',
+            host: hostRef.card,
+            hostPlayerId: hostRef.playerId,
+            hostZoneId: hostRef.zoneId,
+            energy: cardRef.card,
+            fromZone: cardRef.zoneId,
+            events,
+          });
+        }
       }
       break;
     }
@@ -3830,6 +3987,12 @@ export function applyCommand(state, command, rng = null) {
           playerId: initiatorPlayerId,
           selection: payload.selection || [],
           events,
+        });
+      } else if (token.effectType === SPECIAL_ENERGY_EFFECT) {
+        resumeSpecialEnergyTrigger(draft, {
+          selection: payload.selection || [],
+          events,
+          resumeToken: token,
         });
       } else if (token.effectType === 'glimwood') {
         // Glimwood Tangle: resume the attack with the kept coin result or a fresh
@@ -4642,6 +4805,7 @@ export function applyCommand(state, command, rng = null) {
 
   settlePrizeEntitlements(draft, { events });
   clearFaceDownOffBoard(draft);
+  delete draft.__attackEffectPhase;
 
   // Advance state version and append to commandLog
   draft.stateVersion = (state.stateVersion || 0) + 1;

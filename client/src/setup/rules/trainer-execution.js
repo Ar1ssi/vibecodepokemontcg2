@@ -303,7 +303,7 @@ function discardStadiumInPlay() {
   return false;
 }
 
-function switchBenchToActive(user, benchCard) {
+export function switchBenchToActive(user, benchCard) {
   const benchIdx = zone(user, 'bench').array.indexOf(benchCard);
   if (benchIdx < 0) return;
   moveCardBundle(user, user, 'bench', 'active', benchIdx, false, 'move');

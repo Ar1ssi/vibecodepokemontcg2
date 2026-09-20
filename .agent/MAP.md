@@ -61,6 +61,7 @@ server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
 shared/engine/rules/attack-engine.mjs — `computeAttackDamage`, `canPayAttackCost`
+shared/engine/rules/special-energy-parse.mjs — special-energy text → structured effect steps (`parseSpecialEnergyEffects`) + pure execution helpers used by `computeAttackDamage` (damage bonus/penalty/reduction) and `effectiveHp` (+HP); audit `scripts/audit-all-special-energy.mjs` (S220)
 shared/engine/rules/special-conditions.mjs — server card conditions: rotation field + Poison/Burn marker keys (D45); every reducer/effect write goes through it
 shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
 shared/engine/rules/trainer-play-conditions.mjs — `trainerPlayBlockReason` (turn-1 Supporter, same Stadium, printed play conditions); used by reduce.mjs legality and the bot's e2e-options.mjs

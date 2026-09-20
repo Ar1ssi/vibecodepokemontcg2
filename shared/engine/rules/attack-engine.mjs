@@ -15,6 +15,11 @@ import {
   applyToolDamageReduction,
   combinedToolDamagePrevention,
 } from './tool-combat.mjs';
+import {
+  getSpecialEnergyAttackBonus,
+  getSpecialEnergyAttackPenalty,
+  getSpecialEnergyDamageReduction,
+} from './special-energy-parse.mjs';
 
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -46,7 +51,12 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     stadium,
   });
 
-  const damageBeforeWR = Math.max(0, base + attackerBonus);
+  // Step 2b: Attacker special-energy damage bonuses / penalties (taxonomy §F,
+  // Gap #4c). Applied BEFORE Weakness and Resistance, like tool bonuses.
+  const specialEnergyBonus = getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive });
+  const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards);
+
+  const damageBeforeWR = Math.max(0, base + attackerBonus + specialEnergyBonus - specialEnergyPenalty);
 
   // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
   // Stadiums nullify Weakness for a filtered set of Pokémon, force Weakness to
@@ -90,6 +100,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   let damageAfterWR = damageBeforeWR * multiplier + flat - resistance - stadiumReduction;
   if (damageAfterWR < 0) damageAfterWR = 0;
 
+  // Step 4b: Defender special-energy damage reduction applied after W/R
+  // (Metal Energy, Stone, V Guard, …).
+  const specialEnergyReduction = getSpecialEnergyDamageReduction(defender, defenderZoneCards, {
+    attacker,
+    afterWR: true,
+  });
+  damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction);
+
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
   let reduced = 0;
   let damageAfterReduction = damageAfterWR;
@@ -123,10 +141,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     total: finalDamage,
     base,
     attackerBonus,
+    specialEnergyBonus,
+    specialEnergyPenalty,
     multiplier,
     flat,
     resistance,
     stadiumReduction,
+    specialEnergyReduction,
     reduced,
     prevented,
   };

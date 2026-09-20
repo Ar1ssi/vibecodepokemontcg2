@@ -25,6 +25,7 @@ import {
   isRuleBoxPokemon,
 } from './card-classify.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
+import { isSpecialEnergyCard } from './special-energy-parse.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -473,13 +474,16 @@ export function toolPrizeCountAdjust(
   defender,
   zoneCards,
   baseCount,
-  { blockTools = false, stadium = null } = {}
+  { blockTools = false, stadium = null, skipSpecialEnergy = false } = {}
 ) {
   let count = baseCount;
   if (!defender) return count;
   const toolsBlocked = toolBlocked(blockTools, stadium);
   for (const card of attachedCards(defender, zoneCards)) {
     if (isPokemonToolCard(card) && toolsBlocked) continue;
+    // Legacy Energy's once-per-game reduction can be spent; when it is, its
+    // (generic) prize-modify text must be ignored.
+    if (skipSpecialEnergy && isSpecialEnergyCard(card)) continue;
     const delta = parsePrizeModify(card).delta;
     if (delta) count = Math.max(0, count + delta);
   }

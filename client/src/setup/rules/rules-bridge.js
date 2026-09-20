@@ -35,7 +35,7 @@
 import { isPrismStarCard } from '/shared/engine/rules/card-classify.mjs';
     import { applyStatus, parseStatusFromAttackText, resolveTurnBoundary, resetStatuses, clearStatuses } from '/shared/engine/rules/status.mjs';
 import { statusState } from '/shared/engine/rules/status.mjs';
-import { initTrainerExecution, runTrainerSteps } from './trainer-execution.js';
+import { initTrainerExecution, runTrainerSteps, switchBenchToActive } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
 import { getDealOrderStarter, resetDealOrder } from '../netcode/deal-order.js';
 import { multiplayerLocksRulesEnabled } from '../general/e2e-mode.mjs';
@@ -63,12 +63,11 @@ import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMa
 import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
-  describeTypedSpecialEnergy,
-  getTelepathicOnAttachSearch,
-  matchesBasicPokemonType,
-  parseTypedSpecialEnergy,
-  pokemonMatchesEnergyType,
-} from '/shared/engine/rules/special-energy-effects.mjs';
+  parseSpecialEnergyEffects,
+  describeSpecialEnergyEffects,
+  planSpecialEnergyTriggers,
+  isSpecialEnergyCard,
+} from '/shared/engine/rules/special-energy-parse.mjs';
 import { classifyAbility, describeAbilityFamily } from '/shared/engine/rules/ability-effects.mjs';
 import {
   planAbilitySteps,
@@ -82,7 +81,7 @@ import {
 } from '../netcode/turn-order-call.js';
 import { healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
-import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
+import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../../actions/counters/damage-counter.js';
 import { evaluateMulligans, bonusDrawsOwed } from '/shared/engine/rules/mulligan.mjs';
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
@@ -483,6 +482,47 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
           }
         }
     
+        // end-of-turn special-energy effects (legacy Darkness Energy): "at the
+        // end of every turn" applies to both players' in-play Pokémon.
+        if (rulesState.enabled) {
+          for (const player of ['self', 'opp']) {
+            for (const zoneId of ['active', 'bench']) {
+              const z = getZone(player, zoneId);
+              for (let i = 0; i < z.array.length; i++) {
+                const host = z.array[i];
+                if (!host || host.image?.attached) continue;
+                const energies = z.array.filter(
+                  (c) => c && c.type === 'Energy' && c.image?.relative === host.image && isSpecialEnergyCard(c)
+                );
+                for (const energy of energies) {
+                  const plans = planSpecialEnergyTriggers(energy, {
+                    trigger: 'endTurn',
+                    host,
+                    zoneArray: z.array,
+                  });
+                  for (const plan of plans) {
+                    if (plan.action !== 'addDamage') continue;
+                    const amount = plan.count * 10;
+                    const current =
+                      parseInt(host.image?.damageCounter?.textContent || '0', 10) || 0;
+                    if (host.image?.damageCounter) {
+                      updateDamageCounter(player, zoneId, i, current + amount, true);
+                    } else {
+                      addDamageCounter(player, zoneId, i, amount, true);
+                    }
+                    appendMessage(
+                      '',
+                      `⏰ End of turn: ${plan.count} damage counter(s) on ${host.name || 'a Pokémon'} (${energy.name}).`,
+                      'announcement',
+                      false
+                    );
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // win-condition sweep before passing
         if (evaluateAndApplyWinConditions(endingPlayer)) {
           return;
@@ -1259,74 +1299,192 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
 
       document.addEventListener('rules-energy-attached', async (event) => {
         if (!rulesState.enabled) return;
-        const { user, energy, pokemon, fromZone } = event.detail || {};
+        const { user, energy, pokemon, fromZone, toZone } = event.detail || {};
         if (!energy || !pokemon) return;
         try {
           await ensureCardData(energy);
           await ensureCardData(pokemon);
-          const def = parseTypedSpecialEnergy(energy);
-          if (!def) return;
+          const parsed = parseSpecialEnergyEffects(energy);
+          if (!parsed) return;
 
-          const desc = describeTypedSpecialEnergy(energy) || describeEnergyEffect(energy);
+          const desc = describeSpecialEnergyEffects(energy) || describeEnergyEffect(energy);
           appendMessage('', `⚡ ${desc}`, 'announcement', false);
 
-          if (
-            def.recoverStatusOnAttach &&
-            pokemonMatchesEnergyType(pokemon, def.requiredPokemonType)
-          ) {
-            const key = pokemon.image?.dataset?.cardId || pokemon.name;
-            clearStatuses(user, key);
-            appendMessage(
-              '',
-              `  💧 ${pokemon.name}: recovered from all Special Conditions.`,
-              'announcement',
-              false,
-            );
-          }
+          const hostZoneId = toZone === 'active' ? 'active' : 'bench';
+          const hostZone = getZone(user, hostZoneId);
+          const hostIndex = hostZone?.array ? hostZone.array.indexOf(pokemon) : -1;
+          const statusKey = pokemon.image?.dataset?.cardId || pokemon.name;
+          const currentDamage = () =>
+            parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
+          const setDamage = (value) => {
+            if (hostIndex < 0) return;
+            const v = Math.max(0, value);
+            if (v <= 0) removeDamageCounter(user, hostZoneId, hostIndex);
+            else updateDamageCounter(user, hostZoneId, hostIndex, v);
+          };
 
-          const search = getTelepathicOnAttachSearch(energy);
-          if (
-            fromZone === 'hand' &&
-            search &&
-            pokemonMatchesEnergyType(pokemon, def.requiredPokemonType)
-          ) {
-            openDeckSearchWindow(`${energy.name} — search your deck`);
-            const deck = getZone(user, 'deck');
-            const matches = [];
-            for (const c of deck.array) {
-              await ensureCardData(c);
-              if (matchesBasicPokemonType(c, def.requiredPokemonType)) {
-                matches.push(c);
-              }
-            }
-            const pool = matches.length > 0 ? matches : deck.array;
-            if (pool.length === 0) {
-              appendMessage('', '  no cards left in deck', 'announcement', false);
-              return;
-            }
-            openChoicePicker({
-              title: `${energy.name} — choose up to ${search.count} Basic ${def.requiredPokemonType} Pokémon for your Bench`,
-              candidates: pool,
-              zoneFrom: 'deck',
-              destination: 'bench',
-              multiSelect: true,
-              requiredCount: Math.min(search.count, pool.length),
-              // openCardPicker's confirm already moved (and relayed) every
-              // pick via zoneFrom/destination before calling this.
-              onConfirm: (selected) => {
+          const plans = planSpecialEnergyTriggers(energy, {
+            trigger: 'attach',
+            host: pokemon,
+            zoneArray: hostZone?.array || [],
+            fromZone,
+          });
+
+          for (const plan of plans) {
+            switch (plan.action) {
+              case 'draw':
+                if (plan.count > 0) draw(user, user, plan.count, true);
+                break;
+              case 'heal':
+                if (currentDamage() > 0) {
+                  setDamage(currentDamage() - plan.amount);
+                  appendMessage('', `  💚 ${pokemon.name}: healed ${plan.amount}.`, 'announcement', false);
+                }
+                break;
+              case 'removeDamage': {
+                if (currentDamage() > 0) setDamage(currentDamage() - plan.count * 10);
+                if (plan.alsoCure) clearStatuses(user, statusKey);
                 appendMessage(
                   '',
-                  `  ${selected.map((s) => s.name).join(', ')} → Bench`,
+                  `  💚 ${pokemon.name}: removed ${plan.count} damage counter${plan.count === 1 ? '' : 's'}${plan.alsoCure ? ' and Special Conditions' : ''}.`,
                   'announcement',
                   false,
                 );
-                shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
-              },
-              onCancel: () => {
-                appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
-                shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name, message: null });
-              },
-            });
+                break;
+              }
+              case 'addDamage':
+                setDamage(currentDamage() + plan.count * 10);
+                appendMessage(
+                  '',
+                  `  ⚠️ ${pokemon.name}: ${plan.count} damage counter${plan.count === 1 ? '' : 's'}.`,
+                  'announcement',
+                  false,
+                );
+                break;
+              case 'clearStatus':
+                clearStatuses(user, statusKey);
+                appendMessage('', `  💧 ${pokemon.name}: recovered from all Special Conditions.`, 'announcement', false);
+                break;
+              case 'search': {
+                openDeckSearchWindow(`${energy.name} — search your deck`);
+                const deck = getZone(user, 'deck');
+                const matches = [];
+                for (const c of deck.array) {
+                  await ensureCardData(c);
+                  if (matchesSearch(c, plan.what)) matches.push(c);
+                }
+                const pool = matches.length > 0 ? matches : deck.array;
+                if (pool.length === 0) {
+                  appendMessage('', '  no cards left in deck', 'announcement', false);
+                  break;
+                }
+                openChoicePicker({
+                  title: `${energy.name} — choose up to ${plan.count} ${plan.what} for your Bench`,
+                  candidates: pool,
+                  zoneFrom: 'deck',
+                  destination: 'bench',
+                  multiSelect: true,
+                  requiredCount: Math.min(plan.count, pool.length),
+                  // openCardPicker's confirm already moved (and relayed) every
+                  // pick via zoneFrom/destination before calling this.
+                  onConfirm: (selected) => {
+                    appendMessage(
+                      '',
+                      `  ${selected.map((s) => s.name).join(', ')} → Bench`,
+                      'announcement',
+                      false,
+                    );
+                    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name });
+                  },
+                  onCancel: () => {
+                    appendMessage('', '  search canceled — shuffle your deck', 'announcement', false);
+                    shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: energy.name, message: null });
+                  },
+                });
+                break;
+              }
+              case 'switch': {
+                const oppSide = user === 'self' ? 'opp' : 'self';
+                const switchSide = plan.side === 'opponent' ? oppSide : user;
+                if (plan.side === 'self' && plan.target === 'benchedToActive') {
+                  switchBenchToActive(user, pokemon);
+                  break;
+                }
+                const bench = getZone(switchSide, 'bench').array.filter((c) => c && !c.image?.attached);
+                if (bench.length === 1) {
+                  switchBenchToActive(switchSide, bench[0]);
+                } else if (bench.length > 1) {
+                  import('./mat-picker.js').then(({ openMatPick }) => {
+                    openMatPick({
+                      title: `${energy.name} — click a Benched Pokémon to switch in`,
+                      candidates: bench,
+                      onPick: (b) => switchBenchToActive(switchSide, b),
+                    });
+                  });
+                }
+                break;
+              }
+              case 'devolve': {
+                if (currentDamage() > 0) setDamage(currentDamage() - plan.count * 10);
+                const base = (hostZone?.array || []).find(
+                  (c) => c && c !== pokemon && c.parentCard === pokemon && (c.type2 || c.type) === 'Pokémon'
+                );
+                if (!base) {
+                  appendMessage('', `  ${pokemon.name} is not an evolved Pokémon — nothing to discard.`, 'announcement', false);
+                  break;
+                }
+                // Detach the base so moving the top card out does not drag it
+                // (and the host's energy/tools) to the discard pile with it.
+                if (Array.isArray(pokemon.attachedCards)) {
+                  pokemon.attachedCards = pokemon.attachedCards.filter((c) => c !== base);
+                }
+                base.attached = false;
+                base.parentCard = null;
+                base.parentCardId = null;
+                if (base.image) base.image.relative = null;
+                // Re-point the host's remaining attachments to the base.
+                for (const c of hostZone.array) {
+                  if (c === base || c === pokemon) continue;
+                  if (c.parentCard === pokemon || c.image?.relative === pokemon.image) {
+                    c.parentCard = base;
+                    c.parentCardId = base.cardId ?? base.syncInstance ?? null;
+                    if (c.image) c.image.relative = base.image;
+                    if (!Array.isArray(base.attachedCards)) base.attachedCards = [];
+                    if (!base.attachedCards.includes(c)) base.attachedCards.push(c);
+                  }
+                }
+                const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+                const topIdx = hostZone.array.indexOf(pokemon);
+                if (topIdx >= 0) moveCardBundle(user, user, hostZoneId, 'discard', topIdx, false, 'move');
+                appendMessage(
+                  '',
+                  `  🔄 ${pokemon.name}: top Evolution card discarded — ${base.name} devolved.`,
+                  'announcement',
+                  false
+                );
+                break;
+              }
+              case 'returnBasicEnergy': {
+                const attached = (hostZone?.array || []).filter(
+                  (c) =>
+                    c &&
+                    c.type === 'Energy' &&
+                    c.image?.relative === pokemon.image &&
+                    !isSpecialEnergyCard(c),
+                );
+                if (attached.length) {
+                  const i = hostZone.array.indexOf(attached[0]);
+                  if (i >= 0) {
+                    const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+                    moveCardBundle(user, user, hostZoneId, 'hand', i, false, 'move');
+                    appendMessage('', `  ↩️ ${attached[0].name} returned to your hand.`, 'announcement', false);
+                  }
+                }
+                break;
+              }
+              default:
+                break;
+            }
           }
         } catch {
           /* card data may not be ready */
@@ -1423,8 +1581,30 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
 
                   const who = player === 'self' ? 'Your' : "Opponent's";
                   // Prism Star cards go to the Lost Zone, not the discard pile (App. 17).
-                  const koDestination = isPrismStarCard(card) ? 'lostZone' : 'discard';
-                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to ${koDestination === 'lostZone' ? 'the Lost Zone' : 'discard'}${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
+                  let koDestination = isPrismStarCard(card) ? 'lostZone' : 'discard';
+
+                  // Special-energy on-KO triggers (Splash/Rescue return to hand,
+                  // Gift draw-until-7). Plans come from the shared parser; only
+                  // the destination-changing return-to-hand is applied here.
+                  const koPlans = [];
+                  for (const e of zone.array) {
+                    if (e && e.type === 'Energy' && e.image?.relative === card.image) {
+                      koPlans.push(
+                        ...planSpecialEnergyTriggers(e, {
+                          trigger: 'knockout',
+                          host: card,
+                          zoneArray: zone.array,
+                        }),
+                      );
+                    }
+                  }
+                  const koReturnToHand = koPlans.some((p) => p.action === 'returnToHand');
+                  const koDrawUntil = koPlans.find((p) => p.action === 'drawUntil');
+                  if (koReturnToHand) koDestination = 'hand';
+
+                  const destinationLabel =
+                    koDestination === 'lostZone' ? 'the Lost Zone' : koDestination === 'hand' ? 'your hand' : 'discard';
+                  appendMessage('', `💀 ${who} ${card.name || 'Pokémon'} has ${damage}/${effHp} damage — KO! Move it to ${destinationLabel}${zoneId === 'active' ? ' and promote a new Active' : ''}.`, 'announcement', false);
     
                   playAttackFeedback(true);
     
@@ -1446,10 +1626,26 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
                   if (player === 'self' || (!systemState.isTwoPlayer && player === 'opp')) {
                     import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
                       try {
+                        // Rescue/Splash Energy: discard the attached cards, then
+                        // return the Pokémon itself to the owner's hand.
+                        if (koReturnToHand) {
+                          for (const e of [...zone.array]) {
+                            if (e && e.type === 'Energy' && e.image?.relative === card.image) {
+                              const ei = zone.array.indexOf(e);
+                              if (ei >= 0) moveCardBundle(player, player, zoneId, 'discard', ei, false, 'move');
+                            }
+                          }
+                          appendMessage('', `♻️ ${card.name || 'Pokémon'} returns to your hand.`, 'announcement', false);
+                        }
                         const idx = zone.array.indexOf(card);
                         if (idx >= 0) {
                           moveCardBundle(player, player, zoneId, koDestination, idx, false, 'move');
-                          appendMessage('', `auto: KO'd Pokémon moved to ${koDestination === 'lostZone' ? 'the Lost Zone' : 'discard'}`, 'announcement', false);
+                          appendMessage('', `auto: KO'd Pokémon moved to ${destinationLabel}`, 'announcement', false);
+                          if (koDrawUntil) {
+                            const hand = getZone(player, 'hand');
+                            const need = koDrawUntil.until - hand.getCount();
+                            if (need > 0) draw(player, player, need, true);
+                          }
 
                           if (zoneId === 'active') {
                             const benchZone = getZone(player, 'bench');
@@ -2602,6 +2798,44 @@ if (!isTrainer) {
               false
             );
           });
+        }
+      });
+
+      // Special-energy on-evolve triggers (e.g. Regenerative Energy: "whenever
+      // you play a Pokémon from your hand to evolve the Pokémon V this card is
+      // attached to, heal 30 damage"). The energy re-points to the evolved card
+      // in evolve-card.js, so scan the evolving player's zone for energies whose
+      // relative is the evolved card.
+      document.addEventListener('rules-opponent-evolved', (event) => {
+        if (!rulesState.enabled || rulesState.phase === 'ended') return;
+        const { user: evolvingPlayer, evolvedCard, zoneId } = event.detail || {};
+        if (!evolvedCard) return;
+        const z = getZone(evolvingPlayer, zoneId);
+        const idx = z.array.findIndex((c) => c.image === evolvedCard.image);
+        if (idx < 0) return;
+        for (const energy of z.array.filter(
+          (c) => c && c.type === 'Energy' && c.image?.relative === evolvedCard.image && isSpecialEnergyCard(c)
+        )) {
+          const plans = planSpecialEnergyTriggers(energy, {
+            trigger: 'evolve',
+            host: evolvedCard,
+            zoneArray: z.array,
+          });
+          for (const plan of plans) {
+            if (plan.action !== 'heal') continue;
+            const current =
+              parseInt(evolvedCard.image?.damageCounter?.textContent || '0', 10) || 0;
+            if (current <= 0) continue;
+            const next = Math.max(0, current - plan.amount);
+            if (next <= 0) removeDamageCounter(evolvingPlayer, zoneId, idx);
+            else updateDamageCounter(evolvingPlayer, zoneId, idx, next, true);
+            appendMessage(
+              '',
+              `💚 ${evolvedCard.name}: healed ${plan.amount} on evolve (${energy.name}).`,
+              'announcement',
+              false
+            );
+          }
         }
       });
 

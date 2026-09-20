@@ -23,6 +23,7 @@ import {
   ownedCards,
 } from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
+import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 
 const BENCH_LIMIT = 5;
 
@@ -105,6 +106,33 @@ function ownerOf(draft, card) {
 function discardCard(draft, card, events) {
   const owner = ownerOf(draft, card);
   if (!owner) return;
+  // Special-energy on-discard triggers: Recycle Energy returns to hand, while
+  // Boomerang/Burning Energy stay attached when discarded by their own attack.
+  if (isEnergy(card) && card.attachedTo != null) {
+    const host = findCard(draft, card.attachedTo)?.card;
+    const hostRef = host ? findCard(draft, host.instanceId) : null;
+    const resolution = resolveSpecialEnergyDiscard(draft, {
+      energy: card,
+      host,
+      hostPlayerId: hostRef?.playerId,
+      hostZoneId: hostRef?.zoneId,
+      events,
+    });
+    if (resolution === 'reattach') return;
+    if (resolution === 'hand') {
+      removeFromZones(owner, card);
+      card.attachedTo = null;
+      owner.zones.hand.push(card);
+      events.push({
+        type: 'cardMoved',
+        instanceId: card.instanceId,
+        from: hostRef?.zoneId,
+        to: 'hand',
+        playerId: owner.playerId,
+      });
+      return;
+    }
+  }
   removeFromZones(owner, card);
   card.attachedTo = null;
   discardCardToPlayerZone(owner, card);

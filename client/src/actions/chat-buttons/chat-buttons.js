@@ -49,7 +49,8 @@ import { takePrizes } from '../zones/prizes-actions.js';
 import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions, occupiedZoneCount } from '/shared/engine/rules/ko-flow.mjs';
-import { isPrismStarCard } from '/shared/engine/rules/card-classify.mjs';
+import { isPrismStarCard, isExCard } from '/shared/engine/rules/card-classify.mjs';
+import { planSpecialEnergyTriggers, isSpecialEnergyCard } from '/shared/engine/rules/special-energy-parse.mjs';
 import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '/shared/engine/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
@@ -1282,6 +1283,42 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               const z = oppActiveZoneForKo;
               const idx = z.array.indexOf(eff.tool);
               if (idx >= 0) moveCard(oppPlayer, user, 'active', 'discard', idx);
+            }
+          }
+        }
+
+        // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
+        // Energy, Lucky Energy): the defender's attached special energies are
+        // parsed for a `damaged` trigger — counters go on the attacker, or the
+        // defender's owner draws.
+        if (rulesState.enabled && dmg.total > 0) {
+          for (const energy of oppActiveZoneForKo.array.filter(
+            (c) => c && c.type === 'Energy' && c.image?.relative === oppActive.image && isSpecialEnergyCard(c)
+          )) {
+            const plans = planSpecialEnergyTriggers(energy, {
+              trigger: 'damaged',
+              host: oppActive,
+              zoneArray: oppActiveZoneForKo.array,
+            });
+            for (const plan of plans) {
+              if (plan.action === 'addDamage' && plan.target === 'attacker') {
+                if (plan.against === 'pokemonEx' && !isExCard(active)) continue;
+                placeSelfDamage(user, 'active', 0, plan.count * 10);
+                appendMessage(
+                  user,
+                  `⚡ ${energy.name}: ${plan.count} damage counter(s) on ${active?.name || 'the attacking Pokémon'}!`,
+                  'announcement',
+                  false
+                );
+              } else if (plan.action === 'draw' && plan.count > 0) {
+                draw(oppPlayer, oppPlayer, plan.count, emit);
+                appendMessage(
+                  user,
+                  `⚡ ${energy.name}: ${oppPlayer === 'self' ? 'You draw' : 'Opponent draws'} ${plan.count} card(s).`,
+                  'announcement',
+                  false
+                );
+              }
             }
           }
         }

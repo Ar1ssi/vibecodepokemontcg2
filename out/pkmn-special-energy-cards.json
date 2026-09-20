@@ -1,0 +1,1714 @@
+[
+ {
+  "name": "Voltaic {",
+  "set": "Pitch Black",
+  "number": "084",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {L} Energy. Attacks used by the {L} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/voltaic-l-energy-pitch-black-pbl-084/"
+ },
+ {
+  "name": "Shadowy {",
+  "set": "Pitch Black",
+  "number": "083",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {D} Energy. As long as the {D} Pokémon this card is attached to is on your Bench, prevent all damage done to it by attacks from your opponent’s Pokémon.",
+  "url": "https://pkmncards.com/card/shadowy-d-energy-pitch-black-pbl-083/"
+ },
+ {
+  "name": "Nitro {",
+  "set": "Chaos Rising",
+  "number": "086",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {R} Energy. If this card is discarded by an effect of an attack used by the {R} Pokémon this card is attached to, put this card into your hand after attack damage and effects.",
+  "url": "https://pkmncards.com/card/nitro-r-energy-chaos-rising-cri-086/"
+ },
+ {
+  "name": "Magnetic {",
+  "set": "Chaos Rising",
+  "number": "085",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {M} Energy. The {M} Pokémon this card is attached to has no Retreat Cost.",
+  "url": "https://pkmncards.com/card/magnetic-m-energy-chaos-rising-cri-085/"
+ },
+ {
+  "name": "Bubbly {",
+  "set": "Chaos Rising",
+  "number": "084",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {W} Energy. The {W} Pokémon this card is attached to recovers from all Special Conditions and can’t be affected by any Special Conditions.",
+  "url": "https://pkmncards.com/card/bubbly-w-energy-chaos-rising-cri-084/"
+ },
+ {
+  "name": "Telepathic {",
+  "set": "Perfect Order",
+  "number": "088",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for up to 2 Basic {P} Pokémon and put them onto your Bench. Then, shuffle your deck.",
+  "url": "https://pkmncards.com/card/telepathic-p-energy-perfect-order-por-088/"
+ },
+ {
+  "name": "Rocky {",
+  "set": "Perfect Order",
+  "number": "087",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {F} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the {F} Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)",
+  "url": "https://pkmncards.com/card/rocky-f-energy-perfect-order-por-087/"
+ },
+ {
+  "name": "Growing {",
+  "set": "Perfect Order",
+  "number": "086",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {G} Energy. The {G} Pokémon this card is attached to gets +20 HP.",
+  "url": "https://pkmncards.com/card/growing-g-energy-perfect-order-por-086/"
+ },
+ {
+  "name": "Team Rocket’s Energy",
+  "set": "Ascended Heroes",
+  "number": "217",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Team Rocket’s Pokémon. If this card is attached to anything other than a Team Rocket’s Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides 2 in any combination of {P} Energy and {D} Energy.",
+  "url": "https://pkmncards.com/card/team-rockets-energy-ascended-heroes-asc-217/"
+ },
+ {
+  "name": "Prism Energy",
+  "set": "Ascended Heroes",
+  "number": "216",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to a Basic Pokémon, this card provides every type of Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/prism-energy-ascended-heroes-asc-216/"
+ },
+ {
+  "name": "Ignition Energy",
+  "set": "Phantasmal Flames",
+  "number": "124",
+  "subtype": "Special Energy",
+  "text": "If this card is attached to 1 of your Pokémon, discard it at the end of your turn. As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to an Evolution Pokémon, it provides {C}{C}{C} Energy instead.",
+  "url": "https://pkmncards.com/card/ignition-energy-phantasmal-flames-pfl-124/"
+ },
+ {
+  "name": "Ignition Energy",
+  "set": "White Flare",
+  "number": "086",
+  "subtype": "Special Energy",
+  "text": "If this card is attached to 1 of your Pokémon, discard it at the end of your turn. As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to an Evolution Pokémon, it provides {C}{C}{C} Energy instead.",
+  "url": "https://pkmncards.com/card/ignition-energy-white-flare-wht-086/"
+ },
+ {
+  "name": "Prism Energy",
+  "set": "Black Bolt",
+  "number": "086",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to a Basic Pokémon, this card provides every type of Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/prism-energy-black-bolt-blk-086/"
+ },
+ {
+  "name": "Team Rocket’s Energy",
+  "set": "Destined Rivals",
+  "number": "182",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Team Rocket’s Pokémon. If this card is attached to anything other than a Team Rocket’s Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides 2 in any combination of {P} Energy and {D} Energy.",
+  "url": "https://pkmncards.com/card/team-rockets-energy-destined-rivals-dri-182/"
+ },
+ {
+  "name": "Spiky Energy",
+  "set": "Journey Together",
+  "number": "190",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if this Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+  "url": "https://pkmncards.com/card/spiky-energy-journey-together-jtg-190/"
+ },
+ {
+  "name": "Spiky Energy",
+  "set": "Journey Together",
+  "number": "159",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if this Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+  "url": "https://pkmncards.com/card/spiky-energy-journey-together-jtg-159/"
+ },
+ {
+  "name": "Jet Energy",
+  "set": "Surging Sparks",
+  "number": "252",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to 1 of your Benched Pokémon, switch that Pokémon with your Active Pokémon.",
+  "url": "https://pkmncards.com/card/jet-energy-surging-sparks-ssp-252/"
+ },
+ {
+  "name": "Enriching Energy",
+  "set": "Surging Sparks",
+  "number": "191",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to a Pokémon, draw 4 cards.",
+  "url": "https://pkmncards.com/card/enriching-energy-surging-sparks-ssp-191/"
+ },
+ {
+  "name": "Luminous Energy",
+  "set": "Twilight Masquerade",
+  "number": "226",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to has any other Special Energy attached, this card provides {C} Energy instead.",
+  "url": "https://pkmncards.com/card/luminous-energy-twilight-masquerade-twm-226/"
+ },
+ {
+  "name": "Legacy Energy",
+  "set": "Twilight Masquerade",
+  "number": "167",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, that player takes 1 fewer Prize card. This effect of your Legacy Energy can’t be applied more than once per game.",
+  "url": "https://pkmncards.com/card/legacy-energy-twilight-masquerade-twm-167/"
+ },
+ {
+  "name": "Boomerang Energy",
+  "set": "Twilight Masquerade",
+  "number": "166",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is discarded by an effect of an attack used by the Pokémon this card is attached to, attach this card from your discard pile to that Pokémon after attacking.",
+  "url": "https://pkmncards.com/card/boomerang-energy-twilight-masquerade-twm-166/"
+ },
+ {
+  "name": "Neo Upper Energy",
+  "set": "Temporal Forces",
+  "number": "162",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to a Stage 2 Pokémon, this card provides every type of Energy but provides only 2 Energy at a time.",
+  "url": "https://pkmncards.com/card/neo-upper-energy-temporal-forces-tef-162/"
+ },
+ {
+  "name": "Mist Energy",
+  "set": "Temporal Forces",
+  "number": "161",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)",
+  "url": "https://pkmncards.com/card/mist-energy-temporal-forces-tef-161/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Pokémon Trading Card Game Classic—Blastoise",
+  "number": "032",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/double-colorless-energy-pokemon-trading-card-game-classic-blastoise-clb-032/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Pokémon Trading Card Game Classic—Charizard",
+  "number": "032",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/double-colorless-energy-pokemon-trading-card-game-classic-charizard-clc-032/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Pokémon Trading Card Game Classic—Venusaur",
+  "number": "032",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/double-colorless-energy-pokemon-trading-card-game-classic-venusaur-clv-032/"
+ },
+ {
+  "name": "Reversal Energy",
+  "set": "Paradox Rift",
+  "number": "266",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to an Evolution Pokémon that doesn’t have a Rule Box (Pokémon ex, Pokémon V, etc. have Rule Boxes), this card provides every type of Energy but provides only 3 Energy at a time.",
+  "url": "https://pkmncards.com/card/reversal-energy-paradox-rift-par-266/"
+ },
+ {
+  "name": "Medical Energy",
+  "set": "Paradox Rift",
+  "number": "182",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, heal 30 damage from that Pokémon.",
+  "url": "https://pkmncards.com/card/medical-energy-paradox-rift-par-182/"
+ },
+ {
+  "name": "Therapeutic Energy",
+  "set": "Paldea Evolved",
+  "number": "193",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The Pokémon this card is attached to recovers from being Asleep, Confused, or Paralyzed and can’t be affected by those Special Conditions.",
+  "url": "https://pkmncards.com/card/therapeutic-energy-paldea-evolved-pal-193/"
+ },
+ {
+  "name": "Reversal Energy",
+  "set": "Paldea Evolved",
+  "number": "192",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to an Evolution Pokémon that doesn’t have a Rule Box (Pokémon ex, Pokémon V, etc. have Rule Boxes), this card provides every type of Energy but provides only 3 Energy at a time.",
+  "url": "https://pkmncards.com/card/reversal-energy-paldea-evolved-pal-192/"
+ },
+ {
+  "name": "Luminous Energy",
+  "set": "Paldea Evolved",
+  "number": "191",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to has any other Special Energy attached, this card provides {C} Energy instead.",
+  "url": "https://pkmncards.com/card/luminous-energy-paldea-evolved-pal-191/"
+ },
+ {
+  "name": "Jet Energy",
+  "set": "Paldea Evolved",
+  "number": "190",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to 1 of your Benched Pokémon, switch that Pokémon with your Active Pokémon.",
+  "url": "https://pkmncards.com/card/jet-energy-paldea-evolved-pal-190/"
+ },
+ {
+  "name": "V Guard Energy",
+  "set": "Silver Tempest",
+  "number": "215",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The Pokémon this card is attached to takes 30 less damage from attacks from your opponent’s Pokémon V (after applying Weakness and Resistance). This effect can’t be applied more than once at a time to the same Pokémon.",
+  "url": "https://pkmncards.com/card/v-guard-energy-silver-tempest-sit-215/"
+ },
+ {
+  "name": "V Guard Energy",
+  "set": "Silver Tempest",
+  "number": "169",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The Pokémon this card is attached to takes 30 less damage from attacks from your opponent’s Pokémon V (after applying Weakness and Resistance). This effect can’t be applied more than once at a time to the same Pokémon.",
+  "url": "https://pkmncards.com/card/v-guard-energy-silver-tempest-sit-169/"
+ },
+ {
+  "name": "Regenerative Energy",
+  "set": "Silver Tempest",
+  "number": "168",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.",
+  "url": "https://pkmncards.com/card/regenerative-energy-silver-tempest-sit-168/"
+ },
+ {
+  "name": "Gift Energy",
+  "set": "Lost Origin",
+  "number": "171",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.",
+  "url": "https://pkmncards.com/card/gift-energy-lost-origin-lor-171/"
+ },
+ {
+  "name": "Double Turbo Energy",
+  "set": "Astral Radiance",
+  "number": "216",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. The attacks of the Pokémon this card is attached to do 20 less damage to your opponent’s Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/double-turbo-energy-astral-radiance-asr-216/"
+ },
+ {
+  "name": "Double Turbo Energy",
+  "set": "Brilliant Stars",
+  "number": "151",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. The attacks of the Pokémon this card is attached to do 20 less damage to your opponent’s Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/double-turbo-energy-brilliant-stars-brs-151/"
+ },
+ {
+  "name": "Fusion Strike Energy",
+  "set": "Fusion Strike",
+  "number": "244",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Fusion Strike Pokémon. If this card is attached to anything other than a Fusion Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. Prevent all effects of your opponent’s Pokémon’s Abilities done to the Pokémon this card is attached to.",
+  "url": "https://pkmncards.com/card/fusion-strike-energy-fusion-strike-fst-244/"
+ },
+ {
+  "name": "Treasure Energy",
+  "set": "Evolving Skies",
+  "number": "165",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If you took this card as a face-down Prize card during your turn, before you put it into your hand, you may attach this card to 1 of your Pokémon.",
+  "url": "https://pkmncards.com/card/treasure-energy-evolving-skies-evs-165/"
+ },
+ {
+  "name": "Spiral Energy",
+  "set": "Chilling Reign",
+  "number": "159",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Rapid Strike Pokémon. If this card is attached to anything other than a Rapid Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. The Pokémon this card is attached to can’t be Paralyzed, and if it is already Paralyzed, it recovers from that Special Condition.",
+  "url": "https://pkmncards.com/card/spiral-energy-chilling-reign-cre-159/"
+ },
+ {
+  "name": "Lucky Energy",
+  "set": "Chilling Reign",
+  "number": "158",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if it is Knocked Out), draw a card.",
+  "url": "https://pkmncards.com/card/lucky-energy-chilling-reign-cre-158/"
+ },
+ {
+  "name": "Impact Energy",
+  "set": "Chilling Reign",
+  "number": "157",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Single Strike Pokémon. If this card is attached to anything other than a Single Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. The Pokémon this card is attached to can’t be Poisoned, and if it is already Poisoned, it recovers from that Special Condition.",
+  "url": "https://pkmncards.com/card/impact-energy-chilling-reign-cre-157/"
+ },
+ {
+  "name": "Single Strike Energy",
+  "set": "Battle Styles",
+  "number": "183",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Single Strike Pokémon. If this card is attached to anything other than a Single Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides {F} and {D} Energy but provides only 1 Energy at a time, and the attacks of the Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/single-strike-energy-battle-styles-bst-183/"
+ },
+ {
+  "name": "Rapid Strike Energy",
+  "set": "Battle Styles",
+  "number": "182",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Rapid Strike Pokémon. If this card is attached to anything other than a Rapid Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides 2 in any combination of {W} Energy and {F} Energy.",
+  "url": "https://pkmncards.com/card/rapid-strike-energy-battle-styles-bst-182/"
+ },
+ {
+  "name": "Single Strike Energy",
+  "set": "Battle Styles",
+  "number": "141",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Single Strike Pokémon. If this card is attached to anything other than a Single Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides {F} and {D} Energy but provides only 1 Energy at a time, and the attacks of the Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/single-strike-energy-battle-styles-bst-141/"
+ },
+ {
+  "name": "Rapid Strike Energy",
+  "set": "Battle Styles",
+  "number": "140",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to a Rapid Strike Pokémon. If this card is attached to anything other than a Rapid Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides 2 in any combination of {W} Energy and {F} Energy.",
+  "url": "https://pkmncards.com/card/rapid-strike-energy-battle-styles-bst-140/"
+ },
+ {
+  "name": "Wash {",
+  "set": "Vivid Voltage",
+  "number": "165",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {W} Energy. Prevent all effects of attacks from your opponent’s Pokémon done to the {W} Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)",
+  "url": "https://pkmncards.com/card/wash-w-energy-vivid-voltage-viv-165/"
+ },
+ {
+  "name": "Stone {",
+  "set": "Vivid Voltage",
+  "number": "164",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {F} Energy. The {F} Pokémon this card is attached to takes 20 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/stone-f-energy-vivid-voltage-viv-164/"
+ },
+ {
+  "name": "Coating {",
+  "set": "Vivid Voltage",
+  "number": "163",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {M} Energy. The {M} Pokémon this card is attached to has no Weakness.",
+  "url": "https://pkmncards.com/card/coating-m-energy-vivid-voltage-viv-163/"
+ },
+ {
+  "name": "Aromatic {",
+  "set": "Vivid Voltage",
+  "number": "162",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {G} Energy. The {G} Pokémon this card is attached to recovers from all Special Conditions and can’t be affected by any Special Conditions.",
+  "url": "https://pkmncards.com/card/aromatic-g-energy-vivid-voltage-viv-162/"
+ },
+ {
+  "name": "Capture Energy",
+  "set": "Darkness Ablaze",
+  "number": "201",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to a Pokémon, search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.",
+  "url": "https://pkmncards.com/card/capture-energy-darkness-ablaze-daa-201/"
+ },
+ {
+  "name": "Powerful {",
+  "set": "Darkness Ablaze",
+  "number": "176",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The attacks of the {C} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/powerful-c-energy-darkness-ablaze-daa-176/"
+ },
+ {
+  "name": "Hiding {",
+  "set": "Darkness Ablaze",
+  "number": "175",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {D} Energy. The {D} Pokémon this card is attached to has no Retreat Cost.",
+  "url": "https://pkmncards.com/card/hiding-d-energy-darkness-ablaze-daa-175/"
+ },
+ {
+  "name": "Heat {",
+  "set": "Darkness Ablaze",
+  "number": "174",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {R} Energy. The {R} Pokémon this card is attached to gets +20 HP.",
+  "url": "https://pkmncards.com/card/heat-r-energy-darkness-ablaze-daa-174/"
+ },
+ {
+  "name": "Twin Energy",
+  "set": "Rebel Clash",
+  "number": "209",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon that isn’t a Pokémon V or a Pokémon-GX, it provides {C}{C} Energy. If this card is attached to a Pokémon V or a Pokémon-GX, it provides {C} Energy instead.",
+  "url": "https://pkmncards.com/card/twin-energy-rebel-clash-rcl-209/"
+ },
+ {
+  "name": "Twin Energy",
+  "set": "Rebel Clash",
+  "number": "174",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon that isn’t a Pokémon V or a Pokémon-GX, it provides {C}{C} Energy. If this card is attached to a Pokémon V or a Pokémon-GX, it provides {C} Energy instead.",
+  "url": "https://pkmncards.com/card/twin-energy-rebel-clash-rcl-174/"
+ },
+ {
+  "name": "Speed {",
+  "set": "Rebel Clash",
+  "number": "173",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {L} Energy. When you attach this card from your hand to a {L} Pokémon, draw 2 cards.",
+  "url": "https://pkmncards.com/card/speed-l-energy-rebel-clash-rcl-173/"
+ },
+ {
+  "name": "Horror {",
+  "set": "Rebel Clash",
+  "number": "172",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {P} Energy. If the {P} Pokémon this card is attached to is in the Active Spot and is damaged by an opponent’s attack (even if it is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+  "url": "https://pkmncards.com/card/horror-p-energy-rebel-clash-rcl-172/"
+ },
+ {
+  "name": "Capture Energy",
+  "set": "Rebel Clash",
+  "number": "171",
+  "subtype": "Special Energy",
+  "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to a Pokémon, search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.",
+  "url": "https://pkmncards.com/card/capture-energy-rebel-clash-rcl-171/"
+ },
+ {
+  "name": "Aurora Energy",
+  "set": "Sword & Shield",
+  "number": "186",
+  "subtype": "Special Energy",
+  "text": "You can attach this card to 1 of your Pokémon only if you discard another card from your hand. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/aurora-energy-sword-shield-ssh-186/"
+ },
+ {
+  "name": "Draw Energy",
+  "set": "Cosmic Eclipse",
+  "number": "271",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When you attach this card from your hand to a Pokémon, draw a card.",
+  "url": "https://pkmncards.com/card/draw-energy-cosmic-eclipse-cec-271/"
+ },
+ {
+  "name": "Draw Energy",
+  "set": "Cosmic Eclipse",
+  "number": "209",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When you attach this card from your hand to a Pokémon, draw a card.",
+  "url": "https://pkmncards.com/card/draw-energy-cosmic-eclipse-cec-209/"
+ },
+ {
+  "name": "Weakness Guard Energy",
+  "set": "Unified Minds",
+  "number": "258",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. The Pokémon this card is attached to has no Weakness.",
+  "url": "https://pkmncards.com/card/weakness-guard-energy-unified-minds-unm-258/"
+ },
+ {
+  "name": "Recycle Energy",
+  "set": "Unified Minds",
+  "number": "257",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. If this card is discarded from play, put it into your hand instead of the discard pile.",
+  "url": "https://pkmncards.com/card/recycle-energy-unified-minds-unm-257/"
+ },
+ {
+  "name": "Weakness Guard Energy",
+  "set": "Unified Minds",
+  "number": "213",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. The Pokémon this card is attached to has no Weakness.",
+  "url": "https://pkmncards.com/card/weakness-guard-energy-unified-minds-unm-213/"
+ },
+ {
+  "name": "Recycle Energy",
+  "set": "Unified Minds",
+  "number": "212",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. If this card is discarded from play, put it into your hand instead of the discard pile.",
+  "url": "https://pkmncards.com/card/recycle-energy-unified-minds-unm-212/"
+ },
+ {
+  "name": "Triple Acceleration Energy",
+  "set": "Unbroken Bonds",
+  "number": "234",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to Evolution Pokémon. If this card is attached to 1 of your Pokémon, discard it at the end of the turn. This card provides {C}{C}{C} Energy only while it is attached to an Evolution Pokémon. If this card is attached to anything other than an Evolution Pokémon, discard this card.",
+  "url": "https://pkmncards.com/card/triple-acceleration-energy-unbroken-bonds-unb-234/"
+ },
+ {
+  "name": "Triple Acceleration Energy",
+  "set": "Unbroken Bonds",
+  "number": "190",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to Evolution Pokémon. If this card is attached to 1 of your Pokémon, discard it at the end of the turn. This card provides {C}{C}{C} Energy only while it is attached to an Evolution Pokémon. If this card is attached to anything other than an Evolution Pokémon, discard this card.",
+  "url": "https://pkmncards.com/card/triple-acceleration-energy-unbroken-bonds-unb-190/"
+ },
+ {
+  "name": "Memory Energy",
+  "set": "Lost Thunder",
+  "number": "194",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. The Pokémon this card is attached to can use any attack from its previous Evolutions. (You still need the necessary Energy to use each attack.)",
+  "url": "https://pkmncards.com/card/memory-energy-lost-thunder-lot-194/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Celestial Storm",
+  "number": "183",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-celestial-storm-ces-183/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Celestial Storm",
+  "number": "151",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-celestial-storm-ces-151/"
+ },
+ {
+  "name": "Unit Energy {",
+  "set": "Forbidden Light",
+  "number": "146",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {F}, {D}, and {Y} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/unit-energy-fdy-forbidden-light-fli-146/"
+ },
+ {
+  "name": "Unit Energy {",
+  "set": "Forbidden Light",
+  "number": "118",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {F}, {D}, and {Y} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/unit-energy-fdy-forbidden-light-fli-118/"
+ },
+ {
+  "name": "Beast Energy Prism Star",
+  "set": "Forbidden Light",
+  "number": "117",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to an Ultra Beast, it provides every type of Energy but provides only 1 Energy at a time. The attacks of the Ultra Beast this card is attached to do 30 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/beast-energy-prism-star-forbidden-light-fli-117/"
+ },
+ {
+  "name": "Unit Energy {",
+  "set": "Ultra Prism",
+  "number": "171",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {L}, {P}, and {M} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/unit-energy-lpm-ultra-prism-upr-171/"
+ },
+ {
+  "name": "Unit Energy {",
+  "set": "Ultra Prism",
+  "number": "170",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {G}, {R}, and {W} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/unit-energy-grw-ultra-prism-upr-170/"
+ },
+ {
+  "name": "Unit Energy {",
+  "set": "Ultra Prism",
+  "number": "138",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {L}, {P}, and {M} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/unit-energy-lpm-ultra-prism-upr-138/"
+ },
+ {
+  "name": "Unit Energy {",
+  "set": "Ultra Prism",
+  "number": "137",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {G}, {R}, and {W} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/unit-energy-grw-ultra-prism-upr-137/"
+ },
+ {
+  "name": "Super Boost Energy Prism Star",
+  "set": "Ultra Prism",
+  "number": "136",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While this card is attached to a Stage 2 Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If you have 3 or more Stage 2 Pokémon in play, it provides every type of Energy but provides 4 Energy at a time.",
+  "url": "https://pkmncards.com/card/super-boost-energy-prism-star-ultra-prism-upr-136/"
+ },
+ {
+  "name": "Warp Energy",
+  "set": "Crimson Invasion",
+  "number": "123",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch that Pokémon with 1 of your Benched Pokémon.",
+  "url": "https://pkmncards.com/card/warp-energy-crimson-invasion-cin-123/"
+ },
+ {
+  "name": "Counter Energy",
+  "set": "Crimson Invasion",
+  "number": "122",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to a Pokémon that isn’t a Pokémon-GX or Pokémon-EX, this card provides every type of Energy but provides only 2 Energy at a time.",
+  "url": "https://pkmncards.com/card/counter-energy-crimson-invasion-cin-122/"
+ },
+ {
+  "name": "Counter Energy",
+  "set": "Crimson Invasion",
+  "number": "100",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to a Pokémon that isn’t a Pokémon-GX or Pokémon-EX, this card provides every type of Energy but provides only 2 Energy at a time.",
+  "url": "https://pkmncards.com/card/counter-energy-crimson-invasion-cin-100/"
+ },
+ {
+  "name": "Warp Energy",
+  "set": "Shining Legends",
+  "number": "70",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch that Pokémon with 1 of your Benched Pokémon.",
+  "url": "https://pkmncards.com/card/warp-energy-shining-legends-slg-70/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Shining Legends",
+  "number": "69",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-shining-legends-slg-69/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Guardians Rising",
+  "number": "166",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-guardians-rising-gri-166/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Sun & Moon",
+  "number": "137",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-sun-moon-sum-137/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Sun & Moon",
+  "number": "136",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-sun-moon-sum-136/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Evolutions",
+  "number": "90",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-evolutions-evo-90/"
+ },
+ {
+  "name": "Strong Energy",
+  "set": "Fates Collide",
+  "number": "115",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {F} Pokémon. This card provides {F} Energy only while this card is attached to a {F} Pokémon. The attacks of the {F} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance). (If this card is attached to anything other than a {F} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/strong-energy-fates-collide-fco-115/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Fates Collide",
+  "number": "114",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-fates-collide-fco-114/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Generations",
+  "number": "74",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-generations-gen-74/"
+ },
+ {
+  "name": "Splash Energy",
+  "set": "BREAKpoint",
+  "number": "113",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {W} Pokémon. This card provides {W} Energy only while this card is attached to a {W} Pokémon. If the {W} Pokémon this card is attached to is Knocked Out by damage from an opponent’s attack, put that Pokémon into your hand. (Discard all cards attached to it.) (If this card is attached to anything other than a {W} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/splash-energy-breakpoint-bkp-113/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "BREAKthrough",
+  "number": "152",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-breakthrough-bkt-152/"
+ },
+ {
+  "name": "Burning Energy",
+  "set": "BREAKthrough",
+  "number": "151",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {R} Pokémon. This card provides {R} Energy only while this card is attached to a {R} Pokémon. If this card is discarded by an attack of the {R} Pokémon this card is attached to, attach this card from your discard pile to that Pokémon after attacking. (If this card is attached to anything other than a {R} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/burning-energy-breakthrough-bkt-151/"
+ },
+ {
+  "name": "Flash Energy",
+  "set": "Ancient Origins",
+  "number": "83",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {L} Pokémon. This card provides {L} Energy only while this card is attached to a {L} Pokémon. The {L} Pokémon this card is attached to has no Weakness. (If this card is attached to anything other than a {L} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/flash-energy-ancient-origins-aor-83/"
+ },
+ {
+  "name": "Dangerous Energy",
+  "set": "Ancient Origins",
+  "number": "82",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {D} Pokémon. This card provides {D} Energy only while this card is attached to a {D} Pokémon. Whenever the {D} Pokémon this card is attached to is your Active Pokémon and is damaged by an attack from your opponent’s Pokémon-EX (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon-EX. (If this card is attached to anything other than a {D} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/dangerous-energy-ancient-origins-aor-82/"
+ },
+ {
+  "name": "Double Dragon Energy",
+  "set": "Roaring Skies",
+  "number": "97",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {N} Pokémon. This card provides every type of Energy, but provides only 2 Energy at a time, only while this card is attached to a {N} Pokémon. (If this card is attached to anything other than a {N} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/double-dragon-energy-roaring-skies-ros-97/"
+ },
+ {
+  "name": "Double Magma Energy",
+  "set": "Double Crisis",
+  "number": "34",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to Team Magma Pokémon. Discard this card at the end of the turn you attached it. This card provides {F}{F} Energy only while it is attached to a Team Magma Pokémon. (If this card is attached to anything other than a Team Magma Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/double-magma-energy-double-crisis-dcr-34/"
+ },
+ {
+  "name": "Double Aqua Energy",
+  "set": "Double Crisis",
+  "number": "33",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to Team Aqua Pokémon. Discard this card at the end of the turn you attached it. This card provides {W}{W} Energy only while it is attached to a Team Aqua Pokémon. (If this card is attached to anything other than a Team Aqua Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/double-aqua-energy-double-crisis-dcr-33/"
+ },
+ {
+  "name": "Wonder Energy",
+  "set": "Primal Clash",
+  "number": "144",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {Y} Pokémon. This card provides {Y} Energy only while this card is attached to a {Y} Pokémon. Prevent all effects of your opponent’s attacks, except damage, done to the {Y} Pokémon that this card is attached to. (Existing effects are not removed.) (If this card is attached to anything other than a {Y} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/wonder-energy-primal-clash-prc-144/"
+ },
+ {
+  "name": "Shield Energy",
+  "set": "Primal Clash",
+  "number": "143",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {M} Pokémon. This card provides {M} Energy only while this card is attached to a {M} Pokémon. The attacks of your opponent’s Pokémon do 10 less damage to the {M} Pokémon this card is attached to (before applying Weakness and Resistance). (If this card is attached to anything other than a {M} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/shield-energy-primal-clash-prc-143/"
+ },
+ {
+  "name": "Mystery Energy",
+  "set": "Phantom Forces",
+  "number": "112",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {P} Pokémon. This card provides {P} Energy only while this card is attached to a {P} Pokémon. The Retreat Cost of the Pokémon this card is attached to is {C}{C} less. (If this card is attached to anything other than a {P} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/mystery-energy-phantom-forces-phf-112/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Phantom Forces",
+  "number": "111",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-phantom-forces-phf-111/"
+ },
+ {
+  "name": "Strong Energy",
+  "set": "Furious Fists",
+  "number": "104",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {F} Pokémon. This card provides {F} Energy only while this card is attached to a {F} Pokémon. The attacks of the {F} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance). (If this card is attached to anything other than a {F} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/strong-energy-furious-fists-ffi-104/"
+ },
+ {
+  "name": "Herbal Energy",
+  "set": "Furious Fists",
+  "number": "103",
+  "subtype": "Special Energy",
+  "text": "This card can only be attached to {G} Pokémon. This card provides {G} Energy only while this card is attached to a {G} Pokémon. When you attach this card from your hand to 1 of your {G} Pokémon, heal 30 damage from that Pokémon. (If this card is attached to anything other than a {G} Pokémon, discard this card.)",
+  "url": "https://pkmncards.com/card/herbal-energy-furious-fists-ffi-103/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "XY",
+  "number": "131",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-xy-xy-131/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "XY",
+  "number": "130",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-xy-xy-130/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Legendary Treasures",
+  "number": "113",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-legendary-treasures-ltr-113/"
+ },
+ {
+  "name": "Plasma Energy",
+  "set": "Plasma Blast",
+  "number": "91",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy.",
+  "url": "https://pkmncards.com/card/plasma-energy-plasma-blast-plb-91/"
+ },
+ {
+  "name": "Plasma Energy",
+  "set": "Plasma Freeze",
+  "number": "106",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy.",
+  "url": "https://pkmncards.com/card/plasma-energy-plasma-freeze-plf-106/"
+ },
+ {
+  "name": "Plasma Energy",
+  "set": "Plasma Storm",
+  "number": "127",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy.",
+  "url": "https://pkmncards.com/card/plasma-energy-plasma-storm-pls-127/"
+ },
+ {
+  "name": "Blend Energy {",
+  "set": "Dragons Exalted",
+  "number": "118",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When this card is attached to a Pokémon, this card provides {W}, {L}, {F}, or {M} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/blend-energy-wlfm-dragons-exalted-drx-118/"
+ },
+ {
+  "name": "Blend Energy {",
+  "set": "Dragons Exalted",
+  "number": "117",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When this card is attached to a Pokémon, this card provides {G}, {R}, {P}, or {D} Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/blend-energy-grpd-dragons-exalted-drx-117/"
+ },
+ {
+  "name": "Prism Energy",
+  "set": "Next Destinies",
+  "number": "93",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. If the Pokémon this card is attached to is a Basic Pokémon, this card provides every type of Energy but provides only 1 Energy at a time.",
+  "url": "https://pkmncards.com/card/prism-energy-next-destinies-nxd-93/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Next Destinies",
+  "number": "92",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-next-destinies-nxd-92/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Call of Legends",
+  "number": "87",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-call-of-legends-cl-87/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Call of Legends",
+  "number": "86",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this Effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-call-of-legends-cl-86/"
+ },
+ {
+  "name": "Rescue Energy",
+  "set": "Triumphant",
+  "number": "90",
+  "subtype": "Special Energy",
+  "text": "Rescue Energy provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon back into your hand. (Discard all cards attached to that Pokémon.)",
+  "url": "https://pkmncards.com/card/rescue-energy-triumphant-tm-90/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Undaunted",
+  "number": "80",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-undaunted-ud-80/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Undaunted",
+  "number": "79",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-undaunted-ud-79/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "HeartGold & SoulSilver",
+  "number": "104",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon. (While not in play, Rainbow Energy counts as {C} Energy.)",
+  "url": "https://pkmncards.com/card/rainbow-energy-heartgold-soulsilver-hs-104/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "HeartGold & SoulSilver",
+  "number": "103",
+  "subtype": "Special Energy",
+  "text": "Double Colorless Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-heartgold-soulsilver-hs-103/"
+ },
+ {
+  "name": "Upper Energy",
+  "set": "Rising Rivals",
+  "number": "102",
+  "subtype": "Special Energy",
+  "text": "Upper Energy provides {C} Energy. If you have more Prize cards left than your opponent and this card is attached to a Pokémon (excluding Pokémon LV.X), Upper Energy provides {C}{C} Energy.",
+  "url": "https://pkmncards.com/card/upper-energy-rising-rivals-rr-102/"
+ },
+ {
+  "name": "SP Energy",
+  "set": "Rising Rivals",
+  "number": "101",
+  "subtype": "Special Energy",
+  "text": "SP Energy provides {C} Energy. If the Pokémon SP Energy is attached to is a Pokémon SP, SP Energy provides every type of Energy buy provides only 1 Energy at a time. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/sp-energy-rising-rivals-rr-101/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Rising Rivals",
+  "number": "100",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-rising-rivals-rr-100/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Rising Rivals",
+  "number": "99",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-rising-rivals-rr-99/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Platinum",
+  "number": "121",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-platinum-pl-121/"
+ },
+ {
+  "name": "Warp Energy",
+  "set": "Stormfront",
+  "number": "95",
+  "subtype": "Special Energy",
+  "text": "Warp Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch that Pokémon with 1 of your Benched Pokémon.",
+  "url": "https://pkmncards.com/card/warp-energy-stormfront-sf-95/"
+ },
+ {
+  "name": "Cyclone Energy",
+  "set": "Stormfront",
+  "number": "94",
+  "subtype": "Special Energy",
+  "text": "Cyclone Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch 1 of the Defending Pokémon with 1 of your opponent’s Benched Pokémon. Your opponent chooses the Benched Pokémon to switch.",
+  "url": "https://pkmncards.com/card/cyclone-energy-stormfront-sf-94/"
+ },
+ {
+  "name": "Recover Energy",
+  "set": "Majestic Dawn",
+  "number": "96",
+  "subtype": "Special Energy",
+  "text": "Recover Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove all Special Conditions from that Pokémon.",
+  "url": "https://pkmncards.com/card/recover-energy-majestic-dawn-md-96/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Majestic Dawn",
+  "number": "95",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-majestic-dawn-md-95/"
+ },
+ {
+  "name": "Health Energy",
+  "set": "Majestic Dawn",
+  "number": "94",
+  "subtype": "Special Energy",
+  "text": "Health Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove 1 damage counter from that Pokémon.",
+  "url": "https://pkmncards.com/card/health-energy-majestic-dawn-md-94/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Majestic Dawn",
+  "number": "93",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-majestic-dawn-md-93/"
+ },
+ {
+  "name": "Call Energy",
+  "set": "Majestic Dawn",
+  "number": "92",
+  "subtype": "Special Energy",
+  "text": "Call Energy provides {C} Energy. Once during your turn, if the Pokémon Call Energy is attached to is your Active Pokémon, you may search your deck for up to 2 Basic Pokémon and put them onto your Bench. If you do, shuffle your deck and your turn ends.",
+  "url": "https://pkmncards.com/card/call-energy-majestic-dawn-md-92/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Secret Wonders",
+  "number": "130",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-secret-wonders-sw-130/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Secret Wonders",
+  "number": "129",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-secret-wonders-sw-129/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Mysterious Treasures",
+  "number": "120",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-mysterious-treasures-mt-120/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Mysterious Treasures",
+  "number": "119",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-mysterious-treasures-mt-119/"
+ },
+ {
+  "name": "Multi Energy",
+  "set": "Mysterious Treasures",
+  "number": "118",
+  "subtype": "Special Energy",
+  "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) Multi Energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
+  "url": "https://pkmncards.com/card/multi-energy-mysterious-treasures-mt-118/"
+ },
+ {
+  "name": "δ Rainbow Energy",
+  "set": "POP Series 5",
+  "number": "9",
+  "subtype": "Special Energy",
+  "text": "δ Rainbow Energy provides {C} Energy. While attached to a Pokémon that has δ on its card, δ Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.)",
+  "url": "https://pkmncards.com/card/delta-species-rainbow-energy-pop-series-5-p5-9/"
+ },
+ {
+  "name": "Boost Energy",
+  "set": "POP Series 5",
+  "number": "8",
+  "subtype": "Special Energy",
+  "text": "Boost Energy can be attached only to an Evolved Pokémon. Discard Boost Energy at the end of the turn it was attached. Boost Energy provides {C}{C}{C} Energy. The Pokémon Boost Energy is attached to can’t retreat. If the Pokémon Boost Energy is attached to isn’t an Evolved Pokémon, discard Boost Energy.",
+  "url": "https://pkmncards.com/card/boost-energy-pop-series-5-p5-8/"
+ },
+ {
+  "name": "Double Rainbow Energy",
+  "set": "POP Series 5",
+  "number": "4",
+  "subtype": "Special Energy",
+  "text": "Double Rainbow Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). While in play, Double Rainbow Energy provides every type of Energy but provides 2 Energy at a time. (Has no effect other than providing Energy.) Damage done to your opponent’s Pokémon by the Pokémon Double Rainbow Energy is attached to is reduced by 10 (before applying Weakness and Resistance). When the Pokémon Double Rainbow Energy is attached to is no longer an Evolved Pokémon, discard Double Rainbow Energy.",
+  "url": "https://pkmncards.com/card/double-rainbow-energy-pop-series-5-p5-4/"
+ },
+ {
+  "name": "Warp Energy",
+  "set": "Power Keepers",
+  "number": "91",
+  "subtype": "Special Energy",
+  "text": "Warp Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch that Pokémon with 1 of your Benched Pokémon.",
+  "url": "https://pkmncards.com/card/warp-energy-power-keepers-pk-91/"
+ },
+ {
+  "name": "Cyclone Energy",
+  "set": "Power Keepers",
+  "number": "90",
+  "subtype": "Special Energy",
+  "text": "Cyclone Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch 1 of the Defending Pokémon with 1 of your opponent’s Benched Pokémon. Your opponent chooses the Benched Pokémon to switch.",
+  "url": "https://pkmncards.com/card/cyclone-energy-power-keepers-pk-90/"
+ },
+ {
+  "name": "Multi Energy",
+  "set": "Power Keepers",
+  "number": "89",
+  "subtype": "Special Energy",
+  "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) Multi Energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
+  "url": "https://pkmncards.com/card/multi-energy-power-keepers-pk-89/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Power Keepers",
+  "number": "88",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-power-keepers-pk-88/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Power Keepers",
+  "number": "87",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect unless the Attacking Pokémon is {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-power-keepers-pk-87/"
+ },
+ {
+  "name": "Scramble Energy",
+  "set": "Dragon Frontiers",
+  "number": "89",
+  "subtype": "Special Energy",
+  "text": "Scramble Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). Scramble Energy provides {C} Energy. While in play, if you have more Prize cards left than your opponent, Scramble Energy provides every type of Energy but provides only 3 in any combination at a time. If the Pokémon Scramble Energy is attached to isn’t an Evolved Pokémon (or evolves into Pokémon-ex), discard Scramble Energy.",
+  "url": "https://pkmncards.com/card/scramble-energy-dragon-frontiers-df-89/"
+ },
+ {
+  "name": "δ Rainbow Energy",
+  "set": "Dragon Frontiers",
+  "number": "88",
+  "subtype": "Special Energy",
+  "text": "δ Rainbow Energy provides {C} Energy. While attached to a Pokémon that has δ on its card, δ Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.)",
+  "url": "https://pkmncards.com/card/delta-species-rainbow-energy-dragon-frontiers-df-88/"
+ },
+ {
+  "name": "Boost Energy",
+  "set": "Dragon Frontiers",
+  "number": "87",
+  "subtype": "Special Energy",
+  "text": "Boost Energy can be attached only to an Evolved Pokémon. Discard Boost Energy at the end of the turn it was attached. Boost Energy provides {C}{C}{C} Energy. The Pokémon Boost Energy is attached to can’t retreat. If the Pokémon Boost Energy is attached to isn’t an Evolved Pokémon, discard Boost Energy.",
+  "url": "https://pkmncards.com/card/boost-energy-dragon-frontiers-df-87/"
+ },
+ {
+  "name": "Holon Energy WP",
+  "set": "Dragon Frontiers",
+  "number": "86",
+  "subtype": "Special Energy",
+  "text": "Holon Energy WP provides {C} Energy. If the Pokémon that Holon Energy WP is attached to also has a basic {W} Energy card attached to it, prevent all effects of attacks, excluding damage, done to that Pokémon by your opponent’s Pokémon. If the Pokémon that Holon Energy WP is attached to also has a basic {P} Energy card attached to it, that Pokémon’s Retreat Cost is 0. Ignore these effects if Holon Energy WP is attached to Pokémon-ex.",
+  "url": "https://pkmncards.com/card/holon-energy-wp-dragon-frontiers-df-86/"
+ },
+ {
+  "name": "Holon Energy GL",
+  "set": "Dragon Frontiers",
+  "number": "85",
+  "subtype": "Special Energy",
+  "text": "Holon Energy GL provides {C} Energy. If the Pokémon that Holon Energy GL is attached to also has a basic {G} Energy card attached to it, that Pokémon can’t be affected by any Special Conditions. If the Pokémon that Holon Energy GL is attached to also has a basic {L} Energy card attached to it, damage done to that Pokémon by attacks from your opponent’s Pokémon-ex is reduced by 10. Ignore these effects if Holon Energy GL is attached to Pokémon-ex.",
+  "url": "https://pkmncards.com/card/holon-energy-gl-dragon-frontiers-df-85/"
+ },
+ {
+  "name": "Holon Energy FF",
+  "set": "Dragon Frontiers",
+  "number": "84",
+  "subtype": "Special Energy",
+  "text": "Holon Energy FF provides {C} Energy. If the Pokémon that Holon Energy FF is attached to also has a basic {R} Energy card attached to it, that Pokémon has no Weakness. If the Pokémon that Holon Energy FF is attached to also has a basic {F} Energy card attached to it, damage done by that Pokémon’s attack isn’t affected by Resistance. Ignore these effects if Holon Energy FF is attached to Pokémon-ex.",
+  "url": "https://pkmncards.com/card/holon-energy-ff-dragon-frontiers-df-84/"
+ },
+ {
+  "name": "Double Rainbow Energy",
+  "set": "Crystal Guardians",
+  "number": "88",
+  "subtype": "Special Energy",
+  "text": "Double Rainbow Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). While in play, Double Rainbow Energy provides every type of Energy but provides 2 Energy at a time. (Has no effect other than providing Energy.) Damage done to your opponent’s Pokémon by the Pokémon Double Rainbow Energy is attached to is reduced by 10 (before applying Weakness and Resistance). When the Pokémon Double Rainbow Energy is attached to is no longer an Evolved Pokémon, discard Double Rainbow Energy.",
+  "url": "https://pkmncards.com/card/double-rainbow-energy-crystal-guardians-cg-88/"
+ },
+ {
+  "name": "Scramble Energy",
+  "set": "POP Series 4",
+  "number": "10",
+  "subtype": "Special Energy",
+  "text": "Scramble Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). Scramble Energy provides {C} Energy. While in play, if you have more Prize cards left than your opponent, Scramble Energy provides every type of Energy but provides only 3 in any combination at a time. If the Pokémon Scramble Energy is attached to isn’t an Evolved Pokémon (or evolves into Pokémon-ex), discard Scramble Energy.",
+  "url": "https://pkmncards.com/card/scramble-energy-pop-series-4-p4-10/"
+ },
+ {
+  "name": "Heal Energy",
+  "set": "POP Series 4",
+  "number": "8",
+  "subtype": "Special Energy",
+  "text": "Heal Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove 1 damage counter and all Special Conditions from that Pokémon. If Heal Energy is attached to Pokémon-ex, Heal Energy has no effect other than providing Energy.",
+  "url": "https://pkmncards.com/card/heal-energy-pop-series-4-p4-8/"
+ },
+ {
+  "name": "δ Rainbow Energy",
+  "set": "Holon Phantoms",
+  "number": "98",
+  "subtype": "Special Energy",
+  "text": "δ Rainbow Energy provides {C} Energy. While attached to a Pokémon that has δ on its card, δ Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.)",
+  "url": "https://pkmncards.com/card/delta-species-rainbow-energy-holon-phantoms-hp-98/"
+ },
+ {
+  "name": "Dark Metal Energy",
+  "set": "Holon Phantoms",
+  "number": "97",
+  "subtype": "Special Energy",
+  "text": "Attach Dark Metal Energy to 1 of your Pokémon. While in play, Dark Metal Energy provides {D} Energy and {M} Energy, but provides only 1 Energy at a time. (Doesn’t count as a basic energy card when not in play and has no effect other than providing Energy.)",
+  "url": "https://pkmncards.com/card/dark-metal-energy-holon-phantoms-hp-97/"
+ },
+ {
+  "name": "Multi Energy",
+  "set": "Holon Phantoms",
+  "number": "96",
+  "subtype": "Special Energy",
+  "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) Multi Energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
+  "url": "https://pkmncards.com/card/multi-energy-holon-phantoms-hp-96/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Holon Phantoms",
+  "number": "95",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-holon-phantoms-hp-95/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Holon Phantoms",
+  "number": "94",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect unless the Attacking Pokémon is {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-holon-phantoms-hp-94/"
+ },
+ {
+  "name": "React Energy",
+  "set": "Legend Maker",
+  "number": "82",
+  "subtype": "Special Energy",
+  "text": "React Energy provides {C} Energy.",
+  "url": "https://pkmncards.com/card/react-energy-legend-maker-lm-82/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Legend Maker",
+  "number": "81",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-legend-maker-lm-81/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Delta Species",
+  "number": "107",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-delta-species-ds-107/"
+ },
+ {
+  "name": "Holon Energy WP",
+  "set": "Delta Species",
+  "number": "106",
+  "subtype": "Special Energy",
+  "text": "Holon Energy WP provides {C} Energy. If the Pokémon that Holon Energy WP is attached to also has a basic {W} Energy card attached to it, prevent all effects, excluding damage, done to that Pokémon by your opponent’s Pokémon. If the Pokémon that Holon Energy WP is attached to also has a basic {P} Energy card attached to it, that Pokémon’s Retreat Cost is 0. Ignore these effects if Holon Energy WP is attached to Pokémon-ex.",
+  "url": "https://pkmncards.com/card/holon-energy-wp-delta-species-ds-106/"
+ },
+ {
+  "name": "Holon Energy GL",
+  "set": "Delta Species",
+  "number": "105",
+  "subtype": "Special Energy",
+  "text": "Holon Energy GL provides {C} Energy. If the Pokémon that Holon Energy GL is attached to also has a basic {G} Energy card attached to it, that Pokémon can’t be affected by any Special Conditions. If the Pokémon that Holon Energy GL is attached to also has a basic {L} Energy card attached to it, damage done by your opponent’s Pokémon-ex is reduced by 10. Ignore these effects if Holon Energy GL is attached to Pokémon-ex.",
+  "url": "https://pkmncards.com/card/holon-energy-gl-delta-species-ds-105/"
+ },
+ {
+  "name": "Holon Energy FF",
+  "set": "Delta Species",
+  "number": "104",
+  "subtype": "Special Energy",
+  "text": "Holon Energy FF provides {C} Energy. If the Pokémon that Holon Energy FF is attached to also has a basic {R} Energy card attached to it, that Pokémon has no Weakness. If the Pokémon that Holon Energy FF is attached to also has a basic {F} Energy card attached to it, damage done by that Pokémon’s attack isn’t affected by Resistance. Ignore these effects if Holon Energy FF is attached to Pokémon-ex.",
+  "url": "https://pkmncards.com/card/holon-energy-ff-delta-species-ds-104/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Delta Species",
+  "number": "103",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect unless the Attacking Pokémon is {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-delta-species-ds-103/"
+ },
+ {
+  "name": "Warp Energy",
+  "set": "Unseen Forces",
+  "number": "100",
+  "subtype": "Special Energy",
+  "text": "Warp Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch that Pokémon with 1 of your Benched Pokémon.",
+  "url": "https://pkmncards.com/card/warp-energy-unseen-forces-uf-100/"
+ },
+ {
+  "name": "Cyclone Energy",
+  "set": "Unseen Forces",
+  "number": "99",
+  "subtype": "Special Energy",
+  "text": "Cyclone Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch 1 of the Defending Pokémon with 1 of your opponent’s Benched Pokémon. Your opponent chooses the Benched Pokémon to switch.",
+  "url": "https://pkmncards.com/card/cyclone-energy-unseen-forces-uf-99/"
+ },
+ {
+  "name": "Boost Energy",
+  "set": "Unseen Forces",
+  "number": "98",
+  "subtype": "Special Energy",
+  "text": "Boost Energy can be attached only to an Evolved Pokémon. Discard Boost Energy at the end of the turn it was attached. Boost Energy provides {C}{C}{C} Energy. The Pokémon Boost Energy is attached to can’t retreat. If the Pokémon Boost Energy is attached to isn’t an Evolved Pokémon, discard Boost Energy.",
+  "url": "https://pkmncards.com/card/boost-energy-unseen-forces-uf-98/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Unseen Forces",
+  "number": "97",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-unseen-forces-uf-97/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Unseen Forces",
+  "number": "96",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attack, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect unless the Attacking Pokémon is {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-unseen-forces-uf-96/"
+ },
+ {
+  "name": "Multi Energy",
+  "set": "Emerald",
+  "number": "89",
+  "subtype": "Special Energy",
+  "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) Multi Energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
+  "url": "https://pkmncards.com/card/multi-energy-emerald-em-89/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Emerald",
+  "number": "88",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-emerald-em-88/"
+ },
+ {
+  "name": "Double Rainbow Energy",
+  "set": "Emerald",
+  "number": "87",
+  "subtype": "Special Energy",
+  "text": "Double Rainbow Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). While in play, Double Rainbow Energy provides every type of Energy but provides 2 Energy at a time. (Has no effect other than providing Energy.) Damage done to your opponent’s Pokémon by the Pokémon Double Rainbow Energy is attached to is reduced by 10 (before applying Weakness and Resistance). When the Pokémon Double Rainbow Energy is attached to is no longer an Evolved Pokémon, discard Double Rainbow Energy.",
+  "url": "https://pkmncards.com/card/double-rainbow-energy-emerald-em-87/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Emerald",
+  "number": "86",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect unless the Attacking Pokémon is {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-emerald-em-86/"
+ },
+ {
+  "name": "Scramble Energy",
+  "set": "Deoxys",
+  "number": "95",
+  "subtype": "Special Energy",
+  "text": "Scramble Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). Scramble Energy provides {C} Energy. While in play, if you have more Prize cards left than your opponent, Scramble Energy provides every type of Energy but provides only 3 in any combination at a time. If the Pokémon Scramble Energy is attached to isn’t an Evolved Pokémon (or evolves into Pokémon-ex), discard Scramble Energy.",
+  "url": "https://pkmncards.com/card/scramble-energy-deoxys-dx-95/"
+ },
+ {
+  "name": "Heal Energy",
+  "set": "Deoxys",
+  "number": "94",
+  "subtype": "Special Energy",
+  "text": "Heal Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove 1 damage counter and all Special Conditions from that Pokémon. If Heal Energy is attached to Pokémon-ex, Heal Energy has no effect other than providing Energy.",
+  "url": "https://pkmncards.com/card/heal-energy-deoxys-dx-94/"
+ },
+ {
+  "name": "Boost Energy",
+  "set": "Deoxys",
+  "number": "93",
+  "subtype": "Special Energy",
+  "text": "Boost Energy can be attached only to an Evolved Pokémon. Discard Boost Energy at the end of the turn it was attached. Boost Energy provides {C}{C}{C} Energy. The Pokémon Boost Energy is attached to can’t retreat. If the Pokémon Boost Energy is attached to isn’t an Evolved Pokémon, discard Boost Energy.",
+  "url": "https://pkmncards.com/card/boost-energy-deoxys-dx-93/"
+ },
+ {
+  "name": "R Energy",
+  "set": "Team Rocket Returns",
+  "number": "95",
+  "subtype": "Special Energy",
+  "text": "R Energy can be attached only to a Pokémon that has Dark or Rocket’s in its name. While in play, R Energy provides 2 {D} Energy. (Doesn’t count as a basic Energy card.) If the Pokémon R Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). When your turn ends, discard R Energy.",
+  "url": "https://pkmncards.com/card/r-energy-team-rocket-returns-tr-95/"
+ },
+ {
+  "name": "Dark Metal Energy",
+  "set": "Team Rocket Returns",
+  "number": "94",
+  "subtype": "Special Energy",
+  "text": "Attach Dark Metal Energy to 1 of your Pokémon. While in play, Dark Metal Energy provides {D} Energy and {M} Energy, but provides only 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play and has no effect other than providing Energy.)",
+  "url": "https://pkmncards.com/card/dark-metal-energy-team-rocket-returns-tr-94/"
+ },
+ {
+  "name": "Multi Energy",
+  "set": "FireRed & LeafGreen",
+  "number": "103",
+  "subtype": "Special Energy",
+  "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play.) Multi Energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
+  "url": "https://pkmncards.com/card/multi-energy-firered-leafgreen-rg-103/"
+ },
+ {
+  "name": "Double Rainbow Energy",
+  "set": "Team Magma vs Team Aqua",
+  "number": "88",
+  "subtype": "Special Energy",
+  "text": "Double Rainbow Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). While in play, Double Rainbow Energy provides every type of Energy but provides 2 Energy at a time. (Doesn’t count as a basic Energy when not in play and has no effect other than providing Energy.) Damage done to your opponent’s Pokémon by the Pokémon Double Rainbow Energy is attached to is reduced by 10 (after applying Weakness and Resistance). When the Pokémon Double Rainbow Energy is attached to is no longer an Evolved Pokémon, discard Double Rainbow Energy.",
+  "url": "https://pkmncards.com/card/double-rainbow-energy-team-magma-vs-team-aqua-ma-88/"
+ },
+ {
+  "name": "Magma Energy",
+  "set": "Team Magma vs Team Aqua",
+  "number": "87",
+  "subtype": "Special Energy",
+  "text": "Magma Energy can be attached only to a Pokémon with Team Magma in its name. Magma Energy provides {F} and /or {D} Energy but provides 2 Energy at a time. (Doesn’t count as a basic Energy card when not in play and has no effect other than providing Energy.) At the end of your turn, discard Magma Energy.",
+  "url": "https://pkmncards.com/card/magma-energy-team-magma-vs-team-aqua-ma-87/"
+ },
+ {
+  "name": "Aqua Energy",
+  "set": "Team Magma vs Team Aqua",
+  "number": "86",
+  "subtype": "Special Energy",
+  "text": "Aqua Energy can be attached only to a Pokémon with Team Aqua in its name. Aqua Energy provides {W} and {D} Energy but provides 2 Energy at a time. (Doesn’t count as a basic Energy card when not in play and has no effect other than providing Energy.) At the end of your turn, discard Aqua Energy.",
+  "url": "https://pkmncards.com/card/aqua-energy-team-magma-vs-team-aqua-ma-86/"
+ },
+ {
+  "name": "Multi Energy",
+  "set": "Sandstorm",
+  "number": "93",
+  "subtype": "Special Energy",
+  "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play.) Multi energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
+  "url": "https://pkmncards.com/card/multi-energy-sandstorm-ss-93/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Ruby & Sapphire",
+  "number": "95",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play.) When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-ruby-sapphire-rs-95/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Ruby & Sapphire",
+  "number": "94",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-ruby-sapphire-rs-94/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Ruby & Sapphire",
+  "number": "93",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this effect unless the Attacking Pokémon is {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-ruby-sapphire-rs-93/"
+ },
+ {
+  "name": "Retro Energy",
+  "set": "Skyridge",
+  "number": "144",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When you play this card from your hand and attach it to 1 of your Evolved Pokémon, you may remove up to 2 damage counters from that Pokémon and discard the top card from it. (This counts as devolving it.)",
+  "url": "https://pkmncards.com/card/retro-energy-skyridge-sk-144/"
+ },
+ {
+  "name": "Cyclone Energy",
+  "set": "Skyridge",
+  "number": "143",
+  "subtype": "Special Energy",
+  "text": "This card provides {C} Energy. When you play this card from your hand and attach it to your Active Pokémon, your opponent switches his or her Active Pokémon with 1 of his or her Benched Pokémon.",
+  "url": "https://pkmncards.com/card/cyclone-energy-skyridge-sk-143/"
+ },
+ {
+  "name": "Bounce Energy",
+  "set": "Skyridge",
+  "number": "142",
+  "subtype": "Special Energy",
+  "text": "This card provides {C}{C} Energy. You can attach this card to your Pokémon that has basic Energy cards attached to it. When you play this card from your hand and attach it to 1 of your Pokémon, return a basic Energy card attached to that Pokémon to your hand.",
+  "url": "https://pkmncards.com/card/bounce-energy-skyridge-sk-142/"
+ },
+ {
+  "name": "Warp Energy",
+  "set": "Aquapolis",
+  "number": "147",
+  "subtype": "Special Energy",
+  "text": "Warp Energy provides 1 {C} Energy. When you attach Warp Energy from your hand to your Active Pokémon, switch your Active Pokémon with 1 of your Benched Pokémon.",
+  "url": "https://pkmncards.com/card/warp-energy-aquapolis-aq-147/"
+ },
+ {
+  "name": "Crystal Energy",
+  "set": "Aquapolis",
+  "number": "146",
+  "subtype": "Special Energy",
+  "text": "Crystal Energy provides 1 Energy of all types (colors) of basic Energy cards attached to the Pokémon Crystal Energy is attached to. If there are no basic Energy cards attached to the Pokémon Crystal Energy is attached to, Crystal Energy provides {C} Energy.",
+  "url": "https://pkmncards.com/card/crystal-energy-aquapolis-aq-146/"
+ },
+ {
+  "name": "Boost Energy",
+  "set": "Aquapolis",
+  "number": "145",
+  "subtype": "Special Energy",
+  "text": "Boost Energy can be attached only to an Evolved Pokémon. Discard Boost Energy at the end of the turn it was attached. Boost Energy provides {C}{C}{C} Energy. The Pokémon Boost Energy is attached to can’t retreat. When the Pokémon Boost Energy is attached to is no longer an Evolved Pokémon, discard Boost Energy.",
+  "url": "https://pkmncards.com/card/boost-energy-aquapolis-aq-145/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Aquapolis",
+  "number": "144",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play.) When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/rainbow-energy-aquapolis-aq-144/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Aquapolis",
+  "number": "143",
+  "subtype": "Special Energy",
+  "text": "Damage done to the Pokémon Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). If the Pokémon Metal Energy is attached to isn’t {M}, whenever it damages a Pokémon, reduce that damage by 10 (before applying Weakness and Resistance). Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-aquapolis-aq-143/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Aquapolis",
+  "number": "142",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to damages the Defending Pokémon (after applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon. At the end of every turn, put 1 damage counter on the Pokémon Darkness Energy is attached to, unless it’s {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-aquapolis-aq-142/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Expedition",
+  "number": "159",
+  "subtype": "Special Energy",
+  "text": "Damage done by attacks to the Pokémon Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). If the Pokémon Metal Energy is attached to isn’t {M}, whenever it damages a Pokémon by an attack, reduce that damage by 10 (after applying Weakness and Resistance). Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-expedition-ex-159/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Expedition",
+  "number": "158",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to does damage with an attack (after applying Weakness and Resistance), the attack does 10 more damage. At the end of every turn, put 1 damage counter on the Pokémon Darkness Energy is attached to, unless it’s {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-expedition-ex-158/"
+ },
+ {
+  "name": "Potion Energy",
+  "set": "Legendary Collection",
+  "number": "101",
+  "subtype": "Special Energy",
+  "text": "If you play this card from your hand, remove 1 damage counter from the Pokémon you attach it to, if it has any. Potion Energy provides {C} energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/potion-energy-legendary-collection-lc-101/"
+ },
+ {
+  "name": "Full Heal Energy",
+  "set": "Legendary Collection",
+  "number": "100",
+  "subtype": "Special Energy",
+  "text": "If you play this card from your hand, the Pokémon you attach it to is no longer affected by a Special Condition. Full Heal Energy provides {C} energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/full-heal-energy-legendary-collection-lc-100/"
+ },
+ {
+  "name": "Miracle Energy",
+  "set": "Neo Destiny",
+  "number": "16",
+  "subtype": "Special Energy",
+  "text": "You can’t have more than 1 Miracle Energy in your deck. Attach Miracle Energy to 1 of your Shining or Light Pokémon. At the end of your turn, discard Miracle Energy. While in play, Miracle Energy counts as every type of Energy but provides only 2 Energy at a time.",
+  "url": "https://pkmncards.com/card/miracle-energy-neo-destiny-n4-16/"
+ },
+ {
+  "name": "Recycle Energy",
+  "set": "Neo Genesis",
+  "number": "105",
+  "subtype": "Special Energy",
+  "text": "Recycle Energy provides {C} Energy. (Doesn’t count as a basic Energy card.) If this card is put into your discard pile from play, return it to your hand.",
+  "url": "https://pkmncards.com/card/recycle-energy-neo-genesis-n1-105/"
+ },
+ {
+  "name": "Darkness Energy",
+  "set": "Neo Genesis",
+  "number": "104",
+  "subtype": "Special Energy",
+  "text": "If the Pokémon Darkness Energy is attached to damages the Defending Pokémon (after applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon. At the end of every turn, put 1 damage counter on the Pokémon Darkness Energy is attached to, unless it’s {D} or has Dark in its name. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/darkness-energy-neo-genesis-n1-104/"
+ },
+ {
+  "name": "Metal Energy",
+  "set": "Neo Genesis",
+  "number": "19",
+  "subtype": "Special Energy",
+  "text": "Damage done to the Pokémon Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). If the Pokémon Metal Energy is attached to isn’t {M}, whenever it damages a Pokémon, reduce that damage by 10 (before applying Weakness and Resistance). Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/metal-energy-neo-genesis-n1-19/"
+ },
+ {
+  "name": "Potion Energy",
+  "set": "Team Rocket",
+  "number": "82",
+  "subtype": "Special Energy",
+  "text": "If you play this card from your hand, remove 1 damage counter from the Pokémon you attach it to, if it has any. Potion Energy provides {C} energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/potion-energy-team-rocket-ro-82/"
+ },
+ {
+  "name": "Full Heal Energy",
+  "set": "Team Rocket",
+  "number": "81",
+  "subtype": "Special Energy",
+  "text": "If you play this card from your hand, the Pokémon you attach it to is no longer Asleep, Confused, Paralyzed, or Poisoned. Full Heal Energy provides {C} energy. (Doesn’t count as a basic Energy card.)",
+  "url": "https://pkmncards.com/card/full-heal-energy-team-rocket-ro-81/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Team Rocket",
+  "number": "80",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy counts as every type of basic Energy but only provides 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play.) When you attach this card from your hand to 1 of your Pokémon, it does 10 damage to that Pokémon. (Don’t apply Weakness and Resistance.)",
+  "url": "https://pkmncards.com/card/rainbow-energy-team-rocket-ro-80/"
+ },
+ {
+  "name": "Rainbow Energy",
+  "set": "Team Rocket",
+  "number": "17",
+  "subtype": "Special Energy",
+  "text": "Attach Rainbow Energy to 1 of your Pokémon. While in play, Rainbow Energy counts as every type of basic Energy but only provides 1 Energy at a time. (Doesn’t count as a basic Energy card when not in play.) When you attach this card from your hand to 1 of your Pokémon, it does 10 damage to that Pokémon. (Don’t apply Weakness and Resistance.)",
+  "url": "https://pkmncards.com/card/rainbow-energy-team-rocket-ro-17/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Base Set 2",
+  "number": "124",
+  "subtype": "Special Energy",
+  "text": "Provides {C}{C} energy. Doesn’t count as a basic Energy card.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-base-set-2-b2-124/"
+ },
+ {
+  "name": "Double Colorless Energy",
+  "set": "Base Set",
+  "number": "96",
+  "subtype": "Special Energy",
+  "text": "Provides {C}{C} energy. Doesn’t count as a basic Energy card.",
+  "url": "https://pkmncards.com/card/double-colorless-energy-base-set-bs-96/"
+ }
+]

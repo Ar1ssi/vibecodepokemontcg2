@@ -293,6 +293,16 @@ passes `{ type, family }` objects. **Special-energy card *effects* are classifie
 > **Parser state:** the energy's **type** (what it satisfies in a cost) is fully modeled,
 > including Double/Double Colorless counting (Gap #4a done). The **effect** (what the card
 > itself does on attach / while attached) is now fully executed (Gap #4b done): the `attach-type` family is executed (effective attached type honored in the live cost gate); the `lock` family is now executed (removal gate in `move-card.js` + `isLockEnergy` / `pokemonHasLockedEnergy` in `energy-effects.mjs`); the `redirect` (Switching Energy) family is now executed (free-switch gate in `retreat()`, `chat-buttons.js` + `isRedirectEnergy` / `pokemonHasRedirectEnergy` in `energy-effects.mjs`); the `protect` (Buddy-Buddy Energy) family is now executed (damage cap in `attack()`, `chat-buttons.js` + `isProtectEnergy` / `pokemonHasProtectEnergy` / `applyProtectCap` in `energy-effects.mjs`; simplified model: caps opponent-attack damage at 1 counter — the full card also shields from non-damage effects). All four special-energy effect families are now executed.
+>
+> **Gap #4c (S220):** the coarse family classifier is now backed by a full text parser,
+> `parseSpecialEnergyEffects` in `shared/engine/rules/special-energy-parse.mjs`, which turns any
+> special-energy's printed text into structured steps (conditional provision, attach restrictions,
+> HP/damage/reduction modifiers, status/effect shields, on-attach/on-KO/on-discard triggers). The
+> audit `scripts/audit-all-special-energy.mjs` reports **0 unrecognized** across the 100 unique
+> special-energy card names scraped from pkmncards (`out/pkmn-special-energy-cards.json`). Combat
+> modifiers execute through the pure `getSpecialEnergy*` helpers, wired into
+> `computeAttackDamage` (damage bonus / penalty / reduction) and `effectiveHp` (+HP); on-attach /
+> on-KO / on-discard triggers are parsed but their live execution is still open (I68).
 
 ---
 

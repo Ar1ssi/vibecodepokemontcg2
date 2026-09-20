@@ -77,7 +77,7 @@ import {
 } from '/shared/engine/zones/active-pokemon.mjs';
 import { pokemonHasLockedEnergy } from '/shared/engine/rules/energy-effects.mjs';
 import { blocksItemPlay } from '/shared/engine/rules/ability-executors.mjs';
-import { shouldNitroReturnToHand } from '/shared/engine/rules/special-energy-effects.mjs';
+import { planSpecialEnergyTriggers } from '/shared/engine/rules/special-energy-parse.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import {
@@ -493,13 +493,16 @@ export const moveCard = async (
     return { destZoneId, ok: false };
   }
 
-  // ── rules: Nitro Fire Energy — return to hand when discarded by own attack ─
-  // Skip on mirror replay: the originator rewrites destZoneId and relays the
-  // actual destination so both clients land the energy in the same zone.
+  // ── rules: special-energy on-discard triggers ───────────────────────────
+  // Energy effects that replace the discard: Recycle Energy ("put it into your
+  // hand instead"), Nitro Fire Energy (return on an attack discard), Boomerang /
+  // Burning Energy (reattach to the host after attacking). Plans come from the
+  // shared parser; skip on mirror replay because the originator rewrites
+  // destZoneId and relays the actual destination so both clients land the
+  // energy in the same zone.
   if (
     rulesState.enabled &&
     !syncReplay &&
-    rulesState.attackExecuting &&
     movingCard.type === 'Energy' &&
     destZoneId === 'discard' &&
     ['active', 'bench'].includes(oZoneId) &&
@@ -508,12 +511,29 @@ export const moveCard = async (
     const hostPokemon = oZone.array.find(
       (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative
     );
-    if (shouldNitroReturnToHand(movingCard, hostPokemon, true)) {
+    const discardPlans = planSpecialEnergyTriggers(movingCard, {
+      trigger: 'discard',
+      host: hostPokemon,
+      zoneArray: oZone.array,
+      attackExecuting: !!rulesState.attackExecuting,
+    });
+    if (discardPlans.some((p) => p.action === 'returnToHand')) {
       destZoneId = 'hand';
       dZone = getZone(user, destZoneId);
       appendMessage(
         user,
-        `🔥 ${movingCard.name} returns to your hand (Nitro Fire Energy).`,
+        `♻️ ${movingCard.name} returns to your hand.`,
+        'announcement',
+        false
+      );
+    } else if (discardPlans.some((p) => p.action === 'reattach') && hostPokemon) {
+      // "attach this card from your discard pile to that Pokémon after
+      // attacking" — net effect is the energy stays attached to its host.
+      destZoneId = oZoneId;
+      dZone = oZone;
+      appendMessage(
+        user,
+        `🔥 ${movingCard.name} stays attached to ${hostPokemon.name || 'its Pokémon'} (its attack discard returns it).`,
         'announcement',
         false
       );

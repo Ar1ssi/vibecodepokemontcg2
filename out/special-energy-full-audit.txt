@@ -1,0 +1,576 @@
+# Special-energy parse coverage
+Corpus: 214 printings → 129 unique (name+text)
+
+guided 39 / passive 90 / unrecognized 0
+
+## Unrecognized
+
+## Guided (effect steps)
+- Nitro {: provide, onDiscardReturnToHand
+- Telepathic {: provide, onAttachSearch
+- Spiky Energy: provide, onDamagedDamageCounters
+- Jet Energy: provide, onAttachSwitch
+- Enriching Energy: provide, onAttachDraw
+- Legacy Energy: provide, prizeReduction, oncePerGame
+- Boomerang Energy: provide, onDiscardReattach
+- Medical Energy: provide, onAttachHeal
+- Regenerative Energy: provide, onEvolveHeal
+- Gift Energy: provide, onKnockoutDraw
+- Treasure Energy: provide, attachFromPrize
+- Lucky Energy: provide, onDamagedDraw
+- Capture Energy: provide, onAttachSearch
+- Speed {: provide, onAttachDraw
+- Horror {: provide, onDamagedDamageCounters
+- Draw Energy: provide, onAttachDraw
+- Recycle Energy: provide, onDiscardReturnToHand
+- Rainbow Energy: provide, onAttachDamageCounter
+- Warp Energy: provide, onAttachSwitch
+- Splash Energy: attachRestriction, provide, onKnockoutReturnToHand
+- Burning Energy: attachRestriction, provide, onDiscardReattach
+- Dangerous Energy: attachRestriction, provide, onDamagedDamageCounters
+- Herbal Energy: attachRestriction, provide, onAttachHeal
+- Rescue Energy: provide, onKnockoutReturnToHand
+- Rainbow Energy: provide, noExtraEffect, onAttachDamageCounter
+- Rainbow Energy: provide, noExtraEffect, onAttachDamageCounter
+- Warp Energy: provide, onAttachSwitch
+- Cyclone Energy: provide, onAttachSwitch
+- Recover Energy: provide, onAttachClearStatus
+- Health Energy: provide, onAttachRemoveDamage
+- Call Energy: provide, onAttachSearch
+- Heal Energy: provide, noExtraEffect, onAttachRemoveDamage, ignoredOn
+- Rainbow Energy: provide, onAttachDamageCounter
+- Retro Energy: provide, onAttachDevolve
+- Cyclone Energy: provide, onAttachSwitch
+- Bounce Energy: attachRestriction, provide, onAttachReturnBasicEnergy
+- Warp Energy: provide, onAttachSwitch
+- Potion Energy: provide, onAttachRemoveDamage
+- Full Heal Energy: provide, onAttachClearStatus
+
+## Passive
+- Voltaic {: provide, damageBonus
+- Shadowy {: provide, benchDamageShield
+- Magnetic {: provide, freeRetreat
+- Bubbly {: provide, statusImmunity
+- Rocky {: provide, effectShield
+- Growing {: provide, hpBonus
+- Team Rocket’s Energy: attachRestriction, provide
+- Prism Energy: provide, provide
+- Ignition Energy: provide, provide, discardAtEndOfTurn
+- Luminous Energy: provide, provide
+- Neo Upper Energy: provide, provide
+- Mist Energy: provide, effectShield
+- Double Colorless Energy: provide
+- Reversal Energy: provide, provide
+- Therapeutic Energy: provide, statusImmunity
+- V Guard Energy: provide, damageReduction, onceAtATime
+- Double Turbo Energy: provide, attackDamagePenalty
+- Fusion Strike Energy: attachRestriction, provide, abilityShield
+- Spiral Energy: attachRestriction, provide, statusImmunity
+- Impact Energy: attachRestriction, provide, statusImmunity
+- Single Strike Energy: attachRestriction, provide, damageBonus
+- Rapid Strike Energy: attachRestriction, provide
+- Wash {: provide, effectShield
+- Stone {: provide, damageReduction
+- Coating {: provide, noWeakness
+- Aromatic {: provide, statusImmunity
+- Powerful {: provide, damageBonus
+- Hiding {: provide, freeRetreat
+- Heat {: provide, hpBonus
+- Twin Energy: provide, provide
+- Aurora Energy: attachCost, provide
+- Weakness Guard Energy: provide, noWeakness
+- Triple Acceleration Energy: attachRestriction, provide, discardAtEndOfTurn, discardWhenConditionLost
+- Memory Energy: provide, canUseEvolutionAttacks
+- Unit Energy {: provide
+- Beast Energy Prism Star: provide, provide, damageBonus
+- Unit Energy {: provide
+- Unit Energy {: provide
+- Super Boost Energy Prism Star: provide, provide
+- Counter Energy: provide, provide
+- Double Colorless Energy: provide
+- Strong Energy: attachRestriction, provide, damageBonus
+- Flash Energy: attachRestriction, provide, noWeakness
+- Double Dragon Energy: attachRestriction, provide
+- Double Magma Energy: attachRestriction, provide, discardAtEndOfTurn
+- Double Aqua Energy: attachRestriction, provide, discardAtEndOfTurn
+- Wonder Energy: attachRestriction, provide, effectShield
+- Shield Energy: attachRestriction, provide, damageReduction
+- Mystery Energy: attachRestriction, provide, retreatReduction
+- Plasma Energy: provide
+- Blend Energy {: provide
+- Blend Energy {: provide
+- Prism Energy: provide, provide
+- Metal Energy: provide, damageReduction, ignoredOn
+- Darkness Energy: provide, damageBonus, ignoredOn
+- Darkness Energy: provide, damageBonus, ignoredOn
+- Upper Energy: provide, provide
+- SP Energy: provide, provide
+- Multi Energy: provide, provide, noExtraEffect
+- δ Rainbow Energy: provide, provide, noExtraEffect
+- Boost Energy: attachRestriction, provide, discardAtEndOfTurn, discardWhenConditionLost, cannotRetreat
+- Double Rainbow Energy: attachRestriction, provide, discardWhenConditionLost, noExtraEffect, attackDamagePenalty
+- Darkness Energy: provide, damageBonus
+- Scramble Energy: attachRestriction, provide, provide, discardWhenConditionLost
+- Holon Energy WP: provide, effectShield, freeRetreat, ignoredOn
+- Holon Energy GL: provide, damageReduction, statusImmunity, ignoredOn
+- Holon Energy FF: provide, noWeakness, ignoresResistance, ignoredOn
+- Dark Metal Energy: provide, noExtraEffect
+- React Energy: provide
+- Holon Energy WP: provide, freeRetreat, ignoredOn
+- Holon Energy GL: provide, statusImmunity, ignoredOn
+- Darkness Energy: provide
+- R Energy: attachRestriction, provide, damageBonus
+- Dark Metal Energy: provide, noExtraEffect
+- Multi Energy: provide, provide
+- Double Rainbow Energy: attachRestriction, provide, discardWhenConditionLost, noExtraEffect, attackDamagePenalty
+- Magma Energy: attachRestriction, provide, discardAtEndOfTurn, noExtraEffect
+- Aqua Energy: attachRestriction, provide, discardAtEndOfTurn, noExtraEffect
+- Multi Energy: provide, provide
+- Crystal Energy: provide, provide
+- Boost Energy: attachRestriction, provide, discardAtEndOfTurn, discardWhenConditionLost, cannotRetreat
+- Metal Energy: provide, damageReduction, damageReduction
+- Darkness Energy: provide, endOfTurnDamageCounter, damageBonus
+- Metal Energy: provide, damageReduction
+- Darkness Energy: provide, endOfTurnDamageCounter, damageBonus
+- Miracle Energy: deckLimit, provide, discardAtEndOfTurn
+- Recycle Energy: provide
+- Full Heal Energy: provide
+- Rainbow Energy: provide
+- Double Colorless Energy: provide
+
+## Per-card description
+### Voltaic {
+  - provides 1 Lightning Energy
+  - host attacks do +20 damage (Lightning)
+### Shadowy {
+  - provides 1 Dark Energy
+  - prevents all attack damage on host while benched (Dark)
+### Nitro {
+  - provides 1 Fire Energy
+  - if discarded by attackEffect, return to hand
+### Magnetic {
+  - provides 1 Metal Energy
+  - host has no Retreat Cost (Metal)
+### Bubbly {
+  - provides 1 Water Energy
+  - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
+### Telepathic {
+  - provides 1 Psychic Energy
+  - on attach from hand: search 2 Basic Psychic Pokémon → bench
+### Rocky {
+  - provides 1 Fighting Energy
+  - prevents attack effects on host (Fighting)
+### Growing {
+  - provides 1 Grass Energy
+  - host gets +20 HP
+### Team Rocket’s Energy
+  - attach restricted to teamRocket Pokémon
+  - provides 2 Psychic / Dark Energy (any combination)
+### Prism Energy
+  - provides 1 Colorless Energy
+  - provides 1 Energy of every type [hostBasic]
+### Ignition Energy
+  - provides 1 Colorless Energy
+  - provides 3 Colorless Energy [evolution]
+  - discard at the end of the turn
+### Spiky Energy
+  - provides 1 Colorless Energy
+  - if host is damaged, put 2 damage counters on the attacker
+### Jet Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: switch (self/benchedToActive)
+### Enriching Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: draw 4
+### Luminous Energy
+  - provides 1 Energy of every type
+  - provides 1 Colorless Energy [otherSpecial]
+### Legacy Energy
+  - provides 1 Energy of every type
+  - KO by opponent: they take 1 fewer Prize
+  - effect applies at most once per game
+### Boomerang Energy
+  - provides 1 Colorless Energy
+  - if discarded by attackEffect, reattach from discard
+### Neo Upper Energy
+  - provides 1 Colorless Energy
+  - provides 2 Energy of every type [stage2]
+### Mist Energy
+  - provides 1 Colorless Energy
+  - prevents attack effects on host
+### Double Colorless Energy
+  - provides 2 Colorless Energy
+### Reversal Energy
+  - provides 1 Colorless Energy
+  - provides 3 Energy of every type [trailingPrizesEvolutionNoRuleBox]
+### Medical Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: heal 30 damage
+### Therapeutic Energy
+  - provides 1 Colorless Energy
+  - host immune to Asleep, Confused, Paralyzed
+### V Guard Energy
+  - provides 1 Colorless Energy
+  - host takes -30 damage from Pokémon V (after W/R)
+  - effect applies at most once at a time
+### Regenerative Energy
+  - provides 1 Colorless Energy
+  - on evolving the host, heal 100 damage
+### Gift Energy
+  - provides 1 Colorless Energy
+  - if host is KO'd, draw until 7 cards in hand
+### Double Turbo Energy
+  - provides 2 Colorless Energy
+  - host attacks do -20 damage
+### Fusion Strike Energy
+  - attach restricted to fusionStrike Pokémon
+  - provides 1 Energy of every type
+  - prevents opponent Abilities on host
+### Treasure Energy
+  - provides 1 Colorless Energy
+  - may attach from a face-down Prize
+### Spiral Energy
+  - attach restricted to rapidStrike Pokémon
+  - provides 1 Energy of every type
+  - host immune to Paralyzed
+### Lucky Energy
+  - provides 1 Colorless Energy
+  - if host is damaged, draw 1 card
+### Impact Energy
+  - attach restricted to singleStrike Pokémon
+  - provides 1 Energy of every type
+  - host immune to Poisoned
+### Single Strike Energy
+  - attach restricted to singleStrike Pokémon
+  - provides 1 Fighting / Dark Energy
+  - host attacks do +20 damage
+### Rapid Strike Energy
+  - attach restricted to rapidStrike Pokémon
+  - provides 1 Water / Fighting Energy (any combination)
+### Wash {
+  - provides 1 Water Energy
+  - prevents attack effects on host (Water)
+### Stone {
+  - provides 1 Fighting Energy
+  - host takes -20 damage (after W/R)
+### Coating {
+  - provides 1 Metal Energy
+  - host has no Weakness (Metal)
+### Aromatic {
+  - provides 1 Grass Energy
+  - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
+### Capture Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: search 1 Basic Pokémon → bench
+### Powerful {
+  - provides 1 Colorless Energy
+  - host attacks do +20 damage (Colorless)
+### Hiding {
+  - provides 1 Dark Energy
+  - host has no Retreat Cost (Dark)
+### Heat {
+  - provides 1 Fire Energy
+  - host gets +20 HP
+### Twin Energy
+  - provides 2 Colorless Energy [notVOrGx]
+  - provides 1 Colorless Energy [isVOrGx]
+### Speed {
+  - provides 1 Lightning Energy
+  - on attach from hand: draw 2 (Lightning)
+### Horror {
+  - provides 1 Psychic Energy
+  - if host is damaged, put 2 damage counters on the attacker
+### Aurora Energy
+  - attach cost: discard 1 card from hand
+  - provides 1 Energy of every type
+### Draw Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: draw 1
+### Weakness Guard Energy
+  - provides 1 Colorless Energy
+  - host has no Weakness
+### Recycle Energy
+  - provides 1 Colorless Energy
+  - if discarded by an effect, return to hand
+### Triple Acceleration Energy
+  - attach restricted to evolution Pokémon
+  - provides 3 Colorless Energy [evolution]
+  - discard at the end of the turn
+  - discard if no longer evolution
+### Memory Energy
+  - provides 1 Colorless Energy
+  - host may use attacks from its previous Evolutions
+### Rainbow Energy
+  - provides 1 Energy of every type
+  - on attach from hand: put 1 damage counter
+### Unit Energy {
+  - provides 1 Fighting / Dark / Fairy Energy (any combination)
+### Beast Energy Prism Star
+  - provides 1 Colorless Energy
+  - provides 1 Energy of every type [ultraBeast]
+  - host attacks do +30 damage (Ultra Beast)
+### Unit Energy {
+  - provides 1 Fighting / Dark / Fairy Energy (any combination)
+### Unit Energy {
+  - provides 1 Fighting / Dark / Fairy Energy (any combination)
+### Super Boost Energy Prism Star
+  - provides 1 Energy of every type [stage2]
+  - provides 4 Energy of every type [threeStage2]
+### Warp Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: switch (self/activeToBench)
+### Counter Energy
+  - provides 1 Colorless Energy
+  - provides 2 Energy of every type [trailingPrizesNotGxEx]
+### Double Colorless Energy
+  - provides 2 Colorless Energy
+### Strong Energy
+  - can only be attached to a Fighting Pokémon
+  - provides 1 Fighting Energy [host:Fighting]
+  - host attacks do +20 damage (Fighting)
+### Splash Energy
+  - can only be attached to a Water Pokémon
+  - provides 1 Water Energy [host:Water]
+  - if host is KO'd, return it to hand (Water)
+### Burning Energy
+  - can only be attached to a Fire Pokémon
+  - provides 1 Fire Energy [host:Fire]
+  - if discarded by attack, reattach from discard
+### Flash Energy
+  - can only be attached to a Lightning Pokémon
+  - provides 1 Lightning Energy [host:Lightning]
+  - host has no Weakness (Lightning)
+### Dangerous Energy
+  - can only be attached to a Dark Pokémon
+  - provides 1 Dark Energy [host:Dark]
+  - if host is damaged, put 2 damage counters on the attacker (pokemonEx)
+### Double Dragon Energy
+  - can only be attached to a Dragon Pokémon
+  - provides 2 Energy of every type [host:Dragon]
+### Double Magma Energy
+  - attach restricted to teamMagma Pokémon
+  - provides 2 Fighting Energy [teamMagma]
+  - discard at the end of the turn
+### Double Aqua Energy
+  - attach restricted to teamAqua Pokémon
+  - provides 2 Water Energy [teamAqua]
+  - discard at the end of the turn
+### Wonder Energy
+  - can only be attached to a Fairy Pokémon
+  - provides 1 Fairy Energy [host:Fairy]
+  - prevents attack effects on host (Fairy)
+### Shield Energy
+  - can only be attached to a Metal Pokémon
+  - provides 1 Metal Energy [host:Metal]
+  - host takes -10 damage
+### Mystery Energy
+  - can only be attached to a Psychic Pokémon
+  - provides 1 Psychic Energy [host:Psychic]
+  - host Retreat Cost -2
+### Herbal Energy
+  - can only be attached to a Grass Pokémon
+  - provides 1 Grass Energy [host:Grass]
+  - on attach from hand: heal 30 damage (Grass)
+### Plasma Energy
+  - provides 1 Colorless Energy
+### Blend Energy {
+  - provides 1 Water / Lightning / Fighting / Metal Energy (any combination)
+### Blend Energy {
+  - provides 1 Water / Lightning / Fighting / Metal Energy (any combination)
+### Prism Energy
+  - provides 1 Colorless Energy
+  - provides 1 Energy of every type [hostBasic]
+### Metal Energy
+  - provides 1 Metal Energy
+  - host takes -10 damage (after W/R)
+  - ignored unless host is Metal
+### Darkness Energy
+  - provides 1 Dark Energy
+  - host attacks do +10 damage (Dark)
+  - ignored unless host is Dark
+### Rescue Energy
+  - provides 1 Colorless Energy
+  - if host is KO'd, return it to hand
+### Darkness Energy
+  - provides 1 Dark Energy
+  - host attacks do +10 damage (Dark)
+  - ignored unless host is Dark
+### Rainbow Energy
+  - provides 1 Energy of every type
+  - no effect other than providing Energy
+  - on attach from hand: put 1 damage counter
+### Upper Energy
+  - provides 1 Colorless Energy
+  - provides 2 Colorless Energy [trailingPrizesNotLvX]
+### SP Energy
+  - provides 1 Colorless Energy
+  - provides 1 Energy of every type [hostSP]
+### Rainbow Energy
+  - provides 1 Energy of every type
+  - no effect other than providing Energy
+  - on attach from hand: put 1 damage counter
+### Warp Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: switch (self/activeToBench)
+### Cyclone Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: switch (opponent)
+### Recover Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: clear Special Conditions
+### Health Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: remove 1 damage counter
+### Call Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: search 2 Basic Pokémon → bench (once/turn) (ends turn)
+### Multi Energy
+  - provides 1 Energy of every type
+  - provides 1 Colorless Energy [otherSpecial]
+  - no effect other than providing Energy
+### δ Rainbow Energy
+  - provides 1 Colorless Energy
+  - provides 1 Energy of every type [delta]
+  - no effect other than providing Energy
+### Boost Energy
+  - attach restricted to evolution Pokémon
+  - provides 3 Colorless Energy
+  - discard at the end of the turn
+  - discard if no longer evolution
+  - host cannot retreat
+### Double Rainbow Energy
+  - attach restricted to evolvedExcludingEx Pokémon
+  - provides 2 Energy of every type
+  - discard if no longer evolution
+  - no effect other than providing Energy
+  - host attacks do -10 damage
+### Darkness Energy
+  - provides 1 Dark Energy
+  - host attacks do +10 damage (Dark)
+### Scramble Energy
+  - attach restricted to evolvedExcludingEx Pokémon
+  - provides 1 Colorless Energy
+  - provides 3 Energy of every type [trailingPrizes]
+  - discard if no longer evolution
+### Holon Energy WP
+  - provides 1 Colorless Energy
+  - prevents attack effects on host
+  - host has no Retreat Cost
+  - ignored on pokemonEx
+### Holon Energy GL
+  - provides 1 Colorless Energy
+  - host takes -10 damage from Pokémon-EX
+  - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
+  - ignored on pokemonEx
+### Holon Energy FF
+  - provides 1 Colorless Energy
+  - host has no Weakness
+  - host attack ignores Resistance
+  - ignored on pokemonEx
+### Heal Energy
+  - provides 1 Colorless Energy
+  - no effect other than providing Energy
+  - on attach from hand: remove 1 damage counter + cure status
+  - ignored on pokemonEx unless it has a basic Energy
+### Dark Metal Energy
+  - provides 1 Dark / Metal Energy (any combination)
+  - no effect other than providing Energy
+### React Energy
+  - provides 1 Colorless Energy
+### Holon Energy WP
+  - provides 1 Colorless Energy
+  - host has no Retreat Cost
+  - ignored on pokemonEx
+### Holon Energy GL
+  - provides 1 Colorless Energy
+  - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
+  - ignored on pokemonEx
+### Darkness Energy
+  - provides 1 Dark Energy
+### R Energy
+  - attach restricted to darkOrRocket Pokémon
+  - provides 2 Dark Energy
+  - host attacks do +10 damage
+### Dark Metal Energy
+  - provides 1 Dark / Metal Energy (any combination)
+  - no effect other than providing Energy
+### Multi Energy
+  - provides 1 Energy of every type
+  - provides 1 Colorless Energy [otherSpecial]
+### Double Rainbow Energy
+  - attach restricted to evolvedExcludingEx Pokémon
+  - provides 2 Energy of every type
+  - discard if no longer evolution
+  - no effect other than providing Energy
+  - host attacks do -10 damage
+### Magma Energy
+  - attach restricted to teamMagma Pokémon
+  - provides 2 Fighting / Dark Energy (any combination)
+  - discard at the end of the turn
+  - no effect other than providing Energy
+### Aqua Energy
+  - attach restricted to teamAqua Pokémon
+  - provides 2 Water / Dark Energy (any combination)
+  - discard at the end of the turn
+  - no effect other than providing Energy
+### Multi Energy
+  - provides 1 Energy of every type
+  - provides 1 Colorless Energy [otherSpecial]
+### Rainbow Energy
+  - provides 1 Energy of every type
+  - on attach from hand: put 1 damage counter
+### Retro Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: remove 2 damage counters + devolve
+### Cyclone Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: switch (opponent)
+### Bounce Energy
+  - attach restricted to basicEnergyBearer Pokémon
+  - provides 2 Colorless Energy
+  - on attach from hand: return a basic Energy to hand
+### Warp Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: switch (self/activeToBench)
+### Crystal Energy
+  - provides 1 Energy of all types of basic Energy attached
+  - provides 1 Colorless Energy [noBasicEnergy]
+### Boost Energy
+  - attach restricted to evolution Pokémon
+  - provides 3 Colorless Energy
+  - discard at the end of the turn
+  - discard if no longer evolution
+  - host cannot retreat
+### Metal Energy
+  - provides 1 Metal Energy
+  - host takes -10 damage (after W/R)
+  - host takes -10 damage
+### Darkness Energy
+  - provides 1 Dark Energy
+  - at end of every turn, put 1 damage counter on host (unless host:Dark)
+  - host attacks do +10 damage (Dark)
+### Metal Energy
+  - provides 1 Metal Energy
+  - host takes -10 damage
+### Darkness Energy
+  - provides 1 Dark Energy
+  - at end of every turn, put 1 damage counter on host (unless host:Dark)
+  - host attacks do +10 damage (Dark)
+### Potion Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: remove 1 damage counter
+### Full Heal Energy
+  - provides 1 Colorless Energy
+  - on attach from hand: clear Special Conditions
+### Miracle Energy
+  - at most 1 per deck
+  - provides 2 Energy of every type
+  - discard at the end of the turn
+### Recycle Energy
+  - provides 1 Colorless Energy
+### Full Heal Energy
+  - provides 1 Colorless Energy
+### Rainbow Energy
+  - provides 1 Energy of every type
+### Double Colorless Energy
+  - provides 2 Colorless Energy
