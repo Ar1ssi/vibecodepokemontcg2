@@ -1443,13 +1443,36 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
                   // moveCardBundle — the same synced wrapper used by manual
                   // drag/discard — so the peer receives and replays the
                   // identical action instead of guessing at it locally.
-                  if (player === 'self') {
+                  if (player === 'self' || (!systemState.isTwoPlayer && player === 'opp')) {
                     import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
                       try {
                         const idx = zone.array.indexOf(card);
                         if (idx >= 0) {
-                          moveCardBundle('self', 'self', zoneId, koDestination, idx, false, 'move');
+                          moveCardBundle(player, player, zoneId, koDestination, idx, false, 'move');
                           appendMessage('', `auto: KO'd Pokémon moved to ${koDestination === 'lostZone' ? 'the Lost Zone' : 'discard'}`, 'announcement', false);
+
+                          if (zoneId === 'active') {
+                            const benchZone = getZone(player, 'bench');
+                            const candidates = (benchZone?.array || []).filter(
+                              (c) => c && !c.image?.attached && ((c.type2 || c.type) === 'Pokémon')
+                            );
+                            if (candidates.length > 0) {
+                              import('./mat-picker.js').then(({ openMatPick }) => {
+                                openMatPick({
+                                  title: `${card.name || 'Active Pokémon'} was KO'd — click a Bench Pokémon to promote to Active`,
+                                  candidates,
+                                  cancellable: false,
+                                  onPick: (picked) => {
+                                    const bIdx = benchZone.array.indexOf(picked);
+                                    if (bIdx >= 0) {
+                                      moveCardBundle(player, player, 'bench', 'active', bIdx, false, 'move');
+                                      appendMessage('', `⬆️ ${picked.name || 'A benched Pokémon'} promotes to Active.`, 'announcement', false);
+                                    }
+                                  },
+                                });
+                              });
+                            }
+                          }
                         }
                       } catch {}
                     });

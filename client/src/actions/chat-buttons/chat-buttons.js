@@ -284,6 +284,72 @@ function hasRoundAttack(card) {
   return (card?.attacks || []).some((a) => /^round$/i.test(String(a?.name || '')));
 }
 
+const executeKnockoutPromotion = async (
+  defenderPlayer,
+  initiator,
+  oldActiveName,
+  koDestination = 'discard'
+) => {
+  const benchZone = getZone(defenderPlayer, 'bench');
+  const benchCount = countBenchPokemon(benchZone);
+  const plan = planPromotion(true, benchCount);
+
+  // Move the knocked out Pokémon from active to discard/lostZone
+  await moveCard(defenderPlayer, initiator, 'active', koDestination, 0);
+
+  if (plan.promote) {
+    const candidates = (benchZone.array || []).filter(
+      (c) => c && isBoardPokemon(c) && !c.image?.attached
+    );
+
+    let pickedCard = null;
+    if (candidates.length > 0) {
+      try {
+        const { openMatPick } = await import('../../setup/rules/mat-picker.js');
+        pickedCard = await new Promise((resolve) => {
+          openMatPick({
+            title: `${oldActiveName} was KO'd — click a Bench Pokémon to promote to Active`,
+            candidates,
+            cancellable: false,
+            onPick: (c) => resolve(c),
+            onCancel: () => resolve(null),
+          });
+        });
+      } catch (err) {
+        console.warn('Knockout mat picker failed, defaulting to first bench:', err);
+      }
+    }
+
+    const currentBench = getZone(defenderPlayer, 'bench');
+    let benchIdx = -1;
+    if (pickedCard) {
+      benchIdx = currentBench.array.indexOf(pickedCard);
+    }
+    if (benchIdx < 0) {
+      benchIdx = currentBench.array.findIndex(
+        (c) => c && isBoardPokemon(c) && !c.image?.attached
+      );
+    }
+    if (benchIdx < 0) benchIdx = 0;
+
+    await moveCard(defenderPlayer, initiator, 'bench', 'active', benchIdx);
+    const newActive = getZone(defenderPlayer, 'active').array[0];
+    appendMessage(
+      initiator,
+      `⬆️ ${oldActiveName} was KO'd — ${newActive?.name || 'a benched Pokémon'} promotes to Active.`,
+      'announcement',
+      false
+    );
+  } else {
+    appendMessage(
+      initiator,
+      `💀 ${oldActiveName} was Knocked Out!`,
+      'announcement',
+      false
+    );
+  }
+};
+
 function isGrassPokemon(card) {
   const types = (card?.types || []).map((t) => String(t).toLowerCase());
   return types.includes('grass');
@@ -1260,32 +1326,10 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 );
               }
             }
-            // P4: real promotion — move KO'd active to discard, promote first bench.
-            const benchCount = countBenchPokemon(getZone(oppPlayer, 'bench'));
-            const plan = planPromotion(true, benchCount);
-            if (plan.promote) {
-              const oldActiveName = oppActive.name || 'The active Pokémon';
-              const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
-              moveCard(oppPlayer, user, 'active', koDestination, 0);
-              moveCard(oppPlayer, user, 'bench', 'active', 0);
-              const newActive = getZone(oppPlayer, 'active').array[0];
-              appendMessage(
-                user,
-                `⬆️ ${oldActiveName} was KO'd — ${newActive?.name || 'a benched Pokémon'} promotes to Active.`,
-                'announcement',
-                false
-              );
-            } else {
-              const oldActiveName = oppActive.name || 'The active Pokémon';
-              const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
-              moveCard(oppPlayer, user, 'active', koDestination, 0);
-              appendMessage(
-                user,
-                `💀 ${oldActiveName} was Knocked Out!`,
-                'announcement',
-                false
-              );
-            }
+            // P4: promotion — move KO'd active to discard/lostZone, prompt mat picker for bench promotion.
+            const oldActiveName = oppActive.name || 'The active Pokémon';
+            const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
+            await executeKnockoutPromotion(oppPlayer, user, oldActiveName, koDestination);
             evaluateWinCondition(user);
           }
         }
@@ -1507,21 +1551,9 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 false
               );
               await _takePrizesWithPicker(user, koResult.prizeCount);
-              const benchCount = countBenchPokemon(getZone(oppPlayer, 'bench'));
-              const plan = planPromotion(true, benchCount);
-              if (plan.promote) {
-                const oldActiveName = oppActive.name || 'The active Pokémon';
-                const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
-                moveCard(oppPlayer, user, 'active', koDestination, 0);
-                moveCard(oppPlayer, user, 'bench', 'active', 0);
-                const newActive = getZone(oppPlayer, 'active').array[0];
-                appendMessage(
-                  user,
-                  `⬆️ ${oldActiveName} was KO'd — ${newActive?.name || 'a benched Pokémon'} promotes to Active.`,
-                  'announcement',
-                  false
-                );
-              }
+              const oldActiveName = oppActive.name || 'The active Pokémon';
+              const koDestination = isPrismStarCard(oppActive) ? 'lostZone' : 'discard';
+              await executeKnockoutPromotion(oppPlayer, user, oldActiveName, koDestination);
             }
           }
           }
