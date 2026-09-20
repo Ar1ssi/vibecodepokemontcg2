@@ -8,7 +8,7 @@ import test from 'node:test';
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility } = await import('../abilities.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus } = await import('../stadium-effects.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus, isSingleStrikeCard, isEvolutionCard, isStadiumEnergyAttachHeal, isStadiumGlimwoodReFlip } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
@@ -761,6 +761,86 @@ import test from 'node:test';
       assert.equal(classifyAbility({ name: 'Pikachu' }), 'unknown');
     });
 
+    test('classifyAbility: full-corpus pkmncards audit clusters', () => {
+      // Ancient-Trait / play-from-hand evolution wording.
+      assert.equal(
+        classifyAbility({
+          ability: {
+            text: 'You may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.',
+          },
+        }),
+        'evolve',
+      );
+      assert.equal(
+        classifyAbility({ ability: { text: 'Murkrow can evolve during the turn you play it.' } }),
+        'evolve',
+      );
+      // Opponent hand reveal.
+      assert.equal(
+        classifyAbility({
+          ability: { text: 'Once during your turn, you may have your opponent reveal their hand.' },
+        }),
+        'opponent-disrupt',
+      );
+      // Energy provides a different type / provides every type.
+      assert.equal(
+        classifyAbility({
+          ability: {
+            text: 'All basic Energy cards attached to Steelix provide {M} Energy instead of their usual types.',
+          },
+        }),
+        'energy-multiplier',
+      );
+      // Self/type change.
+      assert.equal(
+        classifyAbility({
+          ability: {
+            text: 'As long as Lanturn has any {L} Energy attached to it, Lanturn is both {L} and {W} type.',
+          },
+        }),
+        'type-change',
+      );
+      // Retreat-cost modifiers worded without the phrase "retreat cost".
+      assert.equal(
+        classifyAbility({
+          ability: { text: 'You pay {C} less to retreat Arcanine for each Energy attached to it.' },
+        }),
+        'retreat-cost',
+      );
+      // Player play-locks.
+      assert.equal(
+        classifyAbility({
+          ability: { text: 'Each player can\u2019t play any Item cards from his or her hand.' },
+        }),
+        'effect-prevent',
+      );
+      // Prize prevention on KO.
+      assert.equal(
+        classifyAbility({
+          ability: {
+            text: 'When Shedinja is Knocked Out, your opponent doesn\u2019t take any Prize cards.',
+          },
+        }),
+        'prize-modify',
+      );
+      // Resistance modifications.
+      assert.equal(
+        classifyAbility({
+          ability: { text: "Each of your {L} Pokémon's Resistance is now -30." },
+        }),
+        'weakness',
+      );
+      // Discard pile onto Bench recursion.
+      assert.equal(
+        classifyAbility({
+          ability: {
+            text: 'During your turn, you may put up to 2 {W} Pokémon that don\u2019t have a Rule Box from your discard pile onto your Bench.',
+          },
+        }),
+        'recursion',
+      );
+    });
+
     test('parseAbility: Mega Greninja ex Mortal Shuriken (discard Water Energy → place damage on opponent)', () => {
       const text =
         "Once during your turn, if this Pokémon is in the Active Spot, you may discard a Basic Water Energy card from your hand in order to use this Ability. Place 6 damage counters on 1 of your opponent's Pokémon.";
@@ -967,7 +1047,7 @@ import test from 'node:test';
 
     test('parseStadiumOncePerTurn: buckets draw/search/energy/heal', () => {
       assert.deepEqual(parseStadiumOncePerTurn({ text: 'Once per turn, draw 2 cards.' }), { kind: 'draw', n: 2 });
-      assert.deepEqual(parseStadiumOncePerTurn({ text: 'Once per turn, search your deck.' }), { kind: 'search', n: 1 });
+      assert.deepEqual(parseStadiumOncePerTurn({ text: 'Once per turn, search your deck.' }), { kind: 'search', n: 1, searchWhat: 'card' });
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, attach an Energy.' }).kind, 'energy');
       assert.equal(parseStadiumOncePerTurn({ text: 'Once per turn, heal 20 damage.' }).kind, 'heal');
       assert.equal(parseStadiumOncePerTurn({ text: 'Prevent all damage.' }), null);
@@ -1073,6 +1153,227 @@ import test from 'node:test';
       });
       assert.equal(drawsSingular.kind, 'draw');
       assert.equal(drawsSingular.n, 1);
+    });
+
+    test('parseStadiumOncePerTurn: discard-pile Energy recovery (Mt. Coronet / Training Court)', () => {
+      const coronet = parseStadiumOncePerTurn({
+        name: 'Mt. Coronet',
+        text: "Once during each player's turn, that player may put 2 {M} Energy cards from their discard pile into their hand.",
+      });
+      assert.equal(coronet.kind, 'recover-energy');
+      assert.equal(coronet.n, 2);
+      assert.equal(coronet.typeFilter, 'metal');
+      const court = parseStadiumOncePerTurn({
+        name: 'Training Court',
+        text: "Once during each player's turn, that player may put a basic Energy card from their discard pile into their hand.",
+      });
+      assert.equal(court.kind, 'recover-energy');
+      assert.equal(court.n, 1);
+      assert.equal(court.basicOnly, true);
+    });
+
+    test('parseStadiumOncePerTurn: draw-until-hand-count and shuffle-draw', () => {
+      const rose = parseStadiumOncePerTurn({
+        name: 'Rose Tower',
+        text: "Once during each player's turn, that player may draw cards until they have 3 cards in their hand.",
+      });
+      assert.equal(rose.kind, 'draw-until-count');
+      assert.equal(rose.n, 3);
+      const beach = parseStadiumOncePerTurn({
+        name: 'Tropical Beach',
+        text: "Once during each player's turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player's turn ends.",
+      });
+      assert.equal(beach.kind, 'draw-until-count');
+      assert.equal(beach.n, 7);
+      assert.equal(beach.turnEnds, true);
+      const jubilife = parseStadiumOncePerTurn({
+        name: 'Jubilife Village',
+        text: "Once during each player's turn, that player may shuffle their hand into their deck and draw 5 cards. If they do, their turn ends.",
+      });
+      assert.equal(jubilife.kind, 'shuffle-draw');
+      assert.equal(jubilife.n, 5);
+      assert.equal(jubilife.turnEnds, true);
+    });
+
+    test('parseStadiumOncePerTurn: search qualifiers are preserved', () => {
+      const artazon = parseStadiumOncePerTurn({
+        name: 'Artazon',
+        text: "Once during each player's turn, that player may search their deck for a Basic Pokémon that doesn't have a Rule Box and put it onto their Bench. Then, that player shuffles their deck.",
+      });
+      assert.equal(artazon.kind, 'search-bench');
+      assert.match(artazon.searchWhat, /rule box/i);
+      const brooklet = parseStadiumOncePerTurn({
+        name: 'Brooklet Hill',
+        text: "Once during each player's turn, that player may search their deck for a Basic {W} Pokémon or Basic {F} Pokémon, put it onto their Bench, and shuffle their deck.",
+      });
+      assert.equal(brooklet.searchWhat, 'Basic {W} Pokémon or Basic {F} Pokémon');
+      const turffield = parseStadiumOncePerTurn({
+        name: 'Turffield Stadium',
+        text: "Once during each player's turn, that player may search their deck for an Evolution {G} Pokémon, reveal it, and put it into their hand. Then, that player shuffles their deck.",
+      });
+      assert.equal(turffield.kind, 'search');
+      assert.equal(turffield.searchWhat, 'Evolution {G} Pokémon');
+    });
+
+    test('parseStadiumOncePerTurn: coin, condition, and utility kinds', () => {
+      const p = (name, text) => parseStadiumOncePerTurn({ name, text });
+
+      const battle = p("Battle City", "Once during each player's turn, that player may flip a coin. If heads, the player draws a card.");
+      assert.equal(battle.kind, 'draw');
+      assert.equal(battle.coin, true);
+
+      const mesagoza = p('Mesagoza', "Once during each player's turn, that player may flip a coin. If heads, that player searches their deck for a Pokémon, reveals it, and puts it into their hand. Then, that player shuffles their deck.");
+      assert.equal(mesagoza.kind, 'search');
+      assert.equal(mesagoza.coin, true);
+
+      const healing = p('Healing Field', "Once during each player's turn, he or she may flip a coin. If heads, that player removes 2 damage counters from his or her Active Pokémon (1 if it only has 1).");
+      assert.equal(healing.kind, 'heal');
+      assert.equal(healing.n, 20);
+
+      const burned = p('Burned Tower', "Once during each player's turn, that player may flip a coin. If heads, the player searches his or her discard pile for a basic Energy card, shows it to his or her opponent, and put it into his or her hand.");
+      assert.equal(burned.kind, 'recover-energy');
+      assert.equal(burned.basicOnly, true);
+
+      const quarry = p('Conductive Quarry', "Once during each player's turn, the player may flip a coin. If heads, that player searches his or her discard pile for a {L} or {M} Energy card, shows it to the opponent, and puts it into his or her hand.");
+      assert.equal(quarry.kind, 'recover-energy');
+      assert.deepEqual(quarry.types, ['lightning', 'metal']);
+
+      const speed = p('Speed Stadium', "Once during each player's turn, the player may flip a coin until he or she gets tails. For each heads, that player draws a card.");
+      assert.equal(speed.kind, 'coin-draw');
+      assert.equal(speed.coin, true);
+
+      const contest = p('Pokémon Contest Hall', "Once during each player's turn, if that player's Bench isn't full, the player may flip a coin. If heads, that player searches his or her deck for a Basic Pokémon and puts it onto his or her Bench.");
+      assert.equal(contest.kind, 'search-bench');
+      assert.equal(contest.coin, true);
+      assert.equal(contest.condition.type, 'bench-not-full');
+
+      const ultra = p('Ultra Space', "Once during each player's turn, that player may search their deck for an Ultra Beast card, reveal it, put it into their hand, and shuffle their deck.");
+      assert.equal(ultra.searchWhat, 'Ultra Beast');
+
+      const shop = p('Shopping Center', "Once during each player's turn, that player may put a Pokémon Tool attached to 1 of their Pokémon into their hand.");
+      assert.equal(shop.kind, 'return-tool');
+
+      const stark = p('Stark Mountain', "Once during each player's turn, that player may choose a {R} or {F} Energy attached to 1 of his or her Pokémon and move that Energy to 1 of his or her Pokémon.");
+      assert.equal(stark.kind, 'move-energy');
+
+      const undersea = p('Undersea Ruins', "Once during each player's turn (before attacking), that player may flip a coin. If heads, that player chooses 1 of his or her Evolved Pokémon in play and discards the top Evolution card from that Pokémon, devolving it.");
+      assert.equal(undersea.kind, 'devolve');
+      assert.equal(undersea.coin, true);
+
+      const twist = p('Twist Mountain', "Once during each player's turn, that player may flip a coin. If heads, that player puts a Restored Pokémon from his or her hand onto his or her Bench.");
+      assert.equal(twist.kind, 'bench-restored');
+
+      assert.equal(p('Strange Cave', "Once during each player's turn, that player may put an Omanyte, Kabuto, Aerodactyl, Aerodactyl ex, Lileep, or Anorith onto his or her Bench from his or her hand.").source, 'hand');
+      assert.equal(p('Underground Lake', "Once during each player's turn, that player may put an Omanyte or a Kabuto card from his or her discard pile onto his or her Bench.").source, 'discard');
+
+      const magma = p('Magma Basin', "Once during each player's turn, that player may attach a {R} Energy card from their discard pile to 1 of their Benched {R} Pokémon. If a player attached Energy to a Pokémon in this way, put 2 damage counters on that Pokémon.");
+      assert.equal(magma.kind, 'attach-discard-damage');
+      assert.equal(magma.damage, 2);
+
+      assert.equal(p('Radio Tower', "Once during each player's turn (before attacking), that player may look at the top 2 cards of his or her deck and put them back in the same order.").kind, 'peek-return');
+      assert.equal(p('Primordial Altar', "Once during each player's turn, that player may look at the top card of their deck. They may discard that card.").kind, 'peek-discard');
+      assert.equal(p('Fuchsia City Gym', "Once during each player's turn (before attacking), that player may flip a coin. If heads, that player may shuffle 1 of his or her Pokémon in play with Koga in its name and any cards attached to it into his or her deck.").kind, 'shuffle-own-pokemon');
+      assert.equal(p('Lavender Town', "Once during each player's turn, that player may have their opponent reveal their hand.").kind, 'reveal-hand');
+
+      const tower = p('Tower of Darkness', "Once during each player's turn, that player may draw 2 cards. In order to use this effect, that player must discard a Single Strike card from their hand.");
+      assert.equal(tower.kind, 'discard-draw');
+      assert.equal(tower.n, 2);
+      assert.deepEqual(tower.cost, { type: 'discard-single-strike', n: 1 });
+
+      const lost = p('Lost World', "Once during each player's turn, if that player's opponent has 6 or more Pokémon in the Lost Zone, the player may choose to win the game.");
+      assert.equal(lost.kind, 'win-game');
+      assert.deepEqual(lost.condition, { type: 'opponent-lost-zone', n: 6 });
+
+      const ruins = p('Ancient Ruins', "Once during each player's turn, if he or she has not played a Supporter card, that player may reveal his or her hand to his or her opponent. If that player reveals his or her hand and there is no Supporter card there, that player draws a card.");
+      assert.equal(ruins.kind, 'ancient-ruins');
+      assert.equal(ruins.condition.type, 'no-supporter-played');
+
+      const mystery = p('Mystery Zone', "Once during each player's turn, if that player has an Evolution card in his or her hand, he or she may search his or her deck for a basic Energy card, show it to his or her opponent, and put it into his or her hand. Then that player chooses an Evolution card from his or her hand and puts it into his or her deck. That player shuffles his or her deck afterward.");
+      assert.equal(mystery.kind, 'mystery-zone');
+      assert.equal(mystery.condition.type, 'has-evolution-in-hand');
+
+      assert.equal(isSingleStrikeCard({ name: 'Single Strike Urshifu V' }), true);
+      assert.equal(isSingleStrikeCard({ name: 'Rapid Strike Urshifu V' }), false);
+      assert.equal(isEvolutionCard({ name: 'Ivysaur', stage: 'Stage 1' }), true);
+      assert.equal(isEvolutionCard({ name: 'Bulbasaur', stage: 'Basic' }), false);
+      assert.equal(
+        isStadiumEnergyAttachHeal({ name: 'Pokémon Park', text: "Once during each of his or her turns, whenever a player attaches an Energy card from his or her hand to 1 of his or her Benched Pokémon, he or she removes 1 damage counter, if any, from that Pokémon." }),
+        true
+      );
+      assert.equal(
+        classifyStadiumEffect({ name: 'Pokémon Park', type: 'Stadium', subtypes: ['Stadium'], text: "Once during each of his or her turns, whenever a player attaches an Energy card from his or her hand to 1 of his or her Benched Pokémon, he or she removes 1 damage counter, if any, from that Pokémon." }),
+        'continuous-both'
+      );
+      const glimwood = {
+        name: 'Glimwood Tangle',
+        type: 'Stadium',
+        subtypes: ['Stadium'],
+        text: "Once during each player's turn, after that player flips any coins for an attack, they may ignore all results of those coin flips and begin flipping those coins again.",
+      };
+      assert.equal(isStadiumGlimwoodReFlip(glimwood), true);
+      assert.equal(hasRecognizedPassiveStadiumEffect(glimwood), true);
+      assert.equal(classifyStadiumEffect(glimwood), 'continuous-both');
+    });
+
+    test('parseStadiumOncePerTurn: unmodeled gates stay announce-only', () => {
+      // Glimwood Tangle needs an attack coin re-flip window the executor has no
+      // hook for, so it stays announce-only rather than resolving for free.
+      assert.equal(
+        parseStadiumOncePerTurn({ name: 'Glimwood Tangle', text: "Once during each player's turn, after that player flips any coins for an attack, they may ignore all results of those coin flips and begin flipping those coins again." }),
+        null
+      );
+      // Coin-flip and condition effects are now modeled, not announce-only.
+      assert.equal(
+        parseStadiumOncePerTurn({ name: 'Battle City', text: "Once during each player's turn, that player may flip a coin. If heads, the player draws a card." })?.kind,
+        'draw'
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ name: 'All-Night Party', text: "Once during each player's turn, if that player's Active Pokémon is Asleep, he or she may remove that Special Condition and heal 30 damage from that Pokémon." })?.kind,
+        'heal'
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ name: 'Stark Mountain', text: "Once during each player's turn, that player may choose a {R} or {F} Energy attached to 1 of his or her Pokémon and move that Energy to 1 of his or her Pokémon." })?.kind,
+        'move-energy'
+      );
+      assert.equal(
+        parseStadiumOncePerTurn({ name: 'Magma Basin', text: "Once during each player's turn, that player may attach a {R} Energy card from their discard pile to 1 of their Benched {R} Pokémon. If a player attached Energy to a Pokémon in this way, put 2 damage counters on that Pokémon." })?.kind,
+        'attach-discard-damage'
+      );
+    });
+
+    test('parseStadiumOncePerTurn: bench heal, top-deck mill, and discard-then-search', () => {
+      const center = parseStadiumOncePerTurn({
+        name: 'Pokémon Center',
+        text: "Once during each player's turn, that player may heal 20 damage from 1 of his or her Benched Pokémon.",
+      });
+      assert.equal(center.kind, 'heal');
+      assert.equal(center.n, 20);
+      assert.equal(center.target, 'bench');
+
+      const stop = parseStadiumOncePerTurn({
+        name: 'PokéStop',
+        text: "Once during each player's turn, that player may discard 3 cards from the top of their deck. If a player discarded any Item cards in this way, they put those Item cards into their hand.",
+      });
+      assert.equal(stop.kind, 'mill-items');
+      assert.equal(stop.n, 3);
+
+      const hearth = parseStadiumOncePerTurn({
+        name: 'Giant Hearth',
+        text: "Once during each player's turn, that player may discard a card from their hand. If they do, that player searches their deck for up to 2 {R} Energy cards, reveals them, and puts them into their hand. Then, that player shuffles their deck.",
+      });
+      assert.equal(hearth.kind, 'discard-search');
+      assert.equal(hearth.n, 2);
+      assert.equal(hearth.searchWhat, '{R} Energy');
+      assert.deepEqual(hearth.cost, { type: 'discard-hand', n: 1 });
+
+      const viridian = parseStadiumOncePerTurn({
+        name: 'Viridian Forest',
+        text: "Once during each player's turn, that player may discard a card from their hand. If they do, that player searches their deck for a basic Energy card, reveals it, and puts it into their hand. Then, that player shuffles their deck.",
+      });
+      assert.equal(viridian.kind, 'discard-search');
+      assert.equal(viridian.n, 1);
+      assert.equal(viridian.searchWhat, 'Basic Energy');
+      assert.deepEqual(viridian.cost, { type: 'discard-hand', n: 1 });
     });
 
     test('Grand Tree: once-per-turn search-evolve, including Stage 2 chain', () => {
@@ -1567,6 +1868,297 @@ import test from 'node:test';
           text: 'Each player draws 3 cards.',
         }),
         'draw-attach',
+      );
+    });
+
+    test('classifyAttackEffect: full-corpus pkmncards audit patterns', () => {
+      // "times the amount of … Energy attached" scaling wording.
+      assert.equal(
+        classifyAttackEffect({
+          damage: 60,
+          text: 'This attack does 20 more damage times the amount of {W} Energy attached to this Pokémon.',
+        }),
+        'per-energy',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 20,
+          text: "This attack does 30 more damage times the amount of Energy attached to your opponent's Active Pokémon.",
+        }),
+        'per-energy',
+      );
+      // Bracketed energy symbol followed by a space ("{W} Energy attached").
+      assert.equal(
+        classifyAttackEffect({
+          damage: 40,
+          text: 'This attack does 40 damage plus 10 more damage for each {W} Energy attached to this Pokémon.',
+        }),
+        'per-energy',
+      );
+      // Named group scaling ("for each of your Ultra Beasts in play").
+      assert.equal(
+        classifyAttackEffect({
+          damage: 20,
+          text: 'This attack does 20 damage for each of your Ultra Beasts in play.',
+        }),
+        'per-energy',
+      );
+      // Damage-reduction clauses (both printed directions).
+      assert.equal(
+        classifyAttackEffect({
+          damage: 30,
+          text: "During your opponent's next turn, any damage done by attacks from the Defending Pokémon is reduced by 30 (before applying Weakness and Resistance).",
+        }),
+        'damage-prevention',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 60,
+          text: "During your opponent's next turn, any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).",
+        }),
+        'damage-prevention',
+      );
+      // Generalised play-lock and heal-lock clauses.
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: "During your opponent's next turn, they can't play any Special Energy or Stadium cards from their hand.",
+        }),
+        'next-turn-lock',
+      );
+      assert.equal(
+        classifyAttackEffect({
+          damage: 50,
+          text: "The Defending Pokémon can't be healed during your opponent's next turn.",
+        }),
+        'next-turn-lock',
+      );
+      // "Move as many … Energy attached … to your other Pokémon".
+      assert.equal(
+        classifyAttackEffect({
+          damage: 0,
+          text: 'Move as many {W} Energy attached to your Pokémon to your other Pokémon in any way you like.',
+        }),
+        'move-energy',
+      );
+    });
+
+    test('classifyAttackEffect: S208 corpus clusters (new families)', () => {
+      const c = (text, damage = 0) => classifyAttackEffect({ name: 'X', damage, text });
+      assert.equal(
+        c('If you go first, you can use this attack on your first turn.', 30),
+        'first-turn-attack',
+      );
+      assert.equal(
+        c('If you go first, you can use this attack during your first turn. Search your deck for up to 3 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.'),
+        'search-deck',
+      );
+      assert.equal(
+        c("Prevent all effects of your opponent's attacks, except damage, done to this Pokémon during your opponent's next turn."),
+        'effect-prevention',
+      );
+      assert.equal(
+        c("During your opponent's next turn, prevent all effects of attacks used by your opponent's Pokémon done to this Pokémon. (Damage is not an effect.)"),
+        'effect-prevention',
+      );
+      assert.equal(c('Put 2 Energy attached to your Pokémon in the Lost Zone.'), 'lost-zone');
+      assert.equal(
+        c("Look at the top 3 cards of either player's deck and put them back in any order."),
+        'look-any-deck',
+      );
+      assert.equal(
+        c('Devolve any number of your Benched Pokémon as many times as you like. Put each Evolution card removed this way into your hand.'),
+        'devolve-self',
+      );
+      assert.equal(
+        c('If you have a Supporter card in play, use the effect of that card as the effect of this attack.'),
+        'supporter-effect',
+      );
+    });
+
+    test('classifyAttackEffect: S208 corpus clusters (broadened families)', () => {
+      const c = (text, damage = 0) => classifyAttackEffect({ name: 'X', damage, text });
+      // self-damage: counters on your own side or a named own Pokémon.
+      assert.equal(c('Put 3 damage counters on 1 of your Pokémon.'), 'self-damage');
+      assert.equal(c('Put 1 damage counter on Beldum.'), 'self-damage');
+      assert.equal(c('Put 7 damage counters on Rayquaza.'), 'self-damage');
+      // immunity: "don't apply Weakness/Resistance".
+      assert.equal(c("Don't apply Resistance.", 30), 'immunity');
+      assert.equal(
+        c("Don't apply Weakness and Resistance for this attack. (Any other effects that would happen after applying Weakness and Resistance still happen.)", 30),
+        'immunity',
+      );
+      // deferred KO.
+      assert.equal(
+        c("At the end of your opponent's next turn, the Defending Pokémon will be Knocked Out."),
+        'deferred-damage',
+      );
+      // multi-target: "each Defending Pokémon".
+      assert.equal(c('Does 20 damage to each Defending Pokémon.', 20), 'multi-target');
+      // conditional KO: HP threshold / status / fewest HP.
+      assert.equal(
+        c("Knock Out 1 of your opponent's Pokémon in play that has 60 HP or less remaining."),
+        'conditional-ko',
+      );
+      assert.equal(c("If your opponent's Active Pokémon is Asleep, it is Knocked Out."), 'conditional-ko');
+      assert.equal(
+        c("Choose 1 Pokémon (yours or your opponent's) with the fewest remaining HP (excluding Gardevoir) and that Pokémon is now Knocked Out."),
+        'conditional-ko',
+      );
+      // return-self: "return … all cards attached to it".
+      assert.equal(c('Return this Pokémon and all cards attached to it to your hand.', 60), 'return-self');
+      assert.equal(
+        c('You may put Uxie and all cards attached to it on the bottom of your deck in any order.', 60),
+        'return-self',
+      );
+      // move-energy: return Energy to hand / move to 1 of your Pokémon.
+      assert.equal(c('Return 2 {W} Energy attached to this Pokémon to your hand.', 60), 'move-energy');
+      assert.equal(c('You may move a {L} Energy card attached to Zapdos ex to 1 of your Pokémon.', 30), 'move-energy');
+      // reveal-hand: "his or her".
+      assert.equal(c('Your opponent reveals his or her hand.', 30), 'reveal-hand');
+      // next-turn-lock additions.
+      assert.equal(
+        c("During your opponent's next turn, Energy cards can't be attached from your opponent's hand to the Defending Pokémon."),
+        'next-turn-lock',
+      );
+      assert.equal(
+        c("During your opponent's next turn, the Defending Pokémon's attacks cost {C}{C} more."),
+        'next-turn-lock',
+      );
+      assert.equal(
+        c("During your opponent's next turn, any damage done to Lucario by attacks is increased by 30 (after applying Weakness and Resistance).", 60),
+        'next-turn-lock',
+      );
+      // next-turn-bonus: this Pokémon's / named attacks.
+      assert.equal(
+        c("During your next turn, this Pokémon's attacks do 80 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).", 80),
+        'next-turn-bonus',
+      );
+      assert.equal(
+        c("During your next turn, Deoxys's attacks do 40 more damage to the Defending Pokémon (before applying Weakness and Resistance).", 60),
+        'next-turn-bonus',
+      );
+      // copy-attack: the Defending Pokémon's attacks.
+      assert.equal(c("Choose 1 of the Defending Pokémon's attacks. Copy copies that attack."), 'copy-attack');
+      // recover-status: remove Special Conditions.
+      assert.equal(c('Remove all Special Conditions from Hoppip.'), 'recover-status');
+      assert.equal(c('Remove the Special Condition Asleep from the Defending Pokémon.'), 'recover-status');
+      // per-energy additions.
+      assert.equal(
+        c("Count the number of cards in your opponent's hand. Put that many damage counters on the Defending Pokémon."),
+        'per-energy',
+      );
+      assert.equal(c('This attack does 100 damage for each Special Condition affecting this Pokémon.', 100), 'per-energy');
+      assert.equal(c('Does 50 more damage for each Special Condition affecting the Defending Pokémon.', 50), 'per-energy');
+      assert.equal(
+        c("This attack does 30 damage plus 10 more damage for each Trainer card in your opponent's hand.", 30),
+        'per-energy',
+      );
+      assert.equal(
+        c('Does 10 damage plus 20 more damage for each type of basic Energy card attached to Ho-Oh ex.', 10),
+        'per-energy',
+      );
+      assert.equal(
+        c("Does 40 damage plus 10 more damage for each {C} Energy in the Defending Pokémon's Retreat Cost", 40),
+        'per-energy',
+      );
+      // bench-damage: choose-1 snipe and counter-equal placement.
+      assert.equal(
+        c("Choose 1 of your opponent's Pokémon. This attack does 20 damage to that Pokémon. Don't apply Weakness and Resistance for this attack."),
+        'bench-damage',
+      );
+      assert.equal(
+        c("Put damage counters on 1 of your opponent's Pokémon equal to the number of damage counters on this Pokémon."),
+        'bench-damage',
+      );
+      // draw-attach: "opponent draws a card".
+      assert.equal(c('Your opponent draws a card.'), 'draw-attach');
+      // devolve-opponent: remove the highest Stage Evolution card.
+      assert.equal(
+        c("Choose a number of your opponent's Stage 1 or Stage 2 Evolved Pokémon up to the amount of Energy attached to Jirachi. Remove the highest Stage Evolution card from each of those Pokémon."),
+        'devolve-opponent',
+      );
+      // damage-prevention: "prevent that attack's damage".
+      assert.equal(
+        c("During your opponent's next turn, if this Pokémon would be damaged by an attack, prevent that attack's damage done to this Pokémon if that damage is 60 or less."),
+        'damage-prevention',
+      );
+    });
+
+    test('classifyAttackEffect: S208 broadenings do not steal earlier families', () => {
+      const c = (text, damage = 0) => classifyAttackEffect({ name: 'X', damage, text });
+      // A coin-flip lock must stay coin-flip, not become multi-target.
+      assert.equal(
+        c("Flip a coin. If heads, each Defending Pokémon can't attack during your opponent's next turn."),
+        'coin-flip',
+      );
+      // A count-the-Prizes placement must stay per-prize.
+      assert.equal(
+        c('Put 5 damage counters on the Defending Pokémon. Then, count the number of Prize cards your opponent has taken and put that many damage counters on the Defending Pokémon.'),
+        'per-prize',
+      );
+    });
+
+    test('ATTACK_FAMILIES / describeAttackEffect: S208 families', () => {
+      for (const f of [
+        'first-turn-attack',
+        'effect-prevention',
+        'lost-zone',
+        'look-any-deck',
+        'devolve-self',
+        'supporter-effect',
+      ]) {
+        assert.ok(ATTACK_FAMILIES.includes(f), f);
+      }
+      assert.match(
+        describeAttackEffect({ name: 'Lost Impact', damage: 0, text: 'Put 2 Energy attached to your Pokémon in the Lost Zone.' }),
+        /Lost Zone/,
+      );
+      assert.match(
+        describeAttackEffect({ name: 'Star Shield-GX', damage: 0, text: "Prevent all effects of attacks, including damage, done to this Pokémon during your opponent's next turn." }),
+        /prevents attack effects/,
+      );
+    });
+
+    test('classifyAttackEffect: I66 remaining one-offs', () => {
+      const c = (text, damage = 0) => classifyAttackEffect({ name: 'X', damage, text });
+      assert.equal(
+        c('From the moment you use this attack, you must begin to sing a song. (While the song is being sung, the game continues.) When the song is finished, this attack does 30 damage.', 30),
+        'conditional-damage',
+      );
+      assert.equal(c("During your next turn, Vespiquen's Retreat Cost is 0.", 70), 'next-turn-bonus');
+      assert.equal(
+        c("Move 1 damage counter from 1 of your Pokémon to 1 of your opponent's Pokémon.", 0),
+        'move-damage-counter',
+      );
+      assert.equal(
+        c("Choose an Energy card attached to the Defending Pokémon and put it face down. Treat that card as a Special Energy card that provides {C} Energy and doesn't have any effect other than providing Energy.", 0),
+        'neutralize-opponent-energy',
+      );
+      assert.equal(
+        c('During your next turn, Extra Comet Punch does 30 damage plus 30 more damage.', 60),
+        'next-turn-bonus',
+      );
+      assert.equal(
+        c("If an attack does damage to Rocket's Moltres during your opponent's next turn (even if Rocket's Moltres is Knocked Out), Rocket's Moltres attacks your opponent's Active Pokémon for 10 damage. (Apply Weakness and Resistance.)", 0),
+        'retaliate',
+      );
+      // Regression guards: "Remove N damage counters" is a heal, not a move;
+      // counter-equal placement on the Attacking Pokémon is retaliate, not bench-damage.
+      assert.equal(
+        c('Remove 3 damage counters from each of your Pokémon that has any Energy attached to it.', 0),
+        'heal',
+      );
+      assert.equal(
+        c("During your opponent's next turn, if this Pokémon is damaged by an attack (even if it is Knocked Out), put damage counters on the Attacking Pokémon equal to the damage done to this Pokémon.", 0),
+        'retaliate',
+      );
+      for (const f of ['move-damage-counter', 'neutralize-opponent-energy']) {
+        assert.ok(ATTACK_FAMILIES.includes(f), f);
+      }
+      assert.match(
+        describeAttackEffect({ name: 'Transfer Pain', damage: 0, text: "Move 1 damage counter from 1 of your Pokémon to 1 of your opponent's Pokémon." }),
+        /moves damage counters/,
       );
     });
 
@@ -4156,6 +4748,651 @@ import test from 'node:test';
       assert.equal(marker.trait, 'alpha', 'the printed α marker tags the trait');
     });
 
+    // ── full-corpus ability gap clusters (I65) ──
+    //
+    // Regression coverage for the pkmncards full-corpus audit
+    // (scripts/audit-all-pokemon.mjs). Each text is a real printed ability
+    // that previously fell through to the `passiveAbility` fallback.
+
+    test('parseAbility: continuous type change (Double Type / Unit Energy)', () => {
+      const double = parseAbility('As long as this Pokémon is in play, it is {F} and {P} type.');
+      assert.deepEqual(double.map((s) => s.type), ['typeChangeAbility']);
+
+      const unit = parseAbility(
+        'As long as this Pokémon has Unit Energy {F}{D}{Y} attached to it, it is a {F}, {D}, and {Y} Pokémon.'
+      );
+      assert.equal(unit[0].type, 'typeChangeAbility');
+    });
+
+    test('parseAbility: Special-Condition immunity without a named condition', () => {
+      const steps = parseAbility(
+        "Each of your Pokémon that has any {M} Energy attached to it can't be affected by any Special Conditions. Remove any Special Conditions affecting those Pokémon."
+      );
+      assert.ok(steps.some((s) => s.type === 'statusImmunityAbility'));
+    });
+
+    test('parseAbility: ability-suppression wording ("have no Abilities")', () => {
+      const capsule = parseAbility(
+        "If this Pokémon has a Memory Capsule attached, {W} Pokémon in play (both yours and your opponent's) have no Abilities."
+      );
+      assert.equal(capsule[0].type, 'effectPreventAbility');
+
+      const damp = parseAbility(
+        "Pokémon in play (both yours and your opponent's) lose any Ability that requires the Pokémon using it to Knock Out itself."
+      );
+      assert.equal(damp[0].type, 'effectPreventAbility');
+    });
+
+    test('parseAbility: attack copying ("can use the attacks of …")', () => {
+      const steps = parseAbility(
+        'This Pokémon can use the attacks of any Basic Pokémon in your discard pile. (You still need the necessary Energy to use each attack.)'
+      );
+      assert.equal(steps[0].type, 'attackCopyAbility');
+    });
+
+    test('parseAbility: extra attacks per turn (Festival Lead / Ω Barrage)', () => {
+      assert.equal(
+        parseAbility('This Pokémon may attack twice a turn.').some((s) => s.type === 'extraAttackAbility'),
+        true
+      );
+      const festival = parseAbility(
+        "If Festival Grounds is in play, this Pokémon may use an attack it has twice. If the first attack Knocks Out your opponent's Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon."
+      );
+      assert.ok(festival.some((s) => s.type === 'extraAttackAbility'));
+    });
+
+    test('parseAbility: attacks ignore effects on the Defending Pokémon', () => {
+      const steps = parseAbility(
+        "Damage from attacks used by this Pokémon isn't affected by any effects on your opponent's Active Pokémon."
+      );
+      assert.equal(steps[0].type, 'ignoreDefenderEffectsAbility');
+    });
+
+    test('parseAbility: retreat-cost wording without "retreat cost"', () => {
+      const less = parseAbility('As long as Dodrio is Benched, pay {C} less to retreat your Active Pokémon.');
+      assert.equal(less[0].type, 'retreatCostAbility');
+      assert.equal(less[0].increased, false);
+
+      const more = parseAbility(
+        "As long as Ariados is in play, each player must pay an additional {C} to retreat his or her Active Pokémon."
+      );
+      assert.equal(more[0].type, 'retreatCostAbility');
+      assert.equal(more[0].increased, true);
+    });
+
+    test('parseAbility: energy replacement ("instead of its/their usual type")', () => {
+      const steps = parseAbility(
+        'All basic Energy cards attached to Steelix provide {M} Energy instead of their usual types.'
+      );
+      assert.equal(steps[0].type, 'energyMultiplierAbility');
+    });
+
+    test('parseAbility: Δ Evolution first-turn evolve permission', () => {
+      const steps = parseAbility(
+        'You may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.'
+      );
+      assert.equal(steps[0].type, 'evolvePermissionAbility');
+    });
+
+    test('parseAbility: opponent reveal-hand is opponent disruption', () => {
+      const steps = parseAbility('Once during your turn, you may have your opponent reveal their hand.');
+      assert.equal(steps[0].type, 'opponentDisruptAbility');
+      assert.equal(steps[0].revealHand, true);
+    });
+
+    test('parseAbility: hand ↔ top-of-deck swap (Primate Wisdom)', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may switch a card from your hand with the top card of your deck.'
+      );
+      assert.equal(steps[0].type, 'handDeckSwapAbility');
+    });
+
+    test('parseAbility: discard pile → Bench recursion', () => {
+      const steps = parseAbility(
+        "During your turn, you may put up to 2 {C} Pokémon that don't have a Rule Box from your discard pile onto your Bench. (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)"
+      );
+      assert.equal(steps[0].type, 'benchFromDiscardAbility');
+    });
+
+    test('parseAbility: variable draw until a board count', () => {
+      const steps = parseAbility(
+        'Once during your turn, you may draw cards until you have as many cards in your hand as you have Fusion Strike Pokémon in play.'
+      );
+      assert.equal(steps[0].type, 'drawVariableAbility');
+    });
+
+    test('parseAbility: shuffle this Pokémon into the deck', () => {
+      const steps = parseAbility(
+        'Once during your turn, if this Pokémon is on your Bench, you may shuffle it and all attached cards into your deck.'
+      );
+      assert.equal(steps[0].type, 'returnSelfToDeckAbility');
+    });
+
+    test('planAbilitySteps: new passive types are skipped, announce types not actionable', async () => {
+      const { planAbilitySteps, actionableAbilityPlan } = await import('../ability-step-plan.mjs');
+      const passive = parseAbility('As long as this Pokémon is in play, it is {F} and {P} type.');
+      assert.deepEqual(
+        planAbilitySteps(passive, { mode: 'interactive' }).map((p) => p.action),
+        ['skip']
+      );
+
+      const announce = parseAbility(
+        'Once during your turn, you may switch a card from your hand with the top card of your deck.'
+      );
+      const plan = planAbilitySteps(announce, { mode: 'interactive' });
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['announce']
+      );
+      assert.equal(actionableAbilityPlan(plan, { mode: 'interactive' }).length, 0);
+    });
+
+    // ── S211: long-tail ability families (I65 closed) ─────────────────────
+
+    test('parseAbility: S211 locks, moves, self-return, one-offs', () => {
+      const has = (text, type) => parseAbility(text).some((s) => s.type === type);
+
+      // Card-play / evolve locks
+      assert.ok(
+        has(
+          "As long as this Pokémon is in the Active Spot, your opponent can't play any Item cards or Pokémon Tool cards from their hand.",
+          'playLockAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "As long as Dialga is your Active Pokémon, your opponent can't play any Pokémon from his or her hand to evolve his or her Active Pokémon.",
+          'evolveLockAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'As long as Kabutops is your Active Pokémon, neither player can play Basic Pokémon or Evolution cards from his or her hand to evolve Benched Pokémon.',
+          'evolveLockAbility'
+        )
+      );
+      // Retreat locks
+      assert.ok(
+        has(
+          "As long as this Pokémon is in the Active Spot, your opponent's Active Pokémon can't retreat.",
+          'retreatLockAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "As long as Snorlax is your Active Pokémon, the Defending Pokémon can't Retreat. This power stops working when Snorlax is affected by a Special Condition.",
+          'retreatLockAbility'
+        )
+      );
+      // Ability suppression
+      assert.ok(
+        has(
+          'As long as Muk ex is your Active Pokémon, ignore all Poké-Powers and Poké-Bodies other than Toxic Gas.',
+          'powerSuppressAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), choose 1 of your opponent's Benched Pokémon that has a Pokémon Power. That power stops working until the end of this turn.",
+          'powerSuppressAbility'
+        )
+      );
+      // Damage-counter lock / moves
+      assert.ok(
+        has(
+          "Damage counters on each Pokémon (both yours and your opponent's) can't be moved to other Pokémon.",
+          'damageCounterLockAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'As often as you like during your turn, you may move 1 damage counter from 1 of your other Pokémon to this Pokémon.',
+          'moveDamageBetweenAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn, you may move 1 damage counter from 1 of your Pokémon to 1 of your opponent's Pokémon.",
+          'moveDamageAbility'
+        )
+      );
+      // Energy moves
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may move a {R} Energy from 1 of your Pokémon to this Pokémon.',
+          'moveEnergyAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "When 1 of your Pokémon is Knocked Out by damage from an attack from your opponent's Pokémon, you may move a {L} Energy from that Pokémon to this Pokémon.",
+          'energyOnKoAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), you may flip a coin. If heads, move an Energy from your opponent's Active Pokémon to 1 of his or her Benched Pokémon.",
+          'moveOpponentEnergyAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may switch a basic Energy attached to your Active Pokémon with a different type of basic Energy card from your discard pile.',
+          'energySwapAbility'
+        )
+      );
+      // Transform / self moves
+      assert.ok(
+        has(
+          'Once during your turn, you may switch this Pokémon with an Aegislash in your hand. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.',
+          'transformAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), if this Pokémon is in your discard pile, you may put this Pokémon on the bottom of your deck.',
+          'returnSelfToDeckAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may return this Pokémon and all cards attached to it to your hand.',
+          'returnSelfToHandAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn, if this Pokémon is in your hand and your opponent has any Stage 2 Pokémon in play, you may put this Pokémon onto your Bench.',
+          'selfBenchPlacementAbility'
+        )
+      );
+      // Status / win / Lost Zone
+      assert.ok(
+        has(
+          'Once during your turn, you may use this Ability. Your Active Pokémon recovers from all Special Conditions.',
+          'recoverStatusAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may remove a Special Condition from your Active Pokémon.',
+          'recoverStatusAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn, if Xatu is on your Bench, you may choose 1 Special Condition from 1 of your Active Pokémon and remove that Special Condition. Then, 1 of the Defending Pokémon is now affected by that Special Condition that you chose.',
+          'transferStatusAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), if this Pokémon is your Active Pokémon, and if you have 35 or more cards in your hand, you may use this Ability. If you do, you win this game.',
+          'winGameAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), when you put Absol G LV.X from your hand onto your Active Absol G, you may flip 3 coins. For each heads, put the top card from your opponent's deck in the Lost Zone.",
+          'lostZoneFromDeckAbility'
+        )
+      );
+      // Deck peek / top-of-deck / discard
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), you may look at 5 cards from the top of your opponent's deck and put them back in the same order.",
+          'deckPeekAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), you may put the top card of your opponent's deck on the bottom of their deck without looking at it.",
+          'deckPlaceAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may flip a coin. If heads, put a card from your discard pile on top of your deck. If you use this Ability, your turn ends.',
+          'recursionAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'During your turn, you may use this Ability. Discard any number of cards from your hand. Then, draw that many cards.',
+          'discardForDrawAbility'
+        )
+      );
+      // Self-attach / stadium / energy type / cost / coin / misc
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may Knock Out this Pokémon and attach it to one of your {L} Pokémon as a Special Energy card.',
+          'selfAttachEnergyAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may discard any Stadium card in play. If you do, put a Stadium card with a different name from your discard pile into play.',
+          'stadiumManipAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "All Special Energy attached to Pokémon (both yours and your opponent's) provide {C} Energy and have no other effect.",
+          'energyTypeChangeAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "If you have the same number of cards in your hand as your opponent, the attack cost of each of Yanmega's attacks is 0.",
+          'attackCostAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn, after you flip any coins for an attack, you may ignore all effects of those coin flips and begin flipping those coins again.',
+          'coinFlipControlAbility'
+        )
+      );
+      assert.ok(has('During your turn, you may play 2 Supporter cards.', 'playExtraSupporterAbility'));
+      assert.ok(
+        has(
+          'As long as this Pokémon is in the Active Spot, your turn does not end when you use Café Master.',
+          'turnNotEndAbility'
+        )
+      );
+      assert.ok(
+        has('If Sableye is your Active Pokémon at the beginning of the game, you go first.', 'goFirstAbility')
+      );
+      assert.ok(
+        has(
+          "As long as Brock's Rhydon is Benched, whenever 1 of your Benched Pokémon is damaged, you may do 10 of that damage to Brock's Rhydon instead.",
+          'benchGuardAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'To attach a {W} Energy card from your hand to Suicune, you must discard an Energy card attached to Suicune.',
+          'attachRestrictionAbility'
+        )
+      );
+      assert.ok(has('You may attach any Technical Machine to Xatu.', 'attachPermissionAbility'));
+      assert.ok(
+        has(
+          'When this Doduo retreats, hold this card and throw it as hard as you can because Doduo is running away.',
+          'jokeAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), if Trapinch is your Active Pokémon, you may search your discard pile for a basic {F} card and attach it to Trapinch.',
+          'searchDiscardAttachAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during your turn (before your attack), you may choose 3 of your Benched Pokémon. Then, discard your other Benched Pokémon.',
+          'discardBenchAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'Once during a game on your turn (before your attack), each player shuffles all cards in play (excluding Pokémon and Supporter cards) into his or her deck.',
+          'resetInPlayAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), you may look at your opponent's hand. You may use the effect of a Supporter card you find there as the effect of this power.",
+          'useSupporterAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "Once during your turn (before your attack), if this Pokémon is your Active Pokémon, you may discard a card from your hand. If you do, discard the top card of your opponent's deck.",
+          'discardOpponentDeckAbility'
+        )
+      );
+      assert.ok(
+        has(
+          "As long as Octillery is your Active Pokémon, whenever the Defending Pokémon retreats, discard all Energy cards attached to the Defending Pokémon when it goes to the Bench.",
+          'opponentDisruptAbility'
+        )
+      );
+      assert.ok(
+        has(
+          'As long as Articuno is your Active Pokémon, your Benched Pokémon do not take damage from and are not affected by attacks.',
+          'damagePreventAbility'
+        )
+      );
+    });
+
+    test('classifyAbility: S211 long-tail families', () => {
+      const c = (text) => classifyAbility({ name: 'X', abilities: [{ name: 'X', text }] });
+      assert.equal(
+        c("Pokémon-GX that have any damage counters on them (both yours and your opponent's) have no Abilities."),
+        'effect-prevent'
+      );
+      assert.equal(
+        c('Each Pokémon BREAK has no Abilities (this includes Abilities of its previous Evolution).'),
+        'effect-prevent'
+      );
+      assert.equal(
+        c('As long as Muk ex is your Active Pokémon, ignore all Poké-Powers and Poké-Bodies other than Toxic Gas.'),
+        'effect-prevent'
+      );
+      assert.equal(
+        c(
+          "Once during your turn, choose 1 of your opponent's Benched Pokémon that has a Pokémon Power. That power stops working until the end of this turn."
+        ),
+        'effect-prevent'
+      );
+      assert.equal(
+        c(
+          'As long as Kabutops is your Active Pokémon, neither player can play Basic Pokémon or Evolution cards from his or her hand to evolve Benched Pokémon.'
+        ),
+        'effect-prevent'
+      );
+      assert.equal(
+        c('This Pokémon can use the attacks of any Basic Pokémon in your discard pile.'),
+        'copy-attack'
+      );
+      assert.equal(
+        c('Once during your turn, you may use this Ability. Your Active Pokémon recovers from all Special Conditions.'),
+        'status-recover'
+      );
+      assert.equal(
+        c(
+          "Once during your turn (before your attack), you may look at 5 cards from the top of your opponent's deck and put them back in the same order."
+        ),
+        'deck-peek'
+      );
+      assert.equal(
+        c(
+          'Once during your turn (before your attack), if this Pokémon is in your discard pile, you may put this Pokémon on the bottom of your deck.'
+        ),
+        'self-return'
+      );
+      assert.equal(
+        c('To attach a {W} Energy card from your hand to Suicune, you must discard an Energy card attached to Suicune.'),
+        'attach-restriction'
+      );
+      assert.equal(c('You may attach any Technical Machine to Xatu.'), 'attach-permission');
+      assert.equal(
+        c(
+          "When 1 of your Pokémon is Knocked Out by damage from an attack from your opponent's Pokémon, you may move a {L} Energy from that Pokémon to this Pokémon."
+        ),
+        'energy-on-ko'
+      );
+      assert.equal(
+        c("If you have the same number of cards in your hand as your opponent, the attack cost of each of Yanmega's attacks is 0."),
+        'attack-cost'
+      );
+      assert.equal(
+        c("All Special Energy attached to Pokémon (both yours and your opponent's) provide {C} Energy and have no other effect."),
+        'energy-type'
+      );
+      assert.equal(
+        c(
+          'Once during your turn, after you flip any coins for an attack, you may ignore all effects of those coin flips and begin flipping those coins again.'
+        ),
+        'coin-control'
+      );
+      assert.equal(c('During your turn, you may play 2 Supporter cards.'), 'extra-supporter');
+      assert.equal(
+        c("If Sableye is your Active Pokémon at the beginning of the game, you go first."),
+        'go-first'
+      );
+      assert.equal(
+        c(
+          "As long as Brock's Rhydon is Benched, whenever 1 of your Benched Pokémon is damaged, you may do 10 of that damage to Brock's Rhydon instead."
+        ),
+        'bench-guard'
+      );
+      assert.equal(
+        c(
+          'Once during your turn (before your attack), you may choose 3 of your Benched Pokémon. Then, discard your other Benched Pokémon.'
+        ),
+        'discard-bench'
+      );
+      assert.equal(
+        c('When this Doduo retreats, hold this card and throw it as hard as you can because Doduo is running away.'),
+        'joke'
+      );
+      assert.equal(
+        c('As often as you like during your turn (before your attack), you may discard a {W} Energy card from your hand.'),
+        'discard-cost'
+      );
+      assert.equal(
+        c(
+          "Once during your turn (before your attack), when you put Absol G LV.X from your hand onto your Active Absol G, you may flip 3 coins. For each heads, put the top card from your opponent's deck in the Lost Zone."
+        ),
+        'lost-zone'
+      );
+      assert.equal(
+        c('Once during your turn (before your attack), you may Knock Out this Pokémon and attach it to one of your {L} Pokémon as a Special Energy card.'),
+        'self-attach-energy'
+      );
+      assert.equal(
+        c('As long as there is a {G} Energy attached to Muk, you must pay an additional {C}{C} to retreat it.'),
+        'retreat-cost'
+      );
+      assert.equal(
+        c("If Kecleon has any React Energy cards attached to it, Kecleon is {G}, {R}, {W}, {L}, {P}, and {F} type."),
+        'type-change'
+      );
+      assert.equal(
+        c('Once during your turn, you may move 1 damage counter from 1 of your Pokémon to 1 of your opponent\'s Pokémon.'),
+        'move-damage'
+      );
+      assert.equal(
+        c("Once during your turn (before your attack), if Azumarill is on your Bench, you may flip a coin. If heads, return Azumarill and all cards attached to it to your hand."),
+        'self-return'
+      );
+    });
+
+    test('classifyAbility: S211 additions do not steal earlier families', () => {
+      const c = (text) => classifyAbility({ name: 'X', abilities: [{ name: 'X', text }] });
+      // "play from your hand … discard" triggers are not discard-costs
+      assert.equal(
+        c("When you play this Pokémon from your hand onto your Bench during your turn, you may discard the top card of your opponent's deck."),
+        'when-played'
+      );
+      assert.equal(
+        c('When you play this Pokémon from your hand onto your Bench during your turn, you may discard a Stadium in play.'),
+        'when-played'
+      );
+      // damage reduction is not a discard cost
+      assert.equal(
+        c(
+          "If Flygon ex is damaged by an opponent's attack, you may discard up to 4 cards from your hand. If you do, any damage done to Flygon ex is reduced by 10 for each card you discarded."
+        ),
+        'damage-reduce'
+      );
+      // energy-discard + damage bonus stays cost-discount
+      assert.equal(
+        c(
+          "Once during your turn, you may discard a {R} Energy card from your hand in order to use this Ability. During this turn, your {R} Pokémon's attacks do 30 more damage to your opponent's Active Pokémon."
+        ),
+        'cost-discount'
+      );
+      // "ignore all Energy in the attack cost" stays cost-discount
+      assert.equal(
+        c("If you have exactly 4 cards in your hand, ignore all Energy in the attack cost of each of this Pokémon's attacks."),
+        'cost-discount'
+      );
+      // "discard an Energy attached to the Defending Pokémon" is not an attach restriction
+      assert.equal(
+        c('When you play Gyarados from your hand to evolve your Active Pokémon, you may flip 2 coins. For each heads, discard an Energy card attached to the Defending Pokémon.'),
+        'when-played'
+      );
+      // transform wording is not a damage move
+      assert.equal(
+        c(
+          'During your turn (before your attack), you may put a Basic Pokémon from your hand on top of this Pokémon. (This does not count as playing that Pokémon or evolving.) This Pokémon is now that Pokémon. (Any cards attached to this Pokémon, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.)'
+        ),
+        'status'
+      );
+      // heal + condition removal stays status, not status-recover
+      assert.equal(
+        c('Once during your turn (before your attack), you may heal 30 damage and remove a Special Condition from your Active Pokémon.'),
+        'status'
+      );
+      // "when you play … return" is not self-return
+      assert.equal(
+        c(
+          'Once during your turn, when you play Shiftry from your hand to evolve 1 of your Pokémon, you may choose 1 of your Evolved Pokémon in play (excluding any Shiftry). Return that Pokémon and all cards attached to it to your hand.'
+        ),
+        'when-played'
+      );
+    });
+
+    test('planAbilitySteps: S211 passive lock types are skipped', async () => {
+      const { planAbilitySteps, PASSIVE_ABILITY_STEP_TYPES } = await import('../ability-step-plan.mjs');
+      for (const type of [
+        'playLockAbility',
+        'evolveLockAbility',
+        'retreatLockAbility',
+        'powerSuppressAbility',
+        'damageCounterLockAbility',
+        'energyOnKoAbility',
+        'energyTypeChangeAbility',
+        'attackCostAbility',
+        'coinFlipControlAbility',
+        'playExtraSupporterAbility',
+        'turnNotEndAbility',
+        'goFirstAbility',
+        'benchGuardAbility',
+        'attachRestrictionAbility',
+        'attachPermissionAbility',
+        'jokeAbility',
+      ]) {
+        assert.ok(PASSIVE_ABILITY_STEP_TYPES.has(type), type);
+      }
+      const plan = planAbilitySteps(
+        parseAbility("As long as this Pokémon is in the Active Spot, your opponent can't play any Item cards from their hand."),
+        { mode: 'interactive' }
+      );
+      assert.deepEqual(
+        plan.map((p) => p.action),
+        ['skip']
+      );
+    });
+
+    test('describeAbilityFamily: S211 families get guidance lines', () => {
+      assert.match(
+        describeAbilityFamily({ name: 'Xatu', ability: { text: 'You may attach any Technical Machine to Xatu.' } }),
+        /attach permission/
+      );
+      assert.match(
+        describeAbilityFamily({ name: 'Victini', ability: { text: 'Once during your turn, after you flip any coins for an attack, you may ignore all effects of those coin flips and begin flipping those coins again.' } }),
+        /coin control/
+      );
+      assert.match(
+        describeAbilityFamily({ name: 'Imakuni?s Doduo', ability: { text: 'When this Doduo retreats, hold this card and throw it as hard as you can because Doduo is running away.' } }),
+        /joke card/
+      );
+    });
+
     test('App. 23: "have no Abilities" leaves Ancient Traits alone', async () => {
       const { isAncientTraitAbility } = await import('../abilities.mjs');
       const { stadiumAbilityBlocked } = await import('../stadium-effects.mjs');
@@ -5128,3 +6365,269 @@ import test from 'node:test';
     });
 
 
+
+// ── Continuous Stadium passives (previously "continuous-unparsed") ─────────
+
+test('continuous Stadiums: every previously-unmodeled passive is recognized', () => {
+  const cards = [
+    ['Lost City', "Whenever a Pokémon (either yours or your opponent's) is Knocked Out, put that Pokémon in the Lost Zone instead of the discard pile. (Discard all attached cards.)"],
+    ['Temple of Sinnoh', "All Special Energy attached to Pokémon (both yours and your opponent's) provide {C} Energy and have no other effect."],
+    ['Dyna Tree Hill', "Pokémon (both yours and your opponent's) can't be healed."],
+    ['Shrine of Punishment', "Between turns, put 1 damage counter on each Pokémon-GX and Pokémon-EX (both yours and your opponent's)."],
+    ['Sea of Nothingness', "Special Conditions are not removed when Pokémon (both yours and your opponent's) evolve or devolve."],
+    ['Altar of the Sunne', "{R} Pokémon and {M} Pokémon (both yours and your opponent's) have no Weakness."],
+    ['Shrine of Memories', "Each player's evolved Pokémon can use any attack from its previous Evolutions. (That player still needs the necessary Energy to use each attack.)"],
+    ['Shadow Circle', "Each Pokémon that has any {D} Energy attached to it (both yours and your opponent's) has no Weakness."],
+    ['Plasma Frigate', "Each Pokémon that has any Plasma Energy attached to it (both yours and your opponent's) has no Weakness."],
+    ['Ultimate Zone', "During each player's turn, the player may move an Energy card attached to 1 of his or her Benched Pokémon to his or her Active Arceus as often as he or she likes."],
+    ['Sunyshore City Gym', "Any damage done by attacks from {L} Pokémon (both yours and your opponent's) to the Defending Pokémon isn't affected by Resistance. Each {L} Pokémon in play (both yours and your opponent's) has no Weakness."],
+    ['Lake Boundary', "Apply Weakness for each Pokémon (both yours and your opponent's) as ×2 instead."],
+    ["Glacia's Stadium", "Each player's {W} Pokémon (excluding Pokémon-ex) has no Weakness."],
+    ["Drake's Stadium", "Any damage done to {C} Active Pokémon (both yours and your opponent's) by an opponent's attack is reduced by 10 (after applying Weakness and Resistance)."],
+    ['Crystal Beach', "Each Special Energy card that provides 2 or more Energy (both yours and your opponent's) now provides only 1 {C} Energy. This isn't affected by any Poké-Powers or Poké-Bodies."],
+    ['Holon Lake', "Each player's Pokémon that has {Delta Species} on its card can use attacks on this card instead of its own. {C} → Delta Call Search your deck for a Pokémon that has {Delta Species} on its card, show it to your opponent, and put it into your hand. Shuffle your deck afterward."],
+    ['Holon Research Tower', "Each player's basic Energy cards attached to Pokémon that has {Delta Species} on its card are both their usual Energy type and {M} type but provide only 1 Energy at a time. (Has no effect other than providing Energy.)"],
+    ['Meteor Falls', "Each player's Active Evolved Pokémon (excluding Pokémon-ex) can use any attack from its Basic Pokémon or its Stage 1 Evolution card. (You still have to pay for that attack's Energy cost.)"],
+    ["Rocket's Tricky Gym", "Each Pokémon with Dark or Rocket's in its name (both yours and your opponent's) can use attacks on this card instead of its own. {C} → Feint Attack Does 20 damage to 1 of your opponent's Pokémon. This attack's damage isn't affected by Weakness, Resistance, Poké-Powers, Poké-Bodies, or any other effects on that Pokémon."],
+    ['Magnetic Storm', "Any damage done by attacks from {P} Pokémon and {F} Pokémon (both yours and your opponent's) is not affected by Resistance."],
+    ['Desert Ruins', 'At any time between turns, each player puts 1 damage counter on his or her Pokémon-ex with maximum HP of at least 100.'],
+    ['Cursed Stone', 'At any time between turns, each player puts 1 damage counter on his or her Pokémon that has a Poké-Power.'],
+    ['Saffron City Gym', "As often as each player likes during his or her turn (before attacking), that player may return 1 basic Energy card attached to 1 of his or her Pokémon with Sabrina in its name to his or her hand."],
+    ['Celadon City Gym', "During each player's turn, that player may choose to discard an Energy card attached to 1 of his or her Pokémon with Erika in its name. If that player does so, that Pokémon is no longer Asleep, Confused, Paralyzed, or Poisoned."],
+  ].map(([name, text]) => ({ name, text, subtypes: ['Stadium'], type: 'Stadium' }));
+
+  for (const c of cards) {
+    assert.notEqual(classifyStadiumEffect(c), 'unknown', c.name);
+    assert.equal(hasRecognizedPassiveStadiumEffect(c), true, c.name);
+    assert.ok(applyStadiumEffect(c).results.length > 0, c.name);
+  }
+});
+
+// ── Special-Energy rewrites (Temple of Sinnoh / Crystal Beach / Holon Research Tower) ──
+
+test('energy rewrites: Temple of Sinnoh flattens Special Energy to one {C}', async () => {
+  const { serverEnergyDescriptor } = await import('../server-energy.mjs');
+  const { canPayAttackCost } = await import('../attack-engine.mjs');
+  const doubleEnergy = { name: 'Double Colorless Energy', supertype: 'Energy', subtypes: ['Special'], types: ['Colorless'] };
+  const stadium = { name: 'Temple of Sinnoh', text: "All Special Energy attached to Pokémon (both yours and your opponent's) provide {C} Energy and have no other effect." };
+  const d = serverEnergyDescriptor(doubleEnergy, { stadiumCard: stadium });
+  assert.deepEqual(d, { type: 'Colorless', family: 'basic' });
+  assert.equal(canPayAttackCost([d], ['Colorless']), true);
+  assert.equal(canPayAttackCost([d], ['Colorless', 'Colorless']), false, 'a Double becomes a single unit');
+  assert.equal(canPayAttackCost([d], ['Fire']), false);
+  // Without the Stadium the Double still counts twice.
+  assert.equal(canPayAttackCost([serverEnergyDescriptor(doubleEnergy)], ['Colorless', 'Colorless']), true);
+});
+
+test('energy rewrites: Crystal Beach caps ≥2 Special Energy at one {C}', async () => {
+  const { serverEnergyDescriptor } = await import('../server-energy.mjs');
+  const { canPayAttackCost } = await import('../attack-engine.mjs');
+  const stadium = { name: 'Crystal Beach', text: "Each Special Energy card that provides 2 or more Energy (both yours and your opponent's) now provides only 1 {C} Energy." };
+  const doubleFire = { name: 'Double Fire Energy', supertype: 'Energy', subtypes: ['Special'], types: ['Fire'] };
+  const single = { name: 'Lucky Energy', supertype: 'Energy', subtypes: ['Special'], types: ['Colorless'] };
+  const d = serverEnergyDescriptor(doubleFire, { stadiumCard: stadium });
+  assert.deepEqual(d, { type: 'Colorless', family: 'basic' });
+  assert.equal(canPayAttackCost([d], ['Fire']), false);
+  // A one-unit Special is untouched.
+  assert.equal(
+    serverEnergyDescriptor(single, { stadiumCard: stadium }).family,
+    'attach-type'
+  );
+});
+
+test('energy rewrites: Holon Research Tower makes Basic Energy dual {M} but one unit', async () => {
+  const { serverEnergyDescriptor } = await import('../server-energy.mjs');
+  const { canPayAttackCost } = await import('../attack-engine.mjs');
+  const stadium = { name: 'Holon Research Tower', text: "Each player's basic Energy cards attached to Pokémon that has {Delta Species} on its card are both their usual Energy type and {M} type but provide only 1 Energy at a time. (Has no effect other than providing Energy.)" };
+  const basic = { name: 'Fire Energy', supertype: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+  const delta = { name: 'Charizard δ', supertype: 'Pokémon' };
+  const plain = { name: 'Charizard', supertype: 'Pokémon' };
+  const d = serverEnergyDescriptor(basic, { stadiumCard: stadium, hostPokemon: delta });
+  assert.equal(d.dualType, 'Metal');
+  assert.equal(canPayAttackCost([d], ['Fire']), true);
+  assert.equal(canPayAttackCost([d], ['Metal']), true);
+  assert.equal(canPayAttackCost([d], ['Fire', 'Metal']), false, 'still only one Energy');
+  assert.equal(canPayAttackCost([d], ['Water']), false);
+  // Not a Delta Species host → untouched.
+  assert.equal(
+    serverEnergyDescriptor(basic, { stadiumCard: stadium, hostPokemon: plain }).dualType,
+    undefined
+  );
+});
+
+// ── Stadium attack inheritance / grants ────────────────────────────────────
+
+test('stadiumExtraAttacks: Shrine of Memories inherits prior-evolution attacks', async () => {
+  const { stadiumExtraAttacks, stadiumInheritedAttacks } = await import('../stadium-effects.mjs');
+  const basic = { instanceId: 1, name: 'Bulbasaur', stage: 'Basic', supertype: 'Pokémon', attacks: [{ name: 'Tackle', cost: [], damage: 10 }] };
+  const stage1 = { instanceId: 2, name: 'Ivysaur', stage: 'Stage 1', supertype: 'Pokémon', attachedTo: 1, attacks: [{ name: 'Vine Whip', cost: [], damage: 30 }] };
+  const shrine = { name: 'Shrine of Memories', text: "Each player's evolved Pokémon can use any attack from its previous Evolutions. (That player still needs the necessary Energy to use each attack.)" };
+  const zone = [basic, stage1];
+  assert.deepEqual(stadiumInheritedAttacks(shrine, { zoneCards: zone, root: basic, isActive: true }).map((a) => a.name), ['Tackle']);
+  // Unevolved → no inheritance.
+  assert.deepEqual(stadiumInheritedAttacks(shrine, { zoneCards: [basic], root: basic, isActive: true }), []);
+  // Merged list de-dupes and tags.
+  const merged = stadiumExtraAttacks(shrine, { zoneCards: zone, root: basic, isActive: true });
+  assert.deepEqual(merged.map((a) => a.name), ['Tackle']);
+  assert.equal(merged[0].inherited, true);
+});
+
+test('stadiumExtraAttacks: Meteor Falls is Active-only and excludes Pokémon-ex', async () => {
+  const { stadiumInheritedAttacks } = await import('../stadium-effects.mjs');
+  const basic = { instanceId: 1, name: 'Bulbasaur', stage: 'Basic', supertype: 'Pokémon', attacks: [{ name: 'Tackle' }] };
+  const stage1 = { instanceId: 2, name: 'Ivysaur', stage: 'Stage 1', supertype: 'Pokémon', attachedTo: 1, attacks: [{ name: 'Vine Whip' }] };
+  const stage2 = { instanceId: 3, name: 'Venusaur', stage: 'Stage 2', supertype: 'Pokémon', attachedTo: 1, attacks: [{ name: 'Solar Beam' }] };
+  const exTop = { instanceId: 4, name: 'Venusaur ex', stage: 'Stage 2', supertype: 'Pokémon', subtypes: ['ex'], attachedTo: 1, attacks: [{ name: 'Giant Bloom' }] };
+  const falls = { name: 'Meteor Falls', text: "Each player's Active Evolved Pokémon (excluding Pokémon-ex) can use any attack from its Basic Pokémon or its Stage 1 Evolution card. (You still have to pay for that attack's Energy cost.)" };
+  const zone = [basic, stage1, stage2];
+  assert.deepEqual(
+    stadiumInheritedAttacks(falls, { zoneCards: zone, root: basic, isActive: true }).map((a) => a.name),
+    ['Tackle', 'Vine Whip']
+  );
+  // Bench → nothing.
+  assert.deepEqual(stadiumInheritedAttacks(falls, { zoneCards: zone, root: basic, isActive: false }), []);
+  // Pokémon-ex top → nothing.
+  assert.deepEqual(
+    stadiumInheritedAttacks(falls, { zoneCards: [basic, stage1, exTop], root: basic, isActive: true }),
+    []
+  );
+});
+
+test('stadiumGrantedAttacks: Holon Lake / Rocket\'s Tricky Gym grant a fixed attack', async () => {
+  const { stadiumGrantedAttacks } = await import('../stadium-effects.mjs');
+  const lake = { name: 'Holon Lake', text: "Each player's Pokémon that has {Delta Species} on its card can use attacks on this card instead of its own. {C} → Delta Call Search your deck for a Pokémon that has {Delta Species} on its card, show it to your opponent, and put it into your hand. Shuffle your deck afterward." };
+  assert.deepEqual(stadiumGrantedAttacks(lake, { name: 'Pikachu δ' }).map((a) => a.name), ['Delta Call']);
+  assert.deepEqual(stadiumGrantedAttacks(lake, { name: 'Pikachu' }), []);
+
+  const gym = { name: "Rocket's Tricky Gym", text: "Each Pokémon with Dark or Rocket's in its name (both yours and your opponent's) can use attacks on this card instead of its own. {C} → Feint Attack Does 20 damage to 1 of your opponent's Pokémon. This attack's damage isn't affected by Weakness, Resistance, Poké-Powers, Poké-Bodies, or any other effects on that Pokémon." };
+  assert.deepEqual(stadiumGrantedAttacks(gym, { name: "Rocket's Scyther" }).map((a) => a.name), ['Feint Attack']);
+  assert.deepEqual(stadiumGrantedAttacks(gym, { name: 'Darkrai' }).map((a) => a.name), ['Feint Attack']);
+  assert.deepEqual(stadiumGrantedAttacks(gym, { name: 'Pikachu' }), []);
+});
+
+test('listAttacks: extraAttacks are merged and priced like printed attacks', async () => {
+  const { listAttacks } = await import('../attack-window.mjs');
+  const card = { name: 'Ivysaur', stage: 'Stage 1', attacks: [{ name: 'Vine Whip', cost: ['Grass'], damage: 30 }] };
+  const extraAttacks = [{ name: 'Tackle', cost: [], damage: 10, inherited: true }];
+  const noEnergy = listAttacks(card, { energyTypes: [], extraAttacks });
+  assert.deepEqual(noEnergy.map((a) => a.name), ['Vine Whip', 'Tackle']);
+  assert.equal(noEnergy[0].payable, false);
+  assert.equal(noEnergy[1].payable, true);
+});
+
+test('parseStadiumOncePerTurn: paper-unlimited Energy actions are modeled', () => {
+  const u = parseStadiumOncePerTurn({
+    name: 'Ultimate Zone',
+    text: "During each player's turn, the player may move an Energy card attached to 1 of his or her Benched Pokémon to his or her Active Arceus as often as he or she likes.",
+  });
+  assert.equal(u?.kind, 'move-to-arceus');
+  const s = parseStadiumOncePerTurn({
+    name: 'Saffron City Gym',
+    text: "As often as each player likes during his or her turn (before attacking), that player may return 1 basic Energy card attached to 1 of his or her Pokémon with Sabrina in its name to his or her hand.",
+  });
+  assert.equal(s?.kind, 'return-sabrina-energy');
+  const c = parseStadiumOncePerTurn({
+    name: 'Celadon City Gym',
+    text: "During each player's turn, that player may choose to discard an Energy card attached to 1 of his or her Pokémon with Erika in its name. If that player does so, that Pokémon is no longer Asleep, Confused, Paralyzed, or Poisoned.",
+  });
+  assert.equal(c?.kind, 'discard-erika-cure');
+
+  const base = { subtypes: ['Stadium'], type: 'Stadium' };
+  assert.equal(
+    classifyStadiumEffect({
+      ...base,
+      name: 'Ultimate Zone',
+      text: "During each player's turn, the player may move an Energy card attached to 1 of his or her Benched Pokémon to his or her Active Arceus as often as he or she likes.",
+    }),
+    'once-per-turn'
+  );
+});
+
+test('stadiumActivationStatus: unlimited "as often as" actions stay usable after use', () => {
+  const ultimate = {
+    name: 'Ultimate Zone',
+    type: 'Stadium',
+    subtypes: ['Stadium'],
+    text: "During each player's turn, the player may move an Energy card attached to 1 of his or her Benched Pokémon to his or her Active Arceus as often as he or she likes.",
+  };
+  assert.equal(stadiumActivationStatus(ultimate).usable, true);
+  assert.equal(
+    stadiumActivationStatus(ultimate, { usedThisTurn: true }).usable,
+    true,
+    'repeatable action is not blocked by a prior activation'
+  );
+
+  const artazon = {
+    name: 'Artazon',
+    type: 'Stadium',
+    subtypes: ['Stadium'],
+    text: 'Once during each player\u2019s turn, that player may search their deck for a Basic Pok\u00e9mon that doesn\u2019t have a Rule Box and put it onto their Bench. Then, that player shuffles their deck.',
+  };
+  assert.equal(stadiumActivationStatus(artazon, { usedThisTurn: true }).usable, false);
+});
+
+test('stadiumExtraAttacksFromZone: normalizes both render paths to the same extras', async () => {
+  const { stadiumExtraAttacksFromZone } = await import('../stadium-effects.mjs');
+  const shrine = {
+    name: 'Shrine of Memories',
+    text: "Each player's evolved Pokémon can use any attack from its previous Evolutions. (That player still needs the necessary Energy to use each attack.)",
+  };
+
+  // Authoritative shape: the Basic is the root; the evolution attaches to it.
+  const basic = {
+    instanceId: 1,
+    name: 'Bulbasaur',
+    stage: 'Basic',
+    supertype: 'Pokémon',
+    attacks: [{ name: 'Tackle', cost: [], damage: 10 }],
+  };
+  const stage1 = {
+    instanceId: 2,
+    name: 'Ivysaur',
+    stage: 'Stage 1',
+    supertype: 'Pokémon',
+    attachedTo: 1,
+    attacks: [{ name: 'Vine Whip', cost: [], damage: 30 }],
+  };
+  assert.deepEqual(
+    stadiumExtraAttacksFromZone(shrine, {
+      zoneCards: [basic, stage1],
+      card: basic,
+      isActive: true,
+    }).map((a) => a.name),
+    ['Tackle']
+  );
+
+  // Legacy shape: the visible top links its pre-evolutions by image.relative.
+  const topImg = { id: 'top' };
+  const legacyBase = {
+    instanceId: 1,
+    name: 'Bulbasaur',
+    stage: 'Basic',
+    supertype: 'Pokémon',
+    image: { id: 'base', relative: topImg },
+    attacks: [{ name: 'Tackle', cost: [], damage: 10 }],
+  };
+  const legacyTop = {
+    instanceId: 2,
+    name: 'Ivysaur',
+    stage: 'Stage 1',
+    supertype: 'Pokémon',
+    image: topImg,
+    attacks: [{ name: 'Vine Whip', cost: [], damage: 30 }],
+  };
+  assert.deepEqual(
+    stadiumExtraAttacksFromZone(shrine, {
+      zoneCards: [legacyBase, legacyTop],
+      card: legacyTop,
+      isActive: true,
+    }).map((a) => a.name),
+    ['Tackle']
+  );
+
+  // Unevolved → no extras.
+  assert.deepEqual(
+    stadiumExtraAttacksFromZone(shrine, { zoneCards: [basic], card: basic, isActive: true }),
+    []
+  );
+});

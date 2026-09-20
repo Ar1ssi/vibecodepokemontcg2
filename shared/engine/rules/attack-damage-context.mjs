@@ -35,12 +35,16 @@ const inPlayPokemon = (player) => [
 ];
 
 /** Energy cards attached to one Pokémon, counted as the cost pool sees them. */
-function energyOn(player, pokemon) {
+function energyOn(player, pokemon, stadiumCard = null) {
   if (!pokemon) return [];
   const attached = [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
     (card) => card.attachedTo === pokemon.instanceId && isEnergy(card)
   );
-  return expandEnergyEntries(attached.map(serverEnergyDescriptor));
+  return expandEnergyEntries(
+    attached.map((card) =>
+      serverEnergyDescriptor(card, { stadiumCard, hostPokemon: pokemon })
+    )
+  );
 }
 
 function specialEnergyOn(player, pokemon) {
@@ -113,15 +117,16 @@ export function buildServerAttackContext(
   const opponent = state?.players?.[defenderPlayerId] || null;
   const attackerCard = attackerView || attacker || {};
   const defenderCard = defenderView || defender || {};
+  const stadiumCard = state?.stadium?.card || state?.stadium || null;
 
   const ownInPlay = inPlayPokemon(own);
   const ownBench = rootPokemon(own, 'bench');
   const opponentBench = rootPokemon(opponent, 'bench');
 
   const ctx = {
-    energyCount: energyOn(own, attacker).length,
+    energyCount: energyOn(own, attacker, stadiumCard).length,
     ownEnergyCount: ownInPlay.reduce(
-      (total, { card }) => total + energyOn(own, card).length,
+      (total, { card }) => total + energyOn(own, card, stadiumCard).length,
       0
     ),
     opponentPrizes: zoneOf(opponent, 'prizes').length,
@@ -157,7 +162,7 @@ export function buildServerAttackContext(
   if (defender) {
     ctx.defenderHp = Number(defenderCard.hp) || 0;
     ctx.defenderDamage = defender.damage || 0;
-    ctx.opponentEnergyCount = energyOn(opponent, defender).length;
+    ctx.opponentEnergyCount = energyOn(opponent, defender, stadiumCard).length;
     ctx.retreatCostColorless = getRetreatCostCount(defenderCard);
     ctx.opponentStatusCount = listConditions(defender).length;
   }

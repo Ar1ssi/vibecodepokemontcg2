@@ -3,7 +3,13 @@
     // the turn after attacking (TCG Live behavior).
     
     import { rulesState, markAttacked } from './rules-state.mjs';
-import { effectiveHp } from './stadium-effects.mjs';
+import {
+  effectiveHp,
+  stadiumNullifiesWeakness,
+  isStadiumWeaknessTimesTwo,
+  stadiumIgnoresResistance,
+  getStadiumTypeDamageReduction,
+} from './stadium-effects.mjs';
 import {
   combinedToolAttackBonus,
   applyToolDamageReduction,
@@ -42,13 +48,23 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   const damageBeforeWR = Math.max(0, base + attackerBonus);
 
+  // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
+  // Stadiums nullify Weakness for a filtered set of Pokémon, force Weakness to
+  // ×2, ignore Resistance, or reduce damage to a type after W/R.
+  const stadiumCard = stadium?.card || stadium || null;
+  const weaknessNullified =
+    !!stadiumCard &&
+    stadiumNullifiesWeakness(stadiumCard, defender, { defenderZoneCards });
+
   let multiplier = 1;
   let flat = 0;
-  if (attacker?.types?.length && defender?.weakness) {
+  if (attacker?.types?.length && defender?.weakness && !weaknessNullified) {
     // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
     if (attacker.types.includes(defender.weakness.type)) {
       const v = defender.weakness.value;
-      if (v <= 2) {
+      if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
+        multiplier = 2;                   // Lake Boundary: Weakness is always ×2
+      } else if (v <= 2) {
         multiplier = Math.max(1, v);      // modern weakness: ×2 (or ×1)
       } else {
         flat += v;                        // legacy weakness: flat +20/+30
@@ -57,13 +73,21 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   }
 
   let resistance = 0;
-  if (attacker?.types?.length && defender?.resistance) {
+  if (
+    attacker?.types?.length &&
+    defender?.resistance &&
+    !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
+  ) {
     if (attacker.types.includes(defender.resistance.type)) {
       resistance = Math.abs(defender.resistance.value || 0);
     }
   }
 
-  let damageAfterWR = damageBeforeWR * multiplier + flat - resistance;
+  const stadiumReduction = stadiumCard
+    ? getStadiumTypeDamageReduction(stadiumCard, defender, { defenderIsActive })
+    : 0;
+
+  let damageAfterWR = damageBeforeWR * multiplier + flat - resistance - stadiumReduction;
   if (damageAfterWR < 0) damageAfterWR = 0;
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
@@ -102,6 +126,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     multiplier,
     flat,
     resistance,
+    stadiumReduction,
     reduced,
     prevented,
   };
@@ -132,6 +157,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
           pool.push(type, type);
         } else if (family === 'attach-type' && type === 'Colorless') {
           pool.push('Wildcard');
+        } else if (entry?.dualType) {
+          // Holon Research Tower: one Energy that may satisfy either of two
+          // types (encoded as "A|B", consumed by `canPayAttackCost`).
+          pool.push(`${type}|${entry.dualType}`);
         } else {
           pool.push(type);
         }
@@ -147,6 +176,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     // — it cannot cover a colored (e.g. Fire, Psychic) requirement. A 'Wildcard'
     // pool entry (Prism/Stellar Energy) is the one genuine exception and pays any
     // symbol, colored or Colorless.
+    // Pool tokens are plain type strings; a Holon Research Tower unit is "A|B"
+    // (satisfies either type, still one Energy). 'Wildcard' pays any symbol.
+    const dualMatches = (token, symbol) =>
+      typeof token === 'string' &&
+      token.includes('|') &&
+      token.split('|').includes(symbol);
+
     export function canPayAttackCost(attachedEnergies = [], cost = []) {
       const pool = expandEnergyEntries(attachedEnergies);
       for (const symbol of cost) {
@@ -154,16 +190,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
           const ci = pool.indexOf('Colorless');
           if (ci !== -1) pool.splice(ci, 1);
           else if (pool.length === 0) return false;
-          else pool.pop(); // any single energy (including Wildcard) pays a Colorless symbol
+          else pool.pop(); // any single energy (including Wildcard/dual) pays a Colorless symbol
         } else {
-          const idx = pool.indexOf(symbol);
-          if (idx !== -1) {
-            pool.splice(idx, 1);
-          } else {
-            const wi = pool.indexOf('Wildcard');
-            if (wi === -1) return false;
-            pool.splice(wi, 1);
-          }
+          let idx = pool.indexOf(symbol);
+          if (idx === -1) idx = pool.findIndex((token) => dualMatches(token, symbol));
+          if (idx === -1) idx = pool.indexOf('Wildcard');
+          if (idx === -1) return false;
+          pool.splice(idx, 1);
         }
       }
       return true;

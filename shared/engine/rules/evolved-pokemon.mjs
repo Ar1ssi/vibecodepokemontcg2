@@ -33,6 +33,21 @@ function stackEvolutions(zoneCards, root) {
 }
 
 /**
+ * The Pokémon cards a "use attacks from previous Evolutions" effect may draw from:
+ * the Basic (root) plus every evolution card below the current top, in stage order.
+ * Returns [] for an unevolved Pokémon.
+ * @param {object[]} zoneCards Cards in the zone holding the root (active or bench)
+ * @param {object} root The in-play Pokémon (a card with no attachedTo)
+ * @returns {object[]}
+ */
+export function priorEvolutionCards(zoneCards, root) {
+  const top = topPokemonCard(zoneCards, root);
+  if (!top || top === root) return [];
+  const attached = stackEvolutions(zoneCards, root);
+  return [root, ...attached.filter((c) => c !== top)];
+}
+
+/**
  * @param {object[]} zoneCards Cards in the zone holding the root (active or bench)
  * @param {object} root The in-play Pokémon (a card with no attachedTo)
  * @returns {object} The highest-stage Pokémon card in the stack; the root when unevolved

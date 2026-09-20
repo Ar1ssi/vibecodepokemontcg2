@@ -25,6 +25,7 @@ import { parseTypeValue } from '../../../../shared/engine/rules/rules-state.mjs'
 import {
   isStadiumCard,
   stadiumActivationStatus,
+  mergeAttacks,
 } from '../../../../shared/engine/rules/stadium-effects.mjs';
 import {
   attackZoneBounds,
@@ -252,7 +253,15 @@ export function buildInspectorModel(card, ctx = {}) {
       rulesEnabled,
       abilityUsed: Boolean(abilityUsed),
       stadiumCostModifier: Number(ctx.stadiumCostModifier) || 0,
+      extraAttacks: ctx.extraAttacks || [],
     });
+
+  // Stadium-granted / inherited attacks render alongside the printed ones; the
+  // window indexes line up because both use the same merge order.
+  const renderedAttacks = mergeAttacks(
+    card.attacks || [],
+    ctx.extraAttacks || []
+  );
 
   const byName = new Map(window.map((w) => [w.name, w]));
   const interactive = rulesEnabled && !readOnly;
@@ -261,7 +270,7 @@ export function buildInspectorModel(card, ctx = {}) {
   // not exist; the reason is positional, and it says so.
   const attackable = interactive && zone === 'active';
 
-  const attacks = (card.attacks || []).map((raw, i) => {
+  const attacks = renderedAttacks.map((raw, i) => {
     const { base, printed } = splitDamageLabel(raw?.damage);
     const entry = window[i] ?? byName.get(raw?.name) ?? null;
     const payable = entry ? Boolean(entry.payable) : true;

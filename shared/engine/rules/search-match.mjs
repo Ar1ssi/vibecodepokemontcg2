@@ -14,6 +14,8 @@ const SYMBOL_TO_TYPE = {
   f: 'Fighting',
   d: 'Dark',
   m: 'Metal',
+  n: 'Dragon',
+  y: 'Fairy',
 };
 
 // Word-form Pokémon types ("a Water Pokémon", "Basic Psychic Pokémon") as they
@@ -74,6 +76,19 @@ export function matchesSearch(card, what = '') {
   }
   const isPokemon = isPokemonCard(card);
   const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
+  if (w.includes('ultra beast')) {
+    const st = Array.isArray(card.subtypes)
+      ? card.subtypes.map((s) => String(s).toLowerCase())
+      : [];
+    const tags = Array.isArray(card.tags)
+      ? card.tags.map((s) => String(s).toLowerCase())
+      : [];
+    return (
+      st.includes('ultra beast') ||
+      tags.includes('ultra beast') ||
+      /ultra beast/i.test(String(card.name || ''))
+    );
+  }
   if (w.includes('item') && w.includes('tool')) return isTrainer;
   if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {
     const tt = String(card.trainerType || card.type || '').toLowerCase();

@@ -11,7 +11,7 @@ import {
   parseAttackInheritance,
   requiresActiveSpot,
 } from './ability-executors.mjs';
-import { parseStadiumCostModifier } from './stadium-effects.mjs';
+import { parseStadiumCostModifier, mergeAttacks } from './stadium-effects.mjs';
 
 /**
  * Merge prior-evolution attacks when the active has attack-inheritance.
@@ -48,9 +48,13 @@ export function listAttacks(card, opts = {}) {
     abilityUsed = false,
     rulesEnabled = true,
     priorAttacks = [],
+    extraAttacks = [],
   } = opts;
 
-  const attacks = mergeInheritedAttacks(card, priorAttacks);
+  // `priorAttacks` are merged only when the card's own text grants inheritance
+  // (`parseAttackInheritance`); `extraAttacks` (Stadium inheritance / grants)
+  // apply unconditionally.
+  const attacks = mergeAttacks(mergeInheritedAttacks(card, priorAttacks), extraAttacks);
   const discount = rulesEnabled
     ? passiveCostDiscount(card) + stadiumCostModifier
     : 0;
