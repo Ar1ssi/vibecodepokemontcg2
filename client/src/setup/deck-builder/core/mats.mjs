@@ -19,18 +19,19 @@ export function classifyMatLayoutFromTitle(title) {
   return 'one-player';
 }
 
-export const MATS = MATS_CATALOG.map((mat) => ({
-  id: mat.id,
-  title: mat.title,
-  image: mat.image,
-  thumb: mat.thumb || mat.image,
-  board: mat.board || mat.thumb || mat.image,
-  layout: mat.layout || classifyMatLayoutFromTitle(mat.title),
-  fit: mat.fit || 'contain',
-  overlay: Boolean(mat.overlay),
-  sourceUrl: mat.sourceUrl,
-  imageUrl: mat.imageUrl,
-}));
+export const MATS = MATS_CATALOG.filter((mat) => !mat.id.includes('full-size'))
+  .map((mat) => ({
+    id: mat.id,
+    title: mat.title,
+    image: mat.image,
+    thumb: mat.thumb || mat.image,
+    board: mat.board || mat.thumb || mat.image,
+    layout: mat.layout || classifyMatLayoutFromTitle(mat.title),
+    fit: mat.fit || 'contain',
+    overlay: Boolean(mat.overlay),
+    sourceUrl: mat.sourceUrl,
+    imageUrl: mat.imageUrl,
+  }));
 
 /** Every mat, as clones so callers cannot mutate the catalog. */
 export function listMats() {
