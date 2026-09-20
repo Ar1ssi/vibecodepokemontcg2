@@ -1966,6 +1966,36 @@ test('stack: an attachment to the stacked evolution stays in the host slot, not 
   assert.deepEqual(stage2.card.attachedCards.map((c) => c.instanceId), [10, 12, 13]);
 });
 
+test('stack: an attachment that precedes its root in view order still joins the host slot (post-retreat order)', () => {
+  // A retreat reorders each stack so the attached top Evolution is emitted before its
+  // Basic root (applyRetreatSwap pushes the attached card first). placeCardInZone must
+  // not fall through to the top-level play-zone branch for the attachment just because
+  // the root's .play-container has not been created yet — that splits the evolution into
+  // two side-by-side cards instead of a proper stack.
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const active = doc.getElementById('selfMat').querySelector('#active');
+  const zones = {
+    active: [
+      { instanceId: 11, name: 'Mega Greninja ex', src: 'g.png', type: 'Pokémon', stage: 'Stage 2', attachedTo: 10 },
+      { instanceId: 10, name: 'Frogadier', src: 'f.png', type: 'Pokémon', stage: 'Basic' },
+    ],
+  };
+
+  applyView({ stateVersion: 1, you: { playerId: 'p1', zones } }, [], opts);
+  sizeRegisteredCards(150, 210);
+  applyView({ stateVersion: 2, you: { playerId: 'p1', zones } }, [], opts);
+
+  const registry = getCardRegistry();
+  const basic = registry.get(10);
+  const stage2 = registry.get(11);
+  assert.equal(active.querySelectorAll('.play-container').length, 1, 'one stack slot, not two');
+  assert.equal(stage2.element.parentNode, basic.container, 'Stage 2 stays in the Basic slot');
+  assert.equal(stage2.element.style.position || '', '', 'Stage 2 stays in flow as the visible card');
+  assert.equal(basic.element.style.position, 'absolute');
+  assert.equal(basic.element.style.bottom, '10px');
+});
+
 test('rotation: the root turns its whole stack and clears back to upright', () => {
   const { doc, mockGetZone } = setupMockDom();
   const opts = { document: doc, getZone: mockGetZone };

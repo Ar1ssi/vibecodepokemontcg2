@@ -2058,6 +2058,19 @@ export function applyView(view, events = [], options = {}) {
 
       for (const cardData of orderedCards) {
         createOrUpdateCardElement(cardData, side, zoneId, options);
+      }
+      // A stack's root can come after its attachments in view order: a retreat
+      // reorders each stack (applyRetreatSwap pushes the attached top Evolution
+      // before its Basic root). placeCardInZone drops an attachment into its
+      // host's `.play-container`, which only exists once the root has been
+      // placed — so place every root before any attachment, or the attachment
+      // falls through to the top-level play-zone branch and the stack renders
+      // as two separate side-by-side cards.
+      const placementOrder = [
+        ...orderedCards.filter((c) => c.attachedTo == null),
+        ...orderedCards.filter((c) => c.attachedTo != null),
+      ];
+      for (const cardData of placementOrder) {
         const { attachedParent } = placeCardInZone(
           cardData,
           side,
