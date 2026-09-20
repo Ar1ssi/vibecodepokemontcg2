@@ -173,6 +173,90 @@ test('attack & KO: awards 1 prize for basic, 2 for ex, and 3 for Mega', () => {
   assert.equal(res.state.players.p2.zones.active[0].instanceId, 50);
 });
 
+test('attack & KO: a 2+ bench active KO suspends to a promotion mat pick, then promotes the clicked bench', () => {
+  const state = createGameState({
+    players: {
+      p1: {
+        username: 'Ash',
+        zones: {
+          prizes: [
+            createCard({ instanceId: 101, name: 'Prize 1' }),
+            createCard({ instanceId: 102, name: 'Prize 2' }),
+            createCard({ instanceId: 103, name: 'Prize 3' }),
+          ],
+        },
+      },
+      p2: {
+        username: 'Gary',
+        zones: {
+          bench: [
+            createCard({ instanceId: 50, name: 'Benched Pidgey', hp: 50 }),
+            createCard({ instanceId: 51, name: 'Benched Rattata', hp: 40 }),
+          ],
+          deck: [
+            createCard({ instanceId: 99, name: 'Deck' }),
+            createCard({ instanceId: 98, name: 'Deck 2' }),
+          ],
+        },
+      },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  const attacker = createCard({
+    instanceId: 1,
+    name: 'Mewtwo',
+    attacks: [{ name: 'Psystrike', cost: [], damage: 250 }],
+  });
+  state.players.p1.zones.active.push(attacker);
+
+  const miraidonEx = createCard({
+    instanceId: 2,
+    name: 'Miraidon ex',
+    subtypes: ['ex'],
+    hp: 220,
+  });
+  state.players.p2.zones.active.push(miraidonEx);
+
+  const attackRes = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(attackRes.error, null);
+
+  // The KO'd player must choose which Benched Pokemon promotes (server-authoritative
+  // mat picker, PR #178 parity) instead of the server silently taking bench[0].
+  const choice = attackRes.state.pendingChoice;
+  assert.equal(choice?.player, 'p2');
+  assert.equal(choice.resumeToken.effectType, 'promote');
+  assert.equal(choice.min, 1);
+  assert.equal(choice.max, 1);
+  assert.equal(choice.cancellable, false);
+  assert.deepEqual(
+    choice.options.map((o) => o.instanceId),
+    [50, 51]
+  );
+  // Nothing has promoted yet — the Active Spot is empty and both bench Pokemon remain.
+  assert.equal(attackRes.state.players.p2.zones.active.length, 0);
+  assert.equal(attackRes.state.players.p2.zones.bench.length, 2);
+
+  const promoted = applyCommand(attackRes.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: [51] },
+    playerId: 'p2',
+  });
+  assert.equal(promoted.error, null);
+  assert.equal(promoted.state.players.p2.zones.active[0].instanceId, 51);
+  assert.deepEqual(
+    promoted.state.players.p2.zones.bench.map((c) => c.instanceId),
+    [50]
+  );
+
+  // Prize settlement follows the promotion: p1 still owes 2 prizes for the ex KO.
+  assert.equal(promoted.state.pendingChoice?.player, 'p1');
+  const paid = pickPrizes(promoted, 'p1');
+  assert.equal(paid.error, null);
+  assert.equal(paid.state.players.p1.zones.hand.length, 2);
+});
+
 test('retreat: swaps active with bench, clears status, and pays energy cost', () => {
   const state = createGameState({
     players: {

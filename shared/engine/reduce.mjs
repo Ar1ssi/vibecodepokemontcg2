@@ -718,27 +718,12 @@ function handleKnockout(
     prizeCount,
   });
 
-  // Auto-promote first bench Pokemon ONLY if active Pokemon was knocked out
-  if (wasActive) {
-    const benchPokemon = victimBench.find((c) => !c.attachedTo);
-    if (benchPokemon) {
-      for (let i = victimBench.length - 1; i >= 0; i--) {
-        const c = victimBench[i];
-        if (
-          c.instanceId === benchPokemon.instanceId ||
-          c.attachedTo === benchPokemon.instanceId
-        ) {
-          victimBench.splice(i, 1);
-          victimActive.push(c);
-        }
-      }
-      events.push({
-        type: 'pokemonPromoted',
-        instanceId: benchPokemon.instanceId,
-        playerId: victimPlayerId,
-      });
-    }
-  }
+  // Promotion of a new Active is NOT done here. `settlePromotionChoices` runs at the
+  // end of every command: a single Benched Pokémon is promoted automatically, while 2+
+  // raise a `PendingChoice` so the KO'd player clicks which one promotes (server
+  // authority parity with the legacy mat picker, design 017 / PR #178). Deferring it to
+  // the command tail keeps the promotion from being overwritten by the attack's own
+  // search/snipe choice, which also uses `state.pendingChoice`.
 
   // Win condition checks (rulebook 30c 1.3a / p.21 "both players win at the same
   // time"). Count how many ways each player wins on this Knockout, then compare:
@@ -788,6 +773,96 @@ function handleKnockout(
       },
       events,
     });
+  }
+
+  // A Knockout of the Active leaves the Active Spot empty; `settlePromotionChoices`
+  // promotes at the command tail (auto for one Benched Pokémon, mat-pick choice for 2+).
+  // Marked here rather than inferred from an empty Active later, so unrelated commands
+  // that merely see an empty Active never trigger a promotion.
+  if (wasActive && !isGameConcluded(draft) && victimPlayer) {
+    const benchRoots = victimBench.filter(
+      (c) => !c.attachedTo && isPokemon(c)
+    );
+    if (benchRoots.length > 0) victimPlayer.promotionPending = true;
+  }
+}
+
+/**
+ * Moves one Benched Pokémon (and every card attached to it) into the empty Active Spot
+ * and emits `pokemonPromoted`. Shared by the direct `promote` command, the promotion
+ * PendingChoice resume, and the automatic single-bench promotion below. Returns false
+ * (emitting nothing) when the id is not a face-up Benched Pokémon root.
+ */
+function promoteBenchToActive(draft, { playerId, instanceId, events }) {
+  const player = draft.players?.[playerId];
+  const bench = player?.zones?.bench;
+  const active = player?.zones?.active;
+  if (!Array.isArray(bench) || !Array.isArray(active)) return false;
+  const isRoot = bench.some(
+    (c) => c.instanceId === instanceId && !c.attachedTo
+  );
+  if (!isRoot) return false;
+
+  for (let i = bench.length - 1; i >= 0; i--) {
+    const c = bench[i];
+    if (c.instanceId === instanceId || c.attachedTo === instanceId) {
+      bench.splice(i, 1);
+      active.push(c);
+    }
+  }
+  events.push({ type: 'pokemonPromoted', instanceId, playerId });
+  return true;
+}
+
+/**
+ * Fills an Active Spot left empty by a Knockout at the end of a command. A single
+ * Benched Pokémon promotes automatically; 2+ raise a PendingChoice so the KO'd player
+ * chooses (the mat picker renders it, design 017 / D19). `handleKnockout` marks the
+ * KO'd player with `promotionPending`, so this never fires for the many test/edge states
+ * that merely have an empty Active with a populated Bench. Deferred to the command tail
+ * so it never fights an attack's search/snipe choice for `state.pendingChoice`, and so
+ * the turn has already advanced before the choice blocks all further commands.
+ */
+function settlePromotionChoices(draft, { events }) {
+  if (isGameConcluded(draft)) return;
+  if (draft.pendingChoice) return;
+
+  for (const playerId of Object.keys(draft.players || {})) {
+    const player = draft.players[playerId];
+    if (!player?.promotionPending) continue;
+
+    const active = (player.zones?.active || []).filter((c) => !c.attachedTo);
+    const bench = (player.zones?.bench || []).filter(
+      (c) => !c.attachedTo && isPokemon(c)
+    );
+    delete player.promotionPending;
+
+    // A promotion is only ever expected with an empty Active and a legal candidate;
+    // if either no longer holds (the game moved the card itself), drop the marker.
+    if (active.length > 0 || bench.length === 0) continue;
+
+    if (bench.length === 1) {
+      promoteBenchToActive(draft, {
+        playerId,
+        instanceId: bench[0].instanceId,
+        events,
+      });
+      continue;
+    }
+
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: 'promote',
+      prompt:
+        'Your Active Pokémon was Knocked Out — choose a Benched Pokémon to promote',
+      options: bench,
+      min: 1,
+      max: 1,
+      cancellable: false,
+      resumeToken: { effectType: 'promote', initiatorPlayerId: playerId },
+    });
+    events.push({ type: 'promotionChoiceRequested', playerId });
+    return;
   }
 }
 
@@ -3854,27 +3929,11 @@ export function applyCommand(state, command, rng = null) {
     }
 
     case 'promote': {
-      const player = draft.players[playerId];
-      const benchIdx = player.zones.bench.findIndex(
-        (c) => c.instanceId === payload.instanceId
-      );
-      if (benchIdx >= 0) {
-        for (let i = player.zones.bench.length - 1; i >= 0; i--) {
-          const c = player.zones.bench[i];
-          if (
-            c.instanceId === payload.instanceId ||
-            c.attachedTo === payload.instanceId
-          ) {
-            player.zones.bench.splice(i, 1);
-            player.zones.active.push(c);
-          }
-        }
-        events.push({
-          type: 'pokemonPromoted',
-          instanceId: payload.instanceId,
-          playerId,
-        });
-      }
+      promoteBenchToActive(draft, {
+        playerId,
+        instanceId: payload.instanceId,
+        events,
+      });
       break;
     }
 
@@ -4061,6 +4120,15 @@ export function applyCommand(state, command, rng = null) {
           playerId: initiatorPlayerId,
           benchInstanceId: (payload.selection || [])[0] ?? null,
           discardEnergyIds: token.discardEnergyIds || [],
+          events,
+        });
+        draft.pendingChoice = null;
+      } else if (token.effectType === 'promote') {
+        // Active-KO promotion: the player clicked the Benched Pokémon to promote.
+        // `settlePromotionChoices` in the command tail continues any prize settlement.
+        promoteBenchToActive(draft, {
+          playerId: initiatorPlayerId,
+          instanceId: (payload.selection || [])[0],
           events,
         });
         draft.pendingChoice = null;
@@ -4803,6 +4871,7 @@ export function applyCommand(state, command, rng = null) {
       break;
   }
 
+  settlePromotionChoices(draft, { events });
   settlePrizeEntitlements(draft, { events });
   clearFaceDownOffBoard(draft);
   delete draft.__attackEffectPhase;
