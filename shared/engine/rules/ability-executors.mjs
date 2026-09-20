@@ -345,7 +345,11 @@ export function parseRetreatCostModifier(card) {
     t.match(/(\d+)\s*(?:more|less)/) ||
     t.match(/(?:by|is)\s+(\d+)/) ||
     t.match(/(\d+)/);
-  const n = m ? parseInt(m[1], 10) || 1 : 1;
+  // TCGdex prints retreat modifiers with energy symbols, not numerals: Air
+  // Balloon is "{C}{C} less" (two Colorless). The digit fallback below missed
+  // that, defaulting to 1, so a 2-retreat Pokémon stayed at 1 instead of 0.
+  const symbolCount = (t.match(/\{[a-z]\}/g) || []).length;
+  const n = m ? parseInt(m[1], 10) || 1 : symbolCount || 1;
   if (decreased && !increased) return { delta: -n };
   if (increased) return { delta: n };
   return { delta: 0 };

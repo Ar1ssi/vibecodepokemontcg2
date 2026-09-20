@@ -2980,8 +2980,32 @@ import test from 'node:test';
         parseRetreatCostModifier({ ability: { text: 'It costs 2 more to retreat this Pokémon.' } }),
         { delta: 2 }
       );
+      // TCGdex prints Air Balloon as "{C}{C} less" — energy symbols, no digit.
+      // The old digit fallback read that as "1 less" and left a 2-retreat
+      // Pokémon at 1 instead of a free retreat.
+      assert.deepEqual(
+        parseRetreatCostModifier({
+          text: 'The Retreat Cost of the Pokémon this card is attached to is {C}{C} less.',
+        }),
+        { delta: -2 }
+      );
+      assert.deepEqual(
+        parseRetreatCostModifier({
+          text: 'The Retreat Cost of the Pokémon this card is attached to is {C} less.',
+        }),
+        { delta: -1 }
+      );
       assert.equal(applyRetreatCostModifier(3, -1), 2);
       assert.equal(applyRetreatCostModifier(1, -5), 0);
+      assert.equal(
+        applyRetreatCostModifier(
+          2,
+          parseRetreatCostModifier({
+            text: 'The Retreat Cost of the Pokémon this card is attached to is {C}{C} less.',
+          }).delta
+        ),
+        0
+      );
     });
 
     test('parsePrizeModify / applyPrizeModify', () => {
