@@ -33,20 +33,18 @@ const DRAG_SRC = readFileSync(
   'utf8'
 );
 
-describe('Lost Zone rail — docked outside the mat on the right', () => {
+describe('Lost Zone rail — positioned beside the mat', () => {
   const body = ruleBody(INDEX_CSS, '#lostZoneRail');
 
-  it('is positioned against the right screen edge', () => {
+  it('is positioned in the board area to the right of the mat', () => {
     assert.ok(body, '#lostZoneRail rule is missing from index.css');
     assert.match(body, /position:\s*fixed/);
-    assert.match(body, /right:\s*0/);
+    assert.match(body, /left:\s*60%/);
   });
 
   it('is laid out in the screen frame, not the mat frame', () => {
-    // #battleMat is 75.5% wide; the rail uses vh/vw units of the screen and
-    // is not nested under the playmat iframes.
-    assert.match(body, /top:\s*5vh/);
-    assert.match(body, /height:\s*95vh/);
+    assert.match(body, /top:\s*28vh/);
+    assert.match(body, /height:\s*52vh/);
   });
 
   it('draws above the sidebox but below the top tab bar', () => {

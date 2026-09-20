@@ -5323,15 +5323,16 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
    unchanged; this is a presentation layer only. */
 #lostZoneRail {
   position: fixed;
-  right: 0;
-  top: 5vh;
-  width: 6%;
+  left: 60%;
+  top: 28vh;
+  width: 6.5%;
   min-width: 54px;
-  height: 95vh;
+  height: 52vh;
   box-sizing: border-box;
   padding: 0.6vh 0.35vw;
   background: rgba(18, 22, 28, 0.92);
-  border-left: 2px solid rgba(90, 110, 188, 0.864);
+  border: 1.5px solid rgba(90, 110, 188, 0.864);
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
