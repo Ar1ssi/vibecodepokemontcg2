@@ -7,7 +7,7 @@ import { discardBoard } from '../general/board-actions.js';
 import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } from '/shared/engine/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '/shared/engine/rules/ability-effects.mjs';
 import { computeAttackDamage, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
-import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
+import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard, rewriteEnergyDescriptor } from '/shared/engine/rules/energy-effects.mjs';
 import {
   parsePendingAttackEffects,
   parseDiscardOpponentEffect,
@@ -75,7 +75,7 @@ import {
   resolveTurnBoundary,
 } from '/shared/engine/rules/status.mjs';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../counters/damage-counter.js';
-import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch } from '/shared/engine/rules/stadium-effects.mjs';
+import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch, isStadiumGlimwoodReFlip, stadiumBlocksHealing, isRepeatableStadiumAction, stadiumExtraAttacksFromZone, mergeAttacks } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail, isMirrorReplayCall } from '../../setup/general/sync-action-args.mjs';
 import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
 import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
@@ -558,7 +558,18 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
     const oppActive = getActivePokemonCard(getZone(oppPlayer, 'active'));
     if (active && !rngBundle.confusedFizzle) {
       await ensureCardData(active);
-      let atk = syncAttackFromCard(active, attackIndex, null);
+      // Stadium-granted / inherited attacks sit after the printed ones in the
+      // same order the server merges them, so the inspector's `attackIndex`
+      // (and the index sent to the server) resolve to the same attack.
+      const extraAttacks = stadiumExtraAttacksFromZone(getStadium()?.card, {
+        zoneCards: activeZone.array,
+        card: active,
+        isActive: true,
+      });
+      const attackSource = extraAttacks.length
+        ? { ...active, attacks: mergeAttacks(active.attacks || [], extraAttacks) }
+        : active;
+      let atk = syncAttackFromCard(attackSource, attackIndex, null);
       if (atk) {
         // Once-per-turn (taxonomy §D once-per-turn family): if this attack
         // carries an "Once during your turn" clause and it was already used
@@ -610,7 +621,16 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           // attach-type family (letter / named specials): use the effective
           // attached type (e.g. U Energy → Fighting) for cost payment.
           const override = effectiveEnergyType(e);
-          energyTypes.push({ type: override || type, family });
+          energyTypes.push(
+            rewriteEnergyDescriptor(
+              { type: override || type, family },
+              {
+                card: e,
+                stadiumCard: getStadium()?.card || null,
+                hostPokemon: active,
+              }
+            )
+          );
         }
         // Passive cost discount (ability family: passive) — reduce the
         // attacker's energy cost per the active card's printed ability.
@@ -652,9 +672,9 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           }
         }
         if (!canPayAttackCost(energyTypes, effectiveCost)) {
-          if (attackIndex === 0 && Array.isArray(active.attacks) && active.attacks.length > 1) {
-            for (let i = 1; i < active.attacks.length; i++) {
-              const altAtk = active.attacks[i];
+          if (attackIndex === 0 && Array.isArray(attackSource.attacks) && attackSource.attacks.length > 1) {
+            for (let i = 1; i < attackSource.attacks.length; i++) {
+              const altAtk = attackSource.attacks[i];
               let altCost = altAtk.cost || [];
               if (rulesState.enabled) {
                 let altDiscount = combinedPassiveCostDiscount(active, activeZone.array, {
@@ -817,7 +837,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         if (oppActive) {
         await ensureCardData(oppActive);
         await ensureCardData(active);
-        atk = syncAttackFromCard(active, attackIndex, atk);
+        atk = syncAttackFromCard(attackSource, attackIndex, atk);
         // Text-based damage scaling (taxonomy §D damage families): when rules
         // are on, parse the printed attack text for per-energy / per-prize /
         // per-turn / extra-by-type / conditional bonuses and substitute the
@@ -858,6 +878,48 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               'announcement',
               false
             );
+          }
+          // Glimwood Tangle (solo path): after the attack coins are revealed,
+          // the player may ignore them and re-flip, once per turn.
+          const glimwoodStadium = getStadium()?.card || getStadium();
+          const hadAttackFlips =
+            Boolean(coin) ||
+            (Array.isArray(rngBundle.multiFlips) && rngBundle.multiFlips.length > 0);
+          if (
+            hadAttackFlips &&
+            isStadiumGlimwoodReFlip(glimwoodStadium) &&
+            !rulesState.flags[user]?.glimwoodUsed &&
+            typeof window !== 'undefined' &&
+            window.confirm('Glimwood Tangle: ignore the coin results and re-flip?')
+          ) {
+            if (!rulesState.flags[user]) rulesState.flags[user] = {};
+            rulesState.flags[user].glimwoodUsed = true;
+            coin = /flip a coin/.test(atkLower)
+              ? flipCoin(rngBundle, 'attack')
+              : null;
+            if (multiFlip && /for each heads/.test(atkText)) {
+              const flips = parseInt(multiFlip[1], 10);
+              rngBundle.multiFlips = [];
+              headsCount = 0;
+              for (let i = 0; i < flips; i++) {
+                const face = Math.random() < 0.5 ? 'heads' : 'tails';
+                rngBundle.multiFlips.push(face);
+                if (face === 'heads') headsCount++;
+              }
+              appendMessage(
+                user,
+                `🪙 Glimwood Tangle re-flip — ${headsCount} head${headsCount !== 1 ? 's' : ''}!`,
+                'announcement',
+                false
+              );
+            } else {
+              appendMessage(
+                user,
+                `🪙 Glimwood Tangle re-flip — ${coin === 'heads' ? 'Heads!' : 'Tails!'}`,
+                'announcement',
+                false
+              );
+            }
           }
           const oppActiveZoneForEnergy = getZone(oppPlayer, 'active');
           // "is damaged" conditions (taxonomy §D "if conditional damage"):
@@ -925,7 +987,11 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             appendMessage(user, `✨ ${note}`, 'announcement', false);
           }
         }
-        let dmg = computeAttackDamage(active, oppActive, effectiveAttack);
+        let dmg = computeAttackDamage(active, oppActive, effectiveAttack, {
+          stadium: getStadium()?.card || null,
+          defenderIsActive: true,
+          defenderZoneCards: getZone(oppPlayer, 'active').array,
+        });
         if (rulesState.enabled && immunityClause(atk.text)) {
           const raw = parsed?.total ?? effectiveAttack.damage ?? dmg.total;
           dmg = { ...dmg, total: raw, multiplier: 1, flat: 0, resistance: 0 };
@@ -1490,7 +1556,15 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // counters from the printed target (defender when it says "Defending
         // Pokémon", otherwise the attacker's active — the common self-heal
         // form). Skipped when the defender was KO'd by this very attack.
-        if (parsed?.heal > 0) {
+        if (parsed?.heal > 0 && stadiumBlocksHealing()) {
+          appendMessage(
+            user,
+            `🏟️ Dyna Tree Hill — all healing is blocked.`,
+            'announcement',
+            false
+          );
+        }
+        if (parsed?.heal > 0 && !stadiumBlocksHealing()) {
           const wantDefender = healTarget(atk.text) === 'defender';
           const defenderKO = oppHp === 0 || totalDmg >= oppHp;
           const target = wantDefender && !defenderKO
@@ -1988,7 +2062,15 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         }
 
         // Mirror heal: heal this Pokémon for damage dealt this attack.
-        if (mirrorHealClause(atk.text) && dmg.total > 0) {
+        if (mirrorHealClause(atk.text) && dmg.total > 0 && stadiumBlocksHealing()) {
+          appendMessage(
+            user,
+            `🏟️ Dyna Tree Hill — all healing is blocked.`,
+            'announcement',
+            false
+          );
+        }
+        if (mirrorHealClause(atk.text) && dmg.total > 0 && !stadiumBlocksHealing()) {
           const countersEl = active?.image?.damageCounter;
           const current = countersEl
             ? parseInt(countersEl.textContent || '0', 10) || 0
@@ -2314,7 +2396,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // then shuffles — awaited so the turn does not end before the pick.
         if (rulesState.enabled) {
           await ensureCardData(active);
-          atk = syncAttackFromCard(active, attackIndex, atk);
+          atk = syncAttackFromCard(attackSource, attackIndex, atk);
           const searchStep = parseAttackSearchClause(atk.text);
           if (searchStep) {
             await _runAttackDeckSearch(user, atk, searchStep, emit);
@@ -2502,7 +2584,16 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
         const type = e.types?.[0] || 'Colorless';
         const family = classifyEnergyEffect(e);
         const override = effectiveEnergyType(e);
-        energyTypes.push({ type: override || type, family });
+        energyTypes.push(
+          rewriteEnergyDescriptor(
+            { type: override || type, family },
+            {
+              card: e,
+              stadiumCard: getStadium()?.card || null,
+              hostPokemon: active,
+            }
+          )
+        );
       }
       const costSymbols = new Array(retreatCost).fill('Colorless');
       if (!canPayAttackCost(energyTypes, costSymbols)) {
@@ -2617,6 +2708,15 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
 
   await ensureCardData(target);
   if (abilityBlockedByStadium(user, target)) return;
+  if (stadiumBlocksHealing()) {
+    appendMessage(
+      user,
+      `🏟️ Dyna Tree Hill — all healing is blocked.`,
+      'announcement',
+      false
+    );
+    return;
+  }
   if (classifyAbility(target) !== 'heal') {
     appendMessage(
       user,
@@ -4149,9 +4249,18 @@ const payStadiumCost = (user, cost) => {
   if (!cost) return true;
   const hand = getZone(user, 'hand');
   if (cost.type === 'discard-energy') {
-    const idx = hand.array.findIndex((c) => c.type === 'Energy');
+    const typeFilter = Array.isArray(cost.types) && cost.types.length
+      ? cost.types.map((t) => String(t).toLowerCase())
+      : null;
+    const matchesType = (c) => {
+      if (!typeFilter) return true;
+      const name = String(c.name || '').toLowerCase();
+      const types = (c.types || []).map((t) => String(t).toLowerCase());
+      return typeFilter.some((t) => name.includes(t) || types.includes(t));
+    };
+    const idx = hand.array.findIndex((c) => c.type === 'Energy' && matchesType(c));
     if (idx < 0) {
-      appendMessage(user, '⛔ No Energy in hand to discard.', 'announcement', false);
+      appendMessage(user, '⛔ No matching Energy in hand to discard.', 'announcement', false);
       return false;
     }
     moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
@@ -4167,11 +4276,45 @@ const payStadiumCost = (user, cost) => {
     }
     return true;
   }
+  if (cost.type === 'discard-single-strike') {
+    const idx = hand.array.findIndex((c) => {
+      const name = String(c.name || '').toLowerCase();
+      const subs = (c.subtypes || []).map((s) => String(s).toLowerCase());
+      return name.includes('single strike') || subs.includes('single strike');
+    });
+    if (idx < 0) {
+      appendMessage(user, '⛔ No Single Strike card in hand to discard.', 'announcement', false);
+      return false;
+    }
+    moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
+    return true;
+  }
   return true;
 };
 
+const isSupporterCard = (c) => {
+  const subs = Array.isArray(c?.subtypes)
+    ? c.subtypes.map((s) => String(s).toLowerCase())
+    : [];
+  return (
+    /supporter/i.test(String(c?.type || '')) ||
+    /supporter/i.test(String(c?.trainerType || '')) ||
+    subs.some((s) => s.includes('supporter'))
+  );
+};
+
+const isEvolutionCardClient = (c) => {
+  const stage = String(c?.stage || '');
+  if (stage) return stage.toLowerCase() !== 'basic';
+  const subs = (c?.subtypes || []).map((s) => String(s).toLowerCase());
+  return subs.some((s) =>
+    /^(stage 1|stage 2|stage1|stage2|vmax|vstar|break|evolution)$/.test(s)
+  );
+};
+
 const finishStadiumAction = (user, card, emit, payload) => {
-  if (rulesState.enabled) markStadiumUsed(user);
+  // Unlimited "as often as … likes" actions stay usable after they resolve.
+  if (rulesState.enabled && !isRepeatableStadiumAction(card)) markStadiumUsed(user);
   processAction(user, emit, 'stadium-effect', [payload]);
 };
 
@@ -4501,7 +4644,8 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
 
   // Mirror: card moves already arrived via moveCardBundle. Only mark used.
   if (!emit) {
-    if (rulesState.enabled) markStadiumUsed(user);
+    if (rulesState.enabled && !isRepeatableStadiumAction(getStadium()?.card))
+      markStadiumUsed(user);
     return;
   }
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
@@ -4531,8 +4675,13 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     return;
   }
 
-  // Once-per-turn gate
-  if (result.family === 'once-per-turn' && rulesState.enabled && stadiumUsed(user)) {
+  // Once-per-turn gate (unlimited actions are exempt)
+  if (
+    result.family === 'once-per-turn' &&
+    rulesState.enabled &&
+    stadiumUsed(user) &&
+    !isRepeatableStadiumAction(card)
+  ) {
     appendMessage(user, `⛔ ${card.name || 'Stadium'}'s effect was already used this turn.`, 'announcement', false);
     return;
   }
@@ -4543,12 +4692,26 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     const msg =
       action.condition.type === 'named-supporter'
         ? `⛔ Play a Supporter with "${action.condition.contains}" in its name first this turn.`
-        : '⛔ Play a Supporter from your hand this turn first.';
+        : action.condition.type === 'no-supporter-played'
+          ? '⛔ You already played a Supporter this turn.'
+          : action.condition.type === 'has-evolution-in-hand'
+            ? '⛔ You need an Evolution card in your hand.'
+            : '⛔ Play a Supporter from your hand this turn first.';
     appendMessage(user, msg, 'announcement', false);
     return;
   }
 
   if (action.cost && !payStadiumCost(user, action.cost)) return;
+
+  // "Flip a coin. If heads, …" — tails consumes the activation with no effect.
+  if (action.coin) {
+    const face = flipCoin({}, 'stadium');
+    appendMessage(user, `🪙 ${card.name}: Coin flip — ${face === 'heads' ? 'Heads!' : 'Tails!'}`, 'announcement', false);
+    if (face !== 'heads') {
+      finishStadiumAction(user, card, emit, { action: action.action, coin: 'tails' });
+      return;
+    }
+  }
 
   switch (action.action) {
     case 'hand-to-deck-top': {
@@ -4659,12 +4822,43 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       appendMessage(user, `🔍 ${card.name}: ${foundName} → Bench.`, 'announcement', false);
       shuffleZone(user, user, 'deck');
       finishStadiumAction(user, card, emit, { action: 'search-bench' });
+      // Lumiose City: only a search actually performed ends the turn.
+      if (action.turnEnds && rulesState.enabled) endTurnWithBanner(user, {});
       break;
     }
     case 'search-hand': {
       const deck = getZone(user, 'deck');
+      // Fossil Quarry puts the searched "Antique" Items onto the Bench.
+      const dest = action.destination === 'bench' ? 'bench' : 'hand';
       let moved = 0;
       const want = action.n || 1;
+      for (let i = 0; i < deck.array.length && moved < want; ) {
+        await ensureCardData(deck.array[i]);
+        if (matchesStadiumSearch(deck.array[i], action)) {
+          await moveCardBundle(user, user, 'deck', dest, i, false, 'move');
+          moved++;
+        } else {
+          i++;
+        }
+      }
+      appendMessage(
+        user,
+        moved
+          ? `🔍 ${card.name}: found ${moved} card(s) → ${dest}.`
+          : `🔍 ${card.name}: no matching cards in deck.`,
+        'announcement',
+        false
+      );
+      shuffleZone(user, user, 'deck');
+      finishStadiumAction(user, card, emit, { action: 'search-hand', n: moved, destination: dest });
+      break;
+    }
+    case 'discard-search': {
+      // Giant Hearth / Viridian Forest: the hand-discard cost already ran in
+      // payStadiumCost; now search for the printed Energy.
+      const deck = getZone(user, 'deck');
+      const want = action.n || 1;
+      let moved = 0;
       for (let i = 0; i < deck.array.length && moved < want; ) {
         await ensureCardData(deck.array[i]);
         if (matchesStadiumSearch(deck.array[i], action)) {
@@ -4677,13 +4871,113 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       appendMessage(
         user,
         moved
-          ? `🔍 ${card.name}: found ${moved} card(s) → hand.`
-          : `🔍 ${card.name}: no matching cards in deck.`,
+          ? `🔍 ${card.name}: found ${moved} ${action.searchWhat || 'Energy'} card(s) → hand.`
+          : `🔍 ${card.name}: no matching Energy in deck.`,
         'announcement',
         false
       );
       shuffleZone(user, user, 'deck');
-      finishStadiumAction(user, card, emit, { action: 'search-hand', n: moved });
+      finishStadiumAction(user, card, emit, { action: 'discard-search', n: moved });
+      break;
+    }
+    case 'mill-items': {
+      // PokéStop: mill the top N cards; Item cards among them go to hand.
+      const deck = getZone(user, 'deck');
+      const n = action.n || 3;
+      let items = 0;
+      for (let i = 0; i < n && deck.array.length > 0; i++) {
+        const c = deck.array[0];
+        await ensureCardData(c);
+        if (matchesStadiumSearch(c, { searchWhat: 'item' })) {
+          await moveCardBundle(user, user, 'deck', 'hand', 0, false, 'move');
+          items++;
+        } else {
+          await moveCardBundle(user, user, 'deck', 'discard', 0, false, 'move');
+        }
+      }
+      appendMessage(
+        user,
+        `◈ ${card.name}: Milled ${n} card(s); ${items} Item card(s) → hand.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'mill-items', n: items });
+      break;
+    }
+    case 'recover-energy': {
+      const discard = getZone(user, 'discard');
+      const want = action.n || 1;
+      const typeFilter = action.typeFilter
+        ? [String(action.typeFilter).toLowerCase()]
+        : null;
+      let moved = 0;
+      for (let i = 0; i < discard.array.length && moved < want; ) {
+        const c = discard.array[i];
+        const nameL = String(c.name || '').toLowerCase();
+        const isEnergy =
+          String(c.type || '').toLowerCase().includes('energy') ||
+          nameL.includes('energy');
+        const types = (c.types || []).map((t) => String(t).toLowerCase());
+        const matchesType =
+          !typeFilter || typeFilter.some((t) => types.includes(t) || nameL.includes(t));
+        if (isEnergy && matchesType) {
+          await moveCardBundle(user, user, 'discard', 'hand', i, false, 'move');
+          moved++;
+        } else {
+          i++;
+        }
+      }
+      appendMessage(
+        user,
+        moved
+          ? `◈ ${card.name}: Recovered ${moved} Energy card(s) from your discard pile.`
+          : `🔍 ${card.name}: no matching Energy in your discard pile.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'recover-energy', n: moved });
+      break;
+    }
+    case 'draw-until-type': {
+      // Mystery Garden: draw until hand size equals the count of matching
+      // Pokémon in play (e.g. {P} Pokémon), which is only known at runtime.
+      const inPlay = pokemonInPlayForUser(user);
+      const target = action.targetType
+        ? inPlay.filter((c) => pokemonMatchesType(c, action.targetType)).length
+        : 0;
+      const hand = getZone(user, 'hand');
+      const need = Math.max(0, target - hand.array.length);
+      if (need > 0) draw(user, user, need, emit);
+      appendMessage(
+        user,
+        `◈ ${card.name}: Drew ${need} card(s) to reach ${target} (your ${action.targetType || 'matching'} Pokémon in play).`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'draw-until-type', n: need });
+      break;
+    }
+    case 'draw-until-count': {
+      const target = action.n || 5;
+      const hand = getZone(user, 'hand');
+      const need = Math.max(0, target - hand.array.length);
+      if (need > 0) draw(user, user, need, emit);
+      appendMessage(user, `◈ ${card.name}: Drew ${need} card(s) to reach ${target} in hand.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'draw-until-count', n: need });
+      if (action.turnEnds && rulesState.enabled) endTurnWithBanner(user, {});
+      break;
+    }
+    case 'shuffle-draw': {
+      const n = action.n || 5;
+      const hand = getZone(user, 'hand');
+      for (let i = hand.array.length - 1; i >= 0; i--) {
+        moveCardBundle(user, user, 'hand', 'deck', i, false, 'move');
+      }
+      shuffleZone(user, user, 'deck');
+      draw(user, user, n, emit);
+      appendMessage(user, `◈ ${card.name}: Shuffled your hand into your deck and drew ${n} card(s).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'shuffle-draw', n });
+      if (action.turnEnds && rulesState.enabled) endTurnWithBanner(user, {});
       break;
     }
     case 'discard-draw':
@@ -4692,6 +4986,7 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
       draw(user, user, n, emit);
       appendMessage(user, `◈ ${card.name}: Drew ${n} card(s).`, 'announcement', false);
       finishStadiumAction(user, card, emit, { action: action.action, n });
+      if (action.turnEnds && rulesState.enabled) endTurnWithBanner(user, {});
       break;
     }
     case 'search': {
@@ -4737,6 +5032,21 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     }
     case 'heal': {
       const n = action.n || 1;
+      if (action.target === 'bench') {
+        const bench = getZone(user, 'bench');
+        const idx = bench.array.findIndex(
+          (c) => String(c?.type || '').includes('Pokémon') && (c.damage || 0) > 0
+        );
+        if (idx < 0) {
+          appendMessage(user, '⛔ No damaged Benched Pokémon to heal.', 'announcement', false);
+          return;
+        }
+        const mon = bench.array[idx];
+        removeDamageCounter(user, 'bench', idx, n, emit);
+        appendMessage(user, `💚 ${card.name}: Healed ${n} damage from ${mon.name || 'a benched Pokémon'}.`, 'announcement', false);
+        finishStadiumAction(user, card, emit, { action: 'heal', n, target: 'bench' });
+        break;
+      }
       const active = getZone(user, 'active').array[0];
       if (!active) {
         appendMessage(user, '⛔ No active Pokémon to heal.', 'announcement', false);
@@ -4819,6 +5129,163 @@ export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
     }
     case 'attack-cost-increase': {
       appendMessage(user, `◈ ${card.name}: Attack cost increase (+${action.amount}) is active while this Stadium is in play.`, 'announcement', false);
+      break;
+    }
+    case 'coin-draw': {
+      let heads = 0;
+      while (Math.random() < 0.5 && heads < 30) heads++;
+      const drawn = heads * (action.n || 1);
+      if (drawn > 0) draw(user, user, drawn, emit);
+      appendMessage(user, `🪙 ${card.name}: ${heads} head(s) — drew ${drawn} card(s).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'coin-draw', heads });
+      break;
+    }
+    case 'return-tool': {
+      appendMessage(user, `◈ ${card.name}: Return an attached Pokémon Tool to your hand.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'return-tool' });
+      break;
+    }
+    case 'move-energy': {
+      appendMessage(user, `◈ ${card.name}: Move an Energy between your Pokémon (see card text).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'move-energy' });
+      break;
+    }
+    case 'devolve': {
+      appendMessage(user, `◈ ${card.name}: Devolve an Evolved Pokémon (see card text).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'devolve' });
+      break;
+    }
+    case 'peek-return': {
+      const deck = getZone(user, 'deck');
+      const names = deck.array.slice(0, action.n || 2).map((c) => c.name).filter(Boolean);
+      appendMessage(user, `👁 ${card.name}: Top of deck — ${names.join(', ') || 'empty'} (kept in order).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'peek-return' });
+      break;
+    }
+    case 'peek-discard': {
+      const deck = getZone(user, 'deck');
+      if (deck.array.length === 0) {
+        appendMessage(user, '⛔ Your deck is empty.', 'announcement', false);
+        return;
+      }
+      appendMessage(user, `👁 ${card.name}: Top card is ${deck.array[0].name || 'unknown'}.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'peek-discard' });
+      break;
+    }
+    case 'bench-restored': {
+      appendMessage(user, `◈ ${card.name}: Put a Restored Pokémon onto your Bench.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'bench-restored' });
+      break;
+    }
+    case 'fossil-bench': {
+      appendMessage(user, `◈ ${card.name}: Put a fossil Pokémon onto your Bench (see card text).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'fossil-bench' });
+      break;
+    }
+    case 'attach-discard-damage': {
+      appendMessage(user, `◈ ${card.name}: Attach a {R} Energy from your discard pile to a Benched {R} Pokémon (then 2 damage counters).`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'attach-discard-damage' });
+      break;
+    }
+    case 'shuffle-own-pokemon': {
+      appendMessage(user, `◈ ${card.name}: Shuffle 1 of your Pokémon in play (see card text) into your deck.`, 'announcement', false);
+      finishStadiumAction(user, card, emit, { action: 'shuffle-own-pokemon' });
+      break;
+    }
+    case 'reveal-hand': {
+      const oppHand = getZone('opp', 'hand');
+      const names = (oppHand?.array || []).map((c) => c.name).filter(Boolean);
+      appendMessage(
+        user,
+        `👁 ${card.name}: Opponent reveals ${names.length ? names.join(', ') : 'an empty hand'}.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'reveal-hand' });
+      break;
+    }
+    case 'win-game': {
+      const reason = `${card.name}: opponent has 6 or more Pokémon in the Lost Zone`;
+      appendMessage(user, `🏆 ${card.name}: You win the game!`, 'announcement', false);
+      if (rulesState.enabled) {
+        rulesState.phase = 'ended';
+        document.dispatchEvent(
+          new CustomEvent('rules-game-ended', { detail: { reason } })
+        );
+      }
+      break;
+    }
+    case 'ancient-ruins': {
+      const hand = getZone(user, 'hand');
+      const names = hand.array.map((c) => c.name).filter(Boolean);
+      appendMessage(
+        user,
+        `👁 ${card.name}: You reveal ${names.length ? names.join(', ') : 'an empty hand'}.`,
+        'announcement',
+        false
+      );
+      if (!hand.array.some(isSupporterCard)) {
+        draw(user, user, 1, emit);
+        appendMessage(user, `◈ ${card.name}: No Supporter in hand — drew a card.`, 'announcement', false);
+      } else {
+        appendMessage(user, `◈ ${card.name}: A Supporter is in hand — no draw.`, 'announcement', false);
+      }
+      finishStadiumAction(user, card, emit, { action: 'ancient-ruins' });
+      break;
+    }
+    case 'move-to-arceus': {
+      appendMessage(
+        user,
+        `◈ ${card.name}: Move an Energy from a Benched Pokémon to your Active Arceus.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'move-to-arceus' });
+      break;
+    }
+    case 'return-sabrina-energy': {
+      appendMessage(
+        user,
+        `◈ ${card.name}: Return a Basic Energy from a Sabrina Pokémon to your hand.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'return-sabrina-energy' });
+      break;
+    }
+    case 'discard-erika-cure': {
+      appendMessage(
+        user,
+        `◈ ${card.name}: Discard an Energy from an Erika Pokémon to cure its Special Conditions.`,
+        'announcement',
+        false
+      );
+      finishStadiumAction(user, card, emit, { action: 'discard-erika-cure' });
+      break;
+    }
+    case 'mystery-zone': {
+      const deck = getZone(user, 'deck');
+      let energyIdx = deck.array.findIndex(
+        (c) =>
+          c.type === 'Energy' &&
+          !(c.subtypes || []).some((s) => /special/i.test(String(s)))
+      );
+      if (energyIdx >= 0) {
+        const eName = deck.array[energyIdx].name;
+        moveCardBundle(user, user, 'deck', 'hand', energyIdx, false, 'move');
+        appendMessage(user, `🔍 ${card.name}: Found ${eName} → hand.`, 'announcement', false);
+      } else {
+        appendMessage(user, `🔍 ${card.name}: no Basic Energy in deck.`, 'announcement', false);
+      }
+      shuffleZone(user, user, 'deck');
+      const evoIdx = getZone(user, 'hand').array.findIndex(isEvolutionCardClient);
+      if (evoIdx >= 0) {
+        const evoName = getZone(user, 'hand').array[evoIdx].name;
+        moveCardBundle(user, user, 'hand', 'deck', evoIdx, false, 'move');
+        shuffleZone(user, user, 'deck');
+        appendMessage(user, `↩️ ${card.name}: Put ${evoName} into your deck.`, 'announcement', false);
+      }
+      finishStadiumAction(user, card, emit, { action: 'mystery-zone' });
       break;
     }
     default:

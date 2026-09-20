@@ -71,6 +71,14 @@ const TYPED_POKEMON_TYPE_RE = new RegExp(
   `\\b(${POKEMON_TYPE_WORDS})(?:-type)?\\s+pok[ée]mon`,
 );
 
+// "Search your deck for a Lightning Energy card" (Thundurus' Charge) names the
+// energy type in words, with no {L} symbol and no "Basic". Without this the
+// generic fallback leaves `what` as 'card', so the filter lets the whole deck
+// through. Mirrors TYPED_POKEMON_SEARCH_RE.
+const TYPED_ENERGY_SEARCH_RE = new RegExp(
+  `search your deck for (?:up to\\s+\\d+\\s+)?(?:an?\\s+)?(?:basic\\s+)?(${POKEMON_TYPE_WORDS})\\s+energy`,
+);
+
 function typedPokemonSearchWhat(lower) {
   const clause = lower.match(TYPED_POKEMON_SEARCH_RE);
   if (!clause) return null;
@@ -182,6 +190,8 @@ export function parseSearchDeckParams(lower) {
   } else if (
     lower.includes('attach them to') ||
     lower.includes('attach them to 1') ||
+    lower.includes('attach it to this pok') ||
+    lower.includes('attach it to 1 of your') ||
     (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
   ) {
     destination = 'attach';
@@ -232,6 +242,47 @@ export function parseSearchDeckParams(lower) {
   const basicEnergyHand = lower.match(/search your deck for up to\s+(\d+)\s+basic energy cards/);
   if (basicEnergyHand && lower.includes('into your hand')) {
     return { what: 'Basic Energy', count: Number(basicEnergyHand[1]), destination: 'hand', upTo: true };
+  }
+
+  // Word-form typed Energy ("a Lightning Energy card"). Checked before the
+  // generic fallbacks so `what` keeps the type instead of collapsing to 'card'
+  // (which would let every deck card match).
+  if (!/\bor\b/.test(lower)) {
+    const typedEnergy = lower.match(TYPED_ENERGY_SEARCH_RE);
+    if (typedEnergy) {
+      const type = WORD_POKEMON_TYPES[typedEnergy[1]];
+      if (type) {
+        const upToMatch = lower.match(/up to\s+(\d+)/);
+        return {
+          what: `Basic ${type} Energy`,
+          count: upToMatch ? Number(upToMatch[1]) : 1,
+          destination,
+          ...(upToMatch ? { upTo: true } : {}),
+          ...(reveal ? { reveal: true } : {}),
+        };
+      }
+    }
+
+    // Generic Energy with no type word ("an Energy card", "a Basic Energy
+    // card", "a {L} Energy card"). Must precede the Pokémon fallback, which
+    // otherwise latches onto a trailing "this Pokémon" and searches Pokémon.
+    const genericEnergy = lower.match(
+      /search your deck for (?:up to\s+(\d+)\s+)?(?:an?\s+)?(?:basic\s+)?(\{[a-z]\})?\s*energy/
+    );
+    if (genericEnergy) {
+      const gSym = genericEnergy[2];
+      return {
+        what: gSym
+          ? `Basic ${gSym.toUpperCase()} Energy`
+          : /\bbasic\b/.test(lower)
+            ? 'Basic Energy'
+            : 'Energy',
+        count: genericEnergy[1] ? Number(genericEnergy[1]) : 1,
+        destination,
+        ...(genericEnergy[1] ? { upTo: true } : {}),
+        ...(reveal ? { reveal: true } : {}),
+      };
+    }
   }
 
   const typedHpBench = lower.match(

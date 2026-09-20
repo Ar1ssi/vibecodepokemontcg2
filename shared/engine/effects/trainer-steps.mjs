@@ -11,7 +11,12 @@ import { isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
-import { addCondition, clearConditions, copyConditions } from '../rules/special-conditions.mjs';
+import {
+  addCondition,
+  clearConditions,
+  copyConditions,
+  hasAnyCondition,
+} from '../rules/special-conditions.mjs';
 import {
   topPokemonCard as topOfStack,
   rareCandyOptions,
@@ -536,6 +541,12 @@ function moveEnergyToActive(ctx) {
   const { player, step } = ctx;
   const active = activeOf(player);
   if (!active) return skip(ctx, 'no_active');
+  if (step.activeName) {
+    const name = String(topPokemonCard(player, active)?.name || '').toLowerCase();
+    if (!name.includes(String(step.activeName).toLowerCase())) {
+      return skip(ctx, 'active_name_mismatch');
+    }
+  }
   const benchEnergy = benchRootsOf(player)
     .flatMap((root) => attachedCards(player, root.instanceId))
     .filter(isEnergy);
@@ -695,6 +706,89 @@ function discardEnergyFromOpponent(ctx) {
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose an Energy attached to your opponent's Pokémon`,
     options: energies,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Saffron City Gym: return a Basic Energy attached to a qualifying Pokémon to hand.
+function returnOwnAttachedEnergy(ctx) {
+  const { player, step } = ctx;
+  const nameFilter = String(step.nameContains || '').toLowerCase();
+  const attached = rootsOf(player)
+    .filter(
+      (root) =>
+        !nameFilter ||
+        String(topPokemonCard(player, root)?.name || '')
+          .toLowerCase()
+          .includes(nameFilter)
+    )
+    .flatMap((root) => attachedCards(player, root.instanceId))
+    .filter((c) => isEnergy(c) && (!step.basicOnly || isBasicEnergy(c)));
+
+  if (ctx.selection) {
+    const energy = attached.find((c) => c.instanceId === ctx.selection[0]);
+    if (!energy) return skip(ctx, 'target_not_found');
+    removeFromZones(player, energy);
+    energy.attachedTo = null;
+    player.zones.hand.push(energy);
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: energy.instanceId,
+      from: 'inPlay',
+      to: 'hand',
+      playerId: player.playerId,
+    });
+    return null;
+  }
+  if (attached.length === 0) return skip(ctx, 'no_energy_to_return');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Stadium')}: Choose a Basic Energy to return to your hand`,
+    options: attached,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Celadon City Gym: discard an Energy attached to a qualifying Pokémon to cure it.
+function discardOwnAttachedEnergy(ctx) {
+  const { player, step } = ctx;
+  const nameFilter = String(step.nameContains || '').toLowerCase();
+  const hosts = rootsOf(player).filter(
+    (root) =>
+      !nameFilter ||
+      String(topPokemonCard(player, root)?.name || '')
+        .toLowerCase()
+        .includes(nameFilter)
+  );
+  const attached = hosts
+    .flatMap((root) => attachedCards(player, root.instanceId))
+    .filter(isEnergy);
+
+  const applyDiscard = (energy) => {
+    const host = hosts.find((root) => root.instanceId === energy.attachedTo);
+    discardCard(ctx.draft, energy, ctx.events);
+    if (step.cure && host && hasAnyCondition(host)) {
+      clearConditions(host);
+      ctx.events.push({
+        type: 'specialConditionUpdated',
+        instanceId: host.instanceId,
+        condition: null,
+        conditions: [],
+      });
+    }
+    return null;
+  };
+
+  if (ctx.selection) {
+    const energy = attached.find((c) => c.instanceId === ctx.selection[0]);
+    if (!energy) return skip(ctx, 'target_not_found');
+    return applyDiscard(energy);
+  }
+  if (attached.length === 0) return skip(ctx, 'no_energy_to_discard');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Stadium')}: Choose an Energy to discard and cure the Pokémon`,
+    options: attached,
     min: 1,
     max: 1,
   });
@@ -1285,6 +1379,8 @@ export const EXTRA_STEP_HANDLERS = {
   massDiscardAttached,
   discardToolAndSpecialEnergy,
   discardEnergyFromOpponent,
+  returnOwnAttachedEnergy,
+  discardOwnAttachedEnergy,
   damageCounters,
   fossilItem,
   returnPokemonToHand,

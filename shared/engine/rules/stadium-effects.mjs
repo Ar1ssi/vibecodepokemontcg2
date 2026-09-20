@@ -11,9 +11,13 @@ import {
   parseHpBonus,
   applyHpBonus,
 } from './ability-executors.mjs';
-import { pokemonNamesMatch } from './evolution.mjs';
+import { pokemonNamesMatch, normalizeStage } from './evolution.mjs';
+import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
+import { isPokemon } from '../cards.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
-import { isRuleBoxPokemon, isTeraCard } from './card-classify.mjs';
+import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard } from './card-classify.mjs';
+import { isDeltaSpecies } from './energy-effects.mjs';
+import { matchesSearch } from './search-match.mjs';
 //
 // Layers:
 //   - `classifyStadiumEffect` — buckets a card into an effect family.
@@ -45,6 +49,376 @@ const subtypesOf = (card) =>
 
 const textOf = (card) =>
   lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
+
+/**
+ * Battle Style (Single Strike) is printed as a name prefix ("Single Strike
+ * Urshifu V", "Single Strike Energy"); the card data has no dedicated tag
+ * field, so the name/subtype is the best available signal.
+ */
+export function isSingleStrikeCard(card) {
+  if (!card) return false;
+  if (lower(card.name || '').includes('single strike')) return true;
+  return subtypesOf(card).includes('single strike');
+}
+
+/** Whether a card is an Evolution Pokémon (has a non-Basic stage). */
+export function isEvolutionCard(card) {
+  if (!card) return false;
+  const stage = lower(card.stage || '');
+  if (stage) return stage !== 'basic';
+  return subtypesOf(card).some((s) =>
+    /^(stage 1|stage 2|stage1|stage2|vmax|vstar|break|evolution)$/.test(s)
+  );
+}
+
+/**
+ * Pokémon Park: a triggered passive that heals 1 damage counter when an Energy
+ * attached from hand lands on a Benched Pokémon. It has no activatable effect,
+ * so it is recognized as a passive rather than a once-per-turn activation.
+ */
+export function isStadiumEnergyAttachHeal(card) {
+  const t = textOf(card);
+  return (
+    /attaches an energy card from (?:his or her|their|your) hand to 1 of (?:his or her|their|your) benched pok[eé]mon/.test(
+      t
+    ) && /removes? 1 damage counter/.test(t)
+  );
+}
+
+/**
+ * Glimwood Tangle: a triggered reflex (not an activation) that lets a player
+ * ignore the coins flipped for an attack and re-flip them. The attack resolver
+ * in `reduce.mjs` recognizes it and offers the choice before effects resolve.
+ */
+export function isStadiumGlimwoodReFlip(card) {
+  const t = textOf(card);
+  return (
+    /ignore all results of those coin flips and begin flipping/.test(t) ||
+    (/flips? any coins? for an attack/.test(t) &&
+      /flipping (?:those|the) coins again/.test(t))
+  );
+}
+
+/** Lost City: a Knocked Out Pokémon goes to the Lost Zone instead of discard. */
+export function isStadiumLostCity(card) {
+  const t = textOf(card);
+  return /knocked out/.test(t) && /lost zone instead of the discard/.test(t);
+}
+
+/** Dyna Tree Hill: Pokémon (both sides) can't be healed. */
+export function isStadiumBlocksHealing(card) {
+  return /can'?t be healed/.test(textOf(card));
+}
+
+/** Whether the in-play Stadium forbids healing (Dyna Tree Hill). */
+export function stadiumBlocksHealing(stadiumOverride = null) {
+  const card = stadiumOverride
+    ? stadiumOverride.card || stadiumOverride
+    : null;
+  if (card) return isStadiumBlocksHealing(card);
+  if (!rulesState.enabled) return false;
+  const stadium = getStadium()?.card;
+  return stadium ? isStadiumBlocksHealing(stadium) : false;
+}
+
+/** Sea of Nothingness: Special Conditions survive evolving/devolving. */
+export function isStadiumStatusPersistsOnEvolve(card) {
+  const t = textOf(card);
+  return (
+    /special conditions are not removed/.test(t) &&
+    /evolve|devolve/.test(t)
+  );
+}
+
+// ── Special Energy rewrites (continuous) ───────────────────────────────────
+// These rewrite how attached Energy provides/counts (taxonomy §F). They are
+// recognized and described here; the deep cost-payment rewrite is guidance-only
+// for now, matching energy-effects.mjs's "do not silently build execution".
+
+/** Temple of Sinnoh: Special Energy provides {C} and has no other effect. */
+export function isStadiumSpecialEnergyColorless(card) {
+  const t = textOf(card);
+  return (
+    /special energy/.test(t) &&
+    /provide \{c\}/.test(t) &&
+    /no other effect/.test(t)
+  );
+}
+
+/** Crystal Beach: Special Energy providing ≥2 now provides only 1 {C}. */
+export function isStadiumSpecialEnergyToOne(card) {
+  const t = textOf(card);
+  return (
+    /special energy/.test(t) &&
+    /provid(?:es?|ing) only 1 \{c\}/.test(t)
+  );
+}
+
+/** Holon Research Tower: Basic Energy on Delta Species also provides {M}. */
+export function isStadiumBasicEnergyMetal(card) {
+  const t = textOf(card);
+  return (
+    /basic energy/.test(t) && /\{m\}/.test(t) && /delta species/.test(t)
+  );
+}
+
+// ── Attack inheritance / grants (continuous) ───────────────────────────────
+
+/**
+ * Shrine of Memories ("evolved Pokémon can use attacks from its previous
+ * Evolutions") and Meteor Falls ("Active Evolved Pokémon can use attacks from
+ * its Basic or Stage 1"). Returns the scope, or null.
+ */
+export function parseStadiumAttackInheritance(card) {
+  const t = textOf(card);
+  if (!/can use any attack/.test(t)) return null;
+  if (/from its previous evolutions/.test(t))
+    return { scope: 'evolved', sources: 'previous-evolutions' };
+  if (
+    /active evolved pokémon/.test(t) &&
+    /from its basic pokémon or its stage 1/.test(t)
+  )
+    return { scope: 'active-evolved', sources: 'basic-or-stage1' };
+  return null;
+}
+
+/**
+ * Holon Lake / Rocket's Tricky Gym: a filtered Pokémon "can use attacks on this
+ * card instead of its own". Returns `{ filter }` naming the qualifying Pokémon.
+ */
+export function parseStadiumAttackGrant(card) {
+  const t = textOf(card);
+  if (!/can use attacks on this card instead of its own/.test(t)) return null;
+  let filter = 'all';
+  if (/has \{delta species\}/.test(t)) filter = 'delta-species';
+  else if (/dark or rocket's in its name/.test(t)) filter = 'dark-or-rockets';
+  return { filter };
+}
+
+/** Whether `pokemon` qualifies for a Stadium's granted-attack filter. */
+export function stadiumAttackGrantMatches(stadiumCard, pokemon) {
+  const parsed = parseStadiumAttackGrant(stadiumCard);
+  if (!parsed || !pokemon) return false;
+  if (parsed.filter === 'delta-species') return isDeltaSpecies(pokemon);
+  if (parsed.filter === 'dark-or-rockets') {
+    const name = lower(pokemon?.name || '');
+    return name.includes('dark') || name.includes("rocket's") || name.includes('rockets');
+  }
+  return true;
+}
+
+/**
+ * The attack(s) a Stadium grants to a qualifying Pokémon:
+ * - Holon Lake → Delta Call (search a {Delta Species} Pokémon into hand).
+ * - Rocket's Tricky Gym → Feint Attack (20 to any of the opponent's Pokémon,
+ *   unaffected by Weakness/Resistance/effects).
+ *
+ * Returns the same shape as a printed attack (name/cost/damage/text), tagged
+ * `granted`, or [] when the card grants nothing / the Pokémon does not qualify.
+ */
+export function stadiumGrantedAttacks(stadiumCard, pokemon) {
+  if (!stadiumAttackGrantMatches(stadiumCard, pokemon)) return [];
+  const t = textOf(stadiumCard);
+  if (/delta call/.test(t)) {
+    return [
+      {
+        name: 'Delta Call',
+        cost: ['Colorless'],
+        damage: null,
+        text: 'Search your deck for a Pokémon that has {Delta Species} on its card, show it to your opponent, and put it into your hand. Shuffle your deck afterward.',
+        granted: true,
+      },
+    ];
+  }
+  if (/feint attack/.test(t)) {
+    return [
+      {
+        name: 'Feint Attack',
+        cost: ['Colorless'],
+        damage: 20,
+        text: "Does 20 damage to 1 of your opponent's Pokémon. This attack's damage isn't affected by Weakness, Resistance, Poké-Powers, Poké-Bodies, or any other effects on that Pokémon.",
+        granted: true,
+      },
+    ];
+  }
+  return [];
+}
+
+/**
+ * Attacks `pokemon` may use from below its top stage while this Stadium is in
+ * play (Shrine of Memories / Meteor Falls). Returns [] when the Stadium does
+ * not grant inheritance, the Pokémon is unevolved, or (Meteor Falls) it is not
+ * an Active non-ex Pokémon.
+ */
+export function stadiumInheritedAttacks(
+  stadiumCard,
+  { zoneCards = [], root = null, isActive = false } = {}
+) {
+  const parsed = parseStadiumAttackInheritance(stadiumCard);
+  if (!parsed || !root) return [];
+  const sources = priorEvolutionCards(zoneCards, root);
+  if (sources.length === 0) return [];
+  if (parsed.scope === 'active-evolved') {
+    if (!isActive) return [];
+    if (isExCard(topPokemonCard(zoneCards, root))) return [];
+  }
+  const out = [];
+  for (const src of sources) {
+    for (const atk of src.attacks || []) out.push({ ...atk, inherited: true });
+  }
+  return out;
+}
+
+/**
+ * All extra attacks a Stadium makes available to `pokemon` (inherited +
+ * granted), in a stable order shared by the server, the client list builders
+ * and the inspector. De-duplicated by name (printed attacks win).
+ */
+export function stadiumExtraAttacks(
+  stadiumCard,
+  { zoneCards = [], root = null, isActive = false } = {}
+) {
+  const inherited = stadiumInheritedAttacks(stadiumCard, { zoneCards, root, isActive });
+  const granted = stadiumGrantedAttacks(stadiumCard, root);
+  return mergeAttacks(inherited, granted);
+}
+
+/**
+ * Merge printed attacks with extra ones, de-duplicated by name (first wins).
+ * Entries already carrying their own tag keep it; otherwise `inherited`/`granted`
+ * is preserved from the source object.
+ */
+export function mergeAttacks(printed = [], extra = []) {
+  const merged = Array.isArray(printed) ? [...printed] : [];
+  const seen = new Set(merged.map((a) => String(a?.name ?? '').toLowerCase()));
+  for (const atk of extra) {
+    const key = String(atk?.name ?? '').toLowerCase();
+    if (!key || seen.has(key)) continue;
+    merged.push({ ...atk });
+    seen.add(key);
+  }
+  return merged;
+}
+
+const STACK_STAGE_RANK = { Basic: 0, 'Stage 1': 1, 'Stage 2': 2, BREAK: 3 };
+const stackStageRank = (card) =>
+  STACK_STAGE_RANK[normalizeStage(card?.stage) || 'Basic'] ?? 0;
+
+/**
+ * The cards in one Pokémon's evolution stack, tolerant of the two client render
+ * paths. The authoritative view links an evolution to its Basic by `attachedTo`
+ * (so `card` is the Basic root); the legacy board links a pre-evolution to the
+ * visible top by `image.relative`/`image.attached` (so `card` is the top). A
+ * card that is itself an attached evolution is walked up to its root first.
+ * Returns the stack in zone order, or `[card]` for an unevolved Pokémon.
+ */
+function stackMembersFor(zoneCards, card) {
+  const list = (Array.isArray(zoneCards) ? zoneCards : []).filter(isPokemon);
+  if (!card) return [];
+  let root = card;
+  const seen = new Set();
+  while (root?.attachedTo != null && !seen.has(root.attachedTo)) {
+    seen.add(root.attachedTo);
+    const parent = list.find((c) => c.instanceId === root.attachedTo);
+    if (!parent) break;
+    root = parent;
+  }
+  // `instanceId != null` guards a malformed card: without it, `attachedTo ===
+  // undefined` would sweep in every unrelated unevolved Pokémon in the zone.
+  const byAttachedTo =
+    root.instanceId == null
+      ? []
+      : list.filter((c) => c.attachedTo === root.instanceId);
+  if (byAttachedTo.length > 0) return [root, ...byAttachedTo];
+  const img = root?.image || card?.image;
+  if (img) {
+    const legacy = list.filter((c) => c === root || c.image?.relative === img);
+    if (legacy.length > 1) return legacy;
+  }
+  return [card];
+}
+
+/**
+ * Stadium extras for the Pokémon `card` sitting in `zoneCards`, from whichever
+ * render path populated the zone. Normalizes the stack to the server shape so
+ * `stadiumExtraAttacks` sees the same ordering the engine does — and therefore
+ * an `attackIndex` into the merged list resolves alike on both sides.
+ */
+export function stadiumExtraAttacksFromZone(
+  stadiumCard,
+  { zoneCards = [], card = null, isActive = true } = {}
+) {
+  if (!stadiumCard || !card) return [];
+  const members = stackMembersFor(zoneCards, card);
+  if (members.length <= 1) {
+    return stadiumExtraAttacks(stadiumCard, { zoneCards, root: card, isActive });
+  }
+  const base = members.reduce(
+    (low, c) => (stackStageRank(c) < stackStageRank(low) ? c : low),
+    card
+  );
+  const normalized = zoneCards.map((c) =>
+    members.includes(c)
+      ? c === base
+        ? { ...c, attachedTo: null }
+        : { ...c, attachedTo: base.instanceId }
+      : c
+  );
+  return stadiumExtraAttacks(stadiumCard, {
+    zoneCards: normalized,
+    root: base,
+    isActive,
+  });
+}
+
+// ── Per-turn energy movement / status (continuous) ─────────────────────────
+
+/**
+ * Ultimate Zone, Saffron City Gym and Celadon City Gym give players an
+ * unlimited-use turn action ("as often as … likes during his or her turn").
+ * Recognized so they are no longer unknown; the actions themselves are played
+ * through the table UI rather than a single activation.
+ */
+export function parseStadiumEnergyMovement(card) {
+  const t = textOf(card);
+  if (
+    /move an energy card attached to 1 of (?:his or her|their) benched pokémon to (?:his or her|their) active arceus/.test(
+      t
+    )
+  )
+    return { kind: 'move-to-arceus' };
+  if (
+    /return 1 basic energy card attached to 1 of (?:his or her|their) pokémon with sabrina in its name/.test(
+      t
+    )
+  )
+    return { kind: 'return-sabrina-energy' };
+  if (
+    /discard an energy card attached to 1 of (?:his or her|their) pokémon with erika in its name/.test(
+      t
+    )
+  )
+    return { kind: 'discard-erika-cure' };
+  return null;
+}
+
+const REPEATABLE_STADIUM_KINDS = new Set([
+  'move-to-arceus',
+  'return-sabrina-energy',
+  'discard-erika-cure',
+]);
+
+/**
+ * True for the three "as often as … likes during his or her turn" Stadiums
+ * (Ultimate Zone, Saffron City Gym, Celadon City Gym). They run through the
+ * same activation pipeline as a once-per-turn Stadium but are unlimited: the
+ * engine must neither block a repeat activation nor consume
+ * `stadiumUsedThisTurn` for them.
+ */
+export function isRepeatableStadiumAction(card) {
+  const opt = parseStadiumOncePerTurn(card);
+  return Boolean(opt?.repeatable) && REPEATABLE_STADIUM_KINDS.has(opt.kind);
+}
 
 const isStadiumCard = (card) => {
   if (!card) return false;
@@ -103,7 +477,23 @@ export function hasRecognizedPassiveStadiumEffect(card) {
     isStadiumToolNegation(card) ||
     isStadiumAbilityNegation(card) ||
     parseStadiumCheckupPoisonBonus(card) > 0 ||
-    parseStadiumAttackCostIncrease(card) > 0
+    parseStadiumAttackCostIncrease(card) > 0 ||
+    isStadiumEnergyAttachHeal(card) ||
+    isStadiumGlimwoodReFlip(card) ||
+    isStadiumNoWeakness(card) ||
+    isStadiumWeaknessTimesTwo(card) ||
+    isStadiumResistanceIgnore(card) ||
+    parseStadiumTypeDamageReduction(card) > 0 ||
+    isStadiumBetweenTurnsDamage(card) ||
+    isStadiumLostCity(card) ||
+    isStadiumBlocksHealing(card) ||
+    isStadiumStatusPersistsOnEvolve(card) ||
+    isStadiumSpecialEnergyColorless(card) ||
+    isStadiumSpecialEnergyToOne(card) ||
+    isStadiumBasicEnergyMetal(card) ||
+    parseStadiumAttackInheritance(card) !== null ||
+    parseStadiumAttackGrant(card) !== null ||
+    parseStadiumEnergyMovement(card) !== null
   );
 }
 
@@ -134,7 +524,15 @@ export function classifyStadiumEffect(card) {
   if (stadiumHasWhenPlayedEffect(card)) {
     return 'setup-once';
   }
-  if (ONCE_PER_TURN_RE.test(t)) {
+  // Pokémon Park triggers on Energy attachment and Glimwood Tangle on attack
+  // coin flips — neither has a "use" action, so they must not be bucketed as a
+  // once-per-turn activation.
+  if (isStadiumEnergyAttachHeal(card) || isStadiumGlimwoodReFlip(card)) {
+    return 'continuous-both';
+  }
+  // Ultimate Zone / Saffron City Gym / Celadon City Gym are "as often as you
+  // like" actions with no "once per turn" phrase — modeled as once-per-turn.
+  if (ONCE_PER_TURN_RE.test(t) || parseStadiumEnergyMovement(card)) {
     return 'once-per-turn';
   }
   if (BOTH_PLAYERS_RE.test(t)) {
@@ -221,26 +619,361 @@ export function parseStadiumHealTypes(clause) {
 }
 
 /**
+ * Build the `searchWhat` string a once-per-turn search should use, preserving
+ * the printed qualifiers (type symbols, Evolution, Rule Box, Tool, Ultra Beast)
+ * that `matchesSearch` already understands. Without this the deck search was
+ * offered with no filter at all and the player could take any card.
+ */
+function stadiumSearchWhat(t) {
+  if (/ultra beast/.test(t)) return 'Ultra Beast';
+  if (/restored pok[eé]mon/.test(t)) return 'Restored Pokémon';
+  const evo = t.match(/evolution\s*\{([a-z])\}\s*pok[eé]mon/);
+  if (evo) return `Evolution {${evo[1].toUpperCase()}} Pokémon`;
+  const wordEvo = t.match(/evolution\s+([a-z]+)\s+pok[eé]mon/);
+  if (wordEvo) return `Evolution ${wordEvo[1][0].toUpperCase()}${wordEvo[1].slice(1)} Pokémon`;
+  const typedBasics = [...t.matchAll(/basic\s*\{([a-z])\}\s*pok[eé]mon/g)].map(
+    (m) => `Basic {${m[1].toUpperCase()}} Pokémon`
+  );
+  if (typedBasics.length) return typedBasics.join(' or ');
+  // "search … for a Basic Pokémon" (Artazon, Pokémon Contest Hall) is the
+  // primary target even when a Tool search is also printed.
+  if (/search[^.]*for (?:a|an|up to \d+) basic pok[eé]mon/.test(t)) {
+    return 'Basic Pokémon';
+  }
+  if (/pok[eé]mon tool/.test(t)) return 'Item + Pokémon Tool';
+  if (/basic\b/.test(t) && /pok[eé]mon/.test(t)) return 'Basic Pokémon';
+  if (/pok[eé]mon/.test(t)) return 'Pokémon';
+  if (/basic\b/.test(t) && /energy/.test(t)) return 'Basic Energy';
+  if (/energy/.test(t)) return 'Energy';
+  return 'card';
+}
+
+/** Append the Rule Box qualifier so `matchesSearch` excludes Rule Box mons. */
+function withRuleBoxQualifier(what, t) {
+  if (
+    /doesn't have a rule box|does not have a rule box|don't have a rule box|do not have a rule box|without a rule box|no rule box/.test(
+      t
+    )
+  ) {
+    return `${what} that doesn't have a Rule Box`;
+  }
+  return what;
+}
+
+/**
  * Once-per-turn stadium effect descriptor.
- * Returns { kind, n, cost?, condition?, typeFilter?, types?, searchFilter?, destination? } or null.
+ * Returns {
+ *   kind, n, cost?, condition?, typeFilter?, types?, targetType?,
+ *   searchFilter?, destination?, turnEnds?, basicOnly?
+ * } or null.
  */
 export function parseStadiumOncePerTurn(card) {
   const t = textOf(card);
-  if (!ONCE_PER_TURN_RE.test(t)) return null;
+  // Ultimate Zone / Saffron City Gym / Celadon City Gym read "as often as …
+  // likes during his or her turn" — no "once per turn" phrase. They are modeled
+  // as a once-per-turn activation (a deliberate sim simplification; the paper
+  // card allows unlimited uses).
+  const movement = parseStadiumEnergyMovement(card);
+  if (!ONCE_PER_TURN_RE.test(t) && !movement) return null;
 
   const base = { n: 1 };
+  if (movement) {
+    return { ...base, kind: movement.kind, repeatable: true };
+  }
   if (/played a supporter card from their hand this turn/.test(t)) {
     base.condition = { type: 'supporter-played' };
   }
   if (/supporter card that has "team rocket" in its name/.test(t)) {
     base.condition = { type: 'named-supporter', contains: 'team rocket' };
   }
-  if (/discard an energy card from their hand/.test(t)) {
-    base.cost = { type: 'discard-energy', n: 1 };
+  // "...their turn ends" (Lumiose City) — the activation is paid for by ending
+  // the turn, so the execution layer must advance the turn once it resolves.
+  if (/turn ends/.test(t)) {
+    base.turnEnds = true;
+  }
+  // "flip a coin. If heads, …" — the effect resolves only on heads. The coin is
+  // modeled as a step, so the parser still returns the effect body.
+  if (/flip a coin|flips? (?:any |those )?coins?/.test(t)) {
+    base.coin = true;
+  }
+  // Statically-checkable conditions ("if that player's Active Pokémon is
+  // Asleep", "if that player has 6 Pokémon in play", "no Special Energy cards
+  // in their discard pile"). The server guards these before executing.
+  if (/active pok[eé]mon is asleep/.test(t)) {
+    base.condition = { type: 'active-asleep' };
+  }
+  if (/has 6 pok[eé]mon in play/.test(t)) {
+    base.condition = { type: 'six-pokemon-in-play' };
+  }
+  if (/no special energy cards? in (?:his or her|their|your) discard pile/.test(t)) {
+    base.condition = { type: 'no-special-energy-in-discard' };
+  }
+  if (/bench isn't full|bench is not full/.test(t)) {
+    base.condition = { type: 'bench-not-full' };
+  }
+  if (/has not played a supporter card/.test(t)) {
+    base.condition = { type: 'no-supporter-played' };
+  }
+  if (/has an evolution card in (?:his or her|their|your) hand/.test(t)) {
+    base.condition = { type: 'has-evolution-in-hand' };
+  }
+  const lostZoneWin = t.match(
+    /opponent has (\d+) or more pok[eé]mon in the lost zone/
+  );
+  if (lostZoneWin) {
+    base.condition = {
+      type: 'opponent-lost-zone',
+      n: parseInt(lostZoneWin[1], 10) || 6,
+    };
+  }
+  // "discard a [Basic] Energy card from your hand" (Cycling Road, Heat Factory,
+  // Moonlit Hill). Typed clauses are refined below.
+  const discardEnergy = t.match(
+    /discard (?:an? )?(basic )?energy card from (?:their|his or her|your) hand/
+  );
+  if (discardEnergy) {
+    base.cost = {
+      type: 'discard-energy',
+      n: 1,
+      ...(discardEnergy[1] ? { basicOnly: true } : {}),
+    };
   }
   const discardHand = t.match(/discard (\d+) cards? from their hand/);
   if (discardHand) {
     base.cost = { type: 'discard-hand', n: parseInt(discardHand[1], 10) || 2 };
+  }
+  // Typed Energy discard, e.g. Scorched Earth: "discard a Fire or Fighting
+  // Energy card from his or her hand". The clause between "discard" and
+  // "from … hand" must name Energy; extract every type word/symbol in it.
+  const typedEnergyClause = t.match(
+    /discard ([a-z0-9 {}\s,]+?) from (?:their|his or her|your) hand/
+  );
+  if (typedEnergyClause && /energy card/.test(typedEnergyClause[1])) {
+    const clause = typedEnergyClause[1];
+    const types = HEAL_TYPE_WORDS.filter((w) =>
+      new RegExp(`\\b${w}\\b`).test(clause)
+    );
+    for (const m of clause.matchAll(/\{([a-z])\}/g)) {
+      const type = HEAL_TYPE_SYMBOLS[m[1]];
+      if (type && !types.includes(type)) types.push(type);
+    }
+    if (types.length) {
+      base.cost = { type: 'discard-energy', n: 1, types };
+    }
+  }
+
+  // "discard a card from their hand" (Giant Hearth, Viridian Forest) — an
+  // untyped, one-card discard paid before a deck search.
+  if (
+    !base.cost &&
+    /discard (?:a|an) card from (?:their|his or her|your) hand/.test(t)
+  ) {
+    base.cost = { type: 'discard-hand', n: 1 };
+  }
+
+  // Tower of Darkness: "must discard a Single Strike card from their hand". The
+  // battle-style tag is printed as a name prefix (the card data carries no
+  // dedicated field), so the executor matches on the name/subtype.
+  if (
+    !base.cost &&
+    /discard a single strike card from (?:their|his or her|your) hand/.test(t)
+  ) {
+    base.cost = { type: 'discard-single-strike', n: 1 };
+  }
+
+  // A printed discard cost we did not capture ("discard a Single Strike card")
+  // would otherwise run the whole effect for free. Top-of-deck mills are not a
+  // cost — PokéStop handles them below.
+  if (
+    /(?:^|[^a-z])discard (?:a|an|up to|\d|the top)/.test(t) &&
+    !base.cost &&
+    !/from the top of (?:their|your|his or her) deck/.test(t)
+  ) {
+    return null;
+  }
+
+  // Gates the executor does not model. Running the body unconditionally would
+  // be a silent cheat (a free draw/search that ignores the coin flip or board
+  // condition), so these are announce-only until the gate is implemented.
+  const UNMODELED_GATE =
+    /when that player attaches an energy card/.test(t) ||
+    (/attach a .*energy card from (?:their|your|his or her) discard pile/.test(t) &&
+      !/to 1 of (?:their|your|his or her) benched/.test(t)) ||
+    (/from 1 of (?:his or her|their) benched pok[eé]mon/.test(t) &&
+      !/heal \d+ damage/.test(t));
+  if (UNMODELED_GATE) return null;
+
+  // PokéStop: mill the top N cards; the Item cards among them go to hand.
+  const millItems = t.match(
+    /discard (\d+) cards? from the top of (?:their|your|his or her) deck/
+  );
+  if (millItems && /item/.test(t)) {
+    return { ...base, kind: 'mill-items', n: parseInt(millItems[1], 10) || 3 };
+  }
+
+  // Speed Stadium: "flip a coin until he or she gets tails. For each heads, …
+  // draws a card" — an unbounded number of flips, so a dedicated step.
+  if (/flip a coin until .* gets tails/.test(t)) {
+    return { ...base, kind: 'coin-draw', n: 1 };
+  }
+  // Healing Field: "removes 2 damage counters from his or her Active Pokémon".
+  const healCounters = t.match(
+    /removes? (\d+) damage counters? from (?:his or her|their|your) active/
+  );
+  if (healCounters) {
+    return {
+      ...base,
+      kind: 'heal',
+      n: parseInt(healCounters[1], 10) * 10,
+      target: 'active',
+    };
+  }
+  // All-Night Party: cure the Active's Special Condition and heal it.
+  if (base.condition?.type === 'active-asleep' && /heal (\d+) damage/.test(t)) {
+    const m = t.match(/heal (\d+) damage/);
+    return {
+      ...base,
+      kind: 'heal',
+      n: parseInt(m[1], 10),
+      target: 'active',
+      cure: true,
+    };
+  }
+  // Conductive Quarry / Power Tree: search the discard pile for (typed) Energy.
+  if (/search(?:es)? (?:his or her|their|your) discard pile for/.test(t)) {
+    const clause = t.match(/discard pile for ([^.]+)/)?.[1] || '';
+    const types = [];
+    for (const m of clause.matchAll(/\{([a-z])\}/g)) {
+      const type = HEAL_TYPE_SYMBOLS[m[1]];
+      if (type && !types.includes(type)) types.push(type);
+    }
+    return {
+      ...base,
+      kind: 'recover-energy',
+      n: 1,
+      ...(types.length ? { types } : {}),
+      ...(/basic/.test(clause) ? { basicOnly: true } : {}),
+    };
+  }
+  // Shopping Center: return an attached Pokémon Tool to hand.
+  if (
+    /put a pok[eé]mon tool attached to 1 of (?:their|your) pok[eé]mon into (?:their|your) hand/.test(
+      t
+    )
+  ) {
+    return { ...base, kind: 'return-tool', n: 1 };
+  }
+  // Stark Mountain: move a {R}/{F} Energy between your own Pokémon.
+  if (
+    /choose a \{r\} or \{f\} energy attached to 1 of (?:his or her|their|your) pok[eé]mon and move/.test(
+      t
+    )
+  ) {
+    return { ...base, kind: 'move-energy', n: 1 };
+  }
+  // Undersea Ruins: coin flip, then devolve an Evolved Pokémon.
+  if (/discards the top evolution card from that pok[eé]mon, devolving/.test(t)) {
+    return { ...base, kind: 'devolve', n: 1 };
+  }
+  // Lavender Town: opponent reveals their hand.
+  if (/opponent reveal (?:their|his or her) hand/.test(t)) {
+    return { ...base, kind: 'reveal-hand', n: 1 };
+  }
+  // Lost World: win outright when the opponent's Lost Zone is deep enough.
+  if (/choose to win the game/.test(t)) {
+    return { ...base, kind: 'win-game', n: 1 };
+  }
+  // Ancient Ruins: reveal your hand, then draw 1 only if it holds no Supporter.
+  if (
+    /has not played a supporter card/.test(t) &&
+    /reveal (?:his or her|their|your) hand/.test(t)
+  ) {
+    return { ...base, kind: 'ancient-ruins', n: 1 };
+  }
+  // Mystery Zone: trade a hand Evolution card for a Basic Energy from the deck.
+  if (
+    /has an evolution card in (?:his or her|their|your) hand/.test(t) &&
+    /search(?:es)? (?:his or her|their|your) deck for a basic energy card/.test(t)
+  ) {
+    return { ...base, kind: 'mystery-zone', n: 1 };
+  }
+  // Fuchsia City Gym: shuffle a named Pokémon in play (and its attachments)
+  // into the deck.
+  const shuffleOwn = t.match(
+    /shuffle 1 of (?:his or her|their|your) pok[eé]mon in play with ([a-z.' ]+?) in its name/
+  );
+  if (shuffleOwn) {
+    return {
+      ...base,
+      kind: 'shuffle-own-pokemon',
+      n: 1,
+      searchFilter: shuffleOwn[1].trim(),
+    };
+  }
+  // Magma Basin: attach a {R} Energy from the discard to a Benched {R} Pokémon,
+  // then put 2 damage counters on it.
+  if (
+    /attach a \{r\} energy card from (?:their|your|his or her) discard pile to 1 of (?:their|your|his or her) benched/.test(
+      t
+    )
+  ) {
+    return {
+      ...base,
+      kind: 'attach-discard-damage',
+      n: 1,
+      energyType: 'fire',
+      damage: 2,
+    };
+  }
+  // Radio Tower: look at the top N cards and put them back in the same order.
+  if (
+    /look at the top \d+ cards? of (?:his or her|their|your) deck and put (?:them|it) back in the same order/.test(
+      t
+    )
+  ) {
+    const m = t.match(/top (\d+) cards?/);
+    return { ...base, kind: 'peek-return', n: parseInt(m[1], 10) || 2 };
+  }
+  // Primordial Altar: look at the top card and optionally discard it.
+  if (
+    /look at the top card of (?:his or her|their|your) deck.*(?:may|can) discard (?:that|it)/.test(
+      t
+    )
+  ) {
+    return { ...base, kind: 'peek-discard', n: 1 };
+  }
+  // Twist Mountain: put a Restored Pokémon from hand onto the Bench.
+  if (
+    /puts? a restored pok[eé]mon from (?:his or her|their|your) hand onto (?:his or her|their|your) bench/.test(
+      t
+    )
+  ) {
+    return { ...base, kind: 'bench-restored', n: 1 };
+  }
+  // Strange Cave / Underground Lake: put a named fossil Pokémon onto the Bench.
+  if (
+    /put an? (?:omanyte|kabuto|aerodactyl|lileep|anorith).*bench/.test(t) ||
+    /put an? (?:omanyte|kabuto)[^.]*bench/.test(t)
+  ) {
+    const fromDiscard = /from (?:his or her|their|your) discard pile/.test(t);
+    return {
+      ...base,
+      kind: 'fossil-bench',
+      n: 1,
+      source: fromDiscard ? 'discard' : 'hand',
+    };
+  }
+  const drawUntilCount = t.match(
+    /draws? cards? until (?:they|you|he or she|that player) (?:has|have) (\d+) cards? in (?:their|your|his or her) hand/
+  );
+  if (drawUntilCount) {
+    return { ...base, kind: 'draw-until-count', n: parseInt(drawUntilCount[1], 10) || 5 };
+  }
+  const shuffleDraw = t.match(
+    /shuffle (?:their|your|his or her) hand into (?:their|your|his or her) deck and draw (\d+) cards?/
+  );
+  if (shuffleDraw) {
+    return { ...base, kind: 'shuffle-draw', n: parseInt(shuffleDraw[1], 10) || 5 };
   }
 
   if (/put a card from their hand on top of their deck/.test(t)) {
@@ -264,6 +997,18 @@ export function parseStadiumOncePerTurn(card) {
       typeFilter: 'lightning',
     };
   }
+  // Pokémon Center: "heal 20 damage from 1 of his or her Benched Pokémon".
+  const healBench = t.match(
+    /heal (\d+) damage from 1 of (?:his or her|their|your) benched pok[eé]mon/
+  );
+  if (healBench) {
+    return {
+      ...base,
+      kind: 'heal',
+      n: parseInt(healBench[1], 10),
+      target: 'bench',
+    };
+  }
   const healEach = t.match(/heal (\d+) damage from each(?: of their)? ([^.]+)/);
   if (healEach) {
     const types = parseStadiumHealTypes(healEach[2]);
@@ -283,7 +1028,12 @@ export function parseStadiumOncePerTurn(card) {
     };
   }
   if (/search.*basic.*pok[ée]mon.*bench/.test(t)) {
-    return { ...base, kind: 'search-bench', n: 1, searchWhat: 'basic pokemon' };
+    return {
+      ...base,
+      kind: 'search-bench',
+      n: 1,
+      searchWhat: withRuleBoxQualifier(stadiumSearchWhat(t), t),
+    };
   }
   const fusion = t.match(/search.*up to (\d+) item cards that have "([^"]+)"/);
   if (fusion) {
@@ -293,6 +1043,8 @@ export function parseStadiumOncePerTurn(card) {
       n: parseInt(fusion[1], 10) || 2,
       searchFilter: fusion[2],
       searchWhat: 'item',
+      // Fossil Quarry puts the "Antique" Items directly onto the Bench.
+      destination: /onto their bench/.test(t) ? 'bench' : 'hand',
     };
   }
   if (/search.*marnie's pokémon/.test(t)) {
@@ -308,8 +1060,42 @@ export function parseStadiumOncePerTurn(card) {
     const m = t.match(/up to (\d+)/);
     return { ...base, kind: 'energy', n: m ? parseInt(m[1], 10) : 1 };
   }
+  // Discard-pile Energy recovery: Levincia ("up to 2 Basic {L} Energy"),
+  // Mt. Coronet ("2 {M} Energy"), Training Court ("a basic Energy card"), etc.
+  // Not a deck search — must precede the generic search fallback.
+  const recoverEnergy = t.match(
+    /puts? (?:up to )?(?:an? )?(\d+ )?(basic )?(\{([a-z])\}\s*)?energy cards? from (?:their|your|his or her) discard pile into (?:their|your|his or her) hand/
+  );
+  if (recoverEnergy) {
+    const type = recoverEnergy[4] ? HEAL_TYPE_SYMBOLS[recoverEnergy[4]] : null;
+    return {
+      ...base,
+      kind: 'recover-energy',
+      n: recoverEnergy[1] ? parseInt(recoverEnergy[1], 10) || 1 : 1,
+      ...(type ? { typeFilter: type } : {}),
+      ...(recoverEnergy[2] ? { basicOnly: true } : {}),
+    };
+  }
+  // Mystery Garden: "discard an Energy card … in order to draw cards until they
+  // have as many cards in their hand as they have {P} Pokémon in play." The
+  // draw has no printed count — the target is a live board count, so a fixed
+  // `n` would silently draw 1.
+  const untilHandSize = t.match(
+    /draws? cards? until (?:they|you) have as many cards in (?:their|your) hand as (?:they|you) have \{([a-z])\} pok[eé]mon in play/
+  );
+  if (untilHandSize) {
+    const type = HEAL_TYPE_SYMBOLS[untilHandSize[1]];
+    return {
+      ...base,
+      kind: 'draw-until-type',
+      n: null,
+      ...(type ? { targetType: type } : {}),
+      cost: base.cost || { type: 'discard-energy', n: 1 },
+    };
+  }
   if (/discard/.test(t) && /draw/.test(t)) {
-    const dm = t.match(/draw (?:up to )?(\d+|a card)/);
+    // Third-person "draws N" (Scorched Earth) as well as "draw N".
+    const dm = t.match(/draws? (?:up to )?(\d+|a card)/);
     const n = !dm || dm[1] === 'a card' ? 1 : parseInt(dm[1], 10) || 1;
     return {
       ...base,
@@ -318,18 +1104,51 @@ export function parseStadiumOncePerTurn(card) {
       cost: base.cost || { type: 'discard-hand', n: 2 },
     };
   }
-  if (/draw/.test(t)) {
-    const m = t.match(/draw (?:up to )?(\d+)/);
-    return { ...base, kind: 'draw', n: m ? parseInt(m[1], 10) : 1 };
+  if (/draws?\b/.test(t)) {
+    // Third-person "draws N" / "draws a card" as well as "draw N" (Scorched
+    // Earth class — no discard cost). Missing "draws" here silently drew 1.
+    const m = t.match(/draws? (?:up to )?(\d+|a card)/);
+    const n = !m || m[1] === 'a card' ? 1 : parseInt(m[1], 10) || 1;
+    return { ...base, kind: 'draw', n };
+  }
+  // Giant Hearth / Viridian Forest: discard a card from hand, then search the
+  // deck for typed/deck Energy. Both the cost and the search count/filter are
+  // printed, so this composes a discardCost + searchDeck rather than falling
+  // through to a free search.
+  if (
+    /discard (?:a|an) card from (?:their|his or her|your) hand/.test(t) &&
+    /search(?:es)? (?:their|your|his or her) deck/.test(t)
+  ) {
+    const es = t.match(
+      /search(?:es)? (?:their|your|his or her) deck for (?:up to )?(\d+|an?|a) (basic )?(\{([a-z])\}\s*)?energy cards?/
+    );
+    if (es) {
+      const n = /^\d+$/.test(es[1]) ? parseInt(es[1], 10) : 1;
+      const symbol = es[4] ? es[4].toUpperCase() : null;
+      const searchWhat = symbol
+        ? `{${symbol}} Energy`
+        : es[2]
+          ? 'Basic Energy'
+          : 'Energy';
+      return {
+        ...base,
+        kind: 'discard-search',
+        n,
+        searchWhat,
+        cost: base.cost || { type: 'discard-hand', n: 1 },
+      };
+    }
   }
   if (/search|look through|find/.test(t)) {
-    return { ...base, kind: 'search', n: 1 };
+    return { ...base, kind: 'search', n: 1, searchWhat: stadiumSearchWhat(t) };
   }
   if (/heal/.test(t)) {
     const m = t.match(/heal\s*(\d+)?/);
     return { ...base, kind: 'heal', n: m?.[1] ? parseInt(m[1], 10) : 10 };
   }
-  return { ...base, kind: 'search', n: 1 };
+  // No modeled effect: stay announce-only rather than defaulting to a deck
+  // search, which silently let the player take any card.
+  return null;
 }
 
 /** Whether a once-per-turn stadium condition is met for this player. */
@@ -343,6 +1162,11 @@ export function stadiumOnceConditionMet(condition, playerFlags = {}) {
       !!name && name.includes(String(condition.contains || '').toLowerCase())
     );
   }
+  if (condition.type === 'no-supporter-played') {
+    return !playerFlags.supporterPlayed;
+  }
+  // The remaining conditions depend on hand/board state the flags object does
+  // not carry; the server executor re-checks them against live state.
   return true;
 }
 
@@ -360,22 +1184,10 @@ export function matchesStadiumSearch(card, { searchWhat, searchFilter } = {}) {
   const name = lower(card.name || '');
   if (searchFilter && !name.includes(String(searchFilter).toLowerCase()))
     return false;
-  const type = lower(card.type || '');
-  const sub = (card.subtypes || []).map(lower);
-  if (searchWhat === 'basic pokemon') {
-    return (
-      type.includes('pok') &&
-      (sub.includes('basic') || lower(card.stage) === 'basic' || !card.stage)
-    );
-  }
-  if (searchWhat === 'item') {
-    return (
-      type.includes('trainer') &&
-      (sub.includes('item') || lower(card.trainerType) === 'item')
-    );
-  }
-  if (searchWhat === 'pokemon') return type.includes('pok');
-  return true;
+  // Delegate to the shared matcher so the richer qualifiers the parser now
+  // preserves (type symbols, Evolution, Rule Box, Tool) filter correctly on
+  // the legacy client path too.
+  return matchesSearch(card, searchWhat || 'basic pokemon');
 }
 
 // Tera detection now lives in card-classify.mjs; re-exported for this
@@ -386,9 +1198,15 @@ export { isTeraCard };
 export function getEffectiveBenchLimit(hasTeraInPlay) {
   if (!rulesState.enabled) return 5;
   const stadium = getStadium()?.card;
-  const raised = parseStadiumBenchLimit(stadium);
-  if (!raised) return 5;
-  return hasTeraInPlay ? raised : 5;
+  const limit = parseStadiumBenchLimit(stadium);
+  if (!limit) return 5;
+  // Area Zero's raised limit is gated on a Tera Pokémon being in play; Sky
+  // Field's is unconditional. Limits below 5 (Collapsed Stadium, Giant Stump,
+  // Narrow Gym) always tighten.
+  if (limit > 5 && /tera pok[eé]mon/.test(textOf(stadium))) {
+    return hasTeraInPlay ? limit : 5;
+  }
+  return limit;
 }
 
 export function playerHasTeraInPlay(pokemonInPlay = []) {
@@ -463,8 +1281,8 @@ export function stadiumFilterMatches(card, stadiumCard) {
     const types = (card?.types || []).map(lower);
     if (types.length && !types.includes('colorless')) return false;
   }
-  const typeMatch = t.match(/\{([wlfmpdgyn])\}/i);
-  if (typeMatch) {
+  const typeMatches = [...t.matchAll(/\{([wlfmpdgyn])\}/gi)];
+  if (typeMatches.length) {
     const typeMap = {
       w: 'water',
       l: 'lightning',
@@ -476,9 +1294,15 @@ export function stadiumFilterMatches(card, stadiumCard) {
       y: 'fairy',
       n: 'dragon',
     };
-    const want = typeMap[typeMatch[1].toLowerCase()];
+    const wanted = typeMatches
+      .map((m) => typeMap[m[1].toLowerCase()])
+      .filter(Boolean);
     const types = (card?.types || []).map(lower);
-    if (want && types.length && !types.includes(want)) return false;
+    // A multi-type card (Moonlight Stadium's {P}/{D}) matches if the Pokémon
+    // has any of the listed types.
+    if (wanted.length && types.length && !wanted.some((w) => types.includes(w))) {
+      return false;
+    }
   }
   if (/stage 2 pokémon/.test(t)) {
     const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
@@ -488,6 +1312,10 @@ export function stadiumFilterMatches(card, stadiumCard) {
     const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
     if (stage && stage !== 'basic') return false;
   }
+  if (/evolved pokémon/.test(t)) {
+    const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
+    if (stage && stage === 'basic') return false;
+  }
   if (/each psyduck/.test(t) && !name.includes('psyduck')) return false;
   if (
     /tera pokémon/.test(t) &&
@@ -495,6 +1323,115 @@ export function stadiumFilterMatches(card, stadiumCard) {
   )
     return false;
   return true;
+}
+
+// ── Weakness / Resistance modifiers (continuous) ───────────────────────────
+
+/** The energy type a card provides/represents, lowercased ('' if unknown). */
+function energyTypeOf(card) {
+  if (!card) return '';
+  return lower(card.energyType || (Array.isArray(card.types) ? card.types[0] : ''));
+}
+
+/** True when `pokemon` has an attached Energy card whose type/name matches. */
+function hasAttachedEnergy(pokemon, zoneCards, { type = null, namePart = null } = {}) {
+  if (!pokemon) return false;
+  const wanted = type ? lower(type) : null;
+  for (const c of Array.isArray(zoneCards) ? zoneCards : []) {
+    if (c?.attachedTo !== pokemon.instanceId) continue;
+    const supertype = lower(c?.supertype || c?.type || '');
+    if (!supertype.includes('energy') && !/\benergy\b/i.test(String(c?.name || '')))
+      continue;
+    if (namePart && String(c?.name || '').toLowerCase().includes(namePart)) return true;
+    if (wanted) {
+      const et = energyTypeOf(c);
+      const nm = lower(c?.name || '');
+      const shortWanted = wanted === 'darkness' ? 'dark' : wanted;
+      if (
+        et === wanted ||
+        et === shortWanted ||
+        (shortWanted === 'dark' && (et.includes('dark') || nm.includes('darkness')))
+      )
+        return true;
+    }
+  }
+  return false;
+}
+
+/** A Stadium that removes Weakness from some Pokémon ("… has no Weakness"). */
+export function isStadiumNoWeakness(card) {
+  const t = textOf(card);
+  if (!t) return false;
+  return /no weakness/.test(t) && !/weakness is now/.test(t);
+}
+
+/**
+ * Whether the in-play stadium nullifies `defender`'s printed Weakness. Applies
+ * to Pokémon matching the card's type filter; the energy-conditioned variants
+ * (Shadow Circle / Plasma Frigate) and Glacia's ex exclusion are honored.
+ */
+export function stadiumNullifiesWeakness(
+  stadiumCard,
+  defender,
+  { defenderZoneCards = [] } = {}
+) {
+  if (!isStadiumNoWeakness(stadiumCard)) return false;
+  const t = textOf(stadiumCard);
+  if ((/excluding pokémon-ex|excluding pokemon-ex/.test(t) || /\bnon-ex\b/.test(t)) && isExCard(defender)) {
+    return false;
+  }
+  if (/has any \{d\} energy attached/.test(t)) {
+    return hasAttachedEnergy(defender, defenderZoneCards, { type: 'darkness' });
+  }
+  if (/has any plasma energy attached/.test(t)) {
+    return hasAttachedEnergy(defender, defenderZoneCards, { namePart: 'plasma' });
+  }
+  return stadiumFilterMatches(defender, stadiumCard);
+}
+
+/** Lake Boundary: "Apply Weakness … as ×2 instead." */
+export function isStadiumWeaknessTimesTwo(card) {
+  const t = textOf(card);
+  return /apply weakness/.test(t) && /(?:×|x)?\s*2/.test(t);
+}
+
+/** A Stadium whose attacks ignore Resistance ("not affected by Resistance"). */
+export function isStadiumResistanceIgnore(card) {
+  const t = textOf(card);
+  if (!t) return false;
+  return (
+    /resistance/.test(t) &&
+    /(?:isn'?t|is not|not)\s+affected by/.test(t) &&
+    /attacks?/.test(t)
+  );
+}
+
+/** Whether a Stadium makes `attacker`'s attack damage ignore Resistance. */
+export function stadiumIgnoresResistance(stadiumCard, attacker) {
+  if (!isStadiumResistanceIgnore(stadiumCard)) return false;
+  return stadiumFilterMatches(attacker, stadiumCard);
+}
+
+/** Drake's Stadium: flat −N to damage done to matching Active Pokémon. */
+export function parseStadiumTypeDamageReduction(card) {
+  const t = textOf(card);
+  if (!t || !/reduced by/.test(t) || !/damage/.test(t)) return 0;
+  const m = t.match(/reduced by\s+(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/** Flat damage reduction the Stadium applies to `defender` (0 when N/A). */
+export function getStadiumTypeDamageReduction(
+  stadiumCard,
+  defender,
+  { defenderIsActive = true } = {}
+) {
+  const amount = parseStadiumTypeDamageReduction(stadiumCard);
+  if (amount <= 0) return 0;
+  const t = textOf(stadiumCard);
+  if (/active pokémon/.test(t) && !defenderIsActive) return 0;
+  if (!stadiumFilterMatches(defender, stadiumCard)) return 0;
+  return amount;
 }
 
 /**
@@ -665,7 +1602,14 @@ export function parseStadiumEvolutionSpeed(card) {
     /since the start of the (?:game|battle|previous turn)/.test(t) ||
     /even if (?:it|they) (?:had been|were) (?:just )?played/.test(t) ||
     /during the turn (?:they|you) play those pokémon/.test(t) ||
-    /can evolve .* during the turn they play/.test(t)
+    /can evolve .* during the turn they play/.test(t) ||
+    // Forest of Giant Plants: "can evolve during … first turn or the turn …
+    // plays those Pokémon".
+    /can evolve during (?:his or her|their|your) first turn/.test(t) ||
+    /the turn (?:he or she|they|you) plays? those pokémon/.test(t) ||
+    // Broken Time-Space: "may evolve a Pokémon that … just played or evolved
+    // during that turn".
+    /evolve a pokémon that (?:he or she|they|you) just played/.test(t)
   ) {
     out.relaxTurnGate = true;
   }
@@ -704,8 +1648,13 @@ export function getStadiumEvolutionSpeed(targetPlayer, pokemon = null) {
 export function parseStadiumRetreatModifier(card) {
   const t = textOf(card);
   if (!t || !/retreat cost|retreat/.test(t)) return 0;
-  if (/no retreat cost|retreat cost of 0|retreat for free/.test(t))
+  if (/no retreat cost|retreat cost of 0|retreat for free|retreat cost .* is 0/.test(t))
     return -Infinity;
+  // "pays {C} more to retreat" (Broken Ground Gym, The Rocket's Training Gym,
+  // Team Aqua Hideout) raises the cost.
+  if (/\{c\}\s+more to retreat|pays? \{c\} more to retreat|more to retreat/.test(t)) {
+    return 1;
+  }
   if (/(less|reduc|lower)/.test(t)) {
     const m = t.match(/(?:by|less)\s*(\d+)|(\d+)\s+less/);
     return -(m ? parseInt(m[1] || m[2], 10) || 1 : 1);
@@ -767,11 +1716,11 @@ export function getStadiumAttackDamageBonus(attacker, targetPlayer) {
 /** Festival Grounds-style: Energy-attached Pokémon can't gain Special Conditions. */
 export function isStadiumStatusImmunity(card) {
   const t = textOf(card);
-  return (
-    /special condition/.test(t) &&
-    /can'?t be affected|can't be affected|recover/.test(t) &&
-    /energy attached/.test(t)
-  );
+  if (!t) return false;
+  // Festival Grounds-style energy gate, blanket immunity (Steel Shelter), or a
+  // named-condition immunity (Sidney's Stadium).
+  if (/can'?t be affected by (?:any )?special condition/.test(t)) return true;
+  return /can'?t be (?:asleep|confused|paralyzed|poisoned|burned)/.test(t);
 }
 
 /** Dizzying Valley: Confused Pokémon don't recover on evolve/devolve. */
@@ -787,8 +1736,15 @@ export function isStadiumConfusedPersist(card) {
 /** Area Zero Underdepths-style bench limit (null = default 5). */
 export function parseStadiumBenchLimit(card) {
   const t = textOf(card);
-  const m = t.match(/up to (\d+) pokémon on (?:their|your) bench/);
-  return m ? parseInt(m[1], 10) : null;
+  let m = t.match(/up to (\d+) pokémon on (?:their|your) bench/);
+  if (m) return parseInt(m[1], 10);
+  m = t.match(/can'?t have more than (\d+) benched pokémon/);
+  if (m) return parseInt(m[1], 10);
+  m = t.match(/more than (\d+) pokémon on (?:his or her|their|your) bench/);
+  if (m) return parseInt(m[1], 10);
+  m = t.match(/can have (\d+) pokémon on (?:his or her|their|your) bench/);
+  if (m) return parseInt(m[1], 10);
+  return null;
 }
 
 /** Bench play damage applies to this Pokémon (Risky Ruins filters). */
@@ -810,11 +1766,17 @@ export function stadiumBlocksStatusApplication(pokemon, zoneCards = []) {
   if (!rulesState.enabled) return false;
   const stadium = getStadium()?.card;
   if (!stadium || !isStadiumStatusImmunity(stadium)) return false;
-  if (!pokemon?.image) return false;
-  const attached = (zoneCards || []).filter(
-    (c) => c.type === 'Energy' && c.image?.relative === pokemon.image
-  );
-  return attached.length > 0;
+  const t = textOf(stadium);
+  // Festival Grounds: only Energy-attached Pokémon are protected. Blanket
+  // immunity cards are filtered by their printed type/name.
+  if (/energy attached/.test(t)) {
+    if (!pokemon?.image) return false;
+    const attached = (zoneCards || []).filter(
+      (c) => c.type === 'Energy' && c.image?.relative === pokemon.image
+    );
+    return attached.length > 0;
+  }
+  return stadiumFilterMatches(pokemon, stadium);
 }
 
 export function getStadiumDamageReduction(defender, targetPlayer) {
@@ -843,13 +1805,20 @@ export function stadiumBlocksToolEffects(stadiumOverride = null) {
 /** Jamming Tower: Pokémon Tools have no effect. */
 export function isStadiumToolNegation(card) {
   const t = textOf(card);
-  return /pokémon tools/.test(t) && /have no effect/.test(t);
+  return /pokémon tools?/.test(t) && /have no effect/.test(t);
 }
 
 /** Team Rocket's Watchtower: matching Pokémon have no Abilities. */
 export function isStadiumAbilityNegation(card) {
   const t = textOf(card);
-  return /have no abilities/.test(t);
+  // Modern "have no Abilities" plus the legacy Poké-Power/Poké-Body phrasing
+  // (Space Center, Battle Frontier), which maps onto Abilities in this engine.
+  return (
+    /have no abilities/.test(t) ||
+    /can'?t use any pok(?:é|e)-powers|ignore pok(?:é|e)-bodies|ignore pok(?:é|e)-powers/.test(
+      t
+    )
+  );
 }
 
 export function stadiumAbilityBlocked(pokemon) {
@@ -866,7 +1835,9 @@ export function stadiumAbilityBlocked(pokemon) {
 /** Perilous Jungle: extra poison damage during Pokémon Checkup. */
 export function parseStadiumCheckupPoisonBonus(card) {
   const t = textOf(card);
-  if (!/pokémon checkup/.test(t) || !/poisoned/.test(t)) return 0;
+  // Perilous Jungle ("During Pokémon Checkup …") and Virbank City Gym
+  // ("… between turns") both add extra poison damage.
+  if (!/pokémon checkup|between turns/.test(t) || !/poisoned/.test(t)) return 0;
   const m = t.match(/(\d+)\s+more damage counter/);
   return m ? parseInt(m[1], 10) : 0;
 }
@@ -886,6 +1857,64 @@ export function getStadiumCheckupPoisonBonus(pokemon, targetPlayer) {
   if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
   if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
   return bonus;
+}
+
+// ── Between-turns damage counters (continuous) ─────────────────────────────
+
+/** Legacy ability "Poké-Power" tag (Cursed Stone's filter). */
+function pokemonHasPokePower(pokemon) {
+  const abilities = Array.isArray(pokemon?.abilities) ? pokemon.abilities : [];
+  return abilities.some(
+    (a) =>
+      /pok[eé]-power/.test(lower(a?.type || '')) ||
+      /pok[eé]-power/.test(lower(a?.text || ''))
+  );
+}
+
+/**
+ * "Between turns, put 1 damage counter on each …" — Shrine of Punishment
+ * (GX/EX), Cursed Stone (Pokémon with a Poké-Power), Desert Ruins (ex with
+ * ≥100 max HP). Virbank/Perilous poison bonuses are handled separately.
+ */
+export function parseStadiumBetweenTurnsDamage(card) {
+  const t = textOf(card);
+  if (!t) return null;
+  if (!/(?:between turns|at any time between turns|pokémon checkup)/.test(t))
+    return null;
+  if (!/puts? \d+ damage counter/.test(t)) return null;
+  if (/poisoned/.test(t)) return null;
+  const m = t.match(/puts?\s+(\d+)\s+damage counter/);
+  const counters = m ? parseInt(m[1], 10) : 1;
+  let filter = 'all';
+  if (/pokémon-gx and pokémon-ex|pokémon-ex and pokémon-gx/.test(t))
+    filter = 'gx-ex';
+  else if (/pokémon-ex with maximum hp of at least \d+/.test(t))
+    filter = 'ex-high-hp';
+  else if (/pokémon that has a poké-power/.test(t)) filter = 'poke-power';
+  return { amount: counters * 10, counters, filter };
+}
+
+export function isStadiumBetweenTurnsDamage(card) {
+  return parseStadiumBetweenTurnsDamage(card) !== null;
+}
+
+/** Damage counters this Stadium's between-turns effect places on `pokemon`. */
+export function stadiumBetweenTurnsDamageFor(pokemon, card) {
+  const parsed = parseStadiumBetweenTurnsDamage(card);
+  if (!parsed || !pokemon) return 0;
+  switch (parsed.filter) {
+    case 'gx-ex':
+      return isGxCard(pokemon) || isExCard(pokemon) ? parsed.amount : 0;
+    case 'ex-high-hp': {
+      if (!isExCard(pokemon)) return 0;
+      const hp = parseInt(pokemon.hp, 10) || 0;
+      return hp >= 100 ? parsed.amount : 0;
+    }
+    case 'poke-power':
+      return pokemonHasPokePower(pokemon) ? parsed.amount : 0;
+    default:
+      return parsed.amount;
+  }
 }
 
 /** Nighttime Mine: attacks cost {C} more for filtered Pokémon. */
@@ -953,6 +1982,38 @@ function collectPassiveStadiumResults(card) {
   const costInc = parseStadiumAttackCostIncrease(card);
   if (costInc > 0)
     results.push({ action: 'attack-cost-increase', amount: costInc });
+  if (isStadiumEnergyAttachHeal(card))
+    results.push({ action: 'energy-attach-heal', amount: 10 });
+  if (isStadiumGlimwoodReFlip(card))
+    results.push({ action: 'attack-coin-reflip' });
+  if (isStadiumNoWeakness(card)) results.push({ action: 'no-weakness' });
+  if (isStadiumWeaknessTimesTwo(card))
+    results.push({ action: 'weakness-times-two' });
+  if (isStadiumResistanceIgnore(card))
+    results.push({ action: 'ignore-resistance' });
+  const typeDamageReduction = parseStadiumTypeDamageReduction(card);
+  if (typeDamageReduction > 0)
+    results.push({ action: 'type-damage-reduction', amount: typeDamageReduction });
+  const betweenTurns = parseStadiumBetweenTurnsDamage(card);
+  if (betweenTurns)
+    results.push({ action: 'between-turns-damage', ...betweenTurns });
+  if (isStadiumLostCity(card)) results.push({ action: 'ko-to-lost-zone' });
+  if (isStadiumBlocksHealing(card)) results.push({ action: 'block-healing' });
+  if (isStadiumStatusPersistsOnEvolve(card))
+    results.push({ action: 'status-persist-on-evolve' });
+  if (isStadiumSpecialEnergyColorless(card))
+    results.push({ action: 'special-energy-colorless' });
+  if (isStadiumSpecialEnergyToOne(card))
+    results.push({ action: 'special-energy-to-one' });
+  if (isStadiumBasicEnergyMetal(card))
+    results.push({ action: 'basic-energy-metal-extra' });
+  const inheritance = parseStadiumAttackInheritance(card);
+  if (inheritance) results.push({ action: 'attack-inheritance', ...inheritance });
+  const grant = parseStadiumAttackGrant(card);
+  if (grant) results.push({ action: 'attack-grant', ...grant });
+  const movement = parseStadiumEnergyMovement(card);
+  if (movement)
+    results.push({ action: 'energy-movement', ...movement });
   return results;
 }
 
@@ -993,7 +2054,11 @@ export function stadiumActivationStatus(
   if (!yourTurn) {
     return { actionable: true, usable: false, reason: "It's not your turn." };
   }
-  if (applied.family === 'once-per-turn' && usedThisTurn) {
+  if (
+    applied.family === 'once-per-turn' &&
+    usedThisTurn &&
+    !applied.results[0]?.repeatable
+  ) {
     return { actionable: true, usable: false, reason: 'Already used this turn.' };
   }
   const condition = applied.results[0]?.condition;
@@ -1004,7 +2069,11 @@ export function stadiumActivationStatus(
       reason:
         condition.type === 'named-supporter'
           ? `Play a Supporter with "${condition.contains}" in its name first this turn.`
-          : 'Play a Supporter from your hand this turn first.',
+          : condition.type === 'no-supporter-played'
+            ? 'You already played a Supporter this turn.'
+            : condition.type === 'has-evolution-in-hand'
+              ? 'You need an Evolution card in your hand.'
+              : 'Play a Supporter from your hand this turn first.',
     };
   }
   return { actionable: true, usable: true, reason: null };
@@ -1043,7 +2112,7 @@ export function applyStadiumEffect(card) {
       return {
         family,
         executed: true,
-        message: `◈ ${description} → ${parsed ? `${parsed.kind} (${parsed.n})` : 'see card text'}.`,
+        message: `◈ ${description} → ${parsed ? `${parsed.kind} (${parsed.n ?? '—'})` : 'see card text'}.`,
         results,
       };
     }

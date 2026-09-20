@@ -278,6 +278,19 @@ export function energyMatchesSearchWhat(card, what = '') {
     const name = lower(card.name);
     return name.includes(expected) && name.includes('energy');
   }
+  // Word-form type qualifier ("a Lightning Energy card", "a Water Energy").
+  // The printed type word stands in for the {L}/{W} glyph; without this every
+  // energy card would match (the branch below only checks "basic").
+  const word = w.match(
+    /\b(grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|dragon|fairy|colorless)\b/
+  );
+  if (word) {
+    const expected = word[1] === 'darkness' ? 'dark' : word[1];
+    if (w.includes('basic') && classifyEnergyEffect(card) !== 'basic') return false;
+    if (primaryEnergyTypeName(card) === expected) return true;
+    const name = lower(card.name);
+    return name.includes(expected) && name.includes('energy');
+  }
   if (w.includes('basic')) {
     return classifyEnergyEffect(card) === 'basic' || lower(card.name).includes('basic');
   }
@@ -294,6 +307,68 @@ export function resolveAttachedEnergyType(card) {
     || typeHintFromEffect(card)
     || 'Colorless'
   );
+}
+
+// ── Stadium-driven Energy rewrites (taxonomy §E) ─────────────────────────
+// Three Stadiums change what attached Energy *provides* while in play. The
+// rewrite is applied to the descriptor just before cost payment, so every
+// payment path (server attack/retreat, client, bot) sees the same pool.
+
+/** Delta Species Pokémon (name "… δ" / "Delta Species" subtype). */
+export function isDeltaSpecies(card) {
+  if (!card) return false;
+  const name = String(card.name ?? '');
+  if (name.includes('\u03b4')) return true; // δ
+  if (/delta species/i.test(name)) return true;
+  return subtypesOf(card).includes('delta species');
+}
+
+/**
+ * Rewrite an attached-Energy descriptor under the Stadium in play.
+ * - Temple of Sinnoh: all Special Energy provides 1 {C} and nothing else.
+ * - Crystal Beach: Special Energy that provided ≥2 now provides 1 {C}.
+ * - Holon Research Tower: Basic Energy on a Delta Species Pokémon also
+ *   provides {M} but stays a single Energy (dualType).
+ *
+ * @param {{type:string, family:string}} descriptor
+ * @param {{card?:object, stadiumCard?:object|null, hostPokemon?:object|null}} args
+ * @returns {{type:string, family:string, dualType?:string}}
+ */
+export function rewriteEnergyDescriptor(
+  descriptor,
+  { card = null, stadiumCard = null, hostPokemon = null } = {}
+) {
+  if (!descriptor || !stadiumCard) return descriptor;
+  const t = lower(stadiumCard?.text ?? stadiumCard?.effect ?? '');
+  if (!t) return descriptor;
+  const family = descriptor.family;
+  const isSpecial = family !== 'basic';
+
+  // Temple of Sinnoh — every Special Energy becomes a plain Colorless unit.
+  if (
+    /all special energy/.test(t) &&
+    /provide \{c\}/.test(t) &&
+    /no other effect/.test(t)
+  ) {
+    return isSpecial ? { type: 'Colorless', family: 'basic' } : descriptor;
+  }
+
+  // Crystal Beach — Special Energy worth ≥2 now provides only 1 {C}.
+  if (/special energy/.test(t) && /provid(?:es?|ing) only 1 \{c\}/.test(t)) {
+    if (family === 'double' || family === 'double-colorless') {
+      return { type: 'Colorless', family: 'basic' };
+    }
+    return descriptor;
+  }
+
+  // Holon Research Tower — Basic Energy on a Delta Species also counts {M}.
+  if (/basic energy/.test(t) && /\{m\}/.test(t) && /delta species/.test(t)) {
+    if (family === 'basic' && isDeltaSpecies(hostPokemon)) {
+      return { ...descriptor, dualType: 'Metal' };
+    }
+  }
+
+  return descriptor;
 }
 
 // ── lock execution (taxonomy §F, family 2) ──────────────────────────────

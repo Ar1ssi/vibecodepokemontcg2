@@ -15,9 +15,36 @@ import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
+import {
+  isSingleStrikeCard,
+  isEvolutionCard,
+  stadiumBlocksHealing,
+} from '../rules/stadium-effects.mjs';
 import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
+
+/**
+ * Whether a card can satisfy a discard-cost Energy-type filter. Basic Energy
+ * cards carry their type in the printed name ("Fire Energy"); some printings
+ * also set `types`. A null/empty filter matches any card.
+ *
+ * @param {object} card
+ * @param {string[]|null|undefined} energyTypes lowercase type names
+ * @returns {boolean}
+ */
+export function matchesEnergyTypeFilter(card, energyTypes) {
+  if (!Array.isArray(energyTypes) || energyTypes.length === 0) return true;
+  const name = String(card?.name || '').toLowerCase();
+  const types = (Array.isArray(card?.types) ? card.types : []).map((t) =>
+    String(t).toLowerCase()
+  );
+  return energyTypes.some((type) => {
+    const t = String(type).toLowerCase();
+    return types.includes(t) || name.includes(t);
+  });
+}
 
 /**
  * Deterministically creates a PendingChoice without Math.random (Invariant 6).
@@ -69,7 +96,7 @@ function inPlayRoots(player) {
   return [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => !c.attachedTo);
 }
 
-function attachToRoot(player, card, root, events) {
+export function attachToRoot(player, card, root, events) {
   for (const zone of [player.zones.deck, player.zones.discard, player.zones.hand]) {
     const i = (zone || []).indexOf(card);
     if (i >= 0) zone.splice(i, 1);
@@ -213,9 +240,18 @@ export function executeSteps(draft, {
           break;
         }
 
-        // Needs input: prompt player to discard N cards
+        // Needs input: prompt player to discard N cards. An Energy-discard cost
+        // (`energyOnly`) must not offer a non-Energy card just because the cost
+        // names a type loosely ("discard an Energy card").
+        const isEnergyCard = (c) =>
+          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
         const candidates = (player.zones.hand || []).filter(
-          (c) => c.instanceId !== sourceCard?.instanceId
+          (c) =>
+            c.instanceId !== sourceCard?.instanceId &&
+            matchesEnergyTypeFilter(c, step.energyTypes) &&
+            (!step.energyOnly || isEnergyCard(c)) &&
+            (!step.basicOnly || classifyEnergyEffect(c) === 'basic') &&
+            (step.tagFilter !== 'single-strike' || isSingleStrikeCard(c))
         );
         const count = step.count || 1;
         const choice = createPendingChoice({
@@ -247,6 +283,12 @@ export function executeSteps(draft, {
         const what = step.what || step.searchTarget || 'card';
         const dest = step.destination || 'hand';
         const maxCount = step.count || 1;
+        const nameFilter = step.nameFilter
+          ? String(step.nameFilter).toLowerCase()
+          : null;
+        const cardMatches = (c) =>
+          matchesSearch(c, what) &&
+          (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter));
 
         const attachKey = `${idx}:searchAttach`;
         if (stepSelection && context[attachKey]) {
@@ -356,7 +398,7 @@ export function executeSteps(draft, {
 
         // Needs input: filter deck candidates
         const deck = player.zones.deck || [];
-        const matches = deck.filter((c) => matchesSearch(c, what));
+        const matches = deck.filter(cardMatches);
 
         if (matches.length === 0) {
           // Fail to find in private zone: shuffle deck and continue
@@ -434,7 +476,18 @@ export function executeSteps(draft, {
       }
 
       case 'drawUntil': {
-        const target = step.target || 5;
+        let target = step.target || 5;
+        // Mystery Garden: target hand size is the live count of the player's
+        // in-play Pokémon of a given type ("as many … as they have {P} Pokémon
+        // in play"), not a printed number.
+        if (step.targetType) {
+          const want = String(step.targetType).toLowerCase();
+          target = inPlayRoots(player).filter((c) =>
+            (Array.isArray(c.types) ? c.types : [])
+              .map((v) => String(v).toLowerCase())
+              .includes(want)
+          ).length;
+        }
         const hand = player.zones.hand || [];
         const deck = player.zones.deck || [];
         const needed = Math.max(0, target - hand.length);
@@ -448,6 +501,34 @@ export function executeSteps(draft, {
             playerId,
             cards: drawn.map((c) => ({ instanceId: c.instanceId })),
           });
+        }
+        break;
+      }
+
+      case 'millItems': {
+        // PokéStop: mill the top N deck cards; Item cards go to hand, the rest
+        // to the discard pile. Public-zone move, so no choice is required.
+        const count = step.count || 3;
+        const deck = player.zones.deck || [];
+        const milled = deck.splice(0, Math.min(count, deck.length));
+        for (const c of milled) {
+          if (matchesSearch(c, 'item')) {
+            player.zones.hand.push(c);
+            events.push({
+              type: 'cardMoved',
+              instanceId: c.instanceId,
+              from: 'deck',
+              to: 'hand',
+              playerId,
+            });
+          } else {
+            discardCardToPlayerZone(player, c);
+            events.push({
+              type: 'cardsDiscarded',
+              playerId,
+              cards: [{ instanceId: c.instanceId, name: c.name }],
+            });
+          }
         }
         break;
       }
@@ -871,6 +952,11 @@ export function executeSteps(draft, {
       case 'heal':
       case 'healAmount':
       case 'healAbility': {
+        // Dyna Tree Hill: all healing is suppressed while it is in play.
+        if (stadiumBlocksHealing(draft.stadium)) {
+          events.push({ type: 'effectStepSkipped', reason: 'healing_blocked' });
+          break;
+        }
         // 'heal' with no amount is "heal all damage" (Wally's Compassion).
         const healAmt = step.amount ?? (step.type === 'heal' ? Infinity : 30);
         // Edge Case 10: re-resolve damaged in-play Pokemon dynamically
@@ -954,8 +1040,14 @@ export function executeSteps(draft, {
       }
 
       case 'coinFlip': {
-        const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
-        events.push({ type: 'coinFlipped', playerId, face });
+        // Memoize the face so resuming a suspended branch choice doesn't re-flip.
+        const coinKey = `${idx}:coinFlip`;
+        let face = context[coinKey];
+        if (!face) {
+          face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+          context[coinKey] = face;
+          events.push({ type: 'coinFlipped', playerId, face });
+        }
         const branch = normalizeSteps(face === 'heads' ? step.heads : step.tails);
         if (branch.length > 0) {
           const subResult = executeSteps(draft, {
@@ -973,6 +1065,325 @@ export function executeSteps(draft, {
             return subResult;
           }
         }
+        break;
+      }
+
+      case 'coinDraw': {
+        // Speed Stadium: flip until tails, draw per heads.
+        const perHeads = step.perHeads || 1;
+        let heads = 0;
+        while (activeRng && activeRng.next() < 0.5) {
+          heads++;
+          if (heads > MAX_EFFECT_STEPS) break;
+        }
+        events.push({ type: 'coinFlipped', playerId, face: 'tails', heads });
+        if (heads > 0) {
+          const deck = player.zones.deck || [];
+          const hand = player.zones.hand || [];
+          const actual = Math.min(heads * perHeads, deck.length);
+          const drawn = deck.splice(0, actual);
+          hand.push(...drawn);
+          events.push({
+            type: 'cardsDrawn',
+            count: actual,
+            playerId,
+            cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+          });
+        }
+        break;
+      }
+
+      case 'returnTool': {
+        // Shopping Center: return an attached Pokémon Tool to hand.
+        const isTool = (c) =>
+          /tool/i.test(
+            String(c?.trainerType || '') +
+              ',' +
+              (Array.isArray(c?.subtypes) ? c.subtypes.join(',') : '')
+          );
+        let moved = null;
+        for (const zone of [player.zones.active || [], player.zones.bench || []]) {
+          const idx = zone.findIndex((c) => c.attachedTo && isTool(c));
+          if (idx >= 0) {
+            moved = zone.splice(idx, 1)[0];
+            break;
+          }
+        }
+        if (moved) {
+          moved.attachedTo = null;
+          player.zones.hand.push(moved);
+          events.push({
+            type: 'cardMoved',
+            instanceId: moved.instanceId,
+            from: 'attached',
+            to: 'hand',
+            playerId,
+          });
+        } else {
+          events.push({ type: 'effectStepSkipped', reason: 'no_tool_in_play' });
+        }
+        break;
+      }
+
+      case 'shuffleOwnPokemon': {
+        // Fuchsia City Gym: shuffle a named Pokémon in play and everything
+        // attached to it back into the deck.
+        const filter = step.nameFilter
+          ? String(step.nameFilter).toLowerCase()
+          : null;
+        const target = inPlayRoots(player).find(
+          (c) => !filter || String(c.name || '').toLowerCase().includes(filter)
+        );
+        if (!target) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_matching_pokemon' });
+          break;
+        }
+        const zones = [player.zones.active || [], player.zones.bench || []];
+        const attached = zones
+          .flatMap((z) => z)
+          .filter((c) => c.attachedTo === target.instanceId);
+        for (const card of [target, ...attached]) {
+          for (const zone of zones) {
+            const i = zone.indexOf(card);
+            if (i >= 0) zone.splice(i, 1);
+          }
+          card.attachedTo = null;
+          player.zones.deck.push(card);
+        }
+        if (activeRng) activeRng.shuffle(player.zones.deck);
+        events.push({ type: 'deckShuffled', playerId });
+        events.push({
+          type: 'cardMoved',
+          instanceId: target.instanceId,
+          from: 'play',
+          to: 'deck',
+          playerId,
+        });
+        break;
+      }
+
+      case 'revealHand': {
+        // Lavender Town reveals the opponent's hand; Ancient Ruins reveals your
+        // own (target: 'self').
+        const revealed = step.target === 'self' ? player : opponent;
+        if (revealed) {
+          events.push({
+            type: 'cardsRevealed',
+            playerId: revealed.playerId,
+            hand: true,
+            cards: (revealed.zones.hand || []).map((c) => ({
+              instanceId: c.instanceId,
+              name: c.name,
+            })),
+          });
+        }
+        break;
+      }
+
+      case 'drawIfNoSupporter': {
+        // Ancient Ruins: after revealing, draw 1 only when the hand has no
+        // Supporter in it.
+        const hand = player.zones.hand || [];
+        const hasSupporter = hand.some((c) => {
+          const subs = Array.isArray(c?.subtypes)
+            ? c.subtypes.map((s) => String(s).toLowerCase())
+            : [];
+          return (
+            /supporter/i.test(String(c?.type || '')) ||
+            /supporter/i.test(String(c?.trainerType || '')) ||
+            subs.some((s) => s.includes('supporter'))
+          );
+        });
+        if (hasSupporter) {
+          events.push({ type: 'effectStepSkipped', reason: 'supporter_in_hand' });
+          break;
+        }
+        const deck = player.zones.deck || [];
+        if (deck.length === 0) {
+          events.push({ type: 'effectStepSkipped', reason: 'deck_empty' });
+          break;
+        }
+        const [drawn] = deck.splice(0, 1);
+        hand.push(drawn);
+        events.push({
+          type: 'cardsDrawn',
+          count: 1,
+          playerId,
+          cards: [{ instanceId: drawn.instanceId }],
+        });
+        break;
+      }
+
+      case 'putHandToDeck': {
+        // Mystery Zone: move a chosen (Evolution) card from hand into the deck,
+        // then shuffle.
+        const hand = player.zones.hand || [];
+        const count = step.count || 1;
+        if (stepSelection) {
+          const moved = [];
+          for (const sId of stepSelection) {
+            const i = hand.findIndex((c) => c.instanceId === sId);
+            if (i >= 0) {
+              const [c] = hand.splice(i, 1);
+              player.zones.deck.push(c);
+              moved.push(c);
+            }
+          }
+          if (activeRng) activeRng.shuffle(player.zones.deck);
+          events.push({ type: 'deckShuffled', playerId });
+          events.push({
+            type: 'cardsPutInDeck',
+            playerId,
+            cards: moved.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+          });
+          break;
+        }
+        const candidates = hand.filter(
+          (c) =>
+            c.instanceId !== sourceCard?.instanceId &&
+            (!step.evolutionOnly || isEvolutionCard(c))
+        );
+        if (candidates.length === 0) {
+          events.push({
+            type: 'effectStepSkipped',
+            reason: 'no_eligible_hand_card',
+            step: step.type,
+          });
+          break;
+        }
+        const choice = createPendingChoice({
+          player: playerId,
+          prompt: `${sourceCard?.name || 'Effect'}: Choose ${count} card${
+            count > 1 ? 's' : ''
+          } from your hand to put into your deck`,
+          source: sourceCard?.name || '',
+          options: candidates,
+          min: count,
+          max: count,
+          cancellable: false,
+          stateVersion: draft.stateVersion,
+          stepIndex: idx,
+          resumeToken: {
+            effectType,
+            sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
+            stepIndex: idx,
+            steps,
+            context,
+            budgetCount: budget.count,
+          },
+        });
+        return { pendingChoice: choice, completed: false };
+      }
+
+      case 'peekReturn': {
+        // Radio Tower: look at the top N and put them back unchanged.
+        const n = step.count || 2;
+        const top = (player.zones.deck || []).slice(0, n);
+        if (top.length > 0) {
+          events.push({
+            type: 'cardsRevealed',
+            playerId,
+            peek: true,
+            cards: top.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+          });
+        }
+        break;
+      }
+
+      case 'peekDiscard': {
+        // Primordial Altar: look at the top card and optionally discard it.
+        const deck = player.zones.deck || [];
+        if (deck.length === 0) break;
+        const top = deck[0];
+        if (stepSelection) {
+          if (stepSelection.includes(top.instanceId)) {
+            deck.splice(0, 1);
+            discardCardToPlayerZone(player, top);
+            events.push({
+              type: 'cardsDiscarded',
+              playerId,
+              cards: [{ instanceId: top.instanceId, name: top.name }],
+            });
+          }
+          break;
+        }
+        events.push({
+          type: 'cardsRevealed',
+          playerId,
+          peek: true,
+          cards: [{ instanceId: top.instanceId, name: top.name }],
+        });
+        return {
+          pendingChoice: createPendingChoice({
+            player: playerId,
+            prompt: `${sourceCard?.name || 'Stadium'}: Discard the top card of your deck?`,
+            source: sourceCard?.name || '',
+            options: [top],
+            min: 0,
+            max: 1,
+            cancellable: true,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context,
+              budgetCount: budget.count,
+            },
+          }),
+          completed: false,
+        };
+      }
+
+      case 'benchRestored': {
+        // Twist Mountain: Restored Pokémon from hand to Bench.
+        const hand = player.zones.hand || [];
+        const bench = player.zones.bench || [];
+        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+          events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
+          break;
+        }
+        const idx = hand.findIndex((c) =>
+          /restored/i.test(
+            String(c?.stage || '') +
+              ',' +
+              (Array.isArray(c?.subtypes) ? c.subtypes.join(',') : '')
+          )
+        );
+        if (idx < 0) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_restored_pokemon' });
+          break;
+        }
+        const [card] = hand.splice(idx, 1);
+        bench.push(card);
+        events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'bench', playerId });
+        break;
+      }
+
+      case 'fossilBench': {
+        // Strange Cave / Underground Lake: named fossil Pokémon to the Bench.
+        const FOSSIL = /^(omanyte|kabuto|aerodactyl|lileep|anorith)\b/i;
+        const zoneKey = step.source === 'discard' ? 'discard' : 'hand';
+        const zone = player.zones[zoneKey] || [];
+        const bench = player.zones.bench || [];
+        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+          events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
+          break;
+        }
+        const idx = zone.findIndex((c) => FOSSIL.test(String(c?.name || '')));
+        if (idx < 0) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_fossil' });
+          break;
+        }
+        const [card] = zone.splice(idx, 1);
+        card.stage = 'Basic';
+        card.playedAsPokemon = true;
+        bench.push(card);
+        events.push({ type: 'cardMoved', instanceId: card.instanceId, from: zoneKey, to: 'bench', playerId });
         break;
       }
 
@@ -996,10 +1407,87 @@ export function executeSteps(draft, {
         break;
       }
 
+      case 'recoverEnergy':
+      case 'recoverFromDiscard': {
+        const discard = player.zones.discard || [];
+        const maxCount = step.count || 1;
+        const energyTypes =
+          step.energyTypes || (step.typeFilter ? [step.typeFilter] : null);
+        const isEnergy = (c) =>
+          /energy/i.test(String(c?.type || '') + String(c?.name || ''));
+        const candidates = discard.filter(
+          (c) =>
+            isEnergy(c) &&
+            matchesEnergyTypeFilter(c, energyTypes) &&
+            (!step.basicOnly || classifyEnergyEffect(c) === 'basic')
+        );
+
+        if (stepSelection) {
+          // Resume: move the chosen discard-pile Energy into the hand.
+          for (const sId of stepSelection) {
+            const dIdx = discard.findIndex((c) => c.instanceId === sId);
+            if (dIdx >= 0) {
+              const [c] = discard.splice(dIdx, 1);
+              (player.zones.hand || []).push(c);
+              events.push({
+                type: 'cardMoved',
+                instanceId: c.instanceId,
+                from: 'discard',
+                to: 'hand',
+                playerId,
+              });
+            }
+          }
+          break;
+        }
+
+        if (candidates.length === 0) {
+          events.push({
+            type: 'effectStepSkipped',
+            reason: 'no_matching_energy_in_discard',
+            step: step.type,
+          });
+          break;
+        }
+
+        const max = Math.min(maxCount, candidates.length);
+        const choice = createPendingChoice({
+          player: playerId,
+          prompt: `${sourceCard?.name || 'Recover'}: Select up to ${max} Energy card${max > 1 ? 's' : ''} from your discard pile`,
+          source: sourceCard?.name || '',
+          options: candidates,
+          min: 0,
+          max,
+          cancellable: true,
+          stateVersion: draft.stateVersion,
+          stepIndex: idx,
+          resumeToken: {
+            effectType,
+            sourceInstanceId: sourceCard?.instanceId,
+            initiatorPlayerId: playerId,
+            stepIndex: idx,
+            steps,
+            context,
+            budgetCount: budget.count,
+          },
+        });
+        return { pendingChoice: choice, completed: false };
+      }
+
       case 'attachFromDiscard': {
         const discard = player.zones.discard || [];
         const memoKey = `${idx}:attachFromDiscard`;
         const targets = inPlayRoots(player).filter((c) => rootMatchesTarget(player, c, step.target));
+        // Magma Basin: attaching in this way puts damage counters on the target.
+        const applyAttachmentDamage = (target) => {
+          if (!step.damage || !target) return;
+          target.damage = (target.damage || 0) + step.damage * 10;
+          events.push({
+            type: 'damageUpdated',
+            instanceId: target.instanceId,
+            damage: target.damage,
+          });
+        };
         const energyCandidates = discard.filter(
           (c) => String(c.name || '').toLowerCase().includes('energy') && matchesSearch(c, step.energy || 'Basic Energy')
         );
@@ -1034,6 +1522,7 @@ export function executeSteps(draft, {
           delete context[memoKey];
           if (energyCard && targetCard) {
             attachToRoot(player, energyCard, targetCard, events);
+            applyAttachmentDamage(targetCard);
           } else {
             events.push({ type: 'effectStepSkipped', reason: 'target_not_found' });
           }
@@ -1051,6 +1540,7 @@ export function executeSteps(draft, {
         if (chosenEnergy) {
           if (targets.length === 1) {
             attachToRoot(player, chosenEnergy, targets[0], events);
+            applyAttachmentDamage(targets[0]);
             delete context[memoKey];
             break;
           }

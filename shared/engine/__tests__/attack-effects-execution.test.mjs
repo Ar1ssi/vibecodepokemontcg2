@@ -527,5 +527,284 @@ describe('Phase 3: Secondary Attack Effects & Costs', () => {
       assert.equal(res2.state.turn.player, 'p2');
       assert.equal(res2.state.turn.number, 3);
     });
+
+    it("Thundurus' Charge: offers only the typed Energy (with art) and attaches it to the attacker", () => {
+      const state = createTestGame();
+      const thundurus = createCard({
+        instanceId: 1,
+        id: 'thundurus',
+        name: 'Thundurus',
+        supertype: 'Pokémon',
+        hp: 110,
+        attacks: [
+          {
+            name: 'Charge',
+            cost: ['Lightning'],
+            damage: 0,
+            text: 'Search your deck for a Lightning Energy card and attach it to this Pokémon. Shuffle your deck afterward.',
+          },
+        ],
+      });
+      const costEnergy = createCard({
+        instanceId: 11,
+        id: 'le-cost',
+        name: 'Lightning Energy',
+        supertype: 'Energy',
+        energyType: 'Lightning',
+        attachedTo: 1,
+      });
+      const deckLightning = createCard({
+        instanceId: 101,
+        id: 'le-deck',
+        name: 'Lightning Energy',
+        supertype: 'Energy',
+        type: 'Energy',
+        src: 'lightning.png',
+      });
+      const deckWater = createCard({
+        instanceId: 102,
+        id: 'we-deck',
+        name: 'Water Energy',
+        supertype: 'Energy',
+        type: 'Energy',
+        src: 'water.png',
+      });
+      const deckTrainer = createCard({
+        instanceId: 103,
+        id: 'trainer-deck',
+        name: 'Ultra Ball',
+        supertype: 'Trainer',
+        type: 'Trainer',
+        src: 'ball.png',
+      });
+      const defender = createCard({
+        instanceId: 2,
+        id: 'def',
+        name: 'Defender',
+        supertype: 'Pokémon',
+        hp: 100,
+      });
+
+      state.players.p1.zones.active = [thundurus, costEnergy];
+      state.players.p1.zones.deck = [deckLightning, deckWater, deckTrainer];
+      state.players.p2.zones.active = [defender];
+
+      const res1 = applyCommand(state, {
+        type: 'attack',
+        playerId: 'p1',
+        payload: { attackIndex: 0 },
+      });
+
+      assert.equal(res1.error, null);
+      assert.ok(res1.state.pendingChoice, 'pendingChoice must be created');
+      // Only the matching Lightning Energy is offered, and it carries art so the
+      // client's carousel (not the face-down fallback grid) opens.
+      const options = res1.state.pendingChoice.options;
+      assert.equal(options.length, 1);
+      assert.equal(options[0].instanceId, 101);
+      assert.equal(options[0].src, 'lightning.png');
+
+      const res2 = applyCommand(res1.state, {
+        type: 'resolveChoice',
+        playerId: 'p1',
+        payload: {
+          choiceId: res1.state.pendingChoice.choiceId,
+          selection: [101],
+        },
+      });
+
+      assert.equal(res2.error, null);
+      assert.equal(res2.state.pendingChoice, null);
+      assert.equal(
+        res2.state.players.p1.zones.hand.some((c) => c.instanceId === 101),
+        false,
+        'searched Energy must not go to hand'
+      );
+      const attached = res2.state.players.p1.zones.active.find(
+        (c) => c.instanceId === 101
+      );
+      assert.ok(attached, 'searched Energy is attached on the active Pokémon');
+      assert.equal(attached.attachedTo, 1);
+    });
+
+    it('Staged attack search (Basic → Stage 1 → Stage 2) walks one stage per choice', () => {
+      const state = createTestGame();
+      const searcher = createCard({
+        instanceId: 1,
+        id: 'searcher',
+        name: 'Searcher',
+        supertype: 'Pokémon',
+        hp: 60,
+        attacks: [
+          {
+            name: 'Evolution Search',
+            cost: ['Colorless'],
+            damage: 0,
+            text: 'Search your deck for a Basic Pokémon, a Stage 1 Pokémon, and a Stage 2 Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.',
+          },
+        ],
+      });
+      const cEnergy = createCard({
+        instanceId: 11,
+        id: 'ce-1',
+        name: 'Colorless Energy',
+        supertype: 'Energy',
+        energyType: 'Colorless',
+        attachedTo: 1,
+      });
+      const basic = createCard({
+        instanceId: 101,
+        id: 'basic',
+        name: 'Charmander',
+        supertype: 'Pokémon',
+        stage: 'Basic',
+        hp: 70,
+      });
+      const stage1 = createCard({
+        instanceId: 102,
+        id: 'stage1',
+        name: 'Charmeleon',
+        supertype: 'Pokémon',
+        stage: 'Stage 1',
+        hp: 90,
+      });
+      const stage2 = createCard({
+        instanceId: 103,
+        id: 'stage2',
+        name: 'Charizard',
+        supertype: 'Pokémon',
+        stage: 'Stage 2',
+        hp: 170,
+      });
+      const defender = createCard({
+        instanceId: 2,
+        id: 'def',
+        name: 'Defender',
+        supertype: 'Pokémon',
+        hp: 100,
+      });
+
+      state.players.p1.zones.active = [searcher, cEnergy];
+      state.players.p1.zones.deck = [basic, stage1, stage2];
+      state.players.p2.zones.active = [defender];
+
+      const res1 = applyCommand(state, {
+        type: 'attack',
+        playerId: 'p1',
+        payload: { attackIndex: 0 },
+      });
+      assert.equal(res1.error, null);
+      assert.deepEqual(
+        res1.state.pendingChoice.options.map((o) => o.instanceId),
+        [101],
+        'stage 1 offers only Basic Pokémon'
+      );
+
+      const res2 = applyCommand(res1.state, {
+        type: 'resolveChoice',
+        playerId: 'p1',
+        payload: {
+          choiceId: res1.state.pendingChoice.choiceId,
+          selection: [101],
+        },
+      });
+      assert.equal(res2.error, null);
+      assert.deepEqual(
+        res2.state.pendingChoice.options.map((o) => o.instanceId),
+        [102],
+        'stage 2 offers only Stage 1 Pokémon'
+      );
+
+      const res3 = applyCommand(res2.state, {
+        type: 'resolveChoice',
+        playerId: 'p1',
+        payload: {
+          choiceId: res2.state.pendingChoice.choiceId,
+          selection: [102],
+        },
+      });
+      assert.equal(res3.error, null);
+      assert.deepEqual(
+        res3.state.pendingChoice.options.map((o) => o.instanceId),
+        [103],
+        'stage 3 offers only Stage 2 Pokémon'
+      );
+
+      const res4 = applyCommand(res3.state, {
+        type: 'resolveChoice',
+        playerId: 'p1',
+        payload: {
+          choiceId: res3.state.pendingChoice.choiceId,
+          selection: [103],
+        },
+      });
+      assert.equal(res4.error, null);
+      assert.equal(res4.state.pendingChoice, null, 'sequence finished');
+      const handIds = res4.state.players.p1.zones.hand.map((c) => c.instanceId);
+      assert.deepEqual(
+        [101, 102, 103].every((id) => handIds.includes(id)),
+        true,
+        'all three picked cards are in hand'
+      );
+      assert.equal(res4.state.turn.player, 'p2');
+      assert.equal(res4.state.turn.number, 3);
+    });
+
+    it('Attack deck search raises no choice when no deck card matches the clause', () => {
+      const state = createTestGame();
+      const thundurus = createCard({
+        instanceId: 1,
+        id: 'thundurus',
+        name: 'Thundurus',
+        supertype: 'Pokémon',
+        hp: 110,
+        attacks: [
+          {
+            name: 'Charge',
+            cost: ['Lightning'],
+            damage: 0,
+            text: 'Search your deck for a Lightning Energy card and attach it to this Pokémon. Shuffle your deck afterward.',
+          },
+        ],
+      });
+      const costEnergy = createCard({
+        instanceId: 11,
+        id: 'le-cost',
+        name: 'Lightning Energy',
+        supertype: 'Energy',
+        energyType: 'Lightning',
+        attachedTo: 1,
+      });
+      const deckWater = createCard({
+        instanceId: 102,
+        id: 'we-deck',
+        name: 'Water Energy',
+        supertype: 'Energy',
+        type: 'Energy',
+        src: 'water.png',
+      });
+      const defender = createCard({
+        instanceId: 2,
+        id: 'def',
+        name: 'Defender',
+        supertype: 'Pokémon',
+        hp: 100,
+      });
+
+      state.players.p1.zones.active = [thundurus, costEnergy];
+      state.players.p1.zones.deck = [deckWater];
+      state.players.p2.zones.active = [defender];
+
+      const res = applyCommand(state, {
+        type: 'attack',
+        playerId: 'p1',
+        payload: { attackIndex: 0 },
+      });
+
+      assert.equal(res.error, null);
+      assert.equal(res.state.pendingChoice, null, 'no matching card → no choice');
+      // Attack still resolved and the turn advanced.
+      assert.equal(res.state.turn.player, 'p2');
+    });
   });
 });
