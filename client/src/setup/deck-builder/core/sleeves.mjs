@@ -989,7 +989,7 @@
 ,
   {
     "id": "967b4390-68ff-4182-9b94-7fadc35f79fc",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/967b4390-68ff-4182-9b94-7fadc35f79fc.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/967b4390-68ff-4182-9b94-7fadc35f79fc.jpg",
     "name": "Umbreon 30th CELEBRATION Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -998,7 +998,7 @@
   },
   {
     "id": "69d4f14a-cc16-4105-8806-4a73767e3d10",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/69d4f14a-cc16-4105-8806-4a73767e3d10.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/69d4f14a-cc16-4105-8806-4a73767e3d10.jpg",
     "name": "No. 30 Nidorina 30th CELEBRATION Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1007,7 +1007,7 @@
   },
   {
     "id": "ca67affc-5e21-4551-9e38-e62e930bd61a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/ca67affc-5e21-4551-9e38-e62e930bd61a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/ca67affc-5e21-4551-9e38-e62e930bd61a.jpg",
     "name": "Morpeko Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1016,7 +1016,7 @@
   },
   {
     "id": "3f0fe14e-4823-420f-a1f8-c9bd266cefc0",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/3f0fe14e-4823-420f-a1f8-c9bd266cefc0.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/3f0fe14e-4823-420f-a1f8-c9bd266cefc0.jpg",
     "name": "First Partner Pokémon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1025,7 +1025,7 @@
   },
   {
     "id": "bf87efb9-a69b-49f2-8511-68f2a02085a5",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/bf87efb9-a69b-49f2-8511-68f2a02085a5.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/bf87efb9-a69b-49f2-8511-68f2a02085a5.jpg",
     "name": "Espeon 30th CELEBRATION Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1034,7 +1034,7 @@
   },
   {
     "id": "b718b479-568f-4fe5-9a47-70d9ad6a0efe",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b718b479-568f-4fe5-9a47-70d9ad6a0efe.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b718b479-568f-4fe5-9a47-70d9ad6a0efe.jpg",
     "name": "Embroidered Design Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1043,7 +1043,7 @@
   },
   {
     "id": "487b084d-2d47-4486-abd2-d4c09f4fec0a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/487b084d-2d47-4486-abd2-d4c09f4fec0a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/487b084d-2d47-4486-abd2-d4c09f4fec0a.jpg",
     "name": "30th CELEBRATION Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1052,7 +1052,7 @@
   },
   {
     "id": "b305fed8-5d12-4e87-ac18-81f455034478",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b305fed8-5d12-4e87-ac18-81f455034478.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b305fed8-5d12-4e87-ac18-81f455034478.jpg",
     "name": "30th Anniversary Design Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1061,7 +1061,7 @@
   },
   {
     "id": "a594285e-7a44-4eb0-8d89-684f99a62b41",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/a594285e-7a44-4eb0-8d89-684f99a62b41.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/a594285e-7a44-4eb0-8d89-684f99a62b41.jpg",
     "name": "Terapagos (Terastal Form) Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1070,7 +1070,7 @@
   },
   {
     "id": "31751aca-a12c-4034-afb9-28bf179f6446",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/31751aca-a12c-4034-afb9-28bf179f6446.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/31751aca-a12c-4034-afb9-28bf179f6446.jpg",
     "name": "Tatsugiri, To the usual place Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1079,7 +1079,7 @@
   },
   {
     "id": "af6c1df4-7b61-49c2-925a-ac221032b456",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/af6c1df4-7b61-49c2-925a-ac221032b456.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/af6c1df4-7b61-49c2-925a-ac221032b456.jpg",
     "name": "Ogerpon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1088,7 +1088,7 @@
   },
   {
     "id": "bb8413d4-f0a4-48e3-975a-5bb064675bba",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/bb8413d4-f0a4-48e3-975a-5bb064675bba.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/bb8413d4-f0a4-48e3-975a-5bb064675bba.jpg",
     "name": "Kitakami Village Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1097,7 +1097,7 @@
   },
   {
     "id": "8dccf403-194d-4f67-a603-3bfcc7e7c4a3",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/8dccf403-194d-4f67-a603-3bfcc7e7c4a3.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/8dccf403-194d-4f67-a603-3bfcc7e7c4a3.jpg",
     "name": "Eevee Evolutions Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1106,7 +1106,7 @@
   },
   {
     "id": "90db0c95-9ce1-4cc6-a008-99636a16c2d9",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/90db0c95-9ce1-4cc6-a008-99636a16c2d9.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/90db0c95-9ce1-4cc6-a008-99636a16c2d9.jpg",
     "name": "Unova Adventure - Reshiram & Amoonguss Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1115,7 +1115,7 @@
   },
   {
     "id": "f90406ba-e17b-49aa-851f-5d4194440e20",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f90406ba-e17b-49aa-851f-5d4194440e20.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f90406ba-e17b-49aa-851f-5d4194440e20.jpg",
     "name": "Sinnoh Adventure - Dialga & Lucario Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1124,7 +1124,7 @@
   },
   {
     "id": "0826a056-a579-469e-853f-81c45f825558",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/0826a056-a579-469e-853f-81c45f825558.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/0826a056-a579-469e-853f-81c45f825558.jpg",
     "name": "Paldea Adventure - Koraidon & Paldean Clodsire Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1133,7 +1133,7 @@
   },
   {
     "id": "29672613-a78d-44bd-9d2b-0885ae3c16ec",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/29672613-a78d-44bd-9d2b-0885ae3c16ec.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/29672613-a78d-44bd-9d2b-0885ae3c16ec.jpg",
     "name": "Kanto Adventure - Pikachu & Snorlax Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1142,7 +1142,7 @@
   },
   {
     "id": "25e67537-eaa3-4e13-b72b-fdef3b65efad",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/25e67537-eaa3-4e13-b72b-fdef3b65efad.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/25e67537-eaa3-4e13-b72b-fdef3b65efad.jpg",
     "name": "Kalos Adventure - Xerneas & Noivern Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1151,7 +1151,7 @@
   },
   {
     "id": "fea3419f-8ddd-4483-89aa-eced5090c580",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/fea3419f-8ddd-4483-89aa-eced5090c580.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/fea3419f-8ddd-4483-89aa-eced5090c580.jpg",
     "name": "Shiny Tinkaton Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1160,7 +1160,7 @@
   },
   {
     "id": "518444ec-42c7-4890-99d6-3c0ddb0efe8b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/518444ec-42c7-4890-99d6-3c0ddb0efe8b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/518444ec-42c7-4890-99d6-3c0ddb0efe8b.jpg",
     "name": "Shiny Kingambit Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1169,7 +1169,7 @@
   },
   {
     "id": "f8f2981e-107a-4d23-8cdb-f5555deeff81",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f8f2981e-107a-4d23-8cdb-f5555deeff81.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f8f2981e-107a-4d23-8cdb-f5555deeff81.jpg",
     "name": "Palafin Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1178,7 +1178,7 @@
   },
   {
     "id": "dd8f0e5c-3abe-49de-8198-2e0f22c1f206",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/dd8f0e5c-3abe-49de-8198-2e0f22c1f206.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/dd8f0e5c-3abe-49de-8198-2e0f22c1f206.jpg",
     "name": "Order Up Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1187,7 +1187,7 @@
   },
   {
     "id": "af6ca4ef-3e48-420a-bcaa-604943132b9b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/af6ca4ef-3e48-420a-bcaa-604943132b9b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/af6ca4ef-3e48-420a-bcaa-604943132b9b.jpg",
     "name": "Nemona Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1196,7 +1196,7 @@
   },
   {
     "id": "5c356897-7e22-476c-90b0-760d2592b1a5",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/5c356897-7e22-476c-90b0-760d2592b1a5.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/5c356897-7e22-476c-90b0-760d2592b1a5.jpg",
     "name": "Iono Zone Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1205,7 +1205,7 @@
   },
   {
     "id": "b76c3ba7-dc95-4836-8c27-cca86808dbf0",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b76c3ba7-dc95-4836-8c27-cca86808dbf0.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b76c3ba7-dc95-4836-8c27-cca86808dbf0.jpg",
     "name": "Connecting World Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1214,7 +1214,7 @@
   },
   {
     "id": "5104bd23-8bbb-4fac-b097-f8fdb78af490",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/5104bd23-8bbb-4fac-b097-f8fdb78af490.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/5104bd23-8bbb-4fac-b097-f8fdb78af490.jpg",
     "name": "Ceruledge & Armarouge Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1223,7 +1223,7 @@
   },
   {
     "id": "6f8b7ad2-ba5a-4ba0-a72e-287fdd8760b5",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/6f8b7ad2-ba5a-4ba0-a72e-287fdd8760b5.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/6f8b7ad2-ba5a-4ba0-a72e-287fdd8760b5.jpg",
     "name": "POKÉMON TRAINERS Rika & Clodsire Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1232,7 +1232,7 @@
   },
   {
     "id": "f5b7e9b1-d658-4e41-a17d-b2dba63f2f9e",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f5b7e9b1-d658-4e41-a17d-b2dba63f2f9e.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f5b7e9b1-d658-4e41-a17d-b2dba63f2f9e.jpg",
     "name": "POKÉMON TRAINERS Penny & Umbreon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1241,7 +1241,7 @@
   },
   {
     "id": "3e563356-90fe-4704-9f10-850143a42a08",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/3e563356-90fe-4704-9f10-850143a42a08.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/3e563356-90fe-4704-9f10-850143a42a08.jpg",
     "name": "Sinnoh Legend Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1250,7 +1250,7 @@
   },
   {
     "id": "b88db692-d0b8-44c8-87db-59fa7ee077b9",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b88db692-d0b8-44c8-87db-59fa7ee077b9.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b88db692-d0b8-44c8-87db-59fa7ee077b9.jpg",
     "name": "Rei & Akari Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1259,7 +1259,7 @@
   },
   {
     "id": "f5591f99-bc24-4c6d-9391-0cc9cb9f665a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f5591f99-bc24-4c6d-9391-0cc9cb9f665a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f5591f99-bc24-4c6d-9391-0cc9cb9f665a.jpg",
     "name": "Radiant Eternatus Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1268,7 +1268,7 @@
   },
   {
     "id": "b594bdba-6d05-40b0-89af-215a05929d32",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b594bdba-6d05-40b0-89af-215a05929d32.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b594bdba-6d05-40b0-89af-215a05929d32.jpg",
     "name": "Radiant Charjabug Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1277,7 +1277,7 @@
   },
   {
     "id": "1924e8f8-0cc7-4db4-b78b-a0c0cac9144a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/1924e8f8-0cc7-4db4-b78b-a0c0cac9144a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/1924e8f8-0cc7-4db4-b78b-a0c0cac9144a.jpg",
     "name": "Mew & Manaphy & Diancie Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1286,7 +1286,7 @@
   },
   {
     "id": "265fd4f8-9f9d-4101-b155-87b400a18b5b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/265fd4f8-9f9d-4101-b155-87b400a18b5b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/265fd4f8-9f9d-4101-b155-87b400a18b5b.jpg",
     "name": "Lucas & Dawn Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1295,7 +1295,7 @@
   },
   {
     "id": "fdb5fc49-70d4-4ce0-b94f-ab7898431b52",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/fdb5fc49-70d4-4ce0-b94f-ab7898431b52.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/fdb5fc49-70d4-4ce0-b94f-ab7898431b52.jpg",
     "name": "Entei & Raikou & Suicune Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1304,7 +1304,7 @@
   },
   {
     "id": "634290b0-4fb6-491c-896a-ca68f365b517",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/634290b0-4fb6-491c-896a-ca68f365b517.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/634290b0-4fb6-491c-896a-ca68f365b517.jpg",
     "name": "Saiko Soda Refresh Full Pattern Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1313,7 +1313,7 @@
   },
   {
     "id": "e023df0d-a0fd-4042-bbbd-586efaf8c18f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/e023df0d-a0fd-4042-bbbd-586efaf8c18f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/e023df0d-a0fd-4042-bbbd-586efaf8c18f.jpg",
     "name": "Pokémon and Tools STEPLADDER Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1322,7 +1322,7 @@
   },
   {
     "id": "13369f06-c021-47b1-8879-d74cae8a7fc3",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/13369f06-c021-47b1-8879-d74cae8a7fc3.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/13369f06-c021-47b1-8879-d74cae8a7fc3.jpg",
     "name": "Playroom Pokémon Center - Orange",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1331,7 +1331,7 @@
   },
   {
     "id": "6e9ebebc-4ca1-4192-9074-3527c32b94bb",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/6e9ebebc-4ca1-4192-9074-3527c32b94bb.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/6e9ebebc-4ca1-4192-9074-3527c32b94bb.jpg",
     "name": "POKÉMON TRAINERS Off Shot! Raihan Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1340,7 +1340,7 @@
   },
   {
     "id": "9d5ef442-b928-4162-b84c-f13894b02278",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/9d5ef442-b928-4162-b84c-f13894b02278.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/9d5ef442-b928-4162-b84c-f13894b02278.jpg",
     "name": "POKÉMON TRAINERS Off Shot! Nessa Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1349,7 +1349,7 @@
   },
   {
     "id": "3c8f1dd4-75c3-455d-8a1a-a6f6b51721de",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/3c8f1dd4-75c3-455d-8a1a-a6f6b51721de.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/3c8f1dd4-75c3-455d-8a1a-a6f6b51721de.jpg",
     "name": "POKÉMON TRAINERS Off Shot! Leon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1358,7 +1358,7 @@
   },
   {
     "id": "bae5f01d-1fc5-4bf4-9f96-75a7a33d3102",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/bae5f01d-1fc5-4bf4-9f96-75a7a33d3102.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/bae5f01d-1fc5-4bf4-9f96-75a7a33d3102.jpg",
     "name": "POKÉMON TRAINERS Off Shot! Gloria & Marnie Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1367,7 +1367,7 @@
   },
   {
     "id": "16547b06-69f4-45d7-a1d2-4287dd4d7187",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/16547b06-69f4-45d7-a1d2-4287dd4d7187.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/16547b06-69f4-45d7-a1d2-4287dd4d7187.jpg",
     "name": "POKÉMON TRAINERS Off Shot! Bede, Victor & Hop Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1376,7 +1376,7 @@
   },
   {
     "id": "d144f7d8-a50e-4f5d-819c-394e4059fc0f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/d144f7d8-a50e-4f5d-819c-394e4059fc0f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/d144f7d8-a50e-4f5d-819c-394e4059fc0f.jpg",
     "name": "Pikachu Forest Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1385,7 +1385,7 @@
   },
   {
     "id": "a73716e0-eb5d-40d6-b932-3f0de7b8a735",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/a73716e0-eb5d-40d6-b932-3f0de7b8a735.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/a73716e0-eb5d-40d6-b932-3f0de7b8a735.jpg",
     "name": "Dash! Eeveelutions Pokémon Center - Yellow",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1394,7 +1394,7 @@
   },
   {
     "id": "3351fbaf-9682-49e9-8907-d72cf9f5339b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/3351fbaf-9682-49e9-8907-d72cf9f5339b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/3351fbaf-9682-49e9-8907-d72cf9f5339b.jpg",
     "name": "Soft and Elegant Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1403,7 +1403,7 @@
   },
   {
     "id": "78aac8d7-02f3-4aaa-b1f3-68671580e1e4",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/78aac8d7-02f3-4aaa-b1f3-68671580e1e4.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/78aac8d7-02f3-4aaa-b1f3-68671580e1e4.jpg",
     "name": "Red & Green Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1412,7 +1412,7 @@
   },
   {
     "id": "0a4d0801-93b4-48c7-9351-ca200f6daf61",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/0a4d0801-93b4-48c7-9351-ca200f6daf61.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/0a4d0801-93b4-48c7-9351-ca200f6daf61.jpg",
     "name": "Poke Ball Design Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1421,7 +1421,7 @@
   },
   {
     "id": "090bab61-d181-4986-bd36-a515afedefad",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/090bab61-d181-4986-bd36-a515afedefad.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/090bab61-d181-4986-bd36-a515afedefad.jpg",
     "name": "Zacian / Zamazenta / Eternatus Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1430,7 +1430,7 @@
   },
   {
     "id": "c9651952-11b3-40b2-8b13-94380e2c5a0a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/c9651952-11b3-40b2-8b13-94380e2c5a0a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/c9651952-11b3-40b2-8b13-94380e2c5a0a.jpg",
     "name": "The ball is really profound, isn't it? Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1439,7 +1439,7 @@
   },
   {
     "id": "bc8bb3bb-60e4-493d-b6a4-9062d7ac9a2e",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/bc8bb3bb-60e4-493d-b6a4-9062d7ac9a2e.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/bc8bb3bb-60e4-493d-b6a4-9062d7ac9a2e.jpg",
     "name": "Shiny Charizard Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1448,7 +1448,7 @@
   },
   {
     "id": "85406f6a-2759-47af-ac2c-fb99ce89bec8",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/85406f6a-2759-47af-ac2c-fb99ce89bec8.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/85406f6a-2759-47af-ac2c-fb99ce89bec8.jpg",
     "name": "Let Me Show You My Strength Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1457,7 +1457,7 @@
   },
   {
     "id": "7555b163-9bd3-40f2-9bf2-922aaacb80fe",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/7555b163-9bd3-40f2-9bf2-922aaacb80fe.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/7555b163-9bd3-40f2-9bf2-922aaacb80fe.jpg",
     "name": "Go! Go! Ditto Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1466,7 +1466,7 @@
   },
   {
     "id": "601b55b9-7bfc-40d7-9030-784544340ccd",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/601b55b9-7bfc-40d7-9030-784544340ccd.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/601b55b9-7bfc-40d7-9030-784544340ccd.jpg",
     "name": "As Expected of You! Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1475,7 +1475,7 @@
   },
   {
     "id": "eb6b0dc9-b48c-423d-9d70-d50dddea9adc",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/eb6b0dc9-b48c-423d-9d70-d50dddea9adc.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/eb6b0dc9-b48c-423d-9d70-d50dddea9adc.jpg",
     "name": "Three Green Onions Corps Story - Sirfetch'd Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1484,7 +1484,7 @@
   },
   {
     "id": "c7e4ea84-f4b9-4bcd-ae33-21e6a96553e8",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/c7e4ea84-f4b9-4bcd-ae33-21e6a96553e8.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/c7e4ea84-f4b9-4bcd-ae33-21e6a96553e8.jpg",
     "name": "Three Green Onions Corps Story - Galarian Farfetch'd Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1493,7 +1493,7 @@
   },
   {
     "id": "08890303-677d-413a-8496-2cc13f6d0626",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/08890303-677d-413a-8496-2cc13f6d0626.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/08890303-677d-413a-8496-2cc13f6d0626.jpg",
     "name": "Three Green Onions Corps Story - Farfetch'd Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1502,7 +1502,7 @@
   },
   {
     "id": "97b92d70-2224-4a5f-b554-535b1179c679",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/97b92d70-2224-4a5f-b554-535b1179c679.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/97b92d70-2224-4a5f-b554-535b1179c679.jpg",
     "name": "Psyduck is carefree Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1511,7 +1511,7 @@
   },
   {
     "id": "b1cf2cb8-4686-4533-834c-13ff234a6802",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b1cf2cb8-4686-4533-834c-13ff234a6802.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b1cf2cb8-4686-4533-834c-13ff234a6802.jpg",
     "name": "NeonColor Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1520,7 +1520,7 @@
   },
   {
     "id": "a7b8d945-f166-4f0d-b60e-42bb91ab5fb9",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/a7b8d945-f166-4f0d-b60e-42bb91ab5fb9.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/a7b8d945-f166-4f0d-b60e-42bb91ab5fb9.jpg",
     "name": "Berry's Forest Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1529,7 +1529,7 @@
   },
   {
     "id": "f80cdbc9-ff19-466c-a2e3-e948c1446520",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f80cdbc9-ff19-466c-a2e3-e948c1446520.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f80cdbc9-ff19-466c-a2e3-e948c1446520.jpg",
     "name": "Zacian & Zamazenta Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1538,7 +1538,7 @@
   },
   {
     "id": "77f9468e-48a9-4367-91ff-a45ab1359cdc",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/77f9468e-48a9-4367-91ff-a45ab1359cdc.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/77f9468e-48a9-4367-91ff-a45ab1359cdc.jpg",
     "name": "Type Fighters Water Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1547,7 +1547,7 @@
   },
   {
     "id": "0db647a6-39b5-4723-a5d0-5284428caf73",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/0db647a6-39b5-4723-a5d0-5284428caf73.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/0db647a6-39b5-4723-a5d0-5284428caf73.jpg",
     "name": "Type Fighters Grass Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1556,7 +1556,7 @@
   },
   {
     "id": "ca41b0e1-cc6f-4250-b11a-130aa32b5276",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/ca41b0e1-cc6f-4250-b11a-130aa32b5276.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/ca41b0e1-cc6f-4250-b11a-130aa32b5276.jpg",
     "name": "Type Fighters Fire Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1565,7 +1565,7 @@
   },
   {
     "id": "255bd93a-ee87-4648-bdf4-3a31aa406a7e",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/255bd93a-ee87-4648-bdf4-3a31aa406a7e.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/255bd93a-ee87-4648-bdf4-3a31aa406a7e.jpg",
     "name": "Grookey & Scorbunny & Sobble Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1574,7 +1574,7 @@
   },
   {
     "id": "555d18ae-cadd-4514-9f02-d5854a48414f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/555d18ae-cadd-4514-9f02-d5854a48414f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/555d18ae-cadd-4514-9f02-d5854a48414f.jpg",
     "name": "Sun & Moon Umbreon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1583,7 +1583,7 @@
   },
   {
     "id": "a0a63700-2e12-49e0-be4e-c89c6bd2dbb6",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/a0a63700-2e12-49e0-be4e-c89c6bd2dbb6.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/a0a63700-2e12-49e0-be4e-c89c6bd2dbb6.jpg",
     "name": "Sun & Moon Espeon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1592,7 +1592,7 @@
   },
   {
     "id": "4ece4cc2-5f40-4b1e-b1a4-f247cdd13907",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/4ece4cc2-5f40-4b1e-b1a4-f247cdd13907.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/4ece4cc2-5f40-4b1e-b1a4-f247cdd13907.jpg",
     "name": "Porygon Maker Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1601,7 +1601,7 @@
   },
   {
     "id": "3b9b0dc0-1e39-4306-b1c4-32b5285a818f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/3b9b0dc0-1e39-4306-b1c4-32b5285a818f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/3b9b0dc0-1e39-4306-b1c4-32b5285a818f.jpg",
     "name": "Super Nerd's Robo-Pikachu Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1610,7 +1610,7 @@
   },
   {
     "id": "ab5a92b9-8e95-45d1-b91a-500c5a828d70",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/ab5a92b9-8e95-45d1-b91a-500c5a828d70.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/ab5a92b9-8e95-45d1-b91a-500c5a828d70.jpg",
     "name": "Super Nerd's Experiment Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1619,7 +1619,7 @@
   },
   {
     "id": "d918e198-ba19-4f99-a443-0fa7c1884bb1",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/d918e198-ba19-4f99-a443-0fa7c1884bb1.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/d918e198-ba19-4f99-a443-0fa7c1884bb1.jpg",
     "name": "Pikachu & Zekrom TAG TEAM GX WCS Illustration Version Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1628,7 +1628,7 @@
   },
   {
     "id": "26c4bff0-edd6-4def-81d1-fdef6bab4719",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/26c4bff0-edd6-4def-81d1-fdef6bab4719.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/26c4bff0-edd6-4def-81d1-fdef6bab4719.jpg",
     "name": "Pikachu & Zekrom TAG TEAM GX Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1637,7 +1637,7 @@
   },
   {
     "id": "c4c86a4c-3133-44e5-973f-d31a8bcb3d05",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/c4c86a4c-3133-44e5-973f-d31a8bcb3d05.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/c4c86a4c-3133-44e5-973f-d31a8bcb3d05.jpg",
     "name": "Magikarp & Wailord TAG TEAM GX Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1646,7 +1646,7 @@
   },
   {
     "id": "1225bc99-2a3d-4554-9323-9d520c274993",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/1225bc99-2a3d-4554-9323-9d520c274993.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/1225bc99-2a3d-4554-9323-9d520c274993.jpg",
     "name": "Gengar & Mimikyu TAG TEAM GX Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1655,7 +1655,7 @@
   },
   {
     "id": "85855340-d353-4f8d-9f32-671652a7067f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/85855340-d353-4f8d-9f32-671652a7067f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/85855340-d353-4f8d-9f32-671652a7067f.jpg",
     "name": "Eevee Friends Sticking Together Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1664,7 +1664,7 @@
   },
   {
     "id": "08374095-8adf-4fcf-85e7-164c4f247727",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/08374095-8adf-4fcf-85e7-164c4f247727.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/08374095-8adf-4fcf-85e7-164c4f247727.jpg",
     "name": "Ultra Sun & Ultra Moon Pokémon Center - Blue",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1673,7 +1673,7 @@
   },
   {
     "id": "c8a61962-6ada-457c-b3ce-2904b52386fa",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/c8a61962-6ada-457c-b3ce-2904b52386fa.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/c8a61962-6ada-457c-b3ce-2904b52386fa.jpg",
     "name": "Transform! Ditto Pokémon Center - Blue",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1682,7 +1682,7 @@
   },
   {
     "id": "8990e86e-a6a7-46a5-b207-239087233437",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/8990e86e-a6a7-46a5-b207-239087233437.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/8990e86e-a6a7-46a5-b207-239087233437.jpg",
     "name": "Sumi-e Series Rayquaza Ver. 2 Pokémon Center - Green",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1691,7 +1691,7 @@
   },
   {
     "id": "f7f9eaa7-0ff3-481a-99df-608bdc9fa52f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f7f9eaa7-0ff3-481a-99df-608bdc9fa52f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f7f9eaa7-0ff3-481a-99df-608bdc9fa52f.jpg",
     "name": "Volkner Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1700,7 +1700,7 @@
   },
   {
     "id": "6184cf7a-926b-4184-b313-b56ff1f4c8c1",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/6184cf7a-926b-4184-b313-b56ff1f4c8c1.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/6184cf7a-926b-4184-b313-b56ff1f4c8c1.jpg",
     "name": "Ultra Moon & Ultra Sun Pokémon Center - Black",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1709,7 +1709,7 @@
   },
   {
     "id": "e2ab5bde-ef5c-4d5a-b5af-b2d4a0c5dd52",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/e2ab5bde-ef5c-4d5a-b5af-b2d4a0c5dd52.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/e2ab5bde-ef5c-4d5a-b5af-b2d4a0c5dd52.jpg",
     "name": "Pyukumuku Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1718,7 +1718,7 @@
   },
   {
     "id": "ab391f27-92ea-4bed-b58b-4ca7b817eeff",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/ab391f27-92ea-4bed-b58b-4ca7b817eeff.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/ab391f27-92ea-4bed-b58b-4ca7b817eeff.jpg",
     "name": "Lucario's Aura Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1727,7 +1727,7 @@
   },
   {
     "id": "39afbd71-0a80-49db-8191-99456d1aec61",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/39afbd71-0a80-49db-8191-99456d1aec61.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/39afbd71-0a80-49db-8191-99456d1aec61.jpg",
     "name": "Good Luck Lillie Pokémon Center - White",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1736,7 +1736,7 @@
   },
   {
     "id": "b7686c46-dd53-4f2e-ae37-d73c4b8a49b4",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/b7686c46-dd53-4f2e-ae37-d73c4b8a49b4.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/b7686c46-dd53-4f2e-ae37-d73c4b8a49b4.jpg",
     "name": "Espeon & Umbreon Flower Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1745,7 +1745,7 @@
   },
   {
     "id": "fb922fa3-7efb-4599-a06b-fc5771b86325",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/fb922fa3-7efb-4599-a06b-fc5771b86325.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/fb922fa3-7efb-4599-a06b-fc5771b86325.jpg",
     "name": "Cynthia Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1754,7 +1754,7 @@
   },
   {
     "id": "f8723431-16f0-45df-aa95-c7f4746e5311",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f8723431-16f0-45df-aa95-c7f4746e5311.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f8723431-16f0-45df-aa95-c7f4746e5311.jpg",
     "name": "Ultra Alola Adventure Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1763,7 +1763,7 @@
   },
   {
     "id": "29ab9091-8936-46fb-a541-303bd3eaa80c",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/29ab9091-8936-46fb-a541-303bd3eaa80c.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/29ab9091-8936-46fb-a541-303bd3eaa80c.jpg",
     "name": "Eevee Capes: Vaporeon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -1772,7 +1772,7 @@
   },
   {
     "id": "f2f8af178-3f22-4270-af10-6d1aa855df9f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokémon-center/f2f8af178-3f22-4270-af10-6d1aa855df9f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/f2f8af178-3f22-4270-af10-6d1aa855df9f.jpg",
     "name": "Eevee Capes: Umbreon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Japan",
@@ -2582,7 +2582,7 @@
   },
   {
     "id": "f9c398f6-361c-4b67-8b02-694081ad505b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/f9c398f6-361c-4b67-8b02-694081ad505b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/f9c398f6-361c-4b67-8b02-694081ad505b.jpg",
     "name": "Terapagos (Terastal Form) Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2591,7 +2591,7 @@
   },
   {
     "id": "7b7fe4fc-50d5-4e31-a35f-db2f56f0c927",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/7b7fe4fc-50d5-4e31-a35f-db2f56f0c927.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/7b7fe4fc-50d5-4e31-a35f-db2f56f0c927.jpg",
     "name": "Teatime Delights Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2600,7 +2600,7 @@
   },
   {
     "id": "9b6382e4-d675-401c-8af2-7f95f902f972",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/9b6382e4-d675-401c-8af2-7f95f902f972.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/9b6382e4-d675-401c-8af2-7f95f902f972.jpg",
     "name": "Tandemaus & Maushold Household Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2609,7 +2609,7 @@
   },
   {
     "id": "fd42d28d-757c-4bce-b470-219a4ee7c6e7",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/fd42d28d-757c-4bce-b470-219a4ee7c6e7.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/fd42d28d-757c-4bce-b470-219a4ee7c6e7.jpg",
     "name": "Sylveon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2618,7 +2618,7 @@
   },
   {
     "id": "4c6582e0-163b-4432-ba34-db462892460a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/4c6582e0-163b-4432-ba34-db462892460a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/4c6582e0-163b-4432-ba34-db462892460a.jpg",
     "name": "Paldea Pokémon Trainers Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2627,7 +2627,7 @@
   },
   {
     "id": "4b6ea200-1103-4d01-9afa-c771cdbf3956",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/4b6ea200-1103-4d01-9afa-c771cdbf3956.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/4b6ea200-1103-4d01-9afa-c771cdbf3956.jpg",
     "name": "Koffing & Weezing Sunset Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2636,7 +2636,7 @@
   },
   {
     "id": "cb0edf60-3910-4e48-bcb0-97a9adafa136",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/cb0edf60-3910-4e48-bcb0-97a9adafa136.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/cb0edf60-3910-4e48-bcb0-97a9adafa136.jpg",
     "name": "Diglett's Cave Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2645,7 +2645,7 @@
   },
   {
     "id": "b9e0a7bd-4ba1-4a4a-8f10-32440c033c6b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/b9e0a7bd-4ba1-4a4a-8f10-32440c033c6b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/b9e0a7bd-4ba1-4a4a-8f10-32440c033c6b.jpg",
     "name": "Charming & Ghostly Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2654,7 +2654,7 @@
   },
   {
     "id": "b71ed2ae-a6cd-4d16-b845-60e659243fa7",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/b71ed2ae-a6cd-4d16-b845-60e659243fa7.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/b71ed2ae-a6cd-4d16-b845-60e659243fa7.jpg",
     "name": "Slither Wing & Iron Moth Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2663,7 +2663,7 @@
   },
   {
     "id": "65d5300e-9041-424b-aa99-72536770bab9",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/65d5300e-9041-424b-aa99-72536770bab9.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/65d5300e-9041-424b-aa99-72536770bab9.jpg",
     "name": "Powerhouse Pokémon Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2672,7 +2672,7 @@
   },
   {
     "id": "8affd29b-ef77-483e-b491-0d320922a969",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/8affd29b-ef77-483e-b491-0d320922a969.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/8affd29b-ef77-483e-b491-0d320922a969.jpg",
     "name": "Moomoo Milk Medley Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2681,7 +2681,7 @@
   },
   {
     "id": "f7f23341-5328-48d3-909b-73dd200ffe40",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/f7f23341-5328-48d3-909b-73dd200ffe40.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/f7f23341-5328-48d3-909b-73dd200ffe40.jpg",
     "name": "Dreamy Dragonite Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2690,7 +2690,7 @@
   },
   {
     "id": "35461f82-207b-40d9-945a-f878b6f7c6cd",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/35461f82-207b-40d9-945a-f878b6f7c6cd.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/35461f82-207b-40d9-945a-f878b6f7c6cd.jpg",
     "name": "Ditto Quartet Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2699,7 +2699,7 @@
   },
   {
     "id": "0798c0ea-5fa9-45f6-a607-a312e5dd2746",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/0798c0ea-5fa9-45f6-a607-a312e5dd2746.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/0798c0ea-5fa9-45f6-a607-a312e5dd2746.jpg",
     "name": "Scorching Charizard Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2708,7 +2708,7 @@
   },
   {
     "id": "1606b408-c818-492d-b908-320db04ae26e",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/1606b408-c818-492d-b908-320db04ae26e.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/1606b408-c818-492d-b908-320db04ae26e.jpg",
     "name": "Pikachu Neon Charge Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2717,7 +2717,7 @@
   },
   {
     "id": "7af17794-2095-4926-924a-eacea0d66771",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/7af17794-2095-4926-924a-eacea0d66771.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/7af17794-2095-4926-924a-eacea0d66771.jpg",
     "name": "Haunted Ruins Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2726,7 +2726,7 @@
   },
   {
     "id": "9611f671-7fe7-4b8b-a725-158e3f74adfd",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/9611f671-7fe7-4b8b-a725-158e3f74adfd.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/9611f671-7fe7-4b8b-a725-158e3f74adfd.jpg",
     "name": "Ghostly Gathering Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2735,7 +2735,7 @@
   },
   {
     "id": "4edfd7b7-d436-4f37-9936-ab77bec56089",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/4edfd7b7-d436-4f37-9936-ab77bec56089.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/4edfd7b7-d436-4f37-9936-ab77bec56089.jpg",
     "name": "Flowing Steel Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2744,7 +2744,7 @@
   },
   {
     "id": "963fdb04-920c-4a7c-991c-c6469d2f0856",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/963fdb04-920c-4a7c-991c-c6469d2f0856.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/963fdb04-920c-4a7c-991c-c6469d2f0856.jpg",
     "name": "Sunflora Inspired by Sunflowers Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2753,7 +2753,7 @@
   },
   {
     "id": "39743ea9-c056-45fb-b79d-ae13159b630b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/39743ea9-c056-45fb-b79d-ae13159b630b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/39743ea9-c056-45fb-b79d-ae13159b630b.jpg",
     "name": "Smeargle Inspired by Self-Portrait as a Painter Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2762,7 +2762,7 @@
   },
   {
     "id": "23bf9cfc-b2c1-4e5d-a98e-b593e3a96f90",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/23bf9cfc-b2c1-4e5d-a98e-b593e3a96f90.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/23bf9cfc-b2c1-4e5d-a98e-b593e3a96f90.jpg",
     "name": "Pikachu Inspired by Self-Portrait with Grey Felt Hat Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2771,7 +2771,7 @@
   },
   {
     "id": "96eb97c8-982f-4b7a-8428-d3a6283ec7f8",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/96eb97c8-982f-4b7a-8428-d3a6283ec7f8.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/96eb97c8-982f-4b7a-8428-d3a6283ec7f8.jpg",
     "name": "Munchlax & Snorlax Inspired by The Bedroom Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2780,7 +2780,7 @@
   },
   {
     "id": "69fadf99-dc79-4d4b-95ac-45a39d4c84c0",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/69fadf99-dc79-4d4b-95ac-45a39d4c84c0.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/69fadf99-dc79-4d4b-95ac-45a39d4c84c0.jpg",
     "name": "Eevee Inspired by Self-Portrait with Straw Hat Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2789,7 +2789,7 @@
   },
   {
     "id": "19a0263a-5720-4fe3-b185-f4bb49a1253a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/19a0263a-5720-4fe3-b185-f4bb49a1253a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/19a0263a-5720-4fe3-b185-f4bb49a1253a.jpg",
     "name": "Corviknight Inspired by Wheatfield with Crows Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2798,7 +2798,7 @@
   },
   {
     "id": "81be8680-35b3-4478-926b-7c2de9e2acb6",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/81be8680-35b3-4478-926b-7c2de9e2acb6.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/81be8680-35b3-4478-926b-7c2de9e2acb6.jpg",
     "name": "Rayquaza Among the Stars Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2807,7 +2807,7 @@
   },
   {
     "id": "71a9c437-f6fb-4b7f-9b07-ab130dee2eef",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/71a9c437-f6fb-4b7f-9b07-ab130dee2eef.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/71a9c437-f6fb-4b7f-9b07-ab130dee2eef.jpg",
     "name": "Rapidash Flames & Fairies Pokémon Center - Rapidash",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2816,7 +2816,7 @@
   },
   {
     "id": "9cde2be7-e5e0-4eaf-8bc2-b7388d5c4528",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/9cde2be7-e5e0-4eaf-8bc2-b7388d5c4528.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/9cde2be7-e5e0-4eaf-8bc2-b7388d5c4528.jpg",
     "name": "Rapidash Flames & Fairies Pokémon Center - Galarian Rapidash",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2825,7 +2825,7 @@
   },
   {
     "id": "029e90d7-0aa4-44f9-8bbd-b546f647815a",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/029e90d7-0aa4-44f9-8bbd-b546f647815a.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/029e90d7-0aa4-44f9-8bbd-b546f647815a.jpg",
     "name": "Luxray Limitless Lightning Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2834,7 +2834,7 @@
   },
   {
     "id": "27bddcb3-52a7-4ac4-b125-9bc9e10a8cda",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/27bddcb3-52a7-4ac4-b125-9bc9e10a8cda.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/27bddcb3-52a7-4ac4-b125-9bc9e10a8cda.jpg",
     "name": "Vulpix Seasons Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2843,7 +2843,7 @@
   },
   {
     "id": "0b290a23-3418-4d80-b29b-582da4b9d781",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/0b290a23-3418-4d80-b29b-582da4b9d781.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/0b290a23-3418-4d80-b29b-582da4b9d781.jpg",
     "name": "Pokémon Trainers Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2852,7 +2852,7 @@
   },
   {
     "id": "546c04de-00c7-4c47-a57a-14dc8d6b22b1",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/546c04de-00c7-4c47-a57a-14dc8d6b22b1.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/546c04de-00c7-4c47-a57a-14dc8d6b22b1.jpg",
     "name": "Pikachu Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2861,7 +2861,7 @@
   },
   {
     "id": "6b7285f1-e112-49bd-80cd-4eee2354218f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/6b7285f1-e112-49bd-80cd-4eee2354218f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/6b7285f1-e112-49bd-80cd-4eee2354218f.jpg",
     "name": "Pikachu Comic-Style Attack 2022 Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2870,7 +2870,7 @@
   },
   {
     "id": "41b5028d-c2ed-4740-ae57-8987dcb3e02d",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/41b5028d-c2ed-4740-ae57-8987dcb3e02d.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/41b5028d-c2ed-4740-ae57-8987dcb3e02d.jpg",
     "name": "Pikachu Comic-Style 2022 Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2879,7 +2879,7 @@
   },
   {
     "id": "d52a4f69-ba6e-4b13-9403-6a563fb006b6",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/d52a4f69-ba6e-4b13-9403-6a563fb006b6.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/d52a4f69-ba6e-4b13-9403-6a563fb006b6.jpg",
     "name": "Pikachu Allover Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2888,7 +2888,7 @@
   },
   {
     "id": "a15cd099-2849-4581-9585-38873589c09b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/a15cd099-2849-4581-9585-38873589c09b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/a15cd099-2849-4581-9585-38873589c09b.jpg",
     "name": "Trubbish & Garbodor Crossing Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2897,7 +2897,7 @@
   },
   {
     "id": "a7a59b3e-4093-4cd7-9b9f-e3d0e9c8a476",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/a7a59b3e-4093-4cd7-9b9f-e3d0e9c8a476.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/a7a59b3e-4093-4cd7-9b9f-e3d0e9c8a476.jpg",
     "name": "Shinx Evolution Electro-Stack Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2906,7 +2906,7 @@
   },
   {
     "id": "309ccf48-a0ae-4aaf-9c4a-947367bc1b77",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/309ccf48-a0ae-4aaf-9c4a-947367bc1b77.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/309ccf48-a0ae-4aaf-9c4a-947367bc1b77.jpg",
     "name": "Rayquaza Legendary Lights Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2915,7 +2915,7 @@
   },
   {
     "id": "2cab4cd7-fd97-4f73-b729-7e717902d7f1",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/2cab4cd7-fd97-4f73-b729-7e717902d7f1.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/2cab4cd7-fd97-4f73-b729-7e717902d7f1.jpg",
     "name": "Lucario Focused Fighter Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2924,7 +2924,7 @@
   },
   {
     "id": "1aef73fd-32ee-48d1-a8fd-ce22a7669845",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/1aef73fd-32ee-48d1-a8fd-ce22a7669845.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/1aef73fd-32ee-48d1-a8fd-ce22a7669845.jpg",
     "name": "Venusaur Tropical Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2933,7 +2933,7 @@
   },
   {
     "id": "8bb0e485-3b82-4b1d-9998-205e91d95739",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/8bb0e485-3b82-4b1d-9998-205e91d95739.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/8bb0e485-3b82-4b1d-9998-205e91d95739.jpg",
     "name": "Pokémon Sunny Sea Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2942,7 +2942,7 @@
   },
   {
     "id": "dfd13ea0-e2a2-44bf-875e-cf8db89669c3",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/dfd13ea0-e2a2-44bf-875e-cf8db89669c3.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/dfd13ea0-e2a2-44bf-875e-cf8db89669c3.jpg",
     "name": "Wooloo Fluffy Flock Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2951,7 +2951,7 @@
   },
   {
     "id": "98223391-5b1c-442b-a443-a67d838fb791",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/98223391-5b1c-442b-a443-a67d838fb791.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/98223391-5b1c-442b-a443-a67d838fb791.jpg",
     "name": "Pokémon Cool Friends Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2960,7 +2960,7 @@
   },
   {
     "id": "ed72f871-9117-4167-9013-aa47758eea94",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/ed72f871-9117-4167-9013-aa47758eea94.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/ed72f871-9117-4167-9013-aa47758eea94.jpg",
     "name": "Sirfetch'd Strike Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2969,7 +2969,7 @@
   },
   {
     "id": "6fd38ca6-bdf0-4cdf-aa9d-bb0dbcb48081",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/6fd38ca6-bdf0-4cdf-aa9d-bb0dbcb48081.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/6fd38ca6-bdf0-4cdf-aa9d-bb0dbcb48081.jpg",
     "name": "Morpeko Moods Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2978,7 +2978,7 @@
   },
   {
     "id": "4bacff3e-24ec-4abc-a0bb-87b8e690a1dd",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/4bacff3e-24ec-4abc-a0bb-87b8e690a1dd.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/4bacff3e-24ec-4abc-a0bb-87b8e690a1dd.jpg",
     "name": "Eevee Prismatic Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2987,7 +2987,7 @@
   },
   {
     "id": "9dce3235-dad6-4477-a00e-f892e8d83193",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/9dce3235-dad6-4477-a00e-f892e8d83193.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/9dce3235-dad6-4477-a00e-f892e8d83193.jpg",
     "name": "Ball Guy Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -2996,7 +2996,7 @@
   },
   {
     "id": "fd27fc31-17ee-4f3e-85d3-9403bee6c10c",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/fd27fc31-17ee-4f3e-85d3-9403bee6c10c.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/fd27fc31-17ee-4f3e-85d3-9403bee6c10c.jpg",
     "name": "Pokémon Celebration Pokémon Center - White",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3005,7 +3005,7 @@
   },
   {
     "id": "1a17b663-4a98-45e7-b496-517cfe52e370",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/1a17b663-4a98-45e7-b496-517cfe52e370.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/1a17b663-4a98-45e7-b496-517cfe52e370.jpg",
     "name": "Pokémon Celebration Pokémon Center - Black",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3014,7 +3014,7 @@
   },
   {
     "id": "bcc74014-91f7-4b7f-813b-22234cc79861",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/bcc74014-91f7-4b7f-813b-22234cc79861.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/bcc74014-91f7-4b7f-813b-22234cc79861.jpg",
     "name": "Psyduck Bewildered Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3023,7 +3023,7 @@
   },
   {
     "id": "1db84594-9811-4bf8-83b7-c4560538f225",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/1db84594-9811-4bf8-83b7-c4560538f225.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/1db84594-9811-4bf8-83b7-c4560538f225.jpg",
     "name": "Pikachu Adventure Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3032,7 +3032,7 @@
   },
   {
     "id": "670a7479-d150-401b-808c-457b2a01a05f",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/670a7479-d150-401b-808c-457b2a01a05f.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/670a7479-d150-401b-808c-457b2a01a05f.jpg",
     "name": "Mimikyu Scribbles Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3041,7 +3041,7 @@
   },
   {
     "id": "663f0135-ec0e-415b-a323-3d3de3d4eb0b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/663f0135-ec0e-415b-a323-3d3de3d4eb0b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/663f0135-ec0e-415b-a323-3d3de3d4eb0b.jpg",
     "name": "Mew Celestial Circles Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3050,7 +3050,7 @@
   },
   {
     "id": "8b20e215-7607-4a2c-b114-721f126948de",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/8b20e215-7607-4a2c-b114-721f126948de.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/8b20e215-7607-4a2c-b114-721f126948de.jpg",
     "name": "Island Guardian Stained Glass Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3059,7 +3059,7 @@
   },
   {
     "id": "844aec19-839d-4388-a3ec-af9b9010c85d",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/844aec19-839d-4388-a3ec-af9b9010c85d.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/844aec19-839d-4388-a3ec-af9b9010c85d.jpg",
     "name": "Gigantamax Pikachu & Gigantamax Eevee Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3068,7 +3068,7 @@
   },
   {
     "id": "24b38d6c-dd63-448c-99c6-43af524e9467",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/24b38d6c-dd63-448c-99c6-43af524e9467.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/24b38d6c-dd63-448c-99c6-43af524e9467.jpg",
     "name": "Gigantamax Charizard Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3077,7 +3077,7 @@
   },
   {
     "id": "d031025b-66df-4215-a7be-960ca5a1144d",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/d031025b-66df-4215-a7be-960ca5a1144d.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/d031025b-66df-4215-a7be-960ca5a1144d.jpg",
     "name": "Galarian Ponyta Gradient Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3086,7 +3086,7 @@
   },
   {
     "id": "a0f2877c-a162-4ebd-b5eb-a660d4d203da",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/a0f2877c-a162-4ebd-b5eb-a660d4d203da.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/a0f2877c-a162-4ebd-b5eb-a660d4d203da.jpg",
     "name": "Pikachu Chalk Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3095,7 +3095,7 @@
   },
   {
     "id": "f27fcd3c-c06c-4a0f-a394-86c3a41594a1",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/f27fcd3c-c06c-4a0f-a394-86c3a41594a1.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/f27fcd3c-c06c-4a0f-a394-86c3a41594a1.jpg",
     "name": "London City Pikachu Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3104,7 +3104,7 @@
   },
   {
     "id": "0102f710-e3f3-4ca7-870a-a9e1aebeb61d",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/0102f710-e3f3-4ca7-870a-a9e1aebeb61d.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/0102f710-e3f3-4ca7-870a-a9e1aebeb61d.jpg",
     "name": "Eevee Friendship Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3113,7 +3113,7 @@
   },
   {
     "id": "7d9e6374-9ad1-483a-84bd-4f518963a4a0",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/7d9e6374-9ad1-483a-84bd-4f518963a4a0.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/7d9e6374-9ad1-483a-84bd-4f518963a4a0.jpg",
     "name": "Charizard Fury Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3122,7 +3122,7 @@
   },
   {
     "id": "4fea7008-d979-4946-a516-9d610af42cec",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/4fea7008-d979-4946-a516-9d610af42cec.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/4fea7008-d979-4946-a516-9d610af42cec.jpg",
     "name": "Eevee Pixel Collection Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3131,7 +3131,7 @@
   },
   {
     "id": "e78176bc-c6ef-4525-a798-fd2ba17967e2",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/e78176bc-c6ef-4525-a798-fd2ba17967e2.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/e78176bc-c6ef-4525-a798-fd2ba17967e2.jpg",
     "name": "Raichu Art Nouveau Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3140,7 +3140,7 @@
   },
   {
     "id": "c2871934-99fc-4660-bf34-0b339d9f19b7",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/c2871934-99fc-4660-bf34-0b339d9f19b7.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/c2871934-99fc-4660-bf34-0b339d9f19b7.jpg",
     "name": "Look Upon The Stars Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3149,7 +3149,7 @@
   },
   {
     "id": "2a005b5d-8713-4d17-b163-e21f58013a1b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/2a005b5d-8713-4d17-b163-e21f58013a1b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/2a005b5d-8713-4d17-b163-e21f58013a1b.jpg",
     "name": "Poké Ball Pattern Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3158,7 +3158,7 @@
   },
   {
     "id": "fd63ffb4-6f84-4d6a-ba40-6b3d34ce6cd6",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/fd63ffb4-6f84-4d6a-ba40-6b3d34ce6cd6.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/fd63ffb4-6f84-4d6a-ba40-6b3d34ce6cd6.jpg",
     "name": "Mimikyu Day by Day Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3167,7 +3167,7 @@
   },
   {
     "id": "5145174c-5898-463a-b08f-cdeca030e5de",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/5145174c-5898-463a-b08f-cdeca030e5de.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/5145174c-5898-463a-b08f-cdeca030e5de.jpg",
     "name": "Eevee Capes Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3176,7 +3176,7 @@
   },
   {
     "id": "30817d79-49d7-41f3-8754-b4ffe04224d8",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/30817d79-49d7-41f3-8754-b4ffe04224d8.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/30817d79-49d7-41f3-8754-b4ffe04224d8.jpg",
     "name": "Alolan Exeggutor Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3185,7 +3185,7 @@
   },
   {
     "id": "09338dd5-3932-4e90-b129-1a3baf3e3ab5",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/09338dd5-3932-4e90-b129-1a3baf3e3ab5.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/09338dd5-3932-4e90-b129-1a3baf3e3ab5.jpg",
     "name": "Espeon & Umbreon Starry Constellations Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3194,7 +3194,7 @@
   },
   {
     "id": "730debd1-192b-4d9d-8943-f283f8fb570c",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/730debd1-192b-4d9d-8943-f283f8fb570c.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/730debd1-192b-4d9d-8943-f283f8fb570c.jpg",
     "name": "Pumpkin Pikachu Halloween Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3203,7 +3203,7 @@
   },
   {
     "id": "e4c55529-ce6d-46d0-b982-9cb2104c1c98",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/e4c55529-ce6d-46d0-b982-9cb2104c1c98.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/e4c55529-ce6d-46d0-b982-9cb2104c1c98.jpg",
     "name": "Pikachu Pixel Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3212,7 +3212,7 @@
   },
   {
     "id": "b4c8e1c0-288d-4bbc-8e3a-c0297b889404",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/b4c8e1c0-288d-4bbc-8e3a-c0297b889404.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/b4c8e1c0-288d-4bbc-8e3a-c0297b889404.jpg",
     "name": "Ditto As Raichu Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3221,7 +3221,7 @@
   },
   {
     "id": "2e573900-4aa5-41e9-bc8b-b7331d1b26a0",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/2e573900-4aa5-41e9-bc8b-b7331d1b26a0.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/2e573900-4aa5-41e9-bc8b-b7331d1b26a0.jpg",
     "name": "Charizard Crimson Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3230,7 +3230,7 @@
   },
   {
     "id": "e99d2b4a-3b83-4980-b2e3-a59c308acaeb",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/e99d2b4a-3b83-4980-b2e3-a59c308acaeb.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/e99d2b4a-3b83-4980-b2e3-a59c308acaeb.jpg",
     "name": "Berry Snorlax Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3239,7 +3239,7 @@
   },
   {
     "id": "b79350e6-188c-4105-a981-174ab54230ae",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/b79350e6-188c-4105-a981-174ab54230ae.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/b79350e6-188c-4105-a981-174ab54230ae.jpg",
     "name": "Gengar Smirk Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3248,7 +3248,7 @@
   },
   {
     "id": "2eba6677-3f3f-4e48-acff-153922e3d45b",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/2eba6677-3f3f-4e48-acff-153922e3d45b.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/2eba6677-3f3f-4e48-acff-153922e3d45b.jpg",
     "name": "Lapras Surf Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3257,7 +3257,7 @@
   },
   {
     "id": "bfacb873-2a6f-4098-af90-63fe2a224845",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/bfacb873-2a6f-4098-af90-63fe2a224845.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/bfacb873-2a6f-4098-af90-63fe2a224845.jpg",
     "name": "Pokémon-Amie Substitute Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3266,7 +3266,7 @@
   },
   {
     "id": "d3c47e1e-28fd-41db-863c-cbd0be54f92c",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/d3c47e1e-28fd-41db-863c-cbd0be54f92c.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/d3c47e1e-28fd-41db-863c-cbd0be54f92c.jpg",
     "name": "Mythical Mania Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3275,7 +3275,7 @@
   },
   {
     "id": "3aa4ff85-d6f8-4d40-9bfd-780d769952c9",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/3aa4ff85-d6f8-4d40-9bfd-780d769952c9.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/3aa4ff85-d6f8-4d40-9bfd-780d769952c9.jpg",
     "name": "Shiny Mega Gyarados Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3284,7 +3284,7 @@
   },
   {
     "id": "83cf5a67-f620-495b-8410-04b19322d1dc",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/83cf5a67-f620-495b-8410-04b19322d1dc.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/83cf5a67-f620-495b-8410-04b19322d1dc.jpg",
     "name": "Mega Mewtwo X and Mega Mewtwo Y Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3293,7 +3293,7 @@
   },
   {
     "id": "62ae4d55-ffd4-4d83-995d-ec0a84d12d49",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/62ae4d55-ffd4-4d83-995d-ec0a84d12d49.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/62ae4d55-ffd4-4d83-995d-ec0a84d12d49.jpg",
     "name": "Mega Lucario Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3302,7 +3302,7 @@
   },
   {
     "id": "6a8401f3-a72d-47e9-b338-4b5ee5995e1c",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/6a8401f3-a72d-47e9-b338-4b5ee5995e1c.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/6a8401f3-a72d-47e9-b338-4b5ee5995e1c.jpg",
     "name": "Mega Gengar Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3311,7 +3311,7 @@
   },
   {
     "id": "de31b7c1-e5b5-4e8c-8335-3508c22656e8",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/de31b7c1-e5b5-4e8c-8335-3508c22656e8.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/de31b7c1-e5b5-4e8c-8335-3508c22656e8.jpg",
     "name": "Just My Type Pokémon Center - Water",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3320,7 +3320,7 @@
   },
   {
     "id": "5e17d012-076f-4698-b90d-899a81530024",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/5e17d012-076f-4698-b90d-899a81530024.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/5e17d012-076f-4698-b90d-899a81530024.jpg",
     "name": "Just My Type Pokémon Center - Grass",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3329,7 +3329,7 @@
   },
   {
     "id": "a1a32994-2ca8-4435-9ac1-8674b5e94852",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/a1a32994-2ca8-4435-9ac1-8674b5e94852.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/a1a32994-2ca8-4435-9ac1-8674b5e94852.jpg",
     "name": "Just My Type Pokémon Center - Fire",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3338,7 +3338,7 @@
   },
   {
     "id": "699e591b-2b69-4482-98f3-aa0d0e7f6b58",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/699e591b-2b69-4482-98f3-aa0d0e7f6b58.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/699e591b-2b69-4482-98f3-aa0d0e7f6b58.jpg",
     "name": "Bellossom Tropics Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3347,7 +3347,7 @@
   },
   {
     "id": "e9d29bbd-5210-4936-a274-3e8a1d5af0dd",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/e9d29bbd-5210-4936-a274-3e8a1d5af0dd.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/e9d29bbd-5210-4936-a274-3e8a1d5af0dd.jpg",
     "name": "Pokémon 20th Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3356,7 +3356,7 @@
   },
   {
     "id": "d9c662cf-c640-420f-8c0e-2d8c7be52482",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/d9c662cf-c640-420f-8c0e-2d8c7be52482.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/d9c662cf-c640-420f-8c0e-2d8c7be52482.jpg",
     "name": "Pikachu Comic-Style 2016 Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3365,7 +3365,7 @@
   },
   {
     "id": "d887a5ef-14be-4f4b-a364-517b9bca7ade",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/d887a5ef-14be-4f4b-a364-517b9bca7ade.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/d887a5ef-14be-4f4b-a364-517b9bca7ade.jpg",
     "name": "Shiny Mega Rayquaza Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3374,7 +3374,7 @@
   },
   {
     "id": "7f043aaa-e1b9-424a-9c99-274945d8897e",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/7f043aaa-e1b9-424a-9c99-274945d8897e.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/7f043aaa-e1b9-424a-9c99-274945d8897e.jpg",
     "name": "Mega Charizard Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
@@ -3383,7 +3383,7 @@
   },
   {
     "id": "5a634ebd-4a98-4ab1-971f-6b6ae247826c",
-    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokémon-center/5a634ebd-4a98-4ab1-971f-6b6ae247826c.jpg",
+    "image": "https://pokemon-sleeve-database.com/images/sleeves/western/pokemon-center/5a634ebd-4a98-4ab1-971f-6b6ae247826c.jpg",
     "name": "Hoopa Unbound Pokémon Center",
     "brand": "The Pokémon Company",
     "region": "Western",
