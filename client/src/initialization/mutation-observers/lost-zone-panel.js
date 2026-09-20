@@ -15,6 +15,39 @@ import { getZone } from '../../setup/zones/get-zone.js';
 
 const RAIL_ID = 'lostZoneRail';
 const MAX_THUMBS = 14;
+const STORAGE_KEY = 'ptcg-sim.show-lost-zone';
+
+export const isLostZoneEnabled = () => {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setLostZoneEnabled = (enabled) => {
+  const isEnabled = Boolean(enabled);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, isEnabled ? 'true' : 'false');
+    }
+  } catch {}
+  const rail = document.getElementById(RAIL_ID);
+  if (rail) {
+    rail.style.display = isEnabled ? 'flex' : 'none';
+  }
+  const checkbox = document.getElementById('showLostZoneCheckbox');
+  if (checkbox && checkbox.checked !== isEnabled) {
+    checkbox.checked = isEnabled;
+  }
+  return isEnabled;
+};
+
+export const toggleLostZone = (force) => {
+  const current = isLostZoneEnabled();
+  const next = force !== undefined ? Boolean(force) : !current;
+  return setLostZoneEnabled(next);
+};
 
 function buildRail() {
   let rail = document.getElementById(RAIL_ID);
@@ -22,6 +55,7 @@ function buildRail() {
 
   rail = document.createElement('div');
   rail.id = RAIL_ID;
+  rail.style.display = isLostZoneEnabled() ? 'flex' : 'none';
   rail.innerHTML = `
     <button id="lostZoneRailToggle" type="button" title="Collapse the Lost Zone rail">LZ</button>
     <div class="lost-zone-rail-side" data-lost-user="opp" data-drop-zone="lostZone" data-drop-user="opp">
@@ -87,6 +121,10 @@ function renderSide(rail, user) {
 
 export const initializeLostZonePanel = () => {
   const rail = buildRail();
+  if (typeof window !== 'undefined') {
+    window.toggleLostZone = toggleLostZone;
+    window.setLostZoneEnabled = setLostZoneEnabled;
+  }
   const render = () => {
     renderSide(rail, 'self');
     renderSide(rail, 'opp');

@@ -101,3 +101,18 @@ describe('Lost Zone rail — accepts drag/drop as an in-mat lostZone drop', () =
     assert.match(DRAG_SRC, /explicitDrop\.dataset\.dropUser !== mouseClick\.cardUser/);
   });
 });
+
+describe('Lost Zone rail — disabled by default with toggle support', () => {
+  const body = ruleBody(INDEX_CSS, '#lostZoneRail');
+
+  it('is disabled / hidden by default via display: none', () => {
+    assert.match(body, /display:\s*none/);
+  });
+
+  it('exports toggle and enabled state helpers', () => {
+    assert.match(PANEL_SRC, /export const isLostZoneEnabled/);
+    assert.match(PANEL_SRC, /export const setLostZoneEnabled/);
+    assert.match(PANEL_SRC, /export const toggleLostZone/);
+  });
+});
+
