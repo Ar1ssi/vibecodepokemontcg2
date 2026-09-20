@@ -8,6 +8,10 @@ import {
   lookAtCards,
   stopLookingAtCards,
 } from '../../../actions/general/reveal-and-hide.js';
+import {
+  isLostZoneEnabled,
+  setLostZoneEnabled,
+} from '../../mutation-observers/lost-zone-panel.js';
 
 export const initializeSettings = () => {
   const darkModeCheckbox = document.getElementById('darkModeCheckbox');
@@ -32,6 +36,14 @@ export const initializeSettings = () => {
       }
     }
   });
+
+  const showLostZoneCheckbox = document.getElementById('showLostZoneCheckbox');
+  if (showLostZoneCheckbox) {
+    showLostZoneCheckbox.checked = isLostZoneEnabled();
+    showLostZoneCheckbox.addEventListener('change', () => {
+      setLostZoneEnabled(showLostZoneCheckbox.checked);
+    });
+  }
 
   const changeBackgroundButton = document.getElementById(
     'changeBackgroundButton'
