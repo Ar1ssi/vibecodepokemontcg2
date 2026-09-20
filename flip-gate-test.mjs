@@ -22,7 +22,7 @@ const T = (name, cond, extra = '') => {
 
 let failed = 0;
 
-async function waitFor(page, fn, timeout = 25000) {
+async function waitFor(page, fn, timeout = 25000, label = '') {
   const started = Date.now();
   let last;
   while (Date.now() - started < timeout) {
@@ -30,7 +30,7 @@ async function waitFor(page, fn, timeout = 25000) {
     if (last) return last;
     await page.waitForTimeout(150);
   }
-  throw new Error(`timeout waiting for page predicate (last=${JSON.stringify(last)})`);
+  throw new Error(`timeout waiting for ${label || fn.toString()} (last=${JSON.stringify(last)})`);
 }
 
 async function openClient(browser, name) {
@@ -133,13 +133,28 @@ try {
       caller = 'B';
       break;
     }
+    // Under design 013 E2E mode, handleServerTurnOrderCall auto-answers the coin call
+    // directly over socket without displaying #rulesCoinCallOverlay (matches playtest-bot.mjs
+    // and test-card-inspector-e2e.mjs). If hands are already dealt, proceed.
+    const [aHandCount, bHandCount] = await Promise.all([
+      a.page.evaluate(() => window.__ptcg.zone('self', 'hand').count),
+      b.page.evaluate(() => window.__ptcg.zone('self', 'hand').count),
+    ]);
+    if (aHandCount >= 7 && bHandCount >= 7) {
+      break;
+    }
     await a.page.waitForTimeout(200);
   }
-  if (!caller) throw new Error('coin call overlay never opened');
+  console.log('Coin caller page:', caller || 'auto-resolved (E2E)');
 
-  await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count === 7);
-  await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count === 7);
-  T('2. both hands dealt (7 cards each)', true);
+  await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
+  await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
+  const [aCount, bCount] = await Promise.all([
+    a.page.evaluate(() => window.__ptcg.zone('self', 'hand').count),
+    b.page.evaluate(() => window.__ptcg.zone('self', 'hand').count),
+  ]);
+  const countsLegal = (aCount === 8 && bCount === 7) || (aCount === 7 && bCount === 8);
+  T('2. both hands dealt (starter has 8 with turn-1 draw, defender has 7)', countsLegal, `A=${aCount}, B=${bCount}`);
 
   // Until the first server view lands, rulesState.turnPlayer is still the local coin
   // flip's guess, which the server never agreed to (I27) — both clients can believe it is
