@@ -49,12 +49,12 @@ The parser's first job is to bucket a card by `supertype` (`'Pokémon' | 'Traine
 | **VMAX** | 3 prizes on KO; evolves from a V. | `subtypes` includes `vmax` | Legacy (SwSh) |
 | **VSTAR** | 2 prizes; evolves from a V; has a "VSTAR Power" instead of an ability. | `subtypes` includes `vstar` | Legacy (SwSh) |
 | **GX** | 2 prizes ("GX rule"); a KO does **not** lose the match (30c App. 19). | `subtypes` includes `gx` | Legacy (SM) |
-| **Mega Evolution** | 2 prizes; a new (SV) evolution mechanic, often from a non-standard line. | `rarity` includes `mega` | Modern (SV) |
+| **Mega Evolution** | 3 prizes; a new (SV) evolution mechanic, often from a non-standard line. | `rarity` includes `mega` | Modern (SV) |
 | **Tera / Terastal** | SV "Terastal" — a Tera Type swap; not a prize modifier. | `subtypes`/text; no dedicated TCGdex field | Modern (SV) |
 
 > **Note:** prize-count derivation lives in `prizesForKO()` (`card-classify.mjs`;
 > re-exported from `ko-flow.mjs`) and is built from `rarity` + `subtypes`
-> (**VMAX / TAG TEAM / V-UNION → 3**; ex / GX / V / VSTAR / Mega / LEGEND → 2;
+> (**VMAX / TAG TEAM / V-UNION / modern Mega ex → 3**; ex / GX / V / VSTAR / legacy Mega-EX / LEGEND → 2;
 > default → 1). There is no "2 extra prizes" ex rule and no GX match-loss:
 > `koOutcome()` returns a plain `{ type: 'prizes', count }`. Single definition of the
 > rule-box test is `isRuleBoxPokemon()` in the same module. Tested in
@@ -356,7 +356,7 @@ passes `{ type, family }` objects. **Special-energy card *effects* are classifie
 
 | Rule | Where | Status |
 |---|---|---|
-| KO → prize count by card class | `prizesForKO()` (`card-classify.mjs`) — VMAX/TAG TEAM/V-UNION→**3**, ex/GX/V/VSTAR/Mega/LEGEND→**2**, else→**1** | ✅ |
+| KO → prize count by card class | `prizesForKO()` (`card-classify.mjs`) — VMAX/TAG TEAM/V-UNION/modern Mega→**3**, ex/GX/V/VSTAR/legacy Mega/LEGEND→**2**, else→**1** | ✅ |
 | **Win = all 6 prizes taken** | `awardPrizes()` (`won: total >= 6`) — **not** in `checkWinConditions` | ✅ |
 | **Win = opponent has no Pokémon in play** | `checkWinConditions()` (active + bench both 0) | ✅ |
 | **Win = opponent deck-out** | `checkWinConditions()` (`deckCounts[turnPlayer] === 0`) | ✅ |

@@ -22,14 +22,15 @@ import test from 'node:test';
     } = await import('../collect-usable-abilities.mjs');
     
     // ── KO / prizes ──
-    test('prizesForKO: standard = 1, ex/mega = 2, VMAX = 3', () => {
+    test('prizesForKO: standard/legacy Mega = 1/2, modern Mega & VMAX = 3', () => {
       assert.equal(prizesForKO({ rarity: 'Common' }), 1);
       assert.equal(prizesForKO({ rarity: 'Double rare', subtypes: ['ex'] }), 2);
       assert.equal(prizesForKO({ name: 'Cetitan ex' }), 2);
       assert.equal(prizesForKO({ subtypes: ['VMAX'] }), 3);
       assert.equal(prizesForKO({ subtypes: ['VSTAR'] }), 2);
-      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 2);
-      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 2);
+      assert.equal(prizesForKO({ rarity: 'Mega Hyper Rare' }), 3);
+      assert.equal(prizesForKO({ name: 'Mega Charizard ex' }), 3);
+      assert.equal(prizesForKO({ name: 'M Charizard-EX' }), 2);
       assert.equal(prizesForKO({ name: 'Yanmega' }), 1);
       assert.equal(prizesForKO({ name: 'Pikachu V' }), 2);
       assert.equal(prizesForKO({ name: 'Lugia VSTAR' }), 2);
@@ -60,7 +61,7 @@ import test from 'node:test';
       assert.deepEqual(koOutcome({ subtypes: ['GX'] }), { type: 'prizes', count: 2 });
       assert.deepEqual(koOutcome({ name: 'Ninetales GX' }), { type: 'prizes', count: 2 });
       assert.deepEqual(koOutcome({ name: 'Cetitan ex' }), { type: 'prizes', count: 2 });
-      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 2 });
+      assert.deepEqual(koOutcome({ name: 'Mega Charizard ex' }), { type: 'prizes', count: 3 });
       assert.deepEqual(koOutcome({ rarity: 'Common' }), { type: 'prizes', count: 1 });
     });
 

@@ -202,7 +202,7 @@ import test from 'node:test';
     });
 
     // ── prize table ────────────────────────────────────────────────────────
-    test('prizesForKO: 3 for VMAX / TAG TEAM / V-UNION', () => {
+    test('prizesForKO: 3 for VMAX / TAG TEAM / V-UNION / modern Mega', () => {
       assert.equal(prizesForKO(card({ subtypes: ['VMAX'] })), 3);
       assert.equal(prizesForKO(card({ name: 'Lapras VMAX' })), 3);
       assert.equal(prizesForKO(card({ name: 'Pikachu & Zekrom-GX' })), 3);
@@ -211,14 +211,40 @@ import test from 'node:test';
       assert.equal(prizesForKO(card({ subtypes: ['V-UNION'] })), 3);
     });
 
-    test('prizesForKO: 2 for ex / GX / V / VSTAR / Mega / LEGEND / Double Rare', () => {
+    // Gen 9 Mega Evolution Pokémon ex (2025 Mega Evolution Series) give up 3
+    // prizes; Gen 6 XY Mega Evolution Pokémon-EX give up 2 (rulebook, App. 1
+    // vs. App. 14). Regression: Mega Greninja ex (Chaos Rising) awarded 2.
+    test('prizesForKO: 3 for modern Mega ex, 2 for legacy Mega-EX', () => {
+      assert.equal(prizesForKO(card({ name: 'Mega Greninja ex' })), 3);
+      assert.equal(
+        prizesForKO(
+          card({ name: 'Mega Greninja ex', subtypes: ['Mega Evolution', 'ex'], rarity: 'Double Rare' })
+        ),
+        3
+      );
+      assert.equal(prizesForKO(card({ name: 'Mega Venusaur ex' })), 3);
+      assert.equal(prizesForKO(card({ rarity: 'Mega Hyper Rare' })), 3);
+      assert.equal(prizesForKO(card({ name: 'M Venusaur-EX' })), 2);
+      assert.equal(prizesForKO(card({ name: 'M Lucario-EX' })), 2);
+      assert.equal(prizesForKO(card({ name: 'Primal Kyogre-EX' })), 2);
+    });
+
+    // Legacy names must never classify as modern when the card data carries a
+    // "MEGA" subtype token (TCGdex uses `stage: "MEGA"`, which importers can
+    // surface as a subtype) — the printed name wins.
+    test('legacy Mega-EX name overrides a mega subtype token', () => {
+      const legacyWithSubtype = card({ name: 'M Lucario-EX', subtypes: ['MEGA', 'EX'] });
+      assert.equal(isModernMegaCard(legacyWithSubtype), false);
+      assert.equal(isLegacyMegaCard(legacyWithSubtype), true);
+      assert.equal(prizesForKO(legacyWithSubtype), 2);
+    });
+
+    test('prizesForKO: 2 for ex / GX / V / VSTAR / LEGEND / Double Rare', () => {
       assert.equal(prizesForKO(card({ subtypes: ['ex'] })), 2);
       assert.equal(prizesForKO(card({ name: 'Cetitan ex' })), 2);
       assert.equal(prizesForKO(card({ name: 'Mewtwo GX' })), 2);
       assert.equal(prizesForKO(card({ name: 'Pikachu V' })), 2);
       assert.equal(prizesForKO(card({ name: 'Lugia VSTAR' })), 2);
-      assert.equal(prizesForKO(card({ name: 'M Venusaur-EX' })), 2);
-      assert.equal(prizesForKO(card({ name: 'Mega Venusaur ex' })), 2);
       assert.equal(prizesForKO(card({ name: 'Lugia LEGEND' })), 2);
       assert.equal(prizesForKO(card({ rarity: 'Double rare' })), 2);
     });

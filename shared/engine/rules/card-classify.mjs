@@ -94,9 +94,17 @@ export function isTeraCard(card = {}) {
   return /\btera\b/i.test(nameOf(card));
 }
 
+// Legacy Mega Evolution / Primal Reversion is written "<M|Primal> <Name>-EX"
+// (e.g. "M Lucario-EX", "Primal Kyogre-EX") in the XY Series.
+const LEGACY_MEGA_NAME_RE = /^(?:m|primal)\s+\S/i;
+
 // Modern (2025+) Mega Evolution spells the full word "Mega"; the legacy
-// abbreviation "M Venusaur-EX" must not match here.
+// abbreviation "M Venusaur-EX" must not match here. The printed name wins over
+// subtype/rarity fallbacks: TCGdex reports `stage: "MEGA"` for legacy cards
+// (an importer can surface that as a "MEGA" subtype token), which would
+// otherwise mis-flag every legacy Mega as modern.
 export function isModernMegaCard(card = {}) {
+  if (LEGACY_MEGA_NAME_RE.test(nameOf(card))) return false;
   if (lower(card?.rarity).includes('mega')) return true;
   if (subtypeTokens(card).some((token) => token.includes('mega'))) return true;
   return /\bmega\b/i.test(nameOf(card));
@@ -104,8 +112,7 @@ export function isModernMegaCard(card = {}) {
 
 // Legacy Mega Evolution / Primal Reversion: "<M|Primal> <Name>-EX".
 export function isLegacyMegaCard(card = {}) {
-  const name = nameOf(card);
-  if (!/^(?:m|primal)\s+\S/i.test(name)) return false;
+  if (!LEGACY_MEGA_NAME_RE.test(nameOf(card))) return false;
   return !isModernMegaCard(card);
 }
 
@@ -193,16 +200,24 @@ export function isRuleBoxPokemon(card = {}) {
 }
 
 // ── prizes ─────────────────────────────────────────────────────────────────
-// 3: VMAX / TAG TEAM / V-UNION.  2: ex / GX / V / VSTAR / Mega (legacy and
-// modern) / LEGEND / Double Rare.  1: everything else. (App. 10, 16, 19, 26.)
+// 3: VMAX / TAG TEAM / V-UNION / modern Mega Evolution Pokémon ex.  2: ex /
+// GX / V / VSTAR / legacy Mega (Gen 6 "M …-EX") / LEGEND / Double Rare.
+// 1: everything else. (App. 1, 10, 14, 16, 19, 26.)
 export function prizesForKO(card = {}) {
-  if (isVmaxCard(card) || isTagTeamCard(card) || isVUnionCard(card)) return 3;
+  if (
+    isVmaxCard(card) ||
+    isTagTeamCard(card) ||
+    isVUnionCard(card) ||
+    isModernMegaCard(card)
+  ) {
+    return 3;
+  }
   if (
     isExCard(card) ||
     isGxCard(card) ||
     isVCard(card) ||
     isVstarCard(card) ||
-    isMegaCard(card) ||
+    isLegacyMegaCard(card) ||
     isLegendCard(card) ||
     lower(card?.rarity).includes('double rare')
   ) {
