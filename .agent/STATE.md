@@ -4,20 +4,20 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 217
-Focus: Disabled Lost Zone rail by default with quick toggle in Settings.
+Session: 218
+Focus: Scrape and merge 740 historical coins from Bulbapedia Gens I-VIII.
 Active: none.
-Next: sync primary local repository on main and verify full test suite.
+Next: none.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
+- Coin catalog expanded 202 → 942 coins. Gens V, VII, VIII previously zero; now 100+/150+/100+ respectively.
+- New coins use placeholder asset refs (`src/assets/coins/bulbapedia/{ID}.jpg`); actual images not downloaded.
 - Lost Zone rail is disabled (`display: none`) by default; toggled via Settings `showLostZoneCheckbox` or `window.toggleLostZone()`.
-- Lost Zone rail is positioned in the board area (`left: 60%, top: 28vh, height: 52vh`).
 - Knockout promotion uses openMatPick with cancellable: false when bench has eligible Pokémon.
 - Under server authority, turn-start draws are executed authoritatively on the server; client must never emit a start-of-turn draw command.
-- In 2P setup under server authority, coin call is resolved server-side; `maybeBeginServerTurnOrder` must wait for `openingSetupReadyForCoinFlip` so setupPrizes and dealOrder settle before drawing opening hands.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S218 feat: merged 740 Bulbapedia coins Gens I-VIII → 942 total (sleeves.test.mjs now includes coin test).
 - S217 patch: disabled Lost Zone rail by default with quick toggle in Settings (showLostZoneCheckbox).
 - S216 patch: moved Lost Zone rail to the board area beside the playmat as outlined (index.css).
-- S215 feature: linked existing mat picker to Active Pokémon knockout flow for player choice (PR #178).
