@@ -1,0 +1,122 @@
+Pokémon attacks + abilities full audit — pkmncards linked query corpus
+Source: out/pkmn-pokemon-cards.json (6098 printings)
+Entries parsed: 8690 attacks, 4228 abilities
+
+=== Attack families ===
+   1437  flat
+    850  bench-damage
+    741  conditional-damage
+    726  next-turn-lock
+    635  per-energy
+    597  discard-cost
+    429  coin-flip
+    316  draw-attach
+    243  immunity
+    217  search-deck
+    183  status-poisoned
+    174  damage-prevention
+    172  status-paralyzed
+    166  self-damage
+    165  multi-target
+    154  switch
+    151  discard-opponent
+    150  heal
+    147  per-prize
+    135  move-energy
+    135  status-asleep
+    133  per-heads-coin
+    130  status-confused
+    109  status-burned
+     46  shuffle-cost
+     45  draw-until
+     44  reveal-hand
+     36  next-turn-bonus
+     34  copy-attack
+     33  self-status
+     26  effect-prevention
+     20  conditional-ko
+     15  return-self
+     12  recover-status
+     11  lost-zone
+     11  devolve-opponent
+     11  mirror-heal
+      9  hp-cap-damage
+      8  look-own-deck
+      6  first-turn-attack
+      5  once-per-turn
+      5  look-any-deck
+      5  supporter-effect
+      3  deferred-damage
+      3  return-opponent-energy
+      2  devolve-self
+      2  retaliate
+      1  move-damage-counter
+      1  neutralize-opponent-energy
+      1  extra-by-type
+
+=== Ability families ===
+    507  status
+    321  weakness
+    305  damage-prevent
+    295  search
+    294  move-damage
+    256  switch
+    223  opponent-disrupt
+    219  draw
+    211  heal
+    198  attach
+    172  retreat-cost
+    167  passive
+    151  effect-prevent
+    119  recursion
+     95  energy-redirect
+     91  cost-discount
+     72  evolve
+     67  look-at-top
+     63  ko-prevention
+     52  prize-modify
+     47  tool-cap
+     38  status-recover
+     30  copy-attack
+     30  on-opponent-evolve
+     24  when-played
+     22  hp-bonus
+     19  energy-multiplier
+     18  type-change
+     17  end-of-turn
+     13  checkup
+     12  self-return
+     10  attach-restriction
+      9  setup
+      9  energy-on-ko
+      9  damage-bonus
+      8  coin-control
+      6  attack-cost
+      5  attack-inheritance
+      3  energy-type
+      3  deck-peek
+      3  damage-reduce
+      3  attach-permission
+      2  self-attach-energy
+      2  lost-zone
+      2  discard-bench
+      2  discard-cost
+      1  joke
+      1  extra-supporter
+      1  go-first
+      1  bench-guard
+
+=== Issue counts ===
+
+Gaps: 0 attacks, 0 abilities
+Engine-run failures (error/throw): 0
+Lines not attributed to any attack/ability: 0 on 0 cards
+
+
+=== ATTACK GAPS — unknown / flat-with-text (0) ===
+
+=== ABILITY GAPS — unknown / unrecognized passive (0) ===
+
+=== ENGINE ERRORS (0) ===
+
+=== UNATTRIBUTED LINES (0 cards) ===
