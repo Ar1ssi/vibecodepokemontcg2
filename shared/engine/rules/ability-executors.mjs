@@ -30,6 +30,26 @@ export function requiresActiveSpot(card) {
   return ACTIVE_SPOT_CLAUSE.test(textOf(card));
 }
 
+// "When you play this Pokémon from your hand to evolve 1 of your Pokémon"
+// (Primarina Enriching Melody) is a one-shot trigger, legal only on the turn
+// that Pokémon was played. Distinct from the played-to-Bench wording, which
+// has its own one-shot window.
+const EVOLVE_PLAYED_CLAUSE =
+  /when you play this pok[eé]mon from your hand to evolve\b/;
+
+export function isEvolvePlayedTrigger(card) {
+  const arrText =
+    Array.isArray(card?.abilities) && card.abilities.length > 0
+      ? typeof card.abilities[0] === 'string'
+        ? card.abilities[0]
+        : card.abilities[0]?.text
+      : '';
+  return (
+    EVOLVE_PLAYED_CLAUSE.test(textOf(card)) ||
+    EVOLVE_PLAYED_CLAUSE.test(lower(arrText || ''))
+  );
+}
+
 // --- passive -----------------------------------------------------------
 
 // How many cost symbols a passive ability removes from attacks.

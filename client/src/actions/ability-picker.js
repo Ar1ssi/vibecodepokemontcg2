@@ -18,11 +18,24 @@ import {
 
 // "When you play this Pokémon onto your Bench" triggers aren't gated by the
 // per-turn abilitiesUsed map (that resets every turn) — they're gated by the
-// one-shot window opened when the card is played from hand to Bench.
-const isPlayedToBenchTrigger = (card) => {
-  const text = card?.ability?.text ?? card?.abilityText ?? card?.text ?? '';
-  return parseAbility(text).some((s) => s.type === 'whenPlayedAbility');
+// one-shot window opened when the card is played from hand to Bench. The
+// evolve wording ("from your hand to evolve") is gated by the turn it evolved.
+const abilityTextOf = (card) => {
+  const first = Array.isArray(card?.abilities) && card.abilities.length > 0
+    ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
+    : '';
+  return first || card?.ability?.text || card?.abilityText || card?.text || '';
 };
+
+const isPlayedToBenchTrigger = (card) =>
+  parseAbility(abilityTextOf(card)).some(
+    (s) => s.type === 'whenPlayedAbility' && !s.evolve
+  );
+
+const isEvolvePlayedTrigger = (card) =>
+  parseAbility(abilityTextOf(card)).some(
+    (s) => s.type === 'whenPlayedAbility' && s.evolve === true
+  );
 
 // Human-readable labels for each family
 const FAMILY_LABELS = {
@@ -61,8 +74,10 @@ export async function collectUsableAbilities(user) {
   const usable = filterUsableAbilities(candidates, {
     rulesEnabled: rulesState.enabled,
     isUsed: (card) =>
-      isPlayedToBenchTrigger(card)
-        ? !canUsePlayedToBenchTrigger(user, card)
+      isPlayedToBenchTrigger(card) || isEvolvePlayedTrigger(card)
+        ? isEvolvePlayedTrigger(card)
+          ? abilityUsed(user, card) || card.enteredPlayTurn !== rulesState.turnNumber
+          : !canUsePlayedToBenchTrigger(user, card)
         : abilityUsed(user, card),
   });
   return usable.map((entry) =>

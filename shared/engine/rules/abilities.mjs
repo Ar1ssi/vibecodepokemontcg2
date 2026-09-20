@@ -412,11 +412,16 @@ export function parseAbility(text = '') {
     const amount = lower.match(/heal\s+(\d+)\s+damage/)?.[1] || lower.match(/remove\s+(?:up to\s+)?(\d+)\s+damage/)?.[1] || null;
     const all = lower.includes('all damage');
     const cure = lower.includes('special condition') || lower.includes('recover');
+    // "Heal all damage from 1 of your Pokémon" (Primarina Enriching Melody) lets the
+    // player pick ANY of their Pokémon, unlike a self/Active-only heal. Flag it so the
+    // interactive executor opens a target picker instead of healing the ability's owner.
+    const target = /from 1 of your pok[eé]mon/.test(lower) ? '1 of your Pokémon' : null;
     steps.push({
       type: 'healAbility',
       amount: amount ? Number(amount) : null,
       all,
       cure,
+      target,
       guidance: all
         ? 'Once during your turn: heal all damage from the target Pokémon.'
         : amount
@@ -509,6 +514,15 @@ export function parseAbility(text = '') {
     const count = countMatch ? Number(countMatch[1]) : 1;
     const basic = lower.includes('basic');
     const energyType = parseEnergyTypeHint(lower);
+    // This family is a catch-all for "discard … from your hand" costs that
+    // mention Energy somewhere in the card, so the discarded card is not
+    // always Energy (e.g. "discard a card … draw 3 cards"). Scope the
+    // Energy-only filter to the discard clause itself, and expose the same
+    // engine fields (`energyOnly`/`basicOnly`/`energyTypes`) the server
+    // executor's discard-cost step already reads (I: Mega Greninja ex let any
+    // hand card be discarded). Without these the filter matches every card.
+    const discardClauses = lower.match(/[^.]*\bdiscard\b[^.]*/g) || [];
+    const energyInDiscard = discardClauses.some((clause) => clause.includes('energy'));
     const typeLabel = energyType
       ? `${basic ? 'Basic ' : ''}${energyType.charAt(0).toUpperCase()}${energyType.slice(1)} `
       : basic ? 'Basic ' : '';
@@ -517,6 +531,9 @@ export function parseAbility(text = '') {
       count,
       basic,
       energyType,
+      energyOnly: energyInDiscard,
+      ...(energyInDiscard ? { basicOnly: basic } : {}),
+      ...(energyInDiscard && energyType ? { energyTypes: [energyType] } : {}),
       guidance: `Once during your turn: discard ${count > 1 ? `${count} ` : ''}${typeLabel}Energy from your hand (cost).`,
     });
   }
@@ -678,9 +695,13 @@ export function parseAbility(text = '') {
   }
 
   // ── 11. Evolve (put an evolution card onto this Pokémon) ────────────────
+  // Excludes the "when you play this Pokémon from your hand to evolve 1 of your
+  // Pokémon" trigger wording: there "evolve" is the trigger condition, not an
+  // activated ability that evolves this Pokémon (Primarina Enriching Melody).
   if (
     lower.includes('evolve') &&
-    (lower.includes('this pokémon') || lower.includes('onto this pokémon'))
+    (lower.includes('this pokémon') || lower.includes('onto this pokémon')) &&
+    !/from your hand to evolve/.test(lower)
   ) {
     steps.push({
       type: 'evolveAbility',
@@ -707,8 +728,15 @@ export function parseAbility(text = '') {
 
   // ── 13. When-played (one-shot on play) ──────────────────────────────────
   if (lower.includes('when you play')) {
+    // "from your hand to evolve 1 of your Pokémon" is the evolve trigger (Primarina
+    // Enriching Melody), gated by the turn that Pokémon evolved — not the played-to-
+    // Bench window. Flagged so the orchestrators pick the right gate.
+    const evolve = /when you play this pok[eé]mon from your hand to evolve/.test(lower);
+    const toBench = /when you play this pok[eé]mon from your hand (?:on)?to your bench/.test(lower);
     steps.push({
       type: 'whenPlayedAbility',
+      evolve,
+      toBench,
       guidance: 'When you play this Pokémon: resolve the one-shot effect as described.',
     });
   }

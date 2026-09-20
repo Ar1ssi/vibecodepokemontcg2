@@ -54,6 +54,7 @@ import {
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
   requiresActiveSpot,
+  isEvolvePlayedTrigger,
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -2299,6 +2300,18 @@ export function validateLegality(state, command) {
           return {
             allowed: false,
             reason: 'This ability can only be used from the Active Spot.',
+          };
+        }
+        // "When you play this Pokémon from your hand to evolve" (Primarina
+        // Enriching Melody) is a one-shot trigger, legal only on the turn that
+        // Pokémon evolved. enteredPlayTurn is stamped on evolve.
+        if (
+          isEvolvePlayedTrigger(cardRef.card) &&
+          cardRef.card.enteredPlayTurn !== state.turn?.number
+        ) {
+          return {
+            allowed: false,
+            reason: 'This ability can only be used the turn it evolved.',
           };
         }
       }

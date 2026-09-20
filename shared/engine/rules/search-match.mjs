@@ -190,6 +190,43 @@ export function matchesSearch(card, what = '') {
   return true;
 }
 
+/**
+ * True when a discard-cost step restricts the discard to Energy cards.
+ *
+ * The ability parser marks this explicitly with `energyOnly` (false = an
+ * explicit "discard any card" cost, e.g. "discard a card … draw 3"), while
+ * trainer/stadium steps may carry only the raw filter fields. Falling back to
+ * `basic`/`energyType` keeps older trainer step shapes working.
+ */
+export function isEnergyDiscardCost(step = {}) {
+  if (step.energyOnly === false) return false;
+  return (
+    step.energyOnly === true ||
+    step.basicOnly === true ||
+    (Array.isArray(step.energyTypes) && step.energyTypes.length > 0) ||
+    step.basic === true ||
+    Boolean(step.energyType)
+  );
+}
+
+/**
+ * Whether `card` can pay a discard-cost step. A plain hand-discard cost
+ * ("discard 2 cards") accepts any card; an Energy-scoped one is filtered by
+ * type/basic through `energySearchWhat` + `matchesSearch`. Shared by the
+ * client ability/trainer pickers so a typed Energy cost never offers the
+ * whole hand (and a non-Energy cost never hides cards behind an Energy-only
+ * filter).
+ */
+export function matchesDiscardCost(card, step = {}) {
+  if (!isEnergyDiscardCost(step)) return true;
+  const what = energySearchWhat({
+    basic: step.basicOnly === true || step.basic === true,
+    energyType:
+      (Array.isArray(step.energyTypes) && step.energyTypes[0]) || step.energyType || null,
+  });
+  return matchesSearch(card, what);
+}
+
 /** Filter candidates; returns [] and calls onNoMatches instead of silently showing full deck. */
 export function filterSearchMatches(cards, what, { onNoMatches } = {}) {
   const matches = cards.filter((c) => matchesSearch(c, what));

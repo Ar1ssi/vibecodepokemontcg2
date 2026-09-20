@@ -229,7 +229,9 @@ const isRecursion = (t) => {
 };
 
 const isEvolve = (t) =>
-  (t.includes('evolve') && (t.includes('this pokémon') || t.includes('onto this pokémon'))) ||
+  (t.includes('evolve') &&
+    (t.includes('this pokémon') || t.includes('onto this pokémon')) &&
+    !t.includes('from your hand to evolve')) ||
   t.includes('can evolve during the turn you play it') ||
   t.includes('play this card from your hand to evolve');
 

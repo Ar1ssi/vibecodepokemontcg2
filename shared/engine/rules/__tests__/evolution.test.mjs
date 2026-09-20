@@ -180,6 +180,19 @@ import test from 'node:test';
       assert.ok(steps.some((s) => s.type === 'whenPlayedAbility'));
     });
 
+    test('ability parser: Primarina Enriching Melody is an evolve-triggered full heal of a chosen Pokémon', () => {
+      const steps = parseAbility(
+        'Once during your turn, when you play this Pokémon from your hand to evolve 1 of your Pokémon, you may use this Ability. Heal all damage from 1 of your Pokémon.'
+      );
+      const heal = steps.find((s) => s.type === 'healAbility');
+      assert.equal(heal.all, true);
+      assert.equal(heal.target, '1 of your Pokémon');
+      const trigger = steps.find((s) => s.type === 'whenPlayedAbility');
+      assert.equal(trigger.evolve, true);
+      // "evolve" here is the trigger condition, not an activated evolve ability.
+      assert.equal(steps.some((s) => s.type === 'evolveAbility'), false);
+    });
+
     test('ability parser: effect prevention', () => {
       const steps = parseAbility("Prevent all effects of your opponent's abilities.");
       assert.equal(steps[0].type, 'effectPreventAbility');

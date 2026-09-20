@@ -60,7 +60,7 @@ import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
 import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects, isStadiumEnergyAttachHeal, stadiumExtraAttacksFromZone } from '/shared/engine/rules/stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
-import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { isPokemonCard, matchesSearch, filterSearchMatches, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
   parseSpecialEnergyEffects,
@@ -102,7 +102,7 @@ import {
 } from '../netcode/apply-view.js';
 import { isBasicPokemon, isEnergy, isTrainer } from '/shared/engine/cards.mjs';
 import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
-import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-affordances.mjs';
+import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTriggerCard } from './action-affordances.mjs';
     
     let initialized = false;
 
@@ -1761,7 +1761,10 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       const isAbilitySpent = (user, card) =>
         isPlayedToBenchTriggerCard(card)
           ? !canUsePlayedToBenchTrigger(user, card)
-          : abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed);
+          : isEvolvePlayedTriggerCard(card)
+            ? abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed) ||
+              card?.enteredPlayTurn !== rulesState.turnNumber
+            : abilityUsedFor(card, abilityUsed(user, card), rulesState.flags?.[user]?.abilitiesUsed);
 
       const refresh = async () => {
         const gen = ++generation;
@@ -2367,6 +2370,33 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       }
     };
 
+    // "Heal all damage from 1 of your Pokémon" (Primarina Enriching Melody) lets the
+    // player choose among their damaged Pokémon. Returns the chosen card, or null
+    // when nothing is damaged / the pick is canceled (so the ability is not spent).
+    const pickDamageHealTarget = async (user, source) => {
+      const candidates = [];
+      const active = getZone(user, 'active').array[0];
+      if (active?.type === 'Pokémon') candidates.push(active);
+      for (const c of getZone(user, 'bench').array) {
+        if (c?.type === 'Pokémon') candidates.push(c);
+      }
+      const damaged = candidates.filter(
+        (c) => (parseInt(c.image?.damageCounter?.textContent || '0', 10) || 0) > 0
+      );
+      if (damaged.length === 0) {
+        appendMessage('', `  ${source.name}: no damaged Pokémon to heal`, 'announcement', false);
+        return null;
+      }
+      if (damaged.length === 1) return damaged[0];
+      const result = await awaitChoicePicker({
+        title: `${source.name} — choose a Pokémon to heal`,
+        candidates: damaged,
+        zoneFrom: 'board',
+        destination: null,
+      });
+      return result.ok ? result.picks[0] : null;
+    };
+
     export async function runAbilitySteps(user, card) {
       if (rulesState.enabled && rulesState.turnPlayer !== user) {
         appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
@@ -2380,9 +2410,32 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       // Last Ditch Catch) aren't a recurring once-per-turn action — they're
       // gated by the one-shot window opened when the card was played from
       // hand to Bench, not the per-turn abilitiesUsed map.
-      const isPlayedToBenchTrigger = steps.some((s) => s.type === 'whenPlayedAbility');
+      //
+      // "When you play this Pokémon from your hand to evolve 1 of your Pokémon"
+      // (Primarina Enriching Melody) is a different trigger: it is legal only on
+      // the turn that Pokémon evolved, so gate it on enteredPlayTurn instead.
+      const isPlayedToBenchTrigger = steps.some(
+        (s) => s.type === 'whenPlayedAbility' && !s.evolve
+      );
+      const isEvolvePlayedTrigger = steps.some(
+        (s) => s.type === 'whenPlayedAbility' && s.evolve
+      );
 
-      if (isPlayedToBenchTrigger) {
+      if (isEvolvePlayedTrigger) {
+        if (
+          rulesState.enabled &&
+          (abilityUsed(user, card) ||
+            card.enteredPlayTurn !== rulesState.turnNumber)
+        ) {
+          appendMessage(
+            user,
+            `⛔ ${card.name}'s ability only works the turn it was played from your hand to evolve.`,
+            'announcement',
+            false
+          );
+          return;
+        }
+      } else if (isPlayedToBenchTrigger) {
         if (rulesState.enabled && !canUsePlayedToBenchTrigger(user, card)) {
           appendMessage(
             user,
@@ -2404,6 +2457,16 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
         return;
       }
 
+      // runWhenPlayedStep already resolves the draw/search body of a "when you
+      // play" ability, so the matching plan step is skipped to avoid resolving
+      // it twice (the same reason the bench trigger skipped its search).
+      const whenPlayedEffect = parseWhenPlayedEffect(card);
+      const hasWhenPlayedTrigger = isPlayedToBenchTrigger || isEvolvePlayedTrigger;
+      const whenPlayedHandlesDraw =
+        hasWhenPlayedTrigger && whenPlayedEffect?.kind === 'draw';
+      const whenPlayedHandlesSearch =
+        hasWhenPlayedTrigger && whenPlayedEffect?.kind === 'search';
+
       const name = card.ability?.name || 'Ability';
       appendMessage('', `✦ ${card.name} — ${name}:`, 'announcement', false);
 
@@ -2415,13 +2478,15 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
         if (item.action === 'skip') continue;
 
         if (item.action === 'draw') {
+          // A when-played ability's draw is resolved inside runWhenPlayedStep.
+          if (whenPlayedHandlesDraw) continue;
           await executeAbilityDraw(user, item.step);
           executed = true;
         } else if (item.action === 'search') {
-          // A when-played + search combo (isPlayedToBenchTrigger) resolves
-          // its search entirely inside runWhenPlayedStep below — running it
-          // again here would pop the picker twice for one trigger.
-          if (isPlayedToBenchTrigger) continue;
+          // A when-played + search combo resolves its search entirely inside
+          // runWhenPlayedStep below — running it again here would pop the
+          // picker twice for one trigger.
+          if (whenPlayedHandlesSearch) continue;
           const completed = await runAbilitySearchPicker(user, card, item.step);
           if (markAbilityUseAfterSearchStep(completed)) {
             executed = true;
@@ -2449,21 +2514,35 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
           const fn = ABILITY_EXECUTOR_FNS[item.executor];
           if (fn) {
             if (item.step?.unlimited) skipAbilityMark = true;
-            await fn(user, true, card, orchestrated);
+            let executorOpts = orchestrated;
+            if (item.executor === 'heal' && item.step?.target === '1 of your Pokémon') {
+              // Pick any of your damaged Pokémon before healing (Primarina).
+              const targetCard = await pickDamageHealTarget(user, card);
+              if (!targetCard) continue;
+              executorOpts = {
+                orchestrated: true,
+                targetCard,
+                healAll: item.step.all === true,
+                amount: item.step.amount ?? null,
+              };
+            }
+            await fn(user, true, card, executorOpts);
             executed = true;
           }
         } else if (item.action === 'discard-cost') {
           const hand = getZone(user, 'hand');
-          const whatFilter = energySearchWhat({
-            basic: item.step.basic,
-            energyType: item.step.energyType,
-          });
-          const candidates = hand.array.filter((c) => matchesSearch(c, whatFilter));
+          const energyScoped = isEnergyDiscardCost(item.step);
+          const candidates = hand.array.filter((c) => matchesDiscardCost(c, item.step));
           if (!candidates.length) {
-            appendMessage('', '  no matching Energy in hand to pay the cost', 'announcement', false);
+            appendMessage(
+              '',
+              `  no matching ${energyScoped ? 'Energy' : 'card'} in hand to pay the cost`,
+              'announcement',
+              false
+            );
           } else {
             const result = await awaitChoicePicker({
-              title: `${card.name} — discard ${item.step.count} Energy (cost)`,
+              title: `${card.name} — discard ${item.step.count} ${energyScoped ? 'Energy' : `card${item.step.count > 1 ? 's' : ''}`} (cost)`,
               candidates,
               zoneFrom: 'hand',
               destination: 'discard',

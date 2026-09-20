@@ -958,7 +958,9 @@ export function executeSteps(draft, {
           break;
         }
         // 'heal' with no amount is "heal all damage" (Wally's Compassion).
-        const healAmt = step.amount ?? (step.type === 'heal' ? Infinity : 30);
+        // A heal ability flagged `all` ("Heal all damage from 1 of your Pokémon",
+        // Primarina Enriching Melody) also heals to full, not a flat 30.
+        const healAmt = step.amount ?? (step.type === 'heal' || step.all ? Infinity : 30);
         // Edge Case 10: re-resolve damaged in-play Pokemon dynamically
         const typeFilter = Array.isArray(step.types) && step.types.length
           ? step.types.map((ty) => String(ty).toLowerCase())

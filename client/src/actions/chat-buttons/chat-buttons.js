@@ -79,7 +79,7 @@ import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../c
 import { applyStadiumEffect, parseStadiumOncePerTurn, parseStadiumSetupDraw, parseStadiumDamagePrevention, parseStadiumDamagePreventionDetail, stadiumPreventionApplies, getStadiumDamageReduction, getStadiumAttackDamageBonus, getStadiumAttackCostIncrease, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, effectiveHp, getStadiumRetreatCost, stadiumBlocksStatusApplication, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumSearch, matchesStadiumEvolveSearch, isStadiumGlimwoodReFlip, stadiumBlocksHealing, isRepeatableStadiumAction, stadiumExtraAttacksFromZone, mergeAttacks } from '/shared/engine/rules/stadium-effects.mjs';
 import { flipCoin, parseAttackArgs, parseRetreatArgs, rngFromCoin, splitEmitAndTail, isMirrorReplayCall } from '../../setup/general/sync-action-args.mjs';
 import { dispatchAuthoritativeAction, readCardInstanceId } from '../../setup/netcode/authoritative-dispatch.js';
-import { matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { matchesSearch, filterSearchMatches, energySearchWhat, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 
 const abilityBlockedByStadium = (user, target) => {
@@ -2744,39 +2744,41 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
   processAction(user, emit, 'retreat', [resolvedBenchIdx]);
 };
 
-// How many damage counters a heal ability removes: "remove all damage" →
-// 'all', "remove 2 damage" → 2, unparseable → 1.
+// How many damage counters a heal ability removes: "heal/remove all damage" →
+// 'all', "heal 2 damage" → 2, unparseable → 1.
 const parseHealAmount = (abilityText) => {
   const t = String(abilityText || '').toLowerCase();
-  if (/remove (all|every) damage/.test(t)) return 'all';
-  const m = t.match(/remove (\d+) damage/);
+  if (/(?:heal|remove) (?:all|every) damage/.test(t)) return 'all';
+  const m = t.match(/(?:heal|remove) (\d+) damage/);
   if (m) return parseInt(m[1], 10);
   return 1;
 };
 
-// Heal ability (taxonomy C, once-per-turn): remove N damage counters from the
-// active Pokémon using the active's own heal-family ability. Does NOT end the
-// turn (like retreat). Damage-counter updates relay in multiplayer via the
-// existing updateDamageCounter/removeDamageCounter actions.
-export const healAbility = async (user, emit = true, targetCard = null) => {
+// Heal ability (taxonomy C, once-per-turn): remove damage counters using the
+// ability's own heal family. Does NOT end the turn (like retreat). Damage-counter
+// updates relay in multiplayer via the existing updateDamageCounter/removeDamageCounter
+// actions.
+//
+// `sourceCard` is the Pokémon whose ability is being used (the ability owner); the
+// Pokémon actually healed is `opts.targetCard` (defaults to the source). Abilities
+// that heal "1 of your Pokémon" (Primarina Enriching Melody) resolve their target in
+// the orchestrator and pass it here; `opts.healAll` forces a full heal.
+export const healAbility = async (user, emit = true, sourceCard = null, opts = {}) => {
   if (rulesState.enabled && rulesState.turnPlayer !== user) {
     appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
     return;
   }
 
-  const _activeCard = getZone(user, 'active').array[0];
-  const target = targetCard || _activeCard;
-  if (!target) {
-    appendMessage(user, '⛔ No Pokémon to heal.', 'announcement', false);
+  const source = sourceCard || getZone(user, 'active').array[0];
+  if (!source) {
+    appendMessage(user, '⛔ No Pokémon with a heal ability.', 'announcement', false);
     return;
   }
+  const target = opts?.targetCard || source;
 
-  const zoneId = targetCard && targetCard !== _activeCard ? 'bench' : 'active';
-  const zoneIdx = targetCard && targetCard !== _activeCard
-    ? getZone(user, 'bench').array.indexOf(targetCard) : 0;
-
+  await ensureCardData(source);
   await ensureCardData(target);
-  if (abilityBlockedByStadium(user, target)) return;
+  if (abilityBlockedByStadium(user, source)) return;
   if (stadiumBlocksHealing()) {
     appendMessage(
       user,
@@ -2786,20 +2788,20 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     );
     return;
   }
-  if (classifyAbility(target) !== 'heal') {
+  if (classifyAbility(source) !== 'heal') {
     appendMessage(
       user,
-      `⛔ ${target.name || 'This Pokémon'} has no heal ability.`,
+      `⛔ ${source.name || 'This Pokémon'} has no heal ability.`,
       'announcement',
       false
     );
     return;
   }
 
-  if (rulesState.enabled && abilityUsed(user, target)) {
+  if (rulesState.enabled && abilityUsed(user, source)) {
     appendMessage(
       user,
-      `⛔ ${target.name}'s heal ability was already used this turn.`,
+      `⛔ ${source.name}'s heal ability was already used this turn.`,
       'announcement',
       false
     );
@@ -2807,8 +2809,24 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
   }
 
   const abilityText =
-    target.ability?.text ?? target.abilityText ?? target.text ?? '';
-  const amount = parseHealAmount(abilityText);
+    source.ability?.text ?? source.abilityText ?? source.text ?? '';
+  const amount = opts?.healAll
+    ? 'all'
+    : opts?.amount != null
+      ? opts.amount
+      : parseHealAmount(abilityText);
+
+  const activeCard = getZone(user, 'active').array[0];
+  let zoneId = 'active';
+  let zoneIdx = 0;
+  if (target !== activeCard) {
+    const benchIdx = getZone(user, 'bench').array.indexOf(target);
+    if (benchIdx >= 0) {
+      zoneId = 'bench';
+      zoneIdx = benchIdx;
+    }
+  }
+
   let current = 0;
   if (target.image?.damageCounter) {
     current =
@@ -2831,7 +2849,7 @@ export const healAbility = async (user, emit = true, targetCard = null) => {
     updateDamageCounter(user, zoneId, zoneIdx, current - amount, emit);
   }
 
-  if (rulesState.enabled) markAbilityUsed(user, target);
+  if (rulesState.enabled) markAbilityUsed(user, source);
   appendMessage(
     user,
     `💖 ${target.name} heals ${healed} damage counter${healed !== 1 ? 's' : ''}.`,
@@ -3847,16 +3865,13 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null, op
     : null;
 
   if (costStep) {
-    const whatFilter = energySearchWhat({
-      basic: costStep.basic,
-      energyType: costStep.energyType,
-    });
+    const energyScoped = isEnergyDiscardCost(costStep);
     const hand = getZone(user, 'hand');
-    const candidates = hand.array.filter((c) => matchesSearch(c, whatFilter));
+    const candidates = hand.array.filter((c) => matchesDiscardCost(c, costStep));
     if (candidates.length === 0) {
       appendMessage(
         user,
-        `⛔ Discard ${whatFilter} from your hand to use ${target.name}'s ability.`,
+        `⛔ Discard ${energyScoped ? 'a matching Energy card' : 'a card'} from your hand to use ${target.name}'s ability.`,
         'announcement',
         false
       );
@@ -3867,7 +3882,7 @@ export const moveDamageAbility = async (user, emit = true, targetCard = null, op
       await moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move', emit);
     } else {
       const pick = await _pickFromList(
-        `${target.name} — discard ${whatFilter} (cost)`,
+        `${target.name} — discard ${energyScoped ? 'Energy' : 'a card'} (cost)`,
         candidates.map((c, i) => ({ label: c.name || 'Energy', idx: i }))
       );
       if (pick === null) {

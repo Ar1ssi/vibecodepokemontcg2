@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   computeActionAffordances,
   isPlayedToBenchTriggerCard,
+  isEvolvePlayedTriggerCard,
 } from '../action-affordances.mjs';
 
 const pikachu = (attacks) => ({
@@ -125,4 +126,18 @@ test('isPlayedToBenchTriggerCard: matches when-played wording only', () => {
     false
   );
   assert.equal(isPlayedToBenchTriggerCard(undefined), false);
+});
+
+test('isEvolvePlayedTriggerCard: matches the evolve-play wording only', () => {
+  const primarina = {
+    ability: {
+      name: 'Enriching Melody',
+      text: 'Once during your turn, when you play this Pokémon from your hand to evolve 1 of your Pokémon, you may use this Ability. Heal all damage from 1 of your Pokémon.',
+    },
+  };
+  assert.equal(isEvolvePlayedTriggerCard(primarina), true);
+  // The evolve trigger must not be read as a played-to-Bench trigger (the two
+  // have different one-shot gates).
+  assert.equal(isPlayedToBenchTriggerCard(primarina), false);
+  assert.equal(isEvolvePlayedTriggerCard(undefined), false);
 });

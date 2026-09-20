@@ -1410,6 +1410,18 @@ export const EXTRA_STEP_HANDLERS = {
   returnOwnAttachedEnergy,
   discardOwnAttachedEnergy,
   damageCounters,
+  // Ability "place N damage counters on 1 of your opponent's Pokémon" step
+  // (Mortal Shuriken et al.). Reuses the trainer damage-counter target picker,
+  // which raises a PendingChoice over the in-play Pokémon (mat picker); the
+  // ability step carries `count`/`onOpponent` instead of `target`.
+  moveDamageAbility: (ctx) =>
+    damageCounters({
+      ...ctx,
+      step: {
+        ...ctx.step,
+        target: ctx.step.onOpponent ? "opponent's Pokémon" : 'your Pokémon',
+      },
+    }),
   fossilItem,
   returnPokemonToHand,
   swapWithDiscard,

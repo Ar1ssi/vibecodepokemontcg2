@@ -17,14 +17,34 @@ import {
 } from '../../../../shared/engine/rules/collect-usable-abilities.mjs';
 import { parseAbility } from '../../../../shared/engine/rules/abilities.mjs';
 
+const abilityTextOf = (card) => {
+  const first = Array.isArray(card?.abilities) && card.abilities.length > 0
+    ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
+    : '';
+  return first || card?.ability?.text || card?.abilityText || card?.text || '';
+};
+
 /**
  * Same gate as ability-picker.js: "When you play this Pokémon onto your
  * Bench" triggers are gated by the one-shot window, not the per-turn
- * abilitiesUsed map.
+ * abilitiesUsed map. The evolve wording ("from your hand to evolve") has its
+ * own gate (the turn the Pokémon evolved) and is excluded here.
  */
 export function isPlayedToBenchTriggerCard(card) {
-  const text = card?.ability?.text ?? card?.abilityText ?? card?.text ?? '';
-  return parseAbility(text).some((s) => s.type === 'whenPlayedAbility');
+  return parseAbility(abilityTextOf(card)).some(
+    (s) => s.type === 'whenPlayedAbility' && !s.evolve
+  );
+}
+
+/**
+ * "When you play this Pokémon from your hand to evolve 1 of your Pokémon"
+ * one-shot triggers (Primarina Enriching Melody) are only legal on the turn
+ * that Pokémon evolved, not every turn.
+ */
+export function isEvolvePlayedTriggerCard(card) {
+  return parseAbility(abilityTextOf(card)).some(
+    (s) => s.type === 'whenPlayedAbility' && s.evolve === true
+  );
 }
 
 /**

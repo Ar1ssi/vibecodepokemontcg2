@@ -206,6 +206,76 @@ test('ability: the same Active-Spot ability is allowed from the Active', () => {
   );
 });
 
+// Mega Greninja ex — Mortal Shuriken. Two engine defects: the server
+// discard-cost step offered every hand card (the parser never populated the
+// executor's energyType/basic filter fields), and the follow-up damage step
+// had no handler, so no target picker was raised.
+test("ability: Mega Greninja ex Mortal Shuriken — Water-only discard then damage picker", () => {
+  const { state, rng } = setupGame();
+  const TEXT =
+    "Once during your turn, if this Pokémon is in the Active Spot, you may discard a Basic {W} Energy card from your hand in order to use this Ability. Place 6 damage counters on 1 of your opponent's Pokémon.";
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Mega Greninja ex',
+      hp: 330,
+      supertype: 'Pokémon',
+      abilityText: TEXT,
+      abilities: [{ name: 'Mortal Shuriken', type: 'Ability', text: TEXT }],
+    })
+  );
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 2, name: 'Water Energy', supertype: 'Energy', types: ['Water'] }),
+    createCard({ instanceId: 3, name: 'Fire Energy', supertype: 'Energy', types: ['Fire'] }),
+    createCard({ instanceId: 4, name: "Professor's Research", supertype: 'Trainer' })
+  );
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 9, name: 'Charmander', hp: 60, supertype: 'Pokémon' })
+  );
+  state.players.p2.zones.bench.push(
+    createCard({ instanceId: 10, name: 'Bulbasaur', hp: 70, supertype: 'Pokémon' })
+  );
+
+  const res1 = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 1 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+  // Only the Basic {W} Energy is a legal cost — not the Fire Energy, Trainer,
+  // or any other hand card.
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [2]);
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [2] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.equal(
+    res2.state.players.p1.zones.discard.some((c) => c.instanceId === 2),
+    true
+  );
+  // The cost is paid, then the damage-counter target picker opens over the
+  // opponent's in-play Pokémon.
+  assert.ok(res2.pendingChoice);
+  assert.deepEqual(
+    res2.pendingChoice.options.map((o) => o.instanceId).sort((a, b) => a - b),
+    [9, 10]
+  );
+
+  const res3 = applyCommand(res2.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res2.pendingChoice.choiceId, selection: [9] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res3.error, null);
+  assert.equal(res3.pendingChoice, null);
+  assert.equal(res3.state.players.p2.zones.active[0].damage, 60);
+  assert.ok(!res3.state.players.p2.zones.bench[0].damage);
+});
+
 test('ability: a non-positional ability from the Bench is unaffected by the guard', () => {
   const { state, rng } = setupGame();
   const kirlia = createCard({
@@ -236,4 +306,66 @@ test('ability: a non-positional ability from the Bench is unaffected by the guar
 
   assert.equal(res.error, null);
   assert.equal(res.state.players.p1.zones.hand.length, 2);
+});
+
+// ── Primarina Enriching Melody: an evolve-triggered, target-chosen full heal ──
+// The ability is a one-shot on the turn it evolves ("when you play this Pokémon
+// from your hand to evolve"), and heals ALL damage from a chosen Pokémon, not a
+// flat 30 on the ability's owner (which used to make the click a no-op).
+const ENRICHING_MELODY =
+  'Once during your turn, when you play this Pokémon from your hand to evolve 1 of your Pokémon, you may use this Ability. Heal all damage from 1 of your Pokémon.';
+
+const makePrimarina = (instanceId, enteredPlayTurn) =>
+  createCard({
+    instanceId,
+    name: 'Primarina',
+    hp: 150,
+    supertype: 'Pokémon',
+    stage: 'Stage 2',
+    enteredPlayTurn,
+    abilityText: ENRICHING_MELODY,
+    abilities: [{ name: 'Enriching Melody', type: 'Ability', text: ENRICHING_MELODY }],
+  });
+
+test('ability: Primarina Enriching Melody heals a chosen Pokémon to full', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(makePrimarina(40, state.turn.number));
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 41, name: 'Brionne', hp: 90, supertype: 'Pokémon', damage: 50 }),
+    createCard({ instanceId: 42, name: 'Popplio', hp: 70, supertype: 'Pokémon', damage: 20 })
+  );
+
+  const res1 = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 40 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice, 'expected a heal-target choice');
+  assert.equal(res1.pendingChoice.options.length, 2);
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [41] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.state.players.p1.zones.bench.find((c) => c.instanceId === 41).damage, 0);
+  assert.equal(res2.state.players.p1.zones.bench.find((c) => c.instanceId === 42).damage, 20);
+});
+
+test('ability: Primarina Enriching Melody is refused when not used the turn it evolved', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(makePrimarina(43, state.turn.number - 1));
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 44, name: 'Brionne', hp: 90, supertype: 'Pokémon', damage: 50 })
+  );
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 43 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res.error, 'This ability can only be used the turn it evolved.');
+  assert.equal(res.state.players.p1.zones.bench[0].damage, 50);
 });
