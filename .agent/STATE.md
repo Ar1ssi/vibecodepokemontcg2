@@ -18,15 +18,16 @@ Active: unrecognizable 402 → 25 across the 1,348 unique cards (98.1%). Slices 
   user-mismatch drops refused). In-mat `#lostZoneCover` kept visible (user choice). Verified:
   node --check clean, rail test 11/11, full suite 2441/2441, audit buckets unchanged, eslint
   clean. Buckets: guided 698 / passive-only 321 / automated 295 / unhandled-step 9 /
-  unrecognizable 25. Full step list in the journal (S207 cont. 5–12). ALL UNCOMMITTED.
+  unrecognizable 25. Full step list in the journal (S207 cont. 5–13). COMMITTED as 9349173;
+  PR #176 open vs main.
 Next: (1) MANUAL BROWSER CHECK of rail drag/drop — cross-iframe HTML5 DnD is unverified (no
-  Playwright run; drag starts in a playmat iframe, drops on the host rail). (2) commit everything
-  on `task/pkmncards-parse` when the user approves. (3) behavioral browser check of the new client
-  trainer steps ('/shared/...' specifiers -> not headless; static guard at
-  `client/src/setup/rules/__tests__/trainer-step-parity.test.mjs`). SERVER-EXTENSION BACKLOG at the
-  end of `.agent/journal/2026-09.md`. Remaining 25 are one-offs (rock-paper-scissors, use-an-
-  opponent's-card, ~20 singles). NOTE: no free screen band — the 6%-wide rail overlays the right
-  6% of the sidebox.
+  Playwright run; drag starts in a playmat iframe, drops on the host rail). (2) behavioral browser
+  check of the new client trainer steps ('/shared/...' specifiers -> not headless; static guard at
+  `client/src/setup/rules/__tests__/trainer-step-parity.test.mjs`). (3) merge PR #176 (carries the
+  two prior parse commits c2acf55/79e8084 too). SERVER-EXTENSION BACKLOG at the end of
+  `.agent/journal/2026-09.md` and in docs/pkmncards-trainer-parse-and-lost-zone.md §8. Remaining 25
+  are one-offs (rock-paper-scissors, use-an-opponent's-card, ~20 singles). NOTE: no free screen
+  band — the 6%-wide rail overlays the right 6% of the sidebox.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
