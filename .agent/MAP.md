@@ -69,7 +69,7 @@ shared/engine/rules/evolved-pokemon.mjs — `evolvedView` (in-play Pokémon read
 shared/engine/rules/server-energy.mjs — `serverEnergyDescriptor`: how the server prices attached Energy; the bot uses it too
 shared/engine/effects/executor.mjs — resumable step runner; core step kinds inline, the rest delegated to trainer-steps.mjs
 shared/engine/effects/trainer-steps.mjs — server handlers for the other trainer step kinds; multi-choice progress lives in resumeToken.context
-shared/engine/rules/abilities.mjs + ability-step-plan.mjs - ability parse + ordered step plan (resume seam); Ancient Traits tagged `trait:'alpha'|'omega'` with `isAncientTraitAbility` so "no Abilities" gates skip them (30c 5.2)
+shared/engine/rules/abilities.mjs + ability-step-plan.mjs - ability parse + ordered step plan (resume seam); Ancient Traits (`ancientTraitIn`: Δ/θ/Ω/α markers or spelled "Delta …") tag EVERY step `trait:'alpha'|'omega'|'delta'|'theta'` with `isAncientTraitAbility` so "no Abilities" gates skip them (App. 23/D72); audit `scripts/audit-all-ancient-traits.mjs` over `out/pkmn-ancient-trait-cards.json` (shared splitter `scripts/lib/split-card-text.mjs`)
 shared/engine/rules/stadium-effects.mjs - pure stadium classify/parse/apply (`applyStadiumEffect`) + `stadiumActivationStatus` (the inspector stadium Use gate, design 018); server executor in shared/engine/effects/stadium.mjs
 shared/engine/rules/damage-parser.mjs - attack text → damage math; `isGxAttack` name classifier
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)

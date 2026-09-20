@@ -1,0 +1,54 @@
+# Ancient-trait parse coverage
+Source: out/pkmn-ancient-trait-cards.json (59 printings)
+Entries: 10 unique Ancient-Trait entries (10 distinct traits)
+Trait kinds: delta 3 / theta 3 / omega 2 / alpha 2
+
+guided 3 / passive 7 / unrecognized 0
+
+## By trait
+- Δ Evolution (delta) x10 printings: evolvePermissionAbility[delta]
+- θ Stop (theta) x9 printings: effectPreventAbility[theta]
+- θ Double (theta) x7 printings: toolCapAbility[theta]
+- θ Max (theta) x3 printings: healAbility[theta]
+- Δ Plus (delta) x5 printings: prizeModifyAbility[delta]
+- Delta Wild (delta) x1 printings: weaknessAbility[delta], damageReductionAbility[delta]
+- Ω Barrier (omega) x7 printings: effectPreventAbility[omega]
+- α Growth (alpha) x7 printings: attachAbility[alpha]
+- Ω Barrage (omega) x5 printings: extraAttackAbility[omega]
+- α Recovery (alpha) x5 printings: healAbility[alpha]
+
+## Unrecognized
+(none)
+
+## Per-card description
+### Δ Evolution (delta) — 10 printings
+  M Rayquaza-EX [Celebrations #76] · Salamence [XY Promos #XY59] · Fearow [XY Promos #XY57] · +7
+  - [evolvePermissionAbility] Passive: you may evolve this Pokémon during your first turn or the turn it was played (Δ Evolution).
+### θ Stop (theta) — 9 printings
+  Celebi [XY Promos #XY93] · Sableye [XY Promos #XY92] · Malamar [XY Promos #XY58] · +6
+  - [effectPreventAbility] Passive: prevent or negate effects/abilities as described.
+### θ Double (theta) — 7 printings
+  Gyarados [XY Promos #XY60] · M Tyranitar-EX [Ancient Origins #92] · Metagross [Ancient Origins #50] · +4
+  - [toolCapAbility] Passive: this Pokémon can have an extra Pokémon Tool attached (as described).
+### θ Max (theta) — 3 printings
+  M Rayquaza-EX [Ancient Origins #98] · Primal Groudon-EX [Ancient Origins #97] · Primal Kyogre-EX [Ancient Origins #96]
+  - [healAbility] Once during your turn: heal all damage from the target Pokémon.
+### Δ Plus (delta) — 5 printings
+  Swellow [Roaring Skies #72] · Dragonite [Roaring Skies #52] · Natu [Roaring Skies #28] · +2
+  - [prizeModifyAbility] Passive: modifies the number of Prize cards taken when this Pokémon is Knocked Out (as described).
+### Delta Wild (delta) — 1 printing
+  M Rayquaza-EX [Roaring Skies #61]
+  - [weaknessAbility] Passive: modifies this Pokémon's Weakness/Resistance as described.
+  - [damageReductionAbility] Passive: this Pokémon takes 20 less damage from attacks.
+### Ω Barrier (omega) — 7 printings
+  Regirock [XY Promos #XY49] · Primal Groudon-EX [Primal Clash #151] · Primal Groudon-EX [Primal Clash #86] · +4
+  - [effectPreventAbility] Whenever your opponent plays a Trainer card (excluding Pokémon Tools/Stadium): prevent all effects of that card done to this Pokémon.
+### α Growth (alpha) — 7 printings
+  Primal Kyogre-EX [Primal Clash #149] · Kingdra [Primal Clash #108] · Primal Kyogre-EX [Primal Clash #55] · +4
+  - [attachAbility] Whenever you attach an Energy card from your hand to this Pokémon: you may attach 2 additional Energy cards (triggers automatically on your normal attach — not a separate manual action).
+### Ω Barrage (omega) — 5 printings
+  Bunnelby [Primal Clash #121] · Excadrill [Primal Clash #97] · Medicham [Primal Clash #81] · +2
+  - [extraAttackAbility] Passive: this Pokémon may attack twice during your turn (as described).
+### α Recovery (alpha) — 5 printings
+  Bidoof [Primal Clash #117] · Azumarill [Primal Clash #104] · Tentacool [Primal Clash #71] · +2
+  - [healAbility] Once during your turn: remove damage counters as described.

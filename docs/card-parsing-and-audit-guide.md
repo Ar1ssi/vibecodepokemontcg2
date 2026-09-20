@@ -48,12 +48,16 @@ shared/engine/rules/
   ability-step-plan.mjs     PASSIVE_ABILITY_STEP_TYPES, planAbilitySteps
   __tests__/rules-extended.test.mjs   all regression tests
 scripts/
+  lib/split-card-text.mjs   shared splitCard()/header regexes for both audits
   scrape-pkmncards.mjs      rebuild out/pkmn-pokemon-cards.json (network)
   audit-all-pokemon.mjs     split → parse → classify → engine-run → gap report
+  audit-all-ancient-traits.mjs   Ancient-Trait parse coverage → out/ancient-trait-full-audit.txt
 out/
   pkmn-pokemon-cards.json   corpus (6098 printings)
   pokemon-attacks-abilities-full-audit.txt   grouped gaps + family tables
   pokemon-attacks-abilities-audit.json       gap rows + engine results
+  pkmn-ancient-trait-cards.json              corpus (59 printings, has:ancient-trait)
+  ancient-trait-full-audit.txt               per-trait parse coverage
 ```
 
 **Special energy** follows the same two-layer pattern in
@@ -62,6 +66,17 @@ structured steps; pure `getSpecialEnergy*` execution helpers). Audit:
 `scripts/audit-all-special-energy.mjs` over `out/pkmn-special-energy-cards.json`
 (scraped by `scripts/scrape-pkmncards-special-energy.mjs`); it must report
 `unrecognized 0`.
+
+**Ancient Traits** (App. 23) live in `shared/engine/rules/abilities.mjs`:
+`ancientTraitIn(text)` classifies the printed marker — Δ (`delta`), θ (`theta`),
+Ω (`omega`), α (`alpha`) — or a spelled "Delta …" name, and `parseAbility` tags
+**every** step it emits with `trait` (one tagging site, so a trait whose body
+matched no branch still carries a tagged fallback step; marker-less wording is
+never a trait, D72). Audit: `scripts/audit-all-ancient-traits.mjs` over
+`out/pkmn-ancient-trait-cards.json` — scraped with
+`node scripts/scrape-pkmncards.mjs --query="has:ancient-trait" --out=out/pkmn-ancient-trait-cards.json`
+— and must report `unrecognized 0` (it exits non-zero otherwise). Both audits
+share the pkmncards splitter `scripts/lib/split-card-text.mjs`.
 
 ## 4. Workflow
 
@@ -136,6 +151,7 @@ npx eslint --rule "linebreak-style: off" --rule "prettier/prettier: off" \
 
 ```bash
 node scripts/audit-all-pokemon.mjs        # gap metric + reports
+node scripts/audit-all-ancient-traits.mjs # ancient-trait coverage (`unrecognized 0` gate)
 node --test shared/engine/rules/__tests__/rules-extended.test.mjs   # fast loop
 pnpm test                                 # full suite (2188+)
 ```

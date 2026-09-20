@@ -7,7 +7,7 @@ import test from 'node:test';
     const { applyStatus, canAct, canActThroughStatuses, resolveWake, resolveConfusedAttack, resolveTurnBoundary, parseStatusFromAttackText, parseSelfStatusFromAttackText, resetStatuses, getStatus, statusAllowsRetreat, clearStatuses } = await import('../status.mjs');
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
-    const { parseAbility } = await import('../abilities.mjs');
+    const { parseAbility, ancientTraitIn } = await import('../abilities.mjs');
     const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus, isSingleStrikeCard, isEvolutionCard, isStadiumEnergyAttachHeal, isStadiumGlimwoodReFlip } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
@@ -4746,6 +4746,77 @@ import test from 'node:test';
         (s) => s.type === 'attachAbility'
       );
       assert.equal(marker.trait, 'alpha', 'the printed α marker tags the trait');
+    });
+
+    test('ancientTraitIn: all four printed markers + spelled Delta, null when marker-less', () => {
+      assert.equal(ancientTraitIn('Ω Barrier'), 'omega');
+      assert.equal(ancientTraitIn('α Growth'), 'alpha');
+      assert.equal(ancientTraitIn('Δ Evolution'), 'delta');
+      assert.equal(ancientTraitIn('θ Stop'), 'theta');
+      assert.equal(ancientTraitIn('θ Double'), 'theta');
+      assert.equal(ancientTraitIn('Delta Wild'), 'delta', 'the one spell-out printing');
+      assert.equal(ancientTraitIn('Ancient Trait'), 'ancient', 'bare header stays truthy');
+      assert.equal(ancientTraitIn('Once during your turn, draw 2 cards.'), null);
+    });
+
+    // Full ancient-trait corpus (pkmncards has:ancient-trait, 10 distinct traits).
+    // Each marker tags every step parseAbility emits, so isAncientTraitAbility can
+    // spare the card from a "have no Abilities" effect (App. 23, D72).
+    test('parseAbility: all 10 Ancient Traits tag their parsed step (App. 23)', () => {
+      const cases = [
+        ['Δ Evolution', 'You may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.', 'evolvePermissionAbility', 'delta'],
+        ['θ Stop', "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.", 'effectPreventAbility', 'theta'],
+        ['θ Double', 'This Pokémon may have up to 2 Pokémon Tool cards attached to it.', 'toolCapAbility', 'theta'],
+        ['θ Max', 'When 1 of your Pokémon becomes this Pokémon, heal all damage from it.', 'healAbility', 'theta'],
+        ['Δ Plus', "If your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card.", 'prizeModifyAbility', 'delta'],
+        ['Delta Wild', "Any damage done to this Pokémon by attacks from your opponent's {G}, {R}, {W}, or {L} Pokémon is reduced by 20.", 'damageReductionAbility', 'delta'],
+        ['Ω Barrier', "Whenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.", 'effectPreventAbility', 'omega'],
+        ['α Growth', 'When you attach an Energy card from your hand to this Pokémon, you may attach 2 Energy cards.', 'attachAbility', 'alpha'],
+        ['Ω Barrage', 'This Pokémon may attack twice a turn.', 'extraAttackAbility', 'omega'],
+        ['α Recovery', 'When this Pokémon is healed, double the amount healed.', 'healAbility', 'alpha'],
+      ];
+      for (const [name, body, type, trait] of cases) {
+        const steps = parseAbility(`${name} ${body}`);
+        const step = steps.find((s) => s.type === type);
+        assert.ok(step, `${name}: expected a ${type} step, got ${steps.map((s) => s.type)}`);
+        assert.equal(step.trait, trait, `${name} must carry trait='${trait}'`);
+        assert.ok(
+          steps.every((s) => s.trait === trait),
+          `${name}: every step carries the trait`
+        );
+      }
+    });
+
+    test('parseAbility: a trait whose body matches no branch still tags the fallback step', () => {
+      const steps = parseAbility('θ Unknown A completely novel trait effect that no branch recognizes.');
+      assert.equal(steps.length, 1);
+      assert.equal(steps[0].type, 'passiveAbility');
+      assert.equal(steps[0].trait, 'theta');
+    });
+
+    test('isAncientTraitAbility: Δ/θ trait cards are traits, not Abilities (App. 23)', async () => {
+      const { isAncientTraitAbility } = await import('../abilities.mjs');
+      assert.equal(
+        isAncientTraitAbility({
+          name: 'Celebi',
+          ability: { name: 'θ Stop', text: "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon." },
+        }),
+        true
+      );
+      assert.equal(
+        isAncientTraitAbility({
+          name: 'Swellow',
+          ability: { name: 'Δ Plus', text: "If your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card." },
+        }),
+        true
+      );
+      assert.equal(
+        isAncientTraitAbility({
+          name: 'M Rayquaza-EX',
+          ability: { name: 'Delta Wild', text: "Any damage done to this Pokémon by attacks from your opponent's {G}, {R}, {W}, or {L} Pokémon is reduced by 20." },
+        }),
+        true
+      );
     });
 
     // ── full-corpus ability gap clusters (I65) ──

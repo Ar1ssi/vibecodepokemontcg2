@@ -1,0 +1,415 @@
+[
+  {
+    "name": "M Rayquaza-EX",
+    "set": "Celebrations",
+    "number": "76",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{C}{C}{C} → Emerald Break : 30×\n\nThis attack does 30 damage times the number of your Benched Pokémon.",
+    "url": "https://pkmncards.com/card/m-rayquaza-ex-celebrations-cel-76/"
+  },
+  {
+    "name": "Celebi",
+    "set": "XY Promos",
+    "number": "XY93",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\nAbility ⇢ Leap Through Time\n\nWhen this Pokémon is Knocked Out, flip a coin. If heads, shuffle this Pokémon and all cards attached to it into your deck, and your opponent can't take any Prize cards for it.\n\n{G} → Sparkle Motion\n\nPut 1 damage counter on each of your opponent's Pokémon.",
+    "url": "https://pkmncards.com/card/celebi-xy-promos-xyp-xy93/"
+  },
+  {
+    "name": "Sableye",
+    "set": "XY Promos",
+    "number": "XY92",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\n{P} → Energy Hunt\n\nFlip 3 coins. For each heads, attach a basic Energy card from your discard pile to your Benched Pokémon-EX in any way you like.\n\n{C}{C} → Claw Slash : 20",
+    "url": "https://pkmncards.com/card/sableye-xy-promos-xyp-xy92/"
+  },
+  {
+    "name": "Gyarados",
+    "set": "XY Promos",
+    "number": "XY60",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{C}{C} → Full Retaliation : 30+\n\nThis attack does 30 more damage for each damage counter on each of your Benched Magikarp.\n\n{W}{W}{C}{C} → Thrash : 100+\n\nFlip a coin. If heads, this attack does 30 more damage. If tails, this Pokémon does 30 damage to itself.",
+    "url": "https://pkmncards.com/card/gyarados-xy-promos-xyp-xy60/"
+  },
+  {
+    "name": "Salamence",
+    "set": "XY Promos",
+    "number": "XY59",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{C} → Call for Goons\n\nSearch your deck for up to 3 Basic Pokémon and put them onto your Bench. Shuffle your deck afterward.\n\n{R}{W}{C}{C} → Dragon Pulse : 130\n\nDiscard the top card of your deck.",
+    "url": "https://pkmncards.com/card/salamence-xy-promos-xyp-xy59/"
+  },
+  {
+    "name": "Malamar",
+    "set": "XY Promos",
+    "number": "XY58",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\nAbility ⇢ Contrary\n\nIf this Pokémon is your Active Pokémon, whenever your opponent flips a coin during his or her turn, treat it as tails.\n\n{D}{C}{C} → Conform : 40\n\nIf you have the same number of cards in your hand as your opponent, your opponent's Active Pokémon is now Confused.",
+    "url": "https://pkmncards.com/card/malamar-xy-promos-xyp-xy58/"
+  },
+  {
+    "name": "Fearow",
+    "set": "XY Promos",
+    "number": "XY57",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{C} → Repeating Drill : 20×\n\nFlip 5 coins. This attack does 20 damage times the number of heads.\n\n{C}{C}{C} → Nosedive : 80\n\nThis Pokémon does 20 damage to itself.",
+    "url": "https://pkmncards.com/card/fearow-xy-promos-xyp-xy57/"
+  },
+  {
+    "name": "M Rayquaza-EX",
+    "set": "Ancient Origins",
+    "number": "98",
+    "text": "Ancient Trait ⇢ θ Max\n\nWhen 1 of your Pokémon becomes this Pokémon, heal all damage from it.\n\n{C}{C}{C} → Emerald Break : 30×\n\nThis attack does 30 damage times the number of your Benched Pokémon.",
+    "url": "https://pkmncards.com/card/m-rayquaza-ex-ancient-origins-aor-98/"
+  },
+  {
+    "name": "Primal Groudon-EX",
+    "set": "Ancient Origins",
+    "number": "97",
+    "text": "Ancient Trait ⇢ θ Max\n\nWhen 1 of your Pokémon becomes this Pokémon, heal all damage from it.\n\n{F}{F}{F}{C} → Gaia Volcano : 100+\n\nIf there is any Stadium card in play, this attack does 100 more damage. Discard that Stadium card.",
+    "url": "https://pkmncards.com/card/primal-groudon-ex-ancient-origins-aor-97/"
+  },
+  {
+    "name": "Primal Kyogre-EX",
+    "set": "Ancient Origins",
+    "number": "96",
+    "text": "Ancient Trait ⇢ θ Max\n\nWhen 1 of your Pokémon becomes this Pokémon, heal all damage from it.\n\n{W}{W}{W}{C} → Tidal Storm : 150\n\nMove 2 Energy from this Pokémon to 1 of your Benched Pokémon. This attack does 30 damage to each of your opponent's Benched Pokémon-EX. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+    "url": "https://pkmncards.com/card/primal-kyogre-ex-ancient-origins-aor-96/"
+  },
+  {
+    "name": "M Tyranitar-EX",
+    "set": "Ancient Origins",
+    "number": "92",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{D}{D}{C}{C} → Destroyer King : 110+\n\nThis attack does 60 more damage for each damage counter on your opponent's Active Pokémon.",
+    "url": "https://pkmncards.com/card/m-tyranitar-ex-ancient-origins-aor-92/"
+  },
+  {
+    "name": "M Sceptile-EX",
+    "set": "Ancient Origins",
+    "number": "85",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\n{G}{C} → Jagged Saber : 100\n\nYou may attach up to 2 {G} Energy cards from your hand to your Benched Pokémon in any way you like. If you attached Energy to a Pokémon in this way, heal all damage from that Pokémon.",
+    "url": "https://pkmncards.com/card/m-sceptile-ex-ancient-origins-aor-85/"
+  },
+  {
+    "name": "Porygon-Z",
+    "set": "Ancient Origins",
+    "number": "67",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\n{C} → Digital Reboot\n\nDevolve as many of your Benched Pokémon as many times as you like. Put each Evolution card removed this way into your hand.\n\n{C}{C} → Dazzle Blast : 50\n\nYour opponent's Active Pokémon is now Confused.",
+    "url": "https://pkmncards.com/card/porygon-z-ancient-origins-aor-67/"
+  },
+  {
+    "name": "Metagross",
+    "set": "Ancient Origins",
+    "number": "50",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{C}{C} → Machine Gun Stomp : 20+\n\nThis attack does 10 more damage for each card in your hand.\n\n{M}{M}{C}{C} → Guard Press : 80\n\nDuring your opponent's next turn, any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/metagross-ancient-origins-aor-50/"
+  },
+  {
+    "name": "M Tyranitar-EX",
+    "set": "Ancient Origins",
+    "number": "43",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{D}{D}{C}{C} → Destroyer King : 110+\n\nThis attack does 60 more damage for each damage counter on your opponent's Active Pokémon.",
+    "url": "https://pkmncards.com/card/m-tyranitar-ex-ancient-origins-aor-43/"
+  },
+  {
+    "name": "Golurk",
+    "set": "Ancient Origins",
+    "number": "35",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\nAbility ⇢ Double Type\n\nAs long as this Pokémon is in play, it is {P} and {F} type.\n\n{C}{C}{C}{C} → Superpower : 80+\n\nYou may do 40 more damage. If you do, this Pokémon does 20 damage to itself.",
+    "url": "https://pkmncards.com/card/golurk-ancient-origins-aor-35/"
+  },
+  {
+    "name": "Baltoy",
+    "set": "Ancient Origins",
+    "number": "32",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\n{P} → Future Spin\n\nLook at the top 3 cards of either player's deck and put them back on top of that player's deck in any order.",
+    "url": "https://pkmncards.com/card/baltoy-ancient-origins-aor-32/"
+  },
+  {
+    "name": "Gyarados",
+    "set": "Ancient Origins",
+    "number": "21",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{C}{C} → Full Retaliation : 30+\n\nThis attack does 30 more damage for each damage counter on each of your Benched Magikarp.\n\n{W}{W}{C}{C} → Thrash : 100+\n\nFlip a coin. If heads, this attack does 30 more damage. If tails, this Pokémon does 30 damage to itself.",
+    "url": "https://pkmncards.com/card/gyarados-ancient-origins-aor-21/"
+  },
+  {
+    "name": "Volcarona",
+    "set": "Ancient Origins",
+    "number": "18",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\n{R} → Burning Scale : 20+\n\nFlip 2 coins. This attack does 20 more damage for each heads.\n\n{R}{C}{C} → Wind Wheel : 80\n\nYour opponent switches his or her Active Pokémon with 1 of his or her Benched Pokémon.",
+    "url": "https://pkmncards.com/card/volcarona-ancient-origins-aor-18/"
+  },
+  {
+    "name": "Entei",
+    "set": "Ancient Origins",
+    "number": "15",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{R}{C} → Flame Screen : 30\n\nDuring your opponent's next turn, any damage done to this Pokémon by attacks is reduced by 30 (after applying Weakness and Resistance).\n\n{R}{R}{C}{C} → Heat Tackle : 130\n\nFlip a coin. If tails, this Pokémon does 30 damage to itself.",
+    "url": "https://pkmncards.com/card/entei-ancient-origins-aor-15/"
+  },
+  {
+    "name": "Vespiquen",
+    "set": "Ancient Origins",
+    "number": "11",
+    "text": "Ancient Trait ⇢ θ Double\n\nThis Pokémon may have up to 2 Pokémon Tool cards attached to it.\n\n{G} → Bee Drain : 20\n\nHeal from this Pokémon the same amount of damage you did to your opponent's Active Pokémon.\n\n{C}{C} → Fury Swipes : 30×\n\nFlip 3 coins. This attack does 30 damage times the number of heads.",
+    "url": "https://pkmncards.com/card/vespiquen-ancient-origins-aor-11/"
+  },
+  {
+    "name": "M Sceptile-EX",
+    "set": "Ancient Origins",
+    "number": "8",
+    "text": "Ancient Trait ⇢ θ Stop\n\nPrevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.\n\n{G}{C} → Jagged Saber : 100\n\nYou may attach up to 2 {G} Energy cards from your hand to your Benched Pokémon in any way you like. If you attached Energy to a Pokémon in this way, heal all damage from that Pokémon.",
+    "url": "https://pkmncards.com/card/m-sceptile-ex-ancient-origins-aor-8/"
+  },
+  {
+    "name": "M Rayquaza-EX",
+    "set": "Roaring Skies",
+    "number": "105",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{C}{C}{C} → Emerald Break : 30×\n\nThis attack does 30 damage times the number of your Benched Pokémon.",
+    "url": "https://pkmncards.com/card/m-rayquaza-ex-roaring-skies-ros-105/"
+  },
+  {
+    "name": "Unfezant",
+    "set": "Roaring Skies",
+    "number": "81",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{C}{C} → Feather Dance\n\nDuring your next turn, each of this Pokémon's attacks does 80 more damage (before applying Weakness and Resistance).\n\n{C}{C}{C} → Sky Attack : 120\n\nFlip a coin. If tails, this attack does nothing.",
+    "url": "https://pkmncards.com/card/unfezant-roaring-skies-ros-81/"
+  },
+  {
+    "name": "M Rayquaza-EX",
+    "set": "Roaring Skies",
+    "number": "76",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{C}{C}{C} → Emerald Break : 30×\n\nThis attack does 30 damage times the number of your Benched Pokémon.",
+    "url": "https://pkmncards.com/card/m-rayquaza-ex-roaring-skies-ros-76/"
+  },
+  {
+    "name": "Altaria",
+    "set": "Roaring Skies",
+    "number": "74",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\nAbility ⇢ Clear Humming\n\nEach of your {C} Pokémon has no Weakness.\n\n{C}{C} → Wing Attack : 30",
+    "url": "https://pkmncards.com/card/altaria-roaring-skies-ros-74/"
+  },
+  {
+    "name": "Swellow",
+    "set": "Roaring Skies",
+    "number": "72",
+    "text": "Ancient Trait ⇢ Δ Plus\n\nIf your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card.\n\n{C}{C} → Peck : 30\n\n{C}{C}{C} → Wing Attack : 50",
+    "url": "https://pkmncards.com/card/swellow-roaring-skies-ros-72/"
+  },
+  {
+    "name": "M Rayquaza-EX",
+    "set": "Roaring Skies",
+    "number": "61",
+    "text": "Ancient Trait ⇢ Delta Wild\n\nAny damage done to this Pokémon by attacks from your opponent's {G}, {R}, {W}, or {L} Pokémon is reduced by 20 (after applying Weakness and Resistance).\n\n{R}{R}{R}{L}{C} → Dragon Ascent : 300\n\nDiscard 2 Energy attached to this Pokémon.",
+    "url": "https://pkmncards.com/card/m-rayquaza-ex-roaring-skies-ros-61/"
+  },
+  {
+    "name": "Dragonite",
+    "set": "Roaring Skies",
+    "number": "52",
+    "text": "Ancient Trait ⇢ Δ Plus\n\nIf your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card.\n\n{L} → Wrapped in Wind\n\nAttach up to 2 basic Energy cards from your hand to this Pokémon.\n\n{G}{G}{G}{L}{C} → Heavy Impact : 150",
+    "url": "https://pkmncards.com/card/dragonite-roaring-skies-ros-52/"
+  },
+  {
+    "name": "Regirock",
+    "set": "XY Promos",
+    "number": "XY49",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\n{F} → Land Maker\n\nPut 2 Stadium cards from your discard pile into your hand.\n\n{F}{F}{F}{C} → Stone Edge : 80+\n\nFlip a coin. If heads, this attack does 40 more damage.",
+    "url": "https://pkmncards.com/card/regirock-xy-promos-xyp-xy49/"
+  },
+  {
+    "name": "Togekiss",
+    "set": "Roaring Skies",
+    "number": "46",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\nAbility ⇢ Serene Grace\n\nWhen you play this Pokémon from your hand to evolve 1 of your Pokémon, you may look at the top 8 cards of your deck. Choose any basic Energy cards you find there and attach them to your Pokémon in any way you like. Shuffle the other cards back into your deck.\n\n{Y}{C}{C} → Fairy Wind : 60",
+    "url": "https://pkmncards.com/card/togekiss-roaring-skies-ros-46/"
+  },
+  {
+    "name": "Altaria",
+    "set": "XY Promos",
+    "number": "XY46",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\nAbility ⇢ Clear Humming\n\nEach of your {C} Pokémon has no Weakness.\n\n{C}{C} → Wing Attack : 30",
+    "url": "https://pkmncards.com/card/altaria-xy-promos-xyp-xy46/"
+  },
+  {
+    "name": "Banette",
+    "set": "Roaring Skies",
+    "number": "32",
+    "text": "Ancient Trait ⇢ Δ Evolution\n\nYou may play this card from your hand to evolve a Pokémon during your first turn or the turn you play that Pokémon.\n\n{P} → Evolution Jammer : 20\n\nYour opponent can't play any Pokémon from his or her hand to evolve his or her Pokémon during his or her next turn.\n\n{P}{C} → Curse Deeply\n\nPut 5 damage counters on your opponent's Active Pokémon.",
+    "url": "https://pkmncards.com/card/banette-roaring-skies-ros-32/"
+  },
+  {
+    "name": "Natu",
+    "set": "Roaring Skies",
+    "number": "28",
+    "text": "Ancient Trait ⇢ Δ Plus\n\nIf your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card.\n\n{P}{C} → Psywave : 10×\n\nThis attack does 10 damage times the amount of Energy attached to your opponent's Active Pokémon.",
+    "url": "https://pkmncards.com/card/natu-roaring-skies-ros-28/"
+  },
+  {
+    "name": "Articuno",
+    "set": "Roaring Skies",
+    "number": "17",
+    "text": "Ancient Trait ⇢ Δ Plus\n\nIf your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card.\n\n{W} → Chilling Sigh\n\nYour opponent's Active Pokémon is now Asleep.\n\n{W}{W}{C} → Tri Edge : 20+\n\nFlip 3 coins. This attack does 40 more damage for each heads.",
+    "url": "https://pkmncards.com/card/articuno-roaring-skies-ros-17/"
+  },
+  {
+    "name": "Dustox",
+    "set": "Roaring Skies",
+    "number": "8",
+    "text": "Ancient Trait ⇢ Δ Plus\n\nIf your opponent's Pokémon is Knocked Out by damage from an attack of this Pokémon, take 1 more Prize card.\n\n{G} → Flap : 20\n\n{G}{C}{C} → Wind Shard\n\nThis attack does 50 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+    "url": "https://pkmncards.com/card/dustox-roaring-skies-ros-8/"
+  },
+  {
+    "name": "Primal Groudon-EX",
+    "set": "Primal Clash",
+    "number": "151",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\n{F}{F}{F}{C} → Gaia Volcano : 100+\n\nIf there is any Stadium card in play, this attack does 100 more damage. Discard that Stadium card.",
+    "url": "https://pkmncards.com/card/primal-groudon-ex-primal-clash-prc-151/"
+  },
+  {
+    "name": "Primal Kyogre-EX",
+    "set": "Primal Clash",
+    "number": "149",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\n{W}{W}{W}{C} → Tidal Storm : 150\n\nMove 2 Energy from this Pokémon to 1 of your Benched Pokémon. This attack does 30 damage to each of your opponent's Benched Pokémon-EX. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+    "url": "https://pkmncards.com/card/primal-kyogre-ex-primal-clash-prc-149/"
+  },
+  {
+    "name": "Bunnelby",
+    "set": "Primal Clash",
+    "number": "121",
+    "text": "Ancient Trait ⇢ Ω Barrage\n\nThis Pokémon may attack twice a turn. (If the first attack Knocks Out your opponent's Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.)\n\n{C} → Burrow\n\nDiscard the top card of your opponent's deck.\n\n{C} → Rototiller\n\nShuffle a card from your discard pile into your deck.",
+    "url": "https://pkmncards.com/card/bunnelby-primal-clash-prc-121/"
+  },
+  {
+    "name": "Bidoof",
+    "set": "Primal Clash",
+    "number": "117",
+    "text": "Ancient Trait ⇢ α Recovery\n\nWhen this Pokémon is healed, double the amount healed.\n\n{C}{C} → Drench : 20+\n\nIf this Pokémon has any {W} Energy attached to it, this attack does 20 more damage.",
+    "url": "https://pkmncards.com/card/bidoof-primal-clash-prc-117/"
+  },
+  {
+    "name": "Kingdra",
+    "set": "Primal Clash",
+    "number": "108",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\n{C} → Gather Strength\n\nSearch your deck for up to 4 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.\n\n{W}{W}{L} → Dragon Blast : 150\n\nDiscard a {W} and a {L} Energy attached to this Pokémon.",
+    "url": "https://pkmncards.com/card/kingdra-primal-clash-prc-108/"
+  },
+  {
+    "name": "Azumarill",
+    "set": "Primal Clash",
+    "number": "104",
+    "text": "Ancient Trait ⇢ α Recovery\n\nWhen this Pokémon is healed, double the amount healed.\n\n{Y}{C} → Tail Rap : 30×\n\nFlip 2 coins. This attack does 30 damage times the number of heads.\n\n{Y}{C}{C} → Dwindling Wave : 100-\n\nThis attack does 100 damage minus 10 damage for each damage counter on this Pokémon.",
+    "url": "https://pkmncards.com/card/azumarill-primal-clash-prc-104/"
+  },
+  {
+    "name": "Excadrill",
+    "set": "Primal Clash",
+    "number": "97",
+    "text": "Ancient Trait ⇢ Ω Barrage\n\nThis Pokémon may attack twice a turn. (If the first attack Knocks Out your opponent's Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.)\n\n{C} → Dredge\n\nSearch your deck for 2 Energy cards and attach them to this Pokémon. Shuffle your deck afterward.\n\n{M}{C}{C} → Mach Claw : 50\n\nThis attack's damage isn't affected by Resistance.",
+    "url": "https://pkmncards.com/card/excadrill-primal-clash-prc-97/"
+  },
+  {
+    "name": "Primal Groudon-EX",
+    "set": "Primal Clash",
+    "number": "86",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\n{F}{F}{F}{C} → Gaia Volcano : 100+\n\nIf there is any Stadium card in play, this attack does 100 more damage. Discard that Stadium card.",
+    "url": "https://pkmncards.com/card/primal-groudon-ex-primal-clash-prc-86/"
+  },
+  {
+    "name": "Medicham",
+    "set": "Primal Clash",
+    "number": "81",
+    "text": "Ancient Trait ⇢ Ω Barrage\n\nThis Pokémon may attack twice a turn. (If the first attack Knocks Out your opponent's Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.)\n\n{C} → Calm Mind\n\nHeal 30 damage from this Pokémon.\n\n{F}{F} → Yoga Kick : 30\n\nThis attack's damage isn't affected by Weakness or Resistance.",
+    "url": "https://pkmncards.com/card/medicham-primal-clash-prc-81/"
+  },
+  {
+    "name": "Rhyperior",
+    "set": "Primal Clash",
+    "number": "77",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\nAbility ⇢ Rock Wall\n\nAny damage done to your Pokémon by an opponent's attack is reduced by 10 (after applying Weakness and Resistance).\n\n{F}{F}{C}{C} → Hammer Arm : 100\n\nDiscard the top card of your opponent's deck.",
+    "url": "https://pkmncards.com/card/rhyperior-primal-clash-prc-77/"
+  },
+  {
+    "name": "Tentacool",
+    "set": "Primal Clash",
+    "number": "71",
+    "text": "Ancient Trait ⇢ α Recovery\n\nWhen this Pokémon is healed, double the amount healed.\n\n{P}{C} → Psyshot : 20",
+    "url": "https://pkmncards.com/card/tentacool-primal-clash-prc-71/"
+  },
+  {
+    "name": "Nidoqueen",
+    "set": "Primal Clash",
+    "number": "69",
+    "text": "Ancient Trait ⇢ Ω Barrage\n\nThis Pokémon may attack twice a turn. (If the first attack Knocks Out your opponent's Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.)\n\n{P} → Poison Jab : 30\n\nYour opponent's Active Pokémon is now Poisoned.\n\n{P}{P}{C} → Dynamite Punch : 70\n\nThis Pokémon does 20 damage to itself. Don't apply Weakness to this damage.",
+    "url": "https://pkmncards.com/card/nidoqueen-primal-clash-prc-69/"
+  },
+  {
+    "name": "Eelektrik",
+    "set": "Primal Clash",
+    "number": "64",
+    "text": "Ancient Trait ⇢ α Recovery\n\nWhen this Pokémon is healed, double the amount healed.\n\n{L}{C}{C} → Thrash : 50+\n\nFlip a coin. If heads, this attack does 20 more damage. If tails, this Pokémon does 20 damage to itself.",
+    "url": "https://pkmncards.com/card/eelektrik-primal-clash-prc-64/"
+  },
+  {
+    "name": "Electrike",
+    "set": "Primal Clash",
+    "number": "60",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\n{L} → Thunder Fang : 10\n\nFlip a coin. If heads, your opponent's Active Pokémon is now Paralyzed.",
+    "url": "https://pkmncards.com/card/electrike-primal-clash-prc-60/"
+  },
+  {
+    "name": "Primal Kyogre-EX",
+    "set": "Primal Clash",
+    "number": "55",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\n{W}{W}{W}{C} → Tidal Storm : 150\n\nMove 2 Energy from this Pokémon to 1 of your Benched Pokémon. This attack does 30 damage to each of your opponent's Benched Pokémon-EX. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+    "url": "https://pkmncards.com/card/primal-kyogre-ex-primal-clash-prc-55/"
+  },
+  {
+    "name": "Gorebyss",
+    "set": "Primal Clash",
+    "number": "52",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\n{W}{C} → Psy Bolt : 30\n\nFlip a coin. If heads, your opponent's Active Pokémon is now Paralyzed.",
+    "url": "https://pkmncards.com/card/gorebyss-primal-clash-prc-52/"
+  },
+  {
+    "name": "Whiscash",
+    "set": "Primal Clash",
+    "number": "41",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\n{W}{C}{C} → Water Gun : 40\n\n{W}{W}{C}{C} → Earthquake : 120\n\nThis attack does 20 damage to each of your Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+    "url": "https://pkmncards.com/card/whiscash-primal-clash-prc-41/"
+  },
+  {
+    "name": "Kingdra",
+    "set": "XY Promos",
+    "number": "XY39",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\n{C} → Gather Strength\n\nSearch your deck for up to 4 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.\n\n{W}{W}{L} → Dragon Blast : 150\n\nDiscard a {W} and a {L} Energy attached to this Pokémon.",
+    "url": "https://pkmncards.com/card/kingdra-xy-promos-xyp-xy39/"
+  },
+  {
+    "name": "Ludicolo",
+    "set": "Primal Clash",
+    "number": "37",
+    "text": "Ancient Trait ⇢ α Recovery\n\nWhen this Pokémon is healed, double the amount healed.\n\n{C} → Astonish : 30\n\nChoose a random card from your opponent's hand. Your opponent reveals that card and shuffles it into his or her deck.\n\n{W}{C}{C} → Splash Dance : 60\n\nDuring your next turn, this Pokémon's Splash Dance attack does 60 more damage (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/ludicolo-primal-clash-prc-37/"
+  },
+  {
+    "name": "Swampert",
+    "set": "Primal Clash",
+    "number": "36",
+    "text": "Ancient Trait ⇢ α Growth\n\nWhen you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.\n\nAbility ⇢ Diving Search\n\nOnce during your turn (before your attack), you may search your deck for a card. Shuffle your deck, then put that card on top of it.\n\n{C}{C}{C} → Hydro Pump : 40+\n\nThis attack does 30 more damage for each {W} Energy attached to this Pokémon.",
+    "url": "https://pkmncards.com/card/swampert-primal-clash-prc-36/"
+  },
+  {
+    "name": "Torchic",
+    "set": "Primal Clash",
+    "number": "26",
+    "text": "Ancient Trait ⇢ Ω Barrage\n\nThis Pokémon may attack twice a turn. (If the first attack Knocks Out your opponent's Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.)\n\n{R} → Flare Bonus\n\nDiscard a {R} Energy card from your hand. If you do, draw 2 cards.\n\n{R} → Claw : 20\n\nFlip a coin. If tails, this attack does nothing.",
+    "url": "https://pkmncards.com/card/torchic-primal-clash-prc-26/"
+  },
+  {
+    "name": "Magcargo",
+    "set": "Primal Clash",
+    "number": "24",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\n{R}{C} → Ram : 30\n\n{R}{C}{C} → Indomitable Blaze : 60+\n\nIf your opponent's Active Pokémon is a Pokémon-EX, this attack does 60 more damage.",
+    "url": "https://pkmncards.com/card/magcargo-primal-clash-prc-24/"
+  },
+  {
+    "name": "Sceptile",
+    "set": "Primal Clash",
+    "number": "9",
+    "text": "Ancient Trait ⇢ Ω Barrier\n\nWhenever your opponent plays a Trainer card (excluding Pokémon Tools and Stadium cards), prevent all effects of that card done to this Pokémon.\n\n{G} → Leaf Blade : 30+\n\nFlip a coin. If heads, this attack does 30 more damage.\n\n{G}{G}{C} → Power Poison : 120\n\nDiscard 1 Energy attached to this Pokémon. Your opponent's Active Pokémon is now Poisoned.",
+    "url": "https://pkmncards.com/card/sceptile-primal-clash-prc-9/"
+  }
+]
