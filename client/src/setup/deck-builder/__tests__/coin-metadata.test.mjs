@@ -36,9 +36,13 @@ test('filterCoins applies every facet together and ignores "all"', () => {
 });
 
 test('filterCoins hasImage drops placeholder-only coins', () => {
-  const coins = getCoins();
+  const coins = [
+    { id: 'remote', name: 'Remote', url: 'https://archives.bulbagarden.net/a.png' },
+    { id: 'local', name: 'Local', url: 'src/assets/coins/historical/c.png' },
+    { id: 'missing', name: 'Missing', url: 'src/assets/coins/bulbapedia/b.jpg' },
+  ];
   const withImage = filterCoins(coins, { hasImage: true });
-  assert.ok(withImage.length > 0 && withImage.length < coins.length);
+  assert.deepEqual(withImage.map((c) => c.id), ['remote', 'local']);
   assert.ok(withImage.every((c) => !isPlaceholderCoin(c)));
 });
 

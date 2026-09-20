@@ -1,7 +1,7 @@
 # Coin Catalog — Handoff
 
-**Sessions**: 218 (expansion) · 219 (integrity + metadata)
-**Status**: ✓ Complete — 939-entry normalized catalog, metadata/filter UI, download tooling
+**Sessions**: 218 (expansion) · 219 (integrity + metadata + image sourcing)
+**Status**: ✓ Complete — 939 coins, unique ids, **all 939 with real art**
 **Design**: `.agent/designs/019-coin-catalog-metadata.md`
 
 ---
@@ -24,11 +24,14 @@ entries)**, a polluted `release` (`"date\t<date>"`), and metal coins classified 
 3. **Upgraded the picker** (`native-deck-builder-coin-picker.js`): real total in the header,
    material buttons incl. **Metal**/**Cardboard**, a region filter, an "Only with images" toggle,
    and release/region/date/variant metadata on the selected coin.
-4. **Added image tooling**: `scripts/download-coin-images.mjs` + `core/coin-image-manifest.mjs`
-   download available Bulbapedia scans to `client/src/assets/coins/historical/` and write a
-   manifest. It never edits the catalog — linking is a reviewed, manual step.
+4. **Added image tooling and sourced the art**: `scripts/download-coin-images.mjs` +
+   `core/coin-image-manifest.mjs` scrape the coin scans Bulbapedia publishes (plain `fetch`),
+   download the 120px thumbnails into `client/src/assets/coins/historical/`, and link each coin
+   to its scan by matching the catalog `description` to the wiki `Description:` text. The wiki
+   had 720 unique scans (S218's "~12" was wrong); **all 737 historical coins matched**, so the
+   catalog now has **0 placeholders**.
 5. **Tests**: extended the coin catalog test and added `coin-metadata`, `coin-normalize`,
-   `coin-image-manifest` suites. `pnpm test` = 2553 pass.
+   `coin-image-manifest` suites. `pnpm test` = 2596 pass.
 
 ---
 
@@ -45,12 +48,14 @@ entries)**, a polluted `release` (`"date\t<date>"`), and metal coins classified 
 ### Image coverage
 | Status | Count | Notes |
 |---|---|---|
-| **Real art** | 214 | 202 local Gen IX files + 12 remote Bulbapedia scans |
-| **Placeholders** | 725 | `src/assets/coins/bulbapedia/{ID}.jpg` — no scan published |
+| **Gen IX local art** | 202 | `client/src/assets/coins/*.png` |
+| **Historical local art** | 737 | `client/src/assets/coins/historical/*` (720 unique files, ~19 MB, 120px) |
+| **Placeholders** | 0 | |
 | **Total** | 939 | |
 
 `isPlaceholderCoin(coin)` is true iff the url contains `/coins/bulbapedia/` — the picker's
-"Only with images" filter and `getCoinStats` use it.
+"Only with images" filter and `getCoinStats` use it. With everything linked it now matches nothing,
+but it still guards any future placeholder rows.
 
 ---
 
@@ -64,12 +69,16 @@ entries)**, a polluted `release` (`"date\t<date>"`), and metal coins classified 
 ### Fetch newly published scans
 ```bash
 node scripts/download-coin-images.mjs --dry-run           # list candidates
-node scripts/download-coin-images.mjs                     # download to client/src/assets/coins/historical/
-node scripts/download-coin-images.mjs --limit 5 --from-file rows.json   # offline/partial
+node scripts/download-coin-images.mjs                     # download + link into the catalog
+node scripts/download-coin-images.mjs --no-link           # download + manifest only
+node scripts/download-coin-images.mjs --full-size         # originals instead of 120px thumbs
+node scripts/download-coin-images.mjs --from-file rows.json   # offline/partial
 ```
-Then review `client/src/assets/coins/historical/manifest.json` and point the matching coin's
-`url`/`thumb` at the local file (`src/assets/coins/historical/<file>`). Do **not** put real art
-under `bulbapedia/`, or it will be treated as a placeholder.
+The script scrapes the three Bulbapedia pages, downloads the 120px thumbnails (the picker renders
+coins at 84-120px), writes `client/src/assets/coins/historical/manifest.json`, then points every
+matched coin's `url`/`thumb` at the local file and rewrites `coins.mjs`. Matching is by exact, then
+prefix, normalized `description`; a coin with no wiki scan stays on its placeholder. Do **not** put
+real art under `bulbapedia/`, or it will be treated as a placeholder.
 
 ### Add metadata filters
 All facet logic lives in `filterCoins`; the picker only maps UI controls onto it.
@@ -77,15 +86,12 @@ All facet logic lives in `filterCoins`; the picker only maps UI controls onto it
 ---
 
 ## Known limitations / remaining work
-- **725 coins lack scans.** Bulbapedia publishes ~12; the rest need collectors, PTCGO/eBay
-  archives, or manual sourcing. No fabricated art.
+- **All art is 120px.** Good for the current 84-120px coin UI; re-run with `--full-size` if a
+  larger zoom is ever added (originals are ~10x the bytes).
 - **No `rarity` field.** The source has none; it was deliberately not invented. Variant counts
   per release (`groupCoinsByRelease`) are the honest substitute.
-- **Live `download-coin-images.mjs` wiki scrape is unverified in some environments** — the
-  Playwright navigation to `bulbapedia.bulbagarden.net` hung in S219; the pure parsing/manifest
-  logic and a real `archives.bulbagarden.net` image fetch are verified.
-- **Graceful card-style fallback UI** for missing images is still not implemented (the picker
-  shows a "No scan available yet" note; broken-image icons remain in the grid).
+- **No graceful card-style fallback UI** for a missing image; with 0 placeholders it is moot, but
+  the picker still shows a "No scan available yet" note if a placeholder is ever re-added.
 - `client/src/setup/deck-builder/core/coins.mjs.bak-urls` is a stale tracked backup — delete it (I67).
 
 ## References

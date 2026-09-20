@@ -127,8 +127,12 @@ their id was a collision leader; those coins were effectively unselectable, note
 - Material inference also corrected 20 of the frozen Gen IX coins (19 "Metal …" + 1 "Cardboard …").
   Names are explicit, so this is a truthful fix; ids stayed frozen.
 - `scripts/download-coin-images.mjs` gained `--from-file` so the manifest/download pipeline is
-  verifiable offline. Verified end-to-end against a fixture + one real archives.bulbagarden.net
-  fetch; the live Bulbapedia *wiki* scrape was not reproducible in this environment (network hang)
-  and is the one unverified path.
+  verifiable offline. The live wiki scrape was later made to work by using plain `fetch` instead
+  of Playwright (Playwright navigation to bulbapedia hung); it now scrapes 740 rows / 720 unique
+  scans and links all 737 historical coins, so the catalog has 0 placeholders.
+- Option 7 ("manifest only, never rewrite the catalog") was reversed once the wiki data proved
+  reliable: `parseCoinTables` yields the exact `Description:` text the catalog stores, and
+  `matchManifestToCoins` matches it (735 exact/prefix, 737 total). The downloader now links
+  automatically; `--no-link` preserves the manual path. See D86.
 - The picker gained a region `<select>`, an "only with images" toggle, and a gallery meta line
   beyond the design's minimum, all fed by `filterCoins`.
