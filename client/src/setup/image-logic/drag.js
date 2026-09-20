@@ -25,6 +25,18 @@ const popupContainers = [
   'viewCards',
 ];
 
+// Host-level presentation drop targets (currently the Lost Zone rail) live
+// outside the playmat iframes, so `zoneOf`'s DOM lookup can't find a zone id
+// for them. They name their destination explicitly instead.
+const DROP_TARGET_CLASS = 'lost-zone-rail-drop';
+const explicitDropZoneOf = (target) =>
+  target?.closest?.('[data-drop-zone]') ?? null;
+const clearExplicitDropHighlights = () => {
+  document
+    .querySelectorAll(`[data-drop-zone].${DROP_TARGET_CLASS}`)
+    .forEach((el) => el.classList.remove(DROP_TARGET_CLASS));
+};
+
 export const dragStart = (event) => {
   if (systemState.isReplay && !systemState.isTwoPlayer) {
     return;
@@ -64,6 +76,15 @@ export const dragOver = (event) => {
     return;
   }
   event.preventDefault();
+  const explicitDrop = explicitDropZoneOf(event.target);
+  if (explicitDrop) {
+    // Only light up the side that owns the dragged card — the drop handler
+    // refuses the other side, so highlighting it would be a lie.
+    if (explicitDrop.dataset.dropUser === mouseClick.cardUser) {
+      explicitDrop.classList.add(DROP_TARGET_CLASS);
+    }
+    return;
+  }
   const blockedClasses = ['self-circle', 'opp-circle', 'self-tab', 'opp-tab']; //need to turn off pointerevents for these to allow the drop to be triggered from card images
   if (
     blockedClasses.some((className) =>
@@ -151,6 +172,7 @@ export const dragOver = (event) => {
 };
 
 export const dragLeave = (event) => {
+  explicitDropZoneOf(event.target)?.classList.remove(DROP_TARGET_CLASS);
   event.target.classList.remove('highlight', 'highlightBox');
   zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
   event.target.parentElement?.classList.remove('highlight', 'highlightBox');
@@ -167,6 +189,7 @@ export const dragEnd = (event) => {
   const classList = ['self-circle', 'opp-circle', 'self-tab', 'opp-tab'];
   enablePointerEvents(selfContainerDocument, classList);
   enablePointerEvents(oppContainerDocument, classList);
+  clearExplicitDropHighlights();
 
   event.target.classList.remove('dragging');
   zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
@@ -218,6 +241,7 @@ export const drop = (event) => {
   event.target.classList.remove('highlight', 'highlightBox');
   zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
   event.target.parentElement?.classList.remove('highlight', 'highlightBox');
+  clearExplicitDropHighlights();
 
   let draggedImage =
     document.querySelector('.dragging') ||
@@ -248,8 +272,19 @@ export const drop = (event) => {
     let dZoneId;
     let targetIndex;
     let targetInstanceId = null;
-    // if target image exists and it isn't itself
-    if (
+    const explicitDrop = explicitDropZoneOf(event.target);
+    if (explicitDrop) {
+      // A host-level presentation target (the Lost Zone rail). It names its
+      // destination directly, and only accepts a card owned by the side it
+      // belongs to — you can't manually fling the opponent's card into your
+      // Lost Zone.
+      if (explicitDrop.dataset.dropUser !== mouseClick.cardUser) {
+        event.stopPropagation();
+        return;
+      }
+      dZoneId = explicitDrop.dataset.dropZone;
+    } else if (
+      // if target image exists and it isn't itself
       event.target.tagName === 'IMG' &&
       event.target !== draggedImage[0] &&
       ['active', 'bench'].includes(zoneOf(event.target)?.id)

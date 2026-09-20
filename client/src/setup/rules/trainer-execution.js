@@ -5,7 +5,7 @@ import { moveToDeckBottom } from '../../actions/zones/deck-actions.js';
 import { flipCoin } from '../../actions/general/flip-coin.js';
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
-import { applyStatus } from '/shared/engine/rules/status.mjs';
+import { applyStatus, clearStatuses } from '/shared/engine/rules/status.mjs';
 import { rulesState, ensureCardData, getStadium } from '/shared/engine/rules/rules-state.mjs';
 import { normalizeStage, isRareCandyJump, canEvolve } from '/shared/engine/rules/evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from '/shared/engine/rules/energy-effects.mjs';
@@ -107,6 +107,16 @@ function countVariableDraw(source) {
       ).length;
     case 'opponentHandPokemon':
       return getZoneSafe(opp, 'hand').array.filter((c) => _isPokemonCard(c)).length;
+    case 'opponentPokemonInPlay':
+      return getInPlayPokemon(opp).length;
+    case 'opponentBenchBasic':
+      return getZoneSafe(opp, 'bench').array.filter(
+        (c) => _isPokemonCard(c) && (normalizeStage(c.stage) || 'Basic') === 'Basic'
+      ).length;
+    case 'opponentHandTrainer':
+      return getZoneSafe(opp, 'hand').array.filter((c) => !_isPokemonCard(c) && !isEnergyCard(c)).length;
+    case 'allBench':
+      return getZoneSafe('self', 'bench').getCount() + getZoneSafe('opp', 'bench').getCount();
     default:
       return 0;
   }
@@ -909,6 +919,14 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                 applyStatusToCard(who, active, step.conditions);
               }
             }
+          } else if (step.target === 'bothActiveAll') {
+            for (const who of ['self', 'opp']) {
+              const active = zone(who, 'active').array[0];
+              if (active) applyStatusToCard(who, active, step.conditions);
+            }
+          } else if (step.target === 'ownActive') {
+            const active = zone(_effectOwner, 'active').array[0];
+            if (active) applyStatusToCard(_effectOwner, active, step.conditions);
           }
           break;
         case 'damageCounters': {
@@ -1574,6 +1592,1180 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
             });
           }
           msg('  auto: switched opponent Active to Bench');
+          break;
+        }
+        case 'reviveFromDiscard': {
+          const side = step.side === 'opponent' ? (_effectOwner === 'self' ? 'opp' : 'self') : _effectOwner;
+          const bench = zone(side, 'bench');
+          if (countBenchPokemon(bench) >= 8) {
+            msg('  Bench full — cannot put a Pokémon onto the Bench');
+            break;
+          }
+          const basics = zone(side, 'discard').array.filter(
+            (c) => _isPokemonCard(c) && (normalizeStage(c.stage) || 'Basic') === 'Basic'
+          );
+          if (!basics.length) {
+            msg('  no Basic Pokémon in the discard pile');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Basic Pokémon to put on the Bench`,
+            candidates: basics,
+            user: _effectOwner,
+            onPick: (mon) => {
+              const i = zone(side, 'discard').array.indexOf(mon);
+              if (i >= 0) moveCardBundle(side, side, 'discard', 'bench', i, false, 'move');
+              msg(`  auto: put ${mon.name} onto the Bench`);
+            },
+          });
+          break;
+        }
+        case 'moveDamageCounters': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const fromSide = step.from === 'opponent' ? oppSide : _effectOwner;
+          const toSide = step.to === 'opponent' || step.to === 'opponentActive' ? oppSide : _effectOwner;
+          const donorPool = step.from === 'ownActive'
+            ? zone(_effectOwner, 'active').array
+            : getInPlayPokemon(fromSide);
+          const donors = donorPool.filter(
+            (p) => p && !p.image?.attached &&
+              (parseInt(p.image?.damageCounter?.textContent || '0', 10) || 0) > 0
+          );
+          if (!donors.length) {
+            msg('  no damage counters to move');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Pokémon with damage counters`,
+            candidates: donors,
+            user: _effectOwner,
+            onPick: (source) => {
+              const current = parseInt(source.image?.damageCounter?.textContent || '0', 10) || 0;
+              const amount = Math.min(step.count || 1, current);
+              const targets = step.to === 'opponentActive'
+                ? zone(oppSide, 'active').array.filter((p) => p && !p.image?.attached)
+                : getInPlayPokemon(toSide).filter((p) => p !== source);
+              if (!targets.length) {
+                msg('  no Pokémon to receive the damage counters');
+                return;
+              }
+              openMatPick({
+                title: `${card.name} — click a Pokémon to receive ${amount} damage counter${amount === 1 ? '' : 's'}`,
+                candidates: targets,
+                onPick: (target) => {
+                  _applyHealToCard(source, amount, false, fromSide);
+                  const tgt = pokemonZoneEntry(toSide, target);
+                  if (tgt) placeDamageCounters(toSide, tgt.zoneId, tgt.index, amount);
+                  msg(`  auto: moved ${amount} damage counter${amount === 1 ? '' : 's'} from ${source.name} to ${target.name}`);
+                },
+              });
+            },
+          });
+          break;
+        }
+        case 'lookAtOpponentHand': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const hand = zone(oppSide, 'hand').array;
+          if (!hand.length) {
+            msg("  opponent's hand is empty");
+            break;
+          }
+          msg(`  opponent's hand: ${hand.map((c) => c.name).join(', ')}`);
+          break;
+        }
+        case 'attachFromHand': {
+          const handEnergy = zone(_effectOwner, 'hand').array.filter((c) => {
+            if (!isEnergyCard(c)) return false;
+            return step.energy === 'Basic Energy' ? isBasicEnergyCard(c) : true;
+          });
+          if (!handEnergy.length) {
+            msg('  no matching Energy in hand');
+            break;
+          }
+          const targets = getInPlayPokemon(_effectOwner);
+          if (!targets.length) {
+            msg('  no Pokémon to attach to');
+            break;
+          }
+          const count = Math.min(step.count || 1, handEnergy.length);
+          openMultiPickOnly({
+            title: `${card.name} — choose ${count > 1 ? `up to ${count}` : '1'} Energy from your hand`,
+            candidates: handEnergy,
+            count,
+            upTo: step.count > 1,
+            user: _effectOwner,
+            onConfirm: (picked) => {
+              if (!picked.length) return;
+              openPickOnly({
+                title: `${card.name} — choose a Pokémon to attach ${picked.map((e) => e.name).join(', ')} to`,
+                candidates: getInPlayPokemon(_effectOwner),
+                user: _effectOwner,
+                onPick: (target) => {
+                  for (const e of picked) attachEnergyCard(_effectOwner, e, target);
+                  msg(`  auto: attached ${picked.length} Energy to ${target.name}`);
+                },
+              });
+            },
+          });
+          break;
+        }
+        case 'attachAttackTool': {
+          const boardIdx = zone(_effectOwner, 'board').array.indexOf(card);
+          const fromZone = boardIdx >= 0 ? 'board' : 'hand';
+          if (zone(_effectOwner, fromZone).array.indexOf(card) < 0) {
+            msg('  cannot attach this card automatically');
+            break;
+          }
+          const attachTargets = getInPlayPokemon(_effectOwner);
+          if (!attachTargets.length) {
+            msg('  no Pokémon to attach to');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Pokémon to attach this card to`,
+            candidates: attachTargets,
+            user: _effectOwner,
+            onPick: (target) => {
+              const loc = pokemonZoneEntry(_effectOwner, target);
+              const i = zone(_effectOwner, fromZone).array.indexOf(card);
+              if (loc && i >= 0) {
+                moveCardBundle(_effectOwner, _effectOwner, fromZone, loc.zoneId, i, loc.index, 'move', true);
+                msg(`  auto: attached ${card.name} to ${target.name} — it may use ${card.name}'s attack this turn`);
+              }
+            },
+          });
+          break;
+        }
+        case 'revealPrizes': {
+          const sides = step.scope === 'all' ? ['self', 'opp'] : [_effectOwner];
+          for (const side of sides) {
+            for (const pz of zone(side, 'prizes').array) {
+              if (pz?.image) pz.image.faceDown = false;
+            }
+          }
+          msg(`  auto: turned ${step.scope === 'all' ? "both players'" : 'your'} Prize cards face up`);
+          break;
+        }
+        case 'prizeToHand': {
+          const prizes = zone(_effectOwner, 'prizes').array.filter((c) => c && !c.image?.attached);
+          if (!prizes.length) {
+            msg('  no Prize cards');
+            break;
+          }
+          const takeCount = Math.min(step.count || 1, prizes.length);
+          openMultiPickOnly({
+            title: `${card.name} — choose up to ${takeCount} Prize card(s) to put into your hand`,
+            candidates: prizes,
+            count: takeCount,
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picked) => {
+              for (const p of picked) {
+                const i = zone(_effectOwner, 'prizes').array.indexOf(p);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'prizes', 'hand', i, false, 'move');
+              }
+              msg(`  auto: put ${picked.length} Prize card(s) into hand`);
+              if (!step.replace || !picked.length) return;
+              const handCards = zone(_effectOwner, 'hand').array;
+              if (!handCards.length) return;
+              openMultiPickOnly({
+                title: `${card.name} — choose ${picked.length} card(s) to set face down as Prizes`,
+                candidates: handCards,
+                count: picked.length,
+                user: _effectOwner,
+                onConfirm: (sel) => {
+                  for (const h of sel) {
+                    const i = zone(_effectOwner, 'hand').array.indexOf(h);
+                    if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'prizes', i, false, 'move', true);
+                  }
+                  msg(`  auto: set ${sel.length} card(s) face down as Prizes`);
+                },
+              });
+            },
+          });
+          break;
+        }
+        case 'clearStatus': {
+          const targets = step.target === 'allYourPokémon'
+            ? getInPlayPokemon(_effectOwner)
+            : zone(_effectOwner, 'active').array.filter((c) => c && !c.image?.attached);
+          for (const t of targets) {
+            const key = t.image?.dataset?.cardId || t.name;
+            if (key) clearStatuses(_effectOwner, key);
+          }
+          msg('  auto: cleared Special Conditions');
+          break;
+        }
+        case 'discardStadium': {
+          if (!discardStadiumInPlay()) msg('  no Stadium in play to discard');
+          break;
+        }
+        case 'putDiscardOnTop': {
+          const candidates = zone(_effectOwner, 'discard').array.filter(
+            (c) => step.what !== 'Pokémon' || _isPokemonCard(c)
+          );
+          if (!candidates.length) {
+            msg('  no matching card in the discard pile');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a card to put on top of your deck`,
+            candidates,
+            user: _effectOwner,
+            onPick: (chosen) => {
+              const i = zone(_effectOwner, 'discard').array.indexOf(chosen);
+              if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'discard', 'deck', i, 0, 'move');
+              msg(`  auto: put ${chosen.name} on top of your deck`);
+            },
+          });
+          break;
+        }
+        case 'energyToHand': {
+          const energies = collectAttachedForUser(_effectOwner, (att) => isEnergyCard(att));
+          if (!energies.length) {
+            msg('  no attached Energy to return');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — choose Energy to return to your hand`,
+            candidates: energies.map((e) => e.card),
+            count: energies.length,
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picked) => {
+              for (const e of picked) {
+                const entry = energies.find((x) => x.card === e);
+                if (!entry) continue;
+                const i = zone(_effectOwner, entry.zoneId).array.indexOf(e);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, entry.zoneId, 'hand', i, false, 'move');
+              }
+              msg(`  auto: returned ${picked.length} Energy to hand`);
+            },
+          });
+          break;
+        }
+        case 'opponentDiscardToHand': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const discard = zone(oppSide, 'discard').array;
+          if (!discard.length) {
+            msg('  no cards in the opponent’s discard pile');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a card from your opponent's discard pile`,
+            candidates: discard,
+            user: _effectOwner,
+            onPick: (chosen) => {
+              const i = zone(oppSide, 'discard').array.indexOf(chosen);
+              if (i >= 0) moveCardBundle(oppSide, oppSide, 'discard', 'hand', i, false, 'move');
+              msg(`  auto: put ${chosen.name} into your opponent's hand`);
+            },
+          });
+          break;
+        }
+        case 'opponentActiveEnergyToDeck': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const activeZone = zone(oppSide, 'active');
+          const energies = [];
+          for (const mon of activeZone.array.filter((c) => c && !c.image?.attached)) {
+            for (const att of getAttachedCards(activeZone, mon)) {
+              if (isEnergyCard(att)) energies.push(att);
+            }
+          }
+          if (!energies.length) {
+            msg('  no Energy attached to the opponent’s Active Pokémon');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — put an opponent Energy on top of their deck`,
+            candidates: energies,
+            user: _effectOwner,
+            onPick: (energy) => {
+              const i = activeZone.array.indexOf(energy);
+              if (i >= 0) moveToDeckBottom(oppSide, oppSide, 'active', i);
+              msg(`  auto: put ${energy.name} on top of the opponent's deck`);
+            },
+          });
+          break;
+        }
+        case 'opponentDiscardToDeckBottom': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const discard = zone(oppSide, 'discard').array;
+          if (!discard.length) {
+            msg('  no cards in the opponent’s discard pile');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a card to put on the bottom of your opponent's deck`,
+            candidates: discard,
+            user: _effectOwner,
+            onPick: (chosen) => {
+              const i = zone(oppSide, 'discard').array.indexOf(chosen);
+              if (i >= 0) moveToDeckBottom(oppSide, oppSide, 'discard', i);
+              msg(`  auto: put ${chosen.name} on the bottom of your opponent's deck`);
+            },
+          });
+          break;
+        }
+        case 'shufflePokemonIntoDeck': {
+          const candidates = getInPlayPokemon(_effectOwner);
+          if (!candidates.length) {
+            msg('  no Pokémon to shuffle in');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Pokémon to shuffle into your deck`,
+            candidates,
+            user: _effectOwner,
+            onPick: (mon) => {
+              const loc = pokemonZoneEntry(_effectOwner, mon);
+              if (!loc) return;
+              const z = zone(_effectOwner, loc.zoneId);
+              for (const att of [...getAttachedCards(z, mon)]) {
+                const ai = z.array.indexOf(att);
+                if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'deck', ai, false, 'move');
+              }
+              const i = z.array.indexOf(mon);
+              if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'deck', i, false, 'move');
+              if (_shuffleZone) _shuffleZone(_effectOwner, _effectOwner, 'deck');
+              msg(`  auto: shuffled ${mon.name} into the deck`);
+            },
+          });
+          break;
+        }
+        case 'discardOwnBenchPokemon': {
+          const bench = zone(_effectOwner, 'bench').array.filter((c) => c && !c.image?.attached);
+          if (!bench.length) {
+            msg('  no Benched Pokémon');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — choose up to ${step.count || 1} Benched Pokémon to discard`,
+            candidates: bench,
+            count: step.count || 1,
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picked) => {
+              for (const mon of picked) {
+                const loc = pokemonZoneEntry(_effectOwner, mon);
+                if (!loc) continue;
+                const z = zone(_effectOwner, loc.zoneId);
+                for (const att of [...getAttachedCards(z, mon)]) {
+                  const ai = z.array.indexOf(att);
+                  if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'discard', ai, false, 'move');
+                }
+                const i = z.array.indexOf(mon);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'discard', i, false, 'move');
+              }
+              msg(`  auto: discarded ${picked.length} Benched Pokémon`);
+            },
+          });
+          break;
+        }
+        case 'shuffleDiscardIntoDeck': {
+          for (const side of ['self', 'opp']) {
+            while (zone(side, 'discard').getCount() > 0) {
+              moveCardBundle(side, side, 'discard', 'deck', 0, false, 'move');
+            }
+            if (_shuffleZone) _shuffleZone(side, side, 'deck');
+          }
+          msg('  auto: each player shuffled their discard pile into their deck');
+          break;
+        }
+        case 'opponentHandShuffleDeck': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const hand = zone(oppSide, 'hand').array.filter((c) => !c.image?.attached);
+          const pool = step.what === 'Trainer'
+            ? hand.filter((c) => String(c.cardType || c.supertype || c.cardKind || '').toLowerCase().includes('trainer'))
+            : hand;
+          if (!pool.length) {
+            msg('  opponent has no matching cards in hand');
+            break;
+          }
+          const n = Math.min(step.count || 1, pool.length);
+          openMultiPickOnly({
+            title: `${card.name} — shuffle ${n} card(s) from your opponent's hand into their deck`,
+            candidates: pool,
+            count: n,
+            upTo: !!step.upTo,
+            user: oppSide,
+            onConfirm: (picks) => {
+              for (const pick of picks) {
+                const i = zone(oppSide, 'hand').array.indexOf(pick);
+                if (i >= 0) moveCardBundle(oppSide, oppSide, 'hand', 'deck', i, false, 'move');
+              }
+              if (_shuffleZone) _shuffleZone(oppSide, oppSide, 'deck');
+              if (step.optionalOpponentDraw && zone(oppSide, 'deck').getCount() > 0) {
+                moveCardBundle(oppSide, oppSide, 'deck', 'hand', 0, false, 'move');
+              }
+              msg(`  auto: shuffled ${picks.length} opponent card(s) into their deck`);
+            },
+          });
+          break;
+        }
+        case 'opponentHandToBenchBasic': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const benchZone = zone(oppSide, 'bench');
+          const space = Math.max(0, 8 - countBenchPokemon(benchZone));
+          if (space <= 0) {
+            msg('  opponent Bench is full');
+            break;
+          }
+          const basics = zone(oppSide, 'hand').array.filter(
+            (c) => _isPokemonCard(c) && (normalizeStage(c.stage) || 'Basic') === 'Basic'
+          );
+          if (!basics.length) {
+            msg("  no Basic Pokémon in the opponent's hand");
+            break;
+          }
+          const placeBasics = (picks) => {
+            for (const mon of picks) {
+              const i = zone(oppSide, 'hand').array.indexOf(mon);
+              if (i >= 0) moveCardBundle(oppSide, oppSide, 'hand', 'bench', i, false, 'move');
+            }
+            if (step.switchActive && picks[0]) switchBenchToActive(oppSide, picks[0]);
+            msg(`  auto: put ${picks.length} Basic Pokémon onto the opponent's Bench`);
+          };
+          if (step.anyNumber) {
+            openMultiPickOnly({
+              title: `${card.name} — put Basic Pokémon onto the opponent's Bench`,
+              candidates: basics,
+              count: space,
+              upTo: true,
+              user: oppSide,
+              onConfirm: placeBasics,
+            });
+          } else {
+            openPickOnly({
+              title: `${card.name} — choose a Basic Pokémon to put onto the opponent's Bench`,
+              candidates: basics,
+              user: oppSide,
+              onPick: (mon) => placeBasics([mon]),
+            });
+          }
+          break;
+        }
+        case 'eachPlayerDiscardFromHand': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const order = step.opponentFirst ? [oppSide, _effectOwner] : [_effectOwner, oppSide];
+          for (const side of order) {
+            for (let i = 0; i < step.count; i++) {
+              if (zone(side, 'hand').getCount() === 0) break;
+              moveCardBundle(side, side, 'hand', 'discard', 0, false, 'move');
+            }
+          }
+          msg(`  auto: each player discarded up to ${step.count} card(s)`);
+          break;
+        }
+        case 'eachPlayerDraw': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          for (const side of [_effectOwner, oppSide]) {
+            for (let i = 0; i < step.count; i++) {
+              if (zone(side, 'deck').getCount() > 0) moveCardBundle(side, side, 'deck', 'hand', 0, false, 'move');
+            }
+          }
+          msg(`  auto: each player drew up to ${step.count} card(s)`);
+          break;
+        }
+        case 'eachPlayerReturnBench': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          for (const side of [_effectOwner, oppSide]) {
+            const z = zone(side, 'bench');
+            const mon = z.array.find((c) => c && !c.image?.attached);
+            if (!mon) continue;
+            for (const att of [...getAttachedCards(z, mon)]) {
+              const ai = z.array.indexOf(att);
+              if (ai >= 0) moveCardBundle(side, side, 'bench', 'hand', ai, false, 'move');
+            }
+            const i = z.array.indexOf(mon);
+            if (i >= 0) moveCardBundle(side, side, 'bench', 'hand', i, false, 'move');
+          }
+          msg('  auto: each player returned a Benched Pokémon to hand');
+          break;
+        }
+        case 'eachPlayerShuffleHandDraw': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          for (const side of [_effectOwner, oppSide]) {
+            const n = zone(side, 'hand').getCount();
+            while (zone(side, 'hand').getCount() > 0) moveCardBundle(side, side, 'hand', 'deck', 0, false, 'move');
+            if (_shuffleZone) _shuffleZone(side, side, 'deck');
+            for (let i = 0; i < n; i++) {
+              if (zone(side, 'deck').getCount() > 0) moveCardBundle(side, side, 'deck', 'hand', 0, false, 'move');
+            }
+          }
+          msg('  auto: each player shuffled their hand into their deck and redrew');
+          break;
+        }
+        case 'eachPlayerHandToFive': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const order = step.opponentFirst ? [oppSide, _effectOwner] : [_effectOwner, oppSide];
+          for (const side of order) {
+            while (zone(side, 'hand').getCount() > step.count) {
+              moveCardBundle(side, side, 'hand', 'discard', 0, false, 'move');
+            }
+            while (zone(side, 'hand').getCount() < step.count && zone(side, 'deck').getCount() > 0) {
+              moveCardBundle(side, side, 'deck', 'hand', 0, false, 'move');
+            }
+          }
+          msg(`  auto: each player now has ${step.count} cards in hand`);
+          break;
+        }
+        case 'eachPlayerRecoverPokemon': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          for (const side of [oppSide, _effectOwner]) {
+            const mon = zone(side, 'discard').array.find((c) => _isPokemonCard(c));
+            if (!mon) continue;
+            const i = zone(side, 'discard').array.indexOf(mon);
+            if (i >= 0) moveCardBundle(side, side, 'discard', 'hand', i, false, 'move');
+          }
+          msg('  auto: each player recovered a Pokémon from their discard pile');
+          break;
+        }
+        case 'discardAnyThenDraw': {
+          const hand = zone(_effectOwner, 'hand').array;
+          if (!hand.length) {
+            msg('  no cards in hand to discard');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — discard any number, then draw that many`,
+            candidates: hand,
+            count: hand.length,
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picks) => {
+              for (const p of picks) {
+                const i = zone(_effectOwner, 'hand').array.indexOf(p);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', i, false, 'move');
+              }
+              for (let k = 0; k < picks.length; k++) {
+                if (zone(_effectOwner, 'deck').getCount() > 0) {
+                  moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+                }
+              }
+              msg(`  auto: discarded ${picks.length} and drew ${picks.length}`);
+            },
+          });
+          break;
+        }
+        case 'opponentHandShuffleItemsDraw': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const items = zone(oppSide, 'hand').array.filter(
+            (c) => String(c.type || c.supertype || '').toLowerCase().includes('trainer') && !_isPokemonCard(c) && !isEnergyCard(c)
+          );
+          let n = 0;
+          for (const item of items) {
+            const i = zone(oppSide, 'hand').array.indexOf(item);
+            if (i >= 0) {
+              moveCardBundle(oppSide, oppSide, 'hand', 'deck', i, false, 'move');
+              n++;
+            }
+          }
+          if (_shuffleZone) _shuffleZone(oppSide, oppSide, 'deck');
+          for (let k = 0; k < n; k++) {
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+          }
+          msg(`  auto: opponent shuffled ${n} Item card(s); you drew ${n}`);
+          break;
+        }
+        case 'discardAllTrainerInPlay': {
+          const side = step.side === 'opponent' ? (_effectOwner === 'self' ? 'opp' : 'self') : _effectOwner;
+          for (const zoneId of ['active', 'bench']) {
+            const z = zone(side, zoneId);
+            for (const parent of z.array.filter((c) => c && !c.image?.attached)) {
+              for (const att of [...getAttachedCards(z, parent)]) {
+                const attStr = `${att.type || ''} ${att.supertype || ''} ${att.name || ''}`.toLowerCase();
+                if (attStr.includes('trainer') || attStr.includes('tool')) {
+                  const ai = z.array.indexOf(att);
+                  if (ai >= 0) moveCardBundle(side, side, zoneId, 'discard', ai, false, 'move');
+                }
+              }
+            }
+          }
+          if (side === _effectOwner) discardStadiumInPlay();
+          msg('  auto: discarded Trainer cards in play');
+          break;
+        }
+        case 'returnStadiumToHand': {
+          const stadium = getStadium();
+          if (!stadium?.card) {
+            msg('  no Stadium in play');
+            break;
+          }
+          const owner = stadium.user || 'self';
+          const idx = zone(owner, 'stadium').array.indexOf(stadium.card);
+          if (idx >= 0) {
+            moveCardBundle(owner, owner, 'stadium', 'hand', idx, false, 'move');
+            msg(`  auto: returned ${stadium.card.name} to hand`);
+          } else {
+            msg('  no Stadium in play');
+          }
+          break;
+        }
+        case 'shuffleDeckOnly': {
+          if (_shuffleZone) _shuffleZone(_effectOwner, _effectOwner, 'deck');
+          msg('  auto: shuffled deck');
+          break;
+        }
+        case 'clearAttackEffects': {
+          msg('  cleared all effects of attacks — resolve any lingering effects manually');
+          break;
+        }
+        case 'revealUntilCard': {
+          const deck = zone(_effectOwner, 'deck');
+          const what = String(step.what || '').toLowerCase();
+          const match = (c) => {
+            if (what.includes('supporter')) {
+              return String(c.type || c.supertype || '').toLowerCase().includes('trainer');
+            }
+            if (what.includes('pokémon')) {
+              if (!_isPokemonCard(c)) return false;
+              return what.includes('evolution') ? (normalizeStage(c.stage) || 'Basic') !== 'Basic' : true;
+            }
+            return false;
+          };
+          let idx = -1;
+          for (let i = 0; i < deck.getCount(); i++) {
+            if (match(deck.array[i])) {
+              idx = i;
+              break;
+            }
+          }
+          if (idx >= 0) {
+            const name = deck.array[idx]?.name || 'a card';
+            moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', idx, false, 'move');
+            msg(`  auto: revealed and took ${name}`);
+          } else {
+            msg('  no matching card revealed');
+          }
+          if (_shuffleZone) _shuffleZone(_effectOwner, _effectOwner, 'deck');
+          break;
+        }
+        case 'lookAtFaceDownPrize': {
+          const prizes = zone(_effectOwner, 'prizes');
+          const what = String(step.what || '').toLowerCase();
+          const match = (c) =>
+            what.includes('ultra beast')
+              ? /ultra beast/i.test(String(c.name || ''))
+              : _isPokemonCard(c) && (normalizeStage(c.stage) || 'Basic') === 'Basic';
+          const found = prizes.array.find((c) => c && !c.image?.faceUp && match(c));
+          if (!found) {
+            msg('  no matching face-down Prize card');
+            break;
+          }
+          const i = prizes.array.indexOf(found);
+          moveCardBundle(_effectOwner, _effectOwner, 'prizes', 'hand', i, false, 'move');
+          msg(`  auto: revealed ${found.name} from your Prizes into your hand`);
+          break;
+        }
+        case 'putHandBasicAsActive': {
+          const basics = zone(_effectOwner, 'hand').array.filter(
+            (c) => _isPokemonCard(c) && (normalizeStage(c.stage) || 'Basic') === 'Basic'
+          );
+          if (!basics.length) {
+            msg('  no Basic Pokémon in hand');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Basic Pokémon to make your Active`,
+            candidates: basics,
+            user: _effectOwner,
+            onPick: (mon) => {
+              while (zone(_effectOwner, 'active').getCount() > 0) {
+                moveCardBundle(_effectOwner, _effectOwner, 'active', 'bench', 0, false, 'move');
+              }
+              const i = zone(_effectOwner, 'hand').array.indexOf(mon);
+              if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'active', i, false, 'move');
+              msg(`  auto: put ${mon.name} into play as your Active Pokémon`);
+            },
+          });
+          break;
+        }
+        case 'healPerHeads': {
+          const coins = step.coins || 2;
+          let heads = 0;
+          for (let i = 0; i < coins; i++) heads += Math.random() < 0.5 ? 1 : 0;
+          const amount = heads * (step.perHeads || 3);
+          const candidates = getInPlayPokemon(_effectOwner).filter((c) => c?.hp);
+          if (!candidates.length) {
+            msg('  no Pokémon to heal');
+            break;
+          }
+          _openHealPicker({
+            title: `${card.name} — ${heads} heads: remove up to ${amount} damage counters`,
+            candidates,
+            amount,
+            cure: false,
+            user: _effectOwner,
+          });
+          break;
+        }
+        case 'healEachActive': {
+          const sides = step.scope === 'all' ? ['self', 'opp'] : [_effectOwner];
+          for (const side of sides) {
+            for (const mon of getInPlayPokemon(side)) {
+              const cur = parseInt(mon.image?.damageCounter?.textContent || '0', 10) || 0;
+              if (cur <= 0) continue;
+              _applyHealToCard(mon, Math.min(step.amount, cur), false, side);
+            }
+          }
+          msg(`  auto: removed ${step.amount} damage counter(s) from each damaged Pokémon`);
+          break;
+        }
+        case 'opponentChoosesFromTop': {
+          const deck = zone(_effectOwner, 'deck');
+          const top = deck.array.slice(0, Math.min(step.count, deck.getCount()));
+          if (!top.length) {
+            msg('  deck is empty');
+            break;
+          }
+          const keep = top.slice(0, step.chosen);
+          for (const c of keep) {
+            const i = zone(_effectOwner, 'deck').array.indexOf(c);
+            if (i >= 0) {
+              moveCardBundle(_effectOwner, _effectOwner, 'deck', step.chosenTo === 'discard' ? 'discard' : 'hand', i, false, 'move');
+            }
+          }
+          for (const c of top.slice(step.chosen)) {
+            const i = zone(_effectOwner, 'deck').array.indexOf(c);
+            if (i >= 0 && step.restTo === 'hand') {
+              moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', i, false, 'move');
+            }
+          }
+          msg(`  auto: opponent chose ${keep.length} card(s) from the top of the deck`);
+          break;
+        }
+        case 'millPerHeads': {
+          const coins = step.coins || 2;
+          let heads = 0;
+          for (let i = 0; i < coins; i++) heads += Math.random() < 0.5 ? 1 : 0;
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const n = heads * (step.per || 1);
+          for (let i = 0; i < n; i++) {
+            if (zone(oppSide, 'deck').getCount() > 0) moveCardBundle(oppSide, oppSide, 'deck', 'discard', 0, false, 'move');
+          }
+          msg(`  auto: ${heads} heads — milled ${n} from the opponent's deck`);
+          break;
+        }
+        case 'flipUntilTailsDraw': {
+          let heads = 0;
+          while (Math.random() < 0.5 && heads < 50) heads++;
+          for (let i = 0; i < heads; i++) {
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+          }
+          msg(`  auto: ${heads} heads — drew ${heads} card(s)`);
+          break;
+        }
+        case 'toolsToHand': {
+          const tools = collectAttachedForUser(_effectOwner, (att) => {
+            const s = `${att.type || ''} ${att.supertype || ''} ${att.name || ''}`.toLowerCase();
+            return s.includes('trainer') || s.includes('tool');
+          });
+          if (!tools.length) {
+            msg('  no attached Pokémon Tools');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — choose up to ${step.count} Tool(s) to return to hand`,
+            candidates: tools.map((t) => t.card),
+            count: step.count || 1,
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picks) => {
+              for (const p of picks) {
+                const loc = tools.find((t) => t.card === p);
+                if (!loc) continue;
+                const z = zone(_effectOwner, loc.zoneId);
+                const i = z.array.indexOf(p);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'hand', i, false, 'move');
+              }
+              msg(`  auto: returned ${picks.length} Tool(s) to hand`);
+            },
+          });
+          break;
+        }
+        case 'switchHandWithTop': {
+          if (zone(_effectOwner, 'deck').getCount() === 0) {
+            msg('  deck is empty');
+            break;
+          }
+          if (zone(_effectOwner, 'hand').getCount() === 0) {
+            msg('  hand is empty');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a card to swap with the top of your deck`,
+            candidates: [...zone(_effectOwner, 'hand').array],
+            user: _effectOwner,
+            onPick: (pick) => {
+              const top = zone(_effectOwner, 'deck').array[0];
+              const hi = zone(_effectOwner, 'hand').array.indexOf(pick);
+              if (hi >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', hi, false, 'move');
+              const ti = zone(_effectOwner, 'deck').array.indexOf(top);
+              if (ti >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', ti, false, 'move');
+              msg('  auto: swapped a hand card with the top of the deck');
+            },
+          });
+          break;
+        }
+        case 'putHandBottomThenDraw': {
+          const hand = zone(_effectOwner, 'hand').array;
+          if (!hand.length) {
+            msg('  no cards in hand');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — put any number on the bottom of your deck, then draw that many`,
+            candidates: hand,
+            count: hand.length,
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picks) => {
+              for (const p of picks) {
+                const i = zone(_effectOwner, 'hand').array.indexOf(p);
+                if (i >= 0) moveToDeckBottom(_effectOwner, _effectOwner, 'hand', i);
+              }
+              for (let k = 0; k < picks.length; k++) {
+                if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+              }
+              msg(`  auto: put ${picks.length} on the bottom and drew ${picks.length}`);
+            },
+          });
+          break;
+        }
+        case 'shuffleHandCardsThenDraw': {
+          const handCards = zone(_effectOwner, 'hand').array;
+          if (!handCards.length) {
+            msg('  no cards in hand to shuffle');
+            break;
+          }
+          const picks = handCards.slice(0, Math.min(step.count, handCards.length));
+          for (const p of picks) {
+            const i = zone(_effectOwner, 'hand').array.indexOf(p);
+            if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'deck', i, false, 'move');
+          }
+          if (_shuffleZone) _shuffleZone(_effectOwner, _effectOwner, 'deck');
+          for (let k = 0; k < (step.draw || 1); k++) {
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+          }
+          msg(`  auto: shuffled ${picks.length} into the deck and drew ${step.draw || 1}`);
+          break;
+        }
+        case 'drawBottom': {
+          for (let i = 0; i < step.count; i++) {
+            const deck = zone(_effectOwner, 'deck');
+            if (deck.getCount() === 0) break;
+            moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', deck.getCount() - 1, false, 'move');
+          }
+          msg(`  auto: drew the bottom ${step.count} card(s)`);
+          break;
+        }
+        case 'moveEnergyOpponent': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const energies = collectAttachedForUser(oppSide, (att) => isEnergyCard(att));
+          if (!energies.length) {
+            msg('  no Special Energy attached to the opponent');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Special Energy to move`,
+            candidates: energies.map((e) => e.card),
+            user: _effectOwner,
+            onPick: (energy) => {
+              const src = energies.find((e) => e.card === energy);
+              const targets = getInPlayPokemon(oppSide).filter((p) => p !== src?.parent);
+              if (!targets.length) return;
+              openMatPick({
+                title: `${card.name} — click a Pokémon to receive ${energy.name}`,
+                candidates: targets,
+                onPick: (target) => {
+                  attachEnergyCard(oppSide, energy, target);
+                  msg(`  auto: moved ${energy.name} to ${target.name}`);
+                },
+              });
+            },
+          });
+          break;
+        }
+        case 'sendEnergyToDeckBottom': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const energies = collectAttachedForUser(oppSide, (att) => isEnergyCard(att));
+          if (!energies.length) {
+            msg('  no Energy attached to the opponent');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Special Energy to put on the bottom of their deck`,
+            candidates: energies.map((e) => e.card),
+            user: _effectOwner,
+            onPick: (energy) => {
+              const loc = energies.find((e) => e.card === energy);
+              if (!loc) return;
+              const z = zone(oppSide, loc.zoneId);
+              const i = z.array.indexOf(energy);
+              if (i >= 0) moveToDeckBottom(oppSide, oppSide, loc.zoneId, i);
+              msg(`  auto: put ${energy.name} on the bottom of the opponent's deck`);
+            },
+          });
+          break;
+        }
+        case 'revealTopEnergy': {
+          const deck = zone(_effectOwner, 'deck');
+          if (deck.getCount() === 0) {
+            msg('  deck is empty');
+            break;
+          }
+          const top = deck.array[0];
+          const want = String(step.energy || '').toLowerCase();
+          const energyMatch = isEnergyCard(top) && (want.includes('basic') ? isBasicEnergyCard(top) : true);
+          if (energyMatch) {
+            const active = zone(_effectOwner, 'active').array[0];
+            const targets = (step.toBench ? getInPlayPokemon(_effectOwner).filter((p) => p !== active) : getInPlayPokemon(_effectOwner)).filter((c) => c?.hp);
+            if (!targets.length) {
+              msg('  no Pokémon to attach to');
+              break;
+            }
+            if (targets.length === 1) {
+              attachEnergyCard(_effectOwner, top, targets[0]);
+              msg(`  auto: attached ${top.name} to ${targets[0].name}`);
+            } else {
+              openMatPick({
+                title: `${card.name} — attach ${top.name} to which Pokémon?`,
+                candidates: targets,
+                onPick: (t) => {
+                  attachEnergyCard(_effectOwner, top, t);
+                  msg(`  auto: attached ${top.name} to ${t.name}`);
+                },
+              });
+            }
+          } else {
+            const i = zone(_effectOwner, 'deck').array.indexOf(top);
+            if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', i, false, 'move');
+            msg(`  auto: put ${top.name} into your hand`);
+          }
+          break;
+        }
+        case 'discardAllEnergyFromActive': {
+          const side = step.side === 'opponent' ? (_effectOwner === 'self' ? 'opp' : 'self') : _effectOwner;
+          const z = zone(side, 'active');
+          for (const parent of z.array.filter((c) => c && !c.image?.attached)) {
+            for (const att of [...getAttachedCards(z, parent)]) {
+              if (isEnergyCard(att)) {
+                const ai = z.array.indexOf(att);
+                if (ai >= 0) moveCardBundle(side, side, 'active', 'discard', ai, false, 'move');
+              }
+            }
+          }
+          msg('  auto: discarded all Energy from the Active Pokémon');
+          break;
+        }
+        case 'searchToTop': {
+          const deck = zone(_effectOwner, 'deck');
+          if (deck.getCount() === 0) {
+            msg('  deck is empty');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — choose ${step.count} card(s) to put on top`,
+            candidates: [...deck.array],
+            count: Math.min(step.count || 1, deck.getCount()),
+            user: _effectOwner,
+            onConfirm: (picks) => {
+              for (let k = picks.length - 1; k >= 0; k--) {
+                const i = zone(_effectOwner, 'deck').array.indexOf(picks[k]);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'deck', i, false, 'move');
+              }
+              msg(`  auto: put ${picks.length} card(s) on top of your deck`);
+            },
+          });
+          break;
+        }
+        case 'rearrangeTop': {
+          msg(`  look at the top ${step.count} cards of your deck and rearrange them as you like`);
+          break;
+        }
+        case 'shuffleDiscardThenMill': {
+          const n = zone(_effectOwner, 'discard').getCount();
+          while (zone(_effectOwner, 'discard').getCount() > 0) {
+            moveCardBundle(_effectOwner, _effectOwner, 'discard', 'deck', 0, false, 'move');
+          }
+          if (_shuffleZone) _shuffleZone(_effectOwner, _effectOwner, 'deck');
+          for (let i = 0; i < n; i++) {
+            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'discard', 0, false, 'move');
+          }
+          msg(`  auto: shuffled the discard pile in, then milled ${n}`);
+          break;
+        }
+        case 'discardRandomOpponentHandIfSupporter': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const hand = zone(oppSide, 'hand').array;
+          if (!hand.length) {
+            msg('  opponent hand is empty');
+            break;
+          }
+          const pick = hand[Math.floor(Math.random() * hand.length)];
+          const isSupporter = String(pick.subtype || pick.type || pick.supertype || '').toLowerCase().includes('supporter') ||
+            String(pick.type || pick.supertype || '').toLowerCase().includes('trainer');
+          if (isSupporter) {
+            const i = zone(oppSide, 'hand').array.indexOf(pick);
+            if (i >= 0) moveCardBundle(oppSide, oppSide, 'hand', 'discard', i, false, 'move');
+            msg(`  auto: revealed ${pick.name} (Supporter) and discarded it`);
+          } else {
+            msg(`  auto: revealed ${pick.name} — not a Supporter, no effect`);
+          }
+          break;
+        }
+        case 'lostZoneCost': {
+          const hand = zone(_effectOwner, 'hand').array;
+          if (!hand.length) {
+            msg('  no cards in hand to put in the Lost Zone');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — put ${step.count} card(s) from your hand in the Lost Zone`,
+            candidates: hand,
+            count: Math.min(step.count, hand.length),
+            user: _effectOwner,
+            onConfirm: (picks) => {
+              for (const p of picks) {
+                const i = zone(_effectOwner, 'hand').array.indexOf(p);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'lostZone', i, false, 'move');
+              }
+              msg(`  auto: put ${picks.length} card(s) in the Lost Zone`);
+            },
+          });
+          break;
+        }
+        case 'toolOrStadiumToLostZone': {
+          const toolEntries = [];
+          for (const side of ['self', 'opp']) {
+            for (const zoneId of ['active', 'bench']) {
+              const z = zone(side, zoneId);
+              for (const parent of z.array.filter((c) => c && !c.image?.attached)) {
+                for (const att of getAttachedCards(z, parent)) {
+                  const s = `${att.type || ''} ${att.supertype || ''} ${att.name || ''}`.toLowerCase();
+                  if (s.includes('tool') || s.includes('trainer')) toolEntries.push({ side, zoneId, card: att });
+                }
+              }
+            }
+          }
+          const stadium = getStadium();
+          const candidates = toolEntries.map((t) => t.card);
+          if (stadium?.card) candidates.push(stadium.card);
+          if (!candidates.length) {
+            msg('  no Tool or Stadium in play to put in the Lost Zone');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Tool or Stadium to put in the Lost Zone`,
+            candidates,
+            user: _effectOwner,
+            onPick: (pick) => {
+              const t = toolEntries.find((x) => x.card === pick);
+              if (t) {
+                const z = zone(t.side, t.zoneId);
+                const i = z.array.indexOf(pick);
+                if (i >= 0) moveCardBundle(t.side, t.side, t.zoneId, 'lostZone', i, false, 'move');
+              } else if (stadium?.card === pick) {
+                const owner = stadium.user || 'self';
+                const zi = zone(owner, 'stadium').array.indexOf(pick);
+                if (zi >= 0) moveCardBundle(owner, owner, 'stadium', 'lostZone', zi, false, 'move');
+              }
+              msg(`  auto: put ${pick.name} in the Lost Zone`);
+            },
+          });
+          break;
+        }
+        case 'sendEnergyToLostZone': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const energies = collectAttachedForUser(oppSide, (att) => isEnergyCard(att));
+          if (!energies.length) {
+            msg('  no Energy attached to the opponent');
+            break;
+          }
+          openPickOnly({
+            title: `${card.name} — choose a Special Energy to put in the Lost Zone`,
+            candidates: energies.map((e) => e.card),
+            user: _effectOwner,
+            onPick: (energy) => {
+              const loc = energies.find((e) => e.card === energy);
+              if (!loc) return;
+              const z = zone(oppSide, loc.zoneId);
+              const i = z.array.indexOf(energy);
+              if (i >= 0) moveCardBundle(oppSide, oppSide, loc.zoneId, 'lostZone', i, false, 'move');
+              msg(`  auto: put ${energy.name} in the Lost Zone`);
+            },
+          });
+          break;
+        }
+        case 'opponentDiscardToLostZonePerPokemon': {
+          const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
+          const n = getInPlayPokemon(_effectOwner).filter((c) => {
+            const t = String(c.type || c.types || '').toLowerCase();
+            return t.includes('fire') || String(c.name || '').toLowerCase().includes('fire');
+          }).length;
+          let moved = 0;
+          for (let k = 0; k < n; k++) {
+            const discard = zone(oppSide, 'discard');
+            if (discard.getCount() === 0) break;
+            moveCardBundle(oppSide, oppSide, 'discard', 'lostZone', 0, false, 'move');
+            moved++;
+          }
+          msg(`  auto: put ${moved} card(s) from the opponent's discard pile in the Lost Zone`);
+          break;
+        }
+        case 'healAllOwnAndDiscardEnergy': {
+          for (const mon of getInPlayPokemon(_effectOwner)) {
+            const cur = parseInt(mon.image?.damageCounter?.textContent || '0', 10) || 0;
+            if (cur > 0) _applyHealToCard(mon, cur, false, _effectOwner);
+          }
+          for (const zoneId of ['active', 'bench']) {
+            const z = zone(_effectOwner, zoneId);
+            for (const parent of z.array.filter((c) => c && !c.image?.attached)) {
+              for (const att of [...getAttachedCards(z, parent)]) {
+                if (isEnergyCard(att)) {
+                  const ai = z.array.indexOf(att);
+                  if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, zoneId, 'discard', ai, false, 'move');
+                }
+              }
+            }
+          }
+          msg('  auto: healed your Pokémon and discarded their Energy');
+          break;
+        }
+        case 'healOneDiscardEnergy': {
+          const healable = getInPlayPokemon(_effectOwner).filter((c) => c?.hp);
+          if (!healable.length) {
+            msg('  no Pokémon to heal');
+            break;
+          }
+          const cleanse = (mon, side) => {
+            const cur = parseInt(mon.image?.damageCounter?.textContent || '0', 10) || 0;
+            if (cur > 0) _applyHealToCard(mon, cur, false, side);
+            const loc = pokemonZoneEntry(side, mon);
+            if (!loc) return;
+            const z = zone(side, loc.zoneId);
+            for (const att of [...getAttachedCards(z, mon)]) {
+              if (isEnergyCard(att)) {
+                const ai = z.array.indexOf(att);
+                if (ai >= 0) moveCardBundle(side, side, loc.zoneId, 'discard', ai, false, 'move');
+              }
+            }
+          };
+          if (healable.length === 1) {
+            cleanse(healable[0], _effectOwner);
+            msg('  auto: healed a Pokémon and discarded its Energy');
+          } else {
+            openPickOnly({
+              title: `${card.name} — choose a Pokémon to heal`,
+              candidates: healable,
+              user: _effectOwner,
+              onPick: (mon) => {
+                cleanse(mon, _effectOwner);
+                msg('  auto: healed a Pokémon and discarded its Energy');
+              },
+            });
+          }
           break;
         }
         default:
