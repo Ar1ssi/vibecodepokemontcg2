@@ -17,7 +17,10 @@
 
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
-import { isStadiumCard } from '../../../../shared/engine/rules/stadium-effects.mjs';
+import {
+  isStadiumCard,
+  stadiumExtraAttacksFromZone,
+} from '../../../../shared/engine/rules/stadium-effects.mjs';
 import {
   rulesState,
   ensureCardData,
@@ -559,33 +562,48 @@ async function resolveLiveContext(card, zone = 'active') {
   } catch {
     /* card data not resolved yet — fall back on whatever the stamp carries */
   }
-  const attachedEnergyCards = attachedEnergiesFor(
-    card,
-    getZone('self', 'active').array
-  );
+  const zoneId = zone === 'bench' ? 'bench' : 'active';
+  const zoneCards = getZone('self', zoneId).array;
+  const attachedEnergyCards = attachedEnergiesFor(card, zoneCards);
   const stadiumCard = stadiumCardFor(
     getStadium(),
     getAuthoritativeStadiumArray()
   );
-  const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks } =
-    await resolveAttackContext({
-      activeCard: card,
-      attachedEnergyCards,
-      ensureCardData,
-      stadiumCard,
-      abilityUsed: (c) =>
-        abilityUsedFor(
-          c,
-          abilityUsed('self', c),
-          rulesState.flags?.self?.abilitiesUsed
-        ),
-    });
+  // Stadium-granted / inherited attacks (Shrine of Memories, Meteor Falls,
+  // Holon Lake, Rocket's Tricky Gym) rendered alongside the printed ones. The
+  // same merge order is used by the server, so an `attackIndex` picked here
+  // resolves to the same attack there.
+  const extraAttacks = stadiumExtraAttacksFromZone(stadiumCard, {
+    zoneCards,
+    card,
+    isActive: zoneId === 'active',
+  });
+  const {
+    energyTypes,
+    stadiumCostModifier,
+    abilityUsedFlag,
+    priorAttacks,
+    extraAttacks: resolvedExtra,
+  } = await resolveAttackContext({
+    activeCard: card,
+    attachedEnergyCards,
+    ensureCardData,
+    stadiumCard,
+    extraAttacks,
+    abilityUsed: (c) =>
+      abilityUsedFor(
+        c,
+        abilityUsed('self', c),
+        rulesState.flags?.self?.abilitiesUsed
+      ),
+  });
 
   return {
     energyTypes,
     stadiumCostModifier,
     abilityUsed: abilityUsedFlag,
     priorAttacks,
+    extraAttacks: resolvedExtra,
     attacker: card,
     zone,
     damageCtx: {

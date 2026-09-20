@@ -13,6 +13,7 @@ export async function resolveAttackContext({
   ensureCardData,
   stadiumCard,
   abilityUsed,
+  extraAttacks = [],
 }) {
   const energyTypes = [];
   for (const energyCard of attachedEnergyCards || []) {
@@ -28,10 +29,19 @@ export async function resolveAttackContext({
   const stadiumCostModifier = stadiumCard ? parseStadiumCostModifier(stadiumCard) : 0;
   const abilityUsedFlag = abilityUsed(activeCard);
 
-  // priorAttacks is always [] at the live call site today — inheritance
-  // never actually fires (I43). Preserve that behaviour exactly.
+  // `extraAttacks` carries Stadium-granted inheritance (Shrine of Memories,
+  // Meteor Falls, Holon Lake, Rocket's Tricky Gym); the caller resolves them
+  // from the evolution stack. `priorAttacks` remains the card's own text-driven
+  // inheritance (I44).
   const priorAttacks = [];
   const inheritsAttacks = !!parseAttackInheritance(activeCard);
 
-  return { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks, inheritsAttacks };
+  return {
+    energyTypes,
+    stadiumCostModifier,
+    abilityUsedFlag,
+    priorAttacks,
+    extraAttacks,
+    inheritsAttacks,
+  };
 }

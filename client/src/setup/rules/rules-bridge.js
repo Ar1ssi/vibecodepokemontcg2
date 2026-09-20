@@ -57,7 +57,7 @@ import { canEvolve, markEvolvedThisTurn } from '/shared/engine/rules/evolution.m
 import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
-import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects } from '/shared/engine/rules/stadium-effects.mjs';
+import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects, isStadiumEnergyAttachHeal, stadiumExtraAttacksFromZone } from '/shared/engine/rules/stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, energySearchWhat, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
@@ -1225,6 +1225,37 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
       document.addEventListener('rules-card-moved', checkEnergyAdds);
       document.addEventListener('action-processed', checkEnergyAdds);
 
+      // Pokémon Park: attaching an Energy from hand to a Benched Pokémon
+      // removes 1 damage counter (once per player per turn).
+      document.addEventListener('rules-energy-attached', (event) => {
+        if (!rulesState.enabled) return;
+        const { user, energy, pokemon, fromZone, toZone } = event.detail || {};
+        if (!energy || !pokemon || fromZone !== 'hand' || toZone !== 'bench') return;
+        const stadium = getStadium();
+        if (!isStadiumEnergyAttachHeal(stadium?.card || stadium)) return;
+        if (!rulesState.flags[user]) rulesState.flags[user] = {};
+        if (rulesState.flags[user].pokemonParkHealed) return;
+        rulesState.flags[user].pokemonParkHealed = true;
+        import('../../actions/counters/damage-counter.js').then(
+          ({ updateDamageCounter, removeDamageCounter }) => {
+            const bench = getZone(user, 'bench');
+            const idx = bench.array.indexOf(pokemon);
+            if (idx < 0) return;
+            const current =
+              parseInt(pokemon.image?.damageCounter?.textContent || '0', 10) || 0;
+            if (current <= 0) return;
+            if (current - 10 <= 0) removeDamageCounter(user, 'bench', idx);
+            else updateDamageCounter(user, 'bench', idx, current - 10);
+            appendMessage(
+              '',
+              `💚 Pokémon Park: removed 1 damage counter from ${pokemon.name}.`,
+              'announcement',
+              false
+            );
+          }
+        );
+      });
+
       document.addEventListener('rules-energy-attached', async (event) => {
         if (!rulesState.enabled) return;
         const { user, energy, pokemon, fromZone } = event.detail || {};
@@ -1531,11 +1562,19 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
             try {
               const activeZone = getZone(user, 'active');
               const activeCard = getActivePokemonCard(activeZone);
+              const stadiumCard = stadiumCardFor(getStadium(), getAuthoritativeStadiumArray());
               affordance = await computeActionAffordances({
                 activeCard,
                 attachedEnergyCards: attachedEnergiesFor(activeCard, activeZone.array),
                 benchCards: getZone(user, 'bench').array,
-                stadiumCard: stadiumCardFor(getStadium(), getAuthoritativeStadiumArray()),
+                stadiumCard,
+                // Stadium-granted / inherited attacks count toward "can this
+                // Active attack" — without them the button dims a legal attack.
+                extraAttacks: stadiumExtraAttacksFromZone(stadiumCard, {
+                  zoneCards: activeZone.array,
+                  card: activeCard,
+                  isActive: true,
+                }),
                 isAbilityUsed: (card) => isAbilitySpent(user, card),
                 ensureCardData,
               });

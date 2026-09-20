@@ -66,6 +66,15 @@ import {
   getStadiumRetreatCost,
   isStadiumRetreatPrevention,
   isStadiumToolNegation,
+  isStadiumEnergyAttachHeal,
+  isStadiumGlimwoodReFlip,
+  stadiumBetweenTurnsDamageFor,
+  isStadiumLostCity,
+  stadiumBlocksHealing,
+  isStadiumStatusPersistsOnEvolve,
+  stadiumExtraAttacks,
+  mergeAttacks,
+  isRepeatableStadiumAction,
 } from './rules/stadium-effects.mjs';
 import {
   isRuleBoxPokemon,
@@ -454,6 +463,30 @@ function inPlayView(state, card) {
   return Array.isArray(zone) ? evolvedView(zone, card) : card;
 }
 
+// Extra attacks a Stadium makes usable by this Pokémon (Shrine of Memories /
+// Meteor Falls inheritance, Holon Lake / Rocket's Tricky Gym grants). Order is
+// shared with the client's list builders, so an attackIndex resolves alike.
+function stadiumExtraAttacksFor(state, card, { isActive = true } = {}) {
+  const stadiumCard = state.stadium?.card || state.stadium;
+  if (!stadiumCard || !card) return [];
+  const ref = findCard(state, card.instanceId);
+  const zone = ref?.player?.zones?.[ref.zoneId];
+  if (!Array.isArray(zone)) return [];
+  return stadiumExtraAttacks(stadiumCard, {
+    zoneCards: zone,
+    root: card,
+    isActive,
+  });
+}
+
+// `inPlayView` with Stadium extras merged into its attacks list.
+function attackViewFor(state, card, { isActive = true } = {}) {
+  const view = inPlayView(state, card);
+  const extras = stadiumExtraAttacksFor(state, card, { isActive });
+  if (extras.length === 0) return view;
+  return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
+}
+
 // Effective HP including printed base stats, top evolution, attached Tools, and Stadium modifiers.
 function cardEffectiveHp(state, card, playerId) {
   if (!card) return 0;
@@ -572,6 +605,10 @@ function handleKnockout(
     }
   }
 
+  // Lost City: the Knocked Out Pokémon itself is put in the Lost Zone instead
+  // of the discard pile — attached cards are still discarded (card text).
+  const lostCity = isStadiumLostCity(draft.stadium?.card || draft.stadium);
+
   if (targetZone) {
     for (let i = targetZone.length - 1; i >= 0; i--) {
       const c = targetZone[i];
@@ -583,8 +620,15 @@ function handleKnockout(
         c.damage = 0;
         clearConditions(c);
         c.attachedTo = null;
-        // Prism Star cards go to the Lost Zone instead of discard (App. 17).
-        discardCardToPlayerZone(victimPlayer, c);
+        if (lostCity && c.instanceId === victim.instanceId) {
+          if (!Array.isArray(victimPlayer.zones.lostZone)) {
+            victimPlayer.zones.lostZone = [];
+          }
+          victimPlayer.zones.lostZone.push(c);
+        } else {
+          // Prism Star cards go to the Lost Zone instead of discard (App. 17).
+          discardCardToPlayerZone(victimPlayer, c);
+        }
       }
     }
   }
@@ -678,6 +722,56 @@ function handleKnockout(
  * - Asleep: 50% cure flip
  * - Paralyzed: cured at the end of the paralyzed player's turn
  */
+/**
+ * "Between turns" Stadium damage (Shrine of Punishment, Cursed Stone, Desert
+ * Ruins). Applies to every in-play Pokémon that matches the card's filter,
+ * on both sides, then resolves any Knockouts (prizes go to the non-victim).
+ */
+function applyBetweenTurnsStadiumDamage(draft, { events }) {
+  const card = draft.stadium?.card || draft.stadium;
+  if (!card || isGameConcluded(draft)) return;
+  const playerIds = Object.keys(draft.players || {});
+  for (const pid of playerIds) {
+    const player = draft.players[pid];
+    for (const zone of [player.zones?.active, player.zones?.bench]) {
+      if (!Array.isArray(zone)) continue;
+      for (const mon of [...zone]) {
+        if (mon.attachedTo) continue;
+        const dmg = stadiumBetweenTurnsDamageFor(mon, card);
+        if (dmg <= 0) continue;
+        mon.damage = (mon.damage || 0) + dmg;
+        events.push({
+          type: 'stadiumBetweenTurnsDamage',
+          instanceId: mon.instanceId,
+          playerId: pid,
+          damage: dmg,
+        });
+      }
+    }
+  }
+  for (const pid of playerIds) {
+    if (isGameConcluded(draft)) break;
+    const player = draft.players[pid];
+    const oppId = playerIds.find((id) => id !== pid);
+    for (const zone of [player.zones?.active, player.zones?.bench]) {
+      if (isGameConcluded(draft)) break;
+      if (!Array.isArray(zone)) continue;
+      for (const mon of [...zone]) {
+        if (mon.attachedTo) continue;
+        const hp = cardEffectiveHp(draft, mon, pid);
+        if (hp && (mon.damage || 0) >= hp) {
+          handleKnockout(draft, {
+            victimPlayerId: pid,
+            attackerPlayerId: oppId,
+            victim: mon,
+            events,
+          });
+        }
+      }
+    }
+  }
+}
+
 function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
@@ -739,6 +833,9 @@ function resolveCheckup(
       });
     }
   }
+
+  // Between-turns Stadium damage resolves after Pokémon Checkup.
+  applyBetweenTurnsStadiumDamage(draft, { events });
 }
 
 /**
@@ -1800,7 +1897,7 @@ export function validateLegality(state, command) {
         };
       }
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = inPlayView(state, active).attacks?.[atkIdx];
+      const attack = attackViewFor(state, active).attacks?.[atkIdx];
       // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
       // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide.
       if (isGxAttack(attack) && player.oncePerGame?.gxUsed) {
@@ -1833,9 +1930,15 @@ export function validateLegality(state, command) {
         const attached = (player.zones?.active || []).filter(
           (c) => c.attachedTo === active.instanceId && isEnergy(c)
         );
+        const energyContext = {
+          stadiumCard: state.stadium?.card || state.stadium || null,
+          hostPokemon: inPlayView(state, active),
+        };
         if (
           !canPayAttackCost(
-            expandEnergyEntries(attached.map(serverEnergyDescriptor)),
+            expandEnergyEntries(
+              attached.map((c) => serverEnergyDescriptor(c, energyContext))
+            ),
             attack.cost
           )
         ) {
@@ -1915,9 +2018,15 @@ export function validateLegality(state, command) {
           };
         }
         const costSymbols = new Array(retreatCostN).fill('Colorless');
+        const energyContext = {
+          stadiumCard: state.stadium?.card || state.stadium || null,
+          hostPokemon: inPlayView(state, active),
+        };
         if (
           !canPayAttackCost(
-            expandEnergyEntries(attached.map(serverEnergyDescriptor)),
+            expandEnergyEntries(
+              attached.map((c) => serverEnergyDescriptor(c, energyContext))
+            ),
             costSymbols
           )
         ) {
@@ -2041,7 +2150,12 @@ export function validateLegality(state, command) {
     }
 
     case 'stadium-effect': {
-      if (player.flags?.stadiumUsedThisTurn) {
+      // Ultimate Zone / Saffron City Gym / Celadon City Gym are "as often as …
+      // likes" actions, so a prior activation must not block a repeat.
+      if (
+        player.flags?.stadiumUsedThisTurn &&
+        !isRepeatableStadiumAction(state.stadium?.card || state.stadium)
+      ) {
         return {
           allowed: false,
           reason: 'Stadium effect already used this turn.',
@@ -2237,6 +2351,576 @@ function buildAttackSearchChoice(
  *   reason?: string
  * }}
  */
+/**
+ * Resolves the part of an attack that runs after its coins are flipped:
+ * printed-text damage, recoil, status, bench/spread damage, searches, and the
+ * terminal checkup/turn hand-off. Extracted so Glimwood Tangle can re-enter it
+ * with a fresh (or kept) coin result without re-running the confusion check.
+ *
+ * @param {object} draft Cloned GameState
+ * @param {object} ctx Derived attack context (see the call site)
+ */
+function resolveAttackEffectPhase(draft, ctx) {
+  const {
+    playerId,
+    activeRng,
+    events,
+    attacker,
+    defender,
+    defenderPlayerId,
+    oppId,
+    attack,
+    attackerPlayer,
+    attackerView,
+    coin,
+    headsCount,
+    flips,
+  } = ctx;
+
+      const parsed = parseAttackDamage(
+        attack,
+        attackerView,
+        defender ? inPlayView(draft, defender) : {},
+        buildServerAttackContext(draft, {
+          attackerPlayerId: playerId,
+          defenderPlayerId,
+          attacker,
+          defender,
+          attackerView,
+          defenderView: defender ? inPlayView(draft, defender) : null,
+          coin,
+          headsCount,
+        })
+      );
+      const effectiveAttack =
+        parsed.total !== parsed.base
+          ? { ...attack, damage: parsed.total }
+          : attack;
+      if (parsed.notes.length > 0) {
+        events.push({
+          type: 'attackDamageScaled',
+          playerId,
+          attackName: attack.name,
+          base: parsed.base,
+          total: parsed.total,
+          notes: [...parsed.notes],
+          resolved: parsed.resolved,
+        });
+      }
+
+      let dmgDealt = 0;
+      if (attacker && defender) {
+        const defenderView = inPlayView(draft, defender);
+        const attackerView = inPlayView(draft, attacker);
+        const attackerZoneCards = draft.players[playerId]?.zones?.active || [];
+        const defenderZoneCards =
+          draft.players[defenderPlayerId]?.zones?.active || [];
+        const defenderInPlayCards = [
+          ...(draft.players[defenderPlayerId]?.zones?.active || []),
+          ...(draft.players[defenderPlayerId]?.zones?.bench || []),
+        ];
+        const myPrizes = (draft.players[playerId]?.zones?.prizes || []).length;
+        const oppPrizes = (draft.players[defenderPlayerId]?.zones?.prizes || [])
+          .length;
+        const attackerTrailingPrizes = myPrizes > oppPrizes;
+        const defenderPoisoned = hasCondition(defender, 'Poisoned');
+
+        const dmgResult = computeAttackDamage(
+          attackerView,
+          defenderView,
+          effectiveAttack,
+          {
+            attackerZoneCards,
+            defenderZoneCards,
+            defenderInPlayCards,
+            stadium: draft.stadium,
+            defenderIsActive: true,
+            attackerTrailingPrizes,
+            defenderPoisoned,
+            baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
+          }
+        );
+        dmgDealt = dmgResult.total;
+
+        if (dmgResult.prevented) {
+          events.push({
+            type: 'damagePrevented',
+            instanceId: defender.instanceId,
+            attackerInstanceId: attacker.instanceId,
+            attackName: effectiveAttack?.name,
+          });
+        }
+
+        if (dmgDealt > 0) {
+          const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
+          const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
+
+          if (wouldKo) {
+            const koEval = evaluateToolKoPrevention(
+              defender,
+              defenderZoneCards,
+              {
+                currentDamage: defender.damage || 0,
+                incomingDamage: dmgDealt,
+                baseHp: koHp,
+                stadium: draft.stadium,
+                inHp: true,
+              }
+            );
+
+            if (koEval.prevented) {
+              defender.damage = koEval.totalDamage;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+              });
+              events.push({
+                type: 'koPrevented',
+                instanceId: defender.instanceId,
+                tool: koEval.tool,
+                surviveHp: koEval.surviveHp,
+              });
+              if (koEval.discardOnUse && koEval.toolCard) {
+                discardCardFromPlayerZone(
+                  draft,
+                  koEval.toolCard.instanceId,
+                  defenderPlayerId
+                );
+              }
+            } else {
+              defender.damage = (defender.damage || 0) + dmgDealt;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+              });
+              handleKnockout(draft, {
+                victimPlayerId: defenderPlayerId,
+                attackerPlayerId: playerId,
+                victim: defender,
+                events,
+              });
+            }
+          } else {
+            defender.damage = (defender.damage || 0) + dmgDealt;
+            events.push({
+              type: 'damageUpdated',
+              instanceId: defender.instanceId,
+              damage: defender.damage,
+              dealt: dmgDealt,
+            });
+          }
+        }
+
+        // Reactive tool effects & Thorns on damage (if damage > 0 and not prevented)
+        if (dmgDealt > 0 && !dmgResult.prevented && attacker) {
+          let thornsDamage = 0;
+          const toolEffects = attachedToolOnDamageEffects(
+            defender,
+            defenderZoneCards,
+            {
+              stadium: draft.stadium,
+              isActive: true,
+            }
+          );
+          for (const eff of toolEffects) {
+            if (eff.damageAttacker > 0) {
+              thornsDamage += eff.damageAttacker * 10;
+            }
+            if (eff.draw > 0) {
+              const defPlayer = draft.players[defenderPlayerId];
+              if (defPlayer?.zones?.deck && defPlayer?.zones?.hand) {
+                for (
+                  let d = 0;
+                  d < eff.draw && defPlayer.zones.deck.length > 0;
+                  d++
+                ) {
+                  defPlayer.zones.hand.push(defPlayer.zones.deck.pop());
+                }
+                events.push({
+                  type: 'cardsDrawn',
+                  playerId: defenderPlayerId,
+                  count: eff.draw,
+                  source: eff.tool?.name || 'Tool',
+                });
+              }
+            }
+            if (eff.discardTool && eff.tool) {
+              discardCardFromPlayerZone(
+                draft,
+                eff.tool.instanceId,
+                defenderPlayerId
+              );
+            }
+          }
+
+          const thorns = parseThorns(defender);
+          if (thorns?.count > 0) {
+            thornsDamage += thorns.count * 10;
+          }
+
+          if (thornsDamage > 0) {
+            attacker.damage = (attacker.damage || 0) + thornsDamage;
+            events.push({
+              type: 'damageUpdated',
+              instanceId: attacker.instanceId,
+              damage: attacker.damage,
+              dealt: thornsDamage,
+              reason: 'thorns',
+            });
+            const atkKoHp = cardEffectiveHp(draft, attacker, playerId);
+            if (atkKoHp > 0 && attacker.damage >= atkKoHp) {
+              handleKnockout(draft, {
+                victimPlayerId: playerId,
+                attackerPlayerId: defenderPlayerId,
+                victim: attacker,
+                events,
+              });
+            }
+          }
+        }
+      }
+
+      // Recoil: printed damage the attack deals to its own Pokémon. A recoil KO hands the
+      // prize entitlement to the DEFENDING player.
+      if (parsed.selfDamage > 0 && attacker) {
+        attacker.damage = (attacker.damage || 0) + parsed.selfDamage;
+        events.push({
+          type: 'damageUpdated',
+          instanceId: attacker.instanceId,
+          damage: attacker.damage,
+          dealt: parsed.selfDamage,
+        });
+        const selfKoHp = cardEffectiveHp(draft, attacker, playerId);
+        if (selfKoHp > 0 && attacker.damage >= selfKoHp) {
+          handleKnockout(draft, {
+            victimPlayerId: playerId,
+            attackerPlayerId: oppId,
+            victim: attacker,
+            events,
+          });
+        }
+      }
+
+      // Healing from attack effect (e.g. "Heal 30 damage from this Pokémon").
+      // Dyna Tree Hill suppresses all healing while it is in play.
+      if (parsed.heal > 0 && attacker && !stadiumBlocksHealing(draft.stadium)) {
+        const atkRef = findCard(draft, attacker.instanceId);
+        if (
+          atkRef &&
+          atkRef.zoneId === 'active' &&
+          (attacker.damage || 0) > 0
+        ) {
+          const healAmount = Math.min(attacker.damage, parsed.heal);
+          attacker.damage -= healAmount;
+          events.push({
+            type: 'damageUpdated',
+            instanceId: attacker.instanceId,
+            damage: attacker.damage,
+            healed: healAmount,
+          });
+        }
+      }
+
+      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack
+      const { defenderConditions, attackerConditions } =
+        resolveAttackStatusConditions(attack, {
+          coin,
+          headsCount,
+          flips,
+        });
+
+      if (defenderConditions.length > 0 && defender) {
+        // Only apply condition if defender survived the attack (not KO'd)
+        const defRef = findCard(draft, defender.instanceId);
+        if (defRef && defRef.zoneId === 'active') {
+          for (const cond of defenderConditions) {
+            addCondition(defRef.card, cond);
+            events.push(conditionsUpdatedEvent(defRef.card, cond));
+          }
+        }
+      }
+
+      if (attackerConditions.length > 0 && attacker) {
+        const atkRef = findCard(draft, attacker.instanceId);
+        if (atkRef && atkRef.zoneId === 'active') {
+          for (const cond of attackerConditions) {
+            addCondition(atkRef.card, cond);
+            events.push(conditionsUpdatedEvent(atkRef.card, cond));
+          }
+        }
+      }
+
+      // Spread damage ("… to EACH of your opponent's Benched Pokémon") and single-target bench
+      // damage ("… to 1 of your opponent's Benched Pokémon") are the same printed sentence to
+      // `parsed.bench`'s looser regex, so a spread attack matches both. Spread wins: applying
+      // both would double every benched Pokémon's damage.
+      const spread = allBenchDamage(attack.text);
+
+      // A printed clause that lets the player choose which opponent Pokémon take
+      // damage / counters. Resolved after the attack's other effects below so a
+      // suspension never drops them (design 017 / D19).
+      const attackTarget = resolveAttackTargetClause(attack.text, parsed, spread);
+      let benchDealt = 0;
+
+      // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
+      // list is snapshotted first, because a KO inside the loop mutates the bench array.
+      if (spread > 0) {
+        const targets = benchTargets(draft.players[defenderPlayerId]);
+        if (targets.length === 0) {
+          events.push({
+            type: 'attackBenchFizzled',
+            playerId,
+            attackName: attack.name,
+            reason: 'no-benched-pokemon',
+          });
+        } else {
+          for (const victim of targets) {
+            // A previous KO in this same loop (or the active KO above) may already have
+            // moved this card to the discard — never damage a card that has left the bench.
+            const ref = findCard(draft, victim.instanceId);
+            if (ref?.zoneId !== 'bench') continue;
+            benchDealt += spread;
+            damageBenchedPokemon(draft, {
+              victim,
+              victimPlayerId: defenderPlayerId,
+              attackerPlayerId: playerId,
+              attackName: attack.name,
+              dealt: spread,
+              auto: false,
+              events,
+            });
+          }
+        }
+      }
+
+      // Attack effects: draw cards (e.g. Collect)
+      const drawN = drawCount(attack);
+      if (drawN > 0) {
+        const deck = attackerPlayer?.zones?.deck || [];
+        const hand = attackerPlayer?.zones?.hand || [];
+        const actual = Math.min(drawN, deck.length);
+        if (actual > 0) {
+          const drawn = deck.splice(0, actual);
+          hand.push(...drawn);
+          events.push({
+            type: 'cardsDrawn',
+            playerId,
+            count: actual,
+            cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+          });
+        }
+      }
+
+      // Attack effects: discard energy from attacker (Phase 3)
+      const energyDiscardSpec = parseAttackEnergyDiscard(effectiveAttack);
+      if (energyDiscardSpec && attacker) {
+        const attackerZone = draft.players[playerId]?.zones?.active || [];
+        const attachedEnergies = attackerZone.filter(
+          (c) => c.attachedTo === attacker.instanceId && isEnergy(c)
+        );
+
+        let toDiscard = [];
+        if (energyDiscardSpec.all) {
+          toDiscard = attachedEnergies;
+        } else {
+          let candidates = attachedEnergies;
+          if (energyDiscardSpec.energyType) {
+            candidates = attachedEnergies.filter((c) => {
+              const ty = c.energyType || c.name?.replace(/\s*Energy.*/i, '');
+              return (
+                ty &&
+                ty
+                  .toLowerCase()
+                  .includes(energyDiscardSpec.energyType.toLowerCase())
+              );
+            });
+          }
+          toDiscard = candidates.slice(0, energyDiscardSpec.count);
+        }
+
+        for (const card of toDiscard) {
+          const idx = draft.players[playerId].zones.active.findIndex(
+            (c) => c.instanceId === card.instanceId
+          );
+          if (idx >= 0) {
+            const [discarded] = draft.players[playerId].zones.active.splice(
+              idx,
+              1
+            );
+            discarded.attachedTo = null;
+            const to = discardCardToPlayerZone(
+              draft.players[playerId],
+              discarded
+            );
+            events.push({
+              type: 'cardMoved',
+              instanceId: card.instanceId,
+              from: 'active',
+              to,
+              playerId,
+              reason: 'attack-energy-discard',
+            });
+          }
+        }
+      }
+
+      // Attack effects: next-turn locks (Phase 3)
+      const locks = parseNextTurnLock(effectiveAttack);
+      if (locks) {
+        if (locks.selfCannotAttack && attacker) {
+          attacker.cannotAttackUntilTurn = (draft.turn.number || 1) + 2;
+        } else if (locks.selfCannotUseAttack && attacker) {
+          attacker.cannotAttackUntilTurn = (draft.turn.number || 1) + 2;
+          attacker.cannotAttackAttackName = locks.selfCannotUseAttack;
+        }
+        if (locks.oppCannotRetreat && defender) {
+          const defRef = findCard(draft, defender.instanceId);
+          if (defRef && defRef.zoneId === 'active') {
+            defender.cannotRetreatUntilTurn = (draft.turn.number || 1) + 1;
+          }
+        }
+      }
+
+      // Attack effects: deck search (Phase 3, e.g. Call for Family)
+      const searchClause = parseAttackSearchClause(effectiveAttack);
+      let searchTriggered = false;
+      if (searchClause && attackerPlayer?.zones?.deck?.length > 0) {
+        // A staged clause (searchDeckSequence) is walked one stage per choice so
+        // each stage keeps its own filter; treating it as a single clause left
+        // `what` undefined and offered the entire deck.
+        const stages =
+          searchClause.type === 'searchDeckSequence' &&
+          Array.isArray(searchClause.stages)
+            ? searchClause.stages
+            : [searchClause];
+        const choice = buildAttackSearchChoice(draft, {
+          playerId,
+          oppId,
+          attackerId: attacker?.instanceId,
+          stages,
+        });
+        if (choice) {
+          draft.pendingChoice = choice;
+          searchTriggered = true;
+        }
+      }
+
+      // Chosen-target damage/counters, resolved now (after every other attack
+      // effect) so a click-to-select suspension never drops them. The player
+      // clicks the target(s) on the mat (design 017 / D19).
+      if (attackTarget) {
+        const candidates = attackTargetOptions(
+          draft,
+          defenderPlayerId,
+          attackTarget.scope
+        );
+        if (candidates.length === 0) {
+          events.push({
+            type: 'attackBenchFizzled',
+            playerId,
+            attackName: attack.name,
+            reason: 'no-target',
+          });
+        } else {
+          const distributable = Boolean(attackTarget.distributable);
+          const required = distributable
+            ? attackTarget.remaining || 0
+            : attackTarget.count;
+          const picksFor = (cards) =>
+            distributable
+              ? new Array(required).fill(cards[0].instanceId)
+              : cards.slice(0, attackTarget.count).map((c) => c.instanceId);
+          if (
+            attackTarget.scope === 'active' ||
+            candidates.length <= (distributable ? 1 : attackTarget.count)
+          ) {
+            benchDealt += applyAttackTargets(draft, {
+              selection: picksFor(candidates),
+              clause: attackTarget,
+              defenderPlayerId,
+              attackerPlayerId: playerId,
+              attackName: attack.name,
+              events,
+            });
+          } else if (!searchTriggered) {
+            draft.pendingChoice = createPendingChoice({
+              player: playerId,
+              source: 'attack',
+              prompt: distributable
+                ? `${attack.name}: Place a damage counter (${required} left)`
+                : `${attack.name}: Choose ${attackTarget.count > 1 ? `${attackTarget.count} ` : ''}of your opponent's Pokémon to take damage`,
+              options: candidates,
+              min: distributable ? 1 : attackTarget.count,
+              max: distributable ? 1 : attackTarget.count,
+              resumeToken: {
+                effectType: 'attack',
+                initiatorPlayerId: playerId,
+                oppId,
+                attackTarget,
+                effectiveAttack,
+                damage: dmgDealt,
+              },
+            });
+            return;
+          } else {
+            // A deck-search clause already suspended this attack; apply the target
+            // to the first eligible Pokémon rather than overwriting its choice.
+            benchDealt += applyAttackTargets(draft, {
+              selection: picksFor(candidates),
+              clause: attackTarget,
+              defenderPlayerId,
+              attackerPlayerId: playerId,
+              attackName: attack.name,
+              events,
+            });
+          }
+        }
+      }
+
+      events.push({
+        type: 'attackExecuted',
+        attackerId: attacker?.instanceId,
+        attackName: attack.name,
+        damage: dmgDealt,
+        benchDealt,
+        playerId,
+      });
+
+      // App. 19: using a GX attack spends the player's single GX attack for the game.
+      // Set here, on the resolving path only — a Confused fizzle above never reaches it.
+      if (isGxAttack(attack)) {
+        const oncePerGame = ensureOncePerGame(draft, playerId);
+        if (oncePerGame && !oncePerGame.gxUsed) {
+          oncePerGame.gxUsed = true;
+          events.push({
+            type: 'gxAttackUsed',
+            playerId,
+            instanceId: attacker?.instanceId,
+            attackName: attack.name,
+          });
+        }
+      }
+
+      if (!attackerPlayer.flags) attackerPlayer.flags = {};
+      attackerPlayer.flags.attackerAttacked = true;
+
+      // Auto-end turn after attacking (unless paused by pendingChoice)
+      if (!searchTriggered && !isGameConcluded(draft)) {
+        resolveCheckup(draft, {
+          rng: activeRng,
+          events,
+          endingPlayerId: playerId,
+        });
+        if (!isGameConcluded(draft)) {
+          advanceTurn(draft, { nextPlayerId: oppId, events });
+        }
+      }
+}
+
 export function applyCommand(state, command, rng = null) {
   if (!state || typeof state !== 'object') {
     return {
@@ -2513,6 +3197,39 @@ export function applyCommand(state, command, rng = null) {
             draft.players[playerId].flags = {};
           }
           draft.players[playerId].flags.energyAttached = true;
+
+          // Pokémon Park: attaching an Energy from hand to a Benched Pokémon
+          // removes 1 damage counter (once per player per turn).
+          const parkStadium = draft.stadium?.card || draft.stadium;
+          const attachedToBench =
+            hostRef.zoneId === 'bench' ||
+            (draft.players[hostRef.playerId]?.zones?.bench || []).includes(
+              hostRef.card
+            );
+          if (
+            cardRef.zoneId === 'hand' &&
+            attachedToBench &&
+            isStadiumEnergyAttachHeal(parkStadium) &&
+            !draft.players[playerId].flags.pokemonParkHealedThisTurn
+          ) {
+            draft.players[playerId].flags.pokemonParkHealedThisTurn = true;
+            const before = hostRef.card.damage || 0;
+            if (before > 0) {
+              hostRef.card.damage = Math.max(0, before - 10);
+              events.push({
+                type: 'damageUpdated',
+                instanceId: hostRef.card.instanceId,
+                damage: hostRef.card.damage,
+                healed: before - hostRef.card.damage,
+              });
+            }
+            events.push({
+              type: 'stadiumTriggered',
+              name: 'Pokémon Park',
+              instanceId: parkStadium?.instanceId,
+              playerId,
+            });
+          }
         } else if (isPokemon(cardRef.card)) {
           if (!draft.players[playerId].flags) {
             draft.players[playerId].flags = {};
@@ -2524,7 +3241,14 @@ export function applyCommand(state, command, rng = null) {
             true;
           cardRef.card.enteredPlayTurn = draft.turn.number;
           hostRef.card.lastEvolvedTurn = draft.turn.number;
-          clearConditions(hostRef.card);
+          // Sea of Nothingness: Special Conditions survive evolving.
+          if (
+            !isStadiumStatusPersistsOnEvolve(
+              draft.stadium?.card || draft.stadium
+            )
+          ) {
+            clearConditions(hostRef.card);
+          }
           events.push({
             type: 'pokemonEvolved',
             playerId,
@@ -2708,7 +3432,7 @@ export function applyCommand(state, command, rng = null) {
         (c) => !c.attachedTo
       );
       const atkIdx = payload?.attackIndex ?? 0;
-      const attackerView = inPlayView(draft, attacker);
+      const attackerView = attackViewFor(draft, attacker);
       const attack = attackerView?.attacks?.[atkIdx] || {
         name: 'Attack',
         damage: 10,
@@ -2778,7 +3502,8 @@ export function applyCommand(state, command, rng = null) {
       // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
       // the parser resolves from live board counts, then bench/spread damage. Without this
       // every attack dealt its flat printed number regardless of the board (I26 follow-up).
-      const { coin, headsCount, flips } = flipAttackCoins(attack, activeRng);
+      const coinResult = flipAttackCoins(attack, activeRng);
+      const { coin, headsCount, flips } = coinResult;
       if (flips.length > 0) {
         events.push({
           type: 'attackCoinFlipped',
@@ -2790,547 +3515,52 @@ export function applyCommand(state, command, rng = null) {
         });
       }
 
-      const parsed = parseAttackDamage(
-        attack,
-        attackerView,
-        defender ? inPlayView(draft, defender) : {},
-        buildServerAttackContext(draft, {
-          attackerPlayerId: playerId,
-          defenderPlayerId,
-          attacker,
-          defender,
-          attackerView,
-          defenderView: defender ? inPlayView(draft, defender) : null,
-          coin,
-          headsCount,
-        })
-      );
-      const effectiveAttack =
-        parsed.total !== parsed.base
-          ? { ...attack, damage: parsed.total }
-          : attack;
-      if (parsed.notes.length > 0) {
-        events.push({
-          type: 'attackDamageScaled',
-          playerId,
-          attackName: attack.name,
-          base: parsed.base,
-          total: parsed.total,
-          notes: [...parsed.notes],
-          resolved: parsed.resolved,
+      // Glimwood Tangle: after any coins are flipped for an attack, the player
+      // may ignore the results and re-flip. The choice is offered before any
+      // effect resolves, so a re-flip never has to undo damage or a KO.
+      if (
+        flips.length > 0 &&
+        isStadiumGlimwoodReFlip(draft.stadium?.card || draft.stadium) &&
+        !attackerPlayer?.flags?.glimwoodUsedThisTurn
+      ) {
+        draft.pendingChoice = createPendingChoice({
+          player: playerId,
+          source: 'stadium',
+          prompt: `${attack.name}: keep the coin results or re-flip them (Glimwood Tangle)?`,
+          // Numeric sentinels: the choice validator only accepts integer
+          // instanceIds. 1 = keep, 2 = re-flip.
+          options: [
+            { instanceId: 1, name: 'Keep results', type: 'option' },
+            { instanceId: 2, name: 'Re-flip coins', type: 'option' },
+          ],
+          min: 1,
+          max: 1,
+          resumeToken: {
+            effectType: 'glimwood',
+            initiatorPlayerId: playerId,
+            attackIndex: atkIdx,
+            targetInstanceId: payload?.targetInstanceId ?? null,
+            coinResult,
+          },
         });
+        break;
       }
 
-      let dmgDealt = 0;
-      if (attacker && defender) {
-        const defenderView = inPlayView(draft, defender);
-        const attackerView = inPlayView(draft, attacker);
-        const attackerZoneCards = draft.players[playerId]?.zones?.active || [];
-        const defenderZoneCards =
-          draft.players[defenderPlayerId]?.zones?.active || [];
-        const defenderInPlayCards = [
-          ...(draft.players[defenderPlayerId]?.zones?.active || []),
-          ...(draft.players[defenderPlayerId]?.zones?.bench || []),
-        ];
-        const myPrizes = (draft.players[playerId]?.zones?.prizes || []).length;
-        const oppPrizes = (draft.players[defenderPlayerId]?.zones?.prizes || [])
-          .length;
-        const attackerTrailingPrizes = myPrizes > oppPrizes;
-        const defenderPoisoned = hasCondition(defender, 'Poisoned');
-
-        const dmgResult = computeAttackDamage(
-          attackerView,
-          defenderView,
-          effectiveAttack,
-          {
-            attackerZoneCards,
-            defenderZoneCards,
-            defenderInPlayCards,
-            stadium: draft.stadium,
-            defenderIsActive: true,
-            attackerTrailingPrizes,
-            defenderPoisoned,
-            baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
-          }
-        );
-        dmgDealt = dmgResult.total;
-
-        if (dmgResult.prevented) {
-          events.push({
-            type: 'damagePrevented',
-            instanceId: defender.instanceId,
-            attackerInstanceId: attacker.instanceId,
-            attackName: effectiveAttack?.name,
-          });
-        }
-
-        if (dmgDealt > 0) {
-          const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
-          const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
-
-          if (wouldKo) {
-            const koEval = evaluateToolKoPrevention(
-              defender,
-              defenderZoneCards,
-              {
-                currentDamage: defender.damage || 0,
-                incomingDamage: dmgDealt,
-                baseHp: koHp,
-                stadium: draft.stadium,
-                inHp: true,
-              }
-            );
-
-            if (koEval.prevented) {
-              defender.damage = koEval.totalDamage;
-              events.push({
-                type: 'damageUpdated',
-                instanceId: defender.instanceId,
-                damage: defender.damage,
-                dealt: dmgDealt,
-              });
-              events.push({
-                type: 'koPrevented',
-                instanceId: defender.instanceId,
-                tool: koEval.tool,
-                surviveHp: koEval.surviveHp,
-              });
-              if (koEval.discardOnUse && koEval.toolCard) {
-                discardCardFromPlayerZone(
-                  draft,
-                  koEval.toolCard.instanceId,
-                  defenderPlayerId
-                );
-              }
-            } else {
-              defender.damage = (defender.damage || 0) + dmgDealt;
-              events.push({
-                type: 'damageUpdated',
-                instanceId: defender.instanceId,
-                damage: defender.damage,
-                dealt: dmgDealt,
-              });
-              handleKnockout(draft, {
-                victimPlayerId: defenderPlayerId,
-                attackerPlayerId: playerId,
-                victim: defender,
-                events,
-              });
-            }
-          } else {
-            defender.damage = (defender.damage || 0) + dmgDealt;
-            events.push({
-              type: 'damageUpdated',
-              instanceId: defender.instanceId,
-              damage: defender.damage,
-              dealt: dmgDealt,
-            });
-          }
-        }
-
-        // Reactive tool effects & Thorns on damage (if damage > 0 and not prevented)
-        if (dmgDealt > 0 && !dmgResult.prevented && attacker) {
-          let thornsDamage = 0;
-          const toolEffects = attachedToolOnDamageEffects(
-            defender,
-            defenderZoneCards,
-            {
-              stadium: draft.stadium,
-              isActive: true,
-            }
-          );
-          for (const eff of toolEffects) {
-            if (eff.damageAttacker > 0) {
-              thornsDamage += eff.damageAttacker * 10;
-            }
-            if (eff.draw > 0) {
-              const defPlayer = draft.players[defenderPlayerId];
-              if (defPlayer?.zones?.deck && defPlayer?.zones?.hand) {
-                for (
-                  let d = 0;
-                  d < eff.draw && defPlayer.zones.deck.length > 0;
-                  d++
-                ) {
-                  defPlayer.zones.hand.push(defPlayer.zones.deck.pop());
-                }
-                events.push({
-                  type: 'cardsDrawn',
-                  playerId: defenderPlayerId,
-                  count: eff.draw,
-                  source: eff.tool?.name || 'Tool',
-                });
-              }
-            }
-            if (eff.discardTool && eff.tool) {
-              discardCardFromPlayerZone(
-                draft,
-                eff.tool.instanceId,
-                defenderPlayerId
-              );
-            }
-          }
-
-          const thorns = parseThorns(defender);
-          if (thorns?.count > 0) {
-            thornsDamage += thorns.count * 10;
-          }
-
-          if (thornsDamage > 0) {
-            attacker.damage = (attacker.damage || 0) + thornsDamage;
-            events.push({
-              type: 'damageUpdated',
-              instanceId: attacker.instanceId,
-              damage: attacker.damage,
-              dealt: thornsDamage,
-              reason: 'thorns',
-            });
-            const atkKoHp = cardEffectiveHp(draft, attacker, playerId);
-            if (atkKoHp > 0 && attacker.damage >= atkKoHp) {
-              handleKnockout(draft, {
-                victimPlayerId: playerId,
-                attackerPlayerId: defenderPlayerId,
-                victim: attacker,
-                events,
-              });
-            }
-          }
-        }
-      }
-
-      // Recoil: printed damage the attack deals to its own Pokémon. A recoil KO hands the
-      // prize entitlement to the DEFENDING player.
-      if (parsed.selfDamage > 0 && attacker) {
-        attacker.damage = (attacker.damage || 0) + parsed.selfDamage;
-        events.push({
-          type: 'damageUpdated',
-          instanceId: attacker.instanceId,
-          damage: attacker.damage,
-          dealt: parsed.selfDamage,
-        });
-        const selfKoHp = cardEffectiveHp(draft, attacker, playerId);
-        if (selfKoHp > 0 && attacker.damage >= selfKoHp) {
-          handleKnockout(draft, {
-            victimPlayerId: playerId,
-            attackerPlayerId: oppId,
-            victim: attacker,
-            events,
-          });
-        }
-      }
-
-      // Healing from attack effect (e.g. "Heal 30 damage from this Pokémon")
-      if (parsed.heal > 0 && attacker) {
-        const atkRef = findCard(draft, attacker.instanceId);
-        if (
-          atkRef &&
-          atkRef.zoneId === 'active' &&
-          (attacker.damage || 0) > 0
-        ) {
-          const healAmount = Math.min(attacker.damage, parsed.heal);
-          attacker.damage -= healAmount;
-          events.push({
-            type: 'damageUpdated',
-            instanceId: attacker.instanceId,
-            damage: attacker.damage,
-            healed: healAmount,
-          });
-        }
-      }
-
-      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack
-      const { defenderConditions, attackerConditions } =
-        resolveAttackStatusConditions(attack, {
-          coin,
-          headsCount,
-          flips,
-        });
-
-      if (defenderConditions.length > 0 && defender) {
-        // Only apply condition if defender survived the attack (not KO'd)
-        const defRef = findCard(draft, defender.instanceId);
-        if (defRef && defRef.zoneId === 'active') {
-          for (const cond of defenderConditions) {
-            addCondition(defRef.card, cond);
-            events.push(conditionsUpdatedEvent(defRef.card, cond));
-          }
-        }
-      }
-
-      if (attackerConditions.length > 0 && attacker) {
-        const atkRef = findCard(draft, attacker.instanceId);
-        if (atkRef && atkRef.zoneId === 'active') {
-          for (const cond of attackerConditions) {
-            addCondition(atkRef.card, cond);
-            events.push(conditionsUpdatedEvent(atkRef.card, cond));
-          }
-        }
-      }
-
-      // Spread damage ("… to EACH of your opponent's Benched Pokémon") and single-target bench
-      // damage ("… to 1 of your opponent's Benched Pokémon") are the same printed sentence to
-      // `parsed.bench`'s looser regex, so a spread attack matches both. Spread wins: applying
-      // both would double every benched Pokémon's damage.
-      const spread = allBenchDamage(attack.text);
-
-      // A printed clause that lets the player choose which opponent Pokémon take
-      // damage / counters. Resolved after the attack's other effects below so a
-      // suspension never drops them (design 017 / D19).
-      const attackTarget = resolveAttackTargetClause(attack.text, parsed, spread);
-      let benchDealt = 0;
-
-      // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
-      // list is snapshotted first, because a KO inside the loop mutates the bench array.
-      if (spread > 0) {
-        const targets = benchTargets(draft.players[defenderPlayerId]);
-        if (targets.length === 0) {
-          events.push({
-            type: 'attackBenchFizzled',
-            playerId,
-            attackName: attack.name,
-            reason: 'no-benched-pokemon',
-          });
-        } else {
-          for (const victim of targets) {
-            // A previous KO in this same loop (or the active KO above) may already have
-            // moved this card to the discard — never damage a card that has left the bench.
-            const ref = findCard(draft, victim.instanceId);
-            if (ref?.zoneId !== 'bench') continue;
-            benchDealt += spread;
-            damageBenchedPokemon(draft, {
-              victim,
-              victimPlayerId: defenderPlayerId,
-              attackerPlayerId: playerId,
-              attackName: attack.name,
-              dealt: spread,
-              auto: false,
-              events,
-            });
-          }
-        }
-      }
-
-      // Attack effects: draw cards (e.g. Collect)
-      const drawN = drawCount(attack);
-      if (drawN > 0) {
-        const deck = attackerPlayer?.zones?.deck || [];
-        const hand = attackerPlayer?.zones?.hand || [];
-        const actual = Math.min(drawN, deck.length);
-        if (actual > 0) {
-          const drawn = deck.splice(0, actual);
-          hand.push(...drawn);
-          events.push({
-            type: 'cardsDrawn',
-            playerId,
-            count: actual,
-            cards: drawn.map((c) => ({ instanceId: c.instanceId })),
-          });
-        }
-      }
-
-      // Attack effects: discard energy from attacker (Phase 3)
-      const energyDiscardSpec = parseAttackEnergyDiscard(effectiveAttack);
-      if (energyDiscardSpec && attacker) {
-        const attackerZone = draft.players[playerId]?.zones?.active || [];
-        const attachedEnergies = attackerZone.filter(
-          (c) => c.attachedTo === attacker.instanceId && isEnergy(c)
-        );
-
-        let toDiscard = [];
-        if (energyDiscardSpec.all) {
-          toDiscard = attachedEnergies;
-        } else {
-          let candidates = attachedEnergies;
-          if (energyDiscardSpec.energyType) {
-            candidates = attachedEnergies.filter((c) => {
-              const ty = c.energyType || c.name?.replace(/\s*Energy.*/i, '');
-              return (
-                ty &&
-                ty
-                  .toLowerCase()
-                  .includes(energyDiscardSpec.energyType.toLowerCase())
-              );
-            });
-          }
-          toDiscard = candidates.slice(0, energyDiscardSpec.count);
-        }
-
-        for (const card of toDiscard) {
-          const idx = draft.players[playerId].zones.active.findIndex(
-            (c) => c.instanceId === card.instanceId
-          );
-          if (idx >= 0) {
-            const [discarded] = draft.players[playerId].zones.active.splice(
-              idx,
-              1
-            );
-            discarded.attachedTo = null;
-            const to = discardCardToPlayerZone(
-              draft.players[playerId],
-              discarded
-            );
-            events.push({
-              type: 'cardMoved',
-              instanceId: card.instanceId,
-              from: 'active',
-              to,
-              playerId,
-              reason: 'attack-energy-discard',
-            });
-          }
-        }
-      }
-
-      // Attack effects: next-turn locks (Phase 3)
-      const locks = parseNextTurnLock(effectiveAttack);
-      if (locks) {
-        if (locks.selfCannotAttack && attacker) {
-          attacker.cannotAttackUntilTurn = (draft.turn.number || 1) + 2;
-        } else if (locks.selfCannotUseAttack && attacker) {
-          attacker.cannotAttackUntilTurn = (draft.turn.number || 1) + 2;
-          attacker.cannotAttackAttackName = locks.selfCannotUseAttack;
-        }
-        if (locks.oppCannotRetreat && defender) {
-          const defRef = findCard(draft, defender.instanceId);
-          if (defRef && defRef.zoneId === 'active') {
-            defender.cannotRetreatUntilTurn = (draft.turn.number || 1) + 1;
-          }
-        }
-      }
-
-      // Attack effects: deck search (Phase 3, e.g. Call for Family)
-      const searchClause = parseAttackSearchClause(effectiveAttack);
-      let searchTriggered = false;
-      if (searchClause && attackerPlayer?.zones?.deck?.length > 0) {
-        // A staged clause (searchDeckSequence) is walked one stage per choice so
-        // each stage keeps its own filter; treating it as a single clause left
-        // `what` undefined and offered the entire deck.
-        const stages =
-          searchClause.type === 'searchDeckSequence' &&
-          Array.isArray(searchClause.stages)
-            ? searchClause.stages
-            : [searchClause];
-        const choice = buildAttackSearchChoice(draft, {
-          playerId,
-          oppId,
-          attackerId: attacker?.instanceId,
-          stages,
-        });
-        if (choice) {
-          draft.pendingChoice = choice;
-          searchTriggered = true;
-        }
-      }
-
-      // Chosen-target damage/counters, resolved now (after every other attack
-      // effect) so a click-to-select suspension never drops them. The player
-      // clicks the target(s) on the mat (design 017 / D19).
-      if (attackTarget) {
-        const candidates = attackTargetOptions(
-          draft,
-          defenderPlayerId,
-          attackTarget.scope
-        );
-        if (candidates.length === 0) {
-          events.push({
-            type: 'attackBenchFizzled',
-            playerId,
-            attackName: attack.name,
-            reason: 'no-target',
-          });
-        } else {
-          const distributable = Boolean(attackTarget.distributable);
-          const required = distributable
-            ? attackTarget.remaining || 0
-            : attackTarget.count;
-          const picksFor = (cards) =>
-            distributable
-              ? new Array(required).fill(cards[0].instanceId)
-              : cards.slice(0, attackTarget.count).map((c) => c.instanceId);
-          if (
-            attackTarget.scope === 'active' ||
-            candidates.length <= (distributable ? 1 : attackTarget.count)
-          ) {
-            benchDealt += applyAttackTargets(draft, {
-              selection: picksFor(candidates),
-              clause: attackTarget,
-              defenderPlayerId,
-              attackerPlayerId: playerId,
-              attackName: attack.name,
-              events,
-            });
-          } else if (!searchTriggered) {
-            draft.pendingChoice = createPendingChoice({
-              player: playerId,
-              source: 'attack',
-              prompt: distributable
-                ? `${attack.name}: Place a damage counter (${required} left)`
-                : `${attack.name}: Choose ${attackTarget.count > 1 ? `${attackTarget.count} ` : ''}of your opponent's Pokémon to take damage`,
-              options: candidates,
-              min: distributable ? 1 : attackTarget.count,
-              max: distributable ? 1 : attackTarget.count,
-              resumeToken: {
-                effectType: 'attack',
-                initiatorPlayerId: playerId,
-                oppId,
-                attackTarget,
-                effectiveAttack,
-                damage: dmgDealt,
-              },
-            });
-            break;
-          } else {
-            // A deck-search clause already suspended this attack; apply the target
-            // to the first eligible Pokémon rather than overwriting its choice.
-            benchDealt += applyAttackTargets(draft, {
-              selection: picksFor(candidates),
-              clause: attackTarget,
-              defenderPlayerId,
-              attackerPlayerId: playerId,
-              attackName: attack.name,
-              events,
-            });
-          }
-        }
-      }
-
-      events.push({
-        type: 'attackExecuted',
-        attackerId: attacker?.instanceId,
-        attackName: attack.name,
-        damage: dmgDealt,
-        benchDealt,
+      resolveAttackEffectPhase(draft, {
         playerId,
+        activeRng,
+        events,
+        attacker,
+        defender,
+        defenderPlayerId,
+        oppId,
+        attack,
+        attackerPlayer,
+        attackerView,
+        coin,
+        headsCount,
+        flips,
       });
-
-      // App. 19: using a GX attack spends the player's single GX attack for the game.
-      // Set here, on the resolving path only — a Confused fizzle above never reaches it.
-      if (isGxAttack(attack)) {
-        const oncePerGame = ensureOncePerGame(draft, playerId);
-        if (oncePerGame && !oncePerGame.gxUsed) {
-          oncePerGame.gxUsed = true;
-          events.push({
-            type: 'gxAttackUsed',
-            playerId,
-            instanceId: attacker?.instanceId,
-            attackName: attack.name,
-          });
-        }
-      }
-
-      if (!attackerPlayer.flags) attackerPlayer.flags = {};
-      attackerPlayer.flags.attackerAttacked = true;
-
-      // Auto-end turn after attacking (unless paused by pendingChoice)
-      if (!searchTriggered && !isGameConcluded(draft)) {
-        resolveCheckup(draft, {
-          rng: activeRng,
-          events,
-          endingPlayerId: playerId,
-        });
-        if (!isGameConcluded(draft)) {
-          advanceTurn(draft, { nextPlayerId: oppId, events });
-        }
-      }
       break;
     }
 
@@ -3525,8 +3755,15 @@ export function applyCommand(state, command, rng = null) {
         activeRng,
         events,
       });
-      // Lumiose City: the activation ends the turn once it resolves.
-      if (result?.turnEnds && !result.pendingChoice) {
+      // Lost World: the activation can win the game outright.
+      if (result?.gameWinner && !result.pendingChoice) {
+        setGameEnded(draft, {
+          winner: result.gameWinner,
+          reason: result.gameReason || 'stadium effect',
+          events,
+        });
+      } else if (result?.turnEnds && !result.pendingChoice) {
+        // Lumiose City: the activation ends the turn once it resolves.
         endTurnFromEffect(draft, { playerId, activeRng, events });
       }
       break;
@@ -3594,6 +3831,66 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection || [],
           events,
         });
+      } else if (token.effectType === 'glimwood') {
+        // Glimwood Tangle: resume the attack with the kept coin result or a fresh
+        // re-flip, then run the remaining effect phase. The confusion check is
+        // deliberately skipped — it already resolved before the coins.
+        const resumer = draft.players[initiatorPlayerId];
+        if (!resumer.flags) resumer.flags = {};
+        resumer.flags.glimwoodUsedThisTurn = true;
+        const pick = (payload.selection || [])[0];
+        const wantsReflip = Number(pick) === 2;
+        const attackIdx = token.attackIndex ?? 0;
+        const attacker = resumer?.zones?.active?.find((c) => !c.attachedTo);
+        const attackerView = attackViewFor(draft, attacker);
+        const attack = attackerView?.attacks?.[attackIdx] || {
+          name: 'Attack',
+          damage: 10,
+        };
+        const gOppId = Object.keys(draft.players || {}).find(
+          (id) => id !== initiatorPlayerId
+        );
+        const defenderPlayer = draft.players[gOppId];
+        let defender = null;
+        let defenderPlayerId = gOppId;
+        if (token.targetInstanceId != null) {
+          const targetRef = findCard(draft, token.targetInstanceId);
+          defender = targetRef?.card;
+          if (targetRef?.playerId) defenderPlayerId = targetRef.playerId;
+        } else {
+          defender = defenderPlayer?.zones?.active?.find((c) => !c.attachedTo);
+        }
+        const coinResult = wantsReflip
+          ? flipAttackCoins(attack, activeRng)
+          : token.coinResult;
+        const { coin, headsCount, flips } = coinResult;
+        if (flips.length > 0) {
+          events.push({
+            type: 'attackCoinFlipped',
+            playerId: initiatorPlayerId,
+            attackName: attack.name,
+            coin,
+            headsCount,
+            flips,
+            reflip: wantsReflip,
+          });
+        }
+        draft.pendingChoice = null;
+        resolveAttackEffectPhase(draft, {
+          playerId: initiatorPlayerId,
+          activeRng,
+          events,
+          attacker,
+          defender,
+          defenderPlayerId,
+          oppId: gOppId,
+          attack,
+          attackerPlayer: resumer,
+          attackerView,
+          coin,
+          headsCount,
+          flips,
+        });
       } else if (token.effectType === 'retreat') {
         // The player clicked the Benched Pokémon to switch in; pay the retreat
         // cost and perform the swap (retreat does not end the turn).
@@ -3612,7 +3909,13 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection,
           resumeToken: token,
         });
-        if (result?.turnEnds && !result.pendingChoice) {
+        if (result?.gameWinner && !result.pendingChoice) {
+          setGameEnded(draft, {
+            winner: result.gameWinner,
+            reason: result.gameReason || 'stadium effect',
+            events,
+          });
+        } else if (result?.turnEnds && !result.pendingChoice) {
           endTurnFromEffect(draft, {
             playerId: initiatorPlayerId,
             activeRng,

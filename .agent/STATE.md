@@ -4,40 +4,36 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 206
-Focus: PRs #171 (once-per-game GX attack/VSTAR Power), #172 (stadium inspector Use panel) and
-  #173 (rulebook-30c Phases 0–6 + review fixes) are MERGED to `main` (6fab9c2, 34c509a, 813474a).
-  171 was reconciled with 173, not taken wholesale: kept 173's `oncePerGame` state, optional
-  `kind` + subtype inference, and flags mirror; kept 171's attack-command GX gate (`isGxAttack`),
-  spend-on-resolve (also target-choice resume, never Confusion fizzle), view projection, and
-  `instanceId`-optional shape/refs. Dedupe: D76 (card-classify, was `D-cardclassify`), D77
-  (stadium inspector, was a second D61), merged D61 text; I64 (attack panel, was a second I61).
-Active: worktree `C:\Users\SMG26\AppData\Local\Temp\opencode\merge-171-173` on `merge/prs-171-173`
-  @ 813474a + the S206 harness commit, pushed to `main`.
-Next: overdue maintenance (carried since S200): run `.agent/workflows/maintain.md` — DECISIONS is
-  ~140 active lines vs its 50-line cap (archive superseded/expired), journal is ~2270 lines.
-  Also owed: browser e2e for the stadium inspector Use panel (PR #172's open edge rows); I64
-  (attack panel does not grey a spent GX attack); I62/I63 (V-UNION / LEGEND play rules).
+Session: 207
+Focus: Stadium full-coverage pass on branch `fix/stadium-effect-parsing` (PR #174), UNCOMMITTED on
+  top of 79e8084 (batches 1–3 + deep mechanics, none journaled until now). Removed the dangerous
+  `kind:'search'` fallback (`UNMODELED_GATE`); wired every parseable active/passive; closed all 7
+  complex actives (Glimwood Tangle keep/re-flip). Deep mechanics: Special-Energy rewrites (Temple of
+  Sinnoh / Crystal Beach / Holon Research Tower), attack inheritance (Shrine of Memories / Meteor
+  Falls) and grants (Holon Lake / Rocket's Tricky Gym), and the three unlimited "as often as … likes"
+  energy actions (Ultimate Zone / Saffron City Gym / Celadon City Gym). Client now computes Stadium
+  `extraAttacks` from the live zone (rules-bridge affordance + card-inspector `resolveLiveContext`)
+  and indexes a merged attack list; repeatable Stadiums bypass `stadiumUsedThisTurn` (D78).
+Active: uncommitted on `fix/stadium-effect-parsing`; full suite 2226/2226; audit 0 unparsed.
+Next: commit the branch into PR #174 — first split the unrelated Thundurus delta in
+  `energy-effects.mjs`. Then overdue maintenance (DECISIONS ~127 lines vs 50-line cap; journal ~2290).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- `pnpm test` = D75 globs, 2145/2145 green on merged main. Lint bar: `npx eslint --rule
-  'linebreak-style: off' --rule 'prettier/prettier: off' <files>`; pre-existing errors only
-  (card-search `URL`/`fetch`, evolution `fetch`/no-empty, ko-flow `rulesState`/`defenderBoard`,
-  rules-bridge/chat-buttons no-empty+unused, rules-extended unused imports, reduce.test
-  `getZone`/`findCard`, card-inspector `document`/`requestAnimationFrame`). `pnpm lint` NOT usable.
-- Once-per-game lives on game-scoped `player.oncePerGame` (survives `advanceTurn`; `flags` only
-  mirrors it). `useVStarGX.kind` is OPTIONAL (inferred from `isVstarCard`/`isGxCard`; unclassifiable
-  senders spend both); `instanceId` optional. GX attacks are gated in the `attack` case by
-  `isGxAttack` and spent on resolve only — not on a Confusion fizzle, yes on target-choice resume.
-- `dual-run-bridge.js` maps legacy `VSTARGXFunction [type]` → `kind` and omits `instanceId`
-  (I22 closed); command shape + `validateReferences` accept that omission.
-- Card classification: ONLY `card-classify.mjs` predicates (`isRuleBoxPokemon` = sole rule-box
-  definition; ex/GX name suffixes need a separator, D73; TFHG accepts a modern ex by design, D74).
-- Prism Star discards route through `discardCardToPlayerZone` (D65); Ancient Traits are
-  marker-only (D72). Stadium usability decisions live in `stadiumActivationStatus` (D77).
+- `pnpm test` = D75 globs, 2226/2226 green. Lint bar: `npx eslint --rule 'linebreak-style: off'
+  --rule 'prettier/prettier: off' <files>`; pre-existing errors only (document/requestAnimationFrame,
+  no-empty, unused imports, `dmg` no-undef in chat-buttons). `pnpm lint` NOT usable.
+- Stadium extras have ONE merge order (D78): printed → inherited → granted, de-duped by name, shared
+  by server `attackViewFor` and client `stadiumExtraAttacksFromZone`/`listAttacks`/`mergeAttacks`. An
+  `attackIndex` is an index into that merged list — never into `card.attacks` alone.
+- `isRepeatableStadiumAction` is the single gate exempting Ultimate Zone / Saffron City Gym / Celadon
+  City Gym from the once-per-turn flag (reduce.mjs canPerformAction, effects/stadium.mjs, chat-buttons).
+- `out/` is NOT gitignored; audit: `node scripts/audit-all-stadiums.mjs` → `out/stadium-full-audit.txt`
+  (212 unique | 0 unparsed | 117 continuous-both | 67 once-per-turn | 28 unknown).
+- The client inspector/affordance context is 'self'-oriented (`resolveLiveContext` reads
+  `getZone('self', …)`), so opening it on the opponent's card yields no extras — pre-existing.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S207 stadium deep mechanics + client attack-list wiring; D78, I65; 2226/2226, 0 unparsed.
 - S206 merge: PRs #171/#172/#173 on `main`; 171+173 once-per-game reconciled; 2145/2145, lint delta nil.
 - S205 review-fix Phase 6: TFHG/tiebreak kept + documented (D74), `pnpm test` → globs (D75); 2126/2126.
-- S193 feature: Stadium double-click → inspector Use panel (`stadiumActivationStatus`, D77); 2012/2012.

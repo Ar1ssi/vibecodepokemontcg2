@@ -48,6 +48,7 @@ export async function computeActionAffordances({
   attachedEnergyCards = [],
   benchCards = [],
   stadiumCard = null,
+  extraAttacks = [],
   isAbilityUsed = () => false,
   ensureCardData = async () => {},
 } = {}) {
@@ -58,20 +59,27 @@ export async function computeActionAffordances({
     } catch {
       /* card data may not be ready yet — treat as no payable attack */
     }
-    const { energyTypes, stadiumCostModifier, abilityUsedFlag, priorAttacks } =
-      await resolveAttackContext({
-        activeCard,
-        attachedEnergyCards,
-        ensureCardData,
-        stadiumCard,
-        abilityUsed: isAbilityUsed,
-      });
+    const {
+      energyTypes,
+      stadiumCostModifier,
+      abilityUsedFlag,
+      priorAttacks,
+      extraAttacks: resolvedExtra,
+    } = await resolveAttackContext({
+      activeCard,
+      attachedEnergyCards,
+      ensureCardData,
+      stadiumCard,
+      abilityUsed: isAbilityUsed,
+      extraAttacks,
+    });
     const { attacks } = listUsableActions(activeCard, {
       energyTypes,
       stadiumCostModifier,
       abilityUsed: abilityUsedFlag,
       rulesEnabled: true,
       priorAttacks,
+      extraAttacks: resolvedExtra,
     });
     attackAvailable = attacks.some((a) => a.usable);
   }
