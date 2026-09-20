@@ -515,12 +515,16 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
     // - Gen 8 (swsh): Crown Zenith (swsh12.5) basic energies
     // - Gen 7 (sm): Sun & Moon (sm1), Guardians Rising (sm2), Burning Shadows (sm3), Crimson Invasion (sm4) basic energies
     // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies
+    // - Gen 5 (bw): every set with an Energy card — Black & White (bw1) basic energies plus the
+    //               special energies in Next Destinies (bw4), Dragons Exalted (bw6), Plasma Storm
+    //               (bw8), Plasma Freeze (bw9), Plasma Blast (bw10), Legendary Treasures (bw11)
     // - Gen 3 (ecard/ex): Expedition Base Set (ecard1), EX Ruby & Sapphire (ex1), EX Emerald (ex9),
     //                     EX Holon Phantoms (ex13), EX Power Keepers (ex16) basic energies
     export const REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION = {
       8: new Set(['swsh12.5']),
       7: new Set(['sm1', 'sm2', 'sm3', 'sm4']),
       6: new Set(['xy12', 'g1']),
+      5: new Set(['bw1', 'bw4', 'bw6', 'bw8', 'bw9', 'bw10', 'bw11']),
       3: new Set(['ecard1', 'ex1', 'ex9', 'ex13', 'ex16']),
     };
     export const GEN6_REVERSE_HOLO_ENERGY_SET_IDS = REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[6];
@@ -536,7 +540,7 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 
     // Fetch every Energy card (basic, special, and rarer variants) printed
     // across every set in a Pokémon generation. For generations featuring
-    // Reverse Holo energy prints (Gen 8, 7, 6, 3), this includes their Reverse Holo variants.
+    // Reverse Holo energy prints (Gen 8, 7, 6, 5, 3), this includes their Reverse Holo variants.
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);

@@ -56,6 +56,8 @@ const SHARED_ENERGY_SUMMARY = [
   { id: 'sm1-164', name: 'Grass Energy', localId: '164' },
   { id: 'ex16-103', name: 'Grass Energy', localId: '103' },
   { id: 'bw1-105', name: 'Grass Energy', localId: '105' },
+  { id: 'bw4-92', name: 'Double Colorless Energy', localId: '92' },
+  { id: 'dp1-100', name: 'Grass Energy', localId: '100' },
 ];
 
 describe('fetchGenerationSets', () => {
@@ -322,16 +324,55 @@ describe('fetchGenerationEnergyCards', () => {
     assert.equal(rh.localId, '103 · Reverse Holo');
   });
 
-  it('fetchGenerationEnergyCards does not generate reverse holos for generations without them (e.g. Gen 5)', async () => {
+  it('fetchGenerationEnergyCards(5) appends Reverse Holo variants for every Gen 5 set with Energy cards', async () => {
     stubFetch([
-      ['/series/bw', { id: 'bw', name: 'Black & White', sets: [{ id: 'bw1' }] }],
-      ['/sets/bw1', { id: 'bw1', name: 'Black & White', cards: [{ id: 'bw1-105', name: 'Grass Energy', localId: '105', image: 'x' }] }],
+      ['/series/bw', { id: 'bw', name: 'Black & White', sets: [{ id: 'bw1' }, { id: 'bw4' }] }],
+      [
+        '/sets/bw1',
+        {
+          id: 'bw1',
+          name: 'Black & White',
+          cards: [{ id: 'bw1-105', name: 'Grass Energy', localId: '105', image: 'bw1-img' }],
+        },
+      ],
+      [
+        '/sets/bw4',
+        {
+          id: 'bw4',
+          name: 'Next Destinies',
+          cards: [{ id: 'bw4-92', name: 'Double Colorless Energy', localId: '92', image: 'bw4-img' }],
+        },
+      ],
       ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
     ]);
+
     const cards = await fetchGenerationEnergyCards(5);
     const ids = cards.map((c) => c.id);
-    assert.ok(ids.includes('bw1-105'));
-    assert.ok(!ids.some((id) => id.endsWith('-reverse')), 'Gen 5 must not generate reverse holo energies');
+
+    // Gen 5 basic energies (bw1) and special energies (bw4) each produce both
+    // a regular and a reverse holo variant.
+    assert.ok(ids.includes('bw1-105'), 'must include regular bw1-105');
+    assert.ok(ids.includes('bw1-105-reverse'), 'must include reverse holo bw1-105-reverse');
+    assert.ok(ids.includes('bw4-92'), 'must include regular bw4-92');
+    assert.ok(ids.includes('bw4-92-reverse'), 'must include reverse holo bw4-92-reverse');
+
+    const rh = cards.find((c) => c.id === 'bw4-92-reverse');
+    assert.equal(rh.rarity, 'Reverse Holo');
+    assert.equal(rh.localId, '92 · Reverse Holo');
+    assert.equal(rh.name, 'Double Colorless Energy');
+    assert.equal(rh.supertype, 'Energy');
+  });
+
+  it('fetchGenerationEnergyCards does not generate reverse holos for generations without them (e.g. Gen 4)', async () => {
+    stubFetch([
+      ['/series/dp', { id: 'dp', name: 'Diamond & Pearl', sets: [{ id: 'dp1' }] }],
+      ['/sets/dp1', { id: 'dp1', name: 'Diamond & Pearl', cards: [{ id: 'dp1-100', name: 'Grass Energy', localId: '100', image: 'x' }] }],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    const cards = await fetchGenerationEnergyCards(4);
+    const ids = cards.map((c) => c.id);
+    assert.ok(ids.includes('dp1-100'));
+    assert.ok(!ids.some((id) => id.endsWith('-reverse')), 'Gen 4 must not generate reverse holo energies');
   });
 });
 

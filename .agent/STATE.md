@@ -4,8 +4,8 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 224
-Focus: Ancient-Trait parse coverage — Δ/θ markers + `has:ancient-trait` corpus audit.
+Session: 225
+Focus: Gen 5 Energy tab — reverse-holo energy variants for every BW set holding an Energy card.
 Active: none.
 Next: none.
 Blocked: nothing.
@@ -22,8 +22,11 @@ Blocked: nothing.
   the ancient-trait audit import it). Scripts use `process`, which eslint flags `no-undef` (pre-existing style).
 - Ancient-Trait EFFECTS (Δ Plus extra prize, θ Max heal-on-evolve, θ Double extra tool, …) are announce-only —
   the parser tags them but nothing executes them.
+- Gen 5 Energy tab reverse holos: `REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[5]` now lists every BW set with an
+  Energy card (`bw1,bw4,bw6,bw8,bw9,bw10,bw11`); `fetchGenerationEnergyCards` synthesizes the `-reverse` variant
+  (no separate image). TCGdex's per-card `variants.reverse` flag is false for old sets — don't trust it.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S225 feat(deck-builder): Gen 5 Energy tab emits reverse-holo variants for all 7 BW sets with Energy cards; 21 targeted tests, 2592/2592.
 - S224 feat(rules): Ancient-Trait audit + Δ/θ marker support; parseAbility tags all steps (App. 23/D72); 4 tests.
 - S223 feat(rules): authoritative special-energy trigger execution (attach/evolve/damaged/KO/endTurn/discard) + Legacy guard; 11 tests (I69).
-- S222 feat(rules): wired special-energy on-evolve/on-damaged/end-turn triggers + Retro devolve; Legacy prize test.
