@@ -50,6 +50,7 @@ function shouldExecuteLocalRulesEffect({
 }
 
 function shouldEmitTurnStartDraw({ isTwoPlayer = false, turnPlayer = 'self' } = {}) {
+  if (systemState.serverAuthoritative) return false;
   if (!isTwoPlayer) return true;
   return turnPlayer === 'self';
 }
@@ -839,7 +840,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard } from './action-a
     const maybeBeginServerTurnOrder = () => {
       if (!serverTurnOrderAnimationDone) return false;
       if (!serverTurnOrderStarter) return false;
-      if (!openingSetupReadyForCoinFlip && !isE2eMode()) return false;
+      if (!openingSetupReadyForCoinFlip) return false;
       const starter = serverTurnOrderStarter;
       serverTurnOrderStarter = null;
       beginSetupWithTurnOrder(starter);
@@ -2651,6 +2652,10 @@ if (!isTrainer) {
         if (!rulesState.enabled) return;
         // Catch-up/resync replays pass/attack and must not emit extra draws.
         if (systemState.isCatchingUp || systemState.isReplay) return;
+        // Under server authority the server executes turn-start draws authoritatively
+        // (setupGame for turn 1, advanceTurn on subsequent turns). Client must not
+        // emit an extra draw command.
+        if (systemState.serverAuthoritative) return;
         // In 2P each client draws only for itself; the peer's draw arrives
         // as a `draw` action. Drawing for `opp` here duplicated start-of-turn
         // draws and desynced both hands (sync log: 18× draw after one attack).
