@@ -12,9 +12,9 @@ import test from 'node:test';
       setDeckSleeve,
     } from '../core/deck-library.mjs';
     
-    test('sleeve catalog: all 109 Mega Evolution sleeves with data', () => {
+    test('sleeve catalog: all 449 Pokemon sleeves with data', () => {
       const sleeves = getSleeves();
-      assert.equal(sleeves.length, 109);
+      assert.equal(sleeves.length, 449);
 
       for (const sleeve of sleeves) {
         assert.ok(sleeve.id, `missing id: ${sleeve.name}`);
@@ -22,6 +22,21 @@ import test from 'node:test';
         const isRemote = sleeve.image.startsWith('https://pokemon-sleeve-database.com/');
         const isLocal = sleeve.image.startsWith('src/assets/sleeves/');
         assert.ok(isRemote || isLocal, `bad image url: ${sleeve.id}`);
+      }
+    });
+
+    test('coin catalog: all 942 Pokemon coins with data', async () => {
+      const {
+        getCoins,
+      } = await import('../core/coins.mjs');
+      const coins = getCoins();
+      assert.equal(coins.length, 942);
+
+      for (const coin of coins) {
+        assert.ok(coin.id, `missing id: ${coin.name}`);
+        assert.ok(coin.name, `missing name: ${coin.id}`);
+        assert.ok(coin.url, `bad url: ${coin.id}`);
+        assert.ok(coin.material, `missing material: ${coin.id}`);
       }
     });
     
