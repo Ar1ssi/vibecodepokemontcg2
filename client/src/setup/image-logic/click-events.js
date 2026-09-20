@@ -31,6 +31,7 @@ import {
 } from '../rules/card-inspector.mjs';
 import {
   attack,
+  retreat,
   stadiumEffect,
 } from '../../actions/chat-buttons/chat-buttons.js';
 import { resolvePreviewCard } from './preview-card.mjs';
@@ -406,6 +407,10 @@ export const doubleClick = (event) => {
           onAttack: (index) => {
             closeCardInspector();
             attack(rulesState.turnPlayer, true, index);
+          },
+          onRetreat: () => {
+            closeCardInspector();
+            retreat(systemState.initiator);
           },
         });
         return;

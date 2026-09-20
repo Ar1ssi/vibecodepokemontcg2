@@ -27,6 +27,10 @@ export const initializeP1ChatButtons = () => {
             closeCardInspector();
             attack(rulesState.turnPlayer, true, index);
           },
+          onRetreat: () => {
+            closeCardInspector();
+            retreat(systemState.initiator);
+          },
         });
         return;
       }

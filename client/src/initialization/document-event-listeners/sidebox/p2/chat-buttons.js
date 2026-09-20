@@ -28,6 +28,10 @@ export const initializeP2ChatButtons = () => {
             closeCardInspector();
             attack(rulesState.turnPlayer, true, index);
           },
+          onRetreat: () => {
+            closeCardInspector();
+            retreat(getP2User());
+          },
         });
         return;
       }

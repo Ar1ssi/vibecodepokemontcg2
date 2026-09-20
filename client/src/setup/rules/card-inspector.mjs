@@ -249,8 +249,13 @@ const typeValueTile = (label, tv, suffix) =>
     }
   });
 
-const retreatTile = (symbols) =>
-  valueTile('retreat', (val) => {
+// The retreat tile is also the Retreat affordance: `data-ptcg-retreat` lets the delegated click
+// resolve it after a re-render, exactly as `data-ptcg-attack` does for attacks. It only becomes
+// clickable when the model says so (see `applyAffordances`); the reason a card cannot retreat
+// rides on the tooltip.
+const retreatTile = (model) => {
+  const tile = valueTile('retreat', (val) => {
+    const symbols = model.retreat || [];
     if (symbols.length) {
       for (const symbol of symbols)
         val.appendChild(orb(symbol, 'ptcg-orb ptcg-orb--sm'));
@@ -258,6 +263,11 @@ const retreatTile = (symbols) =>
       val.appendChild(el('span', 'ptcg-stat__n ptcg-stat__n--none', '—'));
     }
   });
+  tile.dataset.ptcgRetreat = '1';
+  if (!model.retreatable && model.retreatReason)
+    tile.title = model.retreatReason;
+  return tile;
+};
 
 /**
  * The overlay pieces.
@@ -307,7 +317,7 @@ const buildChrome = (model) => {
   stats.appendChild(
     typeValueTile('resistance', model.resistance, (v) => `-${v}`)
   );
-  stats.appendChild(retreatTile(model.retreat));
+  stats.appendChild(retreatTile(model));
   chrome.appendChild(stats);
 
   if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
@@ -478,6 +488,13 @@ const applyAffordances = (state, model) => {
       Boolean(handlers?.onAttack) && Boolean(attack?.usable)
     );
   });
+
+  state.wrap
+    .querySelector('.ptcg-stat[data-ptcg-retreat]')
+    ?.classList.toggle(
+      'ptcg-stat--usable',
+      Boolean(handlers?.onRetreat) && Boolean(model.retreatable)
+    );
 };
 
 /**
@@ -507,6 +524,15 @@ const wirePanelClicks = (state) => {
       if (!state.model.ability?.usable) return;
       event.stopPropagation();
       state.actions?.onAbility?.();
+      return;
+    }
+    const retreatPanel = event.target.closest?.(
+      '.ptcg-stat[data-ptcg-retreat]'
+    );
+    if (retreatPanel) {
+      if (!state.model.retreatable) return;
+      event.stopPropagation();
+      state.actions?.onRetreat?.();
     }
   });
 };
@@ -647,6 +673,8 @@ const hydrateContext = (state) => {
  *   one always arrives via `hydrateContext`, so this only changes what shows before then.
  * @param {(attackIndex: number) => void} [options.onAttack] fires a payable attack
  * @param {() => void} [options.onAbility] uses the card's ability
+ * @param {() => void} [options.onRetreat] retreats the Active Spot Pokémon (clicking the
+ *   retreat tile); the caller closes the inspector before dispatching, as the attack path does
  * @param {'active'|'bench'} [options.zone] where the card sits, for the ability dispatch
  */
 export function openCardInspector({
@@ -656,6 +684,7 @@ export function openCardInspector({
   getContext = () => stampContextFor(card, zone),
   onAttack = null,
   onAbility = () => useAbility(card, zone),
+  onRetreat = null,
   onUse = null,
 } = {}) {
   if (!card?.image) return false;
@@ -670,6 +699,7 @@ export function openCardInspector({
       ? decorateInspectorSlide(built, slideCard, getContext, {
           onAttack,
           onAbility,
+          onRetreat,
           onUse,
         })
       : built.node;

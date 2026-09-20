@@ -369,6 +369,14 @@ export function buildInspectorModel(card, ctx = {}) {
     dimLevel: readOnly || zone === 'bench' ? 'none' : dimLevelFor(attacks),
     interactive,
     attackable,
+    // Retreat is a positional action: only the Active Spot can retreat, and only when there is
+    // something to retreat to. The model sees one card, so the bench-count and energy gates stay
+    // in `retreat()` (the same gate the sidebox Retreat button passes through), which reports the
+    // reason through the chat line. What lives here is the one fact this model owns: a benched or
+    // read-only Pokémon is not the one that retreats.
+    retreatable: interactive && zone === 'active',
+    retreatReason:
+      zone === 'bench' ? 'A benched Pokémon cannot retreat.' : null,
     zone,
     readOnly,
   };

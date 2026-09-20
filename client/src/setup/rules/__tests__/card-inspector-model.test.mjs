@@ -533,6 +533,39 @@ test('model: zone defaults to active', () => {
   assert.equal(buildInspectorModel(CHARMANDER, {}).attackable, true);
 });
 
+// ── retreat ────────────────────────────────────────────────────────────────
+
+test('model: the Active Spot Pokémon is retreatable', () => {
+  const m = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE });
+  assert.equal(m.retreatable, true);
+  assert.equal(m.retreatReason, null);
+});
+
+test('model: a benched Pokémon is not retreatable, with a positional reason', () => {
+  const m = buildInspectorModel(ARCANINE, {
+    energyTypes: THREE_FIRE,
+    zone: 'bench',
+  });
+  assert.equal(m.retreatable, false);
+  assert.match(m.retreatReason, /benched/i);
+});
+
+test('model: rules off drops the retreat action (E18)', () => {
+  const m = buildInspectorModel(ARCANINE, {
+    energyTypes: THREE_FIRE,
+    rulesEnabled: false,
+  });
+  assert.equal(m.retreatable, false);
+});
+
+test('model: a read-only (opponent) card is not retreatable (E7)', () => {
+  const m = buildInspectorModel(ARCANINE, {
+    energyTypes: THREE_FIRE,
+    readOnly: true,
+  });
+  assert.equal(m.retreatable, false);
+});
+
 // ── positional abilities (design 015) ──────────────────────────────────────
 // The panel is faithful to the engine by design, so once `listAbilities` became zone-aware the
 // inspector has to stop offering a positional ability from the Bench. Contrast Agile above: it is

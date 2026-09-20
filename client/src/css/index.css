@@ -5248,10 +5248,12 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 .ptcg-stadium--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
 .ptcg-atk--usable,
 .ptcg-ability--usable,
-.ptcg-stadium--usable { cursor: pointer; }
+.ptcg-stadium--usable,
+.ptcg-stat--usable { cursor: pointer; }
 .ptcg-atk--usable:hover,
 .ptcg-ability--usable:hover,
-.ptcg-stadium--usable:hover {
+.ptcg-stadium--usable:hover,
+.ptcg-stat--usable:hover {
   box-shadow: inset 0 0 0 calc(var(--u) * 0.5) rgba(255, 255, 255, 0.85);
 }
 
