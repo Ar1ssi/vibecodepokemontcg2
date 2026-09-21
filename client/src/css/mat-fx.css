@@ -71,3 +71,31 @@ body.fx-off .fx-overlay {
   border-radius: 50%;
   box-shadow: 0 0 18px 4px rgba(255, 170, 80, 0.85);
 }
+
+.fx-status-apply__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px solid var(--fx-status-color, #fff);
+  box-shadow: 0 0 22px 6px var(--fx-status-color, #fff);
+}
+
+.fx-status-apply__label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8%;
+  text-align: center;
+  font: 900 0.8rem Impact, 'Arial Black', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fx-status-color, #fff);
+  -webkit-text-stroke: 0.14em #000;
+  paint-order: stroke fill;
+}
+
+.fx-status-apply--poison { --fx-status-color: #b76ce0; }
+.fx-status-apply--burn { --fx-status-color: #ff7a2f; }
+.fx-status-apply--asleep { --fx-status-color: #5fb4dd; }
+.fx-status-apply--paralyzed { --fx-status-color: #f4d03f; }
+.fx-status-apply--confused { --fx-status-color: #c77be8; }

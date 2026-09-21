@@ -5,8 +5,9 @@
 import { fxDisabled, motionReduced } from '../../image-logic/mat-fx.mjs';
 import { attack, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
+import { status } from './status.js';
 
-const EFFECTS = { damage, attack };
+const EFFECTS = { damage, attack, status };
 const STATIC_FALLBACKS = {};
 
 export const playFx = createFxDispatcher({
