@@ -2,6 +2,7 @@ import { reset } from '../../actions/general/reset.js';
 import { systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { processAction } from '../general/process-action.js';
+import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 import { deckDataEquals } from '../general/sync-action-args.mjs';
 import { changePlaymat, getStoredMatId } from '../sizing/apply-mat-layout.js';
 
@@ -42,7 +43,9 @@ export const exchangeData = (
         'announcement',
         false
       );
-      reset('opp', true, true, false, false);
+      if (shouldResetBoardOnDeckData('opp', systemState)) {
+        reset('opp', true, true, false, false);
+      }
     }
 
     // Only the originating client should chain a response; mirror/resync replays

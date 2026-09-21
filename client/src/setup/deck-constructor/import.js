@@ -14,6 +14,7 @@ import { buildPreferredCardId } from '/shared/engine/rules/legacy-set-ids.mjs';
 import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { getCardType } from './find-type.js';
 import { getOldCardType } from './find-old-type.js';
+import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 
 const decklistTable = document.getElementById('decklistTable');
 const altDeckImportInput = document.getElementById('altDeckImportInput');
@@ -749,7 +750,9 @@ export const loadDeckData = (user, deckData, emit = true) => {
   } else {
     systemState.p1OppDeckData = deckData;
   }
-  reset(user, true, true, false, false);
+  if (shouldResetBoardOnDeckData(user, systemState)) {
+    reset(user, true, true, false, false);
+  }
   if (deckData) {
     appendMessage(
       '',
