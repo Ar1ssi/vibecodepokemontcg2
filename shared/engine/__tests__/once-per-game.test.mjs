@@ -339,3 +339,77 @@ test('once-per-game: a kind outside the enum is a shape error', () => {
   assert.equal(res.error, 'bad_command');
   assert.match(res.reason, /kind/);
 });
+
+test('a GX attack suspended for a deck search spends the limit on the initial resolve', () => {
+  const state = baseState();
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Call for Family GX',
+      subtypes: ['GX'],
+      hp: 210,
+      attacks: [
+        {
+          name: 'Call for Family GX',
+          cost: [],
+          damage: 0,
+          text: 'Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.',
+        },
+      ],
+    })
+  );
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 2, name: 'Defender', hp: 300 })
+  );
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 20, name: 'Basic A', stage: 'Basic', hp: 60 }),
+    createCard({ instanceId: 21, name: 'Basic B', stage: 'Basic', hp: 60 })
+  );
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.ok(res.state.pendingChoice, 'the search clause should suspend the attack');
+  assert.equal(res.state.turn.player, 'p1', 'a suspended attack does not end the turn');
+  assert.equal(res.state.players.p1.oncePerGame.gxUsed, true);
+  assert.ok(res.events.some((e) => e.type === 'gxAttackUsed'));
+});
+
+test('a useVStarGX kind:gx marker blocks a later GX attack', () => {
+  const state = baseState();
+  addGxAttacker(state);
+  addDefender(state);
+
+  const marker = applyCommand(state, {
+    type: 'useVStarGX',
+    payload: { kind: 'gx' },
+    playerId: 'p1',
+  });
+  assert.equal(marker.error, null);
+  assert.equal(marker.state.players.p1.oncePerGame.gxUsed, true);
+
+  const res = applyCommand(marker.state, {
+    type: 'attack',
+    payload: { attackIndex: 1 },
+    playerId: 'p1',
+  });
+  assert.match(res.error, /one GX attack/i);
+});
+
+test('a legacy flags-only spent GX blocks a second GX attack (I75)', () => {
+  const state = baseState();
+  addGxAttacker(state);
+  addDefender(state);
+  delete state.players.p1.oncePerGame;
+  state.players.p1.flags.gxUsed = true;
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 1 },
+    playerId: 'p1',
+  });
+  assert.match(res.error, /one GX attack/i);
+});

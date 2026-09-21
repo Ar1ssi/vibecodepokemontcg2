@@ -1264,9 +1264,6 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.
   const prizesOwed = draft.players[nextPlayerId].flags?.prizesOwed;
-  // Once-per-game allowances live outside `flags` (which this function
-  // rebuilds), so mirror them back in for the client's special-move buttons.
-  const oncePerGame = draft.players[nextPlayerId].oncePerGame || {};
 
   draft.turn.player = nextPlayerId;
   draft.turn.number = (draft.turn.number || 1) + 1;
@@ -1285,8 +1282,6 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     abilitiesUsed: {},
     evolved: {},
     briarActive: false,
-    vstarUsed: Boolean(oncePerGame.vstarUsed),
-    gxUsed: Boolean(oncePerGame.gxUsed),
     ...(prizesOwed ? { prizesOwed } : {}),
   };
   for (const p of Object.values(draft.players || {})) {
@@ -2056,8 +2051,9 @@ export function validateLegality(state, command) {
       const atkIdx = payload?.attackIndex ?? 0;
       const attack = attackViewFor(state, active).attacks?.[atkIdx];
       // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
-      // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide.
-      if (isGxAttack(attack) && player.oncePerGame?.gxUsed) {
+      // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide. Share the
+      // `useVStarGX` guard so a legacy state whose marker lives on `flags` also blocks it.
+      if (isGxAttack(attack) && oncePerGameUsed(player, 'gx')) {
         return {
           allowed: false,
           reason: 'Only one GX attack can be used per game.',
@@ -4000,19 +3996,16 @@ export function applyCommand(state, command, rng = null) {
 
     case 'useVStarGX': {
       const kind = effectiveOncePerGameKind(draft, command);
+      // `player.oncePerGame` is the single source of truth (App. 9/19); `view.mjs`
+      // projects it into the exposed `flags` for the client, so nothing is mirrored here.
+      // `kind === null` is the legacy fallback: no discriminator and no classifiable
+      // source card, so spend both allowances as before.
       const oncePerGame = ensureOncePerGame(draft, playerId);
-      const user = draft.players[playerId];
-      if (!user.flags) user.flags = {};
-      // `kind === null` is the legacy fallback: no discriminator and no
-      // classifiable source card, so spend both allowances as before. The
-      // flags mirror keeps the client's special-move buttons greyed.
       if (kind !== 'gx') {
         if (oncePerGame) oncePerGame.vstarUsed = true;
-        user.flags.vstarUsed = true;
       }
       if (kind !== 'vstar') {
         if (oncePerGame) oncePerGame.gxUsed = true;
-        user.flags.gxUsed = true;
       }
       events.push({
         type: 'vstarUsed',
