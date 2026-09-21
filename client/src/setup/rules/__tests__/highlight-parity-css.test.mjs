@@ -222,3 +222,18 @@ describe('card-glow CSS contracts (design 023)', () => {
     }
   });
 });
+
+// A glowing card that is mid draw/play motion carries both `.has-glow` (whose
+// `animation` shorthand is infinite, or paused under reduced motion) and
+// `.tcgl-anim`. Any longhand `.tcgl-anim` leaves unset leaks in from the glow,
+// looping the fade-from-transparent forever so the card flashes or vanishes.
+describe('card motion is not hijacked by the affordance glow', () => {
+  for (const sheet of ['self-containers.css', 'opp-containers.css']) {
+    it(`${sheet}: .tcgl-anim pins iteration count and play state`, () => {
+      const body = ruleBody(readCss(sheet), '.tcgl-anim');
+      assert.ok(body, '.tcgl-anim rule missing');
+      assert.match(body, /animation-iteration-count:\s*1\b/);
+      assert.match(body, /animation-play-state:\s*running\b/);
+    });
+  }
+});

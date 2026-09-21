@@ -1033,7 +1033,9 @@ img.draw-flight-source,
       0%   { transform: none; opacity: 1; }
       100% { transform: translateY(18px) rotate(5deg) scale(0.94); opacity: 0; }
     }
-    .tcgl-anim { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1); animation-fill-mode: backwards; }
+    /* Every longhand is pinned: otherwise `.has-glow`'s `infinite` / reduced-motion `paused` would
+       otherwise leak in: the fade-from-0 then loops and animationend never fires. */
+    .tcgl-anim { animation-iteration-count: 1; animation-play-state: running; animation-delay: 0s; animation-direction: normal; animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1); animation-fill-mode: backwards; }
     .tcgl-from-deck { animation-name: tcgl-from-deck; }
     .tcgl-from-hand { animation-name: tcgl-from-hand; }
     .tcgl-to-discard { animation-name: tcgl-to-discard; animation-fill-mode: forwards; }

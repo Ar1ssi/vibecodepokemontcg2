@@ -1842,14 +1842,31 @@ import { glowColorFor } from './card-glow-colors.mjs';
       // card node `getZone` returns, so its glow targets that element directly.
       const stadiumNode = () => document.getElementById('stadium');
 
-      const addGlow = (card, { node: override = null, color, ability = false } = {}) => {
+      // Glows are collected per refresh and reconciled against the painted set,
+      // so a node that stays lit is never touched: clearing up front and
+      // re-adding after the async scan blinked every glow (and restarted its
+      // animation) on each event of the startup / rejoin burst.
+      const collectGlow = (next, card, { node: override = null, color, ability = false } = {}) => {
         const node = override || glowNodeFor(card);
         if (!node?.classList) return;
         const { rgb } = color || glowColorFor(card);
-        node.classList.add('has-glow');
-        if (ability) node.classList.add('has-usable-ability');
-        node.style?.setProperty('--glow-rgb', rgb.join(','));
-        glowNodes.add(node);
+        const prev = next.get(node);
+        next.set(node, { rgb: rgb.join(','), ability: ability || !!prev?.ability });
+      };
+
+      const applyGlows = (next) => {
+        for (const node of glowNodes) {
+          if (next.has(node)) continue;
+          node.classList?.remove(...GLOW_CLASSES);
+          node.style?.removeProperty('--glow-rgb');
+          glowNodes.delete(node);
+        }
+        for (const [node, { rgb, ability }] of next) {
+          node.classList.add('has-glow');
+          node.classList.toggle('has-usable-ability', ability);
+          if (node.style?.getPropertyValue('--glow-rgb') !== rgb) node.style?.setProperty('--glow-rgb', rgb);
+          glowNodes.add(node);
+        }
       };
 
       const isAbilitySpent = (user, card) =>
@@ -1862,8 +1879,8 @@ import { glowColorFor } from './card-glow-colors.mjs';
 
       const refresh = async () => {
         const gen = ++generation;
-        clearGlow();
         if (!rulesState.enabled || rulesState.phase === 'setup' || rulesState.phase === 'ended') {
+          clearGlow();
           for (const box of sideboxes) {
             box.attackButton?.classList.remove('attacks-available', 'turn-disabled');
             box.abilityButton?.classList.remove('abilities-available', 'turn-disabled');
@@ -1936,19 +1953,21 @@ import { glowColorFor } from './card-glow-colors.mjs';
           scored.push({ box, isTurn, glows, activeCard, stadiumCard });
           if (gen !== generation) return; // a newer refresh took over mid-await
         }
+        const next = new Map();
         for (const { box, isTurn, glows, activeCard, stadiumCard } of scored) {
           box.attackButton?.classList.toggle('attacks-available', !!glows?.activeCanAttack);
           box.attackButton?.classList.toggle('turn-disabled', !isTurn);
           box.abilityButton?.classList.toggle('abilities-available', !!glows?.abilityCards.length);
           box.abilityButton?.classList.toggle('turn-disabled', !isTurn);
           if (!glows) continue;
-          for (const [card, color] of glows.handPlayable) addGlow(card, { color });
-          for (const { card } of glows.abilityCards) addGlow(card, { ability: true });
-          if (glows.activeCanAttack) addGlow(activeCard, { color: glows.activeColor });
+          for (const [card, color] of glows.handPlayable) collectGlow(next, card, { color });
+          for (const { card } of glows.abilityCards) collectGlow(next, card, { ability: true });
+          if (glows.activeCanAttack) collectGlow(next, activeCard, { color: glows.activeColor });
           if (glows.stadiumUsable) {
-            addGlow(stadiumCard, { node: stadiumNode(), color: glows.stadiumColor });
+            collectGlow(next, stadiumCard, { node: stadiumNode(), color: glows.stadiumColor });
           }
         }
+        applyGlows(next);
       };
 
       [
