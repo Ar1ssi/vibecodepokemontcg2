@@ -1,5 +1,5 @@
 # 022: Mat cosmetic effects — glows & animations to TCG-Live parity
-Status: approved (user, S236) — building
+Status: built S236 (slices 0-6 on branch claude/mat-cosmetic-effects-dee363) — awaiting user visual check
 Date: 2026-09-21 · Session: S236
 
 ## Problem
@@ -153,16 +153,16 @@ Sonnet 5, working one increment per session on a single branch.
 ## Edge cases & failure modes — Builder ticks every row per slice
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | instanceId not in registry / element gone | effect no-ops, no throw | [ ] |
-| 2 | delta absent on damageUpdated | fall back to last-seen diff; if unknown, skip popup (no "−undefined") | [ ] |
-| 3 | delta = 0 (damage step, net zero) | no popup, no shake | [ ] |
-| 4 | rapid repeated events (multi-hit, chained damage) | overlays stack independently, each self-removes | [ ] |
-| 5 | catch-up replay / hidden tab | suppressed via existing `shouldAnimateMirror` guard | [ ] |
-| 6 | `prefers-reduced-motion: reduce` | transient FX skipped; state FX static; game playable | [ ] |
-| 7 | self vs opp side / flipped board | rects resolve per iframe via visualRectOf; correct side | [ ] |
-| 8 | overlay outlives its card (KO mid-animation) | detached ghost/overlay, real-card removal irrelevant | [ ] |
-| 9 | cardAttached of a Tool (not Energy) | energy FX does not fire | [ ] |
-| 10 | legacy (non-authoritative) mode | events don't flow; no FX, no error (acceptable) | [ ] |
+| 1 | instanceId not in registry / element gone | effect no-ops, no throw | [x] unit (rectForInstance) + every effect guards null rect |
+| 2 | delta absent on damageUpdated | fall back to last-seen diff; if unknown, skip popup (no "−undefined") | [x] unit (classifyDamagePlan) |
+| 3 | delta = 0 (damage step, net zero) | no popup, no shake | [x] unit |
+| 4 | rapid repeated events (multi-hit, chained damage) | overlays stack independently, each self-removes | [x] by construction: each overlay is independent and self-removes (user eyeball) |
+| 5 | catch-up replay / hidden tab | suppressed via existing `shouldAnimateMirror` guard | [x] guard branch in handleAdvisoryEvent + discardOrigins (unit) |
+| 6 | `prefers-reduced-motion: reduce` | transient FX skipped; state FX static; game playable | [x] unit (dispatcher) + CSS media queries (user eyeball) |
+| 7 | self vs opp side / flipped board | rects resolve per iframe via visualRectOf; correct side | [~] rects via visualRectOf; user to eyeball both sides |
+| 8 | overlay outlives its card (KO mid-animation) | detached ghost/overlay, real-card removal irrelevant | [x] overlays/ghosts are detached; KO ghost pre-captured |
+| 9 | cardAttached of a Tool (not Energy) | energy FX does not fire | [~] isEnergyCard filter in attach(); DOM path, user to eyeball |
+| 10 | legacy (non-authoritative) mode | events don't flow; no FX, no error (acceptable) | [x] n/a: no events, no FX |
 
 ## Test plan
 - **Unit (node --test, DOM-free):** extend `advisory-animations.test.mjs` — new event types map
@@ -199,6 +199,26 @@ slice 0 so the whole layer can be disabled without a revert.
   `runPose` does not apply; knockout-flight was moved onto `spawnOverlay`+`runPose`. Dispatcher split into
   `netcode/mat-fx/dispatcher.mjs` (DI, tested) + `index.js` (real deps). Kill switch: `body.fx-off` or
   `localStorage['ptcg-fx-off']==='1'`. fx plans do not require `playerId` (damageUpdated has none) -> `user: null`.
+- Slice 1 ✅: engine already carried the hit amount as `dealt` (and `healed`) on every damageUpdated site, so NO
+  `delta` field was added; only `weakness:true` on the three defender-damage pushes + `defenderId` on
+  `attackExecuted` (reduce.mjs; tests in attack-scaling.test.mjs). Hit "shake" is a jittering red flash overlay on the
+  defender (not the real card); table shake = WAAPI `translate` on #battleMat/iframes/#stadium. Lunge = attacker ghost
+  (real card stays put), aimed at `defenderId`.
+- Slice 2 ✅: burst is an extra overlay (glow + ring) launched with the existing ghost; knockoutPose untouched.
+- Slice 3 ✅: idle keyframes use individual `translate/rotate/scale` + wrapper `drop-shadow` (never on .coin-3d/.coin-face,
+  D92). Idle motion honours reduced-motion but NOT `fx-off` (iframes cannot see the parent body class). Apply-pop is a
+  labelled ring over the card (token position is not addressable from the parent).
+- Slice 4 ✅: retreat/trainer origins are captured in `onBeforeApply` (`origins.mjs`); event field names differ from the
+  design: cardRetreated {activeId,promotedId}, pokemonSwapped {instanceId,replacedInstanceId}. Trainer present uses the
+  pre-diff src, else the current element's.
+- Slice 5 ✅: glow/hover use zero-specificity `:where()` so real rings still win; hover uses `scale`. Mat tilt is NOT
+  holo.mjs (still `tilt:false`, D54): `mat-tilt.mjs` writes --fx-tilt-x/y from pointer over the real <img>, attached in
+  hydrate-holo.js, gated by fxDisabled()/motionReduced(). Ambience CSS = css/mat-ambient.css imported by both container sheets.
+- Slice 6 ✅: payloads confirmed: turnStarted {player,number}, gameEnded {winner,reason}; plan `user` now resolves from
+  `player`/`winner`. No turn-timer element exists in the codebase, so "timer glow" became a brief screen-edge glow.
+  Game-over = confetti (win) / dim (loss) over the existing modal; no banner (modal already says Victory/Defeat).
+- Not done: `attackExecuted`-less legacy path; no settings UI for `fx-off` (toggle via localStorage 'ptcg-fx-off'='1'
+  or body class).
 
 ---
 Self-approval checklist (only when the user is unreachable):
