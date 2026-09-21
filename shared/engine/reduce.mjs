@@ -1162,6 +1162,43 @@ function settlePrizeEntitlements(draft, { events }) {
   events.push({ type: 'prizeChoiceRequested', playerId, count });
 }
 
+/**
+ * Resolves lethal damage placed by `damageCounters` (trainer steps and abilities
+ * such as Mega Greninja ex's Mortal Shuriken). The counter handler in
+ * effects/trainer-steps.mjs can't call handleKnockout (reduce.mjs imports it —
+ * importing back would be circular), so it emits `damageCountersPlaced` and the
+ * reducer sweeps them here. Mirrors the counter KO check in
+ * applyFlatDamageToTarget, and runs after the whole effect so multi-step
+ * placement has settled.
+ */
+function resolveDamageCounterKnockouts(draft, { events }) {
+  const placed = events.filter((e) => e.type === 'damageCountersPlaced');
+  if (placed.length === 0) return;
+
+  const koed = new Set();
+  for (const e of placed) {
+    if (koed.has(e.instanceId)) continue;
+    const ref = findCard(draft, e.instanceId);
+    if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) continue;
+    const victim = ref.card;
+    const koHp = cardEffectiveHp(draft, victim, ref.playerId);
+    if (koHp > 0 && (victim.damage || 0) >= koHp) {
+      koed.add(e.instanceId);
+      handleKnockout(draft, {
+        victimPlayerId: ref.playerId,
+        attackerPlayerId: e.attackerPlayerId,
+        victim,
+        events,
+      });
+    }
+  }
+
+  // Internal marker events are not part of the client-facing stream.
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].type === 'damageCountersPlaced') events.splice(i, 1);
+  }
+}
+
 function resolvePrizeChoice(draft, { playerId, selection, events }) {
   const player = draft.players[playerId];
   const prizes = player.zones.prizes;
@@ -1907,6 +1944,13 @@ export function validateLegality(state, command) {
         (payload.to === 'bench' || payload.to === 'active')
       ) {
         const cardRef = findCard(state, payload.instanceId);
+        if (cardRef && !isPokemon(cardRef.card)) {
+          return {
+            allowed: false,
+            reason:
+              'Only Pokémon can be played to the Bench or Active Spot. Items, Supporters, and Tools are played elsewhere.',
+          };
+        }
         if (cardRef && isPokemon(cardRef.card) && !isBasicPokemon(cardRef.card)) {
           return {
             allowed: false,
@@ -2062,6 +2106,21 @@ export function validateLegality(state, command) {
             reason: `${cardRef.card.name} evolves from ${cardRef.card.evolvesFrom}, not ${topTarget.name}.`,
           };
         }
+      }
+      // Anything that is not Energy, a Pokémon Tool, or a Pokémon (evolution)
+      // has no business attached to a Pokémon. Without this fallback an Item or
+      // Supporter passed straight through to applyCommand and rode along as if
+      // it were a Tool.
+      if (
+        cardRef &&
+        !isEnergy(cardRef.card) &&
+        !isPokemonToolCard(cardRef.card) &&
+        !isPokemon(cardRef.card)
+      ) {
+        return {
+          allowed: false,
+          reason: 'Only Pokémon Tools and Energy can be attached to a Pokémon.',
+        };
       }
       return { allowed: true };
     }
@@ -5619,6 +5678,7 @@ export function applyCommand(state, command, rng = null) {
       break;
   }
 
+  resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settlePrizeEntitlements(draft, { events });
   clearFaceDownOffBoard(draft);

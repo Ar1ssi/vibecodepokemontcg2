@@ -743,6 +743,53 @@ test('Prism Star routing: swapWithDiscard sends the replaced Prism Star to the L
   assert.ok(!zone(done, 'p1', 'discard').some((c) => c.instanceId === prism.instanceId));
 });
 
+test('Tarragon: offers only {F} Pokémon / Basic {F} Energy, up to 4, as one pick', () => {
+  const game = setup();
+  const { p1 } = game;
+  const fightingMon = pokemon('Machop', { types: ['Fighting'] });
+  const fightingEnergy = energy('Basic Fighting Energy', { types: ['Fighting'] });
+  const fireMon = pokemon('Charmander', { types: ['Fire'] });
+  const fireEnergy = energy('Basic Fire Energy', { types: ['Fire'] });
+  p1.zones.discard.push(fightingMon, fightingEnergy, fireMon, fireEnergy);
+
+  const { res } = play(
+    game,
+    'Put up to 4 in any combination of {F} Pokémon and Basic {F} Energy cards from your discard pile into your hand.',
+    { name: 'Tarragon', trainerType: 'Supporter' }
+  );
+  assert.equal(res.error, null);
+  const choice = res.pendingChoice;
+  assert.ok(choice, 'Tarragon must open a discard picker');
+  assert.deepEqual(
+    ids(choice.options).sort((a, b) => a - b),
+    ids([fightingMon, fightingEnergy]).sort((a, b) => a - b),
+    'only Fighting Pokémon and Basic Fighting Energy are offered'
+  );
+  assert.equal(choice.max, 2, 'can take both legal cards, capped at the two present');
+
+  const done = resolve(game, res, [fightingMon.instanceId, fightingEnergy.instanceId]);
+  assert.equal(done.error, null);
+  const handIds = ids(zone(done, 'p1', 'hand'));
+  assert.ok(handIds.includes(fightingMon.instanceId));
+  assert.ok(handIds.includes(fightingEnergy.instanceId));
+  assert.ok(!ids(zone(done, 'p1', 'hand')).includes(fireMon.instanceId));
+});
+
+test('an Item cannot be played to the Bench or Active Spot', () => {
+  const game = setup();
+  const item = card({ name: 'Nest Ball', type: 'Trainer', trainerType: 'Item', text: '' });
+  game.p1.zones.hand.push(item);
+
+  const res = applyCommand(game.state, {
+    type: 'moveCard',
+    payload: { instanceId: item.instanceId, from: 'hand', to: 'bench' },
+    playerId: 'p1',
+  }, game.rng);
+  assert.ok(res.error, 'the move is rejected');
+  assert.equal(res.state.players.p1.zones.bench.length, 0, 'nothing lands on the Bench');
+  assert.ok(res.state.players.p1.zones.hand.some((c) => c.instanceId === item.instanceId));
+});
+
 test('cardStats applies evolvesFrom and abilities to server cards', () => {
   const game = setup();
   const kirlia = pokemon('Kirlia', { syncInstance: 9 });

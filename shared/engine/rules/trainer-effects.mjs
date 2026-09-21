@@ -272,6 +272,56 @@ function discardSearchCount(lower) {
   return m ? Number(m[1]) : 1;
 }
 
+// Energy-symbol → type word for the Pokémon half of "any combination" discard
+// clauses (matchesSearch filters typed Pokémon by word form, not by symbol).
+const SYMBOL_TYPE_WORDS = {
+  c: 'Colorless',
+  g: 'Grass',
+  r: 'Fire',
+  w: 'Water',
+  l: 'Lightning',
+  p: 'Psychic',
+  f: 'Fighting',
+  d: 'Darkness',
+  m: 'Metal',
+  n: 'Dragon',
+  y: 'Fairy',
+};
+
+// "…in any combination of {F} Pokémon and Basic {F} Energy cards…" → a single
+// `or`-joined filter the executor's matchesSearch already understands
+// ("Fighting Pokémon or Basic {F} Energy"). Keeps the type qualifier on both
+// halves so the picker can't offer the whole discard pile.
+function combinationDiscardWhat(clause) {
+  const parts = clause
+    .split(/\s+and\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const converted = parts.map((part) => {
+    const sym = part.match(/\{([a-z])\}/);
+    if (part.includes('energy')) {
+      if (sym) {
+        const basic = part.includes('basic') ? 'Basic ' : '';
+        return `${basic}{${sym[1].toUpperCase()}} Energy`;
+      }
+      return part.includes('basic') ? 'Basic Energy' : 'Energy';
+    }
+    if (part.includes('pokémon') || part.includes('pokemon')) {
+      const stage = part.includes('evolution')
+        ? 'Evolution '
+        : part.includes('basic')
+          ? 'Basic '
+          : '';
+      const word = sym ? SYMBOL_TYPE_WORDS[sym[1]] : null;
+      return word ? `${stage}${word} Pokémon` : `${stage}Pokémon`;
+    }
+    if (part.includes('supporter')) return 'Supporter';
+    if (part.includes('trainer')) return 'Trainer';
+    return 'card';
+  });
+  return converted.join(' or ');
+}
+
 // Boss's Orders, Lisia's Appeal, etc. — optional stage/type words between "Benched" and "Pokémon".
 function matchesSwitchOpponentIn(lower) {
   return (
@@ -955,6 +1005,23 @@ function parseTrainerSteps(lower) {
 
   // recursion from discard (Night Stretcher, Lana's Aid)
   if (lower.includes('from your discard pile into your hand')) {
+    // "Put up to 4 in any combination of {F} Pokémon and Basic {F} Energy cards
+    // from your discard pile into your hand." (Tarragon) — a count plus a
+    // two-clause filter, which the plain branch below drops (it saw `what:
+    // 'card'` and a single-card pick).
+    const combo = lower.match(
+      /put up to (\d+) in any combination of (.+?) cards? from your discard pile into your hand/
+    );
+    if (combo) {
+      steps.push({
+        type: 'recursion',
+        what: combinationDiscardWhat(combo[2]),
+        count: Number(combo[1]),
+        from: 'discard',
+      });
+      appendTrailingDraw(steps, lower);
+      return { steps, recognizable: true };
+    }
     let what = 'card';
     if (lower.includes('pokémon or a basic energy')) what = 'Pokémon or Basic Energy';
     else if (

@@ -208,6 +208,34 @@ test("a Team Flare Hyper Gear cannot attach to the opponent's non-EX Pokémon", 
   assert.equal(res.state.players.p1.zones.hand.length, 1, 'the Tool stays in hand');
 });
 
+function trainerItem(state, playerId, instanceId, name) {
+  const card = createCard({ instanceId, name, ownerId: playerId });
+  card.type = 'Trainer';
+  card.trainerType = 'Item';
+  state.players[playerId].zones.hand.push(card);
+  return instanceId;
+}
+
+test('a plain Item cannot be attached to a Pokémon (only Tools/Energy can)', () => {
+  const state = mainPhaseState();
+  const itemId = trainerItem(state, 'p1', 103, "Professor's Research");
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 50, name: 'Pikachu', supertype: 'Pokémon', hp: 60, ownerId: 'p1' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: itemId, targetInstanceId: 50 },
+    playerId: 'p1',
+  });
+  assert.equal(
+    res.error,
+    'Only Pokémon Tools and Energy can be attached to a Pokémon.'
+  );
+  assert.equal(res.state.players.p1.zones.hand.length, 1, 'the Item stays in hand');
+  assert.equal(res.state.players.p1.zones.active.length, 1, 'nothing was attached');
+});
+
 function withDeck(state, playerId, count) {
   for (let i = 0; i < count; i++) {
     state.players[playerId].zones.deck.push(

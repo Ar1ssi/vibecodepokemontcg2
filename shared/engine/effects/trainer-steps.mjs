@@ -828,11 +828,23 @@ function damageCounters(ctx) {
   const onOpponent = /opponent/i.test(step.target || '');
   const side = onOpponent ? ctx.opponent : ctx.player;
   if (!side) return skip(ctx, 'no_opponent');
+  const victimPlayerId = side.playerId;
+  const attackerPlayerId = onOpponent ? ctx.player?.playerId : ctx.opponent?.playerId;
   const targets = /active/i.test(step.target || '') ? [activeOf(side)].filter(Boolean) : rootsOf(side);
 
   const apply = (card) => {
     card.damage = (card.damage || 0) + amount;
     ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
+    // Lethal counters must become a knockout. handleKnockout lives in reduce.mjs,
+    // which imports this module (importing it back would be circular), so mark
+    // the placement for the reducer's post-command KO sweep instead.
+    ctx.events.push({
+      type: 'damageCountersPlaced',
+      instanceId: card.instanceId,
+      victimPlayerId,
+      attackerPlayerId,
+      damage: card.damage,
+    });
   };
 
   if (ctx.selection) {

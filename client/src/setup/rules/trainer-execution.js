@@ -949,19 +949,27 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           return;
         case 'recursion': {
           const discard = zone(_effectOwner, 'discard');
-          const matches = discard.array.filter((c) => {
-            const isPokemon = _isPokemonCard(c);
-            const isEnergy = String(c.name || '').toLowerCase().includes('energy');
-            return isPokemon || isEnergy;
-          });
+          const what = step.what || 'card';
+          const count = step.count || 1;
+          // Honour the parsed filter (a generic 'card' still matches the whole
+          // pile, but a typed clause like Tarragon's must not).
+          const matches = discard.array.filter((c) => _matchesSearch(c, what));
           if (matches.length) {
+            const multi = count > 1 && matches.length > 1;
             _openChoicePicker({
-              title: `${card.name} — take from discard`,
+              title: `${card.name} — take${count > 1 ? ` up to ${count}` : ''} from discard`,
               candidates: matches,
               user: _effectOwner,
               zoneFrom: 'discard',
               destination: 'hand',
-              onPick: (picked) => announceDiscardPick(_effectOwner, card.name, picked, _appendMessage),
+              multiSelect: multi,
+              requiredCount: Math.min(count, matches.length),
+              upTo: count > 1,
+              onPick: (picked) =>
+                announceDiscardPick(_effectOwner, card.name, picked, _appendMessage),
+              onConfirm: (picked) =>
+                announceDiscardPick(_effectOwner, card.name, picked, _appendMessage),
+              onCancel: () => {},
             });
           }
           break;

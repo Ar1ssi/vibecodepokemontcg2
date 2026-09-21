@@ -57,6 +57,8 @@ import {
   getStatus,
   applyStatus,
 } from '/shared/engine/rules/status.mjs';
+import { isEnergy, isPokemon } from '/shared/engine/cards.mjs';
+import { isPokemonToolCard } from '/shared/engine/rules/ability-executors.mjs';
 import {
   describeStadiumEffect,
   isStadiumCard,
@@ -186,35 +188,31 @@ export const moveCard = async (
 
   if (!movingCard) return { destZoneId, ok: false };
 
-  // ── structural: Item/Supporter cards can't sit on an empty Bench slot ──
-  // Attaching a Pokémon Tool to a Pokémon already on the Bench still goes
-  // through the `targetCard` attach path below, so only block the case
-  // where the card would occupy a slot on its own.
-  if (dZoneId === 'bench' && !targetCard) {
+  // ── structural: only Pokémon occupy Active/Bench slots ──
+  // Items, Supporters and Stadiums are played, never placed on or attached to a
+  // Pokémon; Tools and Energy attach to a host Pokémon and never occupy a slot
+  // of their own. Anything that is neither Pokémon, Energy, nor Tool dropped on
+  // Active/Bench is refused here (the server rejects it too — this is the UI
+  // guard so the drag never emits an illegal command).
+  const activeOrBenchDest = dZoneId === 'active' || dZoneId === 'bench';
+  if (activeOrBenchDest) {
     await ensureCardData(movingCard);
-    const subtypes = (movingCard.subtypes || []).map((s) =>
-      String(s).toLowerCase()
-    );
-    const cardType = String(movingCard.type || '').toLowerCase();
-    const isItemOrSupporter =
-      cardType === 'item' ||
-      cardType === 'supporter' ||
-      subtypes.includes('item') ||
-      subtypes.includes('supporter');
-    if (isItemOrSupporter) {
-      appendMessage(
-        user,
-        `⛔ ${movingCard.name}: Item and Supporter cards can't be placed on the Bench.`,
-        'announcement',
-        false
-      );
+    const isPokemonCard = isPokemon(movingCard);
+    const isEnergyCard = isEnergy(movingCard);
+    const isToolCard = isPokemonToolCard(movingCard);
+    if (!targetCard && !isPokemonCard) {
+      const reason = isEnergyCard
+        ? 'Energy cards must be attached to a Pokémon, not placed on an empty slot.'
+        : isToolCard
+          ? 'Pokémon Tools must be attached to a Pokémon.'
+          : "Item and Supporter cards can't be placed on the Bench.";
+      appendMessage(user, `⛔ ${movingCard.name}: ${reason}`, 'announcement', false);
       return { destZoneId, ok: false };
     }
-    const isEnergy = cardType === 'energy' || subtypes.includes('energy');
-    if (isEnergy) {
+    if (targetCard && !isPokemonCard && !isEnergyCard && !isToolCard) {
       appendMessage(
         user,
-        `⛔ ${movingCard.name}: Energy cards must be attached to a Pokémon, not placed on an empty Bench slot.`,
+        `⛔ ${movingCard.name}: Item and Supporter cards can't be attached to a Pokémon.`,
         'announcement',
         false
       );

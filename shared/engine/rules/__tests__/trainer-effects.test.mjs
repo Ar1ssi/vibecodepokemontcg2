@@ -83,6 +83,25 @@ import test, { describe } from 'node:test';
       assert.equal(r.steps[0].type, 'recursion');
       assert.equal(r.steps[0].what, 'Pokémon or Basic Energy');
     });
+
+    test('Tarragon: combination recursion keeps the count and both type filters', () => {
+      const r = parseTrainerEffect(
+        'Put up to 4 in any combination of {F} Pokémon and Basic {F} Energy cards from your discard pile into your hand.'
+      );
+      assert.equal(r.steps[0].type, 'recursion');
+      assert.equal(r.steps[0].count, 4);
+      assert.equal(r.steps[0].what, 'Fighting Pokémon or Basic {F} Energy');
+      // The filter must actually match a Fighting Pokémon / Basic Fighting Energy
+      // and reject a Fire pair, not fall back to "every card".
+      const fightingMon = { name: 'Machop', supertype: 'Pokémon', hp: 70, types: ['Fighting'] };
+      const fightingEnergy = { name: 'Basic Fighting Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fighting'] };
+      const fireMon = { name: 'Charmander', supertype: 'Pokémon', hp: 60, types: ['Fire'] };
+      const fireEnergy = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
+      assert.equal(matchesSearch(fightingMon, r.steps[0].what), true);
+      assert.equal(matchesSearch(fightingEnergy, r.steps[0].what), true);
+      assert.equal(matchesSearch(fireMon, r.steps[0].what), false);
+      assert.equal(matchesSearch(fireEnergy, r.steps[0].what), false);
+    });
     
     test("Wally's Compassion: heal Mega Evolution ex", () => {
       const r = parseTrainerEffect("Heal all damage from 1 of your Mega Evolution Pokémon ex. If you healed any damage in this way, put all Energy attached to that Pokémon into your hand.");

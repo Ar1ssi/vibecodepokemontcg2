@@ -229,8 +229,10 @@ test("ability: Mega Greninja ex Mortal Shuriken — Water-only discard then dama
     createCard({ instanceId: 3, name: 'Fire Energy', supertype: 'Energy', types: ['Fire'] }),
     createCard({ instanceId: 4, name: "Professor's Research", supertype: 'Trainer' })
   );
+  // 120 HP so 6 counters (60) are non-lethal: this test is about the cost +
+  // target pickers, not the knockout (covered separately below).
   state.players.p2.zones.active.push(
-    createCard({ instanceId: 9, name: 'Charmander', hp: 60, supertype: 'Pokémon' })
+    createCard({ instanceId: 9, name: 'Charmander', hp: 120, supertype: 'Pokémon' })
   );
   state.players.p2.zones.bench.push(
     createCard({ instanceId: 10, name: 'Bulbasaur', hp: 70, supertype: 'Pokémon' })
@@ -274,6 +276,63 @@ test("ability: Mega Greninja ex Mortal Shuriken — Water-only discard then dama
   assert.equal(res3.pendingChoice, null);
   assert.equal(res3.state.players.p2.zones.active[0].damage, 60);
   assert.ok(!res3.state.players.p2.zones.bench[0].damage);
+});
+
+test('ability: Mortal Shuriken counters exceeding remaining HP knock out and grant prizes', () => {
+  const { state, rng } = setupGame();
+  const TEXT =
+    "Once during your turn, if this Pokémon is in the Active Spot, you may discard a Basic {W} Energy card from your hand in order to use this Ability. Place 6 damage counters on 1 of your opponent's Pokémon.";
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Mega Greninja ex',
+      hp: 330,
+      supertype: 'Pokémon',
+      abilityText: TEXT,
+      abilities: [{ name: 'Mortal Shuriken', type: 'Ability', text: TEXT }],
+    })
+  );
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 2, name: 'Water Energy', supertype: 'Energy', types: ['Water'] }),
+    createCard({ instanceId: 4, name: 'Fire Energy', supertype: 'Energy', types: ['Fire'] })
+  );
+  for (let i = 0; i < 6; i++) {
+    state.players.p1.zones.prizes.push(createCard({ instanceId: 80 + i }));
+  }
+  // 50 HP, 6 counters = 60: more than the remaining HP, so it must be Knocked Out.
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 9, name: 'Charmander', hp: 50, supertype: 'Pokémon' })
+  );
+  // A second target keeps the damage-counter picker open so the choose-then-apply
+  // resume path is what triggers the knockout.
+  state.players.p2.zones.bench.push(
+    createCard({ instanceId: 10, name: 'Bulbasaur', hp: 70, supertype: 'Pokémon' })
+  );
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 1 }, playerId: 'p1' }, rng);
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [2] },
+    playerId: 'p1',
+  }, rng);
+  const res3 = applyCommand(res2.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res2.pendingChoice.choiceId, selection: [9] },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res3.error, null);
+  assert.ok(
+    !res3.state.players.p2.zones.active.some((c) => c.instanceId === 9),
+    'the Knocked Out Charmander leaves the Active Spot'
+  );
+  assert.ok(
+    res3.state.players.p2.zones.discard.some((c) => c.instanceId === 9),
+    'the Knocked Out Pokémon is discarded'
+  );
+  // The knockout grants a prize entitlement; the tail raises the prize picker.
+  assert.ok((res3.state.players.p1.flags.prizesOwed || 0) >= 1);
+  assert.equal(res3.state.pendingChoice?.player, 'p1');
 });
 
 test('ability: a non-positional ability from the Bench is unaffected by the guard', () => {
