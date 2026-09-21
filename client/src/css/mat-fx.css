@@ -1,0 +1,11 @@
+/* Design 022: mat cosmetic effects. Every class and keyframe here is prefixed
+   `fx-`. Overlays are detached body children and never take pointer events. */
+.fx-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 2450;
+}
+
+body.fx-off .fx-overlay {
+  display: none;
+}

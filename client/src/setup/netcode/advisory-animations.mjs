@@ -4,8 +4,39 @@
 // playShuffleFlight/playDrawToHand/playKnockoutGhost calls. The knockout ghost
 // itself is captured earlier, by `onBeforeApply` (before the DOM diff removes
 // the card) — this plan only carries the instanceId needed to find it.
+//
+// Design 022: event types in EVENT_FX become `{ kind: 'fx', effect, user, ...payload }`
+// and are dispatched to the mat-fx registry. Several of those events (e.g.
+// damageUpdated) carry no playerId, so `user` is null there and the effect
+// finds its side from the card element instead.
+export const EVENT_FX = {
+  damageUpdated: 'damage',
+  statusApplied: 'status',
+  pokemonEvolved: 'evolve',
+  cardAttached: 'attach',
+  abilityUsed: 'ability-banner',
+  cardRetreated: 'retreat',
+  pokemonSwapped: 'retreat',
+  trainerPlayed: 'trainer-play',
+  stadiumEffectUsed: 'stadium-play',
+  turnStarted: 'turn-banner',
+  gameEnded: 'game-over',
+};
+
+const fxPlan = (event, selfPlayerId) => {
+  const { type, playerId, ...fields } = event;
+  const user =
+    playerId == null || selfPlayerId == null
+      ? null
+      : playerId === selfPlayerId
+        ? 'self'
+        : 'opp';
+  return { kind: 'fx', effect: EVENT_FX[type], user, ...fields };
+};
+
 export function advisoryAnimationPlan(event, selfPlayerId) {
   if (!event || typeof event !== 'object') return null;
+  if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
   if (event.playerId == null || selfPlayerId == null) return null;
   const user = event.playerId === selfPlayerId ? 'self' : 'opp';
 

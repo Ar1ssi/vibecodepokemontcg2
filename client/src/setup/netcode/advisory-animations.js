@@ -13,6 +13,7 @@ import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { playDrawToHand } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+import { playFx } from './mat-fx/index.js';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
 // and consumed by handleAdvisoryEvent's 'knockout' branch (card already
@@ -89,5 +90,7 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
     const ghost = pendingKnockoutGhosts.get(plan.instanceId);
     pendingKnockoutGhosts.delete(plan.instanceId);
     if (ghost) playKnockoutGhost(ghost);
+  } else if (plan.kind === 'fx') {
+    playFx(plan);
   }
 }

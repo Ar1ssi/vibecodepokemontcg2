@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { advisoryAnimationPlan } from '../advisory-animations.mjs';
+import { advisoryAnimationPlan, EVENT_FX } from '../advisory-animations.mjs';
 
 test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side', () => {
   const event = { type: 'zoneShuffled', zoneId: 'deck', playerId: 'p1' };
@@ -101,4 +101,45 @@ test('advisoryAnimationPlan: malformed input returns null without throwing', () 
     advisoryAnimationPlan({ type: 'zoneShuffled', zoneId: 'deck', playerId: null }, 'p1'),
     null
   );
+});
+
+test('advisoryAnimationPlan: EVENT_FX maps every fx event type to a named effect', () => {
+  for (const [type, effect] of Object.entries(EVENT_FX)) {
+    const plan = advisoryAnimationPlan({ type, playerId: 'p1', instanceId: 'c1' }, 'p1');
+    assert.equal(plan.kind, 'fx');
+    assert.equal(plan.effect, effect);
+    assert.equal(plan.user, 'self');
+    assert.equal(plan.instanceId, 'c1');
+  }
+});
+
+test('advisoryAnimationPlan: fx plan passes payload through and resolves the opp side', () => {
+  const plan = advisoryAnimationPlan(
+    { type: 'damageUpdated', instanceId: 'c9', damage: 60, delta: 30, weakness: true, playerId: 'p2' },
+    'p1'
+  );
+  assert.deepEqual(plan, {
+    kind: 'fx',
+    effect: 'damage',
+    user: 'opp',
+    instanceId: 'c9',
+    damage: 60,
+    delta: 30,
+    weakness: true,
+  });
+});
+
+test('advisoryAnimationPlan: fx event without playerId still plans, with user null', () => {
+  const plan = advisoryAnimationPlan({ type: 'damageUpdated', instanceId: 'c9', damage: 30 }, 'p1');
+  assert.deepEqual(plan, { kind: 'fx', effect: 'damage', user: null, instanceId: 'c9', damage: 30 });
+  assert.equal(advisoryAnimationPlan({ type: 'turnStarted' }, null).user, null);
+});
+
+test('advisoryAnimationPlan: inherited object keys are not fx event types', () => {
+  assert.equal(advisoryAnimationPlan({ type: 'toString', playerId: 'p1' }, 'p1'), null);
+});
+
+test('advisoryAnimationPlan: pokemonKnockedOut stays a knockout plan, not fx', () => {
+  const plan = advisoryAnimationPlan({ type: 'pokemonKnockedOut', playerId: 'p1', instanceId: 'c1' }, 'p1');
+  assert.equal(plan.kind, 'knockout');
 });
