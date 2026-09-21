@@ -8,7 +8,7 @@ Session: 234
 Focus: Feature — realistic coin materials CSS: fixed virtual light + environment / specular /
   luminance-relief layers (techniques 1–3 of the coin-material audit; 4–5 deferred).
 Active: none.
-Next: User visual check of the coin picker + mat token, then commit/merge `feature/coin-material-realism`.
+Next: User visual check of the coin picker + mat token (commit 1183757 on main; no code pending).
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -19,9 +19,9 @@ Blocked: nothing.
   (fixed light from angle, never the cursor) via `wireCoinPointerLight` (picker) / `startCoinDrift` (mat).
   Never put `filter`/`isolation`/`opacity` on `.coin-3d`/`.coin-face` — it flattens the flip's
   `preserve-3d` (contract-tested). Metallics mask `.coin__spec` by the coin's own art (`--coin-relief`).
-- Concurrent writers collided on `.agent` (S230/S233 vs S231/S232). S234's coin files are in the PRIMARY
-  uncommitted, plus worktree `coin-materials-wt`; S233 battle-log and S232 GX `oncePerGame` are also recent.
-  Re-read `git log`/`git status` before assuming what is on main.
+- Concurrent writers collided on `.agent` (S230/S233 vs S231/S232). S234's coin work shipped to main
+  (commit 1183757); the sizing/stadium session's files are still uncommitted in the primary. Re-read
+  `git log`/`git status` before assuming what is on main.
 - Battle-log mapper (S233/D91): `client/src/setup/netcode/server-battle-log.mjs` is the single
   server-event→text map, wired as `onAdvisoryEvent`; don't reintroduce a second text handler.
 - Ability-step executor contract (S229): `parseAbility`'s `discardCostAbility` emits `energyOnly` /
@@ -33,7 +33,7 @@ Blocked: nothing.
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S234 feature: coin material CSS — shared `css/coin/` + `coin-effects.mjs` (fixed light, studio env,
   per-material specular, luminance relief mask, holofoil/mirror finishes); 13 new tests, full suite
-  2651/2651, headless smoke 939 coins / 0 page errors. UNCOMMITTED (primary + worktree).
+  2651/2651, headless smoke 939 coins / 0 page errors. Commit 1183757 on main.
 - S233 feature: authoritative battle-log narration (design 021/I71) — pure event→text mapper + server
   `trainerPlayed`, `cardAttached` non-Pokémon gate; 23 tests, 2635/2635. UNCOMMITTED, primary.
 - S232 fix(rules): GX once-per-game single-sourced on `player.oncePerGame`, shared `oncePerGameUsed`,
