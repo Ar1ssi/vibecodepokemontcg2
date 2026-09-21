@@ -168,7 +168,10 @@ export function parseAttackDamage(
   // NOT the attached count. 0 discarded → 0 damage, per the printed text.
   if (text && /for each card you discard(ed)?/.test(text)) {
     const discarded = ctx.energyDiscarded ?? 0;
-    total = base * discarded;
+    // "does N more damage for each card" (Mega Clefable ex) adds to the base;
+    // "does N damage for each card" (Inferno X) replaces it.
+    const more = /(\d+) more damage for each card you discard/.exec(text);
+    total = more ? base + parseInt(more[1], 10) * discarded : base * discarded;
     components.push('per-energy-discarded');
     notes.push(`× ${discarded} Energy discarded in this way`);
   } else if (text && /number of energy|× the number|\* the number/.test(text)) {
@@ -952,21 +955,47 @@ export function attackTargetClause(attackText) {
 
 // Parse a printed "discard Energy to scale damage" clause
 // (taxonomy §D damage-scaling family, distinct from the fixed discard-cost
-// family): the discard amount is a *choice* ("up to N") and the damage
-// scales with what was actually discarded. Returns { max: N } or null.
+// family): the discard amount is a *choice* ("up to N" / "any amount of")
+// and the damage scales with what was actually discarded. Pure.
 // e.g. Mega Diancie ex / Garland Ray: "Discard up to 2 Energy cards from
 // this Pokémon, and this attack does 120 damage for each card you
-// discarded in this way." Pure.
+// discarded in this way."
+// Mega Charizard X ex / Inferno X: "Discard any amount of {R} Energy from
+// among your Pokémon, and this attack does 90 damage for each card you
+// discarded in this way."
+// Returns { max, source, energyType, basicOnly } or null:
+//   max        — Infinity for "any amount"; 1 for an unnumbered clause
+//   source     — 'self' (this Pokémon) | 'bench' (Benched) | 'all' (any of yours)
+//                | 'hand' (Energy cards from your hand: Gholdengo ex, Blastoise ex)
+//   energyType — printed type filter ('Fire' for {R}) or null
+// Only "for each card you discarded" counts: "for each Energy card you discarded"
+// is the deck-mill family (Flareon VMAX), where the count is not a choice.
+const ENERGY_SYMBOL_TYPES = {
+  G: 'Grass', R: 'Fire', W: 'Water', L: 'Lightning', P: 'Psychic',
+  F: 'Fighting', D: 'Darkness', M: 'Metal', Y: 'Fairy', N: 'Dragon', C: 'Colorless',
+};
 export function discardEnergyScaling(attackText) {
   const text = String(attackText || '');
-  const each = /for each card you discard(ed)?/i.test(text);
-  const discard =
-    /discard\s+(?:up\s+to\s+)?(\d+\s+)?Energy\s+cards?\s+from\s+this\s+Pok[ée]mon/i.exec(
+  if (!/for each card you discard(ed)?/i.test(text)) return null;
+  const m =
+    /discard\s+(?:up\s+to\s+(\d+)|(\d+)|(any\s+(?:amount|number)\s+of))?\s*(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon|your\s+hand)/i.exec(
       text
     );
-  if (!each || !discard) return null;
-  const max = discard[1] ? Math.max(0, parseInt(discard[1], 10)) : 1;
-  return { max };
+  if (!m) return null;
+  const [, upTo, exact, anyAmount, basic, symbol, from] = m;
+  let max = 1;
+  if (anyAmount) max = Infinity;
+  else if (upTo || exact) max = Math.max(0, parseInt(upTo || exact, 10));
+  let source = 'all';
+  if (/hand/i.test(from)) source = 'hand';
+  else if (/this/i.test(from)) source = 'self';
+  else if (/benched/i.test(from)) source = 'bench';
+  return {
+    max,
+    source,
+    energyType: symbol ? ENERGY_SYMBOL_TYPES[symbol.toUpperCase()] || null : null,
+    basicOnly: Boolean(basic),
+  };
 }
 
 // Parse a printed discard-cost clause (taxonomy §D discard-cost family).

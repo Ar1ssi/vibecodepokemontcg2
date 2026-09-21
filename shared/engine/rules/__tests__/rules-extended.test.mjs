@@ -4371,7 +4371,21 @@ import test from 'node:test';
       'Discard up to 2 Energy cards from this Pokémon, and this attack does 120 damage for each card you discarded in this way.';
 
     test('discardEnergyScaling: Garland Ray → { max: 2 }', () => {
-      assert.deepEqual(discardEnergyScaling(GARLAND_RAY), { max: 2 });
+      assert.deepEqual(discardEnergyScaling(GARLAND_RAY), { max: 2, source: 'self', energyType: null, basicOnly: false });
+    });
+
+    test('discardEnergyScaling: Inferno X → any amount of {R} from among your Pokémon', () => {
+      const t = 'Discard any amount of {R} Energy from among your Pokémon, and this attack does 90 damage for each card you discarded in this way.';
+      assert.deepEqual(discardEnergyScaling(t), { max: Infinity, source: 'all', energyType: 'Fire', basicOnly: false });
+    });
+
+    test('discardEnergyScaling: Benched, hand, and deck-mill discards', () => {
+      const bench = 'You may discard up to 2 Basic Energy from your Benched Pokémon. This attack does 90 more damage for each card you discarded in this way.';
+      assert.deepEqual(discardEnergyScaling(bench), { max: 2, source: 'bench', energyType: null, basicOnly: true });
+      const hand = 'Discard up to 3 Energy cards from your hand. This attack does 60 damage for each card you discarded in this way.';
+      assert.deepEqual(discardEnergyScaling(hand), { max: 3, source: 'hand', energyType: null, basicOnly: false });
+      const mill = 'Discard the top 5 cards of your deck. This attack does 100 damage for each Energy card you discarded in this way.';
+      assert.equal(discardEnergyScaling(mill), null);
     });
 
     test('discardEnergyScaling: no “for each card you discarded” → null', () => {
@@ -4387,7 +4401,7 @@ import test from 'node:test';
       // present; the number is optional in the regex but Garland Ray-style
       // text always carries one. Guard the default path explicitly.
       const t = 'Discard Energy cards from this Pokémon, and this attack does 120 damage for each card you discarded in this way.';
-      assert.deepEqual(discardEnergyScaling(t), { max: 1 });
+      assert.deepEqual(discardEnergyScaling(t), { max: 1, source: 'self', energyType: null, basicOnly: false });
     });
 
     test('parseAttackDamage: Garland Ray scales by energyDiscarded', () => {

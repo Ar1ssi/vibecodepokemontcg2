@@ -36,6 +36,7 @@ import {
   opponentCounterClause,
   parseAttackSearchClause,
   isGxAttack,
+  discardEnergyScaling,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -92,6 +93,7 @@ import {
   isGxCard,
   isVstarCard,
   isTeamFlareHyperGearCard,
+  isBasicEnergy,
 } from './rules/card-classify.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
@@ -2529,6 +2531,125 @@ function buildAttackSearchChoice(
  * }}
  */
 /**
+ * Energy a discard-to-scale attack may discard (Inferno X, Garland Ray,
+ * Gholdengo ex): the attached Energy on the Pokémon the printed text names, or
+ * the Energy cards in hand, filtered by printed type ({R}) and "basic".
+ *
+ * @param {object} draft
+ * @param {{ playerId: string, attacker: object|null, scaling: object }} params
+ * @returns {object[]} Attached Energy cards, in board order
+ */
+function discardScalingCandidates(draft, { playerId, attacker, scaling }) {
+  const player = draft.players[playerId];
+  if (!player || !attacker) return [];
+  const stadiumCard = draft.stadium?.card || draft.stadium || null;
+  const matchesFilter = (card, hostPokemon) => {
+    if (!isEnergy(card)) return false;
+    if (scaling.basicOnly && !isBasicEnergy(card)) return false;
+    if (!scaling.energyType) return true;
+    const provided = serverEnergyDescriptor(card, { stadiumCard, hostPokemon });
+    return (
+      provided.type === scaling.energyType ||
+      provided.dualType === scaling.energyType
+    );
+  };
+  if (scaling.source === 'hand') {
+    return (player.zones?.hand || []).filter((c) => matchesFilter(c, null));
+  }
+  const zoneIds =
+    scaling.source === 'self'
+      ? ['active']
+      : scaling.source === 'bench'
+        ? ['bench']
+        : ['active', 'bench'];
+  const candidates = [];
+  for (const zoneId of zoneIds) {
+    const zone = player.zones?.[zoneId] || [];
+    for (const host of zone.filter((c) => !c.attachedTo && isPokemon(c))) {
+      if (scaling.source === 'self' && host.instanceId !== attacker.instanceId) {
+        continue;
+      }
+      const hostView = inPlayView(draft, host);
+      for (const card of zone) {
+        if (card.attachedTo !== host.instanceId) continue;
+        if (matchesFilter(card, hostView)) candidates.push(card);
+      }
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Discards the chosen attached Energy for a discard-to-scale attack and returns
+ * how many were actually discarded (ids outside `allowedIds` are ignored).
+ */
+function discardScalingEnergy(draft, { playerId, selection, allowedIds, events }) {
+  const player = draft.players[playerId];
+  let discarded = 0;
+  for (const id of new Set(selection || [])) {
+    if (!allowedIds.includes(id)) continue;
+    const ref = findCard(draft, id);
+    if (!ref || ref.playerId !== playerId) continue;
+    const zone = player.zones[ref.zoneId];
+    const idx = zone.findIndex((c) => c.instanceId === id);
+    if (idx < 0) continue;
+    const [card] = zone.splice(idx, 1);
+    card.attachedTo = null;
+    const to = discardCardToPlayerZone(player, card);
+    events.push({
+      type: 'cardMoved',
+      instanceId: id,
+      from: ref.zoneId,
+      to,
+      playerId,
+      reason: 'attack-energy-discard',
+    });
+    discarded++;
+  }
+  return discarded;
+}
+
+/**
+ * "Put this Pokémon and all attached cards into your hand." (Meowth ex / Tuck
+ * Tail). Runs after damage; the emptied Active is refilled by the command-tail
+ * promotion, and a player left with no Pokémon in play loses.
+ */
+function returnAttackerToHand(draft, { playerId, attacker, oppId, events }) {
+  const player = draft.players[playerId];
+  const active = player?.zones?.active || [];
+  if (!attacker || !active.some((c) => c.instanceId === attacker.instanceId)) {
+    return;
+  }
+  for (let i = active.length - 1; i >= 0; i--) {
+    const card = active[i];
+    if (card.instanceId !== attacker.instanceId && card.attachedTo !== attacker.instanceId) {
+      continue;
+    }
+    active.splice(i, 1);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    player.zones.hand.push(card);
+  }
+  events.push({
+    type: 'cardMoved',
+    instanceId: attacker.instanceId,
+    from: 'active',
+    to: 'hand',
+    playerId,
+    reason: 'attack-return-self',
+  });
+  const benchRoots = (player.zones.bench || []).filter(
+    (c) => !c.attachedTo && isPokemon(c)
+  );
+  if (benchRoots.length > 0) {
+    player.promotionPending = true;
+  } else {
+    setGameEnded(draft, { winner: oppId, reason: 'no Pokémon in play', events });
+  }
+}
+
+/**
  * Resolves the part of an attack that runs after its coins are flipped:
  * printed-text damage, recoil, status, bench/spread damage, searches, and the
  * terminal checkup/turn hand-off. Extracted so Glimwood Tangle can re-enter it
@@ -2559,6 +2680,44 @@ function resolveAttackEffectPhase(draft, ctx) {
   // in the applyCommand tail.
   draft.__attackEffectPhase = true;
 
+  // Discard-to-scale: the player picks which Energy to discard before damage.
+  let energyDiscarded = ctx.energyDiscarded;
+  const discardScaling = discardEnergyScaling(attack?.text);
+  if (discardScaling && energyDiscarded === undefined) {
+    const candidates = discardScalingCandidates(draft, {
+      playerId,
+      attacker,
+      scaling: discardScaling,
+    });
+    const max = Math.min(discardScaling.max, candidates.length);
+    if (max > 0) {
+      draft.pendingChoice = createPendingChoice({
+        player: playerId,
+        source: 'attack',
+        prompt: `${attack.name}: choose Energy to discard (${attack.damage || 0} damage each).`,
+        options: candidates.map((c) => ({
+          instanceId: c.instanceId,
+          name: c.name,
+          src: c.src || '',
+          type: c.type || 'Energy',
+        })),
+        min: 0,
+        max,
+        resumeToken: {
+          effectType: 'attackDiscardScale',
+          initiatorPlayerId: playerId,
+          attackName: attack.name,
+          attackerId: attacker?.instanceId ?? null,
+          targetInstanceId: defender?.instanceId ?? null,
+          allowedIds: candidates.map((c) => c.instanceId),
+          coinResult: { coin, headsCount, flips },
+        },
+      });
+      return;
+    }
+    energyDiscarded = 0;
+  }
+
       const parsed = parseAttackDamage(
         attack,
         attackerView,
@@ -2572,6 +2731,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           defenderView: defender ? inPlayView(draft, defender) : null,
           coin,
           headsCount,
+          energyDiscarded,
         })
       );
       const effectiveAttack =
@@ -3105,6 +3265,10 @@ function resolveAttackEffectPhase(draft, ctx) {
             attackName: attack.name,
           });
         }
+      }
+
+      if (/put this pok[ée]mon and all attached cards into your hand/i.test(attack?.text || '')) {
+        returnAttackerToHand(draft, { playerId, attacker, oppId, events });
       }
 
       if (!attackerPlayer.flags) attackerPlayer.flags = {};
@@ -4147,6 +4311,53 @@ export function applyCommand(state, command, rng = null) {
           headsCount,
           flips,
         });
+      } else if (token.effectType === 'attackDiscardScale') {
+        // Discard-to-scale: discard the chosen Energy, then resume the attack's
+        // effect phase with the discarded count driving the damage.
+        const resumer = draft.players[initiatorPlayerId];
+        const attacker = resumer?.zones?.active?.find(
+          (c) => !c.attachedTo && c.instanceId === token.attackerId
+        );
+        const attackerView = attackViewFor(draft, attacker);
+        const attack = attackerView?.attacks?.find(
+          (a) => a?.name === token.attackName
+        );
+        const sOppId = Object.keys(draft.players || {}).find(
+          (id) => id !== initiatorPlayerId
+        );
+        let defender = null;
+        let defenderPlayerId = sOppId;
+        if (token.targetInstanceId != null) {
+          const targetRef = findCard(draft, token.targetInstanceId);
+          defender = targetRef?.card || null;
+          if (targetRef?.playerId) defenderPlayerId = targetRef.playerId;
+        }
+        draft.pendingChoice = null;
+        if (attacker && attack) {
+          const energyDiscarded = discardScalingEnergy(draft, {
+            playerId: initiatorPlayerId,
+            selection: payload.selection,
+            allowedIds: token.allowedIds || [],
+            events,
+          });
+          const { coin, headsCount, flips } = token.coinResult || {};
+          resolveAttackEffectPhase(draft, {
+            playerId: initiatorPlayerId,
+            activeRng,
+            events,
+            attacker,
+            defender,
+            defenderPlayerId,
+            oppId: sOppId,
+            attack,
+            attackerPlayer: resumer,
+            attackerView,
+            coin: coin ?? null,
+            headsCount,
+            flips: flips || [],
+            energyDiscarded,
+          });
+        }
       } else if (token.effectType === 'retreat') {
         // The player clicked the Benched Pokémon to switch in; pay the retreat
         // cost and perform the swap (retreat does not end the turn).
