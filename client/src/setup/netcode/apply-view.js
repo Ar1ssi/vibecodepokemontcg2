@@ -1057,9 +1057,13 @@ function layoutCardStack(rootRecord, attached) {
   const underPokemon = members
     .filter((record) => record !== displayRecord && isPokemon(record.card))
     .reverse();
+  // Pin `left`: an absolute card with `left: auto` keeps its static position, which
+  // lands beside the visible card whenever it follows that card in DOM order (a swap
+  // re-emits the stack as [top Evolution, Stage 1, Basic]).
   underPokemon.forEach((record, i) => {
     const layer = i + 1;
     setStackStyle(record.element, {
+      left: '0px',
       bottom: `${layer * cardWidth * UNDER_POKEMON_SHIFT}px`,
       zIndex: String(-layer),
     });

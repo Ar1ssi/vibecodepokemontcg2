@@ -2295,3 +2295,25 @@ test('mat choice: declining an optional pick reports an empty selection; a requi
   assert.deepEqual(resolved, [{ choiceId: 'choice_p1_mat_9', selection: [] }]);
 });
 
+
+test('stack: every under-card is pinned to the slot edge after a swap reorders the stack', () => {
+  // A swap re-emits the stack as [top Evolution, Stage 1, Basic], so the Stage 1 lands
+  // after the visible card in DOM order. An absolute card with `left: auto` keeps its
+  // static position, which drew the Stage 1 beside the Stage 2 instead of under it.
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const basic = { instanceId: 10, name: 'Charmander', src: 'a.png', type: 'Pokémon', stage: 'Basic' };
+  const stage1 = { instanceId: 11, name: 'Charmeleon', src: 'b.png', type: 'Pokémon', stage: 'Stage 1', attachedTo: 10 };
+  const stage2 = { instanceId: 12, name: 'Mega Charizard Y ex', src: 'c.png', type: 'Pokémon', stage: 'Stage 2', attachedTo: 10 };
+  const other = { instanceId: 20, name: 'Pidgey', src: 'p.png', type: 'Pokémon', stage: 'Basic' };
+  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
+
+  applyView(view(1, { active: [other], bench: [basic, stage1, stage2] }), [], opts);
+  sizeRegisteredCards(150, 210);
+  applyView(view(2, { active: [stage2, stage1, basic], bench: [other] }), [], opts);
+
+  const registry = getCardRegistry();
+  assert.equal(registry.get(11).element.style.left, '0px', 'Stage 1 sits under the Stage 2');
+  assert.equal(registry.get(10).element.style.left, '0px', 'Basic sits under the Stage 2');
+  assert.equal(registry.get(12).element.style.left || '', '', 'Stage 2 stays in flow');
+});
