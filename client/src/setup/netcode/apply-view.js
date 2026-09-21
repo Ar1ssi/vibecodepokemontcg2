@@ -867,6 +867,19 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
   const img = record.element;
   const parentRecord = attachmentHostRecord(cardData, zoneId);
 
+  // A card fresh out of a duplicate hand stack still carries that stack's inline
+  // positioning (`position: absolute` plus a `translateY` lift, written by
+  // hand-stack-dom.js). That is only valid inside `#hand`; anywhere else it outranks
+  // the destination's own rules (`.play-container img`, `.play-container .mat-holo`),
+  // so the card does not draw where its slot is — the zone keeps the space and the card
+  // is missing from it until a re-render builds a clean element. This covers an
+  // Evolution played onto a Pokémon too (attached branch below), not only a card
+  // placed on its own. The hand keeps its styles, because that is where they belong.
+  if (zoneId !== 'hand') {
+    defaultNetcodeContext.clearHandStackPositioning?.(cardNodeOf(record));
+    defaultNetcodeContext.clearHandStackPositioning?.(img);
+  }
+
   // Handle play zones (active & bench)
   if (parentRecord && parentRecord.container) {
     // Holo is settled after stack layout (reconcilePlacedCard): only the
@@ -888,17 +901,6 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
   img.classList.remove('attached-card');
   clearStackStyle(img);
   const node = cardNodeOf(record);
-  // A card fresh out of a duplicate hand stack still carries that stack's inline
-  // positioning (`position: absolute` plus a `translateY` lift, written by
-  // hand-stack-dom.js). That is only valid inside `#hand`; anywhere else it outranks
-  // the destination's own rules (`.play-container img`, `.play-container .mat-holo`),
-  // so the card does not draw where its slot is — the zone keeps the space and the card
-  // is missing from it until a re-render builds a clean element. The hand keeps its
-  // styles, because that is where they belong.
-  if (zoneId !== 'hand') {
-    defaultNetcodeContext.clearHandStackPositioning?.(node);
-    defaultNetcodeContext.clearHandStackPositioning?.(img);
-  }
 
   if (PLAY_ZONES.includes(zoneId)) {
     // Top-level active/bench Pokemon: wrap in .play-container.

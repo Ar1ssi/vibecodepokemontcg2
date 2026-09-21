@@ -2317,3 +2317,35 @@ test('stack: every under-card is pinned to the slot edge after a swap reorders t
   assert.equal(registry.get(10).element.style.left, '0px', 'Basic sits under the Stage 2');
   assert.equal(registry.get(12).element.style.left || '', '', 'Stage 2 stays in flow');
 });
+
+test('an Evolution played from a duplicate hand stack loses the stack positioning when it attaches onto its Pokémon', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const previous = getDefaultNetcodeContext().clearHandStackPositioning;
+  const cleared = [];
+  setDefaultNetcodeContext({
+    clearHandStackPositioning: (node) => cleared.push(node?.dataset?.instanceId),
+  });
+  try {
+    const staryu = { instanceId: 20, name: 'Staryu', type: 'Pokémon', stage: 'Basic', src: 'staryu.png' };
+    const starmie = { instanceId: 21, name: 'Mega Starmie ex', type: 'Pokémon', stage: 'Stage 1', src: 'starmie.png' };
+    applyView(
+      { stateVersion: 1, you: { playerId: 'p1', zones: { hand: [starmie], active: [staryu] } } },
+      [],
+      { document: doc, getZone: mockGetZone }
+    );
+    cleared.length = 0;
+
+    applyView(
+      {
+        stateVersion: 2,
+        you: { playerId: 'p1', zones: { hand: [], active: [staryu, { ...starmie, attachedTo: 20 }] } },
+      },
+      [],
+      { document: doc, getZone: mockGetZone }
+    );
+
+    assert.ok(cleared.includes('21'), 'the evolving card must be cleared of hand-stack positioning');
+  } finally {
+    setDefaultNetcodeContext({ clearHandStackPositioning: previous });
+  }
+});
