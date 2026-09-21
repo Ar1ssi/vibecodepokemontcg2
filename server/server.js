@@ -724,6 +724,9 @@ async function main() {
             serverAuthoritative: SERVER_AUTHORITATIVE,
             shadowMode: SHADOW_MODE,
             protocolVersion: PROTOCOL_VERSION,
+            // A seated player reloading into a running game: the client pulls
+            // the current view once its room setup is done.
+            rejoinedGame: Boolean(gameRoom) && isExistingPlayer,
           });
           // Replay any setup pushAction packets (exchangeData/loadDeckData)
           // that other sockets in this room already sent before this socket

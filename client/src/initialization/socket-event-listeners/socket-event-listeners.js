@@ -1,5 +1,6 @@
 import { flipBoard } from '../../actions/general/flip-board.js';
 import { reset } from '../../actions/general/reset.js';
+import { shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
 import { clearReady } from '../../actions/general/ready.js';
 import {
   hideCards,
@@ -367,6 +368,9 @@ export const initializeSocketEventListeners = () => {
       type: 'peerSocketId',
       data: { socketId: socket.id },
     });
+    if (shouldRequestViewOnJoin(data)) {
+      emitRequestView({ socket, roomId: systemState.roomId });
+    }
   };
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
