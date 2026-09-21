@@ -11,6 +11,7 @@
 // finds its side from the card element instead.
 export const EVENT_FX = {
   damageUpdated: 'damage',
+  attackExecuted: 'attack',
   statusApplied: 'status',
   pokemonEvolved: 'evolve',
   cardAttached: 'attach',

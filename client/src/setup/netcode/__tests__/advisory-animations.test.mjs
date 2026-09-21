@@ -143,3 +143,18 @@ test('advisoryAnimationPlan: pokemonKnockedOut stays a knockout plan, not fx', (
   const plan = advisoryAnimationPlan({ type: 'pokemonKnockedOut', playerId: 'p1', instanceId: 'c1' }, 'p1');
   assert.equal(plan.kind, 'knockout');
 });
+
+test('advisoryAnimationPlan: attackExecuted -> attack fx carrying attacker and defender ids', () => {
+  const plan = advisoryAnimationPlan(
+    { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20, damage: 30 },
+    'p1'
+  );
+  assert.deepEqual(plan, {
+    kind: 'fx',
+    effect: 'attack',
+    user: 'self',
+    attackerId: 1,
+    defenderId: 20,
+    damage: 30,
+  });
+});

@@ -461,3 +461,35 @@ test('"in any way you like" with only the Active available auto-places every cou
   assert.equal(res.pendingChoice, null);
   assert.equal(damageOf(res.state, 'p2', 'active', 20), 30);
 });
+
+// Design 022 slice 1: presentation fields on already-emitted events.
+test('weakness hit flags the defender damageUpdated and names the defender on attackExecuted', () => {
+  const state = twoBoards({
+    attack: { name: 'Ember', cost: [], damage: 30, text: '' },
+    defenderHp: 200,
+  });
+  state.players.p1.zones.active[0].types = ['Fire'];
+  state.players.p2.zones.active[0].weakness = { type: 'Fire', value: 2 };
+
+  const res = attack(state);
+
+  const hit = eventsOfType(res, 'damageUpdated').find((e) => e.instanceId === 20);
+  assert.equal(hit.dealt, 60);
+  assert.equal(hit.weakness, true);
+  assert.equal(eventsOfType(res, 'attackExecuted')[0].defenderId, 20);
+});
+
+test('a non-weak hit carries no weakness flag', () => {
+  const state = twoBoards({
+    attack: { name: 'Ember', cost: [], damage: 30, text: '' },
+    defenderHp: 200,
+  });
+  state.players.p1.zones.active[0].types = ['Fire'];
+  state.players.p2.zones.active[0].weakness = { type: 'Water', value: 2 };
+
+  const res = attack(state);
+
+  const hit = eventsOfType(res, 'damageUpdated').find((e) => e.instanceId === 20);
+  assert.equal(hit.dealt, 30);
+  assert.equal('weakness' in hit, false);
+});

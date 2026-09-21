@@ -2579,6 +2579,7 @@ function resolveAttackEffectPhase(draft, ctx) {
       }
 
       let dmgDealt = 0;
+      let weaknessApplied = false;
       if (attacker && defender) {
         const defenderView = inPlayView(draft, defender);
         const attackerView = inPlayView(draft, attacker);
@@ -2611,6 +2612,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           }
         );
         dmgDealt = dmgResult.total;
+        weaknessApplied = dmgResult.multiplier > 1 || dmgResult.flat > 0;
 
         if (dmgResult.prevented) {
           events.push({
@@ -2659,6 +2661,7 @@ function resolveAttackEffectPhase(draft, ctx) {
                 instanceId: defender.instanceId,
                 damage: defender.damage,
                 dealt: dmgDealt,
+                ...(weaknessApplied && { weakness: true }),
               });
               events.push({
                 type: 'koPrevented',
@@ -2680,6 +2683,7 @@ function resolveAttackEffectPhase(draft, ctx) {
                 instanceId: defender.instanceId,
                 damage: defender.damage,
                 dealt: dmgDealt,
+                ...(weaknessApplied && { weakness: true }),
               });
               handleKnockout(draft, {
                 victimPlayerId: defenderPlayerId,
@@ -2695,6 +2699,7 @@ function resolveAttackEffectPhase(draft, ctx) {
               instanceId: defender.instanceId,
               damage: defender.damage,
               dealt: dmgDealt,
+              ...(weaknessApplied && { weakness: true }),
             });
           }
         }
@@ -3068,6 +3073,7 @@ function resolveAttackEffectPhase(draft, ctx) {
       events.push({
         type: 'attackExecuted',
         attackerId: attacker?.instanceId,
+        defenderId: defender?.instanceId,
         attackName: attack.name,
         damage: dmgDealt,
         benchDealt,
