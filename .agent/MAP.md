@@ -11,7 +11,9 @@ scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper +
 tools/ — internal dev tools, sync log comparison, asset mappings
 client/src/setup/deck-builder/core/coins.mjs — coin catalog (939, unique ids); normalize via
   scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
-  client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link)
+  client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link);
+  coin-effects.mjs + client/src/css/coin/ = material/finish resolver + shared fixed-light foil CSS for the
+  picker and mat token (D92; derived holofoil/mirror finish, luminance relief mask)
 
 <!-- Netcode/rules detail below verified S2 while designing 001. Deck-builder, image-logic,
      sizing, and initialization subtrees remain unmapped at this depth. -->

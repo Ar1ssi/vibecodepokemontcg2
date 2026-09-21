@@ -1,0 +1,15 @@
+/* Gold — warm anisotropic metal: a strong warm sweep over a warm rim. */
+.coin-mat-gold .coin-face {
+  background: conic-gradient(from 210deg, #c9a24a, #6a5218 25%, #e4c878 50%, #4d3c12 75%, #c9a24a);
+}
+
+.coin-mat-gold {
+  --coin-spec-w: 78%;
+  --coin-spec-h: 13%;
+  --coin-spec-hi: rgba(255, 228, 160, 0.42);
+  --coin-spec-mid: rgba(210, 160, 70, 0.12);
+  --coin-spec-blend: overlay;
+  --coin-spec-mask: var(--coin-relief), var(--coin-relief);
+  --coin-env-blend: soft-light;
+  --coin-grain-opacity: 0.2;
+}

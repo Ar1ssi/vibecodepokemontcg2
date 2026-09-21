@@ -1,0 +1,11 @@
+/* Surface finish — a holofoil/mirror coin gets a rainbow foil layer on top of
+   its material. Loaded after the material sheets so these win. The finish is
+   stamped on .coin-3d by coin-effects.mjs (data-coin-finish). */
+.coin-3d[data-coin-finish="holofoil"] {
+  --coin-holo-opacity: 0.34;
+}
+
+.coin-3d[data-coin-finish="mirror"] {
+  --coin-holo-opacity: 0.52;
+  --coin-spec-opacity: 0.95;
+}

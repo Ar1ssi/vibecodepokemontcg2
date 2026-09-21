@@ -1,0 +1,16 @@
+/* Metal — neutral cast (gunmetal): a wider, flatter, lower-contrast sheen. */
+.coin-mat-metal .coin-face {
+  background: conic-gradient(from 210deg, #cfd4da, #6b7280 25%, #e6e9ee 50%, #565c66 75%, #cfd4da);
+}
+
+.coin-mat-metal {
+  --coin-spec-w: 82%;
+  --coin-spec-h: 16%;
+  --coin-spec-hi: rgba(235, 238, 242, 0.34);
+  --coin-spec-mid: rgba(150, 158, 168, 0.1);
+  --coin-spec-blend: overlay;
+  --coin-spec-mask: var(--coin-relief), var(--coin-relief);
+  --coin-env-blend: soft-light;
+  --coin-env-opacity: 0.8;
+  --coin-grain-opacity: 0.24;
+}

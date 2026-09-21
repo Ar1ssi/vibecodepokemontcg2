@@ -1,0 +1,15 @@
+/* Silver — cool steel: a narrow, bright, cool sweep. */
+.coin-mat-silver .coin-face {
+  background: conic-gradient(from 210deg, #c5ccd6, #5c636e 25%, #dce2ea 50%, #4a515b 75%, #c5ccd6);
+}
+
+.coin-mat-silver {
+  --coin-spec-w: 76%;
+  --coin-spec-h: 12%;
+  --coin-spec-hi: rgba(240, 246, 255, 0.4);
+  --coin-spec-mid: rgba(170, 185, 205, 0.12);
+  --coin-spec-blend: overlay;
+  --coin-spec-mask: var(--coin-relief), var(--coin-relief);
+  --coin-env-blend: soft-light;
+  --coin-grain-opacity: 0.18;
+}

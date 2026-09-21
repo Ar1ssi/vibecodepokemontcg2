@@ -16,6 +16,7 @@
 @import url('./holo/classic-holo.css');
 @import url('./holo/modern-holo.css');
 @import url('./holo/trainer-gallery.css');
+@import url('./coin/coin.css');
 
 :root {
   --mat-half-height: 50vh;
@@ -4416,124 +4417,12 @@ body.side-menu-collapsed #oppResizer {
     body:not(.dark-mode-1) .choice-picker-confirm { background: rgba(80,160,100,0.2); }
 
     /* ═══ COIN PICKER (TCG Live style) ════════════════════════════════════
-       Circular metal discs with mouse-tracked specular highlights.
-       Materials: gold/silver = hard anisotropic sweep (metalness), colored
-       enamel = soft broad sheen. Coins tilt with the pointer and flip to
-       the TM back on click. */
-    .coin-3d {
-          --coin-x: 50%;
-          --coin-y: 50%;
-          --coin-rx: 0deg;
-          --coin-ry: 0deg;
-          position: relative;
-          width: 168px;
-          height: 168px;
-          transform-style: preserve-3d;
-          /* tumble around the HORIZONTAL axis (rotateX) — TCG Live style */
-          transform: perspective(700px) rotateX(calc(var(--coin-rx) + var(--coin-flip, 0deg))) rotateY(var(--coin-ry));
-          transition: transform 0.18s ease-out;
-          cursor: pointer;
-          /* no filter/isolation — grouping props flatten preserve-3d */
-        }
-    .coin-face {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      overflow: hidden;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-      display: grid;
-      place-items: center;
-      background: conic-gradient(from 210deg,
-        rgba(255,255,255,0.18), rgba(70,74,82,0.22) 25%,
-        rgba(255,255,255,0.22) 50%, rgba(50,54,62,0.28) 75%,
-        rgba(255,255,255,0.18));
-      padding: 3px;
-      box-shadow:
-        inset 0 -2px 3px rgba(0, 0, 0, 0.4),
-        0 8px 14px rgba(0, 0, 0, 0.42);
-    }
-    .coin-face img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
-    .coin-face.coin-backc { transform: rotateX(180deg); }
-
-    /* Knock back the baked studio crescent on the PNG so it reads as metal,
-       not a glossy plastic dome. Gold/silver also get faint brushed grain. */
-    .coin-face::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      pointer-events: none;
-      background:
-        radial-gradient(ellipse 58% 42% at 30% 16%,
-          rgba(0, 0, 0, 0.38) 0%,
-          rgba(0, 0, 0, 0.08) 48%,
-          transparent 72%);
-      mix-blend-mode: multiply;
-    }
-    .coin-mat-gold .coin-face::before,
-    .coin-mat-silver .coin-face::before {
-      background:
-        radial-gradient(ellipse 58% 42% at 30% 16%,
-          rgba(0, 0, 0, 0.3) 0%,
-          rgba(0, 0, 0, 0.06) 50%,
-          transparent 72%);
-    }
-
-    /* Specular layers: elongated anisotropic sweep, overlay (not screen).
-       Screen + a circular hotspot is what made the old coins look like plastic. */
-    .coin-face::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      pointer-events: none;
-    }
-    /* GOLD: warm metal streak, muted peak */
-    .coin-mat-gold .coin-face::after {
-      background:
-        radial-gradient(ellipse 78% 13% at var(--coin-x) var(--coin-y),
-          rgba(255, 228, 160, 0.32) 0%,
-          rgba(210, 160, 70, 0.1) 36%,
-          transparent 62%),
-        radial-gradient(ellipse 16% 10% at calc(var(--coin-x) - 10%) calc(var(--coin-y) - 12%),
-          rgba(255, 244, 210, 0.16) 0%,
-          transparent 72%);
-      mix-blend-mode: overlay;
-    }
-    /* SILVER: cool steel streak */
-    .coin-mat-silver .coin-face::after {
-      background:
-        radial-gradient(ellipse 76% 12% at var(--coin-x) var(--coin-y),
-          rgba(240, 246, 255, 0.28) 0%,
-          rgba(170, 185, 205, 0.09) 38%,
-          transparent 64%),
-        radial-gradient(ellipse 14% 9% at calc(var(--coin-x) - 10%) calc(var(--coin-y) - 12%),
-          rgba(255, 255, 255, 0.14) 0%,
-          transparent 72%);
-      mix-blend-mode: overlay;
-    }
-    /* METAL: neutral cast-metal sheen (cooler and flatter than silver) */
-    .coin-mat-metal .coin-face::after {
-      background:
-        radial-gradient(ellipse 76% 12% at var(--coin-x) var(--coin-y),
-          rgba(235, 238, 242, 0.3) 0%,
-          rgba(150, 158, 168, 0.1) 38%,
-          transparent 64%),
-        radial-gradient(ellipse 14% 9% at calc(var(--coin-x) - 10%) calc(var(--coin-y) - 12%),
-          rgba(255, 255, 255, 0.16) 0%,
-          transparent 72%);
-      mix-blend-mode: overlay;
-    }
-    /* ENAMEL: satin paint, not wet lacquer */
-    .coin-mat-enamel .coin-face::after {
-      background:
-        radial-gradient(ellipse 36% 20% at var(--coin-x) var(--coin-y),
-          rgba(255, 255, 255, 0.14) 0%,
-          rgba(255, 255, 255, 0.04) 42%,
-          transparent 68%);
-      mix-blend-mode: overlay;
-    }
+       Coin geometry, the fixed virtual light (--coin-light-x/y) and the
+       per-material specular/environment/grain layers live in css/coin/
+       (imported at the top of this file); coin-effects.mjs drives the light
+       from the coin's angle. Coins tilt with the pointer and flip to the TM
+       back on click. This block only sizes the picker's coin instances. */
+    .coin-3d { width: 168px; height: 168px; cursor: pointer; }
         
     /* gallery cells */
     .native-deck-builder-coin-gallery {
@@ -4659,41 +4548,7 @@ body.side-menu-collapsed #oppResizer {
       gap: 0.6vh;
     }
     
-    /* material rims (on the faces themselves — preserves 3D flip) */
-    .coin-mat-gold .coin-face {
-      background: conic-gradient(from 210deg, #c9a24a, #6a5218 25%, #e4c878 50%, #4d3c12 75%, #c9a24a);
-    }
-    .coin-mat-silver .coin-face {
-      background: conic-gradient(from 210deg, #c5ccd6, #5c636e 25%, #dce2ea 50%, #4a515b 75%, #c5ccd6);
-    }
-    .coin-mat-metal .coin-face {
-      background: conic-gradient(from 210deg, #cfd4da, #6b7280 25%, #e6e9ee 50%, #565c66 75%, #cfd4da);
-    }
-    
-    /* ── TCG Live-style coin toss ─────────────────────────────────────────
-       Click: the coin tumbles 4.5 turns around its horizontal axis while
-       arcing upward, then lands with a small bounce. Each click adds
-       another 4.5 turns (1620deg) so it always spins forward, alternating
-       front/back on landing. */
-    @keyframes coin-toss-arc {
-      0%   { transform: translateY(0) scale(1); }
-      12%  { transform: translateY(-12%) scale(1.05); }
-      38%  { transform: translateY(-46%) scale(1.1); }
-      64%  { transform: translateY(-4%) scale(1.01); }
-      74%  { transform: translateY(-9%) scale(1.02); }
-      86%  { transform: translateY(-1%) scale(1); }
-      100% { transform: translateY(0) scale(1); }
-    }
-    .coin-toss-wrap {
-      display: inline-block;
-      will-change: transform;
-    }
-    .coin-toss-wrap.tossing .coin-3d {
-      transition: transform 1.35s cubic-bezier(0.22, 0.08, 0.24, 1);
-    }
-    .coin-toss-wrap.tossing {
-      animation: coin-toss-arc 1.35s cubic-bezier(0.3, 0.0, 0.35, 1);
-    }
+    /* Material rims live in css/coin/<material>.css. */
     
     /* ── Turn-order coin flip overlay (match start, rules mode) ─────────── */
     #turnOrderCoinFlipOverlay {

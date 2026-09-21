@@ -1,0 +1,13 @@
+/* Enamel — colored paint: a broad soft satin sheen, never a metal streak or
+   rainbow (paint is flat, so the relief mask is not applied either). */
+.coin-mat-enamel {
+  --coin-spec-w: 46%;
+  --coin-spec-h: 34%;
+  --coin-spec-hi: rgba(255, 255, 255, 0.16);
+  --coin-spec-mid: rgba(255, 255, 255, 0.05);
+  --coin-spec-blend: soft-light;
+  --coin-spec-mask: none;
+  --coin-env-blend: soft-light;
+  --coin-env-opacity: 0.75;
+  --coin-grain-opacity: 0;
+}

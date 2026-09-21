@@ -9,6 +9,12 @@ import {
 } from '../../initialization/global-variables/containers.js';
 import { systemState } from '../../initialization/global-variables/global-variables.js';
 import { getCoins } from '../deck-builder/core/coins.mjs';
+import {
+  applyCoinEffect,
+  coinEffectLayerMarkup,
+  startCoinDrift,
+  stopCoinDrift,
+} from '../deck-builder/core/coin-effects.mjs';
 
 const MAT_COIN_BACK_URL = '/src/assets/coins/coin-back.png';
 const MAT_COIN_SLOTS = {
@@ -19,25 +25,6 @@ const MAT_COIN_SLOTS = {
 const selectedCoins = { self: null, opp: null };
 const tossRevolutions = { self: 0, opp: 0 };
 let layoutHooked = false;
-
-const wireMatCoinLighting = (coinEl) => {
-  if (!coinEl) return;
-  coinEl.addEventListener('pointermove', (e) => {
-    const r = coinEl.getBoundingClientRect();
-    const px = ((e.clientX - r.left) / r.width) * 100;
-    const py = ((e.clientY - r.top) / r.height) * 100;
-    coinEl.style.setProperty('--coin-x', px.toFixed(1) + '%');
-    coinEl.style.setProperty('--coin-y', py.toFixed(1) + '%');
-    coinEl.style.setProperty('--coin-rx', ((py - 50) * -0.14).toFixed(2) + 'deg');
-    coinEl.style.setProperty('--coin-ry', ((px - 50) * 0.16).toFixed(2) + 'deg');
-  });
-  coinEl.addEventListener('pointerleave', () => {
-    coinEl.style.setProperty('--coin-x', '50%');
-    coinEl.style.setProperty('--coin-y', '50%');
-    coinEl.style.setProperty('--coin-rx', '0deg');
-    coinEl.style.setProperty('--coin-ry', '0deg');
-  });
-};
 
 const escapeHtml = (value = '') =>
   String(value)
@@ -75,22 +62,28 @@ export const renderMatCoinSlot = (target) => {
   if (!slot) return;
 
   const coin = selectedCoins[target];
+  slot.querySelectorAll('.coin-3d').forEach((el) => stopCoinDrift(el));
   slot.innerHTML = '';
   if (!coin) {
     slot.classList.remove('has-coin');
     return;
   }
 
+  const layers = coinEffectLayerMarkup('div');
   slot.classList.add('has-coin');
   slot.innerHTML = [
     `<span class="coin-toss-wrap mat-coin-toss-wrap" data-mat-coin-toss="${target}">`,
-    `<div class="coin-3d coin-mat-${escapeHtml(coin.material || 'silver')} mat-coin-token" data-mat-coin-el="${target}">`,
-    `<div class="coin-face coin-front"><img src="${escapeHtml(coinUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}"></div>`,
-    `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt=""></div>`,
+    `<div class="coin-3d mat-coin-token" data-mat-coin-el="${target}">`,
+    `<div class="coin-face coin-front"><img src="${escapeHtml(coinUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}">${layers}</div>`,
+    `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt="">${layers}</div>`,
     `</div>`,
     `</span>`,
   ].join('');
-  wireMatCoinLighting(slot.querySelector('[data-mat-coin-el]'));
+  const coinEl = slot.querySelector('[data-mat-coin-el]');
+  // The mask URL must be resolved the same way as the <img>, or the relative
+  // catalog path would resolve against the iframe's base and 404.
+  applyCoinEffect(coinEl, { ...coin, thumb: coinUrl(coin.thumb) });
+  startCoinDrift(coinEl, { phaseOffset: target === 'opp' ? 0.5 : 0 });
 };
 
 export const renderMatCoins = () => {

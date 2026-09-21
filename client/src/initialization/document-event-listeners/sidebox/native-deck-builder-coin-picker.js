@@ -1,10 +1,15 @@
-import {
+    import {
       filterCoins,
       getCoins,
       getCoinStats,
       groupCoinsByRelease,
       isPlaceholderCoin,
     } from '../../../setup/deck-builder/core/coins.mjs';
+    import {
+      applyCoinEffect,
+      coinEffectLayerMarkup,
+      wireCoinPointerLight,
+    } from '../../../setup/deck-builder/core/coin-effects.mjs';
     
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -15,10 +20,11 @@ import {
     
     /**
      * Coin picker for the Customize tab. Renders a circular gallery of the
-     * whole catalog (Gens I-IX) with material-adapted metallic effects
-     * (gold/silver/metal get specular sweeps; enamel gets a soft sheen).
-     * Filterable by name, material, region, and image availability. Coins
-     * flip on click to show the back; clicking a cell selects the coin.
+     * whole catalog (Gens I-IX) with material-adapted effects under a fixed
+     * virtual light (gold/silver/metal = specular metal, enamel = satin
+     * paint, cardboard = matte; holofoil/mirror descriptions add a foil
+     * layer). Filterable by name, material, region, and image availability.
+     * Coins flip on click to show the back; clicking a cell selects it.
      */
     export const initializeDeckBuilderCoinPicker = ({
       panelEl,
@@ -115,11 +121,12 @@ import {
           );
         }
 
+        const layers = coinEffectLayerMarkup('span');
         previewEl.innerHTML = [
           `<span class="coin-toss-wrap" data-coin-toss>`,
-      `<div class="coin-3d coin-mat-${coin.material}" data-coin-preview>`,
-          `  <div class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name)}" /></div>`,
-          `  <div class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="back" /></div>`,
+      `<div class="coin-3d" data-coin-preview>`,
+          `  <div class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name)}" />${layers}</div>`,
+          `  <div class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="back" />${layers}</div>`,
           `</div>`,
           `</span>`,
           `<div class="native-deck-builder-coin-preview-text">`,
@@ -127,12 +134,13 @@ import {
           ...metaLines,
           `</div>`,
         ].join('');
-        wirePreviewCoin();
+        wirePreviewCoin(coin);
       };
     
-      const wirePreviewCoin = () => {
+      const wirePreviewCoin = (coin) => {
         const el = panelEl.querySelector('[data-coin-preview]');
         if (!el) return;
+        applyCoinEffect(el, coin);
         const wrap = el.closest('[data-coin-toss]');
         let tosses = 0;
         el.addEventListener('click', () => {
@@ -145,22 +153,8 @@ import {
           }
         });
         wrap?.addEventListener('animationend', () => wrap.classList.remove('tossing'));
-        // mouse-tracked specular: reuse the pointer var model
-        el.addEventListener('pointermove', (e) => {
-          const r = el.getBoundingClientRect();
-          const px = ((e.clientX - r.left) / r.width) * 100;
-          const py = ((e.clientY - r.top) / r.height) * 100;
-          el.style.setProperty('--coin-x', px.toFixed(1) + '%');
-          el.style.setProperty('--coin-y', py.toFixed(1) + '%');
-          el.style.setProperty('--coin-rx', ((py - 50) * -0.14).toFixed(2) + 'deg');
-          el.style.setProperty('--coin-ry', ((px - 50) * 0.16).toFixed(2) + 'deg');
-        });
-        el.addEventListener('pointerleave', () => {
-          el.style.setProperty('--coin-x', '50%');
-          el.style.setProperty('--coin-y', '50%');
-          el.style.setProperty('--coin-rx', '0deg');
-          el.style.setProperty('--coin-ry', '0deg');
-        });
+        // fixed virtual light: the highlight follows the coin's angle, not the cursor
+        wireCoinPointerLight(el);
       };
     
       const renderGallery = () => {
@@ -175,14 +169,15 @@ import {
           return;
         }
     
+        const layers = coinEffectLayerMarkup('span');
         galleryEl.innerHTML = visible
           .map((coin) => {
             const isSelected = coin.id === selectedId;
             return [
               `<button class="coin-cell${isSelected ? ' selected' : ''}" data-coin-id="${escapeHtml(coin.id)}" title="${escapeHtml(coin.name)}">`,
-              `  <span class="coin-3d coin-sm coin-mat-${coin.material}">`,
-              `    <span class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name)}" loading="lazy" /></span>`,
-              `    <span class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="" loading="lazy" /></span>`,
+              `  <span class="coin-3d coin-sm">`,
+              `    <span class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name)}" loading="lazy" />${layers}</span>`,
+              `    <span class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="" loading="lazy" />${layers}</span>`,
               `  </span>`,
               `  <span class="coin-cell-name">${escapeHtml(coin.name)}</span>`,
               coin.region || coin.releaseDate
@@ -196,6 +191,7 @@ import {
         galleryEl.querySelectorAll('[data-coin-id]').forEach((button) => {
           const id = button.dataset.coinId;
           const coinEl = button.querySelector('.coin-3d');
+          applyCoinEffect(coinEl, coins.find((c) => c.id === id));
           // click anywhere on the cell = select; the big preview coin is where
           // you flip to inspect the back
           button.addEventListener('click', () => {
@@ -205,18 +201,8 @@ import {
             const coin = coins.find((c) => c.id === selectedId) || null;
             onChange?.(coin);
           });
-          // hover specular
-          coinEl.addEventListener('pointermove', (e) => {
-            const r = coinEl.getBoundingClientRect();
-            const px = ((e.clientX - r.left) / r.width) * 100;
-            const py = ((e.clientY - r.top) / r.height) * 100;
-            coinEl.style.setProperty('--coin-x', px.toFixed(1) + '%');
-            coinEl.style.setProperty('--coin-y', py.toFixed(1) + '%');
-          });
-          coinEl.addEventListener('pointerleave', () => {
-            coinEl.style.setProperty('--coin-x', '50%');
-            coinEl.style.setProperty('--coin-y', '50%');
-          });
+          // fixed virtual light: the highlight follows the coin's angle
+          wireCoinPointerLight(coinEl);
         });
       };
     

@@ -1,0 +1,9 @@
+/* Coin effects entry point. Imported by index.css (picker) and mat-coin.css
+   (playmat iframes). @import must precede all other rules in the importer. */
+@import url('./base.css');
+@import url('./gold.css');
+@import url('./silver.css');
+@import url('./metal.css');
+@import url('./enamel.css');
+@import url('./cardboard.css');
+@import url('./finish.css');

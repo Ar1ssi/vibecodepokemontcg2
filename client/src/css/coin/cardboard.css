@@ -1,0 +1,18 @@
+/* Cardboard — flat printed token: a paper rim and a faint matte top light,
+   no metal sweep, no grain. */
+.coin-mat-cardboard .coin-face {
+  background: conic-gradient(from 210deg, #d9d2c4, #a89f8c 25%, #e6e0d4 50%, #9a907c 75%, #d9d2c4);
+}
+
+.coin-mat-cardboard {
+  --coin-spec-w: 40%;
+  --coin-spec-h: 30%;
+  --coin-spec-hi: rgba(255, 255, 255, 0.2);
+  --coin-spec-mid: rgba(255, 255, 255, 0.04);
+  --coin-spec-blend: soft-light;
+  --coin-spec-opacity: 0.5;
+  --coin-spec-mask: none;
+  --coin-env-blend: soft-light;
+  --coin-env-opacity: 0.35;
+  --coin-grain-opacity: 0;
+}

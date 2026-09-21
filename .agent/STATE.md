@@ -4,41 +4,37 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 233
-Focus: feature — server-authoritative battle-log narration (design 021, closed I71).
+Session: 234
+Focus: Feature — realistic coin materials CSS: fixed virtual light + environment / specular /
+  luminance-relief layers (techniques 1–3 of the coin-material audit; 4–5 deferred).
 Active: none.
-Next: none.
+Next: User visual check of the coin picker + mat token, then commit/merge `feature/coin-material-realism`.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Concurrent writers S230/S233 vs S231/S232 collided on `.agent` (single-writer assumption broken). Both
-  landed on main: GX once-per-game single-sourced on `player.oncePerGame` via shared `oncePerGameUsed`
-  (commit 25e18c4, closed I75–I77; the old `flags.{gxUsed,vstarUsed}` mirror is gone) and the battle log
-  (commit 38e97ff, design 021/I71). Remaining GX gaps: the attack panel can't grey a spent GX (I64) and
-  the GX/VSTAR button markup is dead (I23).
-- Battle-log mapper (S233/D91): `client/src/setup/netcode/server-battle-log.mjs` is now the single
-  server-event→text map (it composes `attack-announcements.mjs`), wired as `onAdvisoryEvent` in
-  socket-event-listeners.js. A narratable event needs an absolute `playerId` (or `player` for
-  `turnStarted`) plus a registry-resolvable name/id; the server contracts are the additive
-  `trainerPlayed` event (from `executeTrainer`, Tools excluded) and `cardAttached` emitted only for
-  non-Pokémon attaches (evolves use `pokemonEvolved`). Don't reintroduce a second text handler.
-- Ability-step executor contract (S229): `parseAbility`'s `discardCostAbility` now emits `energyOnly` /
-  `basicOnly` / `energyTypes` — the fields `shared/engine/effects/executor.mjs`'s discard-cost branch
-  reads (it silently matched EVERY hand card before). `moveDamageAbility` is registered in
-  `EXTRA_STEP_HANDLERS` (reuses `damageCounters`) so it raises a mat-pick PendingChoice. A new step
-  type needs BOTH parser-output fields and a handler, or the server path no-ops silently.
-- Mega prize split (D89): `prizesForKO` gives **3** to `isModernMegaCard` ("Mega X ex", 2025+),
-  **2** to `isLegacyMegaCard` ("M X-EX"/"Primal X-EX", Gen 6). `isModernMegaCard` checks the legacy
-  name form FIRST so a `stage: "MEGA"`-derived subtype token can't mis-flag a legacy Mega. Mega
-  turn-end (`evolution.mjs`/D33) reads the same two predicates — don't reintroduce `isMegaCard`.
-- KO promotion (S226/D88): `handleKnockout` no longer auto-promotes. It marks `player.promotionPending`;
-  `settlePromotionChoices` at the command tail auto-promotes a lone Bench Pokémon or raises a
-  PendingChoice (`source:'promote'`, `resumeToken.effectType:'promote'`) that the mat picker renders.
+- Coin effects (S234/D92): `client/src/css/coin/` (`base` + one file per material + `finish`) is the ONE
+  source of coin material styling; `index.css` (picker) and `mat-coin.css` (playmat iframes) only
+  `@import url('./coin/coin.css')` + sizing/position. `coin-effects.mjs` resolves `data-coin-material` /
+  `data-coin-finish` (finish derived from `description`; NOT invented) and drives `--coin-light-x/y`
+  (fixed light from angle, never the cursor) via `wireCoinPointerLight` (picker) / `startCoinDrift` (mat).
+  Never put `filter`/`isolation`/`opacity` on `.coin-3d`/`.coin-face` — it flattens the flip's
+  `preserve-3d` (contract-tested). Metallics mask `.coin__spec` by the coin's own art (`--coin-relief`).
+- Concurrent writers collided on `.agent` (S230/S233 vs S231/S232). S234's coin files are in the PRIMARY
+  uncommitted, plus worktree `coin-materials-wt`; S233 battle-log and S232 GX `oncePerGame` are also recent.
+  Re-read `git log`/`git status` before assuming what is on main.
+- Battle-log mapper (S233/D91): `client/src/setup/netcode/server-battle-log.mjs` is the single
+  server-event→text map, wired as `onAdvisoryEvent`; don't reintroduce a second text handler.
+- Ability-step executor contract (S229): `parseAbility`'s `discardCostAbility` emits `energyOnly` /
+  `basicOnly` / `energyTypes`; `moveDamageAbility` is in `EXTRA_STEP_HANDLERS`. A new step type needs
+  BOTH parser-output fields and a handler.
+- Mega prize split (D89): `prizesForKO` → **3** for `isModernMegaCard`, **2** for `isLegacyMegaCard`;
+  `isModernMegaCard` checks the legacy name form first. Mega turn-end reads the same two predicates.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S234 feature: coin material CSS — shared `css/coin/` + `coin-effects.mjs` (fixed light, studio env,
+  per-material specular, luminance relief mask, holofoil/mirror finishes); 13 new tests, full suite
+  2651/2651, headless smoke 939 coins / 0 page errors. UNCOMMITTED (primary + worktree).
 - S233 feature: authoritative battle-log narration (design 021/I71) — pure event→text mapper + server
-  `trainerPlayed`, `cardAttached` non-Pokémon gate; 23 tests, full suite 2635/2635. UNCOMMITTED, primary.
+  `trainerPlayed`, `cardAttached` non-Pokémon gate; 23 tests, 2635/2635. UNCOMMITTED, primary.
 - S232 fix(rules): GX once-per-game single-sourced on `player.oncePerGame`, shared `oncePerGameUsed`,
-  flags mirror removed, +3 tests (commit 25e18c4 on main).
-- S229 fix(rules): Mega Greninja ex Mortal Shuriken — discard cost restricted to Basic {W} Energy (parser
-  emits `energyOnly`/`basicOnly`/`energyTypes`) + damage-counter mat-pick handler wired; 2601/2601.
+  flags mirror removed (commit 25e18c4 on main).
