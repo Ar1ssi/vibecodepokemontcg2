@@ -3507,12 +3507,16 @@ export function applyCommand(state, command, rng = null) {
           }
         }
 
-        events.push({
-          type: 'cardAttached',
-          instanceId: payload.instanceId,
-          targetInstanceId: payload.targetInstanceId,
-          playerId,
-        });
+        // A Pokémon attach is an evolution and is announced by `pokemonEvolved`;
+        // emitting `cardAttached` too would double-narrate it (design 021).
+        if (!isPokemon(cardRef.card)) {
+          events.push({
+            type: 'cardAttached',
+            instanceId: payload.instanceId,
+            targetInstanceId: payload.targetInstanceId,
+            playerId,
+          });
+        }
 
         // Special-energy on-attach triggers (draw/search/heal/damage/switch/
         // devolve/return-basic-energy). A search or switch may suspend the

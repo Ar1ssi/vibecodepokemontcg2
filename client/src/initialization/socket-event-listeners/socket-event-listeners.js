@@ -38,7 +38,7 @@ import {
   handleAdvisoryEvent,
   handleBeforeApply,
 } from '../../setup/netcode/advisory-animations.js';
-import { handleAttackAnnouncement } from '../../setup/netcode/attack-announcements.js';
+import { handleServerBattleLog } from '../../setup/netcode/server-battle-log.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { CARD_IMAGE_LISTENERS } from '../../setup/image-logic/card-listener-table.js';
 import { COVER_IMAGE_LISTENERS } from '../../setup/image-logic/cover-listener-table.js';
@@ -482,7 +482,7 @@ export const initializeSocketEventListeners = () => {
         onBeforeApply: handleBeforeApply,
         onAdvisoryEvent: (event, selfPlayerId) => {
           handleAdvisoryEvent(event, selfPlayerId);
-          handleAttackAnnouncement(event, selfPlayerId);
+          handleServerBattleLog(event, selfPlayerId);
         },
       });
     }

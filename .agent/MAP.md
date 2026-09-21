@@ -57,6 +57,10 @@ bridge, because the call arrives while setupPrizes() is still awaiting dealOrder
 client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
 resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
 server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles
+client/src/setup/netcode/server-battle-log.mjs + server-battle-log.js — server advisory event →
+battle-log text under server authority (design 021/I71): pure mapper composes attack-announcements.mjs,
+the DOM caller appends; wired as `onAdvisoryEvent` in socket-event-listeners.js, both clients phrase
+from their own `playerId`. Needs the server's `trainerPlayed` event and non-Pokémon `cardAttached`
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)

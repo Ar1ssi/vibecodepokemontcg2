@@ -195,6 +195,17 @@ export function executeTrainer(draft, {
     } else {
       player.zones.board.push(played);
     }
+    // Design 021 / I71: announce the play so the authoritative battle log narrates it.
+    // Tools are announced by their `cardAttached` event instead.
+    if (!isToolCard(played)) {
+      events.push({
+        type: 'trainerPlayed',
+        playerId,
+        instanceId: played.instanceId,
+        name: played.name,
+        stadium: isStadium(played),
+      });
+    }
   }
 
   // Supporter turn restriction

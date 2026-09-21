@@ -1,9 +1,9 @@
-// Design 013 slice 3: thin DOM caller for attackAnnouncementLines (pure plan in
-// attack-announcements.mjs). Wired as part of the `onAdvisoryEvent` hook on `applyView`
+// Design 021: thin DOM caller for `serverBattleLogLines` (pure plan in
+// server-battle-log.mjs). Wired as part of the `onAdvisoryEvent` hook on `applyView`
 // in socket-event-listeners.js, so both players read the same lines off the same server
 // event — one source, no double-announcing.
 import { appendMessage } from '../chatbox/append-message.js';
-import { attackAnnouncementLines } from './attack-announcements.mjs';
+import { serverBattleLogLines } from './server-battle-log.mjs';
 import { getCardRegistry } from './apply-view.js';
 
 const resolveCardName = (instanceId) => {
@@ -13,13 +13,13 @@ const resolveCardName = (instanceId) => {
 };
 
 /**
- * Announces one server attack event, if it has anything to say.
+ * Appends this client's battle-log lines for one server advisory event, if it has any.
  *
  * @param {object} event
- * @param {string|null} selfPlayerId
+ * @param {string|null} selfPlayerId This client's absolute player id
  */
-export function handleAttackAnnouncement(event, selfPlayerId) {
-  const lines = attackAnnouncementLines(event, selfPlayerId, resolveCardName);
+export function handleServerBattleLog(event, selfPlayerId) {
+  const lines = serverBattleLogLines(event, selfPlayerId, resolveCardName);
   for (const line of lines) {
     appendMessage('', line, 'announcement', false);
   }
