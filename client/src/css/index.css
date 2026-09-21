@@ -4571,7 +4571,7 @@ body.side-menu-collapsed #oppResizer {
       transition: opacity 0.4s ease;
     }
     #turnOrderCoinFlipOverlay.fading { opacity: 0; }
-    #turnOrderCoinFlipOverlay .coin-3d { width: 180px; height: 180px; }
+    #turnOrderCoinFlipOverlay .coin-3d { width: clamp(150px, 24vh, 260px); height: clamp(150px, 24vh, 260px); }
     .turn-order-coin-flip-label {
       color: #f2f4ff;
       font-size: 1.9vh;
@@ -5059,28 +5059,33 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   right: var(--ptcg-inset-right, 0%);
   display: flex;
   flex-direction: column;
-  /* The whole text column floats off the print as one rounded, shadowed tile. */
-  border-radius: calc(var(--u) * 2.1);
+  /* Inlaid, not floating: a big drop shadow lifts the column off the card like a sticker. A light
+     inner rule plus a dark outer hairline reads as a frame printed into the card instead. */
+  border-radius: calc(var(--u) * 1.2);
   overflow: hidden;
-  box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.22),
+    0 0 calc(var(--u) * 1.6) rgba(0, 0, 0, 0.18);
 }
 .ptcg-atks {
   display: flex;
   flex-direction: column;
 }
-/* Frosted panels: a top-lit fill at ~90% over a heavy backdrop blur lets the card's colour bleed
-   through while the printed text beneath stays an illegible smear, never a readable ghost.
-   Keep the fill at 85%+ — lower and the blurred print starts to read as shapes again. */
+/* Frosted panels: a top-lit fill over a heavy, saturating backdrop blur carries the artwork's colour
+   into the panel so it reads as part of the card, while the printed text beneath stays an
+   illegible smear. Keep the fill at 65%+ — lower and the blurred print starts to read as shapes. */
 .ptcg-atk,
 .ptcg-ability,
 .ptcg-stadium,
 .ptcg-stat {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ptcg-panel-bg, #fff) 92%, transparent) 0%,
-    color-mix(in srgb, color-mix(in srgb, var(--ptcg-panel-bg, #fff) 94%, #1c2530) 88%, transparent) 100%
+    color-mix(in srgb, var(--ptcg-panel-bg, #fff) 76%, transparent) 0%,
+    color-mix(in srgb, color-mix(in srgb, var(--ptcg-panel-bg, #fff) 94%, #1c2530) 70%, transparent) 100%
   );
-  backdrop-filter: blur(calc(var(--u) * 2.4)) saturate(1.25);
+  backdrop-filter: blur(calc(var(--u) * 3.4)) saturate(1.6) brightness(1.08);
 }
 .ptcg-atk,
 .ptcg-ability,
@@ -5298,8 +5303,10 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   display: flex;
   pointer-events: auto;
   /* Same float as the text stack, so the strip reads as one raised tile. */
-  border-radius: 0 0 calc(var(--u) * 2.1) calc(var(--u) * 2.1);
-  box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
+  border-radius: 0 0 calc(var(--u) * 1.2) calc(var(--u) * 1.2);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.22),
+    0 0 calc(var(--u) * 1.6) rgba(0, 0, 0, 0.18);
 }
 .ptcg-stat {
   flex: 1;
@@ -5313,8 +5320,8 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   border-top: 1px solid #d9d2c5;
   border-left: 1px solid #d9d2c5;
 }
-.ptcg-stat:first-child { border-left: 0; border-radius: 0 0 0 calc(var(--u) * 2.1); }
-.ptcg-stat:last-child { border-radius: 0 0 calc(var(--u) * 2.1) 0; }
+.ptcg-stat:first-child { border-left: 0; border-radius: 0 0 0 calc(var(--u) * 1.2); }
+.ptcg-stat:last-child { border-radius: 0 0 calc(var(--u) * 1.2) 0; }
 .ptcg-stat__k {
   font-size: calc(var(--u) * 1.9);
   text-transform: lowercase;

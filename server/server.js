@@ -448,6 +448,9 @@ async function main() {
         call: resolution.call,
         result: resolution.result,
         starter: resolution.starterPlayerId === pid ? 'self' : 'opp',
+        // Display-only: the caller's chosen coin art, so both mat screens show
+        // the same coin. Never used to decide the flip.
+        coinId: resolution.coinId ?? null,
         auto: Boolean(resolution.auto),
       });
     }
@@ -960,6 +963,7 @@ async function main() {
         const resolution = gameRoom.submitTurnOrderCall(socket.id, {
           callId: data?.callId ?? null,
           call: data?.call ?? null,
+          coinId: data?.coinId ?? null,
         });
         if (!resolution.ok) {
           socket.emit('turnOrderCallRejected', {

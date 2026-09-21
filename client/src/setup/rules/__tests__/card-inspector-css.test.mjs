@@ -71,16 +71,23 @@ describe('013 C1 — the card scan stays the background', () => {
     });
   }
 
-  // …and the pieces that DO replace print must actually be opaque, or the print shows twice.
+  // …and the pieces that DO replace print must hide it: a translucent fill over a heavy backdrop blur,
+  // so the card's colour bleeds through but its printed text never reads twice.
   for (const selector of ['.ptcg-atk', '.ptcg-ability', '.ptcg-stat', '.ptcg-stadium']) {
-    it(`${selector} is opaque so it covers the print it replaces`, () => {
+    it(`${selector} is frosted enough to cover the print it replaces`, () => {
       const decls = body(selector);
       assert.ok(decls, `${selector} is missing from index.css`);
+      assert.match(decls, /(^|[;\s])background\s*:/i, `${selector} must carry a fill`);
       assert.match(
         decls,
-        /background\s*:\s*#fff/i,
-        `${selector} must be opaque or the printed text underneath shows through`
+        /backdrop-filter\s*:\s*blur\(/i,
+        `${selector} must blur the print behind its translucent fill`
       );
+      const fillAlphas = [...decls.matchAll(/(\d+)%\s*,\s*transparent\s*\)/g)].map((m) => Number(m[1]));
+      assert.ok(fillAlphas.length > 0, `${selector} fill must mix its colour with transparent`);
+      for (const alpha of fillAlphas) {
+        assert.ok(alpha >= 65, `${selector} fill is ${alpha}% — below 65% the blurred print reads again`);
+      }
     });
   }
 });

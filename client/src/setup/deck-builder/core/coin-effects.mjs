@@ -65,6 +65,22 @@ export function coinMaskUrl(src, pageOrigin = globalThis.location?.origin) {
   return url.origin === pageOrigin ? url.href : null;
 }
 
+/** Default reverse face shown when no coin (or a coin without art) is used. */
+export const COIN_BACK_URL = '/src/assets/coins/coin-back.png';
+
+/**
+ * Resolve a catalog coin image path to a URL the current page can load.
+ * Catalog paths are relative to the client root (`src/assets/...`), so they
+ * need a leading slash; absolute/data/blob URLs pass through, and a missing
+ * path falls back to the coin back.
+ */
+export const coinArtUrl = (path, fallback = COIN_BACK_URL) => {
+  if (!path) return fallback;
+  const value = String(path);
+  if (/^(https?:|data:|blob:)/.test(value) || value.startsWith('/')) return value;
+  return `/${value.replace(/^\//, '')}`;
+};
+
 /** Markup for the four decorative layers, in paint order. */
 export const coinEffectLayerMarkup = (tag = 'span') =>
   [

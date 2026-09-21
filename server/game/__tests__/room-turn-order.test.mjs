@@ -105,6 +105,38 @@ test('submitTurnOrderCall resolves the starter from the call and the server flip
   assert.equal(room.isAwaitingTurnOrderCall(), false);
 });
 
+test('submitTurnOrderCall echoes the caller coin id, echoing null when absent', () => {
+  const room = readyRoom();
+  const { callId } = room.beginTurnOrderCall();
+  const res = room.submitTurnOrderCall(callerSocket(room), {
+    callId,
+    call: 'heads',
+    coinId: 'SVC_Gold_Pikachu_Coin',
+  });
+  assert.equal(res.ok, true);
+  assert.equal(res.coinId, 'SVC_Gold_Pikachu_Coin');
+  assert.equal(room.turnOrder.coinId, 'SVC_Gold_Pikachu_Coin');
+
+  const room2 = readyRoom();
+  const { callId: callId2 } = room2.beginTurnOrderCall();
+  const res2 = room2.submitTurnOrderCall(callerSocket(room2), { callId: callId2, call: 'heads' });
+  assert.equal(res2.coinId, null);
+});
+
+test('submitTurnOrderCall drops a malformed or oversize coin id', () => {
+  for (const bad of [42, {}, '', 'x'.repeat(129)]) {
+    const room = readyRoom();
+    const { callId } = room.beginTurnOrderCall();
+    const res = room.submitTurnOrderCall(callerSocket(room), {
+      callId,
+      call: 'heads',
+      coinId: bad,
+    });
+    assert.equal(res.ok, true);
+    assert.equal(res.coinId, null, `expected coinId ${JSON.stringify(bad)} to be dropped`);
+  }
+});
+
 test('a losing call hands the first turn to the other player', () => {
   // Drive both faces by scanning seeds until each outcome appears, so neither
   // branch depends on one lucky seed.

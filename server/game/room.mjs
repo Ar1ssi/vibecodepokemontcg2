@@ -423,6 +423,7 @@ export class GameRoom {
       callerPlayerId,
       callId,
       call: null,
+      coinId: null,
       result: null,
       starterPlayerId: null,
       auto: false,
@@ -444,11 +445,12 @@ export class GameRoom {
    * @param {object} [payload]
    * @param {string} [payload.callId]
    * @param {string} [payload.call] 'heads' | 'tails'
+   * @param {string} [payload.coinId] The caller's chosen coin art id (display only)
    * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
    *             starterPlayerId: string, auto: false }
    *          |{ ok: false, reason: string }}
    */
-  submitTurnOrderCall(socketId, { callId = null, call = null } = {}) {
+  submitTurnOrderCall(socketId, { callId = null, call = null, coinId = null } = {}) {
     if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
     if (this.turnOrder.phase !== 'awaiting-call') {
       return { ok: false, reason: 'already_resolved' };
@@ -461,7 +463,7 @@ export class GameRoom {
       return { ok: false, reason: 'stale_call' };
     }
     if (!isCoinFace(call)) return { ok: false, reason: 'invalid_call' };
-    return this.#resolveTurnOrder(call, false);
+    return this.#resolveTurnOrder(call, false, coinId);
   }
 
   /**
@@ -485,10 +487,14 @@ export class GameRoom {
    *
    * @param {string} call
    * @param {boolean} auto
+   * @param {string|null} [coinId] Display-only coin art id the caller chose.
+   *   Echoed back so both clients render the same coin; never trusted for the
+   *   flip itself (D10), so a malformed/oversize value is simply dropped.
    * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, auto: boolean }|{ ok: false, reason: string }}
+   *             starterPlayerId: string, coinId: string|null, auto: boolean }
+   *          |{ ok: false, reason: string }}
    */
-  #resolveTurnOrder(call, auto) {
+  #resolveTurnOrder(call, auto, coinId = null) {
     const result = flipCoinFace(this.rng);
     const starterPlayerId = resolveStarterPlayerId({
       playerIds: Object.keys(this.state.players || {}),
@@ -498,11 +504,17 @@ export class GameRoom {
     });
     if (!starterPlayerId) return { ok: false, reason: 'no_starter' };
 
+    const safeCoinId =
+      typeof coinId === 'string' && coinId.length > 0 && coinId.length <= 128
+        ? coinId
+        : null;
+
     this.turnOrder = {
       ...this.turnOrder,
       phase: 'resolved',
       call,
       result,
+      coinId: safeCoinId,
       starterPlayerId,
       auto,
     };
@@ -513,6 +525,7 @@ export class GameRoom {
       call,
       result,
       starterPlayerId,
+      coinId: safeCoinId,
       auto,
     };
   }

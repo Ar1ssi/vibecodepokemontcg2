@@ -50,8 +50,19 @@ test('normalizeTurnOrderResult accepts a well-formed payload', () => {
       starter: 'self',
       auto: 1,
     }),
-    { caller: 'opp', call: 'tails', result: 'heads', starter: 'self', auto: true }
+    { caller: 'opp', call: 'tails', result: 'heads', starter: 'self', coinId: null, auto: true }
   );
+});
+
+test('normalizeTurnOrderResult passes a bounded coinId and drops a bad one', () => {
+  const base = { caller: 'self', call: 'heads', result: 'heads', starter: 'self' };
+  assert.equal(
+    normalizeTurnOrderResult({ ...base, coinId: 'SVC_Gold_Pikachu_Coin' }).coinId,
+    'SVC_Gold_Pikachu_Coin'
+  );
+  assert.equal(normalizeTurnOrderResult({ ...base, coinId: '' }).coinId, null);
+  assert.equal(normalizeTurnOrderResult({ ...base, coinId: 42 }).coinId, null);
+  assert.equal(normalizeTurnOrderResult({ ...base, coinId: 'x'.repeat(129) }).coinId, null);
 });
 
 test('normalizeTurnOrderResult rejects a half-valid payload', () => {
@@ -147,6 +158,7 @@ test('turnOrderResult is dispatched and cached for a late reader', () => {
     call: 'heads',
     result: 'tails',
     starter: 'opp',
+    coinId: 'SVC_Gold_Pikachu_Coin',
     auto: false,
   });
 
@@ -155,6 +167,7 @@ test('turnOrderResult is dispatched and cached for a late reader', () => {
     call: 'heads',
     result: 'tails',
     starter: 'opp',
+    coinId: 'SVC_Gold_Pikachu_Coin',
     auto: false,
   };
   assert.equal(doc.events[0].type, 'rules-turn-order-result');
