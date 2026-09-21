@@ -177,10 +177,27 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
       });
     };
 
+    // Solo debug shortcut: `?norules` (alias `?debug`) in the URL forces rules
+    // enforcement OFF for this page load so a lone tester can move any card
+    // anywhere on localhost without ticking Settings each time. Ephemeral —
+    // it does NOT persist to localStorage, and it never overrides a
+    // multiplayer game (which always locks rules on).
+    const applyDebugRulesOverride = () => {
+      try {
+        if (typeof location === 'undefined') return;
+        const params = new URLSearchParams(location.search);
+        if (!params.has('norules') && !params.has('debug')) return;
+        if (multiplayerLocksRulesEnabled(systemState.isTwoPlayer)) return;
+        rulesState.enabled = false;
+        appendMessage('', 'Debug mode: rules enforcement disabled (?norules).', 'announcement', false);
+      } catch {}
+    };
+
     export const initializeRulesEngine = () => {
       if (initialized) return;
       initialized = true;
       loadRulesEnabled();
+      applyDebugRulesOverride();
   document.body.classList.toggle('rules-mode', rulesState.enabled);
       initMatCoins();
       buildTurnHUD();
@@ -299,6 +316,24 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
       document.dispatchEvent(new CustomEvent('rules-mode-changed', { detail: { enabled: true } }));
       document.body.classList.toggle('rules-mode', true);
       syncRulesToggleUI();
+    };
+
+    // Debug menu: jump straight to a playable Active main-phase turn for `self`,
+    // skipping the coin flip / deal / prize / starting-Active ritual. Used by the
+    // solo debug panel (debug-menu.js) to test cards in isolation. startGame
+    // resets per-game flags; beginTurn advances to turnNumber 1, phase 'main'.
+    export const forceRulesActiveTurn = (firstPlayer = 'self') => {
+      const starter = firstPlayer === 'opp' ? 'opp' : 'self';
+      rulesState.enabled = true;
+      persistRulesEnabled();
+      document.body.classList.toggle('rules-mode', true);
+      syncRulesToggleUI();
+      startGame(starter);
+      beginTurn(starter);
+      startingActiveFinished = true;
+      startingActiveSelectionPending = false;
+      updateTurnBanner();
+      appendMessage('', 'Debug: game forced to active main phase.', 'announcement', false);
     };
 
     const inPlayCount = (user, zoneId) => {

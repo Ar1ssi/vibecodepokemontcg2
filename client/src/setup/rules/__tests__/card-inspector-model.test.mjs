@@ -9,6 +9,8 @@ const {
   isInspectablePokemon,
   rawAbilityOf,
   bandsForFrame,
+  frameKeyFor,
+  finishFor,
 } = await import('../card-inspector-model.mjs');
 
 const { listAttacks } = await import(
@@ -259,6 +261,29 @@ test('bandsForFrame: an unmapped frame falls back to the default, not a crash (E
   assert.equal(bandsForFrame().footH, bandsForFrame('default').footH);
 });
 
+test('frameKeyFor: modern Mega ex maps to mega-ex, everything else to default', () => {
+  assert.equal(frameKeyFor({ name: 'Mega Charizard X ex', rarity: 'Mega Hyper Rare' }), 'mega-ex');
+  assert.equal(frameKeyFor(ARCANINE), 'default');
+  assert.equal(frameKeyFor(null), 'default');
+});
+
+test('model: a Mega ex stretches its stack over the frame band; a default card stays content-sized', () => {
+  const mega = buildInspectorModel(
+    { ...ARCANINE, name: 'Mega Charizard X ex', rarity: 'Mega Hyper Rare' },
+    { energyTypes: THREE_FIRE }
+  );
+  assert.equal(mega.blockTopPct, 52);
+  assert.equal(mega.blockHeightPct, 23);
+  assert.equal(mega.attackWeights.length, mega.attacks.length);
+  const plain = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE });
+  assert.equal(plain.blockHeightPct, null);
+});
+
+test('model: an explicit ctx.frameKey overrides the classifier', () => {
+  const m = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE, frameKey: 'mega-ex' });
+  assert.equal(m.blockHeightPct, 23);
+});
+
 // ── read-only and rules-off ────────────────────────────────────────────────
 
 test('model: opponent card is read-only — never dimmed, never actionable (E7)', () => {
@@ -388,7 +413,12 @@ test('model: the ability is reported with its printed text', () => {
   const m = buildInspectorModel(CHARMANDER, { energyTypes: ['Fire'] });
   assert.equal(m.ability.name, 'Agile');
   assert.equal(m.ability.text, CHARMANDER.ability.text);
-  assert.equal(m.ability.usable, true);
+});
+
+test('model: a passive ability is neither usable nor greyed', () => {
+  const m = buildInspectorModel(CHARMANDER, { energyTypes: ['Fire'] });
+  assert.equal(m.ability.usable, false);
+  assert.equal(m.ability.recede, false);
 });
 
 test('model: no ability leaves the field null rather than an empty object', () => {
@@ -521,10 +551,10 @@ test('model: a card without an ability behaves the same as one with an inert abi
 });
 
 test('model: an ability IS usable from the bench', () => {
-  const m = buildInspectorModel(CHARMANDER, {
-    energyTypes: ['Fire'],
-    zone: 'bench',
-  });
+  const m = buildInspectorModel(
+    { ...CHARMANDER, ability: { name: 'Ember', text: 'Once during your turn, you may draw a card.' } },
+    { energyTypes: ['Fire'], zone: 'bench' }
+  );
   assert.equal(m.ability.usable, true);
 });
 
@@ -702,4 +732,82 @@ test('model: Stadium extras render after printed attacks with merged indices', (
   assert.equal(m.attacks[1].payable, true);
   assert.equal(m.attacks[1].usable, true);
   assert.equal(m.attacks[0].payable, false);
+});
+
+test('frameKeyFor: Stadiums are sorted by era from the set; unknown or missing set stays default', () => {
+  const rough = { name: 'Rough Seas', supertype: 'Trainer', subtypes: ['Stadium'], set: 'xy5' };
+  const setOf = (set) => frameKeyFor({ ...rough, set });
+  assert.equal(setOf('xy5'), 'stadium-modern');
+  assert.equal(setOf('PRC'), 'stadium-modern');
+  for (const set of ['bw4', 'sm6', 'swsh2', 'sv02', 'me01']) assert.equal(setOf(set), 'stadium-modern');
+  for (const set of ['gym1', 'ex7', 'dp4', 'pl2', 'hgss4', 'col1']) assert.equal(setOf(set), 'stadium-classic');
+  assert.equal(setOf('ecard2'), 'stadium-ecard');
+  assert.equal(setOf(null), 'default');
+  assert.equal(setOf('zzz9'), 'default');
+});
+
+test('model: an XY Stadium is anchored over its printed box and stretched; default stays content-sized', () => {
+  const rough = {
+    name: 'Rough Seas',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    set: 'xy5',
+    text: 'Heal 30.',
+  };
+  const xy = buildInspectorModel(rough, {});
+  assert.equal(xy.kind, 'stadium');
+  assert.equal(xy.blockTopPct, 60);
+  assert.equal(xy.blockHeightPct, 18);
+  const other = buildInspectorModel({ ...rough, set: null }, {});
+  assert.equal(other.blockTopPct, 30);
+  assert.equal(other.blockHeightPct, null);
+});
+
+test('model: retreat greys only when the cost is unpaid; the card is never dimmed', () => {
+  const card = { ...ARCANINE, retreatCost: ['Colorless', 'Colorless', 'Colorless'] };
+  const short = buildInspectorModel(card, { energyTypes: ['Fire'], rulesEnabled: false });
+  assert.equal(short.retreatUsable, true);
+  const gated = buildInspectorModel(card, { energyTypes: ['Fire'] });
+  assert.equal(typeof gated.retreatRecede, 'boolean');
+  assert.equal(gated.retreatRecede, !gated.retreatUsable);
+  const bench = buildInspectorModel(card, { energyTypes: ['Fire'], zone: 'bench' });
+  assert.equal(bench.retreatRecede, false);
+});
+
+test('frameKeyFor: BW and XY Pokémon get the bottom-left Retreat frame; others do not', () => {
+  const kyurem = { name: 'White Kyurem EX', supertype: 'Pokémon', set: 'bw11' };
+  assert.equal(frameKeyFor(kyurem), 'pokemon-bwxy');
+  assert.equal(frameKeyFor({ ...kyurem, set: 'LTR' }), 'pokemon-bwxy');
+  assert.equal(frameKeyFor({ ...kyurem, set: 'xy1' }), 'pokemon-bwxy');
+  assert.equal(frameKeyFor({ ...kyurem, set: 'sv02' }), 'pokemon-modern');
+  assert.equal(frameKeyFor({ ...kyurem, set: null }), 'default');
+});
+
+test('model: a BW/XY frame reports a retreat corner; default reports none', () => {
+  const card = { ...ARCANINE, set: 'bw11' };
+  const m = buildInspectorModel(card, { energyTypes: THREE_FIRE });
+  assert.ok(m.retreatCorner);
+  const plain = buildInspectorModel({ ...ARCANINE, set: null }, { energyTypes: THREE_FIRE });
+  assert.equal(plain.retreatCorner, null);
+});
+
+test('model: only XY M/Primal cards hang their stack from the band bottom', () => {
+  const mega = { ...ARCANINE, name: 'Primal Kyogre-EX', set: 'xy5' };
+  assert.equal(frameKeyFor(mega), 'pokemon-xy-mega');
+  const m = buildInspectorModel(mega, { energyTypes: THREE_FIRE });
+  assert.equal(m.blockBottomPct, 100 - 85);
+  assert.ok(m.retreatCorner);
+  const regular = buildInspectorModel({ ...ARCANINE, set: 'bw11' }, { energyTypes: THREE_FIRE });
+  assert.equal(regular.blockBottomPct, null);
+  const plain = buildInspectorModel({ ...ARCANINE, set: null }, { energyTypes: THREE_FIRE });
+  assert.equal(plain.blockBottomPct, null);
+});
+
+test('finishFor: rarity picks the animation tier', () => {
+  assert.equal(finishFor({ rarity: 'Common' }), 'plain');
+  assert.equal(finishFor(null), 'plain');
+  assert.equal(finishFor({ rarity: 'Rare Holo' }), 'holo');
+  assert.equal(finishFor({ rarity: 'Double Rare' }), 'ultra');
+  assert.equal(finishFor({ name: 'Mega Lucario ex', rarity: 'Rare' }), 'ultra');
+  assert.equal(finishFor({ rarity: 'Special Illustration Rare' }), 'secret');
 });

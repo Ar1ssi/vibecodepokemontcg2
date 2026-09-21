@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { attackZoneBounds, listAttackZoneBounds, abilityZoneBounds, computeContentBox } =
+const {
+  attackZoneBounds,
+  attackWeights,
+  listAttackZoneBounds,
+  abilityZoneBounds,
+  computeContentBox,
+} =
   await import('../attack-zone-geometry.js');
 
 test('0 attacks: attackZoneBounds and listAttackZoneBounds both return empty/null', () => {
@@ -105,4 +111,47 @@ test('computeContentBox: matching aspect ratio fills the box exactly', () => {
     naturalHeight: 350,
   });
   assert.deepEqual(box, { left: 0, top: 0, width: 250, height: 350 });
+});
+
+test('attackWeights: more effect text weighs more; empty text still weighs 1', () => {
+  const [bare, wordy] = attackWeights([
+    { text: '' },
+    { text: 'x'.repeat(100) },
+  ]);
+  assert.equal(bare, 1);
+  assert.ok(wordy > bare);
+  assert.deepEqual(attackWeights(), []);
+});
+
+test('weighted zones: heights follow weights, stay contiguous, and fill the band', () => {
+  const band = { topPct: 50, bottomPct: 80, abilityShiftPct: 8, abilityHeightPct: 7 };
+  const zones = listAttackZoneBounds({ attackCount: 2, band, weights: [1, 2] });
+  assert.equal(zones[0].topPct, 50);
+  assert.equal(zones[0].heightPct, 10);
+  assert.equal(zones[1].heightPct, 20);
+  assert.equal(zones[0].topPct + zones[0].heightPct, zones[1].topPct);
+  assert.equal(zones[1].topPct + zones[1].heightPct, 80);
+});
+
+test('weights of the wrong length fall back to equal shares', () => {
+  const zones = listAttackZoneBounds({ attackCount: 2, weights: [1] });
+  assert.equal(zones[0].heightPct, zones[1].heightPct);
+});
+
+test('a frame band moves the zones and the ability zone with it', () => {
+  const band = { topPct: 40, bottomPct: 60, abilityShiftPct: 5, abilityHeightPct: 4 };
+  assert.equal(attackZoneBounds({ attackCount: 1, index: 0, band }).topPct, 40);
+  assert.deepEqual(abilityZoneBounds({ abilityCount: 1, band }), {
+    topPct: 41,
+    heightPct: 4,
+  });
+});
+
+test('stadiumZoneBounds: default is content-sized; a frame band stretches to its bottom', async () => {
+  const { stadiumZoneBounds } = await import('../attack-zone-geometry.js');
+  assert.deepEqual(stadiumZoneBounds(), { topPct: 30, heightPct: null });
+  assert.deepEqual(stadiumZoneBounds({ band: { topPct: 60, bottomPct: 78 } }), {
+    topPct: 60,
+    heightPct: 18,
+  });
 });

@@ -36,7 +36,7 @@ const OPP_BOARD_CSS = readFileSync(`${CSS_DIR}opp-containers.css`, 'utf8');
 const body = (selector) => ruleBody(INDEX_CSS, selector);
 
 describe('013 C2 — dimming never uses opacity', () => {
-  for (const selector of ['.ptcg-inspector--locked', '.ptcg-atk--recede']) {
+  for (const selector of ['.ptcg-atk--recede']) {
     it(`${selector} dims with filter and declares no opacity`, () => {
       const decls = body(selector);
       assert.ok(decls, `${selector} is missing from index.css`);

@@ -204,7 +204,12 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       token.includes('|') &&
       token.split('|').includes(symbol);
 
+    // Solo debug switch (debug menu): when set, every attack and retreat cost counts as paid.
+    // Server code never sets it, so authoritative play is unaffected.
+    export const debugCosts = { free: false };
+
     export function canPayAttackCost(attachedEnergies = [], cost = []) {
+      if (debugCosts.free) return true;
       const pool = expandEnergyEntries(attachedEnergies);
       for (const symbol of cost) {
         if (symbol === 'Colorless') {

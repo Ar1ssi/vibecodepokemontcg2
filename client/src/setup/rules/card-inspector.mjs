@@ -3,7 +3,7 @@
  *
  * Double-clicking one of your own board Pokémon enlarges the card scan and overlays the
  * TCG Live readout on top of it: an HP pill over the printed HP slot, attack panels over the
- * printed attack text box, and three tiles over the printed weakness strip. Attached Energy
+ * printed attack text box, and a Retreat tile over the printed retreat cost. Attached Energy
  * rides along as further carousel slides.
  *
  * The card scan is the background and stays visible. Every piece is opaque only where it
@@ -99,6 +99,17 @@ const el = (tag, className, text) => {
   return node;
 };
 
+// Short effect text is set larger so a one-line block fills its panel instead of leaving a
+// band of empty white; long text keeps the base size so it still fits the printed box.
+const SHORT_TEXT_MAX_CHARS = 90;
+const textBody = (text) =>
+  el(
+    'p',
+    String(text).length <= SHORT_TEXT_MAX_CHARS
+      ? 'ptcg-atk__text ptcg-atk__text--short'
+      : 'ptcg-atk__text'
+  );
+
 const orb = (type, className) => {
   const src = getEnergyTokenSrcForType(type);
   if (src) {
@@ -144,8 +155,8 @@ const textWithOrbs = (target, text, className) => {
 // type would make an ability panel look like an attack panel of a different cost.
 const ABILITY_BANNER = '#a52834';
 
-// A Stadium prints no type, so its panel uses one fixed slate banner regardless of card.
-const STADIUM_BANNER = '#5a6070';
+// A Stadium prints no type, so its panel uses one fixed green banner regardless of card.
+const STADIUM_BANNER = '#2e8b57';
 
 const stadiumEl = (model) => {
   const section = el(
@@ -166,7 +177,7 @@ const stadiumEl = (model) => {
   section.appendChild(head);
 
   if (model.text) {
-    const body = el('p', 'ptcg-atk__text');
+    const body = textBody(model.text);
     textWithOrbs(body, model.text, 'ptcg-orb ptcg-orb--inline');
     section.appendChild(body);
   }
@@ -189,7 +200,7 @@ const abilityEl = (ability) => {
   section.appendChild(head);
 
   if (ability.text) {
-    const body = el('p', 'ptcg-atk__text');
+    const body = textBody(ability.text);
     textWithOrbs(body, ability.text, 'ptcg-orb ptcg-orb--inline');
     section.appendChild(body);
   }
@@ -197,7 +208,7 @@ const abilityEl = (ability) => {
   return section;
 };
 
-const attackEl = (attack) => {
+const attackEl = (attack, cardType) => {
   const section = el(
     'section',
     `ptcg-atk${attack.recede ? ' ptcg-atk--recede' : ''}`
@@ -207,7 +218,7 @@ const attackEl = (attack) => {
   section.dataset.ptcgAttack = String(attack.index);
   section.style.setProperty(
     '--ptcg-banner',
-    BANNER[attack.cost[0]] || BANNER_DEFAULT
+    BANNER[cardType] || BANNER_DEFAULT
   );
 
   const head = el('div', 'ptcg-atk__head');
@@ -222,7 +233,7 @@ const attackEl = (attack) => {
   section.appendChild(head);
 
   if (attack.text) {
-    const body = el('p', 'ptcg-atk__text');
+    const body = textBody(attack.text);
     textWithOrbs(body, attack.text, 'ptcg-orb ptcg-orb--inline');
     section.appendChild(body);
   }
@@ -239,16 +250,6 @@ const valueTile = (label, render) => {
   return tile;
 };
 
-const typeValueTile = (label, tv, suffix) =>
-  valueTile(label, (val) => {
-    if (tv?.type) {
-      val.appendChild(orb(tv.type, 'ptcg-orb ptcg-orb--sm'));
-      val.appendChild(el('span', 'ptcg-stat__n', suffix(tv.value)));
-    } else {
-      val.appendChild(el('span', 'ptcg-stat__n ptcg-stat__n--none', '—'));
-    }
-  });
-
 // The retreat tile is also the Retreat affordance: `data-ptcg-retreat` lets the delegated click
 // resolve it after a re-render, exactly as `data-ptcg-attack` does for attacks. It only becomes
 // clickable when the model says so (see `applyAffordances`); the reason a card cannot retreat
@@ -264,7 +265,10 @@ const retreatTile = (model) => {
     }
   });
   tile.dataset.ptcgRetreat = '1';
-  if (!model.retreatable && model.retreatReason)
+  // Greyed when the retreat is not available (cost unpaid, already retreated, not your turn);
+  // the reason rides on the tooltip. Only this tile greys — never the card or its HP.
+  tile.classList.toggle('ptcg-stat--recede', Boolean(model.retreatRecede));
+  if (!model.retreatUsable && model.retreatReason)
     tile.title = model.retreatReason;
   return tile;
 };
@@ -282,13 +286,22 @@ const retreatTile = (model) => {
  */
 const buildChrome = (model) => {
   const chrome = el('div', 'ptcg-chrome');
+  chrome.dataset.finish = model.finish ?? 'plain';
+  chrome.style.setProperty('--ptcg-inset-left', `${model.sideInsetLeftPct ?? 0}%`);
+  chrome.style.setProperty('--ptcg-inset-right', `${model.sideInsetRightPct ?? 0}%`);
 
   // A Stadium has no HP row, attack panels or stat strip — just its effect text, laid out as a
   // content-sized panel anchored over the printed effect box.
   if (model.kind === 'stadium') {
     const stack = el('div', 'ptcg-stack');
     stack.style.top = `${model.blockTopPct}%`;
-    stack.appendChild(stadiumEl(model));
+    const panel = stadiumEl(model);
+    if (model.blockHeightPct != null) {
+      // min-height, not height: text longer than the printed box grows the panel, never clips.
+      stack.style.minHeight = `${model.blockHeightPct}%`;
+      panel.style.flexGrow = '1';
+    }
+    stack.appendChild(panel);
     chrome.appendChild(stack);
     return chrome;
   }
@@ -303,22 +316,48 @@ const buildChrome = (model) => {
 
   if (model.blockTopPct != null) {
     const stack = el('div', 'ptcg-stack');
-    stack.style.top = `${model.blockTopPct}%`;
+    if (model.blockBottomPct != null) stack.style.bottom = `${model.blockBottomPct}%`;
+    else stack.style.top = `${model.blockTopPct}%`;
+    if (model.compactStack) stack.classList.add('ptcg-stack--compact');
     if (model.ability) stack.appendChild(abilityEl(model.ability));
     const atks = el('div', 'ptcg-atks');
-    for (const attack of model.attacks) atks.appendChild(attackEl(attack));
+    model.attacks.forEach((attack, i) => {
+      const row = attackEl(attack, model.type);
+      // Weighted growth only matters once the stack is stretched over a frame's printed band.
+      if (model.blockHeightPct != null)
+        row.style.flexGrow = String(model.attackWeights[i] ?? 1);
+      atks.appendChild(row);
+    });
+    if (model.blockHeightPct != null) {
+      // min-height, not height: text longer than the printed band grows the stack instead of clipping.
+      stack.style.minHeight = `${model.blockHeightPct}%`;
+      atks.style.flex = '1 1 auto';
+    }
     stack.appendChild(atks);
     chrome.appendChild(stack);
   }
 
-  const stats = el('footer', 'ptcg-stats');
-  stats.style.bottom = `${model.footH}%`;
-  stats.appendChild(typeValueTile('weakness', model.weakness, (v) => `x${v}`));
-  stats.appendChild(
-    typeValueTile('resistance', model.resistance, (v) => `-${v}`)
-  );
-  stats.appendChild(retreatTile(model));
-  chrome.appendChild(stats);
+  if (model.retreatCorner) {
+    // Frames that print Retreat alone at the bottom-left: only Retreat is interactive, so it is
+    // the one overlay there; the printed Weakness/Resistance are left showing.
+    const corner = el('footer', 'ptcg-stats ptcg-stats--corner');
+    corner.style.left = `${model.retreatCorner.leftPct}%`;
+    corner.style.width = `${model.retreatCorner.widthPct}%`;
+    corner.style.right = 'auto';
+    corner.style.bottom = `${model.retreatCorner.bottomPct}%`;
+    if (model.retreatInline) corner.classList.add('ptcg-stats--row');
+    corner.appendChild(retreatTile(model));
+    chrome.appendChild(corner);
+  } else {
+    const stats = el('footer', 'ptcg-stats');
+    stats.style.bottom = `${model.footH}%`;
+    // Weakness and Resistance are not interactive, so only Retreat is overlaid: it takes the
+    // right-hand third of the printed strip, where these frames print it.
+    stats.style.left =
+      'calc(var(--ptcg-inset-left, 0%) + (100% - var(--ptcg-inset-left, 0%) - var(--ptcg-inset-right, 0%)) * 2 / 3)';
+    stats.appendChild(retreatTile(model));
+    chrome.appendChild(stats);
+  }
 
   if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
   return chrome;
@@ -385,13 +424,6 @@ const wireBoundary = () => {
   boundaryWired = true;
 };
 
-// The dim goes on the wrap rather than the chrome so the card and its pieces darken together,
-// which is what "the window is dimmed" means. Only the card box dims — Retreat and Pass Turn
-// stay legal at any energy count, so greying them would lie about the game state.
-const applyDim = (wrap, model) => {
-  wrap.classList.toggle('ptcg-inspector--locked', model.dimLevel === 'full');
-};
-
 /**
  * Rebuild the chrome in place. Runs on mount and on every REFRESH_EVENT, because using an
  * ability can attach Energy and make an unpayable attack payable while the inspector is open
@@ -409,7 +441,6 @@ const rerender = (state) => {
   // The delegated handler reads state.model, so refreshing it here is what keeps a click after
   // a refresh event firing against current payability rather than the paint it opened with.
   state.model = model;
-  applyDim(state.wrap, model);
   placeChrome(next, state.wrap);
   applyAffordances(state, model);
 };
@@ -447,7 +478,6 @@ export const decorateInspectorSlide = (
   state.refresh = () => rerender(state);
   states.add(state);
   wireBoundary();
-  applyDim(wrap, model);
   applyAffordances(state, model);
   wirePanelClicks(state);
   hydrateContext(state);
@@ -493,7 +523,7 @@ const applyAffordances = (state, model) => {
     .querySelector('.ptcg-stat[data-ptcg-retreat]')
     ?.classList.toggle(
       'ptcg-stat--usable',
-      Boolean(handlers?.onRetreat) && Boolean(model.retreatable)
+      Boolean(handlers?.onRetreat) && Boolean(model.retreatUsable)
     );
 };
 
@@ -530,7 +560,7 @@ const wirePanelClicks = (state) => {
       '.ptcg-stat[data-ptcg-retreat]'
     );
     if (retreatPanel) {
-      if (!state.model.retreatable) return;
+      if (!state.model.retreatUsable) return;
       event.stopPropagation();
       state.actions?.onRetreat?.();
     }

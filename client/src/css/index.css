@@ -5001,13 +5001,6 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   align-items: center;
   justify-content: center;
 }
-/* Attack cost not met. The whole card dims, pieces included, rather than hiding
-   them: the player opens this precisely to read what is missing and decide what
-   to attach. filter, not opacity — see the C2 note in card-inspector.mjs. */
-.ptcg-inspector--locked {
-  filter: saturate(0.28) brightness(0.62);
-}
-
 .ptcg-chrome {
   position: absolute;
   pointer-events: none;
@@ -5036,7 +5029,7 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
    as two different numbers for the same card. */
 .ptcg-hp {
   position: absolute;
-  top: 3%;
+  top: 0;
   right: 2%;
   display: flex;
   align-items: center;
@@ -5062,21 +5055,38 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
    top comes from the model; there is deliberately no bottom. */
 .ptcg-stack {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: var(--ptcg-inset-left, 0%);
+  right: var(--ptcg-inset-right, 0%);
   display: flex;
   flex-direction: column;
+  /* The whole text column floats off the print as one rounded, shadowed tile. */
+  border-radius: calc(var(--u) * 2.1);
+  overflow: hidden;
+  box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
 }
 .ptcg-atks {
   display: flex;
   flex-direction: column;
+}
+/* Frosted panels: a top-lit fill at ~90% over a heavy backdrop blur lets the card's colour bleed
+   through while the printed text beneath stays an illegible smear, never a readable ghost.
+   Keep the fill at 85%+ — lower and the blurred print starts to read as shapes again. */
+.ptcg-atk,
+.ptcg-ability,
+.ptcg-stadium,
+.ptcg-stat {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ptcg-panel-bg, #fff) 92%, transparent) 0%,
+    color-mix(in srgb, color-mix(in srgb, var(--ptcg-panel-bg, #fff) 94%, #1c2530) 88%, transparent) 100%
+  );
+  backdrop-filter: blur(calc(var(--u) * 2.4)) saturate(1.25);
 }
 .ptcg-atk,
 .ptcg-ability,
 .ptcg-stadium {
   display: flex;
   flex-direction: column;
-  background: #fff;
   border-top: 1px solid #d9d2c5;
   pointer-events: auto;
 }
@@ -5108,7 +5118,8 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 }
 /* A slow highlight sweeping across the banner — the "flowing" energy the attack bar carries
    in TCG Live. Scoped to attack panels so ability/stadium text bands stay calm. */
-.ptcg-atk > .ptcg-atk__head::after {
+.ptcg-atk > .ptcg-atk__head::after,
+.ptcg-stadium > .ptcg-atk__head::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -5127,7 +5138,10 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   55%, 100% { transform: translateX(130%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ptcg-atk > .ptcg-atk__head::after { animation: none; opacity: 0; }
+  .ptcg-atk > .ptcg-atk__head::after,
+  .ptcg-stadium > .ptcg-atk__head::after,
+  .ptcg-atk__text::after,
+  .ptcg-stat::after { animation: none; opacity: 0; }
 }
 /* The printed card carries a red "Ability" badge before the name; without it an ability panel
    is indistinguishable from an attack that happens to have no damage. */
@@ -5184,10 +5198,85 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   font-size: calc(var(--u) * 2.7);
   line-height: 1.45;
   color: #1c2530;
+  /* Shadow cast down from the raised head band, so the text sits in a recess below it. */
+  box-shadow: inset 0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.09);
 }
+/* The white text areas and the Retreat tile carry a faint cool sheen sweep of their own. */
+.ptcg-atk__text,
+.ptcg-stat {
+  position: relative;
+  overflow: hidden;
+}
+.ptcg-atk__text::after,
+.ptcg-stat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(110, 140, 185, 0.2) 50%,
+    transparent 66%
+  );
+  transform: translateX(-130%);
+  animation: ptcg-atk-flow 5.2s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Finish tiers (set from the card's rarity as `data-finish`): shinier cards get a tinted panel and a
+   flowing sheen that matches the print. Plain keeps the cool sweep above. */
+.ptcg-chrome[data-finish='holo'] { --ptcg-panel-bg: #f1f6ff; }
+.ptcg-chrome[data-finish='ultra'] { --ptcg-panel-bg: #faf2ff; }
+.ptcg-chrome[data-finish='secret'] { --ptcg-panel-bg: #fff7e2; }
+.ptcg-chrome[data-finish='holo'] .ptcg-atk__text::after,
+.ptcg-chrome[data-finish='holo'] .ptcg-stat::after {
+  background: linear-gradient(100deg, transparent 20%, rgba(110, 165, 255, 0.6) 50%, transparent 80%);
+  animation-duration: 4s;
+}
+.ptcg-chrome[data-finish='ultra'] .ptcg-atk__text::after,
+.ptcg-chrome[data-finish='ultra'] .ptcg-stat::after {
+  /* Two faint colour bands with clear gaps between them: a solid 0.5 rainbow painted the whole
+     panel mint/pink at all times and made it the loudest thing on the card. */
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 90, 190, 0.2) 12%,
+    rgba(90, 190, 255, 0.2) 22%,
+    transparent 34%,
+    transparent 50%,
+    rgba(255, 225, 90, 0.18) 62%,
+    rgba(90, 240, 170, 0.2) 72%,
+    transparent 84%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  transform: none;
+  animation: ptcg-prism 7s linear infinite;
+}
+.ptcg-chrome[data-finish='secret'] .ptcg-atk__text::after,
+.ptcg-chrome[data-finish='secret'] .ptcg-stat::after {
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 190, 60, 0.7) 50%, transparent 80%);
+  animation-duration: 3.4s;
+}
+@keyframes ptcg-prism {
+  from { background-position: 0% 0; }
+  to { background-position: 300% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ptcg-chrome[data-finish] .ptcg-atk__text::after,
+  .ptcg-chrome[data-finish] .ptcg-stat::after { animation: none; opacity: 0; }
+}
+/* Tighter padding and leading so a stack hung from the bottom stays clear of the rules box above. */
+.ptcg-stack--compact .ptcg-atk__text {
+  padding-top: calc(var(--u) * 0.8);
+  padding-bottom: calc(var(--u) * 0.8);
+  line-height: 1.3;
+}
+.ptcg-stack--compact .ptcg-atk__head { padding-top: calc(var(--u) * 0.9); padding-bottom: calc(var(--u) * 0.9); }
+.ptcg-atk__text--short { font-size: calc(var(--u) * 3.4); }
 .ptcg-atk--recede,
 .ptcg-ability--recede,
-.ptcg-stadium--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
+.ptcg-stadium--recede,
+.ptcg-stat--recede { filter: saturate(0.25) brightness(0.84) contrast(0.94); }
 .ptcg-atk--usable,
 .ptcg-ability--usable,
 .ptcg-stadium--usable,
@@ -5204,10 +5293,13 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
    three separate pieces without gaps that let the print through. */
 .ptcg-stats {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: var(--ptcg-inset-left, 0%);
+  right: var(--ptcg-inset-right, 0%);
   display: flex;
   pointer-events: auto;
+  /* Same float as the text stack, so the strip reads as one raised tile. */
+  border-radius: 0 0 calc(var(--u) * 2.1) calc(var(--u) * 2.1);
+  box-shadow: 0 calc(var(--u) * 1.2) calc(var(--u) * 3.4) rgba(0, 0, 0, 0.4);
 }
 .ptcg-stat {
   flex: 1;
@@ -5218,7 +5310,6 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   justify-content: center;
   gap: calc(var(--u) * 0.5);
   padding: calc(var(--u) * 1.1) calc(var(--u) * 0.9);
-  background: #fff;
   border-top: 1px solid #d9d2c5;
   border-left: 1px solid #d9d2c5;
 }
@@ -5238,7 +5329,11 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   gap: calc(var(--u) * 0.7);
 }
 .ptcg-stat__n { font-size: calc(var(--u) * 2.7); font-weight: 800; color: #16202b; }
+/* Modern frames print the label left of the cost instead of above it. */
+.ptcg-stats--row .ptcg-stat { flex-direction: row; gap: calc(var(--u) * 1.4); }
 .ptcg-stat__n--none { color: #a3adb8; font-weight: 600; }
+/* The BW/XY corner button sits below the printed Weakness/Resistance row, so it stays short. */
+.ptcg-stats--corner .ptcg-stat { padding-top: calc(var(--u) * 0.4); padding-bottom: calc(var(--u) * 0.4); border-radius: calc(var(--u) * 2.1); }
 
 .ptcg-dmg {
   position: absolute;
