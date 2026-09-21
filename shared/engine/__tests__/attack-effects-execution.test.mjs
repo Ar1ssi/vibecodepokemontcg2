@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { applyCommand } from '../reduce.mjs';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
+import { returnEnergyBonusClause } from '../rules/damage-parser.mjs';
 
 function createTestGame() {
   const state = createGameState({
@@ -805,6 +806,157 @@ describe('Phase 3: Secondary Attack Effects & Costs', () => {
       assert.equal(res.state.pendingChoice, null, 'no matching card → no choice');
       // Attack still resolved and the turn advanced.
       assert.equal(res.state.turn.player, 'p2');
+    });
+  });
+
+  describe('Mega Greninja ex — Ninja Spinner (optional return Energy)', () => {
+    const NINJA_SPINNER = {
+      name: 'Ninja Spinner',
+      cost: ['Water', 'Water'],
+      damage: 120,
+      text: 'You may put a {W} Energy attached to this Pokémon into your hand and have this attack do 80 more damage.',
+    };
+
+    function ninjaGame({ withWater = true } = {}) {
+      const state = createTestGame();
+      const greninja = createCard({
+        instanceId: 1,
+        id: 'mega-greninja',
+        name: 'Mega Greninja ex',
+        supertype: 'Pokémon',
+        hp: 300,
+        attacks: [NINJA_SPINNER],
+      });
+      const water1 = createCard({
+        instanceId: 11,
+        id: 'we-1',
+        name: 'Water Energy',
+        supertype: 'Energy',
+        energyType: 'Water',
+        attachedTo: 1,
+      });
+      const water2 = createCard({
+        instanceId: 12,
+        id: 'we-2',
+        name: 'Water Energy',
+        supertype: 'Energy',
+        energyType: 'Water',
+        attachedTo: 1,
+      });
+      const fire = createCard({
+        instanceId: 13,
+        id: 'fe-1',
+        name: 'Fire Energy',
+        supertype: 'Energy',
+        energyType: 'Fire',
+        attachedTo: 1,
+      });
+      state.players.p1.zones.active = withWater
+        ? [greninja, water1, water2, fire]
+        : [greninja, fire];
+      state.players.p2.zones.active = [
+        createCard({
+          instanceId: 2,
+          id: 'def',
+          name: 'Defender',
+          supertype: 'Pokémon',
+          hp: 400,
+        }),
+      ];
+      return state;
+    }
+
+    it('parser extracts the type, count and bonus', () => {
+      const clause = returnEnergyBonusClause(NINJA_SPINNER.text);
+      assert.deepEqual(clause, { count: 1, energyType: 'Water', bonus: 80 });
+      assert.equal(returnEnergyBonusClause('Do 30 damage.'), null);
+    });
+
+    it('offers the choice and returns the Water Energy for +80 when accepted', () => {
+      const state = ninjaGame();
+      const res = applyCommand(state, {
+        type: 'attack',
+        playerId: 'p1',
+        payload: { attackIndex: 0 },
+      });
+
+      assert.equal(res.error, null);
+      const choice = res.pendingChoice;
+      assert.ok(choice, 'accepting the optional Energy return must be a choice');
+      assert.equal(choice.player, 'p1');
+      assert.equal(choice.min, 1);
+      assert.equal(choice.max, 1);
+      assert.equal(choice.resumeToken.effectType, 'attackReturnEnergyBonus');
+      // No damage dealt yet — the choice suspends the attack.
+      assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
+
+      const resolved = applyCommand(res.state, {
+        type: 'resolveChoice',
+        payload: { choiceId: choice.choiceId, selection: [1] },
+        playerId: 'p1',
+      });
+
+      assert.equal(resolved.error, null);
+      assert.equal(resolved.pendingChoice, null);
+      // 120 + 80, and the returned Energy is in hand (one Water remains attached).
+      assert.equal(resolved.state.players.p2.zones.active[0].damage, 200);
+      assert.equal(
+        resolved.state.players.p1.zones.hand.filter(
+          (c) => c.energyType === 'Water'
+        ).length,
+        1
+      );
+      assert.equal(
+        resolved.state.players.p1.zones.active.filter(
+          (c) => c.energyType === 'Water'
+        ).length,
+        1
+      );
+      // The turn ended after the suspended attack resolved.
+      assert.equal(resolved.state.turn.player, 'p2');
+    });
+
+    it('keeps the Energy and deals the printed base when declined', () => {
+      const state = ninjaGame();
+      const res = applyCommand(state, {
+        type: 'attack',
+        playerId: 'p1',
+        payload: { attackIndex: 0 },
+      });
+
+      const resolved = applyCommand(res.state, {
+        type: 'resolveChoice',
+        payload: { choiceId: res.pendingChoice.choiceId, selection: [2] },
+        playerId: 'p1',
+      });
+
+      assert.equal(resolved.error, null);
+      assert.equal(resolved.state.players.p2.zones.active[0].damage, 120);
+      assert.equal(resolved.state.players.p1.zones.hand.length, 0);
+      assert.equal(
+        resolved.state.players.p1.zones.active.filter(
+          (c) => c.energyType === 'Water'
+        ).length,
+        2
+      );
+    });
+
+    it('skips the choice and deals base damage with no compatible Energy attached', () => {
+      const state = ninjaGame({ withWater: false });
+      // Colorless cost so the Fire Energy pays it without offering a Water return.
+      state.players.p1.zones.active[0].attacks[0] = {
+        ...NINJA_SPINNER,
+        cost: ['Colorless'],
+      };
+      const res = applyCommand(state, {
+        type: 'attack',
+        playerId: 'p1',
+        payload: { attackIndex: 0 },
+      });
+
+      assert.equal(res.error, null);
+      assert.equal(res.pendingChoice, null);
+      assert.equal(res.state.players.p2.zones.active[0].damage, 120);
     });
   });
 });

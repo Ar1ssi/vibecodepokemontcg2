@@ -365,6 +365,24 @@ export function parseAttackDamage(
     }
   }
 
+  // ── Optional return-energy bonus (Mega Greninja ex — Ninja Spinner) ──
+  // "You may put a {W} Energy attached to this Pokémon into your hand and have
+  // this attack do 80 more damage." The reducer resolves the player's choice
+  // before damage and passes it as `ctx.energyReturned`; the printed bonus
+  // applies only when an Energy was actually returned.
+  const returnBonus = text ? returnEnergyBonusClause(attack?.text) : null;
+  if (returnBonus) {
+    if (ctx.energyReturned === true) {
+      total += returnBonus.bonus;
+      components.push('conditional');
+      notes.push(`+ ${returnBonus.bonus} (Energy returned to hand)`);
+    } else if (ctx.energyReturned !== false) {
+      notes.push(
+        `conditional +${returnBonus.bonus} bonus — resolve the printed condition`
+      );
+    }
+  }
+
   // ── Type-gated bonus: "+N if the Defending Pokémon is a [type] Pokémon" ──
   const typeMatch = text.match(
     /if the defending pokémon is a (grass|fire|water|lightning|psychic|fighting|dark|metal|fairy|dragon) pokémon.*?does (\d+) more damage/
@@ -722,6 +740,26 @@ export function returnEnergyCount(attackText) {
   const m = /put (\d+)/i.exec(text);
   if (m) return Math.max(1, parseInt(m[1], 10));
   return /put an energy/i.test(text) ? 1 : 1;
+}
+
+/**
+ * Optional return-energy-for-damage clause (Mega Greninja ex — Ninja Spinner):
+ * "You may put a {W} Energy attached to this Pokémon into your hand and have
+ * this attack do 80 more damage." The Energy return is the player's choice; the
+ * bonus applies only when they choose it. Returns `{ count, energyType, bonus }`
+ * or null when the attack has no such clause. Pure.
+ */
+export function returnEnergyBonusClause(attackText) {
+  const m =
+    /you may put (?:\d+|an?) (?:\{([a-z])\} )?energy[^.]*?attached to this pok[ée]mon into your hand and have this attack do (\d+) more damage/i.exec(
+      String(attackText || '')
+    );
+  if (!m) return null;
+  return {
+    count: 1,
+    energyType: energyTypeOf(m[1]),
+    bonus: Math.max(0, parseInt(m[2], 10) || 0),
+  };
 }
 
 /** Damage ignores Weakness and Resistance (immunity family). */

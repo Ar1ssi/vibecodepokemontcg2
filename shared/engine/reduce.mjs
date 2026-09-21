@@ -39,6 +39,7 @@ import {
   discardEnergyScaling,
   deckMillScaling,
   attachDiscardToBenchSpread,
+  returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -2752,6 +2753,55 @@ function attachMilledCards(player, cardIds, root, events) {
   }
 }
 
+/**
+ * Energy cards attached to `attacker` that satisfy the printed return-energy
+ * type (Mega Greninja ex — Ninja Spinner). A null type matches any Energy.
+ */
+function attachedEnergyCardsFor(draft, playerId, attacker, energyType) {
+  if (!attacker) return [];
+  const player = draft.players[playerId];
+  const attached = [
+    ...(player?.zones?.active || []),
+    ...(player?.zones?.bench || []),
+  ].filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c));
+  if (!energyType) return attached;
+  return attached.filter((c) => matchesSearch(c, `${energyType} Energy`));
+}
+
+/**
+ * Moves one attached Energy card (of `energyType`, or any when null) from the
+ * attacker to its owner's hand. Returns true when a card moved. Used by the
+ * optional return-energy-for-damage attack (Mega Greninja ex — Ninja Spinner).
+ */
+function moveAttachedEnergyToHand(draft, { playerId, attacker, energyType, events }) {
+  const player = draft.players[playerId];
+  if (!player?.zones || !attacker) return false;
+  for (const zoneKey of ['active', 'bench']) {
+    const zone = player.zones[zoneKey];
+    if (!Array.isArray(zone)) continue;
+    const idx = zone.findIndex(
+      (c) =>
+        c.attachedTo === attacker.instanceId &&
+        isEnergy(c) &&
+        (!energyType || matchesSearch(c, `${energyType} Energy`))
+    );
+    if (idx === -1) continue;
+    const [card] = zone.splice(idx, 1);
+    card.attachedTo = null;
+    player.zones.hand.push(card);
+    events.push({
+      type: 'cardMoved',
+      instanceId: card.instanceId,
+      from: zoneKey,
+      to: 'hand',
+      playerId,
+      reason: 'attack-return-energy',
+    });
+    return true;
+  }
+  return false;
+}
+
 /** Shuffles a player's deck with the command RNG (no-op without one). */
 function shuffleDeckWithRng(player, rng) {
   if (player?.zones?.deck && rng) player.zones.deck = rng.shuffle(player.zones.deck);
@@ -2977,6 +3027,49 @@ function resolveAttackEffectPhase(draft, ctx) {
     energyDiscarded = 0;
   }
 
+  // Optional return-energy-for-damage (Mega Greninja ex — Ninja Spinner): ask
+  // before damage so declining still deals the printed base. The Energy moves
+  // to hand only when accepted; the +N bonus is resolved by parseAttackDamage
+  // from ctx.energyReturned.
+  let energyReturned = ctx.energyReturned;
+  const returnBonus = returnEnergyBonusClause(attack?.text);
+  if (returnBonus && energyReturned === undefined) {
+    const candidates = attachedEnergyCardsFor(
+      draft,
+      playerId,
+      attacker,
+      returnBonus.energyType
+    );
+    if (candidates.length > 0) {
+      const typeLabel = returnBonus.energyType
+        ? `${returnBonus.energyType} Energy`
+        : 'Energy';
+      draft.pendingChoice = createPendingChoice({
+        player: playerId,
+        source: 'attack',
+        prompt: `${attack.name}: return a ${typeLabel} to your hand for ${returnBonus.bonus} more damage?`,
+        // Numeric sentinels: the choice validator only accepts integer instanceIds.
+        options: [
+          {
+            instanceId: 1,
+            name: `Yes — +${returnBonus.bonus} damage`,
+            type: 'option',
+          },
+          { instanceId: 2, name: 'No', type: 'option' },
+        ],
+        min: 1,
+        max: 1,
+        resumeToken: {
+          ...resumeBase,
+          effectType: 'attackReturnEnergyBonus',
+          energyType: returnBonus.energyType,
+        },
+      });
+      return;
+    }
+    energyReturned = false;
+  }
+
       const parsed = parseAttackDamage(
         attack,
         attackerView,
@@ -2992,6 +3085,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           headsCount,
           energyDiscarded,
           milledMatches,
+          energyReturned,
         })
       );
       const effectiveAttack =
@@ -4637,6 +4731,26 @@ export function applyCommand(state, command, rng = null) {
             events,
           });
           resolveAttackEffectPhase(draft, { ...resumeCtx, energyDiscarded });
+        }
+      } else if (token.effectType === 'attackReturnEnergyBonus') {
+        // Ninja Spinner: move the chosen Energy to hand (yes) or keep it (no),
+        // then resume the attack with the bonus decision settled.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const accepted = Number((payload.selection || [])[0]) === 1;
+          const moved =
+            accepted &&
+            moveAttachedEnergyToHand(draft, {
+              playerId: initiatorPlayerId,
+              attacker: resumeCtx.attacker,
+              energyType: token.energyType,
+              events,
+            });
+          resolveAttackEffectPhase(draft, {
+            ...resumeCtx,
+            energyReturned: Boolean(moved),
+          });
         }
       } else if (token.effectType === 'attackMillPick') {
         // Palossand-GX: discard the chosen cards from the opponent's deck, then
