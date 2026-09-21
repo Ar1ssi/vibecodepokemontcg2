@@ -13,6 +13,14 @@ import { attachMatTilt } from './mat-tilt.mjs';
 const hydrated = new WeakSet();
 const pendingHydrations = new WeakMap();
 
+// Wrapping or unwrapping moves which node shows the card, so anything painted on
+// the old node (the design-023 affordance glow) has to be re-resolved.
+const HOLO_CHANGED_EVENT = 'holo-wrapper-changed'; // listened for in rules-bridge.js
+const announceHoloChange = () => {
+  if (typeof document === 'undefined') return;
+  document.dispatchEvent(new CustomEvent(HOLO_CHANGED_EVENT));
+};
+
 export function cardBackSrcForUser(user) {
   return user === 'self'
     ? systemState.cardBackSrc
@@ -116,6 +124,7 @@ export function hydrateHolo(card) {
       attachMatTilt(wrapper, card.image, {
         isEnabled: () => !fxDisabled() && !motionReduced(),
       });
+      announceHoloChange();
       return wrapper;
     })
     .catch(() => {
@@ -145,4 +154,5 @@ export function unhydrateHolo(card) {
   wrapper.remove();
   card.wrapper = undefined;
   hydrated.delete(card);
+  announceHoloChange();
 }

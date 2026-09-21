@@ -1980,6 +1980,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
         'rules-damage-changed',
         'rules-status-changed',
         'action-processed',
+        // hydrate-holo.js: a card gained/lost its .mat-holo wrapper, so the glow
+        // node glowNodeFor resolves has moved.
+        'holo-wrapper-changed',
       ].forEach((name) => document.addEventListener(name, () => refresh()));
       refresh();
     };
