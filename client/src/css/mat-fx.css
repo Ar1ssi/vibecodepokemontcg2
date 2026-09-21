@@ -56,3 +56,18 @@ body.fx-off .fx-overlay {
   border-radius: 0.3rem;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
 }
+
+.fx-ko-burst {
+  border-radius: 0.3rem;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95), rgba(255, 140, 60, 0.6) 55%, rgba(255, 140, 60, 0) 100%);
+  mix-blend-mode: screen;
+  z-index: 2470;
+}
+
+.fx-ko-burst__ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 18px 4px rgba(255, 170, 80, 0.85);
+}

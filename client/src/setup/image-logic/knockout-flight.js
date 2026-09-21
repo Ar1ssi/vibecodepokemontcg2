@@ -8,8 +8,13 @@ import {
   selfContainerDocument,
 } from '../../state.js';
 import { visualRectOf } from './iframe-rect.mjs';
-import { KNOCKOUT_DURATION_MS, knockoutPose } from './knockout-pose.mjs';
-import { runPose, spawnOverlay } from './mat-fx.mjs';
+import {
+  KNOCKOUT_BURST_MS,
+  KNOCKOUT_DURATION_MS,
+  knockoutBurstPose,
+  knockoutPose,
+} from './knockout-pose.mjs';
+import { fxDisabled, motionReduced, runPose, spawnOverlay } from './mat-fx.mjs';
 
 const discardRectFor = (user) => {
   const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
@@ -40,6 +45,20 @@ const applyPose = (host, img, pose) => {
   img.style.filter = `brightness(${pose.brightness}) saturate(${pose.saturate})`;
 };
 
+const playKnockoutBurst = (rect) => {
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-ko-burst' });
+  const ring = document.createElement('div');
+  ring.className = 'fx-ko-burst__ring';
+  host.appendChild(ring);
+  runPose(host, KNOCKOUT_BURST_MS, (t) => {
+    const pose = knockoutBurstPose(t);
+    host.style.transform = `scale(${pose.scale})`;
+    host.style.opacity = String(pose.opacity);
+    ring.style.transform = `scale(${pose.ringScale})`;
+    ring.style.opacity = String(pose.ringOpacity);
+  });
+};
+
 export const playKnockoutGhost = (ghost) => {
   if (!ghost || typeof document === 'undefined' || document.hidden) return;
   const toRect = discardRectFor(ghost.user) || ghost.rect;
@@ -54,4 +73,5 @@ export const playKnockoutGhost = (ghost) => {
   runPose(host, KNOCKOUT_DURATION_MS, (t) =>
     applyPose(host, img, knockoutPose(t, { fromRect: ghost.rect, toRect }))
   );
+  if (!fxDisabled() && !motionReduced()) playKnockoutBurst(ghost.rect);
 };
