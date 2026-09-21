@@ -2,6 +2,7 @@
 /* Holofoil (simey) — @import must precede all other rules in this stylesheet. */
 @import url('./mat-coin.css');
 @import url('./holo/base.css');
+@import url('./mat-ambient.css');
 @import url('./holo/regular-holo.css');
 @import url('./holo/ex-regular.css');
 @import url('./holo/ex-full-art.css');
@@ -987,4 +988,9 @@ body.mat-active .outline {
   box-shadow: none !important;
   background: transparent !important;
   background-color: transparent !important;
+}
+
+/* Design 022: the far side's active glow is red (mat-ambient.css default is blue). */
+:root {
+  --fx-active-glow: 230, 130, 130;
 }

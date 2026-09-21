@@ -1,0 +1,63 @@
+/* Design 022 slice 5: board ambience. Imported by self-containers.css and
+   opp-containers.css (the cards live in the playmat iframes, so mat-fx.css in
+   the parent page never reaches them). Keyframes/classes are `fx-` prefixed.
+   `@import` order: after holo/base.css so the tilt rule wins the tie with
+   base.css's `.mat-holo .card__rotator { transform: none }`. */
+
+/* ── Active breathing glow ────────────────────────────────────────────
+   Zero-specificity (`:where`) so any real ring — `.highlight`,
+   `.selectHighlight`, `.has-usable-ability` — and the `body.mat-active`
+   `!important` resets still win. The far side overrides the colour triplet in
+   opp-containers.css. */
+:root {
+  --fx-active-glow: 120, 160, 255;
+}
+@keyframes fx-active-breathe {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(var(--fx-active-glow), 0.28); }
+  50% { box-shadow: 0 0 16px 5px rgba(var(--fx-active-glow), 0.55); }
+}
+:where(#active:has(> img, > .mat-holo)) {
+  box-shadow: 0 0 10px 3px rgba(var(--fx-active-glow), 0.4);
+  animation: fx-active-breathe 3s ease-in-out infinite;
+}
+
+/* ── Board card hover lift ────────────────────────────────────────────
+   `scale`, not `transform`: resetImage() writes an inline `transform` on every
+   card <img>. Attached cards and Energy tokens stay put; a card mid-drag
+   (`.dragging`) never lifts. */
+:where(#active, #bench, #board) > :where(img, .mat-holo:not(:has(.dragging))) {
+  transition: scale 0.15s ease, filter 0.15s ease;
+  transform-origin: 50% 100%;
+}
+:where(#active, #bench, #board)
+  > :where(img:not(.dragging, .attached-card, .energy-token-3d), .mat-holo:not(:has(.dragging))):hover {
+  scale: 1.045;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.4));
+  z-index: 5;
+}
+
+/* ── Holo mat tilt ────────────────────────────────────────────────────
+   base.css pins the rotator flat on the board. mat-tilt.mjs writes small
+   --fx-tilt-x/y angles from the pointer over the real <img>; the rotator stays
+   pointer-events:none so the <img> remains the sole hit target. */
+.mat-holo .card__rotator {
+  transform: rotateY(var(--fx-tilt-x, 0deg)) rotateX(var(--fx-tilt-y, 0deg));
+  transition: transform 0.12s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(#active:has(> img, > .mat-holo)) {
+    animation: none;
+  }
+  :where(#active, #bench, #board) > :where(img, .mat-holo) {
+    transition: none;
+  }
+  :where(#active, #bench, #board) > :where(img, .mat-holo):hover {
+    scale: 1;
+    filter: none;
+  }
+  .mat-holo .card__rotator {
+    transform: none;
+    transition: none;
+  }
+}

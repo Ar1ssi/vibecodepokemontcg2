@@ -7,6 +7,8 @@ import {
   stopHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
 import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
+import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
+import { attachMatTilt } from './mat-tilt.mjs';
 
 const hydrated = new WeakSet();
 const pendingHydrations = new WeakMap();
@@ -111,6 +113,9 @@ export function hydrateHolo(card) {
       // suppresses pointermove, and cards often just sit still) — auto-play
       // a continuous left-to-right sweep without tilting the card.
       startHoloAnimation(wrapper, { auto: true, tilt: false });
+      attachMatTilt(wrapper, card.image, {
+        isEnabled: () => !fxDisabled() && !motionReduced(),
+      });
       return wrapper;
     })
     .catch(() => {
