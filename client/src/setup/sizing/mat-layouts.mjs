@@ -47,8 +47,10 @@ const SIM = {
     discard: { bottom: '35%', right: '1%', width: '9%', height: '26%' },
     lostZone: { bottom: '84%', left: '1%', width: '7%', height: '15%' },
     // Stadium straddles the midline: half on the opponent's half, half on the
-    // player's. Bottom = 50% - height/2, so the card centers on the seam.
-    stadium: { bottom: '42%', left: '26%', width: '6%', height: '16%' },
+    // player's. Bottom = 50% - height/2, so the card centers on the seam, and
+    // height matches an in-play card (active-height * 0.84, the iframe/parent
+    // mat-height ratio) so it reads the same size as the cards around it.
+    stadium: { bottom: '43.28vh', left: '26%', height: '13.44vh' },
     board: { bottom: '61%', left: '66%', width: '24%', height: '30%' },
   },
 };
@@ -85,8 +87,9 @@ const ONE_PLAYER = {
     deck: { bottom: '56.6%', right: '2.7%', width: '11.7%', height: '30.9%' },
     discard: { bottom: '11.9%', right: '2.7%', width: '11.7%', height: '30.9%' },
     lostZone: { bottom: '84%', left: '2%', width: '8%', height: '14%' },
-    // Straddles the midline: bottom = 100% - height/2 in the half frame.
-    stadium: { bottom: '92%', left: '25%', width: '8%', height: '16%' },
+    // Straddles the midline: bottom = 100% - height/2 in the half frame, and
+    // height matches an in-play card (active-height * 0.84).
+    stadium: { bottom: '87.02%', left: '25%', height: '25.96%' },
     // Trainers in play: the open strip between the battle field and the deck.
     board: { bottom: '56.6%', left: '63.5%', width: '20.5%', height: '30.9%' },
   },
@@ -126,8 +129,9 @@ const TWO_PLAYER = {
     deck: { bottom: '47%', right: '2%', width: '14%', height: '26%' },
     discard: { bottom: '18%', right: '2%', width: '14%', height: '26%' },
     lostZone: { bottom: '86%', left: '1%', width: '8%', height: '13%' },
-    // Straddles the midline: bottom = 100% - height/2 in the half frame.
-    stadium: { bottom: '91.5%', left: '24%', width: '9%', height: '17%' },
+    // Straddles the midline: bottom = 100% - height/2 in the half frame, and
+    // height matches an in-play card (active-height * 0.84).
+    stadium: { bottom: '89.08%', left: '24%', height: '21.84%' },
     board: { bottom: '72%', left: '63%', width: '20%', height: '26%' },
   },
 };
@@ -377,7 +381,6 @@ export function layoutToCssVars(layout) {
 
   put('--stadium-bottom', scaleBottom(zones.stadium?.bottom));
   put('--stadium-left', scaleLeft(zones.stadium?.left));
-  put('--stadium-width', scaleH(zones.stadium?.width));
   put('--stadium-height', scaleV(zones.stadium?.height));
 
   put('--board-bottom', scaleBottom(zones.board?.bottom));

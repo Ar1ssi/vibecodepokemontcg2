@@ -133,6 +133,35 @@ export function tiltTransforms({
 }
 
 /**
+ * The transform + transform-origin that put the parent `#stadium` in the same
+ * tilted plane as `#battleMat`, so the Stadium card recedes with the rest of
+ * the table instead of floating flat above it.
+ *
+ * `#battleMat`'s own transform-origin is its bottom centre (the pivot); the
+ * Stadium is a sibling element, so it needs that same pivot expressed in its
+ * own local coordinates. Reusing `tilt.mat.transform` (which is written with
+ * that pivot as its origin) with this origin projects the Stadium through the
+ * identical mapping.
+ *
+ * @param {{ transform: string } | null} matHalf - `tilt.mat` from tiltTransforms
+ * @param {{ left: number, top: number, width: number, height: number } | null} matBox
+ *   `#battleMat`'s untransformed box, in viewport px
+ * @param {{ left: number, top: number } | null} stadiumBox
+ *   `#stadium`'s untransformed box, in viewport px
+ * @returns {{ transform: string, origin: string } | null}
+ */
+export function stadiumTilt({ matHalf, matBox, stadiumBox }) {
+  if (!matHalf?.transform || !matBox || !stadiumBox) return null;
+  const originX = matBox.left + matBox.width / 2 - stadiumBox.left;
+  const originY = matBox.top + matBox.height - stadiumBox.top;
+  if (!Number.isFinite(originX) || !Number.isFinite(originY)) return null;
+  return {
+    transform: matHalf.transform,
+    origin: `${round(originX)}px ${round(originY)}px`,
+  };
+}
+
+/**
  * Where a plane's transform puts a point given relative to that plane's
  * transform-origin, in the same (local) frame: the math the browser does for
  * `translateY(s) perspective(p) rotateX(a)`.

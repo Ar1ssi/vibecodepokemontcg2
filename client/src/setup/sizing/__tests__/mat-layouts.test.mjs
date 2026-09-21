@@ -111,7 +111,6 @@ test('layoutToCssVars emits a value for every zone property', () => {
     '--lost-zone-height',
     '--stadium-bottom',
     '--stadium-left',
-    '--stadium-width',
     '--stadium-height',
     '--board-bottom',
     '--board-left',

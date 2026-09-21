@@ -5,6 +5,7 @@ import {
   battleMatBox,
   projectLocal,
   seamShiftPx,
+  stadiumTilt,
   tiltTransforms,
 } from '../table-tilt.mjs';
 
@@ -150,6 +151,35 @@ test('tiltDeg 0 is flat: no seam shift, only the oversampling scale', () => {
   assert.equal(
     tilt.mat.transform,
     'translateY(0px) perspective(1400px) rotateX(0deg)'
+  );
+});
+
+test('stadiumTilt reuses the mat transform with the pivot in the stadium frame', () => {
+  const tilt = tiltTransforms({ tiltDeg: 12, perspectivePx: P, depthPx: D, widthPx: W });
+  const spec = stadiumTilt({
+    matHalf: tilt.mat,
+    matBox: { left: 100, top: 40, width: 800, height: 760 },
+    stadiumBox: { left: 384, top: 370 },
+  });
+  assert.equal(spec.transform, tilt.mat.transform);
+  // Pivot = bottom centre of the mat box: (100 + 800/2, 40 + 760) = (500, 800).
+  assert.equal(spec.origin, `${500 - 384}px ${800 - 370}px`);
+});
+
+test('stadiumTilt returns null without a measured board or boxes', () => {
+  const tilt = tiltTransforms({ tiltDeg: 12, perspectivePx: P, depthPx: D, widthPx: W });
+  assert.equal(stadiumTilt({ matHalf: null, matBox: null, stadiumBox: null }), null);
+  assert.equal(
+    stadiumTilt({ matHalf: tilt.mat, matBox: null, stadiumBox: { left: 0, top: 0 } }),
+    null
+  );
+  assert.equal(
+    stadiumTilt({
+      matHalf: tilt.mat,
+      matBox: { left: 0, top: 0, width: Number.NaN, height: 100 },
+      stadiumBox: { left: 0, top: 0 },
+    }),
+    null
   );
 });
 

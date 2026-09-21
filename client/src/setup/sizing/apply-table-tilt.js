@@ -12,7 +12,7 @@
  * strips) and rotates about the seam, so the mat art stays under the zones.
  */
 
-import { battleMatBox, tiltTransforms } from './table-tilt.mjs';
+import { battleMatBox, stadiumTilt, tiltTransforms } from './table-tilt.mjs';
 
 const FRAME_IDS = ['selfContainer', 'oppContainer'];
 const DEFAULT_CROP_FRAC = 0.16;
@@ -49,6 +49,35 @@ const writeHalf = (entry, half) => {
   root.style.setProperty('--deck-stack-dir', entry.isFar ? '1' : '-1');
 };
 
+/**
+ * Puts `#stadium` in the mat's tilted plane. The Stadium is a sibling of
+ * `#battleMat`, so it cannot inherit the mat's transform; it gets the same
+ * transform with the mat's pivot re-expressed in the Stadium's own frame.
+ * Both boxes are read untransformed (computed offsets are unaffected by a
+ * transform), so re-applying never feeds the projected position back in.
+ */
+const writeStadium = (mat, box, matHalf) => {
+  const stadium = document.getElementById('stadium');
+  if (!stadium) return;
+  const num = (value) => Number.parseFloat(value);
+  const matStyle = getComputedStyle(mat);
+  const stadiumStyle = getComputedStyle(stadium);
+  const height = num(stadiumStyle.height);
+  const left = num(stadiumStyle.left);
+  const bottom = num(stadiumStyle.bottom);
+  const matLeft = num(matStyle.left);
+  const matWidth = num(matStyle.width);
+  if (![height, left, bottom, matLeft, matWidth].every(Number.isFinite)) return;
+  const spec = stadiumTilt({
+    matHalf,
+    matBox: { left: matLeft, top: box.top, width: matWidth, height: box.height },
+    stadiumBox: { left, top: window.innerHeight - bottom - height },
+  });
+  if (!spec) return;
+  stadium.style.setProperty('--tilt-transform', spec.transform);
+  stadium.style.setProperty('--stadium-tilt-origin', spec.origin);
+};
+
 const writeBattleMat = (box, matHalf) => {
   const mat = document.getElementById('battleMat');
   if (!mat || !box) return;
@@ -58,6 +87,7 @@ const writeBattleMat = (box, matHalf) => {
   mat.style.setProperty('--mat-half-height', `${box.height / 2}px`);
   mat.style.setProperty('--tilt-transform', matHalf.transform);
   mat.style.setProperty('--tilt-origin', matHalf.origin);
+  writeStadium(mat, box, matHalf);
 };
 
 /** @param {{ tiltDeg?: number, perspectivePx?: number }} [params] */
