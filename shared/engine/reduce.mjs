@@ -38,6 +38,7 @@ import {
   isGxAttack,
   discardEnergyScaling,
   deckMillScaling,
+  attachDiscardToBenchSpread,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -56,6 +57,7 @@ import {
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
   requiresActiveSpot,
+  requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
 } from './rules/ability-executors.mjs';
@@ -599,6 +601,9 @@ function handleKnockout(
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
   const victimPlayer = draft.players[victimPlayerId];
+  if (victimPlayer && draft.turn?.player !== victimPlayerId) {
+    victimPlayer.flags = { ...victimPlayer.flags, koedOnOppTurn: true };
+  }
 
   const wasActive = victimActive.some(
     (c) => c.instanceId === victim.instanceId
@@ -1300,6 +1305,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.
   const prizesOwed = draft.players[nextPlayerId].flags?.prizesOwed;
+  const koedLastOppTurn = !!draft.players[nextPlayerId].flags?.koedOnOppTurn;
 
   draft.turn.player = nextPlayerId;
   draft.turn.number = (draft.turn.number || 1) + 1;
@@ -1318,6 +1324,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     abilitiesUsed: {},
     evolved: {},
     briarActive: false,
+    koedLastOppTurn,
     ...(prizesOwed ? { prizesOwed } : {}),
   };
   for (const p of Object.values(draft.players || {})) {
@@ -2328,6 +2335,13 @@ export function validateLegality(state, command) {
         // An ability printed as a conditional on this Pokémon's position cannot be activated from
         // the Bench. The inspector already greys the panel, so this catches a stale or crafted
         // click that never went through it.
+        if (requiresKoOnOpponentTurn(cardRef.card) && !player.flags?.koedLastOppTurn) {
+          return {
+            allowed: false,
+            reason:
+              "None of your Pokémon were Knocked Out during your opponent's last turn.",
+          };
+        }
         if (cardRef.zoneId !== 'active' && requiresActiveSpot(cardRef.card)) {
           return {
             allowed: false,
@@ -2709,6 +2723,28 @@ function millDecksForAttack(draft, { playerId, oppId, mill, count, events }) {
 }
 
 /** Moves milled cards still in the discard pile onto `root` (Raikou). */
+/**
+ * Raises the next "which Benched Pokémon gets an Energy" pick for a spread attach
+ * (Aura Jab). Returns false — no choice raised — when nothing is left to attach or
+ * no Benched Pokémon exists.
+ */
+function raiseSpreadAttachChoice(draft, { playerId, attackName, spread, remaining, token }) {
+  const player = draft.players[playerId];
+  const hasEnergy = (player?.zones?.discard || []).some((c) => matchesSearch(c, spread.search));
+  const benched = (player?.zones?.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
+  if (remaining <= 0 || !hasEnergy || benched.length === 0) return false;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: 'attack',
+    prompt: `${attackName}: choose a Benched Pokémon for a ${spread.search} card (${remaining} left, none to stop)`,
+    options: benched,
+    min: 0,
+    max: 1,
+    resumeToken: { ...token, remaining, spread },
+  });
+  return true;
+}
+
 function attachMilledCards(player, cardIds, root, events) {
   for (const id of cardIds) {
     const card = (player.zones.discard || []).find((c) => c.instanceId === id);
@@ -3528,6 +3564,20 @@ function resolveAttackEffectPhase(draft, ctx) {
           });
           searchTriggered = true;
         }
+      }
+
+      // Aura Jab: "Attach up to 3 Basic {F} Energy cards from your discard pile to your
+      // Benched Pokémon in any way you like." One Energy per pick so the split is free.
+      const benchSpread = attachDiscardToBenchSpread(attack?.text);
+      if (benchSpread && !draft.pendingChoice) {
+        const resumed = raiseSpreadAttachChoice(draft, {
+          playerId,
+          attackName: attack.name,
+          spread: benchSpread,
+          remaining: benchSpread.count,
+          token: { ...resumeBase, effectType: 'attackAttachSpread', oppId },
+        });
+        if (resumed) searchTriggered = true;
       }
 
       if (/put this pok[ée]mon and all attached cards into your hand/i.test(attack?.text || '')) {
@@ -4615,6 +4665,54 @@ export function applyCommand(state, command, rng = null) {
           }
           shuffleDeckWithRng(oppPlayer, activeRng);
           resolveAttackEffectPhase(draft, { ...resumeCtx, milledMatches: picked });
+        }
+      } else if (token.effectType === 'attackAttachSpread') {
+        // Aura Jab: attach one Energy to the picked Benched Pokémon, then ask again
+        // until the count is spent or the player stops; then end the turn.
+        draft.pendingChoice = null;
+        const player = draft.players[initiatorPlayerId];
+        const pick = (payload.selection || [])[0];
+        const root = (player?.zones?.bench || []).find(
+          (c) => !c.attachedTo && c.instanceId === pick
+        );
+        let remaining = token.remaining;
+        if (player && root) {
+          const energy = (player.zones.discard || []).find((c) =>
+            matchesSearch(c, token.spread.search)
+          );
+          if (energy) {
+            attachToRoot(player, energy, root, events);
+            remaining -= 1;
+          }
+        } else {
+          remaining = 0;
+        }
+        const asked =
+          !isGameConcluded(draft) &&
+          raiseSpreadAttachChoice(draft, {
+            playerId: initiatorPlayerId,
+            attackName: token.attackName,
+            spread: token.spread,
+            remaining,
+            token: {
+              initiatorPlayerId: token.initiatorPlayerId,
+              attackName: token.attackName,
+              attackerId: token.attackerId,
+              targetInstanceId: token.targetInstanceId,
+              coinResult: token.coinResult,
+              effectType: 'attackAttachSpread',
+              oppId: token.oppId,
+            },
+          });
+        if (!asked && !isGameConcluded(draft)) {
+          resolveCheckup(draft, {
+            rng: activeRng,
+            events,
+            endingPlayerId: initiatorPlayerId,
+          });
+          if (!isGameConcluded(draft)) {
+            advanceTurn(draft, { nextPlayerId: token.oppId, events });
+          }
         }
       } else if (token.effectType === 'attackAttachMilled') {
         // Raikou: attach the milled Energy to the chosen Pokémon, then end the turn

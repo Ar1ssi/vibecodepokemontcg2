@@ -4,9 +4,9 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 247
-Focus: rejoin netcode — rejoiner pulls authoritative view (Stadium blank bug).
-Active: nothing in flight. S247 committed on claude/stadium-card-rejoin-bug-33fd40.
+Session: 248
+Focus: Fezandipiti ex KO-gate + Mega Lucario ex Aura Jab spread attach.
+Active: nothing in flight. S248 uncommitted on claude/fezandipiti-mega-lucario-bugs-146b4a.
 Next: push S243-245 if user approves; optional Live parity extras (hand chevron, edge wisps).
 Blocked: nothing.
 
@@ -18,6 +18,6 @@ Blocked: nothing.
 - `pnpm lint` is pre-existing red (CRLF vs prettier `endOfLine`, 0 errors); only NEW rule errors count.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S248 patch: Flip the Script gated on `flags.koedLastOppTurn`; Aura Jab `attackAttachSpread` choice loop.
 - S247 patch: seated rejoin pulls requestView (joinGame.rejoinedGame); Stadium no longer blank after reload.
 - S246 patch: peer rejoin no longer runs legacy reset on the authoritative opp board (empty holo frames); `opp-board-reset.mjs`; uncommitted.
-- S245 patch: Raikou attach, Palossand-GX pick, Flygon ex React Energy, snipe W/R on Active; uncommitted.

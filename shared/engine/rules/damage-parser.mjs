@@ -1154,6 +1154,19 @@ export function deckMillScaling(attackText) {
   };
 }
 
+// Parse "Attach up to N Basic {T} Energy cards from your discard pile to your Benched
+// Pokémon in any way you like" (Mega Lucario ex Aura Jab). Returns null, or
+// { count, search } where `search` is the matchesSearch filter ("Basic {F} Energy").
+// Pure.
+export function attachDiscardToBenchSpread(attackText) {
+  const m =
+    /attach up to (\d+) basic (\{[a-z]\}) energy cards? from your discard pile to your benched pok[ée]mon in any way you like/i.exec(
+      String(attackText || '')
+    );
+  if (!m) return null;
+  return { count: parseInt(m[1], 10), search: `Basic ${m[2].toUpperCase()} Energy` };
+}
+
 // Parse a printed discard-cost clause (taxonomy §D discard-cost family).
 // Returns { energy, hand } counts (0 when absent):
 //   energy: Energy cards to discard from the Active Pokémon

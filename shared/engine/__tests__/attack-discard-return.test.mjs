@@ -407,3 +407,53 @@ test('Flygon ex: discards only React Energy from itself, 40 plus 30 each', () =>
   assert.ok(!res.error, res.error);
   assert.equal(damageOf(res.state, 20), 100);
 });
+
+test('Aura Jab: attaches up to 3 discarded {F} Energy to Benched Pokémon one pick at a time', () => {
+  const state = board({
+    attack: {
+      name: 'Aura Jab',
+      cost: [],
+      damage: 130,
+      text: 'Attach up to 3 Basic {F} Energy cards from your discard pile to your Benched Pokémon in any way you like.',
+    },
+  });
+  state.players.p1.zones.discard.push(
+    energy(60, null, 'Basic Fighting Energy', ['Fighting']),
+    energy(61, null, 'Basic Fighting Energy', ['Fighting']),
+    energy(62, null, 'Basic Fighting Energy', ['Fighting']),
+    energy(63, null, 'Basic Water Energy', ['Water'])
+  );
+  const first = attack(state);
+  assert.ok(!first.error, first.error);
+  assert.equal(damageOf(first.state, 20), 130);
+  assert.equal(first.state.turn.player, 'p1', 'turn held open for the attach picks');
+  assert.deepEqual(first.state.pendingChoice.options.map((o) => o.instanceId).sort((a, b) => a - b), [10, 12]);
+  assert.equal(first.state.pendingChoice.min, 0);
+  const second = choose(first.state, [10]);
+  assert.ok(!second.error, second.error);
+  const third = choose(second.state, [12]);
+  assert.ok(!third.error, third.error);
+  const last = choose(third.state, [12]);
+  assert.ok(!last.error, last.error);
+  const onBench = (id) => last.state.players.p1.zones.bench.filter((c) => c.attachedTo === id).map((c) => c.instanceId);
+  assert.deepEqual(onBench(10).filter((i) => i >= 60), [60]);
+  assert.deepEqual(onBench(12).sort((a, b) => a - b), [61, 62]);
+  assert.deepEqual(last.state.players.p1.zones.discard.map((c) => c.instanceId), [63]);
+  assert.equal(last.state.turn.player, 'p2');
+});
+
+test('Aura Jab: choosing nothing stops early and ends the turn', () => {
+  const state = board({
+    attack: {
+      name: 'Aura Jab',
+      cost: [],
+      damage: 130,
+      text: 'Attach up to 3 Basic {F} Energy cards from your discard pile to your Benched Pokémon in any way you like.',
+    },
+  });
+  state.players.p1.zones.discard.push(energy(60, null, 'Basic Fighting Energy', ['Fighting']));
+  const res = choose(attack(state).state, []);
+  assert.ok(!res.error, res.error);
+  assert.equal(res.state.players.p1.zones.discard.length, 1);
+  assert.equal(res.state.turn.player, 'p2');
+});

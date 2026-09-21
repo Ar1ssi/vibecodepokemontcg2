@@ -440,3 +440,30 @@ test('ability: Meowth ex Last-Ditch Catch is refused on a later turn', () => {
   }, rng);
   assert.equal(res.error, BENCH_TRIGGER_REFUSAL);
 });
+
+test('ability: Fezandipiti ex Flip the Script needs a Knockout during the opponent\'s last turn', () => {
+  const { state, rng } = setupGame();
+  const text =
+    "Flip the Script: Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn, you may draw 3 cards. You can't use more than 1 Flip the Script Ability each turn.";
+  state.players.p1.zones.bench.push(
+    createCard({
+      instanceId: 10,
+      name: 'Fezandipiti ex',
+      hp: 210,
+      supertype: 'Pokémon',
+      abilityText: text,
+      abilities: [{ name: 'Flip the Script', type: 'Ability', text }],
+    })
+  );
+  for (let i = 0; i < 3; i += 1) state.players.p1.zones.deck.push(createCard({ instanceId: 101 + i }));
+  const use = (s) => applyCommand(s, { type: 'useAbility', payload: { instanceId: 10 }, playerId: 'p1' }, rng);
+
+  const blocked = use(state);
+  assert.match(blocked.error, /Knocked Out during your opponent's last turn/);
+  assert.equal(blocked.state.players.p1.zones.hand.length, 0);
+
+  state.players.p1.flags.koedLastOppTurn = true;
+  const allowed = use(state);
+  assert.equal(allowed.error, null);
+  assert.equal(allowed.state.players.p1.zones.hand.length, 3);
+});

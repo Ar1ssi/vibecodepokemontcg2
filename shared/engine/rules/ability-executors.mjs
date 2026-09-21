@@ -30,6 +30,14 @@ export function requiresActiveSpot(card) {
   return ACTIVE_SPOT_CLAUSE.test(textOf(card));
 }
 
+// "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn"
+// (Fezandipiti ex Flip the Script) is only activatable the turn after such a Knockout.
+const OPPONENT_TURN_KO_CLAUSE = /knocked out during your opponent.s last turn/;
+
+export function requiresKoOnOpponentTurn(card) {
+  return OPPONENT_TURN_KO_CLAUSE.test(textOf(card));
+}
+
 // "When you play this Pokémon from your hand to evolve 1 of your Pokémon"
 // (Primarina Enriching Melody) is a one-shot trigger, legal only on the turn
 // that Pokémon was played. Distinct from the played-to-Bench wording, which
