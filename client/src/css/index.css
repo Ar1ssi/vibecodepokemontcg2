@@ -4570,7 +4570,7 @@ body.side-menu-collapsed #oppResizer {
       transition: opacity 0.4s ease;
     }
     #turnOrderCoinFlipOverlay.fading { opacity: 0; }
-    #turnOrderCoinFlipOverlay .coin-3d { width: 180px; height: 180px; }
+    #turnOrderCoinFlipOverlay .coin-3d { width: clamp(150px, 24vh, 260px); height: clamp(150px, 24vh, 260px); }
     .turn-order-coin-flip-label {
       color: #f2f4ff;
       font-size: 1.9vh;

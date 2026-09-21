@@ -11,19 +11,20 @@ import { systemState } from '../../initialization/global-variables/global-variab
 import { getCoins } from '../deck-builder/core/coins.mjs';
 import {
   applyCoinEffect,
+  coinArtUrl,
   coinEffectLayerMarkup,
+  COIN_BACK_URL,
   startCoinDrift,
   stopCoinDrift,
 } from '../deck-builder/core/coin-effects.mjs';
+import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 
-const MAT_COIN_BACK_URL = '/src/assets/coins/coin-back.png';
 const MAT_COIN_SLOTS = {
   self: () => selfContainerDocument.getElementById('matCoinSlot'),
   opp: () => oppContainerDocument.getElementById('matCoinSlot'),
 };
 
 const selectedCoins = { self: null, opp: null };
-const tossRevolutions = { self: 0, opp: 0 };
 let layoutHooked = false;
 
 const escapeHtml = (value = '') =>
@@ -34,12 +35,6 @@ const escapeHtml = (value = '') =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
-const coinUrl = (path) => {
-  if (!path) return MAT_COIN_BACK_URL;
-  if (/^https?:\/\//.test(path) || path.startsWith('/')) return path;
-  return `/${path.replace(/^\//, '')}`;
-};
-
 export const getSelectedCoin = (target) => selectedCoins[target] || null;
 
 export const setSelectedCoin = (target, coin) => {
@@ -48,10 +43,13 @@ export const setSelectedCoin = (target, coin) => {
   renderMatCoinSlot(target);
 };
 
-export const pickRandomCoin = () => {
+/**
+ * Stable fallback for a player who has not chosen a coin: the first catalog
+ * coin. Deterministic so repeated flips never shuffle the art mid-match.
+ */
+export const pickDefaultCoin = () => {
   const coins = getCoins();
-  if (coins.length === 0) return null;
-  return coins[Math.floor(Math.random() * coins.length)];
+  return coins.length > 0 ? coins[0] : null;
 };
 
 /** Position is CSS-driven inside each playmat iframe (#matCoinSlot). */
@@ -74,15 +72,15 @@ export const renderMatCoinSlot = (target) => {
   slot.innerHTML = [
     `<span class="coin-toss-wrap mat-coin-toss-wrap" data-mat-coin-toss="${target}">`,
     `<div class="coin-3d mat-coin-token" data-mat-coin-el="${target}">`,
-    `<div class="coin-face coin-front"><img src="${escapeHtml(coinUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}">${layers}</div>`,
-    `<div class="coin-face coin-backc"><img src="${MAT_COIN_BACK_URL}" alt="">${layers}</div>`,
+    `<div class="coin-face coin-front"><img src="${escapeHtml(coinArtUrl(coin.thumb))}" alt="${escapeHtml(coin.name || 'coin')}">${layers}</div>`,
+    `<div class="coin-face coin-backc"><img src="${COIN_BACK_URL}" alt="">${layers}</div>`,
     `</div>`,
     `</span>`,
   ].join('');
   const coinEl = slot.querySelector('[data-mat-coin-el]');
   // The mask URL must be resolved the same way as the <img>, or the relative
   // catalog path would resolve against the iframe's base and 404.
-  applyCoinEffect(coinEl, { ...coin, thumb: coinUrl(coin.thumb) });
+  applyCoinEffect(coinEl, { ...coin, thumb: coinArtUrl(coin.thumb) });
   startCoinDrift(coinEl, { phaseOffset: target === 'opp' ? 0.5 : 0 });
 };
 
@@ -91,60 +89,11 @@ export const renderMatCoins = () => {
   renderMatCoinSlot('opp');
 };
 
-/** Animate a coin flip on the mat. Returns a promise resolving to `result`. */
-export const flipMatCoin = ({
-  target,
-  result,
-  coin = null,
-  durationMs = 1400,
-} = {}) => {
-  return new Promise((resolve) => {
-    if (target !== 'self' && target !== 'opp') {
-      resolve(result);
-      return;
-    }
-
-    if (coin && (!selectedCoins[target] || selectedCoins[target].id !== coin.id)) {
-      selectedCoins[target] = coin;
-      renderMatCoinSlot(target);
-    }
-
-    const slot = MAT_COIN_SLOTS[target]();
-    const wrap = slot?.querySelector(`[data-mat-coin-toss="${target}"]`);
-    const coinEl = slot?.querySelector(`[data-mat-coin-el="${target}"]`);
-
-    if (!slot?.classList.contains('has-coin') || !wrap || !coinEl) {
-      resolve(result);
-      return;
-    }
-
-    slot.classList.add('flipping');
-
-    tossRevolutions[target] += 1;
-    const finalDeg =
-      tossRevolutions[target] * 1440 + (result === 'tails' ? 180 : 0);
-
-    coinEl.style.setProperty('--coin-flip', `${finalDeg}deg`);
-    wrap.classList.remove('tossing');
-    void wrap.offsetWidth;
-    wrap.classList.add('tossing');
-
-    const finish = () => {
-      wrap.classList.remove('tossing');
-      slot.classList.remove('flipping');
-      resolve(result);
-    };
-
-    wrap.addEventListener('animationend', finish, { once: true });
-    setTimeout(finish, durationMs);
-  });
-};
-
-/** Manual / board-button coin flip for the bottom-of-screen player. */
+/** Manual / board-button coin flip — plays the shared full-screen ceremony. */
 export const flipBoardCoin = async (initiator, result) => {
   const target =
     initiator === 'self' || initiator === 'opp' ? initiator : systemState.initiator;
-  const coin = selectedCoins[target] || pickRandomCoin();
+  const coin = selectedCoins[target] || pickDefaultCoin();
   const flipResult =
     result === 'heads' || result === 'tails'
       ? result
@@ -152,7 +101,11 @@ export const flipBoardCoin = async (initiator, result) => {
         ? 'heads'
         : 'tails';
 
-  await flipMatCoin({ target, result: flipResult, coin });
+  await playCoinFlipCeremony({
+    coin,
+    result: flipResult,
+    ownerLabel: target === 'self' ? 'Your' : "Opponent's",
+  });
   return flipResult;
 };
 

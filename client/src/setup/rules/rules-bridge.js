@@ -88,12 +88,12 @@ import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-action
 import { e2eDelayMs, isE2eMode } from '../general/e2e-mode.mjs';
 import { getCoinById } from '../deck-builder/core/coins.mjs';
 import {
-  flipMatCoin,
   getSelectedCoin,
   initMatCoins,
-  pickRandomCoin,
+  pickDefaultCoin,
   setSelectedCoin,
 } from './mat-coin.js';
+import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
 import {
   hasAuthoritativeView,
@@ -902,9 +902,15 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
       coinCallPending = false;
       document.getElementById('rulesCoinCallOverlay')?.remove();
 
-      const { caller, call, result, starter, auto } = serverResult;
+      const { caller, call, result, starter, coinId, auto } = serverResult;
       const coinOwner = caller;
-      const coin = getSelectedCoin(coinOwner) || pickRandomCoin();
+      // The server echoes the caller's chosen coin so both clients render the
+      // same art; fall back to this client's local selection, then a stable
+      // default (never a random coin, so repeated flips keep the same face).
+      const coin =
+        (coinId ? getCoinById(coinId) : null) ||
+        getSelectedCoin(coinOwner) ||
+        pickDefaultCoin();
       const callerLabel = caller === 'self' ? 'You' : 'Opponent';
       appendMessage(
         '',
@@ -960,6 +966,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
           roomId: targetRoomId,
           callId,
           call: 'heads',
+          coinId: getSelectedCoin('self')?.id || null,
         });
         return;
       }
@@ -973,6 +980,10 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
             roomId: targetRoomId,
             callId,
             call,
+            // The caller's chosen coin, echoed by the server so both screens
+            // show the same art during the ceremony (display only; the flip
+            // result still comes from the server's seeded rng).
+            coinId: getSelectedCoin('self')?.id || null,
           });
           appendMessage('', `You called ${call} — flipping…`, 'announcement', false);
         },
@@ -1092,7 +1103,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
     const runTurnOrderCoinFlip = ({ call, caller = 'self' } = {}) => {
       return new Promise((resolve) => {
         const coinOwner = Math.random() < 0.5 ? 'self' : 'opp';
-        const coin = getSelectedCoin(coinOwner) || pickRandomCoin();
+        const coin = getSelectedCoin(coinOwner) || pickDefaultCoin();
         // "Call the coin": the caller (the player who clicked Set Up) picked
         // a face via the call picker. Fall back to random if none supplied.
         const chosenCall = call || (Math.random() < 0.5 ? 'heads' : 'tails');
@@ -1156,12 +1167,13 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
       document.body.appendChild(overlay);
     };
     
-    // Flip the chosen coin on the battle mat (beside Active), not full-screen.
+    // TCG Live-style full-screen ceremony: dim the board, tumble the chosen
+    // coin at centre screen, reveal the call/winner, fade out.
     const playTurnOrderCoinAnimation = ({ coin, result, coinOwner, turnPlayer, isRemote }) => {
       const ownerLabel = coinOwner === 'self' ? 'Your' : "Opponent's";
       const winnerLabel = turnPlayer === 'self' ? 'You go' : 'Opponent goes';
 
-      flipMatCoin({ target: coinOwner, result, coin });
+      playCoinFlipCeremony({ coin, result, ownerLabel, winnerLabel });
 
       setTimeout(() => {
         if (!isRemote) {
@@ -1173,6 +1185,33 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
           );
         }
       }, 1500);
+    };
+    
+    // In-game effect coin flip: auto-random (no player prompt), rendered through
+    // the same ceremony and mirrored to the opponent so both seats see the same
+    // coin and result. The branch runs only on the acting client; the peer's
+    // board follows the resulting card moves.
+    const playTrainerCoinFlip = (owner = 'self', cardName = '') => {
+      const localOwner = owner === 'opp' ? 'opp' : 'self';
+      const result = Math.random() < 0.5 ? 'heads' : 'tails';
+      const coin = getSelectedCoin(localOwner) || pickDefaultCoin();
+      const ownerLabel = localOwner === 'self' ? 'Your' : "Opponent's";
+
+      playCoinFlipCeremony({ coin, result, ownerLabel });
+
+      if (systemState.isTwoPlayer && rulesSocket) {
+        rulesSocket.emit('rulesEvent', {
+          type: 'coinFlipCeremony',
+          data: { playerId: localOwner, coinId: coin?.id || null, result },
+        });
+      }
+      appendMessage(
+        '',
+        `🪙 ${ownerLabel} coin flip${cardName ? ` (${cardName})` : ''}: ${result}.`,
+        'announcement',
+        false
+      );
+      return Promise.resolve(result);
     };
     
     // ── deck privacy ─────────────────────────────────────────────────────
@@ -2025,6 +2064,17 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
             } else if (type === 'coinChosen') {
               // Opponent chose/changed their coin — show it on our mat
               setSelectedCoin('opp', data?.coin || null);
+            } else if (type === 'coinFlipCeremony') {
+              // The acting client ran an in-game coin flip; show the same coin
+              // and result here. Their 'self' is our 'opp'.
+              const remoteOwner = data?.playerId === 'opp' ? 'self' : 'opp';
+              const coin = data?.coinId
+                ? getCoinById(data.coinId)
+                : getSelectedCoin(remoteOwner) || pickDefaultCoin();
+              const ownerLabel = remoteOwner === 'self' ? 'Your' : "Opponent's";
+              const result = data?.result === 'tails' ? 'tails' : 'heads';
+              playCoinFlipCeremony({ coin, result, ownerLabel });
+              appendMessage('', `🪙 ${ownerLabel} coin flip: ${result}.`, 'announcement', false);
             } else if (type === 'mulliganBonus') {
               // Opponent mulliganed — we draw 1 bonus card for ourselves
               if (rulesState.enabled) {
@@ -2634,6 +2684,7 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
       matchesSearch,
       isPokemonCard,
       prizeState,
+      playCoinFlip: playTrainerCoinFlip,
     });
     
     // ── trainer play guidance ────────────────────────────────────────────

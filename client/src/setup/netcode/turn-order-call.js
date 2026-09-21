@@ -12,13 +12,13 @@
  * `dealOrder`, before the bridge's own setup path runs.
  */
 
-/** @type {{caller: string, call: string, result: string, starter: string, auto: boolean}|null} */
+/** @type {{caller: string, call: string, result: string, starter: string, coinId: string|null, auto: boolean}|null} */
 let lastResult = null;
 
 /**
  * The server's resolved flip, if it has already arrived this game.
  *
- * @returns {{caller: string, call: string, result: string, starter: string, auto: boolean}|null}
+ * @returns {{caller: string, call: string, result: string, starter: string, coinId: string|null, auto: boolean}|null}
  */
 export function getTurnOrderResult() {
   return lastResult;
@@ -37,16 +37,21 @@ const isCoinFace = (value) => value === 'heads' || value === 'tails';
  * half-valid flip must not start a game on a guessed starter.
  *
  * @param {object} data
- * @returns {{caller: string, call: string, result: string, starter: string, auto: boolean}|null}
+ * @returns {{caller: string, call: string, result: string, starter: string, coinId: string|null, auto: boolean}|null}
  */
 export function normalizeTurnOrderResult(data) {
   if (!data || !isSide(data.starter) || !isSide(data.caller)) return null;
   if (!isCoinFace(data.call) || !isCoinFace(data.result)) return null;
+  const coinId =
+    typeof data.coinId === 'string' && data.coinId.length > 0 && data.coinId.length <= 128
+      ? data.coinId
+      : null;
   return {
     caller: data.caller,
     call: data.call,
     result: data.result,
     starter: data.starter,
+    coinId,
     auto: Boolean(data.auto),
   };
 }

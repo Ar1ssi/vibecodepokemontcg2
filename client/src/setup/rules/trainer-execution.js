@@ -2,7 +2,6 @@
 // Wired from rules-bridge.js when a Trainer card hits the board.
 
 import { moveToDeckBottom } from '../../actions/zones/deck-actions.js';
-import { flipCoin } from '../../actions/general/flip-coin.js';
 import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.js';
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus, clearStatuses } from '/shared/engine/rules/status.mjs';
@@ -70,6 +69,8 @@ let _matchesSearch = null;
 let _isPokemonCard = null;
 let _prizeState = null;
 let _pickerTriggerCard = null;
+/** Runs the shared full-screen coin-flip ceremony for an effect; resolves to the face. */
+let _playCoinFlip = null;
 /** Zone owner for the trainer effect currently executing (`self` or `opp`). */
 let _effectOwner = 'self';
 
@@ -84,6 +85,7 @@ export function initTrainerExecution(deps) {
   _matchesSearch = deps.matchesSearch;
   _isPokemonCard = deps.isPokemonCard;
   _prizeState = deps.prizeState;
+  _playCoinFlip = deps.playCoinFlip;
 }
 
 function msg(text) {
@@ -317,29 +319,6 @@ function matchesHealTarget(card, target) {
       (name.includes('mega') && name.includes(' ex'));
   }
   return true;
-}
-
-function openCoinFlipOverlay(cardName, onResult) {
-  document.getElementById('rulesCoinEffectOverlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'rulesCoinEffectOverlay';
-  overlay.className = 'rules-coin-call-overlay';
-  overlay.innerHTML = `
-    <div class="rules-coin-call-card">
-      <p>${cardName} — flip a coin</p>
-      <div class="rules-coin-call-buttons">
-        <button type="button" data-face="heads">Heads</button>
-        <button type="button" data-face="tails">Tails</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  const finish = (face) => {
-    flipCoin(_effectOwner, face);
-    overlay.remove();
-    onResult(face);
-  };
-  overlay.querySelector('[data-face="heads"]').addEventListener('click', () => finish('heads'));
-  overlay.querySelector('[data-face="tails"]').addEventListener('click', () => finish('tails'));
 }
 
 async function runSearchStep(card, searchStep, done) {
@@ -642,7 +621,12 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
     }
 
     if (step.type === 'coinFlip') {
-      openCoinFlipOverlay(card.name, (face) => {
+      // Auto-random (no player input): the shared ceremony renders the acting
+      // player's chosen coin full-screen on both seats, then the face picks the
+      // branch. `playCoinFlip` is injected by rules-bridge (it owns the socket).
+      Promise.resolve(
+        _playCoinFlip ? _playCoinFlip(_effectOwner, card.name) : 'heads'
+      ).then((face) => {
         const branch = normalizeCoinBranch(face === 'heads' ? step.heads : step.tails);
         if (branch.length === 0) {
           msg(`  coin: ${face} — no effect`);
