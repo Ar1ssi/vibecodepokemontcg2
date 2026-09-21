@@ -11,10 +11,11 @@ Next: none.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Concurrent writers, S231/S232 vs S230/S233: the GX-audit (I75–I77) code changes live in worktree
-  `gx-once-per-game` (branch `fix/gx-once-per-game`), NOT in the primary checkout — primary still has
-  the `flags.{gxUsed,vstarUsed}` mirror. Design 021/I71 code IS in the primary working tree. Both are
-  UNCOMMITTED. Reconcile before either lands.
+- Concurrent writers S230/S233 vs S231/S232 collided on `.agent` (single-writer assumption broken). Both
+  landed on main: GX once-per-game single-sourced on `player.oncePerGame` via shared `oncePerGameUsed`
+  (commit 25e18c4, closed I75–I77; the old `flags.{gxUsed,vstarUsed}` mirror is gone) and the battle log
+  (commit 38e97ff, design 021/I71). Remaining GX gaps: the attack panel can't grey a spent GX (I64) and
+  the GX/VSTAR button markup is dead (I23).
 - Battle-log mapper (S233/D91): `client/src/setup/netcode/server-battle-log.mjs` is now the single
   server-event→text map (it composes `attack-announcements.mjs`), wired as `onAdvisoryEvent` in
   socket-event-listeners.js. A narratable event needs an absolute `playerId` (or `player` for
@@ -37,7 +38,7 @@ Blocked: nothing.
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S233 feature: authoritative battle-log narration (design 021/I71) — pure event→text mapper + server
   `trainerPlayed`, `cardAttached` non-Pokémon gate; 23 tests, full suite 2635/2635. UNCOMMITTED, primary.
-- S232 fix(rules) [worktree `gx-once-per-game`, UNCOMMITTED]: GX once-per-game single-sourced on
-  `player.oncePerGame`, flags mirror removed, +3 tests; suite 2613/2613 (worktree).
+- S232 fix(rules): GX once-per-game single-sourced on `player.oncePerGame`, shared `oncePerGameUsed`,
+  flags mirror removed, +3 tests (commit 25e18c4 on main).
 - S229 fix(rules): Mega Greninja ex Mortal Shuriken — discard cost restricted to Basic {W} Energy (parser
   emits `energyOnly`/`basicOnly`/`energyTypes`) + damage-counter mat-pick handler wired; 2601/2601.
