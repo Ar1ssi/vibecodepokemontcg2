@@ -4,25 +4,20 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 237
-Focus: Inspector attack-zone alignment (frame bands + weighted rows) built; awaiting the user's visual check.
-Active: none. S237 work is UNCOMMITTED in worktree mat-cosmetic-effects-copy (branch claude/mat-cosmetic-effects-copy). Design 022 branch claude/mat-cosmetic-effects-dee363 still unpushed.
-Next: User checks Mega ex overlay (frame `mega-ex`, band 52-75%) on localhost; add more INSPECTOR_BANDS frames as misaligned cards are reported. Also: user eyeballs each effect on localhost under SERVER_AUTHORITATIVE=1 (+ reduced-motion pass), then merge to main and sync the primary folder.
+Session: 239
+Focus: Design 023 (card affordance glows) + S239 Live-style flowing-rim restyle shipped to main; user approved visuals on localhost.
+Active: nothing in flight. Design 023 on main (`card-glow-colors.mjs`, `card-glow-model.mjs`, `live-card-sources.mjs`, `.has-glow` flowing lit-rim CSS in self-/opp-containers.css + index.css).
+Next: optional Live parity extras (hand-card up-chevron, edge wisps); holo "freeze on double-click" report not reproduced (legacy fixture, both preview paths animate) — reopen only with repro details.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Mat FX (S236/D94): one dispatch — add an effect = an `EVENT_FX` row in advisory-animations.mjs + a registry entry in
-  `netcode/mat-fx/index.js`. Kill switch: localStorage `ptcg-fx-off`='1' or `body.fx-off`. Event payloads differ from
-  the design's guesses (see design 022 Deviations); `damageUpdated` carries `dealt`, not `delta`.
-- The primary checkout has UNCOMMITTED edits (STATE.md, index.css, rules-bridge.js) and an untracked copy of design 022;
-  the worktree copy of 022 is the live one. Resolve before merging.
-- Stadium tilt (S235/D93): `#stadium` is parent-owned; `--stadium-width` no longer exists (don't reintroduce it).
-- Coin effects (S234/D92): `client/src/css/coin/` is the ONE source of coin styling; never put
-  `filter`/`isolation`/`opacity` on `.coin-3d`/`.coin-face` (status idle keyframes obey this too).
-- `pnpm lint` is pre-existing red (CRLF vs prettier `endOfLine`); only NEW rule errors count.
+- Design 023: glows hand-playable + ability + attack + stadium; colour from ONE palette (`card-glow-colors.mjs`: Energy type colour, Supporter red, Item/Tool blue, Stadium green, Pokémon cyan) via `.has-glow` + inline `--glow-rgb`. Never add per-colour CSS classes. Slice 5 (authoritative) built at `.agent/designs/023-card-playability-glows.md`; `live-card-sources.mjs` is the one card/node resolver for both render paths.
+- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is unpaid" — fails at HEAD too (verified via stash), unrelated to design 023. Suite is otherwise 2770/2771.
+- Mat FX (S236/D94): one dispatch — add an effect = an `EVENT_FX` row in advisory-animations.mjs + a registry entry in `netcode/mat-fx/index.js`. Kill switch: localStorage `ptcg-fx-off`='1' or `body.fx-off`.
+- Stadium tilt (S235/D93): `#stadium` is parent-owned (CSS in index.css, NOT the container sheets); `--stadium-width` no longer exists.
+- `pnpm lint` is pre-existing red (CRLF vs prettier `endOfLine`, 0 errors); only NEW rule errors count.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S237 feature: inspector frame bands (`INSPECTOR_BANDS` band/fillBand, `frameKeyFor`) + text-weighted attack rows; 2715/2715 tests; uncommitted.
-- S236 feature: mat cosmetic effects slices 0-6 (combat, KO burst, status, lifecycle, ambience, flow); 2704/2704 tests;
-  branch claude/mat-cosmetic-effects-dee363, unpushed.
-- S235 fix(board-ui): Stadium card drawn in the table's tilted plane at in-play card size; commit 5e3e7e3 on main.
+- S239 patch: design 023 glow restyled after a TCG Live capture (flowing lit rim on board/Stadium, steady rim in hand, per-kind colours kept); pushed to main.
+- S238 feature: design 023 card affordance glows built (slices 1-5) + review fixes (opponent-hand leak, reduced-motion, authoritative rendering); visuals unverified by eye; uncommitted.
+- S237 feature: inspector frame bands (`INSPECTOR_BANDS` band/fillBand, `frameKeyFor`) + text-weighted attack rows.

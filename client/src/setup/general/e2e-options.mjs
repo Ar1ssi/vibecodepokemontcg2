@@ -256,6 +256,13 @@ export async function enumerateOptions({
         myPrizes: prizeCounts.self,
         opponentPrizes: prizeCounts.opponent,
         stadiumName,
+        // The client marks a played Stadium `stadiumPlayed`; the server's flag
+        // (merged into rulesState.flags under authoritative netcode) is
+        // `stadiumPlayedThisTurn`. Either one blocks a second Stadium.
+        stadiumPlayedThisTurn: !!(
+          rulesState.flags?.[user]?.stadiumPlayed ||
+          rulesState.flags?.[user]?.stadiumPlayedThisTurn
+        ),
         handCount: handCards.length,
         benchCount: benchCards.length,
         ...trainerTargetCountsOf(handCards, inPlayTargets(active, benchCards), attachedCardsOf, deckList),

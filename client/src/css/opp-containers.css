@@ -163,15 +163,102 @@ body, input, textarea, button {
 }
 /* Mirror of self-containers.css (see the comment there), including the source
    order: declared above the ring rules so `.highlight`/`.selectHighlight` win
-   the `animation` tie. Same blue on this side — the glow advertises an
-   activatable ability, not who owns the card. */
-@keyframes ability-glow {
-  0%, 100% { box-shadow: 0 0 4px 1px rgba(120, 200, 255, 0.35); }
-  50% { box-shadow: 0 0 10px 3px rgba(120, 200, 255, 0.6); }
+   the `animation` tie. The colour comes from the node's `--glow-rgb`; the
+   lit rim is drawn on a bare <img>'s padding or a .mat-holo's ::after. */
+@property --glow-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
+@property --glow-angle-2 {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+/* The halo is restated in both frames because the animation is what outranks
+   the ID-specific default card shadows. The two angles turn at unrelated speeds
+   in opposite directions, so the hotspots drift apart and merge instead of
+   circling as one fixed pattern. */
+@keyframes card-glow {
+  from { --glow-angle: 0deg; box-shadow: 0 0 10px 2px rgba(var(--glow-rgb, 120, 200, 255), 0.6); }
+  to { --glow-angle: 360deg; box-shadow: 0 0 10px 2px rgba(var(--glow-rgb, 120, 200, 255), 0.6); }
+}
+@keyframes card-glow-drift {
+  from { --glow-angle-2: 360deg; }
+  to { --glow-angle-2: 0deg; }
+}
+.has-glow,
 .has-usable-ability {
-  box-shadow: 0 0 8px 2px rgba(120, 200, 255, 0.5);
-  animation: ability-glow 2s ease-in-out infinite;
+  box-shadow: 0 0 10px 2px rgba(var(--glow-rgb, 120, 200, 255), 0.6);
+  animation: card-glow 3.2s linear infinite, card-glow-drift 4.9s linear infinite;
+}
+img.has-glow,
+img.has-usable-ability,
+.mat-holo.has-glow::after,
+.mat-holo.has-usable-ability::after {
+  border-radius: 4.55% / 3.5%;
+  background:
+    conic-gradient(
+      from var(--glow-angle),
+      transparent 0deg,
+      rgba(255, 255, 255, 0.85) 30deg,
+      transparent 70deg 150deg,
+      rgba(255, 255, 255, 0.7) 175deg,
+      transparent 205deg 250deg,
+      rgba(255, 255, 255, 0.8) 290deg,
+      transparent 320deg
+    ) border-box,
+    conic-gradient(
+      from var(--glow-angle-2),
+      transparent 0deg,
+      rgba(255, 255, 255, 0.6) 40deg,
+      transparent 95deg 200deg,
+      rgba(255, 255, 255, 0.6) 235deg,
+      transparent 280deg
+    ) border-box,
+    rgb(var(--glow-rgb, 120, 200, 255));
+}
+img.has-glow,
+img.has-usable-ability {
+  box-sizing: border-box;
+  padding: 3px;
+}
+/* `.mat-holo` is a transformed `.card`, so it is the containing block; the
+   ring sits 3px outside the art. translateZ lifts it over the preserve-3d
+   rotator stack. */
+.mat-holo.has-glow::after,
+.mat-holo.has-usable-ability::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  padding: 3px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transform: translateZ(1px);
+  pointer-events: none;
+  animation: card-glow 3.2s linear infinite, card-glow-drift 4.9s linear infinite;
+}
+/* Hand cards hold a steady rim, as in Live: the hotspot layers are dropped, so
+   the running angles have nothing to move. The animation itself stays so the
+   halo keeps outranking `#hand img`'s default shadow. */
+#hand img.has-glow,
+#hand img.has-usable-ability,
+#hand .mat-holo.has-glow::after,
+#hand .mat-holo.has-usable-ability::after {
+  background: rgb(var(--glow-rgb, 120, 200, 255));
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Mirror of self-containers.css: paused, not removed, so the animated shadow
+     still outranks the ID-specific default card shadows and the hotspots hold
+     still on a lit rim. */
+  .has-glow,
+  .has-usable-ability,
+  .mat-holo.has-glow::after,
+  .mat-holo.has-usable-ability::after {
+    animation-play-state: paused;
+  }
 }
 /* Mirror of self-containers.css (see the comment there), with this side's red
    ring. Each playmat iframe is its own document, so the keyframes must be

@@ -16,6 +16,7 @@
  */
 
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
+import { glowHexForType } from './card-glow-colors.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
 import {
   isStadiumCard,
@@ -76,22 +77,8 @@ const TYPE_GLYPHS = {
   Fairy: '✨',
 };
 
-// Banner colour keyed to the attack's dominant cost type.
-const BANNER = {
-  Fire: '#c0392b',
-  Water: '#2d7dd2',
-  Grass: '#3f9b4f',
-  Lightning: '#e0a51f',
-  Psychic: '#9b59b6',
-  Fighting: '#cf6a1c',
-  Dark: '#4a4a5e',
-  Metal: '#7f8792',
-  Dragon: '#5b6ee1',
-  Fairy: '#e07fa8',
-  Colorless: '#8e8e93',
-};
-const BANNER_DEFAULT = '#8e8e93';
-
+// Banner colour keyed to the attack's dominant cost type. Shares card-glow-colors'
+// palette (design 023, C7) so the inspector banner and a card's glow cannot disagree.
 const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -218,7 +205,7 @@ const attackEl = (attack, cardType) => {
   section.dataset.ptcgAttack = String(attack.index);
   section.style.setProperty(
     '--ptcg-banner',
-    BANNER[cardType] || BANNER_DEFAULT
+    glowHexForType(cardType)
   );
 
   const head = el('div', 'ptcg-atk__head');

@@ -487,6 +487,7 @@ import test from 'node:test';
       const b = { name: 'Ancient Tower', type: 'Stadium' };
       assert.equal(markStadiumPlayed('self', a), null);
       assert.deepEqual(getStadium(), { user: 'self', card: a });
+      assert.equal(rulesState.flags.self.stadiumPlayed, true);
       const displaced = markStadiumPlayed('opp', b);
       assert.equal(displaced.card, a);
       assert.equal(displaced.user, 'self');
@@ -494,11 +495,13 @@ import test from 'node:test';
       assert.equal(getStadium().user, 'opp');
     });
 
-    test('startGame: clears the on-field Stadium record', () => {
+    test('startGame: clears the on-field Stadium record and the played-this-turn flag', () => {
       markStadiumPlayed('self', { name: 'Mystic Ruin', type: 'Stadium' });
       assert.notEqual(getStadium(), null);
+      assert.equal(rulesState.flags.self.stadiumPlayed, true);
       startGame('opp');
       assert.equal(getStadium(), null);
+      assert.equal(rulesState.flags.self.stadiumPlayed, false);
     });
 
     // ── TCGdex ability mapping (ensureCardData enrichment) ──

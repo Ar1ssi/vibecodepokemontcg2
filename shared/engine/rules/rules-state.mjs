@@ -529,7 +529,7 @@
     }
     
     function resetTurnFlags(player) {
-      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null, stadiumUsed: false, drewThisTurn: false };
+      rulesState.flags[player] = { energyAttached: false, attackerAttacked: false, evolved: {}, supporterPlayed: false, lastSupporterName: '', abilitiesUsed: {}, turnAttackBonus: null, stadiumUsed: false, stadiumPlayed: false, drewThisTurn: false };
     }
 
     // Mark that the start-of-turn draw already happened for this player this
@@ -606,6 +606,10 @@
     export function markStadiumPlayed(user, card) {
       const previous = rulesState.stadium;
       rulesState.stadium = { user, card };
+      // One Stadium per turn: recorded here (reset in resetTurnFlags) so the client's
+      // legal-move enum and glow can honour the same gate the server enforces.
+      const f = rulesState.flags[user];
+      if (f) f.stadiumPlayed = true;
       return previous;
     }
 

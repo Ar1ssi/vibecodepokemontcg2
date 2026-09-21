@@ -94,7 +94,6 @@ import {
   setSelectedCoin,
 } from './mat-coin.js';
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
-import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
 import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
@@ -102,7 +101,10 @@ import {
 } from '../netcode/apply-view.js';
 import { isBasicPokemon, isEnergy, isTrainer } from '/shared/engine/cards.mjs';
 import { attachedEnergiesFor, stadiumCardFor, abilityUsedFor } from './attack-preview-sources.mjs';
-import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTriggerCard } from './action-affordances.mjs';
+import { liveActiveCard, liveCardFor, glowNodeFor } from './live-card-sources.mjs';
+import { isPlayedToBenchTriggerCard, isEvolvePlayedTriggerCard } from './action-affordances.mjs';
+import { computeCardGlows } from './card-glow-model.mjs';
+import { glowColorFor } from './card-glow-colors.mjs';
     
     let initialized = false;
 
@@ -1824,12 +1826,30 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
           user: () => (systemState.isTwoPlayer ? systemState.initiator : 'opp'),
         },
       ];
+      const GLOW_CLASSES = ['has-glow', 'has-usable-ability'];
       const glowNodes = new Set();
       let generation = 0;
 
       const clearGlow = () => {
-        for (const node of glowNodes) node.classList?.remove('has-usable-ability');
+        for (const node of glowNodes) {
+          node.classList?.remove(...GLOW_CLASSES);
+          node.style?.removeProperty('--glow-rgb');
+        }
         glowNodes.clear();
+      };
+
+      // The in-play Stadium is the parent-owned `#stadium` element (D93), not the
+      // card node `getZone` returns, so its glow targets that element directly.
+      const stadiumNode = () => document.getElementById('stadium');
+
+      const addGlow = (card, { node: override = null, color, ability = false } = {}) => {
+        const node = override || glowNodeFor(card);
+        if (!node?.classList) return;
+        const { rgb } = color || glowColorFor(card);
+        node.classList.add('has-glow');
+        if (ability) node.classList.add('has-usable-ability');
+        node.style?.setProperty('--glow-rgb', rgb.join(','));
+        glowNodes.add(node);
       };
 
       const isAbilitySpent = (user, card) =>
@@ -1850,49 +1870,83 @@ import { computeActionAffordances, isPlayedToBenchTriggerCard, isEvolvePlayedTri
           }
           return;
         }
+        // C4: only the LOCAL player's hand may be scanned or glowed. `isTurn` is
+        // about whose turn it is (solo flips to 'opp'), not who is looking.
+        const localUser = systemState.isTwoPlayer ? systemState.initiator : 'self';
         const scored = [];
         for (const box of sideboxes) {
           const user = box.user();
           const isTurn = rulesState.turnPlayer === user;
-          let affordance = { attackAvailable: false, abilityAvailable: false, usableAbilities: [] };
+          let glows = null;
+          let activeCard = null;
+          let stadiumCard = null;
           if (isTurn) {
             try {
-              const activeZone = getZone(user, 'active');
-              const activeCard = getActivePokemonCard(activeZone);
-              const stadiumCard = stadiumCardFor(getStadium(), getAuthoritativeStadiumArray());
-              affordance = await computeActionAffordances({
+              // Design 023 slice 5: every zone read goes through `liveZoneArray`,
+              // which serves the server's applied view under authoritative
+              // rendering and legacy getZone otherwise, so the legality gates and
+              // the painted nodes describe the same cards.
+              const activeZoneCards = liveZoneArray(user, 'active');
+              activeCard = liveActiveCard(activeZoneCards);
+              stadiumCard = stadiumCardFor(getStadium(), getAuthoritativeStadiumArray());
+              const handCards = user === localUser ? liveZoneArray(user, 'hand') : [];
+              // Registry-backed so `attachedCards`/`abilityUsed` are present on
+              // each card under authoritative rendering (no-op in legacy mode).
+              const benchCards = liveZoneArray(user, 'bench').map((card) => liveCardFor(card));
+              const other = user === 'self' ? 'opp' : 'self';
+              const prizes = liveZoneArray(user, 'prizes');
+              const discard = liveZoneArray(user, 'discard');
+              const lostZone = liveZoneArray(user, 'lostZone');
+              // The server redacts deck contents to a count, its owner included
+              // (view.mjs), so the client's own 60 (recorded when the deck was
+              // built) stands in for the hidden remainder — without it a Rare
+              // Candy line could not be traced and would under-glow.
+              const liveDeck = liveZoneArray(user, 'deck');
+              const deckList = liveDeck.length
+                ? [...liveDeck, ...discard, ...lostZone, ...prizes, ...handCards]
+                : [...(systemState.ownDeckCards || []), ...discard, ...lostZone, ...prizes, ...handCards];
+              glows = await computeCardGlows({
+                user,
+                handCards,
                 activeCard,
-                attachedEnergyCards: attachedEnergiesFor(activeCard, activeZone.array),
-                benchCards: getZone(user, 'bench').array,
+                attachedEnergyCards: attachedEnergiesFor(activeCard, activeZoneCards),
+                benchCards,
+                activeZoneCards,
                 stadiumCard,
                 // Stadium-granted / inherited attacks count toward "can this
                 // Active attack" — without them the button dims a legal attack.
                 extraAttacks: stadiumExtraAttacksFromZone(stadiumCard, {
-                  zoneCards: activeZone.array,
+                  zoneCards: activeZoneCards,
                   card: activeCard,
                   isActive: true,
                 }),
                 isAbilityUsed: (card) => isAbilitySpent(user, card),
                 ensureCardData,
+                prizeCounts: {
+                  self: prizes.length,
+                  opponent: liveZoneArray(other, 'prizes').length,
+                },
+                stadiumName: stadiumCard?.name || null,
+                deckList,
               });
             } catch {
               /* engine not ready — leave this side dim rather than lie */
             }
           }
-          scored.push({ box, isTurn, affordance });
+          scored.push({ box, isTurn, glows, activeCard, stadiumCard });
           if (gen !== generation) return; // a newer refresh took over mid-await
         }
-        for (const { box, isTurn, affordance } of scored) {
-          box.attackButton?.classList.toggle('attacks-available', affordance.attackAvailable);
+        for (const { box, isTurn, glows, activeCard, stadiumCard } of scored) {
+          box.attackButton?.classList.toggle('attacks-available', !!glows?.activeCanAttack);
           box.attackButton?.classList.toggle('turn-disabled', !isTurn);
-          box.abilityButton?.classList.toggle('abilities-available', affordance.abilityAvailable);
+          box.abilityButton?.classList.toggle('abilities-available', !!glows?.abilityCards.length);
           box.abilityButton?.classList.toggle('turn-disabled', !isTurn);
-          for (const { card } of affordance.usableAbilities) {
-            const node = card?.wrapper || card?.image;
-            if (node?.classList) {
-              node.classList.add('has-usable-ability');
-              glowNodes.add(node);
-            }
+          if (!glows) continue;
+          for (const [card, color] of glows.handPlayable) addGlow(card, { color });
+          for (const { card } of glows.abilityCards) addGlow(card, { ability: true });
+          if (glows.activeCanAttack) addGlow(activeCard, { color: glows.activeColor });
+          if (glows.stadiumUsable) {
+            addGlow(stadiumCard, { node: stadiumNode(), color: glows.stadiumColor });
           }
         }
       };

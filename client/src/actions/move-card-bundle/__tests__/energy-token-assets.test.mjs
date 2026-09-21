@@ -2,9 +2,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ENERGY_TOKEN_FRONT,
+  energyTypeKeyFor,
   getEnergyTokenFront,
   getEnergyTokenSrcForType,
   isEnergyCard,
+  normalizeEnergyType,
 } from '../energy-token-assets.mjs';
 
 describe('energy token assets', () => {
@@ -100,5 +102,27 @@ describe('energy token assets', () => {
     assert.equal(isEnergyCard({ name: 'Pikachu', type: 'Pokemon' }), false);
     assert.equal(isEnergyCard(undefined), false);
     assert.equal(isEnergyCard({}), false);
+  });
+
+  it('normalizes printed type names and cost symbols to canonical keys', () => {
+    assert.equal(normalizeEnergyType('Fire'), 'fire');
+    assert.equal(normalizeEnergyType('Dark'), 'darkness');
+    assert.equal(normalizeEnergyType('{F}'), 'fighting');
+    assert.equal(normalizeEnergyType('F'), 'fighting');
+    assert.equal(normalizeEnergyType(''), '');
+    assert.equal(normalizeEnergyType(undefined), '');
+  });
+
+  it('resolves the canonical type key for an Energy card', () => {
+    assert.equal(energyTypeKeyFor({ types: ['Fire'] }), 'fire');
+    assert.equal(energyTypeKeyFor({ types: ['Dark'] }), 'darkness');
+    assert.equal(energyTypeKeyFor({ name: 'Double Colorless Energy', types: [] }), 'colorless');
+    assert.equal(energyTypeKeyFor({ name: 'Basic {F} Energy' }), 'fighting');
+    assert.equal(energyTypeKeyFor({ name: 'Darkness Energy' }), 'darkness');
+  });
+
+  it('returns null from energyTypeKeyFor when no type can be determined', () => {
+    assert.equal(energyTypeKeyFor({ name: 'Mystery Energy', types: [] }), null);
+    assert.equal(energyTypeKeyFor(undefined), null);
   });
 });

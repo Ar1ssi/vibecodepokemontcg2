@@ -35,7 +35,8 @@ const TYPE_BY_COST_SYMBOL = {
 
 const COST_SYMBOL = /\{([a-z])\}/;
 
-const normalizeType = (raw) => {
+/** Canonical type key from a printed type name or a bare cost symbol. */
+export const normalizeEnergyType = (raw) => {
   const lower = String(raw || '')
     .trim()
     .toLowerCase();
@@ -46,34 +47,45 @@ const normalizeType = (raw) => {
 };
 
 /**
+ * Resolve the canonical energy-type key for an Energy card, or null when no type
+ * can be determined (e.g. a Special Energy naming no type at all). Precedence:
+ * declared `types[0]`, then a type word in the name, then a cost symbol in the
+ * name, then 'dark'. Shared by the token image and the card-glow colour.
+ */
+export const energyTypeKeyFor = (card) => {
+  const declared = normalizeEnergyType(card?.types?.[0]);
+  if (ENERGY_TOKEN_FRONT[declared]) return declared;
+
+  const name = String(card?.name || '').toLowerCase();
+  const nameMatch = TYPE_WORDS.find((word) => name.includes(word));
+  if (nameMatch) return nameMatch;
+
+  const symbolInName = name.match(COST_SYMBOL);
+  if (symbolInName && TYPE_BY_COST_SYMBOL[symbolInName[1]]) {
+    return TYPE_BY_COST_SYMBOL[symbolInName[1]];
+  }
+
+  if (name.includes('dark')) return 'darkness';
+
+  return null;
+};
+
+/**
  * Resolve the token image for a printed energy type name — an Energy card's
  * `types[0]` or an attack's cost symbol, which share TCGdex spelling ('Fire',
  * 'Dark', …) but may also arrive as a bare cost symbol ('{F}', 'F'). Null when
  * the type has no token asset.
  */
 export const getEnergyTokenSrcForType = (type) =>
-  ENERGY_TOKEN_FRONT[normalizeType(type)] || null;
+  ENERGY_TOKEN_FRONT[normalizeEnergyType(type)] || null;
 
 /**
  * Resolve the coin-front image for an Energy card, or null if this Energy
  * type has no token asset (e.g. a Special Energy naming no type at all).
  */
 export const getEnergyTokenFront = (card) => {
-  const byDeclaredType = getEnergyTokenSrcForType(card?.types?.[0]);
-  if (byDeclaredType) return byDeclaredType;
-
-  const name = String(card?.name || '').toLowerCase();
-  const nameMatch = TYPE_WORDS.find((word) => name.includes(word));
-  if (nameMatch) return ENERGY_TOKEN_FRONT[nameMatch];
-
-  const symbolInName = name.match(COST_SYMBOL);
-  if (symbolInName && TYPE_BY_COST_SYMBOL[symbolInName[1]]) {
-    return ENERGY_TOKEN_FRONT[TYPE_BY_COST_SYMBOL[symbolInName[1]]];
-  }
-
-  if (name.includes('dark')) return ENERGY_TOKEN_FRONT.darkness;
-
-  return null;
+  const key = energyTypeKeyFor(card);
+  return key ? ENERGY_TOKEN_FRONT[key] : null;
 };
 
 /**

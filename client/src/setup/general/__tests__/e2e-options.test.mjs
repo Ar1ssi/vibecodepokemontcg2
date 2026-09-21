@@ -350,6 +350,30 @@ test('e2e options: card-printed play conditions the server enforces are not offe
   assert.equal(later.filter((o) => o.kind === 'playTrainer').length, 2);
 });
 
+test('e2e options: a second Stadium is not offered once one was played this turn', async () => {
+  resetRules();
+  rulesState.turnNumber = 3;
+  const stadium = { name: 'Battle Cage', type: 'Trainer', trainerType: 'Stadium' };
+  const board = {
+    user: 'self',
+    active: pokemon('Squirtle'),
+    hand: [stadium],
+    prizeCounts: { self: 6, opponent: 6 },
+    stadiumName: null,
+  };
+  assert.equal(kinds(await enumerateOptions(board)).includes('playTrainer'), true);
+
+  rulesState.flags.self.stadiumPlayed = true;
+  assert.equal(kinds(await enumerateOptions(board)).includes('playTrainer'), false);
+
+  // Authoritative netcode: the server's flag name is `stadiumPlayedThisTurn`
+  // (apply-view.js merges view.you.flags), not the client's `stadiumPlayed`.
+  resetRules();
+  rulesState.turnNumber = 3;
+  rulesState.flags.self.stadiumPlayedThisTurn = true;
+  assert.equal(kinds(await enumerateOptions(board)).includes('playTrainer'), false);
+});
+
 test('e2e options: Rare Candy is offered only when a Stage 2 in hand evolves from a Basic in play', async () => {
   resetRules();
   rulesState.turnNumber = 3;
