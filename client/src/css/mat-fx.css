@@ -99,3 +99,56 @@ body.fx-off .fx-overlay {
 .fx-status-apply--asleep { --fx-status-color: #5fb4dd; }
 .fx-status-apply--paralyzed { --fx-status-color: #f4d03f; }
 .fx-status-apply--confused { --fx-status-color: #c77be8; }
+
+.fx-evolve-burst {
+  border-radius: 0.3rem;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95), rgba(140, 200, 255, 0.55) 60%, rgba(140, 200, 255, 0) 100%);
+  mix-blend-mode: screen;
+  z-index: 2470;
+}
+
+.fx-evolve-burst__ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid #fff;
+  border-radius: 0.3rem;
+  box-shadow: 0 0 20px 5px rgba(160, 210, 255, 0.85);
+}
+
+.fx-energy-snap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  z-index: 2460;
+}
+
+.fx-energy-snap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.fx-slide img,
+.fx-card-present img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.3rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.48);
+}
+
+.fx-slide {
+  will-change: transform, opacity;
+}
+
+.fx-card-present {
+  z-index: 2480;
+  will-change: transform, opacity;
+}
+
+.fx-card-present img {
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6), 0 0 26px rgba(255, 255, 255, 0.35);
+}

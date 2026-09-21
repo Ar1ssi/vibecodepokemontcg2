@@ -13,7 +13,9 @@ import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { playDrawToHand } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
+import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { playFx } from './mat-fx/index.js';
+import { captureOrigins, discardOrigins } from './mat-fx/origins.mjs';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
 // and consumed by handleAdvisoryEvent's 'knockout' branch (card already
@@ -59,6 +61,11 @@ export function handleBeforeApply(events, selfPlayerId) {
     const ghost = captureKnockoutGhost(user, record.element);
     if (ghost) pendingKnockoutGhosts.set(event.instanceId, ghost);
   }
+  if (!fxDisabled() && !motionReduced()) {
+    captureOrigins(events, registry, captureKnockoutGhost, (event) =>
+      event.playerId === selfPlayerId ? 'self' : 'opp'
+    );
+  }
 }
 
 /**
@@ -79,6 +86,7 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
     })
   ) {
     if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
+    if (plan.kind === 'fx') discardOrigins(event);
     return;
   }
 

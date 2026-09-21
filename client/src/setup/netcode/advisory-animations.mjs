@@ -24,15 +24,15 @@ export const EVENT_FX = {
   gameEnded: 'game-over',
 };
 
+const sideOf = (playerId, selfPlayerId) =>
+  playerId == null || selfPlayerId == null ? null : playerId === selfPlayerId ? 'self' : 'opp';
+
+// `user` is the acting side. turnStarted names it `player`; gameEnded names the
+// `winner` (so 'self' = you won, 'opp' = you lost, null = draw/no winner).
 const fxPlan = (event, selfPlayerId) => {
   const { type, playerId, ...fields } = event;
-  const user =
-    playerId == null || selfPlayerId == null
-      ? null
-      : playerId === selfPlayerId
-        ? 'self'
-        : 'opp';
-  return { kind: 'fx', effect: EVENT_FX[type], user, ...fields };
+  const actor = type === 'gameEnded' ? event.winner : (playerId ?? event.player);
+  return { kind: 'fx', effect: EVENT_FX[type], user: sideOf(actor, selfPlayerId), ...fields };
 };
 
 export function advisoryAnimationPlan(event, selfPlayerId) {

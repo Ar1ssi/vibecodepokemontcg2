@@ -108,7 +108,8 @@ test('advisoryAnimationPlan: EVENT_FX maps every fx event type to a named effect
     const plan = advisoryAnimationPlan({ type, playerId: 'p1', instanceId: 'c1' }, 'p1');
     assert.equal(plan.kind, 'fx');
     assert.equal(plan.effect, effect);
-    assert.equal(plan.user, 'self');
+    // turnStarted/gameEnded name their side via `player`/`winner`; own tests below.
+    if (type !== 'turnStarted' && type !== 'gameEnded') assert.equal(plan.user, 'self');
     assert.equal(plan.instanceId, 'c1');
   }
 });
@@ -157,4 +158,15 @@ test('advisoryAnimationPlan: attackExecuted -> attack fx carrying attacker and d
     defenderId: 20,
     damage: 30,
   });
+});
+
+test('advisoryAnimationPlan: turnStarted resolves the acting side from `player`', () => {
+  const plan = advisoryAnimationPlan({ type: 'turnStarted', player: 'p2', number: 3 }, 'p1');
+  assert.deepEqual(plan, { kind: 'fx', effect: 'turn-banner', user: 'opp', player: 'p2', number: 3 });
+});
+
+test('advisoryAnimationPlan: gameEnded user is the winner side; no winner -> null', () => {
+  assert.equal(advisoryAnimationPlan({ type: 'gameEnded', winner: 'p1' }, 'p1').user, 'self');
+  assert.equal(advisoryAnimationPlan({ type: 'gameEnded', winner: 'p2' }, 'p1').user, 'opp');
+  assert.equal(advisoryAnimationPlan({ type: 'gameEnded', winner: null }, 'p1').user, null);
 });

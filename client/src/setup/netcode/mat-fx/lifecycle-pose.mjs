@@ -1,0 +1,106 @@
+// Design 022 slice 4: pure math + id helpers for the lifecycle effects
+// (evolve burst, energy snap, retreat slide, trainer/stadium card present).
+// DOM-free; lifecycle.js drives the overlays.
+
+export const EVOLVE_BURST_MS = 650;
+export const ENERGY_SNAP_MS = 480;
+export const RETREAT_SLIDE_MS = 520;
+export const CARD_PRESENT_MS = 1500;
+
+const clamp01 = (t) => Math.max(0, Math.min(1, t));
+const easeOutCubic = (t) => 1 - (1 - t) ** 3;
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
+const rectCenter = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+const isId = (v) => v != null && v !== '';
+
+/**
+ * Instance ids whose on-board position changes for a retreat/switch, so their
+ * pre-diff rects can be captured. Shape-based so it accepts both the raw event
+ * and the fx plan (which drops `type`): `cardRetreated` carries
+ * {activeId, promotedId}; `pokemonSwapped` {instanceId, replacedInstanceId}.
+ * Empty for anything else.
+ */
+export function moveIdsForEvent(event) {
+  if (!event) return [];
+  if (event.activeId != null || event.promotedId != null) {
+    return [event.activeId, event.promotedId].filter(isId);
+  }
+  if (event.replacedInstanceId != null) {
+    return [event.instanceId, event.replacedInstanceId].filter(isId);
+  }
+  return [];
+}
+
+/** Flash + scale pop on the evolved card; peaks mid-way. */
+export function evolveBurstPose(t) {
+  const c = clamp01(t);
+  const bell = Math.sin(c * Math.PI);
+  return { scale: 1 + 0.16 * bell, opacity: bell, ringScale: 0.8 + 0.9 * easeOutCubic(c), ringOpacity: 1 - c };
+}
+
+/** Energy token drops in large and snaps to its size at the card center. */
+export function energySnapPose(t) {
+  const c = clamp01(t);
+  const snap = easeOutCubic(Math.min(1, c / 0.55));
+  return {
+    scale: 2.4 - 1.4 * snap,
+    opacity: c < 0.55 ? snap : Math.max(0, 1 - (c - 0.55) / 0.45),
+    glow: c < 0.55 ? 0 : Math.max(0, 1 - (c - 0.55) / 0.45),
+  };
+}
+
+/**
+ * Ghost slide from a captured origin rect to the card's new rect, fading out
+ * over the last quarter so the real (already placed) card takes over.
+ * @returns {(t:number) => {x:number,y:number,opacity:number}}
+ */
+export function slidePoseFor(fromRect, toRect) {
+  const a = rectCenter(fromRect);
+  const b = rectCenter(toRect);
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return (t) => {
+    const c = clamp01(t);
+    const remain = 1 - easeInOutCubic(c);
+    return { x: dx * remain, y: dy * remain, opacity: c < 0.75 ? 1 : 1 - (c - 0.75) / 0.25 };
+  };
+}
+
+/**
+ * Trainer/Stadium presentation: flies from `fromRect` (or grows from the
+ * center) to a centered hold, then fades. `targetRect` is the centered box the
+ * host was spawned on.
+ * @returns {(t:number) => {x:number,y:number,scale:number,opacity:number}}
+ */
+export function presentPoseFor(fromRect, targetRect) {
+  const b = rectCenter(targetRect);
+  const a = fromRect ? rectCenter(fromRect) : b;
+  const startScale = fromRect ? Math.max(0.15, fromRect.width / targetRect.width) : 0.5;
+  return (t) => {
+    const c = clamp01(t);
+    if (c < 0.2) {
+      const e = easeOutCubic(c / 0.2);
+      return {
+        x: (a.x - b.x) * (1 - e),
+        y: (a.y - b.y) * (1 - e),
+        scale: startScale + (1 - startScale) * e,
+        opacity: e,
+      };
+    }
+    if (c < 0.75) return { x: 0, y: 0, scale: 1, opacity: 1 };
+    const out = (c - 0.75) / 0.25;
+    return { x: 0, y: 0, scale: 1 + 0.08 * out, opacity: Math.max(0, 1 - out) };
+  };
+}
+
+/** Centered card-shaped box (in the viewport) for the presentation overlay. */
+export function presentTargetRect(viewportWidth, viewportHeight, aspect = 0.716) {
+  const height = Math.min(viewportHeight * 0.5, 420);
+  const width = height * aspect;
+  return {
+    left: (viewportWidth - width) / 2,
+    top: (viewportHeight - height) / 2,
+    width,
+    height,
+  };
+}
