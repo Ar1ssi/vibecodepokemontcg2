@@ -174,3 +174,236 @@ test('"N more damage for each card" adds to the printed base (Mega Clefable ex)'
   assert.ok(!res.error, res.error);
   assert.equal(damageOf(res.state, 20), 120);
 });
+
+test('Groudon ex: "as many Energy cards as you like" from hand, 50 plus 10 each ("50+" printed)', () => {
+  const state = board({
+    attack: {
+      name: 'Crushing Mantle',
+      cost: [],
+      damage: '50+',
+      text: 'You may discard from your hand as many Energy cards as you like. If you do, this attack does 50 damage plus 10 more damage for each Energy card you discarded.',
+    },
+  });
+  state.players.p1.zones.hand.push(energy(50, null), energy(51, null), energy(52, null));
+  const pending = attack(state);
+  assert.equal(pending.state.pendingChoice.max, 3);
+  const res = choose(pending.state, [50, 51, 52]);
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 80);
+});
+
+const TRICOLOR_PUMP = {
+  name: 'Tricolor Pump',
+  cost: [],
+  damage: 0,
+  text: "Discard up to 3 Energy cards from your hand. This attack does 60 damage to 1 of your opponent's Pokémon for each Energy card you discarded in this way. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+};
+
+test('Wugtrio ex: discarding 2 from hand snipes the chosen Pokémon for 120', () => {
+  const state = board({ attack: TRICOLOR_PUMP });
+  state.players.p1.zones.hand.push(energy(60, null), energy(61, null));
+  const pending = attack(state);
+  const targetChoice = choose(pending.state, [60, 61]).state;
+  assert.deepEqual(
+    targetChoice.pendingChoice.options.map((o) => o.instanceId).sort((a, b) => a - b),
+    [20, 21]
+  );
+  const res = choose(targetChoice, [21]);
+  assert.ok(!res.error, res.error);
+  const bench = res.state.players.p2.zones.bench.find((c) => c.instanceId === 21);
+  // 120 knocks out the 60-HP Benched Pokémon.
+  assert.ok(!bench, 'Benched Pokémon should be Knocked Out');
+  assert.equal(damageOf(res.state, 20), 0);
+});
+
+test('Wugtrio ex: discarding nothing does no damage and asks for no target', () => {
+  const state = board({ attack: TRICOLOR_PUMP });
+  state.players.p1.zones.hand.push(energy(60, null));
+  const pending = attack(state);
+  const res = choose(pending.state, []);
+  assert.ok(!res.error, res.error);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(damageOf(res.state, 20), 0);
+  assert.ok(res.state.players.p2.zones.bench.some((c) => c.instanceId === 21 && !c.damage));
+});
+
+// ── Deck mill: discard from the top of the deck, count the printed kind ──
+const trainer = (instanceId, name, trainerType = 'Item') =>
+  createCard({ instanceId, name, supertype: 'Trainer', type: 'Trainer', trainerType, subtypes: [trainerType] });
+
+function millBoard(attackDef, p1Deck, p2Deck = null) {
+  const state = board({ attack: attackDef });
+  state.players.p1.zones.deck = [...p1Deck, ...state.players.p1.zones.deck];
+  if (p2Deck) state.players.p2.zones.deck = [...p2Deck, ...state.players.p2.zones.deck];
+  return state;
+}
+
+test('Flareon VMAX: discards the top 5 and deals 100 per Energy among them', () => {
+  const state = millBoard(
+    {
+      name: 'Max Detonation',
+      cost: [],
+      damage: 0,
+      text: 'Discard the top 5 cards of your deck. This attack does 100 damage for each Energy card you discarded in this way.',
+    },
+    [energy(70, null), trainer(71, 'Ultra Ball'), energy(72, null), trainer(73, 'Potion'), trainer(74, 'Judge', 'Supporter')]
+  );
+  const res = attack(state);
+  assert.ok(!res.error, res.error);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(damageOf(res.state, 20), 200);
+  const discard = res.state.players.p1.zones.discard.map((c) => c.instanceId).sort((a, b) => a - b);
+  assert.deepEqual(discard, [70, 71, 72, 73, 74]);
+});
+
+test('Radiant Steelix: mills until 1 card remains, printed + 30 per Energy', () => {
+  const state = board({
+    attack: {
+      name: 'Gigaton Steel',
+      cost: [],
+      damage: 30,
+      text: 'Discard cards from the top of your deck until only 1 card remains. This attack does 30 more damage for each Energy card you discarded in this way.',
+    },
+  });
+  state.players.p1.zones.deck = [energy(80, null), energy(81, null), trainer(82, 'Potion')];
+  const res = attack(state);
+  assert.ok(!res.error, res.error);
+  assert.deepEqual(res.state.players.p1.zones.deck.map((c) => c.instanceId), [82]);
+  assert.equal(damageOf(res.state, 20), 90);
+});
+
+test('Camerupt ex: mills the top card of each deck, 60 plus 20 per Energy', () => {
+  const state = millBoard(
+    {
+      name: 'Magma Burn',
+      cost: [],
+      damage: '60+',
+      text: 'Each player discards the top card of his or her deck. This attack does 60 damage plus 20 more damage for each Energy card discarded in this way.',
+    },
+    [energy(90, null)],
+    [energy(91, null, 'Basic Water Energy', ['Water'])]
+  );
+  const res = attack(state);
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 100);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === 91));
+});
+
+test('Simisear VSTAR: "up to 5" asks for a count, then scales by cards discarded', () => {
+  const state = millBoard(
+    {
+      name: 'Burning Rondo',
+      cost: [],
+      damage: 20,
+      text: 'You may discard up to 5 cards from the top of your deck. This attack does 40 more damage for each card you discarded in this way.',
+    },
+    [trainer(100, 'A'), trainer(101, 'B'), trainer(102, 'C')]
+  );
+  const pending = attack(state);
+  const choice = pending.state.pendingChoice;
+  assert.ok(choice, 'expected a count choice');
+  assert.equal(choice.options.length, 6, 'deck of 9 caps at 5: options 0..5');
+  const res = choose(pending.state, [4]); // option id 4 = discard 3
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 140);
+  assert.equal(res.state.players.p1.zones.discard.length, 3);
+});
+
+test('M Camerupt-EX: declining the optional mill discards nothing and adds nothing', () => {
+  const state = millBoard(
+    {
+      name: 'Mega Eruption',
+      cost: [],
+      damage: 40,
+      text: "You may discard the top 3 cards of each player's deck. If you do, this attack does 40 more damage for each Energy card you discarded in this way.",
+    },
+    [energy(110, null)]
+  );
+  const pending = attack(state);
+  assert.deepEqual(pending.state.pendingChoice.options.map((o) => o.instanceId), [1, 4]);
+  const res = choose(pending.state, [1]);
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 40);
+  assert.equal(res.state.players.p1.zones.discard.length, 0);
+});
+
+test('Wugtrio ex: sniping the Active applies Weakness', () => {
+  const state = board({ attack: TRICOLOR_PUMP });
+  state.players.p1.zones.active[0].types = ['Water'];
+  state.players.p2.zones.active[0].weakness = { type: 'Water', value: 2 };
+  state.players.p1.zones.hand.push(energy(60, null), energy(61, null));
+  const targetChoice = choose(attack(state).state, [60, 61]).state;
+  const res = choose(targetChoice, [20]);
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 240);
+});
+
+test('Raikou: mills 3, 50 plus 10 per {L} Energy, then attaches them to the chosen Pokémon', () => {
+  const state = millBoard(
+    {
+      name: 'Lightning Rider',
+      cost: [],
+      damage: '50+',
+      text: 'Discard 3 cards from the top of your deck. This attack does 50 damage plus 10 more damage for each {L} Energy card you discarded. Then, attach those {L} Energy cards to 1 of your Pokémon.',
+    },
+    [
+      energy(120, null, 'Basic Lightning Energy', ['Lightning']),
+      trainer(121, 'Potion'),
+      energy(122, null, 'Basic Lightning Energy', ['Lightning']),
+    ]
+  );
+  const pending = attack(state);
+  assert.ok(!pending.error, pending.error);
+  assert.equal(damageOf(pending.state, 20), 70);
+  assert.equal(pending.state.turn.player, 'p1', 'turn held open for the attach choice');
+  const res = choose(pending.state, [12]);
+  assert.ok(!res.error, res.error);
+  const attached = res.state.players.p1.zones.bench
+    .filter((c) => c.attachedTo === 12)
+    .map((c) => c.instanceId)
+    .sort((a, b) => a - b);
+  assert.deepEqual(attached, [120, 122]);
+  assert.ok(res.state.players.p1.zones.discard.some((c) => c.instanceId === 121));
+  assert.equal(res.state.turn.player, 'p2');
+});
+
+test('Palossand-GX: pick Pokémon from the top 13 of the opponent deck, 60 each, rest shuffled', () => {
+  const state = millBoard(
+    {
+      name: 'Barren Sands GX',
+      cost: [],
+      damage: 0,
+      text: "Look at the top 13 cards of your opponent's deck and discard any number of Pokémon you find there. This attack does 60 damage for each card you discarded in this way. Your opponent shuffles the other cards back into their deck. (You can't use more than 1 GX attack in a game.)",
+    },
+    [],
+    [pokemon({ instanceId: 130, name: 'Froakie', hp: 60 }), trainer(131, 'Potion'), pokemon({ instanceId: 132, name: 'Staryu', hp: 60 })]
+  );
+  const pending = attack(state);
+  const choice = pending.state.pendingChoice;
+  assert.deepEqual(choice.options.map((o) => o.instanceId).sort((a, b) => a - b), [130, 132]);
+  const res = choose(pending.state, [130, 132]);
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 120);
+  const oppDiscard = res.state.players.p2.zones.discard.map((c) => c.instanceId).sort((a, b) => a - b);
+  assert.deepEqual(oppDiscard, [130, 132]);
+});
+
+test('Flygon ex: discards only React Energy from itself, 40 plus 30 each', () => {
+  const state = board({
+    attack: {
+      name: 'Sand Storm',
+      cost: [],
+      damage: '40+',
+      text: 'You may discard any number of React Energy cards attached to Flygon ex. If you do, this attack does 40 damage plus 30 more damage for each Energy card you discarded.',
+    },
+  });
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 140, name: 'React Energy', supertype: 'Energy', type: 'Energy', subtypes: ['Special'], attachedTo: 1 }),
+    createCard({ instanceId: 141, name: 'React Energy', supertype: 'Energy', type: 'Energy', subtypes: ['Special'], attachedTo: 1 })
+  );
+  const pending = attack(state);
+  assert.deepEqual(pending.state.pendingChoice.options.map((o) => o.instanceId).sort((a, b) => a - b), [140, 141]);
+  const res = choose(pending.state, [140, 141]);
+  assert.ok(!res.error, res.error);
+  assert.equal(damageOf(res.state, 20), 100);
+});

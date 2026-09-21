@@ -166,12 +166,26 @@ export function parseAttackDamage(
   // discarded in this way" (Mega Diancie ex / Garland Ray). The multiplier is
   // the number of Energy the player chose to discard (ctx.energyDiscarded),
   // NOT the attached count. 0 discarded → 0 damage, per the printed text.
-  if (text && /for each card you discard(ed)?/.test(text)) {
+  const mill = text ? deckMillScaling(attack?.text) : null;
+  if (mill) {
+    // Deck mill (Flareon VMAX, Radiant Steelix, Camerupt ex): the multiplier is
+    // how many of the discarded deck cards match the printed kind
+    // (ctx.milledMatches), resolved by the reducer after the cards move.
+    const counted = ctx.milledMatches ?? 0;
+    const printed = base || parseInt(String(attack?.damage ?? ''), 10) || 0;
+    if (mill.plusBase !== null) total = mill.plusBase + mill.perUnit * counted;
+    else if (mill.additive) total = printed + mill.perUnit * counted;
+    else total = mill.perUnit * counted;
+    components.push('per-milled');
+    notes.push(`${mill.perUnit} × ${counted} discarded from the deck`);
+  } else if (text && discardEnergyScaling(attack?.text)) {
     const discarded = ctx.energyDiscarded ?? 0;
     // "does N more damage for each card" (Mega Clefable ex) adds to the base;
     // "does N damage for each card" (Inferno X) replaces it.
-    const more = /(\d+) more damage for each card you discard/.exec(text);
-    total = more ? base + parseInt(more[1], 10) * discarded : base * discarded;
+    const more = /(\d+) more damage for each (?:energy )?card you discard/.exec(text);
+    // TCGdex prints "+" attacks as strings ("50+"), which leave `base` at 0.
+    const printed = base || parseInt(String(attack?.damage ?? ''), 10) || 0;
+    total = more ? printed + parseInt(more[1], 10) * discarded : printed * discarded;
     components.push('per-energy-discarded');
     notes.push(`× ${discarded} Energy discarded in this way`);
   } else if (text && /number of energy|× the number|\* the number/.test(text)) {
@@ -968,33 +982,175 @@ export function attackTargetClause(attackText) {
 //   source     — 'self' (this Pokémon) | 'bench' (Benched) | 'all' (any of yours)
 //                | 'hand' (Energy cards from your hand: Gholdengo ex, Blastoise ex)
 //   energyType — printed type filter ('Fire' for {R}) or null
-// Only "for each card you discarded" counts: "for each Energy card you discarded"
-// is the deck-mill family (Flareon VMAX), where the count is not a choice.
+// Older wordings are covered too: Groudon ex ("discard from your hand as many
+// Energy cards as you like") and Metagross / Heatran ("discard as many Energy
+// cards as you like attached to your Pokémon in play"). Deck-mill attacks
+// (Flareon VMAX) never match a discard-Energy clause, so they return null.
 const ENERGY_SYMBOL_TYPES = {
   G: 'Grass', R: 'Fire', W: 'Water', L: 'Lightning', P: 'Psychic',
   F: 'Fighting', D: 'Darkness', M: 'Metal', Y: 'Fairy', N: 'Dragon', C: 'Colorless',
 };
+const energyTypeOf = (symbol) =>
+  symbol ? ENERGY_SYMBOL_TYPES[symbol.toUpperCase()] || null : null;
+const discardSourceOf = (from) => {
+  if (/hand/i.test(from)) return 'hand';
+  if (/benched/i.test(from)) return 'bench';
+  if (/your\s+pok[ée]mon/i.test(from)) return 'all';
+  return 'self';
+};
+
 export function discardEnergyScaling(attackText) {
   const text = String(attackText || '');
-  if (!/for each card you discard(ed)?/i.test(text)) return null;
-  const m =
+  if (!/for each (?:energy )?card you discard(ed)?/i.test(text)) return null;
+
+  const counted =
     /discard\s+(?:up\s+to\s+(\d+)|(\d+)|(any\s+(?:amount|number)\s+of))?\s*(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon|your\s+hand)/i.exec(
       text
     );
-  if (!m) return null;
-  const [, upTo, exact, anyAmount, basic, symbol, from] = m;
-  let max = 1;
-  if (anyAmount) max = Infinity;
-  else if (upTo || exact) max = Math.max(0, parseInt(upTo || exact, 10));
-  let source = 'all';
-  if (/hand/i.test(from)) source = 'hand';
-  else if (/this/i.test(from)) source = 'self';
-  else if (/benched/i.test(from)) source = 'bench';
+  if (counted) {
+    const [, upTo, exact, anyAmount, basic, symbol, from] = counted;
+    let max = 1;
+    if (anyAmount) max = Infinity;
+    else if (upTo || exact) max = Math.max(0, parseInt(upTo || exact, 10));
+    return {
+      max,
+      source: discardSourceOf(from),
+      energyType: energyTypeOf(symbol),
+      basicOnly: Boolean(basic),
+    };
+  }
+
+  // Groudon ex: "discard from your hand as many Energy cards as you like".
+  const fromHand =
+    /discard\s+from\s+your\s+hand\s+as\s+many\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy\s+cards?\s+as\s+you\s+like/i.exec(
+      text
+    );
+  if (fromHand) {
+    return {
+      max: Infinity,
+      source: 'hand',
+      energyType: energyTypeOf(fromHand[2]),
+      basicOnly: Boolean(fromHand[1]),
+    };
+  }
+
+  // Metagross / Heatran / M Salamence-EX: "discard as many Energy cards as you
+  // like attached to <your Pokémon in play | this Pokémon | its own name>".
+  const attached =
+    /discard\s+as\s+many\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+(?:as\s+you\s+like\s+)?attached\s+to\s+(your\s+Pok[ée]mon(?:\s+in\s+play)?|[^.,]+?)(?:\s+as\s+you\s+like)?[.,]/i.exec(
+      text
+    );
+  if (attached) {
+    return {
+      max: Infinity,
+      source: discardSourceOf(attached[3]),
+      energyType: energyTypeOf(attached[2]),
+      basicOnly: Boolean(attached[1]),
+    };
+  }
+
+  // Flygon ex: "discard any number of React Energy cards attached to Flygon ex"
+  // — a named Energy family, counted by card name.
+  const named =
+    /discard\s+any\s+number\s+of\s+([A-Z][\w'-]*)\s+Energy\s+cards?\s+attached\s+to\s+([^.,]+?)[.,]/.exec(
+      text
+    );
+  if (named && !/^basic$/i.test(named[1])) {
+    return {
+      max: Infinity,
+      source: discardSourceOf(named[2]),
+      energyType: null,
+      basicOnly: false,
+      name: `${named[1]} Energy`,
+    };
+  }
+  return null;
+}
+
+// Parse a printed "discard from the top of the deck, then scale" clause (deck
+// mill). Returns null, or:
+//   { players: 'self'|'each', count, keep, upTo, optional, filter, perUnit,
+//     additive, plusBase }
+//   count    — cards to discard per deck (null when `keep` is set)
+//   keep     — "until only N cards remain" (Radiant Steelix), else null
+//   upTo     — the player picks 0..count ("you may discard up to 5", Simisear VSTAR)
+//   optional — "you may discard ... If you do" (M Camerupt-EX): all or nothing
+//   filter   — { kind: 'any'|'energy'|'supporter'|'name', energyType, basicOnly, name }
+//   damage   — "N damage for each" → N × count; "N more damage" → printed + N × count;
+//              "N damage plus M more" → N + M × count
+//   attachMatched — Raikou: "then attach those {L} Energy cards to 1 of your Pokémon"
+//   lookAndChoose — Palossand-GX: look at the top N of the opponent's deck and
+//                   discard any number of the counted kind (players: 'opponent')
+// Pure.
+export function deckMillScaling(attackText) {
+  const text = String(attackText || '');
+  const each =
+    /for each ([^.]+?) (?:that )?(?:you )?discarded(?: in this way)?/i.exec(text);
+  if (!each) return null;
+
+  let players = 'self';
+  let count = null;
+  let keep = null;
+  let upTo = false;
+  let lookAndChoose = false;
+  let m;
+  if ((m = /look at the top (\d+) cards of your opponent's deck and discard any number of/i.exec(text))) {
+    count = parseInt(m[1], 10);
+    players = 'opponent';
+    lookAndChoose = true;
+  } else if ((m = /discard the top (?:(\d+) )?cards? of (your|each player's) deck/i.exec(text))) {
+    count = m[1] ? parseInt(m[1], 10) : 1;
+    if (/each/i.test(m[2])) players = 'each';
+  } else if ((m = /each player discards the top (?:(\d+) )?cards? of (?:his or her|their) deck/i.exec(text))) {
+    count = m[1] ? parseInt(m[1], 10) : 1;
+    players = 'each';
+  } else if ((m = /discard (up to )?(\d+) cards from the top of your deck/i.exec(text))) {
+    count = parseInt(m[2], 10);
+    upTo = Boolean(m[1]);
+  } else if ((m = /discard cards from the top of your deck until only (\d+) cards? remains?/i.exec(text))) {
+    keep = parseInt(m[1], 10);
+  } else {
+    return null;
+  }
+
+  // Palossand-GX counts "each card you discarded" of the kind it names earlier.
+  const counted = lookAndChoose
+    ? /discard any number of (\w[^.]*?) you find there/i.exec(text)?.[1] || 'card'
+    : each[1];
+  const kind = counted.replace(/\s+cards?$/i, '').trim();
+  let filter = { kind: 'name', energyType: null, basicOnly: false, name: kind };
+  if (/^card$/i.test(counted.trim()) || kind === '') {
+    filter = { kind: 'any', energyType: null, basicOnly: false, name: null };
+  } else if (/energy/i.test(kind)) {
+    const symbol = /\{([A-Z])\}/.exec(kind);
+    filter = {
+      kind: 'energy',
+      energyType: energyTypeOf(symbol?.[1]),
+      basicOnly: /basic/i.test(kind),
+      name: null,
+    };
+  } else if (/supporter/i.test(kind)) {
+    filter = { kind: 'supporter', energyType: null, basicOnly: false, name: null };
+  } else if (/^pok[ée]mon$/i.test(kind)) {
+    filter = { kind: 'pokemon', energyType: null, basicOnly: false, name: null };
+  }
+
+  const plus = /(\d+) damage plus (\d+) more damage for each/i.exec(text);
+  const more = /(\d+) more damage for each/i.exec(text);
+  const flat = /(\d+) damage for each/i.exec(text);
+  if (!plus && !more && !flat) return null;
   return {
-    max,
-    source,
-    energyType: symbol ? ENERGY_SYMBOL_TYPES[symbol.toUpperCase()] || null : null,
-    basicOnly: Boolean(basic),
+    players,
+    count,
+    keep,
+    upTo,
+    optional: !upTo && /you may discard/i.test(text),
+    filter,
+    perUnit: parseInt((plus ? plus[2] : (more || flat)[1]), 10),
+    additive: Boolean(more) && !plus,
+    plusBase: plus ? parseInt(plus[1], 10) : null,
+    attachMatched: /then,? attach those/i.test(text),
+    lookAndChoose,
   };
 }
 

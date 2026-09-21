@@ -37,6 +37,7 @@ import {
   parseAttackSearchClause,
   isGxAttack,
   discardEnergyScaling,
+  deckMillScaling,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -394,6 +395,9 @@ function resolveAttackTargetClause(text, parsed, spread) {
       amount: damage.amount,
       count: damage.count,
       scope: damage.scope,
+      // Attack damage to the Active applies Weakness/Resistance unless the text
+      // waives it for every target ("... for Benched Pokémon" waives only those).
+      activeWR: !/don't apply weakness and resistance(?! for benched)/i.test(t),
     };
   }
   if (parsed?.bench > 0) {
@@ -436,6 +440,33 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, events 
   return amount;
 }
 
+// A chosen-target clause's damage to the opponent's Active after Weakness,
+// Resistance and the other attack modifiers computeAttackDamage applies.
+function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }) {
+  const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find(
+    (c) => !c.attachedTo
+  );
+  if (!attacker) return clause.amount;
+  const defenderPlayer = draft.players[ref.playerId];
+  const result = computeAttackDamage(
+    inPlayView(draft, attacker),
+    inPlayView(draft, ref.card),
+    { name: attackName, damage: clause.amount },
+    {
+      attackerZoneCards: draft.players[attackerPlayerId]?.zones?.active || [],
+      defenderZoneCards: defenderPlayer?.zones?.active || [],
+      defenderInPlayCards: [
+        ...(defenderPlayer?.zones?.active || []),
+        ...(defenderPlayer?.zones?.bench || []),
+      ],
+      stadium: draft.stadium,
+      defenderIsActive: true,
+      baseDamage: clause.amount,
+    }
+  );
+  return result.total;
+}
+
 // Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
 function applyAttackTargets(
   draft,
@@ -459,7 +490,9 @@ function applyAttackTargets(
     } else if (ref.zoneId === 'active') {
       dealt += applyFlatDamageToTarget(draft, {
         ref,
-        amount: clause.amount,
+        amount: clause.activeWR
+          ? activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName })
+          : clause.amount,
         attackerPlayerId,
         events,
       });
@@ -2545,6 +2578,12 @@ function discardScalingCandidates(draft, { playerId, attacker, scaling }) {
   const stadiumCard = draft.stadium?.card || draft.stadium || null;
   const matchesFilter = (card, hostPokemon) => {
     if (!isEnergy(card)) return false;
+    if (
+      scaling.name &&
+      !String(card.name || '').toLowerCase().includes(scaling.name.toLowerCase())
+    ) {
+      return false;
+    }
     if (scaling.basicOnly && !isBasicEnergy(card)) return false;
     if (!scaling.energyType) return true;
     const provided = serverEnergyDescriptor(card, { stadiumCard, hostPokemon });
@@ -2607,6 +2646,120 @@ function discardScalingEnergy(draft, { playerId, selection, allowedIds, events }
     discarded++;
   }
   return discarded;
+}
+
+/** True when a discarded deck card is the kind a deck-mill attack counts. */
+function millFilterMatches(card, filter) {
+  if (!card) return false;
+  switch (filter.kind) {
+    case 'any':
+      return true;
+    case 'energy': {
+      if (!isEnergy(card)) return false;
+      if (filter.basicOnly && !isBasicEnergy(card)) return false;
+      if (!filter.energyType) return true;
+      const provided = serverEnergyDescriptor(card);
+      return (
+        provided.type === filter.energyType ||
+        provided.dualType === filter.energyType
+      );
+    }
+    case 'pokemon':
+      return isPokemon(card);
+    case 'supporter':
+      return /supporter/i.test(
+        `${card.trainerType || ''} ${[].concat(card.subtypes || []).join(' ')}`
+      );
+    default:
+      return String(card.name || '')
+        .toLowerCase()
+        .includes(String(filter.name || '').toLowerCase());
+  }
+}
+
+/**
+ * Discards from the top of the deck(s) a deck-mill attack names and returns
+ * the instanceIds of the discarded cards that match its counted kind.
+ */
+function millDecksForAttack(draft, { playerId, oppId, mill, count, events }) {
+  const playerIds = mill.players === 'each' ? [playerId, oppId] : [playerId];
+  const matchedIds = [];
+  for (const id of playerIds) {
+    const player = draft.players[id];
+    const deck = player?.zones?.deck;
+    if (!Array.isArray(deck)) continue;
+    const toMill =
+      mill.keep !== null
+        ? Math.max(0, deck.length - mill.keep)
+        : Math.min(Math.max(0, count), deck.length);
+    for (const card of deck.splice(0, toMill)) {
+      if (millFilterMatches(card, mill.filter)) matchedIds.push(card.instanceId);
+      const to = discardCardToPlayerZone(player, card);
+      events.push({
+        type: 'cardMoved',
+        instanceId: card.instanceId,
+        from: 'deck',
+        to,
+        playerId: id,
+        reason: 'attack-mill',
+      });
+    }
+  }
+  return matchedIds;
+}
+
+/** Moves milled cards still in the discard pile onto `root` (Raikou). */
+function attachMilledCards(player, cardIds, root, events) {
+  for (const id of cardIds) {
+    const card = (player.zones.discard || []).find((c) => c.instanceId === id);
+    if (card) attachToRoot(player, card, root, events);
+  }
+}
+
+/** Shuffles a player's deck with the command RNG (no-op without one). */
+function shuffleDeckWithRng(player, rng) {
+  if (player?.zones?.deck && rng) player.zones.deck = rng.shuffle(player.zones.deck);
+}
+
+/**
+ * Rebuilds the attack context an attack-phase PendingChoice suspended, from its
+ * resumeToken. Returns null when the attacker or attack is no longer in play.
+ */
+function attackResumeContext(draft, token, { activeRng, events }) {
+  const playerId = token.initiatorPlayerId;
+  const attackerPlayer = draft.players[playerId];
+  const attacker = attackerPlayer?.zones?.active?.find(
+    (c) => !c.attachedTo && c.instanceId === token.attackerId
+  );
+  if (!attacker) return null;
+  const attackerView = attackViewFor(draft, attacker);
+  const attack = attackerView?.attacks?.find((a) => a?.name === token.attackName);
+  if (!attack) return null;
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  let defender = null;
+  let defenderPlayerId = oppId;
+  if (token.targetInstanceId != null) {
+    const targetRef = findCard(draft, token.targetInstanceId);
+    defender = targetRef?.card || null;
+    if (targetRef?.playerId) defenderPlayerId = targetRef.playerId;
+  }
+  const { coin = null, headsCount, flips = [] } = token.coinResult || {};
+  return {
+    playerId,
+    activeRng,
+    events,
+    attacker,
+    defender,
+    defenderPlayerId,
+    oppId,
+    attack,
+    attackerPlayer,
+    attackerView,
+    coin,
+    headsCount,
+    flips,
+    milledMatches: token.milledMatches,
+  };
 }
 
 /**
@@ -2680,6 +2833,79 @@ function resolveAttackEffectPhase(draft, ctx) {
   // in the applyCommand tail.
   draft.__attackEffectPhase = true;
 
+  const resumeBase = {
+    initiatorPlayerId: playerId,
+    attackName: attack.name,
+    attackerId: attacker?.instanceId ?? null,
+    targetInstanceId: defender?.instanceId ?? null,
+    coinResult: { coin, headsCount, flips },
+  };
+
+  // Deck mill: discard from the top of the deck(s) before damage, counting the
+  // printed kind. "Up to N" / "you may" first ask how many (option id = count + 1).
+  let milledMatches = ctx.milledMatches;
+  let milledIds = [];
+  const mill = deckMillScaling(attack?.text);
+  if (mill?.lookAndChoose && milledMatches === undefined) {
+    // Palossand-GX: pick the counted kind from the top N of the opponent's deck.
+    const oppPlayer = draft.players[oppId];
+    const looked = (oppPlayer?.zones?.deck || []).slice(0, mill.count);
+    const options = looked.filter((c) => millFilterMatches(c, mill.filter));
+    if (options.length > 0) {
+      draft.pendingChoice = createPendingChoice({
+        player: playerId,
+        source: 'attack',
+        prompt: `${attack.name}: discard any number of these cards from your opponent's deck (${mill.perUnit} damage each).`,
+        options: options.map((c) => ({
+          instanceId: c.instanceId,
+          name: c.name,
+          src: c.src || '',
+          type: c.type || '',
+        })),
+        min: 0,
+        max: options.length,
+        resumeToken: {
+          ...resumeBase,
+          effectType: 'attackMillPick',
+          allowedIds: options.map((c) => c.instanceId),
+        },
+      });
+      return;
+    }
+    shuffleDeckWithRng(oppPlayer, activeRng);
+    milledMatches = 0;
+  } else if (mill && milledMatches === undefined) {
+    const deckSize = draft.players[playerId]?.zones?.deck?.length || 0;
+    let millCount = ctx.millCount ?? mill.count;
+    if (ctx.millCount === undefined && (mill.upTo || mill.optional) && deckSize > 0) {
+      const counts = mill.upTo
+        ? Array.from({ length: Math.min(mill.count, deckSize) + 1 }, (_, k) => k)
+        : [0, mill.count];
+      draft.pendingChoice = createPendingChoice({
+        player: playerId,
+        source: 'attack',
+        prompt: `${attack.name}: how many cards to discard from the top of the deck?`,
+        options: counts.map((k) => ({
+          instanceId: k + 1,
+          name: k === 0 ? "Don't discard" : `Discard ${k}`,
+          type: 'option',
+        })),
+        min: 1,
+        max: 1,
+        resumeToken: { ...resumeBase, effectType: 'attackMillCount' },
+      });
+      return;
+    }
+    milledIds = millDecksForAttack(draft, {
+      playerId,
+      oppId,
+      mill,
+      count: millCount,
+      events,
+    });
+    milledMatches = milledIds.length;
+  }
+
   // Discard-to-scale: the player picks which Energy to discard before damage.
   let energyDiscarded = ctx.energyDiscarded;
   const discardScaling = discardEnergyScaling(attack?.text);
@@ -2704,13 +2930,10 @@ function resolveAttackEffectPhase(draft, ctx) {
         min: 0,
         max,
         resumeToken: {
+          ...resumeBase,
           effectType: 'attackDiscardScale',
-          initiatorPlayerId: playerId,
-          attackName: attack.name,
-          attackerId: attacker?.instanceId ?? null,
-          targetInstanceId: defender?.instanceId ?? null,
           allowedIds: candidates.map((c) => c.instanceId),
-          coinResult: { coin, headsCount, flips },
+          milledMatches,
         },
       });
       return;
@@ -2732,6 +2955,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           coin,
           headsCount,
           energyDiscarded,
+          milledMatches,
         })
       );
       const effectiveAttack =
@@ -3024,7 +3248,19 @@ function resolveAttackEffectPhase(draft, ctx) {
       // A printed clause that lets the player choose which opponent Pokémon take
       // damage / counters. Resolved after the attack's other effects below so a
       // suspension never drops them (design 017 / D19).
-      const attackTarget = resolveAttackTargetClause(attack.text, parsed, spread);
+      let attackTarget = resolveAttackTargetClause(attack.text, parsed, spread);
+      // Wugtrio ex / Tricolor Pump: the snipe does its printed amount once per
+      // Energy discarded, and nothing when none were.
+      if (
+        attackTarget?.kind === 'damage' &&
+        discardScaling &&
+        /damage to \d+ of your opponent's .*for each (?:energy )?card you discard/i.test(
+          attack.text || ''
+        )
+      ) {
+        const scaledAmount = attackTarget.amount * (energyDiscarded || 0);
+        attackTarget = scaledAmount > 0 ? { ...attackTarget, amount: scaledAmount } : null;
+      }
       let benchDealt = 0;
 
       // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
@@ -3264,6 +3500,33 @@ function resolveAttackEffectPhase(draft, ctx) {
             instanceId: attacker?.instanceId,
             attackName: attack.name,
           });
+        }
+      }
+
+      // Raikou: "Then, attach those {L} Energy cards to 1 of your Pokémon."
+      if (mill?.attachMatched && milledIds.length > 0 && !draft.pendingChoice) {
+        const ownRoots = [
+          ...(attackerPlayer.zones.active || []),
+          ...(attackerPlayer.zones.bench || []),
+        ].filter((c) => !c.attachedTo && isPokemon(c));
+        if (ownRoots.length === 1) {
+          attachMilledCards(attackerPlayer, milledIds, ownRoots[0], events);
+        } else if (ownRoots.length > 1) {
+          draft.pendingChoice = createPendingChoice({
+            player: playerId,
+            source: 'attack',
+            prompt: `${attack.name}: choose 1 of your Pokémon to attach the discarded Energy to`,
+            options: ownRoots,
+            min: 1,
+            max: 1,
+            resumeToken: {
+              ...resumeBase,
+              effectType: 'attackAttachMilled',
+              oppId,
+              cardIds: milledIds,
+            },
+          });
+          searchTriggered = true;
         }
       }
 
@@ -4314,49 +4577,77 @@ export function applyCommand(state, command, rng = null) {
       } else if (token.effectType === 'attackDiscardScale') {
         // Discard-to-scale: discard the chosen Energy, then resume the attack's
         // effect phase with the discarded count driving the damage.
-        const resumer = draft.players[initiatorPlayerId];
-        const attacker = resumer?.zones?.active?.find(
-          (c) => !c.attachedTo && c.instanceId === token.attackerId
-        );
-        const attackerView = attackViewFor(draft, attacker);
-        const attack = attackerView?.attacks?.find(
-          (a) => a?.name === token.attackName
-        );
-        const sOppId = Object.keys(draft.players || {}).find(
-          (id) => id !== initiatorPlayerId
-        );
-        let defender = null;
-        let defenderPlayerId = sOppId;
-        if (token.targetInstanceId != null) {
-          const targetRef = findCard(draft, token.targetInstanceId);
-          defender = targetRef?.card || null;
-          if (targetRef?.playerId) defenderPlayerId = targetRef.playerId;
-        }
         draft.pendingChoice = null;
-        if (attacker && attack) {
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
           const energyDiscarded = discardScalingEnergy(draft, {
             playerId: initiatorPlayerId,
             selection: payload.selection,
             allowedIds: token.allowedIds || [],
             events,
           });
-          const { coin, headsCount, flips } = token.coinResult || {};
-          resolveAttackEffectPhase(draft, {
-            playerId: initiatorPlayerId,
-            activeRng,
+          resolveAttackEffectPhase(draft, { ...resumeCtx, energyDiscarded });
+        }
+      } else if (token.effectType === 'attackMillPick') {
+        // Palossand-GX: discard the chosen cards from the opponent's deck, then
+        // the opponent shuffles the rest back.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const oppPlayer = draft.players[resumeCtx.oppId];
+          const deck = oppPlayer?.zones?.deck || [];
+          let picked = 0;
+          for (const id of new Set(payload.selection || [])) {
+            if (!(token.allowedIds || []).includes(id)) continue;
+            const idx = deck.findIndex((c) => c.instanceId === id);
+            if (idx < 0) continue;
+            const [card] = deck.splice(idx, 1);
+            const to = discardCardToPlayerZone(oppPlayer, card);
+            events.push({
+              type: 'cardMoved',
+              instanceId: id,
+              from: 'deck',
+              to,
+              playerId: resumeCtx.oppId,
+              reason: 'attack-mill',
+            });
+            picked++;
+          }
+          shuffleDeckWithRng(oppPlayer, activeRng);
+          resolveAttackEffectPhase(draft, { ...resumeCtx, milledMatches: picked });
+        }
+      } else if (token.effectType === 'attackAttachMilled') {
+        // Raikou: attach the milled Energy to the chosen Pokémon, then end the turn
+        // the attack's suspension held open.
+        draft.pendingChoice = null;
+        const player = draft.players[initiatorPlayerId];
+        const root = [
+          ...(player?.zones?.active || []),
+          ...(player?.zones?.bench || []),
+        ].find(
+          (c) => !c.attachedTo && c.instanceId === (payload.selection || [])[0]
+        );
+        if (player && root) {
+          attachMilledCards(player, token.cardIds || [], root, events);
+        }
+        if (!isGameConcluded(draft)) {
+          resolveCheckup(draft, {
+            rng: activeRng,
             events,
-            attacker,
-            defender,
-            defenderPlayerId,
-            oppId: sOppId,
-            attack,
-            attackerPlayer: resumer,
-            attackerView,
-            coin: coin ?? null,
-            headsCount,
-            flips: flips || [],
-            energyDiscarded,
+            endingPlayerId: initiatorPlayerId,
           });
+          if (!isGameConcluded(draft)) {
+            advanceTurn(draft, { nextPlayerId: token.oppId, events });
+          }
+        }
+      } else if (token.effectType === 'attackMillCount') {
+        // Deck mill "up to N" / "you may": option id = count + 1.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const pick = Number((payload.selection || [])[0]);
+          const millCount = Number.isInteger(pick) && pick > 0 ? pick - 1 : 0;
+          resolveAttackEffectPhase(draft, { ...resumeCtx, millCount });
         }
       } else if (token.effectType === 'retreat') {
         // The player clicked the Benched Pokémon to switch in; pay the retreat

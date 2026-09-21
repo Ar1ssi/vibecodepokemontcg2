@@ -97,6 +97,7 @@ const isDamagedTauros = ({ card, view }) =>
  * @param {'heads'|'tails'|null} [args.coin] Result of this attack's single coin flip
  * @param {number} [args.headsCount] Heads among a multi-flip "for each heads" attack
  * @param {number} [args.energyDiscarded] Number of energy discarded for scaling damage
+ * @param {number} [args.milledMatches] Counted cards a deck-mill attack discarded
  * @returns {object} ctx for parseAttackDamage
  */
 export function buildServerAttackContext(
@@ -111,6 +112,7 @@ export function buildServerAttackContext(
     coin = null,
     headsCount = undefined,
     energyDiscarded = undefined,
+    milledMatches = undefined,
   } = {}
 ) {
   const own = state?.players?.[attackerPlayerId] || null;
@@ -154,6 +156,9 @@ export function buildServerAttackContext(
 
   if (energyDiscarded !== undefined) {
     ctx.energyDiscarded = energyDiscarded;
+  }
+  if (milledMatches !== undefined) {
+    ctx.milledMatches = milledMatches;
   }
 
   // Defender-derived fields only exist while there IS a defender: an effect-only attack
