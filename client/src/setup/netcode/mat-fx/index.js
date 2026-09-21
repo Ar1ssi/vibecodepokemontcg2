@@ -5,6 +5,7 @@
 import { fxDisabled, motionReduced } from '../../image-logic/mat-fx.mjs';
 import { attack, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
+import { abilityBanner, gameOver, turnBanner } from './flow.js';
 import { attach, evolve, retreat, stadiumPlay, trainerPlay } from './lifecycle.js';
 import { status } from './status.js';
 
@@ -17,6 +18,9 @@ const EFFECTS = {
   retreat,
   'trainer-play': trainerPlay,
   'stadium-play': stadiumPlay,
+  'turn-banner': turnBanner,
+  'ability-banner': abilityBanner,
+  'game-over': gameOver,
 };
 const STATIC_FALLBACKS = {};
 
