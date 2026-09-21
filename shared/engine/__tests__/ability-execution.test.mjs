@@ -369,3 +369,74 @@ test('ability: Primarina Enriching Melody is refused when not used the turn it e
   assert.equal(res.error, 'This ability can only be used the turn it evolved.');
   assert.equal(res.state.players.p1.zones.bench[0].damage, 50);
 });
+
+// ── Meowth ex Last Ditch Catch: a played-onto-Bench one-shot trigger ──
+// Legal only while it sits on the Bench the turn it was played there from hand;
+// never from the Active Spot and never on a later turn.
+const LAST_DITCH_CATCH =
+  'When you play this Pokémon from your hand onto your Bench during your turn, you may use this Ability. Search your deck for a Supporter card, reveal it, and put it into your hand. Then, shuffle your deck. You can\'t use more than 1 Last-Ditch Catch Ability during your turn.';
+
+const makeMeowth = (instanceId) =>
+  createCard({
+    instanceId,
+    name: 'Meowth ex',
+    hp: 170,
+    supertype: 'Pokémon',
+    abilityText: LAST_DITCH_CATCH,
+    abilities: [{ name: 'Last-Ditch Catch', type: 'Ability', text: LAST_DITCH_CATCH }],
+  });
+
+const BENCH_TRIGGER_REFUSAL =
+  "This ability only works the turn it's played from hand to the Bench.";
+
+test('ability: Meowth ex Last-Ditch Catch is allowed the turn it is played from hand to Bench', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(createCard({ instanceId: 50, name: 'Pikachu', hp: 60, supertype: 'Pokémon' }));
+  state.players.p1.zones.hand.push(makeMeowth(51));
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 52, name: 'Judge', supertype: 'Trainer', subtypes: ['Supporter'] })
+  );
+
+  const moved = applyCommand(state, {
+    type: 'moveCard',
+    payload: { instanceId: 51, from: 'hand', to: 'bench' },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(moved.error, null);
+
+  const res = applyCommand(moved.state, {
+    type: 'useAbility',
+    payload: { instanceId: 51 },
+    playerId: 'p1',
+  }, rng);
+  assert.notEqual(res.error, BENCH_TRIGGER_REFUSAL);
+});
+
+test('ability: Meowth ex Last-Ditch Catch is refused from the Active Spot', () => {
+  const { state, rng } = setupGame();
+  const meowth = makeMeowth(53);
+  meowth.playedToBenchTurn = state.turn.number;
+  state.players.p1.zones.active.push(meowth);
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 53 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res.error, BENCH_TRIGGER_REFUSAL);
+  assert.equal(res.events.length, 0);
+});
+
+test('ability: Meowth ex Last-Ditch Catch is refused on a later turn', () => {
+  const { state, rng } = setupGame();
+  const meowth = makeMeowth(54);
+  meowth.playedToBenchTurn = state.turn.number - 2;
+  state.players.p1.zones.bench.push(meowth);
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 54 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res.error, BENCH_TRIGGER_REFUSAL);
+});

@@ -55,6 +55,7 @@ import {
   parseUnlimitedHandEnergyAcceleration,
   requiresActiveSpot,
   isEvolvePlayedTrigger,
+  isBenchPlayedTrigger,
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -2310,6 +2311,17 @@ export function validateLegality(state, command) {
             reason: 'This ability can only be used the turn it evolved.',
           };
         }
+        if (
+          isBenchPlayedTrigger(cardRef.card) &&
+          (cardRef.zoneId !== 'bench' ||
+            cardRef.card.playedToBenchTurn !== state.turn?.number)
+        ) {
+          return {
+            allowed: false,
+            reason:
+              "This ability only works the turn it's played from hand to the Bench.",
+          };
+        }
       }
       return { allowed: true };
     }
@@ -3334,6 +3346,12 @@ export function applyCommand(state, command, rng = null) {
             ['hand', 'deck', 'discard'].includes(payload.from)
           ) {
             card.enteredPlayTurn = draft.turn.number;
+          }
+          // Only a hand→Bench play opens a "when you play onto your Bench" trigger.
+          if (payload.from === 'hand' && payload.to === 'bench') {
+            card.playedToBenchTurn = draft.turn.number;
+          } else {
+            delete card.playedToBenchTurn;
           }
 
           // If moving between active and bench, bring along all attached cards

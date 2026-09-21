@@ -37,17 +37,28 @@ export function requiresActiveSpot(card) {
 const EVOLVE_PLAYED_CLAUSE =
   /when you play this pok[eé]mon from your hand to evolve\b/;
 
-export function isEvolvePlayedTrigger(card) {
+function matchesFirstAbilityOrText(card, clause) {
   const arrText =
     Array.isArray(card?.abilities) && card.abilities.length > 0
       ? typeof card.abilities[0] === 'string'
         ? card.abilities[0]
         : card.abilities[0]?.text
       : '';
-  return (
-    EVOLVE_PLAYED_CLAUSE.test(textOf(card)) ||
-    EVOLVE_PLAYED_CLAUSE.test(lower(arrText || ''))
-  );
+  return clause.test(textOf(card)) || clause.test(lower(arrText || ''));
+}
+
+export function isEvolvePlayedTrigger(card) {
+  return matchesFirstAbilityOrText(card, EVOLVE_PLAYED_CLAUSE);
+}
+
+// "When you play this Pokémon from your hand onto your Bench during your turn"
+// (Meowth ex Last Ditch Catch) is a one-shot trigger: legal only while the
+// Pokémon is still on the Bench the turn it was played there from hand.
+const BENCH_PLAYED_CLAUSE =
+  /when you play this pok[eé]mon from your hand (?:on)?to your bench\b/;
+
+export function isBenchPlayedTrigger(card) {
+  return matchesFirstAbilityOrText(card, BENCH_PLAYED_CLAUSE);
 }
 
 // --- passive -----------------------------------------------------------

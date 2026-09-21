@@ -4,9 +4,9 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 239
-Focus: Design 023 (card affordance glows) + S239 Live-style flowing-rim restyle shipped to main; user approved visuals on localhost.
-Active: nothing in flight. Design 023 on main (`card-glow-colors.mjs`, `card-glow-model.mjs`, `live-card-sources.mjs`, `.has-glow` flowing lit-rim CSS in self-/opp-containers.css + index.css).
+Session: 240
+Focus: Meowth ex Last-Ditch Catch usable from Active / on later turns under server authority — fixed server-side (uncommitted).
+Active: nothing in flight. Fix in `reduce.mjs` legality (`isBenchPlayedTrigger` + `card.playedToBenchTurn` stamped on hand->bench moveCard).
 Next: optional Live parity extras (hand-card up-chevron, edge wisps); holo "freeze on double-click" report not reproduced (legacy fixture, both preview paths animate) — reopen only with repro details.
 Blocked: nothing.
 
@@ -18,6 +18,6 @@ Blocked: nothing.
 - `pnpm lint` is pre-existing red (CRLF vs prettier `endOfLine`, 0 errors); only NEW rule errors count.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S240 patch: server gate for played-onto-Bench ability triggers (Meowth ex); +3 tests; uncommitted.
 - S239 patch: design 023 glow restyled after a TCG Live capture (flowing lit rim on board/Stadium, steady rim in hand, per-kind colours kept); pushed to main.
 - S238 feature: design 023 card affordance glows built (slices 1-5) + review fixes (opponent-hand leak, reduced-motion, authoritative rendering); visuals unverified by eye; uncommitted.
-- S237 feature: inspector frame bands (`INSPECTOR_BANDS` band/fillBand, `frameKeyFor`) + text-weighted attack rows.
