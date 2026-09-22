@@ -974,6 +974,17 @@ function hostIsType(pokemon, typeName) {
   return String(pokemon?.name ?? '').toLowerCase().includes(want);
 }
 
+// TCGdex spells stages inconsistently ("Stage 2" vs "Stage2"), so compare on
+// letters/digits only, like cards.mjs collapseStage().
+function stageKey(pokemon) {
+  const subs = (pokemon?.subtypes || []).map((s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const stage = String(pokemon?.stage ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (stage) return stage;
+  if (subs.includes('stage2')) return 'stage2';
+  if (subs.includes('stage1')) return 'stage1';
+  return 'basic';
+}
+
 function conditionMet(condition, pokemon, zoneArray) {
   if (!condition) return true;
   const img = pokemon?.image;
@@ -982,11 +993,11 @@ function conditionMet(condition, pokemon, zoneArray) {
   if (condition.startsWith('not:')) return !hostIsType(pokemon, condition.slice(4));
   switch (condition) {
     case 'hostBasic':
-      return String(pokemon?.stage ?? 'Basic') === 'Basic';
+      return stageKey(pokemon) === 'basic';
     case 'stage2':
-      return String(pokemon?.stage ?? '').toLowerCase() === 'stage 2';
+      return stageKey(pokemon) === 'stage2';
     case 'evolution':
-      return String(pokemon?.stage ?? 'Basic') !== 'Basic';
+      return stageKey(pokemon) !== 'basic';
     case 'delta':
       return /δ|delta/i.test(String(pokemon?.name ?? '')) || (pokemon?.subtypes || []).map((s) => String(s).toLowerCase()).includes('delta species');
     case 'otherSpecial': {
@@ -1162,4 +1173,29 @@ export function blocksSpecialEnergyBenchDamage(pokemonCard, zoneId, zoneArray = 
     }
   }
   return false;
+}
+
+// Host conditions a cost-payment path can check from the host card alone.
+// Other conditions (prize count, rule box, …) fall through conditionMet's
+// default `true`, which would over-grant Energy, so they are not applied here.
+const HOST_PROVISION_CONDITIONS = new Set(['stage2', 'hostBasic', 'evolution']);
+
+/**
+ * Energy units a special Energy provides because of its host (Neo Upper on a
+ * Stage 2 → two units of every type). Returns pool tokens for
+ * expandEnergyEntries ('Wildcard' = any type), or null when no host
+ * condition applies and the card's ordinary type should be used.
+ */
+export function hostConditionalProvision(energyCard, hostPokemon) {
+  if (!energyCard || !hostPokemon) return null;
+  const provides = parseSpecialEnergyEffects(energyCard)?.provides ?? [];
+  const met = provides.filter(
+    (step) => HOST_PROVISION_CONDITIONS.has(step.condition) && conditionMet(step.condition, hostPokemon, []),
+  );
+  if (!met.length) return null;
+  const step = met[met.length - 1];
+  const types = step.energyTypes || [];
+  const token = types.includes('Any') ? 'Wildcard' : types.length === 1 ? types[0] : null;
+  if (!token) return null;
+  return new Array(Math.max(1, step.count || 1)).fill(token);
 }

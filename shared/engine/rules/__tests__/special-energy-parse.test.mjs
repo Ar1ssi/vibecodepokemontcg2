@@ -286,3 +286,24 @@ test('computeAttackDamage: applies special-energy bonus, penalty and reduction',
   assert.equal(reduced.specialEnergyReduction, 10);
   assert.equal(reduced.total, 40);
 });
+
+test('Neo Upper Energy pays two symbols of any type on a Stage 2, whatever the stage spelling', async () => {
+  const { serverEnergyDescriptor } = await import('../server-energy.mjs');
+  const { canPayAttackCost } = await import('../attack-engine.mjs');
+  const neoUpper = { name: 'Neo Upper Energy', type: 'Energy', subtypes: ['Special'], types: ['Colorless'] };
+  for (const stage of ['Stage 2', 'Stage2']) {
+    const greninja = { name: 'Mega Greninja ex', type: 'Pokémon', stage, types: ['Water'] };
+    const entry = serverEnergyDescriptor(neoUpper, { hostPokemon: greninja });
+    assert.equal(canPayAttackCost([entry], ['Water', 'Psychic']), true, stage);
+    assert.equal(canPayAttackCost([entry], ['Water', 'Water', 'Water']), false, stage);
+  }
+});
+
+test('Neo Upper Energy provides only one Energy on a non-Stage 2 host', async () => {
+  const { serverEnergyDescriptor } = await import('../server-energy.mjs');
+  const { canPayAttackCost } = await import('../attack-engine.mjs');
+  const neoUpper = { name: 'Neo Upper Energy', type: 'Energy', subtypes: ['Special'], types: ['Colorless'] };
+  const frogadier = { name: 'Frogadier', type: 'Pokémon', stage: 'Stage1', types: ['Water'] };
+  const entry = serverEnergyDescriptor(neoUpper, { hostPokemon: frogadier });
+  assert.equal(canPayAttackCost([entry], ['Colorless', 'Colorless']), false);
+});

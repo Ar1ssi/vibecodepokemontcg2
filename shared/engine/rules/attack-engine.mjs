@@ -180,7 +180,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         const type = typeof entry === 'string' ? entry : entry?.type;
         const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
         if (!type) continue;
-        if (family === 'double-colorless') {
+        if (Array.isArray(entry?.provides) && entry.provides.length) {
+          // Host-conditional provision (Neo Upper on a Stage 2, …).
+          pool.push(...entry.provides);
+        } else if (family === 'double-colorless') {
           pool.push('Colorless', 'Colorless');
         } else if (family === 'double') {
           pool.push(type, type);

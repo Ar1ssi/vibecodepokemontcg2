@@ -17,6 +17,7 @@
 //     pending user confirmation (taxonomy: do not silently build execution).
 
 import { describeTypedSpecialEnergy } from './special-energy-effects.mjs';
+import { hostConditionalProvision } from './special-energy-parse.mjs';
 
 // Effect families a special energy can be classified into.
 export const ENERGY_EFFECT_FAMILIES = [
@@ -324,7 +325,9 @@ export function isDeltaSpecies(card) {
 }
 
 /**
- * Rewrite an attached-Energy descriptor under the Stadium in play.
+ * Rewrite an attached-Energy descriptor for its host and the Stadium in play.
+ * - Host: a host-conditional special (Neo Upper on a Stage 2) gains a
+ *   `provides` token list (see hostConditionalProvision).
  * - Temple of Sinnoh: all Special Energy provides 1 {C} and nothing else.
  * - Crystal Beach: Special Energy that provided ≥2 now provides 1 {C}.
  * - Holon Research Tower: Basic Energy on a Delta Species Pokémon also
@@ -338,7 +341,10 @@ export function rewriteEnergyDescriptor(
   descriptor,
   { card = null, stadiumCard = null, hostPokemon = null } = {}
 ) {
-  if (!descriptor || !stadiumCard) return descriptor;
+  if (!descriptor) return descriptor;
+  const hostTokens = descriptor.family === 'basic' ? null : hostConditionalProvision(card, hostPokemon);
+  if (hostTokens) descriptor = { ...descriptor, provides: hostTokens };
+  if (!stadiumCard) return descriptor;
   const t = lower(stadiumCard?.text ?? stadiumCard?.effect ?? '');
   if (!t) return descriptor;
   const family = descriptor.family;
@@ -355,7 +361,7 @@ export function rewriteEnergyDescriptor(
 
   // Crystal Beach — Special Energy worth ≥2 now provides only 1 {C}.
   if (/special energy/.test(t) && /provid(?:es?|ing) only 1 \{c\}/.test(t)) {
-    if (family === 'double' || family === 'double-colorless') {
+    if (family === 'double' || family === 'double-colorless' || descriptor.provides?.length >= 2) {
       return { type: 'Colorless', family: 'basic' };
     }
     return descriptor;
