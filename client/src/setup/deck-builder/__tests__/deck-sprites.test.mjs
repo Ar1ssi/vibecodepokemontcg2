@@ -23,7 +23,7 @@ const REPO_ROOT = path.resolve(
 );
 
 test('the catalog is unique by slug and dex-ordered', () => {
-  assert.ok(POKEMON_SPRITE_CATALOG.length > 800);
+  assert.ok(POKEMON_SPRITE_CATALOG.length > 1000);
   const slugs = new Set(POKEMON_SPRITE_CATALOG.map((entry) => entry.slug));
   assert.equal(slugs.size, POKEMON_SPRITE_CATALOG.length);
   const indexes = POKEMON_SPRITE_CATALOG.map((entry) => entry.idx);
@@ -195,4 +195,92 @@ test('search honours the limit', () => {
     searchPokemon('', 0).length > 0,
     'a bad limit falls back to the default'
   );
+});
+
+// --- alternate forms (Mega / Primal / Gigantamax / regional) ---
+
+test('a species is immediately followed by its forms, in catalog order', () => {
+  const names = POKEMON_SPRITE_CATALOG.filter(
+    (entry) => entry.species === 'Charizard'
+  ).map((entry) => entry.name);
+  assert.deepEqual(names, [
+    'Charizard',
+    'Mega Charizard X',
+    'Mega Charizard Y',
+    'Gigantamax Charizard',
+  ]);
+});
+
+test('searching a species name returns the species with all of its forms', () => {
+  const names = searchPokemon('gengar').map((entry) => entry.name);
+  assert.deepEqual(names, ['Gengar', 'Mega Gengar', 'Gigantamax Gengar']);
+});
+
+test('the base Pokémon always leads its own forms', () => {
+  for (const query of ['meowth', 'growlithe', 'kyogre']) {
+    assert.equal(searchPokemon(query)[0].form, null, query);
+  }
+});
+
+test('regional and Gigantamax forms are reachable by their own wording', () => {
+  assert.ok(
+    searchPokemon('alolan').some((entry) => entry.slug === 'raichu-alola')
+  );
+  assert.ok(
+    searchPokemon('galarian').some((entry) => entry.slug === 'meowth-galar')
+  );
+  assert.ok(
+    searchPokemon('hisuian').some((entry) => entry.slug === 'growlithe-hisui')
+  );
+  assert.ok(
+    searchPokemon('gigantamax').some((entry) => entry.slug === 'gengar-gmax')
+  );
+  // "gmax" is how the form is spelled in the slug, so it is searchable too.
+  assert.ok(
+    searchPokemon('gmax').some((entry) => entry.slug === 'gengar-gmax')
+  );
+});
+
+test('searching a form keyword collects that form across species', () => {
+  const results = searchPokemon('mega', 300);
+  const megas = results.filter((entry) => entry.form?.startsWith('mega'));
+  assert.ok(megas.length > 20);
+  assert.ok(megas.some((entry) => entry.slug === 'gengar-mega'));
+  assert.ok(megas.some((entry) => entry.slug === 'charizard-mega-x'));
+  // Meganium's own name starts with the query, so the species bucket wins the
+  // top of the list — "mega" is a name as well as a form.
+  assert.equal(results[0].slug, 'meganium');
+});
+
+test('a form carries its own art, regular and shiny', () => {
+  assert.equal(
+    deckSpriteImageUrl({ slug: 'gengar-mega' }),
+    '/src/assets/pokemon/gen8/regular/gengar-mega.png'
+  );
+  assert.equal(
+    deckSpriteImageUrl({ slug: 'charizard-gmax', shiny: true }),
+    '/src/assets/pokemon/gen8/shiny/charizard-gmax.png'
+  );
+});
+
+test('a form can be pinned and labelled like any other Pokémon', () => {
+  const sprites = addDeckSprite([], 'meowth-galar', true);
+  assert.deepEqual(sprites, [{ slug: 'meowth-galar', shiny: true }]);
+  assert.equal(deckSpriteLabel(sprites[0]), 'Shiny Galarian Meowth');
+});
+
+test('a species and its form are different slots, not a duplicate', () => {
+  const sprites = addDeckSprite(addDeckSprite([], 'gengar'), 'gengar-mega');
+  assert.deepEqual(
+    sprites.map((sprite) => sprite.slug),
+    ['gengar', 'gengar-mega']
+  );
+});
+
+test('cosmetic-only forms are deliberately absent', () => {
+  // Unown letters, Vivillon patterns and Alcremie creams are hundreds of
+  // near-identical rows that would bury the species they belong to.
+  assert.equal(findPokemonBySlug('unown-b'), null);
+  assert.equal(findPokemonBySlug('vivillon-polar'), null);
+  assert.equal(findPokemonBySlug('pikachu-libre'), null);
 });

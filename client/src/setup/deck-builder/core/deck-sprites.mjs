@@ -2,7 +2,8 @@
  * Deck Pokémon sprites — the pure model behind the strip of Pokémon shown
  * next to a deck's name (design 024).
  *
- * A deck carries up to three slots, each `{ slug, shiny }`. The art is
+ * A deck carries up to three slots, each `{ slug, shiny }`. A slug names a
+ * Pokémon or one of its Mega / Primal / Gigantamax / regional forms. The art is
  * vendored from msikma/pokesprite under client/src/assets/pokemon/gen8, so a
  * slug maps to a file path with no network call and no fallback branch (D97).
  *
@@ -20,15 +21,25 @@ const BY_SLUG = new Map(
 
 export { POKEMON_SPRITE_CATALOG };
 
-/** @returns {{idx: string, name: string, slug: string}|null} */
+/**
+ * @returns {{idx: string, name: string, slug: string, species: string,
+ *   form: string|null}|null} `form` is null for the base Pokémon, otherwise a
+ *   pokesprite form key ('mega', 'gmax', 'alola', …).
+ */
 export function findPokemonBySlug(slug) {
   return BY_SLUG.get(String(slug ?? '')) || null;
 }
 
 /**
- * Name search for the picker. Prefix matches come first (typing "char" should
- * reach Charmander before Wartortle's... nothing, but before any mid-word hit),
- * and each group keeps dex order so the list never reshuffles arbitrarily.
+ * Name search for the picker.
+ *
+ * Ranking is by SPECIES, not by the form's display name: typing "gengar" must
+ * surface Gengar, Mega Gengar and Gigantamax Gengar together, even though only
+ * one of those names starts with the query. Species-prefix hits come first,
+ * then anything else that contains the query (which is what finds every Mega
+ * at once, or a regional by its "Alolan"/"Galarian" prefix). Each bucket keeps
+ * catalog order — dex order, with a species immediately followed by its forms —
+ * so a form never floats away from the Pokémon it belongs to.
  */
 export function searchPokemon(query = '', limit = 40) {
   const needle = String(query ?? '')
@@ -37,17 +48,23 @@ export function searchPokemon(query = '', limit = 40) {
   const max = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 40;
   if (!needle) return POKEMON_SPRITE_CATALOG.slice(0, max);
 
-  const prefix = [];
-  const contains = [];
+  const bySpecies = [];
+  const other = [];
   for (const entry of POKEMON_SPRITE_CATALOG) {
-    const haystack = entry.name.toLowerCase();
-    if (haystack.startsWith(needle) || entry.slug.startsWith(needle))
-      prefix.push(entry);
-    else if (haystack.includes(needle) || entry.slug.includes(needle))
-      contains.push(entry);
-    if (prefix.length >= max) break;
+    const species = entry.species.toLowerCase();
+    const name = entry.name.toLowerCase();
+    if (species.startsWith(needle) || entry.slug.startsWith(needle)) {
+      bySpecies.push(entry);
+    } else if (
+      species.includes(needle) ||
+      name.includes(needle) ||
+      entry.slug.includes(needle)
+    ) {
+      other.push(entry);
+    }
+    if (bySpecies.length >= max) break;
   }
-  return [...prefix, ...contains].slice(0, max);
+  return [...bySpecies, ...other].slice(0, max);
 }
 
 /** @returns {string} the vendored sprite path, or '' for a slug we do not have art for. */
