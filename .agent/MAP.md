@@ -9,6 +9,14 @@ server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQL
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
 tools/ — internal dev tools, sync log comparison, asset mappings
+client/src/css/deck-builder-live.css — deck builder's PTCG Live theme (D: S252); ALL rules scoped
+  under `.db-live` (on #nativeDeckBuilderWorkspace) — that class is what overrides index.css on
+  specificity, so @import order never matters and nothing needs !important. `.db-light` re-tokenizes
+  to the pre-Live grey palette. Token block at the top is the only thing the two themes differ by.
+client/src/setup/deck-builder/core/builder-theme.mjs — theme resolve/persist (dark default)
+client/src/setup/deck-builder/core/deck-counter.mjs — "x / 60" counter model from a validateDeck result
+client/src/setup/deck-builder/core/card-filters.mjs — search filter pills (card class / energy type /
+  Trainer subtype); OR within a group, AND across groups; reuses energy-token-assets.mjs's type vocabulary
 client/src/setup/deck-builder/core/coins.mjs — coin catalog (939, unique ids); normalize via
   scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
   client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link);

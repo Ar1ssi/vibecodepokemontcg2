@@ -4,19 +4,30 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 251
-Focus: audit of item/energy/ability/attack/attack-effect bugs (same class as the glow bug) + fixes.
-Active: 31 fixes landed, UNCOMMITTED on main (suite 2844 tests, 2843 pass).
-Next: review/commit the S251 diff; then I78–I80 (deferred). Maintenance due at S260.
+Session: 252
+Focus: deck builder restyled toward PTCG Live (theme, counter, card grid, filters) + an explicit Save button.
+Active: 5 commits on `claude/great-thompson-tnrmfd`, pushed. Suite 2897, 2896 pass.
+Next: user review of the Live restyle (tunnel was live this session); then I81, I78–I80. Maintenance due at S260.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- S251 uncommitted: run `git status`/`git diff` before anything else; fixes span `shared/engine/reduce.mjs`, `effects/executor.mjs|special-energy.mjs|ability.mjs|trainer.mjs|stadium.mjs|trainer-steps.mjs`, `rules/{rules-state,attack-window,attack-effects,attack-pending-effects,collect-usable-abilities,ability-executors,stadium-effects,resolve-attack-context}.mjs`, and client `move-card.js`, `chat-buttons.js`, `trainer-execution.js`, `rules-bridge.js`, `action-affordances.mjs`, `card-inspector-model.mjs`, `ability-picker.js`, `e2e-options.mjs`, `attack-preview-sources.mjs`.
-- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is unpaid" — verified failing at HEAD with the S251 diff stashed. Suite otherwise 2843/2844.
-- `pnpm test` on this checkout triggers an implicit install and (before S251) emptied `node_modules`; `pnpm install` restores it. Prefer `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
-- Design 023: glows recomputed per turn from legality; colour only via `.has-glow` + `--glow-rgb`. The found "glow stops" cause class (bare catch wiping all glows) is still present in `hookActionAffordances` (rules-bridge.js:1949-1962) — not fixed here (no repro).
-- Client legacy mode still lags the server on: GX once-per-game (I79), fossil Items (I80), simultaneous stadium KO tiebreak (I78, server-side).
+- Deck-builder styling now lives in `client/src/css/deck-builder-live.css`, scoped under `.db-live`
+  (on `#nativeDeckBuilderWorkspace`). That class is what beats index.css on specificity — never add
+  a rule there without the prefix, and never reach for !important. `.db-light` = the old grey palette.
+- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is
+  unpaid" — failing since before S251. Suite otherwise green.
+- Deck-builder cards autosave on every `render()` and the sleeve/coin/mat pickers commit on change,
+  so the Save button only does real work with no deck loaded (I81 tracks the decision).
+- Playwright: the pinned browser build is missing from /opt/pw-browsers. Launch with
+  `executablePath: '/opt/pw-browsers/chromium', args: ['--ignore-certificate-errors']` — without the
+  flag the socket.io CDN fails TLS behind the agent proxy and `io is not defined` breaks page boot.
+- `pnpm test` triggers an implicit install that has emptied `node_modules` before; prefer
+  `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S251 audit+fix: server soft-locks (unpayable discard cost), special-energy lethal KOs + evolved-host type gates, Legacy once-per-game marker erased by advanceTurn, ability consumed with no target, attack pricing (passive/stadium discounts, plural abilities, out-of-range index), stadium drop flag, ability-negation Stadium, Mega-evolve Checkup, defender attack lock, status-aware attack windows.
-- S251 client parity: Trainer pickers that moved cards to the wrong zone (Kofu, attach-from-discard), Trainer replay marker on return to hand, Rare Candy same-turn Basic, trainerType-only Supporter gate, attacker special-energy damage, untyped Energy readers, on-attach search picker, played-to-bench window under authority, Asleep/Paralyzed affordances, `attackExecuting` flag.
+- S252 deck builder → PTCG Live: dark theme with a light toggle, "x / 60" counter, image-first card
+  grid in both search and Browse Sets, energy/class/Trainer filter pills, explicit Save (+53 tests).
+  Fixed in passing: `getActiveDeckName` returned nothing (panel always read "Untitled Deck"); the
+  sleeve gallery rendered under the search grid at boot.
+- S251 audit+fix: 31 server/client fixes across items, energy, abilities, attacks and attack effects.
+- S250 debug/patch: lethal ability damage counters, Items attached as Tools, Items to Bench, Tarragon.
