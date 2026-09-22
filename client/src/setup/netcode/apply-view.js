@@ -1543,10 +1543,17 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     optDiv.className = 'choice-option-card';
     optDiv.dataset.instanceId = String(opt.instanceId);
 
-    const optImg = doc.createElement('img');
-    optImg.src = opt.src || '/src/assets/cardback.png';
-    optImg.alt = opt.name || 'Card';
-    optDiv.appendChild(optImg);
+    // Artless options are answers (Yes/No sentinels), not cards: a cardback per
+    // option would make them indistinguishable, so show their label instead.
+    if (opt.src) {
+      const optImg = doc.createElement('img');
+      optImg.src = opt.src;
+      optImg.alt = opt.name || 'Card';
+      optDiv.appendChild(optImg);
+    } else {
+      optDiv.classList.add('choice-option-text');
+      optDiv.textContent = opt.name || `Option ${opt.instanceId}`;
+    }
 
     optDiv.addEventListener?.('click', () => {
       if (selectedIds.has(opt.instanceId)) {

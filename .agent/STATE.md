@@ -4,12 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 260
-Focus: Mega/Tera signature entry animations (design 027, D104). Merged to main
-  (1cf44ba0) from branch `feature/evolve-fx`. S260 added D105: battle FX ignore the OS
-  reduced-motion flag (opt-in `localStorage['ptcg-reduce-motion']='1'`).
+Session: 261
+Focus: patch — the Yes/No choice modal drew identical cardbacks (Ninja Spinner, Lt. Surge's
+  Bargain). Fixed on main; earlier S259–S260 FX work unchanged.
 Active: none.
 Next: the user checks on localhost in authoritative mode:
+  - the Yes/No modal: Ninja Spinner and Lt. Surge's Bargain now show labeled options;
   - a Tera evolution (e.g. Rare Candy into a Tera Stage 2) and a Tera Basic played to the bench;
   - a Mega evolution and a Mega Basic played from hand (also as the starting Active).
   The S258 FX polish visual check is still open too.
@@ -30,14 +30,13 @@ Blocked: nothing. A public tunnel is NOT possible from this container — see th
 - Vendored art: never hand-edit the `*.generated.mjs` catalogs; rerun the scripts (D97, D98, D100).
   Card→sprite parsing lives only in `core/card-sprites.mjs`.
 - ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is
-  unpaid". Suite otherwise green (3046 tests at S260).
+  unpaid". Suite otherwise green (3047 tests at S261).
 - Test with `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`,
   not `pnpm test` (its implicit install has emptied node_modules). The user checks CSS on localhost.
   No tunnel from this container: never report a printed *.trycloudflare.com URL as live.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S261 fallback choice modal labels artless options (Yes/No sentinels) instead of cardbacks.
 - S260 battle FX no longer follow Windows' reduced-motion setting (D105).
 - S259 Mega/Tera signature entries (merged): Tera crystal shatter in the type colour, Mega
   keystone sphere with swooshes; on evolution and on entering play (+20 tests).
-- S258 mat FX polish (merged to main, 9e0dad29): impact-timed hits, wind-up lunge, KO shards,
-  status particles, evolution silhouette, banner/ability-tag/present/confetti rework.

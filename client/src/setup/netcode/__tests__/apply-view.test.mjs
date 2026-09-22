@@ -515,6 +515,54 @@ test('PendingChoice: mounts modal for owner and waiting banner for opponent', ()
   assert.equal(doc.getElementById('netcodeChoiceBanner'), null);
 });
 
+test('PendingChoice: artless Yes/No options render as labels, not identical cardbacks', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const view = {
+    stateVersion: 1,
+    pendingChoice: {
+      choiceId: 'choice_p1_ninja',
+      player: 'p1',
+      prompt:
+        'Ninja Spinner: return a Water Energy to your hand for 80 more damage?',
+      options: [
+        { instanceId: 1, name: 'Yes — +80 damage', src: '', type: 'option' },
+        { instanceId: 2, name: 'No', src: '', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  };
+
+  let resolvedChoice = null;
+  applyView(view, [], {
+    document: doc,
+    getZone: mockGetZone,
+    onResolveChoice: (sel) => {
+      resolvedChoice = sel;
+    },
+  });
+
+  const modal = doc.getElementById('netcodeChoiceModal');
+  const optionCards = modal.querySelectorAll('.choice-option-card');
+  assert.equal(optionCards.length, 2);
+  assert.equal(
+    modal.querySelectorAll('img').length,
+    0,
+    'no cardback stand-ins'
+  );
+  assert.equal(optionCards[0].textContent, 'Yes — +80 damage');
+  assert.equal(optionCards[1].textContent, 'No');
+
+  optionCards[0].dispatchEvent({ type: 'click' });
+  modal.querySelector('#choiceConfirmBtn').dispatchEvent({ type: 'click' });
+  assert.deepEqual(resolvedChoice, {
+    choiceId: 'choice_p1_ninja',
+    selection: [1],
+  });
+});
+
 test('Invariant 4: Deleting events array leaves client DOM state completely correct', () => {
   const { doc: docWithEvents, mockGetZone: getZoneWithEvents } = setupMockDom();
   const { doc: docWithoutEvents, mockGetZone: getZoneWithoutEvents } = setupMockDom();
