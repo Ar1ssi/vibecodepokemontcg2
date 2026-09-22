@@ -207,3 +207,43 @@ body.fx-off .fx-overlay {
   background: #000;
   z-index: 2430;
 }
+
+/* ── Design 024 slice 2: attack choreography ──────────────────────────── */
+
+/* The attack banner sits on the same strip as the turn/ability banners but
+   reads hotter, so the name of an attack is never mistaken for a turn change. */
+.fx-banner--attack {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0),
+    rgba(38, 10, 10, 0.86) 18%,
+    rgba(38, 10, 10, 0.86) 82%,
+    rgba(0, 0, 0, 0)
+  );
+}
+
+.fx-banner--attack .fx-banner__sub {
+  letter-spacing: 0.18em;
+}
+
+/* Targeting ring: marks the defender while the banner reads. The host is the
+   defender's rect; the inner element is what scales, so the overlay's own
+   position stays put. */
+.fx-target-ring {
+  z-index: 2455;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: opacity;
+}
+
+.fx-target-ring__ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 12%;
+  border: 0.16em solid rgba(255, 96, 96, 0.9);
+  box-shadow:
+    0 0 1.2em 0.2em rgba(255, 70, 70, 0.55),
+    inset 0 0 0.8em rgba(255, 120, 120, 0.4);
+  will-change: transform;
+}

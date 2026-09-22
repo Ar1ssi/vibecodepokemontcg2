@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  attackBannerText,
   classifyDamagePlan,
   damagePopPose,
   lungePoseFor,
   screenShakeAmplitude,
   screenShakeOffsets,
   shakePose,
+  targetRingPose,
 } from '../combat-pose.mjs';
 
 test('classifyDamagePlan: engine dealt is the hit amount, weakness passes through', () => {
@@ -92,4 +94,50 @@ test('lungePoseFor: heads toward the defender, returns home, null without direct
   const end = pose(1);
   assert.ok(Math.abs(end.y) < 1e-9);
   assert.equal(lungePoseFor(from, from), null);
+});
+
+// ── Design 024 slice 2: attack banner + targeting ring ─────────────────────
+
+test('attackBannerText: the attack names the banner, the attacker the subtitle', () => {
+  assert.deepEqual(attackBannerText('Thunderbolt', 'Pikachu'), {
+    title: 'Thunderbolt',
+    sub: 'Pikachu',
+  });
+});
+
+test('attackBannerText: no attack name means no banner at all', () => {
+  assert.equal(attackBannerText('', 'Pikachu'), null);
+  assert.equal(attackBannerText('   ', 'Pikachu'), null);
+  assert.equal(attackBannerText(undefined, 'Pikachu'), null);
+  assert.equal(attackBannerText(null, null), null);
+});
+
+test('attackBannerText: an unknown attacker still banners, with an empty subtitle', () => {
+  assert.deepEqual(attackBannerText('Tackle', undefined), { title: 'Tackle', sub: '' });
+  assert.deepEqual(attackBannerText('  Tackle  ', '  Rattata '), { title: 'Tackle', sub: 'Rattata' });
+});
+
+test('targetRingPose: fades in, shrinks onto the card, and ends invisible', () => {
+  const start = targetRingPose(0);
+  const end = targetRingPose(1);
+  assert.equal(start.opacity, 0);
+  assert.equal(end.opacity, 0);
+  assert.ok(targetRingPose(0.2).opacity > 0.5, 'visible while the banner reads');
+  assert.ok(end.scale < targetRingPose(0.2).scale, 'the ring closes in on the target');
+});
+
+test('targetRingPose: opacity and scale stay finite and bounded across the run', () => {
+  for (let t = -0.5; t <= 1.5; t += 0.05) {
+    const pose = targetRingPose(t);
+    assert.ok(Number.isFinite(pose.scale) && pose.scale > 0, `bad scale at ${t}`);
+    assert.ok(pose.opacity >= 0 && pose.opacity <= 1, `opacity out of range at ${t}`);
+  }
+});
+
+test('targetRingPose: pulses rather than shrinking monotonically', () => {
+  // Two visible pulses are what make it read as "targeting", not "closing".
+  const scales = [];
+  for (let t = 0; t <= 1; t += 0.05) scales.push(targetRingPose(t).scale);
+  const rises = scales.filter((s, i) => i > 0 && s > scales[i - 1]).length;
+  assert.ok(rises >= 2, 'the ring grows again at least twice');
 });

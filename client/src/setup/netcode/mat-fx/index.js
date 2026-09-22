@@ -5,7 +5,7 @@
 import { fxDisabled, motionReduced, soundDisabled } from '../../image-logic/mat-fx.mjs';
 import { playFxSound } from './fx-audio.js';
 import { holdFor } from './fx-holds.mjs';
-import { attack, damage } from './combat.js';
+import { attack, attackBanner, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
 import { attach, evolve, retreat, stadiumPlay, trainerPlay } from './lifecycle.js';
@@ -14,6 +14,7 @@ import { status } from './status.js';
 const EFFECTS = {
   damage,
   attack,
+  'attack-banner': attackBanner,
   status,
   evolve,
   attach,
