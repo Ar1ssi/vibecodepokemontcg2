@@ -8,7 +8,7 @@ import {
   presentTargetRect,
   slidePoseFor,
 } from '../lifecycle-pose.mjs';
-import { captureOrigins, discardOrigins, takeOrigin } from '../origins.mjs';
+import { captureOrigins, discardOrigins, peekCombatOrigin, takeOrigin } from '../origins.mjs';
 
 test('moveIdsForEvent: retreat and swap name both cards, others none', () => {
   assert.deepEqual(moveIdsForEvent({ type: 'cardRetreated', activeId: 1, promotedId: 2 }), [1, 2]);
@@ -83,9 +83,31 @@ test('origins: captures the pre-diff snapshot, take consumes it, discard drops i
     capture,
     () => 'self'
   );
-  assert.deepEqual(captured, [['self', 'a'], ['self', 'b']]);
+  assert.deepEqual(captured, [['self', 'a'], ['self', 'b'], ['self', 'a']]);
   assert.equal(takeOrigin(1).src, 'a');
   assert.equal(takeOrigin(1), undefined);
   discardOrigins({ type: 'cardRetreated', activeId: 1, promotedId: 2 });
   assert.equal(takeOrigin(2), undefined);
+});
+
+test('origins: combat snapshots for attack + damage ids, peeked, rebuilt per batch (edge 5)', () => {
+  const registry = new Map([
+    [1, { element: { id: 'atk' } }],
+    [2, { element: { id: 'def' } }],
+  ]);
+  const capture = (user, el) => ({ rect: { left: 0 }, src: el.id, user });
+  captureOrigins(
+    [
+      { type: 'damageUpdated', instanceId: 2, damage: 60 },
+      { type: 'attackExecuted', attackerId: 1, defenderId: 2, playerId: 'p1' },
+    ],
+    registry,
+    capture,
+    () => 'self'
+  );
+  assert.equal(peekCombatOrigin(1).src, 'atk');
+  assert.equal(peekCombatOrigin(2).src, 'def');
+  assert.equal(peekCombatOrigin(2).src, 'def');
+  captureOrigins([], registry, capture, () => 'self');
+  assert.equal(peekCombatOrigin(1), undefined);
 });

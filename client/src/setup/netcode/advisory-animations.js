@@ -15,6 +15,7 @@ import { playDrawToHand } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { playFx } from './mat-fx/index.js';
+import { afterImpact } from './mat-fx/combat.js';
 import { captureOrigins, discardOrigins } from './mat-fx/origins.mjs';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
@@ -97,7 +98,7 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
   } else if (plan.kind === 'knockout') {
     const ghost = pendingKnockoutGhosts.get(plan.instanceId);
     pendingKnockoutGhosts.delete(plan.instanceId);
-    if (ghost) playKnockoutGhost(ghost);
+    if (ghost) playKnockoutGhost(ghost, { deferStart: afterImpact });
   } else if (plan.kind === 'fx') {
     playFx(plan);
   }

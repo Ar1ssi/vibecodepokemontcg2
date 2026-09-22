@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  LUNGE_IMPACT,
+  attackAngleDeg,
+  createImpactQueue,
+  hitFlashPose,
+  slashPose,
+  stackOffset,
   classifyDamagePlan,
   damagePopPose,
   lungePoseFor,
@@ -85,11 +91,85 @@ test('lungePoseFor: heads toward the defender, returns home, null without direct
   const home = pose(0);
   assert.equal(Math.abs(home.x) + Math.abs(home.y), 0);
   assert.equal(home.scale, 1);
-  const peak = pose(0.3);
+  const windUp = pose(LUNGE_IMPACT * 0.4);
+  assert.ok(windUp.y > 0, 'pulls back away from the defender first');
+  assert.ok(windUp.scale > 1, 'lifts during the wind-up');
+  const peak = pose(LUNGE_IMPACT);
   assert.ok(peak.y < 0);
+  assert.ok(Math.abs(peak.y) >= Math.abs(pose(0.8).y));
   assert.ok(Math.abs(peak.x) < 1e-9);
-  assert.ok(-peak.y <= 56);
+  assert.ok(-peak.y <= 64 + 1e-9);
   const end = pose(1);
   assert.ok(Math.abs(end.y) < 1e-9);
   assert.equal(lungePoseFor(from, from), null);
+});
+
+test('stackOffset: later numbers on the same card sit higher (edge 7)', () => {
+  assert.equal(stackOffset(0, 100), -0);
+  assert.ok(stackOffset(2, 100) < stackOffset(1, 100));
+  assert.equal(stackOffset('junk', 100), -0);
+});
+
+test('hitFlashPose / slashPose: peak early, gone at the end', () => {
+  assert.equal(hitFlashPose(0.08).opacity, 1);
+  assert.equal(hitFlashPose(1).opacity, 0);
+  assert.equal(slashPose(0).scaleX, 0);
+  assert.equal(slashPose(0.35).scaleX, 1);
+  assert.equal(slashPose(1).opacity, 0);
+});
+
+test('attackAngleDeg: straight up is -90', () => {
+  const from = { left: 0, top: 200, width: 40, height: 60 };
+  const to = { left: 0, top: 0, width: 40, height: 60 };
+  assert.equal(attackAngleDeg(from, to), -90);
+});
+
+const fakeTimers = () => {
+  const queue = [];
+  return {
+    setTimer: (fn, ms) => queue.push({ fn, ms }),
+    runNext() {
+      const next = queue.shift();
+      next.fn();
+      return next.ms;
+    },
+    get size() {
+      return queue.length;
+    },
+  };
+};
+
+test('impact queue: hits without an attack fire on the next tick (edge 4)', () => {
+  const timers = fakeTimers();
+  const q = createImpactQueue(timers);
+  const seen = [];
+  q.add((ctx) => seen.push(['a', ctx]));
+  q.add((ctx) => seen.push(['b', ctx]));
+  assert.equal(timers.size, 1);
+  assert.equal(timers.runNext(), 0);
+  assert.deepEqual(seen, [['a', null], ['b', null]]);
+});
+
+test('impact queue: an attack later in the same batch delays hits to contact, with its context', () => {
+  const timers = fakeTimers();
+  const q = createImpactQueue(timers);
+  const seen = [];
+  q.add((ctx) => seen.push(ctx));
+  q.strikeIn(200, { direction: -90 });
+  timers.runNext();
+  assert.deepEqual(seen, []);
+  assert.equal(timers.runNext(), 200);
+  assert.deepEqual(seen, [{ direction: -90 }]);
+});
+
+test('impact queue: an attack with no hits does not delay the next batch (edge 3)', () => {
+  const timers = fakeTimers();
+  const q = createImpactQueue(timers);
+  q.strikeIn(200, { direction: 0 });
+  timers.runNext();
+  assert.equal(timers.size, 0);
+  const seen = [];
+  q.add((ctx) => seen.push(ctx));
+  assert.equal(timers.runNext(), 0);
+  assert.deepEqual(seen, [null]);
 });

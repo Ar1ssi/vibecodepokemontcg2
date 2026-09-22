@@ -1,10 +1,13 @@
 // Design 022 slice 1: pure math for the combat effects (damage popup, hit
-// shake, screen shake, attack lunge). DOM-free; combat.js drives overlays.
+// shake, screen shake, attack lunge, impact timing). DOM-free; combat.js drives
+// overlays. Design 026 reworked the curves (elastic pop, wind-up lunge).
 
-export const DAMAGE_POP_MS = 900;
-export const HIT_FLASH_MS = 380;
-export const LUNGE_MS = 420;
-export const SCREEN_SHAKE_MS = 260;
+export const DAMAGE_POP_MS = 1100;
+export const HIT_FLASH_MS = 420;
+export const LUNGE_MS = 560;
+export const LUNGE_IMPACT = 0.36;
+export const SCREEN_SHAKE_MS = 360;
+export const HIT_SPARKS_MS = 520;
 export const SCREEN_SHAKE_MIN_DAMAGE = 30;
 export const SCREEN_SHAKE_MAX_PX = 6;
 
@@ -40,14 +43,28 @@ export function screenShakeAmplitude(amount) {
   return Math.min(SCREEN_SHAKE_MAX_PX, 2 + amount / 30);
 }
 
-/** Floating number: pops in, rises `rise` px, holds, then fades out. */
-export function damagePopPose(t, { rise = 48 } = {}) {
+/**
+ * Floating number: elastic pop (overshoot then settle), rises `rise` px while
+ * drifting `drift` px sideways, holds, then fades as it keeps climbing.
+ */
+export function damagePopPose(t, { rise = 48, drift = 0 } = {}) {
   const c = clamp01(t);
+  let scale = 1;
+  if (c < 0.12) scale = 0.4 + 1.05 * easeOutCubic(c / 0.12);
+  else if (c < 0.28) scale = 1.45 - 0.45 * easeInOutCubic((c - 0.12) / 0.16);
+  const climb = c < 0.3 ? 0.7 * easeOutCubic(c / 0.3) : 0.7 + 0.3 * ((c - 0.3) / 0.7);
   return {
-    y: -rise * easeOutCubic(c),
-    scale: c < 0.2 ? 0.6 + 0.4 * easeOutCubic(c / 0.2) : 1,
-    opacity: c < 0.65 ? 1 : 1 - (c - 0.65) / 0.35,
+    x: drift * easeOutCubic(c),
+    y: -rise * climb,
+    scale,
+    opacity: c < 0.7 ? 1 : (1 - c) / 0.3,
   };
+}
+
+/** Vertical offset (px) for the `index`-th number already floating on a card. */
+export function stackOffset(index, cardHeight) {
+  const i = Math.max(0, Math.floor(Number(index) || 0));
+  return -i * cardHeight * 0.22;
 }
 
 /** Damped horizontal jitter used on the hit-flash overlay. */
@@ -56,17 +73,35 @@ export function shakePose(t, amplitude) {
   return { x: amplitude * Math.sin(c * Math.PI * 7) * (1 - c), opacity: 1 - c ** 2 };
 }
 
+/** White flash over the struck card: instant peak, fast falloff. */
+export function hitFlashPose(t) {
+  const c = clamp01(t);
+  return { opacity: c < 0.08 ? c / 0.08 : (1 - (c - 0.08) / 0.92) ** 2 };
+}
+
+/** Slash streak across the card: draws in fast, then thins and fades. */
+export function slashPose(t) {
+  const c = clamp01(t);
+  const draw = easeOutCubic(Math.min(1, c / 0.35));
+  return {
+    scaleX: draw,
+    scaleY: c < 0.35 ? 1 : 1 - 0.8 * ((c - 0.35) / 0.65),
+    opacity: c < 0.35 ? 1 : 1 - (c - 0.35) / 0.65,
+  };
+}
+
 /**
- * `translate` values for a whole-table shake, decaying to rest.
+ * `translate` values for a whole-table shake: a damped sine, so the motion
+ * reads as one impact settling rather than a random jitter.
  * @returns {string[]}
  */
-export function screenShakeOffsets(amplitude, steps = 6) {
+export function screenShakeOffsets(amplitude, steps = 12) {
   const out = [];
   for (let i = 0; i < steps; i += 1) {
-    const decay = 1 - i / steps;
-    const sign = i % 2 === 0 ? 1 : -1;
-    const x = (sign * amplitude * decay).toFixed(2);
-    const y = (-sign * amplitude * 0.5 * decay).toFixed(2);
+    const f = i / steps;
+    const decay = (1 - f) ** 2;
+    const x = (amplitude * Math.cos(f * Math.PI * 5) * decay).toFixed(2);
+    const y = (amplitude * 0.6 * Math.sin(f * Math.PI * 4) * decay).toFixed(2);
     out.push(`${x}px ${y}px`);
   }
   out.push('0px 0px');
@@ -75,12 +110,20 @@ export function screenShakeOffsets(amplitude, steps = 6) {
 
 const rectCenter = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 
+/** Direction (degrees, 0 = right, 90 = down) from one rect's center to another's. */
+export function attackAngleDeg(fromRect, toRect) {
+  const a = rectCenter(fromRect);
+  const b = rectCenter(toRect);
+  return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+}
+
 /**
- * Attacker ghost lunge: snap toward the defender (up to `maxPx`), then recoil.
+ * Attacker ghost lunge: wind up (pull back and lift), strike toward the
+ * defender (up to `maxPx`) — contact at t = LUNGE_IMPACT — then recoil home.
  * Returns null when the two centers coincide (no direction).
  * @returns {((t:number) => {x:number,y:number,scale:number})|null}
  */
-export function lungePoseFor(fromRect, toRect, { maxPx = 56, fraction = 0.3 } = {}) {
+export function lungePoseFor(fromRect, toRect, { maxPx = 64, fraction = 0.34 } = {}) {
   const a = rectCenter(fromRect);
   const b = rectCenter(toRect);
   const dx = b.x - a.x;
@@ -90,9 +133,69 @@ export function lungePoseFor(fromRect, toRect, { maxPx = 56, fraction = 0.3 } = 
   const reach = Math.min(maxPx, dist * fraction);
   const ux = dx / dist;
   const uy = dy / dist;
+  const windEnd = LUNGE_IMPACT * 0.55;
   return (t) => {
     const c = clamp01(t);
-    const f = c < 0.3 ? easeOutCubic(c / 0.3) : 1 - easeInOutCubic((c - 0.3) / 0.7);
-    return { x: ux * reach * f, y: uy * reach * f, scale: 1 + 0.06 * f };
+    let f;
+    let lift;
+    if (c < windEnd) {
+      const w = easeOutCubic(c / windEnd);
+      f = -0.22 * w;
+      lift = 0.08 * w;
+    } else if (c < LUNGE_IMPACT) {
+      const s = (c - windEnd) / (LUNGE_IMPACT - windEnd);
+      f = -0.22 + 1.22 * s * s;
+      lift = 0.08;
+    } else {
+      const r = easeInOutCubic((c - LUNGE_IMPACT) / (1 - LUNGE_IMPACT));
+      f = 1 - r;
+      lift = 0.08 * (1 - r);
+    }
+    return { x: ux * reach * f, y: uy * reach * f, scale: 1 + lift };
+  };
+}
+
+/**
+ * Holds hit/KO effects until the attacker's lunge connects. Effects queued in
+ * one synchronous event batch wait one macrotask; if an attack was announced
+ * in that batch (`strikeIn`) they fire at its contact moment with its context
+ * (direction, attacker card), otherwise immediately. `setTimer(fn, ms)` is
+ * injected so the timing is unit-testable.
+ */
+export function createImpactQueue({ setTimer }) {
+  let jobs = [];
+  let delayMs = 0;
+  let context = null;
+  let scheduled = false;
+  const flush = () => {
+    const batch = jobs;
+    const wait = delayMs;
+    const ctx = context;
+    jobs = [];
+    delayMs = 0;
+    context = null;
+    scheduled = false;
+    const run = () => {
+      for (const job of batch) job(ctx);
+    };
+    if (batch.length === 0) return;
+    if (wait > 0) setTimer(run, wait);
+    else run();
+  };
+  const schedule = () => {
+    if (scheduled) return;
+    scheduled = true;
+    setTimer(flush, 0);
+  };
+  return {
+    add(job) {
+      jobs.push(job);
+      schedule();
+    },
+    strikeIn(ms, ctx = null) {
+      delayMs = Math.max(delayMs, ms);
+      context = ctx;
+      schedule();
+    },
   };
 }
