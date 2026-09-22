@@ -5,11 +5,10 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 258
-Focus: mat FX polish (design 026, D103). It is on branch `feature/fx-polish` (worktree
-  `../vcp-fx-polish`), in 4 commits. It is NOT merged to main.
+Focus: mat FX polish (design 026, D103). Merged to main (fast-forward, 9e0dad29).
 Active: none.
 Next: the user checks the effects on localhost in authoritative mode. Check a hit, a KO, each status,
-  an evolve, an energy attach, a trainer, the turn banner, an ability, and a win. Then merge to main.
+  an evolve, an energy attach, a trainer, the turn banner, an ability, and a win.
   After that: check the S257 TCGdex IndexedDB cache in the browser, then I81, then I78–I80.
   Maintenance due at S260.
 Blocked: nothing. A public tunnel is NOT possible from this container — see the watch-out below.
@@ -34,7 +33,7 @@ Blocked: nothing. A public tunnel is NOT possible from this container — see th
   No tunnel from this container: never report a printed *.trycloudflare.com URL as live.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S258 mat FX polish (branch only):
+- S258 mat FX polish (on main):
   - Impact-timed hits with type-coloured sparks.
   - A wind-up lunge and KO shards.
   - Status particles and an evolution silhouette.
