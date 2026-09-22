@@ -4,6 +4,7 @@ import {
   FX_OFF_STORAGE_KEY,
   fxDisabled,
   motionReduced,
+  REDUCE_MOTION_STORAGE_KEY,
   rectForInstance,
   runPose,
 } from '../mat-fx.mjs';
@@ -21,13 +22,21 @@ afterEach(() => {
   }
 });
 
-test('motionReduced: false without matchMedia, follows the query, survives a throw', () => {
-  setGlobal('matchMedia', undefined);
-  assert.equal(motionReduced(), false);
+test('motionReduced: ignores the OS reduced-motion query', () => {
   setGlobal('matchMedia', () => ({ matches: true }));
+  setGlobal('localStorage', { getItem: () => null });
+  assert.equal(motionReduced(), false);
+});
+
+test('motionReduced: opt-in localStorage flag; missing or blocked storage -> false', () => {
+  setGlobal('localStorage', undefined);
+  assert.equal(motionReduced(), false);
+  setGlobal('localStorage', { getItem: (k) => (k === REDUCE_MOTION_STORAGE_KEY ? '1' : null) });
   assert.equal(motionReduced(), true);
-  setGlobal('matchMedia', () => {
-    throw new Error('x');
+  setGlobal('localStorage', {
+    getItem: () => {
+      throw new Error('blocked');
+    },
   });
   assert.equal(motionReduced(), false);
 });

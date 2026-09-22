@@ -8,10 +8,15 @@ import { visualRectOf } from './iframe-rect.mjs';
 export const FX_OFF_CLASS = 'fx-off';
 export const FX_OFF_STORAGE_KEY = 'ptcg-fx-off';
 
+export const REDUCE_MOTION_STORAGE_KEY = 'ptcg-reduce-motion';
+
+// Opt-in only: localStorage['ptcg-reduce-motion'] === '1'. The OS
+// `prefers-reduced-motion` flag is deliberately ignored — Windows sets it
+// whenever "Animation effects" is off system-wide, which silently hid every
+// battle animation for players who never asked the game for less motion.
 export const motionReduced = () => {
-  if (typeof globalThis.matchMedia !== 'function') return false;
   try {
-    return !!globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return globalThis.localStorage?.getItem(REDUCE_MOTION_STORAGE_KEY) === '1';
   } catch {
     return false;
   }
