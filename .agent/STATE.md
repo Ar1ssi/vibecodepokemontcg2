@@ -4,20 +4,19 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 250
-Focus: four user-reported bug fixes — lethal ability damage-counter KO, Tool-only attach, Bench play gate, Tarragon parse.
-Active: clean on main at 38eb815 (pushed to origin/main).
-Next: resume Live-parity extras (hand chevron, edge wisps); maintenance due at S260.
+Session: 251
+Focus: audit of item/energy/ability/attack/attack-effect bugs (same class as the glow bug) + fixes.
+Active: 31 fixes landed, UNCOMMITTED on main (suite 2844 tests, 2843 pass).
+Next: review/commit the S251 diff; then I78–I80 (deferred). Maintenance due at S260.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Design 023: glows hand-playable + ability + attack + stadium; colour from ONE palette (`card-glow-colors.mjs`: Energy type colour, Supporter red, Item/Tool blue, Stadium green, Pokémon cyan) via `.has-glow` + inline `--glow-rgb`. Never add per-colour CSS classes. Slice 5 (authoritative) built at `.agent/designs/023-card-playability-glows.md`; `live-card-sources.mjs` is the one card/node resolver for both render paths.
-- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is unpaid" — fails at HEAD too (verified via stash), unrelated to design 023. Suite is otherwise 2820/2821.
-- Mat FX (S236/D94): one dispatch — add an effect = an `EVENT_FX` row in advisory-animations.mjs + a registry entry in `netcode/mat-fx/index.js`. Kill switch: localStorage `ptcg-fx-off`='1' or `body.fx-off`.
-- Stadium tilt (S235/D93): `#stadium` is parent-owned (CSS in index.css, NOT the container sheets); `--stadium-width` no longer exists.
-- `pnpm lint` is pre-existing red (CRLF vs prettier `endOfLine`; 2 pre-existing `no-useless-escape` errors in trainer-effects.mjs); only NEW rule errors count.
+- S251 uncommitted: run `git status`/`git diff` before anything else; fixes span `shared/engine/reduce.mjs`, `effects/executor.mjs|special-energy.mjs|ability.mjs|trainer.mjs|stadium.mjs|trainer-steps.mjs`, `rules/{rules-state,attack-window,attack-effects,attack-pending-effects,collect-usable-abilities,ability-executors,stadium-effects,resolve-attack-context}.mjs`, and client `move-card.js`, `chat-buttons.js`, `trainer-execution.js`, `rules-bridge.js`, `action-affordances.mjs`, `card-inspector-model.mjs`, `ability-picker.js`, `e2e-options.mjs`, `attack-preview-sources.mjs`.
+- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is unpaid" — verified failing at HEAD with the S251 diff stashed. Suite otherwise 2843/2844.
+- `pnpm test` on this checkout triggers an implicit install and (before S251) emptied `node_modules`; `pnpm install` restores it. Prefer `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
+- Design 023: glows recomputed per turn from legality; colour only via `.has-glow` + `--glow-rgb`. The found "glow stops" cause class (bare catch wiping all glows) is still present in `hookActionAffordances` (rules-bridge.js:1949-1962) — not fixed here (no repro).
+- Client legacy mode still lags the server on: GX once-per-game (I79), fossil Items (I80), simultaneous stadium KO tiebreak (I78, server-side).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S250 patch: lethal ability/trainer damage counters KO (damageCountersPlaced marker swept by reduce.mjs through handleKnockout); attachCard validates Energy/Tool/Pokémon only; moveCard hand→bench/active requires a Pokémon (+client drag guard); Tarragon parsed as a 4-card combo filter. Files: trainer-steps.mjs, reduce.mjs, trainer-effects.mjs, move-card.js, trainer-execution.js (+5 tests).
-- S249 patch: Mega Greninja ex Ninja Spinner prompts to return a {W} Energy to hand for +80 damage (`attackReturnEnergyBonus`).
-- S248 patch: Flip the Script gated on `flags.koedLastOppTurn`; Aura Jab `attackAttachSpread` choice loop.
+- S251 audit+fix: server soft-locks (unpayable discard cost), special-energy lethal KOs + evolved-host type gates, Legacy once-per-game marker erased by advanceTurn, ability consumed with no target, attack pricing (passive/stadium discounts, plural abilities, out-of-range index), stadium drop flag, ability-negation Stadium, Mega-evolve Checkup, defender attack lock, status-aware attack windows.
+- S251 client parity: Trainer pickers that moved cards to the wrong zone (Kofu, attach-from-discard), Trainer replay marker on return to hand, Rare Candy same-turn Basic, trainerType-only Supporter gate, attacker special-energy damage, untyped Energy readers, on-attach search picker, played-to-bench window under authority, Asleep/Paralyzed affordances, `attackExecuting` flag.
