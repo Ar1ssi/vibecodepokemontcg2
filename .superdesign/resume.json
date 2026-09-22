@@ -1,0 +1,22 @@
+{
+  "targets": {
+    "deck-builder": {
+      "projectId": "fb8931cc-624a-4da8-9676-f5b3b5a94522",
+      "baselineDraftId": "c5527b9f-00e5-49e1-bf25-b7cf32ece4cb",
+      "activeDraftId": "59b1e351-b11d-421c-bccc-be974659bad5",
+      "branches": {
+        "59b1e351-b11d-421c-bccc-be974659bad5": "Direction A: pokemon.com poster (red header band, type-tinted deck tiles, Poke-ball counter)",
+        "7a464c8c-d9db-4018-b120-27d99861766d": "Fork of A: Pokemon PC Box (3DS) style",
+        "5685dd13-9b25-4795-9a93-299e6048d1a5": "Flow page: Sets tab (PC Box style)",
+        "e4b1204f-d360-48f3-818d-848c35a3306e": "Flow page: Customize tab (PC Box style)",
+        "cae6fe8c-f922-4a6a-92e1-62700a3f835e": "Flow page: Front drawer Solo tab (PC Box style)",
+        "07273b88-9d7f-4b80-9102-74602ad7c053": "Direction B: TCG Live table (ocean felt stage, left rail, grouped deck list)"
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "client/index.ejs:244:360",
+        "client/src/css/deck-builder-live.css:13:76"
+      ]
+    }
+  }
+}

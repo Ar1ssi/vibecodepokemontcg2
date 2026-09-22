@@ -19,3 +19,4 @@ client/src/assets/playmats/upscaled/
 
 # design 004 slice 6: playtest-bot.mjs failure dumps (replayable traces, not source)
 out/playtest/
+.superdesign/tmp/
