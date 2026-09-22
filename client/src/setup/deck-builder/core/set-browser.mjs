@@ -1,3 +1,4 @@
+import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { GENERATED_STARTER_DECKS } from './starter-decks.generated.mjs';
 
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
@@ -109,13 +110,6 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
     const ENERGY_SET_LOGO = 'src/assets/energy/colorless.png';
     let energySummaryCache = null;
     
-    async function fetchJson(url, options = {}) {
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        throw new Error(`Request failed (${response.status}) for ${url}`);
-      }
-      return response.json();
-    }
     
     function normalizeAssetUrl(url = '') {
       const value = String(url || '').trim();

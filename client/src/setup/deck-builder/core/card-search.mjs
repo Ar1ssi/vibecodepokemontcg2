@@ -1,3 +1,4 @@
+import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
 const tcgdexSetReleaseDateCache = new Map();
@@ -167,13 +168,6 @@ function normalizeTcgdexCard(card) {
   };
 }
 
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status}) for ${url}`);
-  }
-  return response.json();
-}
 
 async function hydrateTcgdexSetReleaseDates(cards = []) {
   const uniqueSetIds = [...new Set(cards.map((card) => card?.set?.id).filter(Boolean))];
