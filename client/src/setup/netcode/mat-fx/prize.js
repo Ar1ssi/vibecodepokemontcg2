@@ -5,6 +5,7 @@
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
 import { runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
+import { docForSide } from './side-doc.mjs';
 import {
   PRIZE_CLAIM_MS,
   prizeHaloPose,
@@ -16,7 +17,7 @@ import {
 // Same shape as knockout-flight's discard lookup: the zone lives inside the
 // side's playmat iframe, and visualRectOf maps it onto the parent viewport.
 const prizeRectFor = (user) => {
-  const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
+  const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
   const zone = doc?.getElementById('prizes');
   if (!zone) return null;
   const rect = visualRectOf(zone);

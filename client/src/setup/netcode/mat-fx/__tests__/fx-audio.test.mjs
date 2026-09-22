@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MAX_GAIN, clampGain, voicesFor } from '../fx-audio.mjs';
 import { HOLD_MS } from '../fx-holds.mjs';
+import { resetDamageBaselines } from '../damage-hit.mjs';
 
 const every = (voices, fn) => voices.every(fn);
 const lowest = (voices) => Math.min(...voices.filter((v) => v.type === 'tone').map((v) => v.freq));
@@ -147,4 +148,43 @@ test('fx-audio: the palette is frozen, so no caller can corrupt it for later sou
     voicesFor('damage', { dealt: 30 })[0].gain = 99;
   }, TypeError);
   assert.equal(voicesFor('attach').length, 2, 'the palette is intact');
+});
+
+// ── Review fix: sound and visuals must agree on what a hit was ─────────────
+
+test('fx-audio: a cumulative-only damageUpdated is heard, not just seen', () => {
+  // Most emitters (checkup Poison/Burn, Tool pings, special energy) send only
+  // the running total. Reading `dealt` alone left those hits silent while the
+  // number still popped and the table still shook.
+  resetDamageBaselines();
+  const card = 'c1';
+  assert.deepEqual(voicesFor('damage', { instanceId: card, damage: 20 }), [], 'no baseline yet');
+  const second = voicesFor('damage', { instanceId: card, damage: 50 });
+  assert.ok(second.length > 0, 'the 30-damage tick is audible');
+});
+
+test('fx-audio: the delta fallback is consumed once, so sound and visual match', () => {
+  resetDamageBaselines();
+  const plan = { instanceId: 'c2', damage: 40 };
+  voicesFor('damage', { instanceId: 'c2', damage: 10 });
+  const first = voicesFor('damage', plan);
+  const again = voicesFor('damage', plan);
+  assert.ok(first.length > 0);
+  assert.deepEqual(again, first, 'the same plan classifies the same way twice');
+});
+
+test('fx-audio: a cumulative heal is a rising figure, same as an explicit one', () => {
+  resetDamageBaselines();
+  voicesFor('damage', { instanceId: 'c3', damage: 60 });
+  const healed = voicesFor('damage', { instanceId: 'c3', damage: 20 });
+  assert.deepEqual(
+    healed.map((v) => v.freq),
+    voicesFor('damage', { healed: 40 }).map((v) => v.freq)
+  );
+});
+
+test('fx-audio: a cumulative no-op is silent', () => {
+  resetDamageBaselines();
+  voicesFor('damage', { instanceId: 'c4', damage: 30 });
+  assert.deepEqual(voicesFor('damage', { instanceId: 'c4', damage: 30 }), []);
 });

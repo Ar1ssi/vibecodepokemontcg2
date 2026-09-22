@@ -17,7 +17,7 @@ import {
   readSettings,
   writeSetting,
 } from './fx-settings.mjs';
-import { motionReduced } from './mat-fx.mjs';
+import { fxDisabled, motionReduced } from './mat-fx.mjs';
 
 const storage = () => {
   try {
@@ -52,7 +52,11 @@ export const onFxSettingsChanged = (listener) => {
  * @returns {{fxOff:boolean, sfxOff:boolean, volume:number}} the applied settings
  */
 export function applyFxSettings() {
-  const settings = readSettings(storage());
+  const stored = readSettings(storage());
+  // `body.fx-off` is an INPUT as well as an output: fxDisabled() documents the
+  // class OR the stored flag as disabling the layer, so a class set by hand (a
+  // test harness, devtools) must not be stripped by the next view apply.
+  const settings = { ...stored, fxOff: fxDisabled() || stored.fxOff };
   const reduced = motionReduced();
   for (const root of markerRoots()) {
     root.classList.toggle(FX_OFF_CLASS, settings.fxOff);

@@ -67,8 +67,16 @@ const ensureContext = () => {
     resumeContext();
     return context;
   } catch {
+    // A partially built context still holds audio hardware; close it and drop
+    // every derived handle, or the next attempt reuses a stale noise buffer.
+    try {
+      context?.close?.();
+    } catch {
+      /* nothing more we can do */
+    }
     context = null;
     master = null;
+    noiseBuffer = null;
     return null;
   }
 };

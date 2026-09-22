@@ -4,6 +4,7 @@
 import { getEnergyTokenFront, isEnergyCard } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
 import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
+import { docForSide } from './side-doc.mjs';
 import { getCardRegistry } from '../apply-view.js';
 import { rectForInstance, runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import {
@@ -62,6 +63,10 @@ export const devolve = (plan) =>
 export const attach = (plan) => {
   const registry = getCardRegistry();
   const attached = registry.get(plan.instanceId)?.card;
+  // No card record at all is "we don't know what this is", not "it's a Tool":
+  // isEnergyCard(undefined) is false, so without this an Energy whose record
+  // has not landed yet would draw the quiet Tool ring instead of its token.
+  if (!attached) return 0;
   const targetRect = rectForInstance(plan.targetInstanceId, registry);
   if (!targetRect) return 0;
   // `cardAttached` covers Energy AND Tools. A Tool attaching is real but
@@ -160,7 +165,7 @@ export const promote = (plan) => {
 // The discard pile lives inside the side's playmat iframe, same lookup shape
 // as knockout-flight's; `#discardCover` is the pile's visible face.
 const discardRectFor = (user) => {
-  const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
+  const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
   const cover = doc?.getElementById('discardCover');
   const el = cover?.querySelector('img') || cover;
   if (!el) return null;

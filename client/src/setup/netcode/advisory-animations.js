@@ -144,8 +144,9 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
   ) {
     for (const plan of plans) {
       if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
-      if (plan.kind === 'fx') discardOrigins(event);
     }
+    // Once per EVENT: a fanned-out event's plans all share the same origins.
+    if (plans.some((plan) => plan.kind === 'fx')) discardOrigins(event);
     fxQueue.clear();
     return;
   }

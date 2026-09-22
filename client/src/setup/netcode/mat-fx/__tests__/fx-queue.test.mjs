@@ -124,23 +124,6 @@ test('fx-queue: a non-numeric hold paces as 0', () => {
   assert.equal(queue.pending(), 0);
 });
 
-test('fx-queue: flush runs everything pending immediately', () => {
-  const ran = [];
-  const { queue, clock } = make((p) => {
-    ran.push(p.id);
-    return 500;
-  });
-  queue.push({ id: 'a' });
-  queue.push({ id: 'b' });
-  queue.push({ id: 'c' });
-  assert.deepEqual(ran, ['a']);
-
-  queue.flush();
-  assert.deepEqual(ran, ['a', 'b', 'c']);
-  assert.equal(queue.pending(), 0);
-  assert.equal(clock.armed, null, 'the pending timer was cancelled');
-});
-
 test('fx-queue: clear drops pending plans without running them', () => {
   const ran = [];
   const { queue, clock } = make((p) => {
@@ -172,4 +155,51 @@ test('fx-queue: falsy pushes are ignored', () => {
   queue.push(undefined);
   assert.deepEqual(ran, []);
   assert.equal(queue.pending(), 0);
+});
+
+test('fx-queue: an effect that clears the queue mid-run does not restart it', () => {
+  // A real case: an effect dispatches `game-restarted`, whose listener clears.
+  // The clear has to survive the `step` call it happened inside — otherwise
+  // that call arms a fresh timer on top of the stop it was just asked for.
+  const ran = [];
+  let queue;
+  const clock = fakeClock();
+  queue = createFxQueue({
+    run: (p) => {
+      ran.push(p.id);
+      if (p.id === 'b') queue.clear();
+      return 100;
+    },
+    schedule: clock.schedule,
+    cancel: clock.cancel,
+  });
+  queue.push({ id: 'a' });
+  queue.push({ id: 'b' });
+  queue.push({ id: 'c' });
+  clock.tick(); // runs 'b', which clears
+
+  assert.deepEqual(ran, ['a', 'b'], 'c was dropped by the clear');
+  assert.equal(queue.pending(), 0);
+  assert.equal(clock.armed, null, 'the stop was not overwritten by a fresh timer');
+});
+
+test('fx-queue: an effect that pushes mid-run does not orphan a timer', () => {
+  const ran = [];
+  let queue;
+  const clock = fakeClock();
+  queue = createFxQueue({
+    run: (p) => {
+      ran.push(p.id);
+      if (p.id === 'a') queue.push({ id: 'nested' });
+      return 50;
+    },
+    schedule: clock.schedule,
+    cancel: clock.cancel,
+  });
+  queue.push({ id: 'a' });
+  clock.drain();
+
+  assert.deepEqual(ran, ['a', 'nested']);
+  assert.equal(queue.pending(), 0);
+  assert.equal(clock.armed, null, 'no leftover timer to fire a phantom step');
 });

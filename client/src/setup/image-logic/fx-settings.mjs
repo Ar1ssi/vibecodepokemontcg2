@@ -41,8 +41,9 @@ export function readSettings(storage) {
  */
 export function writeSetting(storage, key, value) {
   const stored = key === VOLUME_KEY ? String(normalizeVolume(value)) : value ? '1' : '0';
+  if (typeof storage?.setItem !== 'function') return false;
   try {
-    storage?.setItem?.(key, stored);
+    storage.setItem(key, stored);
     return true;
   } catch {
     return false;

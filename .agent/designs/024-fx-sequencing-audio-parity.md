@@ -275,6 +275,36 @@ state impact; the whole layer is disabled at runtime by `ptcg-fx-off`.
   `(plan) => number | void` but slice 0 implemented the hold purely from the table, so an effect
   that drew nothing (missing card) still paced the queue. Found in live browser verification, not
   by a test. Every effect's "nothing drawn" guard now returns 0.
+- **Review pass (hostile, fresh-context subagent) — 9 findings, all resolved in the diff:**
+  1. *Audio/visual drift on the commonest damage event.* `classifyDamagePlan` falls back to the
+     delta against the last seen total; `damageVoices` read only `plan.dealt`. Most emitters
+     (checkup Poison/Burn, Tool pings, special energy) send a cumulative `damage` only, so those
+     hits drew a number, a flash and a table shake in **silence** — the exact drift putting sound
+     in the dispatcher was supposed to make impossible. Both sides now classify through one
+     `damage-hit.mjs`, whose per-plan cache keeps the stateful fallback from being consumed twice.
+  2. *Counters popped on every window resize* — fixed before the review landed (`counterMotionFor`).
+  3. *`flush()` had no caller.* O2 said flush on catch-up; edge row 5 said clear. `clear()` is
+     correct (a replayed burst should be skipped, not fast-forwarded), so `flush()` was deleted
+     and O2's wording is superseded by this note.
+  4. *Wrong mat on an unknown side.* `user === 'self' ? selfDoc : oppDoc` resolved `user: null` —
+     which `advisoryAnimationPlan` yields whenever `playerId`/`selfPlayerId` is missing — to the
+     OPPONENT's mat. New `side-doc.mjs` refuses to guess; an unknown side draws nothing.
+  5. *An Energy whose card record had not landed drew the Tool ring*, because
+     `isEnergyCard(undefined)` is false. A missing record now draws nothing, as before design 024.
+  6. *`writeSetting` returned true with no storage*, contradicting its own JSDoc; the test had
+     pinned the wrong behaviour.
+  7. *`applyFxSettings` stripped a hand-set `body.fx-off`* on every view apply, demoting a
+     documented input to an output. It now ORs the class in, per `fxDisabled()`'s contract.
+  8. *The CSS guard test could not fail* — it grepped for substrings. Rewritten to parse the
+     sheets and check guard coverage by selector-token subset, with a paren-aware selector
+     splitter (`:has(> img, > .mat-holo)` contains a comma). Confirmed by hand: it now fails on an
+     unguarded loop and still passes a legitimately broader guard.
+  9. *Queue re-entrancy.* `timer = schedule(...)` was assigned after `run`, so an effect that
+     synchronously cleared the queue (one dispatching `game-restarted`) would have it re-armed on
+     top of the stop. Guarded with an epoch counter.
+  Minor, also fixed: a partially built `AudioContext` is now closed and its stale noise buffer
+  dropped; `discardOrigins` runs once per event rather than once per fanned-out plan; the
+  reflow-restart idiom is commented where it is a deliberate no-op.
 - **Not done:** an HP readout (O5, filed as an ISSUES line); legacy (non-authoritative) mode still
   gets no effects, unchanged from design 022; sampled audio (O1 — procedural only).
 

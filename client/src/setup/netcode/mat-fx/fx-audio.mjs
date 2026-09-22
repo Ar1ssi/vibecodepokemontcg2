@@ -14,6 +14,7 @@
 //
 // Keeping this DOM-free means the whole palette — including how a hit's pitch
 // tracks its damage — is unit-testable without an AudioContext.
+import { classifyHitOnce } from './damage-hit.mjs';
 
 export const MAX_GAIN = 0.8;
 
@@ -100,15 +101,21 @@ const DEFAULT_STATUS_VOICES = Object.freeze([tone(300, 0.2, 0.13, { wave: 'trian
 /**
  * A hit reads heavier the harder it lands: the thud's pitch falls and its gain
  * rises with `amount`, over the same 0–200 damage span the screen shake uses.
+ *
+ * The hit is read through `classifyHitOnce`, the SAME classification the visual
+ * uses — including its fallback to the delta against the last total seen. Most
+ * engine emitters (checkup Poison/Burn, Tool pings, special energy) send only
+ * a cumulative `damage`, and reading `plan.dealt` alone left every one of those
+ * hits silent while still drawing the number and shaking the table.
  */
 function damageVoices(plan) {
-  const amount = Number.isFinite(plan?.dealt) ? plan.dealt : 0;
-  const healed = Number.isFinite(plan?.healed) ? plan.healed : 0;
-  if (healed > 0 || amount < 0) {
+  const hit = classifyHitOnce(plan);
+  if (!hit) return EMPTY;
+  if (hit.kind === 'heal') {
     return arpeggio([523, 698, 880], { step: 0.06, dur: 0.22, gain: 0.14, wave: 'sine' });
   }
-  if (amount <= 0) return EMPTY;
 
+  const amount = hit.amount;
   const weight = clamp(amount / 200, 0, 1);
   const body = [
     noise(0.16 + 0.12 * weight, 0.16 + 0.2 * weight, {
@@ -122,7 +129,7 @@ function damageVoices(plan) {
     }),
   ];
   // Weakness is the ×2 moment; a bright overtone makes it audibly different.
-  if (plan?.weakness) {
+  if (hit.weakness) {
     body.push(tone(1568, 0.18, 0.13, { wave: 'sine', freqTo: 2093, delay: 0.03 }));
   }
   return Object.freeze(body);

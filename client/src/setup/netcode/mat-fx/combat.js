@@ -9,6 +9,7 @@
 import { getCardRegistry } from '../apply-view.js';
 import { rectForInstance, runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { playBanner } from './banner.js';
+import { classifyHitOnce } from './damage-hit.mjs';
 import {
   DAMAGE_POP_MS,
   HIT_FLASH_MS,
@@ -16,7 +17,6 @@ import {
   SCREEN_SHAKE_MS,
   TARGET_RING_MS,
   attackBannerText,
-  classifyDamagePlan,
   damagePopPose,
   lungePoseFor,
   screenShakeAmplitude,
@@ -25,7 +25,6 @@ import {
   targetRingPose,
 } from './combat-pose.mjs';
 
-const lastSeenDamage = new Map();
 // The tilt owns `transform` on these; WAAPI `translate` composes without clobbering it.
 const SHAKE_TARGET_IDS = ['battleMat', 'selfContainer', 'oppContainer', 'stadium'];
 
@@ -62,7 +61,7 @@ const shakeTable = (amount) => {
 };
 
 export const damage = (plan) => {
-  const hit = classifyDamagePlan(plan, lastSeenDamage);
+  const hit = classifyHitOnce(plan);
   if (!hit) return 0;
   const rect = rectForInstance(plan.instanceId, getCardRegistry());
   if (!rect) return 0;

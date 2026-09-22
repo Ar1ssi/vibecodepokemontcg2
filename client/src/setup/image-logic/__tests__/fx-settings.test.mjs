@@ -91,6 +91,8 @@ test('fx-settings: writeSetting stores flags as 1/0 and volume as a number', () 
 });
 
 test('fx-settings: writeSetting reports failure instead of throwing', () => {
-  assert.equal(writeSetting(throwingStorage, FX_OFF_KEY, true), false);
-  assert.equal(writeSetting(null, FX_OFF_KEY, true), true, 'no storage is a silent no-op');
+  assert.equal(writeSetting(throwingStorage, FX_OFF_KEY, true), false, 'a refused write');
+  assert.equal(writeSetting(null, FX_OFF_KEY, true), false, 'nowhere to write');
+  assert.equal(writeSetting(undefined, FX_OFF_KEY, true), false);
+  assert.equal(writeSetting({}, FX_OFF_KEY, true), false, 'not a storage at all');
 });

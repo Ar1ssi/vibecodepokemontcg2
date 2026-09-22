@@ -6,12 +6,13 @@ import { getCardRegistry } from '../apply-view.js';
 import { rectForInstance, runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
 import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
 import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
+import { docForSide } from './side-doc.mjs';
 import { COIN_CHIP_MS, coinChipPose, coinFaceLabel } from './coin-pose.mjs';
 
 // Anchored on the flipping side's Active slot: that is where the player is
 // already looking during an attack.
 const activeRectFor = (user) => {
-  const doc = user === 'self' ? selfContainerDocument : oppContainerDocument;
+  const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
   const active = doc?.getElementById('active');
   if (!active) return null;
   const rect = visualRectOf(active);

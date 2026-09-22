@@ -52,6 +52,10 @@ const applyDamageCounterStyle = (damageCounter, damageAmount, motion = null, hp 
 
   damageCounter.classList.remove(...DAMAGE_COUNTER_MOTIONS);
   if (!motion) return;
+  // Forces the removal to take effect before the re-add, so the keyframe
+  // replays on an element that already carried the class. On a not-yet-
+  // appended counter this is a no-op and none is needed: the animation starts
+  // when the node is inserted.
   void damageCounter.offsetWidth;
   damageCounter.classList.add(motion === 'land' ? 'fx-counter-land' : 'fx-counter-bump');
 };
