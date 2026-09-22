@@ -20,6 +20,7 @@ import {
   getSpecialEnergyAttackPenalty,
   getSpecialEnergyDamageReduction,
 } from './special-energy-parse.mjs';
+import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -35,6 +36,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderPoisoned = false,
     baseDamage = null,
     blockTools = false,
+    turnDamageBonuses = [],
   } = options;
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
@@ -56,7 +58,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const specialEnergyBonus = getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive });
   const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards);
 
-  const damageBeforeWR = Math.max(0, base + attackerBonus + specialEnergyBonus - specialEnergyPenalty);
+  // Step 2c: Trainer turn boosts (Premium Power Pro), also BEFORE Weakness/Resistance.
+  const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, { defenderIsActive });
+
+  const damageBeforeWR = Math.max(
+    0,
+    base + attackerBonus + specialEnergyBonus + turnBonus - specialEnergyPenalty
+  );
 
   // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
   // Stadiums nullify Weakness for a filtered set of Pokémon, force Weakness to

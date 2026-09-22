@@ -470,6 +470,7 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       stadium: draft.stadium,
       defenderIsActive: true,
       baseDamage: clause.amount,
+      turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
     }
   );
   return result.total;
@@ -1384,6 +1385,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   for (const p of Object.values(draft.players || {})) {
     if (p.playerId !== nextPlayerId && p.flags) {
       p.flags.briarActive = false;
+      delete p.flags.turnDamageBonuses;
     }
   }
 
@@ -3265,6 +3267,7 @@ function resolveAttackEffectPhase(draft, ctx) {
             attackerTrailingPrizes,
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
+            turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
           }
         );
         dmgDealt = dmgResult.total;

@@ -4,6 +4,7 @@
  */
 
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { parseTurnDamageBonus } from '../rules/turn-damage-bonus.mjs';
 import { executeSteps } from './executor.mjs';
 import {
   findCard,
@@ -256,6 +257,12 @@ export function executeTrainer(draft, {
   // A Tool's text is a passive modifier; playing it without a target means attaching it.
   const text = card.text || card.effect || card.cardText || '';
   const parsed = isToolCard(card) ? { steps: [{ type: 'attachTool' }] } : parseTrainerEffect(text);
+
+  const turnBonus = isToolCard(card) ? null : parseTurnDamageBonus(text);
+  if (turnBonus) {
+    if (!player.flags) player.flags = {};
+    player.flags.turnDamageBonuses = [...(player.flags.turnDamageBonuses || []), turnBonus];
+  }
 
   if (parsed?.steps) {
     for (const step of parsed.steps) {

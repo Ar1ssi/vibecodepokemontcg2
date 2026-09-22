@@ -4,9 +4,9 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 261
-Focus: patch — the Yes/No choice modal drew identical cardbacks (Ninja Spinner, Lt. Surge's
-  Bargain). Fixed on main; earlier S259–S260 FX work unchanged.
+Session: 262
+Focus: S262 patch — Trainer turn damage boosts (Premium Power Pro, Black Belt's Training)
+  now apply via flags.turnDamageBonuses in computeAttackDamage. S261 fixed the Yes/No modal.
 Active: none.
 Next: the user checks on localhost in authoritative mode:
   - the Yes/No modal: Ninja Spinner and Lt. Surge's Bargain now show labeled options;
@@ -30,13 +30,12 @@ Blocked: nothing. A public tunnel is NOT possible from this container — see th
 - Vendored art: never hand-edit the `*.generated.mjs` catalogs; rerun the scripts (D97, D98, D100).
   Card→sprite parsing lives only in `core/card-sprites.mjs`.
 - ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is
-  unpaid". Suite otherwise green (3047 tests at S261).
+  unpaid". Suite otherwise green (3055 tests at S262).
 - Test with `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`,
   not `pnpm test` (its implicit install has emptied node_modules). The user checks CSS on localhost.
   No tunnel from this container: never report a printed *.trycloudflare.com URL as live.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S262 Trainer turn boosts (Premium Power Pro, Black Belt's Training, no-Rule-Box) now add attack damage.
 - S261 fallback choice modal labels artless options (Yes/No sentinels) instead of cardbacks.
 - S260 battle FX no longer follow Windows' reduced-motion setting (D105).
-- S259 Mega/Tera signature entries (merged): Tera crystal shatter in the type colour, Mega
-  keystone sphere with swooshes; on evolution and on entering play (+20 tests).

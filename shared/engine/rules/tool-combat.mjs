@@ -37,7 +37,7 @@ const textOf = (card) =>
     card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
   );
 
-const TYPE_LETTER = {
+export const TYPE_LETTER = {
   g: 'grass',
   r: 'fire',
   w: 'water',
