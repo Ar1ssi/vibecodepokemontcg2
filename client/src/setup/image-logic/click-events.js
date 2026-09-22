@@ -12,7 +12,6 @@ import {
   selfContainerDocument,
   systemState,
 } from '../../state.js';
-import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
 import { isBlockedByReplay } from '../../setup/general/replay-block.js';
@@ -68,54 +67,16 @@ export const coverClick = (event) => {
     return;
   }
 
-  const notSpectator = !(
-    document.getElementById('spectatorModeCheckbox').checked &&
-    systemState.isTwoPlayer
-  );
-
-  // Pregame / rules-off: no privacy to protect yet, so show the deck with
-  // the same carousel viewer used for the discard pile instead of the raw
-  // stacked-image zone (that legacy display is still used mid-game below).
+  // Deck cover click no longer opens the deck viewer — players can no
+  // longer inspect their deck contents by clicking it. Right-click actions
+  // (view top/bottom, shuffle, draw) still work via the card context menu.
   if (event.target.id === 'deckCover') {
-    const preGameOrRulesOff =
-      !rulesState.enabled || rulesState.phase === 'setup';
-    if (preGameOrRulesOff) {
-      event.stopPropagation();
-      const user = event.target.user === 'self' ? 'self' : 'opp';
-      const zone = getZone(user, 'deck');
-      if (zone.getCount() === 0) return;
-      openCarouselViewer({
-        title: determineUsername(user) + "'s Deck",
-        candidates: zone.array,
-      });
-      if (notSpectator) {
-        appendMessage(
-          systemState.initiator,
-          determineUsername(systemState.initiator) +
-            ' is looking through ' +
-            determineUsername(event.target.user) +
-            "'s deck",
-          'player'
-        );
-      }
-      return;
-    }
+    return;
   }
 
   const selectedZone = getZone(event.target.user, event.target.id);
   if (selectedZone.elementCover) {
     selectedZone.element.style.display = 'block';
-  }
-
-  if (event.target.id === 'deckCover' && notSpectator) {
-    appendMessage(
-      systemState.initiator,
-      determineUsername(systemState.initiator) +
-        ' is looking through ' +
-        determineUsername(event.target.user) +
-        "'s deck",
-      'player'
-    );
   }
 };
 
