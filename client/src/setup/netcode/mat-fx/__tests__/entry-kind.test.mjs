@@ -11,20 +11,58 @@ test('signatureEntryKind: missing or hidden cards have no signature entry', () =
 });
 
 test('signatureEntryKind: plain Pokémon, ex and V get no signature entry', () => {
-  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Pikachu', hp: 60 }), null);
-  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Charizard ex', subtypes: ['Stage 2', 'ex'] }), null);
-  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Lugia V', subtypes: ['Basic', 'V'] }), null);
+  assert.equal(
+    signatureEntryKind({ supertype: 'Pokémon', name: 'Pikachu', hp: 60 }),
+    null
+  );
+  assert.equal(
+    signatureEntryKind({
+      supertype: 'Pokémon',
+      name: 'Charizard ex',
+      subtypes: ['Stage 2', 'ex'],
+    }),
+    null
+  );
+  assert.equal(
+    signatureEntryKind({
+      supertype: 'Pokémon',
+      name: 'Lugia V',
+      subtypes: ['Basic', 'V'],
+    }),
+    null
+  );
 });
 
 test('signatureEntryKind: modern and legacy Mega Pokémon are mega', () => {
-  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Mega Kangaskhan ex', hp: 300 }), 'mega');
-  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'M Lucario-EX', hp: 210 }), 'mega');
-  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Primal Kyogre-EX', hp: 240 }), 'mega');
+  assert.equal(
+    signatureEntryKind({
+      supertype: 'Pokémon',
+      name: 'Mega Kangaskhan ex',
+      hp: 300,
+    }),
+    'mega'
+  );
+  assert.equal(
+    signatureEntryKind({ supertype: 'Pokémon', name: 'M Lucario-EX', hp: 210 }),
+    'mega'
+  );
+  assert.equal(
+    signatureEntryKind({
+      supertype: 'Pokémon',
+      name: 'Primal Kyogre-EX',
+      hp: 240,
+    }),
+    'mega'
+  );
 });
 
 test('signatureEntryKind: Tera by subtype or by rule text is tera', () => {
   assert.equal(
-    signatureEntryKind({ supertype: 'Pokémon', name: 'Greninja ex', subtypes: ['Stage 2', 'ex', 'Tera'] }),
+    signatureEntryKind({
+      supertype: 'Pokémon',
+      name: 'Greninja ex',
+      subtypes: ['Stage 2', 'ex', 'Tera'],
+    }),
     'tera'
   );
   assert.equal(
@@ -39,5 +77,8 @@ test('signatureEntryKind: Tera by subtype or by rule text is tera', () => {
 });
 
 test('signatureEntryKind: a Trainer named like a Mega is not a Pokémon entry', () => {
-  assert.equal(signatureEntryKind({ supertype: 'Trainer', name: 'Mega Signal' }), null);
+  assert.equal(
+    signatureEntryKind({ supertype: 'Trainer', name: 'Mega Signal' }),
+    null
+  );
 });

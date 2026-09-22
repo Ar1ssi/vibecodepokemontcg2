@@ -1,5 +1,5 @@
 # 027: Signature entry FX — Mega and Tera
-Status: approved (user, S259)
+Status: built S259 (branch feature/evolve-fx) — awaiting user visual check
 Date: 2026-09-22 · Session: S259 · Builds on designs 022 and 026
 
 ## Problem
@@ -66,18 +66,18 @@ orange embers rise; closing flash with a slight card pop.
 ## Edge cases & failure modes
 | # | Case | Expected | Covered by |
 |---|---|---|---|
-| 1 | Card missing / hidden (opponent setup stub, no name) | kind null: `enter` no-ops; `evolve` plays default burst | [ ] entry-kind: null/unknown |
-| 2 | Plain ex / V / Basic enters play | no entry FX | [ ] entry-kind: non-signature |
-| 3 | Legacy "M …-EX" and "Primal …-EX" | Mega entry | [ ] entry-kind: legacy mega |
-| 4 | Tera via subtype, via rule text | Tera entry | [ ] entry-kind: tera variants |
-| 5 | Board-to-board move (retreat/switch/promote) | no `enter` plan | [ ] advisory: cardMoved board→board |
-| 6 | Move out of play (bench→discard, →hand) | no `enter` plan | [ ] advisory: cardMoved out of play |
-| 7 | Deck/discard → bench (Nest Ball, revive) | `enter` plan | [ ] advisory: cardMoved deck/discard |
-| 8 | Card rect not found | no-op, no throw | [ ] by construction: rect guard as in evolve |
+| 1 | Card missing / hidden (opponent setup stub, no name) | kind null: `enter` no-ops; `evolve` plays default burst | [x] entry-kind: missing or hidden cards |
+| 2 | Plain ex / V / Basic enters play | no entry FX | [x] entry-kind: plain Pokémon, ex and V |
+| 3 | Legacy "M …-EX" and "Primal …-EX" | Mega entry | [x] entry-kind: modern and legacy Mega |
+| 4 | Tera via subtype, via rule text | Tera entry | [x] entry-kind: Tera by subtype or by rule text |
+| 5 | Board-to-board move (retreat/switch/promote) | no `enter` plan | [x] advisory: board-to-board and out-of-play moves |
+| 6 | Move out of play (bench→discard, →hand) | no `enter` plan | [x] advisory: board-to-board and out-of-play moves |
+| 7 | Deck/discard → bench (Nest Ball, revive) | `enter` plan | [x] advisory: cardMoved from deck or discard |
+| 8 | Card rect not found | no-op, no throw | [x] by construction: playSignatureEntry returns false without a rect; evolve keeps its own guard |
 | 9 | No WAAPI / `finished` never resolves | final frame / backstop removal | [x] existing mat-fx-waapi tests |
 | 10 | Reduced motion / fx-off | skipped (transient) | [x] existing dispatcher tests |
 | 11 | Tera card with unknown type | neutral colour | [x] particles.test: fxRgbForCard |
-| 12 | Pose boundaries (invisible at start/end, phases in order) | as specified | [ ] entry-pose tests |
+| 12 | Pose boundaries (invisible at start/end, phases in order) | as specified | [x] entry-pose: 12 tests (ends invisible, clamping, beat order, slab under whiteout) |
 
 ## Test plan
 Unit tests for entry-kind, entry-pose, and the advisory mapping; full suite per slice
@@ -94,3 +94,9 @@ n/a — client presentation only; revert = revert the branch commits.
 | 3 | Mega entry (poses + DOM + CSS) | tests pass |
 
 ## Deviations
+- Slices 2 and 3 were built and committed together: they share entry.js, entry-pose.mjs and
+  one CSS block.
+- A Trainer named like a Mega (edge added) is not a Pokémon entry — `signatureEntryKind` requires
+  `isPokemon`.
+- Rare Candy and Salvatore-style evolves emit `cardAttached` + `pokemonEvolved`, never a
+  `cardMoved` into play, so an evolution never plays both `evolve` and `enter`.

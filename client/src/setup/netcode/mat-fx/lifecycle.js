@@ -11,6 +11,8 @@ import {
   spawnOverlay,
   spawnParticles,
 } from '../../image-logic/mat-fx.mjs';
+import { signatureEntryKind } from './entry-kind.mjs';
+import { playSignatureEntry } from './entry.js';
 import { brighten, fxRgbForCard, rgbCss } from './fx-colors.mjs';
 import { burstParticles } from './particles.mjs';
 import {
@@ -49,6 +51,9 @@ export const evolve = (plan) => {
   const id = rectForInstance(plan.instanceId, registry) ? plan.instanceId : plan.targetInstanceId;
   const rect = rectForInstance(id, registry);
   if (!rect) return;
+  // Design 027: a Mega or Tera evolution plays its signature entry instead.
+  const evolved = registry.get(plan.instanceId)?.card;
+  if (playSignatureEntry(signatureEntryKind(evolved), rect, evolved)) return;
   const src = cardSrc(registry.get(id)?.element);
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-evolve-burst' });
   const pillar = document.createElement('div');

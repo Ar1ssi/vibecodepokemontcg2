@@ -5,6 +5,7 @@
 import { fxDisabled, motionReduced } from '../../image-logic/mat-fx.mjs';
 import { attack, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
+import { enter } from './entry.js';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
 import { attach, evolve, retreat, stadiumPlay, trainerPlay } from './lifecycle.js';
 import { status } from './status.js';
@@ -14,6 +15,7 @@ const EFFECTS = {
   attack,
   status,
   evolve,
+  enter,
   attach,
   retreat,
   'trainer-play': trainerPlay,
