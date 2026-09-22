@@ -9,6 +9,7 @@ import { attack, attackBanner, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
 import { attach, evolve, retreat, stadiumPlay, trainerPlay } from './lifecycle.js';
+import { prizeClaim } from './prize.js';
 import { status } from './status.js';
 
 const EFFECTS = {
@@ -23,6 +24,7 @@ const EFFECTS = {
   'stadium-play': stadiumPlay,
   'turn-banner': turnBanner,
   'ability-banner': abilityBanner,
+  'prize-claim': prizeClaim,
   'game-over': gameOver,
 };
 const STATIC_FALLBACKS = {};

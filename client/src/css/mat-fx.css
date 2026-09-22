@@ -247,3 +247,44 @@ body.fx-off .fx-overlay {
     inset 0 0 0.8em rgba(255, 120, 120, 0.4);
   will-change: transform;
 }
+
+/* ── Design 024 slice 3: prize claim ──────────────────────────────────── */
+
+.fx-prize-claim {
+  z-index: 2470;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --fx-prize-color: 255, 214, 102;
+}
+
+.fx-prize-claim--opp {
+  --fx-prize-color: 255, 150, 150;
+}
+
+.fx-prize-claim__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(var(--fx-prize-color), 0.55) 0%,
+    rgba(var(--fx-prize-color), 0.18) 45%,
+    rgba(var(--fx-prize-color), 0) 70%
+  );
+  will-change: transform, opacity;
+}
+
+.fx-prize-claim i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.5em;
+  height: 0.5em;
+  margin: -0.25em 0 0 -0.25em;
+  font-size: inherit;
+  border-radius: 50%;
+  background: rgba(var(--fx-prize-color), 0.95);
+  box-shadow: 0 0 0.6em 0.1em rgba(var(--fx-prize-color), 0.8);
+  will-change: transform, opacity;
+}
