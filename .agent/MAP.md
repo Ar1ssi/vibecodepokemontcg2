@@ -49,7 +49,7 @@ client/src/initialization/global-variables/global-variables.js — `socket` + `s
 ## Reconciliation stack (design 001 slice 8 deleted catch-up-actions.js, resync-actions.js,
 ## sync-replay.mjs, request/apply-board-snapshot.js without replacement; design 002 slice 1.1
 ## restored reconnect recovery via a new, smaller mechanism)
-client/src/setup/netcode/mat-fx/ — mat cosmetic effects (design 022, D94): dispatcher.mjs (guards), index.js (registry), combat/status/lifecycle/flow(.js + *-pose.mjs), origins.mjs (pre-diff snapshots);
+client/src/setup/netcode/mat-fx/ — mat cosmetic effects (design 022, D94; polish design 026, D103: WAAPI via sampleKeyframes, particles.mjs, fx-colors.mjs, impact queue in combat-pose): dispatcher.mjs (guards), index.js (registry), combat/status/lifecycle/flow(.js + *-pose.mjs), origins.mjs (pre-diff snapshots);
   primitives in image-logic/mat-fx.mjs; css/mat-fx.css (parent overlays) + css/mat-ambient.css (iframe ambience) + status-marker.css idle keyframes; deck-constructor/mat-tilt.mjs
 client/src/setup/netcode/peer-log-catchup.js — DOM-free peer-log request/response/replay logic
 client/src/setup/netcode/request-action-queue.js — counter-ordered requestAction buffer (design 002

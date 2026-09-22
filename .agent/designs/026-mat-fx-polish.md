@@ -1,6 +1,6 @@
 # 026: Mat FX polish — higher-quality battle effects
-Status: approved (user, S257: all 4 increments, Rodin font)
-Date: 2026-09-22 · Session: S257 · Builds on design 022
+Status: built S258 (4 slices on branch feature/fx-polish) — awaiting user visual check
+Date: 2026-09-22 · Session: S258 · Builds on design 022
 
 ## Problem
 Design 022 shipped every mat effect, but they read as cheap: hit/KO/evolve are the same
@@ -42,7 +42,7 @@ events fan out, so the killing blow shows no damage number and no lunge.
 Primitives (slice 1): `mat-fx.mjs` gains `sampleKeyframes(poseFn, toFrame, n)` (pure),
 `animateFrames(el, frames, opts) -> Promise`, `removeWhen(host, promises, backstopMs)`,
 `spawnParticles(host, particles, {color, className, duration})`. New pure
-`mat-fx/particles.mjs` (`burstParticles`, `seededRandom` moved-shared) and
+`mat-fx/particles.mjs` (`burstParticles`, reusing flow-pose's `seededRandom`) and
 `mat-fx/fx-colors.mjs` (`fxRgbForCard(card)`: Pokémon → first type, Energy → its type,
 else neutral; `rgbCss(rgb, a)`). Rodin `@font-face` in mat-fx.css; `--fx-font` token.
 Combat (slice 2): damage number = elastic overshoot pop, gradient fill, drift, per-card stack
@@ -59,16 +59,16 @@ flutter, sway, gravity, two side cannons.
 ## Edge cases & failure modes
 | # | Case | Expected | Covered by |
 |---|---|---|---|
-| 1 | Element lacks `animate` (old browser / jsdom) | final frame applied, host still removed | [ ] unit: animateFrames fallback |
-| 2 | `finished` never resolves (tab hidden, cancel) | backstop timeout removes host | [ ] unit: removeWhen backstop |
-| 3 | Attack with no damage events in batch | queue delay resets, next batch immediate | [ ] unit: impact queue |
-| 4 | Damage with no attack (poison, bench snipe via trainer) | plays immediately | [ ] unit: impact queue |
-| 5 | Defender KO'd (element removed pre-fanout) | number + flash + lunge use origin rect | [ ] unit: origins captures attack/damage ids |
-| 6 | Unknown / missing card types | neutral colour, no throw | [ ] unit: fxRgbForCard |
-| 7 | Same card hit several times in one batch | numbers stack upward, don't overlap | [ ] unit: stackOffset |
-| 8 | Lunge cancelled / attacker removed mid-lunge | real card visibility restored | [ ] by construction: restore in finally + backstop |
+| 1 | Element lacks `animate` (old browser / jsdom) | final frame applied, host still removed | [x] mat-fx-waapi: animateFrames without WAAPI |
+| 2 | `finished` never resolves (tab hidden, cancel) | backstop timeout removes host | [x] mat-fx-waapi: removeWhen backstop |
+| 3 | Attack with no damage events in batch | queue delay resets, next batch immediate | [x] combat-pose: impact queue, attack with no hits |
+| 4 | Damage with no attack (poison, bench snipe via trainer) | plays immediately | [x] combat-pose: impact queue, hits without an attack |
+| 5 | Defender KO'd (element removed pre-fanout) | number + flash + lunge use origin rect | [x] lifecycle-pose: origins combat snapshots |
+| 6 | Unknown / missing card types | neutral colour, no throw | [x] particles.test: fxRgbForCard |
+| 7 | Same card hit several times in one batch | numbers stack upward, don't overlap | [x] combat-pose: stackOffset |
+| 8 | Lunge cancelled / attacker removed mid-lunge | real card visibility restored | [x] by construction: hideDuring restores on finish + backstop timer |
 | 9 | Reduced motion / fx-off | unchanged: dispatcher skips transient FX | [x] existing dispatcher tests |
-| 10 | Particle count bounded | ≤ 24 per burst | [ ] unit: burstParticles clamps |
+| 10 | Particle count bounded | ≤ 24 per burst | [x] particles.test: count clamps |
 
 ## Test plan
 Unit tests beside each pose/pure module (`node --test`); DOM paths verified by the user on
@@ -86,3 +86,8 @@ n/a — client presentation only; revert = revert the branch commits.
 | 4 | Present, banners, confetti | tests pass |
 
 ## Deviations
+- Ability banner became a tag anchored over the Pokémon; it names the ability when the card has
+  exactly one (the event carries only the Pokémon name). The full-width banner is the fallback.
+- Retreat slide also moved to WAAPI and gained a mid-slide lift; the KO ghost stays on runPose
+  (it animates `filter`) but now holds still until the attack's contact moment.
+- Particles begin at opacity 0: with `fill: both`, a delayed particle otherwise sits visible.

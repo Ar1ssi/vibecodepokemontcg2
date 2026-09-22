@@ -4,37 +4,40 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 256
-Focus: deck builder PC Box restyle (design 025) and fan sprites for Gen 9 and the Z-A Megas (D100, D101).
-  All of it is on main.
+Session: 258
+Focus: mat FX polish (design 026, D103). It is on branch `feature/fx-polish` (worktree
+  `../vcp-fx-polish`), in 4 commits. It is NOT merged to main.
 Active: none.
-Next: the user checks the new sprites on localhost. Then I81 (autosave vs explicit Save), then I78–I80.
+Next: the user checks the effects on localhost in authoritative mode. Check a hit, a KO, each status,
+  an evolve, an energy attach, a trainer, the turn banner, an ability, and a win. Then merge to main.
+  After that: check the S257 TCGdex IndexedDB cache in the browser, then I81, then I78–I80.
   Maintenance due at S260.
 Blocked: nothing. A public tunnel is NOT possible from this container — see the watch-out below.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
+- Mat FX (designs 022 and 026):
+  - Effects are WAAPI keyframes sampled from the pure `*-pose.mjs` functions (D103). Change the pose
+    function, not the keyframes.
+  - Hits and the KO ghost wait on `afterImpact` (combat.js), because `attackExecuted` arrives after
+    the damage events.
+  - Styles live in css/mat-fx.css (parent page) and css/mat-ambient.css (iframes).
 - Deck-builder styling has two layers:
   - `css/deck-builder-live.css`, scoped `.db-live` (D95).
-  - `css/deck-builder-pc-box.css`, scoped `.db-live:not(.db-light)`. It beats Live without !important, and the light theme opts out (D99).
-  Never add an unprefixed rule, and never use !important. The Solo drawer PC Box block is at the END of index.css.
-- Vendored art (never hand-edit the `*.generated.mjs` catalogs; rerun the scripts):
-  - Pokémon: `client/src/assets/pokemon/gen8/` (D97). Gen 9 fan art is `gen9/regular/`, has no shiny, and its catalog is hand-kept (D100).
-  - Items: `client/src/assets/items/`, from `scripts/generate-item-sprites.mjs` (D98).
-  - Wallpapers: `assets/box-wallpapers/`.
-  - Rodin font: `assets/fonts/`.
-  Card→sprite parsing lives only in `core/card-sprites.mjs`. Sprite cap is 2, auto-filled from the deck.
+  - `css/deck-builder-pc-box.css`, scoped `.db-live:not(.db-light)` (D99).
+  Never add an unprefixed rule, and never use !important.
+- Vendored art: never hand-edit the `*.generated.mjs` catalogs; rerun the scripts (D97, D98, D100).
+  Card→sprite parsing lives only in `core/card-sprites.mjs`.
 - ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is
-  unpaid" — failing since before S251. Suite otherwise green (2982 tests at S256).
-- No tunnel from this container: cloudflared ignores HTTPS_PROXY and times out on 7844. A local relay +
-  `--edge 127.0.0.1:7844` is the only route, and the sandbox blocks the relay. ngrok needs only an authtoken.
-  Never report a printed *.trycloudflare.com URL as live.
+  unpaid". Suite otherwise green (3025 tests at S258).
 - Test with `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`,
-  not `pnpm test` (its implicit install has emptied node_modules). The user checks CSS on localhost themselves.
+  not `pnpm test` (its implicit install has emptied node_modules). The user checks CSS on localhost.
+  No tunnel from this container: never report a printed *.trycloudflare.com URL as live.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S255–S256 fan sprites: all of Gen 9 plus 22 forms (D100), and the 48 Legends: Z-A / Mega Dimension Megas (D101).
-- S254 design 025:
-  - PC Box look for the builder and Solo drawer, with per-deck Gen V wallpapers switched by ◀ ▶ and the Rodin font.
-  - Exactly 2 deck sprites, auto-filled from the deck.
-  - A sprite beside each deck row: Pokémon forms plus pokesprite items (+33 tests).
-- S253 deck Pokémon sprites (design 024, D97): vendored gen-8 art + forms, and a picker beside the deck name.
+- S258 mat FX polish (branch only):
+  - Impact-timed hits with type-coloured sparks.
+  - A wind-up lunge and KO shards.
+  - Status particles and an evolution silhouette.
+  - Banner, ability-tag, trainer-present and confetti rework (+27 tests).
+- S257 persistent TCGdex JSON cache in IndexedDB (D102).
+- S255–S256 fan sprites for Gen 9 and the Z-A Megas (D100, D101), and the PC Box restyle (design 025).
