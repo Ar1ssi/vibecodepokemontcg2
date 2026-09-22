@@ -5,7 +5,7 @@
 export const EVOLVE_BURST_MS = 1150;
 export const ENERGY_SNAP_MS = 560;
 export const RETREAT_SLIDE_MS = 520;
-export const CARD_PRESENT_MS = 1500;
+export const CARD_PRESENT_MS = 1700;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -76,8 +76,9 @@ export function energySnapPose(t) {
 
 /**
  * Ghost slide from a captured origin rect to the card's new rect, fading out
- * over the last quarter so the real (already placed) card takes over.
- * @returns {(t:number) => {x:number,y:number,opacity:number}}
+ * over the last quarter so the real (already placed) card takes over. The
+ * card lifts (scale bump) mid-slide so it reads as picked up and set down.
+ * @returns {(t:number) => {x:number,y:number,scale:number,opacity:number}}
  */
 export function slidePoseFor(fromRect, toRect) {
   const a = rectCenter(fromRect);
@@ -87,7 +88,12 @@ export function slidePoseFor(fromRect, toRect) {
   return (t) => {
     const c = clamp01(t);
     const remain = 1 - easeInOutCubic(c);
-    return { x: dx * remain, y: dy * remain, opacity: c < 0.75 ? 1 : 1 - (c - 0.75) / 0.25 };
+    return {
+      x: dx * remain,
+      y: dy * remain,
+      scale: 1 + 0.07 * Math.sin(Math.PI * c),
+      opacity: c < 0.75 ? 1 : 1 - (c - 0.75) / 0.25,
+    };
   };
 }
 
@@ -109,13 +115,22 @@ export function presentPoseFor(fromRect, targetRect) {
         x: (a.x - b.x) * (1 - e),
         y: (a.y - b.y) * (1 - e),
         scale: startScale + (1 - startScale) * e,
-        opacity: e,
+        rotateY: 38 * (1 - e),
+        opacity: Math.min(1, e * 1.6),
       };
     }
-    if (c < 0.75) return { x: 0, y: 0, scale: 1, opacity: 1 };
+    if (c < 0.75) return { x: 0, y: 0, scale: 1, rotateY: 0, opacity: 1 };
     const out = (c - 0.75) / 0.25;
-    return { x: 0, y: 0, scale: 1 + 0.08 * out, opacity: Math.max(0, 1 - out) };
+    return { x: 0, y: 0, scale: 1 + 0.08 * out, rotateY: 0, opacity: Math.max(0, 1 - out) };
   };
+}
+
+/** Backdrop behind the presented card: eases in, holds, fades with the card. */
+export function presentDimPose(t, peak = 0.38) {
+  const c = clamp01(t);
+  if (c < 0.15) return { opacity: peak * easeOutCubic(c / 0.15) };
+  if (c < 0.75) return { opacity: peak };
+  return { opacity: Math.max(0, peak * (1 - (c - 0.75) / 0.25)) };
 }
 
 /** Centered card-shaped box (in the viewport) for the presentation overlay. */

@@ -6,6 +6,7 @@ import {
   evolvePillarPose,
   evolveSilhouettePose,
   moveIdsForEvent,
+  presentDimPose,
   presentPoseFor,
   presentTargetRect,
   slidePoseFor,
@@ -51,7 +52,8 @@ test('presentPoseFor: flies in, holds fully visible, fades out', () => {
   const target = presentTargetRect(1000, 800);
   const pose = presentPoseFor({ left: 0, top: 700, width: 40, height: 56 }, target);
   assert.equal(pose(0).opacity, 0);
-  assert.deepEqual(pose(0.5), { x: 0, y: 0, scale: 1, opacity: 1 });
+  assert.deepEqual(pose(0.5), { x: 0, y: 0, scale: 1, rotateY: 0, opacity: 1 });
+  assert.ok(pose(0.05).rotateY > 0, 'swings in from a 3D turn');
   assert.equal(pose(1).opacity, 0);
   const grow = presentPoseFor(null, target);
   assert.ok(grow(0).scale < 1);
@@ -126,4 +128,10 @@ test('evolvePillarPose: shoots up, then fades out', () => {
   assert.equal(evolvePillarPose(0).scaleY, 0);
   assert.equal(evolvePillarPose(0.35).scaleY, 1);
   assert.equal(evolvePillarPose(1).opacity, 0);
+});
+
+test('presentDimPose: eases to the peak, holds, clears', () => {
+  assert.equal(presentDimPose(0).opacity, 0);
+  assert.equal(presentDimPose(0.5, 0.4).opacity, 0.4);
+  assert.equal(presentDimPose(1).opacity, 0);
 });

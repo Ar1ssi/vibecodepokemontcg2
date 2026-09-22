@@ -7,7 +7,6 @@ import {
   animateFrames,
   rectForInstance,
   removeWhen,
-  runPose,
   sampleKeyframes,
   spawnOverlay,
   spawnParticles,
@@ -24,10 +23,12 @@ import {
   evolvePillarPose,
   evolveSilhouettePose,
   moveIdsForEvent,
+  presentDimPose,
   presentPoseFor,
   presentTargetRect,
   slidePoseFor,
 } from './lifecycle-pose.mjs';
+import { sweepPose } from './flow-pose.mjs';
 import { takeOrigin } from './origins.mjs';
 
 const buildImage = (src, className) => {
@@ -171,11 +172,12 @@ export const retreat = (plan) => {
     if (!pose) continue;
     const host = spawnOverlay({ rect: to, className: 'fx-overlay fx-slide' });
     host.appendChild(buildImage(origin.src));
-    runPose(host, RETREAT_SLIDE_MS, (t) => {
-      const p = pose(t);
-      host.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`;
-      host.style.opacity = String(p.opacity);
-    });
+    const frames = sampleKeyframes(
+      pose,
+      (p) => ({ transform: `translate3d(${p.x}px, ${p.y}px, 0) scale(${p.scale})`, opacity: p.opacity }),
+      24
+    );
+    removeWhen(host, [animateFrames(host, frames, { duration: RETREAT_SLIDE_MS })], RETREAT_SLIDE_MS + BACKSTOP_PAD_MS);
   }
 };
 
@@ -184,13 +186,42 @@ const presentCard = (src, fromRect) => {
   if (!src || viewport.width < 2 || viewport.height < 2) return;
   const target = presentTargetRect(viewport.width, viewport.height);
   const pose = presentPoseFor(fromRect, target);
-  const host = spawnOverlay({ rect: target, className: 'fx-overlay fx-card-present' });
-  host.appendChild(buildImage(src));
-  runPose(host, CARD_PRESENT_MS, (t) => {
-    const p = pose(t);
-    host.style.transform = `translate3d(${p.x}px, ${p.y}px, 0) scale(${p.scale})`;
-    host.style.opacity = String(p.opacity);
+  const dim = spawnOverlay({
+    rect: { left: 0, top: 0, width: viewport.width, height: viewport.height },
+    className: 'fx-overlay fx-present-dim',
   });
+  const host = spawnOverlay({ rect: target, className: 'fx-overlay fx-card-present' });
+  const card = document.createElement('div');
+  card.className = 'fx-card-present__card';
+  card.appendChild(buildImage(src));
+  const shine = document.createElement('div');
+  shine.className = 'fx-card-present__shine';
+  card.appendChild(shine);
+  host.appendChild(card);
+
+  const cardFrames = sampleKeyframes(
+    pose,
+    (p) => ({
+      transform: `translate3d(${p.x}px, ${p.y}px, 0) perspective(900px) rotateY(${p.rotateY}deg) scale(${p.scale})`,
+      opacity: p.opacity,
+    }),
+    32
+  );
+  const shineFrames = sampleKeyframes(
+    (t) => sweepPose(t, { start: 0.2, end: 0.5 }),
+    (p) => ({ transform: `translateX(${p.x * 160}%) skewX(-18deg)`, opacity: p.opacity }),
+    20
+  );
+  const dimFrames = sampleKeyframes(presentDimPose, (p) => ({ opacity: p.opacity }), 16);
+  removeWhen(
+    host,
+    [
+      animateFrames(card, cardFrames, { duration: CARD_PRESENT_MS }),
+      animateFrames(shine, shineFrames, { duration: CARD_PRESENT_MS }),
+    ],
+    CARD_PRESENT_MS + BACKSTOP_PAD_MS
+  );
+  removeWhen(dim, [animateFrames(dim, dimFrames, { duration: CARD_PRESENT_MS })], CARD_PRESENT_MS + BACKSTOP_PAD_MS);
 };
 
 export const trainerPlay = (plan) => {

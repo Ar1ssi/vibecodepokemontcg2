@@ -11,6 +11,10 @@ import {
   edgeGlowPose,
   seededRandom,
   turnBannerText,
+  abilityTagPose,
+  abilityTagRect,
+  abilityTagText,
+  sweepPose,
 } from '../flow-pose.mjs';
 
 test('turnBannerText: side-aware title, turn number optional, unknown side -> null', () => {
@@ -76,4 +80,54 @@ test('dimPose: rises to the peak, holds, returns to zero', () => {
   assert.equal(dimPose(0).opacity, 0);
   assert.equal(dimPose(0.5).opacity, DIM_PEAK);
   assert.ok(dimPose(1).opacity < 1e-9);
+});
+
+test('abilityTagText: names the sole ability, else falls back to the event name', () => {
+  assert.deepEqual(abilityTagText({ abilities: [{ name: ' Psychic Embrace ' }] }, 'Gardevoir ex'), {
+    title: 'Psychic Embrace',
+    sub: 'Ability',
+  });
+  assert.deepEqual(abilityTagText({ abilities: [{ name: 'A' }, { name: 'B' }] }, 'Mew'), { title: 'Mew', sub: 'Ability' });
+  assert.deepEqual(abilityTagText(null, 'Mew'), { title: 'Mew', sub: 'Ability' });
+  assert.equal(abilityTagText({ abilities: [{}] }, ''), null);
+});
+
+test('abilityTagRect: centered on the card, clamped inside the viewport', () => {
+  const vp = { width: 800, height: 600 };
+  const mid = abilityTagRect({ left: 380, top: 300, width: 40, height: 56 }, vp);
+  assert.equal(mid.width, 170);
+  assert.ok(Math.abs(mid.left + mid.width / 2 - 400) < 1e-9);
+  const edge = abilityTagRect({ left: 0, top: 0, width: 40, height: 56 }, vp);
+  assert.equal(edge.left, 0);
+  assert.equal(edge.top, 0);
+  const right = abilityTagRect({ left: 780, top: 590, width: 40, height: 56 }, vp);
+  assert.equal(right.left + right.width, 800);
+  assert.ok(right.top + right.height <= 600);
+});
+
+test('abilityTagPose: pops past full size, holds, fades out rising', () => {
+  assert.equal(abilityTagPose(0).opacity, 0);
+  assert.ok(abilityTagPose(0.12).scale > 1);
+  assert.deepEqual(abilityTagPose(0.5), { y: 0, scale: 1, opacity: 1 });
+  assert.ok(abilityTagPose(1).y < 0);
+  assert.equal(abilityTagPose(1).opacity, 0);
+});
+
+test('sweepPose: hidden outside its window, crosses -1 to 1', () => {
+  assert.equal(sweepPose(0).opacity, 0);
+  assert.equal(sweepPose(0.35, { start: 0.2, end: 0.5 }).opacity, 1);
+  assert.equal(sweepPose(1).x, 1);
+  assert.equal(sweepPose(0).x, -1);
+});
+
+test('confettiPieces: a third fall from the top, the rest fire from both corners and arc up', () => {
+  const pieces = confettiPieces(CONFETTI_COUNT, 5);
+  const kinds = new Set(pieces.map((p) => p.cannon));
+  assert.deepEqual([...kinds].sort(), ['left', 'right', 'top']);
+  const left = pieces.find((p) => p.cannon === 'left');
+  const start = confettiPiecePose(left, left.delay + 0.001);
+  const apex = confettiPiecePose(left, 0.5);
+  assert.ok(apex.y < start.y - 0.4, 'rises well up the screen');
+  assert.ok(apex.x > start.x, 'left cannon fires rightward');
+  assert.ok(confettiPiecePose(left, 1).y > apex.y, 'falls back down');
 });
