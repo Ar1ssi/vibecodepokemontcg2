@@ -1,5 +1,5 @@
 # 024: FX sequencing, audio & TCG-Live parity round 2
-Status: approved (self — user said "implement all of them" to the S252 gap list)
+Status: shipped S252 (slices 0-6 on branch claude/charming-ride-78yi9u) — awaiting user look/listen
 Date: 2026-09-22 · Session: S252
 
 ## Problem
@@ -207,21 +207,21 @@ two `[~]` edge rows.
 ## Edge cases & failure modes — Builder ticks every row per slice
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | `AudioContext` unavailable (Node, old browser, blocked) | audio no-ops, no throw, visuals unaffected | [ ] |
-| 2 | Autoplay policy: no user gesture yet | context created suspended; resumed on first gesture; no console noise | [ ] |
-| 3 | Sound muted (`ptcg-sfx-off`) but effects on | visuals play, silence | [ ] |
-| 4 | Event flood (multi-hit, chained damage, catch-up burst) | queue budget clamps holds to 0 past `maxQueueMs`; drains, never stalls | [ ] |
-| 5 | Catch-up replay / hidden tab | queue `clear()`ed, origins discarded, no audio | [ ] |
-| 6 | `prefers-reduced-motion: reduce` | transient visuals skipped; **audio still plays** (separate axis) | [ ] |
-| 7 | `fx-off` set | no visuals, no audio, **and iframe idle motion stops** (O4) | [ ] |
-| 8 | An effect throws mid-chain | dispatcher swallows; queue treats hold as 0; later plans still run | [ ] |
-| 9 | `attackExecuted` with no `defenderId` (bench-only / fizzle) | banner still plays; no target ring, no lunge; no throw | [ ] |
-| 10 | Counter element recreated between update and animation | class applied to the live element only; no stale ref | [ ] |
-| 11 | Queue still draining when the game ends / player leaves | `clear()` on game-over and on mirror-guard rejection; no timer leak | [ ] |
-| 12 | `prizesTaken` with `count` 0 or missing `cards` | no burst, no throw | [ ] |
-| 13 | Tool attach vs Energy attach | distinct effects, Energy unchanged from design 022 | [ ] |
-| 14 | Volume out of range / corrupt localStorage | `normalizeVolume` clamps to [0,1]; unreadable storage → defaults | [ ] |
-| 15 | Self vs opp side / flipped board (022 row 7) | rects via `visualRectOf` resolve per iframe | [ ] |
+| 1 | `AudioContext` unavailable (Node, old browser, blocked) | audio no-ops, no throw, visuals unaffected | [x] `ensureContext` returns null on a missing ctor or a throwing `new`; `playFxSound` bails. Every pose/voice test imports the palette under `node --test` with no AudioContext at all |
+| 2 | Autoplay policy: no user gesture yet | context created suspended; resumed on first gesture; no console noise | [x] `bindGestureUnlock` on pointerdown/keydown (not `once`: a context can re-suspend); `resumeContext` try/caught and silent. Live: AudioContext present, no page errors |
+| 3 | Sound muted (`ptcg-sfx-off`) but effects on | visuals play, silence | [x] unit: 'the mute silences sound but leaves visuals alone' |
+| 4 | Event flood (multi-hit, chained damage, catch-up burst) | queue budget clamps holds to 0 past `maxQueueMs`; drains, never stalls | [x] unit: 'holds collapse to 0 once the budget is spent, and the queue drains' + 'the budget resets once the queue goes idle' |
+| 5 | Catch-up replay / hidden tab | queue `clear()`ed, origins discarded, no audio | [x] `handleAdvisoryEvent`'s mirror-guard branch clears the queue and discards origins before returning; unit coverage on `clear()` |
+| 6 | `prefers-reduced-motion: reduce` | transient visuals skipped; **audio still plays** (separate axis) | [x] unit: 'reduced motion skips the visual but KEEPS the sound'; CSS media queries retained (asserted by the kill-switch CSS test) |
+| 7 | `fx-off` set | no visuals, no audio, **and iframe idle motion stops** (O4) | [x] unit: 'the kill switch stops sound as well as visuals' + CSS guard test. **Live-verified**: toggling the checkbox set `fx-off` on `document.body` AND on both playmat iframes' `<html>`, and persisted |
+| 8 | An effect throws mid-chain | dispatcher swallows; queue treats hold as 0; later plans still run | [x] unit: dispatcher 'a throwing effect returns a 0 hold so the queue keeps moving' + queue 'a throwing run does not wedge the chain' |
+| 9 | `attackExecuted` with no `defenderId` (bench-only / fizzle) | banner still plays; no target ring, no lunge; no throw | [x] unit: 'a bench-only attack still fans, with no defender'; `attackBanner` only rings when `rectForInstance` resolves, `attack` returns 0 without both rects |
+| 10 | Counter element recreated between update and animation | class applied to the live element only; no stale ref | [x] `applyDamageCounterStyle` is called with the local `damageCounter` binding that was just created or re-read from `targetCard.image.damageCounter`, after the listener cleanup — never a captured earlier reference |
+| 11 | Queue still draining when the game ends / player leaves | pending choreography dropped, no timer leak | [x] cleared on the `game-restarted` event (dispatched by restart.js and by the `leaveRoom` socket handler) and whenever `fxOff` turns on; unit coverage on `clear()` cancelling the armed timer |
+| 12 | `prizesTaken` with `count` 0 or missing `cards` | no burst, no throw | [x] unit: 'nothing to celebrate draws nothing'; `prizeClaim` returns 0 before touching the DOM |
+| 13 | Tool attach vs Energy attach | distinct effects, Energy unchanged from design 022 | [x] the Energy branch is byte-identical to design 022 below the added guard; the Tool branch is a separate overlay class and returns the shorter `tool-attach` hold |
+| 14 | Volume out of range / corrupt localStorage | `normalizeVolume` clamps to [0,1]; unreadable storage → defaults | [x] unit: 'normalizeVolume clamps and rejects junk', 'a corrupt stored volume falls back', 'a missing or throwing storage yields defaults, not a throw' |
+| 15 | Self vs opp side / flipped board (022 row 7) | rects via `visualRectOf` resolve per iframe | [~] every new anchor (`prizeRectFor`, `discardRectFor`, `activeRectFor`) goes through `visualRectOf`, the same primitive design 022 used and the one that owns the opp iframe's 180° flip. Not eyeballed on a flipped board — user to confirm |
 
 ## Test plan
 - **Unit (node --test, DOM-free)** — the bulk:
@@ -255,6 +255,28 @@ state impact; the whole layer is disabled at runtime by `ptcg-fx-off`.
 | 5 | Settings UI + iframe kill-switch propagation + 022 rows 7/9 verification. | settings tests; user confirms toggles actually silence/stop everything |
 
 ## Deviations (Builder appends here during build)
+- **Settings module path.** `fx-settings.mjs/.js` live in `client/src/setup/image-logic/`, not
+  `netcode/mat-fx/`: `mat-fx.mjs` (image-logic) is the low-level owner of `fxDisabled()`, and
+  having it import upward into `netcode/` would invert the existing dependency direction.
+- **Slice 0 — the queue arms a timer even when it is empty.** First cut went idle as soon as the
+  queue drained, so a plan pushed mid-hold jumped the one still playing. The armed timer *is* the
+  outgoing plan's hold; it must exist with an empty queue. Caught by the slice-0 unit tests.
+- **Slice 0 — the queue carries every plan kind, not just `fx`.** The design only pinned `fx`,
+  but `knockout`/`shuffle`/`draw` share the same batch; leaving them off the queue would have let
+  a KO ghost fire before the damage number that caused it. `runPlan` in advisory-animations.js
+  dispatches all four kinds and returns the hold.
+- **Slice 2 — `attackName` was already on `attackExecuted`.** The design allowed for confirming
+  the payload; it was there (reduce.mjs:5113), so the banner needed no engine change at all.
+  Design 024 ships with **zero** engine edits, as its constraints required.
+- **Slice 4 — `holdFor` moved into an effect.** `attach` handles both Energy and Tools under one
+  effect name, so the Tool branch names `holdFor('tool-attach')` itself rather than being paced
+  by the plan's `attach` entry. This is the one place an effect overrides its table hold.
+- **Post-slice — the dispatcher now honours the effect's return value.** The design pinned
+  `(plan) => number | void` but slice 0 implemented the hold purely from the table, so an effect
+  that drew nothing (missing card) still paced the queue. Found in live browser verification, not
+  by a test. Every effect's "nothing drawn" guard now returns 0.
+- **Not done:** an HP readout (O5, filed as an ISSUES line); legacy (non-authoritative) mode still
+  gets no effects, unchanged from design 022; sampled audio (O1 — procedural only).
 
 ---
 Self-approval checklist (user said "implement all of them"; scope list was posted and accepted):
