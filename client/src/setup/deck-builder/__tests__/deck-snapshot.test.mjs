@@ -140,3 +140,56 @@ test('saving an empty deck is allowed and clears the stored cards', () => {
     .decks[deckId];
   assert.deepEqual(deck.cards, {});
 });
+
+test('saving writes the chosen Pokémon sprites onto the deck', () => {
+  const { library, deckId } = libraryWithDeck();
+
+  const deck = saveDeckSnapshot(
+    library,
+    { deckId, cards: CARDS, sprites: [{ slug: 'pikachu', shiny: true }, 'eevee'] },
+    2000
+  ).library.decks[deckId];
+
+  assert.deepEqual(deck.sprites, [
+    { slug: 'pikachu', shiny: true },
+    { slug: 'eevee', shiny: false },
+  ]);
+});
+
+test('omitted sprites leave the saved ones alone, an empty array clears them', () => {
+  const { library, deckId } = libraryWithDeck({ sprites: ['snorlax'] });
+
+  const kept = saveDeckSnapshot(library, { deckId, cards: CARDS }, 2000).library
+    .decks[deckId];
+  assert.deepEqual(kept.sprites, [{ slug: 'snorlax', shiny: false }]);
+
+  const cleared = saveDeckSnapshot(
+    library,
+    { deckId, cards: CARDS, sprites: [] },
+    2000
+  ).library.decks[deckId];
+  assert.deepEqual(cleared.sprites, []);
+});
+
+test('sprites survive a save that creates the deck', () => {
+  const result = saveDeckSnapshot(
+    createEmptyLibrary(),
+    { deckId: null, name: 'Fresh Deck', cards: CARDS, sprites: ['gengar'] },
+    3000
+  );
+
+  assert.equal(result.created, true);
+  assert.deepEqual(result.library.decks[result.deckId].sprites, [
+    { slug: 'gengar', shiny: false },
+  ]);
+});
+
+test('an unusable sprite slug is dropped rather than saved onto the deck', () => {
+  const { library, deckId } = libraryWithDeck();
+  const deck = saveDeckSnapshot(
+    library,
+    { deckId, cards: CARDS, sprites: ['missingno', { slug: 'mew' }] },
+    2000
+  ).library.decks[deckId];
+  assert.deepEqual(deck.sprites, [{ slug: 'mew', shiny: false }]);
+});
