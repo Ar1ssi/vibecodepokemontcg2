@@ -25,10 +25,18 @@ import { show } from '../../../setup/home-header/header-toggle.js';
 import {
   renderDeckCards,
   renderDeckCounter,
+  renderDeckSprites,
   renderDeckSummary,
   renderFilterBar,
   renderSearchResults,
 } from './native-deck-builder-renderers.js';
+import { initializeNativeDeckBuilderSpritePicker } from './native-deck-builder-sprite-picker.js';
+import {
+  MAX_DECK_SPRITES,
+  deckSpriteImageUrl,
+  deckSpriteLabel,
+  normalizeDeckSprites,
+} from '../../../setup/deck-builder/core/deck-sprites.mjs';
 import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   addCard,
@@ -112,10 +120,14 @@ export const initializeNativeDeckBuilder = () => {
   const importCsvInput = document.getElementById('nativeDeckBuilderCsvImport');
   const clearButton = document.getElementById('nativeDeckBuilderClear');
   const saveButton = document.getElementById('nativeDeckBuilderSaveDeck');
+  const deckSpritesEl = document.getElementById('nativeDeckBuilderDeckSprites');
+  const spritePickerEl = document.getElementById('nativeDeckBuilderSpritePicker');
 
   // The pickers commit straight to the loaded deck, but with nothing loaded
   // there is no deck to commit to and the choice would be lost. Mirror the
   // live selection here so Save can carry it into a newly created deck.
+  // `sprites` rides along with the same mirror: with no deck loaded the
+  // picker has nothing to commit to, and the choice would be lost on Save.
   const chosenCosmetics = { self: {}, opp: {} };
   const rememberCosmetic = (target, key, value) => {
     const side = target === 'opp' ? 'opp' : 'self';
@@ -243,6 +255,10 @@ export const initializeNativeDeckBuilder = () => {
             currentLoadTarget = target;
             deckLibrary?.setTarget(target);
           }
+          // Detaching from a deck (it was deleted, or the editor was cleared)
+          // must also drop the mirrored sprite choice, or the strip would keep
+          // showing the previous deck's Pokémon over an empty editor.
+          if (!deckId) rememberCosmetic(target, 'sprites', []);
           deck = cards;
           syncedDecks[target] = cards;
           // A non-empty deck should sync into the playmat on close; a freshly
@@ -256,6 +272,35 @@ export const initializeNativeDeckBuilder = () => {
         onSaveCurrentDeck: () => {
           deckLibrary?.saveActiveDeck(deck);
         },
+      });
+
+      // ── Deck Pokémon sprites (design 024) ────────────────────────────────
+      // The loaded deck owns the slots; with nothing loaded the mirror holds
+      // them until Save creates a deck to write them to.
+      const currentDeckSprites = () => {
+        const loaded = deckLibrary?.getActiveDeckId?.(currentLoadTarget);
+        if (loaded) return normalizeDeckSprites(deckLibrary?.getActiveSprites?.(currentLoadTarget));
+        return normalizeDeckSprites(
+          chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].sprites
+        );
+      };
+
+      const spritePicker = initializeNativeDeckBuilderSpritePicker({
+        pickerEl: spritePickerEl,
+        getSprites: () => currentDeckSprites(),
+        onChange: (sprites) => {
+          rememberCosmetic(currentLoadTarget, 'sprites', sprites);
+          deckLibrary?.setActiveSprites?.(currentLoadTarget, sprites);
+          render();
+        },
+      });
+
+      deckSpritesEl?.addEventListener('click', (event) => {
+        if (!event.target.closest('[data-sprite-picker-open]')) return;
+        // Without this the document-level dismiss handler would see the very
+        // click that opened the popover and close it again.
+        event.stopPropagation();
+        spritePicker?.toggle();
       });
 
       const persistLastUsedSession = () => {
@@ -1008,6 +1053,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             ? (deckLibrary.getActiveDeckName(currentLoadTarget) || 'Untitled Deck')
             : 'Untitled Deck';
         }
+
+        renderDeckSprites({
+          stripEl: deckSpritesEl,
+          sprites: currentDeckSprites(),
+          spriteUrl: deckSpriteImageUrl,
+          spriteLabel: deckSpriteLabel,
+          editable: true,
+          max: MAX_DECK_SPRITES,
+        });
+        // Loading or switching decks changes the slots under an open popover.
+        spritePicker?.refresh();
     
         if (deckStatus) {
       deckStatus.textContent = hasDeckCards ? 'Saved ✓' : '';
@@ -1208,6 +1264,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       coinId:
         chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
       matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
+      sprites: currentDeckSprites(),
     });
     if (!result?.saved) return;
 
@@ -1221,6 +1278,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // Detach from the saved deck so clearing the editor never silently
         // wipes a saved deck from the library.
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        rememberCosmetic(currentLoadTarget, 'sprites', []);
         deck = createEmptyDeck();
         syncedDecks[currentLoadTarget] = deck;
         deckDirty = true;

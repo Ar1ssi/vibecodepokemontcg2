@@ -81,7 +81,10 @@ test('an unknown slug yields no url and no label rather than a broken path', () 
 
 test('labels name the shiny variant', () => {
   assert.equal(deckSpriteLabel({ slug: 'pikachu' }), 'Pikachu');
-  assert.equal(deckSpriteLabel({ slug: 'pikachu', shiny: true }), 'Shiny Pikachu');
+  assert.equal(
+    deckSpriteLabel({ slug: 'pikachu', shiny: true }),
+    'Shiny Pikachu'
+  );
 });
 
 test('normalizing drops malformed entries and keeps the good ones', () => {
@@ -164,7 +167,11 @@ test('none of the operations mutate the list they are given', () => {
 
 test('search prefers prefix matches and falls back to substrings', () => {
   const results = searchPokemon('char').map((entry) => entry.slug);
-  assert.deepEqual(results.slice(0, 3), ['charmander', 'charmeleon', 'charizard']);
+  assert.deepEqual(results.slice(0, 3), [
+    'charmander',
+    'charmeleon',
+    'charizard',
+  ]);
 
   const chu = searchPokemon('chu').map((entry) => entry.slug);
   assert.ok(chu.includes('pikachu'));
@@ -184,5 +191,8 @@ test('an empty query lists the start of the dex, a nonsense query lists nothing'
 test('search honours the limit', () => {
   assert.equal(searchPokemon('', 5).length, 5);
   assert.equal(searchPokemon('a', 3).length, 3);
-  assert.ok(searchPokemon('', 0).length > 0, 'a bad limit falls back to the default');
+  assert.ok(
+    searchPokemon('', 0).length > 0,
+    'a bad limit falls back to the default'
+  );
 });

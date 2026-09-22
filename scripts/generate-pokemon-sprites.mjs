@@ -17,7 +17,10 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..'
+);
 const CDN_BASE = 'https://cdn.jsdelivr.net/gh/msikma/pokesprite@master';
 const DATA_URL = `${CDN_BASE}/data/pokemon.json`;
 const ASSET_DIR = path.join(REPO_ROOT, 'client/src/assets/pokemon/gen8');
@@ -37,7 +40,9 @@ async function fetchJson(url) {
 /** @returns {{idx: string, name: string, slug: string}[]} dex-ordered base forms. */
 function toCatalog(pokemonData) {
   const entries = [];
-  for (const [idx, entry] of Object.entries(pokemonData).sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [idx, entry] of Object.entries(pokemonData).sort(([a], [b]) =>
+    a.localeCompare(b)
+  )) {
     // No base form in gen 8 means there is no file to vendor; skip rather
     // than emit a catalog row whose sprite would 404.
     if (!entry?.['gen-8']?.forms?.$) continue;
@@ -52,8 +57,11 @@ function toCatalog(pokemonData) {
 async function downloadSprite(slug, variant, force) {
   const target = path.join(ASSET_DIR, variant, `${slug}.png`);
   if (!force && existsSync(target)) return 'skipped';
-  const response = await fetch(`${CDN_BASE}/pokemon-gen8/${variant}/${slug}.png`);
-  if (!response.ok) throw new Error(`${variant}/${slug}.png -> ${response.status}`);
+  const response = await fetch(
+    `${CDN_BASE}/pokemon-gen8/${variant}/${slug}.png`
+  );
+  if (!response.ok)
+    throw new Error(`${variant}/${slug}.png -> ${response.status}`);
   await writeFile(target, Buffer.from(await response.arrayBuffer()));
   return 'downloaded';
 }
@@ -62,14 +70,32 @@ async function downloadSprite(slug, variant, force) {
 async function inBatches(items, worker) {
   const results = [];
   for (let start = 0; start < items.length; start += CONCURRENCY) {
-    results.push(...(await Promise.all(items.slice(start, start + CONCURRENCY).map(worker))));
+    results.push(
+      ...(await Promise.all(
+        items.slice(start, start + CONCURRENCY).map(worker)
+      ))
+    );
   }
   return results;
 }
 
+/**
+ * Quotes a name the way prettier would, so the generated file is already
+ * formatted and never shows up as lint noise: single quotes, except for the
+ * handful of names that contain an apostrophe (Farfetch'd, Sirfetch'd).
+ */
+function quote(value) {
+  const text = String(value).replaceAll('\\', '\\\\');
+  if (text.includes("'") && !text.includes('"')) return `"${text}"`;
+  return `'${text.replaceAll("'", "\\'")}'`;
+}
+
 function renderCatalogModule(entries) {
   const rows = entries
-    .map((entry) => `  { idx: '${entry.idx}', name: ${JSON.stringify(entry.name)}, slug: '${entry.slug}' },`)
+    .map(
+      (entry) =>
+        `  { idx: '${entry.idx}', name: ${quote(entry.name)}, slug: '${entry.slug}' },`
+    )
     .join('\n');
   return `// GENERATED FILE — do not edit by hand.
 // Regenerate with: node scripts/generate-pokemon-sprites.mjs
@@ -91,7 +117,9 @@ async function main() {
   const entries = toCatalog(await fetchJson(DATA_URL));
   console.log(`catalog: ${entries.length} Pokémon`);
 
-  const jobs = entries.flatMap((entry) => VARIANTS.map((variant) => ({ slug: entry.slug, variant })));
+  const jobs = entries.flatMap((entry) =>
+    VARIANTS.map((variant) => ({ slug: entry.slug, variant }))
+  );
   const failures = [];
   const outcomes = await inBatches(jobs, async ({ slug, variant }) => {
     try {
@@ -102,17 +130,24 @@ async function main() {
     }
   });
 
-  const tally = outcomes.reduce((counts, outcome) => ({ ...counts, [outcome]: (counts[outcome] || 0) + 1 }), {});
+  const tally = outcomes.reduce(
+    (counts, outcome) => ({ ...counts, [outcome]: (counts[outcome] || 0) + 1 }),
+    {}
+  );
   console.log(`sprites: ${JSON.stringify(tally)}`);
   if (failures.length) {
     // A partial download would leave the catalog pointing at missing files,
     // so fail loudly instead of writing a catalog that lies.
     console.error(failures.slice(0, 20).join('\n'));
-    throw new Error(`${failures.length} sprite(s) failed to download; catalog not written`);
+    throw new Error(
+      `${failures.length} sprite(s) failed to download; catalog not written`
+    );
   }
 
   const next = renderCatalogModule(entries);
-  const current = existsSync(CATALOG_PATH) ? await readFile(CATALOG_PATH, 'utf8') : '';
+  const current = existsSync(CATALOG_PATH)
+    ? await readFile(CATALOG_PATH, 'utf8')
+    : '';
   if (current === next) {
     console.log('catalog unchanged');
     return;

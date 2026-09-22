@@ -202,3 +202,98 @@ const escapeHtml = (value = '') => String(value)
       });
     };
     
+    /**
+     * Renders a deck's Pokémon sprite strip — the up-to-three mons pinned
+     * beside a deck's name (design 024). Used both in the editor header
+     * (editable: clicking opens the picker) and on the My Decks chips
+     * (read-only). Presentation only; the slots come from `deck-sprites.mjs`.
+     *
+     * @param {object} options
+     * @param {HTMLElement} options.stripEl
+     * @param {{slug: string, shiny: boolean}[]} options.sprites - already normalized
+     * @param {function} options.spriteUrl - (sprite) => string
+     * @param {function} options.spriteLabel - (sprite) => string
+     * @param {boolean} [options.editable] - draw the add/clear affordance
+     * @param {number} [options.max]
+     */
+    export const renderDeckSprites = ({
+      stripEl,
+      sprites = [],
+      spriteUrl,
+      spriteLabel,
+      editable = false,
+      max = 3,
+    }) => {
+      if (!stripEl) return;
+
+      const tiles = sprites
+        .map((sprite) => {
+          const url = spriteUrl(sprite);
+          if (!url) return '';
+          const label = escapeHtml(spriteLabel(sprite));
+          // A sprite file that fails to load must not leave a broken-image
+          // glyph sitting next to the deck name, so it removes itself.
+          return `<img class="native-deck-builder-deck-sprite${sprite.shiny ? ' shiny' : ''}" src="${escapeHtml(url)}" alt="${label}" title="${label}" loading="lazy" onerror="this.remove()" />`;
+        })
+        .join('');
+
+      const canAdd = editable && sprites.length < max;
+      const addButton = editable
+        ? `<button type="button" class="native-deck-builder-deck-sprite-add" data-sprite-picker-open="true" title="${sprites.length ? 'Change this deck’s Pokémon' : 'Pin Pokémon to this deck'}" aria-label="${sprites.length ? 'Change this deck’s Pokémon' : 'Pin Pokémon to this deck'}">${canAdd ? '+' : '✎'}</button>`
+        : '';
+
+      stripEl.innerHTML = `${tiles}${addButton}`;
+      stripEl.classList.toggle('is-empty', sprites.length === 0);
+    };
+
+    /**
+     * Renders the Pokémon sprite picker popover: the deck's current slots
+     * (each with a shiny toggle and a remove button) above a searchable grid
+     * of every vendored Pokémon. Reports intent through the callbacks; all
+     * slot arithmetic lives in `deck-sprites.mjs`.
+     */
+    export const renderSpritePicker = ({
+      pickerEl,
+      sprites = [],
+      results = [],
+      query = '',
+      max = 3,
+      spriteUrl,
+      spriteLabel,
+    }) => {
+      if (!pickerEl) return;
+
+      const slots = sprites
+        .map((sprite, index) => {
+          const label = escapeHtml(spriteLabel(sprite));
+          return `
+            <span class="native-deck-builder-sprite-slot">
+              <img src="${escapeHtml(spriteUrl(sprite))}" alt="${label}" onerror="this.remove()" />
+              <button type="button" data-sprite-shiny="${index}" class="${sprite.shiny ? 'active' : ''}" title="${sprite.shiny ? `Use the regular ${label}` : `Use the shiny ${label}`}" aria-pressed="${Boolean(sprite.shiny)}">&#10022;</button>
+              <button type="button" data-sprite-remove="${index}" title="Remove ${label}" aria-label="Remove ${label}">&#10005;</button>
+            </span>`;
+        })
+        .join('');
+
+      const isFull = sprites.length >= max;
+      const grid = results
+        .map((entry) => {
+          const name = escapeHtml(entry.name);
+          const chosen = sprites.some((sprite) => sprite.slug === entry.slug);
+          return `<button type="button" class="native-deck-builder-sprite-option${chosen ? ' chosen' : ''}" data-sprite-add="${escapeHtml(entry.slug)}"${chosen || isFull ? ' disabled' : ''} title="${name}">
+            <img src="${escapeHtml(spriteUrl({ slug: entry.slug }))}" alt="${name}" loading="lazy" onerror="this.remove()" />
+            <span>${name}</span>
+          </button>`;
+        })
+        .join('');
+
+      pickerEl.innerHTML = `
+        <div class="native-deck-builder-sprite-picker-head">
+          <span class="native-deck-builder-sprite-picker-title">Deck Pokémon <em>${sprites.length} / ${max}</em></span>
+          <button type="button" data-sprite-picker-close="true" class="native-deck-builder-sprite-picker-close" aria-label="Close">&#10005;</button>
+        </div>
+        <div class="native-deck-builder-sprite-slots">${slots || '<span class="native-deck-builder-sprite-empty">No Pokémon pinned yet.</span>'}</div>
+        <input type="search" id="nativeDeckBuilderSpriteSearch" class="native-deck-builder-sprite-search" placeholder="Search Pokémon..." aria-label="Search Pokémon" value="${escapeHtml(query)}" />
+        <div class="native-deck-builder-sprite-grid">${grid || '<span class="native-deck-builder-sprite-empty">No Pokémon match that name.</span>'}</div>
+        ${isFull ? '<span class="native-deck-builder-sprite-hint">Strip is full — remove one to swap it out.</span>' : ''}`;
+    };

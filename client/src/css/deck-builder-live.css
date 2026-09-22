@@ -1014,3 +1014,269 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+/* ------------------------------------------------- deck Pokémon sprites -- */
+/* The up-to-three mons pinned beside a deck's name (design 024). The art is
+ * 68px pixel art from pokesprite, so every rule that scales it keeps
+ * `image-rendering: pixelated` — smoothing turns it to mush. */
+
+.db-live .native-deck-builder-deck-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
+}
+
+.db-live .native-deck-builder-deck-sprites {
+  display: flex;
+  align-items: center;
+  gap: 0.1vw;
+}
+
+.db-live .native-deck-builder-deck-sprite {
+  width: 3.4vh;
+  height: 3.4vh;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+/* Shiny slots get the gold halo the rest of the Live chrome uses, so the
+ * variant reads at a glance even on Pokémon whose recolour is subtle. */
+.db-live .native-deck-builder-deck-sprite.shiny {
+  filter: drop-shadow(0 0 3px var(--db-gold))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.db-live .native-deck-builder-deck-sprite-add {
+  width: 2.2vh;
+  height: 2.2vh;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--db-border-strong, var(--db-border));
+  border-radius: var(--db-radius-pill);
+  background: transparent;
+  color: var(--db-text-dim);
+  font-size: 1.3vh;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+/* The affordance stays out of the way until the header is hovered — except
+ * on an empty strip, where nothing else would hint that it exists. */
+.db-live
+  .native-deck-builder-deck-header:hover
+  .native-deck-builder-deck-sprite-add,
+.db-live .native-deck-builder-deck-sprite-add:focus-visible,
+.db-live
+  .native-deck-builder-deck-sprites.is-empty
+  .native-deck-builder-deck-sprite-add {
+  opacity: 1;
+}
+
+.db-live .native-deck-builder-deck-sprite-add:hover {
+  color: var(--db-gold);
+  border-color: var(--db-gold);
+}
+
+/* Chip strips are decoration only: smaller, and never intercept the click
+ * that opens the deck. */
+.db-live .native-deck-builder-chip-sprites {
+  pointer-events: none;
+  margin-left: 0.3vw;
+}
+
+.db-live .native-deck-builder-chip-sprites .native-deck-builder-deck-sprite {
+  width: 2.4vh;
+  height: 2.4vh;
+}
+
+.db-live .native-deck-builder-chip-sprites:empty,
+.db-live .native-deck-builder-chip-sprites.is-empty {
+  display: none;
+}
+
+/* ------------------------------------------------------- sprite picker -- */
+
+.db-live .native-deck-builder-sprite-picker {
+  position: absolute;
+  top: calc(100% + 0.6vh);
+  /* Right-anchored: the deck pane sits against the workspace edge, so a
+     left-anchored popover would grow straight off it and get clipped. */
+  right: 0;
+  left: auto;
+  z-index: 40;
+  width: max(260px, 17vw);
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 0.8vh 0.7vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  background: var(--db-panel);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+  box-shadow: 0 1.2vh 2.4vh rgba(0, 0, 0, 0.5);
+}
+
+.db-live .native-deck-builder-sprite-picker[hidden] {
+  display: none;
+}
+
+.db-live .native-deck-builder-sprite-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.db-live .native-deck-builder-sprite-picker-title {
+  font-size: 1.3vh;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-sprite-picker-title em {
+  color: var(--db-gold);
+  font-style: normal;
+}
+
+.db-live .native-deck-builder-sprite-picker-close {
+  background: transparent;
+  border: 0;
+  color: var(--db-text-dim);
+  cursor: pointer;
+  font-size: 1.4vh;
+}
+
+.db-live .native-deck-builder-sprite-picker-close:hover {
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-sprite-slots {
+  display: flex;
+  align-items: center;
+  gap: 0.4vw;
+  min-height: 4.4vh;
+}
+
+.db-live .native-deck-builder-sprite-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2vh;
+  background: var(--db-input);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+}
+
+.db-live .native-deck-builder-sprite-slot img {
+  width: 3.6vh;
+  height: 3.6vh;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.db-live .native-deck-builder-sprite-slot button {
+  width: 1.8vh;
+  height: 1.8vh;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  background: var(--db-raised);
+  color: var(--db-text-dim);
+  font-size: 1.1vh;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.db-live .native-deck-builder-sprite-slot button:hover {
+  color: var(--db-text);
+  border-color: var(--db-border-strong, var(--db-gold));
+}
+
+.db-live .native-deck-builder-sprite-slot button.active {
+  color: var(--db-gold);
+  border-color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-sprite-search {
+  width: 100%;
+  padding: 0.5vh 0.6vw;
+  background: var(--db-input);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  font-size: 1.4vh;
+}
+
+.db-live .native-deck-builder-sprite-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.4vh, 1fr));
+  gap: 0.3vh;
+  overflow-y: auto;
+}
+
+.db-live .native-deck-builder-sprite-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1vh;
+  padding: 0.2vh;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--db-radius);
+  color: var(--db-text-dim);
+  font-size: 1vh;
+  cursor: pointer;
+}
+
+.db-live .native-deck-builder-sprite-option img {
+  width: 3.6vh;
+  height: 3.6vh;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.db-live .native-deck-builder-sprite-option span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-live .native-deck-builder-sprite-option:hover:not([disabled]) {
+  border-color: var(--db-gold);
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-sprite-option.chosen {
+  border-color: var(--db-gold);
+  color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-sprite-option[disabled] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.db-live .native-deck-builder-sprite-empty,
+.db-live .native-deck-builder-sprite-hint {
+  color: var(--db-text-dim);
+  font-size: 1.2vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-live .native-deck-builder-deck-sprite-add {
+    transition: none;
+  }
+}

@@ -14,7 +14,9 @@ import { POKEMON_SPRITE_CATALOG } from './pokemon-sprite-catalog.generated.mjs';
 export const MAX_DECK_SPRITES = 3;
 export const POKEMON_SPRITE_BASE_PATH = '/src/assets/pokemon/gen8';
 
-const BY_SLUG = new Map(POKEMON_SPRITE_CATALOG.map((entry) => [entry.slug, entry]));
+const BY_SLUG = new Map(
+  POKEMON_SPRITE_CATALOG.map((entry) => [entry.slug, entry])
+);
 
 export { POKEMON_SPRITE_CATALOG };
 
@@ -29,7 +31,9 @@ export function findPokemonBySlug(slug) {
  * and each group keeps dex order so the list never reshuffles arbitrarily.
  */
 export function searchPokemon(query = '', limit = 40) {
-  const needle = String(query ?? '').trim().toLowerCase();
+  const needle = String(query ?? '')
+    .trim()
+    .toLowerCase();
   const max = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 40;
   if (!needle) return POKEMON_SPRITE_CATALOG.slice(0, max);
 
@@ -37,8 +41,10 @@ export function searchPokemon(query = '', limit = 40) {
   const contains = [];
   for (const entry of POKEMON_SPRITE_CATALOG) {
     const haystack = entry.name.toLowerCase();
-    if (haystack.startsWith(needle) || entry.slug.startsWith(needle)) prefix.push(entry);
-    else if (haystack.includes(needle) || entry.slug.includes(needle)) contains.push(entry);
+    if (haystack.startsWith(needle) || entry.slug.startsWith(needle))
+      prefix.push(entry);
+    else if (haystack.includes(needle) || entry.slug.includes(needle))
+      contains.push(entry);
     if (prefix.length >= max) break;
   }
   return [...prefix, ...contains].slice(0, max);
@@ -91,13 +97,15 @@ export function addDeckSprite(sprites, slug, shiny = false) {
 
 export function removeDeckSpriteAt(sprites, index) {
   const current = normalizeDeckSprites(sprites);
-  if (!Number.isInteger(index) || index < 0 || index >= current.length) return current;
+  if (!Number.isInteger(index) || index < 0 || index >= current.length)
+    return current;
   return current.filter((_, position) => position !== index);
 }
 
 export function toggleDeckSpriteShinyAt(sprites, index) {
   const current = normalizeDeckSprites(sprites);
-  if (!Number.isInteger(index) || index < 0 || index >= current.length) return current;
+  if (!Number.isInteger(index) || index < 0 || index >= current.length)
+    return current;
   return current.map((sprite, position) =>
     position === index ? { ...sprite, shiny: !sprite.shiny } : sprite
   );
