@@ -65,5 +65,8 @@ export const resolvePreviewCard = (legacyCard, target) => {
 
   const image = stampedImageOf(target);
   if (!image || isRedacted(image.card)) return null;
-  return { ...image.card, image, user: image.user };
+  // The foil wrapper (with its fetched rarity) lives around the <img>, not on img.card;
+  // without it the preview rebuilds the card as a plain, foil-less image.
+  const wrapper = image.closest?.('.mat-holo') ?? undefined;
+  return { ...image.card, image, user: image.user, wrapper };
 };

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MEGA_BURST_AT,
   MEGA_ENTRY_MS,
   TERA_ENTRY_MS,
   TERA_GLINT_AT,
@@ -99,29 +100,41 @@ test('tera: rays and smoke only appear after the shatter and grow outward', () =
   assert.ok(teraSmokePose(0.9).scale > teraSmokePose(0.66).scale);
 });
 
-test('mega: the sphere swells in, holds full, then bursts outward as it fades', () => {
-  assert.ok(megaSpherePose(0).scale < 0.5);
-  assert.equal(megaSpherePose(0.5).opacity, 1);
-  assert.ok(megaSpherePose(0.95).scale > 1.2);
-  assert.ok(megaSpherePose(0.95).opacity < 0.1);
-});
-
-test('mega: swooshes orbit in their spin direction from their phase', () => {
+// TCG Live's Mega beat: energy gathers INTO the card, a sphere encloses it and
+// strains, prismatic cracks flare, then the shell bursts in a white-out.
+test('mega: swooshes converge onto the card and are absorbed before the burst', () => {
   assert.equal(megaSwirlPose(0, { phase: 90 }).rotate, 90);
-  assert.ok(megaSwirlPose(0.5, { phase: 0, spin: 1 }).rotate > 0);
-  assert.ok(megaSwirlPose(0.5, { phase: 0, spin: -1 }).rotate < 0);
-  assert.ok(megaSwirlPose(0.4).opacity > 0.99);
+  assert.ok(megaSwirlPose(0.3, { phase: 0, spin: 1 }).rotate > 0);
+  assert.ok(megaSwirlPose(0.3, { phase: 0, spin: -1 }).rotate < 0);
+  assert.ok(megaSwirlPose(0.3).opacity > 0.99);
+  assert.ok(megaSwirlPose(0.1).scale > megaSwirlPose(0.45).scale, 'closes inward');
+  assert.equal(megaSwirlPose(MEGA_BURST_AT).opacity, 0, 'absorbed before the burst');
+  const early = megaSwirlPose(0.2).rotate - megaSwirlPose(0.1).rotate;
+  const late = megaSwirlPose(0.5).rotate - megaSwirlPose(0.4).rotate;
+  assert.ok(late > early, 'spin accelerates as it closes');
 });
 
-test('mega: hex pattern shows while the sphere holds', () => {
-  assert.ok(megaHexPose(0.5).opacity > 0.79);
-  assert.equal(megaHexPose(0.1).opacity, 0);
+test('mega: the sphere encloses the card, strains, then bursts outward as it fades', () => {
+  assert.ok(megaSpherePose(0.1).scale < 0.6);
+  assert.equal(megaSpherePose(0.6).opacity, 1);
+  assert.ok(megaSpherePose(0.55).scale > 0.95);
+  const strain = [0.6, 0.63, 0.66, 0.69].map((t) => megaSpherePose(t).scale);
+  assert.ok(new Set(strain).size > 1, 'strains before bursting');
+  assert.ok(megaSpherePose(0.84).scale > 1.5);
+  assert.ok(megaSpherePose(0.9).opacity < 0.05);
 });
 
-test('mega: the closing flash pops late and settles back to size', () => {
+test('mega: the prismatic cracks flare just before the burst', () => {
+  assert.equal(megaHexPose(0.3).opacity, 0);
+  assert.ok(megaHexPose(0.68).opacity > 0.99);
+  assert.ok(megaHexPose(0.68).opacity > megaHexPose(0.55).opacity);
+  assert.equal(megaHexPose(0.8).opacity, 0);
+});
+
+test('mega: the white-out peaks at the burst and the card pops back to size', () => {
   assert.equal(megaFlashPose(0.5).opacity, 0);
-  assert.equal(megaFlashPose(0.81).opacity, 1);
+  assert.equal(megaFlashPose(MEGA_BURST_AT + 0.02).opacity, 1);
   assert.equal(megaFlashPose(0.5).scale, 1);
   assert.ok(near(megaFlashPose(1).scale, 1));
-  assert.ok(megaFlashPose(0.87).scale > 1.05);
+  assert.ok(megaFlashPose(0.86).scale > 1.05);
 });

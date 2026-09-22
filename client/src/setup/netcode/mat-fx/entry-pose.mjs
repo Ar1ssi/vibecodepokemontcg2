@@ -3,11 +3,14 @@
 // of one entry share a single clock; entry.js samples them into keyframes.
 
 export const TERA_ENTRY_MS = 2100;
-export const MEGA_ENTRY_MS = 1900;
+export const MEGA_ENTRY_MS = 2300;
 
 // Tera beats (fractions of TERA_ENTRY_MS).
 export const TERA_SHATTER_AT = 0.62;
 export const TERA_GLINT_AT = 0.8;
+
+// Mega beat (fraction of MEGA_ENTRY_MS): the moment the keystone shell bursts.
+export const MEGA_BURST_AT = 0.72;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -105,44 +108,62 @@ export function teraSmokePose(t) {
   };
 }
 
-/** Mega: the keystone sphere swells around the card, holds, then bursts outward. */
+// Mega follows TCG Live's beat: energy gathers INTO the card, a keystone sphere
+// encloses it and strains, prismatic cracks flare, then the shell bursts in a
+// white-out that leaves the Mega card standing.
+
+/** The keystone sphere: grows over the card, strains, then bursts outward and fades. */
 export function megaSpherePose(t) {
   const c = clamp01(t);
-  if (c < 0.26) {
-    const k = span(c, 0, 0.26);
-    return { scale: 0.4 + 0.6 * easeOutBack(k), opacity: easeOutCubic(k) };
+  if (c < 0.55) {
+    const k = span(c, 0.08, 0.55);
+    return {
+      scale: 0.3 + 0.7 * easeOutCubic(k),
+      opacity: easeOutCubic(span(c, 0.08, 0.3)),
+    };
   }
-  if (c < 0.78)
-    return { scale: 1 + 0.02 * Math.sin((c - 0.26) * Math.PI * 5), opacity: 1 };
-  const out = easeOutCubic(span(c, 0.78, 1));
-  return { scale: 1 + 0.35 * out, opacity: 1 - out };
+  if (c < MEGA_BURST_AT) {
+    // Strain: a shake that tightens as the burst approaches.
+    const k = span(c, 0.55, MEGA_BURST_AT);
+    return { scale: 1 + 0.035 * k * Math.sin(k * Math.PI * 9), opacity: 1 };
+  }
+  const out = easeOutCubic(span(c, MEGA_BURST_AT, 0.88));
+  return { scale: 1 + 0.7 * out, opacity: 1 - out };
 }
 
-/** Prismatic hex pattern inside the sphere: fades in, drifts, fades out. */
+/** Prismatic cracks across the sphere: build under the strain, flare, gone with the burst. */
 export function megaHexPose(t) {
   const c = clamp01(t);
-  return { opacity: 0.8 * plateau(c, 0.12, 0.32, 0.66, 0.84), rotate: 18 * c };
+  return { opacity: plateau(c, 0.42, 0.66, 0.7, 0.78), rotate: 12 * c };
 }
 
 /**
- * One brush-stroke swoosh orbiting the sphere. `phase` (degrees) spreads the
- * swooshes around the circle; `spin` (+1 / -1) sets the orbit direction.
+ * One brush-stroke swoosh spiralling INTO the card: it closes inward while its spin
+ * accelerates, and is absorbed before the burst. `phase` (degrees) spreads the swooshes
+ * around the circle; `spin` (+1 / -1) sets the orbit direction.
  */
 export function megaSwirlPose(t, { phase = 0, spin = 1 } = {}) {
   const c = clamp01(t);
+  const k = span(c, 0, 0.62);
   return {
-    rotate: phase + spin * 400 * easeInOutCubic(span(c, 0.08, 0.86)),
-    scale: 0.7 + 0.45 * easeOutCubic(span(c, 0.08, 0.5)),
-    opacity: plateau(c, 0.08, 0.24, 0.66, 0.86),
+    rotate: phase + spin * 540 * easeInCubic(k),
+    scale: 1.35 - 0.8 * easeInCubic(k),
+    opacity: plateau(c, 0.02, 0.14, 0.5, 0.62),
   };
 }
 
-/** Closing flash on the card: a quick white pop that settles back to size. */
+/** White-out at the burst, then a slight card pop that settles back to size. */
 export function megaFlashPose(t) {
   const c = clamp01(t);
-  const k = span(c, 0.74, 1);
+  const k = span(c, MEGA_BURST_AT, 1);
   return {
-    opacity: plateau(c, 0.74, 0.8, 0.82, 0.98),
-    scale: k === 0 ? 1 : 1 + 0.08 * Math.sin(k * Math.PI),
+    opacity: plateau(
+      c,
+      MEGA_BURST_AT - 0.04,
+      MEGA_BURST_AT + 0.01,
+      MEGA_BURST_AT + 0.05,
+      0.95
+    ),
+    scale: k === 0 ? 1 : 1 + 0.1 * Math.sin(k * Math.PI),
   };
 }

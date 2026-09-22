@@ -74,3 +74,20 @@ test('nothing to preview without a card or a target', () => {
   assert.equal(resolvePreviewCard(undefined, undefined), null);
   assert.equal(resolvePreviewCard(null, { closest: () => null }), null);
 });
+
+// hydrateHolo keeps the foil wrapper (and its fetched rarity) on the registry's shim,
+// not on img.card; the preview reads `card.wrapper` to rebuild the foil (full-view.js
+// cloneFrom, card-picker.js buildSlideContent), so a hydrated card must carry it.
+test('a server-rendered holo card carries its foil wrapper into the preview', () => {
+  const wrapper = { dataset: { rarity: 'double rare' } };
+  const image = {
+    ...serverImage({ name: 'Mega Gengar ex', src: 'gengar.png' }, 'self'),
+    closest: (selector) => (selector === '.mat-holo' ? wrapper : null),
+  };
+  assert.equal(resolvePreviewCard(null, image).wrapper, wrapper);
+});
+
+test('a server-rendered card without a foil has no wrapper', () => {
+  const image = { ...serverImage({ name: 'Pikachu', src: 'p.png' }, 'self'), closest: () => null };
+  assert.equal(resolvePreviewCard(null, image).wrapper, undefined);
+});
