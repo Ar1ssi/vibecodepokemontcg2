@@ -166,6 +166,9 @@ export function validateDeck(decklist = {}, selectedFormat = DECK_FORMATS.POCKET
     isValid: errors.length === 0,
     errors,
     totalCards,
+    // The legal deck size for this format (60 for TCG, 20 for Pocket). The
+    // Live-style "x / y" counter reads it so it never hard-codes 60.
+    requiredCards: rules.deckSize.max,
     formatName: rules.formatName,
     selectedFormat,
   };

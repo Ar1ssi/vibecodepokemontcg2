@@ -5,6 +5,7 @@ import {
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
 import { getSortedDeckCardArray } from '../../../setup/deck-builder/core/card-sort.mjs';
+import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-counter.mjs';
 import {
   detectDeckFormat,
   validateDeck,
@@ -17,6 +18,7 @@ import {
 import { show } from '../../../setup/home-header/header-toggle.js';
 import {
   renderDeckCards,
+  renderDeckCounter,
   renderDeckSummary,
   renderSearchResults,
 } from './native-deck-builder-renderers.js';
@@ -107,6 +109,7 @@ export const initializeNativeDeckBuilder = () => {
   const validationDot = document.getElementById(
     'nativeDeckBuilderValidationDot'
   );
+  const deckCounter = document.getElementById('nativeDeckBuilderCounter');
   const cards = document.getElementById('nativeDeckBuilderCardsPanel');
   const searchInput = document.getElementById('nativeDeckBuilderSearchInput');
   const cardTypeFilter = document.getElementById(
@@ -997,6 +1000,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // Keep the Browse Sets panel's own card grid in sync with the same
     // filter — the summary bar drives both the deck list and Browse Sets.
     setBrowser?.setSupertypeFilter?.(deckListFilter);
+
+    renderDeckCounter({
+      counterEl: deckCounter,
+      model: getDeckCounterModel(result),
+    });
 
     if (validationDot) {
       const formatLabel = result.formatName;

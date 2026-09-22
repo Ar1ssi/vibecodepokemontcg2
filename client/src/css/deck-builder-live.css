@@ -500,6 +500,95 @@
   border-radius: var(--db-radius-pill);
 }
 
+/* -------------------------------------------------------- deck counter -- */
+
+/* The counter carries legality now, so the old pinhead dot is redundant. */
+.db-live .native-deck-builder-validation-dot {
+  display: none;
+}
+
+.native-deck-builder-counter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vh;
+}
+
+.db-live .native-deck-builder-counter {
+  --db-counter: var(--db-text-dim);
+  padding: 0.7vh 0.8vw 0.8vh;
+  background: var(--db-panel-2);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+}
+
+.db-live .native-deck-builder-counter[data-state='building'] {
+  --db-counter: var(--db-gold);
+}
+
+.db-live .native-deck-builder-counter[data-state='over'],
+.db-live
+  .native-deck-builder-counter[data-legal='false'][data-state='complete'] {
+  --db-counter: var(--db-red);
+}
+
+/* Green is earned: the deck must be the right size AND pass every rule. */
+.db-live
+  .native-deck-builder-counter[data-state='complete'][data-legal='true'] {
+  --db-counter: var(--db-green);
+  border-color: var(--db-green);
+}
+
+.db-live .native-deck-builder-counter-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35vw;
+  min-width: 0;
+}
+
+.db-live .native-deck-builder-counter-count {
+  font-size: 3.4vh;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--db-counter);
+  font-variant-numeric: tabular-nums;
+}
+
+.db-live .native-deck-builder-counter-required {
+  font-size: 1.9vh;
+  font-weight: 700;
+  color: var(--db-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.db-live .native-deck-builder-counter-detail {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.35vh;
+  color: var(--db-text-dim);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-live .native-deck-builder-counter-track {
+  height: 0.7vh;
+  min-height: 5px;
+  overflow: hidden;
+  background: var(--db-input);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-counter-fill {
+  height: 100%;
+  background: var(--db-counter);
+  border-radius: inherit;
+  transition:
+    width 220ms ease,
+    background 220ms ease;
+}
+
 /* ------------------------------------------------------ summary segments -- */
 
 .db-live .native-deck-builder-summary-segment {

@@ -94,7 +94,29 @@ const escapeHtml = (value = '') => String(value)
         });
       });
     };
-    
+
+    /**
+     * Renders Pokémon TCG Live's prominent "x / 60" deck counter: a big card
+     * count, a fill bar that only turns green on a legal deck, and a one-line
+     * detail saying what is still missing. Takes the model from
+     * `deck-counter.mjs` — this function does presentation only.
+     */
+    export const renderDeckCounter = ({ counterEl, model }) => {
+      if (!counterEl || !model) return;
+
+      counterEl.dataset.state = model.state;
+      counterEl.dataset.legal = String(Boolean(model.isLegal));
+      counterEl.innerHTML = `
+        <div class="native-deck-builder-counter-top">
+          <span class="native-deck-builder-counter-count">${escapeHtml(String(model.total))}</span>
+          <span class="native-deck-builder-counter-required">/ ${escapeHtml(String(model.required))}</span>
+          <span class="native-deck-builder-counter-detail">${escapeHtml(model.detail)}</span>
+        </div>
+        <div class="native-deck-builder-counter-track">
+          <div class="native-deck-builder-counter-fill" style="width: ${model.percent}%"></div>
+        </div>`;
+    };
+
     /**
      * Renders the segmented Pokémon / Trainers / Energy counts bar in the style
      * of Pokémon TCG Live's deck sidebar. Each segment is a toggle button:
