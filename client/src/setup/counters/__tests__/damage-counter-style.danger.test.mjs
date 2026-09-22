@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isDangerDamage } from '../damage-counter-style.mjs';
+import { counterMotionFor, isDangerDamage } from '../damage-counter-style.mjs';
 
 test('isDangerDamage: true within one counter of a knockout', () => {
   assert.equal(isDangerDamage(60, 70), true, 'exactly one counter left');
@@ -36,4 +36,25 @@ test('isDangerDamage: reads numeric strings, as the DOM supplies them', () => {
 test('isDangerDamage: junk damage is not a danger', () => {
   assert.equal(isDangerDamage(undefined, 70), false);
   assert.equal(isDangerDamage('lots', 70), false);
+});
+
+// ── Design 024 slice 3: which one-shot a counter plays ─────────────────────
+
+test('counterMotionFor: a brand-new counter lands', () => {
+  assert.equal(counterMotionFor({ isNew: true }), 'land');
+  assert.equal(counterMotionFor({ isNew: true, valueChanged: true }), 'land');
+});
+
+test('counterMotionFor: an existing counter bumps only when its value changed', () => {
+  assert.equal(counterMotionFor({ valueChanged: true }), 'bump');
+  assert.equal(counterMotionFor({ valueChanged: false }), null);
+});
+
+test('counterMotionFor: a restyle with no change is silent', () => {
+  // addDamageCounter doubles as the window-resize handler and never alters an
+  // existing counter's value; animating there would pop every counter on the
+  // board each time the window moved.
+  assert.equal(counterMotionFor(), null);
+  assert.equal(counterMotionFor({}), null);
+  assert.equal(counterMotionFor({ isNew: false }), null);
 });

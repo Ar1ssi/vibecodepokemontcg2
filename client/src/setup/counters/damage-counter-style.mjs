@@ -24,6 +24,22 @@ export function getDamageCounterTier(damage) {
   return 'dmg-tier-100';
 }
 
+/**
+ * Design 024 slice 3: which one-shot a counter should play, if any.
+ *
+ * The rule is subtle enough to be worth naming: `addDamageCounter` doubles as
+ * the window-resize handler and never changes an existing counter's value, so
+ * only a BRAND NEW counter animates there — otherwise every counter on the
+ * board would pop each time the window moved. A value change animates from
+ * `updateDamageCounter` instead, and only when the text actually differs.
+ *
+ * @returns {'land'|'bump'|null}
+ */
+export function counterMotionFor({ isNew = false, valueChanged = false } = {}) {
+  if (isNew) return 'land';
+  return valueChanged ? 'bump' : null;
+}
+
 /** Motion classes the counter can carry; exported so callers can clear them. */
 export const DAMAGE_COUNTER_MOTIONS = ['fx-counter-land', 'fx-counter-bump'];
 export const DAMAGE_DANGER_CLASS = 'dmg-danger';

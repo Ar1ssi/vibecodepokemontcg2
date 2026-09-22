@@ -7,6 +7,7 @@ import {
   DAMAGE_COUNTER_MOTIONS,
   DAMAGE_COUNTER_TIERS,
   DAMAGE_DANGER_CLASS,
+  counterMotionFor,
   getDamageCounterTier,
   isDangerDamage,
 } from '../../setup/counters/damage-counter-style.mjs';
@@ -89,7 +90,12 @@ export const updateDamageCounter = (
   if (changed) {
     damageCounter.textContent = damageAmount;
   }
-  applyDamageCounterStyle(damageCounter, damageAmount, changed ? 'bump' : null, card?.hp);
+  applyDamageCounterStyle(
+    damageCounter,
+    damageAmount,
+    counterMotionFor({ valueChanged: changed }),
+    card?.hp
+  );
 
   processAction(user, emit, 'updateDamageCounter', [
     zoneId,
@@ -192,7 +198,7 @@ export const addDamageCounter = (
   const zoneElementRect = zone.element.getBoundingClientRect();
 
   let damageCounter = targetCard.image.damageCounter;
-  // A counter that did not exist yet 'land's; one already on the card 'bump's.
+  // Only a counter that did not exist yet animates here — see counterMotionFor.
   const isNewCounter = !damageCounter;
   //clean up existing event listeners
   if (damageCounter) {
@@ -221,7 +227,7 @@ export const addDamageCounter = (
   applyDamageCounterStyle(
     damageCounter,
     damageCounter.textContent,
-    isNewCounter ? 'land' : 'bump',
+    counterMotionFor({ isNew: isNewCounter }),
     targetCard.hp
   );
 
