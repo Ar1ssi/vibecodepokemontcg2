@@ -5,6 +5,7 @@ import {
       listDecks,
       loadLibraryFromStorage,
       renameDeckInLibrary,
+      saveDeckSnapshot,
       saveDeckToLibrary,
       saveLibraryToStorage,
       setDeckSleeve,
@@ -258,6 +259,9 @@ import {
             },
             getActiveDeckName: (target) => {
           const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          return activeId && library?.decks?.[activeId]
+            ? library.decks[activeId].name || null
+            : null;
         },
         getActiveSleeve: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
@@ -278,6 +282,49 @@ import {
             silent: true,
           });
           return true;
+        },
+        /**
+         * Explicit Save: writes the editor's cards and the chosen sleeve, coin
+         * and mat over the loaded deck. With nothing loaded there is no deck to
+         * overwrite, so it asks for a name and creates one rather than throwing
+         * the work away.
+         *
+         * @returns {{saved: boolean, created: boolean, name: string|null,
+         *   reason?: 'cancelled'|'limit'}}
+         */
+        saveCurrentDeck: (cards, cosmetics = {}) => {
+          const activeId = activeDeckIds[currentTarget];
+          const isNew = !activeId || !library?.decks?.[activeId];
+
+          let name;
+          if (isNew) {
+            if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
+              showStatus(
+                `Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`
+              );
+              return { saved: false, created: false, name: null, reason: 'limit' };
+            }
+            name = window.prompt('Name this deck:');
+            if (name === null) {
+              return { saved: false, created: false, name: null, reason: 'cancelled' };
+            }
+          }
+
+          const { library: nextLibrary, deckId, created } = saveDeckSnapshot(
+            library,
+            { deckId: activeId, name, cards, ...cosmetics },
+            Date.now()
+          );
+
+          activeDeckIds[currentTarget] = deckId;
+          commit(nextLibrary, {
+            savedMessage: created ? 'Deck created.' : 'Deck saved.',
+          });
+          return {
+            saved: true,
+            created,
+            name: nextLibrary.decks[deckId]?.name || null,
+          };
         },
         getActiveDeckId: (target) =>
           activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??

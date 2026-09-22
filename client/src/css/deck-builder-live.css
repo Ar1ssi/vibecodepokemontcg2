@@ -692,6 +692,33 @@
   color: var(--db-text-dim);
 }
 
+/* Save is the deck panel's primary action: gold, like Play. */
+.db-live .native-deck-builder-save-btn {
+  padding: 0.4vh 0.9vw;
+  font-size: 1.4vh;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  cursor: pointer;
+  color: #23190a;
+  background: linear-gradient(to bottom, var(--db-gold), var(--db-gold-dark));
+  border: none;
+  border-radius: var(--db-radius-pill);
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.db-live .native-deck-builder-save-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.db-live .native-deck-builder-clear-btn {
+  border-radius: var(--db-radius-pill);
+  cursor: pointer;
+}
+
 .db-live .native-deck-builder-deck-status.flash {
   color: var(--db-gold);
 }

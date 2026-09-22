@@ -111,6 +111,16 @@ export const initializeNativeDeckBuilder = () => {
   const importCsvLabel = document.getElementById('nativeDeckBuilderImportCsvLabel');
   const importCsvInput = document.getElementById('nativeDeckBuilderCsvImport');
   const clearButton = document.getElementById('nativeDeckBuilderClear');
+  const saveButton = document.getElementById('nativeDeckBuilderSaveDeck');
+
+  // The pickers commit straight to the loaded deck, but with nothing loaded
+  // there is no deck to commit to and the choice would be lost. Mirror the
+  // live selection here so Save can carry it into a newly created deck.
+  const chosenCosmetics = { self: {}, opp: {} };
+  const rememberCosmetic = (target, key, value) => {
+    const side = target === 'opp' ? 'opp' : 'self';
+    chosenCosmetics[side][key] = value;
+  };
   const deckStatus = document.getElementById('nativeDeckBuilderDeckStatus');
   const summary = document.getElementById('nativeDeckBuilderSummaryPanel');
   const validationDot = document.getElementById(
@@ -344,6 +354,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         panelEl: sleevePanel,
         onChange: (sleeve) => {
           deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
+              rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
           if (sleeve?.image) {
                 // Route through the syncable changeCardBack action: sets the
                 // correct self/opp state var, re-points the target container's
@@ -362,6 +373,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             panelEl: coinPanel,
             onChange: (coin) => {
               deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
+              rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
               document.dispatchEvent(new CustomEvent('rules-coin-changed', {
                 detail: { target: currentLoadTarget, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
               }));
@@ -418,6 +430,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             panelEl: matPanel,
             onChange: (mat) => {
               deckLibrary?.setActiveMat?.(currentLoadTarget, mat ? mat.id : null);
+              rememberCosmetic(currentLoadTarget, 'matId', mat ? mat.id : null);
               // Full-size mats span the whole board and replace the other side.
               if (mat?.layout === 'two-player') {
                 const other = currentLoadTarget === 'opp' ? 'self' : 'opp';
@@ -977,6 +990,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const hasDeckCards = Object.keys(deck).length > 0;
 
     clearButton.style.display = hasDeckCards ? '' : 'none';
+    if (saveButton) {
+      saveButton.style.display = hasDeckCards ? '' : 'none';
+      // With no deck loaded, Save has nothing to overwrite and will ask for a
+      // name instead — say so on the button rather than surprising the user.
+      const hasLoadedDeck = Boolean(deckLibrary?.getActiveDeckId?.(currentLoadTarget));
+      saveButton.textContent = hasLoadedDeck ? 'Save' : 'Save As...';
+    }
     playButton.disabled = !hasDeckCards;
     targetAltButton.style.cursor = systemState.isTwoPlayer ? 'default' : 'pointer';
     targetAltButton.style.opacity = systemState.isTwoPlayer ? '0.5' : '';
@@ -1176,6 +1196,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     } finally {
       importCsvInput.value = '';
     }
+  });
+
+  saveButton?.addEventListener('click', () => {
+    // Cosmetics live on the deck, so pass the picker's current choices through:
+    // Save writes the whole board state the user set up, not just the cards.
+    const chosen = chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'];
+    const result = deckLibrary?.saveCurrentDeck?.(deck, {
+      sleeveId:
+        chosen.sleeveId ?? deckLibrary?.getActiveSleeve?.(currentLoadTarget) ?? null,
+      coinId:
+        chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
+      matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
+    });
+    if (!result?.saved) return;
+
+    deckDirty = true;
+    flashDeckStatus();
+    render();
   });
 
   clearButton.addEventListener('click', () => {

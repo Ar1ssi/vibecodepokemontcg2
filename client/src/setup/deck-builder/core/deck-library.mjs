@@ -103,6 +103,40 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
       return nextLibrary;
     }
     
+    /**
+     * Writes the builder's current state — cards plus the chosen sleeve, coin
+     * and mat — over one saved deck, creating it when `deckId` names no deck
+     * in the library (the "Untitled Deck" case, where nothing is loaded yet).
+     *
+     * Cosmetics are only written when supplied: `undefined` leaves whatever the
+     * deck already has, while an explicit `null` clears it back to the default.
+     *
+     * @returns {{library: object, deckId: string, created: boolean}}
+     */
+    export function saveDeckSnapshot(
+      library = {},
+      { deckId, name, cards = {}, sleeveId, coinId, matId } = {},
+      now = Date.now()
+    ) {
+      if (!deckId || !library?.decks?.[deckId]) {
+        const created = createDeckInLibrary(library, name, cards, now, {
+          sleeveId: sleeveId ?? null,
+          coinId: coinId ?? null,
+          matId: matId ?? null,
+        });
+        return { library: created.library, deckId: created.deckId, created: true };
+      }
+
+      const nextLibrary = structuredClone(library);
+      const deck = nextLibrary.decks[deckId];
+      deck.cards = structuredClone(cards);
+      if (sleeveId !== undefined) deck.sleeveId = sleeveId;
+      if (coinId !== undefined) deck.coinId = coinId;
+      if (matId !== undefined) deck.matId = matId;
+      deck.updatedAt = now;
+      return { library: nextLibrary, deckId, created: false };
+    }
+
     export function listDecks(library = {}) {
       const decks = library?.decks || {};
       return (library?.order || [])
