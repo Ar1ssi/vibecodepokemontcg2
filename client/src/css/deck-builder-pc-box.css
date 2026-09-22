@@ -298,11 +298,18 @@
 
 .db-live:not(.db-light) .native-deck-builder-sleeve-gallery {
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  grid-auto-rows: auto;
+  grid-auto-rows: max-content;
+  align-content: start;
+}
+
+/* the image sets the tile height; an aspect-ratio on the overflow-hidden
+   button lets the scrolling grid squash every row to a sliver */
+.db-live:not(.db-light) .native-deck-builder-sleeve-thumb img {
+  height: auto;
+  aspect-ratio: 63 / 88;
 }
 
 .db-live:not(.db-light) .native-deck-builder-sleeve-thumb {
-  aspect-ratio: 63 / 88;
   background: #fff;
   border: 2px solid #ccc;
   border-radius: 6px;

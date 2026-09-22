@@ -82,6 +82,14 @@ import {
               nextLibrary = setDeckCoin(nextLibrary, existingId, entry.coinId);
               changed = true;
             }
+            if (entry.matId && !deck.matId) {
+              nextLibrary = setDeckMat(nextLibrary, existingId, entry.matId);
+              changed = true;
+            }
+            if (entry.sprites && !deck.sprites?.length) {
+              nextLibrary = setDeckSprites(nextLibrary, existingId, entry.sprites);
+              changed = true;
+            }
             continue;
           }
 
@@ -104,9 +112,16 @@ import {
             entry.name,
             grouped,
             Date.now(),
-            { sleeveId: entry.sleeveId || null, coinId: entry.coinId || null }
+            {
+              sleeveId: entry.sleeveId || null,
+              coinId: entry.coinId || null,
+              matId: entry.matId || null,
+            }
           );
           nextLibrary = created.library;
+          if (entry.sprites) {
+            nextLibrary = setDeckSprites(nextLibrary, created.deckId, entry.sprites);
+          }
           changed = true;
         }
 

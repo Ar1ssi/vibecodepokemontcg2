@@ -1499,12 +1499,15 @@ const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 export const STARTER_DECK_CATALOG = [
   {
     key: 'gengar',
+    matId: 'custom-mega-gengar-edge-to-edge',
+    sprites: ['toxtricity', 'gengar-mega'],
     name: 'Mega Gengar ex Battle Deck',
     sleeveId: 'd92570dc-bbd5-43a4-b7d6-9094993ba975',
     coinId: 'MBG_Purple_Mega_Gengar_Coin',
   },
   {
     key: 'diancie',
+    sprites: ['diancie-mega', 'meloetta'],
     name: 'Mega Diancie ex Battle Deck',
     // No Mega Diancie sleeve in catalog — closest Mega Evolution fairy ETB art.
     sleeveId: '00b68849-fd1f-4908-a8d8-b44ac392e455',
@@ -1512,18 +1515,24 @@ export const STARTER_DECK_CATALOG = [
   },
   {
     key: 'lucario',
+    matId: 'custom-mega-lucario-edge-to-edge',
+    sprites: ['hariyama', 'lucario-mega'],
     name: 'Mega Lucario ex Starter Deck',
     sleeveId: '5341801a-a512-4842-ae15-bd8ce8748f8d',
     coinId: 'MEGETB_Blue_Mega_Lucario_Coin',
   },
   {
     key: 'charizard',
+    matId: 'custom-mega-charizard-x-edge-to-edge',
+    sprites: ['charizard-mega-y', 'charizard-mega-x'],
     name: 'Mega Charizard X ex Starter Deck',
     sleeveId: '5f123df1-82c9-4fae-998c-9e5ce1d7eb9a',
     coinId: 'PFLETB_Mega_Charizard_X_Coin',
   },
   {
     key: 'darkrai',
+    matId: 'custom-mega-darkrai-edge-to-edge',
+    sprites: ['darkrai-mega', 'gengar-mega'],
     name: 'Mega Darkrai ex Starter Deck',
     sleeveId: '52a78878-0457-4619-bc4a-6cba7853998e',
     // No solo Mega Darkrai coin — best available features Darkrai prominently.
@@ -1531,12 +1540,15 @@ export const STARTER_DECK_CATALOG = [
   },
   {
     key: 'dragonite',
+    sprites: ['dragonite-mega', 'eelektross-mega'],
     name: 'Mega Dragonite ex Starter Deck',
     sleeveId: '86456fdb-d9b2-4990-94c6-5ac3657b8260',
     coinId: 'ASCETB_Yellow_Mega_Dragonite_Coin',
   },
   {
     key: 'greninja',
+    matId: '3146-rubber-playmat-mega-greninja-1',
+    sprites: ['greninja-mega', 'starmie-mega'],
     name: 'Mega Greninja ex Starter Deck',
     sleeveId: 'b4952582-3bc4-4bb8-87f6-07dd88f771ff',
     // No Mega Greninja coin — normal Greninja variant.
