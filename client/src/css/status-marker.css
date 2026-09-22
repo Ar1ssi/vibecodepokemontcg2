@@ -170,3 +170,15 @@
     animation: none;
   }
 }
+
+/* Design 024 slice 5: same kill-switch seam as mat-ambient.css — the status
+   idle loops live inside the playmat iframes, so they read the marker class
+   fx-settings.js writes onto the iframe <html>, not the parent's body.
+   Matches the full selector shape above so it wins on specificity, not on
+   source order alone. */
+:root.fx-off .self-circle.status-marker,
+:root.fx-off .opp-circle.status-marker,
+:root.fx-reduced .self-circle.status-marker,
+:root.fx-reduced .opp-circle.status-marker {
+  animation: none;
+}

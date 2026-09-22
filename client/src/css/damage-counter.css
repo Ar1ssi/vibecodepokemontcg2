@@ -229,10 +229,20 @@
     fx-counter-danger 1.4s ease-in-out 260ms infinite;
 }
 
-:root.fx-off .self-circle.damage-counter,
-:root.fx-off .opp-circle.damage-counter,
-:root.fx-reduced .self-circle.damage-counter,
-:root.fx-reduced .opp-circle.damage-counter {
+/* Matches the full selector shape of the rules above so it wins on
+   specificity rather than on source order alone. */
+:root.fx-off .self-circle.damage-counter.dmg-danger,
+:root.fx-off .opp-circle.damage-counter.dmg-danger,
+:root.fx-off .self-circle.damage-counter.fx-counter-land,
+:root.fx-off .opp-circle.damage-counter.fx-counter-land,
+:root.fx-off .self-circle.damage-counter.fx-counter-bump,
+:root.fx-off .opp-circle.damage-counter.fx-counter-bump,
+:root.fx-reduced .self-circle.damage-counter.dmg-danger,
+:root.fx-reduced .opp-circle.damage-counter.dmg-danger,
+:root.fx-reduced .self-circle.damage-counter.fx-counter-land,
+:root.fx-reduced .opp-circle.damage-counter.fx-counter-land,
+:root.fx-reduced .self-circle.damage-counter.fx-counter-bump,
+:root.fx-reduced .opp-circle.damage-counter.fx-counter-bump {
   animation: none;
 }
 

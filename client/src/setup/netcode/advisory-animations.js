@@ -14,6 +14,7 @@ import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { playDrawToHand } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
+import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
 import { holdFor } from './mat-fx/fx-holds.mjs';
@@ -107,8 +108,17 @@ const fxQueue = createFxQueue({
   cancel: (id) => clearTimeout(id),
 });
 
-/** Drops any still-pending choreography (game over, teardown, kill switch). */
-export const clearFxQueue = () => fxQueue.clear();
+// Two ways choreography must stop mid-chain (edge 11):
+// turning effects off — the dispatcher would skip each remaining plan anyway,
+// but the queue would keep ticking timers to do it — and a restart or a player
+// leaving, where the plans describe a board that no longer exists.
+onFxSettingsChanged((settings) => {
+  if (settings.fxOff) fxQueue.clear();
+});
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('game-restarted', () => fxQueue.clear());
+}
 
 /**
  * Handles one server advisory event: builds the plan (pure), then — unless
