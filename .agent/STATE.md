@@ -5,14 +5,14 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 Session: 260
-Focus: Mega/Tera signature entry animations (design 027, D104). They are on branch
-  `feature/evolve-fx` (worktree `../vcp-evolve-fx`), NOT merged. S260 added D105: battle FX ignore the OS
+Focus: Mega/Tera signature entry animations (design 027, D104). Merged to main
+  (1cf44ba0) from branch `feature/evolve-fx`. S260 added D105: battle FX ignore the OS
   reduced-motion flag (opt-in `localStorage['ptcg-reduce-motion']='1'`).
 Active: none.
 Next: the user checks on localhost in authoritative mode:
   - a Tera evolution (e.g. Rare Candy into a Tera Stage 2) and a Tera Basic played to the bench;
   - a Mega evolution and a Mega Basic played from hand (also as the starting Active).
-  Then merge to main. The S258 FX polish visual check is still open too.
+  The S258 FX polish visual check is still open too.
   After that: check the S257 TCGdex IndexedDB cache in the browser, then I81, then I78–I80.
   maintenance due (S260) — run .agent/workflows/maintain.md next session.
 Blocked: nothing. A public tunnel is NOT possible from this container — see the watch-out below.
@@ -36,8 +36,8 @@ Blocked: nothing. A public tunnel is NOT possible from this container — see th
   No tunnel from this container: never report a printed *.trycloudflare.com URL as live.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S260 battle FX no longer follow Windows' reduced-motion setting (D105, branch only).
-- S259 Mega/Tera signature entries (branch only): Tera crystal shatter in the type colour, Mega
+- S260 battle FX no longer follow Windows' reduced-motion setting (D105).
+- S259 Mega/Tera signature entries (merged): Tera crystal shatter in the type colour, Mega
   keystone sphere with swooshes; on evolution and on entering play (+20 tests).
 - S258 mat FX polish (merged to main, 9e0dad29): impact-timed hits, wind-up lunge, KO shards,
   status particles, evolution silhouette, banner/ability-tag/present/confetti rework.
