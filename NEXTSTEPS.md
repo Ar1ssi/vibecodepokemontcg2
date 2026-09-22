@@ -1,3 +1,13 @@
+# Active work — S264 12-item batch (branch `feature/batch-s264`, worktree `../vibe-batch-s264`)
+
+Increment ledger (one cluster per commit, suite green between):
+- [x] C1 card abilities: #2 Eelektrik Dynamotor, #8 Toxtricity Sinister Surge, #12 Munkidori
+      Adrena-Brain, #3 Stadium-as-Trainer (Acerola's Premonition + matchesSearch type-only kinds)
+- [ ] C2 FX: #1 holo on double-click preview, #7 Mega entry poses
+- [ ] C3 board UI: #9 End Turn button, #10 View Board button, #11 card blink (apply-view)
+- [ ] #5 "basic prompt gone" — debug, repro first
+- [ ] #6 logging, #4 30th anniversary set — design first, waiting on user approval
+
 # Active work — design 009: TCG Live table rework
 
 Branch: `claude/design-009-review-287815` (worktree `dawns-multi-stage-selection-8f8db1`).

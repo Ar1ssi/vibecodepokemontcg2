@@ -6489,6 +6489,9 @@ import test from 'node:test';
       assert.equal(matchesSearch(supporter, 'Trainer'), true);
       assert.equal(matchesSearch(item, 'Trainer'), true);
       assert.equal(matchesSearch(stadium, 'Trainer'), true);
+      // Kind carried only in `type` (no supertype) is still a Trainer.
+      assert.equal(matchesSearch({ name: 'Artazon', type: 'Stadium' }, 'Trainer'), true);
+      assert.equal(matchesSearch({ name: 'Air Balloon', type: 'Pokémon Tool' }, 'Trainer'), true);
       assert.equal(matchesSearch(mon, 'Trainer'), false);
       assert.equal(matchesSearch(energy, 'Trainer'), false);
     });

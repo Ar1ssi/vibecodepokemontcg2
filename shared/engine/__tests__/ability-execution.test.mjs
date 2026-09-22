@@ -623,3 +623,166 @@ test('ability: a "have no Abilities" Stadium blocks server ability use (A4)', ()
   assert.match(res.error, /blocked by the Stadium/);
   assert.equal(res.state.players.p1.zones.hand.length, 0, 'no cards drawn through the block');
 });
+
+const DYNAMOTOR_TEXT =
+  'Once during your turn, you may attach a Basic {L} Energy card from your discard pile to 1 of your Benched Pokémon.';
+
+function setupDynamotor() {
+  const { state, rng } = setupGame();
+  const eelektrik = createCard({
+    instanceId: 70,
+    name: 'Eelektrik',
+    hp: 90,
+    supertype: 'Pokémon',
+    abilities: [{ name: 'Dynamotor', type: 'Ability', text: DYNAMOTOR_TEXT }],
+  });
+  const activeMon = createCard({ instanceId: 71, name: 'Tynamo', hp: 40, supertype: 'Pokémon' });
+  const benchedMon = createCard({ instanceId: 72, name: 'Pikachu', hp: 60, supertype: 'Pokémon' });
+  state.players.p1.zones.active.push(activeMon);
+  state.players.p1.zones.bench.push(eelektrik, benchedMon);
+  state.players.p1.zones.discard.push(
+    createCard({ instanceId: 80, name: 'Basic Fire Energy', supertype: 'Energy', subtypes: ['Basic'] }),
+    createCard({ instanceId: 81, name: 'Basic Lightning Energy', supertype: 'Energy', subtypes: ['Basic'] })
+  );
+  return { state, rng };
+}
+
+test('ability: Eelektrik Dynamotor attaches a Basic {L} Energy from discard to a Benched Pokémon', () => {
+  const { state, rng } = setupDynamotor();
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice, 'asks which Energy to attach');
+  assert.deepEqual(res1.pendingChoice.options.map((c) => c.instanceId), [81]);
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [81] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.ok(res2.pendingChoice, 'asks which Benched Pokémon receives it');
+  assert.deepEqual(res2.pendingChoice.options.map((c) => c.instanceId).sort(), [70, 72]);
+
+  const res3 = applyCommand(res2.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res2.pendingChoice.choiceId, selection: [72] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res3.error, null);
+  const p1 = res3.state.players.p1;
+  const energy = p1.zones.bench.find((c) => c.instanceId === 81);
+  assert.equal(energy?.attachedTo, 72);
+  assert.equal(p1.zones.discard.some((c) => c.instanceId === 81), false);
+});
+
+test('ability: Eelektrik Dynamotor with no Basic {L} Energy in discard is not consumed', () => {
+  const { state, rng } = setupDynamotor();
+  state.players.p1.zones.discard = state.players.p1.zones.discard.filter((c) => c.instanceId !== 81);
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
+const SINISTER_SURGE_TEXT =
+  'Once during your turn, you may use this Ability. Search your deck for a Basic {D} Energy card and attach it to 1 of your Benched {D} Pokémon. Then, shuffle your deck. If you attached Energy to a Pokémon in this way, place 2 damage counters on that Pokémon.';
+
+test('ability: Toxtricity Sinister Surge attaches the searched {D} Energy to the chosen Benched {D} Pokémon', () => {
+  const { state, rng } = setupGame();
+  const toxtricity = createCard({
+    instanceId: 90,
+    name: 'Toxtricity',
+    hp: 130,
+    supertype: 'Pokémon',
+    types: ['Darkness'],
+    abilities: [{ name: 'Sinister Surge', type: 'Ability', text: SINISTER_SURGE_TEXT }],
+  });
+  const darkBench = createCard({ instanceId: 91, name: 'Zorua', hp: 70, supertype: 'Pokémon', types: ['Darkness'] });
+  const grassBench = createCard({ instanceId: 92, name: 'Oddish', hp: 60, supertype: 'Pokémon', types: ['Grass'] });
+  state.players.p1.zones.active.push(toxtricity);
+  state.players.p1.zones.bench.push(darkBench, grassBench);
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 95, name: 'Basic Darkness Energy', supertype: 'Energy', subtypes: ['Basic'] }),
+    createCard({ instanceId: 96, name: 'Basic Grass Energy', supertype: 'Energy', subtypes: ['Basic'] })
+  );
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 90 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((c) => c.instanceId), [95]);
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [95] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.pendingChoice.options.map((c) => c.instanceId), [91], 'only Benched {D} Pokémon');
+
+  const res3 = applyCommand(res2.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res2.pendingChoice.choiceId, selection: [91] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res3.error, null);
+  const p1 = res3.state.players.p1;
+  assert.equal(p1.zones.bench.find((c) => c.instanceId === 95)?.attachedTo, 91);
+  assert.equal(p1.zones.hand.length, 0, 'Energy never goes to hand');
+  assert.equal(p1.zones.bench.find((c) => c.instanceId === 91).damage, 20);
+  assert.equal(p1.zones.active[0].damage || 0, 0);
+});
+
+const ADRENA_BRAIN_TEXT =
+  "Once during your turn, if this Pokémon has any {D} Energy attached, you may move up to 3 damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon.";
+
+function setupAdrenaBrain({ withDarkEnergy }) {
+  const { state, rng } = setupGame();
+  const munkidori = createCard({
+    instanceId: 100,
+    name: 'Munkidori',
+    hp: 110,
+    supertype: 'Pokémon',
+    abilities: [{ name: 'Adrena-Brain', type: 'Ability', text: ADRENA_BRAIN_TEXT }],
+  });
+  const damaged = createCard({ instanceId: 101, name: 'Pecharunt', hp: 80, supertype: 'Pokémon' });
+  damaged.damage = 50;
+  state.players.p1.zones.active.push(munkidori);
+  state.players.p1.zones.bench.push(damaged);
+  if (withDarkEnergy) {
+    const energy = createCard({ instanceId: 102, name: 'Basic Darkness Energy', supertype: 'Energy', subtypes: ['Basic'] });
+    energy.attachedTo = 100;
+    state.players.p1.zones.active.push(energy);
+  }
+  state.players.p2.zones.active.push(createCard({ instanceId: 200, name: 'Pikachu', hp: 60, supertype: 'Pokémon' }));
+  return { state, rng };
+}
+
+test('ability: Munkidori Adrena-Brain moves up to 3 damage counters from own Pokémon to the opponent', () => {
+  const { state, rng } = setupAdrenaBrain({ withDarkEnergy: true });
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 100 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((c) => c.instanceId), [101]);
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [101] },
+    playerId: 'p1',
+  }, rng);
+  assert.deepEqual(res2.pendingChoice.options.map((c) => c.instanceId), [200]);
+  const res3 = applyCommand(res2.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res2.pendingChoice.choiceId, selection: [200] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res3.error, null);
+  assert.equal(res3.state.players.p1.zones.bench[0].damage, 20, 'source loses 3 counters');
+  assert.equal(res3.state.players.p2.zones.active[0].damage, 30, 'target gains 3 counters');
+});
+
+test('ability: Munkidori Adrena-Brain does nothing without {D} Energy attached', () => {
+  const { state, rng } = setupAdrenaBrain({ withDarkEnergy: false });
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 100 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.bench[0].damage, 50);
+  assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[100], true);
+});

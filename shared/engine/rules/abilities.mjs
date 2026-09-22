@@ -9,6 +9,7 @@
 //
 // Backward-compat: the bridge auto-draws by finding `type === 'drawAbility'`
 // and reading `.count`. That step type + property are preserved.
+import { energySearchWhat } from './search-match.mjs';
 
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
@@ -324,16 +325,24 @@ export function parseAbility(text = '') {
   ) {
     const parsed = parseAbilitySearchParams(lower);
     const what = parsed.what;
-    const dest = parsed.destination === 'bench' ? 'Bench' : 'hand';
+    // "…and attach it to 1 of your Benched {D} Pokémon" (Sinister Surge): the
+    // searched card goes onto a Pokémon, not into the hand.
+    const attachTarget = lower.match(/search your deck for [^.]*? and attach it to (?:1|one) of (your [^.]*?pok[eé]mon)/)?.[1] || null;
+    const attachDamage = attachTarget
+      ? Number(lower.match(/in this way, place (\d+) damage counters? on that pok/)?.[1] || 0)
+      : 0;
+    const dest = attachTarget ? 'attach' : parsed.destination === 'bench' ? 'Bench' : 'hand';
     const count = parsed.count || 1;
+    const destLabel = { Bench: 'put on Bench', hand: 'add to hand', attach: `attach it to ${attachTarget}` }[dest];
     steps.push({
       type: 'searchAbility',
       what,
       count,
       destination: dest,
+      ...(attachTarget ? { attachTarget, attachDamage } : {}),
       upTo: parsed.upTo || false,
       reveal: lower.includes('reveal'),
-      guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${dest === 'Bench' ? 'put on Bench' : 'add to hand'}, then shuffle.`,
+      guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${destLabel}, then shuffle.`,
     });
   }
 
@@ -447,9 +456,13 @@ export function parseAbility(text = '') {
     const basic = lower.includes('basic');
     const energyType = parseEnergyTypeHint(lower);
     const triggeredByAttach = /when(?:ever)?\s+you attach an?\s+energy/.test(lower);
+    // Executor filters for the discard-attach path (shared with attachFromDiscard).
+    const target = lower.match(/from your discard pile to (?:1|one) of (your [^.]*?pok[eé]mon)/)?.[1] || null;
     steps.push({
       type: 'attachAbility',
       fromDiscard,
+      energy: energySearchWhat({ basic, energyType }),
+      target,
       upTo: upTo ? Number(upTo) : mayAttach ? Number(mayAttach) : null,
       basic,
       energyType,
@@ -477,6 +490,9 @@ export function parseAbility(text = '') {
     !lower.includes('knocked out') &&
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
+    // Energy must be what moves: Adrena-Brain's "has any {D} Energy attached, … move
+    // up to 3 damage counters" is a condition, not an Energy move.
+    /\bmove\b[^.]*\benergy\b/.test(lower) &&
     (lower.includes('to 1 of your') ||
       lower.includes('to another') ||
       lower.includes('to a different') ||
@@ -558,6 +574,7 @@ export function parseAbility(text = '') {
   // ── 8. Move / place / put damage counters (before KO-recursion false positives) ──
   if (
     !hasPromotionTrigger &&
+    !/in this way, place \d+ damage counters? on that pok/.test(lower) &&
     !lower.includes('checkup') &&
     !(lower.includes('opponent') && lower.includes('evolve')) &&
     (hasWord(lower, 'move') || lower.includes('place') || hasWord(lower, 'put')) &&
@@ -607,11 +624,18 @@ export function parseAbility(text = '') {
           : 'Once during your turn: put damage counters on this Pokémon as described.',
       });
     } else {
+      // Adrena-Brain: "if this Pokémon has any {D} Energy attached, you may move …
+      // from 1 of your Pokémon to 1 of your opponent's Pokémon".
+      const fromOwn = verb === 'move' && /from (?:1|one) of your (?!opponent)[^.]*?to (?:1|one) of your opponent/.test(lower);
+      const requiresAttachedEnergy =
+        lower.match(/if this pok[eé]mon has any \{([a-z])\} energy attached/)?.[1] || null;
       steps.push({
         type: 'moveDamageAbility',
         count,
         upTo: upToMatch ? count : null,
         onOpponent,
+        ...(fromOwn ? { fromOwn } : {}),
+        ...(requiresAttachedEnergy ? { requiresAttachedEnergy } : {}),
         selfKnockOut: selfKoOnUse,
         guidance: count
           ? `Once during your turn: ${verb} ${upToMatch ? 'up to ' : ''}${count} damage counter${count !== 1 ? 's' : ''} ${onOpponent ? 'on your opponent\'s Pokémon' : 'as described'}.`

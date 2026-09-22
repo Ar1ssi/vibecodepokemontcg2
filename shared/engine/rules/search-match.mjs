@@ -68,6 +68,9 @@ export function energySearchWhat({ basic = false, energyType = null } = {}) {
   return basic ? 'Basic Energy' : 'Energy';
 }
 
+// Card rows whose `type` names the Trainer kind instead of "Trainer" (cards.mjs isTrainer).
+const TRAINER_KIND_TYPES = new Set(['item', 'supporter', 'stadium', 'tool', 'pokémon tool']);
+
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {
   const w = what.toLowerCase();
@@ -75,7 +78,9 @@ export function matchesSearch(card, what = '') {
     return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg.trim()));
   }
   const isPokemon = isPokemonCard(card);
-  const isTrainer = String(card.supertype || card.type || '').toLowerCase().includes('trainer');
+  const isTrainer =
+    String(card.supertype || card.type || '').toLowerCase().includes('trainer') ||
+    TRAINER_KIND_TYPES.has(String(card.type || '').toLowerCase());
   if (w.includes('ultra beast')) {
     const st = Array.isArray(card.subtypes)
       ? card.subtypes.map((s) => String(s).toLowerCase())

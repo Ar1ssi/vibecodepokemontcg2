@@ -803,3 +803,21 @@ test('cardStats applies evolvesFrom and abilities to server cards', () => {
   assert.equal(synced.evolvesFrom, 'Ralts');
   assert.deepEqual(synced.abilities, [{ name: 'Refinement', text: 'Draw 2 cards.' }]);
 });
+
+test("variableDraw (Acerola's Premonition): Stadium, Item, Supporter and Tool in the opponent's hand all count as Trainer cards", () => {
+  const game = setup();
+  game.p2.zones.hand.push(
+    card({ name: 'Artazon', type: 'Trainer', trainerType: 'Stadium' }),
+    card({ name: 'Nest Ball', type: 'Trainer', trainerType: 'Item' }),
+    card({ name: 'Iono', type: 'Trainer', trainerType: 'Supporter' }),
+    tool(),
+    pokemon('Pikachu'),
+    energy()
+  );
+  for (let i = 0; i < 6; i++) game.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(game, 'Your opponent reveals their hand, and you draw a card for each Trainer card you find there.', {
+    trainerType: 'Supporter',
+  }).res;
+  assert.equal(res.error, null);
+  assert.equal(zone(res, 'p1', 'hand').length, 4);
+});

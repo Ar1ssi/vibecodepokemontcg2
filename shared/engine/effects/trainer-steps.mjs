@@ -7,7 +7,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isEnergy, isPokemon } from '../cards.mjs';
+import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
@@ -338,6 +338,15 @@ function variableDraw(ctx) {
       cards: hand.map((c) => ({ instanceId: c.instanceId, name: c.name })),
     });
     count = hand.filter(isPokemon).length;
+  } else if (step.source === 'opponentHandTrainer') {
+    const hand = opponent?.zones?.hand || [];
+    ctx.events.push({
+      type: 'cardsRevealed',
+      playerId: opponent?.playerId,
+      cards: hand.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+    // Stadiums and Tools are Trainer cards too, whichever field carries the kind.
+    count = hand.filter((c) => isTrainer(c) || isStadiumCard(c) || isToolCard(c)).length;
   } else if (step.source === 'opponentMegaExInPlay') {
     count = rootsOf(opponent).filter((root) =>
       /^mega .* ex$/i.test(topPokemonCard(opponent, root).name || '')
@@ -861,6 +870,61 @@ function damageCounters(ctx) {
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose a Pokémon to put ${step.count} damage counters on`,
     options: targets,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Adrena-Brain: "if this Pokémon has any {D} Energy attached, you may move up to 3
+// damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon."
+function moveOwnDamageToOpponent(ctx) {
+  const { step, player, opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const sources = rootsOf(player).filter((c) => (c.damage || 0) > 0);
+
+  if (ctx.selection && ctx.memo?.fromId != null) {
+    const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
+    const to = rootsOf(opponent).find((c) => c.instanceId === ctx.selection[0]);
+    if (!from || !to) return skip(ctx, 'target_not_found');
+    // "up to N": moves as many as the source holds, capped at N.
+    const moved = Math.min(step.count || 1, Math.floor(from.damage / 10)) * 10;
+    from.damage -= moved;
+    to.damage = (to.damage || 0) + moved;
+    ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
+    ctx.events.push({ type: 'damageUpdated', instanceId: to.instanceId, damage: to.damage });
+    ctx.events.push({
+      type: 'damageCountersPlaced',
+      instanceId: to.instanceId,
+      victimPlayerId: opponent.playerId,
+      attackerPlayerId: player.playerId,
+      damage: to.damage,
+    });
+    return null;
+  }
+
+  if (ctx.selection) {
+    const from = sources.find((c) => c.instanceId === ctx.selection[0]);
+    if (!from) return skip(ctx, 'target_not_found');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose your opponent's Pokémon to move the damage counters to`,
+      options: rootsOf(opponent),
+      min: 1,
+      max: 1,
+      memo: { fromId: from.instanceId },
+    });
+  }
+
+  if (step.requiresAttachedEnergy) {
+    const what = `{${step.requiresAttachedEnergy.toUpperCase()}} Energy`;
+    const hasEnergy = attachedCards(player, ctx.sourceCard?.instanceId).some(
+      (c) => isEnergy(c) && matchesSearch(c, what)
+    );
+    if (!hasEnergy) return skip(ctx, 'energy_condition_unmet');
+  }
+  if (sources.length === 0 || rootsOf(opponent).length === 0) return skip(ctx, 'no_damage_to_move');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose 1 of your Pokémon to move damage counters from`,
+    options: sources,
     min: 1,
     max: 1,
   });
@@ -1428,7 +1492,7 @@ export const EXTRA_STEP_HANDLERS = {
   // which raises a PendingChoice over the in-play Pokémon (mat picker); the
   // ability step carries `count`/`onOpponent` instead of `target`.
   moveDamageAbility: (ctx) =>
-    damageCounters({
+    ctx.step.fromOwn ? moveOwnDamageToOpponent(ctx) : damageCounters({
       ...ctx,
       step: {
         ...ctx.step,

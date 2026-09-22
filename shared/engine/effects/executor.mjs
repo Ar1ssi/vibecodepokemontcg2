@@ -307,14 +307,20 @@ export function executeSteps(draft, {
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter));
 
         const attachKey = `${idx}:searchAttach`;
+        const attachRoots = () =>
+          inPlayRoots(player).filter((c) => !step.attachTarget || rootMatchesTarget(player, c, step.attachTarget));
         if (stepSelection && context[attachKey]) {
           // Resume: second choice picked the Pokémon the searched Energy attaches to
           const deck = player.zones.deck || [];
-          const root = inPlayRoots(player).find((c) => c.instanceId === stepSelection[0]);
-          if (root) {
-            for (const card of deck.filter((c) => context[attachKey].includes(c.instanceId))) {
-              attachToRoot(player, card, root, events);
-            }
+          const root = attachRoots().find((c) => c.instanceId === stepSelection[0]);
+          const searched = root ? deck.filter((c) => context[attachKey].includes(c.instanceId)) : [];
+          for (const card of searched) {
+            attachToRoot(player, card, root, events);
+          }
+          // Sinister Surge: "If you attached Energy … in this way, place N damage counters on that Pokémon."
+          if (searched.length > 0 && step.attachDamage > 0) {
+            root.damage = (root.damage || 0) + step.attachDamage * 10;
+            events.push({ type: 'damageUpdated', instanceId: root.instanceId, damage: root.damage });
           }
           delete context[attachKey];
           if (activeRng) activeRng.shuffle(deck);
@@ -322,8 +328,13 @@ export function executeSteps(draft, {
           break;
         }
 
+        if (dest === 'attach' && !stepSelection && attachRoots().length === 0) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_attach_target' });
+          break;
+        }
+
         if (stepSelection && dest === 'attach' && stepSelection.length > 0) {
-          const roots = inPlayRoots(player);
+          const roots = attachRoots();
           if (roots.length > 0) {
             context[attachKey] = [...stepSelection];
             const choice = createPendingChoice({
@@ -1512,6 +1523,11 @@ export function executeSteps(draft, {
         return { pendingChoice: choice, completed: false };
       }
 
+      case 'attachAbility':
+        // Only the discard-attach form (Dynamotor) resolves here; other attach
+        // abilities stay guidance-only.
+        if (!step.fromDiscard || step.triggeredByAttach) break;
+      // falls through
       case 'attachFromDiscard': {
         const discard = player.zones.discard || [];
         const memoKey = `${idx}:attachFromDiscard`;
