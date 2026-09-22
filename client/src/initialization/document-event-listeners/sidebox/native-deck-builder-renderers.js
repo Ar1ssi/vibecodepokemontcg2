@@ -51,6 +51,55 @@ const escapeHtml = (value = '') => String(value)
       });
     };
     
+    /**
+     * Renders Pokémon TCG Live's filter pill rows above the card gallery.
+     * `groups` comes from card-filters.mjs's BUILDER_FILTER_GROUPS and
+     * `filters` is the active state; this function draws and reports clicks
+     * only — toggling and filtering live in that pure module.
+     */
+    export const renderFilterBar = ({ filterBarEl, groups, filters, onToggle, onClear }) => {
+      if (!filterBarEl) return;
+
+      const activeCount = groups.reduce(
+        (total, group) => total + (filters?.[group.key]?.length || 0),
+        0
+      );
+
+      const rows = groups
+        .map((group) => {
+          const active = filters?.[group.key] || [];
+          const pills = group.options
+            .map((option) => {
+              const isOn = active.includes(option.value);
+              const icon = option.icon
+                ? `<img class="native-deck-builder-filter-icon" src="${escapeHtml(option.icon)}" alt="" aria-hidden="true" />`
+                : '';
+              return `<button type="button" class="native-deck-builder-filter-pill${isOn ? ' active' : ''}" data-filter-group="${escapeHtml(group.key)}" data-filter-value="${escapeHtml(option.value)}" aria-pressed="${isOn}" title="${escapeHtml(option.label)}">${icon}<span>${escapeHtml(option.label)}</span></button>`;
+            })
+            .join('');
+
+          return `
+            <div class="native-deck-builder-filter-row" data-filter-row="${escapeHtml(group.key)}">
+              <span class="native-deck-builder-filter-label">${escapeHtml(group.label)}</span>
+              <div class="native-deck-builder-filter-pills">${pills}</div>
+            </div>`;
+        })
+        .join('');
+
+      filterBarEl.innerHTML = `${rows}
+        <button type="button" id="nativeDeckBuilderFilterClear" class="native-deck-builder-filter-clear"${activeCount ? '' : ' hidden'}>Clear filters (${activeCount})</button>`;
+
+      filterBarEl.querySelectorAll('[data-filter-value]').forEach((pill) => {
+        pill.addEventListener('click', () => {
+          onToggle?.(pill.dataset.filterGroup, pill.dataset.filterValue);
+        });
+      });
+
+      filterBarEl
+        .querySelector('#nativeDeckBuilderFilterClear')
+        ?.addEventListener('click', () => onClear?.());
+    };
+
     export const renderDeckCards = ({ cardsEl, sortedCards, onAdd, onRemove }) => {
       if (!cardsEl) return;
     

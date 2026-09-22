@@ -7,6 +7,12 @@ import {
 import { getSortedDeckCardArray } from '../../../setup/deck-builder/core/card-sort.mjs';
 import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-counter.mjs';
 import {
+  BUILDER_FILTER_GROUPS,
+  applyCardFilters,
+  createEmptyFilters,
+  toggleFilter,
+} from '../../../setup/deck-builder/core/card-filters.mjs';
+import {
   detectDeckFormat,
   validateDeck,
 } from '../../../setup/deck-builder/core/deck-validation.mjs';
@@ -20,6 +26,7 @@ import {
   renderDeckCards,
   renderDeckCounter,
   renderDeckSummary,
+  renderFilterBar,
   renderSearchResults,
 } from './native-deck-builder-renderers.js';
 import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
@@ -622,6 +629,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deck = createEmptyDeck();
   let currentResults = [];
   let currentRawResults = [];
+  let cardFilters = createEmptyFilters();
+  const filterBar = document.getElementById('nativeDeckBuilderFilterBar');
   let currentLoadTarget = 'self';
   let currentTotalSummaries = 0;
   let currentHugeResultSet = false;
@@ -659,11 +668,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   const updateVisibleResults = () => {
-    currentResults = applyLocalControls(currentRawResults, {
-      cardType: cardTypeFilter.value,
-      sortBy: sortBySelect.value,
-      sortDirection: sortDirectionSelect.value,
-    });
+    // Pills narrow first, then the TCG/Pocket select and the sort run over
+    // what is left — sorting a smaller set is cheaper and the order is the
+    // same either way.
+    currentResults = applyLocalControls(
+      applyCardFilters(currentRawResults, cardFilters),
+      {
+        cardType: cardTypeFilter.value,
+        sortBy: sortBySelect.value,
+        sortDirection: sortDirectionSelect.value,
+      }
+    );
   };
 
   const getSearchStatusText = () => {
@@ -1180,6 +1195,25 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     searchStatus.textContent = getSearchStatusText();
     renderResults();
   };
+
+  const renderFilters = () => {
+    renderFilterBar({
+      filterBarEl: filterBar,
+      groups: BUILDER_FILTER_GROUPS,
+      filters: cardFilters,
+      onToggle: (group, value) => {
+        cardFilters = toggleFilter(cardFilters, group, value);
+        renderFilters();
+        rerenderSearchLocally();
+      },
+      onClear: () => {
+        cardFilters = createEmptyFilters();
+        renderFilters();
+        rerenderSearchLocally();
+      },
+    });
+  };
+  renderFilters();
 
   cardTypeFilter.addEventListener('change', rerenderSearchLocally);
   sortBySelect.addEventListener('change', rerenderSearchLocally);

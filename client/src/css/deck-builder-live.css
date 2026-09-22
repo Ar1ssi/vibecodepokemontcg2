@@ -394,6 +394,135 @@
   opacity: 1;
 }
 
+/* --------------------------------------------------------- filter pills -- */
+
+.native-deck-builder-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4vh;
+}
+
+.db-live .native-deck-builder-filter-bar {
+  padding: 0.5vh 0 0.6vh;
+}
+
+.db-live .native-deck-builder-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
+  min-width: 0;
+}
+
+.db-live .native-deck-builder-filter-label {
+  flex: 0 0 auto;
+  width: 5.2vw;
+  min-width: 58px;
+  font-size: 1.2vh;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--db-text-faint);
+  text-transform: uppercase;
+}
+
+.db-live .native-deck-builder-filter-pills {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0.25vw 0.22vw;
+  min-width: 0;
+}
+
+.db-live .native-deck-builder-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2vw;
+  padding: 0.3vh 0.55vw;
+  font-size: 1.25vh;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--db-text-dim);
+  background: var(--db-input);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  transition:
+    color 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.db-live .native-deck-builder-filter-pill:hover {
+  color: var(--db-text);
+  border-color: var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-filter-pill.active {
+  color: #23190a;
+  background: var(--db-gold);
+  border-color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-filter-icon {
+  width: 1.6vh;
+  height: 1.6vh;
+  min-width: 13px;
+  min-height: 13px;
+  object-fit: contain;
+}
+
+/* The energy row is symbol-led, as in Live: the type name is tooltip-only. */
+.db-live
+  .native-deck-builder-filter-row[data-filter-row='energyTypes']
+  .native-deck-builder-filter-pill
+  span {
+  display: none;
+}
+
+.db-live
+  .native-deck-builder-filter-row[data-filter-row='energyTypes']
+  .native-deck-builder-filter-pill {
+  padding: 0.25vh 0.3vw;
+}
+
+/* Icon-only pills carry no label to recolour, so an active one is marked by a
+   gold ring and a slight lift instead of a filled background. */
+.db-live
+  .native-deck-builder-filter-row[data-filter-row='energyTypes']
+  .native-deck-builder-filter-pill.active {
+  background: transparent;
+  border-color: var(--db-gold);
+  box-shadow: 0 0 0 1px var(--db-gold);
+}
+
+.db-live
+  .native-deck-builder-filter-row[data-filter-row='energyTypes']
+  .native-deck-builder-filter-pill:not(.active)
+  .native-deck-builder-filter-icon {
+  opacity: 0.55;
+}
+
+.db-live .native-deck-builder-filter-clear {
+  align-self: flex-start;
+  margin-top: 0.15vh;
+  padding: 0.25vh 0.6vw;
+  font-size: 1.15vh;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--db-text-dim);
+  background: transparent;
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-filter-clear:hover {
+  color: var(--db-text);
+  border-color: var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-filter-clear[hidden] {
+  display: none;
+}
+
 /* ------------------------------------------------------------- results --- */
 
 .db-live .native-deck-builder-search-results::-webkit-scrollbar-thumb,

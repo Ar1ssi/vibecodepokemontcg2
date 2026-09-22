@@ -155,6 +155,11 @@ function normalizeTcgdexCard(card) {
     },
     image,
     rarity: card.rarity,
+    // Printed Pokémon types ('Fire', 'Water', …) and the Trainer subtype
+    // ('Item' | 'Supporter' | 'Stadium' | 'Tool'). Both drive the builder's
+    // Live-style filter pills.
+    types: Array.isArray(card.types) ? card.types : [],
+    trainerType: card.trainerType || '',
     // "Normal" | "Special" (Energy cards only); read by the deck-legality
     // Basic-Energy exemption and rule-box classification.
     energyType: card.energyType || '',
