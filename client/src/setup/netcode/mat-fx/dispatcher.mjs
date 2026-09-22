@@ -31,11 +31,19 @@ export const createFxDispatcher = ({
   const table = isMotionReduced() ? staticFallbacks : effects;
   const run = table[plan.effect];
   if (typeof run !== 'function') return 0;
+
+  // An effect returns a number to override its table hold — in practice 0,
+  // from a guard that found nothing to draw. Pacing the queue for an effect
+  // that drew nothing would stall the chain on an invisible beat.
+  let override;
   try {
-    run(plan);
+    override = run(plan);
   } catch (err) {
     console.warn(`[mat-fx] ${plan.effect} failed`, err);
     return 0;
+  }
+  if (typeof override === 'number' && Number.isFinite(override)) {
+    return Math.max(0, override);
   }
   return holdFor(plan.effect);
 };

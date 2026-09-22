@@ -18,20 +18,20 @@ import {
 
 export const turnBanner = (plan) => {
   const text = turnBannerText(plan.user, plan.number);
-  if (!text) return;
+  if (!text) return 0;
   playBanner(text, plan.user);
   playEdgeGlow(plan.user);
 };
 
 export const abilityBanner = (plan) => {
   const text = abilityBannerText(plan.name);
-  if (!text) return;
+  if (!text) return 0;
   playBanner(text, plan.user);
 };
 
 const playConfetti = () => {
   const rect = viewportRect();
-  if (rect.width < 2) return;
+  if (rect.width < 2) return 0;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-confetti' });
   const pieces = confettiPieces(undefined, Date.now() % 100000);
   const nodes = pieces.map((piece) => {

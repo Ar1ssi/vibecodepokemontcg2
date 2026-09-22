@@ -12,9 +12,9 @@ import {
 
 export const status = (plan) => {
   const fx = statusFxFor(plan.condition);
-  if (!fx) return;
+  if (!fx) return 0;
   const rect = rectForInstance(plan.instanceId, getCardRegistry());
-  if (!rect) return;
+  if (!rect) return 0;
   const host = spawnOverlay({
     rect,
     className: `fx-overlay fx-status-apply fx-status-apply--${fx.key}`,
@@ -41,9 +41,9 @@ export const status = (plan) => {
  */
 export const statusClear = (plan) => {
   const fx = statusFxFor(plan.condition);
-  if (!fx) return;
+  if (!fx) return 0;
   const rect = rectForInstance(plan.instanceId, getCardRegistry());
-  if (!rect) return;
+  if (!rect) return 0;
   const host = spawnOverlay({
     rect,
     className: `fx-overlay fx-status-clear fx-status-apply--${fx.key}`,

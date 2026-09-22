@@ -26,9 +26,9 @@ const prizeRectFor = (user) => {
 
 export const prizeClaim = (plan) => {
   const sparkCount = prizeSparkCount(plan.count ?? plan.cards?.length);
-  if (sparkCount === 0) return;
+  if (sparkCount === 0) return 0;
   const zoneRect = prizeRectFor(plan.user);
-  if (!zoneRect) return;
+  if (!zoneRect) return 0;
 
   // A square centred on the zone, so sparks throw outward symmetrically.
   const size = Math.max(40, Math.min(zoneRect.width, zoneRect.height));

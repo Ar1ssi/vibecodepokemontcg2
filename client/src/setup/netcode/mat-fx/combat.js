@@ -54,7 +54,7 @@ const flashTarget = (rect, hit) => {
 
 const shakeTable = (amount) => {
   const amplitude = screenShakeAmplitude(amount);
-  if (amplitude === 0) return;
+  if (amplitude === 0) return 0;
   const frames = screenShakeOffsets(amplitude).map((translate) => ({ translate }));
   for (const id of SHAKE_TARGET_IDS) {
     document.getElementById(id)?.animate?.(frames, { duration: SCREEN_SHAKE_MS, easing: 'linear' });
@@ -63,11 +63,13 @@ const shakeTable = (amount) => {
 
 export const damage = (plan) => {
   const hit = classifyDamagePlan(plan, lastSeenDamage);
-  if (!hit) return;
+  if (!hit) return 0;
   const rect = rectForInstance(plan.instanceId, getCardRegistry());
-  if (!rect) return;
+  if (!rect) return 0;
   showDamageNumber(rect, hit);
-  if (hit.kind !== 'hit') return;
+  // A heal drew its number and is done — it still paces like a damage beat,
+  // so fall through to the table rather than reporting "nothing drawn".
+  if (hit.kind !== 'hit') return undefined;
   flashTarget(rect, hit);
   shakeTable(hit.amount);
 };
@@ -78,9 +80,9 @@ export const attack = (plan) => {
   const to = rectForInstance(plan.defenderId, registry);
   const element = registry.get(plan.attackerId)?.element;
   const src = element?.currentSrc || element?.src;
-  if (!from || !to || !src) return;
+  if (!from || !to || !src) return 0;
   const pose = lungePoseFor(from, to);
-  if (!pose) return;
+  if (!pose) return 0;
   const host = spawnOverlay({ rect: from, className: 'fx-overlay fx-lunge' });
   const img = document.createElement('img');
   img.src = src;
@@ -109,7 +111,7 @@ export const attackBanner = (plan) => {
   const registry = getCardRegistry();
   const attackerName = registry.get(plan.attackerId)?.card?.name;
   const text = attackBannerText(plan.attackName, attackerName);
-  if (!text) return;
+  if (!text) return 0;
   playBanner(text, plan.user, 'attack');
   // A bench-wide or fizzled attack has no single defender; the banner still
   // plays, there is just nothing to ring (edge 9).

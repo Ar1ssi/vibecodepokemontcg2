@@ -23,6 +23,7 @@ import {
   promotePose,
   slidePoseFor,
 } from './lifecycle-pose.mjs';
+import { holdFor } from './fx-holds.mjs';
 import { takeOrigin } from './origins.mjs';
 
 const buildImage = (src, className) => {
@@ -39,7 +40,7 @@ const buildImage = (src, className) => {
 const playEvolutionBurst = (plan, className, poseFn) => {
   const registry = getCardRegistry();
   const rect = rectForInstance(plan.instanceId, registry) || rectForInstance(plan.targetInstanceId, registry);
-  if (!rect) return;
+  if (!rect) return 0;
   const host = spawnOverlay({ rect, className: `fx-overlay ${className}` });
   const ring = document.createElement('div');
   ring.className = 'fx-evolve-burst__ring';
@@ -62,7 +63,7 @@ export const attach = (plan) => {
   const registry = getCardRegistry();
   const attached = registry.get(plan.instanceId)?.card;
   const targetRect = rectForInstance(plan.targetInstanceId, registry);
-  if (!targetRect) return;
+  if (!targetRect) return 0;
   // `cardAttached` covers Energy AND Tools. A Tool attaching is real but
   // minor, so it gets a soft ring rather than the Energy token's snap — design
   // 022 left it silent entirely (its edge row 9).
@@ -76,7 +77,9 @@ export const attach = (plan) => {
       toolRing.style.transform = `scale(${0.8 + 0.3 * (1 - pose.scale / 2.4)})`;
       ringHost.style.opacity = String(pose.opacity);
     });
-    return;
+    // Both branches arrive as the `attach` effect, so the Tool's shorter hold
+    // has to be named explicitly rather than read from the plan.
+    return holdFor('tool-attach');
   }
   const size = Math.max(24, targetRect.width * 0.34);
   const rect = {
@@ -115,7 +118,7 @@ export const retreat = (plan) => {
 
 const presentCard = (src, fromRect) => {
   const viewport = { width: globalThis.innerWidth || 0, height: globalThis.innerHeight || 0 };
-  if (!src || viewport.width < 2 || viewport.height < 2) return;
+  if (!src || viewport.width < 2 || viewport.height < 2) return 0;
   const target = presentTargetRect(viewport.width, viewport.height);
   const pose = presentPoseFor(fromRect, target);
   const host = spawnOverlay({ rect: target, className: 'fx-overlay fx-card-present' });
@@ -141,7 +144,7 @@ export const stadiumPlay = (plan) => {
 export const promote = (plan) => {
   const registry = getCardRegistry();
   const rect = rectForInstance(plan.instanceId, registry);
-  if (!rect) return;
+  if (!rect) return 0;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-promote' });
   const glow = document.createElement('div');
   glow.className = 'fx-promote__glow';
@@ -168,7 +171,7 @@ const discardRectFor = (user) => {
 
 export const discard = (plan) => {
   const rect = discardRectFor(plan.user);
-  if (!rect) return;
+  if (!rect) return 0;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-discard-puff' });
   runPose(host, DISCARD_PUFF_MS, (t) => {
     const pose = discardPuffPose(t);

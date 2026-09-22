@@ -21,10 +21,10 @@ const activeRectFor = (user) => {
 
 export const coinFlip = (plan) => {
   const label = coinFaceLabel(plan.face);
-  if (!label) return;
+  if (!label) return 0;
   const anchor =
     rectForInstance(plan.instanceId, getCardRegistry()) || activeRectFor(plan.user);
-  if (!anchor) return;
+  if (!anchor) return 0;
 
   const size = Math.max(28, anchor.width * 0.45);
   const rect = {
