@@ -9,6 +9,9 @@
 // and are dispatched to the mat-fx registry. Several of those events (e.g.
 // damageUpdated) carry no playerId, so `user` is null there and the effect
 // finds its side from the card element instead.
+//
+// Design 027: a `cardMoved` that puts a Pokémon into play becomes the `enter`
+// effect, which decides from the card itself whether a Mega/Tera entry plays.
 export const EVENT_FX = {
   damageUpdated: 'damage',
   attackExecuted: 'attack',
@@ -29,15 +32,25 @@ const sideOf = (playerId, selfPlayerId) =>
 
 // `user` is the acting side. turnStarted names it `player`; gameEnded names the
 // `winner` (so 'self' = you won, 'opp' = you lost, null = draw/no winner).
-const fxPlan = (event, selfPlayerId) => {
+const fxPlan = (event, selfPlayerId, effect = EVENT_FX[event.type]) => {
   const { type, playerId, ...fields } = event;
   const actor = type === 'gameEnded' ? event.winner : (playerId ?? event.player);
-  return { kind: 'fx', effect: EVENT_FX[type], user: sideOf(actor, selfPlayerId), ...fields };
+  return { kind: 'fx', effect, user: sideOf(actor, selfPlayerId), ...fields };
 };
+
+// The engine's own "entered play" rule (reduce.mjs `enteredPlayTurn`): from a
+// hand, deck or discard onto the Active Spot or Bench. Board-to-board moves
+// (retreat, switch, promote) are not an entry.
+const ENTRY_SOURCES = new Set(['hand', 'deck', 'discard']);
+const ENTRY_TARGETS = new Set(['active', 'bench']);
+
+const entersPlay = (event) =>
+  event.instanceId != null && ENTRY_SOURCES.has(event.from) && ENTRY_TARGETS.has(event.to);
 
 export function advisoryAnimationPlan(event, selfPlayerId) {
   if (!event || typeof event !== 'object') return null;
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
+  if (event.type === 'cardMoved') return entersPlay(event) ? fxPlan(event, selfPlayerId, 'enter') : null;
   if (event.playerId == null || selfPlayerId == null) return null;
   const user = event.playerId === selfPlayerId ? 'self' : 'opp';
 

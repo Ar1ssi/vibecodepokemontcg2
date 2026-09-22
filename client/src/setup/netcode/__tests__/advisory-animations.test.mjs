@@ -170,3 +170,41 @@ test('advisoryAnimationPlan: gameEnded user is the winner side; no winner -> nul
   assert.equal(advisoryAnimationPlan({ type: 'gameEnded', winner: 'p2' }, 'p1').user, 'opp');
   assert.equal(advisoryAnimationPlan({ type: 'gameEnded', winner: null }, 'p1').user, null);
 });
+
+test('advisoryAnimationPlan: cardMoved into play from hand -> enter fx plan (design 027)', () => {
+  const event = { type: 'cardMoved', playerId: 'p1', instanceId: 9, from: 'hand', to: 'bench' };
+  assert.deepEqual(advisoryAnimationPlan(event, 'p1'), {
+    kind: 'fx',
+    effect: 'enter',
+    user: 'self',
+    instanceId: 9,
+    from: 'hand',
+    to: 'bench',
+  });
+  const active = advisoryAnimationPlan({ ...event, to: 'active' }, 'p2');
+  assert.equal(active.effect, 'enter');
+  assert.equal(active.user, 'opp');
+});
+
+test('advisoryAnimationPlan: cardMoved from deck or discard into play is an entry', () => {
+  for (const from of ['deck', 'discard']) {
+    const plan = advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p1', instanceId: 3, from, to: 'bench' }, 'p1');
+    assert.equal(plan?.effect, 'enter', from);
+  }
+});
+
+test('advisoryAnimationPlan: board-to-board and out-of-play moves are not an entry', () => {
+  const moves = [
+    ['bench', 'active'],
+    ['active', 'bench'],
+    ['bench', 'discard'],
+    ['active', 'hand'],
+    ['hand', 'discard'],
+    ['deck', 'hand'],
+  ];
+  for (const [from, to] of moves) {
+    const event = { type: 'cardMoved', playerId: 'p1', instanceId: 3, from, to };
+    assert.equal(advisoryAnimationPlan(event, 'p1'), null, `${from} -> ${to}`);
+  }
+  assert.equal(advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p1', from: 'hand', to: 'bench' }, 'p1'), null);
+});
