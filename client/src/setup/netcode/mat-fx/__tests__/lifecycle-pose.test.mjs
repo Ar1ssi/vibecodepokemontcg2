@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   energySnapPose,
   evolveBurstPose,
+  evolvePillarPose,
+  evolveSilhouettePose,
   moveIdsForEvent,
   presentPoseFor,
   presentTargetRect,
@@ -110,4 +112,18 @@ test('origins: combat snapshots for attack + damage ids, peeked, rebuilt per bat
   assert.equal(peekCombatOrigin(2).src, 'def');
   captureOrigins([], registry, capture, () => 'self');
   assert.equal(peekCombatOrigin(1), undefined);
+});
+
+test('evolveSilhouettePose: white peaks at 0.4, drains to reveal the card', () => {
+  assert.equal(evolveSilhouettePose(0).opacity, 0);
+  assert.equal(evolveSilhouettePose(0.4).opacity, 1);
+  assert.ok(evolveSilhouettePose(0.4).scale > 1);
+  assert.equal(evolveSilhouettePose(1).opacity, 0);
+  assert.equal(evolveSilhouettePose(1).scale, 1);
+});
+
+test('evolvePillarPose: shoots up, then fades out', () => {
+  assert.equal(evolvePillarPose(0).scaleY, 0);
+  assert.equal(evolvePillarPose(0.35).scaleY, 1);
+  assert.equal(evolvePillarPose(1).opacity, 0);
 });

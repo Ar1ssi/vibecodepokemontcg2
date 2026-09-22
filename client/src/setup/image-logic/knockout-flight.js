@@ -81,8 +81,8 @@ const playKnockoutBurst = (rect) => {
     16
   );
   const outerFrames = sampleKeyframes(
-    (t) => knockoutBurstPose(t),
-    (p) => ({ transform: `scale(${p.ringScale * 1.35})`, opacity: p.ringOpacity * 0.6 }),
+    (t) => ({ ...knockoutBurstPose(t), fadeIn: Math.min(1, t / 0.08) }),
+    (p) => ({ transform: `scale(${p.ringScale * 1.35})`, opacity: p.ringOpacity * 0.6 * p.fadeIn }),
     16
   );
   const pieces = burstParticles({

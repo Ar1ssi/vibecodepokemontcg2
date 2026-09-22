@@ -146,9 +146,10 @@ export const removeWhen = (host, promises, backstopMs) => {
 
 /**
  * Append one `<i>` per particle (from particles.mjs `burstParticles`) at the
- * host's center and fly each outward. Returns the animations' promises.
+ * host's center and fly each outward after `delay` ms. Returns the
+ * animations' promises.
  */
-export const spawnParticles = (host, particles, { className = 'fx-particle', color, duration }) =>
+export const spawnParticles = (host, particles, { className = 'fx-particle', color, duration, delay = 0 }) =>
   particles.map((p) => {
     const node = document.createElement('i');
     node.className = className;
@@ -158,11 +159,14 @@ export const spawnParticles = (host, particles, { className = 'fx-particle', col
     node.style.marginTop = `${(-p.size * (p.aspect ?? 1)) / 2}px`;
     if (color) node.style.setProperty('--fx-p-color', color);
     host.appendChild(node);
-    const rot = `rotate(${p.angle}deg)`;
+    const rot = p.orient === false ? '' : `rotate(${p.angle}deg)`;
     return animateFrames(
       node,
       [
-        { transform: `translate(0px, 0px) ${rot} scale(${p.startScale ?? 1})`, opacity: 1 },
+        // Opacity 0 at offset 0: with fill 'both' a delayed particle would
+        // otherwise sit visible at the center until its start.
+        { transform: `translate(0px, 0px) ${rot} scale(${p.startScale ?? 1})`, opacity: 0 },
+        { transform: `translate(${p.dx * 0.12}px, ${p.dy * 0.12}px) ${rot} scale(${p.startScale ?? 1})`, opacity: 1, offset: 0.08 },
         {
           transform: `translate(${p.dx * 0.8}px, ${p.dy * 0.8 + (p.gravity ?? 0) * 0.3}px) ${rot} scale(${p.midScale ?? 0.9})`,
           opacity: 1,
@@ -170,6 +174,6 @@ export const spawnParticles = (host, particles, { className = 'fx-particle', col
         },
         { transform: `translate(${p.dx}px, ${p.dy + (p.gravity ?? 0)}px) ${rot} scale(0)`, opacity: 0 },
       ],
-      { duration: duration * p.life, delay: duration * p.delay, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)' }
+      { duration: duration * p.life, delay: delay + duration * p.delay, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)' }
     );
   });

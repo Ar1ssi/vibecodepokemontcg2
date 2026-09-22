@@ -17,8 +17,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
  * @param {number} [opts.aspect] - height / width (streaks < 1)
  * @param {number} [opts.gravity] - extra px of fall added at the end
  * @param {number} [opts.maxDelay] - fraction of the duration
+ * @param {boolean} [opts.orient] - false keeps glyph particles upright
  * @returns {{dx:number, dy:number, angle:number, size:number, aspect:number,
- *   gravity:number, delay:number, life:number}[]}
+ *   gravity:number, delay:number, life:number, orient:boolean}[]}
  */
 export function burstParticles({
   count,
@@ -29,6 +30,7 @@ export function burstParticles({
   aspect = 1,
   gravity = 0,
   maxDelay = 0.1,
+  orient = true,
   seed = 1,
 }) {
   const n = Math.max(0, Math.min(MAX_PARTICLES, Math.floor(Number(count) || 0)));
@@ -48,6 +50,7 @@ export function burstParticles({
       gravity: gravity * lerp(0.6, 1.2, rand()),
       delay: maxDelay * rand(),
       life: lerp(0.7, 1, rand()),
+      orient,
     });
   }
   return out;
