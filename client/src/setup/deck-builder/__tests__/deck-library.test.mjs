@@ -8,6 +8,7 @@ import test from 'node:test';
       deleteDeckFromLibrary,
       getDeckFromLibrary,
       saveDeckToLibrary,
+      setDeckSprites,
       listDecks,
       parseLibrary,
       serializeLibrary,
@@ -171,3 +172,112 @@ import test from 'node:test';
       assert.ok(storage.getItem(LAST_SESSION_STORAGE_KEY));
     });
     
+// --- Pokémon sprite slots (design 024) ---
+
+test('a new deck starts with no sprites, and can be created with some', () => {
+  const bare = createDeckInLibrary(createEmptyLibrary(), 'Bare', {}, 1000);
+  assert.deepEqual(bare.library.decks[bare.deckId].sprites, []);
+
+  const withSprites = createDeckInLibrary(createEmptyLibrary(), 'Themed', {}, 1000, {
+    sprites: [{ slug: 'charizard', shiny: true }],
+  });
+  assert.deepEqual(withSprites.library.decks[withSprites.deckId].sprites, [
+    { slug: 'charizard', shiny: true },
+  ]);
+});
+
+test('setDeckSprites writes the slots and stamps updatedAt', () => {
+  const { library, deckId } = createDeckInLibrary(
+    createEmptyLibrary(),
+    'Deck',
+    {},
+    1000
+  );
+
+  const next = setDeckSprites(library, deckId, ['pikachu', { slug: 'mew', shiny: true }]);
+  assert.deepEqual(next.decks[deckId].sprites, [
+    { slug: 'pikachu', shiny: false },
+    { slug: 'mew', shiny: true },
+  ]);
+  assert.ok(next.decks[deckId].updatedAt >= 1000);
+  assert.deepEqual(library.decks[deckId].sprites, [], 'the input library is untouched');
+});
+
+test('setDeckSprites on a missing deck is a no-op copy', () => {
+  const library = createEmptyLibrary();
+  assert.deepEqual(setDeckSprites(library, 'nope', ['pikachu']), library);
+});
+
+test('setDeckSprites caps the strip at three and drops unknown slugs', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000);
+  const next = setDeckSprites(library, deckId, [
+    'missingno',
+    'pikachu',
+    'eevee',
+    'mew',
+    'snorlax',
+  ]);
+  assert.deepEqual(
+    next.decks[deckId].sprites.map((sprite) => sprite.slug),
+    ['pikachu', 'eevee', 'mew']
+  );
+});
+
+test('a library saved before sprites existed parses to empty strips', () => {
+  const legacy = JSON.stringify({
+    decks: {
+      abc12345: {
+        id: 'abc12345',
+        name: 'Old Deck',
+        createdAt: 1,
+        updatedAt: 1,
+        cards: {},
+      },
+    },
+    order: ['abc12345'],
+  });
+
+  const parsed = parseLibrary(legacy);
+  assert.deepEqual(parsed.decks.abc12345.sprites, []);
+  assert.deepEqual(listDecks(parsed)[0].sprites, []);
+});
+
+test('a corrupted sprites field parses to an empty strip rather than throwing', () => {
+  const corrupted = JSON.stringify({
+    decks: {
+      abc12345: {
+        id: 'abc12345',
+        name: 'Broken',
+        createdAt: 1,
+        updatedAt: 1,
+        cards: {},
+        sprites: 'pikachu, eevee',
+      },
+    },
+    order: ['abc12345'],
+  });
+  assert.deepEqual(parseLibrary(corrupted).decks.abc12345.sprites, []);
+});
+
+test('sprites round-trip through serialize and parse', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, {
+    sprites: [{ slug: 'gengar', shiny: true }],
+  });
+  const parsed = parseLibrary(serializeLibrary(library));
+  assert.deepEqual(parsed.decks[deckId].sprites, [{ slug: 'gengar', shiny: true }]);
+});
+
+test('listDecks exposes the sprites so the deck chips can draw them', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, {
+    sprites: ['pikachu'],
+  });
+  assert.deepEqual(listDecks(library), [
+    {
+      id: deckId,
+      name: 'Deck',
+      createdAt: 1000,
+      updatedAt: 1000,
+      sprites: [{ slug: 'pikachu', shiny: false }],
+    },
+  ]);
+});

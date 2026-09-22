@@ -52,6 +52,7 @@ test('valid 60-card TCG deck passes validation', () => {
   const result = validateDeck(deck, DECK_FORMATS.TCG);
   assert.equal(result.isValid, true);
   assert.equal(result.totalCards, 60);
+  assert.equal(result.requiredCards, 60);
   assert.equal(result.errors.length, 0);
 });
 
@@ -65,6 +66,7 @@ test('valid 20-card Pocket deck passes validation', () => {
   const result = validateDeck(deck, DECK_FORMATS.POCKET);
   assert.equal(result.isValid, true);
   assert.equal(result.totalCards, 20);
+  assert.equal(result.requiredCards, 20);
   assert.equal(result.errors.length, 0);
 });
 

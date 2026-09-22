@@ -1,4 +1,6 @@
-const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+import { normalizeDeckSprites } from './deck-sprites.mjs';
+
+    const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const DECK_ID_LENGTH = 8;
     const MAX_DECK_NAME_LENGTH = 60;
     
@@ -45,6 +47,7 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
         sleeveId: options.sleeveId ?? null,
         coinId: options.coinId ?? null,
         matId: options.matId ?? null,
+        sprites: normalizeDeckSprites(options.sprites),
       };
       nextLibrary.order = [...(nextLibrary.order || []), deckId];
       return { library: nextLibrary, deckId };
@@ -95,6 +98,19 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
           return nextLibrary;
         }
     
+        /**
+         * Writes the deck's Pokémon sprite slots (design 024). Anything the
+         * caller cannot back with vendored art is dropped by the normalizer,
+         * so a bad slug can never reach the renderer.
+         */
+        export function setDeckSprites(library = {}, deckId, sprites = []) {
+          if (!library?.decks?.[deckId]) return structuredClone(library);
+          const nextLibrary = structuredClone(library);
+          nextLibrary.decks[deckId].sprites = normalizeDeckSprites(sprites);
+          nextLibrary.decks[deckId].updatedAt = Date.now();
+          return nextLibrary;
+        }
+
     export function saveDeckToLibrary(library = {}, deckId, cards = {}, now = Date.now()) {
       if (!library?.decks?.[deckId]) return structuredClone(library);
       const nextLibrary = structuredClone(library);
@@ -103,6 +119,44 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
       return nextLibrary;
     }
     
+    /**
+     * Writes the builder's current state — cards plus the chosen sleeve, coin,
+     * mat and Pokémon sprites — over one saved deck, creating it when `deckId`
+     * names no deck in the library (the "Untitled Deck" case, where nothing is
+     * loaded yet).
+     *
+     * Cosmetics are only written when supplied: `undefined` leaves whatever the
+     * deck already has, while an explicit `null` (or `[]` for sprites) clears it
+     * back to the default.
+     *
+     * @returns {{library: object, deckId: string, created: boolean}}
+     */
+    export function saveDeckSnapshot(
+      library = {},
+      { deckId, name, cards = {}, sleeveId, coinId, matId, sprites } = {},
+      now = Date.now()
+    ) {
+      if (!deckId || !library?.decks?.[deckId]) {
+        const created = createDeckInLibrary(library, name, cards, now, {
+          sleeveId: sleeveId ?? null,
+          coinId: coinId ?? null,
+          matId: matId ?? null,
+          sprites,
+        });
+        return { library: created.library, deckId: created.deckId, created: true };
+      }
+
+      const nextLibrary = structuredClone(library);
+      const deck = nextLibrary.decks[deckId];
+      deck.cards = structuredClone(cards);
+      if (sleeveId !== undefined) deck.sleeveId = sleeveId;
+      if (coinId !== undefined) deck.coinId = coinId;
+      if (matId !== undefined) deck.matId = matId;
+      if (sprites !== undefined) deck.sprites = normalizeDeckSprites(sprites);
+      deck.updatedAt = now;
+      return { library: nextLibrary, deckId, created: false };
+    }
+
     export function listDecks(library = {}) {
       const decks = library?.decks || {};
       return (library?.order || [])
@@ -112,6 +166,7 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
           name: decks[deckId].name,
           createdAt: decks[deckId].createdAt,
           updatedAt: decks[deckId].updatedAt,
+          sprites: normalizeDeckSprites(decks[deckId].sprites),
         }));
     }
     
@@ -145,6 +200,9 @@ const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
           decks[deckId] = {
             ...deck,
             cards: deck.cards && typeof deck.cards === 'object' ? deck.cards : {},
+            // Decks saved before sprites existed have no field at all; a
+            // hand-edited one may have nonsense. Both normalize to [].
+            sprites: normalizeDeckSprites(deck.sprites),
           };
         }
       }

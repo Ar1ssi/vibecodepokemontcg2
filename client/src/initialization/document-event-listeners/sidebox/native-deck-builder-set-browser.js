@@ -121,13 +121,18 @@ import {
             const displayTitle = card.rarity === 'Reverse Holo'
               ? `${safeName} (Reverse Holo)`
               : safeName;
+            const inDeck = quantities[card.id] || 0;
+            // Same tile shape as the search grid (see renderSearchResults):
+            // the frame is what scales and clips on hover.
             return [
-              `<button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}"${preview ? ` data-preview-image="${safePreview}"` : ''} title="${displayTitle}">`,
-              `  <img src="${safeThumb}" alt="${safeName}" class="native-deck-builder-result-image" loading="lazy" />`,
-              quantities[card.id] > 0 ? `  <span class="native-deck-builder-result-qty">${quantities[card.id]}</span>` : '',
-              '  <span class="native-deck-builder-result-text">',
-              `    <strong>${safeName}</strong>`,
-              `    <span>#${escapeHtml(card.localId)}</span>`,
+              `<button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}"${inDeck > 0 ? ` data-in-deck="${inDeck}"` : ''}${preview ? ` data-preview-image="${safePreview}"` : ''} title="${displayTitle}">`,
+              '  <span class="native-deck-builder-result-frame">',
+              `    <img src="${safeThumb}" alt="${safeName}" class="native-deck-builder-result-image" loading="lazy" />`,
+              inDeck > 0 ? `    <span class="native-deck-builder-result-qty" aria-label="${inDeck} in deck">${inDeck}</span>` : '',
+              '    <span class="native-deck-builder-result-text">',
+              `      <strong>${safeName}</strong>`,
+              `      <span>#${escapeHtml(card.localId)}</span>`,
+              '    </span>',
               '  </span>',
               '</button>',
             ].join('');

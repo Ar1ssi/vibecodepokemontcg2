@@ -241,7 +241,7 @@
         </div>                
     </div>
     
-    <div id="nativeDeckBuilderWorkspace" class="native-deck-builder-workspace">
+    <div id="nativeDeckBuilderWorkspace" class="native-deck-builder-workspace db-live">
         <button id="nativeDeckBuilderEdgeToggle" class="native-deck-builder-edge-toggle" aria-label="Collapse deck builder workspace" title="Collapse deck builder workspace">❮</button>
         <div class="native-deck-builder-inner">
             <div class="native-deck-builder-header">
@@ -250,6 +250,7 @@
                     <div class="native-deck-builder-subtitle">Search cards, build decks, and load them directly into the simulator.</div>
                 </div>
                 <div class="native-deck-builder-actions">
+                    <button id="nativeDeckBuilderThemeToggle" class="native-deck-builder-theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme">☀️</button>
                     <button id="nativeDeckBuilderExportCsv" class="self-color">Export Deck</button>
                     <label for="nativeDeckBuilderCsvImport" id="nativeDeckBuilderImportCsvLabel" class="self-color native-deck-builder-inline-label">Import Deck</label>
                     <input id="nativeDeckBuilderCsvImport" type="file" accept=".csv" style="display:none;" />
@@ -300,6 +301,7 @@
                             </select>
                             <button id="nativeDeckBuilderSearchButton" class="self-color">Search</button>
                         </div>
+                        <div id="nativeDeckBuilderFilterBar" class="native-deck-builder-filter-bar" role="group" aria-label="Card filters"></div>
                         <div id="nativeDeckBuilderSearchStatus" class="native-deck-builder-search-status"></div>
                     </div>
                     <div class="native-deck-builder-results-shell">
@@ -324,13 +326,19 @@
                 
                 <div class="native-deck-builder-pane native-deck-builder-pane-side">
                         <div class="native-deck-builder-deck-header">
-                            <div id="nativeDeckBuilderDeckName" class="native-deck-builder-deck-name">Untitled Deck</div>
+                            <div class="native-deck-builder-deck-title">
+                                <div id="nativeDeckBuilderDeckName" class="native-deck-builder-deck-name">Untitled Deck</div>
+                                <div id="nativeDeckBuilderDeckSprites" class="native-deck-builder-deck-sprites is-empty"></div>
+                                <div id="nativeDeckBuilderSpritePicker" class="native-deck-builder-sprite-picker" role="dialog" aria-label="Choose this deck's Pokémon" hidden></div>
+                            </div>
                             <div class="native-deck-builder-deck-header-row">
                                 <span id="nativeDeckBuilderValidationDot" class="native-deck-builder-validation-dot invalid" aria-label="Deck invalid" title="Deck invalid"></span>
                                 <span id="nativeDeckBuilderDeckStatus" class="native-deck-builder-deck-status"></span>
+                                <button id="nativeDeckBuilderSaveDeck" class="native-deck-builder-save-btn" type="button" title="Save this deck's cards, sleeve, coin and mat">Save</button>
                                 <button id="nativeDeckBuilderClear" class="neutral-color native-deck-builder-clear-btn">Clear</button>
                             </div>
                         </div>
+                        <div id="nativeDeckBuilderCounter" class="native-deck-builder-counter" role="status" aria-live="polite"></div>
                         <div id="nativeDeckBuilderSummaryPanel" class="native-deck-builder-summary"></div>
                         <div id="nativeDeckBuilderCardsPanel" class="native-deck-builder-cards"></div>
                     </div></div>

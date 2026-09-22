@@ -5,6 +5,13 @@ import {
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
 import { getSortedDeckCardArray } from '../../../setup/deck-builder/core/card-sort.mjs';
+import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-counter.mjs';
+import {
+  BUILDER_FILTER_GROUPS,
+  applyCardFilters,
+  createEmptyFilters,
+  toggleFilter,
+} from '../../../setup/deck-builder/core/card-filters.mjs';
 import {
   detectDeckFormat,
   validateDeck,
@@ -17,9 +24,19 @@ import {
 import { show } from '../../../setup/home-header/header-toggle.js';
 import {
   renderDeckCards,
+  renderDeckCounter,
+  renderDeckSprites,
   renderDeckSummary,
+  renderFilterBar,
   renderSearchResults,
 } from './native-deck-builder-renderers.js';
+import { initializeNativeDeckBuilderSpritePicker } from './native-deck-builder-sprite-picker.js';
+import {
+  MAX_DECK_SPRITES,
+  deckSpriteImageUrl,
+  deckSpriteLabel,
+  normalizeDeckSprites,
+} from '../../../setup/deck-builder/core/deck-sprites.mjs';
 import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   addCard,
@@ -32,6 +49,12 @@ import {
   applyLocalControls,
   queryCardsByName,
 } from '../../../setup/deck-builder/core/card-search.mjs';
+import {
+  applyBuilderTheme,
+  builderThemeToggleLabel,
+  loadBuilderTheme,
+  toggleBuilderTheme,
+} from '../../../setup/deck-builder/core/builder-theme.mjs';
 import { initializeNativeDeckBuilderLibrary } from './native-deck-builder-library.js';
 import { initializeNativeDeckBuilderSetBrowser } from './native-deck-builder-set-browser.js';
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
@@ -96,11 +119,26 @@ export const initializeNativeDeckBuilder = () => {
   const importCsvLabel = document.getElementById('nativeDeckBuilderImportCsvLabel');
   const importCsvInput = document.getElementById('nativeDeckBuilderCsvImport');
   const clearButton = document.getElementById('nativeDeckBuilderClear');
+  const saveButton = document.getElementById('nativeDeckBuilderSaveDeck');
+  const deckSpritesEl = document.getElementById('nativeDeckBuilderDeckSprites');
+  const spritePickerEl = document.getElementById('nativeDeckBuilderSpritePicker');
+
+  // The pickers commit straight to the loaded deck, but with nothing loaded
+  // there is no deck to commit to and the choice would be lost. Mirror the
+  // live selection here so Save can carry it into a newly created deck.
+  // `sprites` rides along with the same mirror: with no deck loaded the
+  // picker has nothing to commit to, and the choice would be lost on Save.
+  const chosenCosmetics = { self: {}, opp: {} };
+  const rememberCosmetic = (target, key, value) => {
+    const side = target === 'opp' ? 'opp' : 'self';
+    chosenCosmetics[side][key] = value;
+  };
   const deckStatus = document.getElementById('nativeDeckBuilderDeckStatus');
   const summary = document.getElementById('nativeDeckBuilderSummaryPanel');
   const validationDot = document.getElementById(
     'nativeDeckBuilderValidationDot'
   );
+  const deckCounter = document.getElementById('nativeDeckBuilderCounter');
   const cards = document.getElementById('nativeDeckBuilderCardsPanel');
   const searchInput = document.getElementById('nativeDeckBuilderSearchInput');
   const cardTypeFilter = document.getElementById(
@@ -142,6 +180,35 @@ export const initializeNativeDeckBuilder = () => {
   const customCardPreviewPlaceholder = document.getElementById(
     'nativeCustomCardPreviewPlaceholder'
   );
+
+  // Live-style theme switch. The builder owns its own theme (dark by default)
+  // rather than riding the legacy per-element `dark-mode-1` body class, which
+  // only covers the game surface.
+  const workspaceEl = document.getElementById('nativeDeckBuilderWorkspace');
+  const themeToggle = document.getElementById('nativeDeckBuilderThemeToggle');
+  let builderTheme = applyBuilderTheme(
+    workspaceEl,
+    loadBuilderTheme(window.localStorage),
+    window.localStorage
+  );
+
+  const renderThemeToggle = () => {
+    if (!themeToggle) return;
+    const { glyph, title } = builderThemeToggleLabel(builderTheme);
+    themeToggle.textContent = glyph;
+    themeToggle.title = title;
+    themeToggle.setAttribute('aria-label', title);
+  };
+  renderThemeToggle();
+
+  themeToggle?.addEventListener('click', () => {
+    builderTheme = applyBuilderTheme(
+      workspaceEl,
+      toggleBuilderTheme(builderTheme),
+      window.localStorage
+    );
+    renderThemeToggle();
+  });
 
   playButton.addEventListener('click', () => {
     if (systemState.isTwoPlayer) {
@@ -188,6 +255,10 @@ export const initializeNativeDeckBuilder = () => {
             currentLoadTarget = target;
             deckLibrary?.setTarget(target);
           }
+          // Detaching from a deck (it was deleted, or the editor was cleared)
+          // must also drop the mirrored sprite choice, or the strip would keep
+          // showing the previous deck's Pokémon over an empty editor.
+          if (!deckId) rememberCosmetic(target, 'sprites', []);
           deck = cards;
           syncedDecks[target] = cards;
           // A non-empty deck should sync into the playmat on close; a freshly
@@ -201,6 +272,35 @@ export const initializeNativeDeckBuilder = () => {
         onSaveCurrentDeck: () => {
           deckLibrary?.saveActiveDeck(deck);
         },
+      });
+
+      // ── Deck Pokémon sprites (design 024) ────────────────────────────────
+      // The loaded deck owns the slots; with nothing loaded the mirror holds
+      // them until Save creates a deck to write them to.
+      const currentDeckSprites = () => {
+        const loaded = deckLibrary?.getActiveDeckId?.(currentLoadTarget);
+        if (loaded) return normalizeDeckSprites(deckLibrary?.getActiveSprites?.(currentLoadTarget));
+        return normalizeDeckSprites(
+          chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].sprites
+        );
+      };
+
+      const spritePicker = initializeNativeDeckBuilderSpritePicker({
+        pickerEl: spritePickerEl,
+        getSprites: () => currentDeckSprites(),
+        onChange: (sprites) => {
+          rememberCosmetic(currentLoadTarget, 'sprites', sprites);
+          deckLibrary?.setActiveSprites?.(currentLoadTarget, sprites);
+          render();
+        },
+      });
+
+      deckSpritesEl?.addEventListener('click', (event) => {
+        if (!event.target.closest('[data-sprite-picker-open]')) return;
+        // Without this the document-level dismiss handler would see the very
+        // click that opened the popover and close it again.
+        event.stopPropagation();
+        spritePicker?.toggle();
       });
 
       const persistLastUsedSession = () => {
@@ -299,6 +399,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         panelEl: sleevePanel,
         onChange: (sleeve) => {
           deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
+              rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
           if (sleeve?.image) {
                 // Route through the syncable changeCardBack action: sets the
                 // correct self/opp state var, re-points the target container's
@@ -317,6 +418,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             panelEl: coinPanel,
             onChange: (coin) => {
               deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
+              rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
               document.dispatchEvent(new CustomEvent('rules-coin-changed', {
                 detail: { target: currentLoadTarget, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
               }));
@@ -373,6 +475,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             panelEl: matPanel,
             onChange: (mat) => {
               deckLibrary?.setActiveMat?.(currentLoadTarget, mat ? mat.id : null);
+              rememberCosmetic(currentLoadTarget, 'matId', mat ? mat.id : null);
               // Full-size mats span the whole board and replace the other side.
               if (mat?.layout === 'two-player') {
                 const other = currentLoadTarget === 'opp' ? 'self' : 'opp';
@@ -515,7 +618,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                 matPicker?.filter(term);
               });
             }
-            setView('sleeve'); // default view
+            // Seed the default sub-view, then re-hide: the builder boots on the
+            // Search tab, and setView() unhides whichever panel it selects.
+            // Without this the sleeve gallery renders under the search grid.
+            setView('sleeve');
+            sleevePanel.hidden = true;
+            coinPanel.hidden = true;
+            if (matPanel) matPanel.hidden = true;
           }
 
     
@@ -578,6 +687,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deck = createEmptyDeck();
   let currentResults = [];
   let currentRawResults = [];
+  let cardFilters = createEmptyFilters();
+  const filterBar = document.getElementById('nativeDeckBuilderFilterBar');
   let currentLoadTarget = 'self';
   let currentTotalSummaries = 0;
   let currentHugeResultSet = false;
@@ -615,11 +726,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   const updateVisibleResults = () => {
-    currentResults = applyLocalControls(currentRawResults, {
-      cardType: cardTypeFilter.value,
-      sortBy: sortBySelect.value,
-      sortDirection: sortDirectionSelect.value,
-    });
+    // Pills narrow first, then the TCG/Pocket select and the sort run over
+    // what is left — sorting a smaller set is cheaper and the order is the
+    // same either way.
+    currentResults = applyLocalControls(
+      applyCardFilters(currentRawResults, cardFilters),
+      {
+        cardType: cardTypeFilter.value,
+        sortBy: sortBySelect.value,
+        sortDirection: sortDirectionSelect.value,
+      }
+    );
   };
 
   const getSearchStatusText = () => {
@@ -918,6 +1035,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const hasDeckCards = Object.keys(deck).length > 0;
 
     clearButton.style.display = hasDeckCards ? '' : 'none';
+    if (saveButton) {
+      saveButton.style.display = hasDeckCards ? '' : 'none';
+      // With no deck loaded, Save has nothing to overwrite and will ask for a
+      // name instead — say so on the button rather than surprising the user.
+      const hasLoadedDeck = Boolean(deckLibrary?.getActiveDeckId?.(currentLoadTarget));
+      saveButton.textContent = hasLoadedDeck ? 'Save' : 'Save As...';
+    }
     playButton.disabled = !hasDeckCards;
     targetAltButton.style.cursor = systemState.isTwoPlayer ? 'default' : 'pointer';
     targetAltButton.style.opacity = systemState.isTwoPlayer ? '0.5' : '';
@@ -929,6 +1053,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             ? (deckLibrary.getActiveDeckName(currentLoadTarget) || 'Untitled Deck')
             : 'Untitled Deck';
         }
+
+        renderDeckSprites({
+          stripEl: deckSpritesEl,
+          sprites: currentDeckSprites(),
+          spriteUrl: deckSpriteImageUrl,
+          spriteLabel: deckSpriteLabel,
+          editable: true,
+          max: MAX_DECK_SPRITES,
+        });
+        // Loading or switching decks changes the slots under an open popover.
+        spritePicker?.refresh();
     
         if (deckStatus) {
       deckStatus.textContent = hasDeckCards ? 'Saved ✓' : '';
@@ -962,6 +1097,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // Keep the Browse Sets panel's own card grid in sync with the same
     // filter — the summary bar drives both the deck list and Browse Sets.
     setBrowser?.setSupertypeFilter?.(deckListFilter);
+
+    renderDeckCounter({
+      counterEl: deckCounter,
+      model: getDeckCounterModel(result),
+    });
 
     if (validationDot) {
       const formatLabel = result.formatName;
@@ -1114,11 +1254,31 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     }
   });
 
+  saveButton?.addEventListener('click', () => {
+    // Cosmetics live on the deck, so pass the picker's current choices through:
+    // Save writes the whole board state the user set up, not just the cards.
+    const chosen = chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'];
+    const result = deckLibrary?.saveCurrentDeck?.(deck, {
+      sleeveId:
+        chosen.sleeveId ?? deckLibrary?.getActiveSleeve?.(currentLoadTarget) ?? null,
+      coinId:
+        chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
+      matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
+      sprites: currentDeckSprites(),
+    });
+    if (!result?.saved) return;
+
+    deckDirty = true;
+    flashDeckStatus();
+    render();
+  });
+
   clearButton.addEventListener('click', () => {
         if (!window.confirm('Are you sure you want to delete your deck?')) return;
         // Detach from the saved deck so clearing the editor never silently
         // wipes a saved deck from the library.
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        rememberCosmetic(currentLoadTarget, 'sprites', []);
         deck = createEmptyDeck();
         syncedDecks[currentLoadTarget] = deck;
         deckDirty = true;
@@ -1131,6 +1291,25 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     searchStatus.textContent = getSearchStatusText();
     renderResults();
   };
+
+  const renderFilters = () => {
+    renderFilterBar({
+      filterBarEl: filterBar,
+      groups: BUILDER_FILTER_GROUPS,
+      filters: cardFilters,
+      onToggle: (group, value) => {
+        cardFilters = toggleFilter(cardFilters, group, value);
+        renderFilters();
+        rerenderSearchLocally();
+      },
+      onClear: () => {
+        cardFilters = createEmptyFilters();
+        renderFilters();
+        rerenderSearchLocally();
+      },
+    });
+  };
+  renderFilters();
 
   cardTypeFilter.addEventListener('change', rerenderSearchLocally);
   sortBySelect.addEventListener('change', rerenderSearchLocally);

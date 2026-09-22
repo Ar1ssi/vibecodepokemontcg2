@@ -5,13 +5,21 @@ import {
       listDecks,
       loadLibraryFromStorage,
       renameDeckInLibrary,
+      saveDeckSnapshot,
       saveDeckToLibrary,
       saveLibraryToStorage,
       setDeckSleeve,
       setDeckCoin,
       setDeckMat,
+      setDeckSprites,
       MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
+    import {
+      deckSpriteImageUrl,
+      deckSpriteLabel,
+      normalizeDeckSprites,
+    } from '../../../setup/deck-builder/core/deck-sprites.mjs';
+    import { renderDeckSprites } from './native-deck-builder-renderers.js';
     import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
     
     const escapeHtml = (value = '') => String(value)
@@ -189,6 +197,7 @@ import {
             const isActive = deck.id === activeId;
             return `
               <span class="native-deck-builder-library-chip${isActive ? ' active' : ''}" data-deck-id="${safeId}">
+                <span class="native-deck-builder-deck-sprites native-deck-builder-chip-sprites" data-chip-sprites="${safeId}"></span>
                 <button class="native-deck-builder-library-chip-name" title="Open deck for editing">${safeName}</button>
                 <span class="native-deck-builder-library-chip-actions">
                   <button class="native-deck-builder-library-chip-btn" data-action="rename" title="Rename deck" aria-label="Rename deck">&#9998;</button>
@@ -198,6 +207,18 @@ import {
           })
           .join('');
     
+        // The chip sprites are drawn rather than inlined so the strip markup
+        // has exactly one definition, shared with the editor header.
+        for (const deck of decks) {
+          renderDeckSprites({
+            stripEl: listEl.querySelector(`[data-chip-sprites="${CSS.escape(deck.id)}"]`),
+            sprites: deck.sprites,
+            spriteUrl: deckSpriteImageUrl,
+            spriteLabel: deckSpriteLabel,
+            editable: false,
+          });
+        }
+
         listEl.querySelectorAll('[data-deck-id]').forEach((chip) => {
           const deckId = chip.dataset.deckId;
     
@@ -256,8 +277,23 @@ import {
               commit(setDeckMat(library, activeId, matId), { silent: true });
               return true;
             },
+        setActiveSprites: (target, sprites) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              if (!activeId || !library?.decks?.[activeId]) return false;
+              commit(setDeckSprites(library, activeId, sprites));
+              return true;
+            },
+        getActiveSprites: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId]
+                ? normalizeDeckSprites(library.decks[activeId].sprites)
+                : [];
+            },
             getActiveDeckName: (target) => {
           const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          return activeId && library?.decks?.[activeId]
+            ? library.decks[activeId].name || null
+            : null;
         },
         getActiveSleeve: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
@@ -278,6 +314,49 @@ import {
             silent: true,
           });
           return true;
+        },
+        /**
+         * Explicit Save: writes the editor's cards and the chosen sleeve, coin
+         * and mat over the loaded deck. With nothing loaded there is no deck to
+         * overwrite, so it asks for a name and creates one rather than throwing
+         * the work away.
+         *
+         * @returns {{saved: boolean, created: boolean, name: string|null,
+         *   reason?: 'cancelled'|'limit'}}
+         */
+        saveCurrentDeck: (cards, cosmetics = {}) => {
+          const activeId = activeDeckIds[currentTarget];
+          const isNew = !activeId || !library?.decks?.[activeId];
+
+          let name;
+          if (isNew) {
+            if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
+              showStatus(
+                `Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`
+              );
+              return { saved: false, created: false, name: null, reason: 'limit' };
+            }
+            name = window.prompt('Name this deck:');
+            if (name === null) {
+              return { saved: false, created: false, name: null, reason: 'cancelled' };
+            }
+          }
+
+          const { library: nextLibrary, deckId, created } = saveDeckSnapshot(
+            library,
+            { deckId: activeId, name, cards, ...cosmetics },
+            Date.now()
+          );
+
+          activeDeckIds[currentTarget] = deckId;
+          commit(nextLibrary, {
+            savedMessage: created ? 'Deck created.' : 'Deck saved.',
+          });
+          return {
+            saved: true,
+            created,
+            name: nextLibrary.decks[deckId]?.name || null,
+          };
         },
         getActiveDeckId: (target) =>
           activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??
