@@ -2,7 +2,8 @@
 // the `effect` name in advisory-animations.mjs's EVENT_FX. `STATIC_FALLBACKS`
 // holds the reduced-motion variant of state-reflecting effects; a transient
 // effect has no entry there, which skips it under `prefers-reduced-motion`.
-import { fxDisabled, motionReduced } from '../../image-logic/mat-fx.mjs';
+import { fxDisabled, motionReduced, soundDisabled } from '../../image-logic/mat-fx.mjs';
+import { playFxSound } from './fx-audio.js';
 import { holdFor } from './fx-holds.mjs';
 import { attack, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
@@ -30,5 +31,7 @@ export const playFx = createFxDispatcher({
   staticFallbacks: STATIC_FALLBACKS,
   isDisabled: fxDisabled,
   isMotionReduced: motionReduced,
+  isSoundDisabled: soundDisabled,
+  playSound: playFxSound,
   holdFor,
 });
