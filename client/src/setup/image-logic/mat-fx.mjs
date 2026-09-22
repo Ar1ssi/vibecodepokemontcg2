@@ -3,10 +3,15 @@
 // knockout ghost all draw as detached `document.body` overlays positioned from
 // `visualRectOf`, so this is the single owner of that pattern. DOM is touched
 // only inside function bodies, so importing under `node --test` is safe.
+//
+// Design 024: the three toggles themselves now live in fx-settings.mjs (one
+// pure owner for visuals / sound / volume); the readers below delegate to it
+// and keep their original signatures so no caller changed.
+import { FX_OFF_CLASS, readSettings } from './fx-settings.mjs';
 import { visualRectOf } from './iframe-rect.mjs';
 
-export const FX_OFF_CLASS = 'fx-off';
-export const FX_OFF_STORAGE_KEY = 'ptcg-fx-off';
+export { FX_OFF_CLASS };
+export { FX_OFF_KEY as FX_OFF_STORAGE_KEY } from './fx-settings.mjs';
 
 export const motionReduced = () => {
   if (typeof globalThis.matchMedia !== 'function') return false;
@@ -17,17 +22,22 @@ export const motionReduced = () => {
   }
 };
 
-// Master switch: `body.fx-off` (set by a future settings UI) or, for now,
-// localStorage['ptcg-fx-off'] === '1'. Either one disables the whole layer.
+const settings = () => readSettings(globalThis.localStorage);
+
+// Master switch: `body.fx-off` (set by the FX settings panel) or the stored
+// `ptcg-fx-off` flag. Either one disables the whole layer, visuals and sound.
 export const fxDisabled = () => {
-  if (typeof document === 'undefined') return false;
-  if (document.body?.classList.contains(FX_OFF_CLASS)) return true;
-  try {
-    return globalThis.localStorage?.getItem(FX_OFF_STORAGE_KEY) === '1';
-  } catch {
-    return false;
+  if (typeof document !== 'undefined' && document.body?.classList.contains(FX_OFF_CLASS)) {
+    return true;
   }
+  return settings().fxOff;
 };
+
+/** Sound is off when the whole layer is off, or the sound-only mute is set. */
+export const soundDisabled = () => fxDisabled() || settings().sfxOff;
+
+/** Master audio gain in [0, 1]. */
+export const fxVolume = () => settings().volume;
 
 /**
  * Create a fixed-position overlay host over `rect` (parent-viewport pixels).

@@ -3,6 +3,7 @@
 // holds the reduced-motion variant of state-reflecting effects; a transient
 // effect has no entry there, which skips it under `prefers-reduced-motion`.
 import { fxDisabled, motionReduced } from '../../image-logic/mat-fx.mjs';
+import { holdFor } from './fx-holds.mjs';
 import { attack, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
@@ -29,4 +30,5 @@ export const playFx = createFxDispatcher({
   staticFallbacks: STATIC_FALLBACKS,
   isDisabled: fxDisabled,
   isMotionReduced: motionReduced,
+  holdFor,
 });
