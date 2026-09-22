@@ -47,6 +47,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
         sleeveId: options.sleeveId ?? null,
         coinId: options.coinId ?? null,
         matId: options.matId ?? null,
+        wallpaperId: options.wallpaperId ?? null,
         sprites: normalizeDeckSprites(options.sprites),
       };
       nextLibrary.order = [...(nextLibrary.order || []), deckId];
@@ -103,6 +104,15 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
          * caller cannot back with vendored art is dropped by the normalizer,
          * so a bad slug can never reach the renderer.
          */
+        /** Stores the deck's PC Box wallpaper; null falls back to the default. */
+        export function setDeckWallpaper(library = {}, deckId, wallpaperId = null) {
+          if (!library?.decks?.[deckId]) return structuredClone(library);
+          const nextLibrary = structuredClone(library);
+          nextLibrary.decks[deckId].wallpaperId = wallpaperId || null;
+          nextLibrary.decks[deckId].updatedAt = Date.now();
+          return nextLibrary;
+        }
+
         export function setDeckSprites(library = {}, deckId, sprites = []) {
           if (!library?.decks?.[deckId]) return structuredClone(library);
           const nextLibrary = structuredClone(library);
@@ -133,7 +143,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
      */
     export function saveDeckSnapshot(
       library = {},
-      { deckId, name, cards = {}, sleeveId, coinId, matId, sprites } = {},
+      { deckId, name, cards = {}, sleeveId, coinId, matId, wallpaperId, sprites } = {},
       now = Date.now()
     ) {
       if (!deckId || !library?.decks?.[deckId]) {
@@ -141,6 +151,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
           sleeveId: sleeveId ?? null,
           coinId: coinId ?? null,
           matId: matId ?? null,
+          wallpaperId: wallpaperId ?? null,
           sprites,
         });
         return { library: created.library, deckId: created.deckId, created: true };
@@ -152,6 +163,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
       if (sleeveId !== undefined) deck.sleeveId = sleeveId;
       if (coinId !== undefined) deck.coinId = coinId;
       if (matId !== undefined) deck.matId = matId;
+      if (wallpaperId !== undefined) deck.wallpaperId = wallpaperId;
       if (sprites !== undefined) deck.sprites = normalizeDeckSprites(sprites);
       deck.updatedAt = now;
       return { library: nextLibrary, deckId, created: false };
@@ -167,6 +179,8 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
           createdAt: decks[deckId].createdAt,
           updatedAt: decks[deckId].updatedAt,
           sprites: normalizeDeckSprites(decks[deckId].sprites),
+          cards: structuredClone(decks[deckId].cards || {}),
+          wallpaperId: decks[deckId].wallpaperId ?? null,
         }));
     }
     

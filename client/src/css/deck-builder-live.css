@@ -770,6 +770,31 @@
   text-shadow: none;
 }
 
+/* Card sprite beside each deck row (design 025): a fixed slot, so rows
+ * with no sprite (Supporters, Stadiums, Energy) keep their names aligned. */
+.db-live .native-deck-builder-deck-row-sprite-slot {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+
+.db-live .native-deck-builder-deck-row-sprite {
+  max-width: 32px;
+  max-height: 32px;
+  image-rendering: pixelated;
+}
+
+/* Pokémon art is a 68px box with the Pokémon in its lower middle. */
+.db-live .native-deck-builder-deck-row-sprite.pokemon {
+  width: 40px;
+  height: 40px;
+  max-width: none;
+  max-height: none;
+  margin-top: -6px;
+}
+
 .db-live .native-deck-builder-deck-type {
   color: var(--db-text-dim);
   opacity: 1;

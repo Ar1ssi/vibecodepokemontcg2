@@ -3,6 +3,7 @@ import {
   addDeckSprite,
   deckSpriteImageUrl,
   deckSpriteLabel,
+  hasShinySprite,
   normalizeDeckSprites,
   removeDeckSpriteAt,
   searchPokemon,
@@ -50,6 +51,7 @@ export const initializeNativeDeckBuilderSpritePicker = ({
       max: MAX_DECK_SPRITES,
       spriteUrl: deckSpriteImageUrl,
       spriteLabel: deckSpriteLabel,
+      canShiny: (sprite) => hasShinySprite(sprite.slug),
     });
 
     // The popover redraws wholesale on every edit, which would otherwise

@@ -7,13 +7,15 @@ import {
   renderSpritePicker,
 } from '../../../initialization/document-event-listeners/sidebox/native-deck-builder-renderers.js';
 import {
+  MAX_DECK_SPRITES,
   deckSpriteImageUrl,
   deckSpriteLabel,
+  hasShinySprite,
   normalizeDeckSprites,
   searchPokemon,
 } from '../core/deck-sprites.mjs';
 
-function strip({ sprites = [], editable = false, max = 3 } = {}) {
+function strip({ sprites = [], editable = false, max = MAX_DECK_SPRITES } = {}) {
   const dom = new JSDOM('<div id="strip"></div>');
   const el = dom.window.document.getElementById('strip');
   renderDeckSprites({
@@ -92,7 +94,7 @@ test('rendering into a missing element is a no-op, not a throw', () => {
 
 // --- picker ---
 
-function picker({ sprites = [], query = '', max = 3 } = {}) {
+function picker({ sprites = [], query = '', max = MAX_DECK_SPRITES } = {}) {
   const dom = new JSDOM('<div id="picker"></div>');
   const el = dom.window.document.getElementById('picker');
   renderSpritePicker({
@@ -103,6 +105,7 @@ function picker({ sprites = [], query = '', max = 3 } = {}) {
     max,
     spriteUrl: deckSpriteImageUrl,
     spriteLabel: deckSpriteLabel,
+    canShiny: (sprite) => hasShinySprite(sprite.slug),
   });
   return el;
 }
@@ -113,6 +116,12 @@ test('the picker shows a slot per pinned Pokémon with shiny and remove controls
   const shinyButtons = [...el.querySelectorAll('[data-sprite-shiny]')];
   assert.equal(shinyButtons[0].getAttribute('aria-pressed'), 'false');
   assert.equal(shinyButtons[1].getAttribute('aria-pressed'), 'true');
+});
+
+test('a generation 9 slot has no shiny toggle because there is no shiny art', () => {
+  const el = picker({ sprites: ['pikachu', 'sprigatito'] });
+  assert.equal(el.querySelectorAll('[data-sprite-remove]').length, 2);
+  assert.equal(el.querySelectorAll('[data-sprite-shiny]').length, 1);
 });
 
 test('the picker says when nothing is pinned yet', () => {

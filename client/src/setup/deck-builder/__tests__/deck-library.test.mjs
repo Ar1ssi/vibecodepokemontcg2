@@ -10,6 +10,7 @@ import test from 'node:test';
       saveDeckToLibrary,
       setDeckSprites,
       listDecks,
+      setDeckWallpaper,
       parseLibrary,
       serializeLibrary,
       loadLibraryFromStorage,
@@ -208,7 +209,7 @@ test('setDeckSprites on a missing deck is a no-op copy', () => {
   assert.deepEqual(setDeckSprites(library, 'nope', ['pikachu']), library);
 });
 
-test('setDeckSprites caps the strip at three and drops unknown slugs', () => {
+test('setDeckSprites caps the strip at two and drops unknown slugs', () => {
   const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000);
   const next = setDeckSprites(library, deckId, [
     'missingno',
@@ -219,7 +220,7 @@ test('setDeckSprites caps the strip at three and drops unknown slugs', () => {
   ]);
   assert.deepEqual(
     next.decks[deckId].sprites.map((sprite) => sprite.slug),
-    ['pikachu', 'eevee', 'mew']
+    ['pikachu', 'eevee']
   );
 });
 
@@ -267,9 +268,10 @@ test('sprites round-trip through serialize and parse', () => {
   assert.deepEqual(parsed.decks[deckId].sprites, [{ slug: 'gengar', shiny: true }]);
 });
 
-test('listDecks exposes the sprites so the deck chips can draw them', () => {
+test('listDecks exposes sprites, cards and wallpaper so the deck chips can draw them', () => {
   const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, {
     sprites: ['pikachu'],
+    wallpaperId: 'cave',
   });
   assert.deepEqual(listDecks(library), [
     {
@@ -278,6 +280,25 @@ test('listDecks exposes the sprites so the deck chips can draw them', () => {
       createdAt: 1000,
       updatedAt: 1000,
       sprites: [{ slug: 'pikachu', shiny: false }],
+      cards: {},
+      wallpaperId: 'cave',
     },
   ]);
+});
+
+test('setDeckWallpaper stores the wallpaper and null resets it', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000);
+  assert.equal(library.decks[deckId].wallpaperId, null);
+  const set = setDeckWallpaper(library, deckId, 'snow');
+  assert.equal(set.decks[deckId].wallpaperId, 'snow');
+  assert.equal(library.decks[deckId].wallpaperId, null);
+  assert.equal(setDeckWallpaper(set, deckId, null).decks[deckId].wallpaperId, null);
+  assert.deepEqual(setDeckWallpaper(library, 'nope', 'snow'), library);
+});
+
+test('wallpaper round-trips through serialize and parse', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, {
+    wallpaperId: 'volcano',
+  });
+  assert.equal(parseLibrary(serializeLibrary(library)).decks[deckId].wallpaperId, 'volcano');
 });

@@ -19,6 +19,7 @@
 @import url('./holo/trainer-gallery.css');
 @import url('./coin/coin.css');
 @import url('./deck-builder-live.css');
+@import url('./deck-builder-pc-box.css');
 
 :root {
   --mat-half-height: 50vh;
@@ -5527,4 +5528,157 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 }
 body.sidebox-hidden #lostZoneRail {
   display: none;
+}
+
+/* ── Solo drawer: PC Box restyle (design 025) ─────────────────────────────
+   Styles only; the drawer's structure and the 3x2 bottom grid are the same
+   buttons with the same ids. Set Up is the FIGHT starburst, Reset the RUN
+   slant and Options the BAG tab from the Gen V battle menu. Dark mode's
+   !important rules still win, so its flat palette is unchanged. */
+#topButtonContainer {
+  gap: 4px;
+  padding: 4px 4px 0;
+  background: linear-gradient(to bottom, #3a9fd8, #2f7fc4);
+  border-left: 3px solid #fff;
+}
+#topButtonContainer button {
+  font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-weight: 700;
+  border-radius: 8px 8px 0 0;
+}
+#topButtonContainer .not-selected-page {
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-bottom: none;
+  color: #fff;
+}
+#topButtonContainer .selected-page {
+  background: #fff;
+  color: #1b53a8;
+  border: 2px solid #fff;
+  border-bottom: none;
+}
+#p1Box {
+  background: linear-gradient(to bottom, #2f7fc4, #1b53a8);
+  border-left: 3px solid #fff;
+  border-radius: 0;
+  font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+}
+#p1Box #chatbox {
+  border: 3px solid #fff;
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  background-color: #e1f1ff;
+  background-image:
+    linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%, #fff),
+    linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%, #fff);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+  color: #333;
+}
+#p1Box #tutorialButton {
+  padding: 4px 18px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, #ffdb4d, #ffcb05);
+  color: #1a1a1a;
+  font-weight: 700;
+}
+#p1Box #tutorialButton:hover {
+  background: linear-gradient(to bottom, #ffe36e, #f0bd00);
+}
+/* Quick actions wrap as glossy pills instead of truncating to "Atta…". */
+#p1Box .chat-button-container {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  background: #fff;
+  border-left: 3px solid #fff;
+  border-right: 3px solid #fff;
+}
+#p1Box .chat-button-container button {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: clip;
+  height: 26px;
+  padding: 0 12px;
+  background: linear-gradient(to bottom, #7fd0f0, #3a9fd8);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+#p1Box #FREEBUTTON {
+  background: linear-gradient(to bottom, #f06ec5, #c04095);
+}
+#p1Box #messageInput {
+  border: 3px solid #fff;
+  border-top: 1px solid #eee;
+  border-radius: 0 0 12px 12px;
+  background: #fff;
+}
+#p1Box #bottomP1ButtonContainer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 4px 2px;
+  box-sizing: border-box;
+}
+#p1Box #bottomP1ButtonContainer button {
+  width: auto;
+  height: 44px;
+  padding: 0 6px;
+  border: 3px solid #fff;
+  border-radius: 10px;
+  color: #fff;
+  font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-weight: 700;
+  background: linear-gradient(to bottom, #7fd0f0, #3a9fd8);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 100ms ease-out, filter 100ms ease-out;
+}
+#p1Box #bottomP1ButtonContainer button:hover {
+  filter: brightness(1.08);
+}
+#p1Box #bottomP1ButtonContainer button:active {
+  transform: translateY(2px);
+}
+#p1Box #bottomP1ButtonContainer #setupButton {
+  border: none;
+  background: radial-gradient(circle, #ff5a3c 0%, #c8141e 100%);
+  clip-path: polygon(50% 0%, 61% 10%, 80% 5%, 75% 25%, 95% 30%, 85% 50%, 95% 70%, 75% 75%, 80% 95%, 61% 90%, 50% 100%, 39% 90%, 20% 95%, 25% 75%, 5% 70%, 15% 50%, 5% 30%, 25% 25%, 20% 5%, 39% 10%);
+  box-shadow: none;
+  text-transform: uppercase;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+}
+#p1Box #bottomP1ButtonContainer #setupButton:disabled {
+  filter: grayscale(1) opacity(0.6);
+}
+#p1Box #bottomP1ButtonContainer #resetButton {
+  background: linear-gradient(to bottom, #6fc8ff, #1a6fd8);
+  border: 2px solid #fff;
+  border-radius: 4px;
+  transform: skewX(-12deg);
+  text-transform: uppercase;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+#p1Box #bottomP1ButtonContainer #resetButton:active {
+  transform: skewX(-12deg) translateY(2px);
+}
+#p1Box #bottomP1ButtonContainer #optionsButton {
+  background: linear-gradient(to bottom, #ffe14a, #f5a300);
+  border: 2px solid #fff;
+  border-radius: 0 0 12px 0;
+  clip-path: polygon(10% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 30%);
+  color: #1a1a1a;
+  text-transform: uppercase;
+  text-shadow: 0.5px 0.5px 0 #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  #p1Box #bottomP1ButtonContainer button {
+    transition: none;
+  }
 }

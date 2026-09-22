@@ -12,6 +12,7 @@ import {
       setDeckCoin,
       setDeckMat,
       setDeckSprites,
+      setDeckWallpaper,
       MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
     import {
@@ -19,6 +20,7 @@ import {
       deckSpriteLabel,
       normalizeDeckSprites,
     } from '../../../setup/deck-builder/core/deck-sprites.mjs';
+    import { resolveDisplaySprites } from '../../../setup/deck-builder/core/card-sprites.mjs';
     import { renderDeckSprites } from './native-deck-builder-renderers.js';
     import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
     
@@ -212,7 +214,7 @@ import {
         for (const deck of decks) {
           renderDeckSprites({
             stripEl: listEl.querySelector(`[data-chip-sprites="${CSS.escape(deck.id)}"]`),
-            sprites: deck.sprites,
+            sprites: resolveDisplaySprites(deck.sprites, deck.cards),
             spriteUrl: deckSpriteImageUrl,
             spriteLabel: deckSpriteLabel,
             editable: false,
@@ -282,6 +284,18 @@ import {
               if (!activeId || !library?.decks?.[activeId]) return false;
               commit(setDeckSprites(library, activeId, sprites));
               return true;
+            },
+        setActiveWallpaper: (target, wallpaperId) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              if (!activeId || !library?.decks?.[activeId]) return false;
+              commit(setDeckWallpaper(library, activeId, wallpaperId), { silent: true });
+              return true;
+            },
+        getActiveWallpaper: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId]
+                ? library.decks[activeId].wallpaperId || null
+                : null;
             },
         getActiveSprites: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];

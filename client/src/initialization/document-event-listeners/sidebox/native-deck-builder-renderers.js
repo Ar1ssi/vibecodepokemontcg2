@@ -1,3 +1,5 @@
+import { cardSpriteFor } from '../../../setup/deck-builder/core/card-sprites.mjs';
+
 const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
@@ -120,10 +122,16 @@ const escapeHtml = (value = '') => String(value)
             : safeSupertype;
           const safeImageUrl = escapeHtml(imageUrl);
           const safeCssUrl = escapeHtml(escapeCssUrl(imageUrl));
+          const sprite = cardSpriteFor(card);
+          // Rows without a sprite keep an empty slot so every name lines up.
+          const spriteHtml = sprite
+            ? `<img class="native-deck-builder-deck-row-sprite ${sprite.kind}" src="${escapeHtml(sprite.url)}" alt="" title="${escapeHtml(sprite.label)}" loading="lazy" onerror="this.remove()" />`
+            : '';
     
           return `
             <div class="native-deck-builder-deck-row" data-deck-row-index="${index}"${safeImageUrl ? ` data-preview-image="${safeImageUrl}"` : ''}>
               <span class="native-deck-builder-deck-row-qty">${card.count}</span>
+              <span class="native-deck-builder-deck-row-sprite-slot">${spriteHtml}</span>
               ${safeImageUrl ? `<img class="native-deck-builder-deck-row-thumb" src="${safeCssUrl}" alt="" loading="lazy" />` : '<span class="native-deck-builder-deck-row-thumb"></span>'}
               <div class="native-deck-builder-deck-row-name">${safeName}<span class="native-deck-builder-deck-type">${safeTypeLabel}</span></div>
               <div class="native-deck-builder-deck-row-controls">
@@ -222,7 +230,7 @@ const escapeHtml = (value = '') => String(value)
       spriteUrl,
       spriteLabel,
       editable = false,
-      max = 3,
+      max = 2,
     }) => {
       if (!stripEl) return;
 
@@ -233,7 +241,7 @@ const escapeHtml = (value = '') => String(value)
           const label = escapeHtml(spriteLabel(sprite));
           // A sprite file that fails to load must not leave a broken-image
           // glyph sitting next to the deck name, so it removes itself.
-          return `<img class="native-deck-builder-deck-sprite${sprite.shiny ? ' shiny' : ''}" src="${escapeHtml(url)}" alt="${label}" title="${label}" loading="lazy" onerror="this.remove()" />`;
+          return `<img class="native-deck-builder-deck-sprite${sprite.shiny ? ' shiny' : ''}${sprite.auto ? ' auto' : ''}" src="${escapeHtml(url)}" alt="${label}" title="${label}" loading="lazy" onerror="this.remove()" />`;
         })
         .join('');
 
@@ -257,9 +265,10 @@ const escapeHtml = (value = '') => String(value)
       sprites = [],
       results = [],
       query = '',
-      max = 3,
+      max = 2,
       spriteUrl,
       spriteLabel,
+      canShiny = () => true,
     }) => {
       if (!pickerEl) return;
 
@@ -269,7 +278,7 @@ const escapeHtml = (value = '') => String(value)
           return `
             <span class="native-deck-builder-sprite-slot">
               <img src="${escapeHtml(spriteUrl(sprite))}" alt="${label}" onerror="this.remove()" />
-              <button type="button" data-sprite-shiny="${index}" class="${sprite.shiny ? 'active' : ''}" title="${sprite.shiny ? `Use the regular ${label}` : `Use the shiny ${label}`}" aria-pressed="${Boolean(sprite.shiny)}">&#10022;</button>
+              ${canShiny(sprite) ? `<button type="button" data-sprite-shiny="${index}" class="${sprite.shiny ? 'active' : ''}" title="${sprite.shiny ? `Use the regular ${label}` : `Use the shiny ${label}`}" aria-pressed="${Boolean(sprite.shiny)}">&#10022;</button>` : ''}
               <button type="button" data-sprite-remove="${index}" title="Remove ${label}" aria-label="Remove ${label}">&#10005;</button>
             </span>`;
         })

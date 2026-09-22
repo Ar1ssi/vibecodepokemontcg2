@@ -11,6 +11,7 @@ import {
   deckSpriteImageUrl,
   deckSpriteLabel,
   findPokemonBySlug,
+  hasShinySprite,
   normalizeDeckSprites,
   removeDeckSpriteAt,
   searchPokemon,
@@ -27,25 +28,58 @@ test('the catalog is unique by slug and dex-ordered', () => {
   const slugs = new Set(POKEMON_SPRITE_CATALOG.map((entry) => entry.slug));
   assert.equal(slugs.size, POKEMON_SPRITE_CATALOG.length);
   const indexes = POKEMON_SPRITE_CATALOG.map((entry) => entry.idx);
-  assert.deepEqual(indexes, [...indexes].sort());
+  assert.deepEqual(indexes, [...indexes].sort((a, b) => Number(a) - Number(b)));
 });
 
 // The catalog promises a file for every slug; a partial vendoring run would
 // otherwise only show up as broken images in the browser.
-test('every catalog entry has both a regular and a shiny sprite on disk', () => {
+test('every catalog entry resolves to sprite files on disk, shiny or not', () => {
   const missing = [];
   for (const entry of POKEMON_SPRITE_CATALOG) {
-    for (const variant of ['regular', 'shiny']) {
-      const file = path.join(
-        REPO_ROOT,
-        'client/src/assets/pokemon/gen8',
-        variant,
-        `${entry.slug}.png`
-      );
-      if (!existsSync(file)) missing.push(`${variant}/${entry.slug}.png`);
+    for (const shiny of [false, true]) {
+      const url = deckSpriteImageUrl({ slug: entry.slug, shiny });
+      if (!existsSync(path.join(REPO_ROOT, 'client', url))) missing.push(url);
     }
   }
   assert.deepEqual(missing, []);
+});
+
+test('the catalog carries every generation 9 species, 906 to 1025', () => {
+  const indexes = new Set(POKEMON_SPRITE_CATALOG.map((entry) => Number(entry.idx)));
+  for (let idx = 906; idx <= 1025; idx += 1) assert.ok(indexes.has(idx), String(idx));
+  assert.equal(findPokemonBySlug('sprigatito').name, 'Sprigatito');
+  assert.equal(findPokemonBySlug('iron-crown').name, 'Iron Crown');
+  assert.equal(findPokemonBySlug('pecharunt').idx, '1025');
+});
+
+test('a Paldean form sits right after its older species', () => {
+  const names = POKEMON_SPRITE_CATALOG.filter((entry) => entry.species === 'Tauros').map(
+    (entry) => entry.name
+  );
+  assert.deepEqual(names, [
+    'Tauros',
+    'Paldean Tauros',
+    'Paldean Tauros (Blaze Breed)',
+    'Paldean Tauros (Aqua Breed)',
+  ]);
+});
+
+test('generation 9 art has no shiny set, so shiny is never stored or shown', () => {
+  assert.equal(hasShinySprite('sprigatito'), false);
+  assert.equal(hasShinySprite('pikachu'), true);
+  assert.equal(hasShinySprite('missingno'), false);
+  assert.equal(
+    deckSpriteImageUrl({ slug: 'sprigatito', shiny: true }),
+    '/src/assets/pokemon/gen9/regular/sprigatito.png'
+  );
+  assert.equal(deckSpriteLabel({ slug: 'sprigatito', shiny: true }), 'Sprigatito');
+  assert.deepEqual(normalizeDeckSprites([{ slug: 'sprigatito', shiny: true }]), [
+    { slug: 'sprigatito', shiny: false },
+  ]);
+  assert.deepEqual(addDeckSprite([], 'sprigatito', true), [{ slug: 'sprigatito', shiny: false }]);
+  assert.deepEqual(toggleDeckSpriteShinyAt([{ slug: 'sprigatito' }], 0), [
+    { slug: 'sprigatito', shiny: false },
+  ]);
 });
 
 test('names with awkward characters keep a URL-safe slug', () => {
@@ -100,12 +134,12 @@ test('normalizing drops malformed entries and keeps the good ones', () => {
   );
 });
 
-test('normalizing truncates a stored list past the cap', () => {
+test('normalizing truncates a stored list past the two-sprite cap', () => {
   const stored = ['pikachu', 'eevee', 'snorlax', 'gengar', 'mew'];
   assert.equal(normalizeDeckSprites(stored).length, MAX_DECK_SPRITES);
   assert.deepEqual(
     normalizeDeckSprites(stored).map((sprite) => sprite.slug),
-    ['pikachu', 'eevee', 'snorlax']
+    ['pikachu', 'eevee']
   );
 });
 
@@ -135,10 +169,10 @@ test('adding can start a slot shiny', () => {
 });
 
 test('removing takes the slot at the index and ignores a bad index', () => {
-  const sprites = normalizeDeckSprites(['pikachu', 'eevee', 'snorlax']);
+  const sprites = normalizeDeckSprites(['pikachu', 'eevee']);
   assert.deepEqual(
-    removeDeckSpriteAt(sprites, 1).map((sprite) => sprite.slug),
-    ['pikachu', 'snorlax']
+    removeDeckSpriteAt(sprites, 0).map((sprite) => sprite.slug),
+    ['eevee']
   );
   assert.deepEqual(removeDeckSpriteAt(sprites, 9), sprites);
   assert.deepEqual(removeDeckSpriteAt(sprites, -1), sprites);

@@ -2,18 +2,30 @@
  * Deck Pokémon sprites — the pure model behind the strip of Pokémon shown
  * next to a deck's name (design 024).
  *
- * A deck carries up to three slots, each `{ slug, shiny }`. A slug names a
+ * A deck carries up to two slots, each `{ slug, shiny }`. A slug names a
  * Pokémon or one of its Mega / Primal / Gigantamax / regional forms. The art is
  * vendored from msikma/pokesprite under client/src/assets/pokemon/gen8, so a
  * slug maps to a file path with no network call and no fallback branch (D97).
+ * Generation 9 and the Paldea-era forms are fan art in the same style, kept
+ * under gen9 with no shiny variant (D100).
  *
  * Nothing here touches the DOM or storage: every function returns a new value
  * and leaves its arguments alone.
  */
-import { POKEMON_SPRITE_CATALOG } from './pokemon-sprite-catalog.generated.mjs';
+import { POKEMON_SPRITE_CATALOG as GEN8_SPRITE_CATALOG } from './pokemon-sprite-catalog.generated.mjs';
+import { GEN9_SPRITE_CATALOG } from './pokemon-sprite-catalog-gen9.mjs';
 
-export const MAX_DECK_SPRITES = 3;
-export const POKEMON_SPRITE_BASE_PATH = '/src/assets/pokemon/gen8';
+export const MAX_DECK_SPRITES = 2;
+export const POKEMON_SPRITE_BASE_PATH = '/src/assets/pokemon';
+
+const GEN9_SLUGS = new Set(GEN9_SPRITE_CATALOG.map((entry) => entry.slug));
+
+// One dex-ordered list. The sort is numeric (idx '1000' follows '999') and
+// stable, so a Paldean form lands right after its gen-8 species and forms.
+const POKEMON_SPRITE_CATALOG = [
+  ...GEN8_SPRITE_CATALOG,
+  ...GEN9_SPRITE_CATALOG,
+].sort((a, b) => Number(a.idx) - Number(b.idx));
 
 const BY_SLUG = new Map(
   POKEMON_SPRITE_CATALOG.map((entry) => [entry.slug, entry])
@@ -28,6 +40,20 @@ export { POKEMON_SPRITE_CATALOG };
  */
 export function findPokemonBySlug(slug) {
   return BY_SLUG.get(String(slug ?? '')) || null;
+}
+
+/** @returns {boolean} false for the gen-9 fan art, which has no shiny set. */
+export function hasShinySprite(slug) {
+  return Boolean(findPokemonBySlug(slug)) && !GEN9_SLUGS.has(String(slug));
+}
+
+/** @returns {string} the vendored file for a known slug, or '' for an unknown one. */
+export function pokemonSpriteUrl(slug, shiny = false) {
+  const entry = findPokemonBySlug(slug);
+  if (!entry) return '';
+  const art = GEN9_SLUGS.has(entry.slug) ? 'gen9' : 'gen8';
+  const variant = shiny && hasShinySprite(entry.slug) ? 'shiny' : 'regular';
+  return `${POKEMON_SPRITE_BASE_PATH}/${art}/${variant}/${entry.slug}.png`;
 }
 
 /**
@@ -69,16 +95,16 @@ export function searchPokemon(query = '', limit = 40) {
 
 /** @returns {string} the vendored sprite path, or '' for a slug we do not have art for. */
 export function deckSpriteImageUrl(sprite = {}) {
-  const entry = findPokemonBySlug(sprite?.slug);
-  if (!entry) return '';
-  return `${POKEMON_SPRITE_BASE_PATH}/${sprite?.shiny ? 'shiny' : 'regular'}/${entry.slug}.png`;
+  return pokemonSpriteUrl(sprite?.slug, Boolean(sprite?.shiny));
 }
 
 /** @returns {string} e.g. 'Shiny Pikachu' — used for alt text and tooltips. */
 export function deckSpriteLabel(sprite = {}) {
   const entry = findPokemonBySlug(sprite?.slug);
   if (!entry) return '';
-  return sprite?.shiny ? `Shiny ${entry.name}` : entry.name;
+  return sprite?.shiny && hasShinySprite(entry.slug)
+    ? `Shiny ${entry.name}`
+    : entry.name;
 }
 
 /**
@@ -98,7 +124,10 @@ export function normalizeDeckSprites(value) {
     const entry = findPokemonBySlug(slug);
     if (!entry || seen.has(entry.slug)) continue;
     seen.add(entry.slug);
-    sprites.push({ slug: entry.slug, shiny: Boolean(candidate?.shiny) });
+    sprites.push({
+      slug: entry.slug,
+      shiny: Boolean(candidate?.shiny) && hasShinySprite(entry.slug),
+    });
   }
   return sprites;
 }
@@ -109,7 +138,10 @@ export function addDeckSprite(sprites, slug, shiny = false) {
   const entry = findPokemonBySlug(slug);
   if (!entry || current.length >= MAX_DECK_SPRITES) return current;
   if (current.some((sprite) => sprite.slug === entry.slug)) return current;
-  return [...current, { slug: entry.slug, shiny: Boolean(shiny) }];
+  return [
+    ...current,
+    { slug: entry.slug, shiny: Boolean(shiny) && hasShinySprite(entry.slug) },
+  ];
 }
 
 export function removeDeckSpriteAt(sprites, index) {
@@ -124,6 +156,8 @@ export function toggleDeckSpriteShinyAt(sprites, index) {
   if (!Number.isInteger(index) || index < 0 || index >= current.length)
     return current;
   return current.map((sprite, position) =>
-    position === index ? { ...sprite, shiny: !sprite.shiny } : sprite
+    position === index && hasShinySprite(sprite.slug)
+      ? { ...sprite, shiny: !sprite.shiny }
+      : sprite
   );
 }

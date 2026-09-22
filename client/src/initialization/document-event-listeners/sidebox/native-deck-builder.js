@@ -37,6 +37,11 @@ import {
   deckSpriteLabel,
   normalizeDeckSprites,
 } from '../../../setup/deck-builder/core/deck-sprites.mjs';
+import { resolveDisplaySprites } from '../../../setup/deck-builder/core/card-sprites.mjs';
+import {
+  cycleWallpaper,
+  findWallpaper,
+} from '../../../setup/deck-builder/core/box-wallpapers.mjs';
 import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
   addCard,
@@ -122,6 +127,8 @@ export const initializeNativeDeckBuilder = () => {
   const saveButton = document.getElementById('nativeDeckBuilderSaveDeck');
   const deckSpritesEl = document.getElementById('nativeDeckBuilderDeckSprites');
   const spritePickerEl = document.getElementById('nativeDeckBuilderSpritePicker');
+  const wallpaperSwitchEl = document.getElementById('nativeDeckBuilderWallpaperSwitch');
+  const deckPaneEl = wallpaperSwitchEl?.closest('.native-deck-builder-pane-side') || null;
 
   // The pickers commit straight to the loaded deck, but with nothing loaded
   // there is no deck to commit to and the choice would be lost. Mirror the
@@ -258,7 +265,10 @@ export const initializeNativeDeckBuilder = () => {
           // Detaching from a deck (it was deleted, or the editor was cleared)
           // must also drop the mirrored sprite choice, or the strip would keep
           // showing the previous deck's Pokémon over an empty editor.
-          if (!deckId) rememberCosmetic(target, 'sprites', []);
+          if (!deckId) {
+            rememberCosmetic(target, 'sprites', []);
+            rememberCosmetic(target, 'wallpaperId', null);
+          }
           deck = cards;
           syncedDecks[target] = cards;
           // A non-empty deck should sync into the playmat on close; a freshly
@@ -293,6 +303,34 @@ export const initializeNativeDeckBuilder = () => {
           deckLibrary?.setActiveSprites?.(currentLoadTarget, sprites);
           render();
         },
+      });
+
+      // ── PC Box wallpaper (design 025) ────────────────────────────────────
+      // Per deck like the other cosmetics; the mirror covers "no deck loaded".
+      const currentWallpaper = () =>
+        findWallpaper(
+          deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ??
+            chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].wallpaperId
+        );
+
+      const applyWallpaper = () => {
+        const wallpaper = currentWallpaper();
+        if (deckPaneEl) {
+          deckPaneEl.style.setProperty('--db-wallpaper-banner', `url('${wallpaper.banner}')`);
+          deckPaneEl.style.setProperty('--db-wallpaper-body', `url('${wallpaper.body}')`);
+          deckPaneEl.dataset.wallpaper = wallpaper.id;
+        }
+        const nameEl = wallpaperSwitchEl?.querySelector('[data-wallpaper-name]');
+        if (nameEl) nameEl.textContent = wallpaper.name;
+      };
+
+      wallpaperSwitchEl?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-wallpaper-step]');
+        if (!button) return;
+        const next = cycleWallpaper(currentWallpaper().id, Number(button.dataset.wallpaperStep));
+        rememberCosmetic(currentLoadTarget, 'wallpaperId', next.id);
+        deckLibrary?.setActiveWallpaper?.(currentLoadTarget, next.id);
+        applyWallpaper();
       });
 
       deckSpritesEl?.addEventListener('click', (event) => {
@@ -1056,7 +1094,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
         renderDeckSprites({
           stripEl: deckSpritesEl,
-          sprites: currentDeckSprites(),
+          sprites: resolveDisplaySprites(currentDeckSprites(), deck),
           spriteUrl: deckSpriteImageUrl,
           spriteLabel: deckSpriteLabel,
           editable: true,
@@ -1064,6 +1102,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         });
         // Loading or switching decks changes the slots under an open popover.
         spritePicker?.refresh();
+        applyWallpaper();
     
         if (deckStatus) {
       deckStatus.textContent = hasDeckCards ? 'Saved ✓' : '';
@@ -1264,6 +1303,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       coinId:
         chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
       matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
+      wallpaperId:
+        chosen.wallpaperId ?? deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ?? null,
       sprites: currentDeckSprites(),
     });
     if (!result?.saved) return;

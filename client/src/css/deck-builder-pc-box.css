@@ -1,0 +1,471 @@
+/*
+ * Deck builder — Pokémon PC Box (3DS) look (design 025).
+ *
+ * Layered over deck-builder-live.css. Every rule is scoped
+ * `.db-live:not(.db-light)`: the extra pseudo-class out-ranks the Live rules
+ * without !important, and the light theme toggle drops this whole layer so
+ * `.db-light` keeps its grey palette with no PC Box art.
+ *
+ * Shape language: white 2-3px outlines, sky-blue frames, a checkerboard box
+ * floor for the card grid, and the deck's Gen V wallpaper behind the deck
+ * list (set per deck through --db-wallpaper-banner / --db-wallpaper-body).
+ */
+
+@font-face {
+  font-family: 'Rodin Condensed';
+  src: url('../assets/fonts/rodin-condensed-latin.woff2') format('woff2');
+  font-display: swap;
+}
+
+.native-deck-builder-workspace.db-live:not(.db-light) {
+  --box-deep: #0e3065;
+  --box-stage: #1b53a8;
+  --box-blue: #3f88c5;
+  --box-sky: #7bb5e6;
+  --box-cyan: #7fd0f0;
+  --box-checker: #e1f1ff;
+  --box-yellow: #ffcb05;
+  --box-ink: #1b3a66;
+  --box-font: 'Rodin Condensed', 'Barlow Semi Condensed', 'IBM Plex Sans', sans-serif;
+  --box-glossy: linear-gradient(to bottom, var(--box-cyan), #3a9fd8);
+  --box-checkerboard:
+    linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%, #fff),
+    linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%, #fff);
+
+  --db-bg-top: var(--box-stage);
+  --db-bg-bottom: var(--box-deep);
+  --db-chrome: var(--box-blue);
+  --db-chrome-2: rgba(14, 48, 101, 0.55);
+  --db-border: rgba(255, 255, 255, 0.35);
+  --db-border-strong: #fff;
+  --db-gold: var(--box-yellow);
+  --db-gold-dark: #e0a800;
+  --db-indigo: var(--box-blue);
+  --db-indigo-dark: var(--box-stage);
+  --db-radius: 12px;
+  --db-radius-sm: 8px;
+
+  font-family: var(--box-font);
+}
+
+/* ---------------------------------------------------------------- shell -- */
+
+.db-live:not(.db-light) .native-deck-builder-header {
+  border-bottom: 2px solid #fff;
+}
+
+.db-live:not(.db-light) .native-deck-builder-header strong,
+.db-live:not(.db-light) .native-deck-builder-deck-name,
+.db-live:not(.db-light) .native-deck-builder-mode-tab,
+.db-live:not(.db-light) .native-deck-builder-play-button,
+.db-live:not(.db-light) .native-deck-builder-section-title {
+  font-family: var(--box-font);
+}
+
+.db-live:not(.db-light) .native-deck-builder-targetbar,
+.db-live:not(.db-light) .native-deck-builder-library-bar {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Glossy Box buttons: white rim, sky gradient. Play stays the yellow primary. */
+.db-live:not(.db-light) .native-target-button,
+.db-live:not(.db-light) .native-deck-builder-new-deck {
+  background: var(--box-glossy);
+  color: #fff;
+  border: 2px solid #fff;
+  text-shadow: 0 1px 0 rgba(31, 95, 147, 0.8);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.db-live:not(.db-light) .native-deck-builder-play-button {
+  border: 2px solid #fff;
+  color: #1a1a1a;
+}
+
+/* ------------------------------------------------------------ deck list -- */
+
+.db-live:not(.db-light) .native-deck-builder-library-chip {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  min-height: 40px;
+  width: max-content;
+}
+
+.db-live:not(.db-light) .native-deck-builder-library-chip.active {
+  background: #fff;
+  color: var(--box-stage);
+  border-color: var(--box-yellow);
+  box-shadow: 0 0 0 2px var(--box-yellow);
+}
+
+.db-live:not(.db-light) .native-deck-builder-library-chip.active .native-deck-builder-library-chip-name,
+.db-live:not(.db-light) .native-deck-builder-library-chip.active .native-deck-builder-library-chip-btn {
+  color: var(--box-stage);
+}
+
+.db-live:not(.db-light) .native-deck-builder-library-chip-name {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+}
+
+/* Two sprites, always the same footprint, so every chip's name starts at
+ * the same offset and one-sprite decks do not look off-centre. */
+.db-live:not(.db-light) .native-deck-builder-chip-sprites {
+  flex: none;
+  width: 64px;
+  margin-left: 0;
+}
+
+.db-live:not(.db-light) .native-deck-builder-chip-sprites .native-deck-builder-deck-sprite {
+  width: 44px;
+  height: 44px;
+  margin: -14px -6px -6px;
+}
+
+/* ------------------------------------------------------------------ tabs -- */
+
+.db-live:not(.db-light) .native-deck-builder-mode-tabs {
+  gap: 2px;
+  padding: 2px 4px 0;
+  background: var(--box-blue);
+  border: 2px solid #fff;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+
+.db-live:not(.db-light) .native-deck-builder-mode-tab {
+  background: var(--box-sky);
+  color: #fff;
+  border: 2px solid #fff;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.db-live:not(.db-light) .native-deck-builder-mode-tab:hover {
+  color: #fff;
+  opacity: 1;
+}
+
+.db-live:not(.db-light) .native-deck-builder-mode-tab.active {
+  background: #fff;
+  color: var(--box-blue);
+  opacity: 1;
+}
+
+/* ------------------------------------------------------ the box (left) -- */
+
+/* The left pane is a white Box: its own tokens flip the text dark so the
+ * Live rules inside it (titles, status, inputs) read on white. */
+.db-live:not(.db-light) .native-deck-builder-pane-main {
+  --db-text: var(--box-ink);
+  --db-text-dim: rgba(27, 58, 102, 0.7);
+  --db-text-faint: rgba(27, 58, 102, 0.45);
+  --db-panel: #fff;
+  --db-panel-2: var(--box-checker);
+  --db-raised: #fff;
+  --db-input: #fff;
+  --db-border: rgba(63, 136, 197, 0.35);
+  --db-border-strong: var(--box-sky);
+
+  background: #fff;
+  color: var(--box-ink);
+  border: 3px solid var(--box-sky);
+  border-radius: 12px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-search-input,
+.db-live:not(.db-light) .native-deck-builder-search-select,
+.db-live:not(.db-light) .native-deck-builder-set-browser-filter,
+.db-live:not(.db-light) #nativeDeckBuilderCustomizeFilter {
+  background: #f4f8fc;
+  color: var(--box-ink);
+  border: 2px solid rgba(123, 181, 230, 0.5);
+  border-radius: 6px;
+}
+
+.db-live:not(.db-light) #nativeDeckBuilderSearchButton {
+  background: linear-gradient(to bottom, var(--box-sky), var(--box-blue));
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Checkerboard Box floor behind every card grid. */
+.db-live:not(.db-light) .native-deck-builder-results-shell,
+.db-live:not(.db-light) .native-deck-builder-set-browser-results {
+  background-color: var(--box-checker);
+  background-image: var(--box-checkerboard);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-result-frame {
+  background: #fff;
+  padding: 2px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.db-live:not(.db-light) .native-deck-builder-result-qty {
+  background: var(--box-yellow);
+  color: #000;
+  border: 2px solid #fff;
+}
+
+/* ------------------------------------------------------------ sets tab -- */
+
+/* Short wide tiles: the logo is the label, so no name/pill below it. */
+.db-live:not(.db-light) .native-deck-builder-set-browser-tab {
+  height: 46px;
+  padding: 4px 10px;
+  background: #fff;
+  color: var(--box-ink);
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  justify-content: center;
+}
+
+.db-live:not(.db-light) .native-deck-builder-set-browser-tab:hover {
+  border-color: var(--box-sky);
+}
+
+.db-live:not(.db-light) .native-deck-builder-set-browser-tab.expanded {
+  border: 3px solid var(--box-yellow);
+  box-shadow: 0 0 0 2px var(--box-yellow);
+}
+
+.db-live:not(.db-light) .native-deck-builder-set-browser-tab-logo {
+  height: 34px;
+  max-width: 120px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-set-browser-tab-count {
+  background: var(--box-blue);
+  color: #fff;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  opacity: 1;
+}
+
+/* The expanded set's name pill costs a row of cards; the logo already says it. */
+.db-live:not(.db-light) .native-deck-builder-set-browser-dropdown-label {
+  display: none;
+}
+
+.db-live:not(.db-light) .native-deck-builder-set-browser-series-tag.active {
+  background: #e3350d;
+  color: #fff;
+  border-color: #a00;
+}
+
+/* ------------------------------------------------------- customize tab -- */
+
+.db-live:not(.db-light) .customize-switcher-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--box-checker);
+  border: 2px solid var(--box-sky);
+  border-radius: 8px;
+}
+
+.db-live:not(.db-light) .customize-switcher-toggle button {
+  color: var(--box-blue);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.db-live:not(.db-light) .customize-switcher-toggle button.active {
+  background: var(--box-blue);
+  color: #fff;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.db-live:not(.db-light) .native-deck-builder-sleeve-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-auto-rows: auto;
+}
+
+.db-live:not(.db-light) .native-deck-builder-sleeve-thumb {
+  aspect-ratio: 63 / 88;
+  background: #fff;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-coin-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+}
+
+.db-live:not(.db-light) .coin-cell .coin-3d {
+  width: 66px;
+  height: 66px;
+}
+
+.db-live:not(.db-light) .coin-cell.selected,
+.db-live:not(.db-light) .native-deck-builder-sleeve-thumb.selected {
+  border-color: var(--box-yellow);
+  box-shadow: 0 0 0 2px var(--box-yellow);
+  background: #fff;
+}
+
+/* ----------------------------------------------------- the party (right) -- */
+
+.db-live:not(.db-light) .native-deck-builder-pane-side {
+  background-color: #88c880;
+  background-image: var(--db-wallpaper-body, none);
+  background-position: top center;
+  background-size: 100% auto;
+  background-repeat: repeat-y;
+  image-rendering: pixelated;
+  border: 3px solid #fff;
+  border-radius: 12px;
+}
+
+/* image-rendering inherits; card scans must stay smooth. */
+.db-live:not(.db-light) .native-deck-builder-pane-side .native-deck-builder-deck-row-thumb {
+  image-rendering: auto;
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-header {
+  background-color: rgba(14, 48, 101, 0.4);
+  background-image: var(--db-wallpaper-banner, none);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border: none;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px 8px 0 0;
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-name,
+.db-live:not(.db-light) .native-deck-builder-deck-status {
+  color: #fff;
+  text-shadow:
+    0 1px 0 #1d4a22,
+    1px 0 0 #1d4a22,
+    -1px 0 0 #1d4a22,
+    0 -1px 0 #1d4a22;
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-sprite {
+  width: 48px;
+  height: 48px;
+  margin: -10px -8px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-save-btn {
+  background: linear-gradient(to bottom, var(--box-sky), var(--box-blue));
+  color: #fff;
+  border: 2px solid #fff;
+}
+
+/* Deck rows are party slots: white cards floating on the wallpaper. */
+.db-live:not(.db-light) .native-deck-builder-deck-row {
+  --db-text: #333;
+  --db-text-dim: rgba(51, 51, 51, 0.6);
+
+  background: #fff;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  margin: 4px 8px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-row:hover {
+  border-color: var(--box-sky);
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-row-qty {
+  color: var(--box-stage);
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-plus,
+.db-live:not(.db-light) .native-deck-builder-deck-minus {
+  background: #e2e8f0;
+  color: var(--box-ink);
+  border: none;
+}
+
+.db-live:not(.db-light) .native-deck-builder-counter,
+.db-live:not(.db-light) .native-deck-builder-summary {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* ◀ wallpaper name ▶ under the deck list. */
+.native-deck-builder-wallpaper-switch {
+  display: none;
+}
+
+.db-live:not(.db-light) .native-deck-builder-wallpaper-switch {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 8px;
+  padding: 3px;
+  background: var(--box-glossy);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.db-live:not(.db-light) .native-deck-builder-wallpaper-switch button {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #2d7fc0;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 120ms ease-out;
+}
+
+.db-live:not(.db-light) .native-deck-builder-wallpaper-switch button:hover {
+  transform: translateY(-1px);
+}
+
+.db-live:not(.db-light) .native-deck-builder-wallpaper-switch button:active {
+  transform: translateY(1px);
+}
+
+.db-live:not(.db-light) .native-deck-builder-wallpaper-switch button:focus-visible {
+  outline: 2px solid var(--box-yellow);
+  outline-offset: 2px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-wallpaper-name {
+  flex: 1;
+  text-align: center;
+  color: #fff;
+  font: 700 13px var(--box-font);
+  text-shadow: 0 1px 0 #1f5f93;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-live:not(.db-light) .native-deck-builder-wallpaper-switch button {
+    transition: none;
+  }
+}
