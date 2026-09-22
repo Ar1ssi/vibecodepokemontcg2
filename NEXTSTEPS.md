@@ -4,7 +4,7 @@ Increment ledger (one cluster per commit, suite green between):
 - [x] C1 card abilities: #2 Eelektrik Dynamotor, #8 Toxtricity Sinister Surge, #12 Munkidori
       Adrena-Brain, #3 Stadium-as-Trainer (Acerola's Premonition + matchesSearch type-only kinds)
 - [x] C2 FX: #1 holo on double-click preview (auth-mode wrapper), #7 Mega entry poses (gather→enclose→crack→burst)
-- [ ] C3 board UI: #9 End Turn button, #10 View Board button, #11 card blink (apply-view)
+- [x] C3 board UI: #9 End Turn button, #10 View Board (choose pickers + choice modal), #11 card blink (apply-view placeInViewOrder + src guard)
 - [ ] #5 "basic prompt gone" — debug, repro first
 - [ ] #6 logging, #4 30th anniversary set — design first, waiting on user approval
 

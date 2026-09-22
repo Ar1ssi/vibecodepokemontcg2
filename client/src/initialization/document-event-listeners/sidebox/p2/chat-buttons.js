@@ -1,5 +1,6 @@
 import { attack, attachAbility, healAbility, pass, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
 import { abilityPicker } from '../../../../actions/ability-picker.js';
+import { wireEndTurnButton } from '../../../../setup/general/end-turn-button.mjs';
 import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
@@ -67,6 +68,7 @@ export const initializeP2ChatButtons = () => {
 
   const p2PassButton = document.getElementById('p2PassButton');
   p2PassButton.addEventListener('click', () => pass(getP2User()));
+  wireEndTurnButton(document);
 
   const p2MessageInput = document.getElementById('p2MessageInput');
   p2MessageInput.addEventListener('keydown', (event) => {

@@ -591,6 +591,23 @@ ul, li {
   color: rgb(220, 220, 220);
   box-shadow: 0px 4px 8px rgba(255, 255, 255, 0.2);
 }
+/* End Turn (TCG Live): a full-width primary action heading the board buttons.
+   Two ids outrank the shared `button.dark-mode-2` rules above. */
+#boardButtonContainer #endTurnButton {
+  flex-basis: 100%;
+  font-size: 1.8vh;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.8vh 1.2vw;
+  background: linear-gradient(to bottom, rgb(66, 165, 245), rgb(21, 101, 192));
+  color: rgb(255, 255, 255);
+  border: 1px solid rgb(13, 71, 161);
+  box-shadow: 0px 2px 6px rgba(13, 71, 161, 0.45);
+}
+#boardButtonContainer #endTurnButton:hover {
+  background: linear-gradient(to bottom, rgb(100, 181, 246), rgb(30, 136, 229));
+  color: rgb(255, 255, 255);
+}
 #topButtonContainer {
   position: fixed;
   right: 0;
@@ -4945,6 +4962,38 @@ body.side-menu-collapsed #oppResizer {
   margin-top: 16px;
   display: flex;
   justify-content: center;
+  gap: 12px;
+}
+
+/* View Board (view-board-toggle.mjs): the menu turns see-through except its own
+   Back button; the overlay still blocks the board underneath. */
+.is-viewing-board,
+.is-viewing-board * {
+  visibility: hidden;
+}
+.card-picker-overlay.is-viewing-board,
+.choice-modal-overlay.is-viewing-board {
+  visibility: visible;
+  background: transparent;
+  backdrop-filter: none;
+}
+.is-viewing-board .view-board-button {
+  visibility: visible;
+}
+.view-board-button {
+  border: 2px solid #f5d547;
+  border-radius: 0.15rem;
+  padding: 0.5rem 1rem;
+  background: rgba(20, 22, 30, 0.85);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.card-picker-choose .view-board-button {
+  grid-column: 1;
+  justify-self: start;
 }
 
 .choice-confirm-btn {

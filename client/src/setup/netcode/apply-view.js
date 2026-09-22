@@ -25,6 +25,7 @@ import {
 } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
+import { createViewBoardButton } from '../image-logic/view-board-toggle.mjs';
 import {
   listConditions,
   ROTATION_CONDITIONS,
@@ -429,7 +430,8 @@ function createOrUpdateCardElement(cardData, side, zoneId, options = {}) {
     }
   }
 
-  img.setAttribute('src', displaySrc);
+  // Setting src — even to the same value — re-runs the image load and repaints.
+  if (img.getAttribute?.('src') !== displaySrc) img.setAttribute('src', displaySrc);
   img.setAttribute('alt', cardData.name || 'Face-down card');
   img.dataset.instanceId = String(instanceId);
   img.dataset.zone = zoneId;
@@ -885,13 +887,10 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
     // Holo is settled after stack layout (reconcilePlacedCard): only the
     // stack's visible card, e.g. a Stage 1 attached under its Basic, keeps foil.
     // Append attached card under parent container with attached style.
-    // Always appendChild (not just when the parent differs): appendChild
-    // on an existing child moves it to the end, so re-appending every
-    // card in view order each applyView reconciles sibling order among
-    // a parent's attachments (finding #10) instead of only placing a
-    // card the first time it arrives.
+    // Placed in view order, so sibling order among a parent's attachments
+    // is reconciled every view (finding #10).
     img.classList.add('attached-card');
-    parentRecord.container.appendChild(cardNodeOf(record));
+    placeInViewOrder(parentRecord.container, cardNodeOf(record));
     return { attachedParent: parentRecord };
   }
 
@@ -911,10 +910,10 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
       container.dataset.instanceId = String(cardData.instanceId);
       record.container = container;
     }
-    // Always appendChild: reconciles both the image-within-container order
-    // and the container-within-zone order (finding #10) on every view.
-    container.appendChild(node);
-    zone.element.appendChild(container);
+    // Reconciles both the image-within-container order and the
+    // container-within-zone order (finding #10) on every view.
+    placeInViewOrder(container, node);
+    placeInViewOrder(zone.element, container);
     return { attachedParent: null };
   }
 
@@ -924,11 +923,31 @@ function placeCardInZone(cardData, side, zoneId, options = {}) {
     record.container = null;
   }
 
-  // Always appendChild (not just when the parent differs): reconciles
-  // intra-zone order to match the view's array order on every applyView
-  // (finding #10) instead of freezing the first-seen DOM position.
-  zone.element.appendChild(node);
+  // Reconciles intra-zone order to match the view's array order on every
+  // applyView (finding #10) instead of freezing the first-seen DOM position.
+  placeInViewOrder(zone.element, node);
   return { attachedParent: null };
+}
+
+// The node placed last in each parent during the current applyView.
+let lastPlacedIn = new WeakMap();
+
+const indexIn = (parent, node) => Array.prototype.indexOf.call(parent.children || [], node);
+
+/**
+ * Appends `node` to `parent` only when it is not already after the node placed
+ * before it this view. Re-inserting a node detaches it, which restarts its CSS
+ * animations (holo foil, status idles) and repaints the card — every card
+ * blinked on every view when each one was re-appended unconditionally.
+ */
+function placeInViewOrder(parent, node) {
+  const previous = lastPlacedIn.get(parent);
+  lastPlacedIn.set(parent, node);
+  if (node.parentNode === parent) {
+    const previousIndex = previous?.parentNode === parent ? indexIn(parent, previous) : -1;
+    if (indexIn(parent, node) > previousIndex) return;
+  }
+  parent.appendChild(node);
 }
 
 /**
@@ -1527,6 +1546,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
   confirmBtn.className = 'choice-confirm-btn';
   confirmBtn.disabled = true;
   confirmBtn.textContent = `Confirm (0/${max})`;
+  footer.appendChild(createViewBoardButton(doc, modal));
   footer.appendChild(confirmBtn);
 
   const updateConfirmState = () => {
@@ -2031,6 +2051,7 @@ export function applyView(view, events = [], options = {}) {
     }
     lastRenderedVersion = view.stateVersion;
   }
+  lastPlacedIn = new WeakMap();
 
   // Clear in-flight affordances now that server response has landed
   clearInFlightAffordances();

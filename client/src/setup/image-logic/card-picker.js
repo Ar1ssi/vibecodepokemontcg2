@@ -6,6 +6,7 @@ import {
   startHoloAnimation,
   stopHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
+import { createViewBoardButton } from './view-board-toggle.mjs';
 import { closeCardPreview } from './full-view.js';
 import {
   MAX_TAP_DURATION_MS,
@@ -1236,7 +1237,7 @@ export const openCardPicker = async ({
 
     bottomBar = document.createElement('div');
     bottomBar.className = 'card-picker-bottom-bar';
-    bottomBar.append(instructionEl, doneBtn);
+    bottomBar.append(createViewBoardButton(document, overlay), instructionEl, doneBtn);
 
     overlay.append(filters, main, bottomBar);
   }

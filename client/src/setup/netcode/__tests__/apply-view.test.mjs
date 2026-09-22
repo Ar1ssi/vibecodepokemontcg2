@@ -2397,3 +2397,59 @@ test('an Evolution played from a duplicate hand stack loses the stack positionin
     setDefaultNetcodeContext({ clearHandStackPositioning: previous });
   }
 });
+
+// Re-inserting a node detaches it, which restarts its CSS animations (holo foil,
+// status idles) and repaints the card: every card blinked on every view.
+test('Card blink: an unchanged zone keeps its card nodes in place across views', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfMat = doc.getElementById('selfMat');
+  const discard = selfMat.querySelector('#discard');
+  const bench = selfMat.querySelector('#bench');
+  const viewAt = (stateVersion, benchOrder = [11, 12]) => ({
+    stateVersion,
+    you: {
+      playerId: 'p1',
+      zones: {
+        discard: [
+          { instanceId: 1, name: 'A', src: '/a.png' },
+          { instanceId: 2, name: 'B', src: '/b.png' },
+        ],
+        bench: benchOrder.map((id) => ({ instanceId: id, name: `P${id}`, src: `/${id}.png` })),
+      },
+    },
+    them: { playerId: 'p2', zones: {} },
+  });
+  applyView(viewAt(1), [], { document: doc, getZone: mockGetZone });
+
+  const moved = [];
+  const spy = (el) => {
+    const original = el.appendChild.bind(el);
+    el.appendChild = (child) => {
+      if (child.parentNode === el) moved.push(child.dataset.instanceId);
+      return original(child);
+    };
+  };
+  spy(discard);
+  spy(bench);
+  bench.children.forEach(spy);
+
+  const srcSets = [];
+  for (const img of discard.children) {
+    const original = img.setAttribute.bind(img);
+    img.setAttribute = (name, value) => {
+      if (name === 'src') srcSets.push(img.dataset.instanceId);
+      return original(name, value);
+    };
+  }
+
+  applyView(viewAt(2), [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(moved, [], 'no card node re-inserted when nothing moved');
+  assert.deepEqual(srcSets, [], 'an unchanged src is not set again (it reloads the image)');
+
+  // A real reorder still moves what it must (finding #10).
+  applyView(viewAt(3, [12, 11]), [], { document: doc, getZone: mockGetZone });
+  assert.deepEqual(
+    bench.children.map((c) => c.dataset.instanceId),
+    ['12', '11']
+  );
+});
