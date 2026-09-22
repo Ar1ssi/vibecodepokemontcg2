@@ -4,19 +4,20 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 251
-Focus: audit of item/energy/ability/attack/attack-effect bugs (same class as the glow bug) + fixes.
-Active: 31 fixes landed, UNCOMMITTED on main (suite 2844 tests, 2843 pass).
-Next: review/commit the S251 diff; then I78–I80 (deferred). Maintenance due at S260.
+Session: 253
+Focus: design 024 — FX sequencing, procedural audio, and TCG-Live parity round 2.
+Active: shipped, 10 commits pushed to `claude/charming-ride-78yi9u`. Suite 2949/2950.
+Next: user to LOOK AND LISTEN (nothing visual/audible has been seen or heard by a human yet); then I83 (the pre-existing inspector failure), I78–I80.
 Blocked: nothing.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- S251 uncommitted: run `git status`/`git diff` before anything else; fixes span `shared/engine/reduce.mjs`, `effects/executor.mjs|special-energy.mjs|ability.mjs|trainer.mjs|stadium.mjs|trainer-steps.mjs`, `rules/{rules-state,attack-window,attack-effects,attack-pending-effects,collect-usable-abilities,ability-executors,stadium-effects,resolve-attack-context}.mjs`, and client `move-card.js`, `chat-buttons.js`, `trainer-execution.js`, `rules-bridge.js`, `action-affordances.mjs`, `card-inspector-model.mjs`, `ability-picker.js`, `e2e-options.mjs`, `attack-preview-sources.mjs`.
-- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is unpaid" — verified failing at HEAD with the S251 diff stashed. Suite otherwise 2843/2844.
-- `pnpm test` on this checkout triggers an implicit install and (before S251) emptied `node_modules`; `pnpm install` restores it. Prefer `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
-- Design 023: glows recomputed per turn from legality; colour only via `.has-glow` + `--glow-rgb`. The found "glow stops" cause class (bare catch wiping all glows) is still present in `hookActionAffordances` (rules-bridge.js:1949-1962) — not fixed here (no repro).
-- Client legacy mode still lags the server on: GX once-per-game (I79), fossil Items (I80), simultaneous stadium KO tiebreak (I78, server-side).
+- **Nobody has seen or heard design 024.** Every pacing value (`mat-fx/fx-holds.mjs`), every sound (`mat-fx/fx-audio.mjs` VOICES) and every colour is an unreviewed judgement call. They are all tuning-by-table on purpose — change a number, not a code path. Audio is arcade-style synthesis, not foley; sampled sound would need an asset pipeline + a licensing decision (design 024 O1).
+- ONE pre-existing failing test, now I83: `card-inspector-model.test.mjs` "retreat greys only when the cost is unpaid". Re-verified at S252 by stashing the whole branch — it fails on a clean tree. Do NOT read a 2949/2950 run as a regression.
+- `pnpm test` on this checkout triggers an implicit install that empties `node_modules` (`pnpm install` restores it). Prefer `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`. ESLint needs `pnpm install` first.
+- Browser verification here needs two workarounds: socket.io is CDN-loaded and this sandbox blocks the CDN (stub `window.io` via `addInitScript` or boot aborts with "io is not defined"), and Playwright must be launched with `executablePath: '/opt/pw-browsers/chromium'`. `waitUntil: 'networkidle'` never fires — use `domcontentloaded`.
+- Adding an effect is still one EVENT_FX row + one registry entry (D94), but now also one `fx-holds.mjs` row and one `fx-audio.mjs` voice — the tests assert every mapped effect has both. Idle motion inside the playmat iframes must carry a `:root.fx-off`/`.fx-reduced` guard (D97); a CSS test enforces it.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S251 audit+fix: server soft-locks (unpayable discard cost), special-energy lethal KOs + evolved-host type gates, Legacy once-per-game marker erased by advanceTurn, ability consumed with no target, attack pricing (passive/stadium discounts, plural abilities, out-of-range index), stadium drop flag, ability-negation Stadium, Mega-evolve Checkup, defender attack lock, status-aware attack windows.
-- S251 client parity: Trainer pickers that moved cards to the wrong zone (Kofu, attach-from-discard), Trainer replay marker on return to hand, Rare Candy same-turn Basic, trainerType-only Supporter gate, attacker special-energy damage, untyped Energy readers, on-attach search picker, played-to-bench window under authority, Asleep/Paralyzed affordances, `attackExecuting` flag.
+- S252 design 024: FX queue + hold table (a batch now plays in engine order, not one frame), procedural Web Audio palette (the client was silent), attack name→target→impact→number choreography, damage-counter motion + prize-claim burst, effects for 7 previously-silent events + Tool attach, FX settings UI, and a kill switch that finally reaches inside the playmat iframes. D95/D96/D97; I81–I83 filed.
+- S251 audit+fix: 31 server/client bugs across items, energy, abilities, attacks and attack effects (soft-locks, special-energy KOs, attack pricing, Trainer pickers, status-aware affordances). I78–I80 deferred.
+- S250 debug/patch: four user-reported bugs — lethal ability/trainer damage counters never KO'd, Items attached as Tools, Items played to Bench, Tarragon combination discard.
