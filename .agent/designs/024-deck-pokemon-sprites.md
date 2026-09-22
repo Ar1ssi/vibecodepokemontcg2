@@ -1,5 +1,5 @@
 # 024: Deck Pokémon sprites
-Status: approved (user)
+Status: shipped
 Date: 2026-09-22 · Session: S253
 
 ## Problem
@@ -120,16 +120,16 @@ All return new arrays; none mutate their input.
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | deck has no sprites (all pre-existing decks) | strip renders empty; chip shows name only; `+` still opens the picker in the editor | [ ] |
-| 2 | stored `sprites` malformed (string, null, array of nulls, unknown slug) | `normalizeDeckSprites` drops it; deck still loads | [ ] |
-| 3 | 0 / 1 / 3 / 4 sprites | 4th add is a no-op; `normalizeDeckSprites` truncates a stored 4+ to 3 | [ ] |
-| 4 | same Pokémon added twice | second add is a no-op (dedupe by slug) | [ ] |
-| 5 | sprite PNG missing / 404 | `<img>` `onerror` hides that image; name and the rest of the strip still render | [ ] |
-| 6 | Save cancelled midway with sprites chosen and no deck loaded | nothing is written; the mirror keeps the choice for the next Save | [ ] |
-| 7 | deck deleted while its sprites are on screen | chip disappears with the deck; editor detaches as today | [ ] |
-| 8 | search query with no match / empty query | empty query lists dex order; no match shows an empty-state line | [ ] |
-| 9 | name with regional characters (Nidoran♀, Flabébé, Type: Null) | catalog carries the display name; slug stays URL-safe | [ ] |
-| 10 | localStorage write fails | `saveLibraryToStorage` already returns false silently; sprites behave like any other field | [ ] |
+| 1 | deck has no sprites (all pre-existing decks) | strip renders empty; chip shows name only; `+` still opens the picker in the editor | [x] deck-sprite-strip "an empty strip is flagged"; deck-library "a library saved before sprites existed parses to empty strips" |
+| 2 | stored `sprites` malformed (string, null, array of nulls, unknown slug) | `normalizeDeckSprites` drops it; deck still loads | [x] deck-sprites "normalizing drops malformed entries"; deck-library "a corrupted sprites field parses to an empty strip" |
+| 3 | 0 / 1 / 3 / 4 sprites | 4th add is a no-op; `normalizeDeckSprites` truncates a stored 4+ to 3 | [x] deck-sprites "normalizing truncates a stored list past the cap" + "adding… refuses… a full strip" |
+| 4 | same Pokémon added twice | second add is a no-op (dedupe by slug) | [x] deck-sprites "normalizing de-duplicates by slug"; strip "an already-pinned Pokémon… cannot be added twice" |
+| 5 | sprite PNG missing / 404 | `<img>` `onerror` hides that image; name and the rest of the strip still render | [x] deck-sprite-strip "a sprite that fails to load removes itself" |
+| 6 | Save cancelled midway with sprites chosen and no deck loaded | nothing is written; the mirror keeps the choice for the next Save | [x] reasoning: saveCurrentDeck returns before saveDeckSnapshot on a cancelled prompt, and the mirror is only written by the picker |
+| 7 | deck deleted while its sprites are on screen | chip disappears with the deck; editor detaches as today | [x] reasoning: the chip vanishes with its listDecks row; onOpenDeck(null) now also clears the sprite mirror |
+| 8 | search query with no match / empty query | empty query lists dex order; no match shows an empty-state line | [x] deck-sprites "an empty query lists the start of the dex…"; strip "a search with no matches says so" |
+| 9 | name with regional characters (Nidoran♀, Flabébé, Type: Null) | catalog carries the display name; slug stays URL-safe | [x] deck-sprites "names with awkward characters keep a URL-safe slug" |
+| 10 | localStorage write fails | `saveLibraryToStorage` already returns false silently; sprites behave like any other field | [x] reasoning: sprites live in the same library blob, so saveLibraryToStorage's try/catch already covers them |
 
 ## Test plan
 - `deck-sprites.test.mjs` — the pure model: normalize, add/remove/toggle, cap, dedupe, URL
@@ -158,3 +158,14 @@ become inert. Vendored art is removable with `rm -r client/src/assets/pokemon`.
 | 4 | strip renderer + picker UI + EJS + CSS wiring in editor and chips | suite green; Playwright walkthrough recorded |
 
 ## Deviations (Builder appends here during build)
+
+## Deviations (Builder appends here during build)
+- The picker popover is right-anchored (`right: 0`) rather than left-anchored: the deck pane sits
+  against the workspace edge, so a left-anchored popover grew straight off it and was clipped.
+  Caught in the Playwright walkthrough, not by a test.
+- `renderSpritePicker` joined `renderDeckSprites` in the shared renderers file rather than living
+  inside the picker module, so both pieces of sprite markup sit with the other renderers and are
+  testable in jsdom without instantiating the controller.
+- Added beyond the plan: detaching from a deck (Clear, or the deck being deleted) clears the
+  `chosenCosmetics` sprite mirror. Without it the strip kept showing a cleared deck's Pokémon —
+  a gap the design's edge-case table had not anticipated (row 7 now records it).

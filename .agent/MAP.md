@@ -17,6 +17,11 @@ client/src/setup/deck-builder/core/builder-theme.mjs — theme resolve/persist (
 client/src/setup/deck-builder/core/deck-counter.mjs — "x / 60" counter model from a validateDeck result
 client/src/setup/deck-builder/core/card-filters.mjs — search filter pills (card class / energy type /
   Trainer subtype); OR within a group, AND across groups; reuses energy-token-assets.mjs's type vocabulary
+client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):
+  up to 3 `{slug, shiny}` per deck, catalog search and vendored-art URL building; catalog data in
+  pokemon-sprite-catalog.generated.mjs (905 gen-8 base forms), art in client/src/assets/pokemon/gen8/,
+  both refreshed by scripts/generate-pokemon-sprites.mjs. UI: renderDeckSprites/renderSpritePicker in
+  native-deck-builder-renderers.js + native-deck-builder-sprite-picker.js (popover state only)
 client/src/setup/deck-builder/core/coins.mjs — coin catalog (939, unique ids); normalize via
   scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
   client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link);
