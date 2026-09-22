@@ -1,0 +1,641 @@
+/*
+ * Deck builder — Pokémon TCG Live look.
+ *
+ * Everything here is scoped under `.db-live`, which the builder's theme module
+ * puts on the workspace element. That extra class also buys the specificity
+ * needed to override the base rules in index.css regardless of @import order,
+ * so no rule in this file needs !important.
+ *
+ * `.db-light` layers the pre-Live grey palette back over the same structure:
+ * only the token block changes, never the layout rules below it.
+ */
+
+.native-deck-builder-workspace.db-live {
+  /* Surfaces, back to front. */
+  --db-bg-top: #131a33;
+  --db-bg-bottom: #0b0f21;
+  --db-chrome: rgba(19, 26, 52, 0.96);
+  --db-chrome-2: rgba(25, 33, 63, 0.96);
+  --db-panel: rgba(23, 31, 58, 0.94);
+  --db-panel-2: rgba(30, 39, 70, 0.92);
+  --db-raised: rgba(38, 48, 84, 0.95);
+  --db-input: rgba(11, 16, 34, 0.86);
+
+  /* Lines and lift. */
+  --db-border: rgba(126, 150, 220, 0.18);
+  --db-border-strong: rgba(126, 150, 220, 0.34);
+  --db-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
+  --db-shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+  /* Type. */
+  --db-text: #e9edf9;
+  --db-text-dim: rgba(213, 221, 243, 0.62);
+  --db-text-faint: rgba(213, 221, 243, 0.4);
+
+  /* Accents — gold is the Live primary, indigo the selection colour. */
+  --db-gold: #f0c34a;
+  --db-gold-dark: #cf9f22;
+  --db-indigo: #4d6fe3;
+  --db-indigo-dark: #33509f;
+  --db-rose: #d4577a;
+  --db-green: #3fbf6a;
+  --db-red: #e05563;
+
+  --db-radius: 10px;
+  --db-radius-sm: 6px;
+  --db-radius-pill: 999px;
+
+  color: var(--db-text);
+}
+
+.native-deck-builder-workspace.db-live.db-light {
+  --db-bg-top: #eef1f6;
+  --db-bg-bottom: #dfe4ec;
+  --db-chrome: #e6eaf1;
+  --db-chrome-2: #dde2eb;
+  --db-panel: #f5f7fa;
+  --db-panel-2: #eceff5;
+  --db-raised: #ffffff;
+  --db-input: #ffffff;
+
+  --db-border: rgba(40, 57, 124, 0.14);
+  --db-border-strong: rgba(40, 57, 124, 0.3);
+  --db-shadow: 0 10px 28px rgba(38, 49, 84, 0.16);
+  --db-shadow-soft: 0 3px 10px rgba(38, 49, 84, 0.12);
+
+  --db-text: #1b2127;
+  --db-text-dim: rgba(27, 33, 39, 0.64);
+  --db-text-faint: rgba(27, 33, 39, 0.42);
+
+  --db-gold: #e0a92a;
+  --db-gold-dark: #b8860f;
+  --db-indigo: #4159a8;
+  --db-indigo-dark: #2c3d7a;
+}
+
+/* ---------------------------------------------------------------- shell -- */
+
+.db-live .native-deck-builder-inner {
+  background: linear-gradient(to bottom, var(--db-bg-top), var(--db-bg-bottom));
+  border-left: 1px solid var(--db-border);
+  box-shadow: none;
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-header {
+  background: var(--db-chrome);
+  border-bottom: 1px solid var(--db-border);
+  align-items: center;
+  padding: 1vh 1vw;
+}
+
+.db-live .native-deck-builder-header strong {
+  font-size: 2.2vh;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.db-live .native-deck-builder-subtitle {
+  color: var(--db-text-dim);
+  opacity: 1;
+}
+
+/* The theme switch sits with the header actions but reads as a quiet icon. */
+.db-live .native-deck-builder-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2vh;
+  height: 3.2vh;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  font-size: 1.7vh;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--db-text-dim);
+  background: var(--db-input);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.db-live .native-deck-builder-theme-toggle:hover {
+  color: var(--db-gold);
+  border-color: var(--db-border-strong);
+}
+
+/* ------------------------------------------------------------- controls -- */
+
+.db-live .native-deck-builder-actions button,
+.db-live .native-deck-builder-inline-label {
+  border-radius: var(--db-radius-pill);
+  padding: 0.65vh 1vw;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 1;
+  background: var(--db-raised);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  box-shadow: none;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.db-live .native-deck-builder-actions button:hover,
+.db-live .native-deck-builder-inline-label:hover {
+  border-color: var(--db-border-strong);
+  transform: translateY(-1px);
+}
+
+.db-live .native-deck-builder-targetbar {
+  background: var(--db-chrome-2);
+  border-bottom: 1px solid var(--db-border);
+  padding: 0.8vh 1vw;
+}
+
+.db-live .native-deck-builder-target-label,
+.db-live .native-deck-builder-library-title {
+  color: var(--db-text-dim);
+  font-size: 1.45vh;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.db-live .native-target-button {
+  background: var(--db-input);
+  color: var(--db-text-dim);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  padding: 0.55vh 1.1vw;
+  font-weight: 600;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
+}
+
+.db-live .native-target-button:hover {
+  color: var(--db-text);
+  border-color: var(--db-border-strong);
+}
+
+.db-live #nativeDeckBuilderTargetMain.native-target-selected {
+  background: linear-gradient(
+    to bottom,
+    var(--db-indigo),
+    var(--db-indigo-dark)
+  );
+  color: #fff;
+  border-color: transparent;
+}
+
+.db-live #nativeDeckBuilderTargetAlt.native-target-selected {
+  background: linear-gradient(to bottom, var(--db-rose), #9e3c53);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Gold primary action, as in Live. */
+.db-live .native-deck-builder-play-button {
+  background: linear-gradient(to bottom, var(--db-gold), var(--db-gold-dark));
+  color: #23190a;
+  border-radius: var(--db-radius-pill);
+  padding: 0.6vh 1.6vw;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: var(--db-shadow-soft);
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.db-live .native-deck-builder-play-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.db-live .native-deck-builder-play-button:disabled {
+  background: var(--db-input);
+  color: var(--db-text-faint);
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------ deck list -- */
+
+.db-live .native-deck-builder-library-bar {
+  background: var(--db-chrome-2);
+  border-bottom: 1px solid var(--db-border);
+}
+
+.db-live .native-deck-builder-library-chip {
+  background: var(--db-raised);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-library-chip:hover {
+  border-color: var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-library-chip.active {
+  border-color: var(--db-gold);
+  box-shadow: 0 0 0 1px var(--db-gold) inset;
+}
+
+.db-live .native-deck-builder-library-status,
+.db-live .native-deck-builder-library-empty {
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-new-deck {
+  background: linear-gradient(
+    to bottom,
+    var(--db-indigo),
+    var(--db-indigo-dark)
+  );
+  color: #fff;
+  border: none;
+  border-radius: var(--db-radius-pill);
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- panes -- */
+
+.db-live .native-deck-builder-pane {
+  background: var(--db-panel);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+  box-shadow: var(--db-shadow);
+}
+
+.db-live .native-deck-builder-mode-tabs {
+  border-bottom: 1px solid var(--db-border);
+}
+
+.db-live .native-deck-builder-mode-tab {
+  background: transparent;
+  color: var(--db-text-dim);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+}
+
+.db-live .native-deck-builder-mode-tab:hover {
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-mode-tab.active {
+  color: var(--db-gold);
+  border-bottom-color: var(--db-gold);
+  background: transparent;
+}
+
+.db-live .native-deck-builder-section-title {
+  color: var(--db-text);
+  font-size: 1.5vh;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.db-live .native-deck-builder-section-button {
+  background: var(--db-raised);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-section-button:hover {
+  border-color: var(--db-border-strong);
+}
+
+/* ----------------------------------------------------------- search row -- */
+
+.db-live .native-deck-builder-search-input,
+.db-live .native-deck-builder-search-select,
+.db-live .native-deck-builder-modal-input,
+.db-live #nativeDeckBuilderCustomizeFilter,
+.db-live .native-deck-builder-set-browser-filter,
+.db-live .native-deck-builder-sleeve-filter,
+.db-live .native-deck-builder-coin-filter,
+.db-live .native-deck-builder-mat-filter {
+  background: var(--db-input);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  padding: 0.65vh 0.9vw;
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.db-live .native-deck-builder-search-input::placeholder,
+.db-live .native-deck-builder-modal-input::placeholder,
+.db-live #nativeDeckBuilderCustomizeFilter::placeholder {
+  color: var(--db-text-faint);
+}
+
+.db-live .native-deck-builder-search-input:focus,
+.db-live .native-deck-builder-search-select:focus,
+.db-live .native-deck-builder-modal-input:focus,
+.db-live #nativeDeckBuilderCustomizeFilter:focus {
+  border-color: var(--db-gold);
+  box-shadow: 0 0 0 2px rgba(240, 195, 74, 0.18);
+}
+
+/* Native option lists are drawn by the OS; force a readable pairing. */
+.db-live .native-deck-builder-search-select option,
+.db-live .native-deck-builder-modal-input option {
+  background: var(--db-bg-bottom);
+  color: var(--db-text);
+}
+
+.db-live.db-light .native-deck-builder-search-select option,
+.db-live.db-light .native-deck-builder-modal-input option {
+  background: #fff;
+  color: #1b2127;
+}
+
+.db-live #nativeDeckBuilderSearchButton {
+  background: linear-gradient(
+    to bottom,
+    var(--db-indigo),
+    var(--db-indigo-dark)
+  );
+  color: #fff;
+  border-radius: var(--db-radius-pill);
+  padding: 0.65vh 1.1vw;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.db-live #nativeDeckBuilderSearchButton:hover {
+  filter: brightness(1.1);
+}
+
+.db-live .native-deck-builder-search-status {
+  color: var(--db-text-dim);
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------- results --- */
+
+.db-live .native-deck-builder-search-results::-webkit-scrollbar-thumb,
+.db-live .native-deck-builder-cards::-webkit-scrollbar-thumb {
+  background: var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-result {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: var(--db-radius-sm);
+}
+
+.db-live .native-deck-builder-result:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ----------------------------------------------------------- deck panel -- */
+
+.db-live .native-deck-builder-deck-header {
+  background: linear-gradient(to bottom, var(--db-panel-2), var(--db-panel));
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+  padding: 0.9vh 0.8vw;
+}
+
+.db-live .native-deck-builder-deck-name {
+  color: var(--db-text);
+  font-size: 2.1vh;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.db-live .native-deck-builder-deck-status {
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-deck-status.flash {
+  color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-cards {
+  background: transparent;
+  border: none;
+  padding: 0.4vh 0;
+}
+
+.db-live .native-deck-builder-deck-row {
+  background: var(--db-panel-2);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+  margin-bottom: 0.5vh;
+}
+
+.db-live .native-deck-builder-deck-row:hover {
+  border-color: var(--db-border-strong);
+  box-shadow: var(--db-shadow-soft);
+}
+
+/* The deck-art bleed reads as a wash behind the row, not a picture. */
+.db-live .native-deck-builder-deck-overlay {
+  background: linear-gradient(
+    to right,
+    var(--db-panel-2) 0%,
+    var(--db-panel-2) 38%,
+    rgba(30, 39, 70, 0.72) 66%,
+    rgba(30, 39, 70, 0.28) 86%,
+    rgba(30, 39, 70, 0) 100%
+  );
+}
+
+.db-live.db-light .native-deck-builder-deck-overlay {
+  background: linear-gradient(
+    to right,
+    rgba(244, 247, 250, 0.985) 0%,
+    rgba(244, 247, 250, 0.955) 40%,
+    rgba(244, 247, 250, 0.82) 66%,
+    rgba(244, 247, 250, 0.42) 84%,
+    rgba(244, 247, 250, 0.14) 100%
+  );
+}
+
+.db-live .native-deck-builder-deck-text,
+.db-live .native-deck-builder-deck-row-name {
+  color: var(--db-text);
+  text-shadow: none;
+}
+
+.db-live .native-deck-builder-deck-type {
+  color: var(--db-text-dim);
+  opacity: 1;
+}
+
+.db-live .native-deck-builder-deck-row-qty {
+  color: var(--db-gold);
+  font-weight: 800;
+}
+
+.db-live .native-deck-builder-deck-btn,
+.db-live .native-deck-builder-deck-plus,
+.db-live .native-deck-builder-deck-minus {
+  border-radius: var(--db-radius-pill);
+}
+
+/* ------------------------------------------------------ summary segments -- */
+
+.db-live .native-deck-builder-summary-segment {
+  background: var(--db-panel-2);
+  color: var(--db-text-dim);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+}
+
+.db-live .native-deck-builder-summary-segment strong {
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-summary-segment:hover {
+  border-color: var(--db-border-strong);
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-summary-segment.active {
+  border-color: var(--db-gold);
+  color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-summary-segment.active strong {
+  color: var(--db-gold);
+}
+
+/* ------------------------------------------------- browse / customize --- */
+
+.db-live .native-deck-builder-set-browser,
+.db-live .native-deck-builder-sleeve-panel,
+.db-live .native-deck-builder-coin-picker,
+.db-live .native-deck-builder-mat-picker {
+  color: var(--db-text);
+}
+
+.db-live .native-deck-builder-set-browser-status,
+.db-live .native-deck-builder-set-browser-empty,
+.db-live .native-deck-builder-set-browser-group-label,
+.db-live .native-deck-builder-set-browser-dropdown-label,
+.db-live .native-deck-builder-set-browser-dropdown-empty,
+.db-live .native-deck-builder-sleeve-empty,
+.db-live .native-deck-builder-coin-empty,
+.db-live .native-deck-builder-mat-empty,
+.db-live .native-deck-builder-sleeve-preview-text,
+.db-live .native-deck-builder-coin-preview-text,
+.db-live .native-deck-builder-mat-preview-text,
+.db-live .native-deck-builder-mat-zoom-control label {
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-set-browser-tab,
+.db-live .native-deck-builder-set-browser-group-tabs button,
+.db-live .customize-switcher-toggle button {
+  background: var(--db-raised);
+  color: var(--db-text-dim);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-pill);
+  cursor: pointer;
+}
+
+.db-live .native-deck-builder-set-browser-tab:hover,
+.db-live .customize-switcher-toggle button:hover {
+  color: var(--db-text);
+  border-color: var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-set-browser-tab.active,
+.db-live .native-deck-builder-set-browser-group-tabs button.active,
+.db-live .customize-switcher-toggle button.active {
+  background: linear-gradient(
+    to bottom,
+    var(--db-indigo),
+    var(--db-indigo-dark)
+  );
+  color: #fff;
+  border-color: transparent;
+}
+
+.db-live .native-deck-builder-set-browser-tab-count,
+.db-live .native-deck-builder-set-browser-series-tag {
+  color: var(--db-text-faint);
+}
+
+.db-live .native-deck-builder-mat-cell,
+.db-live .native-deck-builder-sleeve-thumb,
+.db-live .native-deck-builder-coin-preview,
+.db-live .native-deck-builder-sleeve-preview,
+.db-live .native-deck-builder-mat-preview {
+  border-color: var(--db-border);
+  border-radius: var(--db-radius-sm);
+}
+
+.db-live .native-deck-builder-mat-cell-name,
+.db-live .native-deck-builder-mat-cell-badge,
+.db-live .native-deck-builder-sleeve-preview-text strong,
+.db-live .native-deck-builder-coin-preview-text strong,
+.db-live .native-deck-builder-mat-preview-text strong {
+  color: var(--db-text);
+}
+
+/* ---------------------------------------------------------------- modal -- */
+
+.db-live .native-deck-builder-modal-box {
+  background: linear-gradient(to bottom, var(--db-bg-top), var(--db-bg-bottom));
+  color: var(--db-text);
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius);
+  box-shadow: var(--db-shadow);
+}
+
+.db-live .native-deck-builder-modal-title {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.db-live .native-deck-builder-modal-label {
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-modal-preview {
+  background: var(--db-input);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+}
+
+.db-live .native-deck-builder-modal-preview-placeholder {
+  color: var(--db-text-faint);
+}
+
+.db-live .native-deck-builder-modal-error {
+  color: var(--db-red);
+}
+
+.db-live .native-deck-builder-modal-actions button {
+  border-radius: var(--db-radius-pill);
+  font-weight: 700;
+  cursor: pointer;
+}

@@ -18,6 +18,7 @@
 @import url('./holo/modern-holo.css');
 @import url('./holo/trainer-gallery.css');
 @import url('./coin/coin.css');
+@import url('./deck-builder-live.css');
 
 :root {
   --mat-half-height: 50vh;

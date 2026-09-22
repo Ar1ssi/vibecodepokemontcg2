@@ -32,6 +32,12 @@ import {
   applyLocalControls,
   queryCardsByName,
 } from '../../../setup/deck-builder/core/card-search.mjs';
+import {
+  applyBuilderTheme,
+  builderThemeToggleLabel,
+  loadBuilderTheme,
+  toggleBuilderTheme,
+} from '../../../setup/deck-builder/core/builder-theme.mjs';
 import { initializeNativeDeckBuilderLibrary } from './native-deck-builder-library.js';
 import { initializeNativeDeckBuilderSetBrowser } from './native-deck-builder-set-browser.js';
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
@@ -142,6 +148,35 @@ export const initializeNativeDeckBuilder = () => {
   const customCardPreviewPlaceholder = document.getElementById(
     'nativeCustomCardPreviewPlaceholder'
   );
+
+  // Live-style theme switch. The builder owns its own theme (dark by default)
+  // rather than riding the legacy per-element `dark-mode-1` body class, which
+  // only covers the game surface.
+  const workspaceEl = document.getElementById('nativeDeckBuilderWorkspace');
+  const themeToggle = document.getElementById('nativeDeckBuilderThemeToggle');
+  let builderTheme = applyBuilderTheme(
+    workspaceEl,
+    loadBuilderTheme(window.localStorage),
+    window.localStorage
+  );
+
+  const renderThemeToggle = () => {
+    if (!themeToggle) return;
+    const { glyph, title } = builderThemeToggleLabel(builderTheme);
+    themeToggle.textContent = glyph;
+    themeToggle.title = title;
+    themeToggle.setAttribute('aria-label', title);
+  };
+  renderThemeToggle();
+
+  themeToggle?.addEventListener('click', () => {
+    builderTheme = applyBuilderTheme(
+      workspaceEl,
+      toggleBuilderTheme(builderTheme),
+      window.localStorage
+    );
+    renderThemeToggle();
+  });
 
   playButton.addEventListener('click', () => {
     if (systemState.isTwoPlayer) {
