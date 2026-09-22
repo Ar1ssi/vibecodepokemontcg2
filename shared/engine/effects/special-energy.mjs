@@ -159,6 +159,25 @@ function applyPlan(draft, plan, ctx, selection = null) {
       if (plan.against === 'pokemonEx' && !/\bex\b/i.test(String(target.name || ''))) break;
       target.damage = (target.damage || 0) + plan.count * 10;
       events.push({ type: 'damageUpdated', instanceId: target.instanceId, damage: target.damage });
+      // Lethal damage must become a knockout (prizes and all). handleKnockout
+      // lives in reduce.mjs, which imports this module, so mark the placement
+      // for the reducer's post-command KO sweep — the same contract
+      // trainer-steps' damageCounters uses. Without it, end-of-turn ticks and
+      // Dangerous-style retaliation left 0-HP Pokémon in play with no prizes.
+      const targetRef = findCard(draft, target.instanceId);
+      const targetPlayerId = targetRef?.playerId;
+      events.push({
+        type: 'damageCountersPlaced',
+        instanceId: target.instanceId,
+        victimPlayerId: targetPlayerId,
+        // A host damaging itself hands the KO benefit to its opponent; a
+        // retaliation against the attacker hands it to the host's player.
+        attackerPlayerId:
+          target.instanceId === ctx.hostInstanceId
+            ? Object.keys(draft.players || {}).find((id) => id !== targetPlayerId)
+            : ctx.hostPlayerId,
+        damage: target.damage,
+      });
       break;
     }
     case 'clearStatus':
@@ -337,6 +356,10 @@ function runQueue(draft, queue, index, ctx) {
 export function runSpecialEnergyTriggers(draft, {
   trigger,
   host,
+  // Type/name/HP gates must read what the Pokémon *is* — the top evolution card —
+  // while attachments, damage and identity stay on the root (`host`). Passing only
+  // the root silently skipped every hostType-gated effect on an evolved Pokémon.
+  hostTop = null,
   hostPlayerId,
   hostZoneId,
   energy = null,
@@ -356,7 +379,7 @@ export function runSpecialEnergyTriggers(draft, {
   for (const e of energies) {
     const plans = planSpecialEnergyTriggers(e, {
       trigger,
-      host,
+      host: hostTop || host,
       zoneArray: zone,
       fromZone,
       attackExecuting: !!draft.__attackEffectPhase,
@@ -411,6 +434,7 @@ export function runEndOfTurnSpecialEnergies(draft, { events } = {}) {
         runSpecialEnergyTriggers(draft, {
           trigger: 'endTurn',
           host,
+          hostTop: topPokemonCard(zone, host),
           hostPlayerId: pid,
           hostZoneId: zoneId,
           events,
@@ -425,13 +449,13 @@ export function runEndOfTurnSpecialEnergies(draft, { events } = {}) {
  * energy returns to its owner's hand, `'reattach'` when it stays attached
  * (Boomerang/Burning), or null to discard normally.
  */
-export function resolveSpecialEnergyDiscard(draft, { energy, host, hostPlayerId, hostZoneId }) {
+export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = null, hostPlayerId, hostZoneId }) {
   if (!energy || !isSpecialEnergyCard(energy)) return null;
   if (!host) return null;
   const zone = zoneOf(draft, hostPlayerId, hostZoneId);
   const plans = planSpecialEnergyTriggers(energy, {
     trigger: 'discard',
-    host,
+    host: hostTop || host,
     zoneArray: zone,
     attackExecuting: !!draft.__attackEffectPhase,
   });
@@ -444,14 +468,14 @@ export function resolveSpecialEnergyDiscard(draft, { energy, host, hostPlayerId,
  * On-knockout resolution for the KO'd Pokémon's attached special energies.
  * Returns `{ returnToHand, drawUntil }`.
  */
-export function resolveSpecialEnergyKnockout(draft, { host, hostPlayerId, hostZoneId }) {
+export function resolveSpecialEnergyKnockout(draft, { host, hostTop = null, hostPlayerId, hostZoneId }) {
   const out = { returnToHand: false, drawUntil: 0 };
   if (!host) return out;
   const zone = zoneOf(draft, hostPlayerId, hostZoneId);
   for (const energy of zone.filter(
     (c) => c && isSpecialEnergyCard(c) && c.attachedTo === host.instanceId
   )) {
-    const plans = planSpecialEnergyTriggers(energy, { trigger: 'knockout', host, zoneArray: zone });
+    const plans = planSpecialEnergyTriggers(energy, { trigger: 'knockout', host: hostTop || host, zoneArray: zone });
     for (const plan of plans) {
       if (plan.action === 'returnToHand') out.returnToHand = true;
       if (plan.action === 'drawUntil') out.drawUntil = Math.max(out.drawUntil, plan.until);

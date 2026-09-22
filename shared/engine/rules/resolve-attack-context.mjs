@@ -1,4 +1,8 @@
-import { classifyEnergyEffect, resolveAttachedEnergyType } from './energy-effects.mjs';
+import {
+  classifyEnergyEffect,
+  resolveAttachedEnergyType,
+  rewriteEnergyDescriptor,
+} from './energy-effects.mjs';
 import { parseStadiumCostModifier } from './stadium-effects.mjs';
 import { parseAttackInheritance } from './ability-executors.mjs';
 
@@ -23,7 +27,20 @@ export async function resolveAttackContext({
       /* card data may not be ready yet */
     }
     const family = classifyEnergyEffect(energyCard);
-    energyTypes.push({ type: resolveAttachedEnergyType(energyCard), family });
+    // Stadium rewrites (Temple of Sinnoh / Crystal Beach) must apply wherever
+    // energy is priced. Without this the preview and the glow counted a Double
+    // Colorless as 2 while the actual payment path counted it as 1 (or vice
+    // versa), offering an attack the server then rejected.
+    energyTypes.push(
+      rewriteEnergyDescriptor(
+        { type: resolveAttachedEnergyType(energyCard), family },
+        {
+          card: energyCard,
+          stadiumCard,
+          hostPokemon: activeCard,
+        }
+      )
+    );
   }
 
   const stadiumCostModifier = stadiumCard ? parseStadiumCostModifier(stadiumCard) : 0;

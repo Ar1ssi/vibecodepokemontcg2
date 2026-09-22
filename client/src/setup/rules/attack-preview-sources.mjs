@@ -10,7 +10,7 @@
  * Pure and DOM-free so it runs under `node --test`.
  */
 
-const isEnergy = (card) => card?.type === 'Energy';
+import { isEnergy } from '../../../../shared/engine/cards.mjs';
 
 /**
  * @param {object} card the previewed active Pokémon

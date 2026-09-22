@@ -78,9 +78,18 @@ function defaultAttachedCards(card) {
 function trainerTargetCountsOf(handCards, targets, attachedCardsOf, deckList) {
   const attachedOf = (card) => attachedCardsOf(card) || [];
   const isTool = (card) => isTrainer(card) && isToolTrainer(card);
+  // A Basic put into play this turn cannot be Rare-Candy'd into a Stage 2
+  // (`rareCandyOptions` on the server and canEvolve both exclude it); offering
+  // it here glowed/offered a play the engine rejects.
+  const currentTurn = rulesState.turnNumber;
   const basics = targets
     .map(({ card }) => card)
-    .filter((card) => isBasicPokemon(card) && !attachedOf(card).some(isPokemon));
+    .filter(
+      (card) =>
+        isBasicPokemon(card) &&
+        !attachedOf(card).some(isPokemon) &&
+        card.enteredPlayTurn !== currentTurn
+    );
   const knownCards = [...deckList, ...handCards, ...targets.flatMap(({ card }) => [card, ...attachedOf(card)])];
   return {
     rareCandyOptionCount: handCards.filter(
@@ -221,21 +230,30 @@ export async function enumerateOptions({
   }
 
   // ── attach energy (once per turn) ─────────────────────────────────────
-  if (canPerformAction({ user, action: 'attachEnergy' }).allowed) {
-    handCards.forEach((card, handIndex) => {
-      if (!isEnergy(card)) return;
-      for (const target of targets) {
-        options.push({
-          kind: 'attach',
-          handIndex,
-          targetZone: target.targetZone,
-          targetIndex: target.targetIndex,
-          instanceId: idOf(card),
-          targetInstanceId: idOf(target.card),
-        });
+  handCards.forEach((card, handIndex) => {
+    if (!isEnergy(card)) return;
+    for (const target of targets) {
+      // Target-aware: a defender-Active attach lock must not suppress a Bench
+      // attach (the printed text restricts only the Defending Pokémon).
+      if (
+        !canPerformAction({
+          user,
+          action: 'attachEnergy',
+          targetZoneId: target.targetZone,
+        }).allowed
+      ) {
+        continue;
       }
-    });
-  }
+      options.push({
+        kind: 'attach',
+        handIndex,
+        targetZone: target.targetZone,
+        targetIndex: target.targetIndex,
+        instanceId: idOf(card),
+        targetInstanceId: idOf(target.card),
+      });
+    }
+  });
 
   // ── play a Trainer ────────────────────────────────────────────────────
   handCards.forEach((card, handIndex) => {

@@ -11,9 +11,23 @@ const lower = (v) =>
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'");
 
+const firstAbilityText = (card) => {
+  const arr = Array.isArray(card?.abilities) ? card.abilities : [];
+  if (arr.length === 0) return '';
+  const first = arr[0];
+  return typeof first === 'string' ? first : first?.text || '';
+};
+
 const textOf = (card) =>
   lower(
-    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
+    card?.ability?.text ??
+      card?.abilityText ??
+      card?.text ??
+      card?.effect ??
+      // Server-hydrated cards carry abilities as a plural array only; without
+      // this fallback every text-driven parser saw an empty string and silently
+      // skipped the card's ability (e.g. passive cost discounts).
+      firstAbilityText(card)
   );
 
 // --- position ----------------------------------------------------------

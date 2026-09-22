@@ -62,20 +62,25 @@ export function executeAbility(draft, {
     return { pendingChoice: null, completed: true };
   }
 
-  // Mark ability used for card and turn flags
-  card.abilityUsed = true;
-  if (!player.flags) player.flags = {};
-  if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
-  // instanceId first: two Pokémon sharing a name must not share one used-flag
-  // slot, or using one blocks the other's separate ability (I48).
-  player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
-
-  events.push({
-    type: 'abilityUsed',
-    instanceId: card.instanceId,
-    name: card.name,
-    playerId,
-  });
+  // Do not spend the once-per-turn ability before we know it has anything to do:
+  // `actionableSteps.length === 0` means the parser found only non-interactive
+  // steps, and an all-`effectStepSkipped` completion means the effect's own
+  // precondition failed (no damaged Pokémon to heal, empty Bench to switch).
+  // Marking up front consumed the ability with no effect and locked out a retry.
+  const markUsed = () => {
+    card.abilityUsed = true;
+    if (!player.flags) player.flags = {};
+    if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
+    // instanceId first: two Pokémon sharing a name must not share one used-flag
+    // slot, or using one blocks the other's separate ability (I48).
+    player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
+    events.push({
+      type: 'abilityUsed',
+      instanceId: card.instanceId,
+      name: card.name,
+      playerId,
+    });
+  };
 
   // Parse and plan ability steps
   const ability = card.abilities?.[abilityIndex];
@@ -94,6 +99,7 @@ export function executeAbility(draft, {
     return { pendingChoice: null, completed: true };
   }
 
+  const eventsBefore = events.length;
   const result = executeSteps(draft, {
     steps: actionableSteps,
     fromStepIndex: 0,
@@ -105,9 +111,20 @@ export function executeAbility(draft, {
   });
 
   if (result.pendingChoice) {
+    // The ability is in progress (choice pending); it counts as used so a second
+    // command cannot start it again while the choice is outstanding.
+    markUsed();
     draft.pendingChoice = result.pendingChoice;
     return result;
   }
+
+  const newEvents = events.slice(eventsBefore);
+  const skippedOnly =
+    newEvents.length > 0 &&
+    newEvents.every(
+      (e) => e.type === 'effectStepSkipped' || e.type === 'effectLoopAborted'
+    );
+  if (!skippedOnly) markUsed();
 
   draft.pendingChoice = null;
   return { pendingChoice: null, completed: true };

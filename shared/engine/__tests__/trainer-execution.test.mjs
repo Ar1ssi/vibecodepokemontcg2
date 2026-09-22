@@ -5,6 +5,8 @@ import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { viewFor } from '../view.mjs';
+import { hasCondition } from '../rules/special-conditions.mjs';
+import { executeSteps } from '../effects/executor.mjs';
 
 function setupGame() {
   const rng = createRng(12345);
@@ -516,4 +518,102 @@ test('trainer drop: a TCGdex Supporter (trainerType only) sets supporterPlayed',
 
   assert.equal(res.error, null);
   assert.equal(res.state.players.p1.flags.supporterPlayed, true);
+  assert.equal(
+    res.state.players.p1.flags.lastSupporterName,
+    'Hop',
+    'the server records the Supporter name the client Stadium condition reads'
+  );
+});
+
+test('trainer cost: Ultra Ball with fewer than 2 cards in hand is rejected, not soft-locked', () => {
+  const { state, rng } = setupGame();
+  const ultraBall = createCard({
+    instanceId: 7,
+    name: 'Ultra Ball',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Discard 2 cards from your hand. If you do, search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.',
+  });
+  const only = createCard({ instanceId: 15, name: 'Lightning Energy', type: 'Energy' });
+  state.players.p1.zones.hand.push(ultraBall, only);
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 31, name: 'Raichu', hp: 120, supertype: 'Pokémon', stage: 'Stage 1' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 7 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, 'Not enough cards in hand to pay discard cost.');
+  assert.equal(res.pendingChoice, null);
+  assert.ok(res.state.players.p1.zones.hand.some((c) => c.instanceId === 7), 'Ultra Ball stays in hand');
+
+  // The match is not wedged: the next command is processed normally.
+  const pass = applyCommand(res.state, { type: 'pass', payload: {}, playerId: 'p1' }, rng);
+  assert.notEqual(pass.error, 'waiting_for_choice');
+});
+
+test('executor: an unpayable exact-count discardCost aborts instead of opening an unsatisfiable choice', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(createCard({ instanceId: 15, name: 'Only Card', type: 'Trainer' }));
+  state.players.p1.zones.deck.push(createCard({ instanceId: 31, name: 'Deck Card', type: 'Trainer' }));
+
+  const result = executeSteps(state, {
+    steps: [{ type: 'discardCost', count: 2 }, { type: 'draw', count: 2 }],
+    effectType: 'trainer',
+    sourceCard: createCard({ instanceId: 99, name: 'Source', supertype: 'Trainer' }),
+    playerId: 'p1',
+    activeRng: rng,
+    events: [],
+  });
+
+  assert.equal(result.pendingChoice, null, 'must not open a min=2 choice over 1 card');
+  assert.equal(result.completed, true);
+  assert.equal(state.players.p1.zones.hand.length, 1, 'no card discarded');
+  assert.equal(state.players.p1.zones.deck.length, 1, 'the follow-up draw did not resolve');
+});
+
+test('trainer effect: Dark Bell confuses both Active non-{D} Pokémon', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 80,
+    name: 'Dark Bell',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Both Active non-{D} Pokémon are now Confused.',
+  }));
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 80 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  assert.ok(hasCondition(res.state.players.p1.zones.active[0], 'Confused'), 'own Active confused');
+  assert.ok(hasCondition(res.state.players.p2.zones.active[0], 'Confused'), "opponent's Active confused");
+});
+
+test('trainer effect: Dark Bell skips a {D} Active', () => {
+  const { state, rng } = setupGame();
+  state.players.p2.zones.active[0].types = ['Darkness'];
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 81,
+    name: 'Dark Bell',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Both Active non-{D} Pokémon are now Confused.',
+  }));
+
+  const res = applyCommand(state, {
+    type: 'playTrainer',
+    payload: { instanceId: 81 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  assert.ok(hasCondition(res.state.players.p1.zones.active[0], 'Confused'), 'own Active confused');
+  assert.ok(!hasCondition(res.state.players.p2.zones.active[0], 'Confused'), '{D} Active skipped');
 });

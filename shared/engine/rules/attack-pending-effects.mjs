@@ -258,7 +258,14 @@ export function pendingRetreatCostDelta(state, player) {
 }
 
 export function pendingCantAttack(state, player) {
-  return liveEffects(state, player).some((e) => e.kind === 'cant-attack' && e.scope === 'active');
+  // "During your opponent's next turn, the Defending Pokémon can't attack" is
+  // queued with `defender-active` scope, exactly like the retreat lock; only
+  // accepting `active` made the parser's lock a no-op.
+  return liveEffects(state, player).some(
+    (e) =>
+      e.kind === 'cant-attack' &&
+      (e.scope === 'defender-active' || e.scope === 'active')
+  );
 }
 
 export function pendingCantUseAttack(state, player, attackName) {

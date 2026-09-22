@@ -805,8 +805,11 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
             title: `${card.name} — put ${step.count} cards on bottom of deck`,
             candidates: hand,
             user: _effectOwner,
-            zoneFrom: 'hand',
-            destination: 'discard',
+            // pickOnly: the confirm handler below performs the deck-bottom move
+            // itself. Without it the shared picker auto-moved the picks to the
+            // `destination` (discard) first and the handler's index lookup
+            // found nothing, so Kofu discarded instead of bottoming.
+            pickOnly: true,
             multiSelect: true,
             requiredCount: step.count,
             onConfirm: (picks) => {
@@ -1025,8 +1028,11 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
             title: `${card.name} — attach Energy from discard`,
             candidates: energies.slice(0, max),
             user: _effectOwner,
-            zoneFrom: 'discard',
-            destination: 'hand',
+            // pickOnly: the onPick handler attaches the chosen Energy to a
+            // Pokémon itself. The default auto-move sent it to the `destination`
+            // (hand) first, so the discard lookup missed and the attach never
+            // happened.
+            pickOnly: true,
             onPick: (energy) => {
               announceDiscardPick(_effectOwner, card.name, energy, _appendMessage);
               const targets = getInPlayPokemon(_effectOwner);

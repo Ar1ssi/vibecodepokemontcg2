@@ -4,17 +4,29 @@
 import { isAbilityCard, classifyAbility } from './ability-effects.mjs';
 import { parseAbility } from './abilities.mjs';
 import { planAbilitySteps, actionableAbilityPlan } from './ability-step-plan.mjs';
+import {
+  requiresActiveSpot,
+  requiresKoOnOpponentTurn,
+} from './ability-executors.mjs';
 
 /**
  * True when a card has an ability with at least one interactive step and is not
- * already marked used this turn.
+ * already marked used this turn, and every position/turn gate passes.
+ *
+ * `zone` defaults to 'active' (no position gate) and `koedLastOppTurn` defaults
+ * to true (no KO-turn gate) so callers without that context keep today's
+ * behavior; the glow/affordance path threads the real values.
  */
 export function isUsableAbilityCard(
   card,
-  { rulesEnabled = true, used = false } = {}
+  { rulesEnabled = true, used = false, zone = 'active', koedLastOppTurn = true } = {}
 ) {
   if (!card || !isAbilityCard(card)) return false;
   if (rulesEnabled && used) return false;
+  if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) return false;
+  if (rulesEnabled && requiresKoOnOpponentTurn(card) && !koedLastOppTurn) {
+    return false;
+  }
 
   const firstAbility =
     Array.isArray(card.abilities) && card.abilities.length > 0 ? card.abilities[0] : null;
@@ -59,11 +71,12 @@ export function collectUsableAbilityCandidates(activeCard, benchCards = []) {
 /**
  * Filter enriched candidates to usable abilities.
  * @param {Array<{ card, zone, index }>} candidates
- * @param {{ rulesEnabled?: boolean, isUsed?: (card) => boolean }} opts
+ * @param {{ rulesEnabled?: boolean, isUsed?: (card) => boolean,
+ *           koedLastOppTurn?: boolean }} opts
  */
 export function filterUsableAbilities(
   candidates = [],
-  { rulesEnabled = true, isUsed = () => false } = {}
+  { rulesEnabled = true, isUsed = () => false, koedLastOppTurn = true } = {}
 ) {
   const usable = [];
   for (const entry of candidates) {
@@ -72,6 +85,8 @@ export function filterUsableAbilities(
       !isUsableAbilityCard(card, {
         rulesEnabled,
         used: isUsed(card),
+        zone,
+        koedLastOppTurn,
       })
     ) {
       continue;

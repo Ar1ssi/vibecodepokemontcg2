@@ -10,7 +10,10 @@
  */
 
 import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-attack-context.mjs';
-import { listUsableActions } from '../../../../shared/engine/rules/attack-window.mjs';
+import {
+  listUsableActions,
+  statusAttackBlock,
+} from '../../../../shared/engine/rules/attack-window.mjs';
 import {
   collectUsableAbilityCandidates,
   filterUsableAbilities,
@@ -71,6 +74,9 @@ export async function computeActionAffordances({
   extraAttacks = [],
   isAbilityUsed = () => false,
   ensureCardData = async () => {},
+  // False when the player had no Pokémon Knocked Out during the opponent's last
+  // turn; gates Fezandipiti ex-style abilities exactly as the server does.
+  koedLastOppTurn = true,
 } = {}) {
   let attackAvailable = false;
   if (activeCard) {
@@ -100,6 +106,9 @@ export async function computeActionAffordances({
       rulesEnabled: true,
       priorAttacks,
       extraAttacks: resolvedExtra,
+      // Asleep/Paralyzed lock the attack just as the server does. Confused is
+      // not a lock (coin flip), so it is intentionally not passed.
+      blockedReason: statusAttackBlock(activeCard),
     });
     attackAvailable = attacks.some((a) => a.usable);
   }
@@ -115,6 +124,7 @@ export async function computeActionAffordances({
   const usableAbilities = filterUsableAbilities(candidates, {
     rulesEnabled: true,
     isUsed: isAbilityUsed,
+    koedLastOppTurn,
   });
 
   return {

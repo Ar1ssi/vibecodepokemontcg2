@@ -215,6 +215,10 @@ export function executeTrainer(draft, {
   if (isSupporter) {
     if (!player.flags) player.flags = {};
     player.flags.supporterPlayed = true;
+    // Server-projected so the client's Stadium `named-supporter` condition
+    // ("a Supporter with X in its name") can be evaluated under authority;
+    // without it the once-per-turn Stadium never lit up.
+    player.flags.lastSupporterName = card.name || '';
   }
 
   // Tool attachment: attach to target in play

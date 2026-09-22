@@ -79,6 +79,29 @@ test('normal 2-energy case with a cost-modifier stadium', async () => {
   assert.deepEqual(result.priorAttacks, []);
 });
 
+test('stadiumEnergyRewrites: Temple of Sinnoh flattens a Double to one {C} (E4)', async () => {
+  const doubleColorless = {
+    name: 'Double Colorless Energy',
+    supertype: 'Energy',
+    subtypes: ['Special'],
+    types: ['Colorless'],
+  };
+  const temple = {
+    name: 'Temple of Sinnoh',
+    text: "All Special Energy attached to Pokémon (both yours and your opponent's) provide {C} Energy and have no other effect.",
+  };
+
+  const result = await resolveAttackContext({
+    activeCard: { name: 'Pikachu' },
+    attachedEnergyCards: [doubleColorless],
+    ensureCardData: async () => {},
+    stadiumCard: temple,
+    abilityUsed: () => false,
+  });
+
+  assert.deepEqual(result.energyTypes, [{ type: 'Colorless', family: 'basic' }]);
+});
+
 test('priorAttacks is always [] even when inheritance text is present (I43)', async () => {
   const active = {
     name: 'Gengar',

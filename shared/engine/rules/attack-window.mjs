@@ -29,6 +29,25 @@ export function mergeInheritedAttacks(card, priorAttacks = []) {
 }
 
 /**
+ * Special Conditions that outright prevent attacking. Confused is deliberately
+ * NOT a lock: the attack is legal and only risks the coin flip, so blocking it
+ * would hide a legal action.
+ *
+ * @param {object} card
+ * @returns {string} the reason to show, or '' when attacking is allowed
+ */
+export function statusAttackBlock(card) {
+  const condition = String(card?.specialCondition || '');
+  if (condition === 'Asleep' || card?.asleep === true) {
+    return "Asleep — this Pokémon can't attack or retreat.";
+  }
+  if (condition === 'Paralyzed' || card?.paralyzed === true) {
+    return "Paralyzed — this Pokémon can't attack or retreat.";
+  }
+  return '';
+}
+
+/**
  * Build the list of usable attacks for a card.
  *
  * @param {object} card   - the active Pokémon card (must have `.attacks`,
@@ -38,6 +57,7 @@ export function mergeInheritedAttacks(card, priorAttacks = []) {
  *   stadiumCostModifier: number        from parseStadiumCostModifier
  *   abilityUsed:  boolean              once-per-turn already used?
  *   rulesEnabled: boolean
+ *   blockedReason: string              Asleep/Paralyzed text from statusAttackBlock
  * }
  * @returns {Array<{name, cost, payable, onceUsed, reason}>}
  */
@@ -49,6 +69,7 @@ export function listAttacks(card, opts = {}) {
     rulesEnabled = true,
     priorAttacks = [],
     extraAttacks = [],
+    blockedReason = '',
   } = opts;
 
   // `priorAttacks` are merged only when the card's own text grants inheritance
@@ -68,9 +89,12 @@ export function listAttacks(card, opts = {}) {
 
     const payable = canPayAttackCost(energyTypes, effectiveCost);
     const onceUsed = rulesEnabled && oncePerTurnClause(atk.text) && abilityUsed;
+    const blocked = rulesEnabled && !!blockedReason;
 
     let reason = '';
-    if (onceUsed) {
+    if (blocked) {
+      reason = blockedReason;
+    } else if (onceUsed) {
       reason = 'Already used this turn (once per turn).';
     } else if (!payable) {
       const costStr = rawCost.map((s) => symbolLabel(s)).join(' ');
@@ -86,7 +110,7 @@ export function listAttacks(card, opts = {}) {
       payable,
       onceUsed,
       reason,
-      usable: payable && !onceUsed,
+      usable: payable && !onceUsed && !blocked,
     };
   });
 }

@@ -13,7 +13,7 @@ import test from 'node:test';
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
     const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger } = await import('../ability-executors.mjs');
-    const { listAttacks, listAbilities, listUsableActions } = await import('../attack-window.mjs');
+    const { listAttacks, listAbilities, listUsableActions, statusAttackBlock } = await import('../attack-window.mjs');
     const {
       isUsableAbilityCard,
       collectUsableAbilityCandidates,
@@ -465,6 +465,19 @@ import test from 'node:test';
       );
       assert.equal(
         supporterPlayGate({ cardType: 'Trainer', subtypes: ['Special Supporter'], supporterPlayed: true }).allowed,
+        true,
+      );
+    });
+
+    test('supporterPlayGate: trainerType-only Supporter is gated (F7)', () => {
+      assert.equal(
+        supporterPlayGate({ cardType: 'Trainer', trainerType: 'Supporter', supporterPlayed: true })
+          .allowed,
+        false,
+      );
+      assert.equal(
+        supporterPlayGate({ cardType: 'Trainer', trainerType: 'Special Supporter', supporterPlayed: true })
+          .allowed,
         true,
       );
     });
@@ -3914,6 +3927,36 @@ import test from 'node:test';
       assert.deepEqual(res[0].effectiveCost, ['Fire']);
     });
 
+    test('listAttacks: Asleep/Paralyzed block attacks, Confused does not (AT8)', () => {
+      const card = { name: 'T', types: [], attacks: [
+        { name: 'Flame', cost: [], damage: 60, text: '' },
+      ] };
+
+      const asleep = { ...card, specialCondition: 'Asleep' };
+      assert.match(statusAttackBlock(asleep), /Asleep/);
+      const asleepRow = listAttacks(asleep, {
+        energyTypes: [],
+        blockedReason: statusAttackBlock(asleep),
+      })[0];
+      assert.equal(asleepRow.usable, false);
+      assert.match(asleepRow.reason, /Asleep/);
+
+      const paralyzed = { ...card, specialCondition: 'Paralyzed' };
+      assert.equal(
+        listAttacks(paralyzed, { energyTypes: [], blockedReason: statusAttackBlock(paralyzed) })[0]
+          .usable,
+        false
+      );
+
+      const confused = { ...card, specialCondition: 'Confused' };
+      assert.equal(statusAttackBlock(confused), '');
+      const confusedRow = listAttacks(confused, {
+        energyTypes: [],
+        blockedReason: statusAttackBlock(confused),
+      })[0];
+      assert.equal(confusedRow.usable, true, 'Confused is a coin flip, not a lock');
+    });
+
     test('listAbilities: once-per-turn ability is tracked', () => {
       const card = { name: 'T', ability: { name: 'Recycle', text: 'Once during your turn: draw 1 card.' } };
       const before = listAbilities(card, { abilityUsed: false });
@@ -4169,6 +4212,43 @@ import test from 'node:test';
       const usable = filterUsableAbilities(candidates);
       assert.equal(usable.length, 1);
       assert.equal(usable[0].zone, 'active');
+    });
+
+    test('filterUsableAbilities: a positional Active-Spot ability is skipped from the Bench (A2)', () => {
+      const active = {
+        name: 'ActiveMon',
+        ability: { name: 'Draw', text: 'Once during your turn, you may draw a card.' },
+      };
+      const spotBench = {
+        name: 'SpotBench',
+        type: 'Pokémon',
+        ability: {
+          name: 'Pressure',
+          text: 'Once during your turn, if this Pokémon is in the Active Spot, you may draw a card.',
+        },
+      };
+      const candidates = collectUsableAbilityCandidates(active, [spotBench]);
+      const usable = filterUsableAbilities(candidates);
+      assert.deepEqual(usable.map((u) => u.zone), ['active']);
+    });
+
+    test('filterUsableAbilities: a KO-window ability is skipped without koedLastOppTurn (A5)', () => {
+      const fez = {
+        name: 'Fezandipiti ex',
+        type: 'Pokémon',
+        ability: {
+          name: 'Flip the Script',
+          text:
+            "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn, you may draw 3 cards.",
+        },
+      };
+      const candidates = collectUsableAbilityCandidates(null, [fez]);
+      assert.equal(
+        filterUsableAbilities(candidates, { koedLastOppTurn: false }).length,
+        0,
+        'no KO last turn means no usable ability'
+      );
+      assert.equal(filterUsableAbilities(candidates, { koedLastOppTurn: true }).length, 1);
     });
 
     // ── start-of-turn draw (taxonomy B) ──
@@ -6172,6 +6252,42 @@ import test from 'node:test';
       assert.equal(canPerformAction({ user: 'opp', action: 'playSupporter' }).allowed, false);
       assert.equal(canPerformAction({ user: 'opp', action: 'evolve' }).allowed, false);
       assert.equal(canPerformAction({ user: 'opp', action: 'attachEnergy' }).allowed, false);
+      // The attach lock restricts the Defending (Active) Pokémon only: a Bench
+      // target stays legal (E5).
+      assert.equal(
+        canPerformAction({ user: 'opp', action: 'attachEnergy', targetZoneId: 'bench' }).allowed,
+        true
+      );
+      assert.equal(
+        canPerformAction({ user: 'opp', action: 'attachEnergy', targetZoneId: 'active' }).allowed,
+        false
+      );
+    });
+
+    test('parsePendingAttackEffects: "Defending Pokémon can\'t attack" locks the defender (AT4)', async () => {
+      const {
+        parsePendingAttackEffects,
+        queuePendingAttackEffects,
+        pendingCantAttack,
+      } = await import('../attack-pending-effects.mjs');
+      const { rulesState, resetRulesSessionState, beginTurn, endTurn } = await import('../rules-state.mjs');
+
+      const parsed = parsePendingAttackEffects(
+        "During your opponent's next turn, the Defending Pokémon can't attack."
+      );
+      const lock = parsed.find((e) => e.kind === 'cant-attack');
+      assert.ok(lock, 'the parser emits a cant-attack lock');
+      assert.equal(lock.scope, 'defender-active');
+
+      resetRulesSessionState();
+      queuePendingAttackEffects(rulesState, 'self', parsed, 'Frozen Wings');
+      endTurn('self');
+      beginTurn('opp');
+      assert.equal(
+        pendingCantAttack(rulesState, 'opp'),
+        true,
+        'the defender is locked on its own next turn'
+      );
     });
 
     test('classifyAttackEffect: checkup poison counter placement is status-poisoned, not bench-damage', async () => {
@@ -6406,6 +6522,28 @@ import test from 'node:test';
       clearPlayedToBenchWindow('self', meowth);
       openPlayedToBenchWindow('self', meowth);
       assert.equal(canUsePlayedToBenchTrigger('self', meowth), true);
+    });
+
+    test('played-to-bench trigger: server-stamped playedToBenchTurn opens the window (A1)', () => {
+      startGame('self');
+      beginTurn('self');
+      const stamped = { name: 'Meowth ex', cardId: 'c_meowth-ex', playedToBenchTurn: rulesState.turnNumber };
+
+      // The client map is empty under server authority; the card stamp is the
+      // only evidence the trigger is still legal this turn.
+      assert.equal(canUsePlayedToBenchTrigger('self', stamped), true);
+
+      // A used ability stays spent even though the stamp is still this turn.
+      assert.equal(
+        canUsePlayedToBenchTrigger('self', { ...stamped, abilityUsed: true }),
+        false
+      );
+
+      // A stamp from an earlier turn is not a window.
+      assert.equal(
+        canUsePlayedToBenchTrigger('self', { ...stamped, playedToBenchTurn: rulesState.turnNumber - 1 }),
+        false
+      );
     });
 
     test('fix 1: neither player can evolve on their respective first turn', async () => {

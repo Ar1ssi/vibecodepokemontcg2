@@ -526,3 +526,100 @@ test('ability: Fezandipiti ex Flip the Script needs a Knockout during the oppone
   assert.equal(allowed.error, null);
   assert.equal(allowed.state.players.p1.zones.hand.length, 3);
 });
+
+test('ability: a no-target heal ability is not consumed (A3)', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(makePrimarina(60, state.turn.number));
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 60 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.active[0].abilityUsed, false, 'nothing to heal, ability stays available');
+  assert.ok(!res.state.players.p1.flags.abilitiesUsed?.[60]);
+
+  // Once there is something to heal, the same ability can still be used.
+  res.state.players.p1.zones.active[0].damage = 30;
+  const res2 = applyCommand(res.state, {
+    type: 'useAbility',
+    payload: { instanceId: 60 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.state.players.p1.zones.active[0].damage, 0, 'the retry healed the damage');
+  assert.equal(res2.state.players.p1.zones.active[0].abilityUsed, true, 'the successful use is consumed');
+});
+
+test('ability: removeAbilityCounter clears the turn flag too (A6)', () => {
+  const { state, rng } = setupGame();
+  const kirlia = createCard({
+    instanceId: 70,
+    name: 'Kirlia',
+    hp: 80,
+    supertype: 'Pokémon',
+    abilityText: 'Refinement: Once during your turn, you may draw 2 cards.',
+    abilities: [
+      { name: 'Refinement', type: 'Ability', text: 'Refinement: Once during your turn, you may draw 2 cards.' },
+    ],
+  });
+  state.players.p1.zones.bench.push(kirlia);
+  for (let i = 0; i < 4; i += 1) state.players.p1.zones.deck.push(createCard({ instanceId: 101 + i }));
+
+  const used = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 70 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(used.error, null);
+  assert.equal(used.state.players.p1.flags.abilitiesUsed[70], true);
+
+  const cleared = applyCommand(used.state, {
+    type: 'removeAbilityCounter',
+    payload: { instanceId: 70 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(cleared.error, null);
+  assert.ok(!cleared.state.players.p1.flags.abilitiesUsed?.[70], 'turn flag cleared with the counter');
+
+  const again = applyCommand(cleared.state, {
+    type: 'useAbility',
+    payload: { instanceId: 70 },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(again.error, null, 'the ability can be used again after clearing its counter');
+  assert.equal(again.state.players.p1.zones.hand.length, 4);
+});
+
+test('ability: a "have no Abilities" Stadium blocks server ability use (A4)', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 90,
+    name: "Team Rocket's Watchtower",
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: "Each Pokémon in play, in each player's hand, and in each player's discard pile has no Abilities.",
+  });
+  state.players.p1.zones.bench.push(createCard({
+    instanceId: 71,
+    name: 'Kirlia',
+    hp: 80,
+    supertype: 'Pokémon',
+    abilityText: 'Refinement: Once during your turn, you may draw 2 cards.',
+    abilities: [
+      { name: 'Refinement', type: 'Ability', text: 'Refinement: Once during your turn, you may draw 2 cards.' },
+    ],
+  }));
+  state.players.p1.zones.deck.push(createCard({ instanceId: 101 }), createCard({ instanceId: 102 }));
+
+  const res = applyCommand(state, {
+    type: 'useAbility',
+    payload: { instanceId: 71 },
+    playerId: 'p1',
+  }, rng);
+
+  assert.match(res.error, /blocked by the Stadium/);
+  assert.equal(res.state.players.p1.zones.hand.length, 0, 'no cards drawn through the block');
+});

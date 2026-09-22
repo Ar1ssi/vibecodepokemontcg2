@@ -79,6 +79,9 @@ export async function collectUsableAbilities(user) {
           ? abilityUsed(user, card) || card.enteredPlayTurn !== rulesState.turnNumber
           : !canUsePlayedToBenchTrigger(user, card)
         : abilityUsed(user, card),
+    // Fezandipiti ex-style KO-window abilities are refused by the server when
+    // the flag is unset; do not offer them.
+    koedLastOppTurn: !!rulesState.flags?.[user]?.koedLastOppTurn,
   });
   return usable.map((entry) =>
     isPlayedToBenchTrigger(entry.card) ? { ...entry, family: 'when-played' } : entry

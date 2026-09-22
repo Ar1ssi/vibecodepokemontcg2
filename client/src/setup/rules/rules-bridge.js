@@ -1449,9 +1449,12 @@ import { glowColorFor } from './card-glow-colors.mjs';
                   await ensureCardData(c);
                   if (matchesSearch(c, plan.what)) matches.push(c);
                 }
-                const pool = matches.length > 0 ? matches : deck.array;
+                // "search … for up to N" — an empty match set is a legal whiff,
+                // and offering the whole deck as a fallback let the player Bench
+                // arbitrary cards. The player may also take fewer than N.
+                const pool = matches;
                 if (pool.length === 0) {
-                  appendMessage('', '  no cards left in deck', 'announcement', false);
+                  appendMessage('', `  no matching cards in your deck`, 'announcement', false);
                   break;
                 }
                 openChoicePicker({
@@ -1461,6 +1464,8 @@ import { glowColorFor } from './card-glow-colors.mjs';
                   destination: 'bench',
                   multiSelect: true,
                   requiredCount: Math.min(plan.count, pool.length),
+                  minCount: 0,
+                  maxCount: Math.min(plan.count, pool.length),
                   // openCardPicker's confirm already moved (and relayed) every
                   // pick via zoneFrom/destination before calling this.
                   onConfirm: (selected) => {
@@ -2830,6 +2835,17 @@ import { glowColorFor } from './card-glow-colors.mjs';
                 return;
               }
               if (img.__rulesTrainerAnnounced) return;
+              // The card may have left the board while its data was enriching
+              // (returned to hand, discarded). Marking it announced then would
+              // suppress the effect on its next, legitimate play.
+              const stillOnBoard = ['self', 'opp'].some((side) => {
+                try {
+                  return getZone(side, 'board').array.includes(card);
+                } catch {
+                  return false;
+                }
+              });
+              if (!stillOnBoard) return;
               img.__rulesTrainerAnnounced = true;
             const isTrainer = String(card.type || '').toLowerCase().includes('trainer') ||
               String(card.supertype || '').toLowerCase().includes('trainer');

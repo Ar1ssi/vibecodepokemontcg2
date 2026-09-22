@@ -831,6 +831,7 @@ export function applyAttackEffect(attack, attackerCard = {}) {
  * - selfCannotAttack: "can't attack during your next turn"
  * - selfCannotUseAttack: "can't use [Attack Name] during your next turn"
  * - oppCannotRetreat: "the Defending Pokémon can't retreat during your opponent's next turn"
+ * - oppCannotAttack: "the Defending Pokémon can't attack during your opponent's next turn"
  */
 export function parseNextTurnLock(attack) {
   const t = lower(attack?.text ?? '');
@@ -840,6 +841,7 @@ export function parseNextTurnLock(attack) {
     selfCannotAttack: false,
     selfCannotUseAttack: null,
     oppCannotRetreat: false,
+    oppCannotAttack: false,
   };
 
   // Opponent retreat lock
@@ -855,6 +857,19 @@ export function parseNextTurnLock(attack) {
     )
   ) {
     out.oppCannotRetreat = true;
+  }
+
+  // Opponent attack lock (the Defending Pokémon can't attack next turn)
+  if (
+    /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+attack\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
+      t
+    ) ||
+    /during\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack/i.test(
+      t
+    ) ||
+    /can(?:'t|not)\s+attack\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t)
+  ) {
+    out.oppCannotAttack = true;
   }
 
   // Self cannot use specific attack
@@ -875,7 +890,8 @@ export function parseNextTurnLock(attack) {
   if (
     !out.selfCannotAttack &&
     !out.selfCannotUseAttack &&
-    !out.oppCannotRetreat
+    !out.oppCannotRetreat &&
+    !out.oppCannotAttack
   ) {
     return null;
   }

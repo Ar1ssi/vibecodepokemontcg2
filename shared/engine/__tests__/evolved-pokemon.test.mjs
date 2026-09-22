@@ -301,3 +301,23 @@ test('evolve: a modern Mega Venusaur ex does not end the turn', () => {
   assert.ok(!res.events.some((e) => e.type === 'turnEndedByMegaEvolve'));
   assert.equal(res.state.turn.player, 'p1');
 });
+
+test('evolve: a legacy Mega Evolution still runs Pokémon Checkup before the turn ends', () => {
+  const state = megaGame('Venusaur-EX');
+  const poisoned = pokemon({ instanceId: 5, name: 'Budew', hp: 60 });
+  poisoned.specialCondition = 'Poisoned';
+  state.players.p2.zones.active.push(poisoned);
+  state.players.p1.zones.hand.push(
+    pokemon({ instanceId: 2, name: 'M Venusaur-EX', stage: 'Stage 1', hp: 230, evolvesFrom: 'Venusaur-EX' })
+  );
+
+  const res = evolve(state, 2, 1);
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p2', 'the Mega Evolution still ends the turn');
+  assert.equal(
+    res.state.players.p2.zones.active[0].damage,
+    10,
+    'Poison damage was applied at the between-turns checkup'
+  );
+});

@@ -1948,3 +1948,37 @@ test('stadium: unlimited "as often as" actions repeat without spending the once-
     2
   );
 });
+
+const PRISM_TOWER_TEXT =
+  "Once during each player's turn, that player may discard 2 cards from their hand in order to draw a card.";
+
+test('stadium: Prism Tower (discard 2) is a no-op with fewer than 2 cards in hand, never a soft-lock', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 58,
+    name: 'Prism Tower',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: PRISM_TOWER_TEXT,
+  });
+  state.players.p1.zones.hand.push(trainerStub(90, 'Only Card'));
+  state.players.p1.zones.deck.push(trainerStub(100, 'D1'), trainerStub(101, 'D2'));
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null, 'must not open an unsatisfiable discard choice');
+  assert.equal(res.state.players.p1.zones.hand.length, 1, 'no card was discarded');
+  assert.equal(res.state.players.p1.zones.deck.length, 2, 'no card was drawn');
+  assert.ok(!res.state.players.p1.flags.stadiumUsedThisTurn, 'activation not consumed');
+
+  // The same activation succeeds once the hand can pay the cost.
+  res.state.players.p1.zones.hand.push(trainerStub(91, 'Second Card'));
+  const res2 = activate(res.state, rng);
+  assert.ok(res2.pendingChoice);
+  assert.deepEqual(optionIds(res2).sort((a, b) => a - b), [90, 91]);
+  const res3 = resolveChoice(res2, [90, 91], rng);
+  assert.equal(res3.error, null);
+  assert.equal(res3.pendingChoice, null);
+  assert.equal(res3.state.players.p1.zones.deck.length, 1);
+  assert.equal(res3.state.players.p1.flags.stadiumUsedThisTurn, true);
+});

@@ -1,3 +1,5 @@
+import { isEnergy } from '../cards.mjs';
+
 /**
  * Active/bench zones keep the full evolution stack in `array`. After evolving,
  * energies point at the evolved card's <img>, but `array[0]` may still be the
@@ -30,7 +32,7 @@ export function pokemonEnergyHostImage(zone, fallbackCard) {
 export function energiesAttachedToPokemon(zone, hostImage) {
   if (!hostImage || !zone?.array) return [];
   return zone.array.filter(
-    (c) => c.type === 'Energy' && c.image?.relative === hostImage
+    (c) => isEnergy(c) && c.image?.relative === hostImage
   );
 }
 

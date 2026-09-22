@@ -303,6 +303,7 @@ export const moveCard = async (
     );
     const isSupporter =
       String(movingCard.type || '').toLowerCase() === 'supporter' ||
+      String(movingCard.trainerType || '').toLowerCase() === 'supporter' ||
       subtypes.includes('supporter');
     if (isSupporter) {
       const supporterGate = canPerformAction({ user, action: 'playSupporter' });
@@ -318,6 +319,7 @@ export const moveCard = async (
     }
     const gate = supporterPlayGate({
       cardType: movingCard.type,
+      trainerType: movingCard.trainerType,
       subtypes: movingCard.subtypes || [],
       supporterPlayed: rulesState.flags[user]?.supporterPlayed,
     });
@@ -455,11 +457,11 @@ export const moveCard = async (
   if (
     rulesState.enabled &&
     !syncReplay &&
-    movingCard.type === 'Energy' &&
+    isEnergy(movingCard) &&
     oZoneId === 'hand' &&
     (dZoneId === 'active' || dZoneId === 'bench')
   ) {
-    const attachGate = canPerformAction({ user, action: 'attachEnergy' });
+    const attachGate = canPerformAction({ user, action: 'attachEnergy', targetZoneId: dZoneId });
     if (!attachGate.allowed) {
       appendMessage(user, `⛔ ${attachGate.reason}`, 'announcement', false);
       return;
@@ -476,7 +478,7 @@ export const moveCard = async (
   if (
     rulesState.enabled &&
     !syncReplay &&
-    movingCard.type === 'Energy' &&
+    isEnergy(movingCard) &&
     ['active', 'bench', 'attachedCards'].includes(oZoneId) &&
     ['discard', 'lostZone', 'hand', 'deck'].includes(dZoneId) &&
     movingCard.image?.relative &&
@@ -501,7 +503,7 @@ export const moveCard = async (
   if (
     rulesState.enabled &&
     !syncReplay &&
-    movingCard.type === 'Energy' &&
+    isEnergy(movingCard) &&
     destZoneId === 'discard' &&
     ['active', 'bench'].includes(oZoneId) &&
     movingCard.image?.relative
@@ -665,7 +667,7 @@ export const moveCard = async (
       }
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
-      if (rulesState.enabled && !syncReplay && movingCard.type === 'Energy') {
+      if (rulesState.enabled && !syncReplay && isEnergy(movingCard)) {
         document.dispatchEvent(
           new CustomEvent('rules-energy-attached', {
             detail: {
@@ -821,6 +823,12 @@ export const moveCard = async (
       movingCard.image.__rulesPokemonInPlay = false;
     }
   }
+  // Any card returning to hand may be played again: clear the Trainer "already
+  // announced" one-shot marker too, or a retrieved Trainer (VS Seeker, Junk
+  // Arm) becomes a silent no-op and strands on the board.
+  if (dZoneId === 'hand' && movingCard.image) {
+    movingCard.image.__rulesTrainerAnnounced = false;
+  }
   //update counter texts
   updateCount();
 
@@ -869,7 +877,7 @@ export const moveCard = async (
   if (
     rulesState.enabled &&
     !syncReplay &&
-    movingCard.type === 'Energy' &&
+    isEnergy(movingCard) &&
     ['active', 'bench'].includes(dZoneId) &&
     targetCard?.type === 'Pokémon'
   ) {

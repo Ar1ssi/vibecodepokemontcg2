@@ -114,6 +114,7 @@ function discardCard(draft, card, events) {
     const resolution = resolveSpecialEnergyDiscard(draft, {
       energy: card,
       host,
+      hostTop: host ? topPokemonCard(hostRef?.player, host) : null,
       hostPlayerId: hostRef?.playerId,
       hostZoneId: hostRef?.zoneId,
       events,

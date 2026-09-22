@@ -19,6 +19,7 @@
 import {
   listAttacks,
   listAbilities,
+  statusAttackBlock,
 } from '../../../../shared/engine/rules/attack-window.mjs';
 import { parseAttackDamage } from '../../../../shared/engine/rules/damage-parser.mjs';
 import { parseTypeValue } from '../../../../shared/engine/rules/rules-state.mjs';
@@ -426,6 +427,7 @@ export function buildInspectorModel(card, ctx = {}) {
     };
   }
 
+  const statusBlockReason = statusAttackBlock(card);
   const window =
     attackWindow ??
     listAttacks(card, {
@@ -434,6 +436,7 @@ export function buildInspectorModel(card, ctx = {}) {
       abilityUsed: Boolean(abilityUsed),
       stadiumCostModifier: Number(ctx.stadiumCostModifier) || 0,
       extraAttacks: ctx.extraAttacks || [],
+      blockedReason: statusBlockReason,
     });
 
   // Stadium-granted / inherited attacks render alongside the printed ones; the
@@ -486,10 +489,11 @@ export function buildInspectorModel(card, ctx = {}) {
         // `||` not `??`: listAttacks returns '' when there is nothing to explain, and an empty
         // tooltip is worse than no tooltip.
         entry?.reason ||
+        statusBlockReason ||
         (zone === 'bench' ? 'A benched Pokémon cannot attack.' : null),
       // The renderer wires clicks off `usable` alone, so every gate lives here rather than being
       // re-derived in the DOM layer.
-      usable: attackable && payable && !onceUsed,
+      usable: attackable && payable && !onceUsed && !statusBlockReason,
       recede: attackable && (onceUsed || !payable),
     };
   });

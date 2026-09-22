@@ -82,6 +82,9 @@ export async function computeCardGlows({
         extraAttacks,
         isAbilityUsed,
         ensureCardData,
+        // The view's flag is authoritative when present; without it the
+        // Fezandipiti-style KO-window ability must not glow (server refuses it).
+        koedLastOppTurn: !!flags.koedLastOppTurn,
       })
     : { attackAvailable: false, usableAbilities: [] };
 

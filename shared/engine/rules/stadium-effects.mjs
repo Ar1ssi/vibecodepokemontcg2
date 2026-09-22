@@ -1819,7 +1819,7 @@ export function isStadiumAbilityNegation(card) {
   // Modern "have no Abilities" plus the legacy Poké-Power/Poké-Body phrasing
   // (Space Center, Battle Frontier), which maps onto Abilities in this engine.
   return (
-    /have no abilities/.test(t) ||
+    /ha(?:ve|s) no abilities/.test(t) ||
     /can'?t use any pok(?:é|e)-powers|ignore pok(?:é|e)-bodies|ignore pok(?:é|e)-powers/.test(
       t
     )
@@ -1829,8 +1829,18 @@ export function isStadiumAbilityNegation(card) {
 export function stadiumAbilityBlocked(pokemon) {
   if (!rulesState.enabled || !pokemon) return false;
   const stadium = getStadium()?.card;
-  if (!stadium || !isStadiumAbilityNegation(stadium)) return false;
-  if (!stadiumFilterMatches(pokemon, stadium)) return false;
+  return stadiumAbilityBlockedFor(pokemon, stadium);
+}
+
+/**
+ * Server-pure variant: the caller supplies the Stadium card instead of reading
+ * the legacy `rulesState`/`getStadium()` singleton, so `reduce.mjs` can enforce
+ * a "have no Abilities" Stadium (Team Rocket's Watchtower, Space Center).
+ */
+export function stadiumAbilityBlockedFor(pokemon, stadiumCard) {
+  if (!pokemon || !stadiumCard) return false;
+  if (!isStadiumAbilityNegation(stadiumCard)) return false;
+  if (!stadiumFilterMatches(pokemon, stadiumCard)) return false;
   // App. 23: Ancient Traits are not Abilities — a "no Abilities" effect leaves
   // an α-Growth / Ω-Barrier trait alone.
   if (isAncientTraitAbility(pokemon)) return false;
@@ -1934,12 +1944,32 @@ export function getStadiumAttackCostIncrease(attacker, targetPlayer) {
   if (!rulesState.enabled || !attacker) return 0;
   const stadium = getStadium();
   if (!stadium?.card) return 0;
-  const increase = parseStadiumAttackCostIncrease(stadium.card);
+  return getStadiumAttackCostIncreaseFor(
+    attacker,
+    targetPlayer,
+    stadium.card,
+    stadium.user
+  );
+}
+
+/**
+ * Server-pure variant of the cost increase: the caller supplies the stadium
+ * card and its owner instead of the legacy `rulesState`/`getStadium()` singleton,
+ * so `reduce.mjs` prices attacks with the same modifier the client shows.
+ */
+export function getStadiumAttackCostIncreaseFor(
+  attacker,
+  targetPlayer,
+  stadiumCard,
+  stadiumUser
+) {
+  if (!attacker || !stadiumCard) return 0;
+  const increase = parseStadiumAttackCostIncrease(stadiumCard);
   if (increase <= 0) return 0;
-  if (!stadiumFilterMatches(attacker, stadium.card)) return 0;
-  const scope = stadiumTargetScope(stadium.card);
-  if (scope === 'opponent' && targetPlayer === stadium.user) return 0;
-  if (scope === 'owner' && targetPlayer !== stadium.user) return 0;
+  if (!stadiumFilterMatches(attacker, stadiumCard)) return 0;
+  const scope = stadiumTargetScope(stadiumCard);
+  if (scope === 'opponent' && targetPlayer === stadiumUser) return 0;
+  if (scope === 'owner' && targetPlayer !== stadiumUser) return 0;
   return increase;
 }
 

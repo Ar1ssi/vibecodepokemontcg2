@@ -254,6 +254,22 @@ export function executeSteps(draft, {
             (step.tagFilter !== 'single-strike' || isSingleStrikeCard(c))
         );
         const count = step.count || 1;
+        // An exact-count discard cost the hand cannot pay must never open a
+        // min=count/max=count choice over fewer options: `resolveChoice`
+        // rejects any selection below `min`, so the choice could never be
+        // resolved and every later command would answer `waiting_for_choice`
+        // (Prism Tower with one card in hand soft-locked the match).
+        if (candidates.length < count) {
+          events.push({
+            type: 'effectStepSkipped',
+            reason: 'not_enough_cards_to_discard',
+            required: count,
+            available: candidates.length,
+          });
+          // Abort the rest of the effect: the cost is unpayable, and "if you do"
+          // effects must not resolve what follows the unpaid cost.
+          return { pendingChoice: null, completed: true };
+        }
         const choice = createPendingChoice({
           player: playerId,
           prompt: `${sourceCard?.name || 'Trainer'}: Discard ${count} card${count > 1 ? 's' : ''} from your hand`,
@@ -1391,16 +1407,36 @@ export function executeSteps(draft, {
 
       case 'applyStatus':
       case 'statusAbility': {
-        const targetSide = step.target === 'bothActiveNonDark' || step.target === 'opponentActive' ? opponent : player;
-        const targetActive = targetSide?.zones?.active?.find((c) => !c.attachedTo);
-        if (targetActive) {
-          // Every listed condition lands: markers stack with a rotation condition (design 011).
-          const conditions = step.conditions?.length ? step.conditions : [step.condition || 'Poisoned'];
+        // "Both Active Pokémon are now …" / "Both Active non-{D} Pokémon are now …"
+        // must hit both sides; the non-{D} variant skips a Darkness Active.
+        // Collapsing these to a single side applied Dark Bell's Confusion to one
+        // Pokémon only.
+        const sides =
+          step.target === 'bothActiveNonDark' || step.target === 'bothActiveAll'
+            ? [player, opponent].filter(Boolean)
+            : [step.target === 'opponentActive' ? opponent : player].filter(Boolean);
+        const isDark = (card) => {
+          const types = [
+            ...(Array.isArray(card?.types) ? card.types : []),
+            card?.type,
+          ]
+            .filter(Boolean)
+            .map((t) => String(t).toLowerCase());
+          return types.includes('darkness') || types.includes('dark');
+        };
+        // Every listed condition lands: markers stack with a rotation condition (design 011).
+        const conditions = step.conditions?.length
+          ? step.conditions
+          : [step.condition || 'Poisoned'];
+        for (const side of sides) {
+          const targetActive = side?.zones?.active?.find((c) => !c.attachedTo);
+          if (!targetActive) continue;
+          if (step.target === 'bothActiveNonDark' && isDark(targetActive)) continue;
           for (const condition of conditions) {
             if (!addCondition(targetActive, condition)) continue;
             events.push({
               type: 'statusApplied',
-              playerId: targetSide.playerId,
+              playerId: side.playerId,
               instanceId: targetActive.instanceId,
               condition,
             });

@@ -351,3 +351,79 @@ test('authoritative special energy: on-discard return to hand (Recycle)', () => 
   );
   assert.equal(res.state.players.p1.zones.discard.length, 0);
 });
+
+test('authoritative special energy: a lethal end-of-turn tick Knocks Out and awards a prize', () => {
+  const state = game();
+  const host = pokemon({ instanceId: 1, name: 'Snorlax', hp: 150, types: ['Colorless'] });
+  host.damage = 140;
+  const dark = specialEnergy({
+    instanceId: 2,
+    name: 'Darkness Energy',
+    attachedTo: 1,
+    text: "If the Pokémon Darkness Energy is attached to damages the Defending Pokémon (after applying Weakness and Resistance), the attack does 10 more damage. At the end of every turn, put 1 damage counter on the Pokémon Darkness Energy is attached to, unless it's {D} or has Dark in its name. Darkness Energy provides {D} Energy.",
+  });
+  state.players.p1.zones.active.push(host, dark);
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.active.length, 0, '0-HP Pokémon left play');
+  assert.ok(
+    res.state.players.p1.zones.discard.some((c) => c.instanceId === 1),
+    'Knocked Out Pokémon is in the discard pile'
+  );
+  // The KO awards a real prize. p1 has no remaining Pokémon, so the game ends
+  // and the entitlement is collected instead of waiting on a prize-choice prompt.
+  assert.equal(res.state.players.p2.zones.prizes.length, 5, 'opponent was awarded a prize');
+});
+
+test('authoritative special energy: Legacy once-per-game marker survives the turn handoff', () => {
+  const state = game();
+  state.players.p2.flags = {
+    ...(state.players.p2.flags || {}),
+    legacyPrizeReductionUsed: true,
+  };
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu', hp: 60 }));
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew', hp: 60 }));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p2', 'the handoff rebuilt p2 flags');
+  assert.equal(
+    res.state.players.p2.flags.legacyPrizeReductionUsed,
+    true,
+    'the once-per-game marker was not erased by advanceTurn'
+  );
+});
+
+test('authoritative special energy: type-gated triggers read the top evolution, not the Basic', () => {
+  const state = game();
+  const eevee = pokemon({ instanceId: 1, name: 'Eevee', hp: 70, types: ['Colorless'] });
+  const espeon = createCard({
+    instanceId: 3,
+    name: 'Espeon',
+    hp: 110,
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    types: ['Psychic'],
+    attachedTo: 1,
+  });
+  const energy = specialEnergy({
+    instanceId: 2,
+    name: 'Telepathic Energy',
+    text: 'This card provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for up to 2 Basic {P} Pokémon and put them onto your Bench.',
+  });
+  const ralts = pokemon({ instanceId: 50, name: 'Ralts', types: ['Psychic'] });
+  state.players.p1.zones.active.push(eevee, espeon);
+  state.players.p1.zones.hand.push(energy);
+  state.players.p1.zones.deck.push(ralts);
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: 2, targetInstanceId: 1 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.ok(res.pendingChoice, 'the {P} host gate matched the Psychic evolution on a Colorless Basic');
+});

@@ -583,12 +583,16 @@
     // the limit entirely (Special Supporters may be played as many times as
     // their text allows).
     // cardType: supertype string ('Supporter', 'Item', 'Special Supporter', ...)
+    // trainerType: optional TCGdex `trainerType` ('Supporter'), which some card
+    //   shapes carry instead of subtypes.
     // subtypes: optional TCGdex subtypes array as fallback discriminator.
-    export function supporterPlayGate({ cardType, subtypes = [], supporterPlayed = false }) {
+    export function supporterPlayGate({ cardType, trainerType = '', subtypes = [], supporterPlayed = false }) {
       const t = String(cardType || '').toLowerCase();
+      const tr = String(trainerType || '').toLowerCase();
       const subs = (subtypes || []).map((s) => String(s).toLowerCase());
       const isSupporter =
         (t.includes('supporter') && !t.includes('special')) ||
+        (tr.includes('supporter') && !tr.includes('special')) ||
         (subs.includes('supporter') && !subs.includes('special supporter'));
       if (!isSupporter) return { allowed: true };
       if (supporterPlayed) {
@@ -653,8 +657,16 @@
       delete rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
     }
     export function canUsePlayedToBenchTrigger(player, card) {
+      if (card?.abilityUsed === true) return false;
       const entry = rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
-      return !!entry && !entry.used && entry.turn === rulesState.turnNumber;
+      if (entry && !entry.used && entry.turn === rulesState.turnNumber) return true;
+      // Under server authority the window is stamped on the card by the reducer
+      // (`playedToBenchTurn`) because the legacy move body that opens the map
+      // never runs; without this a just-benched Meowth ex read as already spent.
+      return (
+        card?.playedToBenchTurn != null &&
+        card.playedToBenchTurn === rulesState.turnNumber
+      );
     }
     export function consumePlayedToBenchTrigger(player, card) {
       const entry = rulesState.whenPlayedWindows[player]?.[abilityKey(card)];
@@ -756,7 +768,13 @@
           if (S.flags[user]?.energyAttached) {
             return { allowed: false, reason: 'Energy already attached this turn.' };
           }
-          if (pendingCantAttachEnergyFromHand(S, user)) {
+          // The lock is defender-Active scoped ("Energy cards can't be attached
+          // from your opponent's hand to the Defending Pokémon"), so a Bench
+          // target stays legal. Callers without a target keep the safe block.
+          if (
+            pendingCantAttachEnergyFromHand(S, user) &&
+            targetZoneId !== 'bench'
+          ) {
             return { allowed: false, reason: "Energy can't be attached from hand to the Defending Pokémon (attack effect)." };
           }
           return { allowed: true };

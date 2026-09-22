@@ -137,14 +137,17 @@ export function executeStadium(draft, {
     return { pendingChoice: null, completed: true, turnEnds: false };
   }
 
-  // An untimed "discard a card from hand, if you do…" cost can't be paid with an
-  // empty hand — the optional activation simply does nothing.
-  if (
-    preview?.cost?.type === 'discard-hand' &&
-    !(player.zones.hand || []).some((c) => c.instanceId !== stadium.instanceId)
-  ) {
-    draft.pendingChoice = null;
-    return { pendingChoice: null, completed: true, turnEnds: false };
+  // A "discard N cards from hand, if you do…" cost can't be paid when fewer than
+  // N cards are in hand — the activation simply does nothing. Testing only for a
+  // non-empty hand let Prism Tower (discard 2) open an unsatisfiable choice.
+  if (preview?.cost?.type === 'discard-hand') {
+    const held = (player.zones.hand || []).filter(
+      (c) => c.instanceId !== stadium.instanceId
+    ).length;
+    if (held < (preview.cost.n || 1)) {
+      draft.pendingChoice = null;
+      return { pendingChoice: null, completed: true, turnEnds: false };
+    }
   }
 
   // A "discard a Single Strike card" cost can't be paid without one in hand;

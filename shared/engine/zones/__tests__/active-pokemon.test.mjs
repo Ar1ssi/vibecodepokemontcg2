@@ -40,6 +40,20 @@ test('getActivePokemonCard returns sole Pokémon when not evolved', () => {
   assert.equal(countBenchPokemon(zone), 1);
 });
 
+test('energiesAttachedToPokemon recognizes an Energy row with no `type`', () => {
+  const img = { attached: false, relative: null };
+  const zone = {
+    array: [
+      { type: 'Pokémon', name: 'Pikachu', image: img },
+      // TCGdex deck rows can arrive without a `type` field; the name is the
+      // only classifier. Missing it made the attached Energy invisible to
+      // attack/retreat pricing.
+      { name: 'Rocky Fighting Energy', image: { attached: true, relative: img } },
+    ],
+  };
+  assert.equal(energiesAttachedToPokemon(zone, img).length, 1);
+});
+
 test('countBenchPokemon: 4 bench Pokémon + attached Energy counts as 4', () => {
   const hostImg = { attached: false, relative: null };
   const zone = {

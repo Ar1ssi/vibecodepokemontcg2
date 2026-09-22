@@ -61,6 +61,8 @@ import {
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
+  passiveCostDiscount,
+  applyCostDiscount,
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -91,6 +93,9 @@ import {
   stadiumExtraAttacks,
   mergeAttacks,
   isRepeatableStadiumAction,
+  parseStadiumCostModifier,
+  getStadiumAttackCostIncreaseFor,
+  stadiumAbilityBlockedFor,
 } from './rules/stadium-effects.mjs';
 import {
   isRuleBoxPokemon,
@@ -679,6 +684,7 @@ function handleKnockout(
   const koZoneRef = findCard(draft, victim.instanceId);
   const koSpecial = resolveSpecialEnergyKnockout(draft, {
     host: victim,
+    hostTop: inPlayView(draft, victim),
     hostPlayerId: victimPlayerId,
     hostZoneId: koZoneRef?.zoneId || (wasActive ? 'active' : 'bench'),
   });
@@ -714,6 +720,7 @@ function handleKnockout(
           resolveSpecialEnergyDiscard(draft, {
             energy: c,
             host: victim,
+            hostTop: inPlayView(draft, victim),
             hostPlayerId: victimPlayerId,
             hostZoneId: koZoneRef?.zoneId || 'active',
             events,
@@ -1186,7 +1193,11 @@ function resolveDamageCounterKnockouts(draft, { events }) {
       koed.add(e.instanceId);
       handleKnockout(draft, {
         victimPlayerId: ref.playerId,
-        attackerPlayerId: e.attackerPlayerId,
+        // A marker without an explicit beneficiary (self-inflicted damage)
+        // awards the KO to the victim's opponent, so prizes are never skipped.
+        attackerPlayerId:
+          e.attackerPlayerId ||
+          Object.keys(draft.players || {}).find((id) => id !== ref.playerId),
         victim,
         events,
       });
@@ -1344,6 +1355,10 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   // prize choice raised at the end of the command can be settled.
   const prizesOwed = draft.players[nextPlayerId].flags?.prizesOwed;
   const koedLastOppTurn = !!draft.players[nextPlayerId].flags?.koedOnOppTurn;
+  // Game-scoped once-per-game markers live in `flags` too, so the wholesale
+  // rebuild below must carry them across or they are silently forgotten — the
+  // Legacy Energy prize reduction was spent again on a later KO.
+  const legacyPrizeReductionUsed = !!draft.players[nextPlayerId].flags?.legacyPrizeReductionUsed;
 
   draft.turn.player = nextPlayerId;
   draft.turn.number = (draft.turn.number || 1) + 1;
@@ -1364,6 +1379,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     briarActive: false,
     koedLastOppTurn,
     ...(prizesOwed ? { prizesOwed } : {}),
+    ...(legacyPrizeReductionUsed ? { legacyPrizeReductionUsed } : {}),
   };
   for (const p of Object.values(draft.players || {})) {
     if (p.playerId !== nextPlayerId && p.flags) {
@@ -2152,7 +2168,15 @@ export function validateLegality(state, command) {
         };
       }
       const atkIdx = payload?.attackIndex ?? 0;
-      const attack = attackViewFor(state, active).attacks?.[atkIdx];
+      const attacks = attackViewFor(state, active).attacks || [];
+      const attack = attacks[atkIdx];
+      // A stale or out-of-range index on a card the server knows attacks for
+      // must not fall through every cost gate into a fabricated free attack.
+      // An empty attack list is different: card stats have not synced yet, and
+      // the apply case's flat fallback is the documented behavior there.
+      if (attacks.length > 0 && !attack) {
+        return { allowed: false, reason: 'Unknown attack.' };
+      }
       // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
       // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide. Share the
       // `useVStarGX` guard so a legacy state whose marker lives on `flags` also blocks it.
@@ -2182,22 +2206,55 @@ export function validateLegality(state, command) {
           };
         }
       }
-      if (attack && attack.cost?.length > 0) {
-        const attached = (player.zones?.active || []).filter(
+      if (attack?.cost?.length > 0) {
+        const activeZoneCards = player.zones?.active || [];
+        const attached = activeZoneCards.filter(
           (c) => c.attachedTo === active.instanceId && isEnergy(c)
         );
+        const stadiumCard = state.stadium?.card || state.stadium || null;
+        const stadiumUser =
+          state.stadium?.user ??
+          state.stadium?.playedBy ??
+          stadiumCard?.ownerId ??
+          null;
         const energyContext = {
-          stadiumCard: state.stadium?.card || state.stadium || null,
+          stadiumCard,
           hostPokemon: inPlayView(state, active),
         };
-        if (
-          !canPayAttackCost(
-            expandEnergyEntries(
-              attached.map((c) => serverEnergyDescriptor(c, energyContext))
-            ),
-            attack.cost
-          )
-        ) {
+        const energyEntries = expandEnergyEntries(
+          attached.map((c) => serverEnergyDescriptor(c, energyContext))
+        );
+        // Cost modifiers must be priced exactly as the client and the attack
+        // preview price them: passive ability/Tool discounts plus a Stadium
+        // cost modifier, then Nighttime Mine-style increases. Checking the raw
+        // printed cost rejected legally payable attacks.
+        const activeView = inPlayView(state, active);
+        const blockTools = isStadiumToolNegation(stadiumCard);
+        let discount = passiveCostDiscount(activeView);
+        if (!blockTools) {
+          discount += attachedTools(active, activeZoneCards).reduce(
+            (sum, tool) => sum + passiveCostDiscount(tool),
+            0
+          );
+        }
+        if (stadiumCard) discount += parseStadiumCostModifier(stadiumCard);
+        let effectiveCost = attack.cost;
+        if (discount > 0 && effectiveCost.length > 0) {
+          effectiveCost = applyCostDiscount(effectiveCost, discount);
+        }
+        const increase = getStadiumAttackCostIncreaseFor(
+          activeView,
+          playerId,
+          stadiumCard,
+          stadiumUser
+        );
+        if (increase > 0) {
+          effectiveCost = [
+            ...effectiveCost,
+            ...Array(increase).fill('Colorless'),
+          ];
+        }
+        if (!canPayAttackCost(energyEntries, effectiveCost)) {
           return { allowed: false, reason: 'Not enough energy attached.' };
         }
       }
@@ -2391,6 +2448,20 @@ export function validateLegality(state, command) {
           player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
         ) {
           return { allowed: false, reason: 'Ability already used this turn.' };
+        }
+        // "Have no Abilities" Stadiums (Team Rocket's Watchtower, Space Center,
+        // Battle Frontier) suppress abilities server-side too; previously the
+        // block existed only in the legacy client executors.
+        if (
+          stadiumAbilityBlockedFor(
+            inPlayView(state, cardRef.card),
+            state.stadium?.card || state.stadium || null
+          )
+        ) {
+          return {
+            allowed: false,
+            reason: "This Pokémon's Ability is blocked by the Stadium in play.",
+          };
         }
         // An ability printed as a conditional on this Pokémon's position cannot be activated from
         // the Bench. The inspector already greys the panel, so this catches a stale or crafted
@@ -3216,6 +3287,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           runSpecialEnergyTriggers(draft, {
             trigger: 'damaged',
             host: defender,
+            hostTop: inPlayView(draft, defender),
             hostPlayerId: defenderPlayerId,
             hostZoneId: defenderZoneRef?.zoneId || 'active',
             attacker,
@@ -3567,6 +3639,14 @@ function resolveAttackEffectPhase(draft, ctx) {
           const defRef = findCard(draft, defender.instanceId);
           if (defRef && defRef.zoneId === 'active') {
             defender.cannotRetreatUntilTurn = (draft.turn.number || 1) + 1;
+          }
+        }
+        if (locks.oppCannotAttack && defender) {
+          const defRef = findCard(draft, defender.instanceId);
+          if (defRef && defRef.zoneId === 'active') {
+            // The defender's next turn is the immediate next turn number; the
+            // legality gate blocks while `cannotAttackUntilTurn >= turn.number`.
+            defender.cannotAttackUntilTurn = (draft.turn.number || 1) + 1;
           }
         }
       }
@@ -3932,6 +4012,7 @@ export function applyCommand(state, command, rng = null) {
           const resolution = resolveSpecialEnergyDiscard(draft, {
             energy: card,
             host,
+            hostTop: host ? inPlayView(draft, host) : null,
             hostPlayerId: hostRef?.playerId,
             hostZoneId: hostRef?.zoneId,
             events,
@@ -3948,6 +4029,14 @@ export function applyCommand(state, command, rng = null) {
           card.attachedTo = null;
           for (const p of Object.values(draft.players || {})) {
             if (p.flags) p.flags.stadiumUsedThisTurn = false;
+          }
+          // Dropping the Stadium onto the Stadium slot is still "playing a
+          // Stadium": without this flag a second Stadium could be played in the
+          // same turn, which only the drag path allowed.
+          const placing = draft.players[playerId];
+          if (placing) {
+            if (!placing.flags) placing.flags = {};
+            placing.flags.stadiumPlayedThisTurn = true;
           }
         } else if (discardRedirect === 'hand') {
           card.attachedTo = null;
@@ -4157,7 +4246,19 @@ export function applyCommand(state, command, rng = null) {
               playerId,
               instanceId: payload.instanceId,
             });
-            advanceTurn(draft, { nextPlayerId: megaOppId, events });
+            // Ending the turn runs the full between-turns sequence, as every
+            // other turn-ending path does. Skipping Pokémon Checkup left Poison/
+            // Burn damage, status recovery and end-of-turn effects unapplied.
+            if (!isGameConcluded(draft)) {
+              resolveCheckup(draft, {
+                rng: activeRng,
+                events,
+                endingPlayerId: playerId,
+              });
+              if (!isGameConcluded(draft)) {
+                advanceTurn(draft, { nextPlayerId: megaOppId, events });
+              }
+            }
           }
         }
 
@@ -4179,6 +4280,7 @@ export function applyCommand(state, command, rng = null) {
           runSpecialEnergyTriggers(draft, {
             trigger: 'attach',
             host: hostRef.card,
+            hostTop: inPlayView(draft, hostRef.card),
             hostPlayerId: hostRef.playerId,
             hostZoneId: hostRef.zoneId,
             energy: cardRef.card,
@@ -4267,6 +4369,14 @@ export function applyCommand(state, command, rng = null) {
       const cardRef = findCard(draft, payload.instanceId);
       if (cardRef) {
         cardRef.card.abilityUsed = false;
+        // The turn flag is the other half of the used-check; clearing only the
+        // card stamp left the ability refused ("Ability already used this turn")
+        // while the counter visibly disappeared from the board.
+        const usedFlags = draft.players?.[cardRef.playerId]?.flags?.abilitiesUsed;
+        if (usedFlags) {
+          if (cardRef.card.instanceId != null) delete usedFlags[cardRef.card.instanceId];
+          if (cardRef.card.name != null) delete usedFlags[cardRef.card.name];
+        }
         events.push({
           type: 'abilityCounterUpdated',
           instanceId: payload.instanceId,

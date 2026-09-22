@@ -632,3 +632,97 @@ test('Prism Star KO routes the card to the Lost Zone, not discard (gap #11)', ()
   );
 });
 
+// ── Audit regressions: attack pricing and Stadium drops ──
+
+function attackFixture(extra = {}) {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  const attacker = createCard({
+    instanceId: 1,
+    name: 'Discounted Mon',
+    hp: 120,
+    supertype: 'Pokémon',
+    stage: 'Basic',
+    types: ['Water'],
+    attacks: [{ name: 'Aqua Jet', damage: 40, cost: ['Water', 'Water'] }],
+    ...extra,
+  });
+  const energy = createCard({
+    instanceId: 2,
+    name: 'Water Energy',
+    supertype: 'Energy',
+    type: 'Energy',
+    types: ['Water'],
+    attachedTo: 1,
+  });
+  state.players.p1.zones.active.push(attacker, energy);
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 9, name: 'Budew', hp: 60, supertype: 'Pokémon', stage: 'Basic' })
+  );
+  return state;
+}
+
+test('attack legality: a plural-abilities passive discount is priced, not rejected', () => {
+  const state = attackFixture({
+    abilities: [
+      { name: 'Aqua Discount', type: 'Ability', text: 'Attacks used by this Pokémon cost {W} less.' },
+    ],
+  });
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null, 'the discounted cost is payable with one Water Energy');
+  assert.equal(findCard(res.state, 9).card.damage, 40);
+});
+
+test('attack legality: an out-of-range attack index is rejected, not fabricated', () => {
+  const state = attackFixture();
+
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 7 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, 'Unknown attack.');
+  assert.equal(res.state.players.p2.zones.active[0].damage, 0, 'no free damage');
+  assert.equal(res.state.turn.player, 'p1', 'the turn was not consumed');
+});
+
+test('Stadium drop: placing a Stadium from hand marks it as played this turn', () => {
+  const state = createGameState({
+    players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  state.players.p1.zones.hand.push(
+    createCard({
+      instanceId: 30,
+      name: 'Artazon',
+      supertype: 'Trainer',
+      subtypes: ['Stadium'],
+      text: 'Once during each player’s turn, that player may search their deck for a Basic Pokémon that doesn’t have a Rule Box and put it onto their Bench.',
+    })
+  );
+  state.players.p2.zones.active.push(
+    createCard({ instanceId: 9, name: 'Budew', hp: 60, supertype: 'Pokémon', stage: 'Basic' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'moveCard',
+    payload: { instanceId: 30, from: 'hand', to: 'stadium' },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.stadium.instanceId, 30);
+  assert.equal(res.state.players.p1.flags.stadiumPlayedThisTurn, true);
+});
+

@@ -580,7 +580,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
       const key = active.image?.dataset?.cardId || active.name;
       const gate = canAct(user, key);
       if (!gate.can) {
-        if (getStatus(user, key)?.asleep) {
+        const activeStatus = getStatus(user, key);
+        if (activeStatus?.asleep) {
           const wakeCoin = flipCoin(rngBundle, 'wake');
           const wake = resolveWake(user, key, rngFromCoin(wakeCoin));
           if (!wake.woke) {
@@ -593,10 +594,12 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             return; // turn does NOT end; player can retry or pass
           }
           appendMessage(user, '☀️ Heads — the Pokémon is awake!', 'announcement', false);
-        } else {
+        } else if (!activeStatus?.confused) {
           appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
           return; // paralyzed — turn does NOT end
         }
+        // Confused falls through to the pre-attack coin flip below; `canAct`
+        // reports it as blocked, but the flip decides, not a hard lock.
       }
       if (getStatus(user, key)?.confused) {
         const confusedCoin = flipCoin(rngBundle, 'confused');
@@ -785,11 +788,19 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
               );
               return;
             }
-            for (let i = 0; i < cost.energy; i++) {
-              const z = getZone(user, 'active');
-              const idx = z.array.findIndex((c) => c.type === 'Energy');
-              if (idx === -1) break;
-              moveCard(user, user, 'active', 'discard', idx);
+            rulesState.attackExecuting = true;
+            try {
+              for (let i = 0; i < cost.energy; i++) {
+                const z = getZone(user, 'active');
+                const idx = z.array.findIndex((c) => c.type === 'Energy');
+                if (idx === -1) break;
+                moveCard(user, user, 'active', 'discard', idx);
+              }
+            } finally {
+              // Nitro/Boomerang/Burning Energy's on-discard plans are
+              // attack-conditioned; move-card reads this flag while the
+              // discard runs. Without it the return/reattach silently no-oped.
+              rulesState.attackExecuting = false;
             }
             appendMessage(
               user,
@@ -873,11 +884,16 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 chosen = pick;
                 rngBundle.energyDiscarded = chosen;
               }
-              for (let k = 0; k < chosen; k++) {
-                const z = getZone(user, 'active');
-                const idx = z.array.findIndex((c) => c.type === 'Energy');
-                if (idx === -1) break;
-                moveCard(user, user, 'active', 'discard', idx);
+              rulesState.attackExecuting = true;
+              try {
+                for (let k = 0; k < chosen; k++) {
+                  const z = getZone(user, 'active');
+                  const idx = z.array.findIndex((c) => c.type === 'Energy');
+                  if (idx === -1) break;
+                  moveCard(user, user, 'active', 'discard', idx);
+                }
+              } finally {
+                rulesState.attackExecuting = false;
               }
               appendMessage(
                 user,
@@ -1059,6 +1075,10 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
           stadium: getStadium()?.card || null,
           defenderIsActive: true,
           defenderZoneCards: getZone(oppPlayer, 'active').array,
+          // Attacker special-energy bonuses/penalties (Darkness, Double Turbo,
+          // Single Strike, …) read from the whole active zone; omitting it made
+          // the solo path silently ignore every attacker-side modifier.
+          attackerZoneCards: getZone(user, 'active').array,
         });
         if (rulesState.enabled && immunityClause(atk.text)) {
           const raw = parsed?.total ?? effectiveAttack.damage ?? dmg.total;
