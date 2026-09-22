@@ -84,3 +84,92 @@ export const rectForInstance = (instanceId, registry) => {
   if (rect.width < 2 || rect.height < 2) return null;
   return rect;
 };
+
+/**
+ * Design 026: sample a pose function into WAAPI keyframes so effects run on
+ * the compositor while the pose math stays the unit-tested source of truth.
+ * `toFrame(pose)` maps one pose to a keyframe object (transform/opacity only).
+ */
+export const sampleKeyframes = (poseFn, toFrame, samples = 24) => {
+  const count = Math.max(2, Math.floor(samples));
+  const frames = [];
+  for (let i = 0; i <= count; i += 1) {
+    const t = i / count;
+    frames.push({ ...toFrame(poseFn(t)), offset: t });
+  }
+  return frames;
+};
+
+const applyFrame = (el, frame) => {
+  if (!frame || !el?.style) return;
+  for (const [key, value] of Object.entries(frame)) {
+    if (key === 'offset' || key === 'easing' || key === 'composite') continue;
+    el.style[key] = String(value);
+  }
+};
+
+/**
+ * Play `frames` on `el`. Resolves when the animation ends or is cancelled.
+ * Without WAAPI the final frame is applied at once, so the effect degrades to
+ * its end state instead of throwing.
+ */
+export const animateFrames = (el, frames, { duration, delay = 0, easing = 'linear' } = {}) => {
+  if (typeof el?.animate !== 'function') {
+    applyFrame(el, frames?.at?.(-1));
+    return Promise.resolve();
+  }
+  const animation = el.animate(frames, { duration, delay, easing, fill: 'both' });
+  return animation.finished.then(
+    () => undefined,
+    () => undefined
+  );
+};
+
+/**
+ * Remove `host` once every promise settles, or after `backstopMs` at the
+ * latest: a hidden tab or a cancelled animation must never leak an overlay.
+ */
+export const removeWhen = (host, promises, backstopMs) => {
+  let removed = false;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    host.remove();
+  };
+  const timer = setTimeout(remove, backstopMs);
+  Promise.all(promises).then(() => {
+    clearTimeout(timer);
+    remove();
+  });
+  return remove;
+};
+
+/**
+ * Append one `<i>` per particle (from particles.mjs `burstParticles`) at the
+ * host's center and fly each outward. Returns the animations' promises.
+ */
+export const spawnParticles = (host, particles, { className = 'fx-particle', color, duration }) =>
+  particles.map((p) => {
+    const node = document.createElement('i');
+    node.className = className;
+    node.style.width = `${p.size}px`;
+    node.style.height = `${p.size * (p.aspect ?? 1)}px`;
+    node.style.marginLeft = `${-p.size / 2}px`;
+    node.style.marginTop = `${(-p.size * (p.aspect ?? 1)) / 2}px`;
+    if (color) node.style.setProperty('--fx-p-color', color);
+    host.appendChild(node);
+    const rot = `rotate(${p.angle}deg)`;
+    return animateFrames(
+      node,
+      [
+        { transform: `translate(0px, 0px) ${rot} scale(${p.startScale ?? 1})`, opacity: 1 },
+        {
+          transform: `translate(${p.dx * 0.8}px, ${p.dy * 0.8 + (p.gravity ?? 0) * 0.3}px) ${rot} scale(${p.midScale ?? 0.9})`,
+          opacity: 1,
+          offset: 0.55,
+        },
+        { transform: `translate(${p.dx}px, ${p.dy + (p.gravity ?? 0)}px) ${rot} scale(0)`, opacity: 0 },
+      ],
+      { duration: duration * p.life, delay: duration * p.delay, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)' }
+    );
+  });

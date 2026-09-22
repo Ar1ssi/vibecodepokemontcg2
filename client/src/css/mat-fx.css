@@ -10,6 +10,53 @@ body.fx-off .fx-overlay {
   display: none;
 }
 
+/* Design 026: Rodin for FX text (same face the PC Box uses; declaring it
+   again here keeps the game page independent of the deck-builder sheet). */
+@font-face {
+  font-family: 'Rodin Condensed';
+  src: url('../assets/fonts/rodin-condensed-latin.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root {
+  --fx-font: 'Rodin Condensed', 'Arial Narrow', Impact, 'Arial Black', sans-serif;
+}
+
+/* Particles are absolutely placed at the host's center; spawnParticles sets
+   size/margins and flies each one out with WAAPI. */
+.fx-particle,
+.fx-particle--streak,
+.fx-particle--shard,
+.fx-particle--mote {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  will-change: transform, opacity;
+  background: var(--fx-p-color, #fff);
+}
+
+.fx-particle {
+  border-radius: 50%;
+  box-shadow: 0 0 6px 1px var(--fx-p-color, #fff);
+}
+
+.fx-particle--streak {
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 55%, var(--fx-p-color, #fff));
+  box-shadow: 0 0 6px var(--fx-p-color, #fff);
+}
+
+.fx-particle--shard {
+  clip-path: polygon(50% 0, 100% 60%, 40% 100%, 0 35%);
+  filter: drop-shadow(0 0 3px var(--fx-p-color, #fff));
+}
+
+.fx-particle--mote {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 30%, var(--fx-p-color, #fff) 60%, rgba(255, 255, 255, 0) 72%);
+}
+
 .fx-damage-pop {
   display: flex;
   align-items: flex-start;
