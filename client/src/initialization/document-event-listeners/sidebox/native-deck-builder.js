@@ -17,6 +17,7 @@ import {
   validateDeck,
 } from '../../../setup/deck-builder/core/deck-validation.mjs';
 import { systemState } from '../../../state.js';
+import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import {
   changeCardBack,
   loadDeckData,
@@ -812,7 +813,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const detail = await response.json();
-          const rarity = detail?.rarity || '';
+          const rarity = printedRarity(detail);
           rarityCache.set(cardId, rarity);
           return rarity;
         } catch {

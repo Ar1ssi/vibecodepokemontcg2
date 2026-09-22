@@ -2,6 +2,7 @@
     // Tracks whose turn it is, what phase they're in, and what actions are
     // currently legal. All gating flows through canPerformAction().
     
+    import { printedRarity } from './card-classify.mjs';
     import {
       buildSetCardIdCandidates,
       extractTcgdexIdFromImageUrl,
@@ -419,7 +420,7 @@
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || [],
           trainerType: detail.trainerType || null,
-          rarity: detail.rarity || card.rarity || '',
+          rarity: printedRarity(detail) || card.rarity || '',
           effect: detail.effect || null,
           text: detail.text || detail.effect || null,
         };

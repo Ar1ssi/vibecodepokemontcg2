@@ -225,3 +225,12 @@ export function prizesForKO(card = {}) {
   }
   return 1;
 }
+
+// TCGdex lists WotC-era holos (Base Set Alakazam) as plain "Rare"; only the
+// `variants.holo` flag marks the foil print. A card with both holo and non-holo
+// prints is shown as the holo (user decision).
+export function printedRarity(detail = {}) {
+  const rarity = String(detail?.rarity ?? '').trim();
+  if (rarity === 'Rare' && detail?.variants?.holo === true) return 'Holo Rare';
+  return rarity;
+}

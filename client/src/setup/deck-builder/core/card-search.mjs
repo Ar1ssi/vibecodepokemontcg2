@@ -1,4 +1,5 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
+import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
 const tcgdexSetReleaseDateCache = new Map();
@@ -155,7 +156,7 @@ function normalizeTcgdexCard(card) {
       large: image,
     },
     image,
-    rarity: card.rarity,
+    rarity: printedRarity(card),
     // Printed Pokémon types ('Fire', 'Water', …) and the Trainer subtype
     // ('Item' | 'Supporter' | 'Stadium' | 'Tool'). Both drive the builder's
     // Live-style filter pills.
