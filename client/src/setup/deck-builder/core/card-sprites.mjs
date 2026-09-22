@@ -135,7 +135,7 @@ export function pokemonSpriteForName(cardName, { types } = {}) {
   } while (name !== previous);
 
   let form = null;
-  const mega = name.match(/^(?:mega|m)\s+(.+?)(?:\s+([xy]))?$/i);
+  const mega = name.match(/^(?:mega|m)\s+(.+?)(?:\s+([xyz]))?$/i);
   const primal = name.match(/^primal\s+(.+)$/i);
   const regional = name.match(/^(alolan|galarian|hisuian|paldean)\s+(.+)$/i);
   const named = name.match(NAMED_FORM_PREFIX);

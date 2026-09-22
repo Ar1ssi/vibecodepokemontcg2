@@ -11,7 +11,10 @@ import {
   resolveDisplaySprites,
 } from '../core/card-sprites.mjs';
 
-const CLIENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+const CLIENT_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../../..'
+);
 const slugOf = (name) => pokemonSpriteForName(name)?.slug ?? null;
 
 test('rule-box suffixes are stripped down to the species', () => {
@@ -63,9 +66,19 @@ test('generation 9 species and their named forms resolve', () => {
   assert.equal(slugOf('Palafin'), 'palafin');
 });
 
+test('Legends: Z-A and Mega Dimension Megas resolve, including Z Megas', () => {
+  assert.equal(slugOf('Mega Dragonite ex'), 'dragonite-mega');
+  assert.equal(slugOf('Mega Raichu X ex'), 'raichu-mega-x');
+  assert.equal(slugOf('Mega Lucario Z ex'), 'lucario-mega-z');
+  assert.equal(slugOf('Mega Lucario ex'), 'lucario-mega');
+  assert.equal(slugOf('Mega Scovillain ex'), 'scovillain-mega');
+  assert.equal(slugOf('Mega Floette ex'), 'floette-mega');
+});
+
 test('a Paldean Tauros card picks its breed from the card type', () => {
   const taurosOf = (types) =>
-    cardSpriteFor({ name: 'Paldean Tauros', supertype: 'Pokémon', types })?.slug;
+    cardSpriteFor({ name: 'Paldean Tauros', supertype: 'Pokémon', types })
+      ?.slug;
   assert.equal(taurosOf(['Fighting']), 'tauros-paldea');
   assert.equal(taurosOf(['Fire']), 'tauros-paldea-blaze');
   assert.equal(taurosOf(['Water']), 'tauros-paldea-aqua');
@@ -106,41 +119,81 @@ test('item Trainers map to their pokesprite item icon', () => {
 });
 
 test('item icons resolve to files vendored on disk', () => {
-  for (const name of ['Great Ball', 'Rare Candy', 'Choice Belt', 'Super Rod', 'VS Seeker']) {
-    const sprite = cardSpriteFor({ name, supertype: 'Trainer', subtypes: ['Item'] });
+  for (const name of [
+    'Great Ball',
+    'Rare Candy',
+    'Choice Belt',
+    'Super Rod',
+    'VS Seeker',
+  ]) {
+    const sprite = cardSpriteFor({
+      name,
+      supertype: 'Trainer',
+      subtypes: ['Item'],
+    });
     assert.ok(sprite, name);
     assert.ok(existsSync(path.join(CLIENT_ROOT, sprite.url)), sprite.url);
   }
 });
 
 test('cardSpriteFor routes by supertype and skips Supporters, Stadiums and Energy', () => {
-  assert.deepEqual(cardSpriteFor({ name: 'Charizard ex', supertype: 'Pokémon' }), {
-    kind: 'pokemon',
-    slug: 'charizard',
-    url: '/src/assets/pokemon/gen8/regular/charizard.png',
-    label: 'Charizard',
-  });
   assert.deepEqual(
-    cardSpriteFor({ name: 'Great Ball', supertype: 'Trainer', subtypes: ['Item'] }),
-    { kind: 'item', url: '/src/assets/items/ball/great.png', label: 'Great Ball' }
+    cardSpriteFor({ name: 'Charizard ex', supertype: 'Pokémon' }),
+    {
+      kind: 'pokemon',
+      slug: 'charizard',
+      url: '/src/assets/pokemon/gen8/regular/charizard.png',
+      label: 'Charizard',
+    }
+  );
+  assert.deepEqual(
+    cardSpriteFor({
+      name: 'Great Ball',
+      supertype: 'Trainer',
+      subtypes: ['Item'],
+    }),
+    {
+      kind: 'item',
+      url: '/src/assets/items/ball/great.png',
+      label: 'Great Ball',
+    }
   );
   assert.equal(
-    cardSpriteFor({ name: 'Rare Candy', supertype: 'Trainer', subtypes: ['Supporter'] }),
+    cardSpriteFor({
+      name: 'Rare Candy',
+      supertype: 'Trainer',
+      subtypes: ['Supporter'],
+    }),
     null
   );
   assert.equal(
-    cardSpriteFor({ name: 'Artazon', supertype: 'Trainer', subtypes: ['Stadium'] }),
+    cardSpriteFor({
+      name: 'Artazon',
+      supertype: 'Trainer',
+      subtypes: ['Stadium'],
+    }),
     null
   );
   assert.equal(
-    cardSpriteFor({ name: 'Rare Candy', supertype: 'Trainer', trainerType: 'Supporter' }),
+    cardSpriteFor({
+      name: 'Rare Candy',
+      supertype: 'Trainer',
+      trainerType: 'Supporter',
+    }),
     null
   );
   assert.equal(
-    cardSpriteFor({ name: 'Rare Candy', supertype: 'Trainer', trainerType: 'Item' })?.label,
+    cardSpriteFor({
+      name: 'Rare Candy',
+      supertype: 'Trainer',
+      trainerType: 'Item',
+    })?.label,
     'Rare Candy'
   );
-  assert.equal(cardSpriteFor({ name: 'Fire Energy', supertype: 'Energy' }), null);
+  assert.equal(
+    cardSpriteFor({ name: 'Fire Energy', supertype: 'Energy' }),
+    null
+  );
   assert.equal(cardSpriteFor(null), null);
 });
 
@@ -153,7 +206,11 @@ function deckOf(...entries) {
 }
 
 test('display sprites fill empty slots from the deck, most copies first', () => {
-  const cards = deckOf(['Pidgeot ex', 2], ['Charizard ex', 3], ['Rare Candy', 4, 'Trainer']);
+  const cards = deckOf(
+    ['Pidgeot ex', 2],
+    ['Charizard ex', 3],
+    ['Rare Candy', 4, 'Trainer']
+  );
   assert.deepEqual(resolveDisplaySprites([], cards), [
     { slug: 'charizard', shiny: false, auto: true },
     { slug: 'pidgeot', shiny: false, auto: true },
@@ -162,10 +219,13 @@ test('display sprites fill empty slots from the deck, most copies first', () => 
 
 test('chosen sprites come first and are never duplicated by the fill', () => {
   const cards = deckOf(['Charizard ex', 3], ['Pidgeot ex', 2]);
-  assert.deepEqual(resolveDisplaySprites([{ slug: 'charizard', shiny: true }], cards), [
-    { slug: 'charizard', shiny: true },
-    { slug: 'pidgeot', shiny: false, auto: true },
-  ]);
+  assert.deepEqual(
+    resolveDisplaySprites([{ slug: 'charizard', shiny: true }], cards),
+    [
+      { slug: 'charizard', shiny: true },
+      { slug: 'pidgeot', shiny: false, auto: true },
+    ]
+  );
 });
 
 test('copies of one species across card names add up', () => {
@@ -174,15 +234,19 @@ test('copies of one species across card names add up', () => {
 });
 
 test('a deck with no Pokémon and no choice shows no sprites', () => {
-  assert.deepEqual(resolveDisplaySprites([], deckOf(['Rare Candy', 4, 'Trainer'])), []);
+  assert.deepEqual(
+    resolveDisplaySprites([], deckOf(['Rare Candy', 4, 'Trainer'])),
+    []
+  );
   assert.deepEqual(resolveDisplaySprites(undefined, undefined), []);
 });
 
 test('an old three-sprite choice shows only the first two', () => {
   assert.deepEqual(
-    resolveDisplaySprites(['pikachu', 'eevee', 'mew'], deckOf(['Snorlax', 4])).map(
-      (sprite) => sprite.slug
-    ),
+    resolveDisplaySprites(
+      ['pikachu', 'eevee', 'mew'],
+      deckOf(['Snorlax', 4])
+    ).map((sprite) => sprite.slug),
     ['pikachu', 'eevee']
   );
 });

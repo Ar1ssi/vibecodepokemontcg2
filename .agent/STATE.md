@@ -4,12 +4,12 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 255
-Focus: PC Box (3DS) restyle of the deck builder + Solo drawer, per-card deck-list sprites (design 025),
-  and Gen 9 fan sprites (D100). All built on `claude/deck-builder-redesign-e68157` in a worktree. Not committed.
-Active: none. Waiting for the user to check it on localhost and approve committing.
-Next: commit design 025 (per-slice or one commit) and merge on user OK; then I81 (autosave vs explicit
-  Save), then I78–I80. Maintenance due at S260.
+Session: 256
+Focus: deck builder PC Box restyle (design 025) and fan sprites for Gen 9 and the Z-A Megas (D100, D101).
+  All of it is on main.
+Active: none.
+Next: the user checks the new sprites on localhost. Then I81 (autosave vs explicit Save), then I78–I80.
+  Maintenance due at S260.
 Blocked: nothing. A public tunnel is NOT possible from this container — see the watch-out below.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -24,7 +24,7 @@ Blocked: nothing. A public tunnel is NOT possible from this container — see th
   - Rodin font: `assets/fonts/`.
   Card→sprite parsing lives only in `core/card-sprites.mjs`. Sprite cap is 2, auto-filled from the deck.
 - ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is
-  unpaid" — failing since before S251. Suite otherwise green (2980 tests at S255).
+  unpaid" — failing since before S251. Suite otherwise green (2982 tests at S256).
 - No tunnel from this container: cloudflared ignores HTTPS_PROXY and times out on 7844. A local relay +
   `--edge 127.0.0.1:7844` is the only route, and the sandbox blocks the relay. ngrok needs only an authtoken.
   Never report a printed *.trycloudflare.com URL as live.
@@ -32,8 +32,8 @@ Blocked: nothing. A public tunnel is NOT possible from this container — see th
   not `pnpm test` (its implicit install has emptied node_modules). The user checks CSS on localhost themselves.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S255 (uncommitted) Gen 9 fan sprites: all 120 species plus 22 forms, with card-name form parsing (D100, +6 tests).
-- S254 (uncommitted) design 025:
+- S255–S256 fan sprites: all of Gen 9 plus 22 forms (D100), and the 48 Legends: Z-A / Mega Dimension Megas (D101).
+- S254 design 025:
   - PC Box look for the builder and Solo drawer, with per-deck Gen V wallpapers switched by ◀ ▶ and the Rodin font.
   - Exactly 2 deck sprites, auto-filled from the deck.
   - A sprite beside each deck row: Pokémon forms plus pokesprite items (+33 tests).

@@ -28,7 +28,10 @@ test('the catalog is unique by slug and dex-ordered', () => {
   const slugs = new Set(POKEMON_SPRITE_CATALOG.map((entry) => entry.slug));
   assert.equal(slugs.size, POKEMON_SPRITE_CATALOG.length);
   const indexes = POKEMON_SPRITE_CATALOG.map((entry) => entry.idx);
-  assert.deepEqual(indexes, [...indexes].sort((a, b) => Number(a) - Number(b)));
+  assert.deepEqual(
+    indexes,
+    [...indexes].sort((a, b) => Number(a) - Number(b))
+  );
 });
 
 // The catalog promises a file for every slug; a partial vendoring run would
@@ -45,23 +48,39 @@ test('every catalog entry resolves to sprite files on disk, shiny or not', () =>
 });
 
 test('the catalog carries every generation 9 species, 906 to 1025', () => {
-  const indexes = new Set(POKEMON_SPRITE_CATALOG.map((entry) => Number(entry.idx)));
-  for (let idx = 906; idx <= 1025; idx += 1) assert.ok(indexes.has(idx), String(idx));
+  const indexes = new Set(
+    POKEMON_SPRITE_CATALOG.map((entry) => Number(entry.idx))
+  );
+  for (let idx = 906; idx <= 1025; idx += 1)
+    assert.ok(indexes.has(idx), String(idx));
   assert.equal(findPokemonBySlug('sprigatito').name, 'Sprigatito');
   assert.equal(findPokemonBySlug('iron-crown').name, 'Iron Crown');
   assert.equal(findPokemonBySlug('pecharunt').idx, '1025');
 });
 
 test('a Paldean form sits right after its older species', () => {
-  const names = POKEMON_SPRITE_CATALOG.filter((entry) => entry.species === 'Tauros').map(
-    (entry) => entry.name
-  );
+  const names = POKEMON_SPRITE_CATALOG.filter(
+    (entry) => entry.species === 'Tauros'
+  ).map((entry) => entry.name);
   assert.deepEqual(names, [
     'Tauros',
     'Paldean Tauros',
     'Paldean Tauros (Blaze Breed)',
     'Paldean Tauros (Aqua Breed)',
   ]);
+});
+
+test('Z-A Megas sit with their species, after any gen-8 Mega', () => {
+  const absol = POKEMON_SPRITE_CATALOG.filter(
+    (entry) => entry.species === 'Absol'
+  ).map((entry) => entry.name);
+  assert.deepEqual(absol, ['Absol', 'Mega Absol', 'Mega Absol Z']);
+  assert.equal(
+    POKEMON_SPRITE_CATALOG.filter((entry) => entry.species === 'Magearna')
+      .length,
+    3
+  );
+  assert.equal(hasShinySprite('dragonite-mega'), false);
 });
 
 test('generation 9 art has no shiny set, so shiny is never stored or shown', () => {
@@ -72,11 +91,17 @@ test('generation 9 art has no shiny set, so shiny is never stored or shown', () 
     deckSpriteImageUrl({ slug: 'sprigatito', shiny: true }),
     '/src/assets/pokemon/gen9/regular/sprigatito.png'
   );
-  assert.equal(deckSpriteLabel({ slug: 'sprigatito', shiny: true }), 'Sprigatito');
-  assert.deepEqual(normalizeDeckSprites([{ slug: 'sprigatito', shiny: true }]), [
+  assert.equal(
+    deckSpriteLabel({ slug: 'sprigatito', shiny: true }),
+    'Sprigatito'
+  );
+  assert.deepEqual(
+    normalizeDeckSprites([{ slug: 'sprigatito', shiny: true }]),
+    [{ slug: 'sprigatito', shiny: false }]
+  );
+  assert.deepEqual(addDeckSprite([], 'sprigatito', true), [
     { slug: 'sprigatito', shiny: false },
   ]);
-  assert.deepEqual(addDeckSprite([], 'sprigatito', true), [{ slug: 'sprigatito', shiny: false }]);
   assert.deepEqual(toggleDeckSpriteShinyAt([{ slug: 'sprigatito' }], 0), [
     { slug: 'sprigatito', shiny: false },
   ]);
