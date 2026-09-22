@@ -25,13 +25,18 @@ const escapeHtml = (value = '') => String(value)
           const setName = escapeHtml(card.set?.name || 'Unknown Set');
           const qty = quantities[card.id] || 0;
     
+          // Image-first, as in Pokémon TCG Live: the card scan IS the tile.
+          // The name/set caption stays in the DOM for screen readers and for
+          // the light theme, but reads as a hover-in footer over the art.
           return `
-            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}">
-              <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" />
-              ${qty > 0 ? `<span class="native-deck-builder-result-qty">${qty}</span>` : ''}
-              <span class="native-deck-builder-result-text">
-                <strong>${escapeHtml(card.name)}</strong>
-                <span>${setName}</span>
+            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${qty > 0 ? ` data-in-deck="${qty}"` : ''}${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}">
+              <span class="native-deck-builder-result-frame">
+                <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />
+                ${qty > 0 ? `<span class="native-deck-builder-result-qty" aria-label="${qty} in deck">${qty}</span>` : ''}
+                <span class="native-deck-builder-result-text">
+                  <strong>${escapeHtml(card.name)}</strong>
+                  <span>${setName}</span>
+                </span>
               </span>
             </button>
           `;

@@ -401,16 +401,146 @@
   background: var(--db-border-strong);
 }
 
+/* Denser than the base grid — with no caption taking room, more cards fit. */
+.db-live .native-deck-builder-search-results,
+.db-live .native-deck-builder-set-browser-group-cards {
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 0.75vh 0.5vw;
+}
+
+/* Image-first grid: the card scan is the tile, caption rides in on hover. */
 .db-live .native-deck-builder-result {
+  position: relative;
+  display: block;
+  padding: 0;
   background: transparent;
   border: none;
-  padding: 0;
-  border-radius: var(--db-radius-sm);
+  border-radius: 0;
+  gap: 0;
 }
 
 .db-live .native-deck-builder-result:hover {
   background: transparent;
   box-shadow: none;
+  transform: none;
+}
+
+.db-live .native-deck-builder-result-frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--db-radius-sm);
+  box-shadow: var(--db-shadow-soft);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    outline-color 160ms ease;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+.db-live .native-deck-builder-result:hover .native-deck-builder-result-frame,
+.db-live
+  .native-deck-builder-result:focus-visible
+  .native-deck-builder-result-frame {
+  transform: scale(1.045);
+  box-shadow: var(--db-shadow);
+  outline-color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-result-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+/* A card already in the deck wears a gold copy-count pill, like Live. */
+.db-live .native-deck-builder-result-qty {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2vh;
+  height: 2.2vh;
+  padding: 0 0.45vh;
+  font-size: 1.4vh;
+  font-weight: 800;
+  line-height: 1;
+  color: #23190a;
+  background: var(--db-gold);
+  border-radius: var(--db-radius-pill);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.db-live
+  .native-deck-builder-result[data-in-deck]
+  .native-deck-builder-result-frame {
+  outline-color: rgba(240, 195, 74, 0.55);
+}
+
+.db-live .native-deck-builder-result-text {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 1.4vh 0.4vw 0.45vh;
+  text-align: left;
+  background: linear-gradient(
+    to top,
+    rgba(4, 7, 18, 0.94) 0%,
+    rgba(4, 7, 18, 0.82) 55%,
+    rgba(4, 7, 18, 0) 100%
+  );
+  opacity: 0;
+  transform: translateY(20%);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.db-live .native-deck-builder-result:hover .native-deck-builder-result-text,
+.db-live
+  .native-deck-builder-result:focus-visible
+  .native-deck-builder-result-text {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.db-live .native-deck-builder-result-text strong {
+  color: #fff;
+  font-size: 1.3vh;
+}
+
+.db-live .native-deck-builder-result-text span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1.15vh;
+  opacity: 1;
+}
+
+/* Reduced motion: keep the affordances, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .db-live .native-deck-builder-result-frame,
+  .db-live .native-deck-builder-result-text,
+  .db-live .native-deck-builder-counter-fill {
+    transition: none;
+  }
+
+  .db-live .native-deck-builder-result:hover .native-deck-builder-result-frame {
+    transform: none;
+  }
+
+  .db-live .native-deck-builder-result:hover .native-deck-builder-result-text {
+    transform: none;
+  }
 }
 
 /* ----------------------------------------------------------- deck panel -- */

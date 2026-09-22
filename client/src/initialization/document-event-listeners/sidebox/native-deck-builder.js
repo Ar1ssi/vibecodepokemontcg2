@@ -553,7 +553,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                 matPicker?.filter(term);
               });
             }
-            setView('sleeve'); // default view
+            // Seed the default sub-view, then re-hide: the builder boots on the
+            // Search tab, and setView() unhides whichever panel it selects.
+            // Without this the sleeve gallery renders under the search grid.
+            setView('sleeve');
+            sleevePanel.hidden = true;
+            coinPanel.hidden = true;
+            if (matPanel) matPanel.hidden = true;
           }
 
     
