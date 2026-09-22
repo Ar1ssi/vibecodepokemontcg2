@@ -229,10 +229,12 @@ const presentCard = (src, fromRect) => {
   removeWhen(dim, [animateFrames(dim, dimFrames, { duration: CARD_PRESENT_MS })], CARD_PRESENT_MS + BACKSTOP_PAD_MS);
 };
 
+export const presentSrcFor = (origin, element) => element?.currentSrc || element?.src || origin?.src;
+
 export const trainerPlay = (plan) => {
   const origin = takeOrigin(plan.instanceId);
   const element = getCardRegistry().get(plan.instanceId)?.element;
-  presentCard(origin?.src || element?.currentSrc || element?.src, origin?.rect || null);
+  presentCard(presentSrcFor(origin, element), origin?.rect || null);
 };
 
 export const stadiumPlay = (plan) => {

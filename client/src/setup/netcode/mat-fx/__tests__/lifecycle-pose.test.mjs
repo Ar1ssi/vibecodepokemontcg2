@@ -12,6 +12,7 @@ import {
   slidePoseFor,
 } from '../lifecycle-pose.mjs';
 import { captureOrigins, discardOrigins, peekCombatOrigin, takeOrigin } from '../origins.mjs';
+import { presentSrcFor } from '../lifecycle.js';
 
 test('moveIdsForEvent: retreat and swap name both cards, others none', () => {
   assert.deepEqual(moveIdsForEvent({ type: 'cardRetreated', activeId: 1, promotedId: 2 }), [1, 2]);
@@ -114,6 +115,15 @@ test('origins: combat snapshots for attack + damage ids, peeked, rebuilt per bat
   assert.equal(peekCombatOrigin(2).src, 'def');
   captureOrigins([], registry, capture, () => 'self');
   assert.equal(peekCombatOrigin(1), undefined);
+});
+
+test('presentSrcFor: uses the post-update element image over the pre-diff snapshot (opponent hand sleeve fix)', () => {
+  const origin = { src: 'card-back.png' };
+  const element = { currentSrc: 'trainer-face.png' };
+  assert.equal(presentSrcFor(origin, element), 'trainer-face.png');
+  assert.equal(presentSrcFor(origin, { src: 'fallback.png' }), 'fallback.png');
+  assert.equal(presentSrcFor(origin, null), 'card-back.png');
+  assert.equal(presentSrcFor(null, null), undefined);
 });
 
 test('evolveSilhouettePose: white peaks at 0.4, drains to reveal the card', () => {
