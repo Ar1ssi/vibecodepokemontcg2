@@ -11,6 +11,7 @@ import {
   parseHpBonus,
   applyHpBonus,
 } from './ability-executors.mjs';
+import { abilityHpBonus } from './ability-combat.mjs';
 import { pokemonNamesMatch, normalizeStage } from './evolution.mjs';
 import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
@@ -1545,6 +1546,9 @@ export function getStadiumHpBonus(
  * Compute effective HP for a Pokémon given a base HP and the target player.
  * Optional zoneCards includes attached Tools for HP bonuses (Hero's Cape, etc.).
  * Optional stadiumOverride provides the server draft.stadium without relying on rulesState.
+ * Optional sideCards is the whole in-play side, so ability HP bonuses can read
+ * the holder's own and team-scope modifiers (design 034); without it the
+ * zoneCards list still covers the holder's own ability.
  * Clamped to ≥ 1 so a −HP modifier can't make a Pokémon have 0 HP.
  */
 export function effectiveHp(
@@ -1552,7 +1556,8 @@ export function effectiveHp(
   targetPlayer,
   pokemon = null,
   zoneCards = null,
-  stadiumOverride = null
+  stadiumOverride = null,
+  sideCards = null
 ) {
   const base = baseHp || 0;
   if (!base) return 0;
@@ -1568,6 +1573,13 @@ export function effectiveHp(
     for (const tool of attachedTools(pokemon, zoneCards)) {
       total = applyHpBonus(total, parseHpBonus(tool).bonus);
     }
+  }
+  if (pokemon) {
+    const abilityCards = sideCards || zoneCards || [];
+    total += abilityHpBonus(pokemon, {
+      sideCards: abilityCards,
+      inPlayCards: abilityCards,
+    });
   }
   return Math.max(1, total);
 }

@@ -22,6 +22,7 @@ import {
 } from './special-energy-parse.mjs';
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
+import { mergeDamagePrevention } from './ability-executors.mjs';
 
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -48,7 +49,20 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderMarkers = [],
     // Live attack markers on the attacker (next-turn bonuses, "attacks do N less damage").
     attackerMarkers = [],
+    // Ability-side combat modifiers (ability-combat.mjs), built by the reduce
+    // callers. Passing the reduction/prevention options means the caller has
+    // already read abilities, so the internal ability reads are skipped to
+    // avoid double-counting; Tools and Special Energy still apply.
+    abilityBonusBeforeWR = 0,
+    abilityReductionBeforeWR,
+    abilityReductionAfterWR,
+    abilityPrevention,
+    weaknessOverride = null,
   } = options;
+  const abilityReadsExternal =
+    abilityReductionBeforeWR !== undefined ||
+    abilityReductionAfterWR !== undefined ||
+    abilityPrevention !== undefined;
   const defenderEffects = ignoreDefenderEffects ? [] : defenderMarkers;
   const markerSum = (markers, pick) =>
     markers.reduce((sum, marker) => sum + (pick(marker) ? marker.amount || 0 : 0), 0);
@@ -94,8 +108,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   const damageBeforeWR = Math.max(
     0,
-    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus - specialEnergyPenalty -
-      markerReductionBeforeWR
+    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus + abilityBonusBeforeWR -
+      specialEnergyPenalty - markerReductionBeforeWR -
+      (ignoreDefenderEffects ? 0 : abilityReductionBeforeWR || 0)
   );
 
   // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
@@ -108,13 +123,21 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   let multiplier = 1;
   let flat = 0;
+  const weaknessType = weaknessOverride?.type || defender?.weakness?.type;
+  const weaknessValue =
+    weaknessOverride?.multiplier ?? defender?.weakness?.value;
   const weaknessApplies =
-    !ignoreWeakness && !weaknessNullified && !hasMarker(defenderEffects, 'noWeakness');
-  if (attacker?.types?.length && defender?.weakness && weaknessApplies) {
+    !ignoreWeakness &&
+    !weaknessNullified &&
+    !weaknessOverride?.none &&
+    !hasMarker(defenderEffects, 'noWeakness');
+  if (attacker?.types?.length && defender?.weakness && weaknessType && weaknessApplies) {
     // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
-    if (attacker.types.includes(defender.weakness.type)) {
-      const v = defender.weakness.value;
-      if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
+    if (attacker.types.includes(weaknessType)) {
+      const v = weaknessValue;
+      if (weaknessOverride?.multiplier != null) {
+        multiplier = Math.max(1, weaknessOverride.multiplier);
+      } else if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
         multiplier = 2;                   // Lake Boundary: Weakness is always ×2
       } else if (v <= 2) {
         multiplier = Math.max(1, v);      // modern weakness: ×2 (or ×1)
@@ -153,7 +176,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       });
   damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction - markerReductionAfterWR);
 
-  // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
+  // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance).
+  // When the caller passes ability reductions, the ability half has already been read from
+  // ability-combat.mjs and only Tools apply here.
   let reduced = 0;
   let damageAfterReduction = damageAfterWR;
   if (damageAfterWR > 0 && !ignoreDefenderEffects) {
@@ -162,18 +187,32 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       defender,
       defenderZoneCards,
       attacker,
-      { blockTools, stadium, inPlayCards: defenderInPlayCards }
+      {
+        blockTools,
+        stadium,
+        inPlayCards: defenderInPlayCards,
+        abilities: !abilityReadsExternal,
+      }
+    );
+    damageAfterReduction = Math.max(
+      0,
+      damageAfterReduction - (abilityReductionAfterWR || 0)
     );
     reduced = damageAfterWR - damageAfterReduction;
   }
 
   // Step 6: Damage prevention (tools + abilities)
-  const prevention = ignoreDefenderEffects
+  const toolPrevention = ignoreDefenderEffects
     ? null
     : combinedToolDamagePrevention(defender, defenderZoneCards, attacker, {
         blockTools,
         stadium,
+        abilities: !abilityReadsExternal,
       });
+  const prevention = mergeDamagePrevention(
+    toolPrevention,
+    ignoreDefenderEffects ? null : abilityPrevention
+  );
 
   let prevented = false;
   let finalDamage = damageAfterReduction;
@@ -205,6 +244,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     attackerBonus,
     specialEnergyBonus,
     specialEnergyPenalty,
+    abilityBonus: abilityBonusBeforeWR || 0,
+    abilityReduction:
+      (abilityReductionBeforeWR || 0) + (abilityReductionAfterWR || 0),
     multiplier,
     flat,
     resistance,

@@ -147,11 +147,11 @@ Schema / naming contract (stable surface other slices reuse):
 |---|---|---|---|
 | 1 | Ability text empty / card not enriched | all readers return neutral (0/false); no throw | [x] covered: `cardAbilityText: reads plural abilities[] and is neutral when empty`; `parseDamagePrevention / applyDamagePrevention` |
 | 2 | Unknown wording / malformed number | parser returns null, no partial effect | [x] covered: `parseThorns: legacy "on that Pokémon" wording and Active-Spot zone` (attach-cost clause → `{count: 0}`) |
-| 3 | Team scope with 0 in-play cards / holder is the target | team loop skips self-double-count; 0 contributors → 0 | [ ] |
-| 4 | Two abilities stack (same or different source) | bonuses add, reductions add, preventions OR; "doesn't stack" wording applies once | [ ] |
+| 3 | Team scope with 0 in-play cards / holder is the target | team loop skips self-double-count; 0 contributors → 0 | [x] covered: `abilityDamageBonus: team type bonus applies to a matching attacker` |
+| 4 | Two abilities stack (same or different source) | bonuses add, reductions add, preventions OR; "doesn't stack" wording applies once | [x] covered: `abilityDamageBonus: scaling wording and non-stacking`; `abilityPrizeModify: KO-condition prize reduction, trigger wordings excluded` |
 | 5 | Suppression + Ancient Trait | suppression never blocks `trait` steps (D72) | [ ] |
 | 6 | Suppressed holder used via useAbility | rejected with reason; picker greys it | [ ] |
-| 7 | Conditional ability with unmet condition | no effect, no marker, ability still usable if activation legal | [ ] |
+| 7 | Conditional ability with unmet condition | no effect, no marker, ability still usable if activation legal | [x] covered: `abilityDamageReduction: full-HP, energy and attacker-tool conditions`; `abilityDamagePrevention: team prevention honours zone and energy cap`; `abilityWeaknessOverride: none, multiplier and type replacement` |
 | 8 | Legacy "reduced by N" (HP) vs counter-based reduce | HP reduction never multiplied by 10; counter reduce stays counters | [x] covered: `computeAttackDamage: legacy "reduced by 20" subtracts 20 HP` |
 | 9 | Coin-gated prevention/reduction | flip via activeRng; tails = no effect; flip recorded as an event | [ ] |
 | 10 | on-promotion window missed (card moved before turn) | `movedToActiveTurn` stamped at move; stale window rejected | [ ] |
@@ -189,6 +189,12 @@ for legitimate improvements (same policy as D108). Revert = revert the branch co
   was already open and the flag is inert until the reduce.mjs hook gates on it in slice 4.
 - Slice 1 fixed the `matchesSearch` or-split that swallowed "N HP or less" (part of the A11 HP-cap
   class the slice's work-plan row names).
+- Slice 2 added `abilityReductionBeforeWR` as a fifth computeAttackDamage option: the corpus has both
+  "(before applying Weakness and Resistance)" and "(after …)" reduction wordings, and applying the
+  before-WR half after Weakness would compute the wrong number ((50−30)×2 vs 50×2−30).
+- Slice 2 keeps `toolPrizeCountAdjust` unchanged and reads `abilityPrizeModify` in `handleKnockout`
+  instead: tool-combat importing ability-combat would make the dependency mutual (ability-combat
+  already imports the reduction/prevention filters from tool-combat).
 
 ---
 Self-approval checklist (only when the user is unreachable):

@@ -37,6 +37,7 @@ import {
   attackerTypes,
 } from './tool-combat.mjs';
 import { isRuleBoxPokemon, isExCard, isMegaCard } from './card-classify.mjs';
+import { isPokemon } from '../cards.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -75,11 +76,11 @@ function nonStackingOnce(cards) {
 }
 
 function sideInPlay(ctx = {}) {
-  return rootsOf(ctx.sideCards || ctx.inPlayCards || []);
+  return rootsOf(ctx.sideCards || ctx.inPlayCards || []).filter(isPokemon);
 }
 
 function opponentInPlay(ctx = {}) {
-  return rootsOf(ctx.opponentSideCards || []);
+  return rootsOf(ctx.opponentSideCards || []).filter(isPokemon);
 }
 
 function holderZone(card, ctx = {}) {
@@ -447,7 +448,7 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
 
 /** Flat HP the card and its team grant it (scaling wordings are skipped). */
 export function abilityHpBonus(pokemon, ctx = {}) {
-  if (!pokemon) return 0;
+  if (!isPokemon(pokemon)) return 0;
   let total = 0;
   for (const holder of nonStackingOnce(dedupe([pokemon, ...sideInPlay(ctx)]))) {
     const t = cardAbilityText(holder);
@@ -558,6 +559,7 @@ export function abilityAttackCostDiscount(attacker, ctx = {}) {
 
 /** "Damage … isn't affected by any effects on your opponent's Active Pokémon." */
 export function abilityIgnoresDefenderEffects(attacker) {
+  if (!isPokemon(attacker)) return false;
   const t = cardAbilityText(attacker);
   if (!t) return false;
   return (
@@ -571,6 +573,7 @@ export function abilityIgnoresDefenderEffects(attacker) {
 
 /** Extra types the card counts as ("it is {F} and {P} type"). */
 export function abilityExtraTypes(card, ctx = {}) {
+  if (!isPokemon(card)) return [];
   const t = cardAbilityText(card);
   if (!t) return [];
   if (!/it is .*type|is both .* type/.test(t)) return [];
@@ -589,7 +592,7 @@ export function abilityExtraTypes(card, ctx = {}) {
  * once (the first holder wins).
  */
 export function abilityEnergyMultiplier(cards = []) {
-  for (const card of nonStackingOnce(dedupe(cards))) {
+  for (const card of nonStackingOnce(dedupe(cards).filter(isPokemon))) {
     const parsed = parseEnergyMultiplier(card);
     if (parsed.multiplier > 0 && parsed.energyType) return parsed;
   }

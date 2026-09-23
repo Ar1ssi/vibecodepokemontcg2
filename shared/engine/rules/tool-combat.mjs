@@ -274,9 +274,11 @@ export function combinedToolDamagePrevention(
   defender,
   zoneCards,
   attacker,
-  { blockTools = false, stadium = null } = {}
+  { blockTools = false, stadium = null, abilities = true } = {}
 ) {
-  let out = preventionForCard(defender, attacker);
+  let out = abilities
+    ? preventionForCard(defender, attacker)
+    : { preventAll: false, reduce: 0, reduceHp: 0 };
   if (toolBlocked(blockTools, stadium)) return out;
   for (const tool of attachedTools(defender, zoneCards)) {
     out = mergeDamagePrevention(out, preventionForCard(tool, attacker));
@@ -290,22 +292,24 @@ export function applyToolDamageReduction(
   defender,
   zoneCards,
   attacker,
-  { blockTools = false, stadium = null, inPlayCards = [] } = {}
+  { blockTools = false, stadium = null, inPlayCards = [], abilities = true } = {}
 ) {
   let total = incoming;
   if (total <= 0) return 0;
 
-  // 1. Defender's own ability reduction
-  const selfRed = reductionForCard(defender, defender, attacker);
-  if (selfRed > 0) total = Math.max(0, total - selfRed);
+  if (abilities) {
+    // 1. Defender's own ability reduction
+    const selfRed = reductionForCard(defender, defender, attacker);
+    if (selfRed > 0) total = Math.max(0, total - selfRed);
 
-  // 2. Team-wide bench/in-play passive ability reductions (e.g. Radiant Gardevoir)
-  for (const card of inPlayCards) {
-    if (card === defender || card.attachedTo) continue;
-    const t = cardAbilityText(card);
-    if (/your pokémon take|your pokemon take/i.test(t)) {
-      const red = reductionForCard(card, defender, attacker);
-      if (red > 0) total = Math.max(0, total - red);
+    // 2. Team-wide bench/in-play passive ability reductions (e.g. Radiant Gardevoir)
+    for (const card of inPlayCards) {
+      if (card === defender || card.attachedTo) continue;
+      const t = cardAbilityText(card);
+      if (/your pokémon take|your pokemon take/i.test(t)) {
+        const red = reductionForCard(card, defender, attacker);
+        if (red > 0) total = Math.max(0, total - red);
+      }
     }
   }
 

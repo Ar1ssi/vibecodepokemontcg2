@@ -76,6 +76,13 @@ test('abilityDamageBonus: team type bonus applies to a matching attacker', () =>
     abilityDamageBonus(fighter, defender, { ...ctx, isActive: false }),
     0
   );
+  // The holder being the attacker must not double-count itself, and a side
+  // with no in-play cards contributes nothing.
+  assert.equal(
+    abilityDamageBonus(garganacl, defender, { sideCards: [garganacl] }),
+    30
+  );
+  assert.equal(abilityDamageBonus(fighter, defender, { sideCards: [] }), 0);
 });
 
 test('abilityDamageBonus: "this Pokémon" holder and in-play conditions', () => {
@@ -707,6 +714,102 @@ test('abilityEnergyMultiplier and applyEnergyMultiplier', () => {
     ['Grass', 'Grass', 'Water']
   );
   assert.deepEqual(applyEnergyMultiplier(['Water'], []), ['Water']);
+});
+
+// ── computeAttackDamage option matrix ────────────────────────────────────
+
+const { computeAttackDamage } = await import('../attack-engine.mjs');
+const { effectiveHp } = await import('../stadium-effects.mjs');
+
+test('computeAttackDamage: ability options apply at their printed step', () => {
+  const attacker = { types: ['Fire'] };
+  const defender = { weakness: { type: 'Fire', value: 2 } };
+  const hit = (options) =>
+    computeAttackDamage(attacker, defender, { damage: '50' }, options).total;
+
+  // Weakness ×2 baseline is 100.
+  assert.equal(hit({}), 100);
+  assert.equal(hit({ abilityBonusBeforeWR: 30 }), 160);
+  assert.equal(hit({ abilityReductionBeforeWR: 30 }), 40);
+  assert.equal(hit({ abilityReductionAfterWR: 30 }), 70);
+  assert.equal(
+    hit({ abilityPrevention: { preventAll: false, reduceHp: 30 } }),
+    70
+  );
+  assert.equal(hit({ abilityPrevention: { preventAll: true, reduceHp: 0 } }), 0);
+  assert.equal(hit({ weaknessOverride: { multiplier: 4 } }), 200);
+  assert.equal(hit({ weaknessOverride: { none: true } }), 50);
+});
+
+test('computeAttackDamage: external ability reads do not double-count the self ability', () => {
+  const defender = {
+    name: 'Samurott',
+    type: 'Pokémon',
+    stage: 'Basic',
+    hp: 140,
+    abilities: [
+      {
+        name: 'Shell Armor',
+        text: 'Any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).',
+      },
+    ],
+  };
+  const attacker = { name: 'Attacker', types: ['Fire'] };
+  // Legacy callers (no ability options) keep the internal read.
+  assert.equal(
+    computeAttackDamage(attacker, defender, { damage: '50' }, {}).total,
+    30
+  );
+  // Callers that computed the reads themselves must not have them applied twice.
+  const reads = abilityDamagePrevention(defender, attacker, {
+    sideCards: [defender],
+  });
+  assert.deepEqual(reads, { preventAll: false, reduceHp: 20 });
+  assert.equal(
+    computeAttackDamage(attacker, defender, { damage: '50' }, {
+      abilityPrevention: reads,
+    }).total,
+    30
+  );
+});
+
+test('effectiveHp: includes own and team ability HP bonuses', () => {
+  const exeggutor = mon('Alolan Exeggutor', {
+    hp: 160,
+    abilities: [
+      ability(
+        'Tropical Shake',
+        'If this Pokémon has 6 or more {G} Energy attached, it gets +250 HP.'
+      ),
+    ],
+  });
+  const energies = Array.from({ length: 6 }, () =>
+    attached(energy('Grass Energy', 'Grass'), exeggutor)
+  );
+  const zone = [exeggutor, ...energies];
+  assert.equal(effectiveHp(160, 'self', exeggutor, zone, null, zone), 410);
+  assert.equal(
+    effectiveHp(160, 'self', exeggutor, [exeggutor, ...energies.slice(0, 5)], null, [
+      exeggutor,
+      ...energies.slice(0, 5),
+    ]),
+    160
+  );
+
+  const okidogi = mon('Okidogi', {
+    hp: 130,
+    abilities: [
+      ability(
+        'Adrenaline Rush',
+        'If this Pokémon has any {D} Energy attached, it gets +100 HP, and the attacks it uses do 100 more damage to your opponent\u2019s Active Pokémon (before applying Weakness and Resistance).'
+      ),
+    ],
+  });
+  const dark = attached(energy('Darkness Energy', 'Dark'), okidogi);
+  assert.equal(
+    effectiveHp(130, 'self', okidogi, [okidogi, dark], null, [okidogi, dark]),
+    230
+  );
 });
 
 // ── edge cases ───────────────────────────────────────────────────────────

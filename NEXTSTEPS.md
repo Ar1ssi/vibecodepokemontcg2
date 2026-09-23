@@ -5,13 +5,18 @@ slice on this branch; each commit leaves `pnpm test` + `pnpm audit:oracle` green
 
 | Slice | Status | Notes |
 |---|---|---|
-| 1 | in progress | `cardAbilityText` accessor; I130 HP reduction; `parseThorns` legacy wording; typed-basic HP cap |
-| 2 | pending | `ability-combat.mjs` + computeAttackDamage options + effectiveHp + prize/retreat/cost/ignore-defender/type/energy reads |
+| 1 | done (ff74b498) | `cardAbilityText` accessor; I130 HP reduction (`reduceHp`); `parseThorns` legacy wording + zone; typed-basic HP cap; `matchesSearch` or-split fix |
+| 2 | done | `ability-combat.mjs` readers + matrix tests; computeAttackDamage ability options (`abilityBonusBeforeWR`, `abilityReductionBeforeWR/AfterWR`, `abilityPrevention`, `weaknessOverride`); wired at all 3 reduce attack call sites, `effectiveHp` (sideCards), handleKnockout prizes, retreat, attack cost (ignore-Energy + Wild Growth multiplier) |
 | 3 | pending | suppression predicate + activation block reasons + picker parity; locks and gates |
 | 4 | pending | `ability-triggers.mjs` + checkup/end-of-turn/on-damage/on-promotion/on-KO hooks |
 | 5 | pending | executor batch A |
 | 6 | pending | executor batch B (one-offs) |
 | 7 | pending | `scripts/audit-ability-behaviour.mjs` + baseline; close I128/I129/I130 |
+
+Known gaps carried from slice 2 (not regressions): "for each" scaling abilities (Kingambit-class)
+return 0 rather than a flat guess; coin-gated reduction/prevention and on-damage triggers land in
+slice 4; suppression/locks in slice 3; client `listAttacks` does not yet receive the ability cost
+options (server `attackCostPayable` does), so the picker may still show a cost the server ignores.
 
 # Active work — S264 12-item batch (branch `feature/batch-s264`, worktree `../vibe-batch-s264`)
 

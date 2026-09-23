@@ -68,6 +68,19 @@ import {
   applyCostDiscount,
   teamNoRetreatCostForActive,
 } from './rules/ability-executors.mjs';
+import {
+  abilityDamageBonus,
+  abilityDamageReduction,
+  abilityDamagePrevention,
+  abilityWeaknessOverride,
+  abilityHpBonus,
+  abilityPrizeModify,
+  abilityRetreatCost,
+  abilityAttackCostDiscount,
+  abilityIgnoresDefenderEffects,
+  abilityExtraTypes,
+  applyEnergyMultiplier,
+} from './rules/ability-combat.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
@@ -490,9 +503,16 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
   );
   if (!attacker) return clause.amount;
   const defenderPlayer = draft.players[ref.playerId];
+  const defenderView = inPlayView(draft, ref.card);
+  const abilityReads = attackAbilityReads(draft, {
+    attacker: inPlayView(draft, attacker),
+    defender: defenderView,
+    playerId: attackerPlayerId,
+    defenderPlayerId: ref.playerId,
+  });
   const result = computeAttackDamage(
-    inPlayView(draft, attacker),
-    inPlayView(draft, ref.card),
+    abilityReads.attacker,
+    defenderView,
     { name: attackName, damage: clause.amount },
     {
       attackerZoneCards: draft.players[attackerPlayerId]?.zones?.active || [],
@@ -506,6 +526,14 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       baseDamage: clause.amount,
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
       ...clause.immunity,
+      ignoreDefenderEffects:
+        clause.immunity?.ignoreDefenderEffects ||
+        abilityReads.ignoreDefenderEffects,
+      abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+      abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
+      abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
+      abilityPrevention: abilityReads.abilityPrevention,
+      weaknessOverride: abilityReads.weaknessOverride,
       defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
       attackerMarkers: activeAttackMarkers(draft, attackerPlayerId, attacker),
     }
@@ -521,6 +549,72 @@ function activeAttackMarkers(draft, playerId, card) {
     turnNumber: draft.turn?.number || 1,
     zoneCards: active,
   });
+}
+
+/**
+ * Ability-side combat reads for one attack (design 034 slice 2): the
+ * attacker's bonus and extra types plus the defender's reduction, prevention
+ * and Weakness override, in the option shape computeAttackDamage consumes.
+ * `attacker`/`defender` are in-play views.
+ */
+function attackAbilityReads(
+  draft,
+  { attacker, defender, playerId, defenderPlayerId, defenderIsActive = true }
+) {
+  const attackerZones = draft.players[playerId]?.zones || {};
+  const defenderZones = draft.players[defenderPlayerId]?.zones || {};
+  const attackerSide = [
+    ...(attackerZones.active || []),
+    ...(attackerZones.bench || []),
+  ];
+  const defenderSide = [
+    ...(defenderZones.active || []),
+    ...(defenderZones.bench || []),
+  ];
+  const attackerCtx = {
+    sideCards: attackerSide,
+    opponentSideCards: defenderSide,
+    sideActive: attackerZones.active || [],
+    sideBench: attackerZones.bench || [],
+    zone: 'active',
+    isActive: true,
+    attackerIsActive: true,
+    turnNumber: draft.turn?.number,
+    opponentHandCount: (defenderZones.hand || []).length,
+  };
+  const defenderCtx = {
+    sideCards: defenderSide,
+    opponentSideCards: attackerSide,
+    sideActive: defenderZones.active || [],
+    sideBench: defenderZones.bench || [],
+    zone: 'active',
+    isActive: defenderIsActive,
+    attackerIsActive: true,
+    attackerIsEx: isExCard(attacker),
+    turnNumber: draft.turn?.number,
+  };
+  const extraTypes = abilityExtraTypes(attacker, attackerCtx);
+  const attackerView = extraTypes.length
+    ? { ...attacker, types: [...(attacker.types || []), ...extraTypes] }
+    : attacker;
+  const reduction = abilityDamageReduction(defender, attackerView, defenderCtx);
+  return {
+    attacker: attackerView,
+    abilityBonusBeforeWR: abilityDamageBonus(
+      attackerView,
+      defender,
+      attackerCtx
+    ),
+    abilityReductionBeforeWR: reduction.beforeWR,
+    abilityReductionAfterWR: reduction.afterWR,
+    abilityPrevention: abilityDamagePrevention(
+      defender,
+      attackerView,
+      defenderCtx
+    ),
+    weaknessOverride: abilityWeaknessOverride(defender, defenderCtx),
+    ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
+  };
 }
 
 /** The defending player's flip for a surviveKnockOutCoin marker: true on heads. */
@@ -597,9 +691,16 @@ function applyRetaliation(
 function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId }) {
   const strikerZone = draft.players[strikerPlayerId]?.zones?.active || [];
   const targetPlayer = draft.players[attackerPlayerId];
+  const targetView = inPlayView(draft, target);
+  const abilityReads = attackAbilityReads(draft, {
+    attacker: strikerView,
+    defender: targetView,
+    playerId: strikerPlayerId,
+    defenderPlayerId: attackerPlayerId,
+  });
   const result = computeAttackDamage(
-    strikerView,
-    inPlayView(draft, target),
+    abilityReads.attacker,
+    targetView,
     { name: marker.sourceAttack, damage: marker.amount },
     {
       attackerZoneCards: strikerZone.some((c) => c.instanceId === striker.instanceId) ? strikerZone : [],
@@ -608,6 +709,12 @@ function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerP
       stadium: draft.stadium,
       defenderIsActive: true,
       baseDamage: marker.amount,
+      ignoreDefenderEffects: abilityReads.ignoreDefenderEffects,
+      abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+      abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
+      abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
+      abilityPrevention: abilityReads.abilityPrevention,
+      weaknessOverride: abilityReads.weaknessOverride,
       defenderMarkers: activeAttackMarkers(draft, attackerPlayerId, target),
     }
   );
@@ -680,7 +787,7 @@ function attackViewFor(state, card, { isActive = true } = {}) {
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
 }
 
-// Effective HP including printed base stats, top evolution, attached Tools, and Stadium modifiers.
+// Effective HP including printed base stats, top evolution, attached Tools, Stadium modifiers, and ability HP bonuses.
 function cardEffectiveHp(state, card, playerId) {
   if (!card) return 0;
   const view = inPlayView(state, card);
@@ -688,7 +795,9 @@ function cardEffectiveHp(state, card, playerId) {
   if (!baseHp) return 0;
   const ref = findCard(state, card.instanceId);
   const zoneCards = ref?.player?.zones?.[ref.zoneId] || [];
-  return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium);
+  const zones = state.players?.[playerId]?.zones || {};
+  const sideCards = [...(zones.active || []), ...(zones.bench || [])];
+  return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium, sideCards);
 }
 
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
@@ -717,22 +826,22 @@ function computeEffectiveRetreatCost(state, card, playerId) {
     stadium,
   });
 
-  // 2. Team bench abilities (e.g. "your Active Pokémon's Retreat Cost is 1 less")
-  for (const b of player?.zones?.bench || []) {
-    if (b.attachedTo) continue;
-    const t = String(
-      b.ability?.text ?? b.abilityText ?? b.text ?? b.effect ?? ''
-    ).toLowerCase();
-    if (
-      /active pok[ée]mon's retreat cost is (\d+) less|active pokemon's retreat cost is (\d+) less/i.test(
-        t
-      )
-    ) {
-      const m = t.match(/retreat cost is (\d+) less/i);
-      const n = m ? parseInt(m[1], 10) : 1;
-      cost = Math.max(0, cost - n);
-    }
-  }
+  // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
+  // Cost is N less" wording and the opponent-side increases (A10).
+  const opponent = state.players?.[
+    Object.keys(state.players || {}).find((id) => id !== playerId)
+  ];
+  const sideCards = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
+  const opponentSideCards = [
+    ...(opponent?.zones?.active || []),
+    ...(opponent?.zones?.bench || []),
+  ];
+  cost += abilityRetreatCost(inPlayView(state, card), {
+    sideCards,
+    opponentSideCards,
+    zone: 'active',
+    isActive: true,
+  });
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
   cost = getStadiumRetreatCost(cost, card, playerId, stadium);
@@ -789,6 +898,20 @@ function handleKnockout(
       stadium: draft.stadium,
       skipSpecialEnergy: legacyUsed,
     }
+  );
+  // Ability prize modifiers on the victim's side (Mega Gengar ex "that player
+  // takes 1 fewer Prize card"), read from the whole side so a Benched holder
+  // covers an Active victim.
+  const attackerCard = (draft.players[attackerPlayerId]?.zones?.active || []).find(
+    (c) => !c.attachedTo
+  );
+  prizeCount = Math.max(
+    0,
+    prizeCount +
+      abilityPrizeModify(inPlayView(draft, victim), {
+        sideCards: [...victimActive, ...victimBench],
+        attackerIsEx: isExCard(attackerCard),
+      })
   );
   if (legacyEnergyAttached && !legacyUsed) {
     if (!victimPlayer.flags) victimPlayer.flags = {};
@@ -1982,13 +2105,23 @@ function attackCostPayable(state, playerId, active, attack) {
     stadiumCard,
     hostPokemon: inPlayView(state, active),
   };
+  const sideCards = [
+    ...(player.zones?.active || []),
+    ...(player.zones?.bench || []),
+  ];
+  const opponent = state.players?.[
+    Object.keys(state.players || {}).find((id) => id !== playerId)
+  ];
   const energyEntries = expandEnergyEntries(
-    attached.map((c) => serverEnergyDescriptor(c, energyContext))
+    applyEnergyMultiplier(
+      attached.map((c) => serverEnergyDescriptor(c, energyContext)),
+      sideCards
+    )
   );
   // Cost modifiers must be priced exactly as the client and the attack
   // preview price them: passive ability/Tool discounts plus a Stadium
-  // cost modifier, then Nighttime Mine-style increases. Checking the raw
-  // printed cost rejected legally payable attacks.
+  // cost modifier, then ability cost ignores, then Nighttime Mine-style
+  // increases. Checking the raw printed cost rejected legally payable attacks.
   const activeView = inPlayView(state, active);
   const blockTools = isStadiumToolNegation(stadiumCard);
   let discount = passiveCostDiscount(activeView);
@@ -2002,6 +2135,21 @@ function attackCostPayable(state, playerId, active, attack) {
   let effectiveCost = attack.cost;
   if (discount > 0 && effectiveCost.length > 0) {
     effectiveCost = applyCostDiscount(effectiveCost, discount);
+  }
+  const abilityCost = abilityAttackCostDiscount(activeView, {
+    sideCards,
+    opponentSideCards: [
+      ...(opponent?.zones?.active || []),
+      ...(opponent?.zones?.bench || []),
+    ],
+    zone: 'active',
+    isActive: true,
+    opponentHandCount: (opponent?.zones?.hand || []).length,
+  });
+  if (abilityCost.ignoreAll) {
+    effectiveCost = [];
+  } else if (abilityCost.ignoreColorless) {
+    effectiveCost = effectiveCost.filter((symbol) => symbol !== 'Colorless');
   }
   const increase = getStadiumAttackCostIncreaseFor(
     activeView,
@@ -3814,8 +3962,15 @@ function resolveAttackEffectPhase(draft, ctx) {
         const attackerTrailingPrizes = myPrizes > oppPrizes;
         const defenderPoisoned = hasCondition(defender, 'Poisoned');
 
+        const immunity = parseDamageImmunity(effectiveAttack?.text) || {};
+        const abilityReads = attackAbilityReads(draft, {
+          attacker: attackerView,
+          defender: defenderView,
+          playerId,
+          defenderPlayerId,
+        });
         const dmgResult = computeAttackDamage(
-          attackerView,
+          abilityReads.attacker,
           defenderView,
           effectiveAttack,
           {
@@ -3828,7 +3983,14 @@ function resolveAttackEffectPhase(draft, ctx) {
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
-            ...parseDamageImmunity(effectiveAttack?.text),
+            ...immunity,
+            ignoreDefenderEffects:
+              immunity.ignoreDefenderEffects || abilityReads.ignoreDefenderEffects,
+            abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+            abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
+            abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
+            abilityPrevention: abilityReads.abilityPrevention,
+            weaknessOverride: abilityReads.weaknessOverride,
             defenderMarkers: activeAttackMarkers(draft, defenderPlayerId, defender),
             attackerMarkers: activeAttackMarkers(draft, playerId, attacker),
           }
