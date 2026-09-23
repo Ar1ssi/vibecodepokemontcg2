@@ -139,13 +139,8 @@ import {
   hasAnyCondition,
   listConditions,
 } from './rules/special-conditions.mjs';
-import {
-  classifyAttackEffect,
-  dualStatus,
-  selfStatus,
-  parseNextTurnLock,
-  parseAttackEnergyDiscard,
-} from './rules/attack-effects.mjs';
+import { parseNextTurnLock, parseAttackEnergyDiscard } from './rules/attack-effects.mjs';
+import { parseAttackStatusBranches, statusesFromBranches } from './rules/attack-status.mjs';
 import { matchesSearch } from './rules/search-match.mjs';
 
 /**
@@ -196,64 +191,6 @@ function flipAttackCoins(attack, rng) {
     return { coin, headsCount: coin === 'heads' ? 1 : 0, flips: [coin] };
   }
   return { coin: null, headsCount: undefined, flips: [] };
-}
-
-function resolveAttackStatusConditions(
-  attack,
-  { coin, headsCount = 0, flips = [] } = {}
-) {
-  const text = String(attack?.text || '').toLowerCase();
-  if (!text) return { defenderConditions: [], attackerConditions: [] };
-
-  const family = classifyAttackEffect(attack);
-  const toProperCase = (str) =>
-    str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-
-  // Coin check gating status application:
-  // e.g. "Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed."
-  const hasHeadsReq =
-    /if heads[,.\s].*(asleep|paralyzed|poisoned|burned|confused)/.test(text);
-  const hasTailsReq =
-    /if tails[,.\s].*(asleep|paralyzed|poisoned|burned|confused)/.test(text);
-  if (hasHeadsReq && coin !== 'heads' && headsCount < 1) {
-    return { defenderConditions: [], attackerConditions: [] };
-  }
-  if (
-    hasTailsReq &&
-    coin !== 'tails' &&
-    flips.length > 0 &&
-    flips.every((f) => f === 'heads')
-  ) {
-    return { defenderConditions: [], attackerConditions: [] };
-  }
-
-  const self = selfStatus(text);
-  if (self) {
-    return { defenderConditions: [], attackerConditions: [toProperCase(self)] };
-  }
-
-  const dual = dualStatus(text);
-  if (dual) {
-    return {
-      defenderConditions: dual.map(toProperCase),
-      attackerConditions: [],
-    };
-  }
-
-  switch (family) {
-    case 'status-asleep':
-      return { defenderConditions: ['Asleep'], attackerConditions: [] };
-    case 'status-paralyzed':
-      return { defenderConditions: ['Paralyzed'], attackerConditions: [] };
-    case 'status-poisoned':
-      return { defenderConditions: ['Poisoned'], attackerConditions: [] };
-    case 'status-burned':
-      return { defenderConditions: ['Burned'], attackerConditions: [] };
-    case 'status-confused':
-      return { defenderConditions: ['Confused'], attackerConditions: [] };
-    default:
-      return { defenderConditions: [], attackerConditions: [] };
-  }
 }
 
 /** Benched Pokémon of a player, roots only (attached cards are not targets). */
@@ -4127,15 +4064,15 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
       }
 
-      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack.
-      // A chosen condition (Delta Beam) is the atkChooseCondition step's (design 032).
+      // Attack Special Conditions (design 014/036): every printed status clause, with the
+      // attack's own coin results applied per branch. A chosen condition (Delta Beam) is the
+      // atkChooseCondition step's (design 032).
       const { defenderConditions, attackerConditions } = attackSteps.printed.has('atkChooseCondition')
         ? { defenderConditions: [], attackerConditions: [] }
-        : resolveAttackStatusConditions(attack, {
-            coin,
-            headsCount,
-            flips,
-          });
+        : statusesFromBranches(
+            parseAttackStatusBranches(attack?.text, { selfName: attackerView?.name || attacker?.name }),
+            { coin, headsCount, flips }
+          );
 
       if (defenderConditions.length > 0 && defender) {
         // Only apply condition if defender survived the attack (not KO'd)

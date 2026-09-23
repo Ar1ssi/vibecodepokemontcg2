@@ -203,15 +203,15 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 577
+      "observed": 578
     },
     "attack:coin-flip": {
       "n": 429,
       "observed": 415
     },
     "attack:conditional-damage": {
-      "n": 741,
-      "observed": 155
+      "n": 740,
+      "observed": 187
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -252,6 +252,10 @@
     "attack:draw-until": {
       "n": 45,
       "observed": 40
+    },
+    "attack:dual-status": {
+      "n": 78,
+      "observed": 78
     },
     "attack:effect-prevention": {
       "n": 26,
@@ -370,24 +374,24 @@
       "observed": 46
     },
     "attack:status-asleep": {
-      "n": 135,
-      "observed": 135
+      "n": 121,
+      "observed": 121
     },
     "attack:status-burned": {
-      "n": 109,
-      "observed": 109
+      "n": 94,
+      "observed": 94
     },
     "attack:status-confused": {
       "n": 130,
       "observed": 130
     },
     "attack:status-paralyzed": {
-      "n": 172,
-      "observed": 171
+      "n": 155,
+      "observed": 154
     },
     "attack:status-poisoned": {
-      "n": 183,
-      "observed": 183
+      "n": 152,
+      "observed": 152
     },
     "attack:supporter-effect": {
       "n": 5,
