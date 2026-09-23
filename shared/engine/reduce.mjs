@@ -71,6 +71,7 @@ import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
 import {
+  attackerMatchesFilter,
   clearAttackMarkers,
   liveAttackMarkers,
   parseDamageImmunity,
@@ -309,6 +310,15 @@ function damageBenchedPokemon(
     });
     return;
   }
+  if (!ownAttack && sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId)) {
+    events.push({
+      type: 'damagePrevented',
+      instanceId: victim.instanceId,
+      attackName,
+      reason: 'attack-marker',
+    });
+    return;
+  }
 
   const prevDamage = victim.damage || 0;
   const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
@@ -483,6 +493,7 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
       ...clause.immunity,
       defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
+      attackerMarkers: activeAttackMarkers(draft, attackerPlayerId, attacker),
     }
   );
   return result.total;
@@ -496,6 +507,17 @@ function activeAttackMarkers(draft, playerId, card) {
     turnNumber: draft.turn?.number || 1,
     zoneCards: active,
   });
+}
+
+// A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
+function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
+  const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  if (!guard || !attacker) return false;
+  const attackerView = inPlayView(draft, attacker);
+  return activeAttackMarkers(draft, victimPlayerId, guard).some(
+    (m) => m.kind === 'incomingPrevent' && m.scope === 'side' && attackerMatchesFilter(m.filter, attackerView)
+  );
 }
 
 // Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
@@ -3409,6 +3431,7 @@ function resolveAttackEffectPhase(draft, ctx) {
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
             ...parseDamageImmunity(effectiveAttack?.text),
             defenderMarkers: activeAttackMarkers(draft, defenderPlayerId, defender),
+            attackerMarkers: activeAttackMarkers(draft, playerId, attacker),
           }
         );
         dmgDealt = dmgResult.total;

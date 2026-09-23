@@ -8,7 +8,7 @@
 Session: 268
 Focus: S268 closed I112 on branch `fix/i112-attack-family-list`; merged locally into main (NOT pushed).
   S267 design 030 work also still unpushed on local main.
-Active: none.
+Active: I118 / design 031 on feature/i118-attack-gaps (worktree .claude/worktrees/i118). Slices 1-2 committed; next slice 3 (deferred KO, retaliate, hp-cap damage).
 Next: I118 (server attack gaps: reveal-hand, immunity, damage-prevention, next-turn-bonus, copy-attack, …) needs a design.
   I113 oracle gate (record damage amounts so damage-scaling families are verifiable). Push main when the user says so.
   Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).

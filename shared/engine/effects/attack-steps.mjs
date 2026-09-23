@@ -16,7 +16,7 @@ import { matchesSearch } from '../rules/search-match.mjs';
 import { clearConditions, hasAnyCondition, hasCondition } from '../rules/special-conditions.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { addAttackMarker, markerUntilTurn } from '../rules/attack-markers.mjs';
+import { addAttackMarker, markerFromTurn, markerUntilTurn, SELF_NAME } from '../rules/attack-markers.mjs';
 import {
   BENCH_LIMIT,
   activeOf,
@@ -1069,6 +1069,14 @@ function atkHealEach(ctx) {
 
 const whatOf = (step) => energyLabel(step);
 
+// "except any Simisage" arrives as SELF_NAME; the name is the attacker's at attack time.
+function resolveSelfName(marker, ctx) {
+  if (marker.filter?.exceptName !== SELF_NAME) return marker;
+  const root = attackerRef(ctx)?.card;
+  const name = String((root && topPokemonCard(ctx.player, root))?.name || '').toLowerCase();
+  return { ...marker, filter: { ...marker.filter, exceptName: name } };
+}
+
 // Timed effect for a later turn (design 031): marks the attacker or the opponent's Active.
 function atkAddMarker(ctx) {
   const { step } = ctx;
@@ -1076,9 +1084,11 @@ function atkAddMarker(ctx) {
   const card =
     step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
   if (!card) return skip(ctx, 'no_marker_target');
+  const turn = ctx.draft.turn?.number || 1;
   addAttackMarker(card, {
-    ...step.marker,
-    untilTurn: markerUntilTurn(step.window, ctx.draft.turn?.number || 1),
+    ...resolveSelfName(step.marker, ctx),
+    untilTurn: markerUntilTurn(step.window, turn),
+    fromTurn: markerFromTurn(step.window, turn),
     topId: topPokemonCard(owner, card)?.instanceId ?? card.instanceId,
     sourceAttack: attackName(ctx),
   });

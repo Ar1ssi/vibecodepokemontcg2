@@ -21,7 +21,7 @@ import {
   getSpecialEnergyDamageReduction,
 } from './special-energy-parse.mjs';
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
-import { hasMarker } from './attack-markers.mjs';
+import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
 
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -46,8 +46,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     ignoreDefenderEffects = false,
     // Live attack markers on the defender (attack-markers.mjs liveAttackMarkers).
     defenderMarkers = [],
+    // Live attack markers on the attacker (next-turn bonuses, "attacks do N less damage").
+    attackerMarkers = [],
   } = options;
   const defenderEffects = ignoreDefenderEffects ? [] : defenderMarkers;
+  const markerSum = (markers, pick) =>
+    markers.reduce((sum, marker) => sum + (pick(marker) ? marker.amount || 0 : 0), 0);
+  const attackNameLower = String(attack?.name || '').toLowerCase();
+  const incomingApplies = (marker) => attackerMatchesFilter(marker.filter, attacker);
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
@@ -71,9 +77,25 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Step 2c: Trainer turn boosts (Premium Power Pro), also BEFORE Weakness/Resistance.
   const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, { defenderIsActive });
 
+  // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.
+  const markerBonus =
+    base > 0 && defenderIsActive
+      ? markerSum(
+          attackerMarkers,
+          (m) => m.kind === 'nextTurnBonus' && (m.attackName == null || m.attackName === attackNameLower)
+        )
+      : 0;
+  const markerReductionBeforeWR =
+    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && !m.afterWR) +
+    markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && !m.afterWR && incomingApplies(m));
+  const markerReductionAfterWR =
+    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR) +
+    markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && m.afterWR && incomingApplies(m));
+
   const damageBeforeWR = Math.max(
     0,
-    base + attackerBonus + specialEnergyBonus + turnBonus - specialEnergyPenalty
+    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus - specialEnergyPenalty -
+      markerReductionBeforeWR
   );
 
   // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
@@ -129,7 +151,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         attacker,
         afterWR: true,
       });
-  damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction);
+  damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction - markerReductionAfterWR);
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
   let reduced = 0;
@@ -160,6 +182,16 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     finalDamage = 0;
   } else if (prevention?.reduce > 0) {
     finalDamage = Math.max(0, finalDamage - prevention.reduce * 10);
+  }
+  const markerPrevents = defenderEffects.some(
+    (m) =>
+      m.kind === 'incomingPrevent' &&
+      incomingApplies(m) &&
+      (m.maxDamage == null || finalDamage <= m.maxDamage)
+  );
+  if (!prevented && markerPrevents) {
+    prevented = true;
+    finalDamage = 0;
   }
 
   return {

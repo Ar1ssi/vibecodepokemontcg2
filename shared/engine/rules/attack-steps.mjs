@@ -519,6 +519,8 @@ const CHAIN_TEMPLATES = [
 export function parseAttackSteps(text, { selfName = '' } = {}) {
   const result = { before: [], after: [], handlesSearch: false };
   let normalized = normalizeAttackText(text, selfName)
+    // Keeps the Weakness order of timed damage changes as a token each sentence lifts off.
+    .replace(/\s*\((before|after) applying weakness and resistance\)/g, ' <wr:$1>')
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").
     .replace(/\s*\([^)]*\)/g, '');
   if (!normalized) return result;
@@ -547,16 +549,18 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     }
     // "If you do, …" / "If you attached Energy in this way, …" after an attach: the executor
     // runs it only when the attach happened (requiresAttach, I93).
-    const chained = ATTACH_CHAIN.exec(sentence);
+    const wrOrder = /<wr:(before|after)>/.exec(sentence)?.[1];
+    const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
+    const chained = ATTACH_CHAIN.exec(plain);
     const previous = result.after[result.after.length - 1];
     if (chained && !isAttachStep(previous)) continue;
-    const { rest, flags } = stripGates(chained ? sentence.slice(chained[0].length) : sentence);
+    const { rest, flags } = stripGates(chained ? plain.slice(chained[0].length) : plain);
     if (chained) flags.requiresAttach = true;
     const templates = chained ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
-      const step = build(m, rest);
+      const step = build(m, rest, { wrOrder });
       if (!step) break;
       if (step.type === 'atkMill' && millHandled) break;
       const { before, ...stepFlags } = flags;
