@@ -897,3 +897,41 @@ test('ability: coin-flip statusAbility only applies on heads (I88)', () => {
   }
   assert.deepEqual([...faces].sort(), ['heads', 'tails']);
 });
+
+function holderWithAbility(state, text) {
+  const holder = createCard({
+    instanceId: 70,
+    name: 'Holder',
+    hp: 200,
+    supertype: 'Pokémon',
+    abilities: [{ name: 'Test Ability', type: 'Ability', text }],
+  });
+  state.players.p1.zones.active.push(holder);
+  const opp = createCard({ instanceId: 71, name: 'Opp', hp: 200, supertype: 'Pokémon' });
+  state.players.p2.zones.active.push(opp);
+  return { holder, opp };
+}
+
+test('ability: passive and triggered abilities cannot be activated from the ability button (I94)', () => {
+  const passives = [
+    "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), put 3 damage counters on the Attacking Pokémon.",
+    'If this Pokémon is Knocked Out by damage from an attack from your opponent\'s Pokémon, search your deck for up to 2 cards and put them into your hand. Then, shuffle your deck.',
+    "Damage can't be healed from any Pokémon (both yours and your opponent's).",
+  ];
+  for (const text of passives) {
+    const { state, rng } = setupGame();
+    state.players.p1.zones.deck.push(createCard({ instanceId: 80, name: 'Deck Card' }));
+    holderWithAbility(state, text);
+    const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+    assert.equal(res.error, "This Ability can't be activated; it works on its own.", text);
+    assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
+    assert.equal(res.state.players.p1.zones.hand.length, 0);
+  }
+});
+
+test('ability: VSTAR Power "During your turn, you may" wording stays activatable (I94)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, "During your turn, you may put 4 damage counters on 1 of your opponent's Pokémon. (You can't use more than 1 VSTAR Power in a game.)");
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+});

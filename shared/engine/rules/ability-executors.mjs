@@ -83,6 +83,19 @@ export function isBenchPlayedTrigger(card) {
   return matchesFirstAbilityOrText(card, BENCH_PLAYED_CLAUSE);
 }
 
+// Wording that makes an ability something the player activates. Anything else is a passive
+// ("As long as…", "Prevent all damage…") or an automatic trigger ("If this Pokémon is Knocked
+// Out…", "Whenever your opponent attaches…") that must never run from the ability button.
+// Checked over the full corpus (S266): every non-matching text is a passive or trigger.
+const ACTIVATED_ABILITY_CLAUSE =
+  /once during your turn|during your (?:first )?turn\b[^.]*?\byou may\b|at any time during your turn|once during a game on your turn|you may use this ability|as often as you like|once per turn|when you play [^.]*?from your hand/;
+
+export function isActivatedAbility(card, abilityIndex = 0) {
+  const ability = Array.isArray(card?.abilities) ? card.abilities[abilityIndex] : null;
+  const text = typeof ability === 'string' ? ability : ability?.text;
+  return ACTIVATED_ABILITY_CLAUSE.test(text != null ? lower(text) : textOf(card));
+}
+
 // --- passive -----------------------------------------------------------
 
 // How many cost symbols a passive ability removes from attacks.

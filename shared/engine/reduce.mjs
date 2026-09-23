@@ -61,6 +61,7 @@ import {
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
+  isActivatedAbility,
   passiveCostDiscount,
   applyCostDiscount,
 } from './rules/ability-executors.mjs';
@@ -2450,6 +2451,11 @@ export function validateLegality(state, command) {
           player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
         ) {
           return { allowed: false, reason: 'Ability already used this turn.' };
+        }
+        // Passives and automatic triggers resolve through their own hooks; running them from
+        // the ability button placed thorns counters or searched KO-trigger decks at will (I94).
+        if (!isActivatedAbility(cardRef.card, payload?.abilityIndex ?? 0)) {
+          return { allowed: false, reason: "This Ability can't be activated; it works on its own." };
         }
         // "Have no Abilities" Stadiums (Team Rocket's Watchtower, Space Center,
         // Battle Frontier) suppress abilities server-side too; previously the
