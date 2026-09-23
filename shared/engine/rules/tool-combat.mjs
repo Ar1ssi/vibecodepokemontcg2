@@ -155,7 +155,7 @@ export function preventionForCard(card, attacker) {
   return base;
 }
 
-export function reductionForCard(card, defender, attacker) {
+export function reductionForCard(card, defender, attacker, { skipSymbolFilter = false } = {}) {
   if (!card) return 0;
   const t = cardAbilityText(card);
   const red = parseDamageReduction(card).reduce;
@@ -179,7 +179,7 @@ export function reductionForCard(card, defender, attacker) {
   if (/pokémon ex\b|pokemon ex\b/i.test(t) && !isExCard(attacker)) {
     return 0;
   }
-  if (/\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
+  if (!skipSymbolFilter && /\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
     const letters = [...t.matchAll(/\{([a-z])\}/gi)]
       .map((m) => TYPE_LETTER[m[1].toLowerCase()])
       .filter(Boolean);
