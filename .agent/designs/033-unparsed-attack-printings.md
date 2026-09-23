@@ -1,5 +1,5 @@
 # 033: The last unparsed printings of the design-031 families (I119)
-Status: approved (self — user unreachable, background session)
+Status: shipped S271 (approved self — user unreachable, background session)
 Date: 2026-09-23 · Session: S271
 
 ## Problem
@@ -103,18 +103,18 @@ atkOwnHandOpponentPicksToDeck, atkDiscardHandEnergy.
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Iron-Clad Roll with no Capsule attached / declined | No discard, no marker | [ ] |
-| 2 | Desert Geyser with no Stadium / attacker's own Stadium | No discard, no marker | [ ] |
-| 3 | Encore vs defender with 0 / 1 / 2 attacks | 0: skip; 1: auto; 2: prompt | [ ] |
-| 4 | Encore'd Pokémon evolves or retreats | Lock ends (marker expiry) | [ ] |
-| 5 | Mach Wind retreat cost this turn vs next turn | Only next turn is free | [ ] |
-| 6 | Voltage Shoot with 1 {L} in hand | Attack refused with a reason | [ ] |
-| 7 | Rocket Splash choosing 0 Energy | 0 damage, nothing shuffled | [ ] |
-| 8 | Mud Flood with a deck of < 4 cards / 0 cards | Reveals what exists; bonus from those | [ ] |
-| 9 | Unown T with an empty hand on either side | That half skips; the other still runs | [ ] |
-| 10 | Gothorita with < 5 cards in opp deck / 0 | Orders what exists; 0 skips | [ ] |
-| 11 | Inkay declines the shuffle | Deck order unchanged | [ ] |
-| 12 | Resume mid-prompt (ordering, opponent pick) | Memo in resume token (design 030) | [ ] |
+| 1 | Iron-Clad Roll with no Capsule attached / declined | No discard, no marker | [x] "Iron-Clad Roll: discarding the Capsule…", "…no Capsule attached…" |
+| 2 | Desert Geyser with no Stadium / attacker's own Stadium | No discard, no marker | [x] "Desert Geyser: your own Stadium or no Stadium…" |
+| 3 | Encore vs defender with 0 / 1 / 2 attacks | 0: skip; 1: auto; 2: prompt | [x] "Encore: one attack locks without a question…", "Encore: the Defending Pokémon…" |
+| 4 | Encore'd Pokémon evolves or retreats | Lock ends (marker expiry) | [x] "Encore: the lock ends when the locked Pokémon retreats" (evolve expiry is shared D108 marker code) |
+| 5 | Mach Wind retreat cost this turn vs next turn | Only next turn is free | [x] "Mach Wind: the Retreat Cost is 0 during your next turn only" |
+| 6 | Voltage Shoot with 1 {L} in hand | Attack refused with a reason | [x] "Voltage Shoot: refused with fewer than 2 {L}…" |
+| 7 | Rocket Splash choosing 0 Energy | 0 damage, nothing shuffled | [x] "Rocket Splash: shuffling no Energy…" |
+| 8 | Mud Flood with a deck of < 4 cards / 0 cards | Reveals what exists; bonus from those | [x] "Mud Flood: a short deck reveals what is there…" |
+| 9 | Unown T with an empty hand on either side | That half skips; the other still runs | [x] "Unown T: an empty opponent hand skips…" |
+| 10 | Gothorita with < 5 cards in opp deck / 0 | Orders what exists; 0 skips | [x] "Fortunate Eye: a 2-card deck needs one pick; an empty deck skips" |
+| 11 | Inkay declines the shuffle | Deck order unchanged | [x] "Mischievous Tentacles: shows the top card; Yes shuffles, No keeps the order" |
+| 12 | Resume mid-prompt (ordering, opponent pick) | Memo in resume token (design 030) | [x] "Fortunate Eye: the top 5 go back…", "Unown T: each player loses…" (every pick is a resume) |
 
 ## Test plan
 Parser unit cases with the printed texts; reduce-level tests per printing (new file
@@ -131,3 +131,10 @@ n/a: code only; states without the new marker kinds behave as before. Revert = r
 | 3 | Encore/Amnesia, Unown T, Inkay/Gothorita | same + family-signal, audit header |
 
 ## Deviations
+- Unown T is one step, `atkHandCardsToDecks`, with two phases (the second asks the opponent
+  through the memo) instead of two steps. The same handler reads the "he or she chooses" wording.
+- Unown Amnesia ("can't use that attack") shares `atkLockAttack` with mode `except`.
+- Psychic Defense: only the damage half (incomingReduce 20) was verified by a test.
+- The old chosen-target wording in `attackTargetClause` now reads 46 printings (scope 'any'),
+  not only Voltage Shoot.
+- Metagross-style "base damage is 100" next-turn wording is not covered (out of scope).
