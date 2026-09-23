@@ -217,15 +217,17 @@ function moveEnergyEnds(ctx) {
         energies: attacker ? attachedCards(player, attacker.instanceId).filter(matches) : [],
         targets: benchRootsOf(player).filter((c) => c !== attacker),
       };
-    case 'bench':
+    case 'bench': {
+      const target = step.to === 'active' ? activeOf(player) : attacker;
       return {
         owner: player,
         energies: benchRootsOf(player)
-          .filter((c) => c !== attacker)
+          .filter((c) => c !== target)
           .flatMap((root) => attachedCards(player, root.instanceId))
           .filter(matches),
-        targets: attacker ? [attacker] : [],
+        targets: target ? [target] : [],
       };
+    }
     case 'opponentActive': {
       const active = activeOf(opponent);
       return {
@@ -254,7 +256,7 @@ function atkMoveEnergy(ctx) {
       const energy = byId(ctx.memo.energyId);
       const target = targets.find((c) => c.instanceId === ctx.selection?.[0]);
       if (energy && target && target.instanceId !== energy.attachedTo) attachTo(owner, energy, target, ctx.events);
-      return askNextEnergy(ctx, energies);
+      return step.spread ? askNextEnergy(ctx, energies) : null;
     }
     if (ctx.selection) {
       const energy = byId(ctx.selection[0]);
@@ -268,6 +270,14 @@ function atkMoveEnergy(ctx) {
       });
     }
     if (energies.length === 0 || targets.length < 2) return skip(ctx, 'no_energy_to_move');
+    if (!step.spread) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose ${energyLabel(step)} to move`,
+        options: energies,
+        min: 1,
+        max: 1,
+      });
+    }
     return askNextEnergy(ctx, energies);
   }
 
@@ -550,7 +560,8 @@ function atkBenchFromDiscard(ctx) {
     (c) =>
       isPokemon(c) &&
       stageOf(c) === 'Basic' &&
-      (!step.pokemonType || pokemonHasType(c, step.pokemonType))
+      (!step.pokemonType || pokemonHasType(c, step.pokemonType)) &&
+      (!step.maxHp || (Number(c.hp) || 0) <= step.maxHp)
   );
   const what = step.pokemonType ? `Basic {${step.pokemonType.toUpperCase()}} Pokémon` : 'Basic Pokémon';
   const space = benchSpace(player);
@@ -669,6 +680,94 @@ function atkMoveAllCounters(ctx) {
   });
 }
 
+// "Move 1 damage counter from 1 of your Pokémon to another of your Pokémon" (Reuniclus).
+function atkMoveCounterBetween(ctx) {
+  const { player, step } = ctx;
+  const roots = rootsOf(player);
+  // "from 1 of your Team Rocket's Pokémon": the source's name starts with the printed qualifier.
+  const fromName = String(step.fromName || '').toLowerCase();
+  const sources = roots.filter(
+    (c) =>
+      (c.damage || 0) > 0 &&
+      (!fromName || String(topPokemonCard(player, c)?.name || '').toLowerCase().startsWith(fromName))
+  );
+  if (ctx.memo?.fromId != null) {
+    const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
+    const to = roots.find((c) => c.instanceId === ctx.selection?.[0] && c.instanceId !== ctx.memo.fromId);
+    if (!from || !to) return skip(ctx, 'target_not_found');
+    const moved = Math.min(from.damage || 0, (step.count || 1) * 10);
+    from.damage -= moved;
+    ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
+    placeCounters(ctx, to, player.playerId, moved);
+    return null;
+  }
+  if (ctx.selection) {
+    const from = sources.find((c) => c.instanceId === ctx.selection[0]);
+    if (!from) return skip(ctx, 'target_not_found');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose a Pokémon to move the damage counter to`,
+      options: roots.filter((c) => c !== from),
+      min: 1,
+      max: 1,
+      memo: { fromId: from.instanceId },
+    });
+  }
+  if (sources.length === 0 || roots.length < 2) return skip(ctx, 'no_damage_to_move');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a Pokémon to move a damage counter from`,
+    options: sources,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Gumshoos Evidence Gathering: a hand card and the deck's top card trade places.
+function atkHandDeckTopSwap(ctx) {
+  const { player } = ctx;
+  const hand = player.zones.hand || [];
+  const deck = player.zones.deck || [];
+  if (ctx.selection) {
+    const card = hand.find((c) => c.instanceId === ctx.selection[0]);
+    if (!card || deck.length === 0) return skip(ctx, 'target_not_found');
+    const top = deck.shift();
+    hand.splice(hand.indexOf(card), 1, top);
+    deck.unshift(card);
+    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'deck', playerId: player.playerId });
+    ctx.events.push({ type: 'cardMoved', instanceId: top.instanceId, from: 'deck', to: 'hand', playerId: player.playerId });
+    return null;
+  }
+  if (hand.length === 0 || deck.length === 0) return skip(ctx, 'nothing_to_swap');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a card from your hand to put on top of your deck`,
+    options: hand,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Galarian Mr. Rime Shuffle Dance: a face-down Prize trades places with the deck's top card.
+function atkOpponentPrizeDeckSwap(ctx) {
+  const { opponent } = ctx;
+  const prizes = opponent?.zones?.prizes || [];
+  const deck = opponent?.zones?.deck || [];
+  if (ctx.selection) {
+    const at = prizes.findIndex((c) => c.instanceId === ctx.selection[0]);
+    if (at < 0 || deck.length === 0) return skip(ctx, 'target_not_found');
+    const [prize] = prizes.splice(at, 1, deck.shift());
+    deck.unshift(prize);
+    ctx.events.push({ type: 'prizeSwapped', playerId: opponent.playerId });
+    return null;
+  }
+  if (prizes.length === 0 || deck.length === 0) return skip(ctx, 'nothing_to_swap');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 of your opponent's face-down Prize cards`,
+    // Identity only: Prize cards stay face down.
+    options: prizes.map((c) => ({ instanceId: c.instanceId })),
+    min: 1,
+    max: 1,
+  });
+}
+
 function knockOutConditionMet(card, step) {
   switch (step.condition) {
     case null:
@@ -774,6 +873,9 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
   atkCountersEach,
   atkMoveAllCounters: optional(atkMoveAllCounters, () => 'Move damage counters'),
+  atkMoveCounterBetween,
+  atkHandDeckTopSwap,
+  atkOpponentPrizeDeckSwap,
   atkKnockOut,
   atkTakePrize,
   atkDevolve,

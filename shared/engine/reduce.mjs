@@ -69,7 +69,7 @@ import {
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
-import { parseAttackSteps } from './rules/attack-steps.mjs';
+import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
 import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
@@ -3041,20 +3041,11 @@ function returnAttackerToHand(draft, { playerId, attacker, oppId, events }) {
  */
 function planAttackSteps(attack, attacker, { coin, headsCount }) {
   const parsed = parseAttackSteps(attack?.text, { selfName: attacker?.name });
-  const heads = coin === 'heads' ? Math.max(1, headsCount || 0) : headsCount || 0;
   const resolve = (steps) =>
-    steps
-      .filter((step) => {
-        if (step.gate === 'heads') return coin === 'heads';
-        if (step.gate === 'tails') return coin === 'tails';
-        if (step.perHeads) return heads > 0;
-        return true;
-      })
-      .map(({ gate, perHeads, ...step }) => ({
-        ...step,
-        ...(perHeads ? { count: (step.count || 1) * heads } : {}),
-        attackName: attack?.name || 'Attack',
-      }));
+    resolveCoinGates(steps, { coin, headsCount }).map((step) => ({
+      ...step,
+      attackName: attack?.name || 'Attack',
+    }));
   return {
     before: resolve(parsed.before),
     after: resolve(parsed.after),

@@ -124,6 +124,27 @@ const TEMPLATES = [
     (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', anyNumber: true, spread: true, ...energyFilter(m[1], s) }),
   ],
   [
+    new RegExp(String.raw`^move (an?|\d+) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) 1 of your benched pokémon to your active pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'bench', to: 'active', count: countOf(m[1]), ...energyFilter(m[2], s) }),
+  ],
+  [
+    new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) 1 of your pokémon to another of your pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  [
+    /^move (\d+|a) damage counters? from 1 of your ((?:[a-z'.-]+ )*?)pokémon to another of your pokémon$/,
+    (m) => ({
+      type: 'atkMoveCounterBetween',
+      count: countOf(m[1]),
+      ...(m[2].trim() ? { fromName: m[2].trim() } : {}),
+    }),
+  ],
+  [/^switch a card from your hand with the top card of your deck$/, () => ({ type: 'atkHandDeckTopSwap' })],
+  [
+    /^switch 1 of your opponent's face-down prize cards with the top card of their deck$/,
+    () => ({ type: 'atkOpponentPrizeDeckSwap' }),
+  ],
+  [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: card)? from your opponent's active pokémon to 1 of their benched pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
   ],
@@ -184,11 +205,12 @@ const TEMPLATES = [
 
   // Discard pile → Bench / hand
   [
-    new RegExp(String.raw`^put (up to \d+|an?|\d+) (basic )?(?:\{([a-z])\} )?pokémon(?: cards?)? from your discard pile onto your bench$`),
+    new RegExp(String.raw`^put (up to \d+|an?|\d+) (basic )?(?:\{([a-z])\} )?pokémon(?: with (\d+) hp or less)?(?: cards?)? from your discard pile onto your bench$`),
     (m) => ({
       type: 'atkBenchFromDiscard',
       ...attachCount(m[1]),
       ...(m[3] ? { pokemonType: m[3] } : {}),
+      ...(m[4] ? { maxHp: Number(m[4]) } : {}),
     }),
   ],
   [
@@ -312,6 +334,61 @@ function searchAttachStep(clause, gate) {
     ...(gate === 'if heads' ? { gate: 'heads' } : {}),
     ...(gate === 'for each heads' ? { perHeads: true } : {}),
   };
+}
+
+// "Once during your turn, you may …" and the other activation wordings an Ability's effect
+// follows. A preamble with its own condition ("if this Pokémon is on your Bench, …") is not
+// stripped, so the effect is not read without it.
+const ABILITY_PREAMBLE =
+  /^(?:(?:once during your turn|as often as you like during your turn|during your turn|when you play this pokémon from your hand to evolve 1 of your pokémon during your turn), (?:you may use this (?:ability|power)\. )?(?:you may )?)/;
+
+/**
+ * An activated Ability's effect read with the attack templates (I89, I95): the effect half
+ * of the text, after the activation preamble. Empty when the text is not an activated
+ * Ability the templates can read in full order.
+ *
+ * @param {string} text Printed Ability text
+ * @param {{ selfName?: string }} [options] The holder's printed name
+ * @returns {{ steps: object[], holderZone: 'active'|'bench'|null }} `holderZone` is where
+ *   the holder must be for the Ability to work, when the text says so.
+ */
+export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
+  const normalized = normalizeAttackText(text, selfName).replace(/\s*\([^)]*\)/g, '');
+  if (!ABILITY_PREAMBLE.test(normalized)) return { steps: [], holderZone: null };
+  let effect = normalized.replace(ABILITY_PREAMBLE, '');
+  // "if this Pokémon is in the Active Spot / on your Bench, …" is the one condition read.
+  let holderZone = null;
+  const position = HOLDER_POSITION.exec(effect);
+  if (position) {
+    holderZone = /bench/.test(position[1]) ? 'bench' : 'active';
+    effect = effect.slice(position[0].length);
+  }
+  if (/^if /.test(effect)) return { steps: [], holderZone: null };
+  const parsed = parseAttackSteps(effect);
+  return { steps: [...parsed.before, ...parsed.after], holderZone };
+}
+
+const HOLDER_POSITION =
+  /^if this pokémon is (in the active spot|your active pokémon|on your bench), (?:you may )?/;
+
+/**
+ * Applies a coin result to gated steps: "If heads/tails" steps are dropped on the other face
+ * and "For each heads" steps scale their count by the heads flipped.
+ *
+ * @param {object[]} steps
+ * @param {{ coin: 'heads'|'tails'|null, headsCount?: number }} flip
+ * @returns {object[]}
+ */
+export function resolveCoinGates(steps, { coin, headsCount }) {
+  const heads = coin === 'heads' ? Math.max(1, headsCount || 0) : headsCount || 0;
+  return steps
+    .filter((step) => {
+      if (step.gate === 'heads') return coin === 'heads';
+      if (step.gate === 'tails') return coin === 'tails';
+      if (step.perHeads) return heads > 0;
+      return true;
+    })
+    .map(({ gate, perHeads, ...step }) => (perHeads ? { ...step, count: (step.count || 1) * heads } : step));
 }
 
 /**

@@ -3,9 +3,11 @@
  * Handles activated once-per-turn abilities, step planning, and choice resumption.
  */
 
+import { findCard } from '../state.mjs';
 import { parseAbility } from '../rules/abilities.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
-import { executeSteps } from './executor.mjs';
+import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
+import { executeSteps, isExecutableStepType } from './executor.mjs';
 
 /**
  * Executes a Pokemon ability or resumes a suspended ability choice.
@@ -90,17 +92,37 @@ export function executeAbility(draft, {
   const parsedSteps = parseAbility(text);
   const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
   const planned = planAbilitySteps(steps, { mode: 'interactive' });
-  const actionableSteps = planned
+  let actionableSteps = planned
     .filter((p) => p.action !== 'skip')
     .map((p) => p.step);
 
-  if (actionableSteps.length === 0) {
-    draft.pendingChoice = null;
-    return { pendingChoice: null, completed: true };
-  }
-
-  // "Flip a coin. If heads, …": the flip is the ability's use; tails spends it with no effect.
-  if (isHeadsGatedAbility(text, actionableSteps)) {
+  // An activated effect the ability parser leaves without an executor (I89) or reads as
+  // passive only (I95) runs through the shared effect templates when they read it.
+  const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName: card.name });
+  const parserFallsShort =
+    actionableSteps.length === 0 || actionableSteps.some((step) => !isExecutableStepType(step.type));
+  if (parserFallsShort && templateSteps.length > 0) {
+    const zone = findCard(draft, card.instanceId)?.zoneId;
+    if (holderZone && zone !== holderZone) {
+      events.push({ type: 'effectStepSkipped', reason: `holder_not_${holderZone}`, step: 'ability' });
+      draft.pendingChoice = null;
+      return { pendingChoice: null, completed: true };
+    }
+    let flip = { coin: null, headsCount: 0 };
+    if (templateSteps.some((step) => step.gate || step.perHeads)) {
+      const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+      events.push({ type: 'coinFlipped', playerId, face });
+      flip = { coin: face, headsCount: face === 'heads' ? 1 : 0 };
+    }
+    actionableSteps = resolveCoinGates(templateSteps, flip);
+    if (actionableSteps.length === 0) {
+      // Tails on a heads-only effect: the flip was the Ability's use.
+      markUsed();
+      draft.pendingChoice = null;
+      return { pendingChoice: null, completed: true };
+    }
+  } else if (isHeadsGatedAbility(text, actionableSteps)) {
+    // "Flip a coin. If heads, …": the flip is the ability's use; tails spends it with no effect.
     const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
     events.push({ type: 'coinFlipped', playerId, face });
     if (face === 'tails') {
@@ -108,6 +130,11 @@ export function executeAbility(draft, {
       draft.pendingChoice = null;
       return { pendingChoice: null, completed: true };
     }
+  }
+
+  if (actionableSteps.length === 0) {
+    draft.pendingChoice = null;
+    return { pendingChoice: null, completed: true };
   }
 
   const eventsBefore = events.length;

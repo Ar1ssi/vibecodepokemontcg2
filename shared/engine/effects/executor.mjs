@@ -27,6 +27,27 @@ import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
 
+// Step kinds with a case in executeSteps' switch (kept in sync by executor-step-types.test).
+export const EXECUTOR_STEP_TYPES = new Set([
+  'discardCost', 'discardCostAbility', 'searchDeck', 'searchAbility', 'search', 'draw',
+  'drawAbility', 'drawUntil', 'millItems', 'discardHandThenDraw', 'shuffleHandThenDraw',
+  'ionoShuffle', 'switchOwn', 'switchAbility', 'switch', 'switchOpponent', 'switchOpponentOut',
+  'recursion', 'recursionFromDiscardAbility', 'shuffleFromDiscard', 'heal', 'healAmount',
+  'healAbility', 'coinFlip', 'coinDraw', 'returnTool', 'shuffleOwnPokemon', 'revealHand',
+  'drawIfNoSupporter', 'putHandToDeck', 'peekReturn', 'peekDiscard', 'benchRestored',
+  'fossilBench', 'applyStatus', 'statusAbility', 'recoverEnergy', 'recoverFromDiscard',
+  'attachAbility', 'attachFromDiscard',
+]);
+
+/** Whether executeSteps has a handler for a step kind (switch case or handler table). */
+export function isExecutableStepType(type) {
+  return (
+    EXECUTOR_STEP_TYPES.has(type) ||
+    Object.hasOwn(EXTRA_STEP_HANDLERS, type) ||
+    Object.hasOwn(ATTACK_STEP_HANDLERS, type)
+  );
+}
+
 /**
  * Whether a card can satisfy a discard-cost Energy-type filter. Basic Energy
  * cards carry their type in the printed name ("Fire Energy"); some printings
@@ -1718,7 +1739,9 @@ export function executeSteps(draft, {
       }
 
       default:
-        // Passive, informational, or unhandled step: continue safely
+        // No handler: report it, so a caller never counts this as the effect happening
+        // (an ability is not spent on it, I89).
+        events.push({ type: 'effectStepSkipped', reason: 'unsupported_step', step: step.type });
         break;
     }
   }
