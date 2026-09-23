@@ -587,6 +587,8 @@ export function drawCount(attackText) {
     text = String(attackText || '');
   }
   if (/draw\s+cards\s+until\s+you have\s+\d+\s+cards?/i.test(text)) return 0;
+  // "Your opponent draws a card" (Comfey Sweet Kiss) is the opponent's draw, not the attacker's.
+  text = text.replace(/\byour opponent\b[^.]*?\bdraws?\b[^.]*/gi, '');
   const m = /draws?\s+(\d+)\s+cards?/i.exec(text);
   if (m) return Math.max(0, parseInt(m[1], 10));
   if (

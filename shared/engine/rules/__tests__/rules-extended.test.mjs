@@ -3293,6 +3293,12 @@ import test from 'node:test';
       assert.equal(drawCount('You may draw cards until you have 5 cards.'), 0);
     });
 
+    test("drawCount: the opponent's draw is not the attacker's (I101)", () => {
+      assert.equal(drawCount('Your opponent draws a card.'), 0);
+      assert.equal(drawCount('Your opponent shuffles their hand into their deck and draws 4 cards.'), 0);
+      assert.equal(drawCount('Draw a card. Your opponent draws a card.'), 1);
+    });
+
     // ── §D draw family (drawCount) ──
     test('drawCount: parses "draw/draws N card(s)", 0 otherwise', () => {
       assert.equal(drawCount('Draw 2 cards.'), 2);
