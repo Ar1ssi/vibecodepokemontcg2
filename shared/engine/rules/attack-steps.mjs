@@ -257,6 +257,33 @@ const TEMPLATES = [
     (m) => ({ type: 'atkLostZoneFromDiscard', what: recoverWhat(m[1]), anyNumber: true }),
   ],
 
+  // Energy back to the opponent's hand
+  [
+    /^put (an?|\d+) energy(?: cards?)? attached to your opponent's active pokémon into their hand$/,
+    (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', count: countOf(m[1]), toHand: true }),
+  ],
+
+  // Self care
+  [
+    /^(?:this pokémon recovers from all special conditions|remove all special conditions from this pokémon)$/,
+    () => ({ type: 'atkCureSelf' }),
+  ],
+  [
+    /^heal from this pokémon the same amount of damage you did to your opponent's active pokémon$/,
+    () => ({ type: 'atkMirrorHeal' }),
+  ],
+
+  // Choose-and-Knock-Out
+  [
+    /^knock out 1 of your opponent's pokémon(?: in play)? that has (?:exactly (\d+) damage counters on it|(\d+) hp or less remaining)$/,
+    (m) => ({
+      type: 'atkKnockOutChoose',
+      ...(m[1] ? { exactCounters: Number(m[1]) } : { maxRemainingHp: Number(m[2]) }),
+    }),
+  ],
+
+  [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
+
   // Leave play
   [/^shuffle this pokémon and all attached cards into your deck$/, () => ({ type: 'atkShuffleSelf' })],
 
@@ -350,6 +377,23 @@ const BLOCKS = [
   [
     /look at the top (\d+) cards of your deck(?:, and|\.) you may put any number of (basic )?pokémon you find there onto your bench\. shuffle the other cards back into your deck\./g,
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
+  ],
+  [
+    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone)\./g,
+    (m) => ({
+      type: 'atkLookTopTake',
+      look: Number(m[1]),
+      take: m[2] ? Number(m[2]) : m[3] === 'it' ? 1 : Number(m[3]),
+      rest: /lost zone/.test(m[4]) ? 'lostZone' : 'shuffle',
+    }),
+  ],
+  [
+    /choose (\d+) of your opponent's benched pokémon\. shuffle those pokémon and all attached cards into your opponent's deck\./g,
+    (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),
+  ],
+  [
+    /choose a random card from your opponent's hand\. your opponent reveals that card and shuffles it into their deck\./g,
+    () => ({ type: 'atkOppHandRandomToDeck' }),
   ],
   [
     /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,

@@ -8,6 +8,7 @@ import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { parseAttackSteps } from '../rules/attack-steps.mjs';
 import { classifyAttackEffect } from '../rules/attack-effects.mjs';
+import { addCondition, listConditions } from '../rules/special-conditions.mjs';
 import { ATTACK_YES, ATTACK_NO } from '../effects/attack-steps.mjs';
 
 let nextId = 1;
@@ -684,4 +685,74 @@ test('attack: old wordings — discard-pile attach, "you may search", Defending 
     setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A')),
   });
   assert.equal(activeRoot(attack(gust), 'p2').name, 'Opp A');
+});
+
+// ── families the S265 audit found unexecuted (I112) ────────────────────────
+
+test('attack: cure self, mirror heal, Energy back to the opponent\'s hand', () => {
+  const cured = attack(
+    board('This Pokémon recovers from all Special Conditions.', {
+      name: 'Arboliva ex',
+      setup: ({ attacker }) => addCondition(attacker, 'Poisoned'),
+    })
+  );
+  assert.deepEqual(listConditions(activeRoot(cured, 'p1')), []);
+
+  const swallow = attack(
+    board("Heal from this Pokémon the same amount of damage you did to your opponent's Active Pokémon.", {
+      name: 'Snorlax V',
+      damage: '60',
+      setup: ({ attacker }) => {
+        attacker.damage = 100;
+      },
+    })
+  );
+  assert.equal(activeRoot(swallow, 'p1').damage, 40);
+
+  let e1;
+  const b = board("You may put 2 Energy attached to your opponent's Active Pokémon into their hand.", {
+    name: 'Samurott',
+    setup: ({ p2, defender }) => {
+      e1 = energy('Water', { attachedTo: defender.instanceId });
+      p2.zones.active.push(e1);
+    },
+  });
+  const res = choose(attack(b), [ATTACK_YES], b.rng);
+  assert.ok(zone(res, 'p2', 'hand').some((c) => c.instanceId === e1.instanceId));
+});
+
+test('attack: Knock Out 1 of your opponent\'s Pokémon with exactly 6 counters; look at the top and keep', () => {
+  const b = board("Knock Out 1 of your opponent's Pokémon that has exactly 6 damage counters on it.", {
+    name: 'Glaceon ex',
+    setup: ({ p2 }) => {
+      const six = mon('Six');
+      six.damage = 60;
+      p2.zones.bench.push(six, mon('Fresh'));
+    },
+  });
+  const res = attack(b);
+  assert.ok(zone(res, 'p2', 'discard').some((c) => c.name === 'Six'));
+  assert.ok(zone(res, 'p2', 'bench').some((c) => c.name === 'Fresh'));
+
+  const g = board('Look at the top 4 cards of your deck and put 2 of them into your hand. Put the other cards in the Lost Zone.', {
+    name: 'Giratina V',
+  });
+  const top = ids(g.p1.zones.deck.slice(0, 4));
+  const res1 = attack(g);
+  const res2 = choose(res1, top.slice(0, 2), g.rng);
+  assert.deepEqual(ids(zone(res2, 'p1', 'lostZone')).sort(), top.slice(2).sort());
+  assert.ok(top.slice(0, 2).every((id) => zone(res2, 'p1', 'hand').some((c) => c.instanceId === id)));
+});
+
+test("attack: Sylveon ex Angelite shuffles 2 of the opponent's Benched Pokémon into their deck", () => {
+  const b = board(
+    "Choose 2 of your opponent's Benched Pokémon. Shuffle those Pokémon and all attached cards into your opponent's deck.",
+    { name: 'Sylveon ex', setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A'), mon('Opp B'), mon('Opp C')) }
+  );
+  const res1 = attack(b);
+  const [a, c] = zone(res1, 'p2', 'bench').filter((x) => x.name !== 'Opp B');
+  const res2 = choose(res1, [a.instanceId, c.instanceId], b.rng);
+  assert.deepEqual(zone(res2, 'p2', 'bench').map((x) => x.name), ['Opp B']);
+  // Into the deck (the opponent's turn-start draw may already have drawn it).
+  assert.ok([...zone(res2, 'p2', 'deck'), ...zone(res2, 'p2', 'hand')].some((x) => x.instanceId === a.instanceId));
 });

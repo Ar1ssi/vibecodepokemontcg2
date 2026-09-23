@@ -3819,7 +3819,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       };
       if (attackSteps.after.length > 0) {
         const done = runAttackSteps(draft, {
-          steps: attackSteps.after,
+          // Snorlax V Swallow heals the damage this attack just did.
+          steps: attackSteps.after.map((step) =>
+            step.type === 'atkMirrorHeal' ? { ...step, amount: dmgDealt } : step
+          ),
           attackerId: attacker?.instanceId,
           playerId,
           oppId,
