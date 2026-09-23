@@ -5111,6 +5111,46 @@ import test from 'node:test';
       assert.ok(steps.some((s) => s.type === 'statusImmunityAbility'));
     });
 
+    test('parseAbility: named-condition immunity is statusImmunityAbility, not a statusAbility (report E)', () => {
+      const cases = [
+        ["This Pokémon can't be Asleep.", 'Asleep'],
+        ["This Pokémon can't be Paralyzed.", 'Paralyzed'],
+        ["This Pokémon can't be Confused.", 'Confused'],
+        ["This Pokémon can't be Burned.", 'Burned'],
+      ];
+      for (const [text, condition] of cases) {
+        const steps = parseAbility(text);
+        assert.equal(steps[0].type, 'statusImmunityAbility', text);
+        assert.equal(steps[0].condition, condition, text);
+        assert.equal(
+          steps.some((s) => s.type === 'statusAbility'),
+          false,
+          'the immunity must not parse as a status the card applies'
+        );
+      }
+      const all = parseAbility("This Pokémon can't be affected by any Special Conditions.");
+      assert.equal(all[0].type, 'statusImmunityAbility');
+      assert.equal(all[0].condition, null);
+    });
+
+    test('parseAbility: a draw effect is never a playLockAbility (Chandelure TWM)', () => {
+      const steps = parseAbility('Each player draws a card.');
+      assert.deepEqual(steps.map((s) => s.type), ['drawAbility']);
+      assert.equal(steps.some((s) => s.type === 'playLockAbility'), false);
+    });
+
+    test('parseAbility: an evolve lock is not also an activated evolveAbility (Primal Law)', () => {
+      const steps = parseAbility(
+        "As long as this Pokémon is in the Active Spot, your opponent can't play any Pokémon from their hand to evolve their Pokémon."
+      );
+      assert.equal(steps.some((s) => s.type === 'evolveLockAbility'), true);
+      assert.equal(
+        steps.some((s) => s.type === 'evolveAbility'),
+        false,
+        'a passive lock must not offer an evolve button'
+      );
+    });
+
     test('parseAbility: ability-suppression wording ("have no Abilities")', () => {
       const capsule = parseAbility(
         "If this Pokémon has a Memory Capsule attached, {W} Pokémon in play (both yours and your opponent's) have no Abilities."

@@ -195,6 +195,22 @@ for legitimate improvements (same policy as D108). Revert = revert the branch co
 - Slice 2 keeps `toolPrizeCountAdjust` unchanged and reads `abilityPrizeModify` in `handleKnockout`
   instead: tool-combat importing ability-combat would make the dependency mutual (ability-combat
   already imports the reduction/prevention filters from tool-combat).
+- Slice 3 wired `isAbilitySuppressed` into every slice-2 reader (not only the useAbility gate): a
+  suppressed holder must stop contributing damage bonus/reduction/prevention/HP/prize/retreat/cost/
+  weakness/extra-type reads. Locks and permissions also skip suppressed holders.
+- Slice 3 fixed three parser misreads beyond report E's named-condition status one: "each play" as a
+  substring of "each player's hand" made draw texts parse as `playLockAbility` (Chandelure TWM),
+  evolve-lock text also emitted an activated `evolveAbility` (Primal Law), and Spearow 151's
+  "If you go second … first turn" wording now emits `evolvePermissionAbility`.
+- Slice 3 deliberately added no `movedToActiveTurn` stamp: slice 3 has no consumer, and slice 4's
+  on-promotion triggers are where the stamp sites (retreat/switch/promotion) get wired.
+- `abilityStatusImmune` is consulted inside `special-conditions.mjs` `addCondition`, the single write
+  helper every effect path funnels through. That module now imports `ability-combat.mjs` (acyclic:
+  nothing ability-combat imports reaches special-conditions).
+- The oracle baseline was re-ratcheted for exactly three families (damage-prevent 69→66,
+  opponent-disrupt 127→125, status 421→391): the 35 rows that stopped executing were the mis-parsed
+  named-condition immunities and Dachsbun/Dracovish misreads above, i.e. legitimate corrections
+  (D108 policy), not lost execution.
 
 ---
 Self-approval checklist (only when the user is unreachable):

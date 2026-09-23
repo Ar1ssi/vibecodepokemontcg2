@@ -60,12 +60,24 @@ const attacksTwice = (t) =>
   /attack twice (?:a|each) turn/.test(t) ||
   /may use an attack it has twice/.test(t);
 
-// Special-Condition immunity that never names a specific condition.
-const specialConditionImmunity = (t) =>
-  !t.includes('retreat') &&
-  (/(?:can't|cannot|can not) be affected by (?:any )?special condition/.test(t) ||
-    /recover(?:s)? from all special condition/.test(t) ||
-    /remove any special condition/.test(t));
+// Special-Condition immunity: 'all' for the unnamed wording, else the named
+// condition. Report E: "This Pokémon can't be Asleep" (Hoothoot PRE and the
+// other named-condition immunities) used to fall into the statusAbility branch
+// and apply the condition to its own side.
+const statusImmunityCondition = (t) => {
+  if (
+    !t.includes('retreat') &&
+    (/(?:can't|cannot|can not) be affected by (?:any )?special condition/.test(t) ||
+      /recover(?:s)? from all special condition/.test(t) ||
+      /remove any special condition/.test(t))
+  ) {
+    return 'all';
+  }
+  const named = t.match(
+    /(?:can't|cannot|can not) be (?:affected by (?:any )?)?(asleep|burned|confused|paralyzed|poisoned)\b/
+  );
+  return named ? named[1] : null;
+};
 
 // Type-changing continuous text ("it is {F} and {P} type", "type is the same…",
 // "in addition to its existing types", "provides … Energy of every type").
@@ -790,10 +802,13 @@ export function parseAbility(text = '') {
   // Excludes the "when you play this Pokémon from your hand to evolve 1 of your
   // Pokémon" trigger wording: there "evolve" is the trigger condition, not an
   // activated ability that evolves this Pokémon (Primarina Enriching Melody).
+  // Also excludes the opponent-facing evolve-lock wording ("your opponent can't
+  // play any Pokémon from their hand to evolve their Pokémon", Primal Law):
+  // without it a passive lock parsed as an activated evolve ability too.
   if (
     lower.includes('evolve') &&
     (lower.includes('this pokémon') || lower.includes('onto this pokémon')) &&
-    !/from your hand to evolve/.test(lower)
+    !/from (?:your|his or her|their) hand to evolve/.test(lower)
   ) {
     steps.push({
       type: 'evolveAbility',
@@ -857,6 +872,7 @@ export function parseAbility(text = '') {
     (namesStatus || lower.includes('burned') || lower.includes('confused') || lower.includes('poisoned'));
   if (
     !conditionalPoisonOnSwitch &&
+    !statusImmunityCondition(lower) &&
     (coinFlipStatus ||
       namesStatus ||
       (lower.includes('make') &&
@@ -1228,9 +1244,14 @@ export function parseAbility(text = '') {
   }
 
   // ── 36. Special-Condition immunity ──────────────────────────────────────
-  if (specialConditionImmunity(lower)) {
+  const immuneCondition = statusImmunityCondition(lower);
+  if (immuneCondition) {
     steps.push({
       type: 'statusImmunityAbility',
+      condition:
+        immuneCondition === 'all'
+          ? null
+          : immuneCondition[0].toUpperCase() + immuneCondition.slice(1),
       guidance: 'Passive: this Pokémon can\'t be affected by Special Conditions (as described).',
     });
   }
@@ -1263,7 +1284,9 @@ export function parseAbility(text = '') {
   if (
     lower.includes('evolve') &&
     (/first turn or the turn you play/.test(lower) ||
-      /evolve during the turn you play/.test(lower))
+      /evolve during the turn you play/.test(lower) ||
+      // Spearow 151: "If you go second, this Pokémon can evolve during your first turn."
+      /evolve during your first turn/.test(lower))
   ) {
     steps.push({
       type: 'evolvePermissionAbility',
@@ -1334,8 +1357,12 @@ export function parseAbility(text = '') {
 
   // ── 47. Card-play / evolve locks (continuous) ───────────────────────────
   const canPlayLock = /can'?t play [^.]*from (?:his or her|their) hand/.test(lower);
-  const eachPlayerLock =
-    /(?:each player|neither player) can'?t play any/.test(lower) || lower.includes('each play');
+  // "each play" is the corpus typo for "each player"; it must not match the
+  // substring inside "each player's hand" (Chandelure TWM's draw text parsed as
+  // a play lock that would have blocked every card in hand).
+  const eachPlayerLock = /(?:each player|neither player|each play) can'?t play any/.test(
+    lower
+  );
   const neitherCanPlay = /neither player can play/.test(lower);
   if (canPlayLock || eachPlayerLock || neitherCanPlay) {
     const evolveLock = lower.includes('to evolve');

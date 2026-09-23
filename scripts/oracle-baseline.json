@@ -47,7 +47,7 @@
     },
     "ability:damage-prevent": {
       "n": 305,
-      "observed": 69
+      "observed": 66
     },
     "ability:damage-reduce": {
       "n": 3,
@@ -139,7 +139,7 @@
     },
     "ability:opponent-disrupt": {
       "n": 223,
-      "observed": 127
+      "observed": 125
     },
     "ability:passive": {
       "n": 167,
@@ -175,7 +175,7 @@
     },
     "ability:status": {
       "n": 507,
-      "observed": 421
+      "observed": 391
     },
     "ability:status-recover": {
       "n": 38,

@@ -25,6 +25,7 @@ import {
 } from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
+import { abilityCounterMoveLock } from '../rules/ability-combat.mjs';
 
 export const BENCH_LIMIT = 5;
 
@@ -47,6 +48,24 @@ export function isStadiumCard(card) {
 
 export function isBasicEnergy(card) {
   return isEnergy(card) && classifyEnergyEffect(card) === 'basic';
+}
+
+/**
+ * Patrat CR: "Damage counters on each Pokémon … can't be moved to other
+ * Pokémon." True when the board forbids counter movement, for any handler
+ * that moves counters between Pokémon.
+ */
+export function damageCounterMoveLocked(ctx = {}) {
+  return abilityCounterMoveLock({
+    sideCards: [
+      ...(ctx.player?.zones?.active || []),
+      ...(ctx.player?.zones?.bench || []),
+    ],
+    opponentSideCards: [
+      ...(ctx.opponent?.zones?.active || []),
+      ...(ctx.opponent?.zones?.bench || []),
+    ],
+  });
 }
 
 export function isSpecialEnergy(card) {
@@ -995,6 +1014,11 @@ function maxMovableCounters(step, from) {
 
 function moveDamageCounters(ctx, from, to, counters) {
   const { player, opponent } = ctx;
+  // Patrat CR: "Damage counters on each Pokémon … can't be moved to other
+  // Pokémon." Every counter-movement handler funnels through here.
+  if (damageCounterMoveLocked(ctx)) {
+    return skip(ctx, 'damage_counter_move_locked');
+  }
   const moved = counters * 10;
   from.damage -= moved;
   to.damage = (to.damage || 0) + moved;

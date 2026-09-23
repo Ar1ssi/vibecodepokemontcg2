@@ -36,6 +36,7 @@ import {
   attachTo,
   attachedCards,
   benchRootsOf,
+  damageCounterMoveLocked,
   discardCard,
   isBasicEnergy,
   isSpecialEnergy,
@@ -1060,6 +1061,7 @@ function atkHpCap(ctx) {
 
 function atkMoveAllCounters(ctx) {
   const { player, opponent } = ctx;
+  if (damageCounterMoveLocked(ctx)) return skip(ctx, 'damage_counter_move_locked');
   const target = activeOf(opponent);
   const sources = benchRootsOf(player).filter((c) => (c.damage || 0) > 0);
   const move = (from) => {
@@ -1087,6 +1089,7 @@ function atkMoveAllCounters(ctx) {
 // "Move 1 damage counter from 1 of your Pokémon to another of your Pokémon" (Reuniclus).
 function atkMoveCounterBetween(ctx) {
   const { player, step } = ctx;
+  if (damageCounterMoveLocked(ctx)) return skip(ctx, 'damage_counter_move_locked');
   const roots = rootsOf(player);
   // "from 1 of your Team Rocket's Pokémon": the source's name starts with the printed qualifier.
   const fromName = String(step.fromName || '').toLowerCase();

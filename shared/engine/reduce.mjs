@@ -59,11 +59,6 @@ import {
   parseThorns,
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
-  requiresActiveSpot,
-  requiresKoOnOpponentTurn,
-  isEvolvePlayedTrigger,
-  isBenchPlayedTrigger,
-  isActivatedAbility,
   passiveCostDiscount,
   applyCostDiscount,
   teamNoRetreatCostForActive,
@@ -80,6 +75,13 @@ import {
   abilityIgnoresDefenderEffects,
   abilityExtraTypes,
   applyEnergyMultiplier,
+  abilityActivationBlockReason,
+  abilityPlayLocks,
+  abilityEvolvePermission,
+  abilityEvolveLock,
+  abilityRetreatLock,
+  abilitySummonRestricted,
+  abilityFirstTurnAttack,
 } from './rules/ability-combat.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -2167,6 +2169,29 @@ function attackCostPayable(state, playerId, active, attack) {
 }
 
 /**
+ * Ability-combat context for the player whose turn/command this is: their
+ * in-play cards on `side*` and the other player's on `opponent*`, so the
+ * slice-3 readers can scope suppression and locks to the right side.
+ */
+function abilitySideContext(state, playerId) {
+  const player = state.players?.[playerId];
+  const opponent = Object.values(state.players || {}).find(
+    (p) => p.playerId !== playerId
+  );
+  const zones = (p) => p?.zones || {};
+  const own = zones(player);
+  const other = zones(opponent);
+  return {
+    sideCards: [...(own.active || []), ...(own.bench || [])],
+    opponentSideCards: [...(other.active || []), ...(other.bench || [])],
+    sideActive: own.active || [],
+    sideBench: own.bench || [],
+    opponentActive: other.active || [],
+    opponentBench: other.bench || [],
+  };
+}
+
+/**
  * Validates gameplay legality when rulesEnabled is true (Step 4).
  * Skipped completely when rulesEnabled === false (Hazard H6).
  *
@@ -2357,6 +2382,14 @@ export function validateLegality(state, command) {
             reason: 'Only Basic Pokémon can be played from your hand.',
           };
         }
+        // Palafin ex Zero to Hero: this Pokémon may only enter play through its
+        // own Ability's effect, never as a hand play.
+        if (cardRef && isPokemon(cardRef.card) && abilitySummonRestricted(cardRef.card)) {
+          return {
+            allowed: false,
+            reason: `${cardRef.card.name} can only be put into play by its Ability's effect.`,
+          };
+        }
       }
 
       return { allowed: true };
@@ -2461,10 +2494,36 @@ export function validateLegality(state, command) {
             reason: 'Can only evolve a Pokémon in play.',
           };
         }
-        if ((state.turn?.number || 1) <= 2) {
+        const evolveCtx = {
+          ...abilitySideContext(state, playerId),
+          zone: targetRef.zoneId,
+          isActive: targetRef.zoneId === 'active',
+          turnNumber: state.turn?.number,
+          opponentActiveIsEx: isExCard(
+            Object.values(state.players || {})
+              .find((p) => p.playerId !== playerId)
+              ?.zones?.active?.find((c) => !c.attachedTo)
+          ),
+        };
+        // Primal Law-class locks ("your opponent can't play any Pokémon from
+        // their hand to evolve their Pokémon") forbid the evolution outright.
+        if (abilityEvolveLock(cardRef.card, evolveCtx)) {
+          return {
+            allowed: false,
+            reason: 'An Ability prevents evolving your Pokémon.',
+          };
+        }
+        // "This Pokémon can evolve during your first turn or the turn you play
+        // it" (Scatterbug/Eevee/Luxio/Spearow/Shelmet/Karrablast) relaxes the
+        // first-turn and just-played gates for that Pokémon.
+        const evolvePermission = abilityEvolvePermission(targetRef.card, evolveCtx);
+        if (!evolvePermission && (state.turn?.number || 1) <= 2) {
           return { allowed: false, reason: "Can't evolve on the first turn." };
         }
-        if (targetRef.card.enteredPlayTurn === state.turn?.number) {
+        if (
+          !evolvePermission &&
+          targetRef.card.enteredPlayTurn === state.turn?.number
+        ) {
           return {
             allowed: false,
             reason:
@@ -2527,10 +2586,21 @@ export function validateLegality(state, command) {
 
     case 'attack': {
       if (state.turn?.number === 1) {
-        return {
-          allowed: false,
-          reason: "The player going first can't attack on turn 1.",
-        };
+        const goingFirstActive = player.zones?.active?.find((c) => !c.attachedTo);
+        // Meloetta ex: "If you go first, this Pokémon can use attacks during
+        // your first turn." Turn 1 is always the going-first player's turn.
+        if (
+          !goingFirstActive ||
+          !abilityFirstTurnAttack(goingFirstActive, {
+            ...abilitySideContext(state, playerId),
+            turnNumber: state.turn.number,
+          })
+        ) {
+          return {
+            allowed: false,
+            reason: "The player going first can't attack on turn 1.",
+          };
+        }
       }
       if (player.flags?.attackerAttacked) {
         return { allowed: false, reason: 'Already attacked this turn.' };
@@ -2643,6 +2713,15 @@ export function validateLegality(state, command) {
         active.cannotRetreatUntilTurn &&
         active.cannotRetreatUntilTurn >= (state.turn?.number || 1)
       ) {
+        return {
+          allowed: false,
+          reason: "The Defending Pokémon can't retreat.",
+        };
+      }
+      // Omastar 151: the opponent's Active can't retreat while the holder is
+      // in the Active Spot. The Snorlax wording stops working when its holder
+      // is affected by a Special Condition (handled inside the reader).
+      if (abilityRetreatLock(active, abilitySideContext(state, playerId))) {
         return {
           allowed: false,
           reason: "The Defending Pokémon can't retreat.",
@@ -2790,6 +2869,14 @@ export function validateLegality(state, command) {
           ),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
+        // Ability play locks (Gothitelle/Trevenant Items, Copperajah Stadiums,
+        // Genesect ACE SPEC, Team Rocket's Arbok Pokémon): the opponent's
+        // in-play Abilities, or an "each player" lock, forbid the play.
+        const playLock = abilityPlayLocks(
+          cardRef.card,
+          abilitySideContext(state, playerId)
+        );
+        if (playLock) return { allowed: false, reason: playLock.reason };
       }
       return { allowed: true };
     }
@@ -2797,18 +2884,25 @@ export function validateLegality(state, command) {
     case 'useAbility': {
       const cardRef = findCard(state, payload.instanceId);
       if (cardRef) {
-        if (
-          cardRef.card.abilityUsed ||
-          player.flags?.abilitiesUsed?.[cardRef.card.name] ||
-          player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
-        ) {
-          return { allowed: false, reason: 'Ability already used this turn.' };
-        }
-        // Passives and automatic triggers resolve through their own hooks; running them from
-        // the ability button placed thorns counters or searched KO-trigger decks at will (I94).
-        if (!isActivatedAbility(cardRef.card, payload?.abilityIndex ?? 0)) {
-          return { allowed: false, reason: "This Ability can't be activated; it works on its own." };
-        }
+        // One gate for the server and the picker (design 034 slice 3): the
+        // once-per-turn flag, activation wording, Pokémon-source suppression,
+        // KO window, Active-Spot requirement and the evolve/bench-played
+        // windows all live in abilityActivationBlockReason.
+        const blockReason = abilityActivationBlockReason(cardRef.card, {
+          ...abilitySideContext(state, cardRef.playerId || playerId),
+          used: Boolean(
+            cardRef.card.abilityUsed ||
+              player.flags?.abilitiesUsed?.[cardRef.card.name] ||
+              player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
+          ),
+          abilityIndex: payload?.abilityIndex ?? 0,
+          zone: cardRef.zoneId,
+          turnNumber: state.turn?.number,
+          koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
+          enteredPlayTurn: cardRef.card.enteredPlayTurn ?? null,
+          playedToBenchTurn: cardRef.card.playedToBenchTurn ?? null,
+        });
+        if (blockReason) return { allowed: false, reason: blockReason };
         // "Have no Abilities" Stadiums (Team Rocket's Watchtower, Space Center,
         // Battle Frontier) suppress abilities server-side too; previously the
         // block existed only in the legacy client executors.
@@ -2821,45 +2915,6 @@ export function validateLegality(state, command) {
           return {
             allowed: false,
             reason: "This Pokémon's Ability is blocked by the Stadium in play.",
-          };
-        }
-        // An ability printed as a conditional on this Pokémon's position cannot be activated from
-        // the Bench. The inspector already greys the panel, so this catches a stale or crafted
-        // click that never went through it.
-        if (requiresKoOnOpponentTurn(cardRef.card) && !player.flags?.koedLastOppTurn) {
-          return {
-            allowed: false,
-            reason:
-              "None of your Pokémon were Knocked Out during your opponent's last turn.",
-          };
-        }
-        if (cardRef.zoneId !== 'active' && requiresActiveSpot(cardRef.card)) {
-          return {
-            allowed: false,
-            reason: 'This ability can only be used from the Active Spot.',
-          };
-        }
-        // "When you play this Pokémon from your hand to evolve" (Primarina
-        // Enriching Melody) is a one-shot trigger, legal only on the turn that
-        // Pokémon evolved. enteredPlayTurn is stamped on evolve.
-        if (
-          isEvolvePlayedTrigger(cardRef.card) &&
-          cardRef.card.enteredPlayTurn !== state.turn?.number
-        ) {
-          return {
-            allowed: false,
-            reason: 'This ability can only be used the turn it evolved.',
-          };
-        }
-        if (
-          isBenchPlayedTrigger(cardRef.card) &&
-          (cardRef.zoneId !== 'bench' ||
-            cardRef.card.playedToBenchTurn !== state.turn?.number)
-        ) {
-          return {
-            allowed: false,
-            reason:
-              "This ability only works the turn it's played from hand to the Bench.",
           };
         }
       }

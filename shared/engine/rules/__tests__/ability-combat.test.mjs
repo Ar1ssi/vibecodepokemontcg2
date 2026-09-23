@@ -16,6 +16,17 @@ const {
   abilityExtraTypes,
   abilityEnergyMultiplier,
   applyEnergyMultiplier,
+  isAbilitySuppressed,
+  abilityActivationBlockReason,
+  abilityPlayLocks,
+  abilityStatusImmune,
+  abilityEvolvePermission,
+  abilityEvolveLock,
+  abilityRetreatLock,
+  abilityCounterMoveLock,
+  abilitySummonRestricted,
+  abilityFirstTurnAttack,
+  abilityExtraAttack,
 } = await import('../ability-combat.mjs');
 
 let nextId = 1;
@@ -836,4 +847,721 @@ test('readers are neutral on absent/malformed cards', () => {
   assert.deepEqual(abilityExtraTypes({}), []);
   assert.equal(abilityEnergyMultiplier([]), null);
   assert.equal(abilityDamageBonus({ name: 'Empty' }, mon('D'), { sideCards: [] }), 0);
+  assert.equal(isAbilitySuppressed(null, {}), false);
+  assert.equal(isAbilitySuppressed(mon('Plain'), {}), false);
+  assert.equal(abilityActivationBlockReason(null, {}), 'Unknown card.');
+  assert.equal(abilityPlayLocks(null, {}), null);
+  assert.equal(abilityStatusImmune(null, 'Asleep'), false);
+  assert.equal(abilityEvolvePermission(null, {}), false);
+  assert.equal(abilityEvolveLock(null, {}), false);
+  assert.equal(abilityRetreatLock(null, {}), false);
+  assert.equal(abilityCounterMoveLock({}), false);
+  assert.equal(abilitySummonRestricted(null), false);
+  assert.equal(abilityFirstTurnAttack(null, {}), false);
+  assert.equal(abilityExtraAttack(null), null);
+});
+
+// ── slice 3: suppression ─────────────────────────────────────────────────
+
+test('isAbilitySuppressed: in-play "no Abilities" sources scope by side and target', () => {
+  const wobbuffet = mon('Wobbuffet', {
+    types: ['Psychic'],
+    abilities: [
+      ability(
+        'Bide Barricade',
+        "As long as this Pokémon is your Active Pokémon, each Pokémon in play, in each player's hand, and in each player's discard pile has no Abilities (except for {P} Pokémon)."
+      ),
+    ],
+  });
+  const psychic = mon('Psychic Mon', { types: ['Psychic'] });
+  const fire = mon('Fire Mon', { types: ['Fire'] });
+  const ctx = {
+    sideCards: [psychic, fire],
+    sideActive: [psychic],
+    sideBench: [fire],
+    opponentSideCards: [wobbuffet],
+    opponentActive: [wobbuffet],
+  };
+  assert.equal(isAbilitySuppressed(fire, ctx), true);
+  assert.equal(isAbilitySuppressed(psychic, ctx), false, '{P} exception');
+  assert.equal(
+    isAbilitySuppressed(wobbuffet, { sideCards: [wobbuffet], sideActive: [wobbuffet] }),
+    false,
+    'the holder is exempt from its own suppression'
+  );
+
+  const muk = mon('Alolan Muk', {
+    abilities: [
+      ability(
+        'Power of Alchemy',
+        "Each Basic Pokémon in play, in each player's hand, and in each player's discard pile has no Abilities."
+      ),
+    ],
+  });
+  const basic = mon('Basic Mon');
+  const stage1 = mon('Stage 1 Mon', { stage: 'Stage 1' });
+  assert.equal(
+    isAbilitySuppressed(basic, { sideCards: [basic], opponentSideCards: [muk] }),
+    true
+  );
+  assert.equal(
+    isAbilitySuppressed(stage1, { sideCards: [stage1], opponentSideCards: [muk] }),
+    false
+  );
+
+  const weezing = mon('Galarian Weezing', {
+    abilities: [
+      ability(
+        'Neutralizing Gas',
+        "As long as this Pokémon is in the Active Spot, your opponent's Pokémon in play have no Abilities, except for Neutralizing Gas."
+      ),
+    ],
+  });
+  assert.equal(
+    isAbilitySuppressed(fire, {
+      sideCards: [fire],
+      opponentSideCards: [weezing],
+      opponentActive: [weezing],
+    }),
+    true
+  );
+  assert.equal(
+    isAbilitySuppressed(fire, {
+      sideCards: [fire],
+      opponentSideCards: [weezing],
+      opponentBench: [weezing],
+    }),
+    false,
+    'off the Active Spot the source stops'
+  );
+});
+
+test('isAbilitySuppressed: Rule Box, Future and benched-Stage-2 filters', () => {
+  const ironThorns = mon('Iron Thorns ex', {
+    subtypes: ['ex'],
+    abilities: [
+      ability(
+        'Initialization',
+        "As long as this Pokémon is in the Active Spot, Pokémon with a Rule Box in play (both yours and your opponent's) have no Abilities, except for Future Pokémon. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)"
+      ),
+    ],
+  });
+  const exMon = mon('Some ex', { subtypes: ['ex'] });
+  const futureEx = mon('Iron Hands ex', { subtypes: ['ex', 'Future'] });
+  const plain = mon('Plain Mon');
+  const base = {
+    opponentSideCards: [ironThorns],
+    opponentActive: [ironThorns],
+  };
+  assert.equal(isAbilitySuppressed(exMon, { ...base, sideCards: [exMon] }), true);
+  assert.equal(
+    isAbilitySuppressed(futureEx, { ...base, sideCards: [futureEx] }),
+    false,
+    'Future Pokémon are exempt'
+  );
+  assert.equal(isAbilitySuppressed(plain, { ...base, sideCards: [plain] }), false);
+
+  const empoleon = mon('Empoleon V', {
+    abilities: [
+      ability(
+        'Emperor Eye',
+        "As long as this Pokémon is in the Active Spot, your opponent's Basic Pokémon in play have no Abilities, except for Pokémon with a Rule Box (Pokémon V, Pokémon-GX, etc. have Rule Boxes)."
+      ),
+    ],
+  });
+  const basicEx = mon('Basic ex', { subtypes: ['ex'] });
+  const basicMon = mon('Basic Mon');
+  const empoleonCtx = {
+    opponentSideCards: [empoleon],
+    opponentActive: [empoleon],
+  };
+  assert.equal(
+    isAbilitySuppressed(basicMon, { ...empoleonCtx, sideCards: [basicMon] }),
+    true
+  );
+  assert.equal(
+    isAbilitySuppressed(basicEx, { ...empoleonCtx, sideCards: [basicEx] }),
+    false,
+    'the Rule Box exception protects it'
+  );
+
+  const gastrodon = mon('Gastrodon', {
+    abilities: [
+      ability(
+        'Sticky Membrane',
+        "As long as this Pokémon is on your Bench, Benched Stage 2 Pokémon (both yours and your opponent's) have no Abilities."
+      ),
+    ],
+  });
+  const stage2 = mon('Stage 2 Mon', { stage: 'Stage 2' });
+  assert.equal(
+    isAbilitySuppressed(stage2, {
+      sideCards: [stage2],
+      sideBench: [stage2],
+      zone: 'bench',
+      isActive: false,
+      opponentSideCards: [gastrodon],
+      opponentBench: [gastrodon],
+    }),
+    true
+  );
+  assert.equal(
+    isAbilitySuppressed(stage2, {
+      sideCards: [stage2],
+      sideActive: [stage2],
+      zone: 'active',
+      isActive: true,
+      opponentSideCards: [gastrodon],
+      opponentBench: [gastrodon],
+    }),
+    false
+  );
+});
+
+test('isAbilitySuppressed: Psyduck self-KO filter and Ancient Trait exemption', () => {
+  const psyduck = mon('Psyduck', {
+    abilities: [
+      ability(
+        'Damp',
+        "Pokémon in play (both yours and your opponent's) lose any Ability that requires the Pokémon using it to Knock Out itself."
+      ),
+    ],
+  });
+  const selfKo = mon('Self KO', {
+    abilities: [
+      ability(
+        'Explode',
+        'Once during your turn, you may Knock Out this Pokémon. If you do, put 3 damage counters on each of your opponent\u2019s Pokémon.'
+      ),
+    ],
+  });
+  const other = mon('Other', {
+    abilities: [ability('Draw', 'Once during your turn, you may draw a card.')],
+  });
+  assert.equal(
+    isAbilitySuppressed(selfKo, { sideCards: [selfKo], opponentSideCards: [psyduck] }),
+    true
+  );
+  assert.equal(
+    isAbilitySuppressed(other, { sideCards: [other], opponentSideCards: [psyduck] }),
+    false
+  );
+
+  // D72/App. 23: an Ancient Trait is not an Ability, so suppression spares it.
+  const traitCard = mon('Celebi', {
+    ability: {
+      name: '\u03b8 Stop',
+      text: "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.",
+    },
+  });
+  assert.equal(
+    isAbilitySuppressed(traitCard, { sideCards: [traitCard], opponentSideCards: [psyduck] }),
+    false
+  );
+});
+
+test('isAbilitySuppressed: a suppressed holder stops contributing combat reads', () => {
+  const bronzong = mon('Bronzong', {
+    abilities: [
+      ability(
+        'Metal Fortress',
+        "All of your Pokémon take 10 less damage from attacks from your opponent's Pokémon (after applying Weakness and Resistance)."
+      ),
+    ],
+  });
+  const defender = mon('Defender');
+  const attacker = mon('Attacker');
+  const weezing = mon('Galarian Weezing', {
+    abilities: [
+      ability(
+        'Neutralizing Gas',
+        "As long as this Pokémon is in the Active Spot, your opponent's Pokémon in play have no Abilities, except for Neutralizing Gas."
+      ),
+    ],
+  });
+  const ctx = {
+    sideCards: [defender, bronzong],
+    sideActive: [defender],
+    sideBench: [bronzong],
+    opponentSideCards: [attacker, weezing],
+    opponentActive: [attacker],
+    opponentBench: [weezing],
+  };
+  // Weezing is Benched here, so Bronzong still applies.
+  assert.equal(abilityDamageReduction(defender, attacker, ctx).afterWR, 10);
+  // Weezing moves to the Active Spot: Bronzong is suppressed.
+  assert.equal(
+    abilityDamageReduction(defender, attacker, {
+      ...ctx,
+      opponentActive: [weezing],
+      opponentBench: [attacker],
+      attackerIsActive: false,
+    }).afterWR,
+    0
+  );
+});
+
+// ── slice 3: activation reasons ──────────────────────────────────────────
+
+test('abilityActivationBlockReason: shared gate reasons', () => {
+  const kirlia = mon('Kirlia', {
+    abilities: [
+      ability('Refinement', 'Once during your turn, you may draw 2 cards.'),
+    ],
+  });
+  assert.equal(abilityActivationBlockReason(kirlia, {}), null);
+  assert.equal(
+    abilityActivationBlockReason(kirlia, { used: true }),
+    'Ability already used this turn.'
+  );
+  assert.equal(
+    abilityActivationBlockReason(kirlia, { used: true, rulesEnabled: false }),
+    null,
+    'presence-only callers skip the spent flag'
+  );
+
+  const passive = mon('Carbink', {
+    abilities: [ability('Primal Shield', 'As long as this Pokémon is in play, it is {F} and {P} type.')],
+  });
+  assert.equal(
+    abilityActivationBlockReason(passive, {}),
+    "This Ability can't be activated; it works on its own."
+  );
+
+  const spot = mon('Spot', {
+    abilities: [
+      ability(
+        'Aura',
+        'If this Pokémon is in the Active Spot, once during your turn, you may draw a card.'
+      ),
+    ],
+  });
+  assert.equal(
+    abilityActivationBlockReason(spot, { zone: 'bench' }),
+    'This ability can only be used from the Active Spot.'
+  );
+  assert.equal(abilityActivationBlockReason(spot, { zone: 'active' }), null);
+
+  const fez = mon('Fezandipiti ex', {
+    abilities: [
+      ability(
+        'Flip the Script',
+        "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn, you may draw 3 cards."
+      ),
+    ],
+  });
+  assert.match(
+    abilityActivationBlockReason(fez, { koedLastOppTurn: false }),
+    /Knocked Out during your opponent's last turn/
+  );
+
+  const primarina = mon('Primarina', {
+    abilities: [
+      ability(
+        'Enriching Melody',
+        'When you play this Pokémon from your hand to evolve 1 of your Pokémon, you may search your deck for up to 2 Supporter cards.'
+      ),
+    ],
+  });
+  assert.equal(
+    abilityActivationBlockReason(primarina, {
+      turnNumber: 5,
+      enteredPlayTurn: 4,
+    }),
+    'This ability can only be used the turn it evolved.'
+  );
+  assert.equal(
+    abilityActivationBlockReason(primarina, {
+      turnNumber: 4,
+      enteredPlayTurn: 4,
+    }),
+    null
+  );
+  assert.equal(
+    abilityActivationBlockReason(primarina, { turnNumber: 5 }),
+    null,
+    'no stamp supplied means the caller cannot judge the window'
+  );
+
+  const meowth = mon('Meowth ex', {
+    abilities: [
+      ability(
+        'Last Ditch Catch',
+        'When you play this Pokémon from your hand onto your Bench during your turn, you may search your deck for a card.'
+      ),
+    ],
+  });
+  assert.match(
+    abilityActivationBlockReason(meowth, {
+      zone: 'bench',
+      turnNumber: 5,
+      playedToBenchTurn: 4,
+    }),
+    /played from hand to the Bench/
+  );
+  assert.equal(
+    abilityActivationBlockReason(meowth, {
+      zone: 'bench',
+      turnNumber: 4,
+      playedToBenchTurn: 4,
+    }),
+    null
+  );
+});
+
+// ── slice 3: play / evolve / retreat / counter locks ─────────────────────
+
+test('abilityPlayLocks: category locks, each-player wording and conditions', () => {
+  const item = { name: 'Ultra Ball', type: 'Trainer', supertype: 'Trainer', trainerType: 'Item', subtypes: ['Item'] };
+  const supporter = { name: 'Professor', type: 'Trainer', supertype: 'Trainer', trainerType: 'Supporter', subtypes: ['Supporter'] };
+  const stadium = { name: 'Artazon', type: 'Trainer', supertype: 'Trainer', trainerType: 'Stadium', subtypes: ['Stadium'] };
+  const toolCard = { name: 'Choice Belt', type: 'Trainer', supertype: 'Trainer', trainerType: 'Tool', subtypes: ['Tool'] };
+  const aceSpec = { name: 'Prime Catcher', type: 'Trainer', supertype: 'Trainer', trainerType: 'Item', subtypes: ['Item', 'ACE SPEC'] };
+
+  const gothitelle = mon('Gothitelle', {
+    abilities: [
+      ability(
+        'Magic Room',
+        "As long as this Pokémon is your Active Pokémon, your opponent can't play any Item cards from his or her hand."
+      ),
+    ],
+  });
+  const gCtx = {
+    sideCards: [],
+    opponentSideCards: [gothitelle],
+    opponentActive: [gothitelle],
+  };
+  assert.deepEqual(abilityPlayLocks(item, gCtx)?.cards, ['Item']);
+  assert.equal(abilityPlayLocks(supporter, gCtx), null);
+  assert.equal(
+    abilityPlayLocks(item, { ...gCtx, opponentActive: [], opponentBench: [gothitelle] }),
+    null
+  );
+
+  const vileplume = mon('Vileplume', {
+    abilities: [ability('Wafting Pollen', "Each player can't play any Item cards from his or her hand.")],
+  });
+  assert.deepEqual(
+    abilityPlayLocks(item, { sideCards: [vileplume], sideActive: [vileplume] })?.cards,
+    ['Item'],
+    'an each-player lock applies to its own side too'
+  );
+
+  const copperajah = mon('Copperajah', {
+    abilities: [
+      ability(
+        'Stone Tablet',
+        "As long as this Pokémon is in the Active Spot, your opponent can't play any Stadium cards from their hand."
+      ),
+    ],
+  });
+  assert.deepEqual(
+    abilityPlayLocks(stadium, {
+      opponentSideCards: [copperajah],
+      opponentActive: [copperajah],
+    })?.cards,
+    ['Stadium']
+  );
+
+  const jellicent = mon('Jellicent ex', {
+    abilities: [
+      ability(
+        'Draining Lock',
+        "As long as this Pokémon is in the Active Spot, your opponent can't play any Item cards or Pokémon Tool cards from their hand."
+      ),
+    ],
+  });
+  assert.deepEqual(
+    abilityPlayLocks(toolCard, {
+      opponentSideCards: [jellicent],
+      opponentActive: [jellicent],
+    })?.cards,
+    ['Pokémon Tool']
+  );
+
+  const spiritomb = mon('Spiritomb', {
+    abilities: [ability('Cursed Lock', "Each player can't play any ACE SPEC cards from his or her hand.")],
+  });
+  assert.deepEqual(
+    abilityPlayLocks(aceSpec, { sideCards: [spiritomb], sideActive: [spiritomb] })?.cards,
+    ['ACE SPEC']
+  );
+
+  const omastar = mon('Omastar', {
+    abilities: [
+      ability(
+        'Fossil Bind',
+        "As long as you have fewer Pokémon in play than your opponent, they can't play any Item cards from their hand."
+      ),
+    ],
+  });
+  assert.deepEqual(
+    abilityPlayLocks(item, {
+      sideCards: [mon('A'), mon('B')],
+      opponentSideCards: [omastar],
+    })?.cards,
+    ['Item']
+  );
+  assert.equal(
+    abilityPlayLocks(item, { sideCards: [mon('A')], opponentSideCards: [omastar] }),
+    null,
+    'equal counts stop the lock'
+  );
+
+  const genesect = mon('Genesect', {
+    abilities: [
+      ability(
+        'ACE Nullifier',
+        "If this Pokémon has a Pokémon Tool attached, your opponent can't play any ACE SPEC cards from their hand."
+      ),
+    ],
+  });
+  assert.equal(
+    abilityPlayLocks(aceSpec, {
+      opponentSideCards: [genesect],
+      opponentActive: [genesect],
+    }),
+    null
+  );
+  assert.deepEqual(
+    abilityPlayLocks(aceSpec, {
+      opponentSideCards: [genesect, attached(tool('Choice Belt'), genesect)],
+      opponentActive: [genesect],
+    })?.cards,
+    ['ACE SPEC']
+  );
+
+  const arbok = mon("Team Rocket's Arbok", {
+    abilities: [
+      ability(
+        'Venomous Lock',
+        "As long as this Pokémon is in the Active Spot, your opponent can't play any Pokémon that has an Ability from their hand, except for Team Rocket's Pokémon."
+      ),
+    ],
+  });
+  const aCtx = {
+    opponentSideCards: [arbok],
+    opponentActive: [arbok],
+  };
+  assert.deepEqual(
+    abilityPlayLocks(
+      mon('Kirlia', { abilities: [ability('Refinement', 'Once during your turn, you may draw 2 cards.')] }),
+      aCtx
+    )?.cards,
+    ['Pokémon']
+  );
+  assert.equal(abilityPlayLocks(mon('Plain'), aCtx), null);
+  assert.equal(
+    abilityPlayLocks(
+      mon("Team Rocket's Mewtwo", {
+        abilities: [ability('X', 'Once during your turn, you may draw a card.')],
+      }),
+      aCtx
+    ),
+    null
+  );
+
+  // A draw-effect text must never read as a play lock (Chandelure TWM).
+  const chandelure = mon('Chandelure', {
+    abilities: [ability('Free Draw', 'Each player draws a card.')],
+  });
+  assert.equal(abilityPlayLocks(item, { sideCards: [chandelure], sideActive: [chandelure] }), null);
+});
+
+test('abilityEvolveLock and abilityEvolvePermission', () => {
+  const primal = mon('Primal Kyogre', {
+    abilities: [
+      ability(
+        'Primal Law',
+        "As long as this Pokémon is in the Active Spot, your opponent can't play any Pokémon from their hand to evolve their Pokémon."
+      ),
+    ],
+  });
+  assert.equal(
+    abilityEvolveLock(mon('Target'), {
+      opponentSideCards: [primal],
+      opponentActive: [primal],
+    }),
+    true
+  );
+  assert.equal(
+    abilityEvolveLock(mon('Target'), {
+      opponentSideCards: [primal],
+      opponentBench: [primal],
+    }),
+    false
+  );
+
+  const scatterbug = mon('Scatterbug', {
+    abilities: [
+      ability('Adaptive Evolution', 'This Pokémon can evolve during your first turn or the turn you play it.'),
+    ],
+  });
+  assert.equal(abilityEvolvePermission(scatterbug, { turnNumber: 1 }), true);
+
+  const eevee = mon('Eevee', {
+    abilities: [
+      ability(
+        'Boosted Evolution',
+        'As long as this Pokémon is in the Active Spot, it can evolve during your first turn or the turn you play it.'
+      ),
+    ],
+  });
+  assert.equal(abilityEvolvePermission(eevee, { isActive: false }), false);
+  assert.equal(abilityEvolvePermission(eevee, { isActive: true }), true);
+
+  const luxio = mon('Luxio', {
+    abilities: [
+      ability(
+        'Top Entry',
+        "If your opponent's Active Pokémon is a Pokémon ex, this Pokémon can evolve during your first turn or the turn you play it."
+      ),
+    ],
+  });
+  assert.equal(abilityEvolvePermission(luxio, { opponentActiveIsEx: false }), false);
+  assert.equal(abilityEvolvePermission(luxio, { opponentActiveIsEx: true }), true);
+
+  const spearow = mon('Spearow', {
+    abilities: [
+      ability('First Impression', 'If you go second, this Pokémon can evolve during your first turn.'),
+    ],
+  });
+  assert.equal(abilityEvolvePermission(spearow, { turnNumber: 1 }), false);
+  assert.equal(abilityEvolvePermission(spearow, { turnNumber: 2 }), true);
+
+  const shelmet = mon('Shelmet', {
+    abilities: [
+      ability(
+        'Trade',
+        'If you have Karrablast in play, this Pokémon can evolve during your first turn or the turn you play it.'
+      ),
+    ],
+  });
+  assert.equal(abilityEvolvePermission(shelmet, { sideCards: [mon('Karrablast')] }), true);
+  assert.equal(abilityEvolvePermission(shelmet, { sideCards: [mon('Other')] }), false);
+});
+
+test('abilityRetreatLock, abilityCounterMoveLock, summon and attack permissions', () => {
+  const omastar = mon('Omastar', {
+    abilities: [
+      ability(
+        'Suffocating Tentacles',
+        "As long as this Pokémon is in the Active Spot, your opponent's Active Pokémon can't retreat."
+      ),
+    ],
+  });
+  const active = mon('Active');
+  assert.equal(
+    abilityRetreatLock(active, {
+      sideCards: [active],
+      sideActive: [active],
+      opponentSideCards: [omastar],
+      opponentActive: [omastar],
+    }),
+    true
+  );
+  assert.equal(
+    abilityRetreatLock(active, {
+      sideCards: [active],
+      sideActive: [active],
+      opponentSideCards: [omastar],
+      opponentBench: [omastar],
+    }),
+    false
+  );
+
+  const snorlax = mon('Snorlax', {
+    specialCondition: 'Asleep',
+    abilities: [
+      ability(
+        'Block',
+        "As long as Snorlax is your Active Pokémon, the Defending Pokémon can't Retreat. This power stops working when Snorlax is affected by a Special Condition."
+      ),
+    ],
+  });
+  assert.equal(
+    abilityRetreatLock(active, {
+      sideCards: [active],
+      sideActive: [active],
+      opponentSideCards: [snorlax],
+      opponentActive: [snorlax],
+    }),
+    false,
+    'the Snorlax wording stops while its holder has a Special Condition'
+  );
+
+  const patrat = mon('Patrat', {
+    abilities: [
+      ability(
+        'Counter Guard',
+        "Damage counters on each Pokémon (both yours and your opponent's) can't be moved to other Pokémon."
+      ),
+    ],
+  });
+  assert.equal(
+    abilityCounterMoveLock({ sideCards: [active], opponentSideCards: [patrat] }),
+    true
+  );
+  assert.equal(abilityCounterMoveLock({ sideCards: [active] }), false);
+
+  const palafin = mon('Palafin ex', {
+    abilities: [
+      ability(
+        'Zero to Hero',
+        "Put this Pokémon into play only with the effect of Palafin's Zero to Hero Ability."
+      ),
+    ],
+  });
+  assert.equal(abilitySummonRestricted(palafin), true);
+  assert.equal(abilitySummonRestricted(active), false);
+
+  const meloetta = mon('Meloetta ex', {
+    abilities: [
+      ability('Debut Performance', 'If you go first, this Pokémon can use attacks during your first turn.'),
+    ],
+  });
+  assert.equal(abilityFirstTurnAttack(meloetta, { turnNumber: 1 }), true);
+  assert.equal(abilityFirstTurnAttack(meloetta, { turnNumber: 3 }), false);
+  assert.equal(abilityFirstTurnAttack(active, { turnNumber: 1 }), false);
+
+  const dipplin = mon('Dipplin', {
+    abilities: [
+      ability(
+        'Festival Lead',
+        'If Festival Grounds is in play, this Pokémon may use an attack it has twice. If the first attack Knocks Out your opponent\u2019s Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.'
+      ),
+    ],
+  });
+  assert.deepEqual(abilityExtraAttack(dipplin), {
+    twice: true,
+    stadium: 'festival grounds',
+    onKo: true,
+  });
+  assert.deepEqual(abilityExtraAttack(mon('Omega', { abilities: [ability('Ω Barrage', 'This Pokémon may attack twice a turn.')] })), {
+    twice: true,
+    stadium: null,
+    onKo: false,
+  });
+  assert.equal(abilityExtraAttack(active), null);
+});
+
+test('abilityStatusImmune: all-conditions and named-condition wordings', () => {
+  const garganacl = mon('Garganacl ex', {
+    abilities: [
+      ability('Salted Cure', "This Pokémon can't be affected by any Special Conditions."),
+    ],
+  });
+  for (const condition of ['Asleep', 'Burned', 'Confused', 'Paralyzed', 'Poisoned']) {
+    assert.equal(abilityStatusImmune(garganacl, condition), true, condition);
+  }
+  const hoothoot = mon('Hoothoot', {
+    abilities: [ability('Insomnia', "This Pokémon can't be Asleep.")],
+  });
+  assert.equal(abilityStatusImmune(hoothoot, 'Asleep'), true);
+  assert.equal(abilityStatusImmune(hoothoot, 'Burned'), false);
+  const slowpoke = mon('Slowpoke', {
+    abilities: [ability('Oblivious', "This Pokémon can't be Confused.")],
+  });
+  assert.equal(abilityStatusImmune(slowpoke, 'Confused'), true);
+  assert.equal(abilityStatusImmune(mon('Plain'), 'Asleep'), false);
 });
