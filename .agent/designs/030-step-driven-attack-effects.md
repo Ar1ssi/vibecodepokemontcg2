@@ -1,5 +1,5 @@
 # 030: Step-driven attack effects
-Status: approved (user — S267 "Do all the remaining issues", answering "draft design 030?")
+Status: shipped (S267)
 Date: 2026-09-23 · Session: S267
 
 ## Problem
