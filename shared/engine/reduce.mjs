@@ -177,6 +177,16 @@ function flipAttackCoins(attack, rng) {
       flips,
     };
   }
+  // "Flip a coin until you get tails": every flip but the last is heads. No single face, so
+  // only "for each heads" clauses read it. Capped like the printed count above.
+  if (/flip a coin until you get tails/.test(text)) {
+    const flips = [];
+    while (flips.length < 20) {
+      flips.push(flip());
+      if (flips[flips.length - 1] === 'tails') break;
+    }
+    return { coin: null, headsCount: flips.filter((f) => f === 'heads').length, flips };
+  }
   if (/flip a coin/.test(text)) {
     const coin = flip();
     return { coin, headsCount: coin === 'heads' ? 1 : 0, flips: [coin] };
@@ -4193,6 +4203,19 @@ function resolveAttackEffectPhase(draft, ctx) {
 }
 
 /**
+ * Whether the attack's deck search runs for this coin result: "If heads, search your deck …"
+ * (Manaphy Chase Up) searches only on heads (design 032). An ungated search always runs.
+ */
+function searchCoinGateOpen(attack, coinResult) {
+  const sentence = String(attack?.text || '')
+    .toLowerCase()
+    .split(/(?<=\.)\s+/)
+    .find((s) => s.includes('search your deck for'));
+  const gate = /^if (heads|tails),/.exec(sentence || '')?.[1];
+  return !gate || coinResult?.coin === gate;
+}
+
+/**
  * The end of an attack: deck search, chosen-target damage, the attackExecuted event, the
  * GX flag, attach-afterwards effects, and the checkup / turn hand-off. Split out so an
  * `attackSteps` suspension can resume into it (design 030). `tail` is plain JSON.
@@ -4218,7 +4241,10 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
       if (isGameConcluded(draft)) return;
 
       // Attack effects: deck search (Phase 3, e.g. Call for Family)
-      const searchClause = tail.skipSearch ? null : parseAttackSearchClause(effectiveAttack);
+      const searchClause =
+        tail.skipSearch || !searchCoinGateOpen(effectiveAttack, resumeBase?.coinResult)
+          ? null
+          : parseAttackSearchClause(effectiveAttack);
       let searchTriggered = false;
       if (searchClause && attackerPlayer?.zones?.deck?.length > 0) {
         // A staged clause (searchDeckSequence) is walked one stage per choice so

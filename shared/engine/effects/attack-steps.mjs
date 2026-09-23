@@ -342,6 +342,17 @@ function moveToTargets(ctx, picked, targets, owner) {
   });
 }
 
+// ── discard from this Pokémon ───────────────────────────────────────────────
+
+// Coin-gated self discard (design 032): "If tails, discard 2 Energy attached to this Pokémon".
+// Fewer matching Energy than the count discards what there is.
+function atkDiscardSelfEnergy(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const energies = ref ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, step)) : [];
+  return discardChosen(ctx, energies, { label: energyLabel(step) });
+}
+
 // ── discard from the opponent ───────────────────────────────────────────────
 
 function opponentRootsInScope(opponent, scope) {
@@ -1239,6 +1250,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
+  atkDiscardSelfEnergy,
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardOppTools: optional(atkDiscardOppTools, () => "Discard Pokémon Tools from your opponent's Pokémon"),
   atkDiscardOppHand: optional(atkDiscardOppHand, () => "Discard from your opponent's hand"),

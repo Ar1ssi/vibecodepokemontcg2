@@ -150,6 +150,17 @@ const TEMPLATES = [
     (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
   ],
 
+  // Self Energy discard behind the attack's own coin (design 032); parseAttackSteps drops
+  // the ungated form, which parseAttackEnergyDiscard runs.
+  [
+    /^discard (an?|\d+|all) (?:\{([a-z])\} )?energy(?: cards?)? (?:from|attached to) this pokémon$/,
+    (m) => ({
+      type: 'atkDiscardSelfEnergy',
+      ...discardCount(m[1]),
+      ...(m[2] ? { energyType: m[2].toUpperCase() } : {}),
+    }),
+  ],
+
   // Discard from the opponent
   [
     /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon$/,
@@ -601,6 +612,12 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
 
   // Plain mill only when the damage parser does not already mill for scaling.
   const millHandled = Boolean(deckMillScaling(text));
+  // A gated self discard runs as a step unless the damage counts it (Raikou Lightning
+  // Sphere) or the printed cost can cancel the attack (Charizard Blast Burn): neither is
+  // modelled, and a partial effect is worse than none.
+  const selfDiscardOpen = !/discarded in this way|this attack does nothing/.test(
+    normalizeAttackText(text, selfName)
+  );
 
   for (const raw of normalized.split(/(?<=\.)\s+/)) {
     const sentence = raw.trim().replace(/\.$/, '');
@@ -626,6 +643,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       const step = build(m, rest, { wrOrder });
       if (!step) break;
       if (step.type === 'atkMill' && millHandled) break;
+      if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
       const { before, ...stepFlags } = flags;
       (before ? result.before : result.after).push({ ...step, ...stepFlags });
       break;
