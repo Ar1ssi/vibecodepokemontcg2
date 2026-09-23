@@ -885,16 +885,6 @@ function handleKnockout(
   );
   const wasBench = victimBench.some((c) => c.instanceId === victim.instanceId);
 
-  // Extra-attack (Dipplin Festival Lead): "if the first attack KOs your
-  // opponent's Active, you may attack again". Record the KO on the attacker.
-  if (wasActive && attackerPlayerId && attackerPlayerId !== victimPlayerId) {
-    const attacker = draft.players?.[attackerPlayerId];
-    if (attacker) {
-      if (!attacker.flags) attacker.flags = {};
-      attacker.flags.koedOpponentActive = true;
-    }
-  }
-
   const victimZoneCards = wasActive
     ? victimActive
     : wasBench
@@ -1987,7 +1977,6 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     energyAttached: false,
     attackerAttacked: false,
     attacksThisTurn: 0,
-    koedOpponentActive: false,
     retreatedThisTurn: false,
     supporterPlayed: false,
     stadiumPlayedThisTurn: false,
@@ -2926,7 +2915,6 @@ export function validateLegality(state, command) {
           ? extraAttackAvailable(active, {
               stadium: state.stadium,
               attacksThisTurn: player.flags?.attacksThisTurn || 1,
-              koedOpponentActive: Boolean(player.flags?.koedOpponentActive),
             })
           : { allowed: false };
         if (!extra.allowed) {

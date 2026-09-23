@@ -188,7 +188,6 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
       energyAttached: false,
       attackerAttacked: false,
       attacksThisTurn: 0,
-      koedOpponentActive: false,
       retreatedThisTurn: false,
       supporterPlayed: false,
       stadiumPlayedThisTurn: false,

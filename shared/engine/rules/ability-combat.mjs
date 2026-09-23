@@ -1114,9 +1114,9 @@ export function abilityExtraAttack(card) {
 
 /**
  * Whether the Active may make an additional attack this turn (Dipplin Festival
- * Lead / Ω Barrage). `ctx`: `{ stadium, attacksThisTurn, koedOpponentActive }`.
- * The second attack is free while the printed condition holds; the reader caps
- * at two attacks per turn. Returns `{ allowed, reason }`.
+ * Lead / Ω Barrage). `ctx`: `{ stadium, attacksThisTurn }`. The second attack is
+ * free while the printed Stadium condition holds; the reader caps at two attacks
+ * per turn. Returns `{ allowed, reason }`.
  */
 export function extraAttackAvailable(card, ctx = {}) {
   const read = abilityExtraAttack(card);
