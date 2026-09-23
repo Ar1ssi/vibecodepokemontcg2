@@ -329,6 +329,31 @@ test('an effect-only attack with no defender is not gated', () => {
   assert.ok(executed(res), 'the attack still resolves');
 });
 
+test('a coin-gated "does nothing" stays with design 032, not the state gate', () => {
+  const text = 'Flip a coin. If tails, this attack does nothing.';
+  const heads = (() => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const b = board(text, { name: 'Gambler', damage: '80', seed });
+      const res = attack(b);
+      if (res.events.find((e) => e.type === 'attackCoinFlipped')?.coin === 'heads') return res;
+    }
+    throw new Error('no heads seed');
+  })();
+  assert.equal(failed(heads), undefined);
+  assert.equal(damageOn(heads), 80);
+
+  const tails = (() => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const b = board(text, { name: 'Gambler', damage: '80', seed });
+      const res = attack(b);
+      if (res.events.find((e) => e.type === 'attackCoinFlipped')?.coin === 'tails') return res;
+    }
+    throw new Error('no tails seed');
+  })();
+  assert.equal(failed(tails), undefined, 'no state-gate failure event');
+  assert.equal(damageOn(tails), 0);
+});
+
 test('the gate is not re-evaluated when a before-damage step resumes', () => {
   const text =
     "Discard 2 Energy cards from your hand and choose 1 of your opponent's Pokémon. If you don't have exactly 7 cards in your hand, this attack does nothing.";
