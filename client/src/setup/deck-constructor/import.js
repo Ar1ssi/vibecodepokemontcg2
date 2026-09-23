@@ -15,6 +15,7 @@ import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { getCardType } from './find-type.js';
 import { getOldCardType } from './find-old-type.js';
 import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
+import { tcgdexImageUrl } from './tcgdex-image-url.mjs';
 
 const decklistTable = document.getElementById('decklistTable');
 const altDeckImportInput = document.getElementById('altDeckImportInput');
@@ -264,6 +265,8 @@ const cardDataToImageURL = (card, formatHint) => {
     region = 'tpc';
   }
 
+  const modernUrl = id && tcgdexImageUrl(id, language);
+  if (modernUrl) return modernUrl;
   if (id) {
     const [set_ID, set_Number] = id.split('-');
     return (
