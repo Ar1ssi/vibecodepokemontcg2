@@ -109,6 +109,7 @@ function swapActiveBench(draft, playerId, benchRoot, events) {
   const zones = draft.players[playerId].zones;
   const active = zones.active.find((c) => !c.attachedTo);
   if (!active || active === benchRoot) return;
+  benchRoot.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
   moveStackToZone(draft, playerId, benchRoot, 'active', events);
   moveStackToZone(draft, playerId, active, 'bench', events);
 }

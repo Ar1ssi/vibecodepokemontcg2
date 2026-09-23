@@ -6,13 +6,19 @@
 // compute honestly is LEFT OUT rather than sent as 0 — the parser then keeps an unresolved
 // note instead of silently scaling by zero (damage-parser.mjs § "for each" units).
 
-import { isEnergy, isPokemon, isTrainer, getRetreatCostCount } from '../cards.mjs';
+import { isEnergy, isPokemon, isTrainer, isBasicPokemon, getRetreatCostCount } from '../cards.mjs';
 import { serverEnergyDescriptor } from './server-energy.mjs';
 import { expandEnergyEntries } from './attack-engine.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
 import { classifyEnergyEffect } from './energy-effects.mjs';
 import { listConditions } from './special-conditions.mjs';
+import {
+  isExCard,
+  isTeraCard,
+  isRadiantCard,
+  isMegaCard,
+} from './card-classify.mjs';
 
 const zoneOf = (player, zoneId) =>
   Array.isArray(player?.zones?.[zoneId]) ? player.zones[zoneId] : [];
@@ -34,14 +40,18 @@ const inPlayPokemon = (player) => [
   ...rootPokemon(player, 'bench'),
 ];
 
-/** Energy cards attached to one Pokémon, counted as the cost pool sees them. */
-function energyOn(player, pokemon, stadiumCard = null) {
+/** Energy cards attached to one Pokémon, as stored. */
+function attachedEnergyCards(player, pokemon) {
   if (!pokemon) return [];
-  const attached = [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
+  return [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
     (card) => card.attachedTo === pokemon.instanceId && isEnergy(card)
   );
+}
+
+/** Energy cards attached to one Pokémon, counted as the cost pool sees them. */
+function energyOn(player, pokemon, stadiumCard = null) {
   return expandEnergyEntries(
-    attached.map((card) =>
+    attachedEnergyCards(player, pokemon).map((card) =>
       serverEnergyDescriptor(card, { stadiumCard, hostPokemon: pokemon })
     )
   );
@@ -131,6 +141,7 @@ export function buildServerAttackContext(
   const ownInPlay = inPlayPokemon(own);
   const ownBench = rootPokemon(own, 'bench');
   const opponentBench = rootPokemon(opponent, 'bench');
+  const turnNumber = Math.max(1, Number(state?.turn?.number) || 1);
 
   const ctx = {
     energyCount: energyOn(own, attacker, stadiumCard).length,
@@ -161,6 +172,27 @@ export function buildServerAttackContext(
     grassPokemonCount: ownInPlay.filter(isGrassPokemon).length,
     specialEnergyOnSelfCount: specialEnergyOn(own, attacker),
     taurosDamagedCount: ownInPlay.filter(isDamagedTauros).length,
+    // Whole-attack condition reads (design 036 A1). `benchNames`/`benchTypes` are parallel
+    // arrays; `ownInPlayNames` covers "…in play" clauses.
+    stadiumInPlay: Boolean(stadiumCard),
+    ownPrizes: zoneOf(own, 'prizes').length,
+    attackerConditions: listConditions(attacker),
+    attackerEnergyTypes: [...new Set(energyOn(own, attacker, stadiumCard))],
+    attackerEnergyNames: attachedEnergyCards(own, attacker).map((card) => card.name || ''),
+    benchNames: ownBench.map(({ card, view }) => view?.name || card?.name || ''),
+    benchTypes: ownBench.map(({ card, view }) => [...(view?.types || card?.types || [])]),
+    ownInPlayNames: ownInPlay.map(({ card, view }) => view?.name || card?.name || ''),
+    ownDiscardEnergy: zoneOf(own, 'discard')
+      .filter(isEnergy)
+      .map((card) => ({
+        name: card.name || '',
+        type: serverEnergyDescriptor(card).type,
+        basic: classifyEnergyEffect(card) === 'basic',
+      })),
+    attackerMovedToActiveThisTurn:
+      attacker != null && Number(attacker.movedToActiveTurn) === turnNumber,
+    attackerEvolvedThisTurn: Boolean(attacker && own?.flags?.evolved?.[attacker.instanceId]),
+    attackerRemainingHp: Math.max(0, (Number(attackerCard.hp) || 0) - (attacker?.damage || 0)),
     coin,
   };
 
@@ -189,6 +221,16 @@ export function buildServerAttackContext(
     ctx.opponentEnergyCount = energyOn(opponent, defender, stadiumCard).length;
     ctx.retreatCostColorless = getRetreatCostCount(defenderCard);
     ctx.opponentStatusCount = listConditions(defender).length;
+    ctx.defenderPresent = true;
+    ctx.defenderConditions = listConditions(defender);
+    ctx.defenderMaxHp = Number(defenderCard.hp) || 0;
+    ctx.defenderRemainingHp = Math.max(0, (Number(defenderCard.hp) || 0) - (defender.damage || 0));
+    ctx.defenderSpecialEnergyCount = specialEnergyOn(opponent, defender);
+    ctx.defenderIsBasic = isBasicPokemon(defenderCard);
+    ctx.defenderIsEx = isExCard(defenderCard);
+    ctx.defenderIsTera = isTeraCard(defenderCard);
+    ctx.defenderIsRadiant = isRadiantCard(defenderCard);
+    ctx.defenderIsMega = isMegaCard(defenderCard);
   }
   if (headsCount !== undefined) ctx.headsCount = headsCount;
 

@@ -552,6 +552,13 @@ const BLOCKS = [
     /(?<=^|\. )if your opponent has a stadium in play, discard it\. if you discarded a stadium in this way, ([^.]+)\./g,
     (m) => chainedMarkerStep({ type: 'atkDiscardStadium', owner: 'opponent' }, m[1]),
   ],
+  // Eternatus World Ender: the discard is the cost its gate names (the gate itself lives in
+  // rules/attack-conditions.mjs). The block consumes both sentences so no bare template picks
+  // up the other "Discard a Stadium in play." printings, whose damage bonus is not modelled yet.
+  [
+    /discard a stadium in play\. if you can't, this attack does nothing\./g,
+    () => ({ type: 'atkDiscardStadium', owner: 'any' }),
+  ],
   // Mime Jr. Encore ("can use only") / Unown Amnesia ("can't use"): an attack lock marker on
   // the opponent's Active, read by the attack legality gate.
   [

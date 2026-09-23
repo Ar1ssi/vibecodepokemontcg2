@@ -88,7 +88,7 @@ function shuffleOwnDeck(player, ctx) {
 }
 
 /** Swaps a player's Active Pokémon (with attachments) for one of their Benched Pokémon. */
-function swapActive(player, active, benchRoot, events) {
+function swapActive(player, active, benchRoot, events, turnNumber = 1) {
   for (let i = player.zones.active.length - 1; i >= 0; i--) {
     const c = player.zones.active[i];
     if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
@@ -103,6 +103,7 @@ function swapActive(player, active, benchRoot, events) {
       player.zones.active.push(c);
     }
   }
+  benchRoot.movedToActiveTurn = Math.max(1, Number(turnNumber) || 1);
   clearConditions(active);
   events.push({
     type: 'cardSwitched',
@@ -173,14 +174,15 @@ function atkSwitchSelf(ctx) {
   const ref = attackerRef(ctx);
   if (!ref || ref.zoneId !== 'active') return skip(ctx, 'attacker_not_active');
   const bench = benchRootsOf(player);
+  const turn = ctx.draft?.turn?.number;
   if (ctx.selection) {
     const root = bench.find((c) => c.instanceId === ctx.selection[0]);
-    if (root) swapActive(player, ref.card, root, ctx.events);
+    if (root) swapActive(player, ref.card, root, ctx.events, turn);
     return null;
   }
   if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
   if (bench.length === 1) {
-    swapActive(player, ref.card, bench[0], ctx.events);
+    swapActive(player, ref.card, bench[0], ctx.events, turn);
     return null;
   }
   return ctx.ask({
@@ -195,14 +197,15 @@ function atkGust(ctx) {
   const { opponent } = ctx;
   const active = activeOf(opponent);
   const bench = benchRootsOf(opponent);
+  const turn = ctx.draft?.turn?.number;
   if (ctx.selection) {
     const root = bench.find((c) => c.instanceId === ctx.selection[0]);
-    if (active && root) swapActive(opponent, active, root, ctx.events);
+    if (active && root) swapActive(opponent, active, root, ctx.events, turn);
     return null;
   }
   if (!active || bench.length === 0) return skip(ctx, 'no_opponent_bench');
   if (bench.length === 1) {
-    swapActive(opponent, active, bench[0], ctx.events);
+    swapActive(opponent, active, bench[0], ctx.events, turn);
     return null;
   }
   const opponentChooses = ctx.step.chooser === 'opponent';
@@ -1424,6 +1427,7 @@ function atkAddMarker(ctx) {
 
 // The marker a chained discard earns ("If you do, during your opponent's next turn, …").
 function addChainedMarker(ctx) {
+  if (!ctx.step.then) return null;
   return atkAddMarker({ ...ctx, step: { ...ctx.step.then, attackName: ctx.step.attackName } });
 }
 

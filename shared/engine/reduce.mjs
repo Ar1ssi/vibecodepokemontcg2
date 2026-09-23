@@ -73,6 +73,7 @@ import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard } from './effects/attack-steps.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
+import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
 import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
 import {
   attackerMatchesFilter,
@@ -543,6 +544,24 @@ function endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events })
   if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
 }
 
+/**
+ * Spends the player's once-per-game GX attack. Declaring the attack is what spends it, so this
+ * runs on the resolving path and on an attack that failed its printed condition (design 036 A1).
+ */
+function spendGxAttack(draft, { playerId, attacker, attack, events }) {
+  if (!isGxAttack(attack)) return;
+  const oncePerGame = ensureOncePerGame(draft, playerId);
+  if (oncePerGame && !oncePerGame.gxUsed) {
+    oncePerGame.gxUsed = true;
+    events.push({
+      type: 'gxAttackUsed',
+      playerId,
+      instanceId: attacker?.instanceId,
+      attackName: attack.name,
+    });
+  }
+}
+
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
 function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
   const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
@@ -1011,6 +1030,8 @@ function promoteBenchToActive(draft, { playerId, instanceId, events }) {
       active.push(c);
     }
   }
+  const promoted = active.find((c) => c.instanceId === instanceId);
+  if (promoted) promoted.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
   events.push({ type: 'pokemonPromoted', instanceId, playerId });
   return true;
 }
@@ -1510,6 +1531,7 @@ function applyRetreatSwap(
     delete active.cannotAttackAttackName;
     delete active.cannotRetreatUntilTurn;
     clearAttackMarkers(active);
+    benchPokemon.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
 
     if (!player.flags) player.flags = {};
     player.flags.retreatedThisTurn = true;
@@ -3216,6 +3238,7 @@ function attackResumeContext(draft, token, { activeRng, events }) {
     milledMatches: token.milledMatches,
     revealedMatches: token.revealedMatches,
     copiedAttack: token.copiedAttack || null,
+    conditionChecked: token.conditionChecked === true,
   };
 }
 
@@ -3555,6 +3578,39 @@ function resolveAttackEffectPhase(draft, ctx) {
 
   let { defender } = ctx;
 
+  // A printed whole-attack condition ("If …, this attack does nothing", design 036 A1) gates the
+  // damage and every effect step, so it resolves before any of them. It runs once per attack:
+  // a resumed effect phase carries `conditionChecked` so a before-damage step cannot flip it.
+  if (!ctx.conditionChecked) {
+    const condition = parseAttackCondition(attack?.text, {
+      selfName: attackerView?.name || attacker?.name,
+    });
+    const conditionCtx =
+      condition &&
+      buildServerAttackContext(draft, {
+        attackerPlayerId: playerId,
+        defenderPlayerId,
+        attacker,
+        defender,
+        attackerView,
+        defenderView: defender ? inPlayView(draft, defender) : null,
+        coin,
+        headsCount,
+      });
+    if (condition && !attackConditionMet(condition, conditionCtx)) {
+      events.push({
+        type: 'attackConditionFailed',
+        playerId,
+        attackerId: attacker?.instanceId ?? null,
+        attackName: attack.name,
+        condition,
+      });
+      spendGxAttack(draft, { playerId, attacker, attack, events });
+      endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+      return;
+    }
+  }
+
   // Marks that an attack's effect phase is resolving so on-discard reattach
   // triggers (Boomerang/Burning) fire only for attack-driven discards. Cleared
   // in the applyCommand tail.
@@ -3566,6 +3622,7 @@ function resolveAttackEffectPhase(draft, ctx) {
     attackerId: attacker?.instanceId ?? null,
     targetInstanceId: defender?.instanceId ?? null,
     coinResult: { coin, headsCount, flips },
+    conditionChecked: true,
     ...(ctx.copiedAttack ? { copiedAttack: ctx.copiedAttack } : {}),
   };
 
@@ -4457,20 +4514,9 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
         playerId,
       });
 
-      // App. 19: using a GX attack spends the player's single GX attack for the game.
-      // Set here, on the resolving path only — a Confused fizzle above never reaches it.
-      if (isGxAttack(attack)) {
-        const oncePerGame = ensureOncePerGame(draft, playerId);
-        if (oncePerGame && !oncePerGame.gxUsed) {
-          oncePerGame.gxUsed = true;
-          events.push({
-            type: 'gxAttackUsed',
-            playerId,
-            instanceId: attacker?.instanceId,
-            attackName: attack.name,
-          });
-        }
-      }
+      // App. 19: using a GX attack spends the player's single GX attack for the game. Set on the
+      // resolving path and on a condition-failed attack; a Confused fizzle never reaches either.
+      spendGxAttack(draft, { playerId, attacker, attack, events });
 
       // Raikou: "Then, attach those {L} Energy cards to 1 of your Pokémon."
       if (mill?.attachMatched && milledIds.length > 0 && !draft.pendingChoice) {

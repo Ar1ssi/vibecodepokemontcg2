@@ -834,6 +834,7 @@ export function executeSteps(draft, {
           }
           const benchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
           if (benchCard) {
+            benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
             for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
               const c = opponent.zones.active[i];
               if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
@@ -900,6 +901,7 @@ export function executeSteps(draft, {
         // Perform active-bench switch preserving attachments
         const benchCard = bench.find((c) => c.instanceId === chosenBenchId);
         if (benchCard) {
+          benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
           for (let i = player.zones.active.length - 1; i >= 0; i--) {
             const c = player.zones.active[i];
             if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
@@ -972,6 +974,7 @@ export function executeSteps(draft, {
 
         const oppBenchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
         if (oppBenchCard) {
+          oppBenchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
           for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
             const c = opponent.zones.active[i];
             if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
