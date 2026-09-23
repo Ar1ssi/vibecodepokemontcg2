@@ -457,6 +457,36 @@ function atkDiscardOppHand(ctx) {
 
 // ── mill ────────────────────────────────────────────────────────────────────
 
+/** Hand Energy cards an `atkDiscardHandEnergy` step may discard. */
+export function handEnergyForDiscard(player, step) {
+  return (player?.zones?.hand || []).filter((card) => energyMatches(card, step));
+}
+
+// Voltage Shoot: discard exactly `count` matching Energy cards from the hand before damage.
+// The attack legality gate refuses the attack when the hand holds fewer.
+function atkDiscardHandEnergy(ctx) {
+  const { player, step } = ctx;
+  const candidates = handEnergyForDiscard(player, step);
+  const count = step.count || 1;
+  if (ctx.selection) {
+    const picked = pickById(candidates, ctx.selection).slice(0, count);
+    if (picked.length < count) return skip(ctx, 'not_enough_energy');
+    discardCards(player, picked, ctx.events);
+    return null;
+  }
+  if (candidates.length < count) return skip(ctx, 'not_enough_energy');
+  if (candidates.length === count) {
+    discardCards(player, candidates, ctx.events);
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${count} ${energyLabel(step)} card${count === 1 ? '' : 's'} to discard from your hand`,
+    options: candidates,
+    min: count,
+    max: count,
+  });
+}
+
 function atkMill(ctx) {
   const { player, opponent, step } = ctx;
   const sides = step.side === 'self' ? [player] : step.side === 'each' ? [player, opponent] : [opponent];
@@ -1242,6 +1272,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardOppTools: optional(atkDiscardOppTools, () => "Discard Pokémon Tools from your opponent's Pokémon"),
   atkDiscardOppHand: optional(atkDiscardOppHand, () => "Discard from your opponent's hand"),
+  atkDiscardHandEnergy,
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,

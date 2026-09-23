@@ -176,6 +176,14 @@ const TEMPLATES = [
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
   ],
 
+  // Raichu LV.X Voltage Shoot: the hand discard pays for the chosen-target damage, so it
+  // runs before damage and the attack is refused without the cards (handEnergyDiscardCost).
+  // "Discard … from your hand. If you do, …" (Flare Bonus) is conditional and stays unread.
+  [
+    new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand and choose 1 of your opponent's pokémon$`),
+    (m, s) => ({ type: 'atkDiscardHandEnergy', count: countOf(m[1]), ...energyFilter(m[2], s), beforeDamage: true }),
+  ],
+
   // Mill (the "for each card discarded" forms are deckMillScaling's; see parseAttackSteps)
   [
     /^discard the top (?:(\d+) cards|card) (?:of|from) (your|your opponent's|each player's) deck$/,
@@ -627,7 +635,8 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       if (!step) break;
       if (step.type === 'atkMill' && millHandled) break;
       const { before, ...stepFlags } = flags;
-      (before ? result.before : result.after).push({ ...step, ...stepFlags });
+      const { beforeDamage, ...built } = step;
+      (before || beforeDamage ? result.before : result.after).push({ ...built, ...stepFlags });
       break;
     }
   }
