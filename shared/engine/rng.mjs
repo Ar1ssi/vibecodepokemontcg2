@@ -161,3 +161,19 @@ export function createRelayedRng(seed = 0, initialCursor = 0) {
     },
   };
 }
+
+/**
+ * Shuffles `array` in place with `rng` (whose own `shuffle` returns a new array) and returns it.
+ * A missing rng leaves the order unchanged.
+ *
+ * @template T
+ * @param {{ shuffle: (array: T[]) => T[] }|null|undefined} rng
+ * @param {T[]} array
+ * @returns {T[]}
+ */
+export function shuffleInPlace(rng, array) {
+  if (!rng?.shuffle || !Array.isArray(array)) return array;
+  const shuffled = rng.shuffle(array);
+  array.splice(0, array.length, ...shuffled);
+  return array;
+}

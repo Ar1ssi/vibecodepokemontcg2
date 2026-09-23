@@ -68,7 +68,8 @@ import {
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
-import { createPendingChoice, attachToRoot } from './effects/executor.mjs';
+import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
+import { parseAttackSteps } from './rules/attack-steps.mjs';
 import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
@@ -1183,7 +1184,9 @@ function settlePrizeEntitlements(draft, { events }) {
  * placement has settled.
  */
 function resolveDamageCounterKnockouts(draft, { events }) {
-  const placed = events.filter((e) => e.type === 'damageCountersPlaced');
+  const placed = events.filter(
+    (e) => e.type === 'damageCountersPlaced' || e.type === 'knockOutMarked'
+  );
   if (placed.length === 0) return;
 
   const koed = new Set();
@@ -1193,7 +1196,8 @@ function resolveDamageCounterKnockouts(draft, { events }) {
     if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) continue;
     const victim = ref.card;
     const koHp = cardEffectiveHp(draft, victim, ref.playerId);
-    if (koHp > 0 && (victim.damage || 0) >= koHp) {
+    // "… is Knocked Out." (attack-steps atkKnockOut) knocks out regardless of HP.
+    if (e.type === 'knockOutMarked' || (koHp > 0 && (victim.damage || 0) >= koHp)) {
       koed.add(e.instanceId);
       handleKnockout(draft, {
         victimPlayerId: ref.playerId,
@@ -1210,7 +1214,9 @@ function resolveDamageCounterKnockouts(draft, { events }) {
 
   // Internal marker events are not part of the client-facing stream.
   for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i].type === 'damageCountersPlaced') events.splice(i, 1);
+    if (events[i].type === 'damageCountersPlaced' || events[i].type === 'knockOutMarked') {
+      events.splice(i, 1);
+    }
   }
 }
 
@@ -3029,6 +3035,83 @@ function returnAttackerToHand(draft, { playerId, attacker, oppId, events }) {
 }
 
 /**
+ * The attack's printed clauses that run as executor steps (design 030), with the attack's
+ * own coin result applied: "If heads/tails" steps are dropped on the other face and
+ * "For each heads" steps scale their count by the heads flipped.
+ */
+function planAttackSteps(attack, attacker, { coin, headsCount }) {
+  const parsed = parseAttackSteps(attack?.text, { selfName: attacker?.name });
+  const heads = coin === 'heads' ? Math.max(1, headsCount || 0) : headsCount || 0;
+  const resolve = (steps) =>
+    steps
+      .filter((step) => {
+        if (step.gate === 'heads') return coin === 'heads';
+        if (step.gate === 'tails') return coin === 'tails';
+        if (step.perHeads) return heads > 0;
+        return true;
+      })
+      .map(({ gate, perHeads, ...step }) => ({
+        ...step,
+        ...(perHeads ? { count: (step.count || 1) * heads } : {}),
+        attackName: attack?.name || 'Attack',
+      }));
+  return {
+    before: resolve(parsed.before),
+    after: resolve(parsed.after),
+    handlesSearch: parsed.handlesSearch,
+    // Printed step kinds before the coin gates, so a helper can stand down for a clause
+    // the steps own even when the coin dropped it.
+    printed: new Set([...parsed.before, ...parsed.after].map((step) => step.type)),
+  };
+}
+
+/**
+ * A step that took the attacker out of play (shuffle into the deck) leaves its Active Spot
+ * empty: promote from the Bench, or lose with no Pokémon left in play.
+ */
+function settleVacatedActive(draft, { playerId, oppId, events }) {
+  const player = draft.players[playerId];
+  if (!player || (player.zones.active || []).some((c) => !c.attachedTo && isPokemon(c))) return;
+  const benchRoots = (player.zones.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
+  if (benchRoots.length > 0) {
+    player.promotionPending = true;
+  } else if (!isGameConcluded(draft)) {
+    setGameEnded(draft, { winner: oppId, reason: 'no Pokémon in play', events });
+  }
+}
+
+/**
+ * Runs (or resumes) attack steps through the shared executor. Knock Outs the steps caused
+ * are resolved immediately so they count before the turn ends. Returns false while a
+ * choice is pending — the `attackSteps` resume continues from the token.
+ */
+function runAttackSteps(
+  draft,
+  { steps, fromStepIndex = 0, attackerId, playerId, oppId, activeRng, events, selection = null, context, budget }
+) {
+  const attacker = attackerId != null ? findCard(draft, attackerId)?.card : null;
+  const result = executeSteps(draft, {
+    steps,
+    fromStepIndex,
+    effectType: 'attackSteps',
+    sourceCard: attacker || (attackerId != null ? { instanceId: attackerId } : null),
+    playerId,
+    activeRng,
+    events,
+    selection,
+    context,
+    budget,
+  });
+  resolveDamageCounterKnockouts(draft, { events });
+  settleVacatedActive(draft, { playerId, oppId, events });
+  if (result.pendingChoice && !isGameConcluded(draft)) {
+    draft.pendingChoice = result.pendingChoice;
+    return false;
+  }
+  return true;
+}
+
+/**
  * Resolves the part of an attack that runs after its coins are flipped:
  * printed-text damage, recoil, status, bench/spread damage, searches, and the
  * terminal checkup/turn hand-off. Extracted so Glimwood Tangle can re-enter it
@@ -3043,7 +3126,6 @@ function resolveAttackEffectPhase(draft, ctx) {
     activeRng,
     events,
     attacker,
-    defender,
     defenderPlayerId,
     oppId,
     attack,
@@ -3053,6 +3135,8 @@ function resolveAttackEffectPhase(draft, ctx) {
     headsCount,
     flips,
   } = ctx;
+
+  let { defender } = ctx;
 
   // Marks that an attack's effect phase is resolving so on-discard reattach
   // triggers (Boomerang/Burning) fire only for attack-driven discards. Cleared
@@ -3208,6 +3292,34 @@ function resolveAttackEffectPhase(draft, ctx) {
       return;
     }
     energyReturned = false;
+  }
+
+  // "Before doing damage, …" clauses (design 030). A gust there moves the damage to the
+  // opponent's new Active Pokémon.
+  const attackSteps = planAttackSteps(attack, attacker, { coin, headsCount });
+  if (attackSteps.before.length > 0) {
+    if (!ctx.preStepsDone) {
+      const done = runAttackSteps(draft, {
+        steps: attackSteps.before,
+        attackerId: attacker?.instanceId,
+        playerId,
+        oppId,
+        activeRng,
+        events,
+        context: {
+          attack: {
+            phase: 'before',
+            resume: resumeBase,
+            values: { energyDiscarded, milledMatches, energyReturned },
+          },
+        },
+      });
+      if (!done || isGameConcluded(draft)) return;
+    }
+    if (attackSteps.before.some((step) => step.type === 'atkGust')) {
+      defender =
+        draft.players[defenderPlayerId]?.zones?.active?.find((c) => !c.attachedTo) || null;
+    }
   }
 
       const parsed = parseAttackDamage(
@@ -3464,7 +3576,13 @@ function resolveAttackEffectPhase(draft, ctx) {
 
       // Healing from attack effect (e.g. "Heal 30 damage from this Pokémon").
       // Dyna Tree Hill suppresses all healing while it is in play.
-      if (parsed.heal > 0 && attacker && !stadiumBlocksHealing(draft.stadium)) {
+      // "Heal N damage from each of your (Benched) Pokémon" is the atkHealEach step's.
+      if (
+        parsed.heal > 0 &&
+        attacker &&
+        !attackSteps.printed.has('atkHealEach') &&
+        !stadiumBlocksHealing(draft.stadium)
+      ) {
         const atkRef = findCard(draft, attacker.instanceId);
         if (
           atkRef &&
@@ -3585,8 +3703,9 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
       }
 
-      // Attack effects: draw cards (e.g. Collect)
-      const drawN = drawCount(attack);
+      // Attack effects: draw cards (e.g. Collect). "Discard your hand and draw N" is the
+      // discardHandThenDraw step's (Raging Bolt ex Burst Roar).
+      const drawN = attackSteps.printed.has('discardHandThenDraw') ? 0 : drawCount(attack);
       if (drawN > 0) {
         const deck = attackerPlayer?.zones?.deck || [];
         const hand = attackerPlayer?.zones?.hand || [];
@@ -3681,8 +3800,66 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
       }
 
+      // Printed clauses beyond the helpers above (design 030): switch, move Energy, discard
+      // from the opponent, attach, mill, Bench placement, … They run before the deck search
+      // so a suspension resumes into finishAttackTail.
+      const tail = {
+        playerId,
+        oppId,
+        defenderPlayerId,
+        defenderId: defender?.instanceId ?? null,
+        attackerId: attacker?.instanceId ?? null,
+        attack,
+        effectiveAttack,
+        dmgDealt,
+        benchDealt,
+        attackTarget,
+        milledIds,
+        skipSearch: attackSteps.handlesSearch,
+        resumeBase,
+      };
+      if (attackSteps.after.length > 0) {
+        const done = runAttackSteps(draft, {
+          steps: attackSteps.after,
+          attackerId: attacker?.instanceId,
+          playerId,
+          oppId,
+          activeRng,
+          events,
+          context: { attack: { phase: 'after', tail } },
+        });
+        if (!done) return;
+      }
+      finishAttackTail(draft, { tail, activeRng, events });
+}
+
+/**
+ * The end of an attack: deck search, chosen-target damage, the attackExecuted event, the
+ * GX flag, attach-afterwards effects, and the checkup / turn hand-off. Split out so an
+ * `attackSteps` suspension can resume into it (design 030). `tail` is plain JSON.
+ */
+function finishAttackTail(draft, { tail, activeRng, events }) {
+      const {
+        playerId,
+        oppId,
+        defenderPlayerId,
+        attack,
+        effectiveAttack,
+        dmgDealt,
+        attackTarget,
+        milledIds,
+        resumeBase,
+      } = tail;
+      let { benchDealt } = tail;
+      const attackerPlayer = draft.players[playerId];
+      const attackerRef = tail.attackerId != null ? findCard(draft, tail.attackerId) : null;
+      const attacker = attackerRef?.card || null;
+      const defender = tail.defenderId != null ? { instanceId: tail.defenderId } : null;
+      const mill = deckMillScaling(attack?.text);
+      if (isGameConcluded(draft)) return;
+
       // Attack effects: deck search (Phase 3, e.g. Call for Family)
-      const searchClause = parseAttackSearchClause(effectiveAttack);
+      const searchClause = tail.skipSearch ? null : parseAttackSearchClause(effectiveAttack);
       let searchTriggered = false;
       if (searchClause && attackerPlayer?.zones?.deck?.length > 0) {
         // A staged clause (searchDeckSequence) is walked one stage per choice so
@@ -4917,6 +5094,49 @@ export function applyCommand(state, command, rng = null) {
           headsCount,
           flips,
         });
+      } else if (token.effectType === 'attackSteps') {
+        // Design 030: finish the attack's steps, then pick the attack up where it paused —
+        // before damage (re-enter the effect phase) or after it (the attack tail).
+        draft.pendingChoice = null;
+        const cont = token.context?.attack || {};
+        const oppOfInitiator = Object.keys(draft.players || {}).find(
+          (id) => id !== initiatorPlayerId
+        );
+        const done = runAttackSteps(draft, {
+          steps: token.steps || [],
+          fromStepIndex: token.stepIndex || 0,
+          attackerId: token.sourceInstanceId,
+          playerId: initiatorPlayerId,
+          oppId: oppOfInitiator,
+          activeRng,
+          events,
+          selection: payload.selection,
+          context: token.context || {},
+          budget: { count: token.budgetCount || 0 },
+        });
+        if (done && !isGameConcluded(draft)) {
+          if (cont.phase === 'before') {
+            const resumeCtx = attackResumeContext(draft, cont.resume || {}, { activeRng, events });
+            if (resumeCtx) {
+              resolveAttackEffectPhase(draft, {
+                ...resumeCtx,
+                ...(cont.values || {}),
+                preStepsDone: true,
+              });
+            } else {
+              // The attacker left the Active Spot before damage: the attack ends here.
+              const resumer = draft.players[initiatorPlayerId];
+              if (!resumer.flags) resumer.flags = {};
+              resumer.flags.attackerAttacked = true;
+              resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: initiatorPlayerId });
+              if (!isGameConcluded(draft)) {
+                advanceTurn(draft, { nextPlayerId: oppOfInitiator, events });
+              }
+            }
+          } else if (cont.tail) {
+            finishAttackTail(draft, { tail: cont.tail, activeRng, events });
+          }
+        }
       } else if (token.effectType === 'attackDiscardScale') {
         // Discard-to-scale: discard the chosen Energy, then resume the attack's
         // effect phase with the discarded count driving the damage.

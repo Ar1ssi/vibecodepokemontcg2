@@ -25,7 +25,7 @@ import {
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 
-const BENCH_LIMIT = 5;
+export const BENCH_LIMIT = 5;
 
 // ── card and zone helpers ────────────────────────────────────────────────
 
@@ -44,39 +44,39 @@ export function isStadiumCard(card) {
   return kind.includes('stadium');
 }
 
-function isBasicEnergy(card) {
+export function isBasicEnergy(card) {
   return isEnergy(card) && classifyEnergyEffect(card) === 'basic';
 }
 
-function isSpecialEnergy(card) {
+export function isSpecialEnergy(card) {
   return isEnergy(card) && !isBasicEnergy(card);
 }
 
-function stageOf(card) {
+export function stageOf(card) {
   return normalizeStage(card?.stage) || 'Basic';
 }
 
-function rootsOf(player) {
+export function rootsOf(player) {
   return [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
     (c) => !c.attachedTo
   );
 }
 
-function activeOf(player) {
+export function activeOf(player) {
   return (player?.zones?.active || []).find((c) => !c.attachedTo) || null;
 }
 
-function benchRootsOf(player) {
+export function benchRootsOf(player) {
   return (player?.zones?.bench || []).filter((c) => !c.attachedTo);
 }
 
-function attachedCards(player, rootId) {
+export function attachedCards(player, rootId) {
   return [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
     (c) => c.attachedTo === rootId
   );
 }
 
-function topPokemonCard(player, root) {
+export function topPokemonCard(player, root) {
   return topOfStack([...(player?.zones?.active || []), ...(player?.zones?.bench || [])], root);
 }
 
@@ -86,7 +86,7 @@ function zoneIdOf(player, card) {
   return null;
 }
 
-function removeFromZones(player, card) {
+export function removeFromZones(player, card) {
   for (const zone of Object.values(player?.zones || {})) {
     if (!Array.isArray(zone)) continue;
     const i = zone.indexOf(card);
@@ -103,7 +103,7 @@ function ownerOf(draft, card) {
   return ref ? draft.players[ref.playerId] : null;
 }
 
-function discardCard(draft, card, events) {
+export function discardCard(draft, card, events) {
   const owner = ownerOf(draft, card);
   if (!owner) return;
   // Special-energy on-discard triggers: Recycle Energy returns to hand, while
@@ -144,7 +144,7 @@ function discardCard(draft, card, events) {
   });
 }
 
-function attachTo(player, card, root, events) {
+export function attachTo(player, card, root, events) {
   removeFromZones(player, card);
   card.attachedTo = root.instanceId;
   player.zones[zoneIdOf(player, root)].push(card);
@@ -168,7 +168,7 @@ function drawCards(player, count, events) {
   });
 }
 
-function shuffleDeck(player, ctx) {
+export function shuffleDeck(player, ctx) {
   if (ctx.activeRng) ctx.activeRng.shuffle(player.zones.deck);
   ctx.events.push({ type: 'deckShuffled', playerId: player.playerId });
 }
@@ -182,17 +182,17 @@ function handToDeckBottom(player, ctx) {
   return hand.length;
 }
 
-function pickById(cards, selection) {
+export function pickById(cards, selection) {
   const ids = new Set(selection || []);
   return cards.filter((c) => ids.has(c.instanceId));
 }
 
-function skip(ctx, reason) {
+export function skip(ctx, reason) {
   ctx.events.push({ type: 'effectStepSkipped', reason, step: ctx.step.type });
   return null;
 }
 
-function sourceName(ctx, fallback) {
+export function sourceName(ctx, fallback) {
   return ctx.sourceCard?.name || fallback;
 }
 
@@ -217,7 +217,7 @@ const SYMBOL_TYPES = {
   f: 'fighting', d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy',
 };
 
-function pokemonHasType(card, symbol) {
+export function pokemonHasType(card, symbol) {
   const wanted = SYMBOL_TYPES[symbol];
   if (!wanted) return false;
   return (card.types || []).some((type) => {

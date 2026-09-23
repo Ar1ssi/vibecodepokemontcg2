@@ -716,15 +716,8 @@ test('ability: Toxtricity Sinister Surge attaches the searched {D} Energy to the
     playerId: 'p1',
   }, rng);
   assert.equal(res2.error, null);
-  assert.deepEqual(res2.pendingChoice.options.map((c) => c.instanceId), [91], 'only Benched {D} Pokémon');
-
-  const res3 = applyCommand(res2.state, {
-    type: 'resolveChoice',
-    payload: { choiceId: res2.pendingChoice.choiceId, selection: [91] },
-    playerId: 'p1',
-  }, rng);
-  assert.equal(res3.error, null);
-  const p1 = res3.state.players.p1;
+  assert.equal(res2.pendingChoice, null, 'the only Benched {D} Pokémon receives it without a prompt');
+  const p1 = res2.state.players.p1;
   assert.equal(p1.zones.bench.find((c) => c.instanceId === 95)?.attachedTo, 91);
   assert.equal(p1.zones.hand.length, 0, 'Energy never goes to hand');
   assert.equal(p1.zones.bench.find((c) => c.instanceId === 91).damage, 20);
@@ -1021,15 +1014,16 @@ test('ability: "search … {G} Energy … attach them to 1 of your Pokémon" att
   assert.equal(res3.state.players.p1.zones.hand.length, 0);
 });
 
-test('ability: "search … and attach it to this Pokémon" only offers this Pokémon (I91)', () => {
+test('ability: "search … and attach it to this Pokémon" attaches to this Pokémon only (I91)', () => {
   const { state, rng } = setupGame();
   holderWithAbility(state, 'Once during your turn, you may search your deck for a Basic {L} Energy card and attach it to this Pokémon. Then, shuffle your deck.');
+  state.players.p1.zones.bench.push(createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' }));
   state.players.p1.zones.deck.push(energyCard(81, 'Lightning'));
   const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
   const res2 = resolveWith(res1, [81], rng);
-  assert.deepEqual(res2.pendingChoice.options.map((c) => c.instanceId), [70], 'this Pokémon is the only target');
-  const res3 = resolveWith(res2, [70], rng);
-  assert.deepEqual(attachedTo(res3.state, 'p1', 70), [81]);
+  assert.equal(res2.pendingChoice, null, 'this Pokémon is the only target: no prompt');
+  assert.deepEqual(attachedTo(res2.state, 'p1', 70), [81]);
+  assert.deepEqual(attachedTo(res2.state, 'p1', 72), []);
 });
 
 test('ability: "attach them to your Pokémon in any way you like" picks a target per card (I91)', () => {

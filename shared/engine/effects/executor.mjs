@@ -22,6 +22,7 @@ import {
   stadiumBlocksHealing,
 } from '../rules/stadium-effects.mjs';
 import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
+import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
 
@@ -210,7 +211,7 @@ export function executeSteps(draft, {
     // other attachAbility forms stay on the switch below.
     const handlerType =
       step.type === 'attachAbility' && step.fromHand && !step.triggeredByAttach ? 'attachFromHand' : step.type;
-    const extraHandler = EXTRA_STEP_HANDLERS[handlerType];
+    const extraHandler = EXTRA_STEP_HANDLERS[handlerType] || ATTACK_STEP_HANDLERS[handlerType];
     if (extraHandler) {
       const memoKey = `${idx}:${step.type}`;
       const choice = extraHandler({
@@ -415,7 +416,21 @@ export function executeSteps(draft, {
           const picked = stepSelection.filter((id) =>
             (player.zones.deck || []).some((c) => c.instanceId === id && cardMatches(c))
           );
-          if (picked.length === 0 || attachRoots().length === 0) {
+          const roots = attachRoots();
+          if (picked.length === 0 || roots.length === 0) {
+            finishSearch();
+            break;
+          }
+          // One possible Pokémon ("attach it to this Pokémon"): no prompt.
+          if (roots.length === 1) {
+            const deck = player.zones.deck || [];
+            for (const card of deck.filter((c) => picked.includes(c.instanceId))) {
+              attachToRoot(player, card, roots[0], events);
+            }
+            if (step.attachDamage > 0) {
+              roots[0].damage = (roots[0].damage || 0) + step.attachDamage * 10;
+              events.push({ type: 'damageUpdated', instanceId: roots[0].instanceId, damage: roots[0].damage });
+            }
             finishSearch();
             break;
           }

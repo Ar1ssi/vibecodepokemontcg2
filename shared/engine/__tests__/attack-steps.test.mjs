@@ -1,0 +1,552 @@
+// Step-driven attack effects (design 030; I102–I111): printed attack clauses beyond the
+// fixed attack-phase helpers run through the resumable step executor.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createGameState, createPlayerZones } from '../state.mjs';
+import { createCard } from '../cards.mjs';
+import { createRng } from '../rng.mjs';
+import { applyCommand } from '../reduce.mjs';
+import { parseAttackSteps } from '../rules/attack-steps.mjs';
+import { ATTACK_YES, ATTACK_NO } from '../effects/attack-steps.mjs';
+
+let nextId = 1;
+const mon = (name, extra = {}) =>
+  createCard({ instanceId: nextId++, name, supertype: 'Pokémon', stage: 'Basic', hp: 200, ...extra });
+const energy = (type, extra = {}) =>
+  createCard({
+    instanceId: nextId++,
+    name: `Basic ${type} Energy`,
+    supertype: 'Energy',
+    subtypes: ['Basic'],
+    energyType: type,
+    type: 'Energy',
+    ...extra,
+  });
+const trainer = (name) => createCard({ instanceId: nextId++, name, supertype: 'Trainer', type: 'Item' });
+
+/** p1's Active attacks with `text`; `setup` shapes the board before the attack. */
+function board(text, { name = 'Attacker', damage = '0', setup = () => {}, seed = 5 } = {}) {
+  nextId = 1;
+  const state = createGameState({ gameId: 'atk-steps', seed, rulesEnabled: false });
+  for (const id of ['p1', 'p2']) {
+    state.players[id] = { playerId: id, username: id, zones: createPlayerZones(), flags: {} };
+    for (let i = 0; i < 6; i++) state.players[id].zones.prizes.push(mon(`${id} prize ${i}`));
+    for (let i = 0; i < 10; i++) state.players[id].zones.deck.push(trainer(`${id} deck ${i}`));
+  }
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  const attacker = mon(name, { hp: 300, attacks: [{ name: 'Test Attack', cost: [], damage, text }] });
+  state.players.p1.zones.active.push(attacker);
+  const defender = mon('Defender', { hp: 400 });
+  state.players.p2.zones.active.push(defender);
+  const ctx = { state, attacker, defender, p1: state.players.p1, p2: state.players.p2 };
+  setup(ctx);
+  return { ...ctx, rng: createRng(seed) };
+}
+
+function attack(b) {
+  const res = applyCommand(b.state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, b.rng);
+  assert.equal(res.error, null);
+  return res;
+}
+
+function choose(res, selection, rng, playerId = res.state.pendingChoice.player) {
+  const next = applyCommand(
+    res.state,
+    { type: 'resolveChoice', playerId, payload: { choiceId: res.state.pendingChoice.choiceId, selection } },
+    rng
+  );
+  assert.equal(next.error, null);
+  return next;
+}
+
+const ids = (cards) => cards.map((c) => c.instanceId);
+const zone = (res, pid, name) => res.state.players[pid].zones[name];
+const attachedTo = (res, pid, rootId) =>
+  [...zone(res, pid, 'active'), ...zone(res, pid, 'bench')].filter((c) => c.attachedTo === rootId).map((c) => c.instanceId);
+const activeRoot = (res, pid) => zone(res, pid, 'active').find((c) => !c.attachedTo);
+const turnPassed = (res) => assert.equal(res.state.turn.player, 'p2', 'the attack ends the turn');
+
+// ── parser ──────────────────────────────────────────────────────────────────
+
+test('parseAttackSteps: reads the attacker name as "this Pokémon" and keeps printed order', () => {
+  const parsed = parseAttackSteps(
+    'Search your deck for an Energy card and attach it to Mew ex. Then, you may switch Mew ex with 1 of your Benched Pokémon.',
+    { selfName: 'Mew ex' }
+  );
+  assert.deepEqual(parsed.after.map((s) => s.type), ['searchAbility', 'atkSwitchSelf']);
+  assert.equal(parsed.after[0].attachTarget, 'this pokémon');
+  assert.equal(parsed.after[1].optional, true);
+  assert.equal(parsed.handlesSearch, true);
+});
+
+test('parseAttackSteps: coin, before-damage and optional gates', () => {
+  assert.deepEqual(
+    parseAttackSteps("Flip a coin. If heads, discard an Energy from your opponent's Active Pokémon.").after,
+    [{ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, gate: 'heads' }]
+  );
+  assert.deepEqual(
+    parseAttackSteps("Flip 3 coins. For each heads, discard the top card of your opponent's deck.").after,
+    [{ type: 'atkMill', side: 'opponent', count: 1, perHeads: true }]
+  );
+  const before = parseAttackSteps("Before doing damage, discard all Pokémon Tools from your opponent's Active Pokémon.");
+  assert.deepEqual(before.before, [{ type: 'atkDiscardOppTools', scope: 'active', all: true }]);
+  assert.deepEqual(before.after, []);
+});
+
+test('parseAttackSteps: leaves clauses the attack-phase helpers own, and conditions it cannot read', () => {
+  const none = (text) => assert.deepEqual(parseAttackSteps(text), { before: [], after: [], handlesSearch: false }, text);
+  none('Attach up to 3 Basic {F} Energy cards from your discard pile to your Benched Pokémon in any way you like.');
+  none('Discard the top 3 cards of your deck. This attack does 50 damage for each Energy card you discarded in this way.');
+  none('If you do, switch it with 1 of your Benched Pokémon.');
+  none('Discard 2 Energy from this Pokémon.');
+  none('Draw 2 cards.');
+});
+
+// ── I102 switch / gust ─────────────────────────────────────────────────────
+
+test('attack: "Switch this Pokémon with 1 of your Benched Pokémon" swaps in the chosen Pokémon (I102)', () => {
+  const b = board('Switch this Pokémon with 1 of your Benched Pokémon.', {
+    name: 'Mega Zeraora ex',
+    damage: '150',
+    setup: ({ p1 }) => p1.zones.bench.push(mon('Bench A'), mon('Bench B')),
+  });
+  const res1 = attack(b);
+  assert.equal(res1.state.pendingChoice.player, 'p1');
+  const benchB = zone(res1, 'p1', 'bench').find((c) => c.name === 'Bench B');
+  const res2 = choose(res1, [benchB.instanceId], b.rng);
+  assert.equal(activeRoot(res2, 'p1').name, 'Bench B');
+  assert.ok(zone(res2, 'p1', 'bench').some((c) => c.instanceId === b.attacker.instanceId));
+  assert.equal(activeRoot(res2, 'p2').damage, 150, 'damage happened before the switch');
+  turnPassed(res2);
+});
+
+test('attack: "You may switch" asks first; declining keeps the attacker Active (I102)', () => {
+  const b = board('You may switch this Pokémon with 1 of your Benched Pokémon.', {
+    setup: ({ p1 }) => p1.zones.bench.push(mon('Bench A')),
+  });
+  const res1 = attack(b);
+  assert.deepEqual(ids(res1.state.pendingChoice.options), [ATTACK_YES, ATTACK_NO]);
+  const res2 = choose(res1, [ATTACK_NO], b.rng);
+  assert.equal(activeRoot(res2, 'p1').instanceId, b.attacker.instanceId);
+  turnPassed(res2);
+});
+
+test('attack: "switch out your opponent\'s Active Pokémon" lets the opponent choose (I102)', () => {
+  const b = board(
+    "You may switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)",
+    { name: 'Kyogre ex', setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A'), mon('Opp B')) }
+  );
+  const res1 = attack(b);
+  const res2 = choose(res1, [ATTACK_YES], b.rng);
+  assert.equal(res2.state.pendingChoice.player, 'p2', 'the opponent picks the new Active');
+  const oppB = zone(res2, 'p2', 'bench').find((c) => c.name === 'Opp B');
+  const res3 = choose(res2, [oppB.instanceId], b.rng, 'p2');
+  assert.equal(activeRoot(res3, 'p2').name, 'Opp B');
+  turnPassed(res3);
+});
+
+test('attack: a before-damage gust moves the damage to the new Active Pokémon (I102)', () => {
+  const b = board(
+    "Before doing damage, you may switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
+    { damage: '60', setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A'), mon('Opp B')) }
+  );
+  const res1 = attack(b);
+  const res2 = choose(res1, [ATTACK_YES], b.rng);
+  const oppA = zone(res2, 'p2', 'bench').find((c) => c.name === 'Opp A');
+  const res3 = choose(res2, [oppA.instanceId], b.rng);
+  assert.equal(activeRoot(res3, 'p2').name, 'Opp A');
+  assert.equal(activeRoot(res3, 'p2').damage, 60);
+  assert.equal(zone(res3, 'p2', 'bench').find((c) => c.name === 'Defender').damage || 0, 0);
+  turnPassed(res3);
+});
+
+// ── I103 move Energy ───────────────────────────────────────────────────────
+
+test('attack: "Move an Energy from this Pokémon to 1 of your Benched Pokémon" (I103)', () => {
+  let fire;
+  const b = board('Move an Energy from this Pokémon to 1 of your Benched Pokémon.', {
+    name: 'Mega Gengar ex',
+    setup: ({ p1, attacker }) => {
+      fire = energy('Fire', { attachedTo: attacker.instanceId });
+      p1.zones.active.push(fire);
+      p1.zones.bench.push(mon('Bench A'), mon('Bench B'));
+    },
+  });
+  const res1 = attack(b);
+  const benchA = zone(res1, 'p1', 'bench').find((c) => c.name === 'Bench A');
+  const res2 = choose(res1, [benchA.instanceId], b.rng);
+  assert.deepEqual(attachedTo(res2, 'p1', benchA.instanceId), [fire.instanceId]);
+  assert.deepEqual(attachedTo(res2, 'p1', b.attacker.instanceId), []);
+  turnPassed(res2);
+});
+
+test("attack: move an Energy from the opponent's Active to their Bench (Gengar ex Tricky Steps, I103)", () => {
+  let water;
+  const b = board("You may move an Energy from your opponent's Active Pokémon to 1 of their Benched Pokémon.", {
+    setup: ({ p2, defender }) => {
+      water = energy('Water', { attachedTo: defender.instanceId });
+      p2.zones.active.push(water);
+      p2.zones.bench.push(mon('Opp A'));
+    },
+  });
+  const res2 = choose(attack(b), [ATTACK_YES], b.rng);
+  const oppA = zone(res2, 'p2', 'bench').find((c) => c.name === 'Opp A');
+  assert.deepEqual(attachedTo(res2, 'p2', oppA.instanceId), [water.instanceId]);
+  turnPassed(res2);
+});
+
+// ── I104 discard from the opponent ─────────────────────────────────────────
+
+test("attack: \"Discard an Energy from your opponent's Active Pokémon\" asks which (I104)", () => {
+  let fire;
+  let water;
+  const b = board("Discard an Energy from your opponent's Active Pokémon.", {
+    name: 'Decidueye ex',
+    damage: '240',
+    setup: ({ p2, defender }) => {
+      fire = energy('Fire', { attachedTo: defender.instanceId });
+      water = energy('Water', { attachedTo: defender.instanceId });
+      p2.zones.active.push(fire, water);
+    },
+  });
+  const res1 = attack(b);
+  assert.deepEqual(ids(res1.state.pendingChoice.options).sort(), [fire.instanceId, water.instanceId].sort());
+  const res2 = choose(res1, [water.instanceId], b.rng);
+  assert.deepEqual(attachedTo(res2, 'p2', b.defender.instanceId), [fire.instanceId]);
+  assert.ok(zone(res2, 'p2', 'discard').some((c) => c.instanceId === water.instanceId));
+  turnPassed(res2);
+});
+
+test("attack: discarding from a Knocked Out opponent's Active does nothing (I104)", () => {
+  const b = board("Discard an Energy from your opponent's Active Pokémon.", {
+    damage: '500',
+    setup: ({ p2, defender }) => {
+      p2.zones.active.push(energy('Fire', { attachedTo: defender.instanceId }));
+      p2.zones.bench.push(mon('Opp A'));
+    },
+  });
+  const res = attack(b);
+  assert.ok(zone(res, 'p2', 'discard').some((c) => c.instanceId === b.defender.instanceId), 'defender KO');
+  assert.equal(res.state.players.p1.flags.attackerAttacked, true);
+});
+
+test("attack: discard all Pokémon Tools before damage; random hand discard (I104)", () => {
+  let tool;
+  const b = board("Before doing damage, discard all Pokémon Tools from your opponent's Active Pokémon.", {
+    name: 'Klefki',
+    setup: ({ p2, defender }) => {
+      tool = createCard({ instanceId: nextId++, name: 'Tool', supertype: 'Trainer', subtypes: ['Pokémon Tool'], type: 'Pokémon Tool', attachedTo: defender.instanceId });
+      p2.zones.active.push(tool);
+    },
+  });
+  const res = attack(b);
+  assert.ok(zone(res, 'p2', 'discard').some((c) => c.instanceId === tool.instanceId));
+
+  const h = board("Discard a random card from your opponent's hand.", {
+    setup: ({ p2 }) => p2.zones.hand.push(trainer('H1'), trainer('H2'), trainer('H3')),
+  });
+  const handBefore = h.p2.zones.hand.length;
+  const resHand = attack(h);
+  // The opponent draws for their turn after the discard.
+  assert.equal(zone(resHand, 'p2', 'discard').filter((c) => /^H\d$/.test(c.name)).length, 1);
+  assert.equal(zone(resHand, 'p2', 'hand').filter((c) => /^H\d$/.test(c.name)).length, handBefore - 1);
+});
+
+test("attack: \"Your opponent discards 2 cards from their hand\" lets the opponent choose (I104)", () => {
+  const b = board('Your opponent discards 2 cards from their hand.', {
+    setup: ({ p2 }) => p2.zones.hand.push(trainer('H1'), trainer('H2'), trainer('H3')),
+  });
+  const res1 = attack(b);
+  assert.equal(res1.state.pendingChoice.player, 'p2');
+  const [h1, h2] = zone(res1, 'p2', 'hand');
+  const res2 = choose(res1, [h1.instanceId, h2.instanceId], b.rng, 'p2');
+  assert.deepEqual(zone(res2, 'p2', 'discard').map((c) => c.name).sort(), ['H1', 'H2']);
+  turnPassed(res2);
+});
+
+// ── I105 attach from discard / hand ────────────────────────────────────────
+
+test('attack: "Attach up to 2 Basic {F} Energy cards from your discard pile to this Pokémon" (I105)', () => {
+  let f1;
+  let f2;
+  const b = board('Attach up to 2 Basic {F} Energy cards from your discard pile to this Pokémon.', {
+    name: 'Regirock ex',
+    setup: ({ p1 }) => {
+      f1 = energy('Fighting');
+      f2 = energy('Fighting');
+      p1.zones.discard.push(f1, f2, energy('Fire'));
+    },
+  });
+  const res1 = attack(b);
+  assert.deepEqual(ids(res1.state.pendingChoice.options).sort(), [f1.instanceId, f2.instanceId].sort());
+  const res2 = choose(res1, [f1.instanceId, f2.instanceId], b.rng);
+  assert.deepEqual(attachedTo(res2, 'p1', b.attacker.instanceId).sort(), [f1.instanceId, f2.instanceId].sort());
+  turnPassed(res2);
+});
+
+test('attack: attach from hand to your Pokémon in any way you like asks a target per card (I105)', () => {
+  let l1;
+  let l2;
+  const b = board('You may attach any number of Basic Energy cards from your hand to your Pokémon in any way you like.', {
+    name: 'Pikachu ex',
+    setup: ({ p1 }) => {
+      l1 = energy('Lightning');
+      l2 = energy('Lightning');
+      p1.zones.hand.push(l1, l2);
+      p1.zones.bench.push(mon('Bench A'));
+    },
+  });
+  const res1 = choose(attack(b), [ATTACK_YES], b.rng);
+  const res2 = choose(res1, [l1.instanceId, l2.instanceId], b.rng);
+  const benchA = zone(res2, 'p1', 'bench').find((c) => c.name === 'Bench A');
+  const res3 = choose(res2, [b.attacker.instanceId], b.rng);
+  const res4 = choose(res3, [benchA.instanceId], b.rng);
+  assert.equal(attachedTo(res4, 'p1', b.attacker.instanceId).length, 1);
+  assert.equal(attachedTo(res4, 'p1', benchA.instanceId).length, 1);
+  turnPassed(res4);
+});
+
+// ── I106 draw until ────────────────────────────────────────────────────────
+
+test('attack: "Draw cards until you have 7 cards in your hand" (I106)', () => {
+  const b = board('Draw cards until you have 7 cards in your hand.', {
+    name: 'Jirachi ex',
+    setup: ({ p1 }) => p1.zones.hand.push(trainer('H1'), trainer('H2')),
+  });
+  const res = attack(b);
+  assert.equal(zone(res, 'p1', 'hand').length, 7);
+});
+
+// ── I107 deck / discard → Bench ────────────────────────────────────────────
+
+test('attack: Trick Portal puts Basic Pokémon from the top of the deck onto the Bench (I107)', () => {
+  let basicA;
+  let stage1;
+  const b = board(
+    'Look at the top 9 cards of your deck, and you may put any number of Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.',
+    {
+      name: 'Mega Delphox ex',
+      setup: ({ p1 }) => {
+        basicA = mon('Deck Basic');
+        stage1 = mon('Deck Stage 1', { stage: 'Stage 1' });
+        p1.zones.deck.unshift(basicA, stage1);
+      },
+    }
+  );
+  const res1 = attack(b);
+  assert.deepEqual(ids(res1.state.pendingChoice.options), [basicA.instanceId], 'only Basic Pokémon can be benched');
+  const res2 = choose(res1, [basicA.instanceId], b.rng);
+  assert.ok(zone(res2, 'p1', 'bench').some((c) => c.instanceId === basicA.instanceId));
+  turnPassed(res2);
+});
+
+test('attack: "Put up to 3 {N} Pokémon from your discard pile onto your Bench" (I107)', () => {
+  let dragon;
+  const b = board('Put up to 3 {N} Pokémon from your discard pile onto your Bench.', {
+    name: 'Salamence ex',
+    setup: ({ p1 }) => {
+      dragon = mon('Dratini', { types: ['Dragon'] });
+      p1.zones.discard.push(dragon, mon('Charmander', { types: ['Fire'] }));
+    },
+  });
+  const res1 = attack(b);
+  assert.deepEqual(ids(res1.state.pendingChoice.options), [dragon.instanceId]);
+  const res2 = choose(res1, [dragon.instanceId], b.rng);
+  assert.ok(zone(res2, 'p1', 'bench').some((c) => c.instanceId === dragon.instanceId));
+});
+
+// ── I108 search and attach ─────────────────────────────────────────────────
+
+test('attack: Mew ex Power Move attaches the searched Energy to Mew ex, then may switch (I108)', () => {
+  let psychic;
+  const b = board(
+    'Search your deck for an Energy card and attach it to Mew ex. Then, shuffle your deck. Then, you may switch Mew ex with 1 of your Benched Pokémon.',
+    {
+      name: 'Mew ex',
+      setup: ({ p1 }) => {
+        psychic = energy('Psychic');
+        p1.zones.deck.push(psychic);
+        p1.zones.bench.push(mon('Bench A'));
+      },
+    }
+  );
+  const res1 = attack(b);
+  const res2 = choose(res1, [psychic.instanceId], b.rng);
+  assert.deepEqual(attachedTo(res2, 'p1', b.attacker.instanceId), [psychic.instanceId]);
+  assert.ok(!zone(res2, 'p1', 'hand').some((c) => c.instanceId === psychic.instanceId));
+  const res3 = choose(res2, [ATTACK_YES], b.rng);
+  assert.equal(activeRoot(res3, 'p1').name, 'Bench A');
+  turnPassed(res3);
+});
+
+// ── I109 plain mill ────────────────────────────────────────────────────────
+
+test('attack: plain mill discards the top cards of the named deck (I109)', () => {
+  const opp = attack(board("Discard the top 2 cards of your opponent's deck.", { name: 'Mega Heracross ex' }));
+  assert.equal(zone(opp, 'p2', 'discard').length, 2);
+  const own = attack(board('Discard the top 2 cards of your deck.', { name: 'Salamence ex' }));
+  assert.equal(zone(own, 'p1', 'discard').length, 2);
+  assert.equal(zone(own, 'p2', 'discard').length, 0);
+});
+
+// ── I110 shuffle self ──────────────────────────────────────────────────────
+
+test('attack: "Shuffle this Pokémon and all attached cards into your deck" (I110)', () => {
+  let water;
+  const b = board('Shuffle this Pokémon and all attached cards into your deck.', {
+    name: 'Primarina',
+    damage: '120',
+    setup: ({ p1, attacker }) => {
+      water = energy('Water', { attachedTo: attacker.instanceId });
+      p1.zones.active.push(water);
+      p1.zones.bench.push(mon('Bench A'));
+    },
+  });
+  const res = attack(b);
+  const deckIds = ids(zone(res, 'p1', 'deck'));
+  assert.ok(deckIds.includes(b.attacker.instanceId) && deckIds.includes(water.instanceId));
+  assert.equal(activeRoot(res, 'p2').damage, 120);
+  assert.equal(activeRoot(res, 'p1').name, 'Bench A', 'the only Benched Pokémon is promoted');
+});
+
+test('attack: shuffling the last Pokémon in play away loses the game (I110)', () => {
+  const res = attack(board('Shuffle this Pokémon and all attached cards into your deck.'));
+  assert.equal(res.state.turn.phase, 'ended');
+  assert.equal(res.state.winner, 'p2');
+});
+
+// ── I111 misc ──────────────────────────────────────────────────────────────
+
+test('attack: "Put a Trainer card from your discard pile into your hand" (I111)', () => {
+  let item;
+  const b = board('Put a Trainer card from your discard pile into your hand.', {
+    name: 'Sableye V',
+    setup: ({ p1 }) => {
+      item = trainer('Old Item');
+      p1.zones.discard.push(item, energy('Fire'));
+    },
+  });
+  const res = attack(b);
+  assert.ok(zone(res, 'p1', 'hand').some((c) => c.instanceId === item.instanceId));
+});
+
+test("attack: counters on each opponent's Pokémon knock out and grant Prizes (I111)", () => {
+  const b = board("Put 2 damage counters on each of your opponent's Pokémon.", {
+    name: 'Mismagius',
+    setup: ({ p2 }) => p2.zones.bench.push(mon('Frail', { hp: 20 }), mon('Sturdy')),
+  });
+  const res = attack(b);
+  assert.equal(activeRoot(res, 'p2').damage, 20);
+  assert.equal(zone(res, 'p2', 'bench').find((c) => c.name === 'Sturdy').damage, 20);
+  assert.ok(zone(res, 'p2', 'discard').some((c) => c.name === 'Frail'));
+  assert.equal(res.state.pendingChoice?.source, 'Prize cards', 'p1 takes a Prize for the Knock Out');
+  assert.equal(res.state.pendingChoice.player, 'p1');
+});
+
+test('attack: Dedenne ex Tail Swap moves all counters from a Benched Pokémon (I111)', () => {
+  let hurt;
+  const b = board("Move all damage counters from 1 of your Benched Pokémon to your opponent's Active Pokémon.", {
+    setup: ({ p1 }) => {
+      hurt = mon('Hurt');
+      hurt.damage = 90;
+      p1.zones.bench.push(hurt);
+    },
+  });
+  const res = attack(b);
+  assert.equal(zone(res, 'p1', 'bench').find((c) => c.instanceId === hurt.instanceId).damage, 0);
+  assert.equal(activeRoot(res, 'p2').damage, 90);
+});
+
+test('attack: Espeon ex Amazez devolves every evolved opponent Pokémon into their deck (I111)', () => {
+  let evolved;
+  const b = board(
+    "Devolve each of your opponent's evolved Pokémon by shuffling the highest Stage Evolution card on it into your opponent's deck.",
+    {
+      setup: ({ p2, defender }) => {
+        evolved = mon('Defender Stage 1', { stage: 'Stage 1', hp: 400, attachedTo: defender.instanceId });
+        p2.zones.active.push(evolved);
+      },
+    }
+  );
+  const res = attack(b);
+  assert.ok(zone(res, 'p2', 'deck').some((c) => c.instanceId === evolved.instanceId));
+  assert.deepEqual(attachedTo(res, 'p2', b.defender.instanceId), []);
+});
+
+test('attack: Umbreon ex Onyx takes a Prize card; Giratina VSTAR Star Requiem knocks out (I111)', () => {
+  const onyx = attack(board('Discard all Energy from this Pokémon, and take a Prize card.', { name: 'Umbreon ex' }));
+  assert.equal(onyx.state.pendingChoice?.source, 'Prize cards');
+  assert.equal(onyx.state.pendingChoice.max, 1);
+
+  const b = board("Your opponent's Active Pokémon is Knocked Out.", {
+    setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A')),
+  });
+  const res = attack(b);
+  assert.ok(zone(res, 'p2', 'discard').some((c) => c.instanceId === b.defender.instanceId));
+  assert.equal(res.state.pendingChoice?.source, 'Prize cards');
+});
+
+test('attack: a conditional Knock Out needs its condition (I111)', () => {
+  const text = "If your opponent's Active Pokémon is affected by a Special Condition, it is Knocked Out.";
+  const healthy = attack(board(text, { setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A')) }));
+  assert.ok(activeRoot(healthy, 'p2'), 'no Special Condition: no Knock Out');
+});
+
+test('attack: "Heal 30 damage from each of your Pokémon" heals each once (I111)', () => {
+  const b = board('Heal 30 damage from each of your Pokémon.', {
+    setup: ({ p1, attacker }) => {
+      attacker.damage = 50;
+      const hurt = mon('Hurt');
+      hurt.damage = 20;
+      p1.zones.bench.push(hurt);
+    },
+  });
+  const res = attack(b);
+  assert.equal(activeRoot(res, 'p1').damage, 20);
+  assert.equal(zone(res, 'p1', 'bench')[0].damage, 0);
+});
+
+test('attack: Raging Bolt ex Burst Roar discards the hand, then draws 6 (I111)', () => {
+  const b = board('Discard your hand and draw 6 cards.', {
+    name: 'Raging Bolt ex',
+    setup: ({ p1 }) => p1.zones.hand.push(trainer('Old 1'), trainer('Old 2')),
+  });
+  const res = attack(b);
+  assert.equal(zone(res, 'p1', 'hand').length, 6);
+  assert.deepEqual(zone(res, 'p1', 'discard').map((c) => c.name).sort(), ['Old 1', 'Old 2']);
+});
+
+// ── continuation ───────────────────────────────────────────────────────────
+
+test('attack: a step choice resumes into the deck search, then ends the turn', () => {
+  const b = board(
+    'Switch this Pokémon with 1 of your Benched Pokémon. Search your deck for a Trainer card, reveal it, and put it into your hand. Then, shuffle your deck.',
+    { setup: ({ p1 }) => p1.zones.bench.push(mon('Bench A'), mon('Bench B')) }
+  );
+  const res1 = attack(b);
+  const benchA = zone(res1, 'p1', 'bench').find((c) => c.name === 'Bench A');
+  const res2 = choose(res1, [benchA.instanceId], b.rng);
+  assert.ok(res2.state.pendingChoice, 'the deck search follows');
+  assert.equal(res2.state.turn.player, 'p1');
+  const pick = res2.state.pendingChoice.options[0].instanceId;
+  const res3 = choose(res2, [pick], b.rng);
+  assert.ok(zone(res3, 'p1', 'hand').some((c) => c.instanceId === pick));
+  turnPassed(res3);
+});
+
+test('attack: a coin-gated clause follows the attack\'s own flip', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    let fire;
+    const b = board("Flip a coin. If heads, discard an Energy from your opponent's Active Pokémon.", {
+      seed,
+      setup: ({ p2, defender }) => {
+        fire = energy('Fire', { attachedTo: defender.instanceId });
+        p2.zones.active.push(fire);
+      },
+    });
+    const res = attack(b);
+    const flip = res.events.find((e) => e.type === 'attackCoinFlipped');
+    const discarded = zone(res, 'p2', 'discard').some((c) => c.instanceId === fire.instanceId);
+    assert.equal(discarded, flip.coin === 'heads', `seed ${seed}: ${flip.coin}`);
+  }
+});
