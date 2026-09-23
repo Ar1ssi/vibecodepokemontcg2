@@ -663,6 +663,8 @@ function cardEffectiveHp(state, card, playerId) {
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
 function computeEffectiveRetreatCost(state, card, playerId) {
   if (!card) return 0;
+  // Vespiquen Mach Wind (design 033): the Retreat Cost is 0 during the next turn.
+  if (activeAttackMarkers(state, playerId, card).some((m) => m.kind === 'freeRetreat')) return 0;
   const player = state.players?.[playerId];
   const activeZone = player?.zones?.active || [];
   const stadium = state.stadium;

@@ -17,6 +17,7 @@ import { clearConditions, hasAnyCondition, hasCondition } from '../rules/special
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { addAttackMarker, markerFromTurn, markerUntilTurn, SELF_NAME } from '../rules/attack-markers.mjs';
+import { discardCurrentStadium } from './trainer.mjs';
 import {
   BENCH_LIMIT,
   activeOf,
@@ -1265,6 +1266,49 @@ function atkAddMarker(ctx) {
   return null;
 }
 
+// The marker a chained discard earns ("If you do, during your opponent's next turn, …").
+function addChainedMarker(ctx) {
+  return atkAddMarker({ ...ctx, step: { ...ctx.step.then, attackName: ctx.step.attackName } });
+}
+
+// Iron Treads ex Iron-Clad Roll: "you may discard all Future Booster Energy Capsules from
+// this Pokémon. If you do, …". No matching Tool, or a declined discard, earns no marker.
+function atkDiscardSelfTool(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const wanted = String(step.toolName || '').toLowerCase();
+  const tools = ref
+    ? attachedCards(player, ref.card.instanceId).filter(
+        (c) => isToolCard(c) && [wanted, `${wanted}s`].includes(String(c.name || '').toLowerCase())
+      )
+    : [];
+  if (tools.length === 0) return skip(ctx, 'no_matching_tool');
+  if (step.optional && !ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Discard ${tools.map((c) => c.name).join(', ')} from ${ref.card.name}?`,
+      options: [
+        { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+        { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  if (step.optional && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
+  discardCards(player, tools, ctx.events);
+  return addChainedMarker(ctx);
+}
+
+// Flygon Desert Geyser: discard the opponent's Stadium; the marker needs that discard.
+function atkDiscardStadium(ctx) {
+  const stadium = ctx.draft.stadium;
+  if (!stadium) return skip(ctx, 'no_stadium');
+  const ownerId = stadium.ownerId || stadium.playerId || null;
+  if (ctx.step.owner === 'opponent' && ownerId !== ctx.opponent?.playerId) return skip(ctx, 'not_opponent_stadium');
+  discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
+  return addChainedMarker(ctx);
+}
+
 export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
@@ -1304,4 +1348,6 @@ export const ATTACK_STEP_HANDLERS = {
   atkDevolve,
   atkHealEach,
   atkAddMarker,
+  atkDiscardSelfTool,
+  atkDiscardStadium,
 };

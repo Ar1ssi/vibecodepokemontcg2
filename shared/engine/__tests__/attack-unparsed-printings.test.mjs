@@ -198,3 +198,182 @@ test('Voltage Shoot: refused with fewer than 2 {L} Energy cards in hand', () => 
   const res = applyCommand(b.state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, b.rng);
   assert.match(String(res.error), /Energy card\(s\) in your hand/);
 });
+
+// ── slice 2: timed markers from older wordings ──────────────────────────────
+
+const MACH_WIND = "During your next turn, Vespiquen's Retreat Cost is 0.";
+const EXTRA_COMET_PUNCH = 'During your next turn, Extra Comet Punch does 30 damage plus 30 more damage.';
+const PSYCHIC_DEFENSE =
+  "During your opponent's next turn, prevent all effects of an attack, and any damage done to Deoxys by attacks is reduced by 20 (after applying Weakness and Resistance).";
+const IRON_CLAD_ROLL =
+  "After doing damage, you may discard all Future Booster Energy Capsules from this Pokémon. If you do, during your opponent's next turn, this Pokémon takes 150 less damage from attacks (after applying Weakness and Resistance).";
+const DESERT_GEYSER =
+  "If your opponent has a Stadium in play, discard it. If you discarded a Stadium in this way, during your opponent's next turn, prevent all damage from and effects of attacks done to this Pokémon.";
+
+test('parsers: older timed wordings become markers', () => {
+  const steps = (text, selfName) => parseAttackSteps(text, { selfName }).after;
+  assert.deepEqual(steps(MACH_WIND, 'Vespiquen'), [
+    { type: 'atkAddMarker', target: 'self', window: 'yourNextTurn', marker: { kind: 'freeRetreat' } },
+  ]);
+  assert.deepEqual(steps(EXTRA_COMET_PUNCH, 'Metang'), [
+    {
+      type: 'atkAddMarker',
+      target: 'self',
+      window: 'yourNextTurn',
+      marker: { kind: 'nextTurnBonus', amount: 30, attackName: 'extra comet punch' },
+    },
+  ]);
+  assert.deepEqual(steps(PSYCHIC_DEFENSE, 'Deoxys Defense Forme'), [
+    {
+      type: 'atkAddMarker',
+      target: 'self',
+      window: 'opponentNextTurn',
+      marker: { kind: 'incomingReduce', amount: 20, afterWR: true, filter: null },
+    },
+  ]);
+  assert.deepEqual(steps(IRON_CLAD_ROLL, 'Iron Treads ex'), [
+    {
+      type: 'atkDiscardSelfTool',
+      toolName: 'future booster energy capsule',
+      optional: true,
+      then: {
+        type: 'atkAddMarker',
+        target: 'self',
+        window: 'opponentNextTurn',
+        marker: { kind: 'incomingReduce', amount: 150, afterWR: true, filter: null },
+      },
+    },
+  ]);
+  assert.deepEqual(steps(DESERT_GEYSER, 'Flygon'), [
+    {
+      type: 'atkDiscardStadium',
+      owner: 'opponent',
+      then: {
+        type: 'atkAddMarker',
+        target: 'self',
+        window: 'opponentNextTurn',
+        marker: { kind: 'incomingPrevent', filter: null },
+      },
+    },
+  ]);
+  // "This attack does … plus …" is the attack's own damage, not a later-turn bonus.
+  assert.deepEqual(steps('During your next turn, this attack does 30 damage plus 30 more damage.'), []);
+});
+
+const run = (state, playerId, type, payload = {}) => {
+  const res = applyCommand(state, { type, playerId, payload }, createRng(5));
+  assert.equal(res.error, null);
+  return res;
+};
+
+/** p1 attacks with `text` on turn 3; p2's Striker hits back for `strike` on turn 4. */
+function markerDuel(text, { name = 'Attacker', damage = '10', strike = '100', setup = () => {} } = {}) {
+  return board(text, {
+    name,
+    damage,
+    attackName: 'Marked Attack',
+    setup: (ctx) => {
+      ctx.p2.zones.active.splice(0);
+      ctx.p2.zones.active.push(mon('Striker', { hp: 900, attacks: [{ name: 'Strike', cost: [], damage: strike, text: '' }] }));
+      ctx.p1.zones.bench.push(mon('Bench Buddy'));
+      setup(ctx);
+    },
+  });
+}
+
+const activeNamed = (state, name) => state.players.p1.zones.active.find((c) => c.name === name);
+
+test('Mach Wind: the Retreat Cost is 0 during your next turn only', () => {
+  const setup = ({ p1, attacker }) => {
+    attacker.retreatCost = ['Colorless', 'Colorless'];
+    for (let i = 0; i < 2; i++) {
+      const e = energy('Grass');
+      e.attachedTo = attacker.instanceId;
+      p1.zones.active.push(e);
+    }
+  };
+  const afterAttack = attack(markerDuel(MACH_WIND, { name: 'Vespiquen', setup }));
+  const myTurn = run(afterAttack.state, 'p2', 'pass').state;
+  assert.equal(myTurn.turn.number, 5);
+  const retreatPayload = { benchInstanceId: myTurn.players.p1.zones.bench.find((c) => c.name === 'Bench Buddy').instanceId };
+  const free = run(structuredClone(myTurn), 'p1', 'retreat', retreatPayload).state;
+  assert.equal(free.players.p1.zones.discard.length, 0, 'no Energy paid');
+  const later = structuredClone(myTurn);
+  later.turn.number = 7;
+  const paid = run(later, 'p1', 'retreat', retreatPayload).state;
+  assert.equal(paid.players.p1.zones.discard.length, 2, 'the window has closed');
+});
+
+test('Extra Comet Punch (Metang): 30 more damage when used during your next turn', () => {
+  const b = markerDuel(EXTRA_COMET_PUNCH, { name: 'Metang', damage: '30' });
+  b.attacker.attacks[0].name = 'Extra Comet Punch';
+  const first = attack(b);
+  assert.equal(first.state.players.p2.zones.active[0].damage, 30);
+  const myTurn = run(first.state, 'p2', 'pass').state;
+  const second = run(myTurn, 'p1', 'attack', { attackIndex: 0 }).state;
+  assert.equal(second.players.p2.zones.active[0].damage, 30 + 60);
+});
+
+test('Psychic Defense: damage to Deoxys Defense Forme is 20 less on the next turn', () => {
+  const b = markerDuel(PSYCHIC_DEFENSE, { name: 'Deoxys Defense Forme', damage: '0' });
+  const hit = run(attack(b).state, 'p2', 'attack', { attackIndex: 0 }).state;
+  assert.equal(activeNamed(hit, 'Deoxys Defense Forme').damage, 80);
+});
+
+function capsuleSetup({ p1, attacker }) {
+  p1.zones.active.push(
+    createCard({
+      instanceId: 95,
+      name: 'Future Booster Energy Capsule',
+      supertype: 'Trainer',
+      subtypes: ['Pokémon Tool'],
+      type: 'Trainer',
+      attachedTo: attacker.instanceId,
+    })
+  );
+}
+
+test('Iron-Clad Roll: discarding the Capsule gives 150 less damage next turn; declining gives nothing', () => {
+  const opts = { name: 'Iron Treads ex', strike: '200', setup: capsuleSetup };
+  const b = markerDuel(IRON_CLAD_ROLL, opts);
+  const asked = attack(b);
+  assert.match(asked.state.pendingChoice.prompt, /Discard Future Booster Energy Capsule/);
+  const yes = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name === 'Yes').instanceId], b.rng);
+  assert.ok(yes.state.players.p1.zones.discard.some((c) => c.name === 'Future Booster Energy Capsule'));
+  const hit = run(yes.state, 'p2', 'attack', { attackIndex: 0 }).state;
+  assert.equal(activeNamed(hit, 'Iron Treads ex').damage, 50);
+
+  const b2 = markerDuel(IRON_CLAD_ROLL, opts);
+  const asked2 = attack(b2);
+  const no = choose(asked2, [asked2.state.pendingChoice.options.find((o) => o.name === 'No').instanceId], b2.rng);
+  assert.ok(activeNamed(no.state, 'Future Booster Energy Capsule'));
+  const hit2 = run(no.state, 'p2', 'attack', { attackIndex: 0 }).state;
+  assert.equal(activeNamed(hit2, 'Iron Treads ex').damage, 200);
+});
+
+test('Iron-Clad Roll: no Capsule attached means no question and no marker', () => {
+  const res = attack(markerDuel(IRON_CLAD_ROLL, { name: 'Iron Treads ex' }));
+  assert.equal(res.state.pendingChoice, null);
+  assert.ok(!res.events.some((e) => e.type === 'attackMarkerAdded'));
+});
+
+const stadiumOf = (ownerId) =>
+  createCard({ instanceId: 96, name: 'Some Stadium', supertype: 'Trainer', subtypes: ['Stadium'], type: 'Trainer', ownerId });
+
+test("Desert Geyser: discards the opponent's Stadium and prevents next turn's damage", () => {
+  const b = markerDuel(DESERT_GEYSER, { name: 'Flygon', setup: ({ state }) => (state.stadium = stadiumOf('p2')) });
+  const res = attack(b);
+  assert.equal(res.state.stadium, null);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.name === 'Some Stadium'));
+  const hit = run(res.state, 'p2', 'attack', { attackIndex: 0 }).state;
+  assert.equal(activeNamed(hit, 'Flygon').damage || 0, 0);
+});
+
+test('Desert Geyser: your own Stadium or no Stadium leaves the board alone and earns no marker', () => {
+  for (const setup of [({ state }) => (state.stadium = stadiumOf('p1')), () => {}]) {
+    const res = attack(markerDuel(DESERT_GEYSER, { name: 'Flygon', setup }));
+    assert.ok(!res.events.some((e) => e.type === 'attackMarkerAdded'));
+    const hit = run(res.state, 'p2', 'attack', { attackIndex: 0 }).state;
+    assert.equal(activeNamed(hit, 'Flygon').damage, 100);
+  }
+});

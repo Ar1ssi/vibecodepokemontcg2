@@ -10,7 +10,7 @@
  */
 
 import { parseAbility } from './abilities.mjs';
-import { MARKER_TEMPLATES } from './attack-markers.mjs';
+import { MARKER_TEMPLATES, parseMarkerSentence } from './attack-markers.mjs';
 import {
   attachDiscardToBenchSpread,
   deckMillScaling,
@@ -42,8 +42,10 @@ export function normalizeAttackText(text, selfName = '') {
     .toLowerCase()
     .replace(/pokemon/g, 'pokémon');
   const name = String(selfName || '').trim().toLowerCase();
-  if (name) {
-    out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(name)}(?![\\w'])`, 'g'), 'this pokémon');
+  // "Deoxys Defense Forme" prints its own name as "Deoxys".
+  const names = [name, name.replace(/\s+\S+\s+forme$/, '')].filter((n, i, all) => n && all.indexOf(n) === i);
+  for (const n of names) {
+    out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(n)}(?![\\w'])`, 'g'), 'this pokémon');
   }
   return out
     .replace(/\bthe defending pokémon\b/g, "your opponent's active pokémon")
@@ -58,6 +60,7 @@ const GATES = [
   [/^for each heads, /, { perHeads: true }],
   [/^before doing damage, /, { before: true }],
   [/^after your attack, /, {}],
+  [/^after doing damage, /, {}],
   [/^then, /, {}],
 ];
 
@@ -422,6 +425,17 @@ const BLOCKS = [
     /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at (?:the|that) card you chose, then have your opponent shuffle that card) into their deck\./g,
     (m) => ({ type: 'atkOppHandRandomToDeck', count: countOf(m[1]) }),
   ],
+  // "If you do" after a discard: the marker runs only when the discard happened (design 033).
+  // Iron Treads ex Iron-Clad Roll.
+  [
+    /(?<=^|\. )(?:after doing damage, )?(you may )?discard all ([a-z][a-z' -]*?) from this pokémon\. if you do, ([^.]+)\./g,
+    (m) => chainedMarkerStep({ type: 'atkDiscardSelfTool', toolName: m[2].replace(/s$/, ''), ...(m[1] ? { optional: true } : {}) }, m[3]),
+  ],
+  // Flygon Desert Geyser.
+  [
+    /(?<=^|\. )if your opponent has a stadium in play, discard it\. if you discarded a stadium in this way, ([^.]+)\./g,
+    (m) => chainedMarkerStep({ type: 'atkDiscardStadium', owner: 'opponent' }, m[1]),
+  ],
   // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
   // reveals …" stays unparsed instead of losing its condition.
   [
@@ -453,6 +467,14 @@ function gatedBlock([re, build]) {
 }
 
 const ALL_BLOCKS = [...BLOCKS.map(gatedBlock), SEARCH_ATTACH_BLOCK];
+
+// A step whose follow-up sentence is a timed marker: `then` holds the marker step, or the
+// whole block stays unread when the follow-up is not a marker the templates know.
+function chainedMarkerStep(step, markerSentence) {
+  const wrOrder = /<wr:(before|after)>/.exec(markerSentence)?.[1];
+  const then = parseMarkerSentence(markerSentence.replace(/\s*<wr:(?:before|after)>/g, '').trim(), { wrOrder });
+  return then ? { ...step, then } : null;
+}
 
 // "Your opponent reveals their hand. Discard a Trainer card you find there." →
 // { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
