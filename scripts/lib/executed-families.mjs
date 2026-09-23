@@ -9,8 +9,8 @@
  * S269 (design 031, I118) added the former client-only families back: reveal-hand, immunity,
  * damage-prevention, next-turn-bonus, copy-attack, hp-cap-damage, deferred-damage, retaliate, and the
  * shuffle-cost remainder. immunity and hp-cap-damage change damage amounts only; they are kept on
- * parser coverage and reduce tests. redirect-damage has no printings; look-opponent-deck is still
- * unexecuted (I119).
+ * parser coverage and reduce tests. redirect-damage has no printings. S271 (design 033, I119) added
+ * look-opponent-deck (Inkay, Gothorita) and the last unparsed printings.
  */
 export const EXECUTED_ATTACK_FAMILIES = new Set([
   'flat',
@@ -58,6 +58,7 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
   'deferred-damage',
   'retaliate',
   'shuffle-cost',
+  'look-opponent-deck',
 ]);
 
 /** Partial / heuristic execution — still flagged but lower priority. */
@@ -109,6 +110,13 @@ export const ORACLE_BLIND_FAMILIES = new Map([
   [
     'attack:extra-by-type',
     'only Poliwrath "if the Defending Pokémon is a {D}"; the oracle Defending Pokémon is {W}',
+  ],
+  // Design 031 families, covered by shared/engine/__tests__/attack-markers.test.mjs.
+  ['attack:next-turn-bonus', 'a marker read on the next turn; the oracle runs one attack'],
+  ['attack:deferred-damage', 'the Knock Out comes at the end of the next turn; the oracle runs one attack'],
+  [
+    'attack:hp-cap-damage',
+    'damage counters, not dealt damage: the only change is opp:active+dmg, a base tag',
   ],
   ['ability:retreat-cost', 'passive rule modifier; useAbility rejects it'],
   ['ability:effect-prevent', 'passive rule modifier; useAbility rejects it'],

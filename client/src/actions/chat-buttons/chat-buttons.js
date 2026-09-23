@@ -858,8 +858,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         let energyDiscarded = 0;
         if (rulesState.enabled) {
           const scaling = discardEnergyScaling(atk.text);
-          // Hand-source discards resolve only on the authoritative path.
-          if (scaling && scaling.source !== 'hand') {
+          // Hand-source discards and shuffle-into-deck costs resolve only on the authoritative path.
+          if (scaling && scaling.source !== 'hand' && !scaling.destination) {
             const cap = Math.min(scaling.max, attachedEnergies.length);
             let chosen = 0;
             if (cap > 0) {

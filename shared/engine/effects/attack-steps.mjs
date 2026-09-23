@@ -29,6 +29,7 @@ import {
   markerUntilTurn,
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
+import { discardCurrentStadium } from './trainer.mjs';
 import {
   BENCH_LIMIT,
   activeOf,
@@ -490,6 +491,36 @@ function atkDiscardOppHand(ctx) {
 }
 
 // ── mill ────────────────────────────────────────────────────────────────────
+
+/** Hand Energy cards an `atkDiscardHandEnergy` step may discard. */
+export function handEnergyForDiscard(player, step) {
+  return (player?.zones?.hand || []).filter((card) => energyMatches(card, step));
+}
+
+// Voltage Shoot: discard exactly `count` matching Energy cards from the hand before damage.
+// The attack legality gate refuses the attack when the hand holds fewer.
+function atkDiscardHandEnergy(ctx) {
+  const { player, step } = ctx;
+  const candidates = handEnergyForDiscard(player, step);
+  const count = step.count || 1;
+  if (ctx.selection) {
+    const picked = pickById(candidates, ctx.selection).slice(0, count);
+    if (picked.length < count) return skip(ctx, 'not_enough_energy');
+    discardCards(player, picked, ctx.events);
+    return null;
+  }
+  if (candidates.length < count) return skip(ctx, 'not_enough_energy');
+  if (candidates.length === count) {
+    discardCards(player, candidates, ctx.events);
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${count} ${energyLabel(step)} card${count === 1 ? '' : 's'} to discard from your hand`,
+    options: candidates,
+    min: count,
+    max: count,
+  });
+}
 
 function atkMill(ctx) {
   const { player, opponent, step } = ctx;
@@ -1380,6 +1411,169 @@ function atkAddMarker(ctx) {
   return null;
 }
 
+// The marker a chained discard earns ("If you do, during your opponent's next turn, …").
+function addChainedMarker(ctx) {
+  return atkAddMarker({ ...ctx, step: { ...ctx.step.then, attackName: ctx.step.attackName } });
+}
+
+// Iron Treads ex Iron-Clad Roll: "you may discard all Future Booster Energy Capsules from
+// this Pokémon. If you do, …". No matching Tool, or a declined discard, earns no marker.
+function atkDiscardSelfTool(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const wanted = String(step.toolName || '').toLowerCase();
+  const tools = ref
+    ? attachedCards(player, ref.card.instanceId).filter(
+        (c) => isToolCard(c) && [wanted, `${wanted}s`].includes(String(c.name || '').toLowerCase())
+      )
+    : [];
+  if (tools.length === 0) return skip(ctx, 'no_matching_tool');
+  if (step.optional && !ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Discard ${tools.map((c) => c.name).join(', ')} from ${ref.card.name}?`,
+      options: [
+        { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+        { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  if (step.optional && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
+  discardCards(player, tools, ctx.events);
+  return addChainedMarker(ctx);
+}
+
+// Flygon Desert Geyser: discard the opponent's Stadium; the marker needs that discard.
+function atkDiscardStadium(ctx) {
+  const stadium = ctx.draft.stadium;
+  if (!stadium) return skip(ctx, 'no_stadium');
+  const ownerId = stadium.ownerId || stadium.playerId || null;
+  if (ctx.step.owner === 'opponent' && ownerId !== ctx.opponent?.playerId) return skip(ctx, 'not_opponent_stadium');
+  discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
+  return addChainedMarker(ctx);
+}
+
+// Encore / Amnesia: the opponent's Active can use only (or can't use) the attack picked here
+// during their next turn. One printed attack needs no question.
+function atkLockAttack(ctx) {
+  const { opponent, step } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const attacks = (topPokemonCard(opponent, defender)?.attacks || []).filter((a) => a?.name);
+  const lock = (attack) =>
+    atkAddMarker({
+      ...ctx,
+      step: {
+        attackName: step.attackName,
+        target: 'opponentActive',
+        window: 'opponentNextTurn',
+        marker: { kind: 'attackLock', mode: step.mode, attackName: attack.name },
+      },
+    });
+  if (ctx.selection) {
+    const attack = attacks[Number(ctx.selection[0]) - 1];
+    return attack ? lock(attack) : skip(ctx, 'target_not_found');
+  }
+  if (attacks.length === 0) return skip(ctx, 'no_attacks');
+  if (attacks.length === 1) return lock(attacks[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 of ${defender.name}'s attacks`,
+    options: attacks.map((a, i) => ({ instanceId: i + 1, name: a.name, type: 'option' })),
+    min: 1,
+    max: 1,
+  });
+}
+
+function shuffleHandCardIntoDeck(ctx, owner, card) {
+  moveToZone(owner, card, 'deck', 'hand', ctx.events);
+  shuffleOwnDeck(owner, ctx);
+}
+
+// Unown T Hidden Power: the attacker picks 1 card from the opponent's hand for their deck,
+// then the opponent picks 1 card from the attacker's hand for the attacker's deck. An empty
+// hand skips only its own half.
+function atkHandCardsToDecks(ctx) {
+  const { player, opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const askOwnHand = () => {
+    const hand = player.zones.hand || [];
+    if (hand.length === 0) return skip(ctx, 'empty_hand');
+    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: hand.map(revealedCard) });
+    return ctx.ask({
+      player: opponent.playerId,
+      prompt: `${attackName(ctx)}: Choose 1 card from your opponent's hand to shuffle into their deck`,
+      options: hand,
+      min: 1,
+      max: 1,
+      memo: { ownHand: true },
+    });
+  };
+  if (ctx.selection && ctx.memo?.ownHand) {
+    const card = (player.zones.hand || []).find((c) => c.instanceId === ctx.selection[0]);
+    if (card) shuffleHandCardIntoDeck(ctx, player, card);
+    return null;
+  }
+  if (ctx.selection) {
+    const card = (opponent.zones.hand || []).find((c) => c.instanceId === ctx.selection[0]);
+    if (card) shuffleHandCardIntoDeck(ctx, opponent, card);
+    return askOwnHand();
+  }
+  const oppHand = opponent.zones.hand || [];
+  if (oppHand.length === 0) return askOwnHand();
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 card from your opponent's hand to shuffle into their deck`,
+    options: oppHand,
+    min: 1,
+    max: 1,
+  });
+}
+
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th'];
+
+// Inkay: look at the opponent's top card and may have them shuffle. Gothorita: put the top
+// N back in any order, one pick per position from the top; the last card needs no pick.
+function atkLookOppDeck(ctx) {
+  const { opponent, step } = ctx;
+  const deck = opponent?.zones?.deck || [];
+  const viewed = deck.slice(0, step.count || 1);
+  if (viewed.length === 0) return skip(ctx, 'empty_deck');
+  if (step.offerShuffle) {
+    if (ctx.selection) {
+      if (ctx.selection[0] === ATTACK_YES) shuffleOwnDeck(opponent, ctx);
+      return null;
+    }
+    ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: viewed.length });
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: The top card of your opponent's deck is ${viewed.map((c) => c.name).join(', ')}. Have your opponent shuffle their deck?`,
+      options: [
+        { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+        { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  const order = [...(ctx.memo?.order || []), ...(ctx.selection || []).slice(0, 1)].filter((id) =>
+    viewed.some((c) => c.instanceId === id)
+  );
+  const remaining = viewed.filter((c) => !order.includes(c.instanceId));
+  if (!ctx.selection) ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: viewed.length });
+  if (remaining.length > 1) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the card to put ${ORDINALS[order.length] || `${order.length + 1}th`} from the top of your opponent's deck`,
+      options: remaining,
+      min: 1,
+      max: 1,
+      memo: { order },
+    });
+  }
+  const ordered = [...order.map((id) => viewed.find((c) => c.instanceId === id)), ...remaining];
+  deck.splice(0, viewed.length, ...ordered);
+  ctx.events.push({ type: 'deckReordered', playerId: opponent.playerId, count: ordered.length });
+  return null;
+}
+
 export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
@@ -1388,6 +1582,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardOppTools: optional(atkDiscardOppTools, () => "Discard Pokémon Tools from your opponent's Pokémon"),
   atkDiscardOppHand: optional(atkDiscardOppHand, () => "Discard from your opponent's hand"),
+  atkDiscardHandEnergy,
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
@@ -1421,4 +1616,9 @@ export const ATTACK_STEP_HANDLERS = {
   atkBounceOppActive,
   atkHealEach,
   atkAddMarker,
+  atkDiscardSelfTool,
+  atkDiscardStadium,
+  atkLockAttack,
+  atkHandCardsToDecks,
+  atkLookOppDeck,
 };

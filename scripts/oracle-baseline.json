@@ -203,7 +203,7 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 608
+      "observed": 577
     },
     "attack:coin-flip": {
       "n": 429,
@@ -211,7 +211,7 @@
     },
     "attack:conditional-damage": {
       "n": 741,
-      "observed": 160
+      "observed": 155
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -219,11 +219,11 @@
     },
     "attack:copy-attack": {
       "n": 34,
-      "observed": 0
+      "observed": 1
     },
     "attack:damage-prevention": {
       "n": 174,
-      "observed": 1
+      "observed": 4
     },
     "attack:deferred-damage": {
       "n": 3,
@@ -239,11 +239,11 @@
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 409
+      "observed": 411
     },
     "attack:discard-opponent": {
       "n": 151,
-      "observed": 96
+      "observed": 98
     },
     "attack:draw-attach": {
       "n": 321,
@@ -275,7 +275,7 @@
     },
     "attack:immunity": {
       "n": 243,
-      "observed": 11
+      "observed": 12
     },
     "attack:look-any-deck": {
       "n": 5,
@@ -299,7 +299,7 @@
     },
     "attack:move-energy": {
       "n": 135,
-      "observed": 86
+      "observed": 89
     },
     "attack:multi-target": {
       "n": 165,
@@ -315,7 +315,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 433
+      "observed": 439
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -351,7 +351,7 @@
     },
     "attack:reveal-hand": {
       "n": 44,
-      "observed": 1
+      "observed": 34
     },
     "attack:search-deck": {
       "n": 227,
@@ -367,7 +367,7 @@
     },
     "attack:shuffle-cost": {
       "n": 46,
-      "observed": 24
+      "observed": 46
     },
     "attack:status-asleep": {
       "n": 135,
@@ -395,7 +395,7 @@
     },
     "attack:switch": {
       "n": 147,
-      "observed": 138
+      "observed": 139
     },
     "attack:unknown": {
       "n": 1437,

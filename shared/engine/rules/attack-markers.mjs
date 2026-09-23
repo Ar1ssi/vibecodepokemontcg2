@@ -230,6 +230,17 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m) => ({ kind: 'nextTurnBonus', amount: Number(m[2]), attackName: m[1] }),
   ],
+  // Metang: "During your next turn, Extra Comet Punch does 30 damage plus 30 more damage."
+  [
+    /^(?!this attack\b)([a-z][a-z' -]*?) does \d+ damage plus (\d+) more damage$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBonus', amount: Number(m[2]), attackName: m[1] }),
+  ],
+  // Vespiquen Mach Wind: read by the Retreat cost while the Pokémon is Active. The
+  // possessive self name stays in place ("vespiquen's"); an apostrophe-free name excludes
+  // "your opponent's active pokémon's".
+  [/^(?:this pokémon|[a-z .-]+)'s retreat cost is 0$/, 'self', 'yourNextTurn', () => ({ kind: 'freeRetreat' })],
   // "Deoxys's attacks": the parser leaves a possessive self name in place.
   [
     /^(?:attacks used by this pokémon do|each of this pokémon's attacks does|[^,]+'s attacks do) (\d+) more damage(?: to your opponent's active pokémon)?$/,

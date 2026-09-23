@@ -10,7 +10,7 @@
  */
 
 import { parseAbility } from './abilities.mjs';
-import { MARKER_TEMPLATES } from './attack-markers.mjs';
+import { MARKER_TEMPLATES, parseMarkerSentence } from './attack-markers.mjs';
 import {
   attachDiscardToBenchSpread,
   deckMillScaling,
@@ -42,8 +42,10 @@ export function normalizeAttackText(text, selfName = '') {
     .toLowerCase()
     .replace(/pokemon/g, 'pokémon');
   const name = String(selfName || '').trim().toLowerCase();
-  // A LV.X card prints its name without the suffix ("Charizard G LV.X": "attached to Charizard G").
-  for (const printed of new Set([name, name.replace(/ lv\.x$/, '')])) {
+  // A card may print its own name short: "Charizard G LV.X" as "Charizard G",
+  // "Deoxys Defense Forme" as "Deoxys".
+  const shortNames = [name.replace(/ lv\.x$/, ''), name.replace(/\s+\S+\s+forme$/, '')];
+  for (const printed of new Set([name, ...shortNames])) {
     if (!printed) continue;
     out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(printed)}(?![\\w'])`, 'g'), 'this pokémon');
   }
@@ -60,6 +62,7 @@ const GATES = [
   [/^for each heads, /, { perHeads: true }],
   [/^before doing damage, /, { before: true }],
   [/^after your attack, /, {}],
+  [/^after doing damage, /, {}],
   [/^then, /, {}],
 ];
 
@@ -203,6 +206,14 @@ const TEMPLATES = [
   [
     /^your opponent discards (an?|\d+) cards? from their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
+  ],
+
+  // Raichu LV.X Voltage Shoot: the hand discard pays for the chosen-target damage, so it
+  // runs before damage and the attack is refused without the cards (handEnergyDiscardCost).
+  // "Discard … from your hand. If you do, …" (Flare Bonus) is conditional and stays unread.
+  [
+    new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand and choose 1 of your opponent's pokémon$`),
+    (m, s) => ({ type: 'atkDiscardHandEnergy', count: countOf(m[1]), ...energyFilter(m[2], s), beforeDamage: true }),
   ],
 
   // Mill (the "for each card discarded" forms are deckMillScaling's; see parseAttackSteps)
@@ -530,6 +541,37 @@ const BLOCKS = [
     /if your opponent's active pokémon has any energy cards attached to it, flip a coin\. if heads, choose 1 of those energy cards and move it to 1 of your opponent's benched pokémon\.(?: if your opponent has no benched pokémon, ignore this effect\.)?/g,
     () => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, gate: 'heads' }),
   ],
+  // "If you do" after a discard: the marker runs only when the discard happened (design 033).
+  // Iron Treads ex Iron-Clad Roll.
+  [
+    /(?<=^|\. )(?:after doing damage, )?(you may )?discard all ([a-z][a-z' -]*?) from this pokémon\. if you do, ([^.]+)\./g,
+    (m) => chainedMarkerStep({ type: 'atkDiscardSelfTool', toolName: m[2].replace(/s$/, ''), ...(m[1] ? { optional: true } : {}) }, m[3]),
+  ],
+  // Flygon Desert Geyser.
+  [
+    /(?<=^|\. )if your opponent has a stadium in play, discard it\. if you discarded a stadium in this way, ([^.]+)\./g,
+    (m) => chainedMarkerStep({ type: 'atkDiscardStadium', owner: 'opponent' }, m[1]),
+  ],
+  // Mime Jr. Encore ("can use only") / Unown Amnesia ("can't use"): an attack lock marker on
+  // the opponent's Active, read by the attack legality gate.
+  [
+    /choose 1 of your opponent's active pokémon's attacks\. (?:during your opponent's next turn, that pokémon (can't use|can use only) that attack|that pokémon (can't use|can use only) that attack during your opponent's next turn)\./g,
+    (m) => ({ type: 'atkLockAttack', mode: (m[1] || m[2]) === "can't use" ? 'except' : 'only' }),
+  ],
+  // Unown T Hidden Power: each player loses 1 hand card to their deck, picked by the other.
+  [
+    /look at your opponent's hand and choose 1 card, then have your opponent shuffle that card into their deck\. then, show your opponent your hand and (?:they choose|he or she chooses) 1 card\. shuffle that card into your deck\./g,
+    () => ({ type: 'atkHandCardsToDecks' }),
+  ],
+  // Inkay Mischievous Tentacles / Gothorita Fortunate Eye.
+  [
+    /look at the top card of your opponent's deck\. you may have your opponent shuffle their deck\./g,
+    () => ({ type: 'atkLookOppDeck', count: 1, offerShuffle: true }),
+  ],
+  [
+    /look at the top (\d+) cards of your opponent's deck and put them back in any order\./g,
+    (m) => ({ type: 'atkLookOppDeck', count: Number(m[1]), reorder: true }),
+  ],
   // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
   // reveals …" stays unparsed instead of losing its condition.
   [
@@ -561,6 +603,14 @@ function gatedBlock([re, build]) {
 }
 
 const ALL_BLOCKS = [...BLOCKS.map(gatedBlock), SEARCH_ATTACH_BLOCK];
+
+// A step whose follow-up sentence is a timed marker: `then` holds the marker step, or the
+// whole block stays unread when the follow-up is not a marker the templates know.
+function chainedMarkerStep(step, markerSentence) {
+  const wrOrder = /<wr:(before|after)>/.exec(markerSentence)?.[1];
+  const then = parseMarkerSentence(markerSentence.replace(/\s*<wr:(?:before|after)>/g, '').trim(), { wrOrder });
+  return then ? { ...step, then } : null;
+}
 
 // "Your opponent reveals their hand. Discard a Trainer card you find there." →
 // { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
@@ -750,7 +800,8 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       if (step.type === 'atkMill' && millHandled) break;
       if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
       const { before, ...stepFlags } = flags;
-      (before ? result.before : result.after).push({ ...step, ...stepFlags });
+      const { beforeDamage, ...built } = step;
+      (before || beforeDamage ? result.before : result.after).push({ ...built, ...stepFlags });
       break;
     }
   }

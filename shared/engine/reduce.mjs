@@ -39,6 +39,7 @@ import {
   isGxAttack,
   discardEnergyScaling,
   deckMillScaling,
+  deckRevealScaling,
   attachDiscardToBenchSpread,
   returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
@@ -69,6 +70,7 @@ import {
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
+import { handEnergyForDiscard } from './effects/attack-steps.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
 import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
 import {
@@ -691,6 +693,8 @@ function cardEffectiveHp(state, card, playerId) {
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
 function computeEffectiveRetreatCost(state, card, playerId) {
   if (!card) return 0;
+  // Vespiquen Mach Wind (design 033): the Retreat Cost is 0 during the next turn.
+  if (activeAttackMarkers(state, playerId, card).some((m) => m.kind === 'freeRetreat')) return 0;
   const player = state.players?.[playerId];
   const activeZone = player?.zones?.active || [];
   const stadium = state.stadium;
@@ -2428,8 +2432,28 @@ export function validateLegality(state, command) {
           };
         }
       }
+      // Encore / Amnesia (design 033): attack locks the opponent put on this Pokémon.
+      const chosenName = String(attack?.name || '').toLowerCase();
+      for (const lock of activeAttackMarkers(state, playerId, active).filter((m) => m.kind === 'attackLock')) {
+        const lockedName = String(lock.attackName || '').toLowerCase();
+        if (lock.mode === 'only' && chosenName !== lockedName) {
+          return { allowed: false, reason: `This Pokémon can use only ${lock.attackName} during this turn.` };
+        }
+        if (lock.mode === 'except' && chosenName === lockedName) {
+          return { allowed: false, reason: `This Pokémon can't use ${lock.attackName} during this turn.` };
+        }
+      }
       if (!attackCostPayable(state, playerId, active, attack)) {
         return { allowed: false, reason: 'Not enough energy attached.' };
+      }
+      const handCost = parseAttackSteps(attack?.text, { selfName: active.name }).before.find(
+        (step) => step.type === 'atkDiscardHandEnergy'
+      );
+      if (handCost && handEnergyForDiscard(player, handCost).length < (handCost.count || 1)) {
+        return {
+          allowed: false,
+          reason: `You need ${handCost.count || 1} ${handCost.energyType ? `{${handCost.energyType}} ` : ''}Energy card(s) in your hand to discard.`,
+        };
       }
       return { allowed: true };
     }
@@ -2945,7 +2969,8 @@ function discardScalingCandidates(draft, { playerId, attacker, scaling }) {
  * Discards the chosen attached Energy for a discard-to-scale attack and returns
  * how many were actually discarded (ids outside `allowedIds` are ignored).
  */
-function discardScalingEnergy(draft, { playerId, selection, allowedIds, events }) {
+// `destination: 'deck'` (Rocket Splash) shuffles the chosen Energy into the deck instead.
+function discardScalingEnergy(draft, { playerId, selection, allowedIds, destination, activeRng, events }) {
   const player = draft.players[playerId];
   let discarded = 0;
   for (const id of new Set(selection || [])) {
@@ -2957,18 +2982,43 @@ function discardScalingEnergy(draft, { playerId, selection, allowedIds, events }
     if (idx < 0) continue;
     const [card] = zone.splice(idx, 1);
     card.attachedTo = null;
-    const to = discardCardToPlayerZone(player, card);
+    let to = 'deck';
+    if (destination === 'deck') player.zones.deck.push(card);
+    else to = discardCardToPlayerZone(player, card);
     events.push({
       type: 'cardMoved',
       instanceId: id,
       from: ref.zoneId,
       to,
       playerId,
-      reason: 'attack-energy-discard',
+      reason: destination === 'deck' ? 'attack-energy-shuffle' : 'attack-energy-discard',
     });
     discarded++;
   }
+  if (destination === 'deck' && discarded > 0) {
+    shuffleDeckWithRng(player, activeRng);
+    events.push({ type: 'deckShuffled', playerId });
+  }
   return discarded;
+}
+
+/**
+ * Reveals the top `reveal.count` cards of the attacker's deck, counts the printed kind,
+ * and shuffles the deck. Returns the count (0 for an empty deck).
+ */
+function revealDeckTopForAttack(draft, { playerId, reveal, activeRng, events }) {
+  const player = draft.players[playerId];
+  const revealed = (player?.zones?.deck || []).slice(0, reveal.count);
+  if (revealed.length === 0) return 0;
+  events.push({
+    type: 'cardsRevealed',
+    playerId,
+    cards: revealed.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+  });
+  const matches = revealed.filter((c) => millFilterMatches(c, reveal.filter)).length;
+  shuffleDeckWithRng(player, activeRng);
+  events.push({ type: 'deckShuffled', playerId });
+  return matches;
 }
 
 /** True when a discarded deck card is the kind a deck-mill attack counts. */
@@ -3154,6 +3204,7 @@ function attackResumeContext(draft, token, { activeRng, events }) {
     headsCount,
     flips,
     milledMatches: token.milledMatches,
+    revealedMatches: token.revealedMatches,
     copiedAttack: token.copiedAttack || null,
   };
 }
@@ -3573,6 +3624,15 @@ function resolveAttackEffectPhase(draft, ctx) {
     milledMatches = milledIds.length;
   }
 
+  // Deck reveal (Swampert-EX Mud Flood): reveal the top cards, count the printed kind,
+  // shuffle them back. Resume tokens carry the count so a later prompt never re-reveals.
+  let revealedMatches = ctx.revealedMatches;
+  const deckReveal = deckRevealScaling(attack?.text);
+  if (deckReveal && revealedMatches === undefined) {
+    revealedMatches = revealDeckTopForAttack(draft, { playerId, reveal: deckReveal, activeRng, events });
+  }
+  if (revealedMatches !== undefined) resumeBase.revealedMatches = revealedMatches;
+
   // Discard-to-scale: the player picks which Energy to discard before damage.
   let energyDiscarded = ctx.energyDiscarded;
   const discardScaling = discardEnergyScaling(attack?.text);
@@ -3587,7 +3647,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       draft.pendingChoice = createPendingChoice({
         player: playerId,
         source: 'attack',
-        prompt: `${attack.name}: choose Energy to discard (${attack.damage || 0} damage each).`,
+        prompt:
+          discardScaling.destination === 'deck'
+            ? `${attack.name}: choose Energy to shuffle into your deck (${parseInt(attack.damage, 10) || 0} damage each).`
+            : `${attack.name}: choose Energy to discard (${attack.damage || 0} damage each).`,
         options: candidates.map((c) => ({
           instanceId: c.instanceId,
           name: c.name,
@@ -3601,6 +3664,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           effectType: 'attackDiscardScale',
           allowedIds: candidates.map((c) => c.instanceId),
           milledMatches,
+          ...(discardScaling.destination ? { destination: discardScaling.destination } : {}),
         },
       });
       return;
@@ -3703,6 +3767,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           milledMatches,
           energyReturned,
           lostZoned,
+          revealedMatches,
         })
       );
       const effectiveAttack =
@@ -4343,7 +4408,7 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               source: 'attack',
               prompt: distributable
                 ? `${attack.name}: Place a damage counter (${required} left)`
-                : `${attack.name}: Choose ${attackTarget.count > 1 ? `${attackTarget.count} ` : ''}of your opponent's Pokémon to take damage`,
+                : `${attack.name}: Choose ${attackTarget.count} of your opponent's Pokémon to take damage`,
               options: candidates,
               min: distributable ? 1 : attackTarget.count,
               max: distributable ? 1 : attackTarget.count,
@@ -5557,6 +5622,8 @@ export function applyCommand(state, command, rng = null) {
             playerId: initiatorPlayerId,
             selection: payload.selection,
             allowedIds: token.allowedIds || [],
+            destination: token.destination,
+            activeRng,
             events,
           });
           resolveAttackEffectPhase(draft, { ...resumeCtx, energyDiscarded });

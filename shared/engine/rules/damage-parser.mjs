@@ -182,11 +182,18 @@ export function parseAttackDamage(
     else total = mill.perUnit * counted;
     components.push('per-milled');
     notes.push(`${mill.perUnit} × ${counted} discarded from the deck`);
+  } else if (text && deckRevealScaling(attack?.text)) {
+    // Swampert-EX Mud Flood: the reducer reveals the top cards and counts the kind.
+    const reveal = deckRevealScaling(attack.text);
+    const counted = ctx.revealedMatches ?? 0;
+    total = base + reveal.perUnit * counted;
+    components.push('per-revealed');
+    notes.push(`${reveal.perUnit} × ${counted} revealed from the deck`);
   } else if (text && discardEnergyScaling(attack?.text)) {
     const discarded = ctx.energyDiscarded ?? 0;
     // "does N more damage for each card" (Mega Clefable ex) adds to the base;
     // "does N damage for each card" (Inferno X) replaces it.
-    const more = /(\d+) more damage for each (?:energy )?card you discard/.exec(text);
+    const more = /(\d+) more damage for each (?:energy )?card you (?:discard|shuffle)/.exec(text);
     // TCGdex prints "+" attacks as strings ("50+"), which leave `base` at 0.
     const printed = base || parseInt(String(attack?.damage ?? ''), 10) || 0;
     total = more ? printed + parseInt(more[1], 10) * discarded : printed * discarded;
@@ -1024,6 +1031,20 @@ export function ownBenchDamage(attackText) {
 // text names the Bench, otherwise 'any' (Active or Bench). Pure.
 export function attackTargetClause(attackText) {
   const t = String(attackText || '');
+  // Older wording (Raichu LV.X Voltage Shoot): "choose 1 of your opponent's Pokémon. This
+  // attack does 80 to that Pokémon."
+  const chosen =
+    /choose (\d+) of your opponent's (benched )?pok[ée]mon\. this attack does (\d+)(?: damage)? to that pok[ée]mon/i.exec(
+      t.replace(/\s+/g, ' ')
+    );
+  if (chosen) {
+    return {
+      kind: 'damage',
+      amount: Math.max(0, parseInt(chosen[3], 10) || 0),
+      count: Math.max(1, parseInt(chosen[1], 10) || 1),
+      scope: chosen[2] ? 'bench' : 'any',
+    };
+  }
   const m = /does (\d+) damage to (\d+) of your opponent's (benched )?pok[ée]mon/i.exec(
     t
   );
@@ -1070,12 +1091,15 @@ const discardSourceOf = (from) => {
 
 export function discardEnergyScaling(attackText) {
   const text = String(attackText || '');
-  if (!/for each (?:energy )?card you discard(ed)?/i.test(text)) return null;
+  // Blastoise-GX Rocket Splash shuffles the Energy into the deck instead ("for each card
+  // you shuffled into your deck in this way"): destination 'deck'.
+  const shuffled = /for each (?:energy )?card you shuffled into your deck/i.test(text);
+  if (!shuffled && !/for each (?:energy )?card you discard(ed)?/i.test(text)) return null;
 
-  const counted =
-    /discard\s+(?:up\s+to\s+(\d+)|(\d+)|(any\s+(?:amount|number)\s+of))?\s*(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon|your\s+hand)/i.exec(
-      text
-    );
+  const counted = new RegExp(
+    String.raw`${shuffled ? 'shuffle' : 'discard'}\s+(?:up\s+to\s+(\d+)|(\d+)|(any\s+(?:amount|number)\s+of))?\s*(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon|your\s+hand)`,
+    'i'
+  ).exec(text);
   if (counted) {
     const [, upTo, exact, anyAmount, basic, symbol, from] = counted;
     let max = 1;
@@ -1086,8 +1110,10 @@ export function discardEnergyScaling(attackText) {
       source: discardSourceOf(from),
       energyType: energyTypeOf(symbol),
       basicOnly: Boolean(basic),
+      ...(shuffled ? { destination: 'deck' } : {}),
     };
   }
+  if (shuffled) return null;
 
   // Groudon ex: "discard from your hand as many Energy cards as you like".
   const fromHand =
@@ -1186,23 +1212,7 @@ export function deckMillScaling(attackText) {
   const counted = lookAndChoose
     ? /discard any number of (\w[^.]*?) you find there/i.exec(text)?.[1] || 'card'
     : each[1];
-  const kind = counted.replace(/\s+cards?$/i, '').trim();
-  let filter = { kind: 'name', energyType: null, basicOnly: false, name: kind };
-  if (/^card$/i.test(counted.trim()) || kind === '') {
-    filter = { kind: 'any', energyType: null, basicOnly: false, name: null };
-  } else if (/energy/i.test(kind)) {
-    const symbol = /\{([A-Z])\}/.exec(kind);
-    filter = {
-      kind: 'energy',
-      energyType: energyTypeOf(symbol?.[1]),
-      basicOnly: /basic/i.test(kind),
-      name: null,
-    };
-  } else if (/supporter/i.test(kind)) {
-    filter = { kind: 'supporter', energyType: null, basicOnly: false, name: null };
-  } else if (/^pok[ée]mon$/i.test(kind)) {
-    filter = { kind: 'pokemon', energyType: null, basicOnly: false, name: null };
-  }
+  const filter = countedKindFilter(counted);
 
   const plus = /(\d+) damage plus (\d+) more damage for each/i.exec(text);
   const more = /(\d+) more damage for each/i.exec(text);
@@ -1221,6 +1231,39 @@ export function deckMillScaling(attackText) {
     attachMatched: /then,? attach those/i.test(text),
     lookAndChoose,
   };
+}
+
+// The printed kind a deck scaling counts ("{W} Energy", "Supporter cards", "Unown") as
+// { kind: 'any'|'energy'|'supporter'|'pokemon'|'name', energyType, basicOnly, name }.
+function countedKindFilter(counted) {
+  const kind = counted.replace(/\s+cards?$/i, '').trim();
+  if (/^card$/i.test(counted.trim()) || kind === '') {
+    return { kind: 'any', energyType: null, basicOnly: false, name: null };
+  }
+  if (/energy/i.test(kind)) {
+    const symbol = /\{([A-Z])\}/i.exec(kind);
+    return {
+      kind: 'energy',
+      energyType: energyTypeOf(symbol?.[1]),
+      basicOnly: /basic/i.test(kind),
+      name: null,
+    };
+  }
+  if (/supporter/i.test(kind)) return { kind: 'supporter', energyType: null, basicOnly: false, name: null };
+  if (/^pok[ée]mon$/i.test(kind)) return { kind: 'pokemon', energyType: null, basicOnly: false, name: null };
+  return { kind: 'name', energyType: null, basicOnly: false, name: kind };
+}
+
+// Swampert-EX Mud Flood: "Reveal the top 4 cards of your deck. This attack does 40 more
+// damage for each {W} Energy you find there. Shuffle the revealed cards back into your
+// deck." Returns null, or { count, perUnit, filter } (filter as deckMillScaling's). Pure.
+export function deckRevealScaling(attackText) {
+  const m =
+    /reveal the top (\d+) cards of your deck\. this attack does (\d+) more damage for each ([^.]+?) you find there\. shuffle the revealed cards back into your deck/i.exec(
+      String(attackText || '').replace(/\s+/g, ' ')
+    );
+  if (!m) return null;
+  return { count: parseInt(m[1], 10), perUnit: parseInt(m[2], 10), filter: countedKindFilter(m[3]) };
 }
 
 // Parse "Attach up to N Basic {T} Energy cards from your discard pile to your Benched

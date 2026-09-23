@@ -18,8 +18,8 @@ recoil). Reading the reducer turned up three live bugs on the same attacks:
 - Design 030 pipeline: anchored sentence templates (`rules/attack-steps.mjs`) → handlers
   (`effects/attack-steps.mjs`) → resumable `executeSteps`. Helpers stand down for a clause the
   steps own (D107). KOs from handlers go out as `knockOutMarked` events.
-- Timed effects are `card.attackMarkers` (D108). Copy attacks pick their attack before the
-  coins (D109).
+- Timed effects are `card.attackMarkers` (D109). Copy attacks pick their attack before the
+  coins (D110).
 - Randomness only through `activeRng`. Legacy client path out of scope (policy).
 - A missing effect is safer than a wrong one: a sentence with an unsure reading stays unparsed.
 
@@ -42,10 +42,10 @@ recoil). Reading the reducer turned up three live bugs on the same attacks:
    until tails (cap 20) and returns `coin: null, headsCount`. **Pick B**: damage "for each
    heads" and step scaling both read `headsCount`, so one fix covers both.
 3. Opponent-coin markers (Smokescreen Shot, G-Max Cuddle, Strong-Willed). A: new flags on
-   the card. B: new marker kinds in `attackMarkers` (D108). **Pick B**.
+   the card. B: new marker kinds in `attackMarkers` (D109). **Pick B**.
 4. Gated copy (Togetic Mini-Metronome). A: flip in the attack command before the copy
    choice; on tails the attack is used and does nothing. B: skip. **Pick A**. The flip is the
-   attack's own flip (D109 order holds: the copy is still picked before its coins).
+   attack's own flip (D110 order holds: the copy is still picked before its coins).
 
 ## Design
 New and extended step kinds (all take the usual `gate` / `perHeads` / `optional` flags):
