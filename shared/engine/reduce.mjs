@@ -4058,8 +4058,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       }
 
       // Attack effects: draw cards (e.g. Collect). "Discard your hand and draw N" is the
-      // discardHandThenDraw step's (Raging Bolt ex Burst Roar).
-      const drawN = attackSteps.printed.has('discardHandThenDraw') ? 0 : drawCount(attack);
+      // discardHandThenDraw step's (Raging Bolt ex Burst Roar); a printed draw sentence is the
+      // atkDraw step's, which keeps its coin gate ("If heads, draw a card").
+      const drawN =
+        attackSteps.printed.has('discardHandThenDraw') || attackSteps.printed.has('atkDraw') ? 0 : drawCount(attack);
       if (drawN > 0) {
         const deck = attackerPlayer?.zones?.deck || [];
         const hand = attackerPlayer?.zones?.hand || [];

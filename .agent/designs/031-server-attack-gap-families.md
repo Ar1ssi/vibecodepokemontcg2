@@ -101,7 +101,7 @@ Steps (new handlers in `effects/attack-steps.mjs`, templates in `rules/attack-st
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Text matches no template | Family stays client-only, audit still flags it; no partial effect | [x] attack-copy.test (Encore, coin-gated reveal stay unparsed) |
+| 1 | Text matches no template | Family stays client-only, audit still flags it; no partial effect | [x] attack-copy.test (Encore stays unparsed); attack-reveal-hand.test ("if you do" reveal) |
 | 2 | Malformed numbers / unknown filter | Parser returns null, no marker | [x] attack-markers.test parser cases |
 | 3 | Reduction bigger than damage | Damage floors at 0, no negative | [x] not separately tested (computeAttackDamage floors totals at 0) |
 | 4 | Two markers of same kind stack | Reductions add; preventions OR | [x] not separately tested (markers are summed/OR-ed in computeAttackDamage) |
@@ -151,8 +151,13 @@ the branch commits.
 - Window rewrites fold the retaliate condition into the body. Retaliate fires only for main
   attack damage to the Active; in 'attack' mode it hits the current opponent Active. Deferred KO
   runs before the Checkup condition pass. HP-cap 'opponentAny' offers only Pokémon above the cap.
-- "Draw up to 5" draws the full 5. Reveal parsing is sentence-initial only, so coin-gated reveals
-  stay unparsed. Hand Energy scaling excludes Trainers named "Energy". Reveal events come after
+- "Draw up to N" asks how many with Draw 1..N option tiles (capped at the deck size; the user
+  chose 1..N, no 0). Every printed draw sentence is now an `atkDraw` step and the attack-phase
+  `drawCount` stands down, so "If heads, draw a card" (Quick Draw) keeps its coin gate.
+- Multi-sentence blocks take a sentence-start coin gate (if heads / if tails / for each heads)
+  onto their step; reveals still need a sentence start, so "if you do, your opponent reveals"
+  stays unparsed. "Choose 1 card … without looking and discard it" is a random hand discard
+  (Shakedown, Drain Wash, Enrage). Hand Energy scaling excludes Trainers named "Energy". Reveal events come after
   damage (the steps run in `after`).
 - Struck: redirect-damage (0 printings). look-opponent-deck was struck as 0 printings, but that
   count came from the local corpus; live TCGdex has 3 (Inkay, Gothorita x2), deferred to I119.

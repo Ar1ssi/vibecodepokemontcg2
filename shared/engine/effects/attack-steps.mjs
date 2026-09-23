@@ -756,12 +756,27 @@ function atkShuffleHandIntoDeck(ctx) {
   return null;
 }
 
-// "Draw up to 5 cards" draws the full count (the deck permitting); "a number of cards equal
-// to the number of cards in your opponent's hand" reads that hand when the step runs.
+// "Draw up to 5 cards" asks how many (one button per count, 1 to the most the deck allows);
+// "a number of cards equal to the number of cards in your opponent's hand" reads that hand
+// when the step runs.
 function atkDraw(ctx) {
   const { player, step } = ctx;
-  const count = step.countFrom === 'opponentHand' ? ctx.opponent?.zones?.hand?.length || 0 : step.count || 0;
   const deck = player.zones.deck;
+  if (step.upTo && !ctx.selection) {
+    const most = Math.min(step.count || 0, deck.length);
+    if (most === 0) return skip(ctx, 'nothing_to_draw');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: How many cards do you want to draw?`,
+      options: Array.from({ length: most }, (_, i) => ({ instanceId: i + 1, name: `Draw ${i + 1}`, type: 'option' })),
+      min: 1,
+      max: 1,
+    });
+  }
+  const count = step.upTo
+    ? Math.min(Number(ctx.selection[0]) || 0, step.count || 0)
+    : step.countFrom === 'opponentHand'
+      ? ctx.opponent?.zones?.hand?.length || 0
+      : step.count || 0;
   const drawn = deck.splice(0, Math.min(count, deck.length));
   if (drawn.length === 0) return skip(ctx, 'nothing_to_draw');
   player.zones.hand.push(...drawn);

@@ -120,7 +120,7 @@ test('parseAttackSteps: shuffle-cost wordings', () => {
   );
   assert.deepEqual(steps('Shuffle your hand into your deck. Draw up to 5 cards.'), [
     { type: 'atkShuffleHandIntoDeck' },
-    { type: 'atkDraw', count: 5 },
+    { type: 'atkDraw', count: 5, upTo: true },
   ]);
   assert.deepEqual(
     steps("Choose 2 random cards from your opponent's hand. Your opponent reveals those cards and shuffles them into their deck."),
@@ -255,13 +255,99 @@ test('attack: Hexed Mirror shuffles the hand away and draws as many as the oppon
   assert.equal(zone(res, 'p1', 'deck').length, 8);
 });
 
-test('attack: Scattered Shower draws 5 after shuffling the hand in', () => {
+test('attack: Scattered Shower offers Draw 1-5 buttons and draws the chosen count', () => {
   const b = board('Shuffle your hand into your deck. Draw up to 5 cards.', {
     setup: ({ p1 }) => p1.zones.hand.push(item('Mine 1')),
   });
+  const res1 = attack(b);
+  assert.equal(res1.state.pendingChoice.player, 'p1');
+  assert.deepEqual(
+    res1.state.pendingChoice.options.map((o) => o.name),
+    ['Draw 1', 'Draw 2', 'Draw 3', 'Draw 4', 'Draw 5']
+  );
+  assert.equal(zone(res1, 'p1', 'hand').length, 0, 'the hand is shuffled in before the choice');
+  const res2 = choose(res1, [3], b.rng);
+  assert.equal(zone(res2, 'p1', 'hand').length, 3);
+  assert.equal(zone(res2, 'p1', 'deck').length, 8);
+  assert.equal(res2.state.turn.player, 'p2');
+});
+
+test('attack: "draw up to 5" offers only as many buttons as the deck has cards', () => {
+  const b = board('Draw up to 5 cards.', { setup: ({ p1 }) => p1.zones.deck.splice(2) });
+  const res1 = attack(b);
+  assert.deepEqual(res1.state.pendingChoice.options.map((o) => o.name), ['Draw 1', 'Draw 2']);
+});
+
+test('attack: "draw up to 5" with an empty deck asks nothing', () => {
+  const b = board('Draw up to 5 cards.', { setup: ({ p1 }) => p1.zones.deck.splice(0) });
   const res = attack(b);
-  assert.equal(zone(res, 'p1', 'hand').length, 5);
-  assert.equal(zone(res, 'p1', 'deck').length, 6);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(zone(res, 'p1', 'hand').length, 0);
+});
+
+// ── coin-gated clauses ──────────────────────────────────────────────────────
+
+test('parseAttackSteps: coin gates on hand clauses and multi-sentence blocks', () => {
+  const after = (text) => parseAttackSteps(text).after;
+  assert.deepEqual(after('Flip a coin. If heads, your opponent reveals their hand.'), [
+    { type: 'atkRevealOppHand', gate: 'heads' },
+  ]);
+  assert.deepEqual(after('Flip a coin. If tails, your opponent reveals their hand. Discard a card you find there.'), [
+    { type: 'atkRevealOppHand', then: { action: 'discard', count: 1 }, gate: 'tails' },
+  ]);
+  assert.deepEqual(after('Discard an Energy from this Pokémon. If you do, your opponent reveals their hand.'), []);
+  assert.deepEqual(
+    after(
+      "Flip a coin. If heads, choose 1 card from your opponent's hand without looking. Look at that card you chose, then have your opponent shuffle that card into his or her deck."
+    ),
+    [{ type: 'atkOppHandRandomToDeck', count: 1, gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after("Flip a coin. If heads, choose 1 card from your opponent's hand without looking and discard it."),
+    [{ type: 'atkDiscardOppHand', random: true, count: 1, gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after(
+      "Flip a coin until you get tails. For each heads, choose 1 card from your opponent's hand without looking and discard it."
+    ),
+    [{ type: 'atkDiscardOppHand', random: true, count: 1, perHeads: true }]
+  );
+  assert.deepEqual(after('Flip a coin. If heads, draw a card.'), [{ type: 'atkDraw', count: 1, gate: 'heads' }]);
+  assert.deepEqual(after('Flip a coin until you get tails. For each heads, draw 2 cards.'), [
+    { type: 'atkDraw', count: 2, perHeads: true },
+  ]);
+});
+
+test('attack: a coin-gated reveal happens only on its face', () => {
+  const text = 'Flip a coin. If heads, your opponent reveals their hand.';
+  for (let seed = 1; seed <= 8; seed++) {
+    const res = attack(board(text, { seed, setup: handSetup(item('A')) }));
+    const flip = res.events.find((e) => e.type === 'attackCoinFlipped');
+    const revealed = res.events.some((e) => e.type === 'cardsRevealed');
+    assert.equal(revealed, flip.coin === 'heads', `seed ${seed}`);
+  }
+});
+
+test('attack: Quick Draw draws only on heads', () => {
+  const faces = new Set();
+  for (let seed = 1; seed <= 8; seed++) {
+    const res = attack(board('Flip a coin. If heads, draw a card.', { seed }));
+    const coin = res.events.find((e) => e.type === 'attackCoinFlipped').coin;
+    faces.add(coin);
+    assert.equal(zone(res, 'p1', 'hand').length, coin === 'heads' ? 1 : 0, `seed ${seed}`);
+  }
+  assert.equal(faces.size, 2, 'the seeds cover both faces');
+});
+
+test('attack: Whimsy Draw draws 2 per heads', () => {
+  let sawHeads = false;
+  for (let seed = 1; seed <= 8; seed++) {
+    const res = attack(board('Flip a coin until you get tails. For each heads, draw 2 cards.', { seed }));
+    const heads = res.events.find((e) => e.type === 'attackCoinFlipped').headsCount || 0;
+    sawHeads ||= heads > 0;
+    assert.equal(zone(res, 'p1', 'hand').length, 2 * heads, `seed ${seed}`);
+  }
+  assert.ok(sawHeads, 'the seeds cover a heads run');
 });
 
 test('attack: Night Watch shuffles 2 random opponent hand cards into their deck', () => {

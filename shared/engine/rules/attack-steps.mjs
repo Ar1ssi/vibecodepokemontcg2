@@ -167,7 +167,10 @@ const TEMPLATES = [
     /^discard (all|an?|up to \d+) pokémon tools?(?: cards?)? (?:from|attached to) your opponent's (active )?pokémon$/,
     (m) => ({ type: 'atkDiscardOppTools', scope: m[2] ? 'active' : 'any', ...discardCount(m[1]) }),
   ],
-  [/^discard a random card from your opponent's hand$/, () => ({ type: 'atkDiscardOppHand', random: true, count: 1 })],
+  [
+    /^(?:discard a random card from your opponent's hand|choose 1 card from your opponent's hand without looking and discard it)$/,
+    () => ({ type: 'atkDiscardOppHand', random: true, count: 1 }),
+  ],
   [
     /^your opponent discards (an?|\d+) cards? from their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
@@ -288,7 +291,8 @@ const TEMPLATES = [
   // Leave play
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) into your deck$/, () => ({ type: 'atkShuffleSelf' })],
   [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
-  [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]) })],
+  [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
+  [/^draw (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', count: countOf(m[1]) })],
   [/^draw a number of cards equal to the number of cards in your opponent's hand$/, () => ({ type: 'atkDraw', countFrom: 'opponentHand' })],
   [
     /^if your opponent's active pokémon is (asleep|paralyzed|poisoned|burned|confused), your opponent shuffles all energy from it into their deck$/,
@@ -407,20 +411,40 @@ const BLOCKS = [
     (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),
   ],
   [
-    /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at the card you chose, then have your opponent shuffle that card) into their deck\./g,
+    /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at (?:the|that) card you chose, then have your opponent shuffle that card) into their deck\./g,
     (m) => ({ type: 'atkOppHandRandomToDeck', count: countOf(m[1]) }),
   ],
-  // Sentence-initial only, so a coin-gated reveal ("if heads, your opponent reveals …")
-  // stays unparsed instead of losing its gate.
+  // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
+  // reveals …" stays unparsed instead of losing its condition.
   [
-    /(?<=^|\. )your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down))?)?\./g,
+    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down))?)?\./g,
     (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
   ],
-  [
-    /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
-    (m) => searchAttachStep(m[0], m[1], Boolean(m[2])),
-  ],
 ];
+
+// Read after BLOCKS, which take their coin gate from the sentence start (see gatedBlock).
+const SEARCH_ATTACH_BLOCK = [
+  /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
+  (m) => searchAttachStep(m[0], m[1], Boolean(m[2])),
+];
+
+const BLOCK_GATES = { 'if heads': { gate: 'heads' }, 'if tails': { gate: 'tails' }, 'for each heads': { perHeads: true } };
+
+// A block optionally behind the attack's own coin gate at a sentence start
+// ("If heads, choose 1 card from your opponent's hand without looking. …"): the gate is
+// kept on the step, so resolveCoinGates drops or scales it like a one-sentence clause.
+function gatedBlock([re, build]) {
+  const gated = new RegExp(String.raw`(?:(?<=^|\. )(if heads|if tails|for each heads), )?(?:${re.source})`, 'g');
+  return [
+    gated,
+    ([whole, gate, ...rest]) => {
+      const step = build([whole.replace(/^(?:if heads|if tails|for each heads), /, ''), ...rest]);
+      return step && gate ? { ...step, ...BLOCK_GATES[gate] } : step;
+    },
+  ];
+}
+
+const ALL_BLOCKS = [...BLOCKS.map(gatedBlock), SEARCH_ATTACH_BLOCK];
 
 // "Your opponent reveals their hand. Discard a Trainer card you find there." →
 // { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
@@ -565,7 +589,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
   if (!normalized) return result;
 
   const blockSteps = [];
-  for (const [re, build] of BLOCKS) {
+  for (const [re, build] of ALL_BLOCKS) {
     normalized = normalized.replace(re, (...args) => {
       const step = build(args);
       if (!step) return args[0];
