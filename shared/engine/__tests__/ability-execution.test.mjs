@@ -953,3 +953,42 @@ test('ability: "flip a coin. If heads, …" only resolves on heads and is spent 
   }
   assert.deepEqual([...faces].sort(), ['heads', 'tails']);
 });
+
+test("ability: \"You must discard a card from your hand in order to use this Ability\" pays before drawing (I92)", () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'You must discard a card from your hand in order to use this Ability. Once during your turn, you may draw 2 cards.');
+  state.players.p1.zones.hand.push(createCard({ instanceId: 95, name: 'Spare' }));
+  state.players.p1.zones.deck.push(createCard({ instanceId: 96 }), createCard({ instanceId: 97 }));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((c) => c.instanceId), [95], 'only the pre-draw hand is offered');
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [95] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p1.zones.discard.map((c) => c.instanceId), [95]);
+  assert.deepEqual(res2.state.players.p1.zones.hand.map((c) => c.instanceId).sort(), [96, 97]);
+});
+
+test('ability: a discard-cost draw ability with an empty hand does nothing and is not spent (I92)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'You must discard a card from your hand in order to use this Ability. Once during your turn, you may draw 2 cards.');
+  state.players.p1.zones.deck.push(createCard({ instanceId: 96 }), createCard({ instanceId: 97 }));
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
+test('ability: "discard your hand and draw 3 cards" discards the hand first (I92)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may discard your hand and draw 3 cards.');
+  state.players.p1.zones.hand.push(createCard({ instanceId: 95 }), createCard({ instanceId: 94 }));
+  for (const id of [96, 97, 98, 99]) state.players.p1.zones.deck.push(createCard({ instanceId: id }));
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(res.state.players.p1.zones.discard.map((c) => c.instanceId).sort(), [94, 95]);
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [96, 97, 98]);
+});

@@ -372,6 +372,14 @@ export function parseAbility(text = '') {
       count: oppM ? Number(oppM[1]) : 1,
       guidance: `Once during your turn: your opponent draws ${oppM ? oppM[1] : '1'} card${oppM && oppM[1] !== '1' ? 's' : ''}.`,
     });
+  } else if (/discard your hand and draw (\d+) cards?/.test(lower)) {
+    // "Discard your hand and draw N cards" (Rayquaza VMAX Azure Pulse): the hand goes first.
+    const m = lower.match(/discard your hand and draw (\d+) cards?/);
+    steps.push({
+      type: 'discardHandThenDraw',
+      count: Number(m[1]),
+      guidance: `Once during your turn: discard your hand and draw ${m[1]} cards.`,
+    });
   } else if (/draw\s+(\d+)\s+cards?/.test(lower)) {
     // "Draw N cards" — standard
     const m = lower.match(/draw\s+(\d+)\s+cards?/);
@@ -1650,6 +1658,28 @@ export function parseAbility(text = '') {
       returnToHand: true,
       guidance: "Passive: when this Pokémon is damaged, put an Energy from the Attacking Pokémon into your opponent's hand (as described).",
     });
+  }
+
+  // ── Hand-card discard cost ("You must discard a card from your hand in order to use this
+  // Ability", "you may discard 2 cards from your hand. If you do, draw …"). Energy-only costs
+  // are section 7; a qualified card ("a Pokémon that has the Mad Party attack") is not read.
+  const handCardCost = lower.match(
+    /discard (a|an|\d+) cards? from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/
+  );
+  if (handCardCost && !steps.some((step) => step.type === 'discardCostAbility')) {
+    const count = /^\d+$/.test(handCardCost[1]) ? Number(handCardCost[1]) : 1;
+    steps.push({
+      type: 'discardCostAbility',
+      count,
+      energyOnly: false,
+      guidance: `Once during your turn: discard ${count > 1 ? `${count} cards` : 'a card'} from your hand (cost).`,
+    });
+  }
+  // A cost printed before the effect is paid first: the executor runs steps in order, and
+  // drawing before discarding let the player discard a card they had just drawn.
+  const costIndex = steps.findIndex((step) => step.type === 'discardCostAbility');
+  if (costIndex > 0 && lower.indexOf('discard') < lower.search(/\bdraw/)) {
+    steps.unshift(...steps.splice(costIndex, 1));
   }
 
   // ── Passive fallback (only if NO other step matched) ────────────────────
