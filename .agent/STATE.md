@@ -5,14 +5,15 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 269
-Focus: S269 closed I118 (design 031 shipped) on branch `feature/i118-attack-gaps` (worktree .claude/worktrees/i118),
+Session: 270
+Focus: S270 finished I118 (design 031 edge rows 3-4 now tested) on branch `feature/i118-attack-gaps` (worktree .claude/worktrees/i118),
   NOT merged or pushed. S267/S268 work also still unpushed on local main.
 Active: none.
-Next: merge feature/i118-attack-gaps into main and push when the user says so.
+Next: branch stays in its worktree; user said NO merge (S270). Merge/push only on explicit user request.
+  maintenance due (S270).
   I120 (75 coin-gated sentences with no effect), I119 (10 unparsed printings), I113 oracle gate (damage amounts).
   Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
-  maintenance due (S260); ISSUES Open still over cap.
+  ISSUES Open still over cap.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -26,6 +27,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S270 I118 finish: tests for marker reduction floor/stacking and prevention OR.
 - S269 I118 / design 031: markers, HP-cap, reveal-hand, shuffle-cost, copy attacks run on the server.
-- S268 I112: EXECUTED_ATTACK_FAMILIES synced to oracle; 10 client-only families filed as I118.
 - S267 design 030 attack steps (switch/gust/move-energy/discard/attach/bench/mill/KO/Lost Zone/heal…), shuffleInPlace fix.

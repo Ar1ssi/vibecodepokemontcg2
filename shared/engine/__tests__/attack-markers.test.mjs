@@ -368,6 +368,25 @@ test('computeAttackDamage: marker reductions honour their Weakness order', () =>
   );
 });
 
+test('computeAttackDamage: marker reductions floor at 0 and stack; preventions OR', () => {
+  const hit = (markers, damage = '60', att = attacker) =>
+    computeAttackDamage(att, weakDefender, { damage }, { defenderMarkers: markers });
+  const reduce = (amount, afterWR) => ({ kind: 'incomingReduce', amount, afterWR, filter: null });
+
+  assert.equal(hit([reduce(200, true)]).total, 0, 'reduction bigger than the damage floors at 0');
+  assert.equal(hit([reduce(200, false)]).total, 0, 'before Weakness too');
+  assert.equal(hit([reduce(30, true), reduce(20, true)]).total, 70, 'two reductions add');
+  assert.equal(hit([reduce(10, false), reduce(10, false)]).total, 80, 'before Weakness they add too');
+
+  const stage1 = { ...attacker, name: 'Raichu', stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Pikachu' };
+  const basicOnly = { kind: 'incomingPrevent', filter: { any: ['basic'] } };
+  const capped = { kind: 'incomingPrevent', filter: null, maxDamage: 60 };
+  assert.equal(hit([basicOnly], '20', stage1).total, 40, 'filter misses alone');
+  const either = hit([basicOnly, capped], '20', stage1);
+  assert.equal(either.total, 0, 'any one matching prevention stops the damage');
+  assert.equal(either.prevented, true);
+});
+
 test('computeAttackDamage: prevention markers check their filter and damage cap', () => {
   const basic = { ...attacker, name: 'Pikachu', stage: 'Basic', subtypes: ['Basic'] };
   const stage1 = { ...attacker, name: 'Raichu', stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Pikachu' };

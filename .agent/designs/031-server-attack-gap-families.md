@@ -103,8 +103,8 @@ Steps (new handlers in `effects/attack-steps.mjs`, templates in `rules/attack-st
 |---|---|---|---|
 | 1 | Text matches no template | Family stays client-only, audit still flags it; no partial effect | [x] attack-copy.test (Encore stays unparsed); attack-reveal-hand.test ("if you do" reveal) |
 | 2 | Malformed numbers / unknown filter | Parser returns null, no marker | [x] attack-markers.test parser cases |
-| 3 | Reduction bigger than damage | Damage floors at 0, no negative | [x] not separately tested (computeAttackDamage floors totals at 0) |
-| 4 | Two markers of same kind stack | Reductions add; preventions OR | [x] not separately tested (markers are summed/OR-ed in computeAttackDamage) |
+| 3 | Reduction bigger than damage | Damage floors at 0, no negative | [x] attack-markers.test floor/stack/OR |
+| 4 | Two markers of same kind stack | Reductions add; preventions OR | [x] attack-markers.test floor/stack/OR |
 | 5 | Marked card retreats / switches / evolves | Retreat, switch, and evolve clear markers (evolving ends attack effects) | [x] attack-markers.test retreat/KO + evolve expiry |
 | 6 | Marked card KO'd before expiry | Markers leave with the card; retaliate still fires | [x] attack-markers.test Right Back at You |
 | 7 | Deferred KO target left Active / play | Nothing happens | [x] attack-markers.test Word of Ruin |
