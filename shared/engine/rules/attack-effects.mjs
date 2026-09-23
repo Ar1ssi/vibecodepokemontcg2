@@ -898,14 +898,51 @@ export function parseNextTurnLock(attack) {
   return out;
 }
 
+const ENERGY_SYMBOL_WORDS = {
+  g: 'grass',
+  r: 'fire',
+  w: 'water',
+  l: 'lightning',
+  p: 'psychic',
+  f: 'fighting',
+  d: 'darkness',
+  m: 'metal',
+  y: 'fairy',
+  n: 'dragon',
+};
+const DISCARD_ENERGY_TYPES = [
+  'fire',
+  'water',
+  'grass',
+  'lightning',
+  'psychic',
+  'fighting',
+  'darkness',
+  'metal',
+  'fairy',
+  'dragon',
+];
+
+const energyTypeName = (word) =>
+  DISCARD_ENERGY_TYPES.includes(word) ? word.charAt(0).toUpperCase() + word.slice(1) : null;
+const discardCount = (raw) =>
+  raw === 'a' || raw === 'an' ? 1 : parseInt(raw, 10) || 1;
+
 /**
  * Energy discard requirements from attacker:
  * - all: discard all energy from this Pokémon
- * - count: number of energy cards to discard
+ * - count: number of energy cards to discard (Infinity = all of energyType)
  * - energyType: specific type if required (e.g. 'Fire')
+ * - parts: several typed requirements ("a {W} and a {L} Energy"), each { count, energyType }
+ *
+ * Printed text uses symbols ("Discard 2 {R} Energy"); they are read as type words. Costs that
+ * need a player decision ("… or all basic {L} Energy", "as many as you like", "any amount",
+ * "up to") or depend on a coin ("If tails, discard …") return null.
  */
 export function parseAttackEnergyDiscard(attack) {
-  const t = lower(attack?.text ?? '');
+  const t = lower(attack?.text ?? '')
+    .replace(/\{([a-z])\}/g, (m, letter) => ENERGY_SYMBOL_WORDS[letter] || m)
+    .replace(/\bbasic (?=[a-z]+ energy)/g, '');
   if (!t || !t.includes('discard')) return null;
 
   // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
@@ -913,46 +950,61 @@ export function parseAttackEnergyDiscard(attack) {
     return { all: true, count: Infinity, energyType: null };
   }
 
+  const sentence = t
+    .split(/(?<=\.)\s+/)
+    .find((s) => /discard\b[^.]*\benergy\b[^.]*(?:attached to|from) this pok[ée]mon/.test(s));
+  if (
+    !sentence ||
+    /^if (?:heads|tails)\b/.test(sentence) ||
+    /\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)
+  ) {
+    return null;
+  }
+
+  // "Discard a {W} and a {L} Energy attached to this Pokémon"
+  const pair = sentence.match(
+    /discard\s+(\d+|an?)\s+([a-z]+)(?:\s+energy)?\s+and\s+(\d+|an?)\s+([a-z]+)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/
+  );
+  if (pair && energyTypeName(pair[2]) && energyTypeName(pair[4])) {
+    const parts = [
+      { count: discardCount(pair[1]), energyType: energyTypeName(pair[2]) },
+      { count: discardCount(pair[3]), energyType: energyTypeName(pair[4]) },
+    ];
+    return { all: false, count: parts[0].count + parts[1].count, energyType: null, parts };
+  }
+
+  // "Discard all {M} Energy from this Pokémon"
+  const allTyped = sentence.match(
+    /discard\s+all\s+([a-z]+)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/
+  );
+  if (allTyped && energyTypeName(allTyped[1])) {
+    return { all: false, count: Infinity, energyType: energyTypeName(allTyped[1]) };
+  }
+
   // "Discard [N] [Type] Energy from this Pokémon"
-  const typeMatch = t.match(
+  const typeMatch = sentence.match(
     /discard\s+(\d+|an?)\s+([a-z]+)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/i
   );
   if (typeMatch) {
-    const rawCount = typeMatch[1].toLowerCase();
-    const count =
-      rawCount === 'a' || rawCount === 'an' ? 1 : parseInt(rawCount, 10) || 1;
-    const typeCandidate = typeMatch[2].toLowerCase();
-    const knownTypes = [
-      'fire',
-      'water',
-      'grass',
-      'lightning',
-      'psychic',
-      'fighting',
-      'darkness',
-      'metal',
-    ];
-    const energyType = knownTypes.includes(typeCandidate)
-      ? typeCandidate.charAt(0).toUpperCase() + typeCandidate.slice(1)
-      : null;
-    return { all: false, count, energyType };
+    return {
+      all: false,
+      count: discardCount(typeMatch[1].toLowerCase()),
+      energyType: energyTypeName(typeMatch[2].toLowerCase()),
+    };
   }
 
   // "Discard [N] Energy from this Pokémon"
-  const generalMatch = t.match(
+  const generalMatch = sentence.match(
     /discard\s+(\d+|an?)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/i
   );
   if (generalMatch) {
-    const rawCount = generalMatch[1].toLowerCase();
-    const count =
-      rawCount === 'a' || rawCount === 'an' ? 1 : parseInt(rawCount, 10) || 1;
-    return { all: false, count, energyType: null };
+    return { all: false, count: discardCount(generalMatch[1].toLowerCase()), energyType: null };
   }
 
   // "discard an Energy card attached to this Pokémon"
   if (
     /discard\s+(?:an?|1)\s+energy\s+card\s+attached\s+to\s+this\s+pok[ée]mon/i.test(
-      t
+      sentence
     )
   ) {
     return { all: false, count: 1, energyType: null };

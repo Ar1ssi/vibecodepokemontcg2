@@ -3583,30 +3583,30 @@ function resolveAttackEffectPhase(draft, ctx) {
       }
 
       // Attack effects: discard energy from attacker (Phase 3)
-      const energyDiscardSpec = parseAttackEnergyDiscard(effectiveAttack);
+      // A discard-to-scale attack already discarded the player's picks before damage.
+      const energyDiscardSpec = discardScaling ? null : parseAttackEnergyDiscard(effectiveAttack);
       if (energyDiscardSpec && attacker) {
         const attackerZone = draft.players[playerId]?.zones?.active || [];
         const attachedEnergies = attackerZone.filter(
           (c) => c.attachedTo === attacker.instanceId && isEnergy(c)
         );
 
+        const ofType = (energyType) => (c) => {
+          if (!energyType) return true;
+          const ty = c.energyType || c.name?.replace(/\s*Energy.*/i, '');
+          return ty && ty.toLowerCase().includes(energyType.toLowerCase());
+        };
         let toDiscard = [];
         if (energyDiscardSpec.all) {
           toDiscard = attachedEnergies;
         } else {
-          let candidates = attachedEnergies;
-          if (energyDiscardSpec.energyType) {
-            candidates = attachedEnergies.filter((c) => {
-              const ty = c.energyType || c.name?.replace(/\s*Energy.*/i, '');
-              return (
-                ty &&
-                ty
-                  .toLowerCase()
-                  .includes(energyDiscardSpec.energyType.toLowerCase())
-              );
-            });
+          for (const part of energyDiscardSpec.parts || [energyDiscardSpec]) {
+            const picked = attachedEnergies
+              .filter((c) => !toDiscard.includes(c))
+              .filter(ofType(part.energyType))
+              .slice(0, part.count);
+            toDiscard.push(...picked);
           }
-          toDiscard = candidates.slice(0, energyDiscardSpec.count);
         }
 
         for (const card of toDiscard) {
