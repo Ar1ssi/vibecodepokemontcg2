@@ -408,8 +408,11 @@ img.has-usable-ability {
   translate: 0 calc(-50% + 18px);
   z-index: 20;
 }
-.hand-card-stack > img,
-.hand-card-stack > .mat-holo {
+/* `#hand`-scoped to outrank `#hand img` / `#hand .mat-holo`: a holo wrapper
+   hydrates into a stack after the reconciler wrote its inline styles, so these
+   rules alone must size it (else 2/3 size and in-flow, pushed below). */
+#hand .hand-card-stack > img,
+#hand .hand-card-stack > .mat-holo {
   position: absolute;
   bottom: 0;
   left: 0;

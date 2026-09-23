@@ -25,6 +25,15 @@ for (const file of ['self-containers.css', 'opp-containers.css']) {
     assert.equal(imgHeight, 'calc(100% - 1.5vh)');
     assert.equal(holoHeight, imgHeight);
   });
+
+  // A holo wrapper hydrates into a hand stack after the reconciler's inline
+  // styles; unscoped, `#hand .mat-holo` outranks the stack rule and the card
+  // renders 2/3 size, in flow, below its copies.
+  test(`${file}: hand stack cards outrank the #hand card rules`, () => {
+    const stackCard = rule(css, '#hand .hand-card-stack > .mat-holo');
+    assert.match(stackCard, /position:\s*absolute/);
+    assert.match(stackCard, /height:\s*100%/);
+  });
 }
 
 // Zone rules size the wrapper by one axis only; without an aspect ratio the

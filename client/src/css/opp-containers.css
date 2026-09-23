@@ -355,8 +355,9 @@ img.has-usable-ability {
   flex-shrink: 0;
   pointer-events: auto;
 }
-.hand-card-stack > img,
-.hand-card-stack > .mat-holo {
+/* `#hand`-scoped to outrank `#hand img` / `#hand .mat-holo` (see self-containers.css). */
+#hand .hand-card-stack > img,
+#hand .hand-card-stack > .mat-holo {
   position: absolute;
   bottom: 0;
   left: 0;
