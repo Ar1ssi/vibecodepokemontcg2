@@ -1046,3 +1046,51 @@ test('ability: "attach them to your Pokémon in any way you like" picks a target
   assert.deepEqual(attachedTo(res4.state, 'p1', 70), [81]);
   assert.deepEqual(attachedTo(res4.state, 'p1', 72), [82]);
 });
+
+test('ability: once-per-turn hand attach moves the Energy onto the chosen Pokémon (I90)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may attach a Basic {R} Energy card from your hand to 1 of your Benched {R} Pokémon.');
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 72, name: 'Fire Mon', hp: 100, supertype: 'Pokémon', types: ['Fire'] }),
+    createCard({ instanceId: 73, name: 'Water Mon', hp: 100, supertype: 'Pokémon', types: ['Water'] }),
+  );
+  state.players.p1.zones.hand.push(energyCard(81, 'Fire'), energyCard(82, 'Water'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((c) => c.instanceId), [81], 'only Basic {R} Energy');
+  const res2 = resolveWith(res1, [81], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(attachedTo(res2.state, 'p1', 72), [81], 'the only Benched {R} Pokémon receives it');
+  assert.deepEqual(res2.state.players.p1.zones.hand.map((c) => c.instanceId), [82]);
+  assert.equal(res2.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
+test('ability: hand attach "or 1 of each … in any way you like" asks a target per card (I90)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may attach a Basic {R} Energy card, a Basic {F} Energy card, or 1 of each from your hand to your Pokémon in any way you like.');
+  state.players.p1.zones.bench.push(createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' }));
+  state.players.p1.zones.hand.push(energyCard(81, 'Fire'), energyCard(82, 'Fire'), energyCard(83, 'Fighting'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.pendingChoice.max, 2);
+  const res2 = resolveWith(res1, [81, 83], rng);
+  const res3 = resolveWith(res2, [70], rng);
+  const res4 = resolveWith(res3, [72], rng);
+  assert.equal(res4.error, null);
+  assert.deepEqual(attachedTo(res4.state, 'p1', 70), [81]);
+  assert.deepEqual(attachedTo(res4.state, 'p1', 72), [83]);
+  assert.deepEqual(res4.state.players.p1.zones.hand.map((c) => c.instanceId), [82]);
+
+  const twoFire = resolveWith(res1, [81, 82], rng);
+  assert.equal(twoFire.pendingChoice.prompt.includes('Choose a Pokémon'), true);
+  const done = resolveWith(twoFire, [72], rng);
+  assert.deepEqual(attachedTo(done.state, 'p1', 72), [81], 'a second Fire is never taken');
+});
+
+test('ability: hand attach with no matching Energy in hand is not spent (I90)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may attach a Basic Energy card from your hand to 1 of your Pokémon.');
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
+});

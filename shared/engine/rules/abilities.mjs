@@ -314,6 +314,40 @@ export function parseAbilitySearchParams(lower) {
   return { what, count, destination, upTo };
 }
 
+const ENERGY_SYMBOL_TYPES = {
+  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
+  f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon',
+};
+
+// "attach a Basic {R} Energy card from your hand to 1 of your Benched {R} Pokémon" (Energy
+// Carnival, Golden Flame, …) → which hand Energy may go where. Null when the text is not a
+// hand attach. handTarget is the printed target phrase ("this pokémon", "1 of your pokémon").
+function parseHandAttach(lower) {
+  // "As often as you like" hand attaches are Energy accelerators on the normal attach
+  // (parseUnlimitedHandEnergyAcceleration), not a one-shot ability use.
+  if (/as often as you like/.test(lower)) return null;
+  const clause = lower.match(/attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
+  if (!clause) return null;
+  const [, what, rawTarget] = clause;
+  const types = [...what.matchAll(/\{([a-z])\}/g)]
+    .map((m) => ENERGY_SYMBOL_TYPES[m[1]])
+    .filter(Boolean);
+  const named = what.match(/^(?:an?|1) ([a-z'é -]+?) energy card/)?.[1] || null;
+  const oneOfEach = /\bor 1 of each\b/.test(what);
+  const upTo = Number(what.match(/up to (\d+)/)?.[1] || 0);
+  return {
+    handCount: upTo || (oneOfEach ? types.length : 1),
+    handTarget: rawTarget.replace(/\s*\(.*$/, '').trim(),
+    handEnergy: {
+      types,
+      basic: /\bbasic\b/.test(what),
+      special: named === 'special',
+      name: named && !/^(?:basic|special)\b/.test(named) && types.length === 0 ? named : null,
+    },
+    handAttachEach: /in any way you like/.test(rawTarget),
+  };
+}
+
 export function parseAbility(text = '') {
   const lower = normalizeText(text);
   const steps = [];
@@ -478,9 +512,11 @@ export function parseAbility(text = '') {
     const triggeredByAttach = /when(?:ever)?\s+you attach an?\s+energy/.test(lower);
     // Executor filters for the discard-attach path (shared with attachFromDiscard).
     const target = lower.match(/from your discard pile to (?:1|one) of (your [^.]*?pok[eé]mon)/)?.[1] || null;
+    const handAttach = fromDiscard || triggeredByAttach ? null : parseHandAttach(lower);
     steps.push({
       type: 'attachAbility',
       fromDiscard,
+      ...(handAttach ? { fromHand: true, ...handAttach } : {}),
       energy: energySearchWhat({ basic, energyType }),
       target,
       upTo: upTo ? Number(upTo) : mayAttach ? Number(mayAttach) : null,

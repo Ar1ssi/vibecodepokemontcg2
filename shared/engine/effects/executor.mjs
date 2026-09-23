@@ -195,7 +195,11 @@ export function executeSteps(draft, {
     const stepSelection = currentSelection;
     currentSelection = null; // Consume selection for the resumed step
 
-    const extraHandler = EXTRA_STEP_HANDLERS[step.type];
+    // A hand-attach ability (Quaquaval Energy Carnival) runs the attachFromHand handler; the
+    // other attachAbility forms stay on the switch below.
+    const handlerType =
+      step.type === 'attachAbility' && step.fromHand && !step.triggeredByAttach ? 'attachFromHand' : step.type;
+    const extraHandler = EXTRA_STEP_HANDLERS[handlerType];
     if (extraHandler) {
       const memoKey = `${idx}:${step.type}`;
       const choice = extraHandler({

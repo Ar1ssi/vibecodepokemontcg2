@@ -228,6 +228,102 @@ function pokemonHasType(card, symbol) {
 
 // ── step handlers ────────────────────────────────────────────────────────
 
+const RULE_BOX_NAME = /(?:\b(?:ex|gx|v|vmax|vstar|v-union)|-ex|-gx)$/i;
+
+function handEnergyMatches(card, spec = {}) {
+  if (!isEnergy(card)) return false;
+  if (spec.basic && !isBasicEnergy(card)) return false;
+  if (spec.special && !isSpecialEnergy(card)) return false;
+  if (spec.name && !String(card.name || '').toLowerCase().includes(spec.name)) return false;
+  const types = spec.types || [];
+  if (types.length === 0) return true;
+  const kind = String(card.energyType || card.name || '').toLowerCase();
+  return types.some((type) => kind.includes(type.toLowerCase()));
+}
+
+// Pokémon a hand-attach ability may target: the printed phrase ("1 of your Benched {R}
+// Pokémon", "your Active Larry's Pokémon", "1 of your Latios", "… that doesn't have a Rule Box").
+function handAttachTargets(ctx) {
+  const { player, step, sourceCard } = ctx;
+  const phrase = String(step.handTarget || '');
+  if (/^this pok/.test(phrase)) return rootsOf(player).filter((c) => c.instanceId === sourceCard?.instanceId);
+  const owner = phrase.match(/([a-z]+)'s pok/)?.[1];
+  const attackName = phrase.match(/that has the (.+?) attack/)?.[1];
+  const bareName = phrase.match(/^(?:1|one) of your ([^{}]+)$/)?.[1];
+  return rootsOf(player).filter((root) => {
+    if (!rootMatchesTarget(player, root, phrase)) return false;
+    const top = topPokemonCard(player, root);
+    const name = String(top?.name || '').toLowerCase();
+    if (owner && !name.startsWith(`${owner}'s`)) return false;
+    if (/doesn't have a rule box/.test(phrase) && RULE_BOX_NAME.test(name)) return false;
+    if (attackName && !(top?.attacks || []).some((a) => String(a?.name || '').toLowerCase() === attackName)) {
+      return false;
+    }
+    if (bareName && !/pok[eé]mon/.test(bareName) && !name.includes(bareName.trim())) return false;
+    return true;
+  });
+}
+
+// "Once during your turn, you may attach a Basic {R} Energy card from your hand to 1 of your
+// Benched {R} Pokémon" (Quaquaval, Ethan's Ho-Oh ex, Infernape …): pick the Energy, then the
+// Pokémon (once per card when the text says "in any way you like").
+function attachFromHand(ctx) {
+  const { player, step } = ctx;
+  const energies = () => (player.zones.hand || []).filter((c) => handEnergyMatches(c, step.handEnergy));
+  const targets = handAttachTargets(ctx);
+  const askTarget = (energyIds) => {
+    const next = energies().find((c) => c.instanceId === energyIds[0]);
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to attach ${step.handAttachEach && next ? next.name : 'the Energy'} to`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { phase: 'target', energyIds },
+    });
+  };
+
+  if (ctx.memo?.phase === 'target') {
+    const root = targets.find((c) => c.instanceId === ctx.selection?.[0]);
+    if (!root) return skip(ctx, 'target_not_found');
+    const pending = ctx.memo.energyIds || [];
+    const batch = step.handAttachEach ? pending.slice(0, 1) : pending;
+    for (const card of energies().filter((c) => batch.includes(c.instanceId))) {
+      attachTo(player, card, root, ctx.events);
+    }
+    const remaining = step.handAttachEach
+      ? pending.slice(1).filter((id) => energies().some((c) => c.instanceId === id))
+      : [];
+    return remaining.length > 0 ? askTarget(remaining) : null;
+  }
+
+  if (ctx.selection) {
+    let picked = energies().filter((c) => ctx.selection.includes(c.instanceId));
+    // "a Basic {R} Energy card, a Basic {F} Energy card, or 1 of each": at most one per type.
+    if ((step.handEnergy?.types || []).length > 1) {
+      picked = step.handEnergy.types
+        .map((type) => picked.find((c) => handEnergyMatches(c, { types: [type] })))
+        .filter(Boolean);
+    }
+    if (picked.length === 0) return skip(ctx, 'no_energy_selected');
+    if (targets.length === 0) return skip(ctx, 'no_attach_target');
+    if (targets.length === 1) {
+      for (const card of picked) attachTo(player, card, targets[0], ctx.events);
+      return null;
+    }
+    return askTarget(picked.map((c) => c.instanceId));
+  }
+
+  const candidates = energies();
+  if (candidates.length === 0 || targets.length === 0) return skip(ctx, 'no_energy_or_target');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose Energy from your hand to attach`,
+    options: candidates,
+    min: 1,
+    max: Math.min(step.handCount || 1, candidates.length),
+    memo: {},
+  });
+}
+
 function opponentDraw(ctx) {
   if (!ctx.opponent) return skip(ctx, 'no_opponent');
   drawCards(ctx.opponent, ctx.step.count || 1, ctx.events);
@@ -1505,6 +1601,7 @@ export const EXTRA_STEP_HANDLERS = {
   searchEvolve,
   prizeBargain,
   searchAttachEach,
+  attachFromHand,
   opponentDraw,
   putHandOnBottom,
   putHandOnTop,
