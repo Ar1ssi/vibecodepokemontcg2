@@ -191,6 +191,17 @@ export function executeSteps(draft, {
     const step = steps[idx];
     if (!step) continue;
 
+    // "If you attached Energy … in this way" bonuses (I93): remember the attach across resumes.
+    const lastAttach = events.findLast((e) => e.type === 'cardAttached');
+    if (lastAttach) {
+      context.attachedEnergy = true;
+      context.attachedTargetId = lastAttach.targetInstanceId;
+    }
+    if (step.requiresAttach && !context.attachedEnergy) {
+      events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
+      continue;
+    }
+
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;
     currentSelection = null; // Consume selection for the resumed step
@@ -1052,7 +1063,9 @@ export function executeSteps(draft, {
             ((c.damage || 0) > 0 || (step.cure && hasAnyCondition(c))) &&
             (!typeFilter ||
               (c.types || []).some((ty) => typeFilter.includes(String(ty).toLowerCase()))) &&
-            rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target)
+            (step.target === 'attached Pokémon'
+              ? c.instanceId === context.attachedTargetId
+              : rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target))
         );
 
         const healOne = (card) => {

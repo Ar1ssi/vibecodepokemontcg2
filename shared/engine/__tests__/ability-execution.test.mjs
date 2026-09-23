@@ -1094,3 +1094,45 @@ test('ability: hand attach with no matching Energy in hand is not spent (I90)', 
   assert.equal(res.pendingChoice, null);
   assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
 });
+
+const TEAL_DANCE = 'Once during your turn, you may attach a Basic {G} Energy card from your hand to this Pokémon. If you attached Energy to a Pokémon in this way, draw a card.';
+
+test('ability: Teal Dance attaches first and only then draws (I93)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, TEAL_DANCE);
+  state.players.p1.zones.hand.push(energyCard(81, 'Grass'));
+  state.players.p1.zones.deck.push(createCard({ instanceId: 90 }));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  const res2 = resolveWith(res1, [81], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(attachedTo(res2.state, 'p1', 70), [81]);
+  assert.deepEqual(res2.state.players.p1.zones.hand.map((c) => c.instanceId), [90]);
+});
+
+test('ability: Teal Dance with no {G} Energy in hand draws nothing (I93)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, TEAL_DANCE);
+  state.players.p1.zones.deck.push(createCard({ instanceId: 90 }));
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
+test('ability: Ripening Charge heals the Pokémon that received the Energy (I93)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may attach a Basic {G} Energy card from your hand to 1 of your Pokémon. If you attached Energy to a Pokémon in this way, heal 30 damage from that Pokémon.');
+  state.players.p1.zones.active[0].damage = 50;
+  const benched = createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' });
+  benched.damage = 40;
+  state.players.p1.zones.bench.push(benched);
+  state.players.p1.zones.hand.push(energyCard(81, 'Grass'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  const res2 = resolveWith(res1, [81], rng);
+  const res3 = resolveWith(res2, [72], rng);
+  assert.equal(res3.error, null);
+  assert.equal(res3.pendingChoice, null);
+  assert.deepEqual(attachedTo(res3.state, 'p1', 72), [81]);
+  assert.equal(res3.state.players.p1.zones.bench[0].damage, 10);
+  assert.equal(res3.state.players.p1.zones.active[0].damage, 50);
+});

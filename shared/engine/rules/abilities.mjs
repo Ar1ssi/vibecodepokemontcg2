@@ -27,7 +27,7 @@ function normalizeText(text) {
 // Also matches the common "Put an Energy card ... onto a Pokémon" attach wording.
 const hasVerbAttach = (t) =>
   t.includes('energy') &&
-  ((t.includes('attach') && !t.includes('attached')) || (t.includes('put') && t.includes('onto')));
+  (/\battach\b/.test(t) || (t.includes('put') && t.includes('onto')));
 
 // True if `w` appears as a whole word (not a substring of a longer word).
 // Fixes the 'remove' ⊃ 'move' false-positive (split on non-letters, no regex).
@@ -326,8 +326,9 @@ function parseHandAttach(lower) {
   // "As often as you like" hand attaches are Energy accelerators on the normal attach
   // (parseUnlimitedHandEnergyAcceleration), not a one-shot ability use.
   if (/as often as you like/.test(lower)) return null;
-  const clause = lower.match(/attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
-  if (!clause) return null;
+  // The player's own attach action only: not "Whenever you attach…" / "To attach…" rules text.
+  const clause = lower.match(/(?:^|\. |you may )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
+  if (!clause || /^this card\b/.test(clause[1])) return null;
   const [, what, rawTarget] = clause;
   const types = [...what.matchAll(/\{([a-z])\}/g)]
     .map((m) => ENERGY_SYMBOL_TYPES[m[1]])
@@ -1728,6 +1729,29 @@ export function parseAbility(text = '') {
   const costIndex = steps.findIndex((step) => step.type === 'discardCostAbility');
   if (costIndex > 0 && lower.indexOf('discard') < lower.search(/\bdraw/)) {
     steps.unshift(...steps.splice(costIndex, 1));
+  }
+
+  // "If you attached Energy to a Pokémon in this way, <bonus>" (Teal Dance, Ripening Charge,
+  // Psychic Embrace): the attach runs first, the bonus only follows a real attach, and "that
+  // Pokémon" is the one that received the Energy.
+  const attachBonus = lower.match(/if you attached energy[^.]*? in this way, ([^.]*)/)?.[1];
+  const attachStepIndex = steps.findIndex(
+    (step) => step.type === 'attachAbility' || (step.type === 'searchAbility' && step.destination === 'attach')
+  );
+  if (attachBonus && attachStepIndex >= 0) {
+    const [attachStep] = steps.splice(attachStepIndex, 1);
+    steps.unshift(attachStep);
+    const counters = Number(attachBonus.match(/(?:put|place) (\d+) damage counters? on that pok/)?.[1] || 0);
+    if (counters > 0) {
+      if (attachStep.type === 'searchAbility') attachStep.attachDamage = counters;
+      else attachStep.damage = counters;
+      const counterIndex = steps.findIndex((step) => step.type === 'moveDamageAbility');
+      if (counterIndex > 0) steps.splice(counterIndex, 1);
+    }
+    for (const step of steps.slice(1)) {
+      step.requiresAttach = true;
+      if (step.type === 'healAbility' && /from that pok/.test(attachBonus)) step.target = 'attached Pokémon';
+    }
   }
 
   // ── Passive fallback (only if NO other step matched) ────────────────────
