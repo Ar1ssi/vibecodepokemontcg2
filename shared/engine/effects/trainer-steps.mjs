@@ -347,6 +347,12 @@ function variableDraw(ctx) {
     });
     // Stadiums and Tools are Trainer cards too, whichever field carries the kind.
     count = hand.filter((c) => isTrainer(c) || isStadiumCard(c) || isToolCard(c)).length;
+  } else if (step.source === 'opponentBenchBasic') {
+    count = benchRootsOf(opponent).filter((root) => stageOf(topPokemonCard(opponent, root)) === 'Basic').length;
+  } else if (step.source === 'opponentPokemonInPlay') {
+    count = rootsOf(opponent).length;
+  } else if (step.source === 'allBench') {
+    count = benchRootsOf(player).length + benchRootsOf(opponent).length;
   } else if (step.source === 'opponentMegaExInPlay') {
     count = rootsOf(opponent).filter((root) =>
       /^mega .* ex$/i.test(topPokemonCard(opponent, root).name || '')
@@ -875,6 +881,36 @@ function damageCounters(ctx) {
   });
 }
 
+// Pseudo-option ids for "how many counters" prompts: -101 = 1 counter, -102 = 2, …
+// (negative so they never collide with card instanceIds or BARGAIN_YES/NO).
+const COUNTER_OPTION_BASE = -100;
+const counterCountOption = (n) => COUNTER_OPTION_BASE - n;
+function counterCountFromOption(id) {
+  const n = COUNTER_OPTION_BASE - Number(id);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+function maxMovableCounters(step, from) {
+  return Math.min(step.count || 1, Math.floor((from.damage || 0) / 10));
+}
+
+function moveDamageCounters(ctx, from, to, counters) {
+  const { player, opponent } = ctx;
+  const moved = counters * 10;
+  from.damage -= moved;
+  to.damage = (to.damage || 0) + moved;
+  ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
+  ctx.events.push({ type: 'damageUpdated', instanceId: to.instanceId, damage: to.damage });
+  ctx.events.push({
+    type: 'damageCountersPlaced',
+    instanceId: to.instanceId,
+    victimPlayerId: opponent.playerId,
+    attackerPlayerId: player.playerId,
+    damage: to.damage,
+  });
+  return null;
+}
+
 // Adrena-Brain: "if this Pokémon has any {D} Energy attached, you may move up to 3
 // damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon."
 function moveOwnDamageToOpponent(ctx) {
@@ -882,24 +918,31 @@ function moveOwnDamageToOpponent(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const sources = rootsOf(player).filter((c) => (c.damage || 0) > 0);
 
+  if (ctx.selection && ctx.memo?.toId != null) {
+    const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
+    const to = rootsOf(opponent).find((c) => c.instanceId === ctx.memo.toId);
+    const counters = counterCountFromOption(ctx.selection[0]);
+    if (!from || !to || counters == null) return skip(ctx, 'target_not_found');
+    return moveDamageCounters(ctx, from, to, Math.min(counters, maxMovableCounters(step, from)));
+  }
+
   if (ctx.selection && ctx.memo?.fromId != null) {
     const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
     const to = rootsOf(opponent).find((c) => c.instanceId === ctx.selection[0]);
     if (!from || !to) return skip(ctx, 'target_not_found');
-    // "up to N": moves as many as the source holds, capped at N.
-    const moved = Math.min(step.count || 1, Math.floor(from.damage / 10)) * 10;
-    from.damage -= moved;
-    to.damage = (to.damage || 0) + moved;
-    ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
-    ctx.events.push({ type: 'damageUpdated', instanceId: to.instanceId, damage: to.damage });
-    ctx.events.push({
-      type: 'damageCountersPlaced',
-      instanceId: to.instanceId,
-      victimPlayerId: opponent.playerId,
-      attackerPlayerId: player.playerId,
-      damage: to.damage,
+    const maxCounters = maxMovableCounters(step, from);
+    // "up to N": the player picks how many; a fixed count, or only 1 available, moves at once.
+    if (!step.upTo || maxCounters <= 1) return moveDamageCounters(ctx, from, to, maxCounters);
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: How many damage counters to move?`,
+      options: Array.from({ length: maxCounters }, (_, i) => ({
+        instanceId: counterCountOption(maxCounters - i),
+        name: `${maxCounters - i} damage counter${maxCounters - i === 1 ? '' : 's'}`,
+      })),
+      min: 1,
+      max: 1,
+      memo: { fromId: from.instanceId, toId: to.instanceId },
     });
-    return null;
   }
 
   if (ctx.selection) {

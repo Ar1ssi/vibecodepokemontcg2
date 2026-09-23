@@ -773,8 +773,47 @@ test('ability: Munkidori Adrena-Brain moves up to 3 damage counters from own Pok
     playerId: 'p1',
   }, rng);
   assert.equal(res3.error, null);
-  assert.equal(res3.state.players.p1.zones.bench[0].damage, 20, 'source loses 3 counters');
-  assert.equal(res3.state.players.p2.zones.active[0].damage, 30, 'target gains 3 counters');
+  const counterOptions = res3.pendingChoice.options;
+  assert.deepEqual(counterOptions.map((o) => o.name), ['3 damage counters', '2 damage counters', '1 damage counter']);
+  const res4 = applyCommand(res3.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res3.pendingChoice.choiceId, selection: [counterOptions[0].instanceId] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res4.error, null);
+  assert.equal(res4.state.players.p1.zones.bench[0].damage, 20, 'source loses 3 counters');
+  assert.equal(res4.state.players.p2.zones.active[0].damage, 30, 'target gains 3 counters');
+});
+
+test('ability: Munkidori Adrena-Brain lets the player move fewer than 3 counters (I83)', () => {
+  const { state, rng } = setupAdrenaBrain({ withDarkEnergy: true });
+  const resolve = (res, selection) => applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection },
+    playerId: 'p1',
+  }, rng);
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 100 }, playerId: 'p1' }, rng);
+  const res3 = resolve(resolve(res1, [101]), [200]);
+  const oneCounter = res3.pendingChoice.options.find((o) => o.name === '1 damage counter');
+  const res4 = resolve(res3, [oneCounter.instanceId]);
+  assert.equal(res4.error, null);
+  assert.equal(res4.state.players.p1.zones.bench[0].damage, 40);
+  assert.equal(res4.state.players.p2.zones.active[0].damage, 10);
+});
+
+test('ability: Adrena-Brain with a source holding 1 counter moves it without a count prompt (I83)', () => {
+  const { state, rng } = setupAdrenaBrain({ withDarkEnergy: true });
+  state.players.p1.zones.bench[0].damage = 10;
+  const resolve = (res, selection) => applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection },
+    playerId: 'p1',
+  }, rng);
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 100 }, playerId: 'p1' }, rng);
+  const res3 = resolve(resolve(res1, [101]), [200]);
+  assert.equal(res3.pendingChoice, null);
+  assert.equal(res3.state.players.p1.zones.bench[0].damage, 0);
+  assert.equal(res3.state.players.p2.zones.active[0].damage, 10);
 });
 
 test('ability: Munkidori Adrena-Brain does nothing without {D} Energy attached', () => {

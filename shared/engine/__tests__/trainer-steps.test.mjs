@@ -186,6 +186,31 @@ test('variableDraw (Jett): one card per opponent Benched Pokémon', () => {
   assert.equal(zone(res, 'p1', 'hand').length, 2);
 });
 
+test("variableDraw (Steven's Advice): one card per opponent Pokémon in play (I83)", () => {
+  const game = setup();
+  game.p2.zones.bench.push(pokemon('a'), pokemon('b'));
+  for (let i = 0; i < 5; i++) game.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(game, "Draw a number of cards up to the number of your opponent's Pokémon in play.").res;
+  assert.equal(zone(res, 'p1', 'hand').length, 3);
+});
+
+test("variableDraw: opponent's Benched Basic Pokémon only count Basics (I83)", () => {
+  const game = setup();
+  game.p2.zones.bench.push(pokemon('a'), pokemon('b', { stage: 'Stage 1' }));
+  for (let i = 0; i < 5; i++) game.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(game, "Draw a card for each of your opponent's Benched Basic Pokémon.").res;
+  assert.equal(zone(res, 'p1', 'hand').length, 1);
+});
+
+test("variableDraw: each Benched Pokémon (both yours and your opponent's) counts both Benches (I83)", () => {
+  const game = setup();
+  game.p1.zones.bench.push(pokemon('m'));
+  game.p2.zones.bench.push(pokemon('a'), pokemon('b'));
+  for (let i = 0; i < 5; i++) game.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(game, "Draw a card for each Benched Pokémon (both yours and your opponent's).").res;
+  assert.equal(zone(res, 'p1', 'hand').length, 3);
+});
+
 test('lookAtTop (Pokégear 3.0): only Supporters in the top 7 are offered; rest shuffled back', () => {
   const game = setup();
   const supporter = card({ name: 'Iono', type: 'Trainer', trainerType: 'Supporter' });
