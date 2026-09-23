@@ -27,6 +27,7 @@ const {
   abilitySummonRestricted,
   abilityFirstTurnAttack,
   abilityExtraAttack,
+  extraAttackAvailable,
 } = await import('../ability-combat.mjs');
 
 let nextId = 1;
@@ -1584,6 +1585,53 @@ test('abilityRetreatLock, abilityCounterMoveLock, summon and attack permissions'
     onKo: false,
   });
   assert.equal(abilityExtraAttack(active), null);
+});
+
+test('extraAttackAvailable: stadium gate and the two-attack cap', () => {
+  const dipplin = mon('Dipplin', {
+    abilities: [
+      ability(
+        'Festival Lead',
+        'If Festival Grounds is in play, this Pokémon may use an attack it has twice. If the first attack Knocks Out your opponent\u2019s Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.'
+      ),
+    ],
+  });
+  const festival = { name: 'Festival Grounds' };
+  assert.deepEqual(
+    extraAttackAvailable(dipplin, { stadium: festival, attacksThisTurn: 1 }),
+    { allowed: true, reason: null }
+  );
+  assert.match(
+    extraAttackAvailable(dipplin, {
+      stadium: { name: 'Some Other Stadium' },
+      attacksThisTurn: 1,
+    }).reason,
+    /Festival Grounds is not in play/
+  );
+  assert.match(
+    extraAttackAvailable(dipplin, {
+      stadium: festival,
+      attacksThisTurn: 2,
+    }).reason,
+    /twice this turn/
+  );
+
+  const omega = mon('Omega', {
+    abilities: [ability('Ω Barrage', 'This Pokémon may attack twice a turn.')],
+  });
+  assert.equal(
+    extraAttackAvailable(omega, { attacksThisTurn: 1 }).allowed,
+    true
+  );
+  assert.equal(
+    extraAttackAvailable(omega, { attacksThisTurn: 2 }).allowed,
+    false
+  );
+  assert.equal(
+    extraAttackAvailable(mon('Plain'), { attacksThisTurn: 1 }).allowed,
+    false,
+    'a plain Active has no extra attack'
+  );
 });
 
 test('abilityStatusImmune: all-conditions and named-condition wordings', () => {

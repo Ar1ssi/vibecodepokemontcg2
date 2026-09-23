@@ -81,6 +81,7 @@ import {
   abilityRetreatLock,
   abilitySummonRestricted,
   abilityFirstTurnAttack,
+  extraAttackAvailable,
 } from './rules/ability-combat.mjs';
 import {
   inPlayEntries,
@@ -883,6 +884,16 @@ function handleKnockout(
     (c) => c.instanceId === victim.instanceId
   );
   const wasBench = victimBench.some((c) => c.instanceId === victim.instanceId);
+
+  // Extra-attack (Dipplin Festival Lead): "if the first attack KOs your
+  // opponent's Active, you may attack again". Record the KO on the attacker.
+  if (wasActive && attackerPlayerId && attackerPlayerId !== victimPlayerId) {
+    const attacker = draft.players?.[attackerPlayerId];
+    if (attacker) {
+      if (!attacker.flags) attacker.flags = {};
+      attacker.flags.koedOpponentActive = true;
+    }
+  }
 
   const victimZoneCards = wasActive
     ? victimActive
@@ -1975,6 +1986,8 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   draft.players[nextPlayerId].flags = {
     energyAttached: false,
     attackerAttacked: false,
+    attacksThisTurn: 0,
+    koedOpponentActive: false,
     retreatedThisTurn: false,
     supporterPlayed: false,
     stadiumPlayedThisTurn: false,
@@ -2905,10 +2918,24 @@ export function validateLegality(state, command) {
           };
         }
       }
-      if (player.flags?.attackerAttacked) {
-        return { allowed: false, reason: 'Already attacked this turn.' };
-      }
       const active = player.zones?.active?.find((c) => !c.attachedTo);
+      if (player.flags?.attackerAttacked) {
+        // An extra-attack Ability (Dipplin Festival Lead, Ω Barrage) allows a
+        // second attack in the same turn while its condition holds.
+        const extra = active
+          ? extraAttackAvailable(active, {
+              stadium: state.stadium,
+              attacksThisTurn: player.flags?.attacksThisTurn || 1,
+              koedOpponentActive: Boolean(player.flags?.koedOpponentActive),
+            })
+          : { allowed: false };
+        if (!extra.allowed) {
+          return {
+            allowed: false,
+            reason: extra.reason || 'Already attacked this turn.',
+          };
+        }
+      }
       if (!active) {
         return { allowed: false, reason: 'No active Pokémon to attack with.' };
       }
@@ -5046,9 +5073,22 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
 
       if (!attackerPlayer.flags) attackerPlayer.flags = {};
       attackerPlayer.flags.attackerAttacked = true;
+      attackerPlayer.flags.attacksThisTurn =
+        (attackerPlayer.flags.attacksThisTurn || 0) + 1;
+
+      // Extra-attack Ability (Dipplin Festival Lead, Ω Barrage): while a second
+      // attack is still legal the turn does not end, so the opponent promotes a
+      // new Active and the same Pokémon attacks again.
+      const extraRemains =
+        attacker &&
+        attackerPlayer.flags.attacksThisTurn < 2 &&
+        extraAttackAvailable(attacker, {
+          stadium: draft.stadium,
+          attacksThisTurn: attackerPlayer.flags.attacksThisTurn,
+        }).allowed;
 
       // Auto-end turn after attacking (unless paused by pendingChoice)
-      if (!searchTriggered && !isGameConcluded(draft)) {
+      if (!searchTriggered && !extraRemains && !isGameConcluded(draft)) {
         resolveCheckup(draft, {
           rng: activeRng,
           events,

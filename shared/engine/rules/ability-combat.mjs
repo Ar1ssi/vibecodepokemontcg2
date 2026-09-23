@@ -1111,3 +1111,28 @@ export function abilityExtraAttack(card) {
   }
   return null;
 }
+
+/**
+ * Whether the Active may make an additional attack this turn (Dipplin Festival
+ * Lead / Ω Barrage). `ctx`: `{ stadium, attacksThisTurn, koedOpponentActive }`.
+ * The second attack is free while the printed condition holds; the reader caps
+ * at two attacks per turn. Returns `{ allowed, reason }`.
+ */
+export function extraAttackAvailable(card, ctx = {}) {
+  const read = abilityExtraAttack(card);
+  if (!read) return { allowed: false, reason: null };
+  const { stadium = null, attacksThisTurn = 0 } = ctx;
+  if (attacksThisTurn >= 2) {
+    return { allowed: false, reason: 'Already attacked twice this turn.' };
+  }
+  if (read.stadium) {
+    const stadiumName = lower(stadium?.name || stadium?.card?.name || '');
+    if (!stadiumName.includes(read.stadium)) {
+      return {
+        allowed: false,
+        reason: `${read.stadium.replace(/\b\w/g, (c) => c.toUpperCase())} is not in play.`,
+      };
+    }
+  }
+  return { allowed: true, reason: null };
+}

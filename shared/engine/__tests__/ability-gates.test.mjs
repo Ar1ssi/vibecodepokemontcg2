@@ -539,3 +539,62 @@ test('moveCard: bench→active stamps movedToActiveTurn and clears it on the way
   assert.equal(back.error, null);
   assert.equal(back.state.players.p1.zones.bench[0].movedToActiveTurn, undefined);
 });
+
+test('extra attack: Dipplin attacks twice while Festival Grounds is in play', () => {
+  const state = setupGame();
+  const dipplin = pokemon({
+    instanceId: 110,
+    name: 'Dipplin',
+    hp: 90,
+    attacks: [{ name: 'Do the Wave', cost: [], damage: 30 }],
+    abilities: [
+      ability(
+        'Festival Lead',
+        'If Festival Grounds is in play, this Pokémon may use an attack it has twice. If the first attack Knocks Out your opponent\u2019s Active Pokémon, you may attack again after your opponent chooses a new Active Pokémon.'
+      ),
+    ],
+  });
+  state.players.p1.zones.active.push(dipplin);
+  state.players.p2.zones.active.push(pokemon({ instanceId: 111, name: 'Defender', hp: 200 }));
+  state.players.p2.zones.deck.push(createCard({ instanceId: 112, name: 'Card' }));
+
+  // Without the Stadium the second attack is refused.
+  const first = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+  assert.equal(first.error, null);
+  assert.equal(first.state.players.p1.flags.attacksThisTurn, 1);
+  // The turn ended (the KO wording never satisfied, no Stadium).
+  assert.notEqual(first.state.turn.player, 'p1');
+
+  // With Festival Grounds in play, the turn stays open for the second attack.
+  const state2 = setupGame();
+  state2.players.p1.zones.active.push({ ...dipplin });
+  state2.players.p2.zones.active.push(pokemon({ instanceId: 113, name: 'Defender', hp: 200 }));
+  state2.players.p2.zones.deck.push(createCard({ instanceId: 114, name: 'Card' }));
+  state2.stadium = createCard({
+    instanceId: 115,
+    name: 'Festival Grounds',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+  });
+  const attack1 = applyCommand(state2, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+  assert.equal(attack1.error, null);
+  assert.equal(attack1.state.turn.player, 'p1', 'turn stays with the attacker');
+  assert.equal(attack1.state.players.p1.flags.attacksThisTurn, 1);
+
+  const attack2 = applyCommand(attack1.state, {
+    type: 'attack',
+    payload: { attackIndex: 0 },
+    playerId: 'p1',
+  });
+  assert.equal(attack2.error, null);
+  assert.equal(attack2.state.players.p1.flags.attacksThisTurn, 2);
+  assert.notEqual(attack2.state.turn.player, 'p1', 'third attack ends the turn');
+});
