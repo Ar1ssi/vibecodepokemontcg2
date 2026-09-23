@@ -3,7 +3,11 @@
 
 import { rulesState } from './rules-state.mjs';
 import { canPayAttackCost } from './attack-engine.mjs';
-import { parseRetreatCostModifier, applyRetreatCostModifier } from './ability-executors.mjs';
+import {
+  parseRetreatCostModifier,
+  applyRetreatCostModifier,
+  teamNoRetreatCostForActive,
+} from './ability-executors.mjs';
 import { combinedToolRetreatCost } from './tool-combat.mjs';
 import { getStadiumRetreatCost, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { pendingRetreatCostDelta } from './attack-pending-effects.mjs';
@@ -16,11 +20,18 @@ import { classifyEnergyEffect, pokemonHasRedirectEnergy } from './energy-effects
  * - Tool & Ability modifiers
  * - Pending turn deltas (from attack effects)
  */
-export function getEffectiveRetreatCost(activeCard, player, zoneCards = []) {
+export function getEffectiveRetreatCost(
+  activeCard,
+  player,
+  zoneCards = [],
+  benchCards = []
+) {
   if (!rulesState.enabled) return activeCard?.retreatCost || 0;
   const cards = Array.isArray(zoneCards) ? zoneCards : (zoneCards?.array || []);
   // Switching Energy (taxonomy §F, family 3): free switch
   if (pokemonHasRedirectEnergy(activeCard, cards)) return 0;
+  // Team-wide "no Retreat Cost" ability on a Benched Pokémon (Latias ex "Skyliner").
+  if (teamNoRetreatCostForActive(activeCard, benchCards)) return 0;
   let cost = activeCard?.retreatCost || 0;
   cost = getStadiumRetreatCost(cost, activeCard, player);
   cost = combinedToolRetreatCost(cost, activeCard, cards, {
@@ -41,7 +52,13 @@ export function getEnergyValue(entry) {
   return 1;
 }
 
-export function canRetreat(player, activeCard, attachedEnergies = [], zoneCards = []) {
+export function canRetreat(
+  player,
+  activeCard,
+  attachedEnergies = [],
+  zoneCards = [],
+  benchCards = []
+) {
   if (!rulesState.enabled) return { allowed: true, retreatCost: 0 };
   if (rulesState.turnPlayer !== player) {
     return { allowed: false, reason: "It's not your turn." };
@@ -53,7 +70,7 @@ export function canRetreat(player, activeCard, attachedEnergies = [], zoneCards 
     return { allowed: false, reason: 'You already retreated this turn.' };
   }
   const cards = Array.isArray(zoneCards) ? zoneCards : (zoneCards?.array || []);
-  const costN = getEffectiveRetreatCost(activeCard, player, cards);
+  const costN = getEffectiveRetreatCost(activeCard, player, cards, benchCards);
   if (costN === 0) return { allowed: true, retreatCost: 0 };
   const cost = new Array(costN).fill('Colorless');
   if (!canPayAttackCost(attachedEnergies, cost)) {

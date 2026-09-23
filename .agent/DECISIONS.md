@@ -164,3 +164,4 @@
 - D113 2026-09-23 Encore-style locks are an `attackLock` attack marker `{mode:'only'|'except', attackName}` on the opponent's Active, checked in the attack legality gate (design 033). (S271)
 - D114 2026-09-23 A hand-card discard printed as part of an attack (Voltage Shoot) makes the attack illegal when the hand cannot pay it, like an unpayable Energy cost (design 033). (S271)
 - D115 2026-09-23 #stadium's transform belongs to the table tilt; owner-facing flip is the .stadium-opp-facing class rotating the img via `rotate:`, never an inline transform on #stadium (setStadiumFacing). (S273)
+- D116 2026-09-23 Team-wide "no Retreat Cost" passives are read from the Bench by one pure helper, `teamNoRetreatCostForActive` (ability-executors.mjs), against the top evolution view; retreat-cost callers pass an optional `benchCards` array (retreat.mjs) instead of the helper reaching into state. (S277)

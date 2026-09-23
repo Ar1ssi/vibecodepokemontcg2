@@ -6,6 +6,9 @@
 // the attack path; this module only extracts *what* a card does from its
 // printed ability text.
 
+import { isBasicPokemon } from '../cards.mjs';
+import { isExCard, isGxCard } from './card-classify.mjs';
+
 const lower = (v) =>
   String(v ?? '')
     .toLowerCase()
@@ -424,6 +427,37 @@ export function parseRetreatCostModifier(card) {
 export function applyRetreatCostModifier(baseCost, delta) {
   if (delta === -Infinity) return 0;
   return Math.max(0, (baseCost || 0) + (delta || 0));
+}
+
+// Team-wide "no Retreat Cost" passives printed on a Pokémon in play, read for
+// the Active Spot (e.g. Latias ex "Skyliner": "Your Basic Pokémon in play have
+// no Retreat Cost."). The active Pokémon's own copy is handled by
+// parseRetreatCostModifier; this covers the ability holder sitting on the Bench.
+// Energy-conditional wordings ("Each of your Pokémon that has any {W} Energy
+// attached…") are not handled here.
+export function teamNoRetreatCostForActive(activeCard, benchCards) {
+  if (!activeCard) return false;
+  const activeName = lower(activeCard?.name || '');
+  const activeIsBasic = isBasicPokemon(activeCard);
+  const activeIsExOrGx = isExCard(activeCard) || isGxCard(activeCard);
+  for (const card of Array.isArray(benchCards) ? benchCards : []) {
+    if (!card || card.attachedTo || card.image?.attached) continue;
+    const t = textOf(card);
+    if (!/no retreat cost/.test(t)) continue;
+    // "Your Pokémon in play have no Retreat Cost, except Pokémon-GX and Pokémon-EX."
+    if (/except[^.]*pok[eé]mon-(?:gx|ex)/.test(t) && activeIsExOrGx) continue;
+    if (/your basic pok[eé]mon in play have no retreat cost/.test(t)) {
+      if (activeIsBasic) return true;
+      continue;
+    }
+    if (/your pok[eé]mon in play have no retreat cost/.test(t)) return true;
+    // Name-specific, e.g. "Your Latios in play have no Retreat Cost."
+    const named = t.match(
+      /your ([a-z0-9 .'’-]+?) in play have no retreat cost/
+    );
+    if (named && activeName.includes(named[1].trim())) return true;
+  }
+  return false;
 }
 
 // "take N fewer/more Prize cards"

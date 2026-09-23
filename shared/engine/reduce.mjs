@@ -66,6 +66,7 @@ import {
   isActivatedAbility,
   passiveCostDiscount,
   applyCostDiscount,
+  teamNoRetreatCostForActive,
 } from './rules/ability-executors.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -699,6 +700,15 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   const activeZone = player?.zones?.active || [];
   const stadium = state.stadium;
   const baseRetreat = getRetreatCostCount(inPlayView(state, card));
+
+  // Team-wide "no Retreat Cost" ability on a Benched Pokémon (e.g. Latias ex
+  // "Skyliner") zeroes the Active Spot's cost regardless of printed/Tool/Stadium.
+  // Read the top evolution of each Pokémon: the root of an evolved card is its
+  // Basic, whose stage/ability must not stand in for the card in play.
+  const benchViews = (player?.zones?.bench || []).map((b) =>
+    inPlayView(state, b)
+  );
+  if (teamNoRetreatCostForActive(inPlayView(state, card), benchViews)) return 0;
 
   // 1. Tool retreat cost modifier + self ability modifier
   const blockTools = isStadiumToolNegation(stadium?.card || stadium);

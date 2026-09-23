@@ -2666,7 +2666,12 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
     }
 
     // Pay retreat cost: discard N energy from the active Pokémon (unless free)
-    const retreatCost = getEffectiveRetreatCost(active, user, activeZone.array);
+    const retreatCost = getEffectiveRetreatCost(
+      active,
+      user,
+      activeZone.array,
+      bench.array
+    );
 
     if (retreatCost > 0 && !hasRedirectEnergy) {
       const energyTypes = [];

@@ -5,12 +5,13 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 276
-Focus: S276 patch: Run Away Draw (Dudunsparce) shuffles itself + attachments into the deck. Pushed to main.
-  S275 patch: multiplayer Reset unclickable under pending-choice overlays (picker / View Board). Pushed to main.
+Session: 277
+Focus: S277 feature: team-wide "no Retreat Cost" abilities on a Benched Pokémon (Latias ex
+  "Skyliner") now zero the Active Spot's retreat cost. S276 patch: Run Away Draw self-shuffle.
 Active: none.
 Next: maintenance due (S270, still not run).
-  I121-I125 (design 032 leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
+  I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
+  leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
   Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
   Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
   ISSUES Open still over cap.
@@ -24,10 +25,10 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins, tokens carry `copiedAttack` (D110).
   BLOCKS regexes are wrapped by `gatedBlock` (adds capture group 1): no backreferences in them.
 - Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D97-D100.
-- ONE pre-existing failing test: card-inspector-model "retreat greys only when the cost is unpaid". Test with
-  `pnpm test` (globs include scripts/**/*.test.mjs).
+- Pre-existing `pnpm test` failures (7 files, env/CRLF — not one): card-inspector-model "retreat greys…", deck-row-sprites,
+  deck-sprite-strip, result-tile, end-turn-button, view-board-toggle, coin-flip-ceremony. Lint cannot run (`@eslint/js` missing).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S275 side menu reachable during choices: pending-choice overlays stop at right:24% (e2e: pnpm test:reset-choice).
+- S277 team-wide retreat-cost: `teamNoRetreatCostForActive` (D116) zeroes the Active's cost from a Benched Skyliner-style holder; retreat callers pass `benchCards`.
 - S276 ability self-shuffle: `returnSelfToDeckAbility` executes (shuffleSelf, requiresDraw gate); ability path settles a vacated Active.
-- S274 hand stacks: stack child rules scoped under #hand so late-hydrated holo wrappers size correctly.
+- S275 side menu reachable during choices: pending-choice overlays stop at right:24% (e2e: pnpm test:reset-choice).

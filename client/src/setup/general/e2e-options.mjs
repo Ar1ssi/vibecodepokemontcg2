@@ -328,7 +328,8 @@ export async function enumerateOptions({
       user,
       active,
       energyDescriptors(attachedCardsOf(active)),
-      zoneCards
+      zoneCards,
+      benchCards
     );
     if (retreatCheck.allowed && statusAllowsRetreat(user, statusKey(active)).can) {
       benchCards.forEach((_card, benchIndex) => {
