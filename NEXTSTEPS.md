@@ -1,3 +1,18 @@
+# Active work — design 034: ability behaviour implementation (branch `feature/ability-behaviour`)
+
+Full plan: `.agent/designs/034-ability-behaviour-implementation.md` (approved S279). One commit per
+slice on this branch; each commit leaves `pnpm test` + `pnpm audit:oracle` green.
+
+| Slice | Status | Notes |
+|---|---|---|
+| 1 | in progress | `cardAbilityText` accessor; I130 HP reduction; `parseThorns` legacy wording; typed-basic HP cap |
+| 2 | pending | `ability-combat.mjs` + computeAttackDamage options + effectiveHp + prize/retreat/cost/ignore-defender/type/energy reads |
+| 3 | pending | suppression predicate + activation block reasons + picker parity; locks and gates |
+| 4 | pending | `ability-triggers.mjs` + checkup/end-of-turn/on-damage/on-promotion/on-KO hooks |
+| 5 | pending | executor batch A |
+| 6 | pending | executor batch B (one-offs) |
+| 7 | pending | `scripts/audit-ability-behaviour.mjs` + baseline; close I128/I129/I130 |
+
 # Active work — S264 12-item batch (branch `feature/batch-s264`, worktree `../vibe-batch-s264`)
 
 Increment ledger (one cluster per commit, suite green between):
