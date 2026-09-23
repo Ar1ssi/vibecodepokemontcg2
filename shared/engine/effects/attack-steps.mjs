@@ -503,7 +503,11 @@ function attachTargets(ctx) {
     return ref ? [ref.card] : [];
   }
   const attacker = attackerRef(ctx)?.card;
-  if (step.target === 'bench') return benchRootsOf(player).filter((c) => c !== attacker);
+  if (step.target === 'bench') {
+    return benchRootsOf(player).filter(
+      (c) => c !== attacker && (!step.targetEx || /-EX$/.test(String(topPokemonCard(player, c)?.name || '')))
+    );
+  }
   return rootsOf(player);
 }
 
@@ -621,20 +625,32 @@ function atkBenchFromDiscard(ctx) {
   });
 }
 
+// `what: null` takes any card; `to: 'deckTop'` puts it on top of the deck (Xatu Warp Hole).
 function atkRecover(ctx) {
   const { player, step } = ctx;
-  const candidates = (player.zones.discard || []).filter((c) => matchesSearch(c, step.what));
-  const toHand = (cards) => {
-    for (const card of cards) moveToZone(player, card, 'hand', 'discard', ctx.events);
+  const candidates = (player.zones.discard || []).filter((c) => !step.what || matchesSearch(c, step.what));
+  const toDeckTop = step.to === 'deckTop';
+  const recover = (cards) => {
+    for (const card of cards) {
+      if (!toDeckTop) {
+        moveToZone(player, card, 'hand', 'discard', ctx.events);
+        continue;
+      }
+      removeFromZones(player, card);
+      player.zones.deck.unshift(card);
+      ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'discard', to: 'deck', playerId: player.playerId });
+    }
     return null;
   };
-  if (ctx.selection) return toHand(pickById(candidates, ctx.selection));
+  if (ctx.selection) return recover(pickById(candidates, ctx.selection));
   if (candidates.length === 0) return skip(ctx, 'nothing_to_recover');
   const max = Math.min(step.count || 1, candidates.length);
   const min = step.upTo ? 0 : max;
-  if (min === max && max === candidates.length) return toHand(candidates);
+  if (min === max && max === candidates.length) return recover(candidates);
+  const kind = step.what ? `${step.what} ` : '';
+  const where = toDeckTop ? 'on top of your deck' : 'into your hand';
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose ${min === max ? max : `up to ${max}`} ${step.what} card${max === 1 ? '' : 's'} to put into your hand`,
+    prompt: `${attackName(ctx)}: Choose ${min === max ? max : `up to ${max}`} ${kind}card${max === 1 ? '' : 's'} to put ${where}`,
     options: candidates,
     min,
     max,
@@ -1336,7 +1352,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
-  atkRecover: optional(atkRecover, (step) => `Put ${step.what} from your discard pile into your hand`),
+  atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
   atkLostZoneDeckTop,
   atkLostZoneEnergy,

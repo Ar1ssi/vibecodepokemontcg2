@@ -219,7 +219,7 @@ const TEMPLATES = [
 
   // Attach from the discard pile / hand
   [
-    new RegExp(String.raw`^attach (an?|up to \d+|\d+|any number of) ${ENERGY_TYPE}energy cards? from your (discard pile|hand) to (this pokémon|1 of your (?:benched )?pokémon|your (?:benched )?pokémon in any way you like)$`),
+    new RegExp(String.raw`^attach (an?|up to \d+|\d+|any number of) ${ENERGY_TYPE}energy cards? from your (discard pile|hand) to (this pokémon|1 of your (?:benched )?pokémon|your (?:benched )?pokémon(-ex)? in any way you like)$`),
     (m, s) => {
       if (attachDiscardToBenchSpread(s)) return null;
       const target = m[4];
@@ -230,6 +230,8 @@ const TEMPLATES = [
         ...energyFilter(m[2], s),
         target: target === 'this pokémon' ? 'self' : /benched/.test(target) ? 'bench' : 'any',
         ...(/any way you like/.test(target) ? { spread: true } : {}),
+        // Sableye Energy Hunt: only the old uppercase Pokémon-EX.
+        ...(m[5] ? { targetEx: true } : {}),
       };
     },
   ],
@@ -251,6 +253,12 @@ const TEMPLATES = [
   [
     /^put (up to \d+|an?|\d+) (trainer|item|supporter|pokémon tool|stadium|basic energy|energy|pokémon) cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: recoverWhat(m[2]) }),
+  ],
+  // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power
+  [/^put a card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],
+  [
+    /^(?:choose a card from your discard pile and put it|search your discard pile for a card, show it to your opponent, and put it) on top of your deck$/,
+    () => ({ type: 'atkRecover', count: 1, what: null, to: 'deckTop' }),
   ],
 
   // Old wording of an attach from the discard pile ("Search your discard pile for … and attach it to …")
@@ -325,7 +333,7 @@ const TEMPLATES = [
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
 
   // Leave play
-  [/^shuffle this pokémon and all (?:attached cards|cards attached to it) into your deck$/, () => ({ type: 'atkShuffleSelf' })],
+  [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
   [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
   [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
   [/^draw (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', count: countOf(m[1]) })],
@@ -459,6 +467,17 @@ const BLOCKS = [
   [
     /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at (?:the|that) card you chose, then have your opponent shuffle that card) into their deck\./g,
     (m) => ({ type: 'atkOppHandRandomToDeck', count: countOf(m[1]) }),
+  ],
+  // Articuno Freeze Solid / Zapdos Plasma / Moltres Collect Fire: the condition only decides
+  // whether the coin is flipped; with no such Energy the step finds nothing either way.
+  [
+    /if there are any \{([a-z])\} energy cards in your discard pile, flip a coin\. if heads, attach 1 of them to this pokémon\./g,
+    (m) => ({ type: 'atkAttach', source: 'discard', count: 1, energyType: m[1].toUpperCase(), target: 'self', gate: 'heads' }),
+  ],
+  // Kakuna Dangerous Evolution: evolves the attacker from the deck.
+  [
+    /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
+    () => ({ type: 'searchEvolve', ontoSource: true }),
   ],
   // Staraptor Strong Breeze: on top of the deck, then shuffled — the same as shuffled in.
   [
@@ -655,7 +674,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       const step = build(args);
       if (!step) return args[0];
       blockSteps.push(step);
-      if (step.type === 'searchAbility') result.handlesSearch = true;
+      if (step.type === 'searchAbility' || step.type === 'searchEvolve') result.handlesSearch = true;
       return ` @block${blockSteps.length - 1}. `;
     });
   }

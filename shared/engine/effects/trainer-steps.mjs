@@ -1409,10 +1409,13 @@ function evolvesFromTop(player, card) {
 
 // Salvatore: search the deck for an Evolution card and put it onto the Pokémon it evolves from.
 // Grand Tree sets `step.chainStage2`, which offers the matching Stage 2 from the deck as a second,
-// chained evolve onto the same Pokémon (printed exception on that card).
+// chained evolve onto the same Pokémon (printed exception on that card). `step.ontoSource` evolves
+// only the source card (Kakuna Dangerous Evolution: "… evolves from Kakuna and put it onto Kakuna").
 function searchEvolve(ctx) {
   const { player, step } = ctx;
   const deck = player.zones.deck;
+  const evolveTargets = (card) =>
+    evolvesFromTop(player, card).filter((root) => !step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId);
 
   const evolveOnto = (card, root) => {
     attachTo(player, card, root, ctx.events);
@@ -1462,7 +1465,7 @@ function searchEvolve(ctx) {
 
   if (ctx.memo?.phase === 'target') {
     const card = deck.find((c) => c.instanceId === ctx.memo.cardId);
-    const root = card && evolvesFromTop(player, card).find((c) => c.instanceId === ctx.selection?.[0]);
+    const root = card && evolveTargets(card).find((c) => c.instanceId === ctx.selection?.[0]);
     if (!card || !root) {
       shuffleDeck(player, ctx);
       return null;
@@ -1472,7 +1475,7 @@ function searchEvolve(ctx) {
   }
 
   const candidates = deck.filter(
-    (c) => isPokemon(c) && evolvesFromTop(player, c).length > 0 && !(step.noAbilities && hasAbility(c))
+    (c) => isPokemon(c) && evolveTargets(c).length > 0 && !(step.noAbilities && hasAbility(c))
   );
 
   if (ctx.selection) {
@@ -1481,7 +1484,7 @@ function searchEvolve(ctx) {
       shuffleDeck(player, ctx);
       return null;
     }
-    const roots = evolvesFromTop(player, card);
+    const roots = evolveTargets(card);
     if (roots.length === 1) {
       evolveOnto(card, roots[0]);
       return chainStage2(card, roots[0]);

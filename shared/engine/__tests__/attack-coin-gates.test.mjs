@@ -386,3 +386,132 @@ test('attack: Hidden Power devolves the chosen evolved Pokémon of either player
   assert.ok(zone(res2, 'p2', 'hand').some((c) => c.name === 'Opp Stage 1'));
   assert.ok(zone(res2, 'p1', 'bench').some((c) => c.name === 'Own Stage 1'), 'the other side keeps its evolution');
 });
+
+// ── slice 3: your own side ──────────────────────────────────────────────────
+
+test('parseAttackSteps: own-side coin sentences', () => {
+  const after = (text, selfName) => parseAttackSteps(text, { selfName }).after;
+  assert.deepEqual(after('Flip a coin. If heads, put a card from your discard pile into your hand.'), [
+    { type: 'atkRecover', count: 1, what: null, gate: 'heads' },
+  ]);
+  assert.deepEqual(after('Flip a coin. If heads, choose a card from your discard pile and put it on top of your deck.'), [
+    { type: 'atkRecover', count: 1, what: null, to: 'deckTop', gate: 'heads' },
+  ]);
+  assert.deepEqual(
+    after('Flip a coin. If heads, search your discard pile for a card, show it to your opponent, and put it on top of your deck.'),
+    [{ type: 'atkRecover', count: 1, what: null, to: 'deckTop', gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after('If there are any {W} Energy cards in your discard pile, flip a coin. If heads, attach 1 of them to Articuno.', 'Articuno'),
+    [{ type: 'atkAttach', source: 'discard', count: 1, energyType: 'W', target: 'self', gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after(
+      'Flip 3 coins. For each heads, attach a basic Energy card from your discard pile to your Benched Pokémon-EX in any way you like.'
+    ),
+    [{ type: 'atkAttach', source: 'discard', count: 1, basic: true, target: 'bench', spread: true, targetEx: true, perHeads: true }]
+  );
+  assert.deepEqual(
+    after('Flip a coin. If tails, shuffle Crobat and all cards attached to it back into your deck.', 'Crobat'),
+    [{ type: 'atkShuffleSelf', gate: 'tails' }]
+  );
+  const evolve = parseAttackSteps(
+    'The Defending Pokémon is now Poisoned. Flip a coin. If heads, search your deck for an Evolution card that evolves from Kakuna and put it onto Kakuna. (This counts as evolving Kakuna.) Shuffle your deck afterward.',
+    { selfName: 'Kakuna' }
+  );
+  assert.deepEqual(evolve.after, [{ type: 'searchEvolve', ontoSource: true, gate: 'heads' }]);
+  assert.equal(evolve.handlesSearch, true);
+});
+
+const inDiscard = (...cards) => ({ p1 }) => p1.zones.discard.push(...cards);
+
+test('attack: Reverse Edge puts the chosen discard-pile card into the hand on heads', () => {
+  const text = 'Flip a coin. If heads, put a card from your discard pile into your hand.';
+  const { b, res } = attackOn('heads', text, { setup: inDiscard(trainer('Potion'), energy('Metal')) });
+  assert.equal(res.state.pendingChoice.player, 'p1');
+  const potion = zone(res, 'p1', 'discard').find((c) => c.name === 'Potion');
+  const res2 = choose(res, [potion.instanceId], b.rng);
+  assert.deepEqual(
+    zone(res2, 'p1', 'hand').map((c) => c.name),
+    ['Potion']
+  );
+  const tails = attackOn('tails', text, { setup: inDiscard(trainer('Potion')) });
+  assert.equal(zone(tails.res, 'p1', 'hand').length, 0);
+});
+
+test('attack: Warp Hole puts the only discard-pile card on top of the deck', () => {
+  const text = 'Flip a coin. If heads, choose a card from your discard pile and put it on top of your deck.';
+  const { res } = attackOn('heads', text, { setup: inDiscard(trainer('Rare Candy')) });
+  assert.equal(zone(res, 'p1', 'deck')[0].name, 'Rare Candy');
+  assert.equal(zone(res, 'p1', 'discard').length, 0);
+  const empty = attackOn('heads', text);
+  assert.ok(empty.res.events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'nothing_to_recover'));
+});
+
+test('attack: Freeze Solid attaches a {W} Energy from the discard pile to itself on heads', () => {
+  const text = 'If there are any {W} Energy cards in your discard pile, flip a coin. If heads, attach 1 of them to Articuno.';
+  const { b, res } = attackOn('heads', text, { name: 'Articuno', setup: inDiscard(energy('Fire'), energy('Water')) });
+  assert.deepEqual(
+    attachedTo(res, 'p1', b.attacker.instanceId).map((c) => c.energyType),
+    ['Water']
+  );
+  const tails = attackOn('tails', text, { name: 'Articuno', setup: inDiscard(energy('Water')) });
+  assert.equal(attachedTo(tails.res, 'p1', tails.b.attacker.instanceId).length, 0);
+});
+
+test('attack: Energy Hunt attaches 1 basic Energy per heads to Benched Pokémon-EX only', () => {
+  const text =
+    'Flip 3 coins. For each heads, attach a basic Energy card from your discard pile to your Benched Pokémon-EX in any way you like.';
+  let checked = false;
+  for (let seed = 1; seed <= 20 && !checked; seed++) {
+    const b = board(text, {
+      seed,
+      setup: ({ p1 }) => {
+        p1.zones.bench.push(mon('Mewtwo-EX'), mon('Pikachu'));
+        p1.zones.discard.push(energy('Psychic'), energy('Psychic'), energy('Psychic'));
+      },
+    });
+    let res = attack(b);
+    const heads = coinOf(res).headsCount;
+    if (heads === 0) continue;
+    // One Energy picked per heads, then each goes to the only Pokémon-EX.
+    while (res.state.pendingChoice) {
+      const { options, min } = res.state.pendingChoice;
+      assert.ok(options.every((o) => o.name !== 'Pikachu'), 'a non-EX is never offered');
+      res = choose(res, options.slice(0, Math.max(min, 1)).map((o) => o.instanceId), b.rng);
+    }
+    const mewtwo = zone(res, 'p1', 'bench').find((c) => c.name === 'Mewtwo-EX');
+    assert.equal(attachedTo(res, 'p1', mewtwo.instanceId).length, heads, `seed ${seed}`);
+    checked = true;
+  }
+  assert.ok(checked, 'a seed flips heads');
+});
+
+test('attack: Strike and Fade shuffles the attacker into the deck on tails', () => {
+  const text = 'Flip a coin. If tails, shuffle Crobat and all cards attached to it back into your deck.';
+  const setup = ({ p1 }) => p1.zones.bench.push(mon('Benched'));
+  const tails = attackOn('tails', text, { name: 'Crobat', setup });
+  assert.ok(zone(tails.res, 'p1', 'deck').some((c) => c.instanceId === tails.b.attacker.instanceId));
+  const heads = attackOn('heads', text, { name: 'Crobat', setup });
+  assert.equal(zone(heads.res, 'p1', 'active')[0].instanceId, heads.b.attacker.instanceId);
+});
+
+test('attack: Dangerous Evolution evolves the attacker from the deck on heads', () => {
+  const text =
+    'Flip a coin. If heads, search your deck for an Evolution card that evolves from Kakuna and put it onto Kakuna. (This counts as evolving Kakuna.) Shuffle your deck afterward.';
+  const setup = ({ p1 }) => {
+    p1.zones.deck.push(mon('Beedrill', { stage: 'Stage 2', evolvesFrom: 'Kakuna' }));
+    // Another Kakuna on the Bench must not be offered: only the attacker evolves.
+    p1.zones.bench.push(mon('Kakuna', { stage: 'Stage 1' }));
+  };
+  const { b, res } = attackOn('heads', text, { name: 'Kakuna', setup });
+  assert.equal(res.state.pendingChoice.player, 'p1');
+  const beedrill = res.state.pendingChoice.options.find((c) => c.name === 'Beedrill');
+  const res2 = choose(res, [beedrill.instanceId], b.rng);
+  assert.ok(zone(res2, 'p1', 'active').some((c) => c.name === 'Beedrill' && c.attachedTo === b.attacker.instanceId));
+  assert.equal(zone(res2, 'p1', 'hand').length, 0, 'no card goes to the hand');
+
+  const tails = attackOn('tails', text, { name: 'Kakuna', setup });
+  assert.equal(tails.res.state.pendingChoice, null);
+  assert.ok(zone(tails.res, 'p1', 'deck').some((c) => c.name === 'Beedrill'));
+});
