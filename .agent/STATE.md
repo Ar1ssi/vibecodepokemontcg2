@@ -4,32 +4,29 @@
      Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
-Session: 265
-Focus: S265 read-only attack/ability coverage audit (worktree ../vibe-audit-coverage, branch
-  `audit/attack-ability-coverage`, harness files only, uncommitted). Report:
-  .agent/scratch/attack-ability-coverage-audit.md; 28 confirmed gaps filed as I88–I115.
-Active: none — waiting on the user to pick which gaps to fix first.
-Next: user decides the fix order. Recommended: I88 (statusAbility poisons own Active) + I94 (useAbility
-  passive gate), then I99/I100 (regex fixes), then I113 (oracle as gate) before I89–I91/I102–I107.
-  Still pending from S264: approve design 028 (I85) and 029 (I86); describe #5 (I87); localhost checks
-  (holo double-click, Mega entry, End Turn, View Board, no blink).
-  maintenance due (S260) — also ISSUES Open is ~77, over the 40 cap: run .agent/workflows/maintain.md.
-Blocked: #5 needs the user's description (no match logs exist). A public tunnel is NOT possible.
+
+Session: 266
+Focus: S266 fixed I82+ patch-sized gaps on branch `audit/attack-ability-coverage` (worktree
+  ../vibe-audit-coverage, unpushed, not merged). 15 issues closed (incl. I114 audit-script cwd).
+Active: none — waiting on the user: design approval for step-driven attack effects.
+Next: design 030 "step-driven attack effects" covering I102–I111 (switch/gust, move-energy, discard-opponent,
+  attach from discard/hand, draw-until, deck→Bench, search-attach, mill, shuffle-self, misc) + I115;
+  then I89/I95 (unhandled ability step types) and I112/I113 (oracle as execution gate, fix EXECUTED lists).
+  Merge this branch to main when the user approves. Still pending from S264: designs 028 (I85), 029 (I86),
+  #5 description (I87). maintenance due (S260); ISSUES Open still over cap.
+Blocked: attack-effects design needs user approval (feature workflow). #5 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Attack/ability pipeline green metrics lie: `executeSteps` `default:` no-ops and `executeAbility` still
-  marks the ability used; the server attack phase (reduce.mjs:3032-3830) only runs a fixed set of text
-  helpers. Verify execution with `.agent/scratch/cov/oracle.mjs` (state diff), not the audit scripts.
-- Mat FX (designs 022, 026, 027): effects are WAAPI keyframes from pure `*-pose.mjs` (D103); hits wait on
-  `afterImpact`; entry.js decides Mega/Tera (D104); styles in css/mat-fx.css + css/mat-ambient.css.
-- Deck-builder styling has two layers: `css/deck-builder-live.css` scoped `.db-live` (D95) and
-  `css/deck-builder-pc-box.css` scoped `.db-live:not(.db-light)` (D99). No unprefixed rules, no !important.
-- Vendored art: never hand-edit the `*.generated.mjs` catalogs; rerun the scripts (D97, D98, D100).
-- ONE pre-existing failing test: `card-inspector-model.test.mjs` "retreat greys only when the cost is
-  unpaid". Test with `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs"
-  "bot/**/*.test.mjs"`, not `pnpm test`. The user checks CSS on localhost; no tunnel from this container.
+- Attack/ability green metrics lie: verify execution with `.agent/scratch/cov/oracle.mjs` (state diff).
+  The server attack phase (reduce.mjs attack case) runs fixed text helpers, not steps.
+- Editing via bash heredoc eats `\` → `\`: write edit scripts with the Write tool / String.raw.
+  Working-copy files are CRLF (repo LF); keep eol when scripting edits.
+- useAbility now rejects passive/trigger texts in rules mode (isActivatedAbility, ability-executors.mjs).
+- Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D97-D100.
+- ONE pre-existing failing test: card-inspector-model "retreat greys only when the cost is unpaid". Test with
+  `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S265 audit only: 28 attack/ability execution gaps filed (I88–I115); no code changed.
+- S266 (branch, unmerged) status abilities, passive gate, {R} discard costs, self-bench recoil, hand/search attach, attach-bonus, coin gates, draw costs.
+- S265 audit only: 28 attack/ability execution gaps filed (I88–I115).
 - S264 (on main) Dynamotor, Sinister Surge, Adrena-Brain, Acerola's Premonition resolve server-side.
-- S264 (on main) auth-mode previews keep their foil; Mega entry reworked; End Turn/View Board; no blink (D106).

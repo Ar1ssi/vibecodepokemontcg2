@@ -7,6 +7,7 @@
  *   node attack-false-positive-audit.mjs [--json] [--sets=me01,sv08]
  */
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { classifyAttackEffect } from './shared/engine/rules/attack-effects.mjs';
 
 /** Families with live execution in attack() (chat-buttons.js) as of backlog pass. */
@@ -70,12 +71,13 @@ function main() {
   if (setsArg) args.push(setsArg);
 
   const proc = spawnSync('node', args, {
-    cwd: new URL('.', import.meta.url).pathname,
+    // fileURLToPath, not .pathname: on Windows the pathname is '/C:/…' and spawnSync fails (I114).
+    cwd: fileURLToPath(new URL('.', import.meta.url)),
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });
   if (proc.status !== 0) {
-    console.error(proc.stderr || proc.stdout);
+    console.error(proc.error?.message || proc.stderr || proc.stdout);
     process.exit(proc.status || 1);
   }
 
