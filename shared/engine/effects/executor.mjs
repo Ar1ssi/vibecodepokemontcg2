@@ -11,6 +11,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
+import { shuffleInPlace } from '../rng.mjs';
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
@@ -379,7 +380,7 @@ export function executeSteps(draft, {
         };
         const finishSearch = () => {
           delete context[attachKey];
-          if (activeRng) activeRng.shuffle(player.zones.deck || []);
+          if (activeRng) shuffleInPlace(activeRng, player.zones.deck || []);
           events.push({ type: 'deckShuffled', playerId });
         };
         if (stepSelection && context[attachKey]) {
@@ -479,7 +480,7 @@ export function executeSteps(draft, {
 
           // Worked Example B Step 7: Shuffle deck after search
           if (activeRng) {
-            activeRng.shuffle(deck);
+            shuffleInPlace(activeRng, deck);
           }
           events.push({ type: 'deckShuffled', playerId });
           break;
@@ -507,7 +508,7 @@ export function executeSteps(draft, {
         if (matches.length === 0) {
           // Fail to find in private zone: shuffle deck and continue
           if (activeRng) {
-            activeRng.shuffle(deck);
+            shuffleInPlace(activeRng, deck);
           }
           events.push({ type: 'deckShuffled', playerId });
           break;
@@ -664,7 +665,7 @@ export function executeSteps(draft, {
         const hand = player.zones.hand || [];
         const deck = player.zones.deck || [];
         deck.push(...hand.splice(0, hand.length));
-        if (activeRng) activeRng.shuffle(deck);
+        if (activeRng) shuffleInPlace(activeRng, deck);
         events.push({ type: 'deckShuffled', playerId });
         const bonusApplies =
           step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && (player.zones.prizes || []).length === 6;
@@ -691,7 +692,7 @@ export function executeSteps(draft, {
             const hand = p.zones.hand || [];
             const returned = hand.splice(0, hand.length);
             (p.zones.deck || []).push(...returned);
-            if (activeRng) activeRng.shuffle(p.zones.deck);
+            if (activeRng) shuffleInPlace(activeRng, p.zones.deck);
             events.push({ type: 'cardsShuffledIntoDeck', count: returned.length, playerId: p.playerId });
             const drawn = p.zones.deck.splice(0, Math.min(step.drawCount, p.zones.deck.length));
             hand.push(...drawn);
@@ -720,7 +721,7 @@ export function executeSteps(draft, {
           const count = hand.length;
           if (count > 0) {
             const returned = hand.splice(0, count);
-            if (activeRng) activeRng.shuffle(returned);
+            if (activeRng) shuffleInPlace(activeRng, returned);
             if (isBottom) {
               (p.zones.deck || []).push(...returned);
               events.push({
@@ -730,7 +731,7 @@ export function executeSteps(draft, {
               });
             } else {
               (p.zones.deck || []).push(...returned);
-              if (activeRng) activeRng.shuffle(p.zones.deck);
+              if (activeRng) shuffleInPlace(activeRng, p.zones.deck);
               events.push({
                 type: 'cardsShuffledIntoDeck',
                 count,
@@ -1014,7 +1015,7 @@ export function executeSteps(draft, {
             }
           }
           if (isShuffle && activeRng) {
-            activeRng.shuffle(player.zones.deck);
+            shuffleInPlace(activeRng, player.zones.deck);
             events.push({ type: 'deckShuffled', playerId });
           }
           events.push({
@@ -1258,7 +1259,7 @@ export function executeSteps(draft, {
           card.attachedTo = null;
           player.zones.deck.push(card);
         }
-        if (activeRng) activeRng.shuffle(player.zones.deck);
+        if (activeRng) shuffleInPlace(activeRng, player.zones.deck);
         events.push({ type: 'deckShuffled', playerId });
         events.push({
           type: 'cardMoved',
@@ -1337,7 +1338,7 @@ export function executeSteps(draft, {
               moved.push(c);
             }
           }
-          if (activeRng) activeRng.shuffle(player.zones.deck);
+          if (activeRng) shuffleInPlace(activeRng, player.zones.deck);
           events.push({ type: 'deckShuffled', playerId });
           events.push({
             type: 'cardsPutInDeck',

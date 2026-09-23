@@ -7,6 +7,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
+import { shuffleInPlace } from '../rng.mjs';
 import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -169,14 +170,14 @@ function drawCards(player, count, events) {
 }
 
 export function shuffleDeck(player, ctx) {
-  if (ctx.activeRng) ctx.activeRng.shuffle(player.zones.deck);
+  if (ctx.activeRng) shuffleInPlace(ctx.activeRng, player.zones.deck);
   ctx.events.push({ type: 'deckShuffled', playerId: player.playerId });
 }
 
 function handToDeckBottom(player, ctx) {
   const hand = player.zones.hand.splice(0);
   if (hand.length === 0) return 0;
-  if (ctx.activeRng) ctx.activeRng.shuffle(hand);
+  if (ctx.activeRng) shuffleInPlace(ctx.activeRng, hand);
   player.zones.deck.push(...hand);
   ctx.events.push({ type: 'cardsMovedToDeckBottom', count: hand.length, playerId: player.playerId });
   return hand.length;
@@ -556,7 +557,7 @@ function finishLook(ctx, viewed) {
   const deck = player.zones.deck;
   const rest = viewed.filter((card) => deck.includes(card));
   for (const card of rest) deck.splice(deck.indexOf(card), 1);
-  if (ctx.activeRng) ctx.activeRng.shuffle(rest);
+  if (ctx.activeRng) shuffleInPlace(ctx.activeRng, rest);
   deck.push(...rest);
   ctx.events.push({ type: 'cardsMovedToDeckBottom', count: rest.length, playerId: player.playerId });
   return null;
@@ -1208,7 +1209,7 @@ function revealOpponentDeckBench(ctx) {
   const slots = Math.max(0, BENCH_LIMIT - benchRootsOf(opponent).length);
 
   const finish = () => {
-    if (ctx.activeRng) ctx.activeRng.shuffle(deck);
+    if (ctx.activeRng) shuffleInPlace(ctx.activeRng, deck);
     ctx.events.push({ type: 'deckShuffled', playerId: opponent.playerId });
     return null;
   };
