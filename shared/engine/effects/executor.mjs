@@ -110,6 +110,27 @@ export function attachToRoot(player, card, root, events) {
 /**
  * Normalizes coin branch steps into an array.
  */
+const ABILITY_STATUS_CONDITIONS = {
+  asleep: 'Asleep',
+  burned: 'Burned',
+  confused: 'Confused',
+  paralyzed: 'Paralyzed',
+  poisoned: 'Poisoned',
+};
+
+// Maps a parseAbility statusAbility step onto the executor's vocabulary, the way the
+// legacy client reads it (chat-buttons statusAbility): 'opponent' is the opponent's
+// Active, anything else the user's own Active. Returns null when no condition parsed.
+function normalizeStatusAbilityStep(step) {
+  const condition = ABILITY_STATUS_CONDITIONS[String(step.status || '').toLowerCase()];
+  if (!condition) return null;
+  return {
+    target: step.target === 'opponent' || step.target === 'opponentActive' ? 'opponentActive' : 'self',
+    condition,
+    coinFlip: Boolean(step.coinFlip),
+  };
+}
+
 function normalizeSteps(branch) {
   if (!branch) return [];
   if (Array.isArray(branch)) return branch;
@@ -1419,14 +1440,30 @@ export function executeSteps(draft, {
 
       case 'applyStatus':
       case 'statusAbility': {
+        // parseAbility emits { target: 'opponent'|'attacker', status: 'confused', coinFlip };
+        // trainers emit { target: 'opponentActive'|…, conditions: ['Confused'] }.
+        const abilityStatus = step.type === 'statusAbility' ? normalizeStatusAbilityStep(step) : null;
+        if (step.type === 'statusAbility' && !abilityStatus) {
+          events.push({ type: 'effectStepSkipped', reason: 'unparsed_status', playerId });
+          break;
+        }
+        if (abilityStatus?.coinFlip) {
+          const coinKey = `${idx}:statusCoin`;
+          if (!context[coinKey]) {
+            context[coinKey] = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+            events.push({ type: 'coinFlipped', playerId, face: context[coinKey] });
+          }
+          if (context[coinKey] !== 'heads') break;
+        }
+        const statusTarget = abilityStatus?.target ?? step.target;
         // "Both Active Pokémon are now …" / "Both Active non-{D} Pokémon are now …"
         // must hit both sides; the non-{D} variant skips a Darkness Active.
         // Collapsing these to a single side applied Dark Bell's Confusion to one
         // Pokémon only.
         const sides =
-          step.target === 'bothActiveNonDark' || step.target === 'bothActiveAll'
+          statusTarget === 'bothActiveNonDark' || statusTarget === 'bothActiveAll'
             ? [player, opponent].filter(Boolean)
-            : [step.target === 'opponentActive' ? opponent : player].filter(Boolean);
+            : [statusTarget === 'opponentActive' ? opponent : player].filter(Boolean);
         const isDark = (card) => {
           const types = [
             ...(Array.isArray(card?.types) ? card.types : []),
@@ -1437,13 +1474,15 @@ export function executeSteps(draft, {
           return types.includes('darkness') || types.includes('dark');
         };
         // Every listed condition lands: markers stack with a rotation condition (design 011).
-        const conditions = step.conditions?.length
-          ? step.conditions
-          : [step.condition || 'Poisoned'];
+        const conditions = abilityStatus
+          ? [abilityStatus.condition]
+          : step.conditions?.length
+            ? step.conditions
+            : [step.condition || 'Poisoned'];
         for (const side of sides) {
           const targetActive = side?.zones?.active?.find((c) => !c.attachedTo);
           if (!targetActive) continue;
-          if (step.target === 'bothActiveNonDark' && isDark(targetActive)) continue;
+          if (statusTarget === 'bothActiveNonDark' && isDark(targetActive)) continue;
           for (const condition of conditions) {
             if (!addCondition(targetActive, condition)) continue;
             events.push({

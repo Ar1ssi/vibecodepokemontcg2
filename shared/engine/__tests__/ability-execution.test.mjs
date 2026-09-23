@@ -856,3 +856,44 @@ test('ability: deck-to-Bench search puts the card on the Bench, not in hand (I82
   assert.deepEqual(res2.state.players.p1.zones.bench.map((c) => c.instanceId), [60]);
   assert.equal(res2.state.players.p1.zones.hand.length, 0);
 });
+
+function setupStatusAbility(text) {
+  const { state, rng } = setupGame();
+  state.rulesEnabled = false;
+  state.players.p1.zones.active.push(createCard({
+    instanceId: 40,
+    name: 'Status User',
+    hp: 130,
+    supertype: 'Pokémon',
+    abilities: [{ name: 'Status Test', type: 'Ability', text }],
+  }));
+  state.players.p2.zones.active.push(createCard({ instanceId: 41, name: 'Opp', hp: 100, supertype: 'Pokémon' }));
+  return { state, rng };
+}
+
+const conditionsOf = (card) => [card.specialCondition, ...(card.conditions || [])].filter(Boolean);
+
+test("ability: statusAbility applies the printed condition to the opponent's Active, not the user's (I88)", () => {
+  const { state, rng } = setupStatusAbility("Once during your turn, you may make your opponent's Active Pokémon Confused.");
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 40 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(conditionsOf(res.state.players.p2.zones.active[0]), ['Confused']);
+  assert.deepEqual(conditionsOf(res.state.players.p1.zones.active[0]), []);
+});
+
+test('ability: coin-flip statusAbility only applies on heads (I88)', () => {
+  const text = "Once during your turn, you may flip a coin. If heads, your opponent's Active Pokémon is now Asleep.";
+  const faces = new Set();
+  for (let seed = 1; seed <= 12; seed++) {
+    const { state } = setupStatusAbility(text);
+    const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 40 }, playerId: 'p1' }, createRng(seed));
+    assert.equal(res.error, null);
+    const flip = res.events.find((e) => e.type === 'coinFlipped');
+    assert.ok(flip, 'a coin is flipped');
+    faces.add(flip.face);
+    const expected = flip.face === 'heads' ? ['Asleep'] : [];
+    assert.deepEqual(conditionsOf(res.state.players.p2.zones.active[0]), expected);
+    assert.deepEqual(conditionsOf(res.state.players.p1.zones.active[0]), []);
+  }
+  assert.deepEqual([...faces].sort(), ['heads', 'tails']);
+});

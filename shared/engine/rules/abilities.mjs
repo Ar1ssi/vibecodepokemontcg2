@@ -805,6 +805,7 @@ export function parseAbility(text = '') {
     else if (lower.includes('burned')) status = 'burned';
     else if (lower.includes('poisoned') || lower.includes('now poisoned')) status = 'poisoned';
     else if (lower.includes('confused')) status = 'confused';
+    else if (lower.includes('paralyzed')) status = 'paralyzed';
     steps.push({
       type: 'statusAbility',
       target,
