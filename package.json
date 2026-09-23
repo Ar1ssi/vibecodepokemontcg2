@@ -11,6 +11,7 @@
     "test:2p": "node two-player-sync-test.mjs",
     "test:flip": "node flip-gate-test.mjs",
     "test:inspector": "node test-card-inspector-e2e.mjs",
+    "test:reset-choice": "node reset-during-choice-test.mjs",
     "test": "node --test \"shared/**/*.test.mjs\" \"client/**/*.test.mjs\" \"server/**/*.test.mjs\" \"bot/**/*.test.mjs\" \"scripts/**/*.test.mjs\"",
     "audit:oracle": "node scripts/audit-oracle.mjs",
     "lint": "eslint .",

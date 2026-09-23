@@ -4987,6 +4987,18 @@ body.side-menu-collapsed #oppResizer {
 .is-viewing-board .view-board-button {
   visibility: visible;
 }
+
+/* Pending-choice overlays block the board, never the side menu: Reset, chat and
+   Leave Room must stay clickable while a choice is open. The choose picker
+   already lays its cards out left of the menu, so its right padding goes. */
+body:not(.side-menu-collapsed):not(.sidebox-hidden) .discard-pile-overlay,
+body:not(.side-menu-collapsed):not(.sidebox-hidden) .choice-modal-overlay,
+body:not(.side-menu-collapsed):not(.sidebox-hidden) .prize-take-overlay {
+  right: 24%;
+}
+body:not(.side-menu-collapsed):not(.sidebox-hidden) .card-picker-choose {
+  padding-right: 0;
+}
 .view-board-button {
   border: 2px solid #f5d547;
   border-radius: 0.15rem;
