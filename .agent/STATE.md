@@ -5,18 +5,19 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 267
-Focus: S267 shipped design 030 (step-driven attack effects) + I89/I95/I115/I116/I117 on branch
-  `audit/attack-ability-coverage`; merged locally into main folder (NOT pushed to GitHub).
+Session: 268
+Focus: S268 closed I112 on branch `fix/i112-attack-family-list`; merged locally into main (NOT pushed).
+  S267 design 030 work also still unpushed on local main.
 Active: none.
-Next: I112/I113 tooling — re-sync EXECUTED_*_FAMILIES lists to oracle results, promote oracle to a gate.
-  Push main when the user says so. Still pending: designs 028 (I85), 029 (I86), #5 description (I87),
-  I84 legacy (untested by policy). maintenance due (S260); ISSUES Open still over cap.
+Next: I118 (server attack gaps: reveal-hand, immunity, damage-prevention, next-turn-bonus, copy-attack, …) needs a design.
+  I113 oracle gate (record damage amounts so damage-scaling families are verifiable). Push main when the user says so.
+  Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
+  maintenance due (S260); ISSUES Open still over cap.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Attack/ability green metrics lie: verify execution with `.agent/scratch/cov/oracle.mjs` (state diff).
-  Attack phase now runs parseAttackSteps (rules/attack-steps.mjs) via ATTACK_STEP_HANDLERS; resume effectType attackSteps.
+- Attack/ability green metrics lie: verify execution with `.agent/scratch/cov/oracle.mjs` (state diff, ~3 min),
+  then `family-exec.mjs` for per-family rates. Oracle cannot see damage amounts or player-level flags.
 - Editing via bash heredoc eats `\` → `\`: write edit scripts with the Write tool / String.raw.
   Working-copy files are CRLF (repo LF); keep eol when scripting edits.
 - useAbility now rejects passive/trigger texts in rules mode (isActivatedAbility, ability-executors.mjs).
@@ -25,6 +26,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   `node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"`.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S268 I112: EXECUTED_ATTACK_FAMILIES synced to oracle; 10 client-only families filed as I118.
 - S267 design 030 attack steps (switch/gust/move-energy/discard/attach/bench/mill/KO/Lost Zone/heal…), shuffleInPlace fix.
 - S266 status abilities, passive gate, {R} discard costs, self-bench recoil, hand/search attach, coin gates.
-- S265 audit only: 28 attack/ability execution gaps filed (I88–I115).
