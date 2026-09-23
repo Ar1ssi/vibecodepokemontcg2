@@ -70,6 +70,13 @@ import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
+import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
+import {
+  attackerMatchesFilter,
+  clearAttackMarkers,
+  liveAttackMarkers,
+  parseDamageImmunity,
+} from './rules/attack-markers.mjs';
 import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
@@ -169,6 +176,16 @@ function flipAttackCoins(attack, rng) {
       headsCount,
       flips,
     };
+  }
+  // "Flip a coin until you get tails": every flip but the last is heads. No single face, so
+  // only "for each heads" clauses read it. Capped like the printed count above.
+  if (/flip a coin until you get tails/.test(text)) {
+    const flips = [];
+    while (flips.length < 20) {
+      flips.push(flip());
+      if (flips[flips.length - 1] === 'tails') break;
+    }
+    return { coin: null, headsCount: flips.filter((f) => f === 'heads').length, flips };
   }
   if (/flip a coin/.test(text)) {
     const coin = flip();
@@ -304,6 +321,15 @@ function damageBenchedPokemon(
     });
     return;
   }
+  if (!ownAttack && sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId)) {
+    events.push({
+      type: 'damagePrevented',
+      instanceId: victim.instanceId,
+      attackName,
+      reason: 'attack-marker',
+    });
+    return;
+  }
 
   const prevDamage = victim.damage || 0;
   const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
@@ -410,6 +436,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those).
       activeWR: !/don't apply weakness and resistance(?! for benched)/i.test(t),
+      immunity: parseDamageImmunity(t),
     };
   }
   if (parsed?.bench > 0) {
@@ -475,6 +502,110 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       defenderIsActive: true,
       baseDamage: clause.amount,
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
+      ...clause.immunity,
+      defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
+      attackerMarkers: activeAttackMarkers(draft, attackerPlayerId, attacker),
+    }
+  );
+  return result.total;
+}
+
+// Timed attack effects (design 031) still in force on a Pokémon in its owner's Active Spot.
+function activeAttackMarkers(draft, playerId, card) {
+  const active = draft.players[playerId]?.zones?.active || [];
+  if (!card || !active.some((c) => c.instanceId === card.instanceId)) return [];
+  return liveAttackMarkers(card, {
+    turnNumber: draft.turn?.number || 1,
+    zoneCards: active,
+  });
+}
+
+/** The defending player's flip for a surviveKnockOutCoin marker: true on heads. */
+function survivesOnCoin(activeRng, playerId, events) {
+  const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+  events.push({ type: 'attackMarkerCoinFlipped', kind: 'surviveKnockOutCoin', playerId, coin });
+  return coin === 'heads';
+}
+
+/**
+ * An attack that was declared but does not happen (Confusion tails, Smokescreen Shot tails,
+ * Mini-Metronome tails): the attack still ends the turn — Pokémon Checkup, then the hand-off.
+ */
+function endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events }) {
+  const attackerPlayer = draft.players[playerId];
+  if (!attackerPlayer.flags) attackerPlayer.flags = {};
+  attackerPlayer.flags.attackerAttacked = true;
+  if (isGameConcluded(draft)) return;
+  resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+  if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
+}
+
+// A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
+function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
+  const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  if (!guard || !attacker) return false;
+  const attackerView = inPlayView(draft, attacker);
+  return activeAttackMarkers(draft, victimPlayerId, guard).some(
+    (m) => m.kind === 'incomingPrevent' && m.scope === 'side' && attackerMatchesFilter(m.filter, attackerView)
+  );
+}
+
+// Wobbuffet BREAK Right Back at You / Rocket's Moltres Fire Wall (design 031): the damaged
+// Pokémon strikes back, even when this attack knocked it out. `strikerView` is its top card
+// as it was before the damage landed.
+function applyRetaliation(
+  draft,
+  { markers, dealt, striker, strikerView, strikerPlayerId, attacker, attackerPlayerId, events }
+) {
+  for (const marker of markers) {
+    const target =
+      marker.mode === 'counters'
+        ? attacker
+        : (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+    const ref = target && findCard(draft, target.instanceId);
+    if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) continue;
+    const amount =
+      marker.mode === 'counters'
+        ? dealt
+        : retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId });
+    if (amount <= 0) continue;
+    target.damage = (target.damage || 0) + amount;
+    events.push({
+      type: 'damageUpdated',
+      instanceId: target.instanceId,
+      damage: target.damage,
+      dealt: amount,
+      reason: 'retaliate',
+    });
+    const koHp = cardEffectiveHp(draft, target, attackerPlayerId);
+    if (koHp > 0 && target.damage >= koHp) {
+      handleKnockout(draft, {
+        victimPlayerId: attackerPlayerId,
+        attackerPlayerId: strikerPlayerId,
+        victim: target,
+        events,
+      });
+    }
+  }
+}
+
+// "… attacks your opponent's Active Pokémon for 10 damage. (Apply Weakness and Resistance.)"
+function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId }) {
+  const strikerZone = draft.players[strikerPlayerId]?.zones?.active || [];
+  const targetPlayer = draft.players[attackerPlayerId];
+  const result = computeAttackDamage(
+    strikerView,
+    inPlayView(draft, target),
+    { name: marker.sourceAttack, damage: marker.amount },
+    {
+      attackerZoneCards: strikerZone.some((c) => c.instanceId === striker.instanceId) ? strikerZone : [],
+      defenderZoneCards: targetPlayer?.zones?.active || [],
+      defenderInPlayCards: [...(targetPlayer?.zones?.active || []), ...(targetPlayer?.zones?.bench || [])],
+      stadium: draft.stadium,
+      defenderIsActive: true,
+      baseDamage: marker.amount,
+      defenderMarkers: activeAttackMarkers(draft, attackerPlayerId, target),
     }
   );
   return result.total;
@@ -704,6 +835,7 @@ function handleKnockout(
         targetZone.splice(i, 1);
         c.damage = 0;
         clearConditions(c);
+        clearAttackMarkers(c);
         c.attachedTo = null;
         if (lostCity && c.instanceId === victim.instanceId) {
           if (!Array.isArray(victimPlayer.zones.lostZone)) {
@@ -979,10 +1111,30 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
   }
 }
 
+// "At the end of your opponent's next turn, the Defending Pokémon will be Knocked Out."
+// The marker is live only on that turn, and only while the Pokémon is still Active and
+// unevolved, so a switched-out or evolved target is spared.
+function resolveDeferredKnockouts(draft, { events }) {
+  for (const pid of Object.keys(draft.players || {})) {
+    const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
+    const marker = activeAttackMarkers(draft, pid, active).find((m) => m.kind === 'deferredKnockOut');
+    if (!marker || marker.untilTurn !== draft.turn?.number) continue;
+    events.push({ type: 'deferredKnockOut', instanceId: active.instanceId, playerId: pid, sourceAttack: marker.sourceAttack });
+    handleKnockout(draft, {
+      victimPlayerId: pid,
+      attackerPlayerId: Object.keys(draft.players).find((id) => id !== pid),
+      victim: active,
+      events,
+    });
+  }
+}
+
 function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
 ) {
+  resolveDeferredKnockouts(draft, { events });
+
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
     const active = player.zones?.active?.find((c) => !c.attachedTo);
@@ -1343,6 +1495,7 @@ function applyRetreatSwap(
     delete active.cannotAttackUntilTurn;
     delete active.cannotAttackAttackName;
     delete active.cannotRetreatUntilTurn;
+    clearAttackMarkers(active);
 
     if (!player.flags) player.flags = {};
     player.flags.retreatedThisTurn = true;
@@ -1794,6 +1947,64 @@ function validateReferences(state, command) {
 }
 
 /**
+ * Whether `active` has the Energy for `attack`, priced exactly as the attack
+ * preview prices it (ability/Tool/Stadium discounts, then Stadium increases).
+ */
+function attackCostPayable(state, playerId, active, attack) {
+  if (!(attack?.cost?.length > 0)) return true;
+  const player = state.players?.[playerId];
+  if (!player || !active) return false;
+  const activeZoneCards = player.zones?.active || [];
+  const attached = activeZoneCards.filter(
+    (c) => c.attachedTo === active.instanceId && isEnergy(c)
+  );
+  const stadiumCard = state.stadium?.card || state.stadium || null;
+  const stadiumUser =
+    state.stadium?.user ??
+    state.stadium?.playedBy ??
+    stadiumCard?.ownerId ??
+    null;
+  const energyContext = {
+    stadiumCard,
+    hostPokemon: inPlayView(state, active),
+  };
+  const energyEntries = expandEnergyEntries(
+    attached.map((c) => serverEnergyDescriptor(c, energyContext))
+  );
+  // Cost modifiers must be priced exactly as the client and the attack
+  // preview price them: passive ability/Tool discounts plus a Stadium
+  // cost modifier, then Nighttime Mine-style increases. Checking the raw
+  // printed cost rejected legally payable attacks.
+  const activeView = inPlayView(state, active);
+  const blockTools = isStadiumToolNegation(stadiumCard);
+  let discount = passiveCostDiscount(activeView);
+  if (!blockTools) {
+    discount += attachedTools(active, activeZoneCards).reduce(
+      (sum, tool) => sum + passiveCostDiscount(tool),
+      0
+    );
+  }
+  if (stadiumCard) discount += parseStadiumCostModifier(stadiumCard);
+  let effectiveCost = attack.cost;
+  if (discount > 0 && effectiveCost.length > 0) {
+    effectiveCost = applyCostDiscount(effectiveCost, discount);
+  }
+  const increase = getStadiumAttackCostIncreaseFor(
+    activeView,
+    playerId,
+    stadiumCard,
+    stadiumUser
+  );
+  if (increase > 0) {
+    effectiveCost = [
+      ...effectiveCost,
+      ...Array(increase).fill('Colorless'),
+    ];
+  }
+  return canPayAttackCost(energyEntries, effectiveCost);
+}
+
+/**
  * Validates gameplay legality when rulesEnabled is true (Step 4).
  * Skipped completely when rulesEnabled === false (Hazard H6).
  *
@@ -2217,57 +2428,8 @@ export function validateLegality(state, command) {
           };
         }
       }
-      if (attack?.cost?.length > 0) {
-        const activeZoneCards = player.zones?.active || [];
-        const attached = activeZoneCards.filter(
-          (c) => c.attachedTo === active.instanceId && isEnergy(c)
-        );
-        const stadiumCard = state.stadium?.card || state.stadium || null;
-        const stadiumUser =
-          state.stadium?.user ??
-          state.stadium?.playedBy ??
-          stadiumCard?.ownerId ??
-          null;
-        const energyContext = {
-          stadiumCard,
-          hostPokemon: inPlayView(state, active),
-        };
-        const energyEntries = expandEnergyEntries(
-          attached.map((c) => serverEnergyDescriptor(c, energyContext))
-        );
-        // Cost modifiers must be priced exactly as the client and the attack
-        // preview price them: passive ability/Tool discounts plus a Stadium
-        // cost modifier, then Nighttime Mine-style increases. Checking the raw
-        // printed cost rejected legally payable attacks.
-        const activeView = inPlayView(state, active);
-        const blockTools = isStadiumToolNegation(stadiumCard);
-        let discount = passiveCostDiscount(activeView);
-        if (!blockTools) {
-          discount += attachedTools(active, activeZoneCards).reduce(
-            (sum, tool) => sum + passiveCostDiscount(tool),
-            0
-          );
-        }
-        if (stadiumCard) discount += parseStadiumCostModifier(stadiumCard);
-        let effectiveCost = attack.cost;
-        if (discount > 0 && effectiveCost.length > 0) {
-          effectiveCost = applyCostDiscount(effectiveCost, discount);
-        }
-        const increase = getStadiumAttackCostIncreaseFor(
-          activeView,
-          playerId,
-          stadiumCard,
-          stadiumUser
-        );
-        if (increase > 0) {
-          effectiveCost = [
-            ...effectiveCost,
-            ...Array(increase).fill('Colorless'),
-          ];
-        }
-        if (!canPayAttackCost(energyEntries, effectiveCost)) {
-          return { allowed: false, reason: 'Not enough energy attached.' };
-        }
+      if (!attackCostPayable(state, playerId, active, attack)) {
+        return { allowed: false, reason: 'Not enough energy attached.' };
       }
       return { allowed: true };
     }
@@ -2965,7 +3127,8 @@ function attackResumeContext(draft, token, { activeRng, events }) {
   );
   if (!attacker) return null;
   const attackerView = attackViewFor(draft, attacker);
-  const attack = attackerView?.attacks?.find((a) => a?.name === token.attackName);
+  const attack =
+    token.copiedAttack || attackerView?.attacks?.find((a) => a?.name === token.attackName);
   if (!attack) return null;
   const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
   let defender = null;
@@ -2991,6 +3154,7 @@ function attackResumeContext(draft, token, { activeRng, events }) {
     headsCount,
     flips,
     milledMatches: token.milledMatches,
+    copiedAttack: token.copiedAttack || null,
   };
 }
 
@@ -3103,6 +3267,207 @@ function runAttackSteps(
 }
 
 /**
+ * Flips the attack's coins, offers a Glimwood Tangle re-flip, then resolves the effect
+ * phase. `copiedAttack` is set when a copy attack chose `attack` (design 031); resume
+ * tokens carry it because the copier's own attack list does not hold it.
+ */
+function flipAndResolveAttack(draft, ctx) {
+  const { playerId, activeRng, events, attack, attackerPlayer, atkIdx, targetInstanceId, copiedAttack } = ctx;
+  // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
+  // the parser resolves from live board counts, then bench/spread damage. Without this
+  // every attack dealt its flat printed number regardless of the board (I26 follow-up).
+  const coinResult = flipAttackCoins(attack, activeRng);
+  const { coin, headsCount, flips } = coinResult;
+  if (flips.length > 0) {
+    events.push({
+      type: 'attackCoinFlipped',
+      playerId,
+      attackName: attack.name,
+      coin,
+      headsCount,
+      flips,
+    });
+  }
+
+  // Glimwood Tangle: after any coins are flipped for an attack, the player
+  // may ignore the results and re-flip. The choice is offered before any
+  // effect resolves, so a re-flip never has to undo damage or a KO.
+  if (
+    flips.length > 0 &&
+    isStadiumGlimwoodReFlip(draft.stadium?.card || draft.stadium) &&
+    !attackerPlayer?.flags?.glimwoodUsedThisTurn
+  ) {
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: 'stadium',
+      prompt: `${attack.name}: keep the coin results or re-flip them (Glimwood Tangle)?`,
+      // Numeric sentinels: the choice validator only accepts integer
+      // instanceIds. 1 = keep, 2 = re-flip.
+      options: [
+        { instanceId: 1, name: 'Keep results', type: 'option' },
+        { instanceId: 2, name: 'Re-flip coins', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+      resumeToken: {
+        effectType: 'glimwood',
+        initiatorPlayerId: playerId,
+        attackIndex: atkIdx,
+        targetInstanceId,
+        coinResult,
+        ...(copiedAttack ? { copiedAttack } : {}),
+      },
+    });
+    return;
+  }
+
+  resolveAttackEffectPhase(draft, { ...ctx, coin, headsCount, flips });
+}
+
+const rootsIn = (cards) => (cards || []).filter((c) => !c.attachedTo && isPokemon(c));
+
+/** Where a copy attack looks for attacks to use (design 031). */
+function copySourceCards(draft, { copy, playerId, oppId }) {
+  const own = draft.players[playerId]?.zones || {};
+  const opp = draft.players[oppId]?.zones || {};
+  switch (copy.source) {
+    case 'ownBench':
+      return rootsIn(own.bench).filter((c) => inCopyGroup(c, copy.group));
+    case 'ownDiscard':
+      return rootsIn(own.discard).filter((c) => (c.types || []).includes(copy.pokemonType));
+    case 'oppActive':
+      return rootsIn(opp.active);
+    case 'oppBench':
+      return rootsIn(opp.bench);
+    case 'oppInPlay':
+      return [...rootsIn(opp.active), ...rootsIn(opp.bench)];
+    case 'oppDeckTop':
+      return rootsIn((opp.deck || []).slice(0, copy.count));
+    default:
+      return [];
+  }
+}
+
+/**
+ * The attacks a copy attack may use: every attack on its source cards except other copy
+ * attacks, and — when the text requires it — only those the copier has the Energy for.
+ */
+function copyAttackCandidates(draft, { copy, playerId, oppId, attacker }) {
+  const inPlay = copy.source !== 'ownDiscard' && copy.source !== 'oppDeckTop';
+  const candidates = [];
+  for (const card of copySourceCards(draft, { copy, playerId, oppId })) {
+    const attacks = (inPlay ? inPlayView(draft, card) : card)?.attacks || [];
+    for (const attack of attacks) {
+      if (!attack?.name || parseCopyAttack(attack.text)) continue;
+      if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
+      candidates.push({ sourceId: card.instanceId, sourceName: card.name, attack: { ...attack } });
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Asks which attack a copy attack uses. Returns true while that choice is pending; false
+ * when there is nothing to copy, and the copy attack then does only its own text.
+ */
+function offerCopiedAttack(draft, { copy, playerId, oppId, attacker, atkIdx, targetInstanceId, activeRng, events }) {
+  const shuffleOppDeck = copy.source === 'oppDeckTop';
+  if (shuffleOppDeck) {
+    const looked = (draft.players[oppId]?.zones?.deck || []).slice(0, copy.count);
+    events.push({
+      type: 'cardsRevealed',
+      playerId: oppId,
+      cards: looked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
+  const candidates = copyAttackCandidates(draft, { copy, playerId, oppId, attacker });
+  if (candidates.length === 0) {
+    if (shuffleOppDeck) shuffleDeckWithRng(draft.players[oppId], activeRng);
+    events.push({ type: 'attackCopyNothing', playerId, attackerId: attacker?.instanceId ?? null });
+    return false;
+  }
+  // Numeric sentinels: option k (1-based) is candidates[k - 1]; one past them declines.
+  const options = candidates.map((c, i) => ({
+    instanceId: i + 1,
+    name: `${c.sourceName}: ${c.attack.name}`,
+    type: 'option',
+  }));
+  if (copy.optional) {
+    options.push({ instanceId: candidates.length + 1, name: "Don't use an attack", type: 'option' });
+  }
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: 'attack',
+    prompt: 'Choose the attack to use as this attack.',
+    options,
+    min: 1,
+    max: 1,
+    resumeToken: {
+      effectType: 'attackCopy',
+      initiatorPlayerId: playerId,
+      attackerId: attacker?.instanceId ?? null,
+      attackIndex: atkIdx,
+      targetInstanceId,
+      candidates,
+      shuffleOppDeck,
+    },
+  });
+  return true;
+}
+
+/** Resumes a copy attack with the chosen attack (or its own text when declined). */
+function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
+  const playerId = token.initiatorPlayerId;
+  const attackerPlayer = draft.players[playerId];
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  if (token.shuffleOppDeck) shuffleDeckWithRng(draft.players[oppId], activeRng);
+  const attacker = attackerPlayer?.zones?.active?.find(
+    (c) => !c.attachedTo && c.instanceId === token.attackerId
+  );
+  if (!attacker) return;
+  const attackerView = attackViewFor(draft, attacker);
+  const ownAttack = attackerView?.attacks?.[token.attackIndex ?? 0] || { name: 'Attack', damage: 0 };
+  const picked = (token.candidates || [])[Number((selection || [])[0]) - 1];
+  const copiedAttack = picked
+    ? copiedAttackFor(picked.attack, { sourceName: picked.sourceName, copierName: attacker.name })
+    : null;
+  if (copiedAttack) {
+    events.push({
+      type: 'attackCopied',
+      playerId,
+      attackerId: attacker.instanceId,
+      attackName: ownAttack.name,
+      copiedName: copiedAttack.name,
+      sourceId: picked.sourceId,
+    });
+  }
+  let defender = null;
+  let defenderPlayerId = oppId;
+  if (token.targetInstanceId != null) {
+    const targetRef = findCard(draft, token.targetInstanceId);
+    defender = targetRef?.card || null;
+    if (targetRef?.playerId) defenderPlayerId = targetRef.playerId;
+  } else {
+    defender = rootsIn(draft.players[oppId]?.zones?.active)[0] || null;
+  }
+  flipAndResolveAttack(draft, {
+    playerId,
+    activeRng,
+    events,
+    attacker,
+    defender,
+    defenderPlayerId,
+    oppId,
+    attack: copiedAttack || ownAttack,
+    attackerPlayer,
+    attackerView,
+    atkIdx: token.attackIndex ?? 0,
+    targetInstanceId: token.targetInstanceId ?? null,
+    copiedAttack,
+  });
+}
+
+/**
  * Resolves the part of an attack that runs after its coins are flipped:
  * printed-text damage, recoil, status, bench/spread damage, searches, and the
  * terminal checkup/turn hand-off. Extracted so Glimwood Tangle can re-enter it
@@ -3140,6 +3505,7 @@ function resolveAttackEffectPhase(draft, ctx) {
     attackerId: attacker?.instanceId ?? null,
     targetInstanceId: defender?.instanceId ?? null,
     coinResult: { coin, headsCount, flips },
+    ...(ctx.copiedAttack ? { copiedAttack: ctx.copiedAttack } : {}),
   };
 
   // Deck mill: discard from the top of the deck(s) before damage, counting the
@@ -3387,6 +3753,9 @@ function resolveAttackEffectPhase(draft, ctx) {
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
+            ...parseDamageImmunity(effectiveAttack?.text),
+            defenderMarkers: activeAttackMarkers(draft, defenderPlayerId, defender),
+            attackerMarkers: activeAttackMarkers(draft, playerId, attacker),
           }
         );
         dmgDealt = dmgResult.total;
@@ -3400,6 +3769,11 @@ function resolveAttackEffectPhase(draft, ctx) {
             attackName: effectiveAttack?.name,
           });
         }
+
+        // Read before damage lands: a Knock Out takes the markers with the card.
+        const defenderMarkers = activeAttackMarkers(draft, defenderPlayerId, defender);
+        const retaliations = defenderMarkers.filter((m) => m.kind === 'retaliate');
+        const surviveOnHeads = defenderMarkers.some((m) => m.kind === 'surviveKnockOutCoin');
 
         if (dmgDealt > 0) {
           // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
@@ -3455,6 +3829,17 @@ function resolveAttackEffectPhase(draft, ctx) {
                   defenderPlayerId
                 );
               }
+            } else if (surviveOnHeads && survivesOnCoin(activeRng, defenderPlayerId, events)) {
+              // Machamp LV.X Strong-Willed (design 032): heads leaves it at 10 HP.
+              defender.damage = koHp - 10;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+                ...(weaknessApplied && { weakness: true }),
+              });
+              events.push({ type: 'koPrevented', instanceId: defender.instanceId, surviveHp: 10, reason: 'attackMarker' });
             } else {
               defender.damage = (defender.damage || 0) + dmgDealt;
               events.push({
@@ -3549,6 +3934,17 @@ function resolveAttackEffectPhase(draft, ctx) {
               });
             }
           }
+
+          applyRetaliation(draft, {
+            markers: retaliations,
+            dealt: dmgDealt,
+            striker: defender,
+            strikerView: defenderView,
+            strikerPlayerId: defenderPlayerId,
+            attacker,
+            attackerPlayerId: playerId,
+            events,
+          });
         }
       }
 
@@ -3599,13 +3995,15 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
       }
 
-      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack
-      const { defenderConditions, attackerConditions } =
-        resolveAttackStatusConditions(attack, {
-          coin,
-          headsCount,
-          flips,
-        });
+      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack.
+      // A chosen condition (Delta Beam) is the atkChooseCondition step's (design 032).
+      const { defenderConditions, attackerConditions } = attackSteps.printed.has('atkChooseCondition')
+        ? { defenderConditions: [], attackerConditions: [] }
+        : resolveAttackStatusConditions(attack, {
+            coin,
+            headsCount,
+            flips,
+          });
 
       if (defenderConditions.length > 0 && defender) {
         // Only apply condition if defender survived the attack (not KO'd)
@@ -3703,8 +4101,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       }
 
       // Attack effects: draw cards (e.g. Collect). "Discard your hand and draw N" is the
-      // discardHandThenDraw step's (Raging Bolt ex Burst Roar).
-      const drawN = attackSteps.printed.has('discardHandThenDraw') ? 0 : drawCount(attack);
+      // discardHandThenDraw step's (Raging Bolt ex Burst Roar); a printed draw sentence is the
+      // atkDraw step's, which keeps its coin gate ("If heads, draw a card").
+      const drawN =
+        attackSteps.printed.has('discardHandThenDraw') || attackSteps.printed.has('atkDraw') ? 0 : drawCount(attack);
       if (drawN > 0) {
         const deck = attackerPlayer?.zones?.deck || [];
         const hand = attackerPlayer?.zones?.hand || [];
@@ -3836,6 +4236,19 @@ function resolveAttackEffectPhase(draft, ctx) {
 }
 
 /**
+ * Whether the attack's deck search runs for this coin result: "If heads, search your deck …"
+ * (Manaphy Chase Up) searches only on heads (design 032). An ungated search always runs.
+ */
+function searchCoinGateOpen(attack, coinResult) {
+  const sentence = String(attack?.text || '')
+    .toLowerCase()
+    .split(/(?<=\.)\s+/)
+    .find((s) => s.includes('search your deck for'));
+  const gate = /^if (heads|tails),/.exec(sentence || '')?.[1];
+  return !gate || coinResult?.coin === gate;
+}
+
+/**
  * The end of an attack: deck search, chosen-target damage, the attackExecuted event, the
  * GX flag, attach-afterwards effects, and the checkup / turn hand-off. Split out so an
  * `attackSteps` suspension can resume into it (design 030). `tail` is plain JSON.
@@ -3861,7 +4274,10 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
       if (isGameConcluded(draft)) return;
 
       // Attack effects: deck search (Phase 3, e.g. Call for Family)
-      const searchClause = tail.skipSearch ? null : parseAttackSearchClause(effectiveAttack);
+      const searchClause =
+        tail.skipSearch || !searchCoinGateOpen(effectiveAttack, resumeBase?.coinResult)
+          ? null
+          : parseAttackSearchClause(effectiveAttack);
       let searchTriggered = false;
       if (searchClause && attackerPlayer?.zones?.deck?.length > 0) {
         // A staged clause (searchDeckSequence) is walked one stage per choice so
@@ -4291,6 +4707,7 @@ export function applyCommand(state, command, rng = null) {
             delete card.cannotAttackUntilTurn;
             delete card.cannotAttackAttackName;
             delete card.cannotRetreatUntilTurn;
+            clearAttackMarkers(card);
             const srcZone = draft.players[playerId].zones[payload.from];
             for (let i = srcZone.length - 1; i >= 0; i--) {
               if (srcZone[i].attachedTo === card.instanceId) {
@@ -4700,71 +5117,58 @@ export function applyCommand(state, command, rng = null) {
             });
           }
 
-          if (!attackerPlayer.flags) attackerPlayer.flags = {};
-          attackerPlayer.flags.attackerAttacked = true;
-
-          if (!isGameConcluded(draft)) {
-            resolveCheckup(draft, {
-              rng: activeRng,
-              events,
-              endingPlayerId: playerId,
-            });
-            if (!isGameConcluded(draft)) {
-              advanceTurn(draft, { nextPlayerId: oppId, events });
-            }
-          }
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
           break;
         }
       }
 
-      // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
-      // the parser resolves from live board counts, then bench/spread damage. Without this
-      // every attack dealt its flat printed number regardless of the board (I26 follow-up).
-      const coinResult = flipAttackCoins(attack, activeRng);
-      const { coin, headsCount, flips } = coinResult;
-      if (flips.length > 0) {
+      // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle (design 032): the marked Pokémon's
+      // owner flips when it tries to attack; tails, the attack doesn't happen.
+      if (attacker && activeAttackMarkers(draft, playerId, attacker).some((m) => m.kind === 'attackFlipOrFail')) {
+        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        events.push({ type: 'attackMarkerCoinFlipped', kind: 'attackFlipOrFail', playerId, coin });
+        if (coin === 'tails') {
+          events.push({ type: 'attackPrevented', playerId, attackerId: attacker.instanceId, attackName: attack.name });
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+      }
+
+      // A copy attack (design 031) picks the attack it uses before any coin is flipped.
+      const targetInstanceId = payload?.targetInstanceId ?? null;
+      const copy = parseCopyAttack(attack?.text);
+      // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
+      if (copy?.coinGate) {
+        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
         events.push({
           type: 'attackCoinFlipped',
           playerId,
           attackName: attack.name,
           coin,
-          headsCount,
-          flips,
+          headsCount: coin === 'heads' ? 1 : 0,
+          flips: [coin],
         });
+        if (coin !== copy.coinGate) {
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
       }
-
-      // Glimwood Tangle: after any coins are flipped for an attack, the player
-      // may ignore the results and re-flip. The choice is offered before any
-      // effect resolves, so a re-flip never has to undo damage or a KO.
       if (
-        flips.length > 0 &&
-        isStadiumGlimwoodReFlip(draft.stadium?.card || draft.stadium) &&
-        !attackerPlayer?.flags?.glimwoodUsedThisTurn
+        copy &&
+        offerCopiedAttack(draft, {
+          copy,
+          playerId,
+          oppId,
+          attacker,
+          atkIdx,
+          targetInstanceId,
+          activeRng,
+          events,
+        })
       ) {
-        draft.pendingChoice = createPendingChoice({
-          player: playerId,
-          source: 'stadium',
-          prompt: `${attack.name}: keep the coin results or re-flip them (Glimwood Tangle)?`,
-          // Numeric sentinels: the choice validator only accepts integer
-          // instanceIds. 1 = keep, 2 = re-flip.
-          options: [
-            { instanceId: 1, name: 'Keep results', type: 'option' },
-            { instanceId: 2, name: 'Re-flip coins', type: 'option' },
-          ],
-          min: 1,
-          max: 1,
-          resumeToken: {
-            effectType: 'glimwood',
-            initiatorPlayerId: playerId,
-            attackIndex: atkIdx,
-            targetInstanceId: payload?.targetInstanceId ?? null,
-            coinResult,
-          },
-        });
         break;
       }
-
-      resolveAttackEffectPhase(draft, {
+      flipAndResolveAttack(draft, {
         playerId,
         activeRng,
         events,
@@ -4775,9 +5179,8 @@ export function applyCommand(state, command, rng = null) {
         attack,
         attackerPlayer,
         attackerView,
-        coin,
-        headsCount,
-        flips,
+        atkIdx,
+        targetInstanceId,
       });
       break;
     }
@@ -5048,10 +5451,11 @@ export function applyCommand(state, command, rng = null) {
         const attackIdx = token.attackIndex ?? 0;
         const attacker = resumer?.zones?.active?.find((c) => !c.attachedTo);
         const attackerView = attackViewFor(draft, attacker);
-        const attack = attackerView?.attacks?.[attackIdx] || {
-          name: 'Attack',
-          damage: 10,
-        };
+        const attack = token.copiedAttack ||
+          attackerView?.attacks?.[attackIdx] || {
+            name: 'Attack',
+            damage: 10,
+          };
         const gOppId = Object.keys(draft.players || {}).find(
           (id) => id !== initiatorPlayerId
         );
@@ -5095,7 +5499,11 @@ export function applyCommand(state, command, rng = null) {
           coin,
           headsCount,
           flips,
+          copiedAttack: token.copiedAttack || null,
         });
+      } else if (token.effectType === 'attackCopy') {
+        draft.pendingChoice = null;
+        resumeCopiedAttack(draft, { token, selection: payload.selection, activeRng, events });
       } else if (token.effectType === 'attackSteps') {
         // Design 030: finish the attack's steps, then pick the attack up where it paused —
         // before damage (re-enter the effect phase) or after it (the attack tail).

@@ -10,6 +10,7 @@
  */
 
 import { parseAbility } from './abilities.mjs';
+import { MARKER_TEMPLATES } from './attack-markers.mjs';
 import {
   attachDiscardToBenchSpread,
   deckMillScaling,
@@ -41,8 +42,10 @@ export function normalizeAttackText(text, selfName = '') {
     .toLowerCase()
     .replace(/pokemon/g, 'pokémon');
   const name = String(selfName || '').trim().toLowerCase();
-  if (name) {
-    out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(name)}(?![\\w'])`, 'g'), 'this pokémon');
+  // A LV.X card prints its name without the suffix ("Charizard G LV.X": "attached to Charizard G").
+  for (const printed of new Set([name, name.replace(/ lv\.x$/, '')])) {
+    if (!printed) continue;
+    out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(printed)}(?![\\w'])`, 'g'), 'this pokémon');
   }
   return out
     .replace(/\bthe defending pokémon\b/g, "your opponent's active pokémon")
@@ -149,10 +152,37 @@ const TEMPLATES = [
     (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
   ],
 
+  // Self Energy discard behind the attack's own coin (design 032); parseAttackSteps drops
+  // the ungated form, which parseAttackEnergyDiscard runs.
+  [
+    /^discard (an?|\d+|all) (?:\{([a-z])\} )?energy(?: cards?)? (?:from|attached to) this pokémon$/,
+    (m) => ({
+      type: 'atkDiscardSelfEnergy',
+      ...discardCount(m[1]),
+      ...(m[2] ? { energyType: m[2].toUpperCase() } : {}),
+    }),
+  ],
+
   // Discard from the opponent
   [
-    /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon$/,
+    /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
+  ],
+  // Blastoise ex Hyper Whirlpool: the opponent picks the Energy.
+  [
+    /^your opponent discards (an?|\d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon$/,
+    (m) => ({
+      type: 'atkDiscardOppEnergy',
+      scope: 'active',
+      count: countOf(m[1]),
+      chooser: 'opponent',
+      ...(m[2] ? { special: true } : {}),
+    }),
+  ],
+  // Smoochum Psykiss
+  [
+    /^choose a special energy card attached to 1 of your opponent's pokémon and have your opponent shuffle that card into their deck$/,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'any', count: 1, special: true, toDeck: true }),
   ],
   [
     /^discard an? (special )?energy(?: card)? (?:from|attached to) each of your opponent's pokémon$/,
@@ -166,7 +196,10 @@ const TEMPLATES = [
     /^discard (all|an?|up to \d+) pokémon tools?(?: cards?)? (?:from|attached to) your opponent's (active )?pokémon$/,
     (m) => ({ type: 'atkDiscardOppTools', scope: m[2] ? 'active' : 'any', ...discardCount(m[1]) }),
   ],
-  [/^discard a random card from your opponent's hand$/, () => ({ type: 'atkDiscardOppHand', random: true, count: 1 })],
+  [
+    /^(?:discard a random card from your opponent's hand|choose 1 card from your opponent's hand without looking and discard it)$/,
+    () => ({ type: 'atkDiscardOppHand', random: true, count: 1 }),
+  ],
   [
     /^your opponent discards (an?|\d+) cards? from their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
@@ -181,10 +214,14 @@ const TEMPLATES = [
       count: m[1] ? Number(m[1]) : 1,
     }),
   ],
+  [
+    /^your opponent discards the top (?:(\d+) cards|card) (?:of|from) their deck$/,
+    (m) => ({ type: 'atkMill', side: 'opponent', count: m[1] ? Number(m[1]) : 1 }),
+  ],
 
   // Attach from the discard pile / hand
   [
-    new RegExp(String.raw`^attach (an?|up to \d+|\d+|any number of) ${ENERGY_TYPE}energy cards? from your (discard pile|hand) to (this pokémon|1 of your (?:benched )?pokémon|your (?:benched )?pokémon in any way you like)$`),
+    new RegExp(String.raw`^attach (an?|up to \d+|\d+|any number of) ${ENERGY_TYPE}energy cards? from your (discard pile|hand) to (this pokémon|1 of your (?:benched )?pokémon|your (?:benched )?pokémon(-ex)? in any way you like)$`),
     (m, s) => {
       if (attachDiscardToBenchSpread(s)) return null;
       const target = m[4];
@@ -195,6 +232,8 @@ const TEMPLATES = [
         ...energyFilter(m[2], s),
         target: target === 'this pokémon' ? 'self' : /benched/.test(target) ? 'bench' : 'any',
         ...(/any way you like/.test(target) ? { spread: true } : {}),
+        // Sableye Energy Hunt: only the old uppercase Pokémon-EX.
+        ...(m[5] ? { targetEx: true } : {}),
       };
     },
   ],
@@ -216,6 +255,12 @@ const TEMPLATES = [
   [
     /^put (up to \d+|an?|\d+) (trainer|item|supporter|pokémon tool|stadium|basic energy|energy|pokémon) cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: recoverWhat(m[2]) }),
+  ],
+  // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power
+  [/^put a card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],
+  [
+    /^(?:choose a card from your discard pile and put it|search your discard pile for a card, show it to your opponent, and put it) on top of your deck$/,
+    () => ({ type: 'atkRecover', count: 1, what: null, to: 'deckTop' }),
   ],
 
   // Old wording of an attach from the discard pile ("Search your discard pile for … and attach it to …")
@@ -252,6 +297,11 @@ const TEMPLATES = [
     /^put a special energy attached to 1 of your opponent's pokémon in the lost zone$/,
     () => ({ type: 'atkLostZoneEnergy', from: 'opponentAny', count: 1, special: true }),
   ],
+  // Dialga G LV.X Remove Lost
+  [
+    /^remove (an?|\d+) energy cards? attached to your opponent's active pokémon and put (?:it|them) in the lost zone$/,
+    (m) => ({ type: 'atkLostZoneEnergy', from: 'opponentActive', count: countOf(m[1]) }),
+  ],
   [
     /^put any number of (pokémon tool|item|trainer) cards from your discard pile in the lost zone$/,
     (m) => ({ type: 'atkLostZoneFromDiscard', what: recoverWhat(m[1]), anyNumber: true }),
@@ -285,7 +335,15 @@ const TEMPLATES = [
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
 
   // Leave play
-  [/^shuffle this pokémon and all attached cards into your deck$/, () => ({ type: 'atkShuffleSelf' })],
+  [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
+  [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
+  [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
+  [/^draw (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', count: countOf(m[1]) })],
+  [/^draw a number of cards equal to the number of cards in your opponent's hand$/, () => ({ type: 'atkDraw', countFrom: 'opponentHand' })],
+  [
+    /^if your opponent's active pokémon is (asleep|paralyzed|poisoned|burned|confused), your opponent shuffles all energy from it into their deck$/,
+    (m) => ({ type: 'atkShuffleOppActiveEnergy', condition: m[1][0].toUpperCase() + m[1].slice(1) }),
+  ],
 
   // Damage counters
   [
@@ -293,11 +351,25 @@ const TEMPLATES = [
     (m) => ({ type: 'atkCountersEach', count: Number(m[1]), scope: m[2] ? 'bench' : 'all' }),
   ],
   [
+    /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
+    (m) => ({ type: 'atkHpCap', target: m[1].startsWith('1 of') ? 'opponentAny' : 'opponentActive', hp: Number(m[2]) }),
+  ],
+  [
     /^move all damage counters from 1 of your benched pokémon to your opponent's active pokémon$/,
     () => ({ type: 'atkMoveAllCounters' }),
   ],
 
+  // Opponent's Active back to their hand (Fan Rotom Spin Storm, Unown Hidden Power)
+  [
+    /^your opponent returns your opponent's active pokémon and all cards attached to it to their hand$/,
+    () => ({ type: 'atkBounceOppActive' }),
+  ],
+
   // Devolve
+  [
+    /^choose 1 of either player's evolved pokémon, remove the highest stage evolution card from that pokémon, and put it into that player's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'chooseAny', to: 'hand' }),
+  ],
   [
     /^devolve each of your opponent's evolved pokémon (?:by shuffling|and shuffle) the highest stage evolution card on it into your opponent's deck$/,
     () => ({ type: 'atkDevolve', scope: 'all', to: 'deck' }),
@@ -309,6 +381,19 @@ const TEMPLATES = [
   [
     /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'active', to: 'hand' }),
+  ],
+
+  // Alolan Exeggutor ex Swinging Sphene
+  [/^knock out your opponent's active basic pokémon$/, () => ({ type: 'atkKnockOut', condition: 'basic' })],
+  [
+    /^knock out 1 of your opponent's benched basic pokémon$/,
+    () => ({ type: 'atkKnockOutChoose', scope: 'bench', basicOnly: true }),
+  ],
+
+  // Porygon2 Delta Beam: "choose whether … becomes Asleep, Confused, or Paralyzed"
+  [
+    /^choose whether your opponent's active pokémon becomes ((?:asleep|burned|confused|paralyzed|poisoned)(?:,? (?:or )?(?:asleep|burned|confused|paralyzed|poisoned))+)$/,
+    (m) => ({ type: 'atkChooseCondition', options: conditionList(m[1]) }),
   ],
 
   // Prizes / Knock Out
@@ -332,7 +417,16 @@ const TEMPLATES = [
     /^heal (\d+|all) damage from (?:each|all) of your (benched )?pokémon$/,
     (m) => ({ type: 'atkHealEach', ...(m[1] === 'all' ? { all: true } : { amount: Number(m[1]) }), scope: m[2] ? 'bench' : 'all' }),
   ],
+
+  // Timed effects on later turns (design 031)
+  ...MARKER_TEMPLATES,
 ];
+
+const SPECIAL_CONDITIONS = ['Asleep', 'Burned', 'Confused', 'Paralyzed', 'Poisoned'];
+
+function conditionList(phrase) {
+  return phrase.match(/asleep|burned|confused|paralyzed|poisoned/g).map((c) => c[0].toUpperCase() + c.slice(1));
+}
 
 function energyFilter(symbol, sentence) {
   const basic = /\bbasic\b/.test(sentence.split(/ from /)[0]);
@@ -392,14 +486,103 @@ const BLOCKS = [
     (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),
   ],
   [
-    /choose a random card from your opponent's hand\. your opponent reveals that card and shuffles it into their deck\./g,
-    () => ({ type: 'atkOppHandRandomToDeck' }),
+    /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at (?:the|that) card you chose, then have your opponent shuffle that card) into their deck\./g,
+    (m) => ({ type: 'atkOppHandRandomToDeck', count: countOf(m[1]) }),
+  ],
+  // Articuno Freeze Solid / Zapdos Plasma / Moltres Collect Fire: the condition only decides
+  // whether the coin is flipped; with no such Energy the step finds nothing either way.
+  [
+    /if there are any \{([a-z])\} energy cards in your discard pile, flip a coin\. if heads, attach 1 of them to this pokémon\./g,
+    (m) => ({ type: 'atkAttach', source: 'discard', count: 1, energyType: m[1].toUpperCase(), target: 'self', gate: 'heads' }),
+  ],
+  // Kakuna Dangerous Evolution: evolves the attacker from the deck.
+  [
+    /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
+    () => ({ type: 'searchEvolve', ontoSource: true }),
+  ],
+  // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle: the opponent flips when attacking.
+  [
+    /during your opponent's next turn, if your opponent's active pokémon tries to (?:use an )?attack, your opponent flips a coin\. if tails, that attack doesn't happen\./g,
+    () => ({ type: 'atkAddMarker', target: 'opponentActive', window: 'opponentNextTurn', marker: { kind: 'attackFlipOrFail' } }),
+  ],
+  // Machamp LV.X Strong-Willed: the printed name is the attacker's short name, so any name.
+  [
+    /during your opponent's next turn, if [^,.]+ would be knocked out by damage from an attack, flip a coin\. if heads, [^,.]+ is not knocked out and its remaining hp becomes 10 instead\./g,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'surviveKnockOutCoin' } }),
+  ],
+  // Bellossom Miracle Powder / Tropius Miracle Blow
+  [
+    /choose 1 special condition\. your opponent's active pokémon is now affected by that special condition\./g,
+    () => ({ type: 'atkChooseCondition', options: SPECIAL_CONDITIONS }),
+  ],
+  // Staraptor Strong Breeze: on top of the deck, then shuffled — the same as shuffled in.
+  [
+    /put 1 of your opponent's benched pokémon and all cards attached to it on top of your opponent's deck\. your opponent shuffles their deck afterward\./g,
+    () => ({ type: 'atkShuffleOppBench', count: 1 }),
+  ],
+  // Dark Feraligatr Crushing Blow / Vaporeon Aqua Trick: the condition only decides whether
+  // the coin is flipped; with no Energy the step finds nothing either way.
+  [
+    /if your opponent's active pokémon has any energy cards attached to it, flip a coin\. if heads, choose 1 of those (?:energy )?cards and discard it\./g,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, gate: 'heads' }),
   ],
   [
-    /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
-    (m) => searchAttachStep(m[0], m[1], Boolean(m[2])),
+    /if your opponent's active pokémon has any energy cards attached to it, flip a coin\. if heads, choose 1 of those energy cards and move it to 1 of your opponent's benched pokémon\.(?: if your opponent has no benched pokémon, ignore this effect\.)?/g,
+    () => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, gate: 'heads' }),
+  ],
+  // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
+  // reveals …" stays unparsed instead of losing its condition.
+  [
+    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down))?)?\./g,
+    (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
   ],
 ];
+
+// Read after BLOCKS, which take their coin gate from the sentence start (see gatedBlock).
+const SEARCH_ATTACH_BLOCK = [
+  /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
+  (m) => searchAttachStep(m[0], m[1], Boolean(m[2])),
+];
+
+const BLOCK_GATES = { 'if heads': { gate: 'heads' }, 'if tails': { gate: 'tails' }, 'for each heads': { perHeads: true } };
+
+// A block optionally behind the attack's own coin gate at a sentence start
+// ("If heads, choose 1 card from your opponent's hand without looking. …"): the gate is
+// kept on the step, so resolveCoinGates drops or scales it like a one-sentence clause.
+function gatedBlock([re, build]) {
+  const gated = new RegExp(String.raw`(?:(?<=^|\. )(if heads|if tails|for each heads), )?(?:${re.source})`, 'g');
+  return [
+    gated,
+    ([whole, gate, ...rest]) => {
+      const step = build([whole.replace(/^(?:if heads|if tails|for each heads), /, ''), ...rest]);
+      return step && gate ? { ...step, ...BLOCK_GATES[gate] } : step;
+    },
+  ];
+}
+
+const ALL_BLOCKS = [...BLOCKS.map(gatedBlock), SEARCH_ATTACH_BLOCK];
+
+// "Your opponent reveals their hand. Discard a Trainer card you find there." →
+// { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
+// A bare reveal has no `then`; "choose … and put" / "add … to" name the destination.
+function revealHandStep(verb, countWord, kindWord, destination) {
+  if (!verb) return { type: 'atkRevealOppHand' };
+  let action = 'discard';
+  if (verb === 'choose') {
+    if (!/bottom of their deck/.test(destination || '')) return null;
+    action = 'deckBottom';
+  } else if (verb === 'add') {
+    if (!/prize cards/.test(destination || '')) return null;
+    action = 'prize';
+  } else if (destination) {
+    return null;
+  }
+  const filter = kindWord ? kindWord.trim() : undefined;
+  return {
+    type: 'atkRevealOppHand',
+    then: { action, count: countWord === 'all' ? 'all' : countOf(countWord), ...(filter ? { filter } : {}) },
+  };
+}
 
 // "search your deck for up to 2 Basic {G} Energy cards" → { what, count, upTo }
 function searchEnergyParams(body) {
@@ -515,23 +698,31 @@ const CHAIN_TEMPLATES = [
 export function parseAttackSteps(text, { selfName = '' } = {}) {
   const result = { before: [], after: [], handlesSearch: false };
   let normalized = normalizeAttackText(text, selfName)
+    // Keeps the Weakness order of timed damage changes as a token each sentence lifts off.
+    .replace(/\s*\((before|after) applying weakness and resistance\)/g, ' <wr:$1>')
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").
     .replace(/\s*\([^)]*\)/g, '');
   if (!normalized) return result;
 
   const blockSteps = [];
-  for (const [re, build] of BLOCKS) {
+  for (const [re, build] of ALL_BLOCKS) {
     normalized = normalized.replace(re, (...args) => {
       const step = build(args);
       if (!step) return args[0];
       blockSteps.push(step);
-      if (step.type === 'searchAbility') result.handlesSearch = true;
+      if (step.type === 'searchAbility' || step.type === 'searchEvolve') result.handlesSearch = true;
       return ` @block${blockSteps.length - 1}. `;
     });
   }
 
   // Plain mill only when the damage parser does not already mill for scaling.
   const millHandled = Boolean(deckMillScaling(text));
+  // A gated self discard runs as a step unless the damage counts it (Raikou Lightning
+  // Sphere) or the printed cost can cancel the attack (Charizard Blast Burn): neither is
+  // modelled, and a partial effect is worse than none.
+  const selfDiscardOpen = !/discarded in this way|this attack does nothing/.test(
+    normalizeAttackText(text, selfName)
+  );
 
   for (const raw of normalized.split(/(?<=\.)\s+/)) {
     const sentence = raw.trim().replace(/\.$/, '');
@@ -543,18 +734,21 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     }
     // "If you do, …" / "If you attached Energy in this way, …" after an attach: the executor
     // runs it only when the attach happened (requiresAttach, I93).
-    const chained = ATTACH_CHAIN.exec(sentence);
+    const wrOrder = /<wr:(before|after)>/.exec(sentence)?.[1];
+    const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
+    const chained = ATTACH_CHAIN.exec(plain);
     const previous = result.after[result.after.length - 1];
     if (chained && !isAttachStep(previous)) continue;
-    const { rest, flags } = stripGates(chained ? sentence.slice(chained[0].length) : sentence);
+    const { rest, flags } = stripGates(chained ? plain.slice(chained[0].length) : plain);
     if (chained) flags.requiresAttach = true;
     const templates = chained ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
-      const step = build(m, rest);
+      const step = build(m, rest, { wrOrder });
       if (!step) break;
       if (step.type === 'atkMill' && millHandled) break;
+      if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
       const { before, ...stepFlags } = flags;
       (before ? result.before : result.after).push({ ...step, ...stepFlags });
       break;

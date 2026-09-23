@@ -102,6 +102,9 @@ shared/engine/effects/trainer-steps.mjs — server handlers for the other traine
 shared/engine/rules/abilities.mjs + ability-step-plan.mjs - ability parse + ordered step plan (resume seam); Ancient Traits (`ancientTraitIn`: Δ/θ/Ω/α markers or spelled "Delta …") tag EVERY step `trait:'alpha'|'omega'|'delta'|'theta'` with `isAncientTraitAbility` so "no Abilities" gates skip them (App. 23/D72); audit `scripts/audit-all-ancient-traits.mjs` over `out/pkmn-ancient-trait-cards.json` (shared splitter `scripts/lib/split-card-text.mjs`)
 shared/engine/rules/stadium-effects.mjs - pure stadium classify/parse/apply (`applyStadiumEffect`) + `stadiumActivationStatus` (the inspector stadium Use gate, design 018); server executor in shared/engine/effects/stadium.mjs
 shared/engine/rules/damage-parser.mjs - attack text → damage math; `isGxAttack` name classifier
+shared/engine/rules/attack-steps.mjs + effects/attack-steps.mjs - attack text → ordered executor steps (`parseAttackSteps`, design 030/031) and their server handlers; reduce.mjs runs them before/after damage
+shared/engine/rules/attack-markers.mjs - timed attack markers on cards (`card.attackMarkers`: immunity, prevention/reduction, next-turn bonus, deferred KO, retaliate); read by computeAttackDamage, cleared on retreat/KO/evolve (design 031)
+shared/engine/rules/attack-copy.mjs - copy-attack parser (`parseCopyAttack`); reduce.mjs offers the copied attack before coins (`offerCopiedAttack`, design 031)
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
 shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping

@@ -101,7 +101,14 @@ test('parseAttackSteps: leaves clauses the attack-phase helpers own, and conditi
   none('Discard the top 3 cards of your deck. This attack does 50 damage for each Energy card you discarded in this way.');
   none('If you do, switch it with 1 of your Benched Pokémon.');
   none('Discard 2 Energy from this Pokémon.');
-  none('Draw 2 cards.');
+  // A printed draw is a step (it keeps its coin gate); the attack-phase drawCount stands down.
+  assert.deepEqual(parseAttackSteps('Draw 2 cards.').after, [{ type: 'atkDraw', count: 2 }]);
+});
+
+test('attack: a plain printed draw draws once', () => {
+  const res = attack(board('Draw 2 cards.'));
+  assert.equal(zone(res, 'p1', 'hand').length, 2);
+  turnPassed(res);
 });
 
 // ── I102 switch / gust ─────────────────────────────────────────────────────

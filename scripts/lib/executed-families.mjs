@@ -6,9 +6,11 @@
  * Attack families the server engine executes (applyCommand 'attack': damage parser, attack helpers,
  * parseAttackSteps). Synced S268 to oracle state diffs, not to the legacy client attack(): a family
  * belongs here only when its printed effect is observed.
- * Removed then (client-only or no effect observed): reveal-hand, immunity, redirect-damage,
- * copy-attack, retaliate, deferred-damage, look-opponent-deck, next-turn-bonus, hp-cap-damage,
- * damage-prevention.
+ * S269 (design 031, I118) added the former client-only families back: reveal-hand, immunity,
+ * damage-prevention, next-turn-bonus, copy-attack, hp-cap-damage, deferred-damage, retaliate, and the
+ * shuffle-cost remainder. immunity and hp-cap-damage change damage amounts only; they are kept on
+ * parser coverage and reduce tests. redirect-damage has no printings; look-opponent-deck is still
+ * unexecuted (I119).
  */
 export const EXECUTED_ATTACK_FAMILIES = new Set([
   'flat',
@@ -47,14 +49,19 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
   'next-turn-lock',
   'discard-opponent',
   'lost-zone',
+  'reveal-hand',
+  'immunity',
+  'damage-prevention',
+  'next-turn-bonus',
+  'copy-attack',
+  'hp-cap-damage',
+  'deferred-damage',
+  'retaliate',
+  'shuffle-cost',
 ]);
 
 /** Partial / heuristic execution — still flagged but lower priority. */
-export const PARTIAL_ATTACK_FAMILIES = new Set([
-  // 24/46 run (attacker / opponent-Bench shuffles); hand shuffles and "shuffle any amount"
-  // wordings show no effect in the oracle.
-  'shuffle-cost',
-]);
+export const PARTIAL_ATTACK_FAMILIES = new Set([]);
 
 export const EXECUTED_ABILITY_FAMILIES = new Set([
   'search',

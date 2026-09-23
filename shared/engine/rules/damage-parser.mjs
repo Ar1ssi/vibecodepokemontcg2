@@ -215,7 +215,12 @@ export function parseAttackDamage(
     const unit = (text.match(/damage for each (.+)/) || [])[1] || '';
     let count;
     let label;
-    if (/energy attached to all of your pok[ée]mon/.test(unit)) {
+    const handKind = /^(trainer|energy) cards? (?:you find there|in your opponent's hand)/.exec(unit)?.[1];
+    if (handKind) {
+      // Revealed-hand scaling (Poltergeist, Liberation-GX, Wonder Flare) counts one card kind.
+      count = handKind === 'trainer' ? ctx.opponentHandTrainerCount : ctx.opponentHandEnergyCount;
+      label = `${handKind === 'trainer' ? 'Trainer' : 'Energy'} cards in opponent's hand`;
+    } else if (/energy attached to all of your pok[ée]mon/.test(unit)) {
       count = ownEnergyCount;
       label = 'Energy on all your Pokémon';
     } else if (/^(?:energy )?cards? (?:you )?put in the lost zone in this way/.test(unit)) {

@@ -957,21 +957,18 @@ export function parseAttackEnergyDiscard(attack) {
     .replace(/\bbasic (?=[a-z]+ energy)/g, '');
   if (!t || !t.includes('discard')) return null;
 
-  // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
-  if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(t)) {
-    return { all: true, count: Infinity, energyType: null };
-  }
-
   const sentence = t
     .split(/(?<=\.)\s+/)
     .find((s) => /discard\b[^.]*\benergy\b[^.]*(?:attached to|from) this pok[ée]mon/.test(s));
-  if (
-    !sentence ||
-    /^if (?:heads|tails)\b/.test(sentence) ||
-    /\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)
-  ) {
-    return null;
+  // A coin-gated discard is the atkDiscardSelfEnergy step's (design 032).
+  if (!sentence || /^(?:if heads|if tails|for each heads)\b/.test(sentence)) return null;
+
+  // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
+  if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(sentence)) {
+    return { all: true, count: Infinity, energyType: null };
   }
+
+  if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)) return null;
 
   // "Discard a {W} and a {L} Energy attached to this Pokémon"
   const pair = sentence.match(
