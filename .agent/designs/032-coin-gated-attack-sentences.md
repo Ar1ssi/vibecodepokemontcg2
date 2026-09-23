@@ -1,5 +1,5 @@
 # 032: Coin-gated attack sentences that run no server effect (I120)
-Status: approved (user) — building
+Status: shipped (S271)
 Date: 2026-09-23 · Session: S271
 
 ## Problem
@@ -92,18 +92,18 @@ counted for damage).
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Gate face misses | Step dropped, no event | [ ] |
-| 2 | Nothing to act on (no Energy, empty discard, no bench) | skip, attack continues | [ ] |
-| 3 | Until tails: 0 heads / cap 20 | perHeads steps dropped / at most 20 | [ ] |
-| 4 | Fewer matching Energy than count | discard what there is | [ ] |
-| 5 | Bounce with no opponent Bench | Spin Storm: opponent loses (no Pokémon in play); Hidden Power: skip | [ ] |
-| 6 | Opponent chooses (Hyper Whirlpool) | choice goes to the opponent | [ ] |
-| 7 | Dynamic Bolt heads | no Energy discarded | [ ] |
-| 8 | Chase Up tails | no search | [ ] |
-| 9 | Smokescreen tails | attack does nothing, turn passes; heads → normal | [ ] |
-| 10 | Strong-Willed heads on lethal damage | 10 HP left, no KO; tails → KO | [ ] |
-| 11 | Mini-Metronome tails | no copy choice, no damage | [ ] |
-| 12 | Evolve-from-deck with no match | deck shuffled, nothing evolves | [ ] |
+| 1 | Gate face misses | Step dropped, no event | [x] attack-coin-gates.test.mjs "Chase Up searches the deck on heads only", "Dynamic Bolt keeps its Energy…" |
+| 2 | Nothing to act on (no Energy, empty discard, no bench) | skip, attack continues | [x] attack-coin-gates.test.mjs "Aqua Trick … no Bench does nothing", "Spin Storm …" (no Bench) |
+| 3 | Until tails: 0 heads / cap 20 | perHeads steps dropped / at most 20 | [x] attack-coin-gates.test.mjs "Flip a coin until you get tails" (0 heads + runs); cap 20 is code-only in `flipAttackCoins` |
+| 4 | Fewer matching Energy than count | discard what there is | [x] attack-coin-gates.test.mjs "a typed gated discard with fewer matches…" |
+| 5 | Bounce with no opponent Bench | skip for both (see Deviations) | [x] attack-coin-gates.test.mjs "Spin Storm returns the Defending Pokémon…" |
+| 6 | Opponent chooses (Hyper Whirlpool) | choice goes to the opponent | [x] attack-coin-gates.test.mjs "Hyper Whirlpool lets the opponent discard…" |
+| 7 | Dynamic Bolt heads | no Energy discarded | [x] attack-coin-gates.test.mjs "Dynamic Bolt keeps its Energy on heads…" |
+| 8 | Chase Up tails | no search | [x] attack-coin-gates.test.mjs "Chase Up searches the deck on heads only" |
+| 9 | Smokescreen tails | attack does nothing, turn passes; heads → normal | [x] attack-coin-gates.test.mjs "Smokescreen Shot makes the opponent's next attack flip…" |
+| 10 | Strong-Willed heads on lethal damage | 10 HP left, no KO; tails → KO | [x] attack-coin-gates.test.mjs "Strong-Willed survives…", "…does not flip for damage that is not lethal" |
+| 11 | Mini-Metronome tails | no copy choice, no damage | [x] attack-coin-gates.test.mjs "Mini-Metronome copies only on heads" |
+| 12 | Evolve-from-deck with no match | deck shuffled, nothing evolves | [x] attack-coin-gates.test.mjs "Dangerous Evolution with no matching card…" |
 | 13 | Concurrent / partial failure | n/a — single-writer reducer; each step resumes from its token | n/a |
 
 ## Test plan
@@ -124,3 +124,13 @@ n/a: rules code only, no stored data. Revert = revert the slice commits.
 | 5 | attackFlipOrFail, surviveKnockOutCoin, gated copy | tests + suite |
 
 ## Deviations (Builder appends here during build)
+- Bounce with no opponent Bench skips for Spin Storm too (the design said the opponent loses): the
+  printed effect returns the Pokémon "to hand", and ending the game on an attack effect is a bigger
+  rule call than this issue; skipping matches Hidden Power and Aqua Trick.
+- Strong Breeze needed no `toTop` flag: it reuses `atkShuffleOppBench` with count 1.
+- Added LV.X name normalization: attack text names "Charizard G", not "Charizard G LV.X", so
+  `normalizeAttackText` also reads the name without the suffix as "this Pokémon".
+- Delta Beam: `resolveAttackStatusConditions` stands down when the plan prints `atkChooseCondition`
+  (it had auto-applied Paralysis).
+- Out of scope, filed: Bowed Whip, Blast Burn cost cancel, ungated name-form self discards,
+  Lightning Sphere, "Lt." name period (I121-I125).

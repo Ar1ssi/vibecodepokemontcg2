@@ -708,3 +708,16 @@ test('attack: Mini-Metronome copies only on heads', () => {
   }
   assert.equal(zone(res, 'p2', 'active')[0].damage, 60, 'the copied attack hits');
 });
+
+test('attack: Dangerous Evolution with no matching card in the deck evolves nothing', () => {
+  const text =
+    'Flip a coin. If heads, search your deck for an Evolution card that evolves from Kakuna and put it onto Kakuna. (This counts as evolving Kakuna.) Shuffle your deck afterward.';
+  const setup = ({ p1 }) => {
+    p1.zones.deck.push(mon('Beedrill', { stage: 'Stage 2', evolvesFrom: 'Weedle' }));
+  };
+  const { b, res } = attackOn('heads', text, { name: 'Kakuna', setup });
+  const choice = res.state.pendingChoice;
+  const res2 = choice ? choose(res, [], b.rng) : res;
+  assert.equal(zone(res2, 'p1', 'active').filter((c) => c.attachedTo === b.attacker.instanceId && c.name === 'Beedrill').length, 0);
+  assert.ok(zone(res2, 'p1', 'deck').some((c) => c.name === 'Beedrill'));
+});
