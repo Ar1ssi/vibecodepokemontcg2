@@ -163,8 +163,24 @@ const TEMPLATES = [
 
   // Discard from the opponent
   [
-    /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon$/,
+    /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
+  ],
+  // Blastoise ex Hyper Whirlpool: the opponent picks the Energy.
+  [
+    /^your opponent discards (an?|\d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon$/,
+    (m) => ({
+      type: 'atkDiscardOppEnergy',
+      scope: 'active',
+      count: countOf(m[1]),
+      chooser: 'opponent',
+      ...(m[2] ? { special: true } : {}),
+    }),
+  ],
+  // Smoochum Psykiss
+  [
+    /^choose a special energy card attached to 1 of your opponent's pokémon and have your opponent shuffle that card into their deck$/,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'any', count: 1, special: true, toDeck: true }),
   ],
   [
     /^discard an? (special )?energy(?: card)? (?:from|attached to) each of your opponent's pokémon$/,
@@ -195,6 +211,10 @@ const TEMPLATES = [
       side: m[2] === 'your' ? 'self' : m[2] === 'each player\'s' ? 'each' : 'opponent',
       count: m[1] ? Number(m[1]) : 1,
     }),
+  ],
+  [
+    /^your opponent discards the top (?:(\d+) cards|card) (?:of|from) their deck$/,
+    (m) => ({ type: 'atkMill', side: 'opponent', count: m[1] ? Number(m[1]) : 1 }),
   ],
 
   // Attach from the discard pile / hand
@@ -267,6 +287,11 @@ const TEMPLATES = [
     /^put a special energy attached to 1 of your opponent's pokémon in the lost zone$/,
     () => ({ type: 'atkLostZoneEnergy', from: 'opponentAny', count: 1, special: true }),
   ],
+  // Dialga G LV.X Remove Lost
+  [
+    /^remove (an?|\d+) energy cards? attached to your opponent's active pokémon and put (?:it|them) in the lost zone$/,
+    (m) => ({ type: 'atkLostZoneEnergy', from: 'opponentActive', count: countOf(m[1]) }),
+  ],
   [
     /^put any number of (pokémon tool|item|trainer) cards from your discard pile in the lost zone$/,
     (m) => ({ type: 'atkLostZoneFromDiscard', what: recoverWhat(m[1]), anyNumber: true }),
@@ -324,7 +349,17 @@ const TEMPLATES = [
     () => ({ type: 'atkMoveAllCounters' }),
   ],
 
+  // Opponent's Active back to their hand (Fan Rotom Spin Storm, Unown Hidden Power)
+  [
+    /^your opponent returns your opponent's active pokémon and all cards attached to it to their hand$/,
+    () => ({ type: 'atkBounceOppActive' }),
+  ],
+
   // Devolve
+  [
+    /^choose 1 of either player's evolved pokémon, remove the highest stage evolution card from that pokémon, and put it into that player's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'chooseAny', to: 'hand' }),
+  ],
   [
     /^devolve each of your opponent's evolved pokémon (?:by shuffling|and shuffle) the highest stage evolution card on it into your opponent's deck$/,
     () => ({ type: 'atkDevolve', scope: 'all', to: 'deck' }),
@@ -424,6 +459,21 @@ const BLOCKS = [
   [
     /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at (?:the|that) card you chose, then have your opponent shuffle that card) into their deck\./g,
     (m) => ({ type: 'atkOppHandRandomToDeck', count: countOf(m[1]) }),
+  ],
+  // Staraptor Strong Breeze: on top of the deck, then shuffled — the same as shuffled in.
+  [
+    /put 1 of your opponent's benched pokémon and all cards attached to it on top of your opponent's deck\. your opponent shuffles their deck afterward\./g,
+    () => ({ type: 'atkShuffleOppBench', count: 1 }),
+  ],
+  // Dark Feraligatr Crushing Blow / Vaporeon Aqua Trick: the condition only decides whether
+  // the coin is flipped; with no Energy the step finds nothing either way.
+  [
+    /if your opponent's active pokémon has any energy cards attached to it, flip a coin\. if heads, choose 1 of those (?:energy )?cards and discard it\./g,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, gate: 'heads' }),
+  ],
+  [
+    /if your opponent's active pokémon has any energy cards attached to it, flip a coin\. if heads, choose 1 of those energy cards and move it to 1 of your opponent's benched pokémon\.(?: if your opponent has no benched pokémon, ignore this effect\.)?/g,
+    () => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, gate: 'heads' }),
   ],
   // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
   // reveals …" stays unparsed instead of losing its condition.

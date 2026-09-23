@@ -187,3 +187,202 @@ test('attack: Chase Up searches the deck on heads only', () => {
   const heads = attackOn('heads', text, { name: 'Manaphy' });
   assert.equal(heads.res.state.pendingChoice?.player, 'p1');
 });
+
+// ── slice 2: the opponent's board ───────────────────────────────────────────
+
+const onDefender = (...cards) => ({ defender, p2 }) => {
+  for (const card of cards) {
+    card.attachedTo = defender.instanceId;
+    p2.zones.active.push(card);
+  }
+};
+
+test('parseAttackSteps: opponent-board coin sentences', () => {
+  const after = (text, selfName) => parseAttackSteps(text, { selfName }).after;
+  assert.deepEqual(after('Flip a coin. If heads, discard 1 Energy card attached to the Defending Pokémon, if any.'), [
+    { type: 'atkDiscardOppEnergy', scope: 'active', count: 1, gate: 'heads' },
+  ]);
+  assert.deepEqual(
+    after('Flip a coin until you get tails. For each heads, your opponent discards an Energy card attached to the Defending Pokémon.'),
+    [{ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, chooser: 'opponent', perHeads: true }]
+  );
+  assert.deepEqual(
+    after('Flip a coin until you get tails. For each heads, remove an Energy card attached to the Defending Pokémon and put it in the Lost Zone.'),
+    [{ type: 'atkLostZoneEnergy', from: 'opponentActive', count: 1, perHeads: true }]
+  );
+  assert.deepEqual(
+    after('If the Defending Pokémon has any Energy cards attached to it, flip a coin. If heads, choose 1 of those cards and discard it.'),
+    [{ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after(
+      "If the Defending Pokémon has any Energy cards attached to it, flip a coin. If heads, choose 1 of those Energy cards and move it to 1 of your opponent's Benched Pokémon. If your opponent has no Benched Pokémon, ignore this effect."
+    ),
+    [{ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after(
+      "Flip a coin. If heads, choose a Special Energy card attached to 1 of your opponent's Pokémon and have your opponent shuffle that card into his or her deck."
+    ),
+    [{ type: 'atkDiscardOppEnergy', scope: 'any', count: 1, special: true, toDeck: true, gate: 'heads' }]
+  );
+  assert.deepEqual(after('Flip a coin. If heads, your opponent discards the top card from his or her deck.'), [
+    { type: 'atkMill', side: 'opponent', count: 1, gate: 'heads' },
+  ]);
+  assert.deepEqual(
+    after('Flip a coin. If heads, your opponent returns the Defending Pokémon and all cards attached to it to his or her hand.'),
+    [{ type: 'atkBounceOppActive', gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after(
+      "Flip a coin. If heads, put 1 of your opponent's Benched Pokémon and all cards attached to it on top of your opponent's deck. Your opponent shuffles his or her deck afterward."
+    ),
+    [{ type: 'atkShuffleOppBench', count: 1, gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after(
+      "Flip a coin. If heads, choose 1 of either player's Evolved Pokémon, remove the highest Stage Evolution card from that Pokémon, and put it into that player's hand."
+    ),
+    [{ type: 'atkDevolve', scope: 'chooseAny', to: 'hand', gate: 'heads' }]
+  );
+});
+
+test('attack: Hyper Whirlpool lets the opponent discard 1 Energy per heads', () => {
+  const text =
+    'Flip a coin until you get tails. For each heads, your opponent discards an Energy card attached to the Defending Pokémon.';
+  let checked = false;
+  for (let seed = 1; seed <= 30 && !checked; seed++) {
+    const b = board(text, { seed, setup: onDefender(energy('Water'), energy('Water'), energy('Water'), energy('Water')) });
+    const res = attack(b);
+    const heads = coinOf(res).headsCount;
+    if (heads === 0) {
+      assert.equal(attachedTo(res, 'p2', b.defender.instanceId).length, 4);
+      continue;
+    }
+    if (heads >= 4) continue;
+    assert.equal(res.state.pendingChoice.player, 'p2', 'the opponent chooses');
+    assert.equal(res.state.pendingChoice.min, heads);
+    const picked = attachedTo(res, 'p2', b.defender.instanceId)
+      .slice(0, heads)
+      .map((c) => c.instanceId);
+    const res2 = choose(res, picked, b.rng);
+    assert.equal(attachedTo(res2, 'p2', b.defender.instanceId).length, 4 - heads);
+    checked = true;
+  }
+  assert.ok(checked, 'a seed flips 1-3 heads');
+});
+
+test('attack: Remove Lost puts 1 Energy per heads in the Lost Zone', () => {
+  const text =
+    'Flip a coin until you get tails. For each heads, remove an Energy card attached to the Defending Pokémon and put it in the Lost Zone.';
+  const five = () => [1, 2, 3, 4, 5].map(() => energy('Water'));
+  for (let seed = 1; seed <= 10; seed++) {
+    const b = board(text, { seed, setup: onDefender(...five()) });
+    let res = attack(b);
+    const heads = Math.min(coinOf(res).headsCount, 5);
+    if (res.state.pendingChoice) {
+      const picked = attachedTo(res, 'p2', b.defender.instanceId)
+        .slice(0, heads)
+        .map((c) => c.instanceId);
+      res = choose(res, picked, b.rng);
+    }
+    assert.equal((zone(res, 'p2', 'lostZone') || []).length, heads, `seed ${seed}`);
+  }
+});
+
+test("attack: Crushing Blow discards the Defending Pokémon's Energy on heads only", () => {
+  const text =
+    'If the Defending Pokémon has any Energy cards attached to it, flip a coin. If heads, choose 1 of those cards and discard it.';
+  const tails = attackOn('tails', text, { setup: onDefender(energy('Water')) });
+  assert.equal(attachedTo(tails.res, 'p2', tails.b.defender.instanceId).length, 1);
+  const heads = attackOn('heads', text, { setup: onDefender(energy('Water')) });
+  assert.equal(attachedTo(heads.res, 'p2', heads.b.defender.instanceId).length, 0);
+});
+
+test("attack: Aqua Trick moves an Energy to the opponent's Bench; no Bench does nothing", () => {
+  const text =
+    "If the Defending Pokémon has any Energy cards attached to it, flip a coin. If heads, choose 1 of those Energy cards and move it to 1 of your opponent's Benched Pokémon. If your opponent has no Benched Pokémon, ignore this effect.";
+  const { b, res } = attackOn('heads', text, {
+    setup: (ctx) => {
+      onDefender(energy('Water'))(ctx);
+      ctx.p2.zones.bench.push(mon('Benched'));
+    },
+  });
+  const benched = zone(res, 'p2', 'bench').find((c) => c.name === 'Benched');
+  assert.equal(attachedTo(res, 'p2', b.defender.instanceId).length, 0);
+  assert.equal(attachedTo(res, 'p2', benched.instanceId).length, 1);
+  const alone = attackOn('heads', text, { setup: onDefender(energy('Water')) });
+  assert.equal(attachedTo(alone.res, 'p2', alone.b.defender.instanceId).length, 1);
+});
+
+test("attack: Psykiss shuffles a Special Energy into the opponent's deck on heads", () => {
+  const text =
+    "Flip a coin. If heads, choose a Special Energy card attached to 1 of your opponent's Pokémon and have your opponent shuffle that card into his or her deck.";
+  const special = () => energy('Colorless', { name: 'Double Colorless Energy', subtypes: ['Special'] });
+  const { b, res } = attackOn('heads', text, { setup: onDefender(special(), energy('Water')) });
+  const left = attachedTo(res, 'p2', b.defender.instanceId);
+  assert.deepEqual(
+    left.map((c) => c.name),
+    ['Basic Water Energy']
+  );
+  assert.ok(zone(res, 'p2', 'deck').some((c) => c.name === 'Double Colorless Energy'));
+  assert.ok(res.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p2'));
+});
+
+test("attack: Mix-Up discards the top card of the opponent's deck on heads", () => {
+  const text = 'Flip a coin. If heads, your opponent discards the top card from his or her deck.';
+  const heads = attackOn('heads', text);
+  assert.equal(zone(heads.res, 'p2', 'discard').length, 1);
+  const tails = attackOn('tails', text);
+  assert.equal(zone(tails.res, 'p2', 'discard').length, 0);
+});
+
+test('attack: Spin Storm returns the Defending Pokémon to the hand and the opponent promotes', () => {
+  const text =
+    'Flip a coin. If heads, your opponent returns the Defending Pokémon and all cards attached to it to his or her hand.';
+  const { b, res } = attackOn('heads', text, {
+    damage: '20',
+    setup: (ctx) => {
+      onDefender(energy('Water'))(ctx);
+      ctx.p2.zones.bench.push(mon('Benched'));
+    },
+  });
+  const hand = zone(res, 'p2', 'hand');
+  assert.ok(hand.some((c) => c.instanceId === b.defender.instanceId && c.damage === 0));
+  assert.ok(hand.some((c) => c.name === 'Basic Water Energy'));
+  assert.equal(zone(res, 'p2', 'active').find((c) => !c.attachedTo)?.name, 'Benched', 'the only Benched Pokémon promotes');
+
+  const alone = attackOn('heads', text);
+  assert.equal(zone(alone.res, 'p2', 'active')[0].instanceId, alone.b.defender.instanceId, 'no Bench: nothing happens');
+});
+
+test("attack: Strong Breeze shuffles the chosen Benched Pokémon into the opponent's deck", () => {
+  const text =
+    "Flip a coin. If heads, put 1 of your opponent's Benched Pokémon and all cards attached to it on top of your opponent's deck. Your opponent shuffles his or her deck afterward.";
+  const { res } = attackOn('heads', text, { setup: ({ p2 }) => p2.zones.bench.push(mon('Benched')) });
+  assert.equal(zone(res, 'p2', 'bench').length, 0);
+  assert.ok(zone(res, 'p2', 'deck').some((c) => c.name === 'Benched'));
+});
+
+test('attack: Hidden Power devolves the chosen evolved Pokémon of either player', () => {
+  const text =
+    "Flip a coin. If heads, choose 1 of either player's Evolved Pokémon, remove the highest Stage Evolution card from that Pokémon, and put it into that player's hand.";
+  const evolveOnto = (player, root, zoneId, name) => {
+    const stage1 = mon(name, { stage: 'Stage 1', evolvesFrom: root.name });
+    stage1.attachedTo = root.instanceId;
+    player.zones[zoneId].push(stage1);
+  };
+  const { b, res } = attackOn('heads', text, {
+    setup: ({ p1, p2, defender }) => {
+      evolveOnto(p2, defender, 'active', 'Opp Stage 1');
+      const own = mon('Own Basic');
+      p1.zones.bench.push(own);
+      evolveOnto(p1, own, 'bench', 'Own Stage 1');
+    },
+  });
+  assert.equal(res.state.pendingChoice.player, 'p1');
+  assert.equal(res.state.pendingChoice.options.length, 2);
+  const res2 = choose(res, [b.defender.instanceId], b.rng);
+  assert.ok(zone(res2, 'p2', 'hand').some((c) => c.name === 'Opp Stage 1'));
+  assert.ok(zone(res2, 'p1', 'bench').some((c) => c.name === 'Own Stage 1'), 'the other side keeps its evolution');
+});

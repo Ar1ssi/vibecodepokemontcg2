@@ -16,7 +16,13 @@ import { matchesSearch } from '../rules/search-match.mjs';
 import { clearConditions, hasAnyCondition, hasCondition } from '../rules/special-conditions.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { addAttackMarker, markerFromTurn, markerUntilTurn, SELF_NAME } from '../rules/attack-markers.mjs';
+import {
+  addAttackMarker,
+  clearAttackMarkers,
+  markerFromTurn,
+  markerUntilTurn,
+  SELF_NAME,
+} from '../rules/attack-markers.mjs';
 import {
   BENCH_LIMIT,
   activeOf,
@@ -361,25 +367,31 @@ function opponentRootsInScope(opponent, scope) {
 }
 
 // Discards the chosen cards, or with `toOwnerHand` returns them to their owner's hand
-// (Samurott Aqua Wash: "put 2 Energy attached to your opponent's Active Pokémon into their hand").
+// (Samurott Aqua Wash: "put 2 Energy attached to your opponent's Active Pokémon into their hand"),
+// or with `toOwnerDeck` shuffles them into their owner's deck (Smoochum Psykiss).
+// `chooser` is the player who picks (the opponent for Blastoise ex Hyper Whirlpool).
 function discardChosen(ctx, cards, options) {
   const { step } = ctx;
-  const remove = (card) =>
-    options.toOwnerHand
-      ? moveToZone(options.toOwnerHand, card, 'hand', 'inPlay', ctx.events)
-      : discardCard(ctx.draft, card, ctx.events);
-  if (ctx.selection) {
-    for (const card of pickById(cards, ctx.selection)) remove(card);
+  const removeAll = (picked) => {
+    for (const card of picked) {
+      if (options.toOwnerHand) moveToZone(options.toOwnerHand, card, 'hand', 'inPlay', ctx.events);
+      else if (options.toOwnerDeck) moveToZone(options.toOwnerDeck, card, 'deck', 'inPlay', ctx.events);
+      else discardCard(ctx.draft, card, ctx.events);
+    }
+    if (options.toOwnerDeck && picked.length > 0) shuffleOwnDeck(options.toOwnerDeck, ctx);
     return null;
-  }
+  };
+  if (ctx.selection) return removeAll(pickById(cards, ctx.selection));
   if (cards.length === 0) return skip(ctx, 'nothing_to_discard');
-  if (step.all || (!step.upTo && cards.length <= (step.count || 1))) {
-    for (const card of cards) remove(card);
-    return null;
-  }
+  if (step.all || (!step.upTo && cards.length <= (step.count || 1))) return removeAll(cards);
   const max = Math.min(step.count || 1, cards.length);
-  const verb = options.toOwnerHand ? "return to your opponent's hand" : 'discard';
+  const verb = options.toOwnerHand
+    ? "return to your opponent's hand"
+    : options.toOwnerDeck
+      ? "shuffle into your opponent's deck"
+      : 'discard';
   return ctx.ask({
+    ...(options.chooser ? { player: options.chooser.playerId } : {}),
     prompt: `${attackName(ctx)}: Choose ${step.upTo ? 'up to ' : ''}${max} ${options.label} to ${verb}`,
     options: cards,
     min: step.upTo ? 0 : max,
@@ -425,7 +437,12 @@ function atkDiscardOppEnergy(ctx) {
   const energies = opponentRootsInScope(opponent, step.scope)
     .flatMap((root) => attachedCards(opponent, root.instanceId))
     .filter(matches);
-  return discardChosen(ctx, energies, { label: energyLabel(step), toOwnerHand: step.toHand ? opponent : null });
+  return discardChosen(ctx, energies, {
+    label: energyLabel(step),
+    toOwnerHand: step.toHand ? opponent : null,
+    toOwnerDeck: step.toDeck ? opponent : null,
+    chooser: step.chooser === 'opponent' ? opponent : null,
+  });
 }
 
 function atkDiscardOppTools(ctx) {
@@ -1163,36 +1180,97 @@ function atkTakePrize(ctx) {
 
 // ── devolve / heal ──────────────────────────────────────────────────────────
 
+/** Moves the top evolution card of `root` to its owner's hand or deck. False when not evolved. */
+function devolveRoot(ctx, owner, root, to) {
+  const top = topPokemonCard(owner, root);
+  if (!top || top === root) return false;
+  removeFromZones(owner, top);
+  top.attachedTo = null;
+  (to === 'deck' ? owner.zones.deck : owner.zones.hand).push(top);
+  clearConditions(root);
+  ctx.events.push({
+    type: 'pokemonDevolved',
+    playerId: owner.playerId,
+    instanceId: top.instanceId,
+    targetInstanceId: root.instanceId,
+  });
+  // Damage stays on the devolved Pokémon; the sweep knocks it out if that is now lethal.
+  ctx.events.push({
+    type: 'damageCountersPlaced',
+    instanceId: root.instanceId,
+    victimPlayerId: owner.playerId,
+    attackerPlayerId: ctx.playerId,
+    damage: root.damage || 0,
+  });
+  return true;
+}
+
+// Unown Hidden Power: 1 evolved Pokémon of either player, its top card to its owner's hand.
+function devolveChosen(ctx) {
+  const sides = [ctx.player, ctx.opponent].filter(Boolean);
+  const candidates = sides.flatMap((owner) =>
+    rootsOf(owner)
+      .filter((root) => topPokemonCard(owner, root) !== root)
+      .map((root) => ({ owner, root }))
+  );
+  const devolve = ({ owner, root }) => {
+    devolveRoot(ctx, owner, root, 'hand');
+    return null;
+  };
+  if (ctx.selection) {
+    const picked = candidates.find(({ root }) => root.instanceId === ctx.selection[0]);
+    return picked ? devolve(picked) : skip(ctx, 'target_not_found');
+  }
+  if (candidates.length === 0) return skip(ctx, 'no_evolved_pokemon');
+  if (candidates.length === 1) return devolve(candidates[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose an evolved Pokémon to devolve`,
+    options: candidates.map(({ root }) => root),
+    min: 1,
+    max: 1,
+  });
+}
+
 function atkDevolve(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (step.scope === 'chooseAny') return devolveChosen(ctx);
   const roots = step.scope === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent);
   let devolved = 0;
   for (const root of roots) {
-    const top = topPokemonCard(opponent, root);
-    if (!top || top === root) continue;
-    removeFromZones(opponent, top);
-    top.attachedTo = null;
-    (step.to === 'deck' ? opponent.zones.deck : opponent.zones.hand).push(top);
-    clearConditions(root);
-    devolved++;
-    ctx.events.push({
-      type: 'pokemonDevolved',
-      playerId: opponent.playerId,
-      instanceId: top.instanceId,
-      targetInstanceId: root.instanceId,
-    });
-    // Damage stays on the devolved Pokémon; the sweep knocks it out if that is now lethal.
-    ctx.events.push({
-      type: 'damageCountersPlaced',
-      instanceId: root.instanceId,
-      victimPlayerId: opponent.playerId,
-      attackerPlayerId: ctx.playerId,
-      damage: root.damage || 0,
-    });
+    if (devolveRoot(ctx, opponent, root, step.to)) devolved++;
   }
   if (devolved === 0) return skip(ctx, 'no_evolved_pokemon');
   if (step.to === 'deck') shuffleOwnDeck(opponent, ctx);
+  return null;
+}
+
+// Fan Rotom Spin Storm / Unown Hidden Power: the opponent's Active and everything attached go
+// to their hand; they promote at the command tail. Without a Benched Pokémon nothing happens
+// (Hidden Power prints it; Spin Storm is read the same so the effect never ends the game).
+function atkBounceOppActive(ctx) {
+  const { opponent } = ctx;
+  const active = activeOf(opponent);
+  if (!active) return skip(ctx, 'no_opponent_active');
+  if (benchRootsOf(opponent).length === 0) return skip(ctx, 'no_opponent_bench');
+  const stack = [active, ...attachedCards(opponent, active.instanceId)];
+  for (const card of stack) {
+    removeFromZones(opponent, card);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    clearAttackMarkers(card);
+    opponent.zones.hand.push(card);
+  }
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: active.instanceId,
+    from: 'active',
+    to: 'hand',
+    playerId: opponent.playerId,
+    reason: 'attack-bounce',
+  });
+  opponent.promotionPending = true;
   return null;
 }
 
@@ -1283,6 +1361,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkKnockOut,
   atkTakePrize,
   atkDevolve,
+  atkBounceOppActive,
   atkHealEach,
   atkAddMarker,
 };
