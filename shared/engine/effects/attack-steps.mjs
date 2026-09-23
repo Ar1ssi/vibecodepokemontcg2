@@ -731,7 +731,7 @@ function atkRevealOppHand(ctx) {
   const hand = opponent?.zones?.hand;
   if (!hand) return skip(ctx, 'no_opponent');
   const matching = step.then?.filter ? hand.filter((c) => matchesSearch(c, step.then.filter)) : [...hand];
-  if (ctx.selection) return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, step.then.count));
+  if (ctx.selection && step.then) return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, step.then.count));
   ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, cards: hand.map(revealedCard) });
   if (!step.then) return null;
   if (matching.length === 0) return skip(ctx, 'no_matching_card');

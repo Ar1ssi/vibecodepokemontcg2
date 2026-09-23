@@ -14,9 +14,13 @@ import { classifyAttackEffect } from './shared/engine/rules/attack-effects.mjs';
  * Families the server engine executes (applyCommand 'attack': damage parser, attack helpers,
  * parseAttackSteps). Synced S268 to .agent/scratch/cov/oracle.mjs state diffs, not to the
  * legacy client attack(): a family belongs here only when its printed effect is observed.
- * Removed then (client-only or no effect observed): reveal-hand, immunity, redirect-damage,
- * copy-attack, retaliate, deferred-damage, look-opponent-deck, next-turn-bonus, hp-cap-damage,
- * damage-prevention.
+ * S269 (design 031, I118) added the former client-only families; oracle events or parser
+ * coverage per family in .agent/scratch/cov/family-signal.mjs. Unparsed printings left:
+ * Encore (a lock, not a copy), Mach Wind, Extra Comet Punch, Iron-Clad Roll, Desert Geyser,
+ * Psychic Defense, Voltage Shoot, Rocket Splash, Mud Flood, Hidden Power. immunity and
+ * hp-cap-damage change damage amounts only, which the oracle cannot see (I113); they are
+ * kept on parser coverage and reduce tests. redirect-damage has no printings;
+ * look-opponent-deck (Inkay, Gothorita) is still unexecuted (I119).
  */
 export const EXECUTED_ATTACK_FAMILIES = new Set([
   'flat',
@@ -55,14 +59,19 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
   'next-turn-lock',
   'discard-opponent',
   'lost-zone',
+  'reveal-hand',
+  'immunity',
+  'damage-prevention',
+  'next-turn-bonus',
+  'copy-attack',
+  'hp-cap-damage',
+  'deferred-damage',
+  'retaliate',
+  'shuffle-cost',
 ]);
 
 /** Partial / heuristic execution — still flagged but lower priority. */
-export const PARTIAL_ATTACK_FAMILIES = new Set([
-  // 24/46 run (attacker / opponent-Bench shuffles); hand shuffles and "shuffle any amount"
-  // wordings show no effect in the oracle.
-  'shuffle-cost',
-]);
+export const PARTIAL_ATTACK_FAMILIES = new Set([]);
 
 function main() {
   const jsonOut = process.argv.includes('--json');

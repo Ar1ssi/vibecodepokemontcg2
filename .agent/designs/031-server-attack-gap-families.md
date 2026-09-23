@@ -1,5 +1,5 @@
 # 031: Server execution of the remaining client-only attack families (I118)
-Status: approved (user)
+Status: shipped (S269)
 Date: 2026-09-23 · Session: S269
 
 ## Problem
@@ -101,20 +101,20 @@ Steps (new handlers in `effects/attack-steps.mjs`, templates in `rules/attack-st
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Text matches no template | Family stays client-only, audit still flags it; no partial effect | [ ] |
-| 2 | Malformed numbers / unknown filter | Parser returns null, no marker | [ ] |
-| 3 | Reduction bigger than damage | Damage floors at 0, no negative | [ ] |
-| 4 | Two markers of same kind stack | Reductions add; preventions OR | [ ] |
-| 5 | Marked card retreats / switches / evolves | Retreat, switch, and evolve clear markers (evolving ends attack effects) | [ ] |
-| 6 | Marked card KO'd before expiry | Markers leave with the card; retaliate still fires | [ ] |
-| 7 | Deferred KO target left Active / play | Nothing happens | [ ] |
-| 8 | Immunity attacker vs Tool prevention | Tool ignored; Stadium still applies | [ ] |
-| 9 | HP-cap target already at or below cap | 0 counters, no error | [ ] |
-| 10 | Reveal on empty hand | Reveal event with 0 cards; scaling adds 0; discard skips | [ ] |
-| 11 | Copy with no legal source attack | Attack does nothing beyond its own text; no stuck prompt | [ ] |
-| 12 | Copied attack has a prompt / coin | Resumable token carries the copied attack | [ ] |
-| 13 | Crash/reload mid-prompt | Resume token in state, same as design 030 | [ ] |
-| 14 | Side marker "each of your Pokémon until leaves Active" | Expires when the source leaves Active | [ ] |
+| 1 | Text matches no template | Family stays client-only, audit still flags it; no partial effect | [x] attack-copy.test (Encore, coin-gated reveal stay unparsed) |
+| 2 | Malformed numbers / unknown filter | Parser returns null, no marker | [x] attack-markers.test parser cases |
+| 3 | Reduction bigger than damage | Damage floors at 0, no negative | [x] not separately tested (computeAttackDamage floors totals at 0) |
+| 4 | Two markers of same kind stack | Reductions add; preventions OR | [x] not separately tested (markers are summed/OR-ed in computeAttackDamage) |
+| 5 | Marked card retreats / switches / evolves | Retreat, switch, and evolve clear markers (evolving ends attack effects) | [x] attack-markers.test retreat/KO + evolve expiry |
+| 6 | Marked card KO'd before expiry | Markers leave with the card; retaliate still fires | [x] attack-markers.test Right Back at You |
+| 7 | Deferred KO target left Active / play | Nothing happens | [x] attack-markers.test Word of Ruin |
+| 8 | Immunity attacker vs Tool prevention | Tool ignored; Stadium still applies | [x] attack-markers.test Tool reduction skipped |
+| 9 | HP-cap target already at or below cap | 0 counters, no error | [x] attack-markers.test HP-cap "already under the cap" |
+| 10 | Reveal on empty hand | Reveal event with 0 cards; scaling adds 0; discard skips | [x] attack-reveal-hand.test empty hand |
+| 11 | Copy with no legal source attack | Attack does nothing beyond its own text; no stuck prompt | [x] attack-copy.test nothing to copy / Imittack unaffordable |
+| 12 | Copied attack has a prompt / coin | Resumable token carries the copied attack | [x] attack-copy.test coins, Glimwood re-flip, before-damage prompt |
+| 13 | Crash/reload mid-prompt | Resume token in state, same as design 030 | [x] resume tokens carry copiedAttack (state-only, same as design 030) |
+| 14 | Side marker "each of your Pokémon until leaves Active" | Expires when the source leaves Active | [x] attack-markers.test side-wide Pokémon-EX guard |
 
 ## Test plan
 Unit: marker parser + expiry, `computeAttackDamage` option matrix, each new handler.
@@ -135,3 +135,27 @@ the branch commits.
 | 5 | copy-attack | same + oracle run, audit list updated |
 
 ## Deviations
+- Copy attacks resolve in the attack command before coin flips, not as a `before` step: the
+  copied attack's own coins must be flipped for it. Helpers live in `rules/attack-copy.mjs` and
+  reduce.mjs (`offerCopiedAttack`, `resumeCopiedAttack`, `flipAndResolveAttack`); the cost check
+  was extracted as `attackCostPayable`. Energy-gated wordings (Imittack, old Copy) offer only
+  affordable attacks instead of letting an unaffordable pick fizzle.
+- Encore (1 printing) is not a copy: it locks the Defending Pokémon to one attack. Left unparsed.
+- Immunity also ignores defender Abilities. Effects-prevention markers cover damage only.
+  `outgoingReduce` is not skipped by ignoreDefenderEffects.
+- Markers survive a same-turn Bench to Active round trip. Gust/switch paths do not clear markers;
+  the read-time Active check covers them. whileActive markers use MAX_SAFE_INTEGER; `fromTurn`
+  delays next-turn bonuses. nextTurnBonus needs base damage > 0 and an Active defender.
+- Flygon and Iron Treads produce no step; Metang and Vespiquen are skipped. The "-EX" filter
+  matches uppercase only. The side guard blocks only Bench damage via damageBenchedPokemon.
+- Window rewrites fold the retaliate condition into the body. Retaliate fires only for main
+  attack damage to the Active; in 'attack' mode it hits the current opponent Active. Deferred KO
+  runs before the Checkup condition pass. HP-cap 'opponentAny' offers only Pokémon above the cap.
+- "Draw up to 5" draws the full 5. Reveal parsing is sentence-initial only, so coin-gated reveals
+  stay unparsed. Hand Energy scaling excludes Trainers named "Energy". Reveal events come after
+  damage (the steps run in `after`).
+- Struck: redirect-damage (0 printings). look-opponent-deck was struck as 0 printings, but that
+  count came from the local corpus; live TCGdex has 3 (Inkay, Gothorita x2), deferred to I119.
+  10 printings stay unparsed
+  (Encore, Mach Wind, Extra Comet Punch, Iron-Clad Roll, Desert Geyser, Psychic Defense, Voltage
+  Shoot, Rocket Splash, Mud Flood, Hidden Power): listed in the audit header, filed as I119.
