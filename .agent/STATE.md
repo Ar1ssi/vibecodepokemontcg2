@@ -10,7 +10,7 @@ Focus: S269 closed I118 (design 031 shipped) on branch `feature/i118-attack-gaps
   NOT merged or pushed. S267/S268 work also still unpushed on local main.
 Active: none.
 Next: merge feature/i118-attack-gaps into main and push when the user says so.
-  I119 (10 unparsed printings in the design-031 families), I113 oracle gate (damage amounts).
+  I120 (75 coin-gated sentences with no effect), I119 (10 unparsed printings), I113 oracle gate (damage amounts).
   Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
   maintenance due (S260); ISSUES Open still over cap.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
