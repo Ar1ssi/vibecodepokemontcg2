@@ -21,6 +21,7 @@ import {
   getSpecialEnergyDamageReduction,
 } from './special-energy-parse.mjs';
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
+import { hasMarker } from './attack-markers.mjs';
 
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -37,7 +38,16 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     baseDamage = null,
     blockTools = false,
     turnDamageBonuses = [],
+    // Attack immunity wording (attack-markers.mjs parseDamageImmunity). Ignoring "effects on
+    // the Defending Pokémon" skips its attack markers, Tools, Abilities and Special Energy
+    // reductions; Stadiums still apply.
+    ignoreWeakness = false,
+    ignoreResistance = false,
+    ignoreDefenderEffects = false,
+    // Live attack markers on the defender (attack-markers.mjs liveAttackMarkers).
+    defenderMarkers = [],
   } = options;
+  const defenderEffects = ignoreDefenderEffects ? [] : defenderMarkers;
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
@@ -76,7 +86,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   let multiplier = 1;
   let flat = 0;
-  if (attacker?.types?.length && defender?.weakness && !weaknessNullified) {
+  const weaknessApplies =
+    !ignoreWeakness && !weaknessNullified && !hasMarker(defenderEffects, 'noWeakness');
+  if (attacker?.types?.length && defender?.weakness && weaknessApplies) {
     // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
     if (attacker.types.includes(defender.weakness.type)) {
       const v = defender.weakness.value;
@@ -92,6 +104,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   let resistance = 0;
   if (
+    !ignoreResistance &&
     attacker?.types?.length &&
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
@@ -110,16 +123,18 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   // Step 4b: Defender special-energy damage reduction applied after W/R
   // (Metal Energy, Stone, V Guard, …).
-  const specialEnergyReduction = getSpecialEnergyDamageReduction(defender, defenderZoneCards, {
-    attacker,
-    afterWR: true,
-  });
+  const specialEnergyReduction = ignoreDefenderEffects
+    ? 0
+    : getSpecialEnergyDamageReduction(defender, defenderZoneCards, {
+        attacker,
+        afterWR: true,
+      });
   damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction);
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
   let reduced = 0;
   let damageAfterReduction = damageAfterWR;
-  if (damageAfterWR > 0) {
+  if (damageAfterWR > 0 && !ignoreDefenderEffects) {
     damageAfterReduction = applyToolDamageReduction(
       damageAfterWR,
       defender,
@@ -131,10 +146,12 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   }
 
   // Step 6: Damage prevention (tools + abilities)
-  const prevention = combinedToolDamagePrevention(defender, defenderZoneCards, attacker, {
-    blockTools,
-    stadium,
-  });
+  const prevention = ignoreDefenderEffects
+    ? null
+    : combinedToolDamagePrevention(defender, defenderZoneCards, attacker, {
+        blockTools,
+        stadium,
+      });
 
   let prevented = false;
   let finalDamage = damageAfterReduction;

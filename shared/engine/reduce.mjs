@@ -70,6 +70,11 @@ import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
+import {
+  clearAttackMarkers,
+  liveAttackMarkers,
+  parseDamageImmunity,
+} from './rules/attack-markers.mjs';
 import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
@@ -410,6 +415,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those).
       activeWR: !/don't apply weakness and resistance(?! for benched)/i.test(t),
+      immunity: parseDamageImmunity(t),
     };
   }
   if (parsed?.bench > 0) {
@@ -475,9 +481,21 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       defenderIsActive: true,
       baseDamage: clause.amount,
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
+      ...clause.immunity,
+      defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
     }
   );
   return result.total;
+}
+
+// Timed attack effects (design 031) still in force on a Pokémon in its owner's Active Spot.
+function activeAttackMarkers(draft, playerId, card) {
+  const active = draft.players[playerId]?.zones?.active || [];
+  if (!card || !active.some((c) => c.instanceId === card.instanceId)) return [];
+  return liveAttackMarkers(card, {
+    turnNumber: draft.turn?.number || 1,
+    zoneCards: active,
+  });
 }
 
 // Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
@@ -704,6 +722,7 @@ function handleKnockout(
         targetZone.splice(i, 1);
         c.damage = 0;
         clearConditions(c);
+        clearAttackMarkers(c);
         c.attachedTo = null;
         if (lostCity && c.instanceId === victim.instanceId) {
           if (!Array.isArray(victimPlayer.zones.lostZone)) {
@@ -1343,6 +1362,7 @@ function applyRetreatSwap(
     delete active.cannotAttackUntilTurn;
     delete active.cannotAttackAttackName;
     delete active.cannotRetreatUntilTurn;
+    clearAttackMarkers(active);
 
     if (!player.flags) player.flags = {};
     player.flags.retreatedThisTurn = true;
@@ -3387,6 +3407,8 @@ function resolveAttackEffectPhase(draft, ctx) {
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
+            ...parseDamageImmunity(effectiveAttack?.text),
+            defenderMarkers: activeAttackMarkers(draft, defenderPlayerId, defender),
           }
         );
         dmgDealt = dmgResult.total;
@@ -4291,6 +4313,7 @@ export function applyCommand(state, command, rng = null) {
             delete card.cannotAttackUntilTurn;
             delete card.cannotAttackAttackName;
             delete card.cannotRetreatUntilTurn;
+            clearAttackMarkers(card);
             const srcZone = draft.players[playerId].zones[payload.from];
             for (let i = srcZone.length - 1; i >= 0; i--) {
               if (srcZone[i].attachedTo === card.instanceId) {

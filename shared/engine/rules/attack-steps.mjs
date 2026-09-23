@@ -10,6 +10,7 @@
  */
 
 import { parseAbility } from './abilities.mjs';
+import { MARKER_TEMPLATES } from './attack-markers.mjs';
 import {
   attachDiscardToBenchSpread,
   deckMillScaling,
@@ -332,6 +333,9 @@ const TEMPLATES = [
     /^heal (\d+|all) damage from (?:each|all) of your (benched )?pokémon$/,
     (m) => ({ type: 'atkHealEach', ...(m[1] === 'all' ? { all: true } : { amount: Number(m[1]) }), scope: m[2] ? 'bench' : 'all' }),
   ],
+
+  // Timed effects on later turns (design 031)
+  ...MARKER_TEMPLATES,
 ];
 
 function energyFilter(symbol, sentence) {

@@ -16,6 +16,7 @@ import { matchesSearch } from '../rules/search-match.mjs';
 import { clearConditions, hasAnyCondition, hasCondition } from '../rules/special-conditions.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { shuffleInPlace } from '../rng.mjs';
+import { addAttackMarker, markerUntilTurn } from '../rules/attack-markers.mjs';
 import {
   BENCH_LIMIT,
   activeOf,
@@ -1068,6 +1069,28 @@ function atkHealEach(ctx) {
 
 const whatOf = (step) => energyLabel(step);
 
+// Timed effect for a later turn (design 031): marks the attacker or the opponent's Active.
+function atkAddMarker(ctx) {
+  const { step } = ctx;
+  const owner = step.target === 'opponentActive' ? ctx.opponent : ctx.player;
+  const card =
+    step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
+  if (!card) return skip(ctx, 'no_marker_target');
+  addAttackMarker(card, {
+    ...step.marker,
+    untilTurn: markerUntilTurn(step.window, ctx.draft.turn?.number || 1),
+    topId: topPokemonCard(owner, card)?.instanceId ?? card.instanceId,
+    sourceAttack: attackName(ctx),
+  });
+  ctx.events.push({
+    type: 'attackMarkerAdded',
+    kind: step.marker.kind,
+    instanceId: card.instanceId,
+    playerId: owner.playerId,
+  });
+  return null;
+}
+
 export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
@@ -1100,4 +1123,5 @@ export const ATTACK_STEP_HANDLERS = {
   atkTakePrize,
   atkDevolve,
   atkHealEach,
+  atkAddMarker,
 };
