@@ -381,6 +381,19 @@ const TEMPLATES = [
     () => ({ type: 'atkDevolve', scope: 'active', to: 'hand' }),
   ],
 
+  // Alolan Exeggutor ex Swinging Sphene
+  [/^knock out your opponent's active basic pokémon$/, () => ({ type: 'atkKnockOut', condition: 'basic' })],
+  [
+    /^knock out 1 of your opponent's benched basic pokémon$/,
+    () => ({ type: 'atkKnockOutChoose', scope: 'bench', basicOnly: true }),
+  ],
+
+  // Porygon2 Delta Beam: "choose whether … becomes Asleep, Confused, or Paralyzed"
+  [
+    /^choose whether your opponent's active pokémon becomes ((?:asleep|burned|confused|paralyzed|poisoned)(?:,? (?:or )?(?:asleep|burned|confused|paralyzed|poisoned))+)$/,
+    (m) => ({ type: 'atkChooseCondition', options: conditionList(m[1]) }),
+  ],
+
   // Prizes / Knock Out
   [/^(?:discard all energy from this pokémon, and )?take (a|\d+) prize cards?$/, (m) => ({ type: 'atkTakePrize', count: countOf(m[1]) })],
   [/^your opponent's active pokémon is knocked out$/, () => ({ type: 'atkKnockOut', condition: null })],
@@ -406,6 +419,12 @@ const TEMPLATES = [
   // Timed effects on later turns (design 031)
   ...MARKER_TEMPLATES,
 ];
+
+const SPECIAL_CONDITIONS = ['Asleep', 'Burned', 'Confused', 'Paralyzed', 'Poisoned'];
+
+function conditionList(phrase) {
+  return phrase.match(/asleep|burned|confused|paralyzed|poisoned/g).map((c) => c[0].toUpperCase() + c.slice(1));
+}
 
 function energyFilter(symbol, sentence) {
   const basic = /\bbasic\b/.test(sentence.split(/ from /)[0]);
@@ -478,6 +497,11 @@ const BLOCKS = [
   [
     /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
     () => ({ type: 'searchEvolve', ontoSource: true }),
+  ],
+  // Bellossom Miracle Powder / Tropius Miracle Blow
+  [
+    /choose 1 special condition\. your opponent's active pokémon is now affected by that special condition\./g,
+    () => ({ type: 'atkChooseCondition', options: SPECIAL_CONDITIONS }),
   ],
   // Staraptor Strong Breeze: on top of the deck, then shuffled — the same as shuffled in.
   [

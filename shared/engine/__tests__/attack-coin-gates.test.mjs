@@ -515,3 +515,92 @@ test('attack: Dangerous Evolution evolves the attacker from the deck on heads', 
   assert.equal(tails.res.state.pendingChoice, null);
   assert.ok(zone(tails.res, 'p1', 'deck').some((c) => c.name === 'Beedrill'));
 });
+
+// ── slice 4: Knock Outs and chosen Special Conditions ───────────────────────
+
+const SPHENE =
+  "Flip a coin. If heads, Knock Out your opponent's Active Basic Pokémon. If tails, Knock Out 1 of your opponent's Benched Basic Pokémon.";
+
+test('parseAttackSteps: Swinging Sphene, Miracle Powder, Delta Beam', () => {
+  const after = (text, selfName) => parseAttackSteps(text, { selfName }).after;
+  assert.deepEqual(after(SPHENE, 'Alolan Exeggutor ex'), [
+    { type: 'atkKnockOut', condition: 'basic', gate: 'heads' },
+    { type: 'atkKnockOutChoose', scope: 'bench', basicOnly: true, gate: 'tails' },
+  ]);
+  assert.deepEqual(
+    after(
+      'Flip a coin. If heads, choose 1 Special Condition. The Defending Pokémon is now affected by that Special Condition.'
+    ),
+    [{ type: 'atkChooseCondition', options: ['Asleep', 'Burned', 'Confused', 'Paralyzed', 'Poisoned'], gate: 'heads' }]
+  );
+  assert.deepEqual(
+    after('Flip a coin. If heads, choose whether the Defending Pokémon becomes Asleep, Confused, or Paralyzed.'),
+    [{ type: 'atkChooseCondition', options: ['Asleep', 'Confused', 'Paralyzed'], gate: 'heads' }]
+  );
+});
+
+const knockedOut = (res, id) => zone(res, 'p2', 'discard').some((c) => c.instanceId === id);
+
+test('attack: Swinging Sphene knocks out a Basic Active on heads, never an evolved one', () => {
+  const heads = attackOn('heads', SPHENE, { name: 'Alolan Exeggutor ex', setup: ({ p2 }) => p2.zones.bench.push(mon('Benched')) });
+  assert.ok(knockedOut(heads.res, heads.b.defender.instanceId));
+
+  const evolved = attackOn('heads', SPHENE, {
+    name: 'Alolan Exeggutor ex',
+    setup: ({ p2, defender }) => {
+      const stage1 = mon('Stage 1', { stage: 'Stage 1', evolvesFrom: 'Defender' });
+      stage1.attachedTo = defender.instanceId;
+      p2.zones.active.push(stage1);
+      p2.zones.bench.push(mon('Benched'));
+    },
+  });
+  assert.ok(!knockedOut(evolved.res, evolved.b.defender.instanceId));
+});
+
+test('attack: Swinging Sphene knocks out the chosen Benched Basic Pokémon on tails', () => {
+  const { b, res } = attackOn('tails', SPHENE, {
+    name: 'Alolan Exeggutor ex',
+    setup: ({ p2 }) => {
+      const root = mon('Evolved Root');
+      const stage1 = mon('Stage 1', { stage: 'Stage 1', evolvesFrom: 'Evolved Root' });
+      stage1.attachedTo = root.instanceId;
+      p2.zones.bench.push(mon('Basic A'), mon('Basic B'), root, stage1);
+    },
+  });
+  const options = res.state.pendingChoice.options.map((c) => c.name);
+  assert.deepEqual(options.sort(), ['Basic A', 'Basic B'], 'only Benched Basic Pokémon are offered');
+  const basicB = res.state.pendingChoice.options.find((c) => c.name === 'Basic B');
+  const res2 = choose(res, [basicB.instanceId], b.rng);
+  assert.ok(knockedOut(res2, basicB.instanceId));
+  assert.ok(!knockedOut(res2, b.defender.instanceId));
+});
+
+test('attack: Delta Beam applies the chosen condition on heads and none on tails', () => {
+  const text = 'Flip a coin. If heads, choose whether the Defending Pokémon becomes Asleep, Confused, or Paralyzed.';
+  const { b, res } = attackOn('heads', text);
+  assert.deepEqual(
+    res.state.pendingChoice.options.map((o) => o.name),
+    ['Asleep', 'Confused', 'Paralyzed']
+  );
+  assert.deepEqual(zone(res, 'p2', 'active')[0].specialConditions || [], [], 'nothing lands before the choice');
+  const confused = res.state.pendingChoice.options.find((o) => o.name === 'Confused');
+  const res2 = choose(res, [confused.instanceId], b.rng);
+  const defender = zone(res2, 'p2', 'active').find((c) => c.instanceId === b.defender.instanceId);
+  assert.ok(res2.events.some((e) => e.type === 'specialConditionUpdated' && e.condition === 'Confused'));
+  assert.ok(JSON.stringify(defender).includes('Confused'));
+  assert.ok(!JSON.stringify(defender).includes('Paralyzed'));
+
+  const tails = attackOn('tails', text);
+  assert.equal(tails.res.state.pendingChoice, null);
+  assert.ok(!tails.res.events.some((e) => e.type === 'specialConditionUpdated'));
+});
+
+test('attack: Miracle Powder offers all five Special Conditions on heads', () => {
+  const text =
+    'Flip a coin. If heads, choose 1 Special Condition. The Defending Pokémon is now affected by that Special Condition.';
+  const { b, res } = attackOn('heads', text);
+  assert.equal(res.state.pendingChoice.options.length, 5);
+  const poisoned = res.state.pendingChoice.options.find((o) => o.name === 'Poisoned');
+  const res2 = choose(res, [poisoned.instanceId], b.rng);
+  assert.ok(res2.events.some((e) => e.type === 'specialConditionUpdated' && e.condition === 'Poisoned'));
+});

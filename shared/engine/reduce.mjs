@@ -3964,13 +3964,15 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
       }
 
-      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack
-      const { defenderConditions, attackerConditions } =
-        resolveAttackStatusConditions(attack, {
-          coin,
-          headsCount,
-          flips,
-        });
+      // Attack Special Conditions (design 014): apply status conditions inflicted by this attack.
+      // A chosen condition (Delta Beam) is the atkChooseCondition step's (design 032).
+      const { defenderConditions, attackerConditions } = attackSteps.printed.has('atkChooseCondition')
+        ? { defenderConditions: [], attackerConditions: [] }
+        : resolveAttackStatusConditions(attack, {
+            coin,
+            headsCount,
+            flips,
+          });
 
       if (defenderConditions.length > 0 && defender) {
         // Only apply condition if defender survived the attack (not KO'd)

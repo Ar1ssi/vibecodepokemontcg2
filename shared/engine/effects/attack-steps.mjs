@@ -13,7 +13,13 @@
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { clearConditions, hasAnyCondition, hasCondition } from '../rules/special-conditions.mjs';
+import {
+  addCondition,
+  clearConditions,
+  hasAnyCondition,
+  hasCondition,
+  listConditions,
+} from '../rules/special-conditions.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import {
@@ -1124,11 +1130,13 @@ function atkOpponentPrizeDeckSwap(ctx) {
   });
 }
 
-function knockOutConditionMet(card, step) {
+function knockOutConditionMet(card, step, owner) {
   switch (step.condition) {
     case null:
     case undefined:
       return true;
+    case 'basic':
+      return stageOf(topPokemonCard(owner, card)) === 'Basic';
     case 'specialCondition':
       return hasAnyCondition(card);
     case 'exactCounters':
@@ -1142,7 +1150,7 @@ function atkKnockOut(ctx) {
   const { opponent, step } = ctx;
   const target = activeOf(opponent);
   if (!target) return skip(ctx, 'no_opponent_active');
-  if (!knockOutConditionMet(target, step)) return skip(ctx, 'condition_unmet');
+  if (!knockOutConditionMet(target, step, opponent)) return skip(ctx, 'condition_unmet');
   ctx.events.push({
     type: 'knockOutMarked',
     instanceId: target.instanceId,
@@ -1153,15 +1161,19 @@ function atkKnockOut(ctx) {
 }
 
 // Glaceon ex Euclase / Lycanroc VMAX Hunting Claw: Knock Out 1 matching opponent's Pokémon.
+// Alolan Exeggutor ex Swinging Sphene: 1 Benched Basic Pokémon (`scope: 'bench', basicOnly`).
 function atkKnockOutChoose(ctx) {
   const { opponent, step } = ctx;
   const matches = (root) => {
     const damage = root.damage || 0;
+    if (step.basicOnly && stageOf(topPokemonCard(opponent, root)) !== 'Basic') return false;
     if (step.exactCounters != null) return damage === step.exactCounters * 10;
+    if (step.maxRemainingHp == null) return true;
     const hp = Number(topPokemonCard(opponent, root)?.hp) || 0;
     return hp > 0 && hp - damage <= step.maxRemainingHp;
   };
-  const candidates = rootsOf(opponent).filter(matches);
+  const roots = step.scope === 'bench' ? benchRootsOf(opponent) : rootsOf(opponent);
+  const candidates = roots.filter(matches);
   const knockOut = (root) => {
     ctx.events.push({
       type: 'knockOutMarked',
@@ -1180,6 +1192,34 @@ function atkKnockOutChoose(ctx) {
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to Knock Out`,
     options: candidates,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Miracle Powder / Delta Beam: the attacker picks 1 of the printed Special Conditions and it
+// lands on the opponent's Active. Option ids are 1-based indexes into `step.options`.
+function atkChooseCondition(ctx) {
+  const { opponent, step } = ctx;
+  const target = activeOf(opponent);
+  if (!target) return skip(ctx, 'no_opponent_active');
+  const conditions = step.options || [];
+  if (ctx.selection) {
+    const condition = conditions[Number(ctx.selection[0]) - 1];
+    if (!condition) return skip(ctx, 'invalid_condition');
+    addCondition(target, condition);
+    ctx.events.push({
+      type: 'specialConditionUpdated',
+      instanceId: target.instanceId,
+      condition,
+      conditions: listConditions(target),
+    });
+    return null;
+  }
+  if (conditions.length === 0) return skip(ctx, 'no_condition');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a Special Condition for your opponent's Active Pokémon`,
+    options: conditions.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
     min: 1,
     max: 1,
   });
@@ -1376,6 +1416,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkOpponentPrizeDeckSwap,
   atkKnockOut,
   atkTakePrize,
+  atkChooseCondition,
   atkDevolve,
   atkBounceOppActive,
   atkHealEach,
