@@ -6,7 +6,7 @@
 // compute honestly is LEFT OUT rather than sent as 0 — the parser then keeps an unresolved
 // note instead of silently scaling by zero (damage-parser.mjs § "for each" units).
 
-import { isEnergy, isPokemon, getRetreatCostCount } from '../cards.mjs';
+import { isEnergy, isPokemon, isTrainer, getRetreatCostCount } from '../cards.mjs';
 import { serverEnergyDescriptor } from './server-energy.mjs';
 import { expandEnergyEntries } from './attack-engine.mjs';
 import { normalizeStage } from './evolution.mjs';
@@ -142,6 +142,9 @@ export function buildServerAttackContext(
     attackerDamage: attacker?.damage || 0,
     ownHandCount: zoneOf(own, 'hand').length,
     opponentHandCount: zoneOf(opponent, 'hand').length,
+    opponentHandTrainerCount: zoneOf(opponent, 'hand').filter(isTrainer).length,
+    // Trainers like Energy Retrieval carry "Energy" in their name; isEnergy alone counts them.
+    opponentHandEnergyCount: zoneOf(opponent, 'hand').filter((c) => isEnergy(c) && !isTrainer(c)).length,
     ownBenchCount: ownBench.length,
     opponentBenchCount: opponentBench.length,
     stage2BenchCount: ownBench.filter(({ view }) => isStage2(view)).length,

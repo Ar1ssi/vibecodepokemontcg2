@@ -695,9 +695,95 @@ function atkOppHandRandomToDeck(ctx) {
   const { opponent } = ctx;
   const hand = opponent?.zones?.hand || [];
   if (hand.length === 0) return skip(ctx, 'empty_hand');
-  const card = hand[Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * hand.length)];
-  ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
-  moveToZone(opponent, card, 'deck', 'hand', ctx.events);
+  const picked = [];
+  const pool = [...hand];
+  while (picked.length < (ctx.step.count || 1) && pool.length > 0) {
+    const at = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * pool.length);
+    picked.push(...pool.splice(at, 1));
+  }
+  ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, cards: picked.map(revealedCard) });
+  for (const card of picked) moveToZone(opponent, card, 'deck', 'hand', ctx.events);
+  shuffleOwnDeck(opponent, ctx);
+  return null;
+}
+
+const revealedCard = (card) => ({ instanceId: card.instanceId, name: card.name });
+
+const REVEAL_ACTION_ZONE = { deckBottom: 'deck', prize: 'prizes' };
+
+function applyRevealAction(ctx, cards) {
+  const { opponent, step } = ctx;
+  const zone = REVEAL_ACTION_ZONE[step.then.action];
+  if (!zone) {
+    discardCards(opponent, cards, ctx.events);
+    return null;
+  }
+  // Deck index 0 is the top, so a push puts the card on the bottom.
+  for (const card of cards) moveToZone(opponent, card, zone, 'hand', ctx.events);
+  return null;
+}
+
+// "Your opponent reveals their hand." plus an optional follow-up on the revealed cards
+// (discard / bottom of deck / face-down Prize). Damage that counts the revealed cards is
+// the damage parser's, read from the same hand.
+function atkRevealOppHand(ctx) {
+  const { opponent, step } = ctx;
+  const hand = opponent?.zones?.hand;
+  if (!hand) return skip(ctx, 'no_opponent');
+  const matching = step.then?.filter ? hand.filter((c) => matchesSearch(c, step.then.filter)) : [...hand];
+  if (ctx.selection) return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, step.then.count));
+  ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, cards: hand.map(revealedCard) });
+  if (!step.then) return null;
+  if (matching.length === 0) return skip(ctx, 'no_matching_card');
+  if (step.then.count === 'all' || matching.length <= step.then.count) return applyRevealAction(ctx, matching);
+  const kind = step.then.filter ? `${step.then.filter[0].toUpperCase()}${step.then.filter.slice(1)} ` : '';
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${step.then.count} ${kind}card(s) from your opponent's hand`,
+    options: matching,
+    min: step.then.count,
+    max: step.then.count,
+  });
+}
+
+function atkShuffleHandIntoDeck(ctx) {
+  const { player } = ctx;
+  const hand = player.zones.hand.splice(0);
+  player.zones.deck.push(...hand);
+  for (const card of hand) {
+    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'deck', playerId: player.playerId });
+  }
+  shuffleOwnDeck(player, ctx);
+  return null;
+}
+
+// "Draw up to 5 cards" draws the full count (the deck permitting); "a number of cards equal
+// to the number of cards in your opponent's hand" reads that hand when the step runs.
+function atkDraw(ctx) {
+  const { player, step } = ctx;
+  const count = step.countFrom === 'opponentHand' ? ctx.opponent?.zones?.hand?.length || 0 : step.count || 0;
+  const deck = player.zones.deck;
+  const drawn = deck.splice(0, Math.min(count, deck.length));
+  if (drawn.length === 0) return skip(ctx, 'nothing_to_draw');
+  player.zones.hand.push(...drawn);
+  ctx.events.push({
+    type: 'cardsDrawn',
+    count: drawn.length,
+    playerId: player.playerId,
+    cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+  });
+  return null;
+}
+
+// Shiinotic Dream's Touch: the opponent's Active sheds all its Energy into their deck when
+// it has the printed Special Condition.
+function atkShuffleOppActiveEnergy(ctx) {
+  const { opponent, step } = ctx;
+  const target = activeOf(opponent);
+  if (!target) return skip(ctx, 'no_opponent_active');
+  if (!hasCondition(target, step.condition)) return skip(ctx, 'condition_unmet');
+  const energy = attachedCards(opponent, target.instanceId).filter(isEnergy);
+  if (energy.length === 0) return skip(ctx, 'no_energy');
+  for (const card of energy) moveToZone(opponent, card, 'deck', 'active', ctx.events);
   shuffleOwnDeck(opponent, ctx);
   return null;
 }
@@ -1155,6 +1241,10 @@ export const ATTACK_STEP_HANDLERS = {
   atkLookTopTake,
   atkShuffleOppBench,
   atkOppHandRandomToDeck,
+  atkRevealOppHand,
+  atkShuffleHandIntoDeck,
+  atkDraw,
+  atkShuffleOppActiveEnergy,
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
   atkKnockOutChoose,
   atkCountersEach,

@@ -286,7 +286,14 @@ const TEMPLATES = [
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
 
   // Leave play
-  [/^shuffle this pokémon and all attached cards into your deck$/, () => ({ type: 'atkShuffleSelf' })],
+  [/^shuffle this pokémon and all (?:attached cards|cards attached to it) into your deck$/, () => ({ type: 'atkShuffleSelf' })],
+  [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
+  [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]) })],
+  [/^draw a number of cards equal to the number of cards in your opponent's hand$/, () => ({ type: 'atkDraw', countFrom: 'opponentHand' })],
+  [
+    /^if your opponent's active pokémon is (asleep|paralyzed|poisoned|burned|confused), your opponent shuffles all energy from it into their deck$/,
+    (m) => ({ type: 'atkShuffleOppActiveEnergy', condition: m[1][0].toUpperCase() + m[1].slice(1) }),
+  ],
 
   // Damage counters
   [
@@ -400,14 +407,42 @@ const BLOCKS = [
     (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),
   ],
   [
-    /choose a random card from your opponent's hand\. your opponent reveals that card and shuffles it into their deck\./g,
-    () => ({ type: 'atkOppHandRandomToDeck' }),
+    /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at the card you chose, then have your opponent shuffle that card) into their deck\./g,
+    (m) => ({ type: 'atkOppHandRandomToDeck', count: countOf(m[1]) }),
+  ],
+  // Sentence-initial only, so a coin-gated reveal ("if heads, your opponent reveals …")
+  // stays unparsed instead of losing its gate.
+  [
+    /(?<=^|\. )your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down))?)?\./g,
+    (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
   ],
   [
     /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
     (m) => searchAttachStep(m[0], m[1], Boolean(m[2])),
   ],
 ];
+
+// "Your opponent reveals their hand. Discard a Trainer card you find there." →
+// { type: 'atkRevealOppHand', then: { action: 'discard', count: 1, filter: 'trainer' } }.
+// A bare reveal has no `then`; "choose … and put" / "add … to" name the destination.
+function revealHandStep(verb, countWord, kindWord, destination) {
+  if (!verb) return { type: 'atkRevealOppHand' };
+  let action = 'discard';
+  if (verb === 'choose') {
+    if (!/bottom of their deck/.test(destination || '')) return null;
+    action = 'deckBottom';
+  } else if (verb === 'add') {
+    if (!/prize cards/.test(destination || '')) return null;
+    action = 'prize';
+  } else if (destination) {
+    return null;
+  }
+  const filter = kindWord ? kindWord.trim() : undefined;
+  return {
+    type: 'atkRevealOppHand',
+    then: { action, count: countWord === 'all' ? 'all' : countOf(countWord), ...(filter ? { filter } : {}) },
+  };
+}
 
 // "search your deck for up to 2 Basic {G} Energy cards" → { what, count, upTo }
 function searchEnergyParams(body) {
