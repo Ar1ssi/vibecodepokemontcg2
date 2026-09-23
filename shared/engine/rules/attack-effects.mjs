@@ -295,6 +295,18 @@ export function classifyAttackEffect(attack) {
     return 'bench-damage';
   }
 
+  // An Energy attach the rest hangs off names the attack (I115): "Attach … from your hand.
+  // If you do, switch/heal …" and a search-and-attach followed by "Then, …". A cost chain
+  // ("Discard … If you do, <effect>") keeps its effect's family.
+  const [first, second = ''] = t.split(/(?<=\.)\s+/);
+  const attachChain =
+    (/^if you do,/.test(second) && /^attach [^.]*from your hand/.test(first)) ||
+    /^search your deck for [^.]*\battach\b/.test(first);
+  if (second && attachChain) {
+    const primary = classifyAttackEffect({ ...attack, text: first });
+    if (primary !== 'flat' && primary !== 'unknown') return primary;
+  }
+
   // Follow-up actions that ride on the attack.
   if (/your opponent reveal(?:s)? (?:their|his or her) hand/i.test(t))
     return 'reveal-hand';

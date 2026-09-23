@@ -391,6 +391,22 @@ export function resolveCoinGates(steps, { coin, headsCount }) {
     .map(({ gate, perHeads, ...step }) => (perHeads ? { ...step, count: (step.count || 1) * heads } : step));
 }
 
+const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;
+
+function isAttachStep(step) {
+  return step?.type === 'atkAttach' || (step?.type === 'searchAbility' && step.destination === 'attach');
+}
+
+// Sentences that only make sense after an attach: "it" / "that Pokémon" is the Pokémon the
+// Energy went to.
+const CHAIN_TEMPLATES = [
+  [/^switch it with 1 of your benched pokémon$/, () => ({ type: 'atkSwitchSelf' })],
+  [
+    /^heal (\d+) damage from that pokémon$/,
+    (m) => ({ type: 'healAbility', amount: Number(m[1]), target: 'attached Pokémon' }),
+  ],
+];
+
 /**
  * @param {string} text Printed attack effect text
  * @param {{ selfName?: string }} [options] The attacker's printed name ("Mew ex")
@@ -428,8 +444,15 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       result.after.push(blockSteps[Number(block[1])]);
       continue;
     }
-    const { rest, flags } = stripGates(sentence);
-    for (const [re, build] of TEMPLATES) {
+    // "If you do, …" / "If you attached Energy in this way, …" after an attach: the executor
+    // runs it only when the attach happened (requiresAttach, I93).
+    const chained = ATTACH_CHAIN.exec(sentence);
+    const previous = result.after[result.after.length - 1];
+    if (chained && !isAttachStep(previous)) continue;
+    const { rest, flags } = stripGates(chained ? sentence.slice(chained[0].length) : sentence);
+    if (chained) flags.requiresAttach = true;
+    const templates = chained ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
       const step = build(m, rest);

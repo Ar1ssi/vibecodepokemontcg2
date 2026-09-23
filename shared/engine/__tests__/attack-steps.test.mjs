@@ -7,6 +7,7 @@ import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { parseAttackSteps } from '../rules/attack-steps.mjs';
+import { classifyAttackEffect } from '../rules/attack-effects.mjs';
 import { ATTACK_YES, ATTACK_NO } from '../effects/attack-steps.mjs';
 
 let nextId = 1;
@@ -549,4 +550,57 @@ test('attack: a coin-gated clause follows the attack\'s own flip', () => {
     const discarded = zone(res, 'p2', 'discard').some((c) => c.instanceId === fire.instanceId);
     assert.equal(discarded, flip.coin === 'heads', `seed ${seed}: ${flip.coin}`);
   }
+});
+
+// ── attach chains ("If you do, …") ─────────────────────────────────────────
+
+test('attack: Lapras V Body Surf attaches from hand, then switches only if it attached', () => {
+  let water;
+  const withWater = board('Attach a {W} Energy card from your hand to this Pokémon. If you do, switch it with 1 of your Benched Pokémon.', {
+    name: 'Lapras V',
+    setup: ({ p1 }) => {
+      water = energy('Water');
+      p1.zones.hand.push(water);
+      p1.zones.bench.push(mon('Bench A'));
+    },
+  });
+  const res = attack(withWater);
+  assert.deepEqual(attachedTo(res, 'p1', withWater.attacker.instanceId), [water.instanceId]);
+  assert.equal(activeRoot(res, 'p1').name, 'Bench A');
+
+  const noWater = board('Attach a {W} Energy card from your hand to this Pokémon. If you do, switch it with 1 of your Benched Pokémon.', {
+    name: 'Lapras V',
+    setup: ({ p1 }) => p1.zones.bench.push(mon('Bench A')),
+  });
+  const resNone = attack(noWater);
+  assert.equal(activeRoot(resNone, 'p1').instanceId, noWater.attacker.instanceId, 'nothing attached: no switch');
+});
+
+test('attack: Stonjourner VMAX Stone Gift heals the Pokémon the Energy went to', () => {
+  let fighting;
+  let hurt;
+  const b = board('Attach a {F} Energy card from your hand to 1 of your Pokémon. If you do, heal 120 damage from that Pokémon.', {
+    name: 'Stonjourner VMAX',
+    setup: ({ p1 }) => {
+      fighting = energy('Fighting');
+      hurt = mon('Hurt');
+      hurt.damage = 150;
+      p1.zones.hand.push(fighting);
+      p1.zones.bench.push(hurt);
+    },
+  });
+  const res1 = attack(b);
+  const res2 = choose(res1, [hurt.instanceId], b.rng);
+  assert.deepEqual(attachedTo(res2, 'p1', hurt.instanceId), [fighting.instanceId]);
+  assert.equal(zone(res2, 'p1', 'bench').find((c) => c.instanceId === hurt.instanceId).damage, 30);
+});
+
+test('classifyAttackEffect: an attach chain is named by the attach (I115)', () => {
+  const cases = [
+    ['Attach a {W} Energy card from your hand to this Pokémon. If you do, switch it with 1 of your Benched Pokémon.', 'draw-attach'],
+    ['Attach a {F} Energy card from your hand to 1 of your Pokémon. If you do, heal 120 damage from that Pokémon.', 'draw-attach'],
+    ['Search your deck for an Energy card and attach it to Mew ex. Then, shuffle your deck. Then, you may switch Mew ex with 1 of your Benched Pokémon.', 'search-deck'],
+    ["Discard a Team Rocket's Energy from this Pokémon. If you do, discard your opponent's Active Pokémon and all attached cards.", 'discard-opponent'],
+  ];
+  for (const [text, family] of cases) assert.equal(classifyAttackEffect({ text, damage: 0 }), family, text);
 });
