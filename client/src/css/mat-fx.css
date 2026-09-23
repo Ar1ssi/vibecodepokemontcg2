@@ -715,10 +715,10 @@ body.fx-off .fx-overlay {
   will-change: transform, opacity;
 }
 
-/* Design 027 / 034: Mega entry (TCG Live) — a prismatic hex field floods the
-   mat from the card outward (painted inside #battleMatSurface, so it takes the
+/* Design 027 / 034 / 035: Mega entry — a prismatic hex field floods the mat
+   from the card outward (painted inside #battleMatSurface, so it takes the
    table tilt and mat outline and stays under the card zones); over the card,
-   it goes orange-and-blue, rounds into the keystone orb and bursts into a
+   the keystone orb (canvas, mega-orb.mjs) forms, cracks and shatters into a
    vortex of brush strokes. */
 .fx-mega-field {
   position: absolute;
@@ -804,17 +804,19 @@ body.fx-off .fx-mega-field {
   will-change: transform, opacity;
 }
 
+/* The card goes white-hot as the keystone orb swells out of it. */
 .fx-mega-entry__silhouette {
-  inset: 0;
+  inset: -2%;
+  border-radius: 0.4rem;
+  background: #fff;
+  box-shadow: 0 0 14px 6px rgba(255, 244, 228, 0.95), 0 0 42px 16px rgba(255, 170, 90, 0.55);
 }
 
-.fx-mega-entry__silhouette,
+/* Canvas stage for the 3D orb (mega-orb.mjs); its clock is its own animation. */
 .fx-mega-entry__orb {
-  filter: drop-shadow(0 0 6px rgba(255, 190, 120, 0.8));
+  display: block;
 }
 
-.fx-mega-entry__silhouette svg,
-.fx-mega-entry__orb svg,
 .fx-mega-entry__slash svg {
   display: block;
   width: 100%;

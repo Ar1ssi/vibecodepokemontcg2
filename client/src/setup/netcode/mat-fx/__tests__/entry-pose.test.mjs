@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   MEGA_BURST_AT,
   MEGA_ENTRY_MS,
-  MEGA_MORPH_AT,
   TERA_BURST_AT,
   TERA_ENTRY_MS,
   TERA_GLINT_AT,
@@ -11,7 +10,6 @@ import {
   megaFieldPose,
   megaFlashPose,
   megaLensPose,
-  megaOrbPose,
   megaSilhouettePose,
   megaSlashPose,
   megaStageRect,
@@ -41,7 +39,6 @@ const ALL = {
   megaWavePose,
   megaLensPose,
   megaSilhouettePose,
-  megaOrbPose,
   megaFlashPose,
   megaSlashPose,
 };
@@ -73,9 +70,7 @@ test('entry durations and beats are ordered', () => {
   assert.ok(
     TERA_BURST_AT > 0 && TERA_BURST_AT < TERA_GLINT_AT && TERA_GLINT_AT < 1
   );
-  assert.ok(
-    MEGA_MORPH_AT > 0 && MEGA_MORPH_AT < MEGA_BURST_AT && MEGA_BURST_AT < 1
-  );
+  assert.ok(MEGA_BURST_AT > 0 && MEGA_BURST_AT < 1);
 });
 
 // TCG Live's Tera beat: flash, mint crystal, jewel rises, white fills the
@@ -153,47 +148,33 @@ test('mega: the lens pops in around the card and kicks at the burst', () => {
   assert.ok(megaLensPose(MEGA_BURST_AT + 0.05).scale > megaLensPose(0.3).scale);
 });
 
-test('mega: the two-tone card squashes to a square as the orb takes over', () => {
-  assert.ok(megaSilhouettePose(0.1).opacity > 0.99);
-  assert.equal(megaSilhouettePose(0.1).scaleY, 1);
-  assert.ok(
-    near(megaSilhouettePose(MEGA_MORPH_AT + 0.08, { squareY: 0.7 }).scaleY, 0.7)
-  );
-  assert.equal(megaSilhouettePose(MEGA_MORPH_AT + 0.08).opacity, 0);
-  assert.equal(megaOrbPose(MEGA_MORPH_AT - 0.01).opacity, 0);
-  assert.ok(megaOrbPose(MEGA_MORPH_AT + 0.06).opacity > 0.99);
-});
-
-test('mega: the orb grows, strains, then bursts outward as it fades', () => {
-  assert.ok(megaOrbPose(0.35).scale > megaOrbPose(0.2).scale);
-  const strain = [0.33, 0.35, 0.37, 0.39].map((t) => megaOrbPose(t).scale);
-  assert.ok(new Set(strain).size > 1, 'strains before bursting');
-  assert.ok(
-    megaOrbPose(MEGA_BURST_AT + 0.03).scale >
-      megaOrbPose(MEGA_BURST_AT - 0.01).scale
-  );
-  assert.ok(megaOrbPose(MEGA_BURST_AT + 0.08).opacity < 0.01);
+test('mega: the card flashes white-hot and swells as the orb forms around it', () => {
+  assert.equal(megaSilhouettePose(0.01).opacity, 0);
+  assert.ok(megaSilhouettePose(0.08).opacity > 0.99);
+  assert.ok(megaSilhouettePose(0.12).scale > megaSilhouettePose(0.03).scale);
+  assert.equal(megaSilhouettePose(0.16).opacity, 0);
 });
 
 test('mega: the white flash peaks at the burst', () => {
   assert.equal(megaFlashPose(0.3).opacity, 0);
   assert.equal(megaFlashPose(MEGA_BURST_AT + 0.01).opacity, 1);
-  assert.equal(megaFlashPose(0.6).opacity, 0);
+  assert.equal(megaFlashPose(0.7).opacity, 0);
 });
 
 test('mega: slashes launch at the burst, fly out to orbit, and decelerate', () => {
   assert.equal(megaSlashPose(MEGA_BURST_AT - 0.02).opacity, 0);
-  assert.ok(megaSlashPose(0.5).opacity > 0.99);
+  assert.ok(megaSlashPose(0.6).opacity > 0.99);
   assert.ok(megaSlashPose(0.6).radius > megaSlashPose(MEGA_BURST_AT).radius);
   assert.ok(near(megaSlashPose(0.7).radius, 1));
   assert.equal(megaSlashPose(0.3, { phase: 90 }).rotate, 90);
   assert.ok(megaSlashPose(0.6, { spin: 1 }).rotate > 0);
   assert.ok(megaSlashPose(0.6, { spin: -1 }).rotate < 0);
-  const early = megaSlashPose(0.5).rotate - megaSlashPose(0.45).rotate;
-  const late = megaSlashPose(0.9).rotate - megaSlashPose(0.85).rotate;
+  const early = megaSlashPose(0.58).rotate - megaSlashPose(0.54).rotate;
+  const late = megaSlashPose(0.9).rotate - megaSlashPose(0.86).rotate;
   assert.ok(early > late, 'spin decelerates');
+  assert.ok(megaSlashPose(MEGA_BURST_AT + 0.02).opacity > 0);
   assert.equal(
-    megaSlashPose(0.4, { lag: 0.05 }).opacity,
+    megaSlashPose(MEGA_BURST_AT + 0.02, { lag: 0.05 }).opacity,
     0,
     'lag delays the launch'
   );

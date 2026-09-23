@@ -5,10 +5,10 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 278
-Focus: S278 feature: Tera/Mega entry FX rebuilt from TCG Live reference clips (design 034, D117).
+Session: 279
+Focus: S279 feature: Mega keystone orb redrawn as a 3D canvas shell (design 035, D118) after user feedback on S278.
 Active: none.
-Next: maintenance due (S270, still not run). User visual check of the new Tera/Mega entries in a real game.
+Next: maintenance due (S270, still not run). User visual check of the Tera entry and new Mega orb in a real game.
   I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
   leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
   Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
@@ -23,13 +23,13 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   Working-copy files are CRLF (repo LF); keep eol when scripting edits.
 - Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins, tokens carry `copiedAttack` (D110).
   BLOCKS regexes are wrapped by `gatedBlock` (adds capture group 1): no backreferences in them.
-- Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D117, D97-D100. To eyeball an effect:
+- Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D117, D118, D97-D100. To eyeball an effect:
   Playwright on /?e2e=1 (Chromium /opt/pw-browsers/chromium; route cdn.socket.io → local /socket.io/socket.io.min.js), import the
-  effect module, pause `document.getAnimations()` and step `currentTime` into screenshots.
+  effect module, pause `document.getAnimations()`, step `currentTime`, wait 2 rAFs (canvas orb) and screenshot.
 - Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…" (the other 6 listed before passed in S278).
   ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S278 Tera/Mega entry FX replicate TCG Live (design 034): mint crystal + jewel + smoke burst; mat-wide hex field + orb + slash vortex.
+- S279 Mega orb is a 3D canvas shell (mega-orb.mjs): white-hot sphere → faceted cracked shell → perspective shatter.
+- S278 Tera/Mega entry FX replicate TCG Live (design 034): mint crystal + jewel + smoke burst; mat-wide hex field + slash vortex.
 - S277 team-wide retreat-cost: `teamNoRetreatCostForActive` (D116) zeroes the Active's cost from a Benched Skyliner-style holder; retreat callers pass `benchCards`.
-- S276 ability self-shuffle: `returnSelfToDeckAbility` executes (shuffleSelf, requiresDraw gate); ability path settles a vacated Active.

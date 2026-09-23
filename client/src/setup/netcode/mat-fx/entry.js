@@ -1,10 +1,10 @@
-// Design 027 / 034: signature entry animations, modelled on TCG Live. A Tera
-// Pokémon turns into a mint crystal that grows a Tera jewel, fills with white
-// light and bursts in violet smoke; a Mega Pokémon floods the mat with a
-// prismatic hex field, rounds into the keystone orb and bursts into a vortex
-// of orange and blue brush strokes. Played by `evolve` (lifecycle.js) and by
-// `enter` (a Pokémon put into play from hand, deck or discard). Detached,
-// self-removing overlays; no-op when the card is unknown.
+// Design 027 / 034 / 035: signature entry animations. A Tera Pokémon turns
+// into a mint crystal that grows a Tera jewel, fills with white light and
+// bursts in violet smoke; a Mega Pokémon floods the mat with a prismatic hex
+// field, goes white-hot inside a 3D keystone orb (mega-orb.mjs) whose cracked
+// shell shatters into a vortex of orange and blue brush strokes. Played by
+// `evolve` (lifecycle.js) and by `enter` (a Pokémon put into play from hand,
+// deck or discard). Self-removing layers; no-op when the card is unknown.
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -17,8 +17,6 @@ import {
 import {
   HEX_TINT_CELLS,
   HEX_WHITE_CELLS,
-  MEGA_ORB_SVG,
-  MEGA_SILHOUETTE_SVG,
   TERA_FACETS_SVG,
   hexTile,
   megaSlashSvg,
@@ -26,6 +24,7 @@ import {
   teraJewelSvg,
 } from './entry-art.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
+import { buildMegaShell, drawMegaOrb, megaOrbPose } from './mega-orb.mjs';
 import {
   MEGA_BURST_AT,
   MEGA_ENTRY_MS,
@@ -36,7 +35,6 @@ import {
   megaFieldPlacement,
   megaFlashPose,
   megaLensPose,
-  megaOrbPose,
   megaSilhouettePose,
   megaSlashPose,
   megaStageRect,
@@ -433,20 +431,62 @@ function playMegaField(rect, run) {
   return done;
 }
 
-/** The card-local part: two-tone card, keystone orb, burst and slash vortex. */
+const MEGA_ORB_STAGE = 7;
+const MEGA_ORB_RADIUS = 0.72;
+
+/**
+ * The keystone orb on a canvas (mega-orb.mjs), inserted under the vortex.
+ * Its clock is the canvas's own WAAPI animation, read on every frame, so the
+ * orb stays in step with the other layers and stops with them.
+ */
+function playMegaOrb(host, cx, cy, H) {
+  const size = H * MEGA_ORB_STAGE;
+  const canvas = placeCentered(document.createElement('canvas'), cx, cy, size);
+  canvas.className = 'fx-mega-entry__orb';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  host.insertBefore(canvas, host.querySelector('.fx-mega-entry__vortex'));
+  const ctx = canvas.getContext('2d');
+  if (!ctx || typeof canvas.animate !== 'function') return Promise.resolve();
+  const shell = buildMegaShell(randomSeed());
+  const clock = canvas.animate([{ opacity: 1 }, { opacity: 1 }], {
+    duration: MEGA_ENTRY_MS,
+    fill: 'both',
+  });
+  const frame = () => {
+    if (!canvas.isConnected) return;
+    const elapsed = Number(clock.currentTime) || 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    drawMegaOrb(
+      ctx,
+      megaOrbPose(elapsed / MEGA_ENTRY_MS, MEGA_BURST_AT),
+      shell,
+      {
+        cx: size / 2,
+        cy: size / 2,
+        unit: H * MEGA_ORB_RADIUS,
+        time: elapsed / 1000,
+      }
+    );
+    if (clock.playState !== 'finished') requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  return clock.finished.then(
+    () => undefined,
+    () => undefined
+  );
+}
+
+/** The card-local part: white-hot card, keystone orb, burst and slash vortex. */
 function playMegaCard(rect, run) {
   const W = rect.width;
   const H = rect.height;
   const cx = W / 2;
   const cy = H / 2;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-mega-entry' });
-  const silhouette = layer('fx-mega-entry__silhouette', MEGA_SILHOUETTE_SVG);
-  const orb = placeCentered(
-    layer('fx-mega-entry__orb', MEGA_ORB_SVG),
-    cx,
-    cy,
-    W
-  );
+  const silhouette = layer('fx-mega-entry__silhouette');
   const flash = placeCentered(layer('fx-mega-entry__flash'), cx, cy, H * 3);
   const vortex = layer('fx-mega-entry__vortex');
   const burst = layer('fx-mega-entry__burst');
@@ -457,18 +497,11 @@ function playMegaCard(rect, run) {
     W * 2.6,
     H
   );
-  host.append(silhouette, orb, vortex, flash, burst, embers);
+  host.append(silhouette, vortex, flash, burst, embers);
 
   const done = [
-    run(
-      silhouette,
-      sampleKeyframes(
-        (t) => megaSilhouettePose(t, { squareY: W / H }),
-        (p) => ({ transform: `scaleY(${p.scaleY})`, opacity: p.opacity }),
-        32
-      )
-    ),
-    run(orb, spinFrames(megaOrbPose, 48)),
+    run(silhouette, scaleFrames(megaSilhouettePose)),
+    playMegaOrb(host, cx, cy, H),
     run(flash, scaleFrames(megaFlashPose, 32)),
   ];
 
@@ -529,7 +562,7 @@ function playMegaCard(rect, run) {
       className: 'fx-particle--mote',
       color: rgbCss(MEGA_EMBER_RGB),
       duration: MEGA_ENTRY_MS * 0.5,
-      delay: MEGA_ENTRY_MS * 0.22,
+      delay: MEGA_ENTRY_MS * 0.3,
     })
   );
   removeWhen(host, done, MEGA_ENTRY_MS + BACKSTOP_PAD_MS);

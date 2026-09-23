@@ -206,29 +206,6 @@ export const TERA_FACETS_SVG = `<svg viewBox="0 0 100 140" preserveAspectRatio="
 export const MEGA_ORANGE = '#ff8a2a';
 export const MEGA_BLUE = '#2ab8ff';
 
-// The card gone flat two-tone: orange body cut by blue swirls (the Mega
-// symbol's colours). viewBox matches a card's 5:7 ratio.
-export const MEGA_SILHOUETTE_SVG = `<svg viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
-  <rect width="100" height="140" rx="5" fill="${MEGA_ORANGE}"/>
-  <path d="M0 0 H70 C52 10 34 30 30 58 C18 44 8 40 0 42 Z" fill="${MEGA_BLUE}"/>
-  <path d="M100 52 C84 70 70 96 76 140 H100 Z" fill="${MEGA_BLUE}"/>
-  <path d="M8 118 C30 96 58 84 92 82 C66 94 44 110 34 140 H18 Z" fill="#fff" fill-opacity="0.55"/>
-</svg>`;
-
-// The keystone orb: an orange sphere wrapped by a blue helix band, with a
-// glassy highlight. viewBox -50 -50 100 100.
-export const MEGA_ORB_SVG = `<svg viewBox="-50 -50 100 100" aria-hidden="true">
-  <defs>
-    <radialGradient id="fx-mega-orb-fill" cx="0.38" cy="0.34" r="0.75">
-      <stop offset="0" stop-color="#ffd2a1"/><stop offset="0.45" stop-color="${MEGA_ORANGE}"/><stop offset="1" stop-color="#e2560f"/>
-    </radialGradient>
-  </defs>
-  <circle r="46" fill="url(#fx-mega-orb-fill)"/>
-  <path d="M-46 -6 C-40 -40 10 -56 40 -26 C18 -38 -14 -34 -30 -8 C-36 4 -42 6 -46 -6 Z" fill="${MEGA_BLUE}"/>
-  <path d="M44 10 C36 42 -6 56 -34 32 C-12 40 16 34 28 12 C34 2 40 -2 44 10 Z" fill="${MEGA_BLUE}"/>
-  <ellipse cx="-16" cy="-24" rx="14" ry="7" transform="rotate(-30 -16 -24)" fill="#fff" fill-opacity="0.6"/>
-</svg>`;
-
 /**
  * One tapered brush stroke, drawn vertically: fat head at the bottom, thin
  * tail at the top, bulging to +x (away from the orbit centre on its left).

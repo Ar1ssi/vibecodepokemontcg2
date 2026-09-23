@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 import {
   HEX_TINT_CELLS,
   HEX_WHITE_CELLS,
-  MEGA_ORB_SVG,
-  MEGA_SILHOUETTE_SVG,
   hexPoints,
   hexTile,
   jewelStarPoints,
@@ -92,8 +90,6 @@ test('artwork SVGs are well-formed single roots with the requested colours', () 
   for (const svg of [
     teraJewelSvg(),
     teraJewelSvg({ fill: '#fff' }),
-    MEGA_ORB_SVG,
-    MEGA_SILHOUETTE_SVG,
     megaSlashSvg('blue'),
     megaSlashSvg('orange'),
   ]) {

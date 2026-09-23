@@ -3,17 +3,16 @@
 // phases of one entry share a single clock; entry.js samples them into keyframes.
 
 export const TERA_ENTRY_MS = 1900;
-export const MEGA_ENTRY_MS = 2800;
+export const MEGA_ENTRY_MS = 3200;
 
 // Tera beats (fractions of TERA_ENTRY_MS): the card is fully white and bursts
 // into smoke, rays and glitter; the twinkles follow the reveal.
 export const TERA_BURST_AT = 0.58;
 export const TERA_GLINT_AT = 0.7;
 
-// Mega beats (fractions of MEGA_ENTRY_MS): the two-tone card starts rounding
-// into the keystone orb, then the orb bursts into the slash vortex.
-export const MEGA_MORPH_AT = 0.16;
-export const MEGA_BURST_AT = 0.4;
+// Mega beat (fraction of MEGA_ENTRY_MS): the keystone orb's shell shatters
+// and the slash vortex launches. The orb's own timeline is in mega-orb.mjs.
+export const MEGA_BURST_AT = 0.5;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -142,9 +141,9 @@ export function teraSmokePose(t) {
   };
 }
 
-// ---- Mega: the whole mat turns into a prismatic hex field inside which the
-// ---- card goes two-tone, rounds into the keystone orb, and bursts into a
-// ---- vortex of orange and blue brush strokes that orbit the revealed card.
+// ---- Mega: the whole mat turns into a prismatic hex field; the card goes
+// ---- white-hot inside the keystone orb (mega-orb.mjs), whose shell shatters
+// ---- into a vortex of orange and blue brush strokes around the revealed card.
 
 /** The hex field over the mat: `reveal` is the clip radius as a fraction of its max. */
 export function megaFieldPose(t) {
@@ -180,35 +179,13 @@ export function megaLensPose(t) {
   };
 }
 
-/**
- * The card as a flat orange-and-blue silhouette. While morphing it squashes
- * toward a square (scaleY → `squareY`) as the orb takes over.
- */
-export function megaSilhouettePose(t, { squareY = 0.72 } = {}) {
+/** The card flashes white-hot and swells slightly as the orb forms around it. */
+export function megaSilhouettePose(t) {
   const c = clamp01(t);
-  const morph = easeInOutCubic(span(c, MEGA_MORPH_AT, MEGA_MORPH_AT + 0.08));
   return {
-    opacity: plateau(c, 0.02, 0.05, MEGA_MORPH_AT + 0.04, MEGA_MORPH_AT + 0.08),
-    scaleY: 1 - (1 - squareY) * morph,
+    opacity: plateau(c, 0.02, 0.06, 0.1, 0.15),
+    scale: 1 + 0.06 * easeOutCubic(span(c, 0.02, 0.12)),
   };
-}
-
-/** The keystone orb: grows from card width, strains, then bursts outward. */
-export function megaOrbPose(t) {
-  const c = clamp01(t);
-  if (c < MEGA_MORPH_AT) return { scale: 1, opacity: 0, rotate: 0 };
-  if (c < MEGA_BURST_AT) {
-    const k = span(c, MEGA_MORPH_AT, MEGA_BURST_AT);
-    const strain =
-      0.07 * span(c, 0.3, MEGA_BURST_AT) * Math.sin(k * Math.PI * 14);
-    return {
-      scale: 1 + 1.6 * easeInOutCubic(k) + strain,
-      opacity: easeOutCubic(span(c, MEGA_MORPH_AT, MEGA_MORPH_AT + 0.05)),
-      rotate: 160 * easeInCubic(k),
-    };
-  }
-  const out = easeOutCubic(span(c, MEGA_BURST_AT, MEGA_BURST_AT + 0.07));
-  return { scale: 2.6 + 1.0 * out, opacity: 1 - out, rotate: 160 + 30 * out };
 }
 
 /** The white burst that hands the orb over to the revealed card. */

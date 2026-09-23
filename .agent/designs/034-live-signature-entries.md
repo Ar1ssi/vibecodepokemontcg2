@@ -1,5 +1,5 @@
 # 034: Signature entries rebuilt from TCG Live footage (Tera, Mega)
-Status: shipped S278 (approved (self): the user supplied the target as reference video and asked for a replica)
+Status: shipped S278; Mega orb replaced by design 035 (S279)
 Date: 2026-09-23 · Session: S278 · Supersedes the visuals of design 027 (triggers, registry and kind test unchanged)
 
 ## Problem
