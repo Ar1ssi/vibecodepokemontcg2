@@ -33,6 +33,8 @@
 //     attackerDamage /* damage counters on the attacker (this Pokémon) */ }
 
 import { parseSearchDeckParams } from './trainer-effects.mjs';
+import { isBasicPokemon } from '../cards.mjs';
+import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
@@ -726,6 +728,69 @@ export function conditionalKoClause(attackText) {
     return true;
   }
   return false;
+}
+
+// ── extra Prize on Knock Out (design 036 A3) ────────────────────────────────
+// "If your opponent's Pokémon is Knocked Out by damage from this attack, take N more
+// Prize card(s)." The clause's subject narrows which Knock Out pays: the generic wording,
+// Basic Pokémon, Pokémon-GX/-EX, Mega Evolution Pokémon, or the Defending Pokémon ("…by
+// this attack" — Cresselia LV.X Moon Skip). The delayed "During your next turn, if the
+// Defending Pokémon is Knocked Out…" wording is a marker (attack-markers.mjs), and the
+// damage-scaling "If you have more Prize cards remaining" wording never matches. Pure.
+const PRIZE_ON_KO_CLAUSES = [
+  [
+    /(?:1 of )?your opponent's pok[ée]mon-gx or pok[ée]mon-ex is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    'gx-ex',
+  ],
+  [
+    /your opponent's mega evolution pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    'mega',
+  ],
+  [
+    /your opponent's basic pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    'basic',
+  ],
+  [
+    /(?:1 of )?your opponent's pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    null,
+  ],
+  [
+    /the defending pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    null,
+  ],
+];
+
+/**
+ * @param {string} attackText Printed attack effect text
+ * @returns {{count: number, filter?: {ruleBox: 'basic'|'gx-ex'|'mega'}}|null}
+ */
+export function parsePrizeOnKo(attackText) {
+  const text = lower(attackText).replace(/\s+/g, ' ');
+  if (!text) return null;
+  for (const [re, ruleBox] of PRIZE_ON_KO_CLAUSES) {
+    const m = re.exec(text);
+    if (!m) continue;
+    return {
+      count: parseInt(m[1], 10) || 1,
+      ...(ruleBox ? { filter: { ruleBox } } : {}),
+    };
+  }
+  return null;
+}
+
+/** The A3 rule-box labels a Knock Out victim can match: basic / gx-ex / mega. */
+export function prizeRuleBoxes(card) {
+  if (!card) return [];
+  const boxes = [];
+  if (isBasicPokemon(card)) boxes.push('basic');
+  if (isGxCard(card) || isExCard(card)) boxes.push('gx-ex');
+  if (isMegaCard(card)) boxes.push('mega');
+  return boxes;
+}
+
+/** Whether a `{ruleBox}` filter accepts the victim's labels (a missing filter accepts all). */
+export function prizeFilterMatches(filter, ruleBoxes) {
+  return !filter || (ruleBoxes || []).includes(filter.ruleBox);
 }
 
 /** Exact damage-counter threshold for conditional KO (e.g. exactly 6 counters). */

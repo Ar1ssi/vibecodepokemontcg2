@@ -164,6 +164,13 @@ const WINDOW_PHRASES = [
   ],
   [/^(.+) during your opponent's next turn$/, 'opponentNextTurn'],
   [/^during your next turn, (.+)$/, 'yourNextTurn'],
+  // Marshadow Shadow Flicker: "If the Defending Pokémon is Knocked Out during your next
+  // turn, take N more Prize cards." Rewrites to the clause form the marker body reads.
+  [
+    /^if your opponent's active pokémon is knocked out during your next turn, (.+)$/,
+    'yourNextTurn',
+    (body) => `if your opponent's active pokémon is knocked out, ${body}`,
+  ],
   [/^(.+) until the end of your next turn$/, 'throughYourNextTurn'],
 ];
 
@@ -255,6 +262,14 @@ const MARKER_BODIES = [
     null,
     () => ({ kind: 'deferredKnockOut' }),
   ],
+  // Ribombee Plentiful Pollen / Marshadow Shadow Flicker: `handleKnockout` pays the
+  // marker's count when the marked Pokémon is Knocked Out inside the next-turn window.
+  [
+    /^if your opponent's active pokémon is knocked out, take (\d+) more prize cards?$/,
+    'opponentActive',
+    'yourNextTurn',
+    (m) => ({ kind: 'prizeBonus', count: Number(m[1]) }),
+  ],
   // Wobbuffet BREAK / Rocket's Moltres: strike back at the Pokémon that damaged this one.
   [
     /^if this pokémon is damaged by an attack, put damage counters on the attacking pokémon equal to the damage done to this pokémon$/,
@@ -315,7 +330,7 @@ export function parseMarkerSentence(sentence, context = {}) {
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
   [
-    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|.+ (?:during your opponent's|until the end of your) next turn$)/,
+    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon is knocked out during your next turn|.+ (?:during your opponent's|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
   ],
 ];

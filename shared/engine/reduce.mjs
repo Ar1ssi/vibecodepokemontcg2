@@ -36,6 +36,9 @@ import {
   attackTargetClause,
   opponentCounterClause,
   parseAttackSearchClause,
+  parsePrizeOnKo,
+  prizeFilterMatches,
+  prizeRuleBoxes,
   isGxAttack,
   discardEnergyScaling,
   deckMillScaling,
@@ -728,7 +731,8 @@ function handleKnockout(
       ? victimBench
       : [victim];
 
-  const basePrizeCount = prizesForKO(inPlayView(draft, victim));
+  const victimView = inPlayView(draft, victim);
+  const basePrizeCount = prizesForKO(victimView);
   // Legacy Energy: the once-per-game reduction may already be spent.
   const legacyEnergyAttached = victimZoneCards.some(
     (c) =>
@@ -759,6 +763,15 @@ function handleKnockout(
       prizeCount += 1;
     }
   }
+
+  // Ribombee Plentiful Pollen: a `prizeBonus` marker on the victim pays its printed count
+  // when the Knock Out happens inside the marker's next-turn window (design 036 A3). Like
+  // every other marker read, only while the victim is still in its owner's Active Spot.
+  const markerBonus = activeAttackMarkers(draft, victimPlayerId, victim)
+    .filter((marker) => marker.kind === 'prizeBonus')
+    .filter((marker) => prizeFilterMatches(marker.filter, prizeRuleBoxes(victimView)))
+    .reduce((sum, marker) => sum + (marker.count || 0), 0);
+  prizeCount += markerBonus;
 
   const attackerPrizes = attacker?.zones?.prizes || [];
   if (attacker) {
@@ -873,6 +886,7 @@ function handleKnockout(
     playerId: victimPlayerId,
     attackerPlayerId,
     prizeCount,
+    ruleBoxes: prizeRuleBoxes(victimView),
   });
 
   // Promotion of a new Active is NOT done here. `settlePromotionChoices` runs at the
@@ -1276,6 +1290,17 @@ function settlePrizeEntitlements(draft, { events }) {
   if (count === prizes.length) {
     // Every remaining prize is owed: there is nothing to choose between.
     collectPrizeEntitlement(draft, { playerId, events });
+    // A grant can exceed the Prize cards left (extra-Prize clauses, "take N Prize cards");
+    // the surplus has nothing left to redeem, and keeping it would spin the recursion on an
+    // emptied zone. Collecting every remaining prize also ends the game, like the picker.
+    if (player.flags?.prizesOwed) delete player.flags.prizesOwed;
+    if (player.zones.prizes.length === 0) {
+      setGameEnded(draft, {
+        winner: playerId,
+        reason: 'all prize cards taken',
+        events,
+      });
+    }
     settlePrizeEntitlements(draft, { events });
     return;
   }
@@ -4299,7 +4324,12 @@ function resolveAttackEffectPhase(draft, ctx) {
           events,
           context: { attack: { phase: 'after', tail } },
         });
-        if (!done) return;
+        if (!done) {
+          // The attack pauses mid-steps: pay for the Knock Outs already caused, because the
+          // resumed tail scans only the events of its own command (design 036 A3).
+          grantPrizeOnKoBonus(draft, { playerId, attack: effectiveAttack, events });
+          return;
+        }
       }
       finishAttackTail(draft, { tail, activeRng, events });
 }
@@ -4315,6 +4345,38 @@ function searchCoinGateOpen(attack, coinResult) {
     .find((s) => s.includes('search your deck for'));
   const gate = /^if (heads|tails),/.exec(sentence || '')?.[1];
   return !gate || coinResult?.coin === gate;
+}
+
+/**
+ * A3 (design 036): "If your opponent's Pokémon is Knocked Out by damage from this attack,
+ * take N more Prize card(s)." The printed clause is not a step — it pays for each of this
+ * command's Knock Out events whose victim the clause's filter accepts. Callers run it
+ * before `resolveCheckup` (so a checkup Knock Out never pays); the count is floored at the
+ * attacker's remaining Prize cards (edge case 10). `paid` carries the victim ids a previous
+ * call in the same command already paid, so a tail that grants before and after the
+ * chosen-target damage never pays one Knock Out twice.
+ */
+function grantPrizeOnKoBonus(draft, { playerId, attack, events, paid }) {
+  const bonus = parsePrizeOnKo(attack?.text);
+  if (!bonus) return;
+  const player = draft.players[playerId];
+  const prizes = player?.zones?.prizes || [];
+  if (!player || prizes.length === 0) return;
+  const seen = paid || new Set();
+  const victims = events.filter(
+    (event) =>
+      event.type === 'pokemonKnockedOut' &&
+      event.attackerPlayerId === playerId &&
+      !seen.has(event.instanceId) &&
+      prizeFilterMatches(bonus.filter, event.ruleBoxes)
+  );
+  if (victims.length === 0) return;
+  for (const victim of victims) seen.add(victim.instanceId);
+  const count = Math.min(bonus.count * victims.length, prizes.length);
+  if (count <= 0) return;
+  if (!player.flags) player.flags = {};
+  player.flags.prizesOwed = (player.flags.prizesOwed || 0) + count;
+  events.push({ type: 'prizeEntitlementGranted', playerId, count });
 }
 
 /**
@@ -4368,6 +4430,13 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
           searchTriggered = true;
         }
       }
+
+      // A3: the printed clause pays for this attack's Knock Outs. This first call covers the
+      // printed damage and the before/after steps — including when the chosen-target damage
+      // below suspends the attack; the second call covers a target Knock Out applied without
+      // a suspension, and `paidKos` keeps the two from paying one Knock Out twice.
+      const paidKos = new Set();
+      grantPrizeOnKoBonus(draft, { playerId, attack: effectiveAttack, events, paid: paidKos });
 
       // Chosen-target damage/counters, resolved now (after every other attack
       // effect) so a click-to-select suspension never drops them. The player
@@ -4440,6 +4509,9 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
           }
         }
       }
+
+      // A3: a chosen-target Knock Out applied above pays here (the resume path pays its own).
+      grantPrizeOnKoBonus(draft, { playerId, attack: effectiveAttack, events, paid: paidKos });
 
       events.push({
         type: 'attackExecuted',
@@ -5809,6 +5881,12 @@ export function applyCommand(state, command, rng = null) {
             defenderPlayerId: token.oppId,
             attackerPlayerId: initiatorPlayerId,
             attackName: token.effectiveAttack?.name || '',
+            events,
+          });
+          // A3: the chosen target may be the Knock Out the printed clause pays for.
+          grantPrizeOnKoBonus(draft, {
+            playerId: initiatorPlayerId,
+            attack: token.effectiveAttack,
             events,
           });
           // "in any way you like": one counter per click until all are placed.
