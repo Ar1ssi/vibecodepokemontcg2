@@ -5415,6 +5415,11 @@ export function applyCommand(state, command, rng = null) {
           activeRng,
           events,
         });
+        // An ability that shuffles the Active Pokémon into the deck leaves the spot empty.
+        if (cardRef.zoneId === 'active' && findCard(draft, payload.instanceId)?.zoneId !== 'active') {
+          const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+          settleVacatedActive(draft, { playerId, oppId, events });
+        }
       }
       break;
     }

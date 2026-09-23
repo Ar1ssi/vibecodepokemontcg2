@@ -991,6 +991,17 @@ function atkShuffleSelf(ctx) {
   return null;
 }
 
+/** Ability form (Dudunsparce, Run Away Draw): "If you drew any cards in this way" gates the shuffle. */
+function returnSelfToDeckAbility(ctx) {
+  const { step, playerId, events } = ctx;
+  if (!step.shuffleSelf) return skip(ctx, 'unsupported_step');
+  if (step.requiresDraw) {
+    const drew = events.some((e) => e.type === 'cardsDrawn' && e.playerId === playerId && e.count > 0);
+    if (!drew) return skip(ctx, 'drew_no_cards');
+  }
+  return atkShuffleSelf(ctx);
+}
+
 // ── damage counters / Knock Out ─────────────────────────────────────────────
 
 function placeCounters(ctx, card, victimPlayerId, amount) {
@@ -1589,6 +1600,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
+  returnSelfToDeckAbility,
   atkLostZoneDeckTop,
   atkLostZoneEnergy,
   atkLostZoneFromDiscard,

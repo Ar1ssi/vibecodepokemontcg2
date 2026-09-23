@@ -1317,6 +1317,9 @@ export function parseAbility(text = '') {
   ) {
     steps.push({
       type: 'returnSelfToDeckAbility',
+      // Only the shuffle wording executes; the top/bottom-of-deck variants stay announce-only.
+      shuffleSelf: /\bshuffle\b[^.]*this pokémon[^.]*into your deck/.test(lower),
+      requiresDraw: /if you drew/.test(lower),
       guidance: 'Once during your turn: shuffle this Pokémon and its attached cards into your deck (as described).',
     });
   }

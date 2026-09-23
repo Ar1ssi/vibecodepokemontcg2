@@ -5,9 +5,9 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 275
-Focus: S275 patch: multiplayer Reset unclickable under pending-choice overlays (picker / View Board). Pushed to main.
-  S274 fixed duplicate hand stacks drawing holo cards at 2/3 size.
+Session: 276
+Focus: S276 patch: Run Away Draw (Dudunsparce) shuffles itself + attachments into the deck. Pushed to main.
+  S275 patch: multiplayer Reset unclickable under pending-choice overlays (picker / View Board). Pushed to main.
 Active: none.
 Next: maintenance due (S270, still not run).
   I121-I125 (design 032 leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
@@ -29,5 +29,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
 - S275 side menu reachable during choices: pending-choice overlays stop at right:24% (e2e: pnpm test:reset-choice).
+- S276 ability self-shuffle: `returnSelfToDeckAbility` executes (shuffleSelf, requiresDraw gate); ability path settles a vacated Active.
 - S274 hand stacks: stack child rules scoped under #hand so late-hydrated holo wrappers size correctly.
 - S273 Stadium facing: opponent's Stadium flips via `.stadium-opp-facing` (img `rotate`), never an inline transform on #stadium (D115).
