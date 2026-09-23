@@ -11,6 +11,7 @@ import {
   classifyAbilityFamilies,
 } from './shared/engine/rules/ability-effects.mjs';
 import { tcgAbilityFromDetail } from './shared/engine/rules/rules-state.mjs';
+import { EXECUTED_ABILITY_FAMILIES } from './scripts/lib/executed-families.mjs';
 
 const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
 const detailCache = new Map();
@@ -77,43 +78,6 @@ const STEP_TO_FAMILY = {
   passiveAbility: 'passive',
 };
 
-const EXECUTED_FAMILIES = new Set([
-  'search',
-  'draw',
-  'switch',
-  'heal',
-  'attach',
-  'when-played',
-  'end-of-turn',
-  'damage-prevent',
-  'energy-redirect',
-  'move-energy',
-  'hand-protect',
-  'opponent-disrupt',
-  'cost-discount',
-  'move-damage',
-  'status',
-  'look-at-top',
-  'recursion',
-  'evolve',
-  'passive',
-  'damage-reduce',
-  'damage-bonus',
-  'effect-prevent',
-  'thorns',
-  'checkup',
-  'attack-inheritance',
-  'on-opponent-evolve',
-  'ko-prevention',
-  'retreat-cost',
-  'hp-bonus',
-  'weakness',
-  'setup',
-  'tool-cap',
-  'prize-modify',
-  'energy-multiplier',
-]);
-
 function analyzeAbility(card, abilityName, abilityText) {
   const cardForClassify = { name: card.name, ability: { name: abilityName, text: abilityText } };
   const steps = parseAbility(abilityText);
@@ -149,7 +113,7 @@ function analyzeAbility(card, abilityName, abilityText) {
     issues.push({ kind: 'compound-effect', severity: 'info', detail: stepTypes.join('+') });
   }
 
-  if (family !== 'unknown' && !EXECUTED_FAMILIES.has(family)) {
+  if (family !== 'unknown' && !EXECUTED_ABILITY_FAMILIES.has(family)) {
     issues.push({ kind: 'announce-only-family', severity: 'low' });
   }
 
@@ -320,10 +284,10 @@ async function main() {
     familyCounts: Object.fromEntries(Object.entries(byFamily).sort((a, b) => b[1] - a[1])),
     issueCounts: byIssueKind,
     executedFamilyCoverage: {
-      executed: abilityRows.filter((r) => EXECUTED_FAMILIES.has(r.family)).length,
+      executed: abilityRows.filter((r) => EXECUTED_ABILITY_FAMILIES.has(r.family)).length,
       announceOnly: abilityRows.filter((r) => r.issues.some((i) => i.kind === 'announce-only-family')).length,
       pctExecuted: Math.round(
-        (100 * abilityRows.filter((r) => EXECUTED_FAMILIES.has(r.family)).length) / abilityRows.length
+        (100 * abilityRows.filter((r) => EXECUTED_ABILITY_FAMILIES.has(r.family)).length) / abilityRows.length
       ),
     },
     highSeverityGroups: groupByText(high).slice(0, 40),
@@ -340,7 +304,7 @@ async function main() {
       })),
     announceOnlyByFamily: Object.fromEntries(
       [...new Set(abilityRows.map((r) => r.family))]
-        .filter((f) => !EXECUTED_FAMILIES.has(f))
+        .filter((f) => !EXECUTED_ABILITY_FAMILIES.has(f))
         .sort()
         .map((f) => [
           f,

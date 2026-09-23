@@ -9,60 +9,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classifyAttackEffect } from './shared/engine/rules/attack-effects.mjs';
-
-/**
- * Families the server engine executes (applyCommand 'attack': damage parser, attack helpers,
- * parseAttackSteps). Synced S268 to .agent/scratch/cov/oracle.mjs state diffs, not to the
- * legacy client attack(): a family belongs here only when its printed effect is observed.
- * Removed then (client-only or no effect observed): reveal-hand, immunity, redirect-damage,
- * copy-attack, retaliate, deferred-damage, look-opponent-deck, next-turn-bonus, hp-cap-damage,
- * damage-prevention.
- */
-export const EXECUTED_ATTACK_FAMILIES = new Set([
-  'flat',
-  'per-energy',
-  'per-prize',
-  'per-turn',
-  'multi-target',
-  'extra-by-type',
-  'conditional-damage',
-  'bench-damage',
-  'discard-cost',
-  'status-asleep',
-  'status-paralyzed',
-  'status-poisoned',
-  'status-burned',
-  'status-confused',
-  'dual-status',
-  'self-status',
-  'coin-flip',
-  'per-heads-coin',
-  'heal',
-  'draw-attach',
-  'draw-until',
-  'search-deck',
-  'switch',
-  'move-energy',
-  'conditional-ko',
-  'once-per-turn',
-  'self-damage',
-  'mirror-heal',
-  'return-self',
-  'devolve-opponent',
-  'recover-status',
-  'return-opponent-energy',
-  'look-own-deck',
-  'next-turn-lock',
-  'discard-opponent',
-  'lost-zone',
-]);
-
-/** Partial / heuristic execution — still flagged but lower priority. */
-export const PARTIAL_ATTACK_FAMILIES = new Set([
-  // 24/46 run (attacker / opponent-Bench shuffles); hand shuffles and "shuffle any amount"
-  // wordings show no effect in the oracle.
-  'shuffle-cost',
-]);
+import { EXECUTED_ATTACK_FAMILIES, PARTIAL_ATTACK_FAMILIES } from './scripts/lib/executed-families.mjs';
 
 function main() {
   const jsonOut = process.argv.includes('--json');
