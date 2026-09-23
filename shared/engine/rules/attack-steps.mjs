@@ -436,6 +436,26 @@ const BLOCKS = [
     /(?<=^|\. )if your opponent has a stadium in play, discard it\. if you discarded a stadium in this way, ([^.]+)\./g,
     (m) => chainedMarkerStep({ type: 'atkDiscardStadium', owner: 'opponent' }, m[1]),
   ],
+  // Mime Jr. Encore ("can use only") / Unown Amnesia ("can't use"): an attack lock marker on
+  // the opponent's Active, read by the attack legality gate.
+  [
+    /choose 1 of your opponent's active pokémon's attacks\. (?:during your opponent's next turn, that pokémon (can't use|can use only) that attack|that pokémon (can't use|can use only) that attack during your opponent's next turn)\./g,
+    (m) => ({ type: 'atkLockAttack', mode: (m[1] || m[2]) === "can't use" ? 'except' : 'only' }),
+  ],
+  // Unown T Hidden Power: each player loses 1 hand card to their deck, picked by the other.
+  [
+    /look at your opponent's hand and choose 1 card, then have your opponent shuffle that card into their deck\. then, show your opponent your hand and (?:they choose|he or she chooses) 1 card\. shuffle that card into your deck\./g,
+    () => ({ type: 'atkHandCardsToDecks' }),
+  ],
+  // Inkay Mischievous Tentacles / Gothorita Fortunate Eye.
+  [
+    /look at the top card of your opponent's deck\. you may have your opponent shuffle their deck\./g,
+    () => ({ type: 'atkLookOppDeck', count: 1, offerShuffle: true }),
+  ],
+  [
+    /look at the top (\d+) cards of your opponent's deck and put them back in any order\./g,
+    (m) => ({ type: 'atkLookOppDeck', count: Number(m[1]), reorder: true }),
+  ],
   // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
   // reveals …" stays unparsed instead of losing its condition.
   [

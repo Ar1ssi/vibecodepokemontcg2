@@ -2402,6 +2402,17 @@ export function validateLegality(state, command) {
           };
         }
       }
+      // Encore / Amnesia (design 033): attack locks the opponent put on this Pokémon.
+      const chosenName = String(attack?.name || '').toLowerCase();
+      for (const lock of activeAttackMarkers(state, playerId, active).filter((m) => m.kind === 'attackLock')) {
+        const lockedName = String(lock.attackName || '').toLowerCase();
+        if (lock.mode === 'only' && chosenName !== lockedName) {
+          return { allowed: false, reason: `This Pokémon can use only ${lock.attackName} during this turn.` };
+        }
+        if (lock.mode === 'except' && chosenName === lockedName) {
+          return { allowed: false, reason: `This Pokémon can't use ${lock.attackName} during this turn.` };
+        }
+      }
       if (!attackCostPayable(state, playerId, active, attack)) {
         return { allowed: false, reason: 'Not enough energy attached.' };
       }

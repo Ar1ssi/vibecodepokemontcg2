@@ -1309,6 +1309,126 @@ function atkDiscardStadium(ctx) {
   return addChainedMarker(ctx);
 }
 
+// Encore / Amnesia: the opponent's Active can use only (or can't use) the attack picked here
+// during their next turn. One printed attack needs no question.
+function atkLockAttack(ctx) {
+  const { opponent, step } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const attacks = (topPokemonCard(opponent, defender)?.attacks || []).filter((a) => a?.name);
+  const lock = (attack) =>
+    atkAddMarker({
+      ...ctx,
+      step: {
+        attackName: step.attackName,
+        target: 'opponentActive',
+        window: 'opponentNextTurn',
+        marker: { kind: 'attackLock', mode: step.mode, attackName: attack.name },
+      },
+    });
+  if (ctx.selection) {
+    const attack = attacks[Number(ctx.selection[0]) - 1];
+    return attack ? lock(attack) : skip(ctx, 'target_not_found');
+  }
+  if (attacks.length === 0) return skip(ctx, 'no_attacks');
+  if (attacks.length === 1) return lock(attacks[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 of ${defender.name}'s attacks`,
+    options: attacks.map((a, i) => ({ instanceId: i + 1, name: a.name, type: 'option' })),
+    min: 1,
+    max: 1,
+  });
+}
+
+function shuffleHandCardIntoDeck(ctx, owner, card) {
+  moveToZone(owner, card, 'deck', 'hand', ctx.events);
+  shuffleOwnDeck(owner, ctx);
+}
+
+// Unown T Hidden Power: the attacker picks 1 card from the opponent's hand for their deck,
+// then the opponent picks 1 card from the attacker's hand for the attacker's deck. An empty
+// hand skips only its own half.
+function atkHandCardsToDecks(ctx) {
+  const { player, opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const askOwnHand = () => {
+    const hand = player.zones.hand || [];
+    if (hand.length === 0) return skip(ctx, 'empty_hand');
+    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: hand.map(revealedCard) });
+    return ctx.ask({
+      player: opponent.playerId,
+      prompt: `${attackName(ctx)}: Choose 1 card from your opponent's hand to shuffle into their deck`,
+      options: hand,
+      min: 1,
+      max: 1,
+      memo: { ownHand: true },
+    });
+  };
+  if (ctx.selection && ctx.memo?.ownHand) {
+    const card = (player.zones.hand || []).find((c) => c.instanceId === ctx.selection[0]);
+    if (card) shuffleHandCardIntoDeck(ctx, player, card);
+    return null;
+  }
+  if (ctx.selection) {
+    const card = (opponent.zones.hand || []).find((c) => c.instanceId === ctx.selection[0]);
+    if (card) shuffleHandCardIntoDeck(ctx, opponent, card);
+    return askOwnHand();
+  }
+  const oppHand = opponent.zones.hand || [];
+  if (oppHand.length === 0) return askOwnHand();
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 card from your opponent's hand to shuffle into their deck`,
+    options: oppHand,
+    min: 1,
+    max: 1,
+  });
+}
+
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th'];
+
+// Inkay: look at the opponent's top card and may have them shuffle. Gothorita: put the top
+// N back in any order, one pick per position from the top; the last card needs no pick.
+function atkLookOppDeck(ctx) {
+  const { opponent, step } = ctx;
+  const deck = opponent?.zones?.deck || [];
+  const viewed = deck.slice(0, step.count || 1);
+  if (viewed.length === 0) return skip(ctx, 'empty_deck');
+  if (step.offerShuffle) {
+    if (ctx.selection) {
+      if (ctx.selection[0] === ATTACK_YES) shuffleOwnDeck(opponent, ctx);
+      return null;
+    }
+    ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: viewed.length });
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: The top card of your opponent's deck is ${viewed.map((c) => c.name).join(', ')}. Have your opponent shuffle their deck?`,
+      options: [
+        { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+        { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  const order = [...(ctx.memo?.order || []), ...(ctx.selection || []).slice(0, 1)].filter((id) =>
+    viewed.some((c) => c.instanceId === id)
+  );
+  const remaining = viewed.filter((c) => !order.includes(c.instanceId));
+  if (!ctx.selection) ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: viewed.length });
+  if (remaining.length > 1) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the card to put ${ORDINALS[order.length] || `${order.length + 1}th`} from the top of your opponent's deck`,
+      options: remaining,
+      min: 1,
+      max: 1,
+      memo: { order },
+    });
+  }
+  const ordered = [...order.map((id) => viewed.find((c) => c.instanceId === id)), ...remaining];
+  deck.splice(0, viewed.length, ...ordered);
+  ctx.events.push({ type: 'deckReordered', playerId: opponent.playerId, count: ordered.length });
+  return null;
+}
+
 export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
@@ -1350,4 +1470,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkAddMarker,
   atkDiscardSelfTool,
   atkDiscardStadium,
+  atkLockAttack,
+  atkHandCardsToDecks,
+  atkLookOppDeck,
 };

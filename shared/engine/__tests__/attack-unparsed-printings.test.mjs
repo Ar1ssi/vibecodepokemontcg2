@@ -377,3 +377,150 @@ test('Desert Geyser: your own Stadium or no Stadium leaves the board alone and e
     assert.equal(activeNamed(hit, 'Flygon').damage, 100);
   }
 });
+
+// ── slice 3: attack locks, hand swaps, the opponent's deck ──────────────────
+
+const ENCORE =
+  "Choose 1 of the Defending Pokémon's attacks. That Pokémon can use only that attack during your opponent's next turn.";
+const AMNESIA =
+  "Choose 1 of the Defending Pokémon's attacks. That Pokémon can't use that attack during your opponent's next turn.";
+const UNOWN_T =
+  "Look at your opponent's hand and choose 1 card, then have your opponent shuffle that card into his or her deck. Then, show your opponent your hand and he or she chooses 1 card. Shuffle that card into your deck.";
+const MISCHIEVOUS_TENTACLES =
+  "Look at the top card of your opponent's deck. You may have your opponent shuffle their deck.";
+const FORTUNATE_EYE = "Look at the top 5 cards of your opponent's deck and put them back in any order.";
+
+test('parsers: attack locks, Unown T and the opponent-deck looks', () => {
+  const steps = (text) => parseAttackSteps(text).after;
+  assert.deepEqual(steps(ENCORE), [{ type: 'atkLockAttack', mode: 'only' }]);
+  assert.deepEqual(steps(AMNESIA), [{ type: 'atkLockAttack', mode: 'except' }]);
+  assert.deepEqual(steps(UNOWN_T), [{ type: 'atkHandCardsToDecks' }]);
+  assert.deepEqual(steps(MISCHIEVOUS_TENTACLES), [{ type: 'atkLookOppDeck', count: 1, offerShuffle: true }]);
+  assert.deepEqual(steps(FORTUNATE_EYE), [{ type: 'atkLookOppDeck', count: 5, reorder: true }]);
+});
+
+const twoAttacks = [
+  { name: 'Tackle', cost: [], damage: '10', text: '' },
+  { name: 'Big Hit', cost: [], damage: '50', text: '' },
+];
+
+/** p1 locks p2's two-attack Striker; rules on so p2's next attack goes through the gate. */
+function lockDuel(text, { attacks = twoAttacks } = {}) {
+  return board(text, {
+    name: 'Mime Jr.',
+    rules: true,
+    setup: ({ p2 }) => {
+      p2.zones.active.splice(0);
+      p2.zones.active.push(mon('Striker', { hp: 900, attacks }));
+      p2.zones.bench.push(mon('Striker Bench'));
+    },
+  });
+}
+
+const tryAttack = (state, playerId, attackIndex) =>
+  applyCommand(state, { type: 'attack', playerId, payload: { attackIndex } }, createRng(5));
+
+test('Encore: the Defending Pokémon can use only the chosen attack next turn', () => {
+  const b = lockDuel(ENCORE);
+  const asked = attack(b);
+  assert.deepEqual(optionNames(asked), ['Tackle', 'Big Hit']);
+  const locked = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name === 'Tackle').instanceId], b.rng);
+  assert.equal(locked.state.turn.player, 'p2');
+  assert.match(String(tryAttack(structuredClone(locked.state), 'p2', 1).error), /can use only Tackle/);
+  assert.equal(tryAttack(structuredClone(locked.state), 'p2', 0).error, null);
+});
+
+test('Amnesia: the chosen attack is the one the Defending Pokémon cannot use', () => {
+  const b = lockDuel(AMNESIA);
+  const asked = attack(b);
+  const locked = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name === 'Big Hit').instanceId], b.rng);
+  assert.match(String(tryAttack(structuredClone(locked.state), 'p2', 1).error), /can't use Big Hit/);
+  assert.equal(tryAttack(structuredClone(locked.state), 'p2', 0).error, null);
+});
+
+test('Encore: one attack locks without a question; no attacks locks nothing', () => {
+  const one = attack(lockDuel(ENCORE, { attacks: [twoAttacks[0]] }));
+  assert.equal(one.state.pendingChoice, null);
+  assert.ok(one.events.some((e) => e.type === 'attackMarkerAdded' && e.kind === 'attackLock'));
+  const none = attack(lockDuel(ENCORE, { attacks: [] }));
+  assert.ok(!none.events.some((e) => e.type === 'attackMarkerAdded'));
+});
+
+test('Encore: the lock ends when the locked Pokémon retreats', () => {
+  const b = lockDuel(ENCORE);
+  const asked = attack(b);
+  const locked = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name === 'Tackle').instanceId], b.rng);
+  const bench = locked.state.players.p2.zones.bench.find((c) => c.name === 'Striker Bench');
+  const retreated = run(locked.state, 'p2', 'retreat', { benchInstanceId: bench.instanceId }).state;
+  const striker = retreated.players.p2.zones.bench.find((c) => c.name === 'Striker');
+  assert.equal(striker.attackMarkers, undefined);
+});
+
+test('Unown T: each player loses the hand card the other picks, shuffled into their own deck', () => {
+  const b = board(UNOWN_T, {
+    name: 'Unown T',
+    setup: ({ p1, p2 }) => {
+      p1.zones.hand.push(mon('My Card A'), mon('My Card B'));
+      p2.zones.hand.push(mon('Their Card A'), mon('Their Card B'));
+    },
+  });
+  const pickTheirs = attack(b);
+  assert.equal(pickTheirs.state.pendingChoice.player, 'p1');
+  assert.deepEqual(optionNames(pickTheirs), ['Their Card A', 'Their Card B']);
+  const theirId = pickTheirs.state.pendingChoice.options[1].instanceId;
+  const pickMine = choose(pickTheirs, [theirId], b.rng);
+  assert.equal(pickMine.state.pendingChoice.player, 'p2');
+  assert.deepEqual(optionNames(pickMine), ['My Card A', 'My Card B']);
+  const myId = pickMine.state.pendingChoice.options[0].instanceId;
+  const res = choose(pickMine, [myId], b.rng);
+  assert.ok(zone(res, 'p2', 'deck').some((c) => c.instanceId === theirId));
+  assert.ok(zone(res, 'p1', 'deck').some((c) => c.instanceId === myId));
+  assert.ok(!zone(res, 'p1', 'hand').some((c) => c.instanceId === myId));
+});
+
+test('Unown T: an empty opponent hand skips straight to their pick from yours', () => {
+  const b = board(UNOWN_T, { setup: ({ p1 }) => p1.zones.hand.push(mon('Only Card')) });
+  const asked = attack(b);
+  assert.equal(asked.state.pendingChoice.player, 'p2');
+  const res = choose(asked, [asked.state.pendingChoice.options[0].instanceId], b.rng);
+  assert.ok(zone(res, 'p1', 'deck').some((c) => c.name === 'Only Card'));
+  const bothEmpty = attack(board(UNOWN_T));
+  assert.equal(bothEmpty.state.pendingChoice, null);
+});
+
+test('Mischievous Tentacles: shows the top card; Yes shuffles, No keeps the order', () => {
+  const b = board(MISCHIEVOUS_TENTACLES, { name: 'Inkay' });
+  const asked = attack(b);
+  assert.match(asked.state.pendingChoice.prompt, /top card of your opponent's deck is p2 deck 0/);
+  const before = zone(asked, 'p2', 'deck').map((c) => c.instanceId);
+  const kept = choose(structuredClone(asked), [asked.state.pendingChoice.options.find((o) => o.name === 'No').instanceId], b.rng);
+  // p2 draws its top card as its turn starts.
+  assert.deepEqual(zone(kept, 'p2', 'deck').map((c) => c.instanceId), before.slice(1));
+  const shuffled = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name === 'Yes').instanceId], b.rng);
+  assert.ok(shuffled.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p2'));
+});
+
+test('Fortunate Eye: the top 5 go back in the picked order', () => {
+  const b = board(FORTUNATE_EYE, { name: 'Gothorita' });
+  let res = attack(b);
+  const wanted = ['p2 deck 4', 'p2 deck 2', 'p2 deck 0', 'p2 deck 3'];
+  for (const name of wanted) {
+    assert.match(res.state.pendingChoice.prompt, /from the top of your opponent's deck/);
+    res = choose(res, [res.state.pendingChoice.options.find((o) => o.name === name).instanceId], b.rng);
+  }
+  assert.equal(res.state.pendingChoice, null);
+  // p2 draws the new top card as its turn starts.
+  assert.ok(zone(res, 'p2', 'hand').some((c) => c.name === wanted[0]));
+  assert.deepEqual(zone(res, 'p2', 'deck').slice(0, 4).map((c) => c.name), [...wanted.slice(1), 'p2 deck 1']);
+});
+
+test('Fortunate Eye: a 2-card deck needs one pick; an empty deck skips', () => {
+  const short = board(FORTUNATE_EYE, { setup: ({ p2 }) => p2.zones.deck.splice(2) });
+  const asked = attack(short);
+  assert.equal(asked.state.pendingChoice.options.length, 2);
+  const res = choose(asked, [asked.state.pendingChoice.options[1].instanceId], short.rng);
+  assert.ok(zone(res, 'p2', 'hand').some((c) => c.name === 'p2 deck 1'), 'the picked card went on top');
+  assert.deepEqual(zone(res, 'p2', 'deck').map((c) => c.name), ['p2 deck 0']);
+  const empty = attack(board(FORTUNATE_EYE, { setup: ({ p2 }) => p2.zones.deck.splice(0) }));
+  assert.equal(empty.state.pendingChoice, null);
+});
