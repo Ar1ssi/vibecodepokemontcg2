@@ -478,3 +478,133 @@ test('attack: a side-wide Pokémon-EX guard protects the Bench while its Pokémo
   const plainHit = run(plain.state, 'p2', 'attack', { attackIndex: 0 });
   assert.equal(findCard(plainHit, 'p1', benchId).damage, 30, 'control: the spread lands without the guard');
 });
+
+// ── deferred Knock Out, retaliation, HP-cap counters ────────────────────────
+
+const WORD_OF_RUIN = "At the end of your opponent's next turn, the Defending Pokémon will be Knocked Out.";
+const RIGHT_BACK =
+  "Discard all Energy attached to this Pokémon. During your opponent's next turn, if this Pokémon is damaged by an attack (even if this Pokémon is Knocked Out), put damage counters on the Attacking Pokémon equal to the damage done to this Pokémon.";
+const FIRE_WALL =
+  "If an attack does damage to Rocket's Moltres during your opponent's next turn (even if Rocket's Moltres is Knocked Out), Rocket's Moltres attacks your opponent's Active Pokémon for 10 damage. (Apply Weakness and Resistance.)";
+
+test('parseAttackSteps: deferred Knock Out and retaliation wordings become marker steps', () => {
+  const ruin = markerOf(WORD_OF_RUIN, 'Galarian Slowking V');
+  assert.equal(ruin.window, 'opponentNextTurn');
+  assert.equal(ruin.target, 'opponentActive');
+  assert.deepEqual(ruin.marker, { kind: 'deferredKnockOut' });
+
+  const { after } = parseAttackSteps(RIGHT_BACK, { selfName: 'Wobbuffet BREAK' });
+  const counters = after.find((s) => s.type === 'atkAddMarker');
+  assert.ok(counters, 'the retaliation follows the Energy discard');
+  assert.equal(counters.window, 'opponentNextTurn');
+  assert.deepEqual(counters.marker, { kind: 'retaliate', mode: 'counters' });
+
+  const wall = markerOf(FIRE_WALL, "Rocket's Moltres");
+  assert.equal(wall.window, 'opponentNextTurn');
+  assert.deepEqual(wall.marker, { kind: 'retaliate', mode: 'attack', amount: 10 });
+});
+
+test('parseAttackSteps: "until its remaining HP is N" becomes an HP-cap step', () => {
+  const pick = parseAttackSteps(
+    "Put damage counters on 1 of your opponent's Pokémon until its remaining HP is 30.",
+    { selfName: 'Tsareena ex' }
+  ).after;
+  assert.deepEqual(pick, [{ type: 'atkHpCap', target: 'opponentAny', hp: 30 }]);
+  const active = parseAttackSteps(
+    "Put damage counters on your opponent's Active Pokémon until its remaining HP is 50.",
+    { selfName: 'Medicham ex' }
+  ).after;
+  assert.deepEqual(active, [{ type: 'atkHpCap', target: 'opponentActive', hp: 50 }]);
+});
+
+test("attack: Word of Ruin Knocks Out the Defending Pokémon at the end of the opponent's next turn", () => {
+  const b = duel({ p1Attack: { damage: '10', text: WORD_OF_RUIN } });
+  const afterAttack = run(b.state, 'p1', 'attack', { attackIndex: 0 });
+  assert.ok(
+    afterAttack.players.p2.zones.active.some((c) => c.instanceId === b.darkAttacker.instanceId),
+    'still in play during its own turn'
+  );
+
+  const ended = run(structuredClone(afterAttack), 'p2', 'pass');
+  assert.ok(
+    ended.players.p2.zones.discard.some((c) => c.instanceId === b.darkAttacker.instanceId),
+    'Knocked Out at the end of turn 4'
+  );
+
+  const switched = run(structuredClone(afterAttack), 'p2', 'retreat', {
+    benchInstanceId: afterAttack.players.p2.zones.bench[0].instanceId,
+  });
+  const spared = run(switched, 'p2', 'pass');
+  assert.ok(
+    spared.players.p2.zones.bench.some((c) => c.instanceId === b.darkAttacker.instanceId),
+    'a Pokémon that left the Active Spot is spared'
+  );
+});
+
+const retaliationGuard = (marker) => (ctx) =>
+  addAttackMarker(ctx.gardevoir, { ...marker, untilTurn: 4, topId: ctx.gardevoir.instanceId, sourceAttack: 'Fire Wall' });
+
+test('attack: Right Back at You puts the damage taken on the Attacking Pokémon, even after a Knock Out', () => {
+  const b = duel({ turn: { player: 'p2', number: 4 }, setup: retaliationGuard({ kind: 'retaliate', mode: 'counters' }) });
+  const hit = run(b.state, 'p2', 'attack', { attackIndex: 0 });
+  assert.equal(findCard(hit, 'p1', b.gardevoir.instanceId).damage, 120);
+  assert.equal(findCard(hit, 'p2', b.darkAttacker.instanceId).damage, 120, '60 ×2 comes back as counters');
+
+  const ko = duel({
+    turn: { player: 'p2', number: 4 },
+    p2Damage: '200',
+    setup: retaliationGuard({ kind: 'retaliate', mode: 'counters' }),
+  });
+  const koHit = run(ko.state, 'p2', 'attack', { attackIndex: 0 });
+  assert.ok(koHit.players.p1.zones.discard.some((c) => c.instanceId === ko.gardevoir.instanceId));
+  assert.ok(
+    koHit.players.p2.zones.discard.some((c) => c.instanceId === ko.darkAttacker.instanceId),
+    'the counters Knock Out the Attacking Pokémon too'
+  );
+
+  const expired = duel({ turn: { player: 'p2', number: 6 }, setup: retaliationGuard({ kind: 'retaliate', mode: 'counters' }) });
+  const late = run(expired.state, 'p2', 'attack', { attackIndex: 0 });
+  assert.equal(findCard(late, 'p2', expired.darkAttacker.instanceId).damage || 0, 0, 'expired marker does nothing');
+});
+
+test('attack: Fire Wall attacks back for its damage with Weakness applied', () => {
+  const b = duel({
+    turn: { player: 'p2', number: 4 },
+    setup: (ctx) => {
+      ctx.darkAttacker.weakness = { type: 'Psychic', value: 2 };
+      retaliationGuard({ kind: 'retaliate', mode: 'attack', amount: 10 })(ctx);
+    },
+  });
+  const hit = run(b.state, 'p2', 'attack', { attackIndex: 0 });
+  assert.equal(findCard(hit, 'p2', b.darkAttacker.instanceId).damage, 20, '10 ×2');
+});
+
+test('attack: HP-cap damage counters on the Active stop at the printed HP', () => {
+  const text = "Put damage counters on your opponent's Active Pokémon until its remaining HP is 50.";
+  const b = duel({ p1Attack: { damage: '', text } });
+  const hit = run(b.state, 'p1', 'attack', { attackIndex: 0 });
+  assert.equal(findCard(hit, 'p2', b.darkAttacker.instanceId).damage, 250);
+
+  const low = duel({ p1Attack: { damage: '', text }, setup: (ctx) => (ctx.darkAttacker.damage = 260) });
+  const none = run(low.state, 'p1', 'attack', { attackIndex: 0 });
+  assert.equal(findCard(none, 'p2', low.darkAttacker.instanceId).damage, 260, 'already under the cap');
+});
+
+test('attack: HP-cap on 1 of the opponent Pokémon asks only among Pokémon above the cap', () => {
+  const text = "Put damage counters on 1 of your opponent's Pokémon until its remaining HP is 30.";
+  const b = duel({ p1Attack: { damage: '', text } });
+  const benchId = b.state.players.p2.zones.bench[0].instanceId;
+  const res = applyCommand(b.state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(5));
+  assert.equal(res.error, null);
+  const choice = res.state.pendingChoice;
+  assert.ok(choice, 'two Pokémon above the cap need a choice');
+  const picked = run(res.state, choice.player, 'resolveChoice', { choiceId: choice.choiceId, selection: [benchId] });
+  assert.equal(findCard(picked, 'p2', benchId).damage, 270);
+  assert.equal(findCard(picked, 'p2', b.darkAttacker.instanceId).damage || 0, 0);
+
+  const auto = duel({ p1Attack: { damage: '', text }, setup: (ctx) => (ctx.darkAttacker.damage = 280) });
+  const autoBenchId = auto.state.players.p2.zones.bench[0].instanceId;
+  const autoHit = run(auto.state, 'p1', 'attack', { attackIndex: 0 });
+  assert.equal(autoHit.pendingChoice ?? null, null, 'one candidate is picked without asking');
+  assert.equal(findCard(autoHit, 'p2', autoBenchId).damage, 270);
+});

@@ -520,6 +520,66 @@ function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
   );
 }
 
+// Wobbuffet BREAK Right Back at You / Rocket's Moltres Fire Wall (design 031): the damaged
+// Pokémon strikes back, even when this attack knocked it out. `strikerView` is its top card
+// as it was before the damage landed.
+function applyRetaliation(
+  draft,
+  { markers, dealt, striker, strikerView, strikerPlayerId, attacker, attackerPlayerId, events }
+) {
+  for (const marker of markers) {
+    const target =
+      marker.mode === 'counters'
+        ? attacker
+        : (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+    const ref = target && findCard(draft, target.instanceId);
+    if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) continue;
+    const amount =
+      marker.mode === 'counters'
+        ? dealt
+        : retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId });
+    if (amount <= 0) continue;
+    target.damage = (target.damage || 0) + amount;
+    events.push({
+      type: 'damageUpdated',
+      instanceId: target.instanceId,
+      damage: target.damage,
+      dealt: amount,
+      reason: 'retaliate',
+    });
+    const koHp = cardEffectiveHp(draft, target, attackerPlayerId);
+    if (koHp > 0 && target.damage >= koHp) {
+      handleKnockout(draft, {
+        victimPlayerId: attackerPlayerId,
+        attackerPlayerId: strikerPlayerId,
+        victim: target,
+        events,
+      });
+    }
+  }
+}
+
+// "… attacks your opponent's Active Pokémon for 10 damage. (Apply Weakness and Resistance.)"
+function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId }) {
+  const strikerZone = draft.players[strikerPlayerId]?.zones?.active || [];
+  const targetPlayer = draft.players[attackerPlayerId];
+  const result = computeAttackDamage(
+    strikerView,
+    inPlayView(draft, target),
+    { name: marker.sourceAttack, damage: marker.amount },
+    {
+      attackerZoneCards: strikerZone.some((c) => c.instanceId === striker.instanceId) ? strikerZone : [],
+      defenderZoneCards: targetPlayer?.zones?.active || [],
+      defenderInPlayCards: [...(targetPlayer?.zones?.active || []), ...(targetPlayer?.zones?.bench || [])],
+      stadium: draft.stadium,
+      defenderIsActive: true,
+      baseDamage: marker.amount,
+      defenderMarkers: activeAttackMarkers(draft, attackerPlayerId, target),
+    }
+  );
+  return result.total;
+}
+
 // Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
 function applyAttackTargets(
   draft,
@@ -1020,10 +1080,30 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
   }
 }
 
+// "At the end of your opponent's next turn, the Defending Pokémon will be Knocked Out."
+// The marker is live only on that turn, and only while the Pokémon is still Active and
+// unevolved, so a switched-out or evolved target is spared.
+function resolveDeferredKnockouts(draft, { events }) {
+  for (const pid of Object.keys(draft.players || {})) {
+    const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
+    const marker = activeAttackMarkers(draft, pid, active).find((m) => m.kind === 'deferredKnockOut');
+    if (!marker || marker.untilTurn !== draft.turn?.number) continue;
+    events.push({ type: 'deferredKnockOut', instanceId: active.instanceId, playerId: pid, sourceAttack: marker.sourceAttack });
+    handleKnockout(draft, {
+      victimPlayerId: pid,
+      attackerPlayerId: Object.keys(draft.players).find((id) => id !== pid),
+      victim: active,
+      events,
+    });
+  }
+}
+
 function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
 ) {
+  resolveDeferredKnockouts(draft, { events });
+
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
     const active = player.zones?.active?.find((c) => !c.attachedTo);
@@ -3446,6 +3526,11 @@ function resolveAttackEffectPhase(draft, ctx) {
           });
         }
 
+        // Read before damage lands: a Knock Out takes the markers with the card.
+        const retaliations = activeAttackMarkers(draft, defenderPlayerId, defender).filter(
+          (m) => m.kind === 'retaliate'
+        );
+
         if (dmgDealt > 0) {
           // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
           // Energy, Lucky Energy). Resolved before the KO sweep so an energy on
@@ -3594,6 +3679,17 @@ function resolveAttackEffectPhase(draft, ctx) {
               });
             }
           }
+
+          applyRetaliation(draft, {
+            markers: retaliations,
+            dealt: dmgDealt,
+            striker: defender,
+            strikerView: defenderView,
+            strikerPlayerId: defenderPlayerId,
+            attacker,
+            attackerPlayerId: playerId,
+            events,
+          });
         }
       }
 

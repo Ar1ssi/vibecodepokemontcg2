@@ -153,8 +153,15 @@ export function parseDamageImmunity(text) {
 // `window`: 'opponentNextTurn' (turn + 1), 'yourNextTurn' (turn + 2), 'throughYourNextTurn'
 // (now until turn + 2), 'whileActive'. The parser passes `context.wrOrder` ('before'/'after')
 // from a "(before/after applying Weakness and Resistance)" note it lifted off the sentence.
+// A third element rewrites the body so a condition folded into the window survives.
 const WINDOW_PHRASES = [
   [/^during your opponent's next turn, (.+)$/, 'opponentNextTurn'],
+  [/^at the end of your opponent's next turn, (.+)$/, 'opponentNextTurn', (body) => `at the end of the turn, ${body}`],
+  [
+    /^if an attack does damage to this pokémon during your opponent's next turn, (.+)$/,
+    'opponentNextTurn',
+    (body) => `if this pokémon is damaged by an attack, ${body}`,
+  ],
   [/^(.+) during your opponent's next turn$/, 'opponentNextTurn'],
   [/^during your next turn, (.+)$/, 'yourNextTurn'],
   [/^(.+) until the end of your next turn$/, 'throughYourNextTurn'],
@@ -230,6 +237,26 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m) => ({ kind: 'nextTurnBonus', amount: Number(m[1]), attackName: null }),
   ],
+  // Galarian Slowking V Word of Ruin: resolveCheckup knocks the marked Pokémon out.
+  [
+    /^at the end of the turn, your opponent's active pokémon will be knocked out$/,
+    'opponentActive',
+    null,
+    () => ({ kind: 'deferredKnockOut' }),
+  ],
+  // Wobbuffet BREAK / Rocket's Moltres: strike back at the Pokémon that damaged this one.
+  [
+    /^if this pokémon is damaged by an attack, put damage counters on the attacking pokémon equal to the damage done to this pokémon$/,
+    'self',
+    null,
+    () => ({ kind: 'retaliate', mode: 'counters' }),
+  ],
+  [
+    /^if this pokémon is damaged by an attack, this pokémon attacks your opponent's active pokémon for (\d+) damage$/,
+    'self',
+    null,
+    (m) => ({ kind: 'retaliate', mode: 'attack', amount: Number(m[1]) }),
+  ],
 ];
 
 function incomingReduce(amount, filterPhrase, wrOrder) {
@@ -248,9 +275,9 @@ function outgoingReduce(amount, wrOrder) {
 }
 
 function splitWindow(sentence) {
-  for (const [re, window] of WINDOW_PHRASES) {
+  for (const [re, window, rewrite] of WINDOW_PHRASES) {
     const m = re.exec(sentence);
-    if (m) return { window, body: m[1] };
+    if (m) return { window, body: rewrite ? rewrite(m[1]) : m[1] };
   }
   return { window: null, body: sentence };
 }
@@ -276,7 +303,10 @@ export function parseMarkerSentence(sentence, context = {}) {
 
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
-  [/^(?:during your|.+ (?:during your opponent's|until the end of your) next turn$)/, (m, rest, context) => parseMarkerSentence(rest, context)],
+  [
+    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|.+ (?:during your opponent's|until the end of your) next turn$)/,
+    (m, rest, context) => parseMarkerSentence(rest, context),
+  ],
 ];
 
 const WINDOW_TURNS = {

@@ -832,6 +832,39 @@ function atkCountersEach(ctx) {
   return null;
 }
 
+// Tsareena ex Icicle Sole / Medicham ex Chi-Atsu: counters until remaining HP is step.hp.
+function atkHpCap(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const countersToCap = (root) => {
+    const hp = Number(topPokemonCard(opponent, root)?.hp) || 0;
+    return Math.floor(Math.max(0, hp - (root.damage || 0) - step.hp) / 10) * 10;
+  };
+  const place = (root) => {
+    const amount = countersToCap(root);
+    if (amount === 0) return skip(ctx, 'already_at_cap');
+    placeCounters(ctx, root, opponent.playerId, amount);
+    return null;
+  };
+  if (step.target === 'opponentActive') {
+    const active = activeOf(opponent);
+    return active ? place(active) : skip(ctx, 'no_opponent_active');
+  }
+  const candidates = rootsOf(opponent).filter((root) => countersToCap(root) > 0);
+  if (ctx.selection) {
+    const root = candidates.find((c) => c.instanceId === ctx.selection[0]);
+    return root ? place(root) : skip(ctx, 'target_not_found');
+  }
+  if (candidates.length === 0) return skip(ctx, 'already_at_cap');
+  if (candidates.length === 1) return place(candidates[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to put damage counters on`,
+    options: candidates,
+    min: 1,
+    max: 1,
+  });
+}
+
 function atkMoveAllCounters(ctx) {
   const { player, opponent } = ctx;
   const target = activeOf(opponent);
@@ -1125,6 +1158,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
   atkKnockOutChoose,
   atkCountersEach,
+  atkHpCap,
   atkMoveAllCounters: optional(atkMoveAllCounters, () => 'Move damage counters'),
   atkMoveCounterBetween,
   atkHandDeckTopSwap,

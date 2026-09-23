@@ -294,6 +294,10 @@ const TEMPLATES = [
     (m) => ({ type: 'atkCountersEach', count: Number(m[1]), scope: m[2] ? 'bench' : 'all' }),
   ],
   [
+    /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
+    (m) => ({ type: 'atkHpCap', target: m[1].startsWith('1 of') ? 'opponentAny' : 'opponentActive', hp: Number(m[2]) }),
+  ],
+  [
     /^move all damage counters from 1 of your benched pokémon to your opponent's active pokémon$/,
     () => ({ type: 'atkMoveAllCounters' }),
   ],
