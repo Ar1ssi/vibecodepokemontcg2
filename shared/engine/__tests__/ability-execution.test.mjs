@@ -935,3 +935,21 @@ test('ability: VSTAR Power "During your turn, you may" wording stays activatable
   const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
   assert.equal(res.error, null);
 });
+
+test('ability: "flip a coin. If heads, …" only resolves on heads and is spent either way (I97)', () => {
+  const text = 'Once during your turn, you may flip a coin. If heads, draw 2 cards.';
+  const faces = new Set();
+  for (let seed = 1; seed <= 12; seed++) {
+    const { state } = setupGame();
+    holderWithAbility(state, text);
+    state.players.p1.zones.deck.push(createCard({ instanceId: 90 }), createCard({ instanceId: 91 }));
+    const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, createRng(seed));
+    assert.equal(res.error, null);
+    const flips = res.events.filter((e) => e.type === 'coinFlipped');
+    assert.equal(flips.length, 1);
+    faces.add(flips[0].face);
+    assert.equal(res.state.players.p1.zones.hand.length, flips[0].face === 'heads' ? 2 : 0);
+    assert.equal(res.state.players.p1.flags.abilitiesUsed[70], true);
+  }
+  assert.deepEqual([...faces].sort(), ['heads', 'tails']);
+});

@@ -99,6 +99,17 @@ export function executeAbility(draft, {
     return { pendingChoice: null, completed: true };
   }
 
+  // "Flip a coin. If heads, …": the flip is the ability's use; tails spends it with no effect.
+  if (isHeadsGatedAbility(text, actionableSteps)) {
+    const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+    events.push({ type: 'coinFlipped', playerId, face });
+    if (face === 'tails') {
+      markUsed();
+      draft.pendingChoice = null;
+      return { pendingChoice: null, completed: true };
+    }
+  }
+
   const eventsBefore = events.length;
   const result = executeSteps(draft, {
     steps: actionableSteps,
@@ -128,4 +139,15 @@ export function executeAbility(draft, {
 
   draft.pendingChoice = null;
   return { pendingChoice: null, completed: true };
+}
+
+// A single "flip a coin. If heads, …" gate on the whole effect. Texts with their own tails
+// branch or per-heads scaling, and steps that flip for themselves, are left to the steps.
+const HEADS_GATE = /flip a coin\.\s*if heads,/;
+const SELF_FLIPPING_STEPS = new Set(['statusAbility']);
+
+function isHeadsGatedAbility(text, steps) {
+  const lower = String(text || '').toLowerCase();
+  if (!HEADS_GATE.test(lower) || /if tails|for each heads/.test(lower)) return false;
+  return !steps.some((step) => SELF_FLIPPING_STEPS.has(step.type) && step.coinFlip);
 }
