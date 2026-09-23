@@ -180,8 +180,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   if (prevention?.preventAll) {
     prevented = true;
     finalDamage = 0;
-  } else if (prevention?.reduce > 0) {
-    finalDamage = Math.max(0, finalDamage - prevention.reduce * 10);
+  } else if (prevention?.reduce > 0 || prevention?.reduceHp > 0) {
+    // `reduceHp` is already in HP units (the printed "damage is reduced by N",
+    // I130); the legacy `reduce` path is counters.
+    finalDamage = Math.max(
+      0,
+      finalDamage - (prevention.reduce || 0) * 10 - (prevention.reduceHp || 0)
+    );
   }
   const markerPrevents = defenderEffects.some(
     (m) =>

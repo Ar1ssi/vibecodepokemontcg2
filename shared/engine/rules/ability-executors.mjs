@@ -21,17 +21,21 @@ const firstAbilityText = (card) => {
   return typeof first === 'string' ? first : first?.text || '';
 };
 
-const textOf = (card) =>
+// The single ability-text accessor for the engine, lowercased for matching.
+// Server-hydrated cards carry abilities as a plural array only; without the
+// `firstAbilityText` fallback every text-driven parser saw an empty string and
+// silently skipped the card's ability (I128), so passive consumers must read
+// text through here rather than off `card.ability` directly.
+export const cardAbilityText = (card) =>
   lower(
     card?.ability?.text ??
       card?.abilityText ??
       card?.text ??
       card?.effect ??
-      // Server-hydrated cards carry abilities as a plural array only; without
-      // this fallback every text-driven parser saw an empty string and silently
-      // skipped the card's ability (e.g. passive cost discounts).
       firstAbilityText(card)
   );
+
+const textOf = cardAbilityText;
 
 // --- position ----------------------------------------------------------
 
@@ -168,11 +172,14 @@ export function parseEndOfTurnEffect(card) {
 
 // --- damage-prevent ----------------------------------------------------
 
-// { preventAll: bool, reduce: number } — reduce is in damage-counter
-// (10 HP) units, matching computeAttackDamage output.
+// { preventAll: bool, reduce: number, reduceHp: number } — `reduceHp` is in HP
+// units, which is what the printed "damage is reduced by N" actually means
+// (I130: reading it as counters and multiplying by 10 turned a 20-damage
+// reduction into full prevention). `reduce` stays the counter-unit field for
+// callers that feed counters.
 export function parseDamagePrevention(card) {
   const t = textOf(card);
-  const out = { preventAll: false, reduce: 0 };
+  const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (!t) return out;
   if (
     /prevent (all )?(damage|effect)/.test(t) ||
@@ -181,26 +188,31 @@ export function parseDamagePrevention(card) {
     out.preventAll = true;
     return out;
   }
+  // "The Retreat Cost … is reduced by N" is a retreat modifier, not damage
+  // prevention (same guard as passiveCostDiscount).
+  if (/retreat/.test(t) && !/damage/.test(t)) return out;
   const m = t.match(/reduc(?:e|ed).*?(\d+)/);
-  if (m) out.reduce = parseInt(m[1], 10) || 0;
+  if (m) out.reduceHp = parseInt(m[1], 10) || 0;
   return out;
 }
 
-// Apply prevention to an incoming damage amount (in counters).
+// Apply prevention to an incoming damage amount (HP units).
 export function applyDamagePrevention(incoming, prevention) {
   if (prevention?.preventAll) return 0;
-  const reduced = incoming - (prevention?.reduce || 0);
+  const reduced =
+    incoming - (prevention?.reduce || 0) - (prevention?.reduceHp || 0);
   return reduced > 0 ? reduced : 0;
 }
 
 /** Merge two prevention structs (stack reductions; any preventAll wins). */
 export function mergeDamagePrevention(a, b) {
-  const out = { preventAll: false, reduce: 0 };
+  const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (a?.preventAll || b?.preventAll) {
     out.preventAll = true;
     return out;
   }
   out.reduce = (a?.reduce || 0) + (b?.reduce || 0);
+  out.reduceHp = (a?.reduceHp || 0) + (b?.reduceHp || 0);
   return out;
 }
 
@@ -498,19 +510,32 @@ export function parseKoPrevention(card) {
   return out;
 }
 
-// Damage to attacker when this Pokémon is damaged
+// Damage to the attacker when this Pokémon is damaged.
+// Pre-Sun & Moon wording names "that Pokémon" (the Attacking Pokémon) instead
+// of "the Attacking Pokémon"; the attack-damage context is required so the
+// energy-attach costs that print the same "put N damage counters on that
+// Pokémon" clause stay out. `zone` reports whether the printed text restricts
+// the trigger to the Active Spot (callers gate on it; the parser does not).
 export function parseThorns(card) {
   const t = textOf(card);
   if (
     !t ||
     !t.includes('damage counter') ||
     !/(put|place)/.test(t) ||
-    !/(attacker|attacking pokémon)/.test(t)
+    !(
+      /(attacker|attacking pokémon)/.test(t) ||
+      (/on that pokémon/.test(t) &&
+        /damaged by (?:an? )?(?:opponent's )?attack/.test(t))
+    )
   ) {
-    return { count: 0 };
+    return { count: 0, zone: 'any' };
   }
   const m = t.match(/(\d+)\s+damage/);
-  return { count: m ? parseInt(m[1], 10) || 0 : 0 };
+  const count = m ? parseInt(m[1], 10) || 0 : 0;
+  const zone = /in the active spot|is your active pokémon/.test(t)
+    ? 'active'
+    : 'any';
+  return { count, zone };
 }
 
 // During Pokémon Checkup damage

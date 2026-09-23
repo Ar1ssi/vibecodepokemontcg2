@@ -7,6 +7,7 @@ import { planAbilitySteps, actionableAbilityPlan } from './ability-step-plan.mjs
 import {
   requiresActiveSpot,
   requiresKoOnOpponentTurn,
+  cardAbilityText,
 } from './ability-executors.mjs';
 
 /**
@@ -28,15 +29,7 @@ export function isUsableAbilityCard(
     return false;
   }
 
-  const firstAbility =
-    Array.isArray(card.abilities) && card.abilities.length > 0 ? card.abilities[0] : null;
-  const abilityText =
-    (typeof firstAbility === 'string' ? firstAbility : firstAbility?.text) ??
-    card.ability?.text ??
-    card.abilityText ??
-    card.text ??
-    '';
-  const steps = parseAbility(abilityText);
+  const steps = parseAbility(cardAbilityText(card));
   const plan = planAbilitySteps(steps, { mode: 'interactive' });
   const actionable = actionableAbilityPlan(plan, { mode: 'interactive' }).filter(
     (item) => item.action !== 'promotion'

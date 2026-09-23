@@ -10,6 +10,7 @@ import {
   applyCostDiscount,
   parseAttackInheritance,
   requiresActiveSpot,
+  cardAbilityText,
 } from './ability-executors.mjs';
 import { parseStadiumCostModifier, mergeAttacks } from './stadium-effects.mjs';
 
@@ -122,23 +123,33 @@ export function listAttacks(card, opts = {}) {
  * position ("if this Pokémon is in the Active Spot") cannot be activated from the Bench. It
  * defaults to 'active' so every caller with no zone to offer keeps today's behavior.
  *
- * @param {object} card   - the Pokémon card with an `.ability`
+ * Reads the ability through `cardAbilityText` so server-hydrated cards (plural `abilities[]`
+ * only) report the same as singular-shape fixtures.
+ *
+ * @param {object} card   - the Pokémon card with an `.ability` or `abilities[0]`
  * @param {object} opts   - { abilityUsed, rulesEnabled, zone }
  * @returns {Array<{name, text, usable, reason}>}
  */
 export function listAbilities(card, opts = {}) {
   const { abilityUsed = false, rulesEnabled = true, zone = 'active' } = opts;
-  const ability = card.ability;
+  const ability =
+    card?.ability ??
+    (Array.isArray(card?.abilities) && card.abilities.length > 0
+      ? card.abilities[0]
+      : null);
   if (!ability) return [];
 
-  const oncePerTurn = /once during your turn/i.test(ability.text || '');
+  const oncePerTurn = /once during your turn/i.test(cardAbilityText(card));
   const used = rulesEnabled && oncePerTurn && abilityUsed;
   const offSpot = rulesEnabled && zone !== 'active' && requiresActiveSpot(card);
 
   return [
     {
-      name: ability.name || card.ability?.name || 'Ability',
-      text: ability.text || '',
+      name:
+        (typeof ability === 'object' ? ability.name : null) ||
+        card.ability?.name ||
+        'Ability',
+      text: (typeof ability === 'string' ? ability : ability.text) || '',
       oncePerTurn,
       used,
       usable: !used && !offSpot,

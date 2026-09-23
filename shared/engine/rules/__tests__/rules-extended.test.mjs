@@ -12,7 +12,7 @@ import test from 'node:test';
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger, cardAbilityText } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions, statusAttackBlock } = await import('../attack-window.mjs');
     const {
       isUsableAbilityCard,
@@ -2899,13 +2899,115 @@ import test from 'node:test';
 
     test('parseDamagePrevention / applyDamagePrevention', () => {
       const gardevoir = { ability: { text: 'Prevent all damage done to this Pokémon by attacks.' } };
-      assert.deepEqual(parseDamagePrevention(gardevoir), { preventAll: true, reduce: 0 });
+      assert.deepEqual(parseDamagePrevention(gardevoir), { preventAll: true, reduce: 0, reduceHp: 0 });
       assert.equal(applyDamagePrevention(5, parseDamagePrevention(gardevoir)), 0);
       const zacian = { ability: { text: 'Damage done to this Pokémon is reduced by 2.' } };
-      assert.deepEqual(parseDamagePrevention(zacian), { preventAll: false, reduce: 2 });
+      assert.deepEqual(parseDamagePrevention(zacian), { preventAll: false, reduce: 0, reduceHp: 2 });
       assert.equal(applyDamagePrevention(5, parseDamagePrevention(zacian)), 3);
       assert.equal(applyDamagePrevention(1, parseDamagePrevention(zacian)), 0);
       assert.equal(applyDamagePrevention(3, parseDamagePrevention({ name: 'Pikachu' })), 3);
+      // A retreat-cost reduction is not damage prevention.
+      assert.deepEqual(
+        parseDamagePrevention({ ability: { text: 'The Retreat Cost of this Pokémon is reduced by 2.' } }),
+        { preventAll: false, reduce: 0, reduceHp: 0 },
+      );
+    });
+
+    // I128: server-hydrated cards carry abilities as a plural array only, so
+    // every text reader must go through cardAbilityText or it reads ''.
+    test('cardAbilityText: reads plural abilities[] and is neutral when empty', () => {
+      assert.equal(
+        cardAbilityText({
+          abilities: [{ name: 'Shell Armor', text: 'Any damage done to this Pokémon is reduced by 20.' }],
+        }),
+        'any damage done to this pokémon is reduced by 20.',
+      );
+      assert.equal(cardAbilityText({ ability: { text: 'Draw a card.' } }), 'draw a card.');
+      assert.equal(cardAbilityText({ abilities: ['Draw a card.'] }), 'draw a card.');
+      assert.equal(cardAbilityText({ name: 'Pikachu' }), '');
+      assert.equal(cardAbilityText(null), '');
+    });
+
+    // I130: "damage … is reduced by N" is printed in HP, not counters.
+    // Reading it as counters and multiplying by 10 turned a 20-damage
+    // reduction into full prevention.
+    test('computeAttackDamage: legacy "reduced by 20" subtracts 20 HP', () => {
+      const shellArmor = {
+        name: 'Samurott',
+        type: 'Pokémon',
+        stage: 'Basic',
+        hp: 140,
+        abilities: [{
+          name: 'Shell Armor',
+          text: 'Any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).',
+        }],
+      };
+      const attacker = { name: 'Attacker', types: ['Fire'] };
+      const plain = computeAttackDamage(attacker, { ...shellArmor, abilities: [] }, { damage: '50' }, {});
+      assert.equal(plain.total, 50);
+      const reduced = computeAttackDamage(attacker, shellArmor, { damage: '50' }, {});
+      assert.equal(reduced.total, 30);
+      const weak = computeAttackDamage(
+        attacker,
+        { ...shellArmor, weakness: { type: 'Fire', value: 2 } },
+        { damage: '50' },
+        {},
+      );
+      assert.equal(weak.total, 80);
+    });
+
+    // I128: the conditional filters gate prevention now that tool-combat reads
+    // the plural abilities[] text; legacy "Pokémon-EX" spelling must match.
+    test('computeAttackDamage: plural ability attacker filters still gate prevention', () => {
+      const safeguard = {
+        name: 'Sigilyph',
+        type: 'Pokémon',
+        stage: 'Basic',
+        hp: 90,
+        abilities: [{
+          name: 'Safeguard',
+          text: 'Prevent all effects of attacks, including damage, done to this Pokémon by Pokémon-EX.',
+        }],
+      };
+      const normal = computeAttackDamage({ name: 'Attacker', types: ['Fire'] }, safeguard, { damage: '50' }, {});
+      assert.equal(normal.total, 50);
+      assert.equal(normal.prevented, false);
+      const ex = computeAttackDamage({ name: 'Charizard ex', types: ['Fire'] }, safeguard, { damage: '50' }, {});
+      assert.equal(ex.total, 0);
+      assert.equal(ex.prevented, true);
+    });
+
+    test('parseThorns: legacy "on that Pokémon" wording and Active-Spot zone', () => {
+      const roughSkin = {
+        abilities: [{
+          name: 'Rough Skin',
+          text: "If this Pokémon is your Active Pokémon and is damaged by an opponent's attack (even if this Pokémon is Knocked Out), put 2 damage counters on that Pokémon.",
+        }],
+      };
+      assert.deepEqual(parseThorns(roughSkin), { count: 2, zone: 'active' });
+      const anywhere = {
+        abilities: [{
+          name: 'Rough Skin',
+          text: 'If this Pokémon is damaged by an attack, put 3 damage counters on that Pokémon.',
+        }],
+      };
+      assert.deepEqual(parseThorns(anywhere), { count: 3, zone: 'any' });
+      const modern = {
+        abilities: [{
+          name: 'Counterattack Quills',
+          text: "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), put 3 damage counters on the Attacking Pokémon.",
+        }],
+      };
+      assert.deepEqual(parseThorns(modern), { count: 3, zone: 'active' });
+      // Energy-attach costs print the same "on that Pokémon" clause without the
+      // attack-damage context; they must not be read as thorns.
+      const attachCost = {
+        abilities: [{
+          name: 'Hunting Gloves',
+          text: 'Once during your turn, you may attach a Basic {D} Energy card from your discard pile to 1 of your Benched {D} Pokémon. If you attached Energy to a Pokémon in this way, place 2 damage counters on that Pokémon.',
+        }],
+      };
+      assert.deepEqual(parseThorns(attachCost), { count: 0, zone: 'any' });
     });
 
     test('isHandProtected', () => {
@@ -3057,9 +3159,9 @@ import test from 'node:test';
     test('parseThorns: damage counters on attacker', () => {
       assert.deepEqual(
         parseThorns({ ability: { text: 'When this Pokémon is damaged by an attack, put 2 damage counters on the Attacking Pokémon.' } }),
-        { count: 2 }
+        { count: 2, zone: 'any' }
       );
-      assert.deepEqual(parseThorns({ ability: { text: 'Draw a card.' } }), { count: 0 });
+      assert.deepEqual(parseThorns({ ability: { text: 'Draw a card.' } }), { count: 0, zone: 'any' });
     });
 
     test('parseCheckupEffect: checkup damage + filter', () => {
@@ -3978,6 +4080,23 @@ import test from 'node:test';
     test('listAbilities: no ability → empty list', () => {
       assert.deepEqual(listAbilities({ name: 'T' }), []);
       assert.deepEqual(listAbilities({ name: 'T', ability: undefined }), []);
+      assert.deepEqual(listAbilities({ name: 'T', abilities: [] }), []);
+    });
+
+    test('listAbilities: reads plural abilities[] (server shape)', () => {
+      const card = {
+        name: 'Server Card',
+        abilities: [{
+          name: 'Dynamotor',
+          text: 'Once during your turn, you may attach a Basic {L} Energy card from your discard pile to 1 of your Benched Pokémon.',
+        }],
+      };
+      const list = listAbilities(card, { abilityUsed: false });
+      assert.equal(list.length, 1);
+      assert.equal(list[0].name, 'Dynamotor');
+      assert.equal(list[0].oncePerTurn, true);
+      assert.equal(list[0].usable, true);
+      assert.equal(listAbilities(card, { abilityUsed: true })[0].usable, false);
     });
 
     // ── zone-aware ability activation (design 015) ──
