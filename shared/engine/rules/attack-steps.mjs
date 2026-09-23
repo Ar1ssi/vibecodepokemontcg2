@@ -498,6 +498,16 @@ const BLOCKS = [
     /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
     () => ({ type: 'searchEvolve', ontoSource: true }),
   ],
+  // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle: the opponent flips when attacking.
+  [
+    /during your opponent's next turn, if your opponent's active pokémon tries to (?:use an )?attack, your opponent flips a coin\. if tails, that attack doesn't happen\./g,
+    () => ({ type: 'atkAddMarker', target: 'opponentActive', window: 'opponentNextTurn', marker: { kind: 'attackFlipOrFail' } }),
+  ],
+  // Machamp LV.X Strong-Willed: the printed name is the attacker's short name, so any name.
+  [
+    /during your opponent's next turn, if [^,.]+ would be knocked out by damage from an attack, flip a coin\. if heads, [^,.]+ is not knocked out and its remaining hp becomes 10 instead\./g,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'surviveKnockOutCoin' } }),
+  ],
   // Bellossom Miracle Powder / Tropius Miracle Blow
   [
     /choose 1 special condition\. your opponent's active pokémon is now affected by that special condition\./g,

@@ -604,3 +604,103 @@ test('attack: Miracle Powder offers all five Special Conditions on heads', () =>
   const res2 = choose(res, [poisoned.instanceId], b.rng);
   assert.ok(res2.events.some((e) => e.type === 'specialConditionUpdated' && e.condition === 'Poisoned'));
 });
+
+// ── slice 5: the opponent's coin, and a gated copy ──────────────────────────
+
+/** p2 answers on its own turn with its Active's first attack. */
+function counterAttack(res, rng) {
+  return applyCommand(res.state, { type: 'attack', playerId: 'p2', payload: { attackIndex: 0 } }, rng);
+}
+
+const defenderAttacks = (damage) => ({ defender }) => {
+  defender.attacks = [{ name: 'Big Hit', cost: [], damage: String(damage), text: '' }];
+};
+
+test('parseAttackSteps: Smokescreen Shot, G-Max Cuddle and Strong-Willed are markers', () => {
+  const after = (text, selfName) => parseAttackSteps(text, { selfName }).after;
+  const flipOrFail = { type: 'atkAddMarker', target: 'opponentActive', window: 'opponentNextTurn', marker: { kind: 'attackFlipOrFail' } };
+  assert.deepEqual(
+    after(
+      "During your opponent's next turn, if the Defending Pokémon tries to use an attack, your opponent flips a coin. If tails, that attack doesn't happen."
+    ),
+    [flipOrFail]
+  );
+  assert.deepEqual(
+    after(
+      "During your opponent's next turn, if the Defending Pokémon tries to attack, your opponent flips a coin. If tails, that attack doesn't happen."
+    ),
+    [flipOrFail]
+  );
+  assert.deepEqual(
+    after(
+      "During your opponent's next turn, if Machamp would be Knocked Out by damage from an attack, flip a coin. If heads, Machamp is not Knocked Out and its remaining HP becomes 10 instead.",
+      'Machamp LV.X'
+    ),
+    [{ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'surviveKnockOutCoin' } }]
+  );
+});
+
+test("attack: Smokescreen Shot makes the opponent's next attack flip; tails, it doesn't happen", () => {
+  const text =
+    "During your opponent's next turn, if the Defending Pokémon tries to use an attack, your opponent flips a coin. If tails, that attack doesn't happen.";
+  const faces = new Set();
+  for (let seed = 1; seed <= 12; seed++) {
+    const b = board(text, { seed, setup: defenderAttacks(50) });
+    const res = attack(b);
+    turnPassed(res);
+    const res2 = counterAttack(res, b.rng);
+    assert.equal(res2.error, null);
+    const flip = res2.events.find((e) => e.type === 'attackMarkerCoinFlipped');
+    assert.ok(flip, `seed ${seed}: the opponent flips`);
+    faces.add(flip.coin);
+    const hit = zone(res2, 'p1', 'active').find((c) => c.instanceId === b.attacker.instanceId).damage || 0;
+    assert.equal(hit, flip.coin === 'heads' ? 50 : 0, `seed ${seed}`);
+    assert.equal(res2.events.some((e) => e.type === 'attackPrevented'), flip.coin === 'tails');
+    assert.equal(res2.state.turn.player, 'p1', 'the attack ends the turn either way');
+  }
+  assert.equal(faces.size, 2, 'the seeds cover both faces');
+});
+
+test('attack: Strong-Willed survives a Knock Out at 10 HP on heads', () => {
+  const text =
+    "During your opponent's next turn, if Machamp would be Knocked Out by damage from an attack, flip a coin. If heads, Machamp is not Knocked Out and its remaining HP becomes 10 instead.";
+  const faces = new Set();
+  for (let seed = 1; seed <= 12; seed++) {
+    const b = board(text, { seed, name: 'Machamp LV.X', setup: defenderAttacks(500) });
+    const res2 = counterAttack(attack(b), b.rng);
+    assert.equal(res2.error, null);
+    const flip = res2.events.find((e) => e.type === 'attackMarkerCoinFlipped' && e.kind === 'surviveKnockOutCoin');
+    assert.ok(flip, `seed ${seed}`);
+    faces.add(flip.coin);
+    const machamp = zone(res2, 'p1', 'active').find((c) => c.instanceId === b.attacker.instanceId);
+    if (flip.coin === 'heads') assert.equal(machamp?.damage, 290, 'hp 300 → 10 left');
+    else assert.ok(zone(res2, 'p1', 'discard').some((c) => c.instanceId === b.attacker.instanceId));
+  }
+  assert.equal(faces.size, 2, 'the seeds cover both faces');
+});
+
+test('attack: Strong-Willed does not flip for damage that is not lethal', () => {
+  const text =
+    "During your opponent's next turn, if Machamp would be Knocked Out by damage from an attack, flip a coin. If heads, Machamp is not Knocked Out and its remaining HP becomes 10 instead.";
+  const b = board(text, { name: 'Machamp LV.X', setup: defenderAttacks(50) });
+  const res2 = counterAttack(attack(b), b.rng);
+  assert.ok(!res2.events.some((e) => e.type === 'attackMarkerCoinFlipped'));
+  assert.equal(zone(res2, 'p1', 'active').find((c) => c.instanceId === b.attacker.instanceId).damage, 50);
+});
+
+test('attack: Mini-Metronome copies only on heads', () => {
+  const text =
+    "Flip a coin. If heads, choose 1 of the Defending Pokémon's attacks. Mini-Metronome copies that attack except for its Energy cost. (You must still do anything else required in order to use that attack.) (No matter what type the Defending Pokémon is, Togetic is still {C}.) Togetic performs that attack.";
+  const tails = attackOn('tails', text, { name: 'Togetic', setup: defenderAttacks(60) });
+  assert.equal(tails.res.state.pendingChoice, null);
+  assert.equal(zone(tails.res, 'p2', 'active')[0].damage || 0, 0);
+  turnPassed(tails.res);
+
+  const heads = attackOn('heads', text, { name: 'Togetic', setup: defenderAttacks(60) });
+  let res = heads.res;
+  if (res.state.pendingChoice) {
+    const bigHit = res.state.pendingChoice.options.find((o) => /Big Hit/.test(o.name || ''));
+    res = choose(res, [bigHit.instanceId], heads.b.rng);
+  }
+  assert.equal(zone(res, 'p2', 'active')[0].damage, 60, 'the copied attack hits');
+});

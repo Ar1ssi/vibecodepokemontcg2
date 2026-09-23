@@ -55,6 +55,15 @@ const TEMPLATES = [
     ),
     () => ({ source: 'oppActive', needsEnergy: true }),
   ],
+  // Togetic Mini-Metronome: the copy happens only on heads (design 032).
+  [
+    new RegExp(
+      String.raw`^flip a coin\. if heads, choose 1 of the defending pokemon's attacks\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppActive', coinGate: 'heads' }),
+  ],
   [
     new RegExp(
       String.raw`^choose 1 of your opponent's benched pokemon's attacks\. [^.]+ copies that attack except for its energy cost\.` +

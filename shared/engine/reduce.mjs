@@ -520,6 +520,26 @@ function activeAttackMarkers(draft, playerId, card) {
   });
 }
 
+/** The defending player's flip for a surviveKnockOutCoin marker: true on heads. */
+function survivesOnCoin(activeRng, playerId, events) {
+  const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+  events.push({ type: 'attackMarkerCoinFlipped', kind: 'surviveKnockOutCoin', playerId, coin });
+  return coin === 'heads';
+}
+
+/**
+ * An attack that was declared but does not happen (Confusion tails, Smokescreen Shot tails,
+ * Mini-Metronome tails): the attack still ends the turn — Pokémon Checkup, then the hand-off.
+ */
+function endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events }) {
+  const attackerPlayer = draft.players[playerId];
+  if (!attackerPlayer.flags) attackerPlayer.flags = {};
+  attackerPlayer.flags.attackerAttacked = true;
+  if (isGameConcluded(draft)) return;
+  resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
+  if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
+}
+
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
 function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
   const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
@@ -3751,9 +3771,9 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
 
         // Read before damage lands: a Knock Out takes the markers with the card.
-        const retaliations = activeAttackMarkers(draft, defenderPlayerId, defender).filter(
-          (m) => m.kind === 'retaliate'
-        );
+        const defenderMarkers = activeAttackMarkers(draft, defenderPlayerId, defender);
+        const retaliations = defenderMarkers.filter((m) => m.kind === 'retaliate');
+        const surviveOnHeads = defenderMarkers.some((m) => m.kind === 'surviveKnockOutCoin');
 
         if (dmgDealt > 0) {
           // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
@@ -3809,6 +3829,17 @@ function resolveAttackEffectPhase(draft, ctx) {
                   defenderPlayerId
                 );
               }
+            } else if (surviveOnHeads && survivesOnCoin(activeRng, defenderPlayerId, events)) {
+              // Machamp LV.X Strong-Willed (design 032): heads leaves it at 10 HP.
+              defender.damage = koHp - 10;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+                ...(weaknessApplied && { weakness: true }),
+              });
+              events.push({ type: 'koPrevented', instanceId: defender.instanceId, surviveHp: 10, reason: 'attackMarker' });
             } else {
               defender.damage = (defender.damage || 0) + dmgDealt;
               events.push({
@@ -5086,19 +5117,19 @@ export function applyCommand(state, command, rng = null) {
             });
           }
 
-          if (!attackerPlayer.flags) attackerPlayer.flags = {};
-          attackerPlayer.flags.attackerAttacked = true;
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+      }
 
-          if (!isGameConcluded(draft)) {
-            resolveCheckup(draft, {
-              rng: activeRng,
-              events,
-              endingPlayerId: playerId,
-            });
-            if (!isGameConcluded(draft)) {
-              advanceTurn(draft, { nextPlayerId: oppId, events });
-            }
-          }
+      // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle (design 032): the marked Pokémon's
+      // owner flips when it tries to attack; tails, the attack doesn't happen.
+      if (attacker && activeAttackMarkers(draft, playerId, attacker).some((m) => m.kind === 'attackFlipOrFail')) {
+        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        events.push({ type: 'attackMarkerCoinFlipped', kind: 'attackFlipOrFail', playerId, coin });
+        if (coin === 'tails') {
+          events.push({ type: 'attackPrevented', playerId, attackerId: attacker.instanceId, attackName: attack.name });
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
           break;
         }
       }
@@ -5106,6 +5137,22 @@ export function applyCommand(state, command, rng = null) {
       // A copy attack (design 031) picks the attack it uses before any coin is flipped.
       const targetInstanceId = payload?.targetInstanceId ?? null;
       const copy = parseCopyAttack(attack?.text);
+      // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
+      if (copy?.coinGate) {
+        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        events.push({
+          type: 'attackCoinFlipped',
+          playerId,
+          attackName: attack.name,
+          coin,
+          headsCount: coin === 'heads' ? 1 : 0,
+          flips: [coin],
+        });
+        if (coin !== copy.coinGate) {
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+      }
       if (
         copy &&
         offerCopiedAttack(draft, {
