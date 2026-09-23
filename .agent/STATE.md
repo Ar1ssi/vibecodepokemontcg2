@@ -5,30 +5,29 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 271
-Focus: S271 shipped I120 / design 032 (coin-gated attack sentences) on branch `feature/i118-attack-gaps`
-  (worktree .claude/worktrees/i118), NOT merged or pushed. S267/S268 work also still unpushed on local main.
+Session: 272
+Focus: S272 merged feature/i118-attack-gaps (I118, I120) and feature/i119-unparsed-printings (I119) into main
+  (I112/I113 were already there) and pushed origin/main. Oracle gate PASSED after the merge.
 Active: none.
-Next: branch stays in its worktree; user said NO merge (S270). Merge/push only on explicit user request.
-  maintenance due (S270, still not run).
-  Re-run the oracle and re-sync EXECUTED_ATTACK_FAMILIES after design 032 (I113 gate).
-  I121-I125 (design 032 leftovers), I119 (10 unparsed printings), I113 oracle gate (damage amounts).
+Next: maintenance due (S270, still not run).
+  I121-I125 (design 032 leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
+  Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
   Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
   ISSUES Open still over cap.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Attack/ability green metrics lie: verify execution with `.agent/scratch/cov/oracle.mjs` (state diff, ~3 min),
-  then `family-exec.mjs` / `family-signal.mjs` (event + parser coverage per family). Oracle cannot see damage amounts.
+- Attack/ability execution gate: `pnpm audit:oracle` (~2 min, D108). Run after engine attack/ability changes; legit
+  rate changes → `--update-baseline`, commit scripts/oracle-baseline.json. Later-turn markers are ORACLE_BLIND_FAMILIES.
 - Editing via bash heredoc eats `\` → write edit scripts with the Write tool / String.raw.
   Working-copy files are CRLF (repo LF); keep eol when scripting edits.
-- Timed attack effects are `card.attackMarkers` (D108); copy attacks resolve before coins, tokens carry `copiedAttack` (D109).
+- Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins, tokens carry `copiedAttack` (D110).
   BLOCKS regexes are wrapped by `gatedBlock` (adds capture group 1): no backreferences in them.
 - Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D97-D100.
 - ONE pre-existing failing test: card-inspector-model "retreat greys only when the cost is unpaid". Test with
-  `pnpm test` (globs now include scripts/**/*.test.mjs).
+  `pnpm test` (globs include scripts/**/*.test.mjs).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S272 merge: i118 + i119 into main, D-numbers renumbered (D109-D114), oracle baseline re-ratcheted.
+- S271 I119 / design 033: last 10 unparsed printings + Inkay/Gothorita opponent deck look run on the server.
 - S271 I120 / design 032: coin-gated discards, bounce, devolve, recover, attach, KO, chosen conditions, flip markers, gated copy.
-- S270 I118 finish: tests for marker reduction floor/stacking and prevention OR.
-- S269 I118 / design 031: markers, HP-cap, reveal-hand, shuffle-cost, copy attacks run on the server.
