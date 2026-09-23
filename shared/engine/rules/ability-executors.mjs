@@ -827,10 +827,11 @@ export function parseUnlimitedHandEnergyAcceleration(card) {
   if (!isUnlimited || !isHandAttach) return null;
 
   let energyType = null;
-  const typeLetterMatch = t.match(/\{([wlfmpdgyn])\}\s*energy/i);
+  const typeLetterMatch = t.match(/\{([wlfmpdgynr])\}\s*energy/i);
   if (typeLetterMatch) {
     const typeMap = {
       w: 'Water',
+      r: 'Fire',
       l: 'Lightning',
       f: 'Fighting',
       m: 'Metal',

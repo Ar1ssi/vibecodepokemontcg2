@@ -8,7 +8,7 @@ import { isAbilityCard } from '../rules/ability-effects.mjs';
 import { isUsableAbilityCard } from '../rules/collect-usable-abilities.mjs';
 import { tcgAbilityFromDetail } from '../rules/rules-state.mjs';
 import { executeStadium } from '../effects/stadium.mjs';
-import { attachedTools } from '../rules/ability-executors.mjs';
+import { attachedTools, parseUnlimitedHandEnergyAcceleration } from '../rules/ability-executors.mjs';
 import { executeSteps } from '../effects/executor.mjs';
 
 function setupGame(overrides = {}) {
@@ -906,4 +906,9 @@ test('executeSteps: handles discardCostAbility, statusAbility, and opponent gust
   assert.equal(draft.players.p2.zones.active[0].instanceId, 505);
   // Former active should now be on bench
   assert.equal(draft.players.p2.zones.bench[0].instanceId, oppActiveId);
+});
+
+test('parseUnlimitedHandEnergyAcceleration reads {R} as Fire (I98)', () => {
+  const text = 'As often as you like during your turn, you may attach a Basic {R} Energy card from your hand to 1 of your Pokémon.';
+  assert.equal(parseUnlimitedHandEnergyAcceleration({ abilities: [{ text }] })?.energyType, 'Fire');
 });
