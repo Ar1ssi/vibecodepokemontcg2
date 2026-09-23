@@ -297,7 +297,8 @@ export function executeSteps(draft, {
       case 'searchAbility':
       case 'search': {
         const what = step.what || step.searchTarget || 'card';
-        const dest = step.destination || 'hand';
+        // Ability parser emits 'Bench' (legacy client contract); trainers emit 'bench'.
+        const dest = String(step.destination || 'hand').toLowerCase();
         const maxCount = step.count || 1;
         const nameFilter = step.nameFilter
           ? String(step.nameFilter).toLowerCase()

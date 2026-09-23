@@ -786,3 +786,34 @@ test('ability: Munkidori Adrena-Brain does nothing without {D} Energy attached',
   assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
   assert.notEqual(res.state.players.p1.flags.abilitiesUsed[100], true);
 });
+
+test('ability: deck-to-Bench search puts the card on the Bench, not in hand (I82)', () => {
+  const { state, rng } = setupGame();
+  const text = 'Once during your turn, you may search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';
+  const caller = createCard({
+    instanceId: 30,
+    name: 'Caller',
+    hp: 90,
+    supertype: 'Pokémon',
+    abilityText: `Call Out: ${text}`,
+    abilities: [{ name: 'Call Out', type: 'Ability', text }],
+  });
+  state.players.p1.zones.active.push(caller);
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 60, name: 'Pikachu', supertype: 'Pokémon', subtypes: ['Basic'] }),
+  );
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 30 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice);
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [60] },
+    playerId: 'p1',
+  }, rng);
+
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p1.zones.bench.map((c) => c.instanceId), [60]);
+  assert.equal(res2.state.players.p1.zones.hand.length, 0);
+});
