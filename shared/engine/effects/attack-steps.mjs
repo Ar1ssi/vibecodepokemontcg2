@@ -605,6 +605,81 @@ function atkRecover(ctx) {
   });
 }
 
+// ── Lost Zone ───────────────────────────────────────────────────────────────
+
+// `forDamage` marks a cost the attack's damage counts ("for each card put in the Lost Zone
+// in this way"); the reducer sums those events.
+function moveToLostZone(ctx, owner, cards) {
+  if (cards.length === 0) return;
+  if (!owner.zones.lostZone) owner.zones.lostZone = [];
+  for (const card of cards) {
+    removeFromZones(owner, card);
+    card.attachedTo = null;
+    owner.zones.lostZone.push(card);
+  }
+  ctx.events.push({
+    type: 'cardsLostZoned',
+    playerId: owner.playerId,
+    count: cards.length,
+    cards: cards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    ...(ctx.step.countsForDamage ? { forDamage: true } : {}),
+  });
+}
+
+function atkLostZoneDeckTop(ctx) {
+  const { step } = ctx;
+  const owner = step.side === 'opponent' ? ctx.opponent : ctx.player;
+  if (!owner) return skip(ctx, 'no_opponent');
+  const cards = owner.zones.deck.slice(0, step.count || 1);
+  if (cards.length === 0) return skip(ctx, 'empty_deck');
+  moveToLostZone(ctx, owner, cards);
+  return null;
+}
+
+/** Picks cards for a Lost Zone move: all when the count takes them all, else a choice. */
+function lostZoneChoice(ctx, owner, candidates, label) {
+  const { step } = ctx;
+  if (ctx.selection) {
+    moveToLostZone(ctx, owner, pickById(candidates, ctx.selection));
+    return null;
+  }
+  if (candidates.length === 0) return skip(ctx, 'nothing_to_lost_zone');
+  if (!step.anyNumber && candidates.length <= (step.count || 1)) {
+    moveToLostZone(ctx, owner, candidates);
+    return null;
+  }
+  const max = step.anyNumber ? candidates.length : step.count || 1;
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${step.anyNumber ? 'any number of' : max} ${label} to put in the Lost Zone`,
+    options: candidates,
+    min: step.anyNumber ? 0 : max,
+    max,
+  });
+}
+
+function atkLostZoneEnergy(ctx) {
+  const { player, opponent, step } = ctx;
+  const matches = (c) => energyMatches(c, step);
+  const onRoots = (owner, roots) => roots.flatMap((root) => attachedCards(owner, root.instanceId)).filter(matches);
+  const ref = attackerRef(ctx);
+  switch (step.from) {
+    case 'self':
+      return lostZoneChoice(ctx, player, ref ? onRoots(player, [ref.card]) : [], energyLabel(step));
+    case 'yours':
+      return lostZoneChoice(ctx, player, onRoots(player, rootsOf(player)), energyLabel(step));
+    case 'opponentActive':
+      return lostZoneChoice(ctx, opponent, onRoots(opponent, [activeOf(opponent)].filter(Boolean)), energyLabel(step));
+    default:
+      return lostZoneChoice(ctx, opponent, onRoots(opponent, rootsOf(opponent)), energyLabel(step));
+  }
+}
+
+function atkLostZoneFromDiscard(ctx) {
+  const { player, step } = ctx;
+  const candidates = (player.zones.discard || []).filter((c) => matchesSearch(c, step.what));
+  return lostZoneChoice(ctx, player, candidates, `${step.what} cards`);
+}
+
 // ── leave play ──────────────────────────────────────────────────────────────
 
 function atkShuffleSelf(ctx) {
@@ -871,6 +946,9 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkRecover: optional(atkRecover, (step) => `Put ${step.what} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
+  atkLostZoneDeckTop,
+  atkLostZoneEnergy,
+  atkLostZoneFromDiscard,
   atkCountersEach,
   atkMoveAllCounters: optional(atkMoveAllCounters, () => 'Move damage counters'),
   atkMoveCounterBetween,

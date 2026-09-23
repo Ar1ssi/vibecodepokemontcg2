@@ -3312,6 +3312,13 @@ function resolveAttackEffectPhase(draft, ctx) {
         draft.players[defenderPlayerId]?.zones?.active?.find((c) => !c.attachedTo) || null;
     }
   }
+  // Cards a before-damage Lost Zone cost moved (Rotom V Scrap Short). The cost is those
+  // attacks' only before-damage step, so it moves in the command that reaches damage.
+  const lostZoned = attackSteps.before.some((step) => step.countsForDamage)
+    ? events
+        .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
+        .reduce((total, e) => total + e.count, 0)
+    : undefined;
 
       const parsed = parseAttackDamage(
         attack,
@@ -3329,6 +3336,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           energyDiscarded,
           milledMatches,
           energyReturned,
+          lostZoned,
         })
       );
       const effectiveAttack =

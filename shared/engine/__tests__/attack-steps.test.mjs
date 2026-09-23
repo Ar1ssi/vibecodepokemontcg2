@@ -604,3 +604,84 @@ test('classifyAttackEffect: an attach chain is named by the attach (I115)', () =
   ];
   for (const [text, family] of cases) assert.equal(classifyAttackEffect({ text, damage: 0 }), family, text);
 });
+
+// ── Lost Zone, old wordings ────────────────────────────────────────────────
+
+const tool = (name) =>
+  createCard({ instanceId: nextId++, name, supertype: 'Trainer', subtypes: ['Pokémon Tool'], type: 'Pokémon Tool' });
+
+test('attack: Rotom V Scrap Short counts the Tools it put in the Lost Zone (I111)', () => {
+  let t1;
+  let t2;
+  const b = board(
+    'Put any number of Pokémon Tool cards from your discard pile in the Lost Zone. This attack does 40 more damage for each card you put in the Lost Zone in this way.',
+    {
+      name: 'Rotom V',
+      damage: '40+',
+      setup: ({ p1 }) => {
+        t1 = tool('Tool 1');
+        t2 = tool('Tool 2');
+        p1.zones.discard.push(t1, t2, tool('Tool 3'));
+      },
+    }
+  );
+  const res1 = attack(b);
+  assert.equal(res1.state.pendingChoice.min, 0);
+  assert.equal(activeRoot(res1, 'p2').damage || 0, 0, 'no damage before the cost is chosen');
+  const res2 = choose(res1, [t1.instanceId, t2.instanceId], b.rng);
+  assert.deepEqual(ids(zone(res2, 'p1', 'lostZone')).sort(), [t1.instanceId, t2.instanceId].sort());
+  assert.equal(activeRoot(res2, 'p2').damage, 120);
+  turnPassed(res2);
+});
+
+test('attack: Lost Zone from the deck top and from the opponent\'s Active (I111)', () => {
+  const dive = attack(board('Put the top 3 cards of your deck in the Lost Zone.', { name: 'Aerodactyl VSTAR' }));
+  assert.equal(zone(dive, 'p1', 'lostZone').length, 3);
+
+  let fire;
+  const flame = attack(
+    board("Put 2 Energy attached to your opponent's Active Pokémon in the Lost Zone.", {
+      name: 'Typhlosion',
+      setup: ({ p2, defender }) => {
+        fire = energy('Fire', { attachedTo: defender.instanceId });
+        p2.zones.active.push(fire);
+      },
+    })
+  );
+  assert.deepEqual(ids(zone(flame, 'p2', 'lostZone')), [fire.instanceId]);
+});
+
+test('attack: old wordings — discard-pile attach, "you may search", Defending Pokémon gust', () => {
+  let lightning;
+  const steelix = attack(
+    board('Search your discard pile for an Energy card and attach it to Steelix.', {
+      name: 'Steelix',
+      setup: ({ p1 }) => {
+        lightning = energy('Lightning');
+        p1.zones.discard.push(lightning);
+      },
+    })
+  );
+  assert.ok(steelix.state.players.p1.zones.active.some((c) => c.instanceId === lightning.instanceId));
+
+  let g1;
+  const b = board('You may search your deck for 2 {G} Energy cards and attach them to 1 of your Benched Pokémon. Shuffle your deck afterward.', {
+    name: 'Virizion-EX',
+    setup: ({ p1 }) => {
+      g1 = energy('Grass');
+      p1.zones.deck.push(g1);
+      p1.zones.bench.push(mon('Bench A'));
+    },
+  });
+  const res1 = attack(b);
+  assert.equal(res1.state.pendingChoice.min, 0, '"You may": choosing nothing declines');
+  const res2 = choose(res1, [g1.instanceId], b.rng);
+  const benchA = zone(res2, 'p1', 'bench').find((c) => c.name === 'Bench A');
+  assert.deepEqual(attachedTo(res2, 'p1', benchA.instanceId), [g1.instanceId]);
+
+  const gust = board('Your opponent switches the Defending Pokémon with 1 of his or her Benched Pokémon.', {
+    name: 'Shiftry',
+    setup: ({ p2 }) => p2.zones.bench.push(mon('Opp A')),
+  });
+  assert.equal(activeRoot(attack(gust), 'p2').name, 'Opp A');
+});

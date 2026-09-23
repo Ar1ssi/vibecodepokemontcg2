@@ -98,6 +98,7 @@ const isDamagedTauros = ({ card, view }) =>
  * @param {number} [args.headsCount] Heads among a multi-flip "for each heads" attack
  * @param {number} [args.energyDiscarded] Number of energy discarded for scaling damage
  * @param {number} [args.milledMatches] Counted cards a deck-mill attack discarded
+ * @param {number} [args.lostZoned] Cards the attack's before-damage step put in the Lost Zone
  * @param {boolean} [args.energyReturned] Whether an attached Energy was returned to hand
  *   (Mega Greninja ex — Ninja Spinner); drives its optional +N damage bonus.
  * @returns {object} ctx for parseAttackDamage
@@ -116,6 +117,7 @@ export function buildServerAttackContext(
     energyDiscarded = undefined,
     milledMatches = undefined,
     energyReturned = undefined,
+    lostZoned = undefined,
   } = {}
 ) {
   const own = state?.players?.[attackerPlayerId] || null;
@@ -165,6 +167,9 @@ export function buildServerAttackContext(
   }
   if (energyReturned !== undefined) {
     ctx.energyReturned = energyReturned;
+  }
+  if (lostZoned !== undefined) {
+    ctx.lostZoned = lostZoned;
   }
 
   // Defender-derived fields only exist while there IS a defender: an effect-only attack

@@ -122,7 +122,11 @@ export function parseAttackDamage(
   ctx = {}
 ) {
   const text = lower(attack?.text ?? '');
-  const base = Number.isFinite(attack?.damage) ? attack.damage : 0;
+  // TCGdex prints scaling attacks' damage as strings ("30+", "20×"); their printed number
+  // is still the base the "more damage" clauses add to (I117).
+  const base = Number.isFinite(attack?.damage)
+    ? attack.damage
+    : Number.parseInt(String(attack?.damage ?? ''), 10) || 0;
   const components = [];
   const notes = [];
 
@@ -214,6 +218,11 @@ export function parseAttackDamage(
     if (/energy attached to all of your pok[ée]mon/.test(unit)) {
       count = ownEnergyCount;
       label = 'Energy on all your Pokémon';
+    } else if (/^(?:energy )?cards? (?:you )?put in the lost zone in this way/.test(unit)) {
+      // Rotom V Scrap Short / Blacephalon-GX Mind Blown: the cards the attack's own
+      // before-damage step moved (ctx.lostZoned, set by the reducer).
+      count = ctx.lostZoned;
+      label = 'cards put in the Lost Zone';
     } else if (
       /energy (card )?attached to your opponent's active pok[ée]mon/.test(unit)
     ) {

@@ -90,7 +90,7 @@ const TEMPLATES = [
     () => ({ type: 'atkGust', chooser: 'self' }),
   ],
   [
-    /^(?:switch out your opponent's active pokémon to the bench|have your opponent switch their active pokémon with 1 of their benched pokémon|your opponent switches their active pokémon with 1 of their benched pokémon(?:, if any)?)$/,
+    /^(?:switch out your opponent's active pokémon to the bench|have your opponent switch (?:their|your opponent's) active pokémon with 1 of their benched pokémon|your opponent switches (?:their|your opponent's) active pokémon with 1 of their benched pokémon(?:, if any)?)$/,
     () => ({ type: 'atkGust', chooser: 'opponent' }),
   ],
 
@@ -218,6 +218,45 @@ const TEMPLATES = [
     (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: recoverWhat(m[2]) }),
   ],
 
+  // Old wording of an attach from the discard pile ("Search your discard pile for … and attach it to …")
+  [
+    new RegExp(String.raw`^search your discard pile for (an?|up to \d+|\d+|as many) ${ENERGY_TYPE}energy cards?(?: as you like)? and attach (?:it|them) to (this pokémon|1 of your (?:benched )?pokémon|your (?:benched )?pokémon in any way you like)$`),
+    (m, s) => {
+      const target = m[3];
+      return {
+        type: 'atkAttach',
+        source: 'discard',
+        ...(m[1] === 'as many' ? { anyNumber: true } : attachCount(m[1])),
+        ...energyFilter(m[2], s),
+        target: target === 'this pokémon' ? 'self' : /benched/.test(target) ? 'bench' : 'any',
+        ...(/any way you like/.test(target) ? { spread: true } : {}),
+      };
+    },
+  ],
+
+  // Lost Zone
+  [
+    /^put the top (?:(\d+) cards|card) of (your|your opponent's) deck in the lost zone$/,
+    (m) => ({ type: 'atkLostZoneDeckTop', side: m[2] === 'your' ? 'self' : 'opponent', count: m[1] ? Number(m[1]) : 1 }),
+  ],
+  [
+    new RegExp(String.raw`^put (any number of|any amount of|as many|an?|\d+) ${ENERGY_TYPE}energy(?: cards?)? attached to (this pokémon|your pokémon|your opponent's active pokémon|1 of your opponent's pokémon)(?: as you like)? in the lost zone$`),
+    (m, s) => ({
+      type: 'atkLostZoneEnergy',
+      from: { 'this pokémon': 'self', 'your pokémon': 'yours', "your opponent's active pokémon": 'opponentActive' }[m[3]] || 'opponentAny',
+      ...(/any|as many/.test(m[1]) ? { anyNumber: true } : { count: countOf(m[1]) }),
+      ...energyFilter(m[2], s),
+    }),
+  ],
+  [
+    /^put a special energy attached to 1 of your opponent's pokémon in the lost zone$/,
+    () => ({ type: 'atkLostZoneEnergy', from: 'opponentAny', count: 1, special: true }),
+  ],
+  [
+    /^put any number of (pokémon tool|item|trainer) cards from your discard pile in the lost zone$/,
+    (m) => ({ type: 'atkLostZoneFromDiscard', what: recoverWhat(m[1]), anyNumber: true }),
+  ],
+
   // Leave play
   [/^shuffle this pokémon and all attached cards into your deck$/, () => ({ type: 'atkShuffleSelf' })],
 
@@ -313,24 +352,38 @@ const BLOCKS = [
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
   ],
   [
-    /(?:(if heads|for each heads), )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
-    (m) => searchAttachStep(m[0], m[1]),
+    /(?:(if heads|for each heads), )?(you may )?search your deck for [^.]*? and attach (?:it|them) to [^.]*\.(?: then,? shuffle your deck\.)?/g,
+    (m) => searchAttachStep(m[0], m[1], Boolean(m[2])),
   ],
 ];
 
-function searchAttachStep(clause, gate) {
-  const body = clause.replace(/^(?:if heads|for each heads), /, '');
+// "search your deck for up to 2 Basic {G} Energy cards" → { what, count, upTo }
+function searchEnergyParams(body) {
+  const m = /^search your deck for (an?|up to \d+|\d+) (basic )?(?:\{([a-z])\} )?(basic )?energy cards?/.exec(body);
+  if (!m) return null;
+  const basic = m[2] || m[4] ? 'Basic ' : '';
+  const type = m[3] ? `{${m[3].toUpperCase()}} ` : '';
+  return { what: `${basic}${type}Energy`, ...attachCount(m[1]) };
+}
+
+function searchAttachStep(clause, gate, optional) {
+  const body = clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '');
   const parsed = parseAbility(body);
   const steps = Array.isArray(parsed) ? parsed : parsed?.steps || [];
   const search = steps.find((s) => s.type === 'searchAbility' && s.destination === 'attach');
   if (!search) return null;
   // The ability parser reads the attach target; the attack search parser reads the card
   // filter ("a Lightning Energy card" → Basic Lightning Energy), which the ability one drops.
-  const clauseParams = parseAttackSearchClause(body) || {};
+  // Both parsers miss a plain count ("2 {G} Energy cards"), read here first.
+  const clauseParams = searchEnergyParams(body) || parseAttackSearchClause(body) || {};
   const { guidance, ...step } = search;
   return {
     ...step,
     ...(clauseParams.what ? { what: clauseParams.what } : {}),
+    ...(clauseParams.count ? { count: clauseParams.count } : {}),
+    ...(clauseParams.upTo ? { upTo: true } : {}),
+    // "You may search": finding nothing is the way to decline.
+    ...(optional ? { upTo: true } : {}),
     ...(gate === 'if heads' ? { gate: 'heads' } : {}),
     ...(gate === 'for each heads' ? { perHeads: true } : {}),
   };
@@ -462,6 +515,14 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       (before ? result.before : result.after).push({ ...step, ...stepFlags });
       break;
     }
+  }
+
+  // "This attack does N damage for each card put in the Lost Zone in this way": the Lost
+  // Zone step is the cost the damage counts, so it runs before damage and is counted.
+  if (/for each (?:energy )?cards? (?:you )?put in the lost zone in this way/.test(normalized)) {
+    const costs = result.after.filter((step) => step.type.startsWith('atkLostZone'));
+    result.after = result.after.filter((step) => !costs.includes(step));
+    result.before.push(...costs.map((step) => ({ ...step, countsForDamage: true })));
   }
   return result;
 }
