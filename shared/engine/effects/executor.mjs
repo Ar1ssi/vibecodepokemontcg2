@@ -330,12 +330,49 @@ export function executeSteps(draft, {
 
         const attachKey = `${idx}:searchAttach`;
         const attachRoots = () =>
-          inPlayRoots(player).filter((c) => !step.attachTarget || rootMatchesTarget(player, c, step.attachTarget));
+          inPlayRoots(player).filter((c) => {
+            if (!step.attachTarget) return true;
+            if (step.attachTarget === 'this pokémon') return c.instanceId === sourceCard?.instanceId;
+            return rootMatchesTarget(player, c, step.attachTarget);
+          });
+        // "attach them to your Pokémon in any way you like" (attachEach) picks a Pokémon per
+        // card; otherwise every searched card goes onto the one chosen Pokémon.
+        const askAttachTarget = (pendingIds) => {
+          context[attachKey] = pendingIds;
+          const next = (player.zones.deck || []).find((c) => c.instanceId === pendingIds[0]);
+          const what = step.attachEach && next ? next.name : 'the Energy';
+          return createPendingChoice({
+            player: playerId,
+            prompt: `${sourceCard?.name || 'Search'}: Choose a Pokémon to attach ${what} to`,
+            source: sourceCard?.name || '',
+            options: attachRoots(),
+            min: 1,
+            max: 1,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context,
+              budgetCount: budget.count,
+            },
+          });
+        };
+        const finishSearch = () => {
+          delete context[attachKey];
+          if (activeRng) activeRng.shuffle(player.zones.deck || []);
+          events.push({ type: 'deckShuffled', playerId });
+        };
         if (stepSelection && context[attachKey]) {
-          // Resume: second choice picked the Pokémon the searched Energy attaches to
+          // Resume: the chosen Pokémon receives the searched Energy (or the next one, attachEach)
           const deck = player.zones.deck || [];
+          const pendingIds = context[attachKey];
           const root = attachRoots().find((c) => c.instanceId === stepSelection[0]);
-          const searched = root ? deck.filter((c) => context[attachKey].includes(c.instanceId)) : [];
+          const batch = step.attachEach ? pendingIds.slice(0, 1) : pendingIds;
+          const searched = root ? deck.filter((c) => batch.includes(c.instanceId)) : [];
           for (const card of searched) {
             attachToRoot(player, card, root, events);
           }
@@ -344,9 +381,13 @@ export function executeSteps(draft, {
             root.damage = (root.damage || 0) + step.attachDamage * 10;
             events.push({ type: 'damageUpdated', instanceId: root.instanceId, damage: root.damage });
           }
-          delete context[attachKey];
-          if (activeRng) activeRng.shuffle(deck);
-          events.push({ type: 'deckShuffled', playerId });
+          const remaining = step.attachEach
+            ? pendingIds.slice(1).filter((id) => deck.some((c) => c.instanceId === id))
+            : [];
+          if (root && remaining.length > 0) {
+            return { pendingChoice: askAttachTarget(remaining), completed: false };
+          }
+          finishSearch();
           break;
         }
 
@@ -355,31 +396,15 @@ export function executeSteps(draft, {
           break;
         }
 
-        if (stepSelection && dest === 'attach' && stepSelection.length > 0) {
-          const roots = attachRoots();
-          if (roots.length > 0) {
-            context[attachKey] = [...stepSelection];
-            const choice = createPendingChoice({
-              player: playerId,
-              prompt: `${sourceCard?.name || 'Search'}: Choose a Pokémon to attach the Energy to`,
-              source: sourceCard?.name || '',
-              options: roots,
-              min: 1,
-              max: 1,
-              stateVersion: draft.stateVersion,
-              stepIndex: idx,
-              resumeToken: {
-                effectType,
-                sourceInstanceId: sourceCard?.instanceId,
-                initiatorPlayerId: playerId,
-                stepIndex: idx,
-                steps,
-                context,
-                budgetCount: budget.count,
-              },
-            });
-            return { pendingChoice: choice, completed: false };
+        if (stepSelection && dest === 'attach') {
+          const picked = stepSelection.filter((id) =>
+            (player.zones.deck || []).some((c) => c.instanceId === id && cardMatches(c))
+          );
+          if (picked.length === 0 || attachRoots().length === 0) {
+            finishSearch();
+            break;
           }
+          return { pendingChoice: askAttachTarget(picked), completed: false };
         }
 
         if (stepSelection) {

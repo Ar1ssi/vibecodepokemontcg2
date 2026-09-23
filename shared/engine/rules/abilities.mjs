@@ -269,6 +269,9 @@ export function parseAbilitySearchParams(lower) {
   const typedEnergy = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
   if (typedEnergy) {
     what = `Basic ${typedEnergy[1].toUpperCase()} Energy`;
+  } else if (/\{[a-z]\} energy/.test(scope)) {
+    // "search your deck for up to 2 {G} Energy cards" (Rillaboom Voltage Beat)
+    what = `${scope.match(/(\{[a-z]\}) energy/)[1].toUpperCase()} Energy`;
   } else if (/up to\s+(\d+)\s+basic energy/.test(scope)) {
     const m = scope.match(/up to\s+(\d+)\s+basic energy/);
     what = 'Basic Energy';
@@ -325,9 +328,18 @@ export function parseAbility(text = '') {
   ) {
     const parsed = parseAbilitySearchParams(lower);
     const what = parsed.what;
-    // "…and attach it to 1 of your Benched {D} Pokémon" (Sinister Surge): the
-    // searched card goes onto a Pokémon, not into the hand.
-    const attachTarget = lower.match(/search your deck for [^.]*? and attach it to (?:1|one) of (your [^.]*?pok[eé]mon)/)?.[1] || null;
+    // "…and attach it to 1 of your Benched {D} Pokémon" (Sinister Surge), "…attach them to this
+    // Pokémon", "…attach them to your Pokémon in any way you like": the searched cards go onto
+    // Pokémon, not into the hand.
+    const attachClause = lower.match(
+      /search your deck for [^.]*? and attach (?:it|them) to (this pok[eé]mon|(?:1|one) of your [^.]*?pok[eé]mon|your [^.]*?pok[eé]mon in any way you like)/
+    )?.[1];
+    const attachEach = Boolean(attachClause?.endsWith('in any way you like'));
+    const attachTarget = !attachClause
+      ? null
+      : /^this pok/.test(attachClause)
+        ? 'this pokémon'
+        : attachClause.replace(/^(?:1|one) of /, '').replace(/ in any way you like$/, '');
     const attachDamage = attachTarget
       ? Number(lower.match(/in this way, place (\d+) damage counters? on that pok/)?.[1] || 0)
       : 0;
@@ -339,7 +351,7 @@ export function parseAbility(text = '') {
       what,
       count,
       destination: dest,
-      ...(attachTarget ? { attachTarget, attachDamage } : {}),
+      ...(attachTarget ? { attachTarget, attachDamage, ...(attachEach ? { attachEach } : {}) } : {}),
       upTo: parsed.upTo || false,
       reveal: lower.includes('reveal'),
       guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${destLabel}, then shuffle.`,

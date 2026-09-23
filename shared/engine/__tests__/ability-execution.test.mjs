@@ -992,3 +992,57 @@ test('ability: "discard your hand and draw 3 cards" discards the hand first (I92
   assert.deepEqual(res.state.players.p1.zones.discard.map((c) => c.instanceId).sort(), [94, 95]);
   assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [96, 97, 98]);
 });
+
+function energyCard(instanceId, type) {
+  return createCard({ instanceId, name: `Basic ${type} Energy`, supertype: 'Energy', subtypes: ['Basic'], energyType: type, type: 'Energy' });
+}
+const attachedTo = (state, pid, rootId) =>
+  [...state.players[pid].zones.active, ...state.players[pid].zones.bench]
+    .filter((c) => c.attachedTo === rootId)
+    .map((c) => c.instanceId)
+    .sort();
+const resolveWith = (res, selection, rng) => applyCommand(res.state, {
+  type: 'resolveChoice',
+  payload: { choiceId: res.pendingChoice.choiceId, selection },
+  playerId: res.pendingChoice.player,
+}, rng);
+
+test('ability: "search … {G} Energy … attach them to 1 of your Pokémon" attaches, not to hand (I91)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may search your deck for up to 2 {G} Energy cards and attach them to 1 of your Pokémon. Then, shuffle your deck.');
+  state.players.p1.zones.bench.push(createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' }));
+  state.players.p1.zones.deck.push(energyCard(81, 'Grass'), energyCard(82, 'Grass'), energyCard(83, 'Water'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.deepEqual(res1.pendingChoice.options.map((c) => c.instanceId).sort(), [81, 82], 'only {G} Energy offered');
+  const res2 = resolveWith(res1, [81, 82], rng);
+  const res3 = resolveWith(res2, [72], rng);
+  assert.equal(res3.error, null);
+  assert.deepEqual(attachedTo(res3.state, 'p1', 72), [81, 82]);
+  assert.equal(res3.state.players.p1.zones.hand.length, 0);
+});
+
+test('ability: "search … and attach it to this Pokémon" only offers this Pokémon (I91)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may search your deck for a Basic {L} Energy card and attach it to this Pokémon. Then, shuffle your deck.');
+  state.players.p1.zones.deck.push(energyCard(81, 'Lightning'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  const res2 = resolveWith(res1, [81], rng);
+  assert.deepEqual(res2.pendingChoice.options.map((c) => c.instanceId), [70], 'this Pokémon is the only target');
+  const res3 = resolveWith(res2, [70], rng);
+  assert.deepEqual(attachedTo(res3.state, 'p1', 70), [81]);
+});
+
+test('ability: "attach them to your Pokémon in any way you like" picks a target per card (I91)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, 'Once during your turn, you may search your deck for up to 2 Basic {G} Energy cards and attach them to your Pokémon in any way you like. Then, shuffle your deck.');
+  state.players.p1.zones.bench.push(createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' }));
+  state.players.p1.zones.deck.push(energyCard(81, 'Grass'), energyCard(82, 'Grass'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  const res2 = resolveWith(res1, [81, 82], rng);
+  const res3 = resolveWith(res2, [70], rng);
+  assert.ok(res3.pendingChoice, 'second card asks again');
+  const res4 = resolveWith(res3, [72], rng);
+  assert.equal(res4.error, null);
+  assert.deepEqual(attachedTo(res4.state, 'p1', 70), [81]);
+  assert.deepEqual(attachedTo(res4.state, 'p1', 72), [82]);
+});
