@@ -42,8 +42,10 @@ export function normalizeAttackText(text, selfName = '') {
     .toLowerCase()
     .replace(/pokemon/g, 'pokémon');
   const name = String(selfName || '').trim().toLowerCase();
-  if (name) {
-    out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(name)}(?![\\w'])`, 'g'), 'this pokémon');
+  // A LV.X card prints its name without the suffix ("Charizard G LV.X": "attached to Charizard G").
+  for (const printed of new Set([name, name.replace(/ lv\.x$/, '')])) {
+    if (!printed) continue;
+    out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(printed)}(?![\\w'])`, 'g'), 'this pokémon');
   }
   return out
     .replace(/\bthe defending pokémon\b/g, "your opponent's active pokémon")

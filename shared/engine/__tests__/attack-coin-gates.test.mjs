@@ -97,6 +97,10 @@ test('parseAttackSteps: gated self discards are steps; ungated ones stay with th
   assert.deepEqual(after('Flip a coin. If tails, discard a {R} Energy card attached to Ditto.', 'Ditto'), [
     { type: 'atkDiscardSelfEnergy', count: 1, energyType: 'R', gate: 'tails' },
   ]);
+  // A LV.X card prints its name without the suffix.
+  assert.deepEqual(after('Flip a coin. If tails, discard all Energy attached to Charizard G.', 'Charizard G LV.X'), [
+    { type: 'atkDiscardSelfEnergy', all: true, gate: 'tails' },
+  ]);
   assert.deepEqual(after('Discard 2 Energy from this Pokémon.'), []);
   // Damage counts the discard, or the cost can cancel the attack: left alone.
   assert.deepEqual(
