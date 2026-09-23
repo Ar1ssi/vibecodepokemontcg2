@@ -1,0 +1,323 @@
+/**
+ * @file Pure planners for ability-triggered effects (design 034 slice 4).
+ *
+ * These read in-play Pokémon on both sides and return plain effect descriptors
+ * the reduce hooks run at the exact trigger sites: Pokémon Checkup, end of turn,
+ * opponent-evolves, on-damage (thorns) and between-turns. Every reader filters
+ * to Pokémon roots, skips Ancient Traits (D72) and skips holders whose Abilities
+ * are suppressed (`isAbilitySuppressed`, design 034 slice 3), so a suppressed
+ * holder never contributes a trigger.
+ *
+ * Dependency note (D117): this module may import `ability-combat.mjs` and
+ * `tool-combat.mjs`; nothing those import may reach back here.
+ *
+ * Entries are `{ card, playerId, zone }` in-play roots. `ctx` is the
+ * `abilitySideContext` shape used by `ability-combat.mjs`
+ * (`sideCards`/`opponentSideCards`/`sideActive`/`sideBench`/…); holder-position
+ * conditions fail closed when the context cannot say where the holder sits.
+ */
+
+import { isPokemon, isBasicPokemon } from '../cards.mjs';
+import {
+  cardAbilityText,
+  parseOnOpponentEvolve,
+  parseThorns,
+} from './ability-executors.mjs';
+import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
+import { isAbilitySuppressed, abilityPlayLocks } from './ability-combat.mjs';
+import { isAbilityCard } from './ability-effects.mjs';
+import { hasCondition } from './special-conditions.mjs';
+import { attackerTypes, TYPE_LETTER } from './tool-combat.mjs';
+
+const lower = (v) => String(v ?? '').toLowerCase();
+
+/** In-play Pokémon roots from a zone-card array. */
+export function inPlayEntries(state) {
+  const out = [];
+  for (const playerId of Object.keys(state?.players || {})) {
+    const zones = state.players[playerId]?.zones || {};
+    for (const zone of ['active', 'bench']) {
+      for (const card of zones[zone] || []) {
+        if (card && !card.attachedTo && isPokemon(card)) {
+          out.push({ card, playerId, zone });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function holderCanTrigger(card, ctx) {
+  if (!card || !isPokemon(card)) return false;
+  if (isAncientTraitAbility(card)) return false;
+  if (isAbilitySuppressed(card, ctx)) return false;
+  return true;
+}
+
+/** True when `card` is in the Active Spot of whichever side the ctx places it. */
+function holderIsActive(card, ctx) {
+  const onSide =
+    (ctx.sideActive || []).includes(card) ||
+    (ctx.sideBench || []).includes(card);
+  const active = onSide ? ctx.sideActive : ctx.opponentActive;
+  return (active || []).includes(card);
+}
+
+const CONDITION_WORDS = [
+  ['poisoned', 'Poisoned'],
+  ['burned', 'Burned'],
+  ['asleep', 'Asleep'],
+  ['confused', 'Confused'],
+];
+
+/**
+ * Normalize a Checkup-damage wording: base counters, "N more", the condition
+ * and type/basic/Ability target filters, the scope (own/opponent/both) and the
+ * holder-Active gate.
+ */
+function normalizeCheckup(text) {
+  const m = text.match(/put\s+(\d+)\s+(more\s+)?damage/);
+  const count = m ? Number(m[1]) : 0;
+  const more = Boolean(m && m[2]);
+  let condition = null;
+  for (const [word, label] of CONDITION_WORDS) {
+    if (new RegExp(`\\b${word}\\b`).test(text)) {
+      condition = label;
+      break;
+    }
+  }
+  const basic = /\bbasic pok[eé]mon\b/.test(text);
+  const typeMatch = text.match(/\{([a-z])\}\s*pok[eé]mon/);
+  const type = typeMatch ? lower(TYPE_LETTER[typeMatch[1]]) : null;
+  const holderActive = /(?:if|as long as) this pok[eé]mon is in the active spot/.test(
+    text
+  );
+  const targetActive = /your opponent's active pok[eé]mon/.test(text);
+  const both = /\(both yours and your opponent's\)/.test(text);
+  const opponent = /your opponent's/.test(text);
+  const scope = both ? 'both' : opponent ? 'opponent' : 'own';
+  const hasAbility = /has an ability|with an ability/.test(text);
+  const exceptName =
+    text.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null;
+  return {
+    count,
+    more,
+    condition,
+    basic,
+    type,
+    holderActive,
+    targetActive,
+    scope,
+    hasAbility,
+    exceptName,
+  };
+}
+
+function resolveCheckupTargets(effect, entries, holderPlayerId) {
+  let pool = entries.filter((e) => e.card && isPokemon(e.card));
+  if (effect.scope === 'opponent') {
+    pool = pool.filter((e) => e.playerId !== holderPlayerId);
+  } else if (effect.scope === 'own') {
+    pool = pool.filter((e) => e.playerId === holderPlayerId);
+  }
+  if (effect.targetActive) pool = pool.filter((e) => e.zone === 'active');
+  if (effect.condition) {
+    pool = pool.filter((e) => hasCondition(e.card, effect.condition));
+  }
+  if (effect.basic) pool = pool.filter((e) => isBasicPokemon(e.card));
+  if (effect.type) {
+    pool = pool.filter((e) => attackerTypes(e.card).includes(effect.type));
+  }
+  if (effect.hasAbility) pool = pool.filter((e) => isAbilityCard(e.card));
+  if (effect.exceptName) {
+    pool = pool.filter((e) => !lower(e.card.name).includes(effect.exceptName));
+  }
+  return pool.map((e) => ({ card: e.card, playerId: e.playerId }));
+}
+
+/**
+ * Pokémon Checkup damage abilities (Froslass Freezing Shroud, Magmortar Magma
+ * Surge, Pecharunt Toxic Subjugation, Team Rocket's Tyranitar Sand Stream,
+ * Trevenant Forest Miasma). Returns `{ holder, playerId, source, count, more,
+ * targets }`; `more` means "add to the condition damage Checkup already deals".
+ */
+export function parseCheckupAbilities(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const { card, playerId } = entry;
+    if (!holderCanTrigger(card, ctx)) continue;
+    const text = cardAbilityText(card);
+    if (!text || !/checkup/.test(text) || !/damage counter/.test(text)) continue;
+    if (!parseAbility(text).some((s) => s.type === 'checkupAbility')) continue;
+    const effect = normalizeCheckup(text);
+    if (!(effect.count > 0)) continue;
+    if (effect.holderActive && !holderIsActive(card, ctx)) continue;
+    const targets = resolveCheckupTargets(effect, entries, playerId);
+    if (targets.length === 0) continue;
+    out.push({
+      holder: card,
+      playerId,
+      source: card.name,
+      ...effect,
+      targets,
+    });
+  }
+  return out;
+}
+
+/**
+ * "Whenever your opponent plays a Pokémon from their hand to evolve 1 of their
+ * Pokémon, put N damage counters on that Pokémon" (Team Rocket's Ampharos Darkest
+ * Impulse). Non-stacking: one effect per source name.
+ */
+export function parseOnOpponentEvolveAbilities(entries = [], ctx = {}) {
+  const out = [];
+  const seen = new Set();
+  for (const entry of entries) {
+    const { card, playerId } = entry;
+    if (!holderCanTrigger(card, ctx)) continue;
+    const text = cardAbilityText(card);
+    if (!text) continue;
+    if (!parseAbility(text).some((s) => s.type === 'onOpponentEvolveAbility')) {
+      continue;
+    }
+    const { count } = parseOnOpponentEvolve(card);
+    if (!(count > 0)) continue;
+    const key = lower(card.name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ holder: card, playerId, count, source: card.name });
+  }
+  return out;
+}
+
+/**
+ * On-damage thorns (damage to the Attacking Pokémon). Returns the parsed thorns
+ * when the holder's Ability is live, `{ count: 0, zone }` otherwise; an
+ * Active-Spot-only wording is inert when the holder is not the Active.
+ */
+export function parseOnDamageAbilities(holder, ctx = {}) {
+  if (!holderCanTrigger(holder, ctx)) return { count: 0, zone: 'any' };
+  const thorns = parseThorns(holder);
+  if (!thorns || !(thorns.count > 0)) return { count: 0, zone: 'any' };
+  if (thorns.zone === 'active' && ctx.isActive === false) {
+    return { count: 0, zone: thorns.zone };
+  }
+  return thorns;
+}
+
+/**
+ * Mandatory end-of-turn effects (Great Tusk ex Quaking Demolition: "if this
+ * Pokémon is in the Active Spot, you must discard the top 5 cards of your
+ * deck"). Optional end-of-turn abilities are activated through useAbility, not
+ * this hook. Returns `{ holder, playerId, kind: 'discardTop', n }`.
+ */
+export function parseEndOfTurnAbilities(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const { card, playerId } = entry;
+    if (!holderCanTrigger(card, ctx)) continue;
+    const text = cardAbilityText(card);
+    if (!text || !/end of your turn/.test(text)) continue;
+    const discard = text.match(/discard the top (\d+) cards? of your deck/);
+    if (!discard) continue;
+    if (/in the active spot/.test(text) && !holderIsActive(card, ctx)) continue;
+    out.push({
+      holder: card,
+      playerId,
+      kind: 'discardTop',
+      n: Number(discard[1]) || 0,
+      source: card.name,
+    });
+  }
+  return out;
+}
+
+/**
+ * "In between turns" ability damage. The current corpus has no ability with
+ * this wording (between-turns damage is Stadium/Energy today), but the reader
+ * keeps the family in one place for future wordings.
+ */
+export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const { card, playerId } = entry;
+    if (!holderCanTrigger(card, ctx)) continue;
+    const text = cardAbilityText(card);
+    if (!text || !/between turns/.test(text) || !/damage counter/.test(text)) {
+      continue;
+    }
+    const m = text.match(/put\s+(\d+)\s+damage/);
+    if (!m) continue;
+    const scope = /your opponent's/.test(text) ? 'opponent' : 'own';
+    out.push({
+      holder: card,
+      playerId,
+      count: Number(m[1]) || 0,
+      scope,
+      source: card.name,
+    });
+  }
+  return out;
+}
+
+/**
+ * On-Knockout energy moves (Miraidon Photon Cord, Raichu Electrical Grounding,
+ * Veluza Fillet Memento). Reader only: moving Energy needs a target choice and
+ * belongs to the executor batches (slice 5/6); the parsed step is returned so
+ * the KO path can announce it without guessing.
+ */
+export function parseOnKoAbilities(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const { card, playerId } = entry;
+    if (!holderCanTrigger(card, ctx)) continue;
+    const text = cardAbilityText(card);
+    if (!text) continue;
+    const step = parseAbility(text).find((s) => s.type === 'energyOnKoAbility');
+    if (!step) continue;
+    out.push({
+      holder: card,
+      playerId,
+      source: card.name,
+      basic: Boolean(step.basic),
+      upTo: step.upTo ? Number(step.upTo) : null,
+      activeOnly: /in the active spot/.test(text),
+    });
+  }
+  return out;
+}
+
+/**
+ * Bench→Active promotion triggers (Cobalion ex Metal Road, Iron Valiant ex
+ * Tachyon Bits, …). Reader for the on-promotion window; the effect itself runs
+ * through the ability templates once the window is legal (slice 4 enforces the
+ * window, `abilityActivationBlockReason`).
+ */
+export function parseOnPromotionAbilities(entries = [], ctx = {}) {
+  const out = [];
+  for (const entry of entries) {
+    const { card, playerId } = entry;
+    if (!holderCanTrigger(card, ctx)) continue;
+    const text = cardAbilityText(card);
+    if (!text) continue;
+    const step = parseAbility(text).find((s) => s.type === 'onPromotionAbility');
+    if (!step) continue;
+    out.push({
+      holder: card,
+      playerId,
+      source: card.name,
+      effect: step.effect,
+      count: step.count ?? null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Ability play locks (thin re-export of `abilityPlayLocks` under the slice-4
+ * naming contract, so trigger consumers have one import for play locks).
+ */
+export function parsePlayLocks(card, ctx = {}) {
+  return abilityPlayLocks(card, ctx);
+}

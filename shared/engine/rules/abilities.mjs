@@ -1439,7 +1439,10 @@ export function parseAbility(text = '') {
       steps.push({
         type: 'energyOnKoAbility',
         basic: lower.includes('basic'),
-        upTo: lower.match(/move\s+up to\s+(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        upTo:
+          lower.match(
+            /move\s+up to\s+(\d+)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?energy/
+          )?.[1] || null,
         guidance: lower.includes('benched')
           ? 'When this Pokémon is Knocked Out: move Energy from it to your Benched Pokémon (as described).'
           : 'When 1 of your Pokémon is Knocked Out: move Energy from it to this Pokémon (as described).',
@@ -1456,7 +1459,10 @@ export function parseAbility(text = '') {
     } else if (lower.includes('to your benched')) {
       steps.push({
         type: 'moveEnergyAbility',
-        upTo: lower.match(/move\s+up to\s+(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        upTo:
+          lower.match(
+            /move\s+up to\s+(\d+)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?energy/
+          )?.[1] || null,
         basic: lower.includes('basic'),
         guidance: 'Move Energy from this Pokémon to your Benched Pokémon (as described).',
       });

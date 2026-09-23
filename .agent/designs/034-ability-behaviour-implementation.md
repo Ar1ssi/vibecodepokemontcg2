@@ -211,6 +211,19 @@ for legitimate improvements (same policy as D108). Revert = revert the branch co
   opponent-disrupt 127→125, status 421→391): the 35 rows that stopped executing were the mis-parsed
   named-condition immunities and Dachsbun/Dracovish misreads above, i.e. legitimate corrections
   (D108 policy), not lost execution.
+- Slice 4a (S280) landed the pure `rules/ability-triggers.mjs` planner and wired the four hooks it
+  can run without a choice prompt: Checkup damage (`applyCheckupAbilities` in `resolveCheckup`,
+  between the condition damage and the between-turns Stadium damage), mandatory end-of-turn discard
+  (`applyEndOfTurnAbilities`, Great Tusk ex), opponent-evolve counters (`applyOnOpponentEvolve` at
+  the `attachCard` evolve site) and thorns (now via `parseOnDamageAbilities`, so a suppressed holder
+  is inert and the Active-Spot wording is gated). The other readers (`parseOnKoAbilities`,
+  `parseOnPromotionAbilities`, `parseBetweenTurnsAbilities`) ship as tested API but are not wired:
+  on-KO energy needs a target choice (slice 5/6), the on-promotion window needs a `movedToActiveTurn`
+  stamp at every switch site, and the corpus has no "between turns" ability wording. `abilityExtraAttack`
+  stays read-only (the KO→promotion→attack-again turn flow is still open).
+- Slice 4a widened the `move up to N … energy` parser to allow a type symbol between "Basic" and
+  "Energy" (Miraidon "2 Basic {L} Energy"), so `parseOnKoAbilities` reports `upTo`; the step is
+  passive, so execution is unchanged and the oracle stayed green.
 
 ---
 Self-approval checklist (only when the user is unreachable):

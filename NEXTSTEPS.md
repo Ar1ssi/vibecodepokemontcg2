@@ -8,7 +8,7 @@ slice on this branch; each commit leaves `pnpm test` + `pnpm audit:oracle` green
 | 1 | done (ff74b498) | `cardAbilityText` accessor; I130 HP reduction (`reduceHp`); `parseThorns` legacy wording + zone; typed-basic HP cap; `matchesSearch` or-split fix |
 | 2 | done | `ability-combat.mjs` readers + matrix tests; computeAttackDamage ability options (`abilityBonusBeforeWR`, `abilityReductionBeforeWR/AfterWR`, `abilityPrevention`, `weaknessOverride`); wired at all 3 reduce attack call sites, `effectiveHp` (sideCards), handleKnockout prizes, retreat, attack cost (ignore-Energy + Wild Growth multiplier) |
 | 3 | done | suppression (`isAbilitySuppressed`) wired into useAbility + every slice-2 reader + all locks; one `abilityActivationBlockReason` shared by reduce + picker (`collect-usable-abilities.mjs`); play locks (Item/Supporter/Stadium/Tool/ACE SPEC/Pokémon-with-Ability) in playTrainer; status immunity gated in `addCondition`; evolve permission/lock in attachCard; summon restriction in moveCard; retreat lock; Patrat counter lock in all 3 move-counter handlers; first-turn attack (Meloetta). Parser fixes: named-condition immunity → `statusImmunityAbility`, "each play" substring no longer a play lock, evolve-lock text no longer also an `evolveAbility`, Spearow first-turn permission. Oracle baseline surgically re-ratcheted for the 3 families the mis-parse fixes lowered (see D118) |
-| 4 | pending | `ability-triggers.mjs` + checkup/end-of-turn/on-damage/on-promotion/on-KO hooks (`movedToActiveTurn` stamp lands here — slice 3 deliberately shipped no dead stamp) |
+| 4 | in progress (4a done) | 4a: new `rules/ability-triggers.mjs` (checkup / on-opponent-evolve / on-damage / end-of-turn / between-turns / on-KO / on-promotion readers) + wired Checkup damage (Froslass/Magmortar/Pecharunt/TR Tyranitar/Trevenant), mandatory end-of-turn discard (Great Tusk ex), opponent-evolve counters (Team Rocket's Ampharos), thorns suppression + zone gate. Oracle unchanged. 4b (remaining): `movedToActiveTurn` stamp + on-promotion activation window, on-KO energy moves, `abilityExtraAttack` (Dipplin) — need switch-site stamps / choice UI |
 | 5 | pending | executor batch A |
 | 6 | pending | executor batch B (one-offs) |
 | 7 | pending | `scripts/audit-ability-behaviour.mjs` + baseline; close I128/I129/I130 |
@@ -25,6 +25,15 @@ as usable there; the ability picker (`collectUsableAbilities`) does pass board c
 `abilityStatusImmune` inside `addCondition` cannot see the board, so a suppressed immunity source
 still protects its holder; (4) `abilityExtraAttack` is read but not wired (slice 4 owns the
 KO→promotion→attack-again flow).
+
+Slice-4 gaps (4a landed, these remain for 4b): (1) `movedToActiveTurn` is not stamped anywhere yet,
+so on-promotion abilities (Iron Valiant ex Tachyon Bits, Cobalion ex Metal Road, …) can still be
+clicked outside their window — the stamp must land at every bench→active move site (promotion +
+switch steps) and the window enforced in `abilityActivationBlockReason`; (2) on-KO energy moves
+(Miraidon Photon Cord, Raichu Electrical Grounding, Veluza Fillet Memento) are parsed by
+`parseOnKoAbilities` but not executed — they need a target choice (slice 5/6); (3) optional
+end-of-turn abilities (Togekiss Precious Gift) are activated through useAbility, not the mandatory
+end-of-turn hook.
 
 # Active work — S264 12-item batch (branch `feature/batch-s264`, worktree `../vibe-batch-s264`)
 

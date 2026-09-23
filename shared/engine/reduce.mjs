@@ -56,7 +56,6 @@ import {
   isTeraCard,
 } from './rules/tool-combat.mjs';
 import {
-  parseThorns,
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
   passiveCostDiscount,
@@ -83,6 +82,13 @@ import {
   abilitySummonRestricted,
   abilityFirstTurnAttack,
 } from './rules/ability-combat.mjs';
+import {
+  inPlayEntries,
+  parseCheckupAbilities,
+  parseOnOpponentEvolveAbilities,
+  parseEndOfTurnAbilities,
+  parseOnDamageAbilities,
+} from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
@@ -1268,11 +1274,115 @@ function resolveDeferredKnockouts(draft, { events }) {
   }
 }
 
+/**
+ * Pokémon Checkup damage from abilities (design 034 slice 4): Froslass, Magmortar,
+ * Pecharunt, Team Rocket's Tyranitar, Trevenant. Applied after the per-condition
+ * Checkup damage and before between-turns Stadium damage, with a Knockout sweep.
+ */
+function applyCheckupAbilities(draft, { events, ctx }) {
+  const effects = parseCheckupAbilities(inPlayEntries(draft), ctx);
+  const affected = [];
+  for (const effect of effects) {
+    for (const target of effect.targets) {
+      const damage = effect.count * 10;
+      target.card.damage = (target.card.damage || 0) + damage;
+      events.push({
+        type: 'checkupAbilityDamage',
+        source: effect.source,
+        instanceId: target.card.instanceId,
+        playerId: target.playerId,
+        damage,
+      });
+      affected.push(target);
+    }
+  }
+  for (const { card, playerId } of affected) {
+    if (isGameConcluded(draft)) break;
+    const hp = cardEffectiveHp(draft, card, playerId);
+    if (hp > 0 && (card.damage || 0) >= hp) {
+      handleKnockout(draft, {
+        victimPlayerId: playerId,
+        attackerPlayerId: Object.keys(draft.players || {}).find(
+          (id) => id !== playerId
+        ),
+        victim: card,
+        events,
+      });
+    }
+  }
+}
+
+/**
+ * Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition:
+ * discard the top 5 cards of your deck while it is in the Active Spot). Optional
+ * end-of-turn abilities are activated through useAbility instead.
+ */
+function applyEndOfTurnAbilities(draft, { events, ctx, endingPlayerId }) {
+  if (!endingPlayerId) return;
+  const entries = inPlayEntries(draft).filter(
+    (entry) => entry.playerId === endingPlayerId
+  );
+  const effects = parseEndOfTurnAbilities(entries, ctx);
+  for (const effect of effects) {
+    if (effect.kind !== 'discardTop' || !(effect.n > 0)) continue;
+    const player = draft.players[effect.playerId];
+    const deck = player?.zones?.deck || [];
+    const count = Math.min(effect.n, deck.length);
+    const discarded = deck.splice(0, count);
+    for (const card of discarded) discardCardToPlayerZone(player, card);
+    events.push({
+      type: 'cardsDiscarded',
+      playerId: effect.playerId,
+      count,
+      source: effect.source,
+      cards: discarded.map((c) => c.instanceId),
+    });
+  }
+}
+
+/**
+ * "Whenever your opponent plays a Pokémon from their hand to evolve 1 of their
+ * Pokémon, put N damage counters on that Pokémon" (Team Rocket's Ampharos Darkest
+ * Impulse). Fires after the evolve lands, before any turn-end check.
+ */
+function applyOnOpponentEvolve(draft, { evolvedCard, evolvingPlayerId, events }) {
+  const entries = inPlayEntries(draft).filter(
+    (entry) => entry.playerId !== evolvingPlayerId
+  );
+  const ctx = abilitySideContext(draft, evolvingPlayerId);
+  const effects = parseOnOpponentEvolveAbilities(entries, ctx);
+  if (effects.length === 0) return;
+  for (const effect of effects) {
+    const damage = effect.count * 10;
+    evolvedCard.damage = (evolvedCard.damage || 0) + damage;
+    events.push({
+      type: 'damageUpdated',
+      instanceId: evolvedCard.instanceId,
+      damage: evolvedCard.damage,
+      dealt: damage,
+      reason: 'onOpponentEvolve',
+      source: effect.source,
+    });
+  }
+  const hp = cardEffectiveHp(draft, evolvedCard, evolvingPlayerId);
+  if (hp > 0 && (evolvedCard.damage || 0) >= hp) {
+    handleKnockout(draft, {
+      victimPlayerId: evolvingPlayerId,
+      attackerPlayerId: Object.keys(draft.players || {}).find(
+        (id) => id !== evolvingPlayerId
+      ),
+      victim: evolvedCard,
+      events,
+    });
+  }
+}
+
 function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
 ) {
   resolveDeferredKnockouts(draft, { events });
+  const triggerCtx = abilitySideContext(draft, endingPlayerId);
 
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
@@ -1332,12 +1442,19 @@ function resolveCheckup(
     }
   }
 
+  // Pokémon Checkup abilities resolve after the conditions and before the
+  // between-turns Stadium damage (design 034 slice 4).
+  applyCheckupAbilities(draft, { events, ctx: triggerCtx });
+
   // Between-turns Stadium damage resolves after Pokémon Checkup.
   applyBetweenTurnsStadiumDamage(draft, { events });
 
   // End-of-turn special-energy effects (legacy Darkness Energy): "at the end of
   // every turn" applies to both players' in-play Pokémon.
   runEndOfTurnSpecialEnergies(draft, { events });
+
+  // Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition).
+  applyEndOfTurnAbilities(draft, { events, ctx: triggerCtx, endingPlayerId });
 }
 
 /**
@@ -4202,7 +4319,13 @@ function resolveAttackEffectPhase(draft, ctx) {
             }
           }
 
-          const thorns = parseThorns(defender);
+          // Thorns via the trigger reader: a suppressed holder contributes
+          // nothing, and an Active-Spot-only wording is inert off the Active
+          // (the defender here is the opponent's Active, so isActive: true).
+          const thorns = parseOnDamageAbilities(defender, {
+            ...abilitySideContext(draft, defenderPlayerId),
+            isActive: true,
+          });
           if (thorns?.count > 0) {
             thornsDamage += thorns.count * 10;
           }
@@ -5140,6 +5263,13 @@ export function applyCommand(state, command, rng = null) {
             host: hostRef.card,
             hostPlayerId: hostRef.playerId,
             hostZoneId: hostRef.zoneId,
+            events,
+          });
+
+          // Opponent-evolves ability trigger (design 034 slice 4).
+          applyOnOpponentEvolve(draft, {
+            evolvedCard: hostRef.card,
+            evolvingPlayerId: hostRef.playerId,
             events,
           });
 
