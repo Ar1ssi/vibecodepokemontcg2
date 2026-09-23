@@ -276,12 +276,23 @@ export function parseOnKoAbilities(entries = [], ctx = {}) {
     if (!text) continue;
     const step = parseAbility(text).find((s) => s.type === 'energyOnKoAbility');
     if (!step) continue;
+    const move = text.match(
+      /move\s+(?:up to\s+(\d+)\s+)?(?:(?:a|an|\d+)\s+)?(?:basic\s+)?(?:\{([a-z])\}\s*)?energy/
+    );
     out.push({
       holder: card,
       playerId,
       source: card.name,
       basic: Boolean(step.basic),
-      upTo: step.upTo ? Number(step.upTo) : null,
+      upTo: step.upTo ? Number(step.upTo) : move?.[1] ? Number(move[1]) : null,
+      // Printed Energy symbol ({L} → 'lightning'), or null for "any Energy".
+      energyType: move?.[2] ? TYPE_LETTER[move[2]] || null : null,
+      // 'bench' = "move … to 1 of your Benched Pokémon"; 'holder' = "to this Pokémon".
+      targetKind: /benched/.test(text) ? 'bench' : 'holder',
+      // True when the holder is itself the Pokémon that must be Knocked Out.
+      selfSource: /this pok[eé]mon is in the active spot and is knocked out/.test(
+        text
+      ),
       activeOnly: /in the active spot/.test(text),
     });
   }

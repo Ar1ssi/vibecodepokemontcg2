@@ -325,7 +325,98 @@ test('parseOnKoAbilities: reads Miraidon Photon Cord', () => {
   assert.equal(effects[0].basic, true);
   assert.equal(effects[0].upTo, 2);
   assert.equal(effects[0].activeOnly, true);
+  assert.equal(effects[0].energyType, 'lightning');
+  assert.equal(effects[0].targetKind, 'bench');
+  assert.equal(effects[0].selfSource, true);
 });
+
+test('parseOnKoAbilities: reads Raichu Electrical Grounding (holder target)', () => {
+  const state = setupGame();
+  state.players.p1.zones.bench.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Raichu',
+      abilities: [
+        ability(
+          'Electrical Grounding',
+          "When 1 of your Pokémon is Knocked Out by damage from an attack from your opponent's Pokémon, you may move a {L} Energy from that Pokémon to this Pokémon."
+        ),
+      ],
+    })
+  );
+  const effects = parseOnKoAbilities(inPlayEntries(state), ctxFor(state, 'p1'));
+  assert.equal(effects.length, 1);
+  assert.equal(effects[0].energyType, 'lightning');
+  assert.equal(effects[0].targetKind, 'holder');
+  assert.equal(effects[0].selfSource, false);
+  assert.equal(effects[0].activeOnly, false);
+});
+
+test('on-KO energy move: Veluza moves its Energy to the only Benched Pokémon', () => {
+  const state = setupGame({ turn: { number: 5, player: 'p2', phase: 'turn' } });
+  const veluza = pokemon({
+    instanceId: 1,
+    name: 'Veluza',
+    hp: 60,
+    abilities: [
+      ability(
+        'Fillet Memento',
+        "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, move up to 2 {W} Energy cards from this Pokémon to 1 of your Benched Pokémon."
+      ),
+    ],
+  });
+  const benchMon = pokemon({ instanceId: 2, name: 'Bench' });
+  const water = createCard({
+    instanceId: 3,
+    name: 'Water Energy',
+    supertype: 'Energy',
+    subtypes: ['Basic'],
+    attachedTo: 1,
+  });
+  const lightning = createCard({
+    instanceId: 4,
+    name: 'Lightning Energy',
+    supertype: 'Energy',
+    subtypes: ['Basic'],
+    attachedTo: 1,
+  });
+  state.players.p1.zones.active.push(veluza, water, lightning);
+  state.players.p1.zones.bench.push(benchMon);
+  state.players.p1.zones.deck.push(createCard({ instanceId: 90, name: 'Deck' }));
+
+  const attacker = createCard({
+    instanceId: 50,
+    name: 'Attacker',
+    attacks: [{ name: 'KO', cost: [], damage: 200 }],
+  });
+  state.players.p2.zones.active.push(attacker);
+  state.players.p2.zones.deck.push(createCard({ instanceId: 91, name: 'Deck' }));
+
+  const res = applyCommand(
+    state,
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' },
+    undefined
+  );
+  assert.equal(res.error, null);
+
+  // Veluza (and its Energy) is discarded, then the Ability pulls the {W}
+  // Energy back out onto the sole Benched Pokémon; the {L} stays behind.
+  const landed = [
+    ...res.state.players.p1.zones.active,
+    ...res.state.players.p1.zones.bench,
+  ].find((c) => c.instanceId === 3);
+  assert.ok(landed, 'Water Energy moved onto the Benched Pokémon');
+  assert.equal(landed.attachedTo, 2);
+  assert.ok(
+    res.state.players.p1.zones.discard.some((c) => c.instanceId === 4),
+    'non-Water Energy stays in the discard pile'
+  );
+  const energyEvent = res.events.find((e) => e.type === 'koEnergyMoveRequested');
+  assert.ok(energyEvent, 'on-KO energy move announced');
+  assert.equal(energyEvent.source, 'Veluza');
+});
+
+
 
 test('parseOnPromotionAbilities: reads Iron Valiant ex Tachyon Bits', () => {
   const state = setupGame();

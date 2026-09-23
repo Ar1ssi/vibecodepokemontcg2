@@ -88,6 +88,7 @@ import {
   parseOnOpponentEvolveAbilities,
   parseEndOfTurnAbilities,
   parseOnDamageAbilities,
+  parseOnKoAbilities,
 } from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
@@ -960,6 +961,10 @@ function handleKnockout(
   // of the discard pile — attached cards are still discarded (card text).
   const lostCity = isStadiumLostCity(draft.stadium?.card || draft.stadium);
 
+  // Ability energy-move-on-KO: record the victim's Energy an Ability may move
+  // before the stack below is discarded (target chosen/executed at the tail).
+  captureOnKoEnergyMoves(draft, { victimPlayerId, victim, events });
+
   // Special-energy on-knockout triggers (Splash/Rescue return the Pokémon to
   // hand; Gift draws until 7). Attached cards still go to the discard pile.
   const koZoneRef = findCard(draft, victim.instanceId);
@@ -1224,6 +1229,159 @@ function stampActivePromotions(prev, next) {
       if (moved) delete moved.movedToActiveTurn;
     }
   }
+}
+
+/**
+ * Energy-move-on-KO abilities (Miraidon Photon Cord, Raichu Electrical Grounding,
+ * Veluza Fillet Memento; design 034 slice 4b). The victim's Energy is discarded
+ * with the rest of its stack, so this records which cards an Ability may pull
+ * back out of the discard once a target is known; `settleKoEnergyMoves` runs at
+ * the command tail. Obligations live on the draft (not player flags) so
+ * `advanceTurn`'s wholesale flag rebuild cannot drop them, and they ride the
+ * `pendingChoice` resume token when a target must be chosen.
+ */
+function captureOnKoEnergyMoves(draft, { victimPlayerId, victim, events }) {
+  const player = draft.players?.[victimPlayerId];
+  if (!player) return;
+  const entries = inPlayEntries(draft).filter(
+    (e) => e.playerId === victimPlayerId
+  );
+  const abilities = parseOnKoAbilities(
+    entries,
+    abilitySideContext(draft, victimPlayerId)
+  );
+  const zoneCards = [
+    ...(player.zones?.active || []),
+    ...(player.zones?.bench || []),
+  ];
+  const obligations = [];
+  for (const ab of abilities) {
+    // "If this Pokémon … is Knocked Out" only fires for the victim itself;
+    // "move … to this Pokémon" can't target a holder that just left play.
+    if (ab.selfSource) {
+      if (ab.holder !== victim) continue;
+    } else if (ab.holder === victim) {
+      continue;
+    }
+    let energy = zoneCards.filter(
+      (c) => c.attachedTo === victim.instanceId && isEnergy(c)
+    );
+    if (ab.basic) energy = energy.filter((c) => isBasicEnergy(c));
+    if (ab.energyType) {
+      energy = energy.filter((c) => energyMatchesType(c, ab.energyType));
+    }
+    if (energy.length === 0) continue;
+    obligations.push({
+      playerId: victimPlayerId,
+      holderInstanceId: ab.holder.instanceId,
+      targetKind: ab.targetKind,
+      energyIds: energy.map((c) => c.instanceId),
+      upTo: ab.upTo || 1,
+      source: ab.source,
+    });
+    events.push({
+      type: 'koEnergyMoveRequested',
+      playerId: victimPlayerId,
+      source: ab.source,
+      holderInstanceId: ab.holder.instanceId,
+    });
+  }
+  if (obligations.length > 0) {
+    draft.__koEnergyMoves = [...(draft.__koEnergyMoves || []), ...obligations];
+  }
+}
+
+function energyMatchesType(card, typeName) {
+  const want = String(typeName || '').toLowerCase();
+  const types = [card.energyType, ...(Array.isArray(card.types) ? card.types : [])]
+    .filter(Boolean)
+    .map((t) => String(t).toLowerCase());
+  if (types.some((t) => t === want || (want === 'darkness' && t === 'dark'))) {
+    return true;
+  }
+  // Basic Energy rows sometimes carry no `types`; the printed name is then the
+  // only signal ("Water Energy").
+  return (
+    typeof card.name === 'string' &&
+    new RegExp(`\\b${want}\\b`, 'i').test(card.name)
+  );
+}
+
+function koEnergyTargets(player, obligation) {
+  const bench = (player.zones?.bench || []).filter(
+    (c) => !c.attachedTo && isPokemon(c)
+  );
+  if (obligation.targetKind === 'holder') {
+    const holder = [
+      ...(player.zones?.active || []),
+      ...bench,
+    ].find(
+      (c) => !c.attachedTo && c.instanceId === obligation.holderInstanceId
+    );
+    return holder ? [holder] : [];
+  }
+  return bench.filter((c) => c.instanceId !== obligation.holderInstanceId);
+}
+
+function moveKoEnergy(player, target, obligation, events) {
+  const discard = player.zones?.discard || [];
+  let moved = 0;
+  for (const id of obligation.energyIds) {
+    if (moved >= obligation.upTo) break;
+    const card = discard.find((c) => c.instanceId === id);
+    if (!card) continue;
+    attachToRoot(player, card, target, events);
+    moved += 1;
+  }
+  return moved;
+}
+
+function settleKoEnergyMoves(draft, { events }) {
+  if (draft.pendingChoice) return;
+  const pending = draft.__koEnergyMoves;
+  if (!Array.isArray(pending) || pending.length === 0) {
+    delete draft.__koEnergyMoves;
+    return;
+  }
+  const remaining = [...pending];
+  while (remaining.length > 0) {
+    const obligation = remaining[0];
+    const player = draft.players?.[obligation.playerId];
+    const energyLeft = (player?.zones?.discard || []).some((c) =>
+      obligation.energyIds.includes(c.instanceId)
+    );
+    if (!player || !energyLeft) {
+      remaining.shift();
+      continue;
+    }
+    const targets = koEnergyTargets(player, obligation);
+    if (targets.length === 0) {
+      remaining.shift();
+      continue;
+    }
+    if (targets.length > 1) {
+      delete draft.__koEnergyMoves;
+      draft.pendingChoice = createPendingChoice({
+        player: obligation.playerId,
+        source: obligation.source,
+        prompt: `${obligation.source}: choose a Benched Pokémon to move the Energy to`,
+        options: targets,
+        min: 1,
+        max: 1,
+        cancellable: false,
+        stateVersion: draft.stateVersion,
+        resumeToken: {
+          effectType: 'koEnergy',
+          initiatorPlayerId: obligation.playerId,
+          obligations: remaining,
+        },
+      });
+      return;
+    }
+    moveKoEnergy(player, targets[0], obligation, events);
+    remaining.shift();
+  }
+  delete draft.__koEnergyMoves;
 }
 
 /**
@@ -6167,6 +6325,22 @@ export function applyCommand(state, command, rng = null) {
           events,
         });
         draft.pendingChoice = null;
+      } else if (token.effectType === 'koEnergy') {
+        // Energy-move-on-KO: the player picked the target for the first pending
+        // obligation. Queue the rest so the tail (or the next picker) runs them.
+        draft.pendingChoice = null;
+        const player = draft.players[initiatorPlayerId];
+        const pending = Array.isArray(token.obligations)
+          ? [...token.obligations]
+          : [];
+        const obligation = pending.shift();
+        if (player && obligation) {
+          const target = koEnergyTargets(player, obligation).find(
+            (c) => c.instanceId === (payload.selection || [])[0]
+          );
+          if (target) moveKoEnergy(player, target, obligation, events);
+        }
+        draft.__koEnergyMoves = pending;
       } else if (token.effectType === 'stadium') {
         const result = executeStadium(draft, {
           playerId: initiatorPlayerId,
@@ -6908,6 +7082,7 @@ export function applyCommand(state, command, rng = null) {
 
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
+  settleKoEnergyMoves(draft, { events });
   settlePrizeEntitlements(draft, { events });
   stampActivePromotions(state, draft);
   clearFaceDownOffBoard(draft);
