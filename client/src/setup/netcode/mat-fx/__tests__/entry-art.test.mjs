@@ -5,10 +5,7 @@ import {
   HEX_WHITE_CELLS,
   hexPoints,
   hexTile,
-  jewelStarPoints,
-  megaSlashSvg,
   svgDataUrl,
-  teraJewelSvg,
 } from '../entry-art.mjs';
 
 const pointsOf = (str) =>
@@ -67,40 +64,4 @@ test('svgDataUrl: escapes characters that break a CSS url()', () => {
     2,
     'only the wrapping quotes remain'
   );
-});
-
-test('tera jewel: six crystal tips alternating with notches, tallest on top', () => {
-  const pts = pointsOf(jewelStarPoints());
-  assert.equal(pts.length, 12);
-  const tips = pts
-    .filter((_, i) => i % 2 === 0)
-    .map(([x, y]) => Math.hypot(x, y));
-  const notches = pts
-    .filter((_, i) => i % 2 === 1)
-    .map(([x, y]) => Math.hypot(x, y));
-  assert.ok(Math.min(...tips) > Math.max(...notches));
-  assert.equal(Math.max(...tips), tips[0], 'top tip is the tallest');
-  assert.ok(
-    pts[0][1] < 0 && Math.abs(pts[0][0]) < 0.01,
-    'first tip points straight up'
-  );
-});
-
-test('artwork SVGs are well-formed single roots with the requested colours', () => {
-  for (const svg of [
-    teraJewelSvg(),
-    teraJewelSvg({ fill: '#fff' }),
-    megaSlashSvg('blue'),
-    megaSlashSvg('orange'),
-  ]) {
-    assert.ok(svg.trim().startsWith('<svg'));
-    assert.ok(svg.trim().endsWith('</svg>'));
-  }
-  assert.ok(teraJewelSvg({ fill: '#fff' }).includes("fill='#fff'"));
-  assert.equal((teraJewelSvg().match(/id='/g) || []).length, 1);
-  assert.ok(
-    !teraJewelSvg({ fill: '#fff' }).includes("id='"),
-    'flat copy declares no ids'
-  );
-  assert.notEqual(megaSlashSvg('blue'), megaSlashSvg('orange'));
 });

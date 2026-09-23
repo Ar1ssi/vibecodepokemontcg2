@@ -574,152 +574,26 @@ body.fx-off .fx-overlay {
 }
 
 
-/* Design 027 / 034: Tera entry (TCG Live) — the card turns into a mint crystal
-   (--fx-tera-rgb), grows a Tera jewel, fills with white light from the bottom
-   and bursts in violet smoke, light rays and glitter. */
+/* Design 027 / 034 / 037: Tera entry — the whole Scarlet/Violet
+   Terastallization (orb, jewel, crystal cluster, burst) is drawn on one canvas
+   stage (tera-crystal.mjs); its clock is its own animation. */
 .fx-tera-entry {
   overflow: visible;
   z-index: 2470;
-  --fx-tera-rgb: 95, 225, 185;
 }
 
-.fx-tera-entry > * {
+.fx-tera-entry__stage {
   position: absolute;
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
-.fx-tera-entry__flash,
-.fx-tera-entry__whiteout {
-  inset: -2%;
-  border-radius: 0.4rem;
-  background: #fff;
-  box-shadow: 0 0 18px 6px rgba(255, 255, 255, 0.9), 0 0 50px 16px rgba(var(--fx-tera-rgb), 0.5);
-}
-
-.fx-tera-entry__whiteout {
-  box-shadow: 0 0 22px 10px #fff, 0 0 70px 30px rgba(255, 255, 255, 0.7);
-}
-
-.fx-tera-entry__slab {
-  inset: 0;
-  overflow: hidden;
-  border-radius: 0.35rem;
-  background:
-    linear-gradient(170deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 45%),
-    rgb(var(--fx-tera-rgb));
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.8), inset 0 0 14px rgba(255, 255, 255, 0.55);
-}
-
-.fx-tera-entry__slab svg {
   display: block;
-  width: 100%;
-  height: 100%;
-}
-
-/* White light rising through the crystal before it bursts. */
-.fx-tera-entry__fill {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transform-origin: 50% 100%;
-  background: linear-gradient(0deg, #fff 0 82%, rgba(255, 255, 255, 0.6) 92%, rgba(255, 255, 255, 0));
-  will-change: transform, opacity;
-}
-
-.fx-tera-entry__slab-glow {
-  inset: 0;
-  border-radius: 0.35rem;
-  box-shadow: 0 0 16px 6px rgba(var(--fx-tera-rgb), 0.95), 0 0 46px 16px rgba(var(--fx-tera-rgb), 0.5);
-}
-
-.fx-tera-entry__jewel {
-  filter: drop-shadow(0 0 6px rgba(var(--fx-tera-rgb), 1)) drop-shadow(0 0 2px #fff);
-}
-
-.fx-tera-entry__jewel svg,
-.fx-tera-entry__jewel-white svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.fx-tera-entry__jewel-white {
-  position: absolute;
-  inset: 0;
   opacity: 0;
   will-change: opacity;
 }
 
-/* Lens streaks: a hot white core fading to mint along the horizontal. */
-.fx-tera-entry__streak {
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, #fff 0 12%, rgba(var(--fx-tera-rgb), 0.85) 30%, rgba(var(--fx-tera-rgb), 0) 70%);
-  mix-blend-mode: screen;
-}
-
-.fx-tera-entry__streak--thin {
-  transform-origin: 50% 50%;
-  rotate: -7deg;
-}
-
-.fx-tera-entry__ring {
-  border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: rgba(255, 255, 255, 0.85);
-  border-left-color: rgba(var(--fx-tera-rgb), 0.55);
-  filter: drop-shadow(0 0 4px rgba(var(--fx-tera-rgb), 0.9));
-}
-
-.fx-tera-entry__ring--wide {
-  border-width: 1.5px;
-  border-top-color: transparent;
-  border-bottom-color: rgba(255, 255, 255, 0.7);
-  border-left-color: transparent;
-  border-right-color: rgba(var(--fx-tera-rgb), 0.5);
-}
-
-/* Irregular rays: two conic combs of different pitch over each other. */
-.fx-tera-entry__rays {
-  border-radius: 50%;
-  background:
-    repeating-conic-gradient(from 4deg, rgba(255, 255, 255, 0.95) 0 2deg, rgba(255, 255, 255, 0) 2deg 17deg),
-    repeating-conic-gradient(from 11deg, rgba(255, 245, 255, 0.7) 0 4deg, rgba(255, 255, 255, 0) 4deg 29deg);
-  -webkit-mask-image: radial-gradient(circle, #000 8%, rgba(0, 0, 0, 0.7) 30%, transparent 68%);
-  mask-image: radial-gradient(circle, #000 8%, rgba(0, 0, 0, 0.7) 30%, transparent 68%);
-  mix-blend-mode: screen;
-}
-
-.fx-tera-entry__puff {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle at 45% 40%, rgba(235, 215, 255, 0.6), rgba(160, 100, 235, 0.5) 36%, rgba(95, 50, 180, 0.22) 56%, rgba(95, 50, 180, 0) 70%);
-  filter: blur(2px);
-}
-
-.fx-tera-entry__particles {
-  inset: 0;
-  opacity: 1;
-}
-
-.fx-tera-entry__glitter {
-  box-shadow: 0 0 4px 1px var(--fx-p-color, #fff);
-}
-
-.fx-tera-entry__glint {
-  position: absolute;
-  opacity: 0;
-  background: #fff;
-  clip-path: polygon(50% 0, 57% 43%, 100% 50%, 57% 57%, 50% 100%, 43% 57%, 0 50%, 43% 43%);
-  filter: drop-shadow(0 0 3px rgba(var(--fx-tera-rgb), 1));
-  will-change: transform, opacity;
-}
-
-/* Design 027 / 034 / 035: Mega entry — a prismatic hex field floods the mat
+/* Design 027 / 034 / 035 / 036: Mega entry — a prismatic hex field floods the mat
    from the card outward (painted inside #battleMatSurface, so it takes the
    table tilt and mat outline and stays under the card zones); over the card,
    the keystone orb (canvas, mega-orb.mjs) forms, cracks and shatters into a
-   vortex of brush strokes. */
+   vortex of brush strokes drawn on the same canvas (mega-vortex.mjs). */
 .fx-mega-field {
   position: absolute;
   inset: 0;
@@ -812,15 +686,9 @@ body.fx-off .fx-mega-field {
   box-shadow: 0 0 14px 6px rgba(255, 244, 228, 0.95), 0 0 42px 16px rgba(255, 170, 90, 0.55);
 }
 
-/* Canvas stage for the 3D orb (mega-orb.mjs); its clock is its own animation. */
+/* Canvas stage for the 3D orb and vortex; its clock is its own animation. */
 .fx-mega-entry__orb {
   display: block;
-}
-
-.fx-mega-entry__slash svg {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 
 .fx-mega-entry__flash {
@@ -828,22 +696,7 @@ body.fx-off .fx-mega-field {
   background: radial-gradient(circle, #fff 0 22%, rgba(255, 244, 225, 0.85) 40%, rgba(255, 220, 170, 0) 70%);
 }
 
-.fx-mega-entry__vortex,
 .fx-mega-entry__burst {
   inset: 0;
   opacity: 1;
-}
-
-.fx-mega-entry__slash {
-  position: absolute;
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
-.fx-mega-entry__slash--orange {
-  filter: drop-shadow(0 0 4px rgba(255, 140, 50, 0.85));
-}
-
-.fx-mega-entry__slash--blue {
-  filter: drop-shadow(0 0 4px rgba(60, 190, 255, 0.85));
 }

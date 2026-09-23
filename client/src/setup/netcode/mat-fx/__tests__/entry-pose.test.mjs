@@ -3,44 +3,21 @@ import assert from 'node:assert/strict';
 import {
   MEGA_BURST_AT,
   MEGA_ENTRY_MS,
-  TERA_BURST_AT,
-  TERA_ENTRY_MS,
-  TERA_GLINT_AT,
   megaFieldPlacement,
   megaFieldPose,
   megaFlashPose,
   megaLensPose,
   megaSilhouettePose,
-  megaSlashPose,
   megaStageRect,
   megaWavePose,
-  teraFillPose,
-  teraFlashPose,
-  teraJewelPose,
-  teraRaysPose,
-  teraRingPose,
-  teraSlabPose,
-  teraSmokePose,
-  teraStreakPose,
-  teraWhiteoutPose,
 } from '../entry-pose.mjs';
 
 const ALL = {
-  teraFlashPose,
-  teraSlabPose,
-  teraStreakPose,
-  teraJewelPose,
-  teraRingPose,
-  teraFillPose,
-  teraWhiteoutPose,
-  teraRaysPose,
-  teraSmokePose,
   megaFieldPose,
   megaWavePose,
   megaLensPose,
   megaSilhouettePose,
   megaFlashPose,
-  megaSlashPose,
 };
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
 
@@ -65,67 +42,9 @@ test('entry poses: opacity stays within [0, 1] and out-of-range t is clamped', (
   }
 });
 
-test('entry durations and beats are ordered', () => {
-  assert.ok(TERA_ENTRY_MS > 0 && MEGA_ENTRY_MS > 0);
-  assert.ok(
-    TERA_BURST_AT > 0 && TERA_BURST_AT < TERA_GLINT_AT && TERA_GLINT_AT < 1
-  );
+test('entry duration and burst beat are in range', () => {
+  assert.ok(MEGA_ENTRY_MS > 0);
   assert.ok(MEGA_BURST_AT > 0 && MEGA_BURST_AT < 1);
-});
-
-// TCG Live's Tera beat: flash, mint crystal, jewel rises, white fills the
-// crystal from the bottom, burst into smoke/rays, twinkles on the reveal.
-test('tera: the flash hands over to the crystal', () => {
-  assert.equal(teraFlashPose(0.04).opacity, 1);
-  assert.equal(teraFlashPose(0.15).opacity, 0);
-  assert.equal(teraSlabPose(0.02).opacity, 0);
-  assert.ok(teraSlabPose(0.1).opacity > 0.99);
-});
-
-test('tera: the crystal holds, then vanishes exactly under a full whiteout', () => {
-  for (const t of [0.15, 0.3, 0.5])
-    assert.ok(teraSlabPose(t).opacity > 0.99, `slab at ${t}`);
-  assert.equal(teraSlabPose(TERA_BURST_AT).opacity, 0);
-  assert.ok(teraWhiteoutPose(TERA_BURST_AT).opacity > 0.99);
-  assert.ok(teraWhiteoutPose(TERA_BURST_AT - 0.08).opacity < 0.5);
-  assert.ok(teraWhiteoutPose(0.75).opacity < 1e-9);
-});
-
-test('tera: lens streaks shoot outward as the crystal forms and are gone before the fill', () => {
-  assert.ok(teraStreakPose(0.2).scaleX > teraStreakPose(0.05).scaleX);
-  assert.ok(teraStreakPose(0.15).opacity > 0.99);
-  assert.equal(teraStreakPose(0.5).opacity, 0);
-});
-
-test('tera: the jewel grows after the crystal lands, whitens, and is gone at the burst', () => {
-  assert.equal(teraJewelPose(0.1).scale, 0);
-  assert.equal(teraJewelPose(0.1).opacity, 0);
-  assert.ok(teraJewelPose(0.3).opacity > 0.99);
-  assert.ok(near(teraJewelPose(0.26).scale, 1));
-  assert.equal(teraJewelPose(0.3).white, 0);
-  assert.ok(teraJewelPose(0.55).white > 0.99);
-  assert.equal(teraJewelPose(TERA_BURST_AT).opacity, 0);
-});
-
-test('tera: white light rises through the crystal from the bottom before the burst', () => {
-  assert.equal(teraFillPose(0.25).scaleY, 0);
-  assert.ok(teraFillPose(0.4).scaleY > teraFillPose(0.32).scaleY);
-  assert.ok(near(teraFillPose(0.52).scaleY, 1));
-  assert.equal(teraFillPose(TERA_BURST_AT).opacity, 0);
-});
-
-test('tera: arcs orbit forward while charging', () => {
-  assert.ok(teraRingPose(0.45).rotate > teraRingPose(0.25).rotate);
-  assert.ok(teraRingPose(0.3).opacity > 0.99);
-});
-
-test('tera: rays and smoke only appear at the burst and grow outward', () => {
-  assert.equal(teraRaysPose(TERA_BURST_AT - 0.01).opacity, 0);
-  assert.equal(teraSmokePose(TERA_BURST_AT - 0.03).opacity, 0);
-  assert.ok(teraRaysPose(0.62).opacity > 0.99);
-  assert.ok(teraSmokePose(0.64).opacity > 0.8);
-  assert.ok(teraRaysPose(0.78).scale > teraRaysPose(0.61).scale);
-  assert.ok(teraSmokePose(0.8).scale > teraSmokePose(0.62).scale);
 });
 
 // TCG Live's Mega beat: the hex field floods the mat from the card, the card
@@ -159,25 +78,6 @@ test('mega: the white flash peaks at the burst', () => {
   assert.equal(megaFlashPose(0.3).opacity, 0);
   assert.equal(megaFlashPose(MEGA_BURST_AT + 0.01).opacity, 1);
   assert.equal(megaFlashPose(0.7).opacity, 0);
-});
-
-test('mega: slashes launch at the burst, fly out to orbit, and decelerate', () => {
-  assert.equal(megaSlashPose(MEGA_BURST_AT - 0.02).opacity, 0);
-  assert.ok(megaSlashPose(0.6).opacity > 0.99);
-  assert.ok(megaSlashPose(0.6).radius > megaSlashPose(MEGA_BURST_AT).radius);
-  assert.ok(near(megaSlashPose(0.7).radius, 1));
-  assert.equal(megaSlashPose(0.3, { phase: 90 }).rotate, 90);
-  assert.ok(megaSlashPose(0.6, { spin: 1 }).rotate > 0);
-  assert.ok(megaSlashPose(0.6, { spin: -1 }).rotate < 0);
-  const early = megaSlashPose(0.58).rotate - megaSlashPose(0.54).rotate;
-  const late = megaSlashPose(0.9).rotate - megaSlashPose(0.86).rotate;
-  assert.ok(early > late, 'spin decelerates');
-  assert.ok(megaSlashPose(MEGA_BURST_AT + 0.02).opacity > 0);
-  assert.equal(
-    megaSlashPose(MEGA_BURST_AT + 0.02, { lag: 0.05 }).opacity,
-    0,
-    'lag delays the launch'
-  );
 });
 
 test('megaStageRect: a stage around the card, clipped to the viewport', () => {

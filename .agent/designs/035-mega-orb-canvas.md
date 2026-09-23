@@ -1,5 +1,5 @@
 # 035: Mega keystone orb as a 3D canvas shell
-Status: shipped S279 (approved (self): the user named the target: "look at the orb itself, not the colour", with a main-series clip)
+Status: shipped S279; the vortex drawn after it on the same canvas is design 036 (S280) (approved (self): the user named the target: "look at the orb itself, not the colour", with a main-series clip)
 Date: 2026-09-23 · Session: S279 · Replaces the orb part of design 034 (field, lens, slash vortex unchanged)
 
 ## Problem

@@ -2199,6 +2199,12 @@ export function applyView(view, events = [], options = {}) {
 
   lastAppliedView = view;
 
+  // After lastAppliedView so listeners (the Tera skin, mat-fx/tera-skin.js)
+  // read the view just applied; FX holds set by the advisory loop are in place.
+  const viewDocument =
+    options.document || (typeof document !== 'undefined' ? document : null);
+  viewDocument?.dispatchEvent?.(new CustomEvent('board-view-applied'));
+
   return {
     applied: true,
     stateVersion: view.stateVersion,
