@@ -1,5 +1,5 @@
 # 027: Signature entry FX — Mega and Tera
-Status: built S259 (branch feature/evolve-fx) — awaiting user visual check
+Status: visuals superseded by 034 (S278); triggers, registry and kind test still stand
 Date: 2026-09-22 · Session: S259 · Builds on designs 022 and 026
 
 ## Problem

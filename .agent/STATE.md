@@ -5,11 +5,10 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 277
-Focus: S277 feature: team-wide "no Retreat Cost" abilities on a Benched Pokémon (Latias ex
-  "Skyliner") now zero the Active Spot's retreat cost. S276 patch: Run Away Draw self-shuffle.
+Session: 278
+Focus: S278 feature: Tera/Mega entry FX rebuilt from TCG Live reference clips (design 034, D117).
 Active: none.
-Next: maintenance due (S270, still not run).
+Next: maintenance due (S270, still not run). User visual check of the new Tera/Mega entries in a real game.
   I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
   leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
   Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
@@ -24,11 +23,13 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   Working-copy files are CRLF (repo LF); keep eol when scripting edits.
 - Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins, tokens carry `copiedAttack` (D110).
   BLOCKS regexes are wrapped by `gatedBlock` (adds capture group 1): no backreferences in them.
-- Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D97-D100.
-- Pre-existing `pnpm test` failures (7 files, env/CRLF — not one): card-inspector-model "retreat greys…", deck-row-sprites,
-  deck-sprite-strip, result-tile, end-turn-button, view-board-toggle, coin-flip-ceremony. Lint cannot run (`@eslint/js` missing).
+- Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D117, D97-D100. To eyeball an effect:
+  Playwright on /?e2e=1 (Chromium /opt/pw-browsers/chromium; route cdn.socket.io → local /socket.io/socket.io.min.js), import the
+  effect module, pause `document.getAnimations()` and step `currentTime` into screenshots.
+- Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…" (the other 6 listed before passed in S278).
+  ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S278 Tera/Mega entry FX replicate TCG Live (design 034): mint crystal + jewel + smoke burst; mat-wide hex field + orb + slash vortex.
 - S277 team-wide retreat-cost: `teamNoRetreatCostForActive` (D116) zeroes the Active's cost from a Benched Skyliner-style holder; retreat callers pass `benchCards`.
 - S276 ability self-shuffle: `returnSelfToDeckAbility` executes (shuffleSelf, requiresDraw gate); ability path settles a vacated Active.
-- S275 side menu reachable during choices: pending-choice overlays stop at right:24% (e2e: pnpm test:reset-choice).

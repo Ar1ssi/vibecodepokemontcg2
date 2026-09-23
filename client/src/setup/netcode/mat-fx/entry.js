@@ -1,8 +1,10 @@
-// Design 027: signature entry animations. A Tera Pokémon is sealed in a crystal
-// of its type colour that shatters to reveal it; a Mega Pokémon appears inside
-// a keystone sphere ringed by blue and orange swooshes. Played by `evolve`
-// (lifecycle.js) and by `enter` (a Pokémon put into play from hand, deck or
-// discard). Detached, self-removing overlays; no-op when the card is unknown.
+// Design 027 / 034: signature entry animations, modelled on TCG Live. A Tera
+// Pokémon turns into a mint crystal that grows a Tera jewel, fills with white
+// light and bursts in violet smoke; a Mega Pokémon floods the mat with a
+// prismatic hex field, rounds into the keystone orb and bursts into a vortex
+// of orange and blue brush strokes. Played by `evolve` (lifecycle.js) and by
+// `enter` (a Pokémon put into play from hand, deck or discard). Detached,
+// self-removing overlays; no-op when the card is unknown.
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -12,37 +14,71 @@ import {
   spawnOverlay,
   spawnParticles,
 } from '../../image-logic/mat-fx.mjs';
+import {
+  HEX_TINT_CELLS,
+  HEX_WHITE_CELLS,
+  MEGA_ORB_SVG,
+  MEGA_SILHOUETTE_SVG,
+  TERA_FACETS_SVG,
+  hexTile,
+  megaSlashSvg,
+  svgDataUrl,
+  teraJewelSvg,
+} from './entry-art.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
 import {
+  MEGA_BURST_AT,
   MEGA_ENTRY_MS,
+  TERA_BURST_AT,
   TERA_ENTRY_MS,
   TERA_GLINT_AT,
-  TERA_SHATTER_AT,
+  megaFieldPose,
+  megaFieldPlacement,
   megaFlashPose,
-  megaHexPose,
-  megaSpherePose,
-  megaSwirlPose,
-  teraArcPose,
-  teraCrownPose,
+  megaLensPose,
+  megaOrbPose,
+  megaSilhouettePose,
+  megaSlashPose,
+  megaStageRect,
+  megaWashPose,
+  megaWavePose,
+  teraFillPose,
   teraFlashPose,
+  teraJewelPose,
   teraRaysPose,
+  teraRingPose,
   teraSlabPose,
   teraSmokePose,
+  teraStreakPose,
   teraWhiteoutPose,
 } from './entry-pose.mjs';
-import { brighten, fxRgbForCard, rgbCss } from './fx-colors.mjs';
+import { rgbCss } from './fx-colors.mjs';
 import { burstParticles } from './particles.mjs';
 
 const BACKSTOP_PAD_MS = 400;
+// TCG Live draws every Tera crystal in the same mint, whatever the Tera type.
+const TERA_MINT_RGB = [95, 225, 185];
+const TERA_GLITTER_COLOURS = ['#8dffc0', '#ff9fe2', '#b690ff', '#ffffff'];
 const MEGA_EMBER_RGB = [255, 150, 60];
+const MEGA_SPARK_COLOURS = ['#ff8a2a', '#2ab8ff'];
 
-const layer = (className) => {
+const layer = (className, html) => {
   const el = document.createElement('div');
   el.className = className;
+  if (html) el.innerHTML = html;
   return el;
 };
 
 const randomSeed = () => Math.floor(Math.random() * 1e6);
+
+/** Size and centre `el` on (cx, cy) in its host's pixels. */
+const placeCentered = (el, cx, cy, width, height = width) => {
+  el.style.width = `${width}px`;
+  el.style.height = `${height}px`;
+  el.style.left = `${cx - width / 2}px`;
+  el.style.top = `${cy - height / 2}px`;
+  return el;
+};
 
 const scaleFrames = (pose, samples = 24) =>
   sampleKeyframes(
@@ -54,83 +90,121 @@ const scaleFrames = (pose, samples = 24) =>
 const opacityFrames = (pose, samples = 16) =>
   sampleKeyframes(pose, (p) => ({ opacity: p.opacity }), samples);
 
-// Tera-jewel facets drawn over the crystal slab (static markup, no card data).
-const TERA_FACETS_SVG = `<svg viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
-  <polygon points="0,0 100,0 100,30 72,48 50,30 28,48 0,30" fill="rgba(255,255,255,0.2)"/>
-  <polygon points="100,30 100,110 72,86 72,48" fill="rgba(0,0,0,0.14)"/>
-  <polygon points="0,30 28,48 28,86 0,110" fill="rgba(255,255,255,0.08)"/>
-  <polygon points="0,110 28,86 50,104 72,86 100,110 100,140 0,140" fill="rgba(0,0,0,0.22)"/>
-  <polygon points="28,48 50,30 72,48 50,62" fill="rgba(255,255,255,0.5)"/>
-  <polygon points="28,48 50,62 50,104 28,86" fill="rgba(255,255,255,0.22)"/>
-  <polygon points="72,48 50,62 50,104 72,86" fill="rgba(255,255,255,0.06)"/>
-  <g fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" vector-effect="non-scaling-stroke">
-    <polygon points="50,30 72,48 72,86 50,104 28,86 28,48"/>
-    <polyline points="28,48 50,62 72,48"/><line x1="50" y1="62" x2="50" y2="104"/>
-    <line x1="50" y1="30" x2="50" y2="0"/><line x1="72" y1="48" x2="100" y2="30"/>
-    <line x1="72" y1="86" x2="100" y2="110"/><line x1="50" y1="104" x2="50" y2="140"/>
-    <line x1="28" y1="86" x2="0" y2="110"/><line x1="28" y1="48" x2="0" y2="30"/>
-  </g>
-</svg>`;
-
-function playTeraEntry(rect, card) {
-  const rgb = brighten(fxRgbForCard(card), 0.1);
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-tera-entry' });
-  host.style.setProperty('--fx-tera-rgb', rgb.join(', '));
-
-  const smoke = layer('fx-tera-entry__smoke');
-  const arcs = layer('fx-tera-entry__arcs');
-  const slab = layer('fx-tera-entry__slab');
-  slab.innerHTML = TERA_FACETS_SVG;
-  const slabGlow = layer('fx-tera-entry__slab-glow');
-  const crown = layer('fx-tera-entry__crown');
-  crown.appendChild(layer('fx-tera-entry__crown-gem'));
-  const flash = layer('fx-tera-entry__flash');
-  const whiteout = layer('fx-tera-entry__whiteout');
-  const rays = layer('fx-tera-entry__rays');
-  const sparkles = layer('fx-tera-entry__particles');
-  const shards = layer('fx-tera-entry__particles');
-  host.append(
-    smoke,
-    arcs,
-    slabGlow,
-    slab,
-    crown,
-    flash,
-    sparkles,
-    whiteout,
-    rays,
-    shards
+const spinFrames = (pose, samples = 24) =>
+  sampleKeyframes(
+    pose,
+    (p) => ({
+      transform: `rotate(${p.rotate}deg) scale(${p.scale})`,
+      opacity: p.opacity,
+    }),
+    samples
   );
 
-  const at = (fraction) => TERA_ENTRY_MS * fraction;
-  const rising = burstParticles({
-    count: 12,
-    distance: rect.height * 0.75,
-    direction: -90,
-    spread: 70,
-    size: [rect.width * 0.04, rect.width * 0.1],
-    gravity: -rect.height * 0.15,
-    maxDelay: 0.5,
-    seed: randomSeed(),
-  });
-  const burst = burstParticles({
-    count: 22,
-    distance: rect.width * 1.15,
-    size: [rect.width * 0.12, rect.width * 0.26],
-    gravity: rect.height * 0.3,
-    maxDelay: 0.05,
-    seed: randomSeed(),
-  });
-  const glints = burstParticles({
-    count: 5,
-    distance: rect.width * 0.35,
-    size: [rect.width * 0.12, rect.width * 0.2],
-    maxDelay: 0.4,
-    orient: false,
-    seed: randomSeed(),
-  });
-  const shardColor = rgbCss(brighten(rgb, 0.3));
+/** A twinkle: a four-point star that pops, turns and shrinks away. */
+const twinkleFrames = [
+  { transform: 'scale(0) rotate(0deg)', opacity: 0 },
+  { transform: 'scale(1) rotate(45deg)', opacity: 1, offset: 0.35 },
+  { transform: 'scale(0) rotate(90deg)', opacity: 0 },
+];
 
+// Where the glitter twinkles after the Tera reveal, as fractions of the card.
+const TERA_GLINT_SPOTS = [
+  [-0.08, 0.12, 0],
+  [1.04, 0.3, 0.12],
+  [0.86, 1.02, 0.22],
+  [-0.02, 0.78, 0.32],
+  [0.5, -0.06, 0.4],
+];
+
+function playTeraEntry(rect) {
+  const W = rect.width;
+  const H = rect.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const mint = TERA_MINT_RGB;
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-tera-entry' });
+  host.style.setProperty('--fx-tera-rgb', mint.join(', '));
+  const at = (fraction) => TERA_ENTRY_MS * fraction;
+
+  const smoke = placeCentered(layer('fx-tera-entry__smoke'), cx, cy, H * 2.4);
+  const PUFFS = 14;
+  for (let i = 0; i < PUFFS; i += 1) {
+    const angle = (i / PUFFS) * Math.PI * 2 + (i % 2) * 0.2;
+    const radius = H * (0.66 + 0.08 * (i % 3));
+    const puff = layer('fx-tera-entry__puff');
+    placeCentered(
+      puff,
+      H * 1.2 + Math.cos(angle) * radius,
+      H * 1.2 + Math.sin(angle) * radius * 0.85,
+      H * (0.46 + 0.1 * ((i * 7) % 3))
+    );
+    smoke.appendChild(puff);
+  }
+  const rays = placeCentered(layer('fx-tera-entry__rays'), cx, cy, H * 3.4);
+  const ringA = placeCentered(layer('fx-tera-entry__ring'), cx, cy, H * 2.1);
+  const ringB = placeCentered(
+    layer('fx-tera-entry__ring fx-tera-entry__ring--wide'),
+    cx,
+    cy,
+    H * 2.6,
+    H * 2.2
+  );
+  const streakA = placeCentered(
+    layer('fx-tera-entry__streak'),
+    cx,
+    cy,
+    W * 7,
+    H * 0.09
+  );
+  const streakB = placeCentered(
+    layer('fx-tera-entry__streak fx-tera-entry__streak--thin'),
+    cx,
+    cy * 0.8,
+    W * 5,
+    H * 0.05
+  );
+  const slabGlow = layer('fx-tera-entry__slab-glow');
+  const slab = layer('fx-tera-entry__slab', TERA_FACETS_SVG);
+  const fill = layer('fx-tera-entry__fill');
+  slab.appendChild(fill);
+  const jewel = placeCentered(
+    layer('fx-tera-entry__jewel', teraJewelSvg()),
+    cx,
+    H * 0.2,
+    W * 1.3
+  );
+  const jewelWhite = layer(
+    'fx-tera-entry__jewel-white',
+    teraJewelSvg({ fill: '#fff', edge: '#fff' })
+  );
+  jewel.appendChild(jewelWhite);
+  const flash = layer('fx-tera-entry__flash');
+  const whiteout = layer('fx-tera-entry__whiteout');
+  const dust = layer('fx-tera-entry__particles');
+  const glitter = layer('fx-tera-entry__particles');
+  const glints = layer('fx-tera-entry__particles');
+  host.append(
+    smoke,
+    rays,
+    ringA,
+    ringB,
+    streakA,
+    streakB,
+    slabGlow,
+    slab,
+    jewel,
+    flash,
+    whiteout,
+    dust,
+    glitter,
+    glints
+  );
+
+  const streakFrames = sampleKeyframes(
+    teraStreakPose,
+    (p) => ({ transform: `scaleX(${p.scaleX})`, opacity: p.opacity }),
+    20
+  );
   const done = [
     animateFrames(flash, opacityFrames(teraFlashPose), {
       duration: TERA_ENTRY_MS,
@@ -150,16 +224,36 @@ function playTeraEntry(rect, card) {
       ),
       { duration: TERA_ENTRY_MS }
     ),
-    animateFrames(crown, scaleFrames(teraCrownPose), {
+    animateFrames(
+      fill,
+      sampleKeyframes(
+        teraFillPose,
+        (p) => ({ transform: `scaleY(${p.scaleY})`, opacity: p.opacity }),
+        32
+      ),
+      { duration: TERA_ENTRY_MS }
+    ),
+    animateFrames(streakA, streakFrames, { duration: TERA_ENTRY_MS }),
+    animateFrames(streakB, streakFrames, {
+      duration: TERA_ENTRY_MS,
+      delay: at(0.03),
+    }),
+    animateFrames(jewel, scaleFrames(teraJewelPose, 40), {
       duration: TERA_ENTRY_MS,
     }),
     animateFrames(
-      arcs,
+      jewelWhite,
+      sampleKeyframes(teraJewelPose, (p) => ({ opacity: p.white }), 24),
+      { duration: TERA_ENTRY_MS }
+    ),
+    animateFrames(ringA, spinFrames(teraRingPose), { duration: TERA_ENTRY_MS }),
+    animateFrames(
+      ringB,
       sampleKeyframes(
-        teraArcPose,
+        teraRingPose,
         (p) => ({
-          transform: `rotate(${p.rotate}deg) scale(${p.scale})`,
-          opacity: p.opacity,
+          transform: `rotate(${-0.7 * p.rotate}deg) scale(${p.scale})`,
+          opacity: p.opacity * 0.7,
         }),
         24
       ),
@@ -168,133 +262,291 @@ function playTeraEntry(rect, card) {
     animateFrames(whiteout, scaleFrames(teraWhiteoutPose, 32), {
       duration: TERA_ENTRY_MS,
     }),
-    animateFrames(
-      rays,
-      sampleKeyframes(
-        teraRaysPose,
-        (p) => ({
-          transform: `rotate(${p.rotate}deg) scale(${p.scale})`,
-          opacity: p.opacity,
-        }),
-        24
-      ),
-      { duration: TERA_ENTRY_MS }
-    ),
-    animateFrames(smoke, scaleFrames(teraSmokePose), {
+    animateFrames(rays, spinFrames(teraRaysPose), { duration: TERA_ENTRY_MS }),
+    animateFrames(smoke, spinFrames(teraSmokePose), {
       duration: TERA_ENTRY_MS,
     }),
-    ...spawnParticles(sparkles, rising, {
-      className: 'fx-particle--mote',
-      color: rgbCss(brighten(rgb, 0.5)),
-      duration: at(0.4),
-      delay: at(0.2),
-    }),
-    ...spawnParticles(shards, burst, {
-      className: 'fx-particle--shard fx-tera-entry__shard',
-      color: shardColor,
-      duration: at(0.36),
-      delay: at(TERA_SHATTER_AT),
-    }),
-    ...spawnParticles(shards, glints, {
-      className: 'fx-particle fx-tera-entry__glint',
-      color: '#fff',
-      duration: at(0.18),
-      delay: at(TERA_GLINT_AT),
-    }),
   ];
+
+  const rising = burstParticles({
+    count: 16,
+    distance: H * 0.8,
+    direction: -90,
+    spread: 160,
+    size: [W * 0.03, W * 0.07],
+    gravity: -H * 0.2,
+    maxDelay: 0.5,
+    seed: randomSeed(),
+  });
+  done.push(
+    ...spawnParticles(dust, rising, {
+      className: 'fx-particle--mote',
+      color: rgbCss([200, 255, 235]),
+      duration: at(0.4),
+      delay: at(0.14),
+    })
+  );
+  for (const colour of TERA_GLITTER_COLOURS) {
+    const sparks = burstParticles({
+      count: 16,
+      distance: W * 1.5,
+      size: [W * 0.03, W * 0.065],
+      gravity: H * 0.25,
+      maxDelay: 0.12,
+      orient: false,
+      seed: randomSeed(),
+    });
+    done.push(
+      ...spawnParticles(glitter, sparks, {
+        className: 'fx-particle fx-tera-entry__glitter',
+        color: colour,
+        duration: at(0.34),
+        delay: at(TERA_BURST_AT - 0.01),
+      })
+    );
+  }
+  TERA_GLINT_SPOTS.forEach(([fx, fy, lag]) => {
+    const glint = placeCentered(
+      layer('fx-tera-entry__glint'),
+      W * fx,
+      H * fy,
+      W * 0.28
+    );
+    glints.appendChild(glint);
+    done.push(
+      animateFrames(glint, twinkleFrames, {
+        duration: at(0.16),
+        delay: at(TERA_GLINT_AT + lag * 0.5),
+        easing: 'ease-out',
+      })
+    );
+  });
   removeWhen(host, done, TERA_ENTRY_MS + BACKSTOP_PAD_MS);
 }
 
-// Six swooshes on tilted elliptical orbits: [colour, orbit phase, tilt, size].
-const MEGA_SWOOSHES = [
-  ['blue', 0, -18, 1.05],
-  ['orange', 60, 24, 0.95],
-  ['blue', 120, 62, 1.18],
-  ['orange', 180, -48, 1.12],
-  ['blue', 240, 8, 0.88],
-  ['orange', 300, -75, 1.24],
+const viewportRect = () => ({
+  left: 0,
+  top: 0,
+  width: window.innerWidth,
+  height: window.innerHeight,
+});
+
+/**
+ * Host for the Mega hex field. TCG Live paints it onto the mat itself, so it
+ * goes inside the parent page's mat surface: it inherits the table tilt and
+ * the mat outline, and the card zones (iframes) stay on top of it. Without a
+ * mat surface it floats as a soft-edged overlay around the card.
+ */
+const spawnMegaField = (rect) => {
+  const surface = document.getElementById('battleMatSurface');
+  if (surface?.isConnected && surface.offsetWidth > 1) {
+    const place = megaFieldPlacement(rect, surface.getBoundingClientRect(), {
+      width: surface.offsetWidth,
+      height: surface.offsetHeight,
+    });
+    if (place) {
+      const host = layer('fx-mega-field');
+      surface.appendChild(host);
+      return { host, place };
+    }
+  }
+  const stage = megaStageRect(rect, viewportRect());
+  const place = megaFieldPlacement(rect, stage, stage);
+  if (!place) return null;
+  const host = spawnOverlay({
+    rect: stage,
+    className: 'fx-overlay fx-mega-field fx-mega-field--floating',
+  });
+  return { host, place };
+};
+
+// Brush strokes of the vortex: [colour, phase°, orbit radius ×H, length ×H,
+// orbit tilt°, spin, launch lag]. Mixed radii and tilts read as a 3D swirl.
+const MEGA_SLASHES = [
+  ['blue', 0, 1.25, 1.3, -6, 1, 0],
+  ['orange', 40, 1.55, 1.1, 10, 1, 0.01],
+  ['blue', 85, 1.0, 0.9, 4, 1, 0.02],
+  ['orange', 130, 1.35, 1.4, -12, 1, 0],
+  ['blue', 175, 1.7, 1.2, 8, 1, 0.015],
+  ['orange', 220, 1.1, 1.0, -4, 1, 0.025],
+  ['blue', 265, 1.45, 1.5, 14, 1, 0.005],
+  ['orange', 310, 1.8, 1.0, -10, 1, 0.02],
+  ['blue', 20, 2.05, 0.8, 22, -1, 0.03],
+  ['orange', 150, 0.85, 0.7, -24, -1, 0.035],
+  ['blue', 200, 2.2, 1.1, -18, -1, 0.04],
+  ['orange', 330, 0.95, 0.8, 30, -1, 0.03],
 ];
+const MEGA_ORBIT_SQUASH = 0.5;
 
-function playMegaEntry(rect) {
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-mega-entry' });
-  const diameter = Math.max(rect.width, rect.height) * 1.45;
-  const centered = (el, size) => {
-    el.style.width = `${size}px`;
-    el.style.height = `${size}px`;
-    el.style.left = `${(rect.width - size) / 2}px`;
-    el.style.top = `${(rect.height - size) / 2}px`;
-  };
-
-  const sphere = layer('fx-mega-entry__sphere');
-  centered(sphere, diameter);
-  const hex = layer('fx-mega-entry__hex');
-  sphere.appendChild(hex);
-  sphere.appendChild(layer('fx-mega-entry__rim'));
-  const flash = layer('fx-mega-entry__flash');
-  const embers = layer('fx-mega-entry__embers');
-  host.append(sphere, flash, embers);
+/** The mat-wide part: hex field revealed from the card, wavefront and glass lens. */
+function playMegaField(rect, run) {
+  const spawned = spawnMegaField(rect);
+  if (!spawned) return [];
+  const { host, place } = spawned;
+  const { x, y, unit, reach } = place;
+  const wash = layer('fx-mega-field__wash');
+  const hexes = [HEX_WHITE_CELLS, HEX_TINT_CELLS].map((cells) => {
+    const tile = hexTile(Math.max(8, unit * 0.16), cells);
+    const hex = layer('fx-mega-field__hex');
+    hex.style.backgroundImage = svgDataUrl(tile.svg);
+    hex.style.backgroundSize = `${tile.width}px ${tile.height}px`;
+    return hex;
+  });
+  const sheen = layer('fx-mega-field__sheen');
+  const wave = placeCentered(layer('fx-mega-field__wave'), x, y, reach * 2);
+  const lens = placeCentered(layer('fx-mega-field__lens'), x, y, unit * 3.2);
+  lens.appendChild(layer('fx-mega-field__lens-core'));
+  host.append(wash, ...hexes, sheen, wave, lens);
 
   const done = [
-    animateFrames(sphere, scaleFrames(megaSpherePose, 32), {
-      duration: MEGA_ENTRY_MS,
-    }),
-    animateFrames(
-      hex,
+    run(
+      host,
       sampleKeyframes(
-        megaHexPose,
-        (p) => ({ transform: `rotate(${p.rotate}deg)`, opacity: p.opacity }),
-        16
-      ),
-      { duration: MEGA_ENTRY_MS }
+        megaFieldPose,
+        (p) => ({
+          clipPath: `circle(${Math.max(0.5, p.reveal * reach)}px at ${x}px ${y}px)`,
+          opacity: p.opacity,
+        }),
+        32
+      )
     ),
-    animateFrames(flash, scaleFrames(megaFlashPose), {
-      duration: MEGA_ENTRY_MS,
-    }),
+    run(
+      wash,
+      sampleKeyframes(
+        megaWashPose,
+        (p) => ({ transform: `translate(${p.x * 100}%, ${p.y * 100}%)` }),
+        8
+      )
+    ),
+    run(
+      sheen,
+      sampleKeyframes(
+        megaWashPose,
+        (p) => ({ transform: `translateX(${p.x * 500}%)`, opacity: p.opacity }),
+        8
+      )
+    ),
+    run(wave, scaleFrames(megaWavePose)),
+    run(lens, scaleFrames(megaLensPose, 32)),
+  ];
+  removeWhen(host, done, MEGA_ENTRY_MS + BACKSTOP_PAD_MS);
+  return done;
+}
+
+/** The card-local part: two-tone card, keystone orb, burst and slash vortex. */
+function playMegaCard(rect, run) {
+  const W = rect.width;
+  const H = rect.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-mega-entry' });
+  const silhouette = layer('fx-mega-entry__silhouette', MEGA_SILHOUETTE_SVG);
+  const orb = placeCentered(
+    layer('fx-mega-entry__orb', MEGA_ORB_SVG),
+    cx,
+    cy,
+    W
+  );
+  const flash = placeCentered(layer('fx-mega-entry__flash'), cx, cy, H * 3);
+  const vortex = layer('fx-mega-entry__vortex');
+  const burst = layer('fx-mega-entry__burst');
+  const embers = placeCentered(
+    layer('fx-mega-entry__burst'),
+    cx,
+    cy - H * 0.4,
+    W * 2.6,
+    H
+  );
+  host.append(silhouette, orb, vortex, flash, burst, embers);
+
+  const done = [
+    run(
+      silhouette,
+      sampleKeyframes(
+        (t) => megaSilhouettePose(t, { squareY: W / H }),
+        (p) => ({ transform: `scaleY(${p.scaleY})`, opacity: p.opacity }),
+        32
+      )
+    ),
+    run(orb, spinFrames(megaOrbPose, 48)),
+    run(flash, scaleFrames(megaFlashPose, 32)),
   ];
 
-  for (const [colour, phase, tilt, size] of MEGA_SWOOSHES) {
-    const swoosh = layer(
-      `fx-mega-entry__swoosh fx-mega-entry__swoosh--${colour}`
+  for (const [colour, phase, orbit, length, tilt, spin, lag] of MEGA_SLASHES) {
+    const len = H * length * 1.5;
+    const slash = placeCentered(
+      layer(
+        `fx-mega-entry__slash fx-mega-entry__slash--${colour}`,
+        megaSlashSvg(colour)
+      ),
+      cx,
+      cy,
+      len * 0.3,
+      len
     );
-    centered(swoosh, diameter * size);
-    host.appendChild(swoosh);
+    vortex.appendChild(slash);
     const frames = sampleKeyframes(
-      (t) => megaSwirlPose(t, { phase }),
+      (t) => megaSlashPose(t, { phase, spin, lag }),
       (p) => ({
-        transform: `rotate(${tilt}deg) scaleY(0.55) rotate(${p.rotate}deg) scale(${p.scale})`,
+        transform: `rotate(${tilt}deg) scaleY(${MEGA_ORBIT_SQUASH}) rotate(${p.rotate}deg) translateX(${p.radius * orbit * H * 1.2}px) scale(${p.scale}, ${p.scale * spin})`,
         opacity: p.opacity,
       }),
-      48
+      60
     );
-    done.push(animateFrames(swoosh, frames, { duration: MEGA_ENTRY_MS }));
+    done.push(run(slash, frames));
   }
 
+  MEGA_SPARK_COLOURS.forEach((colour) => {
+    const sparks = burstParticles({
+      count: 12,
+      distance: H * 1.9,
+      size: [H * 0.18, H * 0.34],
+      aspect: 0.14,
+      maxDelay: 0.08,
+      seed: randomSeed(),
+    });
+    done.push(
+      ...spawnParticles(burst, sparks, {
+        className: 'fx-particle--streak',
+        color: colour,
+        duration: MEGA_ENTRY_MS * 0.2,
+        delay: MEGA_ENTRY_MS * (MEGA_BURST_AT - 0.01),
+      })
+    );
+  });
   const rising = burstParticles({
-    count: 18,
-    distance: rect.height * 0.95,
+    count: 22,
+    distance: H * 1.4,
     direction: -90,
-    spread: 120,
-    size: [rect.width * 0.04, rect.width * 0.09],
-    gravity: -rect.height * 0.2,
-    maxDelay: 0.5,
+    spread: 110,
+    size: [W * 0.03, W * 0.07],
+    gravity: -H * 0.3,
+    maxDelay: 0.6,
     seed: randomSeed(),
   });
   done.push(
     ...spawnParticles(embers, rising, {
       className: 'fx-particle--mote',
       color: rgbCss(MEGA_EMBER_RGB),
-      duration: MEGA_ENTRY_MS * 0.6,
-      delay: MEGA_ENTRY_MS * 0.1,
+      duration: MEGA_ENTRY_MS * 0.5,
+      delay: MEGA_ENTRY_MS * 0.22,
     })
   );
   removeWhen(host, done, MEGA_ENTRY_MS + BACKSTOP_PAD_MS);
 }
 
-/** Play the signature entry for `kind` over `rect`. Returns false for other kinds. */
-export function playSignatureEntry(kind, rect, card) {
+function playMegaEntry(rect) {
+  const run = (el, frames, options = {}) =>
+    animateFrames(el, frames, { duration: MEGA_ENTRY_MS, ...options });
+  playMegaField(rect, run);
+  playMegaCard(rect, run);
+}
+
+/** Play the signature entry for `kind` over the card at `rect`. Returns false for other kinds. */
+export function playSignatureEntry(kind, rect) {
   if (!rect) return false;
   if (kind === 'tera') {
-    playTeraEntry(rect, card);
+    playTeraEntry(rect);
     return true;
   }
   if (kind === 'mega') {
@@ -310,5 +562,5 @@ export const enter = (plan) => {
   const card = registry.get(plan.instanceId)?.card;
   const kind = signatureEntryKind(card);
   if (!kind) return;
-  playSignatureEntry(kind, rectForInstance(plan.instanceId, registry), card);
+  playSignatureEntry(kind, rectForInstance(plan.instanceId, registry));
 };

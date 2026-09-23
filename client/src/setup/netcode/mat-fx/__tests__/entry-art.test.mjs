@@ -1,0 +1,110 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  HEX_TINT_CELLS,
+  HEX_WHITE_CELLS,
+  MEGA_ORB_SVG,
+  MEGA_SILHOUETTE_SVG,
+  hexPoints,
+  hexTile,
+  jewelStarPoints,
+  megaSlashSvg,
+  svgDataUrl,
+  teraJewelSvg,
+} from '../entry-art.mjs';
+
+const pointsOf = (str) =>
+  str.split(' ').map((pair) => pair.split(',').map(Number));
+
+test('hexPoints: six corners at the radius, pointy top', () => {
+  const pts = pointsOf(hexPoints(10, 20, 5));
+  assert.equal(pts.length, 6);
+  for (const [x, y] of pts)
+    assert.ok(Math.abs(Math.hypot(x - 10, y - 20) - 5) < 0.01);
+  assert.deepEqual(pts[0], [10, 15], 'first corner straight up');
+});
+
+test('hexTile: tile size is whole lattice periods of the cell grid', () => {
+  for (const cells of [HEX_WHITE_CELLS, HEX_TINT_CELLS]) {
+    assert.equal(
+      cells.length % 2,
+      0,
+      'offset rows need an even row count to tile'
+    );
+    const tile = hexTile(10, cells);
+    assert.ok(
+      Math.abs(tile.width - Math.sqrt(3) * 10 * cells[0].length) < 0.01
+    );
+    assert.equal(tile.height, 15 * cells.length);
+  }
+});
+
+test('hexTile: cells cut by the tile edge are redrawn so the seams line up', () => {
+  const cells = [
+    ['#a', '#b'],
+    ['#c', '#d'],
+  ];
+  const tile = hexTile(10, cells);
+  assert.ok(tile.cells > 4, `edge cells repeated (${tile.cells} polygons)`);
+  assert.equal((tile.svg.match(/fill='#a'/g) || []).length > 1, true);
+});
+
+test('hexTile: two layers with different periods share one lattice', () => {
+  const white = hexTile(10, HEX_WHITE_CELLS);
+  const tint = hexTile(10, HEX_TINT_CELLS);
+  const colW = Math.sqrt(3) * 10;
+  assert.ok(
+    Math.abs(white.width / colW - Math.round(white.width / colW)) < 0.01
+  );
+  assert.ok(Math.abs(tint.width / colW - Math.round(tint.width / colW)) < 0.01);
+  assert.notEqual(white.width, tint.width);
+});
+
+test('svgDataUrl: escapes characters that break a CSS url()', () => {
+  const url = svgDataUrl(`<svg fill="#fff"></svg>`);
+  assert.ok(url.startsWith('url("data:image/svg+xml,'));
+  assert.ok(!/[<>#]/.test(url.slice(5, -2)));
+  assert.equal(
+    (url.match(/"/g) || []).length,
+    2,
+    'only the wrapping quotes remain'
+  );
+});
+
+test('tera jewel: six crystal tips alternating with notches, tallest on top', () => {
+  const pts = pointsOf(jewelStarPoints());
+  assert.equal(pts.length, 12);
+  const tips = pts
+    .filter((_, i) => i % 2 === 0)
+    .map(([x, y]) => Math.hypot(x, y));
+  const notches = pts
+    .filter((_, i) => i % 2 === 1)
+    .map(([x, y]) => Math.hypot(x, y));
+  assert.ok(Math.min(...tips) > Math.max(...notches));
+  assert.equal(Math.max(...tips), tips[0], 'top tip is the tallest');
+  assert.ok(
+    pts[0][1] < 0 && Math.abs(pts[0][0]) < 0.01,
+    'first tip points straight up'
+  );
+});
+
+test('artwork SVGs are well-formed single roots with the requested colours', () => {
+  for (const svg of [
+    teraJewelSvg(),
+    teraJewelSvg({ fill: '#fff' }),
+    MEGA_ORB_SVG,
+    MEGA_SILHOUETTE_SVG,
+    megaSlashSvg('blue'),
+    megaSlashSvg('orange'),
+  ]) {
+    assert.ok(svg.trim().startsWith('<svg'));
+    assert.ok(svg.trim().endsWith('</svg>'));
+  }
+  assert.ok(teraJewelSvg({ fill: '#fff' }).includes("fill='#fff'"));
+  assert.equal((teraJewelSvg().match(/id='/g) || []).length, 1);
+  assert.ok(
+    !teraJewelSvg({ fill: '#fff' }).includes("id='"),
+    'flat copy declares no ids'
+  );
+  assert.notEqual(megaSlashSvg('blue'), megaSlashSvg('orange'));
+});

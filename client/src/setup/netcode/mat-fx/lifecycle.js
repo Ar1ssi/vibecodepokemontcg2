@@ -53,7 +53,7 @@ export const evolve = (plan) => {
   if (!rect) return;
   // Design 027: a Mega or Tera evolution plays its signature entry instead.
   const evolved = registry.get(plan.instanceId)?.card;
-  if (playSignatureEntry(signatureEntryKind(evolved), rect, evolved)) return;
+  if (playSignatureEntry(signatureEntryKind(evolved), rect)) return;
   const src = cardSrc(registry.get(id)?.element);
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-evolve-burst' });
   const pillar = document.createElement('div');
