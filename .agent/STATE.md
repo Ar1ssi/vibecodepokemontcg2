@@ -13,8 +13,9 @@ Focus: design 034 on branch `feature/ability-behaviour` (worktree
   new pure `rules/ability-triggers.mjs` (D119) + wired Checkup damage (Froslass/Magmortar/Pecharunt/
   TR Tyranitar/Trevenant), mandatory end-of-turn discard (Great Tusk ex), opponent-evolve counters
   (TR Ampharos), thorns suppression/zone gate.
-Active: slice 4a done, uncommitted. Next: commit it, then slice 4b (`movedToActiveTurn` stamp at
-  every switch site + on-promotion activation window, on-KO energy moves, `abilityExtraAttack`).
+Active: slice 4a committed (163448d). Next: slice 4b — read `.agent/designs/034-slice4b-handoff.md`
+  (`movedToActiveTurn` stamp at every switch site + on-promotion activation window, on-KO energy
+  moves, `abilityExtraAttack`).
 Next: design 034 slices 4b/5/6/7 (ledger in NEXTSTEPS.md + design Deviations). Slice-4 gaps:
   on-promotion window + `movedToActiveTurn` stamp; on-KO energy choice; optional end-of-turn
   abilities. Slice-3 gaps: Special Energy play lock on attachCard; inspector `listAbilities` lacks
