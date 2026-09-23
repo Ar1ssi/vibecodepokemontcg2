@@ -66,14 +66,6 @@ const ENERGY_WORD_TYPES = {
 };
 const KNOWN_TYPES = new Set(Object.values(ENERGY_WORD_TYPES).map((type) => type.toLowerCase()));
 
-const RULE_BOX_VALUES = {
-  basic: 'basic',
-  ex: 'ex',
-  tera: 'tera',
-  radiant: 'radiant',
-  mega: 'mega',
-};
-
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -92,7 +84,9 @@ function nameMatches(actual, wanted) {
  */
 function splitNames(phrase) {
   const raw = String(phrase || '').trim();
-  if (/\b(any|all|each|card|cards|pokémon|pokemon|energy|tool|stadium)\b/.test(raw)) return null;
+  if (/\b(any|all|each|card|cards|pokémon|pokemon|energy|tool|stadium|supporter|item|trainer|basic)\b/.test(raw)) {
+    return null;
+  }
   const names = raw
     .split(/\s+and\s+/)
     .map((name) => name.trim())
@@ -248,27 +242,27 @@ const CLAUSES = [
   // ── Rule box / stage of the defender ───────────────────────────────────────
   [
     /^(?:your opponent's active pokémon|the defending pokémon) (?:isn't|is not) a pokémon[- ]ex$/,
-    () => ({ desc: { kind: 'defenderRuleBox', value: RULE_BOX_VALUES.ex }, printedNegated: true }),
+    () => ({ desc: { kind: 'defenderRuleBox', value: 'ex' }, printedNegated: true }),
   ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) is a pokémon[- ]ex$/,
-    () => ({ desc: { kind: 'defenderRuleBox', value: RULE_BOX_VALUES.ex }, printedNegated: false }),
+    () => ({ desc: { kind: 'defenderRuleBox', value: 'ex' }, printedNegated: false }),
   ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) (?:isn't|is not) a basic pokémon$/,
-    () => ({ desc: { kind: 'defenderRuleBox', value: RULE_BOX_VALUES.basic }, printedNegated: true }),
+    () => ({ desc: { kind: 'defenderRuleBox', value: 'basic' }, printedNegated: true }),
   ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) is a basic pokémon$/,
-    () => ({ desc: { kind: 'defenderRuleBox', value: RULE_BOX_VALUES.basic }, printedNegated: false }),
+    () => ({ desc: { kind: 'defenderRuleBox', value: 'basic' }, printedNegated: false }),
   ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) (?:isn't|is not) a (tera|radiant|mega) pokémon$/,
-    (m) => ({ desc: { kind: 'defenderRuleBox', value: RULE_BOX_VALUES[m[1]] }, printedNegated: true }),
+    (m) => ({ desc: { kind: 'defenderRuleBox', value: m[1] }, printedNegated: true }),
   ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) is a (tera|radiant|mega) pokémon$/,
-    (m) => ({ desc: { kind: 'defenderRuleBox', value: RULE_BOX_VALUES[m[1]] }, printedNegated: false }),
+    (m) => ({ desc: { kind: 'defenderRuleBox', value: m[1] }, printedNegated: false }),
   ],
 
   // ── What happened this turn ────────────────────────────────────────────────
@@ -364,15 +358,15 @@ const CLAUSES = [
   [
     /^this pokémon has no (.+?) energy attached$/,
     (m) => ({
-      desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[1]), mode: 'atLeast', n: 1 },
+      desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[1]), n: 1 },
       printedNegated: true,
     }),
   ],
   [
     /^this pokémon has any (.+?) energy attached$/,
     (m) => ({
-      desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[1]), mode: 'atLeast', n: 1 },
-      printedNegated: true,
+      desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[1]), n: 1 },
+      printedNegated: false,
     }),
   ],
   [
@@ -493,10 +487,16 @@ function energyCheck(cond, ctx) {
   const wanted = cond.type || cond.name;
   if (!wanted) return false;
   const word = String(wanted).toLowerCase();
+  // A Holon Research Tower unit is a dual token ("Lightning|Fighting"): it provides either type.
+  const typeMatches = (token) =>
+    String(token)
+      .toLowerCase()
+      .split('|')
+      .some((part) => part === word);
   const count = KNOWN_TYPES.has(word)
-    ? list(ctx.attackerEnergyTypes).filter((t) => String(t).toLowerCase() === word).length
+    ? list(ctx.attackerEnergyTypes).filter(typeMatches).length
     : list(ctx.attackerEnergyNames).filter((n) => nameMatches(n, wanted)).length;
-  return cond.mode === 'none' ? count === 0 : count >= num(cond.n || 1);
+  return count >= num(cond.n || 1);
 }
 
 function discardEnergyCount(ctx, cond) {

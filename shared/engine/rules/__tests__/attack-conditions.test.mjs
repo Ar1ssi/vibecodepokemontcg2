@@ -185,6 +185,19 @@ const CASES = [
     { attackerEnergyTypes: ['Fire'] },
   ],
   [
+    'attackerEnergyType',
+    'If this Pokémon has any {L} Energy attached, this attack does nothing.',
+    { attackerEnergyTypes: ['Fire'] },
+    { attackerEnergyTypes: ['Lightning'] },
+  ],
+  [
+    'attackerEnergyType',
+    'If this Pokémon has no {L} Energy attached, this attack does nothing.',
+    // Holon Research Tower units provide either of their two types.
+    { attackerEnergyTypes: ['Lightning|Fighting'] },
+    { attackerEnergyTypes: ['Fire|Water'] },
+  ],
+  [
     'discardEnergyCount',
     "If you don't have 10 or more basic {F} Energy cards in your discard pile, this attack does nothing.",
     { ownDiscardEnergy: Array.from({ length: 10 }, () => ({ name: 'Basic Fighting Energy', type: 'Fighting', basic: true })) },

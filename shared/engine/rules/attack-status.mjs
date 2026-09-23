@@ -9,20 +9,23 @@
  *   parseAttackStatusBranches(text, { selfName }) → [{ when, target, statuses }]
  *   statusesFromBranches(branches, { coin, headsCount, flips }) → { defenderConditions, attackerConditions }
  *
- * `when` is 'always', 'heads', 'tails', { firstFlip:'tails' }, { headsAtLeast:n },
+ * `when` is 'always', 'heads', 'tails', { firstFlip:'heads'|'tails' }, { headsAtLeast:n },
  * { headsExactly:n }, { tailsAtLeast:n } or { allHeads:true }. Threshold chains
  * ("if 1 / if 2 / if all of them are heads") are exclusive: only the highest matching
  * clause's statuses apply, so a 2-heads flip does not also apply the 1-head status.
  *
- * The clause's target is the Pokémon it names: "your opponent's Active Pokémon" (the
- * defender) unless the sentence says "this Pokémon" (the attacker, after the parser folds
- * the attacker's own name into it); a sentence naming both targets applies to both.
+ * The target comes from the status clause's own subject: "your opponent's Active Pokémon"
+ * (the defender) unless the clause says "this Pokémon" (the attacker, after the parser folds
+ * the attacker's own name into it); a clause naming both applies to both. A conditional
+ * sentence that does not match one of the known coin/threshold gates applies NOTHING —
+ * "if …" wordings this parser cannot evaluate must not leak in as unconditional statuses.
  *
- * Unknown wording returns [] and the attack applies no status. Pure: no state, no randomness.
+ * Unknown wording returns [] (the legacy family detection still covers a bare "… is Poisoned"
+ * defender wording). Pure: no state, no randomness.
  */
 
 import { normalizeAttackText } from './attack-steps.mjs';
-import { classifyAttackEffect, dualStatus, selfStatus } from './attack-effects.mjs';
+import { classifyAttackEffect } from './attack-effects.mjs';
 
 const STATUS_WORDS = {
   asleep: 'Asleep',
@@ -41,19 +44,24 @@ const VERB_STATUS = {
 
 const properStatus = (word) => STATUS_WORDS[String(word || '').toLowerCase()] || null;
 
-// Leading coin/threshold gate of a status sentence. Order matters: the specific threshold
-// wordings must come before the bare "if N of them is heads" form.
+// Leading coin/threshold gate of a status sentence. Order matters: the specific wordings must
+// come before the bare "if N of them is heads" form. Anything starting with "if " that no gate
+// matches is skipped, never treated as unconditional.
 const GATES = [
-  [/^if heads,?\s+/, () => 'heads'],
+  [/^if heads?,?\s+/, () => 'heads'],
   [/^if tails,?\s+/, () => 'tails'],
   [/^if (?:the )?first flip is tails,?\s+/, () => ({ firstFlip: 'tails' })],
-  [/^if all of them are heads,?\s+/, () => ({ allHeads: true })],
+  [/^if (?:the )?first coin is (heads|tails),?\s+/, (m) => ({ firstFlip: m[1] })],
+  [/^if all (?:of them )?are heads,?\s+/, () => ({ allHeads: true })],
   [/^if at least (\d+) of them are heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
-  [/^if (\d+) or more of them are heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
+  [/^if (\d+) or more (?:of them )?(?:are|is) heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
+  [/^if you get (\d+) or more heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
+  [/^if any of them (?:is|are) heads,?\s+/, () => ({ headsAtLeast: 1 })],
   [/^if (?:either|1 or both) of them (?:is|are) heads,?\s+/, () => ({ headsAtLeast: 1 })],
-  [/^if both of them are heads,?\s+/, () => ({ headsAtLeast: 2 })],
+  [/^if both (?:of them )?are heads,?\s+/, () => ({ headsAtLeast: 2 })],
   [/^if (?:either|1 or both) of them (?:is|are) tails,?\s+/, () => ({ tailsAtLeast: 1 })],
-  [/^if both of them are tails,?\s+/, () => ({ tailsAtLeast: 2 })],
+  [/^if both (?:of them )?are tails,?\s+/, () => ({ tailsAtLeast: 2 })],
+  [/^if only (\d+) (?:of them )?(?:is|are) heads,?\s+/, (m) => ({ headsExactly: Number(m[1]) })],
   [/^if (\d+) of them (?:is|are) heads,?\s+/, (m) => ({ headsExactly: Number(m[1]) })],
 ];
 
@@ -66,46 +74,45 @@ function sentenceGate(sentence) {
   return null;
 }
 
+const SUBJECT = `(?:this pokémon|your opponent's active pokémon)`;
+// One or more status nouns joined by "and" / "or" / commas ("Burned, Paralyzed, and Poisoned").
+const STATUS_LIST = `(?:'?(?:${STATUS_RE})'?)(?:\\s*(?:,\\s*(?:and|or)?\\s*|and\\s+|or\\s+)'?(?:${STATUS_RE})'?)*`;
+const BOTH_RE = new RegExp(`both (${SUBJECT}) and (${SUBJECT}) (?:is|are) (?:now|also) (${STATUS_LIST})`);
+const NOW_RE = new RegExp(`(${SUBJECT}) (?:is|are) (?:now|also) (${STATUS_LIST})`);
+const PUT_RE = new RegExp(`put (${SUBJECT}) to sleep`);
+const VERB_RE = new RegExp(`\\b(paralyze|poison|burn|confuse) (${SUBJECT})`);
+
+const statusList = (text) => [
+  ...new Set((String(text || '').match(new RegExp(STATUS_RE, 'g')) || []).map(properStatus).filter(Boolean)),
+];
+const targetOf = (subject) => (/this pokémon/.test(subject) ? 'attacker' : 'defender');
+
 /**
  * The status application inside a sentence: `{ target, statuses }`, or null when the
  * sentence does not apply one (conditions like "is still asleep" are not applications).
  */
 function statusesIn(sentence) {
   const text = String(sentence || '');
-  const mentionsSelf = /this pokémon/.test(text);
-  const mentionsDefender = /your opponent's active pokémon/.test(text);
-  // "Both this Pokémon and the Defending Pokémon are now Asleep." applies to both sides.
-  const target = mentionsSelf && mentionsDefender ? 'both' : mentionsSelf ? 'attacker' : 'defender';
-
-  const dual = dualStatus(text);
-  if (dual) {
-    const statuses = dual.map(properStatus).filter(Boolean);
-    return statuses.length > 0 ? { target, statuses } : null;
+  const both = BOTH_RE.exec(text);
+  if (both) {
+    const statuses = statusList(both[3]);
+    if (statuses.length > 0) return { target: 'both', statuses };
   }
-  const now = new RegExp(`(?:is|are) (?:now|also) (${STATUS_RE})`).exec(text);
+  const now = NOW_RE.exec(text);
   if (now) {
-    const status = properStatus(now[1]);
-    return status ? { target, statuses: [status] } : null;
+    const statuses = statusList(now[2]);
+    if (statuses.length > 0) return { target: targetOf(now[1]), statuses };
   }
-  if (/put (?:this pokémon|your opponent's active pokémon) to sleep/.test(text)) {
-    return { target, statuses: ['Asleep'] };
-  }
-  const verb = /\b(paralyze|poison|burn|confuse) (?:this pokémon|your opponent's active pokémon)/.exec(text);
-  if (verb) return { target, statuses: [VERB_STATUS[verb[1]]] };
+  const put = PUT_RE.exec(text);
+  if (put) return { target: targetOf(put[1]), statuses: ['Asleep'] };
+  const verb = VERB_RE.exec(text);
+  if (verb) return { target: targetOf(verb[2]), statuses: [VERB_STATUS[verb[1]]] };
   return null;
 }
 
-// The legacy family detection, kept as a fallback for wordings the clause patterns above do
-// not read: if it applied a status before, it must keep applying one.
+// The legacy family detection, kept as a fallback for bare wordings the clause patterns above
+// do not read ("Your opponent's Active Pokémon is Poisoned.").
 function legacyBranches(normalized) {
-  const self = selfStatus(normalized);
-  if (self) {
-    return [{ when: 'always', target: 'attacker', statuses: [properStatus(self)] }];
-  }
-  const dual = dualStatus(normalized);
-  if (dual) {
-    return [{ when: 'always', target: 'defender', statuses: dual.map(properStatus) }];
-  }
   const familyStatus = {
     'status-asleep': 'Asleep',
     'status-paralyzed': 'Paralyzed',
@@ -127,10 +134,17 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
   const normalized = normalizeAttackText(text, selfName);
   if (!normalized) return [];
   const branches = [];
+  let sawConditional = false;
   for (const raw of normalized.split(/(?<=\.)\s+/)) {
     const sentence = raw.trim().replace(/\.$/, '');
     if (!sentence) continue;
     const gate = sentenceGate(sentence);
+    if (!gate && /^if\b/.test(sentence)) {
+      // A conditional wording this parser cannot evaluate: apply nothing rather than
+      // everything (the condition may be a damage gate, a discard chain or a prize count).
+      sawConditional = true;
+      continue;
+    }
     const body = gate ? sentence.slice(gate.length).trim() : sentence;
     const application = statusesIn(body);
     if (!application) continue;
@@ -140,11 +154,13 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
       statuses: application.statuses,
     });
   }
-  return branches.length > 0 ? branches : legacyBranches(normalized);
+  if (branches.length > 0) return branches;
+  return sawConditional ? [] : legacyBranches(normalized);
 }
 
-const isThreshold = (when) => typeof when === 'object' && when !== null;
-const rankOf = (when, flips) => {
+// `firstFlip` is a one-off condition, not a rung on the heads-count ladder.
+const isThreshold = (when) => typeof when === 'object' && when !== null && when.firstFlip == null;
+const rankOf = (when) => {
   if (when.allHeads) return Infinity;
   if (when.headsExactly != null) return when.headsExactly;
   if (when.headsAtLeast != null) return when.headsAtLeast;
@@ -193,7 +209,7 @@ export function statusesFromBranches(branches, { coin = null, headsCount = 0, fl
   // A threshold chain is a ladder: only the highest matching clause's statuses apply.
   const matching = gated
     .filter((branch) => isThreshold(branch.when) && applies(branch.when))
-    .sort((a, b) => rankOf(b.when, flipList) - rankOf(a.when, flipList));
+    .sort((a, b) => rankOf(b.when) - rankOf(a.when));
   if (matching.length > 0) apply(matching[0]);
 
   return { defenderConditions: [...defender], attackerConditions: [...attacker] };

@@ -211,7 +211,7 @@
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 187
+      "observed": 159
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -255,7 +255,7 @@
     },
     "attack:dual-status": {
       "n": 78,
-      "observed": 78
+      "observed": 72
     },
     "attack:effect-prevention": {
       "n": 26,
@@ -375,19 +375,19 @@
     },
     "attack:status-asleep": {
       "n": 121,
-      "observed": 121
+      "observed": 120
     },
     "attack:status-burned": {
       "n": 94,
-      "observed": 94
+      "observed": 90
     },
     "attack:status-confused": {
       "n": 130,
-      "observed": 130
+      "observed": 122
     },
     "attack:status-paralyzed": {
       "n": 155,
-      "observed": 154
+      "observed": 142
     },
     "attack:status-poisoned": {
       "n": 152,

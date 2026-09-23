@@ -1098,7 +1098,7 @@ function returnPokemonToHand(ctx) {
 
   if (ctx.memo?.phase === 'promote') {
     const newActive = benchRootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
-    if (newActive) promoteToActive(player, newActive, ctx.events);
+    if (newActive) promoteToActive(player, newActive, ctx.events, ctx.draft?.turn?.number);
     return null;
   }
 
@@ -1117,7 +1117,7 @@ function returnPokemonToHand(ctx) {
     if (!wasActive) return null;
     const bench = benchRootsOf(player);
     if (bench.length === 1) {
-      promoteToActive(player, bench[0], ctx.events);
+      promoteToActive(player, bench[0], ctx.events, ctx.draft?.turn?.number);
       return null;
     }
     return ctx.ask({
@@ -1140,11 +1140,12 @@ function returnPokemonToHand(ctx) {
   });
 }
 
-function promoteToActive(player, benchRoot, events) {
+function promoteToActive(player, benchRoot, events, turnNumber = 1) {
   for (const card of [benchRoot, ...attachedCards(player, benchRoot.instanceId)]) {
     removeFromZones(player, card);
     player.zones.active.push(card);
   }
+  benchRoot.movedToActiveTurn = Math.max(1, Number(turnNumber) || 1);
   events.push({ type: 'pokemonPromoted', playerId: player.playerId, instanceId: benchRoot.instanceId });
 }
 

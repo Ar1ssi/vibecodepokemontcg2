@@ -130,10 +130,50 @@ test('"is still asleep" is a checkup modifier, not a status application', () => 
   assert.deepEqual(branches(text), [{ when: 'always', target: 'defender', statuses: ['Asleep'] }]);
 });
 
-test('"Put the Defending Pokémon to Sleep" still applies through the legacy fallback', () => {
+test('a bare legacy wording still applies through the family fallback', () => {
+  assert.deepEqual(branches('Your opponent’s Active Pokémon is Poisoned.'), [
+    { when: 'always', target: 'defender', statuses: ['Poisoned'] },
+  ]);
   assert.deepEqual(branches('Put the Defending Pokémon to Sleep.'), [
     { when: 'always', target: 'defender', statuses: ['Asleep'] },
   ]);
+});
+
+test('a conditional wording with no known gate applies nothing (Suicune Aurora Wave)', () => {
+  const text =
+    'Flip 2 coins. If both are heads, the Defending Pokémon is now Paralyzed. If only 1 is heads, the Defending Pokémon is now Asleep.';
+  assert.deepEqual(applied(text, { coin: 'heads', headsCount: 2, flips: ['heads', 'heads'] }).defenderConditions, [
+    'Paralyzed',
+  ]);
+  assert.deepEqual(applied(text, { coin: null, headsCount: 1, flips: ['heads', 'tails'] }).defenderConditions, [
+    'Asleep',
+  ]);
+  assert.deepEqual(applied(text, { coin: 'tails', headsCount: 0, flips: ['tails', 'tails'] }).defenderConditions, []);
+  // "if this Pokémon has at least 1 extra Energy attached …" is a damage condition this parser
+  // does not evaluate: it must not leak in as an unconditional status.
+  const conditional =
+    "If this Pokémon has at least 1 extra Energy attached to it (in addition to this attack's cost), your opponent's Active Pokémon is now Burned and Confused.";
+  assert.deepEqual(branches(conditional), []);
+});
+
+test('three statuses in one clause all apply (Radiant Venusaur Pollen Hazard)', () => {
+  const text = "Your opponent's Active Pokémon is now Burned, Confused, and Poisoned.";
+  assert.deepEqual(applied(text, {}).defenderConditions, ['Burned', 'Confused', 'Poisoned']);
+});
+
+test('the target comes from the status clause, not another subject in the sentence', () => {
+  const text =
+    "This Pokémon does 30 damage to itself, and your opponent's Active Pokémon is now Confused.";
+  assert.deepEqual(applied(text, {}), { defenderConditions: ['Confused'], attackerConditions: [] });
+});
+
+test('a first-flip clause is not dropped by a threshold clause in the same text', () => {
+  const text =
+    "Flip 2 coins. If both of them are tails, your opponent's Active Pokémon is now Asleep. If the first flip is tails, your opponent's Active Pokémon is now Paralyzed.";
+  assert.deepEqual(
+    applied(text, { coin: 'tails', headsCount: 0, flips: ['tails', 'tails'] }).defenderConditions,
+    ['Paralyzed', 'Asleep']
+  );
 });
 
 test('an empty or status-free text has no branches', () => {
