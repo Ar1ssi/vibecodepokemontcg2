@@ -13,7 +13,6 @@
 
 ## Open (newest first — scan this section only)
 - I118 2026-09-23 P2 [rules] Server attack never executes 10 classified families (oracle: no effect observed; helpers exist only in client chat-buttons.js): reveal-hand 44, immunity 243, damage-prevention 174, next-turn-bonus 36, copy-attack 34, hp-cap-damage 9, deferred-damage 3, retaliate 2, redirect-damage, look-opponent-deck; shuffle-cost partial 24/46 (refs: S268, I112).
-- I113 2026-09-23 P2 [tooling] ability-audit.mjs:80 EXECUTED_FAMILIES reports pctExecuted 99 and audit-all-pokemon engineFailures counts only errors, so silent executor no-ops pass every gate; promote .agent/scratch/cov/oracle.mjs (per-card state diff) to an execution gate (refs: S265, audit T2).
 - I87 2026-09-23 P2 [netcode] #5 "basic prompt gone in most recent match" not reproduced: no match logs exist and the prompt is unidentified; waiting on the user's description (refs: S264, design 028).
 - I86 2026-09-23 P2 [feature] 30th Celebration (`30th`) + Classic Collection (`30th-c`) support — design 029 drafted, awaiting user approval (legality: TCGdex says Expanded only) (refs: design 029, S264).
 - I85 2026-09-23 P1 [feature] Match logging (user: IMPORTANT) — design 028 drafted, awaiting user approval (refs: design 028, S264).
@@ -94,6 +93,7 @@
 
 
 ## Closed (append-only history; grep it, never load it wholesale)
+- I113 2026-09-23 P2 [tooling] ability-audit.mjs:80 EXECUTED_FAMILIES reports pctExecuted 99 and audit-all-pokemon engineFailures counts only errors, so silent executor no-ops pass every gate; promote .agent/scratch/cov/oracle.mjs (per-card state diff) to an execution gate (refs: S265, audit T2). → closed 2026-09-23 S269: design 032 — scripts/audit-oracle.mjs (pnpm audit:oracle) runs the oracle as a gate: per-family observed rates (state change, or dealt damage ≠ printed base) ratcheted vs scripts/oracle-baseline.json; an executed-listed family with 0 observed rows fails unless ORACLE_BLIND_FAMILIES gives a reason. Family lists moved to scripts/lib/executed-families.mjs.
 - I112 2026-09-23 P2 [tooling] attack-false-positive-audit.mjs:13 EXECUTED_ATTACK_FAMILIES lists 11 families with 0% server execution (switch 0/154, move-energy 0/135, discard-opponent 0/151, draw-until 0/45, shuffle-cost 0/46, conditional-ko, recover-status, devolve-opponent, mirror-heal, look-own-deck, return-opponent-energy); audit reports 1 unexecuted (refs: S265, audit T1). → closed 2026-09-23 S268: the 11 families now run (S267 attack steps; oracle shows effects or skip events); EXECUTED_ATTACK_FAMILIES re-synced to oracle.mjs, 10 client-only families moved out (→ I118), shuffle-cost partial, lost-zone added.
 - I117 2026-09-23 P2 [rules] String damage ("30+", "30×") parsed as base 0, dropping printed damage from scaling attacks (refs: S267) → closed 2026-09-23 S267 (branch audit/attack-ability-coverage): parseAttackDamage reads numeric prefix (4efddd64).
 - I116 2026-09-23 P2 [rules] rng.shuffle returns a copy; 14 trainer/ability effect sites discarded it so decks never shuffled (refs: S267) → closed 2026-09-23 S267 (branch audit/attack-ability-coverage): shuffleInPlace (c32ead14).

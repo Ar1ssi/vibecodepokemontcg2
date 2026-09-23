@@ -8,6 +8,7 @@ client/ — client application (EJS layout, CSS styles, client JS, deck builder,
 server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQLite DB); entry: server/server.js
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
+scripts/audit-oracle.mjs (`pnpm audit:oracle`, ~2 min) — execution gate: runs every corpus attack/ability through the engine (lib/oracle-harness.mjs), ratchets per-family observed rates vs scripts/oracle-baseline.json (lib/oracle-gate.mjs); family claim lists in lib/executed-families.mjs (I113)
 tools/ — internal dev tools, sync log comparison, asset mappings
 client/src/css/deck-builder-live.css — deck builder's PTCG Live theme (D: S252); ALL rules scoped
   under `.db-live` (on #nativeDeckBuilderWorkspace) — that class is what overrides index.css on
