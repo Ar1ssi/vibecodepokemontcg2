@@ -794,6 +794,7 @@ export function abilityActivationBlockReason(card, ctx = {}) {
     koedLastOppTurn = true,
     enteredPlayTurn,
     playedToBenchTurn,
+    movedToActiveTurn = card.movedToActiveTurn,
   } = ctx;
   if (rulesEnabled && used) return 'Ability already used this turn.';
   if (!isActivatedAbility(card, abilityIndex)) {
@@ -830,7 +831,28 @@ export function abilityActivationBlockReason(card, ctx = {}) {
       return "This ability only works the turn it's played from hand to the Bench.";
     }
   }
+  // Bench→Active promotion trigger: legal only on the turn the stamp records
+  // (design 034 slice 4b). A caller without the stamp (presence-only pickers,
+  // oracle rows that place cards directly in the Active) fails OPEN — only a
+  // *stale* stamp is rejected.
+  if (rulesEnabled && isOnPromotionTrigger(card)) {
+    if (
+      movedToActiveTurn !== undefined &&
+      movedToActiveTurn !== null &&
+      movedToActiveTurn !== turnNumber
+    ) {
+      return 'This ability can only be used the turn this Pokémon moved to the Active Spot.';
+    }
+  }
   return null;
+}
+
+// "Once during your turn, when this Pokémon moves from your Bench to the Active
+// Spot, …" — the parse step that marks a Bench→Active trigger.
+function isOnPromotionTrigger(card) {
+  const text = cardAbilityText(card);
+  if (!text) return false;
+  return parseAbility(text).some((s) => s.type === 'onPromotionAbility');
 }
 
 // --- play / evolve / retreat / counter locks -----------------------------

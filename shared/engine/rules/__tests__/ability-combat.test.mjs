@@ -1209,6 +1209,47 @@ test('abilityActivationBlockReason: shared gate reasons', () => {
   );
 });
 
+// ── slice 4b: on-promotion window ────────────────────────────────────────
+
+test('abilityActivationBlockReason: on-promotion window reads movedToActiveTurn', () => {
+  const cobalion = mon('Cobalion ex', {
+    abilities: [
+      ability(
+        'Metal Road',
+        'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may attach a Basic {M} Energy card from your hand to this Pokémon.'
+      ),
+    ],
+  });
+  assert.equal(
+    abilityActivationBlockReason(cobalion, { turnNumber: 5 }),
+    null,
+    'no stamp supplied means the caller cannot judge the window (fail open)'
+  );
+  assert.equal(
+    abilityActivationBlockReason(cobalion, {
+      turnNumber: 5,
+      movedToActiveTurn: 5,
+    }),
+    null,
+    'the move happened this turn'
+  );
+  assert.match(
+    abilityActivationBlockReason(cobalion, {
+      turnNumber: 5,
+      movedToActiveTurn: 4,
+    }),
+    /moved to the Active Spot/
+  );
+  assert.match(
+    abilityActivationBlockReason(
+      { ...cobalion, movedToActiveTurn: 4 },
+      { turnNumber: 5 }
+    ),
+    /moved to the Active Spot/,
+    'the stamp can be read off the card itself'
+  );
+});
+
 // ── slice 3: play / evolve / retreat / counter locks ─────────────────────
 
 test('abilityPlayLocks: category locks, each-player wording and conditions', () => {

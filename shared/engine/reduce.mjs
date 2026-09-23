@@ -1199,6 +1199,34 @@ function settlePromotionChoices(draft, { events }) {
 }
 
 /**
+ * Stamps `movedToActiveTurn` on every card that entered a player's Active Spot
+ * during this command, and clears it from every card that left (design 034
+ * slice 4b on-promotion window). Diffing the pre/post Active zones here covers
+ * every bench→active site — manual move, KO promotion, Switch/Boss's Orders
+ * attack and trainer steps — without threading a stamp through each effect
+ * module. The whole stack (root plus attached Evolutions/Tools) is stamped so
+ * the activation gate reads the stamp off whichever card the client addresses.
+ */
+function stampActivePromotions(prev, next) {
+  const turnNumber = next.turn?.number;
+  if (turnNumber == null) return;
+  for (const playerId of Object.keys(next.players || {})) {
+    const prevActive = prev.players?.[playerId]?.zones?.active || [];
+    const nextActive = next.players?.[playerId]?.zones?.active || [];
+    const prevIds = new Set(prevActive.map((c) => c.instanceId));
+    const nextIds = new Set(nextActive.map((c) => c.instanceId));
+    for (const card of nextActive) {
+      if (!prevIds.has(card.instanceId)) card.movedToActiveTurn = turnNumber;
+    }
+    for (const card of prevActive) {
+      if (nextIds.has(card.instanceId)) continue;
+      const moved = findCard(next, card.instanceId)?.card;
+      if (moved) delete moved.movedToActiveTurn;
+    }
+  }
+}
+
+/**
  * Resolves Pokémon Checkup between turns, applying every condition the Active holds
  * in this order, then checking for a Knockout once:
  * - Poison: 10 damage
@@ -3018,6 +3046,7 @@ export function validateLegality(state, command) {
           koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
           enteredPlayTurn: cardRef.card.enteredPlayTurn ?? null,
           playedToBenchTurn: cardRef.card.playedToBenchTurn ?? null,
+          movedToActiveTurn: cardRef.card.movedToActiveTurn ?? null,
         });
         if (blockReason) return { allowed: false, reason: blockReason };
         // "Have no Abilities" Stadiums (Team Rocket's Watchtower, Space Center,
@@ -6880,6 +6909,7 @@ export function applyCommand(state, command, rng = null) {
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settlePrizeEntitlements(draft, { events });
+  stampActivePromotions(state, draft);
   clearFaceDownOffBoard(draft);
   delete draft.__attackEffectPhase;
 

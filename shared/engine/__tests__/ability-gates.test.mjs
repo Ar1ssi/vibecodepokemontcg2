@@ -485,3 +485,57 @@ test('picker parity: server reason and picker gate agree on the shared reader', 
   assert.equal(usedReason, 'Ability already used this turn.');
   assert.equal(isUsableAbilityCard(kirlia, { zone: 'bench', used: true }), false);
 });
+
+// ── slice 4b: on-promotion stamp / window ────────────────────────────────
+
+test('moveCard: bench→active stamps movedToActiveTurn and clears it on the way back', () => {
+  const state = setupGame();
+  const cobalion = pokemon({
+    instanceId: 100,
+    name: 'Cobalion ex',
+    abilities: [
+      ability(
+        'Metal Road',
+        'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may attach a Basic {M} Energy card from your hand to this Pokémon.'
+      ),
+    ],
+  });
+  state.players.p1.zones.bench.push(cobalion);
+
+  const moved = applyCommand(state, {
+    type: 'moveCard',
+    payload: { instanceId: 100, from: 'bench', to: 'active' },
+    playerId: 'p1',
+  });
+  assert.equal(moved.error, null);
+  assert.equal(moved.state.players.p1.zones.active[0].movedToActiveTurn, 2);
+
+  // The turn it moved, the promotion trigger is legal.
+  assert.equal(
+    validateLegality(moved.state, {
+      type: 'useAbility',
+      payload: { instanceId: 100 },
+      playerId: 'p1',
+    }).allowed,
+    true
+  );
+
+  // A later turn makes the stamp stale and the ability illegal.
+  const nextTurn = { ...moved.state, turn: { ...moved.state.turn, number: 3 } };
+  const blocked = validateLegality(nextTurn, {
+    type: 'useAbility',
+    payload: { instanceId: 100 },
+    playerId: 'p1',
+  });
+  assert.equal(blocked.allowed, false);
+  assert.match(blocked.reason, /moved to the Active Spot/);
+
+  // Leaving the Active Spot drops the stamp.
+  const back = applyCommand(moved.state, {
+    type: 'moveCard',
+    payload: { instanceId: 100, from: 'active', to: 'bench' },
+    playerId: 'p1',
+  });
+  assert.equal(back.error, null);
+  assert.equal(back.state.players.p1.zones.bench[0].movedToActiveTurn, undefined);
+});
