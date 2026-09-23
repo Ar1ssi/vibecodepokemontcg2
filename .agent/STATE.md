@@ -5,30 +5,38 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 277
-Focus: S277 feature: team-wide "no Retreat Cost" abilities on a Benched Pokémon (Latias ex
-  "Skyliner") now zero the Active Spot's retreat cost. S276 patch: Run Away Draw self-shuffle.
-Active: none.
-Next: maintenance due (S270, still not run).
-  I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
-  leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
-  Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
-  Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
-  ISSUES Open still over cap.
+Session: 279
+Focus: design 034 slices 1-2 on branch `feature/ability-behaviour` (worktree
+  %TEMP%/opencode/ability-behaviour-wt). Slice 1: `cardAbilityText` single plural-aware accessor,
+  I130 legacy "reduced by N" now HP units (`reduceHp`), parseThorns legacy wording + zone flag,
+  typed-basic HP-cap + or-split fix. Slice 2: new `rules/ability-combat.mjs` readers + matrix
+  tests, computeAttackDamage ability options (bonus/reduction before+after WR/prevention/weakness
+  override), wired at all 3 reduce attack sites, `effectiveHp` (sideCards), handleKnockout prizes,
+  retreat cost, attack-cost ignore + Wild Growth multiplier.
+Active: slice 2 done. Next: slice 3 (suppression predicate, `abilityActivationBlockReason`,
+  picker parity, play/status/evolve/retreat locks, summon/first-turn/extra-attack gates).
+Next: continue design 034 slices 3-7 (ledger in NEXTSTEPS.md + design Deviations). Slice 2 gaps:
+  "for each" scaling abilities return 0; client `listAttacks` lacks ability-cost options (server
+  `attackCostPayable` has them). Maintenance due (S270, still not run). I126/I127, I121-I125,
+  I113 oracle blind to damage amounts. Design-number collision 032 (code comments mean the
+  coin-gated one). Pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Attack/ability execution gate: `pnpm audit:oracle` (~2 min, D108). Run after engine attack/ability changes; legit
-  rate changes → `--update-baseline`, commit scripts/oracle-baseline.json. Later-turn markers are ORACLE_BLIND_FAMILIES.
-- Editing via bash heredoc eats `\` → write edit scripts with the Write tool / String.raw.
-  Working-copy files are CRLF (repo LF); keep eol when scripting edits.
-- Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins, tokens carry `copiedAttack` (D110).
-  BLOCKS regexes are wrapped by `gatedBlock` (adds capture group 1): no backreferences in them.
-- Mat FX / deck-builder CSS layering / vendored `*.generated.mjs`: see D95, D99, D103, D104, D97-D100.
-- Pre-existing `pnpm test` failures (7 files, env/CRLF — not one): card-inspector-model "retreat greys…", deck-row-sprites,
-  deck-sprite-strip, result-tile, end-turn-button, view-board-toggle, coin-flip-ceremony. Lint cannot run (`@eslint/js` missing).
+- Design 034 is on `feature/ability-behaviour`; merge to main then sync the primary folder. Main
+  checkout still holds the untracked copy of `.agent/designs/034-*.md` — delete it before merging
+  (the branch tracks the file) and expect main's uncommitted S278 STATE/journal to conflict.
+- `pnpm audit:oracle` (~2 min, D108) after engine attack/ability changes; legit rate changes →
+  `--update-baseline` + commit scripts/oracle-baseline.json. `pnpm test` baseline: 3351 pass, 1
+  pre-existing fail (card-inspector-model "retreat greys…"); lint is prettier-warning noise only.
+- Working-copy files are CRLF (repo LF); use the Write/Edit tools for edits — bash rewrites can
+  re-encode. Editing via bash heredoc eats `\`.
+- Ability reads must go through `cardAbilityText` (plural `abilities[]`, I128); ability-combat may
+  import tool-combat but tool-combat/stadium-effects must not import ability-combat (cycle).
+- Pre-existing `pnpm test` failures (env/CRLF): card-inspector-model "retreat greys…" plus six
+  client suites when run on some machines; not yours.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S277 team-wide retreat-cost: `teamNoRetreatCostForActive` (D116) zeroes the Active's cost from a Benched Skyliner-style holder; retreat callers pass `benchCards`.
-- S276 ability self-shuffle: `returnSelfToDeckAbility` executes (shuffleSelf, requiresDraw gate); ability path settles a vacated Active.
-- S275 side menu reachable during choices: pending-choice overlays stop at right:24% (e2e: pnpm test:reset-choice).
+- S279 design 034 slice 1: `cardAbilityText` accessor; I130 HP reduction; parseThorns legacy; typed-basic HP cap.
+- S279 design 034 slice 2: `ability-combat.mjs` + computeAttackDamage options wired (damage/HP/prize/retreat/cost).
+- S277 team-wide retreat-cost: `teamNoRetreatCostForActive` (D116) zeroes the Active's cost from a Benched Skyliner-style holder.
