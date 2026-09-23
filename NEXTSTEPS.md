@@ -7,7 +7,7 @@ slice on this branch; each commit leaves `pnpm test` + `pnpm audit:oracle` green
 |---|---|---|
 | 1 | done (ff74b498) | `cardAbilityText` accessor; I130 HP reduction (`reduceHp`); `parseThorns` legacy wording + zone; typed-basic HP cap; `matchesSearch` or-split fix |
 | 2 | done | `ability-combat.mjs` readers + matrix tests; computeAttackDamage ability options (`abilityBonusBeforeWR`, `abilityReductionBeforeWR/AfterWR`, `abilityPrevention`, `weaknessOverride`); wired at all 3 reduce attack call sites, `effectiveHp` (sideCards), handleKnockout prizes, retreat, attack cost (ignore-Energy + Wild Growth multiplier) |
-| 3 | pending | suppression predicate + activation block reasons + picker parity; locks and gates |
+| 3 | pending — read `.agent/designs/034-slice3-handoff.md` first | suppression predicate + activation block reasons + picker parity; play locks; status immunity; evolve permission/lock; retreat/counter locks; summon/first-turn gates (`abilityExtraAttack` reader only) |
 | 4 | pending | `ability-triggers.mjs` + checkup/end-of-turn/on-damage/on-promotion/on-KO hooks |
 | 5 | pending | executor batch A |
 | 6 | pending | executor batch B (one-offs) |

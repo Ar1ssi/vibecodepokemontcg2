@@ -13,8 +13,8 @@ Focus: design 034 slices 1-2 on branch `feature/ability-behaviour` (worktree
   tests, computeAttackDamage ability options (bonus/reduction before+after WR/prevention/weakness
   override), wired at all 3 reduce attack sites, `effectiveHp` (sideCards), handleKnockout prizes,
   retreat cost, attack-cost ignore + Wild Growth multiplier.
-Active: slice 2 done. Next: slice 3 (suppression predicate, `abilityActivationBlockReason`,
-  picker parity, play/status/evolve/retreat locks, summon/first-turn/extra-attack gates).
+Active: slice 2 done. Next: slice 3 — read `.agent/designs/034-slice3-handoff.md` (corpus wordings,
+  wiring points, risks) before coding. `abilityExtraAttack` reader only (turn flow is slice 4).
 Next: continue design 034 slices 3-7 (ledger in NEXTSTEPS.md + design Deviations). Slice 2 gaps:
   "for each" scaling abilities return 0; client `listAttacks` lacks ability-cost options (server
   `attackCostPayable` has them). Maintenance due (S270, still not run). I126/I127, I121-I125,
