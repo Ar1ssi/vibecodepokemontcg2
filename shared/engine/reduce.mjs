@@ -32,6 +32,7 @@ import {
   drawCount,
   parseAttackDamage,
   allBenchDamage,
+  ownBenchDamage,
   attackTargetClause,
   opponentCounterClause,
   parseAttackSearchClause,
@@ -263,7 +264,7 @@ function discardCardFromPlayerZone(draft, instanceId, playerId) {
  */
 function damageBenchedPokemon(
   draft,
-  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, events }
+  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, events }
 ) {
   if (dealt <= 0) return;
 
@@ -282,7 +283,8 @@ function damageBenchedPokemon(
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const allVictimCards = [...victimActive, ...victimBench];
-  const benchProtected = allVictimCards.some((c) => {
+  // Bench shields stop the opponent's attacks, not the attacker's own recoil.
+  const benchProtected = !ownAttack && allVictimCards.some((c) => {
     if (c.attachedTo) return false;
     const t = String(
       c?.ability?.text ?? c?.abilityText ?? c?.text ?? c?.effect ?? ''
@@ -3561,6 +3563,25 @@ function resolveAttackEffectPhase(draft, ctx) {
               events,
             });
           }
+        }
+      }
+
+      // Self-recoil spread ("This attack also does 30 damage to each of your Benched
+      // Pokémon"): the attacker's own Bench, and a KO there gives the opponent Prizes.
+      const ownSpread = ownBenchDamage(attack.text);
+      if (ownSpread > 0) {
+        for (const victim of benchTargets(draft.players[playerId])) {
+          if (findCard(draft, victim.instanceId)?.zoneId !== 'bench') continue;
+          damageBenchedPokemon(draft, {
+            victim,
+            victimPlayerId: playerId,
+            attackerPlayerId: defenderPlayerId,
+            attackName: attack.name,
+            dealt: ownSpread,
+            auto: false,
+            ownAttack: true,
+            events,
+          });
         }
       }
 

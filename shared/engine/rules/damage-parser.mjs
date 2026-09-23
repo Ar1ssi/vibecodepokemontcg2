@@ -972,18 +972,33 @@ export function isGxAttack(attack) {
   return /(?:^|[\s-])GX$/i.test(name.trim());
 }
 
-// Per-Pokémon damage dealt to ALL of the opponent's Benched Pokémon
-// (taxonomy §D multi-target family). Matches the common printed forms:
-// "Do 10 damage to each of your opponent's Benched Pokémon", "20 damage to
-// all of your opponent's Benched Pokémon", "…to every one of your opponent's
-// Benched Pokémon". Returns 0 when the text has no such clause OR the clause
-// is unnumbered (caller announces the fizzle rather than guessing an amount).
-// Pure.
+// Per-Pokémon spread damage to a whole Bench, per side. Matches "Do 10 damage to each of your
+// opponent's Benched Pokémon", "20 damage to all of your opponent's Benched Pokémon", the
+// self-recoil "30 damage to each of your Benched Pokémon" and "10 damage to each Benched
+// Pokémon (both yours and your opponent's)". An unowned "each Benched Pokémon" is the
+// opponent's. Pure.
+function benchSpreadClauses(attackText) {
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
+  const clauses = [];
+  const re = /(\d+)\s*damage\s+to\s+(?:each|every|all)\b([^.;]*?)benched pok[ée]mon(\s*\(both yours and your opponent's\))?/gi;
+  for (const m of text.matchAll(re)) {
+    const owner = m[2].toLowerCase();
+    const both = Boolean(m[3]);
+    const own = both || (/\byour\b/.test(owner) && !owner.includes("opponent's"));
+    clauses.push({ amount: Math.max(0, parseInt(m[1], 10)), own, opponent: both || !own });
+  }
+  return clauses;
+}
+
+// Damage to each of the OPPONENT's Benched Pokémon. Returns 0 when the text has no such
+// clause OR the clause is unnumbered (caller announces the fizzle rather than guessing).
 export function allBenchDamage(attackText) {
-  const text = String(attackText || '');
-  if (!/to (?:each|every|all)\b[^.;]*benched pok[ée]mon/i.test(text)) return 0;
-  const m = /(\d+)\s*damage\s+to\s+(?:each|every|all)\b/i.exec(text);
-  return m ? Math.max(0, parseInt(m[1], 10)) : 0;
+  return benchSpreadClauses(attackText).find((c) => c.opponent)?.amount || 0;
+}
+
+// Damage the attack also does to each of the ATTACKER's own Benched Pokémon (recoil). Pure.
+export function ownBenchDamage(attackText) {
+  return benchSpreadClauses(attackText).find((c) => c.own)?.amount || 0;
 }
 
 // A printed attack clause that lets the player choose WHICH of the opponent's
