@@ -959,21 +959,23 @@ function damageCounters(ctx) {
     });
   };
 
+  // "choose 2 of your opponent's Pokémon and put 2 damage counters on each of them"
+  const targetCount = step.targetCount || 1;
   if (ctx.selection) {
-    const card = targets.find((c) => c.instanceId === ctx.selection[0]);
-    if (card) apply(card);
+    for (const card of pickById(targets, ctx.selection).slice(0, targetCount)) apply(card);
     return null;
   }
   if (targets.length === 0) return skip(ctx, 'no_target');
-  if (targets.length === 1) {
-    apply(targets[0]);
+  if (targets.length <= targetCount) {
+    targets.forEach(apply);
     return null;
   }
+  const which = targetCount > 1 ? `${targetCount} Pokémon` : 'a Pokémon';
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Choose a Pokémon to put ${step.count} damage counters on`,
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${which} to put ${step.count} damage counters on`,
     options: targets,
-    min: 1,
-    max: 1,
+    min: targetCount,
+    max: targetCount,
   });
 }
 

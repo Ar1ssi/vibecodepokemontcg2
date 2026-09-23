@@ -629,11 +629,17 @@ export function parseAbility(text = '') {
       /to 1 of your (?!opponent)/.test(lower));
 
   // ── 8. Move / place / put damage counters (before KO-recursion false positives) ──
+  // "When you play this Pokémon from your hand to evolve …" is this Pokémon's own evolution
+  // (Team Rocket's Crobat ex Biting Spree), not the opponent-evolves trigger (section 32).
+  const opponentEvolveTrigger =
+    lower.includes('opponent') &&
+    lower.includes('evolve') &&
+    !/when you play this pok[eé]mon from your hand to evolve/.test(lower);
   if (
     !hasPromotionTrigger &&
     !/in this way, place \d+ damage counters? on that pok/.test(lower) &&
     !lower.includes('checkup') &&
-    !(lower.includes('opponent') && lower.includes('evolve')) &&
+    !opponentEvolveTrigger &&
     (hasWord(lower, 'move') || lower.includes('place') || hasWord(lower, 'put')) &&
     lower.includes('damage counter') &&
     (betweenOwnDamage ||
@@ -686,11 +692,16 @@ export function parseAbility(text = '') {
       const fromOwn = verb === 'move' && /from (?:1|one) of your (?!opponent)[^.]*?to (?:1|one) of your opponent/.test(lower);
       const requiresAttachedEnergy =
         lower.match(/if this pok[eé]mon has any \{([a-z])\} energy attached/)?.[1] || null;
+      // "choose 2 of your opponent's Pokémon and put 2 damage counters on each of them"
+      const targetCount = Number(
+        lower.match(/choose (\d+) of your opponent's pok[eé]mon and (?:put|place) \d+ damage counters? on each/)?.[1] || 0
+      );
       steps.push({
         type: 'moveDamageAbility',
         count,
         upTo: upToMatch ? count : null,
         onOpponent,
+        ...(targetCount > 1 ? { targetCount } : {}),
         ...(fromOwn ? { fromOwn } : {}),
         ...(requiresAttachedEnergy ? { requiresAttachedEnergy } : {}),
         selfKnockOut: selfKoOnUse,
@@ -1163,11 +1174,7 @@ export function parseAbility(text = '') {
   }
 
   // ── 32. Opponent evolution trigger ──────────────────────────────────────
-  if (
-    lower.includes('opponent') &&
-    lower.includes('evolve') &&
-    lower.includes('damage counter')
-  ) {
+  if (opponentEvolveTrigger && lower.includes('damage counter')) {
     const n = lower.match(/put\s+(\d+)\s+damage/)?.[1] || null;
     steps.push({
       type: 'onOpponentEvolveAbility',

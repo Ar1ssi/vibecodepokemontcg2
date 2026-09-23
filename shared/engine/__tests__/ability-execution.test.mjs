@@ -1136,3 +1136,21 @@ test('ability: Ripening Charge heals the Pokémon that received the Energy (I93)
   assert.equal(res3.state.players.p1.zones.bench[0].damage, 10);
   assert.equal(res3.state.players.p1.zones.active[0].damage, 50);
 });
+
+test("ability: Biting Spree puts 2 counters on each of 2 chosen opponent's Pokémon (I96)", () => {
+  const { state, rng } = setupGame();
+  const { holder } = holderWithAbility(state, "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may choose 2 of your opponent's Pokémon and put 2 damage counters on each of them.");
+  holder.enteredPlayTurn = state.turn.number;
+  state.players.p2.zones.bench.push(
+    createCard({ instanceId: 74, name: 'Opp Bench A', hp: 100, supertype: 'Pokémon' }),
+    createCard({ instanceId: 75, name: 'Opp Bench B', hp: 100, supertype: 'Pokémon' }),
+  );
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.equal(res1.pendingChoice.min, 2);
+  const res2 = resolveWith(res1, [71, 75], rng);
+  assert.equal(res2.error, null);
+  const opp = res2.state.players.p2.zones;
+  assert.equal(opp.active[0].damage, 20);
+  assert.deepEqual(opp.bench.map((c) => c.damage || 0), [0, 20]);
+});
