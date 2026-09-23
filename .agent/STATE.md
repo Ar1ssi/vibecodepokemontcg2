@@ -5,9 +5,9 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 272
-Focus: S272 merged feature/i118-attack-gaps (I118, I120) and feature/i119-unparsed-printings (I119) into main
-  (I112/I113 were already there) and pushed origin/main. Oracle gate PASSED after the merge.
+Session: 273
+Focus: S273 patch on main: opponent-played Stadium was invisible (inline flip transform clobbered the table tilt).
+  S272 merged i118 + i119 into main and pushed. S273 commit is local on main (not pushed).
 Active: none.
 Next: maintenance due (S270, still not run).
   I121-I125 (design 032 leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
@@ -28,6 +28,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   `pnpm test` (globs include scripts/**/*.test.mjs).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S273 Stadium facing: opponent's Stadium flips via `.stadium-opp-facing` (img `rotate`), never an inline transform on #stadium (D115).
 - S272 merge: i118 + i119 into main, D-numbers renumbered (D109-D114), oracle baseline re-ratcheted.
-- S271 I119 / design 033: last 10 unparsed printings + Inkay/Gothorita opponent deck look run on the server.
 - S271 I120 / design 032: coin-gated discards, bounce, devolve, recover, attach, KO, chosen conditions, flip markers, gated copy.

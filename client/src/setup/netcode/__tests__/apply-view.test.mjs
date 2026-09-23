@@ -2125,11 +2125,16 @@ test('stadium: reads upright for its owner and flipped for the opponent', () => 
     them: { playerId: 'p2', zones: {} },
   });
 
+  const stadium = doc.getElementById('stadium');
   applyView(view(1, 'p2'), [], opts);
-  assert.equal(doc.getElementById('stadium').style.transform, 'scaleX(-1) scaleY(-1)');
+  assert.equal(stadium.classList.contains('stadium-opp-facing'), true);
+  // #stadium's own transform is the table tilt (CSS); an inline one would
+  // override it and pivot the card off-screen.
+  assert.ok(!stadium.style.transform);
 
   applyView(view(2, 'p1'), [], opts);
-  assert.equal(doc.getElementById('stadium').style.transform, 'scaleX(1) scaleY(1)');
+  assert.equal(stadium.classList.contains('stadium-opp-facing'), false);
+  assert.ok(!stadium.style.transform);
 });
 
 // A Knockout's prize pendingChoice opens the fly-up prize fan over this player's

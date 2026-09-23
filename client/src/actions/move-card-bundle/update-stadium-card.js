@@ -1,5 +1,6 @@
 import { systemState } from '../../state.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { setStadiumFacing } from '../../setup/zones/stadium-facing.mjs';
 import { moveCard } from './move-card.js';
 
 /** Discard a stadium card wherever it sits (shared field or legacy board slot). */
@@ -30,10 +31,9 @@ export const updateStadiumCard = (user, initiator, dZoneId, dZone) => {
     }
   }
   if ('stadium' === dZoneId) {
-    const stadiumElement = document.getElementById('stadium');
-    stadiumElement.style.transform =
-      user === systemState.initiator
-        ? 'scaleX(1) scaleY(1)'
-        : 'scaleX(-1) scaleY(-1)';
+    setStadiumFacing(
+      document.getElementById('stadium'),
+      user !== systemState.initiator
+    );
   }
 };

@@ -12,6 +12,7 @@ import { diffViews } from './view-diff.mjs';
 import { buildMatPickerRequest } from './mat-pick-request.mjs';
 import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
 import { buildCardImage } from '../image-logic/build-card-image.js';
+import { setStadiumFacing } from '../zones/stadium-facing.mjs';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   DAMAGE_COUNTER_TIERS,
@@ -1413,12 +1414,10 @@ function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
   unhydrateCard(cardRegistry.get(stadiumCard.instanceId), options);
   // Legacy update-stadium-card.js: the Stadium reads upright for whoever played it.
   const ownerId = stadiumCard.ownerId || stadiumCard.playerId || null;
-  if (stadiumElement.style) {
-    stadiumElement.style.transform =
-      ownerId && localPlayerId && ownerId !== localPlayerId
-        ? 'scaleX(-1) scaleY(-1)'
-        : 'scaleX(1) scaleY(1)';
-  }
+  setStadiumFacing(
+    stadiumElement,
+    Boolean(ownerId && localPlayerId && ownerId !== localPlayerId)
+  );
   if (img.parentNode !== stadiumElement) {
     if (stadiumElement.innerHTML !== undefined) {
       stadiumElement.innerHTML = '';

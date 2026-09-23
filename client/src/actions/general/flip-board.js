@@ -14,6 +14,7 @@ import {
   selfHandleMouseDown,
 } from '../../setup/sizing/resizer.js';
 import { getZone } from '../../setup/zones/get-zone.js';
+import { setStadiumFacing } from '../../setup/zones/stadium-facing.mjs';
 import { lookAtCards, stopLookingAtCards } from './reveal-and-hide.js';
 
 export const flipBoard = () => {
@@ -197,11 +198,10 @@ export const flipBoard = () => {
   // Flip the stadium
   const stadiumZone = getZone('', 'stadium');
   if (stadiumZone.array[0]) {
-    if (stadiumZone.array[0].image.user === systemState.initiator) {
-      stadiumZone.element.style.transform = 'scaleX(1) scaleY(1)';
-    } else {
-      stadiumZone.element.style.transform = 'scaleX(-1) scaleY(-1)';
-    }
+    setStadiumFacing(
+      stadiumZone.element,
+      stadiumZone.array[0].image.user !== systemState.initiator
+    );
   }
   refreshBoard();
   // The `.self`/`.opp` classes just swapped between the iframes; the tilt
