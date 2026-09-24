@@ -790,6 +790,48 @@ test('evolution legality: enforces turn-1 ban, same-turn ban, stage order, and o
   );
 });
 
+test('Forest of Vitality: a {G} Basic played this turn evolves to Stage 1 then Stage 2', () => {
+  const state = setupGame({ turn: { number: 3, player: 'p1', phase: 'turn' } });
+  state.stadium = createCard({
+    instanceId: 490,
+    name: 'Forest of Vitality',
+    type: 'Trainer',
+    trainerType: 'Stadium',
+    ownerId: 'p2',
+    text: "Each player's {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.",
+  });
+  const grass = (instanceId, name, stage, evolvesFrom) =>
+    createCard({ instanceId, name, supertype: 'Pokémon', stage, evolvesFrom, types: ['Grass'] });
+  const bulbasaur = grass(491, 'Bulbasaur', 'Basic');
+  bulbasaur.enteredPlayTurn = 3;
+  state.players.p1.zones.bench.push(bulbasaur);
+  state.players.p1.zones.hand.push(
+    grass(492, 'Ivysaur', 'Stage 1', 'Bulbasaur'),
+    grass(493, 'Venusaur', 'Stage 2', 'Ivysaur')
+  );
+  const evolve = (st, instanceId) =>
+    applyCommand(st, { type: 'attachCard', payload: { instanceId, targetInstanceId: 491 }, playerId: 'p1' });
+
+  const stage1 = evolve(state, 492);
+  assert.equal(stage1.error, null);
+  const stage2 = evolve(stage1.state, 493);
+  assert.equal(stage2.error, null);
+  assert.equal(stage2.events.filter((e) => e.type === 'pokemonEvolved').length, 1);
+
+  // A non-{G} line keeps both gates.
+  const fire = setupGame({ turn: { number: 3, player: 'p1', phase: 'turn' } });
+  fire.stadium = state.stadium;
+  const charmander = createCard({ instanceId: 494, name: 'Charmander', supertype: 'Pokémon', stage: 'Basic', types: ['Fire'] });
+  charmander.enteredPlayTurn = 3;
+  fire.players.p1.zones.bench.push(charmander);
+  fire.players.p1.zones.hand.push(
+    createCard({ instanceId: 495, name: 'Charmeleon', supertype: 'Pokémon', stage: 'Stage 1', evolvesFrom: 'Charmander', types: ['Fire'] })
+  );
+  const blocked = validateLegality(fire, { type: 'attachCard', payload: { instanceId: 495, targetInstanceId: 494 }, playerId: 'p1' });
+  assert.equal(blocked.allowed, false);
+  assert.match(blocked.reason, /just played this turn/i);
+});
+
 test('Rare Candy: blocked on turn 1/2 and blocked on same-turn Basics', () => {
   const state = setupGame({ turn: { number: 1, player: 'p1', phase: 'turn' } });
   const candy = createCard({

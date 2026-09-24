@@ -54,8 +54,8 @@
 //   { type: 'searchEvolve', noAbilities?: true }
 //   { type: 'prizeBargain', drawCount: N }
 //   { type: 'searchAttachEach', count: N, energy: '…', target: '…', poisonActive?: true }
-// parseTrainerEffect also returns `playCondition` ('opponentPrizes<=N' | 'morePrizesThanOpponent')
-// when the card can only be played under that condition.
+// parseTrainerEffect also returns `playCondition` (see parsePlayCondition; e.g. 'opponentPrizes<=N',
+// 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
 import { WORD_POKEMON_TYPES } from './search-match.mjs';
 
@@ -288,6 +288,25 @@ const SYMBOL_TYPE_WORDS = {
   y: 'Fairy',
 };
 
+// Look-at-deck cards that bench a card ("…onto your Bench", I132). Grimsley's
+// Move picks a {D} Pokémon; the fossil Items name the Pokémon in their own text
+// ("reveal an Anorith you find there"). The generic fallback benches any Basic.
+function benchLookPick(lower) {
+  const named = lower.match(/reveal an? ([a-z0-9 .'-]+?) you find there/);
+  if (named) {
+    // Restore the printed capitalisation for prompts; matching is case-insensitive.
+    const name = named[1]
+      .trim()
+      .replace(/(^|[\s-])([a-z])/g, (_m, lead, ch) => lead + ch.toUpperCase());
+    return `${name} (bench)`;
+  }
+  const typed = lower.match(/\{([a-z])\} pok[eé]mon you find there/);
+  if (typed && SYMBOL_TYPE_WORDS[typed[1]]) {
+    return `${SYMBOL_TYPE_WORDS[typed[1]]} Pokémon (bench)`;
+  }
+  return 'Pokémon (bench)';
+}
+
 // "…in any combination of {F} Pokémon and Basic {F} Energy cards…" → a single
 // `or`-joined filter the executor's matchesSearch already understands
 // ("Fighting Pokémon or Basic {F} Energy"). Keeps the type qualifier on both
@@ -340,13 +359,42 @@ function appendTrailingDraw(steps, lower) {
   // "draw cards until you have N" takes precedence over a bare "draw N".
   const until = lower.match(/draw\s+cards(?:\s+from\s+your\s+deck)?\s+until\s+you have\s+(\d+)\s+cards?/i);
   if (until) {
-    steps.push({ type: 'drawUntil', target: Number(until[1]) });
+    steps.push({ type: 'drawUntil', target: { kind: 'fixed', n: Number(until[1]) } });
     return;
   }
-  const m = lower.match(/(?:then\s+)?draw\s+(\d+)\s+cards?\.?/i);
+  const m = lower.match(/(?:then\s+)?draw\s+(?:a|an|one|(\d+))\s+cards?\.?/i);
   if (m) {
-    steps.push({ type: 'draw', count: Number(m[1]) });
+    steps.push({ type: 'draw', count: m[1] ? Number(m[1]) : 1 });
   }
+}
+
+// "draw cards until you have N cards" / "…as many cards as your opponent" /
+// "…N more card(s) than your opponent" as a target descriptor (design 035 slice 8).
+function drawUntilTarget(text) {
+  const more = text.match(/until you have\s+(\d+)\s+more cards? (?:in your hand )?than your opponent/);
+  if (more) return { kind: 'opponentHandPlus', n: Number(more[1]) };
+  if (/until you have (?:the same number of cards|as many cards) in your hand as your opponent/.test(text)) {
+    return { kind: 'opponentHand' };
+  }
+  const fixed = text.match(/until you have\s+(\d+)\s+cards?/);
+  return fixed ? { kind: 'fixed', n: Number(fixed[1]) } : null;
+}
+
+// The "…N cards in your hand instead / if <condition>" second clause: the target and
+// the condition that must hold for it (Lillie, Grusha, Cynthia's Ambition, Ariana).
+function drawUntilBonus(text) {
+  const all = [...text.matchAll(/until you have\s+(\d+)\s+cards?/g)];
+  if (all.length < 2) return null;
+  let when = null;
+  if (/if it[’']s your first turn/.test(text)) when = 'firstTurn';
+  else if (/none of your pokémon have any energy attached/.test(text)) when = 'noEnergyAttached';
+  else if (/knocked out during your opponent[’']s last turn/.test(text)) when = 'koedLastTurn';
+  else if (/all of your pokémon in play are team rocket[’']s pokémon/.test(text)) when = 'teamRocketInPlay';
+  if (!when) return null;
+  return {
+    target: { kind: 'fixed', n: Number(all[all.length - 1][1]) },
+    when,
+  };
 }
 
 // Shared search-deck target parsing — used by the main search branch, coin-flip
@@ -389,13 +437,13 @@ export function parseSearchDeckParams(lower) {
     };
   }
   if (
-    /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-\.]+?)\s+and put them onto your bench/.test(
+    /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-.]+?)\s+and put them onto your bench/.test(
       lower,
     ) &&
     !lower.includes('basic pok')
   ) {
     const namedBenchMulti = lower.match(
-      /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-\.]+?)\s+and put them onto your bench/
+      /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-.]+?)\s+and put them onto your bench/
     );
     return {
       what: namedBenchMulti[2].trim(),
@@ -732,12 +780,50 @@ function parseCoinFlipStep(lower) {
   return null;
 }
 
+const PLAY_STAGE_WORDS = { basic: 'Basic', 'stage 1': 'Stage 1', 'stage 2': 'Stage 2' };
+
+// Card-printed "only if …" / "you can't play this card if …" restrictions, as one condition
+// string evaluated by trainer-play-conditions.mjs. Hand counts include the Trainer itself.
 function parsePlayCondition(lower) {
   const oppPrizes = lower.match(/only if your opponent has\s+(\d+)\s+or fewer prize cards remaining/);
   if (oppPrizes) return `opponentPrizes<=${oppPrizes[1]}`;
-  if (lower.includes('only if you have more prize cards remaining than your opponent')) {
+  const exactPrizes = lower.match(/only if your opponent has exactly\s+(\d+)(?:\s+or\s+(\d+))?\s+prize cards remaining/);
+  if (exactPrizes) return `opponentPrizes==${[exactPrizes[1], exactPrizes[2]].filter(Boolean).join('|')}`;
+  if (/only if you have more prize cards (?:remaining|left) than your opponent/.test(lower)) {
     return 'morePrizesThanOpponent';
   }
+  const lostZone = lower.match(/only if you have\s+(\d+)\s+or more cards in the lost zone/);
+  if (lostZone) return `lostZone>=${lostZone[1]}`;
+  if (lower.includes('only if there is any stadium card in play')) return 'stadiumInPlay';
+  const oppStage = lower.match(/only if your opponent's active pokémon is a (basic|stage 1|stage 2) pokémon/);
+  if (oppStage) return `opponentActiveStage=${PLAY_STAGE_WORDS[oppStage[1]]}`;
+  if (lower.includes("only if your opponent's active pokémon is poisoned")) return 'opponentActivePoisoned';
+  const koed = lower.match(
+    /only if (?:any of your|1 of your) (\{[a-z]\} |team rocket's )?pokémon (?:were|was) knocked out during your opponent's last turn/
+  );
+  if (koed) {
+    const qualifier = (koed[1] || '').trim();
+    if (!qualifier) return 'koedLastTurn';
+    const symbol = qualifier.match(/^\{([a-z])\}$/);
+    return symbol ? `koedLastTurn:type=${symbol[1]}` : `koedLastTurn:name=${qualifier}`;
+  }
+  if (/only when it is the last card in your hand/.test(lower)) return 'lastCardInHand';
+  if (/can't play this card if you have any cards in your hand other than/.test(lower)) return 'onlyCopiesInHand';
+  const fewerOthers = lower.match(/only if you have\s+(\d+)\s+or fewer other cards in your hand/);
+  if (fewerOthers) return `handCount<=${Number(fewerOthers[1]) + 1}`;
+  const tooMany = lower.match(/if you have\s+(\d+)\s+or more cards (?:\(including this one\) )?in your hand(?: \(including this one\))?, you can't play this card/)
+    || lower.match(/can't play this card if you have\s+(\d+)\s+or more cards in your hand/);
+  if (tooMany) return `handCount<=${Number(tooMany[1]) - 1}`;
+  const moreThan = lower.match(/if you have more than\s+(\d+)\s+cards (?:\(including this one\) )?in your hand, you can't play this card/);
+  if (moreThan) return `handCount<=${moreThan[1]}`;
+  if (
+    /if you have no other cards in your hand, you can't (?:use|play) this card/.test(lower) ||
+    /if this is the only card in your hand, you can't play this card/.test(lower)
+  ) {
+    return 'handCount>=2';
+  }
+  if (/only if you go second, and only (?:during|on) your first turn/.test(lower)) return 'secondPlayerFirstTurn';
+  if (/can use this card only during your first turn/.test(lower)) return 'firstTurnOnly';
   if (lower.includes("can't use this card during your first turn")) return 'notFirstTurn';
   return null;
 }
@@ -746,6 +832,9 @@ export function parseTrainerEffect(text = '') {
   const lower = normalizeText(text);
   const playCondition = parsePlayCondition(lower);
   const result = parseTrainerSteps(lower);
+  if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
+    result.turnOnePermission = true;
+  }
   return playCondition ? { ...result, playCondition } : result;
 }
 
@@ -866,7 +955,7 @@ function parseTrainerSteps(lower) {
     if (lower.includes('discard any number of them')) pick = 'discard';
     else if (lower.includes('supporter card')) pick = 'Supporter';
     else if (lower.includes('attach a basic energy')) pick = 'Basic Energy (attach)';
-    else if (lower.includes('onto your bench')) pick = 'Darkness Pokémon (bench)';
+    else if (lower.includes('onto your bench')) pick = benchLookPick(lower);
     else if (lower.includes('basic pokémon or evolution card')) pick = 'Pokémon or Evolution';
     steps.push({
       type: 'lookAtTop',
@@ -885,9 +974,9 @@ function parseTrainerSteps(lower) {
     const m = lower.match(/bottom\s+(\d+)\s+cards?/) || lower.match(/look at (?:the )?(\d+) cards? from the bottom/);
     let pick = 'any';
     if (lower.includes('supporter card')) pick = 'Supporter';
+    else if (lower.includes('onto your bench')) pick = benchLookPick(lower);
     else if (lower.includes('pokémon')) pick = 'Pokémon';
     else if (lower.includes('attach a basic energy')) pick = 'Basic Energy (attach)';
-    else if (lower.includes('onto your bench')) pick = 'Darkness Pokémon (bench)';
     steps.push({
       type: 'lookAtBottom',
       count: m ? Number(m[1]) : 7,
@@ -1135,11 +1224,11 @@ function parseTrainerSteps(lower) {
   // draw until you have N (standalone — Iris's Fighting Spirit, Ariana,
   // Professor Birch's "draw cards from your deck until you have 6")
   if (/draw\s+cards(?:\s+from\s+your\s+deck)?\s+until\s+you have/.test(lower)) {
-    const all = [...lower.matchAll(/until you have\s+(\d+)\s+cards?/g)].map((x) => Number(x[1]));
+    const bonus = drawUntilBonus(lower);
     steps.push({
       type: 'drawUntil',
-      target: all[0] ?? null,
-      bonusTarget: lower.includes('instead') ? all[all.length - 1] : null,
+      target: drawUntilTarget(lower),
+      ...(bonus ? { bonusTarget: bonus.target, bonusWhen: bonus.when } : {}),
     });
     appendDiscardCost(steps, lower);
     return { steps, recognizable: true };
@@ -1400,6 +1489,8 @@ function parseTrainerSteps(lower) {
       type: 'lookAtFaceDownPrize',
       what: /ultra beast/.test(lower) ? 'Ultra Beast' : 'Basic',
       replace: /put this .* in its place/.test(lower),
+      // Daisy's Help only looks; the Ball cards take a matching card into hand.
+      take: /put it into your hand/.test(lower),
     });
     return { steps, recognizable: true };
   }
@@ -1429,7 +1520,10 @@ function parseTrainerSteps(lower) {
   // Mr. Fuji / Cassius — shuffle one of your Pokémon (and its attachments) into deck
   if (/shuffle 1 of your pokémon and all cards attached to it into your deck/.test(lower) ||
       /shuffle it and any cards attached to it into your deck/.test(lower)) {
-    steps.push({ type: 'shufflePokemonIntoDeck' });
+    steps.push({
+      type: 'shufflePokemonIntoDeck',
+      ...(/pokémon on your bench/.test(lower) ? { benchOnly: true } : {}),
+    });
     return { steps, recognizable: true };
   }
 
@@ -1447,9 +1541,16 @@ function parseTrainerSteps(lower) {
   }
 
   // Karen / Lysandre's Trump Card — each player shuffles their discard pile into deck
-  if (/each player shuffles all (?:pokémon|cards) in (?:his or her|their) discard pile into (?:his or her|their) deck/.test(lower)) {
-    steps.push({ type: 'shuffleDiscardIntoDeck', scope: 'each' });
-    return { steps, recognizable: true };
+  {
+    const m = lower.match(/each player shuffles all (pokémon|cards) in (?:his or her|their) discard pile into (?:his or her|their) deck/);
+    if (m) {
+      steps.push({
+        type: 'shuffleDiscardIntoDeck',
+        scope: 'each',
+        what: m[1] === 'pokémon' ? 'Pokémon' : 'all',
+      });
+      return { steps, recognizable: true };
+    }
   }
 
   // Surprise Box / Return Label — move a card from the opponent's discard pile
@@ -2006,7 +2107,13 @@ function parseTrainerSteps(lower) {
   {
     const m = lower.match(/reveal the top card of your deck\. if that card is an? ([a-zé{}]+(?: [a-zé{}]+)?) energy card, attach it to 1 of your (?:benched )?pokémon/);
     if (m) {
-      steps.push({ type: 'revealTopEnergy', energy: m[1].trim(), toBench: lower.includes('benched pokémon') });
+      steps.push({
+        type: 'revealTopEnergy',
+        energy: m[1].trim(),
+        toBench: lower.includes('benched pokémon'),
+        // Gutsy Pickaxe puts the non-matching card into hand; Ether leaves it on top.
+        restTo: /put it into your hand/.test(lower) ? 'hand' : 'top',
+      });
       return { steps, recognizable: true };
     }
   }
@@ -2193,7 +2300,19 @@ function parseTrainerSteps(lower) {
 export function describeStep(step) {
   switch (step.type) {
     case 'draw': return `Draw ${step.count} card${step.count > 1 ? 's' : ''}.`;
-    case 'drawUntil': return `Draw cards until you have ${step.target} card${step.target === 1 ? '' : 's'} in your hand${step.bonusTarget ? ` (${step.bonusTarget} instead if the condition is met)` : ''}.`;
+    case 'drawUntil': {
+      const describe = (target) => {
+        if (target && typeof target === 'object') {
+          if (target.kind === 'opponentHand') return 'as many cards as your opponent';
+          if (target.kind === 'opponentHandPlus') return `${target.n} more card${target.n === 1 ? '' : 's'} than your opponent`;
+          return String(target.n ?? 5);
+        }
+        return String(target ?? 5);
+      };
+      return `Draw cards until you have ${describe(step.target)} cards in your hand${
+        step.bonusTarget ? ` (${describe(step.bonusTarget)} instead if the condition is met)` : ''
+      }.`;
+    }
     case 'opponentDraw': return `Your opponent draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'discardHandThenDraw': return `Discard your hand, then draw ${step.count} cards.`;
     case 'shuffleHandThenDraw': return `Shuffle your hand into the deck, then draw ${step.count} cards${step.bonusCount ? ` (${step.bonusCount} if 6 prizes left)` : ''}.`;

@@ -3028,11 +3028,11 @@ import test from 'node:test';
     test('parsePrizeModify / applyPrizeModify', () => {
       assert.deepEqual(
         parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 1 fewer Prize card.' } }),
-        { delta: -1 }
+        { delta: -1, side: 'victim' }
       );
       assert.deepEqual(
         parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 2 more Prize cards.' } }),
-        { delta: 2 }
+        { delta: 2, side: 'victim' }
       );
       assert.equal(applyPrizeModify(3, -1), 2);
       assert.equal(applyPrizeModify(1, -5), 0);
@@ -3045,13 +3045,13 @@ import test from 'node:test';
             text: 'If this Pokémon has full HP and would be Knocked Out by damage from an attack, it is not Knocked Out, and its remaining HP becomes 10.',
           },
         }),
-        { fullHpOnly: true, surviveHp: 10 }
+        { fullHpOnly: true, surviveHp: 10, coinFlip: false }
       );
       assert.deepEqual(
         parseKoPrevention({ ability: { text: 'When this Pokémon would be Knocked Out, flip a coin. If heads, it is not Knocked Out.' } }),
-        { fullHpOnly: false, surviveHp: null }
+        { fullHpOnly: false, surviveHp: null, coinFlip: true }
       );
-      assert.deepEqual(parseKoPrevention({ ability: { text: 'Draw a card.' } }), { fullHpOnly: false, surviveHp: null });
+      assert.deepEqual(parseKoPrevention({ ability: { text: 'Draw a card.' } }), { fullHpOnly: false, surviveHp: null, coinFlip: false });
     });
 
     test('parseThorns: damage counters on attacker', () => {

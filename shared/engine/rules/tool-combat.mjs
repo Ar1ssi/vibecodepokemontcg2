@@ -8,7 +8,6 @@ import {
   parseDamagePrevention,
   parseDamageReduction,
   parseDamageBonus,
-  parseHpBonus,
   parseRetreatCostModifier,
   applyRetreatCostModifier,
   parsePrizeModify,
@@ -26,6 +25,13 @@ import {
 } from './card-classify.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { isSpecialEnergyCard } from './special-energy-parse.mjs';
+import {
+  holderView,
+  parseToolCondition,
+  toolConditionMet,
+  toolHpBonusFor,
+  toolRetreatDeltaFor,
+} from './tool-conditions.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -131,11 +137,14 @@ function toolBlocked(blockTools, stadium = null) {
   return Boolean(blockTools || stadiumBlocksToolEffects(stadium));
 }
 
-export function preventionForCard(card, attacker) {
+export function preventionForCard(card, attacker, ctx = {}) {
   if (!card) return { preventAll: false, reduce: 0 };
   const t = textOf(card);
   const base = parseDamagePrevention(card);
   if (!base.preventAll && !base.reduce) return base;
+  if (!toolConditionMet(parseToolCondition(card), { ...ctx, attacker })) {
+    return { preventAll: false, reduce: 0 };
+  }
 
   if (base.preventAll) {
     if (/pokémon ex\b|pokemon ex\b/i.test(t)) {
@@ -157,11 +166,14 @@ export function preventionForCard(card, attacker) {
   return base;
 }
 
-export function reductionForCard(card, defender, attacker) {
+export function reductionForCard(card, defender, attacker, ctx = {}) {
   if (!card) return 0;
   const t = textOf(card);
   const red = parseDamageReduction(card).reduce;
   if (!red) return 0;
+  if (!toolConditionMet(parseToolCondition(card), { ...ctx, defender, attacker })) {
+    return 0;
+  }
 
   // Attacker requirements
   const sym = t.match(/opponent's \{([a-z])\}/i);
@@ -220,18 +232,19 @@ function bonusForTool(
     attacker,
     defenderPoisoned = false,
     attackerTrailingPrizes = false,
+    ctx = null,
   }
 ) {
   const t = textOf(tool);
   const bonus = parseDamageBonus(tool).bonus;
   if (!bonus) return 0;
+  if (ctx && !toolConditionMet(parseToolCondition(tool), ctx)) return 0;
+  if (/active (?:\{[a-z]\}\s*)?pok[eé]mon/i.test(t) && !defenderIsActive) {
+    return 0;
+  }
   if (/active pokémon ex|active pokemon ex/i.test(t) && !isExCard(defender))
     return 0;
-  if (/active pokémon ex|active pokemon ex/i.test(t) && !defenderIsActive)
-    return 0;
   if (/active pokémon v\b|active pokemon v\b/i.test(t) && !isVCard(defender))
-    return 0;
-  if (/active pokémon v\b|active pokemon v\b/i.test(t) && !defenderIsActive)
     return 0;
   if (
     /more prize cards remaining than your opponent/i.test(t) &&
@@ -260,12 +273,14 @@ function bonusForTool(
   ) {
     return 0;
   }
+  // Hop's Choice Band: "Attacks used by the Hop's Pokémon this card is
+  // attached to" — the name check belongs on the holder, not the defender (A3).
   if (
     /hop's pokémon|hop's pokemon/i.test(t) &&
-    !/hop's/i.test(defender?.name || '')
+    !/hop's/i.test(lower(attacker?.name))
   )
     return 0;
-  if (/pikachu ex/i.test(t) && !/pikachu ex/i.test(attacker?.name || ''))
+  if (/pikachu ex/i.test(t) && !/pikachu ex/i.test(lower(attacker?.name)))
     return 0;
   if (/tera pokémon|tera pokemon/i.test(t) && !isTeraCard(attacker)) return 0;
   return bonus;
@@ -276,12 +291,19 @@ export function combinedToolDamagePrevention(
   defender,
   zoneCards,
   attacker,
-  { blockTools = false, stadium = null } = {}
+  { blockTools = false, stadium = null, flags = {} } = {}
 ) {
-  let out = preventionForCard(defender, attacker);
+  const ctx = {
+    holder: holderView(defender, zoneCards),
+    attacker,
+    defender,
+    zoneCards,
+    flags,
+  };
+  let out = preventionForCard(defender, attacker, ctx);
   if (toolBlocked(blockTools, stadium)) return out;
   for (const tool of attachedTools(defender, zoneCards)) {
-    out = mergeDamagePrevention(out, preventionForCard(tool, attacker));
+    out = mergeDamagePrevention(out, preventionForCard(tool, attacker, ctx));
   }
   return out;
 }
@@ -292,13 +314,20 @@ export function applyToolDamageReduction(
   defender,
   zoneCards,
   attacker,
-  { blockTools = false, stadium = null, inPlayCards = [] } = {}
+  { blockTools = false, stadium = null, inPlayCards = [], flags = {} } = {}
 ) {
   let total = incoming;
   if (total <= 0) return 0;
+  const ctx = {
+    holder: holderView(defender, zoneCards),
+    attacker,
+    defender,
+    zoneCards,
+    flags,
+  };
 
   // 1. Defender's own ability reduction
-  const selfRed = reductionForCard(defender, defender, attacker);
+  const selfRed = reductionForCard(defender, defender, attacker, ctx);
   if (selfRed > 0) total = Math.max(0, total - selfRed);
 
   // 2. Team-wide bench/in-play passive ability reductions (e.g. Radiant Gardevoir)
@@ -306,7 +335,10 @@ export function applyToolDamageReduction(
     if (card === defender || card.attachedTo) continue;
     const t = textOf(card);
     if (/your pokémon take|your pokemon take/i.test(t)) {
-      const red = reductionForCard(card, defender, attacker);
+      const red = reductionForCard(card, defender, attacker, {
+        ...ctx,
+        holder: card,
+      });
       if (red > 0) total = Math.max(0, total - red);
     }
   }
@@ -314,7 +346,7 @@ export function applyToolDamageReduction(
   // 3. Attached tools reduction
   if (!toolBlocked(blockTools, stadium)) {
     for (const tool of attachedTools(defender, zoneCards)) {
-      const red = reductionForCard(tool, defender, attacker);
+      const red = reductionForCard(tool, defender, attacker, ctx);
       if (red > 0) total = Math.max(0, total - red);
     }
   }
@@ -332,11 +364,24 @@ export function combinedToolAttackBonus(
     defenderIsActive = true,
     defenderPoisoned = false,
     attackerTrailingPrizes = false,
+    attackerPrizesRemaining,
     stadium = null,
   } = {}
 ) {
   let bonus = 0;
   if (toolBlocked(blockTools, stadium)) return bonus;
+  const ctx = {
+    holder: holderView(attacker, zoneCards),
+    attacker,
+    defender,
+    zoneCards,
+    flags: {
+      defenderIsActive,
+      defenderPoisoned,
+      trailingPrizes: attackerTrailingPrizes,
+      prizesRemaining: attackerPrizesRemaining,
+    },
+  };
   for (const tool of attachedTools(attacker, zoneCards)) {
     bonus += bonusForTool(tool, {
       defender,
@@ -344,6 +389,7 @@ export function combinedToolAttackBonus(
       attacker,
       defenderPoisoned,
       attackerTrailingPrizes,
+      ctx,
     });
   }
   return bonus;
@@ -353,12 +399,13 @@ export function combinedToolAttackBonus(
 export function combinedToolHpBonus(
   pokemon,
   zoneCards,
-  { blockTools = false } = {}
+  { blockTools = false, stadium = null } = {}
 ) {
   let bonus = 0;
-  if (toolBlocked(blockTools)) return bonus;
+  if (toolBlocked(blockTools, stadium)) return bonus;
+  const holder = holderView(pokemon, zoneCards);
   for (const tool of attachedTools(pokemon, zoneCards)) {
-    bonus += parseHpBonus(tool).bonus || 0;
+    bonus += toolHpBonusFor(tool, { holder, zoneCards });
   }
   return bonus;
 }
@@ -371,12 +418,15 @@ export function combinedToolRetreatCost(
   { blockTools = false, stadium = null } = {}
 ) {
   let cost = baseRetreat || 0;
-  const mod = parseRetreatCostModifier(pokemon);
+  const holder = holderView(pokemon, zoneCards);
+  const mod = parseRetreatCostModifier(holder);
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;
   for (const tool of attachedTools(pokemon, zoneCards)) {
-    const tmod = parseRetreatCostModifier(tool);
-    cost = applyRetreatCostModifier(cost, tmod?.delta || 0);
+    cost = applyRetreatCostModifier(
+      cost,
+      toolRetreatDeltaFor(tool, { holder, zoneCards })
+    );
     const t = textOf(tool);
     if (/remaining hp is 30 or less/i.test(t)) {
       const dmg =
@@ -405,6 +455,8 @@ export function evaluateToolKoPrevention(
     blockTools = false,
     stadium = null,
     inHp = false,
+    // Focus Band flips a coin; called only for a coin-flip candidate.
+    flipCoin = null,
   } = {}
 ) {
   const isBlocked = toolBlocked(blockTools, stadium);
@@ -437,10 +489,18 @@ export function evaluateToolKoPrevention(
   const dmgCurrent = currentDamage;
   const dmgTotal = totalAfter;
 
+  // A tails flip still happened, so it is reported even when nothing prevented the KO.
+  let lastCoinFace = null;
   for (const { source, ko, isTool } of candidates) {
     if (!ko.fullHpOnly && ko.surviveHp == null) continue;
     if (ko.fullHpOnly && dmgCurrent > 0) continue;
     if (dmgTotal < hpThreshold) continue;
+    let coinFace = null;
+    if (ko.coinFlip) {
+      coinFace = typeof flipCoin === 'function' ? flipCoin() : null;
+      if (coinFace) lastCoinFace = coinFace;
+      if (coinFace !== 'heads') continue;
+    }
 
     const surviveHp = ko.surviveHp ?? 10;
     const hp = baseHp || 0;
@@ -449,7 +509,7 @@ export function evaluateToolKoPrevention(
       0,
       Math.ceil(hp / 10) - Math.ceil(surviveHp / 10)
     );
-    const discardOnUse = /discard this card/i.test(textOf(source));
+    const discardOnUse = /discard this card|then, discard [a-z]/i.test(textOf(source));
 
     return {
       prevented: true,
@@ -459,6 +519,7 @@ export function evaluateToolKoPrevention(
       toolCard: isTool ? source : null,
       surviveHp,
       discardOnUse,
+      coinFace,
     };
   }
 
@@ -466,6 +527,7 @@ export function evaluateToolKoPrevention(
     prevented: false,
     totalDamage: inHp ? totalAfter : Math.ceil(totalAfter / 10),
     damageHp: totalAfter,
+    ...(lastCoinFace && { coinFace: lastCoinFace }),
   };
 }
 
@@ -474,23 +536,43 @@ export function toolPrizeCountAdjust(
   defender,
   zoneCards,
   baseCount,
-  { blockTools = false, stadium = null, skipSpecialEnergy = false } = {}
+  {
+    blockTools = false,
+    stadium = null,
+    skipSpecialEnergy = false,
+    holder = null,
+    flags = {},
+  } = {}
 ) {
   let count = baseCount;
   if (!defender) return count;
   const toolsBlocked = toolBlocked(blockTools, stadium);
+  const ctx = {
+    holder: holder || holderView(defender, zoneCards),
+    defender,
+    zoneCards,
+    flags,
+  };
   for (const card of attachedCards(defender, zoneCards)) {
     if (isPokemonToolCard(card) && toolsBlocked) continue;
     // Legacy Energy's once-per-game reduction can be spent; when it is, its
     // (generic) prize-modify text must be ignored.
     if (skipSpecialEnergy && isSpecialEnergyCard(card)) continue;
-    const delta = parsePrizeModify(card).delta;
-    if (delta) count = Math.max(0, count + delta);
+    if (!toolConditionMet(parseToolCondition(card), ctx)) continue;
+    // Attacker-side clauses (Beast Bringer) change the holder owner's own Knock Outs.
+    const { delta, side } = parsePrizeModify(card);
+    if (side !== 'victim') continue;
+    count = Math.max(0, count + delta);
   }
   return count;
 }
 
-/** Parse reactive tool effects when the host is damaged by an attack. */
+/**
+ * Parse reactive tool effects when the host is damaged by an attack or Knocked Out.
+ * `phase` is the governing trigger (I139, I140): 'damage' for "is damaged by an
+ * attack (even if … Knocked Out)", which resolves on every damaging hit; 'ko' for
+ * "is Knocked Out by damage", which resolves only on the Knock Out.
+ */
 export function parseToolOnDamageEffect(tool) {
   const t = textOf(tool);
   if (
@@ -500,15 +582,27 @@ export function parseToolOnDamageEffect(tool) {
     return null;
   }
   const out = {
+    phase: t.includes('damaged by an attack') ? 'damage' : 'ko',
     draw: 0,
+    drawUntil: 0,
     damageAttacker: 0,
     searchDeckOnKo: 0,
     moveDamage: 0,
     discardTool: false,
     requiresActive: /active spot/.test(t),
+    // "the Pokémon this card is attached to is Knocked Out" vs "your Active Pokémon
+    // is Knocked Out" (Exp. Share / Wishful Baton sit on a Benched Pokémon).
+    trigger: /your active pok[eé]mon is knocked out/.test(t) ? 'activeKo' : 'selfKo',
+    moveEnergyOnKo: null,
+    discardPrizes: false,
+    statusAttacker: null,
+    millOpponent: null,
+    returnSelfToHand: false,
   };
   const dm = t.match(/draw (\d+) cards?/);
   if (dm) out.draw = parseInt(dm[1], 10) || 2;
+  const drawUntil = t.match(/draw cards until you have (\d+) cards?/);
+  if (drawUntil) out.drawUntil = parseInt(drawUntil[1], 10) || 7;
   const atk = t.match(/put (\d+) damage counters on the attacking pokémon/);
   if (atk) {
     out.damageAttacker = parseInt(atk[1], 10) || 0;
@@ -516,26 +610,111 @@ export function parseToolOnDamageEffect(tool) {
   }
   const mv = t.match(/move (\d+) damage counters?/);
   if (mv) out.moveDamage = parseInt(mv[1], 10) || 1;
-  const search = t.match(/search your deck for up to (\d+) cards?/);
+  const search = t.match(/search your deck for (?:up to (\d+) cards?|a card)/);
   if (search && t.includes('knocked out'))
-    out.searchDeckOnKo = parseInt(search[1], 10) || 1;
+    out.searchDeckOnKo = search[1] ? parseInt(search[1], 10) : 1;
+
+  // Move/return Energy on Knock Out (Exp. Share, Wishful Baton, Heavy Baton,
+  // Energy Pouch, Time Shard, Handheld Fan, Rugged Helmet).
+  if (/energy/.test(t) && /(move|put|return)/.test(t)) {
+    const countM = t.match(/(?:move|return) (?:up to )?(\d+)/);
+    const all = /put all basic energy/.test(t);
+    const from =
+      /(?:from|attached to) the attacking pokémon/.test(t) ? 'attacker' : 'victim';
+    let to = null;
+    if (/into your opponent'?s? hand/.test(t)) to = 'opponentHand';
+    else if (/to 1 of your opponent'?s? benched pokémon/.test(t)) to = 'opponentBench';
+    else if (/to 1 of your benched pokémon|to your benched pokémon/.test(t)) to = 'bench';
+    else if (/to the pokémon this card is attached to/.test(t)) to = 'holder';
+    else if (/into your hand|to your hand/.test(t)) to = 'hand';
+    if (to) {
+      out.moveEnergyOnKo = {
+        count: all ? 'all' : countM ? parseInt(countM[1], 10) : 1,
+        from,
+        to,
+        basicOnly: /basic energy/.test(t),
+      };
+    }
+  }
+  if (/discards any prize cards? they would take/.test(t)) out.discardPrizes = true;
+  if (/attacking pokémon is now asleep/.test(t)) out.statusAttacker = 'Asleep';
+  if (/discard the top (\d+) cards? of your opponent'?s? deck/.test(t)) {
+    const m = t.match(/discard the top (\d+) cards?/);
+    out.millOpponent = { deck: parseInt(m[1], 10) || 1, handRandom: 0 };
+  }
+  if (/discard a random card from your opponent'?s? hand/.test(t)) {
+    out.millOpponent = { deck: 0, handRandom: 1 };
+  }
+  if (/put that pokémon into your hand/.test(t)) out.returnSelfToHand = true;
+
   const th = parseThorns(tool);
   if (th.count && !out.damageAttacker) out.damageAttacker = th.count;
-  if (out.draw || out.damageAttacker || out.searchDeckOnKo || out.moveDamage)
-    return out;
+  if (hasToolOnDamageEffect(out)) return out;
   return null;
 }
 
+function hasToolOnDamageEffect(out) {
+  return Boolean(
+    out.draw ||
+      out.drawUntil ||
+      out.damageAttacker ||
+      out.searchDeckOnKo ||
+      out.moveDamage ||
+      out.moveEnergyOnKo ||
+      out.discardPrizes ||
+      out.statusAttacker ||
+      out.millOpponent ||
+      out.returnSelfToHand
+  );
+}
+
+// Whether an effect only resolves when the holder is Knocked Out (the on-KO hook
+// applies these; the on-damage consumer applies the 'damage' phase).
+function isOnKoEffect(parsed) {
+  return parsed.phase === 'ko';
+}
+
+/**
+ * On-Knock-Out tool effects for the victim's side: Tools attached to the Knocked Out
+ * Pokémon, plus Tools on the player's other Pokémon whose trigger is "your Active
+ * Pokémon is Knocked Out" (Exp. Share / Wishful Baton sit on a Benched Pokémon).
+ */
+export function attachedToolOnKoEffects(
+  victimPlayer,
+  victim,
+  { blockTools = false, stadium = null, isActive = true } = {}
+) {
+  if (!victimPlayer || !victim || toolBlocked(blockTools, stadium)) return [];
+  const zone = [
+    ...(victimPlayer.zones?.active || []),
+    ...(victimPlayer.zones?.bench || []),
+  ];
+  const effects = [];
+  for (const holder of zone.filter((c) => !c.attachedTo)) {
+    const isVictim = holder.instanceId === victim.instanceId;
+    for (const tool of attachedTools(holder, zone)) {
+      const parsed = parseToolOnDamageEffect(tool);
+      if (!parsed || !isOnKoEffect(parsed)) continue;
+      if (parsed.requiresActive && !isActive) continue;
+      if (parsed.trigger === 'selfKo' && !isVictim) continue;
+      if (parsed.trigger === 'activeKo' && !isActive) continue;
+      effects.push({ tool, holder, isVictim, ...parsed });
+    }
+  }
+  return effects;
+}
+
+/** Reactive Tools on `defender` for one trigger phase ('damage' by default, or 'ko'). */
 export function attachedToolOnDamageEffects(
   defender,
   zoneCards,
-  { blockTools = false, stadium = null, isActive = true } = {}
+  { blockTools = false, stadium = null, isActive = true, phase = 'damage' } = {}
 ) {
   if (toolBlocked(blockTools, stadium) || !defender) return [];
   const effects = [];
   for (const tool of attachedTools(defender, zoneCards)) {
     const parsed = parseToolOnDamageEffect(tool);
-    if (!parsed) continue;
+    if (!parsed || parsed.phase !== phase) continue;
     if (parsed.requiresActive && !isActive) continue;
     effects.push({ tool, ...parsed });
   }

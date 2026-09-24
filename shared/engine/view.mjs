@@ -51,6 +51,20 @@ function playerFlags(player) {
 }
 
 /**
+ * A player's Prize cards as seen by any viewer: face down (identity only) until a
+ * card was individually revealed or the player turned them all face up (Town Map /
+ * Here Comes Team Rocket!, design 035 slice 7).
+ *
+ * @param {object} player
+ * @returns {object[]}
+ */
+function prizeCards(player) {
+  const prizes = player?.zones?.prizes || [];
+  const faceUp = Boolean(player?.flags?.prizesFaceUp);
+  return prizes.map((c) => (faceUp || c.revealed ? sanitizeCard(c) : redactCard(c)));
+}
+
+/**
  * Redacts a player's zones for the owner ('you').
  *
  * @param {object} player
@@ -61,7 +75,7 @@ function redactOwnerZones(player) {
   return {
     deck: { count: (zones.deck || []).length },
     hand: (zones.hand || []).map(sanitizeCard),
-    prizes: (zones.prizes || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
+    prizes: prizeCards(player),
     active: (zones.active || []).map(sanitizeCard),
     bench: (zones.bench || []).map(sanitizeCard),
     discard: (zones.discard || []).map(sanitizeCard),
@@ -81,7 +95,7 @@ function redactOpponentZones(player) {
   return {
     deck: { count: (zones.deck || []).length },
     hand: (zones.hand || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
-    prizes: (zones.prizes || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
+    prizes: prizeCards(player),
     active: (zones.active || []).map(sanitizeCard),
     bench: (zones.bench || []).map(sanitizeCard),
     discard: (zones.discard || []).map(sanitizeCard),
@@ -101,7 +115,7 @@ function redactSpectatorZones(player) {
   return {
     deck: { count: (zones.deck || []).length },
     hand: { count: (zones.hand || []).length },
-    prizes: (zones.prizes || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
+    prizes: prizeCards(player),
     active: (zones.active || []).map(sanitizeCard),
     bench: (zones.bench || []).map(sanitizeCard),
     discard: (zones.discard || []).map(sanitizeCard),

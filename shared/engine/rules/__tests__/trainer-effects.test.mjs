@@ -336,22 +336,45 @@ import test, { describe } from 'node:test';
       const r = parseTrainerEffect("Draw cards until you have 6 cards in your hand.");
       assert.equal(r.recognizable, true);
       assert.equal(r.steps[0].type, 'drawUntil');
-      assert.equal(r.steps[0].target, 6);
+      assert.deepEqual(r.steps[0].target, { kind: 'fixed', n: 6 });
     });
 
     test("Iris's Fighting Spirit: 'discard another card' cost + drawUntil", () => {
       const r = parseTrainerEffect("You can use this card only if you discard another card from your hand. Draw cards until you have 6 cards in your hand.");
       assert.equal(r.recognizable, true);
       assert.ok(r.steps.some((s) => s.type === 'discardCost' && s.count === 1));
-      assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target === 6));
+      assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target?.n === 6));
     });
 
-    test("Team Rocket's Ariana: draw until 5 (8 instead)", () => {
+    test("Team Rocket's Ariana: draw until 5 (8 instead for Team Rocket's Pokémon)", () => {
       const r = parseTrainerEffect("Draw cards until you have 5 cards in your hand. If all of your Pokémon in play are Team Rocket’s Pokémon, draw cards until you have 8 cards in your hand instead.");
       assert.equal(r.recognizable, true);
       assert.equal(r.steps[0].type, 'drawUntil');
-      assert.equal(r.steps[0].target, 5);
-      assert.equal(r.steps[0].bonusTarget, 8);
+      assert.deepEqual(r.steps[0].target, { kind: 'fixed', n: 5 });
+      assert.deepEqual(r.steps[0].bonusTarget, { kind: 'fixed', n: 8 });
+      assert.equal(r.steps[0].bonusWhen, 'teamRocketInPlay');
+    });
+
+    test('Lillie / Grusha / Cynthia: first-turn, no-Energy and KO-window bonus targets', () => {
+      const lillie = parseTrainerEffect("Draw cards until you have 6 cards in your hand. If it's your first turn, draw cards until you have 8 cards in your hand.");
+      assert.deepEqual(lillie.steps[0].bonusTarget, { kind: 'fixed', n: 8 });
+      assert.equal(lillie.steps[0].bonusWhen, 'firstTurn');
+
+      const grusha = parseTrainerEffect('Draw cards until you have 5 cards in your hand. If none of your Pokémon have any Energy attached, draw cards until you have 7 cards in your hand instead.');
+      assert.deepEqual(grusha.steps[0].bonusTarget, { kind: 'fixed', n: 7 });
+      assert.equal(grusha.steps[0].bonusWhen, 'noEnergyAttached');
+
+      const cynthia = parseTrainerEffect("Draw cards until you have 5 cards in your hand. If any of your Pokémon were Knocked Out during your opponent's last turn, draw cards until you have 8 cards in your hand instead.");
+      assert.deepEqual(cynthia.steps[0].bonusTarget, { kind: 'fixed', n: 8 });
+      assert.equal(cynthia.steps[0].bonusWhen, 'koedLastTurn');
+    });
+
+    test('Zisu and Battle Reporter: opponent-hand targets', () => {
+      const zisu = parseTrainerEffect('Draw cards until you have 1 more card in your hand than your opponent.');
+      assert.deepEqual(zisu.steps[0].target, { kind: 'opponentHandPlus', n: 1 });
+
+      const reporter = parseTrainerEffect('Draw cards until you have the same number of cards in your hand as your opponent.');
+      assert.deepEqual(reporter.steps[0].target, { kind: 'opponentHand' });
     });
 
     test('Pokémon Center Lady: heal 60 + cure', () => {
@@ -391,7 +414,7 @@ import test, { describe } from 'node:test';
       const r = parseTrainerEffect("Switch your Active Pokémon with 1 of your Benched Pokémon. If you do, draw cards until you have 5 cards in your hand.");
       assert.equal(r.recognizable, true);
       assert.ok(r.steps.some((s) => s.type === 'switchOwn'));
-      assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target === 5));
+      assert.ok(r.steps.some((s) => s.type === 'drawUntil' && s.target?.n === 5));
     });
 
     test('Mesagoza-style stadium draw-until is passive, not a one-shot drawUntil', () => {
@@ -1038,6 +1061,52 @@ import test, { describe } from 'node:test';
         assert.equal(r.steps[0].destination, 'hand');
         assert.ok(describeStep(r.steps[0]).includes('bottom'));
         assert.ok(describeStep(r.steps[0]).includes('7'));
+      });
+
+      test('fossil Items: named (bench) pick from the look-at window (I132)', () => {
+        const fossils = [
+          ['Claw Fossil Anorith', 'an Anorith'],
+          ['Armor Fossil Shieldon', 'a Shieldon'],
+          ['Old Amber Aerodactyl', 'an Aerodactyl'],
+          ['Helix Fossil Omanyte', 'an Omanyte'],
+          ['Dome Fossil Kabuto', 'a Kabuto'],
+          ['Sail Fossil', 'an Amaura'],
+          ['Jaw Fossil', 'a Tyrunt'],
+          ['Root Fossil Lileep', 'a Lileep'],
+          ['Plume Fossil', 'an Archen'],
+          ['Cover Fossil', 'a Tirtouga'],
+        ];
+        for (const [fossil, clause] of fossils) {
+          const target = clause.replace(/^an? /, '');
+          const r = parseTrainerEffect(
+            `Look at the bottom 7 cards of your deck. You may reveal ${clause} you find there and put it onto your Bench. Shuffle the other cards back into your deck.`
+          );
+          assert.equal(r.recognizable, true, fossil);
+          assert.equal(r.steps[0].type, 'lookAtBottom', fossil);
+          assert.equal(r.steps[0].pick, `${target} (bench)`, fossil);
+          assert.equal(r.steps[0].destination, 'bench', fossil);
+        }
+      });
+
+      test("Grimsley's Move: typed (bench) pick stays Darkness (I132)", () => {
+        const r = parseTrainerEffect(
+          "Look at the top 7 cards of your deck and put a {D} Pokémon you find there onto your Bench. Shuffle the other cards and put them on the bottom of your deck. You can't use this card during your first turn."
+        );
+        assert.equal(r.steps[0].type, 'lookAtTop');
+        assert.equal(r.steps[0].pick, 'Darkness Pokémon (bench)');
+        assert.equal(r.steps[0].destination, 'bench');
+        assert.equal(r.steps[0].restToBottom, true);
+      });
+
+      test('bench look-at: generic and typed forms use the (bench) vocabulary (I132)', () => {
+        const generic = parseTrainerEffect(
+          'Look at the top 5 cards of your deck. You may put a Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.'
+        );
+        assert.equal(generic.steps[0].pick, 'Pokémon (bench)');
+        const typed = parseTrainerEffect(
+          'Look at the top 5 cards of your deck and put a {F} Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.'
+        );
+        assert.equal(typed.steps[0].pick, 'Fighting Pokémon (bench)');
       });
     });
 
@@ -1692,7 +1761,7 @@ describe('recurring-wording coverage (batch 5)', () => {
   test("Professor Birch: 'draw cards from your deck until you have 6' → drawUntil 6", () => {
     const r = parseTrainerEffect('Draw cards from your deck until you have 6 cards in your hand.');
     assert.equal(r.steps[0].type, 'drawUntil');
-    assert.equal(r.steps[0].target, 6);
+    assert.deepEqual(r.steps[0].target, { kind: 'fixed', n: 6 });
   });
 
   test('Switch (legacy own-bench wording) → switchOwn', () => {

@@ -23,6 +23,7 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isEnergy } from '../cards.mjs';
 import { findCard } from '../state.mjs';
+import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 const SPECIAL_ENERGY_EFFECT = 'specialEnergy';
 
@@ -105,12 +106,23 @@ function moveStackToZone(draft, playerId, root, toZoneId, events) {
 }
 
 /** Swaps a player's Active with the given Benched root (attachments follow). */
-function swapActiveBench(draft, playerId, benchRoot, events) {
+function swapActiveBench(draft, playerId, benchRoot, events, { duringOwnersTurn = true } = {}) {
   const zones = draft.players[playerId].zones;
   const active = zones.active.find((c) => !c.attachedTo);
   if (!active || active === benchRoot) return;
   moveStackToZone(draft, playerId, benchRoot, 'active', events);
   moveStackToZone(draft, playerId, active, 'bench', events);
+  // Stadium on-switch triggers (Spikemuth). Special Energy is not a Trainer card,
+  // so Dust Island never applies here.
+  applyStadiumSwitchTriggers(draft, {
+    switchedOut: active,
+    switchedIn: benchRoot,
+    switchedOutPlayerId: playerId,
+    switchedInPlayerId: playerId,
+    viaTrainer: false,
+    duringOwnersTurn,
+    events,
+  });
 }
 
 function ctxFor(token, host, attacker) {
@@ -254,7 +266,9 @@ function applyPlan(draft, plan, ctx, selection = null) {
       } else {
         const oppId = Object.keys(draft.players || {}).find((id) => id !== ctx.hostPlayerId);
         const benchRoot = selection && selection.length ? findCard(draft, selection[0])?.card : null;
-        if (oppId && benchRoot) swapActiveBench(draft, oppId, benchRoot, events);
+        if (oppId && benchRoot) {
+          swapActiveBench(draft, oppId, benchRoot, events, { duringOwnersTurn: false });
+        }
       }
       break;
     }
@@ -308,7 +322,9 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
   const bench = zoneOf(draft, playerId, 'bench').filter((c) => !c.attachedTo);
   if (bench.length === 0) return 'done';
   if (bench.length === 1) {
-    swapActiveBench(draft, playerId, bench[0], ctx.events);
+    swapActiveBench(draft, playerId, bench[0], ctx.events, {
+      duringOwnersTurn: plan.side === 'self',
+    });
     return 'done';
   }
   return makeChoice({

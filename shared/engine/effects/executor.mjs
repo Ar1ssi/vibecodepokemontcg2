@@ -12,8 +12,9 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { isPokemon } from '../cards.mjs';
+import { isEnergy, isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
+import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -24,6 +25,7 @@ import {
 } from '../rules/stadium-effects.mjs';
 import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
 import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
+import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
 
@@ -94,12 +96,17 @@ export function createPendingChoice({
     player,
     prompt,
     source,
-    options: options.map((opt) => ({
-      instanceId: opt.instanceId,
-      name: opt.name || '',
-      src: opt.src || '',
-      type: opt.type || '',
-    })),
+    // Blind picks (face-down Prizes) reach the chooser without name or image (I141).
+    options: options.map((opt) =>
+      opt.faceDown
+        ? { instanceId: opt.instanceId, faceDown: true }
+        : {
+            instanceId: opt.instanceId,
+            name: opt.name || '',
+            src: opt.src || '',
+            type: opt.type || '',
+          }
+    ),
     min,
     max,
     cancellable: Boolean(cancellable),
@@ -117,6 +124,46 @@ function opponentBenchIsEvolved(player, root) {
 
 function inPlayRoots(player) {
   return [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => !c.attachedTo);
+}
+
+// A drawUntil target descriptor (design 035 slice 8), a numeric back-compat read,
+// or the 5-card default.
+function drawUntilTargetFor(target, opponent) {
+  if (target && typeof target === 'object') {
+    if (target.kind === 'opponentHand') return (opponent?.zones?.hand || []).length;
+    if (target.kind === 'opponentHandPlus') {
+      return (opponent?.zones?.hand || []).length + (target.n || 1);
+    }
+    if (target.kind === 'fixed') return target.n ?? 5;
+    return 5;
+  }
+  return typeof target === 'number' ? target : 5;
+}
+
+// Whether a drawUntil step's bonus target applies (Lillie, Grusha, Cynthia's
+// Ambition, Team Rocket's Ariana).
+function drawUntilBonusApplies(when, draft, player) {
+  switch (when) {
+    case 'firstTurn':
+      return (draft.turn?.number ?? 99) <= 2;
+    case 'noEnergyAttached':
+      return inPlayRoots(player).every(
+        (root) =>
+          ![...(player.zones.active || []), ...(player.zones.bench || [])].some(
+            (c) => c.attachedTo === root.instanceId && isEnergy(c)
+          )
+      );
+    case 'koedLastTurn':
+      return Boolean(player.flags?.koedLastOppTurn);
+    case 'teamRocketInPlay':
+      return inPlayRoots(player).every((root) => {
+        const zone = [...(player.zones.active || []), ...(player.zones.bench || [])];
+        const top = topPokemonCard(zone, root);
+        return /team rocket[’']s/i.test(String(top?.name || ''));
+      });
+    default:
+      return false;
+  }
 }
 
 export function attachToRoot(player, card, root, events) {
@@ -602,7 +649,10 @@ export function executeSteps(draft, {
       }
 
       case 'drawUntil': {
-        let target = step.target || 5;
+        // Design 035 slice 8: `target` may be a descriptor ({kind:'fixed'|
+        // 'opponentHand'|'opponentHandPlus'}), a numeric back-compat read, or
+        // overridden by `targetType` (Mystery Garden) / the bonus clause.
+        let target = drawUntilTargetFor(step.target, opponent);
         // Mystery Garden: target hand size is the live count of the player's
         // in-play Pokémon of a given type ("as many … as they have {P} Pokémon
         // in play"), not a printed number.
@@ -613,6 +663,8 @@ export function executeSteps(draft, {
               .map((v) => String(v).toLowerCase())
               .includes(want)
           ).length;
+        } else if (step.bonusTarget && drawUntilBonusApplies(step.bonusWhen, draft, player)) {
+          target = drawUntilTargetFor(step.bonusTarget, opponent);
         }
         const hand = player.zones.hand || [];
         const deck = player.zones.deck || [];
@@ -848,6 +900,16 @@ export function executeSteps(draft, {
                 opponent.zones.active.push(c);
               }
             }
+            // Stadium on-switch triggers run before the outgoing conditions clear.
+            applyStadiumSwitchTriggers(draft, {
+              switchedOut: oppActive,
+              switchedIn: benchCard,
+              switchedOutPlayerId: opponent.playerId,
+              switchedInPlayerId: opponent.playerId,
+              viaTrainer: effectType === 'trainer',
+              duringOwnersTurn: false,
+              events,
+            });
             clearConditions(oppActive);
             events.push({
               type: 'cardSwitched',
@@ -914,6 +976,16 @@ export function executeSteps(draft, {
               player.zones.active.push(c);
             }
           }
+          // Stadium on-switch triggers run before the outgoing conditions clear.
+          applyStadiumSwitchTriggers(draft, {
+            switchedOut: active,
+            switchedIn: benchCard,
+            switchedOutPlayerId: playerId,
+            switchedInPlayerId: playerId,
+            viaTrainer: effectType === 'trainer',
+            duringOwnersTurn: true,
+            events,
+          });
           clearConditions(active);
           events.push({
             type: 'cardSwitched',
@@ -986,6 +1058,16 @@ export function executeSteps(draft, {
               opponent.zones.active.push(c);
             }
           }
+          // Stadium on-switch triggers run before the outgoing conditions clear.
+          applyStadiumSwitchTriggers(draft, {
+            switchedOut: oppActive,
+            switchedIn: oppBenchCard,
+            switchedOutPlayerId: opponent.playerId,
+            switchedInPlayerId: opponent.playerId,
+            viaTrainer: effectType === 'trainer',
+            duringOwnersTurn: false,
+            events,
+          });
           clearConditions(oppActive);
           events.push({
             type: 'cardSwitched',

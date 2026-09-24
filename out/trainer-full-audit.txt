@@ -8,11 +8,40 @@ Unique (name+text) cards  : 1348
    257  (Item)
 
 === By parse outcome ===
-   698  guided
+   693  guided
    321  passive-only
-   295  automated
+   300  automated
     25  unrecognizable
      9  unhandled-step
+
+=== Server coverage: cards with a parsed step the server cannot execute (26) ===
+  (Legacy-client coverage is the parse outcome above; the server is authoritative.)
+  [(Item)] Alph Lithograph — server lacks: returnStadiumToHand
+  [(Item)] Alph Lithograph — server lacks: shuffleDeckOnly
+  [Item] Buddy-Buddy Rescue — server lacks: eachPlayerRecoverPokemon
+  [Supporter] Caitlin — server lacks: putHandBottomThenDraw
+  [Item] Eneporter — server lacks: moveEnergyOpponent
+  [Item] Fan of Waves — server lacks: sendEnergyToDeckBottom
+  [Supporter] Ghetsis — server lacks: opponentHandShuffleItemsDraw
+  [Item] Gym Badge — server lacks: flipUntilTailsDraw
+  [Supporter] Hugh — server lacks: eachPlayerHandToFive
+  [Supporter] Jessie & James — server lacks: eachPlayerDiscardFromHand
+  [(Item)] Lost Remover — server lacks: sendEnergyToLostZone
+  [(Item)] Lt. Surge — server lacks: putHandBasicAsActive
+  [Supporter] Lysandre Prism Star — server lacks: opponentDiscardToLostZonePerPokemon
+  [Item] Max Revive — server lacks: putDiscardOnTop
+  [Supporter] Oracle — server lacks: searchToTop
+  [(Item)] Pokémon Center — server lacks: healAllOwnAndDiscardEnergy
+  [Supporter] Pokémon Nurse — server lacks: healOneDiscardEnergy
+  [Item] Return Label — server lacks: opponentDiscardToDeckBottom
+  [Supporter] Seeker — server lacks: eachPlayerReturnBench
+  [Item] Surprise Box — server lacks: opponentDiscardToHand
+  [Item] Switching Cups — server lacks: switchHandWithTop
+  [Supporter] Team Rocket’s Handiwork — server lacks: millPerHeads
+  [Item] Tool Retriever — server lacks: toolsToHand
+  [Item] Tormenting Spray — server lacks: discardRandomOpponentHandIfSupporter
+  [(Item)] Trash Exchange — server lacks: shuffleDiscardThenMill
+  [Supporter] Wicke — server lacks: eachPlayerShuffleHandDraw
 
 === Gaps: unrecognizable / empty / unhandled step (34) ===
 
@@ -1265,845 +1294,845 @@ Unique (name+text) cards  : 1348
   You can play this card only if 1 of your Pokémon was Knocked Out during your opponent’s last turn. Attach up to 2 basic Energy cards from your hand to 1 of your {N} Pokémon.
 
 === OK (842) ===
-  [guided] Aaron’s Collection — recursion
-  [guided] Accompanying Flute — revealOpponentDeckBench
-  [guided] Acerola — returnPokemonToHand
-  [automated] Acerola’s Premonition — variableDraw
-  [guided] Acro Bike — lookAtTop
-  [guided] Adaman — searchDeck
-  [guided] Adventure Bag — searchDeck
-  [guided] Adventurer’s Discovery — searchDeck
-  [guided] Aether Foundation Employee — recursion
-  [guided] Agatha — moveDamageCounters
-  [automated] Allister — draw
-  [guided] Alph Lithograph — returnStadiumToHand
-  [guided] Alph Lithograph — shuffleDeckOnly
-  [guided] Alph Lithograph — lookAtOpponentHand
-  [guided] Amulet of Hope — searchDeck
-  [guided] Ancient Technical Machine [Ice] — attachAttackTool
-  [guided] Ancient Technical Machine [Rock] — attachAttackTool
-  [automated] Antique Armor Fossil — fossilItem
-  [automated] Antique Cover Fossil — fossilItem
-  [automated] Antique Dome Fossil — fossilItem
-  [automated] Antique Helix Fossil — fossilItem
-  [automated] Antique Jaw Fossil — fossilItem
-  [automated] Antique Old Amber — fossilItem
-  [automated] Antique Plume Fossil — fossilItem
-  [automated] Antique Root Fossil — fossilItem
-  [automated] Antique Sail Fossil — fossilItem
-  [automated] Antique Skull Fossil — fossilItem
-  [guided] Apricorn Maker — searchDeck
-  [guided] Apricorn Maker — searchDeck
-  [automated] Aqua Diffuser — applyStatus
-  [guided] Aqua Patch — attachFromDiscard
-  [guided] Archie — searchDeck
-  [guided] Arezu — searchDeck
-  [guided] Armor Fossil Shieldon — lookAtBottom
-  [automated] Aroma Lady — draw + passive
-  [guided] Arven — searchDeck
-  [automated] Arven’s Sandwich — healAmount
-  [automated] Atticus — shuffleHandThenDraw
-  [automated] Avery — draw
-  [automated] Awakening Drum — variableDraw
-  [guided] AZ — returnPokemonToHand
-  [guided] Ball Guy — searchDeck
-  [automated] Barry — draw
-  [guided] Battle Compressor Team Flare Gear — searchDeck
-  [automated] Battle Reporter — drawUntil
-  [guided] Battle VIP Pass — searchDeck
-  [automated] Beauty — draw
-  [guided] Bebe’s Search — searchDeck
-  [guided] Beginning Door — searchDeck
-  [automated] Bertha’s Warmth — healAmount
-  [automated] Bianca — drawUntil
-  [automated] Bianca’s Devotion — heal
-  [automated] Bicycle — drawUntil
-  [automated] Big Malasada — healAmount
-  [automated] Bill — draw
-  [automated] Bill — draw
-  [guided] Bill’s Analysis — lookAtTop
-  [automated] Bill’s Maintenance — draw
-  [automated] Bill’s Maintenance — draw
-  [guided] Bill’s Transfer — lookAtTop
-  [automated] Billy & O’Nare — draw
-  [automated] Bird Keeper — switchOwn + draw
-  [guided] Blacksmith — attachMultipleFromDiscard
-  [automated] Blaine’s Last Resort — draw
-  [automated] Blaine’s Quiz #1 — draw
-  [automated] Blaine’s Quiz #2 — draw
-  [automated] Blaine’s Quiz #3 — draw
-  [automated] Blaine’s Quiz Show — draw
-  [guided] Blowtorch — discardFromOpponent
-  [automated] Blue’s Tactics — drawUntil
-  [guided] Bonnie — discardStadium
-  [guided] Boss’s Orders — switchOpponent
-  [guided] Boss’s Orders — switchOpponent
-  [guided] Boss’s Orders — switchOpponent
-  [guided] Boxed Order — searchDeck
-  [automated] Brandon — variableDraw
-  [automated] Brassius — countShuffleDrawPlus
-  [guided] Brawly — searchDeck
-  [guided] Brigette — searchDeck
-  [guided] Brilliant Blender — searchDeck
-  [guided] Brock — healEachActive
-  [guided] Brock’s Grit — shuffleFromDiscard
-  [guided] Brock’s Scouting — searchDeck
-  [guided] Brock’s Training Method — searchDeck
-  [automated] Bruno — shuffleHandThenDraw
-  [automated] Buck’s Training — draw + passive
-  [guided] Buddy-Buddy Poffin — searchDeck
-  [guided] Buddy-Buddy Rescue — eachPlayerRecoverPokemon
-  [guided] Bug Catching Set — lookAtTop
-  [guided] Café Master — searchDeck
-  [guided] Caitlin — putHandOnBottom
-  [guided] Call Bell — searchDeck
-  [guided] Camping Gear — searchDeck
-  [guided] Canari — discardCost + searchDeck
-  [guided] Candice — lookAtTop
-  [guided] Capacious Bucket — searchDeck
-  [guided] Captivating Poké Puff — opponentHandToBenchBasic
-  [guided] Cara Liss — searchDeck
-  [automated] Caretaker — draw
-  [automated] Carmine — discardHandThenDraw
-  [guided] Cassiopeia — searchDeck
-  [guided] Cassius — shufflePokemonIntoDeck
-  [guided] Castaway — searchDeck
-  [automated] Cedric Juniper — draw
-  [guided] Celio’s Network — searchDeck
-  [guided] Channeler — clearAttackEffects
-  [guided] Charon’s Choice — searchDeck
-  [automated] Cheerleader’s Cheer — draw
-  [automated] Cheren — draw
-  [guided] Cheren’s Care — returnPokemonToHand
-  [guided] Cherish Ball — searchDeck
-  [automated] Cheryl — heal
-  [guided] Chili & Cilan & Cress — searchDeck
-  [guided] Chill Teaser Toy — discardEnergyFromOpponent
-  [guided] Chip-Chip Ice Axe — lookAtTop
-  [automated] Choy — draw
-  [guided] Cilan — searchDeck
-  [guided] Ciphermaniac’s Codebreaking — searchDeck
-  [guided] Clavell — searchDeck
-  [guided] Claw Fossil Anorith — lookAtBottom
-  [automated] Clay — millSelf
-  [guided] Clemont — searchDeck
-  [automated] Clemont’s Quick Wit — healAmount
-  [automated] Coach Trainer — draw
-  [automated] Colress — shuffleHandThenDraw
-  [guided] Colress Machine — searchDeck
-  [guided] Colress’s Experiment — lookAtTop
-  [guided] Colress’s Tenacity — searchDeck
-  [guided] Computer Error — eachPlayerDraw
-  [guided] Computer Search — discardCost + searchDeck
-  [guided] Computer Search — discardCost + searchDeck
-  [guided] Computer Search — searchDeck
-  [automated] Cook — healAmount
-  [automated] Copycat — shuffleHandThenDraw
-  [automated] Copycat — shuffleHandThenDraw
-  [guided] Cover Fossil — lookAtBottom
-  [guided] Crasher Wake — searchDeck
-  [guided] Crispin — searchDeck
-  [guided] Cross Switcher — switchOpponent
-  [guided] Crossceiver — recursion
-  [guided] Crushing Hammer — coinFlip
-  [guided] Crushing Hammer — coinFlip
-  [automated] Custom Catcher — switchOpponent + drawUntil
-  [automated] Cynthia — shuffleHandThenDraw
-  [automated] Cynthia & Caitlin — recursion + draw
-  [automated] Cynthia’s Ambition — drawUntil
-  [automated] Cynthia’s Feelings — shuffleHandThenDraw
-  [guided] Cynthia’s Guidance — lookAtTop
-  [guided] Cyrano — searchDeck
-  [guided] Cyrus’s Conspiracy — searchDeck
-  [guided] Damage Mover — moveDamageCounters
-  [guided] Damage Pump — moveDamageCounters
-  [automated] Dan — draw
-  [guided] Dana — searchDeck
-  [automated] Dancer — draw
-  [guided] Dangerous Drill — discardFromOpponent
-  [automated] Dangerous Laser — applyStatus
-  [automated] Dark Bell — applyStatus
-  [guided] Dark Patch — attachFromDiscard
-  [guided] Darkness Cube 01 — attachAttackTool
-  [guided] Dawn — searchDeckSequence
-  [guided] Deduction Kit — lookAtTop
-  [guided] Delinquent — discardStadium
-  [guided] Delivery Drone — searchDeck
-  [automated] Dendra — putHandOnBottom + drawUntil
-  [guided] Department Store Girl — searchDeck
-  [automated] Desert Shaman — shuffleHandThenDraw
-  [guided] Devolution Spray — devolve
-  [guided] Devolution Spray — devolve
-  [guided] Devolution Spray — devolve
-  [guided] Devolution Spray Z — devolve
-  [guided] Diantha — recursion
-  [guided] Dive Ball — searchDeck
-  [automated] Doctor — draw
-  [guided] Dome Fossil Kabuto — lookAtBottom
-  [guided] Double Full Heal — clearStatus
-  [guided] Double Gust — switchOwn + switchOpponentOut
-  [guided] Dowsing Machine — recursion
-  [automated] Dragon Elixir — healAmount
-  [guided] Drayton — lookAtTop
-  [guided] Drone Rotom — lookAtTop
-  [guided] Dual Ball — searchDeck
-  [guided] Dual Ball — searchDeck
-  [guided] Dual Ball — searchDeck
-  [guided] Dusk Ball — lookAtBottom
-  [guided] Dusk Ball — lookAtBottom
-  [guided] Earthen Vessel — discardCost + searchDeck
-  [guided] Eco Arm — shuffleFromDiscard
-  [guided] Electrocharger — shuffleFromDiscard
-  [guided] Electromagnetic Radar — discardCost + searchDeck
-  [guided] Elesa — searchDeck
-  [guided] Elesa’s Sparkle — searchDeck
-  [guided] Emcee’s Chatter — coinFlip
-  [automated] Emergency Jelly — healAmount
-  [automated] Emma — variableDraw
-  [guided] Energy Ark — searchDeck
-  [guided] Energy Coin — searchDeck
-  [guided] Energy Exchanger — searchDeck
-  [guided] Energy Flow — energyToHand
-  [guided] Energy Loto — lookAtTop
-  [guided] Energy Pickup — coinFlip
-  [guided] Energy Recycle System — recursion
-  [guided] Energy Recycle System — shuffleFromDiscard
-  [guided] Energy Recycler — shuffleFromDiscard
-  [guided] Energy Recycler — shuffleFromDiscard
-  [guided] Energy Recycler — shuffleFromDiscard
-  [guided] Energy Removal — discardEnergyFromOpponent
-  [guided] Energy Removal 2 — coinFlip
-  [guided] Energy Reset — energyToHand
-  [guided] Energy Restore — recursion
-  [guided] Energy Restore — recursion
-  [guided] Energy Retrieval — recursion
-  [guided] Energy Retrieval — recursion
-  [guided] Energy Retrieval — recursion
-  [guided] Energy Retrieval — discardCost + recursion
-  [guided] Energy Returner — shuffleFromDiscard
-  [guided] Energy Search — searchDeck
-  [guided] Energy Search — searchDeck
-  [guided] Energy Search — searchDeck
-  [guided] Energy Search — searchDeck
-  [guided] Energy Search — searchDeck
-  [guided] Energy Search Pro — searchDeck
-  [guided] Energy Spinner — searchDeck
-  [guided] Energy Swatter — opponentHandBottom
-  [guided] Energy Switch — moveEnergy
-  [guided] Energy Switch — moveEnergy
-  [guided] Energy Switch — moveEnergy
-  [guided] Energy Switch — moveEnergy
-  [automated] Engineer’s Adjustments — draw
-  [guided] Enhanced Hammer — discardEnergyFromOpponent
-  [guided] Enhanced Hammer — discardEnergyFromOpponent
-  [guided] Eri — revealOpponentHandDiscard
-  [guided] Erika — eachPlayerDraw
-  [guided] Erika — eachPlayerDraw
-  [automated] Erika’s Hospitality — variableDraw
-  [guided] Erika’s Kindness — healEachActive
-  [guided] Erika’s Perfume — opponentHandToBenchBasic
-  [guided] Escape Rope — switchOwn + switchOpponentOut
-  [guided] Escape Rope — switchOwn + switchOpponentOut
-  [guided] Escape Rope — switchOwn + switchOpponentOut
-  [guided] Ethan’s Adventure — searchDeck
-  [automated] Evelyn — draw
-  [guided] Evolution Incense — searchDeck
-  [guided] Exp. Share — moveEnergy
-  [guided] Exp. Share — moveEnergy
-  [guided] Expedition Uniform — lookAtBottom
-  [guided] Explorer’s Guidance — lookAtTop
-  [guided] Faba — discardFromOpponent
-  [automated] Fairy Drop — healAmount
-  [automated] Falkner — draw
-  [guided] Familiar Bell — searchDeck
-  [guided] Fan of Waves — sendEnergyToDeckBottom
-  [guided] Farewell Bell — searchDeck
-  [guided] Fast Ball — revealUntilCard
-  [guided] Feather Ball — searchDeck
-  [automated] Felicity’s Drawing — draw
-  [automated] Fennel — healAmount
-  [guided] Fervor — lookAtTop
-  [guided] Field Blower — discardTools
-  [automated] Fieldworker — draw
-  [guided] Fiery Flint — discardCost + searchDeck
-  [automated] Fiery Torch — draw
-  [guided] Fighting Cube 01 — attachAttackTool
-  [guided] Fighting Gong — searchDeck
-  [guided] Fire Crystal — recursion
-  [guided] Fire Cube 01 — attachAttackTool
-  [guided] Firebreather — searchDeck
-  [guided] Fisherman — recursion
-  [guided] Fisherman — recursion
-  [guided] Fisherman — recursion
-  [guided] Fisherman — recursion
-  [guided] Flannery — discardEnergyFromOpponent
-  [automated] Floral Crown — healAmount
-  [guided] Flower Shop Lady — shuffleFromDiscard
-  [guided] Fog Crystal — searchDeck
-  [guided] Forest Guardian — lookAtTop
-  [guided] Forest Seal Stone — searchDeck
-  [guided] Fossil Excavation Kit — recursion
-  [guided] Fossil Excavation Map — searchDeck
-  [guided] Fossil Researcher — searchDeck
-  [automated] Fresh Water Set — healAmount
-  [guided] Friend Ball — searchDeck
-  [guided] Friend Ball — searchDeck
-  [automated] Friends in Galar — draw
-  [automated] Friends in Hisui — draw
-  [automated] Friends in Paldea — draw
-  [automated] Friends in Sinnoh — draw
-  [guided] Full Heal — clearStatus
-  [guided] Full Heal — clearStatus
-  [guided] Furisode Girl — searchDeck
-  [automated] Gardenia — healAmount
-  [guided] Geeta — searchDeck
-  [guided] Ghetsis — opponentHandShuffleItemsDraw
-  [guided] Giacomo — discardEnergyFromOpponent
-  [guided] Giovanni’s Exile — discardOwnBenchPokemon
-  [automated] Giovanni’s Last Resort — heal + discardHandThenDraw
-  [automated] Giovanni’s Scheme — drawUntil
-  [guided] Glass Trumpet — attachFromDiscard
-  [guided] Gloria — searchDeck
-  [automated] Gold Potion — healAmount
-  [guided] Good Manners — searchDeck
-  [guided] Good Rod — coinFlip
-  [guided] Gordie — lookAtTop
-  [guided] Grabber — opponentHandBottom
-  [guided] Grass Cube 01 — attachAttackTool
-  [guided] Great Ball — lookAtTop
-  [guided] Great Ball — searchDeck
-  [guided] Great Ball — searchDeck
-  [guided] Great Catcher — switchOpponent
-  [guided] Great Haul Net — shuffleFromDiscard
-  [automated] Great Potion — healAmount
-  [guided] Green’s Exploration — searchDeck
-  [guided] Grimsley — moveDamageCounters
-  [guided] Grimsley’s Move — lookAtTop
-  [automated] Grusha — drawUntil
-  [guided] Gust of Wind — switchOpponent
-  [guided] Guzma — switchOpponent
-  [guided] Guzma & Hala — discardCost + searchDeck
-  [automated] Gym Trainer — draw
-  [automated] Hala — shuffleHandThenDraw
-  [guided] Hand Scope — lookAtOpponentHand
-  [guided] Hand Trimmer — eachPlayerDiscardUntil
-  [guided] Hapu — lookAtTop
-  [guided] Hassel — lookAtTop
-  [automated] Hau — draw
-  [guided] Heal Powder — coinFlip
-  [guided] Heavy Ball — searchDeck
-  [guided] Heavy Baton — moveEnergyToActive
-  [guided] Helix Fossil Omanyte — lookAtBottom
-  [guided] Hiker — lookAtTop
-  [guided] Hilda — searchDeck
-  [automated] Hole-Digging Shovel — millSelf
-  [automated] Holon Adventurer — draw
-  [guided] Holon Farmer — discardCost + shuffleFromDiscard
-  [guided] Holon Mentor — searchDeck
-  [guided] Holon Researcher — searchDeck
-  [automated] Holon Scientist — drawUntil
-  [guided] Holon Transceiver — searchDeck
-  [automated] Honey — variableDraw
-  [guided] Hooligans Jim & Cas — coinFlip
-  [automated] Hop — draw
-  [guided] Hop’s Bag — searchDeck
-  [guided] Hugh — eachPlayerHandToFive
-  [guided] Hyper Aroma — searchDeck
-  [guided] Hyper Devolution Spray — devolve
-  [automated] Hyper Potion — healAmount
-  [automated] Hypnotoxic Laser — applyStatus + coinFlip
-  [automated] Ilima — ionoShuffle + draw
-  [automated] Imakuni? — applyStatus
-  [automated] Imposter Oak’s Revenge — opponentShuffleHandDraw
-  [automated] Imposter Professor Oak — opponentShuffleHandDraw
-  [automated] Impostor Professor Oak — opponentShuffleHandDraw
-  [automated] Ingo & Emmet — discardHandThenDraw
-  [guided] Interviewer’s Questions — lookAtTop
-  [guided] Irida — searchDeck
-  [automated] Iris’s Fighting Spirit — discardCost + drawUntil
-  [automated] Iscan — draw
-  [guided] Item Finder — recursion
-  [automated] Jacinthe — healAmount
-  [guided] Jacq — searchDeck
-  [guided] Janine — lookAtTop
-  [guided] Jasmine — searchDeck
-  [guided] Jaw Fossil — lookAtBottom
-  [guided] Jessie & James — eachPlayerDiscardFromHand
-  [automated] Jett — variableDraw
-  [automated] Judge — ionoShuffle
-  [automated] Judge — ionoShuffle
-  [guided] Judge Whistle — recursion
-  [automated] Juggler — draw
-  [automated] Jumbo Ice Cream — healAmount
-  [guided] Junk Arm — discardCost + recursion
-  [automated] Kabu — shuffleHandThenDraw
-  [automated] Kamado — draw
-  [guided] Karen — shuffleDiscardIntoDeck
-  [automated] Katy — shuffleHandThenDraw
-  [guided] Kiawe — searchDeck
-  [guided] Kindler — lookAtTop
-  [guided] Klara — recursion
-  [automated] Kofu — putHandOnBottom + draw
-  [automated] Koga’s Trap — applyStatus
-  [guided] Korrina — searchDeck
-  [automated] Korrina’s Focus — drawUntil
-  [guided] Lady — searchDeck
-  [guided] Lady Outing — searchDeck
-  [automated] Lana — healAmount
-  [guided] Lana’s Aid — recursion
-  [guided] Lana’s Fishing Rod — shuffleFromDiscard
-  [guided] Lance — searchDeck
-  [guided] Lance Prism Star — searchDeck
-  [guided] Lanette’s Net Search — searchDeck
-  [automated] Lass’s Special — variableDraw
-  [automated] Last Chance Potion — healAmount
-  [automated] League Staff — draw
-  [automated] Leftovers — healAmount
-  [guided] Letter of Encouragement — searchDeck
-  [guided] Level Ball — searchDeck
-  [guided] Level Ball — searchDeck
-  [guided] Life Herb — coinFlip
-  [guided] Life Herb — coinFlip
-  [guided] Life Herb — coinFlip
-  [automated] Lillie — drawUntil
-  [automated] Lillie’s Full Force — draw
-  [guided] Lisia — searchDeck
-  [guided] Lisia’s Appeal — switchOpponent
-  [automated] Looker — draw
-  [guided] Looker Whistle — searchDeck
-  [automated] Lost Blender — lostZoneCost + draw
-  [guided] Lost Remover — sendEnergyToLostZone
-  [guided] Lost Vacuum — lostZoneCost + toolOrStadiumToLostZone
-  [guided] Love Ball — searchDeck
-  [automated] Lucian — ionoShuffle + draw
-  [guided] Lucian’s Assignment — moveEnergy
-  [automated] Lucky Egg — drawUntil
-  [automated] Lucky Egg — drawUntil
-  [automated] Lumiose Galette — healAmount
-  [guided] Lure Ball — recursion
-  [guided] Lure Ball — recursion
-  [automated] Lure Module — ionoShuffle
-  [guided] Lusamine — recursion
-  [guided] Luxury Ball — searchDeck
-  [guided] Lysandre — switchOpponent
-  [guided] Lysandre Prism Star — opponentDiscardToLostZonePerPokemon
-  [guided] Lysandre’s Trump Card — shuffleDiscardIntoDeck
-  [automated] Mail from Bill — drawUntil
-  [guided] Maintenance — shuffleHandCardsThenDraw
-  [guided] Maintenance — shuffleHandCardsThenDraw
-  [guided] Mallow — searchDeck
-  [guided] Mallow — searchDeck
-  [guided] Marley’s Request — recursion
-  [automated] Marnie — ionoShuffle + draw + opponentDraw
-  [guided] Marnie’s Pride — attachFromDiscard
-  [automated] Mars — draw
-  [guided] Mary — shuffleHandCardsThenDraw
-  [automated] Mary’s Request — draw + passive
-  [guided] Master Ball — searchDeck
-  [guided] Master Ball — searchDeck
-  [guided] Master Ball — lookAtTop
-  [guided] Master Ball — lookAtTop
-  [guided] Master Ball — lookAtTop
-  [automated] Max Potion — heal
-  [automated] Max Potion — heal
-  [automated] Max Potion — heal
-  [guided] Max Revive — putDiscardOnTop
-  [guided] Max Rod — recursion
-  [automated] Meddling Memo — opponentCountShuffleDraw
-  [guided] Mega Catcher — switchOpponent
-  [guided] Mega Signal — searchDeck
-  [guided] Mega Turbo — attachFromDiscard
-  [automated] Megaton Blower — massDiscardAttached
-  [automated] Mela — attachFromDiscard + drawUntil
-  [automated] Melony — attachFromDiscard + draw
-  [guided] Metal Cube 01 — switchOpponent
-  [guided] Metal Saucer — attachFromDiscard
-  [guided] Mina — searchDeck
-  [guided] Miracle Headset — recursion
-  [guided] Mirage Gate — searchDeck
-  [guided] Miriam — shuffleFromDiscard
-  [guided] Miss Fortune Sisters — lookAtTop
-  [guided] Misty & Lorelei — discardCost + searchDeck
-  [guided] Misty’s Determination — lookAtTop
-  [guided] Misty’s Favor — searchDeck
-  [guided] Misty’s Tears — searchDeck
-  [guided] Misty’s Vitality — searchDeck
-  [guided] Misty’s Water Command — moveEnergy
-  [guided] Misty’s Wrath — lookAtTop
-  [automated] Mixed Herbs — healAmount
-  [guided] Molayne — shuffleFromDiscard
-  [automated] Mom’s Kindness — draw
-  [guided] Moo-Moo Milk — healPerHeads
-  [automated] Moomoo Cheese — healAmount
-  [automated] Moomoo Milk — healAmount
-  [guided] Moomoo Milk — healPerHeads
-  [guided] Morty — opponentHandShuffleDeck
-  [automated] Morty’s Conviction — discardCost + variableDraw
-  [guided] Mr. Briney’s Compassion — returnPokemonToHand
-  [guided] Mr. Fuji — shufflePokemonIntoDeck
-  [guided] Mr. Stone’s Project — searchDeck
-  [guided] Multi Switch — moveEnergyToActive
-  [guided] Multi Technical Machine 01 — attachAttackTool
-  [guided] Mysterious Treasure — searchDeck
-  [guided] N’s Plan — moveEnergyToActive
-  [guided] N’s PP Up — attachFromDiscard
-  [automated] N’s Resolve — millSelf
-  [guided] Nanu — swapWithDiscard
-  [automated] Naveen — drawUntil
-  [automated] Nemona — draw
-  [guided] Nemona’s Backpack — recursion
-  [guided] Nessa — recursion
-  [guided] Nest Ball — searchDeck
-  [guided] Net Ball — searchDeck
-  [guided] New Pokédex — rearrangeTop
-  [guided] Night Maintenance — shuffleFromDiscard
-  [guided] Night Stretcher — recursion
-  [guided] Nightly Garbage Run — shuffleFromDiscard
-  [guided] Ninja Boy — searchDeck
-  [guided] Nita — opponentActiveEnergyToDeck
-  [automated] Norman — draw
-  [automated] Nugget — draw
-  [guided] Ogre’s Mask — swapWithDiscard
-  [guided] Old Amber Aerodactyl — lookAtBottom
-  [guided] Old PC — recursion
-  [guided] Old Rod — recursion
-  [guided] Old Rod — recursion
-  [guided] Oleana — opponentHandBottom
-  [guided] Olivia — searchDeck
-  [guided] Opal — searchDeck
-  [guided] Oracle — searchToTop
-  [guided] Ordinary Rod — shuffleFromDiscard
-  [guided] Ortega — opponentHandBottom
-  [guided] Paint Roller — discardStadium
-  [guided] Pal Pad — shuffleFromDiscard
-  [guided] Pal Pad — shuffleFromDiscard
-  [guided] Paldean Student — searchDeck
-  [guided] Palmer’s Contribution — shuffleFromDiscard
-  [automated] Parasol Lady — shuffleHandThenDraw
-  [guided] Peeking Red Card — opponentHandShuffleDeck
-  [guided] Penny — returnPokemonToHand
-  [guided] Perrin — searchDeck
-  [guided] Philippe — attachMultipleFromDiscard
-  [automated] Picnic Basket — healAmount
-  [guided] Picnicker — coinFlip
-  [guided] Piers — searchDeck
-  [guided] Plume Fossil — lookAtBottom
-  [guided] Plumeria — discardCost + discardEnergyFromOpponent
-  [guided] Plumeria — discardEnergyFromOpponent
-  [guided] Poké Blower + — coinFlip
-  [guided] Poké Drawer + — searchDeck
-  [automated] Poké Healer + — healAmount
-  [guided] Poké Kid — searchDeck
-  [guided] Poké Maniac — searchDeck
-  [guided] Poké Pad — searchDeck
-  [guided] Poké Radar — lookAtTop
-  [automated] Poké Vital A — healAmount
-  [guided] Pokédex — lookAtTop
-  [guided] Pokédex — lookAtTop
-  [guided] Pokédex — rearrangeTop
-  [guided] PokéDex HANDY909 — lookAtTop
-  [guided] Pokédex HANDY910is — lookAtTop
-  [guided] PokéGear — lookAtTop
-  [guided] Pokégear 3.0 — lookAtTop
-  [guided] Pokégear 3.0 — lookAtTop
-  [automated] Pokémon Breeder — healAmount + draw
-  [guided] Pokémon Breeder — evolveStage2
-  [guided] Pokémon Breeder — evolveStage2
-  [guided] Pokémon Breeder’s Nurturing — searchDeck
-  [guided] Pokémon Catcher — switchOpponent
-  [automated] Pokémon Center Lady — healAmount
-  [automated] Pokémon Center Lady — healAmount
-  [guided] Pokémon Circulator — switchOpponentOut
-  [guided] Pokémon Collector — searchDeck
-  [guided] Pokémon Communication — searchDeck
-  [guided] Pokémon Communication — searchDeck
-  [guided] Pokémon Communication — searchDeck
-  [guided] Pokémon Fan Club — searchDeck
-  [guided] Pokémon Fan Club — searchDeck
-  [guided] Pokémon Fan Club — searchDeck
-  [guided] Pokémon Fan Club — searchDeck
-  [guided] Pokémon Fan Club — searchDeck
-  [guided] Pokémon March — searchDeck
-  [automated] Pokémon Nurse — heal
-  [automated] Pokémon Personality Test — draw
-  [guided] Pokémon Ranger — clearAttackEffects
-  [guided] Pokémon Rescue — recursion
-  [guided] Pokémon Retriever — shuffleFromDiscard
-  [guided] Pokémon Reversal — coinFlip
-  [guided] Pokémon Reversal — coinFlip
-  [guided] Pokémon Reversal — coinFlip
-  [guided] Pokémon Reversal — coinFlip
-  [guided] PokéNav — lookAtTop
-  [guided] PokéNav — lookAtTop
-  [guided] Poppy — moveEnergy
-  [automated] Potion — healAmount
-  [automated] Potion — healAmount
-  [automated] Potion — healAmount
-  [automated] Potion — healAmount
-  [guided] Powerglass — attachFromDiscard
-  [guided] Precious Trolley — searchDeck
-  [guided] Prime Catcher — switchOwn + switchOpponent
-  [automated] Prof. Oak’s Research — shuffleHandThenDraw
-  [automated] Professor Birch — drawUntil
-  [guided] Professor Burnet — searchDeck
-  [guided] Professor Cozmo’s Discovery — coinFlip
-  [automated] Professor Elm — shuffleHandThenDraw
-  [guided] Professor Elm’s Lecture — searchDeck
-  [guided] Professor Elm’s Training Method — searchDeck
-  [automated] Professor Juniper — discardHandThenDraw
-  [automated] Professor Kukui — draw + passive
-  [guided] Professor Laventon — recursion
-  [automated] Professor Oak — discardHandThenDraw
-  [automated] Professor Oak’s Hint — drawUntil
-  [automated] Professor Oak’s New Theory — shuffleHandThenDraw
-  [automated] Professor Oak’s Research — shuffleHandThenDraw
-  [guided] Professor Oak’s Setup — searchDeck
-  [automated] Professor Oak’s Visit — draw
-  [automated] Professor Rowan — draw
-  [automated] Professor Sada’s Vitality — attachFromDiscard + draw
-  [automated] Professor Sycamore — discardHandThenDraw
-  [guided] Professor Turo’s Scenario — returnPokemonToHand
-  [guided] Professor’s Letter — searchDeck
-  [automated] Professor’s Research — discardHandThenDraw
-  [guided] Psychic Cube 01 — attachAttackTool
-  [guided] Psychic’s Third Eye — lookAtOpponentHand + discardAnyThenDraw
-  [guided] Puzzle of Time — lookAtTop
-  [automated] Quad Stone — healAmount
-  [guided] Quick Ball — discardCost + searchDeck
-  [guided] Quick Ball — revealUntilCard
-  [guided] Raifort — lookAtTop
-  [guided] Rainbow Brush — searchDeck
-  [guided] Random Receiver — revealUntilCard
-  [guided] Rare Candy — evolveStage2
-  [guided] Rare Candy — evolveStage2
-  [guided] Rare Candy — evolveStage2
-  [guided] Rare Candy — evolveStage2
-  [guided] Rare Candy — evolveStage2
-  [guided] Rare Candy — evolveStage2
-  [automated] Rare Fossil — fossilItem
-  [guided] Reboot Pod — attachFromDiscard
-  [guided] Recycle — coinFlip
-  [guided] Recycle — coinFlip
-  [automated] Red Card — opponentShuffleHandDraw
-  [guided] Red’s Challenge — discardCost + searchDeck
-  [automated] Redeemable Ticket — reshufflePrizes
-  [guided] Relic Hunter — searchDeck
-  [guided] Repeat Ball — searchDeck
-  [guided] Repel — switchOpponentOut
-  [guided] Repel — switchOpponentOut
-  [guided] Rescue Carrier — recursion
-  [guided] Rescue Stretcher — recursion
-  [guided] Research Record — lookAtTop
-  [guided] Return Label — opponentDiscardToDeckBottom
-  [guided] Reversal Trigger — searchDeck
-  [guided] Revitalizer — recursion
-  [guided] Rika — lookAtTop
-  [guided] Riley — opponentChoosesFromTop
-  [guided] Rival — opponentChoosesFromTop
-  [automated] Roark — recursion + draw
-  [automated] Rocket’s Mission — draw
-  [guided] Rocket’s Poké Ball — searchDeck
-  [guided] Rocket’s Sneak Attack — opponentHandShuffleDeck
-  [automated] Roller Skater — draw
-  [guided] Root Fossil Lileep — lookAtBottom
-  [guided] Rosa — searchDeck
-  [guided] Roseanne’s Backup — shuffleFromDiscard
-  [guided] Roseanne’s Research — searchDeck
-  [guided] Roto-Stick — lookAtTop
-  [automated] Rotom Bike — drawUntil
-  [automated] Rotom Dex — reshufflePrizes
-  [guided] Rotom Dex Poké Finder Mode — lookAtTop
-  [guided] Rotom Phone — lookAtTop
-  [guided] Ruffian — discardToolAndSpecialEnergy
-  [guided] Ruin Wall — searchDeck
-  [guided] Rust Syndicate Grunt — discardEnergyFromOpponent
-  [guided] Ryme — switchOpponentOut
-  [guided] Sabrina — moveEnergy
-  [guided] Sabrina & Brycen — discardCost + searchDeck
-  [automated] Sabrina’s Gaze — ionoShuffle
-  [guided] Sacred Ash — shuffleFromDiscard
-  [guided] Sacred Ash — shuffleFromDiscard
-  [guided] Sage’s Training — lookAtTop
-  [automated] Saguaro — healAmount
-  [guided] Sail Fossil — lookAtBottom
-  [automated] Samson Oak — draw
-  [guided] Scoop Up — returnPokemonToHand
-  [guided] Scoop Up Cyclone — returnPokemonToHand
-  [guided] Scoop Up Cyclone — returnPokemonToHand
-  [guided] Scoop Up Net — returnPokemonToHand
-  [guided] Scott — searchDeck
-  [guided] Secret Box — discardCost + searchDeck
-  [guided] Secret Mission — lookAtOpponentHand + discardAnyThenDraw
-  [guided] Seeker — eachPlayerReturnBench
-  [guided] Seer — lookAtTop
-  [automated] Serena — switchOpponent + drawUntil
-  [guided] Shadow Triad — recursion
-  [automated] Shauna — shuffleHandThenDraw
-  [guided] Sidney — revealOpponentHandDiscard
-  [automated] Siebold — healAmount
-  [automated] Sightseer — drawUntil
-  [automated] Single Strike Style Mustard — searchDeck + draw
-  [automated] Sitrus Berry — healAmount
-  [guided] Skyla — searchDeck
-  [guided] Skyla — searchDeck
-  [guided] Sleep! — coinFlip
-  [guided] Sonia — searchDeck
-  [automated] Sophocles — draw
-  [automated] Sordward & Shielbert — draw
-  [guided] Special Charge — shuffleFromDiscard
-  [automated] Spicy Seasoned Curry — healAmount
-  [guided] Stadium Nav — searchDeck
-  [guided] Star Piece — searchDeck
-  [guided] Startling Megaphone — discardTools
-  [guided] Steven — searchDeck
-  [automated] Steven’s Advice — variableDraw
-  [automated] Steven’s Advice — variableDraw
-  [guided] Steven’s Resolve — searchDeck
-  [guided] Strange Timepiece — devolve
-  [guided] Super Energy Removal — discardEnergyFromOpponent
-  [guided] Super Energy Removal 2 — coinFlip
-  [guided] Super Energy Retrieval — discardCost + recursion
-  [automated] Super Potion — healAmount
-  [automated] Super Potion — healAmount
-  [automated] Super Potion — healAmount
-  [guided] Super Rod — shuffleFromDiscard
-  [guided] Super Rod — shuffleFromDiscard
-  [guided] Super Rod — shuffleFromDiscard
-  [guided] Super Rod — shuffleFromDiscard
-  [guided] Super Rod — coinFlip
-  [guided] Super Scoop Up — coinFlip
-  [guided] Super Scoop Up — coinFlip
-  [guided] Super Scoop Up — coinFlip
-  [guided] Superior Energy Retrieval — recursion
-  [guided] Superior Energy Retrieval — recursion
-  [automated] Surfer — switchOwn + drawUntil
-  [guided] Surprise Box — opponentDiscardToHand
-  [guided] Surprise! Time Machine — searchDeck
-  [automated] Suspicious Food Tin — healAmount
-  [guided] Switch — switchOwn
-  [guided] Switch — switchOwn
-  [guided] Switch — switchOwn
-  [guided] Switch — switchOwn
-  [guided] Switch — switchOwn
-  [automated] Switch Cart — healAmount
-  [automated] Switch Raft — healAmount
-  [guided] Switching Cups — switchHandWithTop
-  [guided] Swoop! Teleporter — searchDeck
-  [guided] Tag Call — searchDeck
-  [guided] Tag Switch — moveEnergy
-  [guided] Tarragon — recursion
-  [automated] Tate & Liza — shuffleHandThenDraw
-  [guided] Team Aqua Admin — attachFromDiscard
-  [guided] Team Aqua Belt — searchDeck
-  [guided] Team Aqua Conspirator — searchDeck
-  [automated] Team Aqua Grunt — draw
-  [automated] Team Aqua Schemer — draw
-  [guided] Team Aqua Technical Machine 01 — attachAttackTool
-  [guided] Team Aqua’s Great Ball — searchDeck
-  [guided] Team Flare Grunt — discardEnergyFromOpponent
-  [guided] Team Galactic’s Invention G-105 Poké Turn — returnPokemonToHand
-  [guided] Team Galactic’s Invention G-109 SP Radar — searchDeck
-  [automated] Team Galactic’s Mars — draw
-  [automated] Team Galactic’s Wager — ionoShuffle
-  [guided] Team Magma Admin — recursion
-  [guided] Team Magma Belt — searchDeck
-  [guided] Team Magma Conspirator — searchDeck
-  [automated] Team Magma Grunt — draw
-  [automated] Team Magma Schemer — draw
-  [guided] Team Magma’s Great Ball — searchDeck
-  [guided] Team Plasma Ball — searchDeck
-  [automated] Team Plasma Grunt — draw
-  [automated] Team Rocket’s Archer — ionoShuffle + draw + opponentDraw
-  [automated] Team Rocket’s Ariana — drawUntil
-  [guided] Team Rocket’s Bother-Bot — opponentPrizeHandSwap
-  [guided] Team Rocket’s Evil Deeds — opponentHandShuffleDeck
-  [guided] Team Rocket’s Giovanni — switchOwn + switchOpponent
-  [guided] Team Rocket’s Handiwork — millPerHeads
-  [guided] Team Rocket’s Petrel — searchDeck
-  [guided] Team Rocket’s Proton — searchDeck
-  [guided] Team Rocket’s Transceiver — searchDeck
-  [automated] Team Rocket’s Trickery — draw
-  [guided] Team Rocket’s Venture Bomb — coinFlip
-  [guided] Team Skull Grunt — revealOpponentHandDiscard
-  [guided] Team Star Grunt — opponentActiveEnergyToDeck
-  [guided] Team Yell Grunt — discardEnergyFromOpponent
-  [automated] Team Yell Towel — healAmount
-  [guided] Team Yell’s Cheer — shuffleFromDiscard
-  [guided] Teammates — searchDeck
-  [guided] Technical Machine: Evolution — searchDeck
-  [automated] Technical Machine: Fluorite — heal
-  [guided] Technical Machine: Turbo Energize — searchDeck
-  [guided] Techno Radar — discardCost + searchDeck
-  [guided] Tera Orb — searchDeck
-  [guided] The Boss’s Way — searchDeck
-  [guided] The Rocket’s Trap — coinFlip
-  [guided] Thorton — swapWithDiscard
-  [automated] Tierno — draw
-  [guided] Time-Space Distortion — recursion
-  [guided] Timer Ball — searchDeck
-  [guided] TM Machine — searchDeck
-  [guided] Tool Box — lookAtTop
-  [guided] Tool Retriever — toolsToHand
-  [guided] Tool Scrapper — discardTools
-  [guided] Tool Scrapper — discardTools
-  [guided] Tormenting Spray — discardRandomOpponentHandIfSupporter
-  [guided] Town Volunteers — shuffleFromDiscard
-  [guided] Toy Catcher — switchOpponent
-  [guided] Trainers’ Mail — lookAtTop
-  [guided] Transformation Tome — swapWithDiscard
-  [guided] Trash Exchange — shuffleDiscardThenMill
-  [guided] Traveling Salesman — searchDeck
-  [guided] Treasure Tracker — searchDeck
-  [guided] Trekking Shoes — lookAtTop
-  [guided] Trevor — searchDeck
-  [guided] Trick Shovel — lookAtTop
-  [guided] Tropical Tidal Wave — coinFlip
-  [guided] Tropical Tidal Wave — coinFlip
-  [guided] Tropical Tidal Wave — coinFlip
-  [guided] Tropical Wind — coinFlip
-  [guided] Tulip — recursion
-  [automated] TV Reporter — draw
-  [automated] TV Reporter — draw
-  [automated] Tyme — draw
-  [guided] Ultra Ball — discardCost + searchDeck
-  [guided] Ultra Ball — discardCost + searchDeck
-  [guided] Ultra Ball — discardCost + searchDeck
-  [guided] Ultra Ball — discardCost + searchDeck
-  [guided] Underground Expedition — lookAtBottom
-  [guided] Underground Expedition — lookAtBottom
-  [guided] Underground Expedition — lookAtBottom
-  [automated] Unfair Stamp — ionoShuffle + draw + opponentDraw
-  [automated] Unidentified Fossil — fossilItem
-  [automated] Unidentified Fossil — fossilItem
-  [automated] Urbain — draw
-  [guided] Urn of Vitality — shuffleFromDiscard
-  [guided] Venture Bomb — coinFlip
-  [guided] Victory Medal — searchDeck
-  [guided] Volkner — searchDeck
-  [automated] Volkner’s Philosophy — drawUntil
-  [guided] Volo — discardOwnBenchPokemon
-  [guided] VS Seeker — recursion
-  [guided] VS Seeker — recursion
-  [guided] VS Seeker — recursion
-  [guided] Wait and See Hammer — discardEnergyFromOpponent
-  [guided] Wait and See Turbo — searchDeck
-  [automated] Wallace — draw
-  [automated] Wally’s Compassion — heal
-  [guided] Wally’s Training — searchDeck
-  [guided] Warp Point — switchOpponentOut + switchOwn
-  [guided] Warp Point — switchOwn + switchOpponentOut
-  [guided] Warp Point — switchOwn + switchOpponentOut
-  [guided] Water Cube 01 — attachAttackTool
-  [guided] Welcoming Lantern — recursion
-  [guided] Wicke — eachPlayerShuffleHandDraw
-  [guided] Windstorm — discardTools
-  [guided] Winona — searchDeck
-  [guided] Wishful Baton — moveEnergyToActive
-  [guided] Wondrous Patch — attachFromDiscard
-  [automated] Worker — draw
-  [guided] Xerosic — discardFromOpponent
-  [guided] Xerosic’s Machinations — opponentDiscardUntil
-  [automated] Yell Horn — applyStatus
-  [automated] Youngster — shuffleHandThenDraw
-  [automated] Zinnia’s Resolve — discardCost + variableDraw
-  [automated] Zisu — drawUntil
+  [guided] Aaron’s Collection — recursion (server: ok)
+  [guided] Accompanying Flute — revealOpponentDeckBench (server: ok)
+  [guided] Acerola — returnPokemonToHand (server: ok)
+  [automated] Acerola’s Premonition — variableDraw (server: ok)
+  [guided] Acro Bike — lookAtTop (server: ok)
+  [guided] Adaman — searchDeck (server: ok)
+  [guided] Adventure Bag — searchDeck (server: ok)
+  [guided] Adventurer’s Discovery — searchDeck (server: ok)
+  [guided] Aether Foundation Employee — recursion (server: ok)
+  [guided] Agatha — moveDamageCounters (server: ok)
+  [automated] Allister — draw (server: ok)
+  [guided] Alph Lithograph — returnStadiumToHand (server: missing)
+  [guided] Alph Lithograph — shuffleDeckOnly (server: missing)
+  [guided] Alph Lithograph — lookAtOpponentHand (server: ok)
+  [guided] Amulet of Hope — searchDeck (server: ok)
+  [guided] Ancient Technical Machine [Ice] — attachAttackTool (server: ok)
+  [guided] Ancient Technical Machine [Rock] — attachAttackTool (server: ok)
+  [automated] Antique Armor Fossil — fossilItem (server: ok)
+  [automated] Antique Cover Fossil — fossilItem (server: ok)
+  [automated] Antique Dome Fossil — fossilItem (server: ok)
+  [automated] Antique Helix Fossil — fossilItem (server: ok)
+  [automated] Antique Jaw Fossil — fossilItem (server: ok)
+  [automated] Antique Old Amber — fossilItem (server: ok)
+  [automated] Antique Plume Fossil — fossilItem (server: ok)
+  [automated] Antique Root Fossil — fossilItem (server: ok)
+  [automated] Antique Sail Fossil — fossilItem (server: ok)
+  [automated] Antique Skull Fossil — fossilItem (server: ok)
+  [guided] Apricorn Maker — searchDeck (server: ok)
+  [guided] Apricorn Maker — searchDeck (server: ok)
+  [automated] Aqua Diffuser — applyStatus (server: ok)
+  [guided] Aqua Patch — attachFromDiscard (server: ok)
+  [guided] Archie — searchDeck (server: ok)
+  [guided] Arezu — searchDeck (server: ok)
+  [guided] Armor Fossil Shieldon — lookAtBottom (server: ok)
+  [automated] Aroma Lady — draw + passive (server: ok)
+  [guided] Arven — searchDeck (server: ok)
+  [automated] Arven’s Sandwich — healAmount (server: ok)
+  [automated] Atticus — shuffleHandThenDraw (server: ok)
+  [automated] Avery — draw (server: ok)
+  [automated] Awakening Drum — variableDraw (server: ok)
+  [guided] AZ — returnPokemonToHand (server: ok)
+  [guided] Ball Guy — searchDeck (server: ok)
+  [automated] Barry — draw (server: ok)
+  [guided] Battle Compressor Team Flare Gear — searchDeck (server: ok)
+  [automated] Battle Reporter — drawUntil (server: ok)
+  [guided] Battle VIP Pass — searchDeck (server: ok)
+  [automated] Beauty — draw (server: ok)
+  [guided] Bebe’s Search — searchDeck (server: ok)
+  [guided] Beginning Door — searchDeck (server: ok)
+  [automated] Bertha’s Warmth — healAmount (server: ok)
+  [automated] Bianca — drawUntil (server: ok)
+  [automated] Bianca’s Devotion — heal (server: ok)
+  [automated] Bicycle — drawUntil (server: ok)
+  [automated] Big Malasada — healAmount (server: ok)
+  [automated] Bill — draw (server: ok)
+  [automated] Bill — draw (server: ok)
+  [guided] Bill’s Analysis — lookAtTop (server: ok)
+  [automated] Bill’s Maintenance — draw (server: ok)
+  [automated] Bill’s Maintenance — draw (server: ok)
+  [guided] Bill’s Transfer — lookAtTop (server: ok)
+  [automated] Billy & O’Nare — draw (server: ok)
+  [automated] Bird Keeper — switchOwn + draw (server: ok)
+  [guided] Blacksmith — attachMultipleFromDiscard (server: ok)
+  [automated] Blaine’s Last Resort — draw (server: ok)
+  [automated] Blaine’s Quiz #1 — draw (server: ok)
+  [automated] Blaine’s Quiz #2 — draw (server: ok)
+  [automated] Blaine’s Quiz #3 — draw (server: ok)
+  [automated] Blaine’s Quiz Show — draw (server: ok)
+  [guided] Blowtorch — discardFromOpponent (server: ok)
+  [automated] Blue’s Tactics — drawUntil (server: ok)
+  [guided] Bonnie — discardStadium (server: ok)
+  [guided] Boss’s Orders — switchOpponent (server: ok)
+  [guided] Boss’s Orders — switchOpponent (server: ok)
+  [guided] Boss’s Orders — switchOpponent (server: ok)
+  [guided] Boxed Order — searchDeck (server: ok)
+  [automated] Brandon — variableDraw (server: ok)
+  [automated] Brassius — countShuffleDrawPlus (server: ok)
+  [guided] Brawly — searchDeck (server: ok)
+  [guided] Brigette — searchDeck (server: ok)
+  [guided] Brilliant Blender — searchDeck (server: ok)
+  [guided] Brock — healEachActive (server: ok)
+  [guided] Brock’s Grit — shuffleFromDiscard (server: ok)
+  [guided] Brock’s Scouting — searchDeck (server: ok)
+  [guided] Brock’s Training Method — searchDeck (server: ok)
+  [automated] Bruno — shuffleHandThenDraw (server: ok)
+  [automated] Buck’s Training — draw + passive (server: ok)
+  [guided] Buddy-Buddy Poffin — searchDeck (server: ok)
+  [guided] Buddy-Buddy Rescue — eachPlayerRecoverPokemon (server: missing)
+  [guided] Bug Catching Set — lookAtTop (server: ok)
+  [guided] Café Master — searchDeck (server: ok)
+  [guided] Caitlin — putHandOnBottom (server: ok)
+  [guided] Call Bell — searchDeck (server: ok)
+  [guided] Camping Gear — searchDeck (server: ok)
+  [guided] Canari — discardCost + searchDeck (server: ok)
+  [guided] Candice — lookAtTop (server: ok)
+  [guided] Capacious Bucket — searchDeck (server: ok)
+  [guided] Captivating Poké Puff — opponentHandToBenchBasic (server: ok)
+  [guided] Cara Liss — searchDeck (server: ok)
+  [automated] Caretaker — draw (server: ok)
+  [automated] Carmine — discardHandThenDraw (server: ok)
+  [guided] Cassiopeia — searchDeck (server: ok)
+  [guided] Cassius — shufflePokemonIntoDeck (server: ok)
+  [guided] Castaway — searchDeck (server: ok)
+  [automated] Cedric Juniper — draw (server: ok)
+  [guided] Celio’s Network — searchDeck (server: ok)
+  [guided] Channeler — clearAttackEffects (server: ok)
+  [guided] Charon’s Choice — searchDeck (server: ok)
+  [automated] Cheerleader’s Cheer — draw (server: ok)
+  [automated] Cheren — draw (server: ok)
+  [guided] Cheren’s Care — returnPokemonToHand (server: ok)
+  [guided] Cherish Ball — searchDeck (server: ok)
+  [automated] Cheryl — heal (server: ok)
+  [guided] Chili & Cilan & Cress — searchDeck (server: ok)
+  [guided] Chill Teaser Toy — discardEnergyFromOpponent (server: ok)
+  [guided] Chip-Chip Ice Axe — lookAtTop (server: ok)
+  [automated] Choy — draw (server: ok)
+  [guided] Cilan — searchDeck (server: ok)
+  [guided] Ciphermaniac’s Codebreaking — searchDeck (server: ok)
+  [guided] Clavell — searchDeck (server: ok)
+  [guided] Claw Fossil Anorith — lookAtBottom (server: ok)
+  [automated] Clay — millSelf (server: ok)
+  [guided] Clemont — searchDeck (server: ok)
+  [automated] Clemont’s Quick Wit — healAmount (server: ok)
+  [automated] Coach Trainer — draw (server: ok)
+  [automated] Colress — shuffleHandThenDraw (server: ok)
+  [guided] Colress Machine — searchDeck (server: ok)
+  [guided] Colress’s Experiment — lookAtTop (server: ok)
+  [guided] Colress’s Tenacity — searchDeck (server: ok)
+  [guided] Computer Error — eachPlayerDraw (server: ok)
+  [guided] Computer Search — discardCost + searchDeck (server: ok)
+  [guided] Computer Search — discardCost + searchDeck (server: ok)
+  [guided] Computer Search — searchDeck (server: ok)
+  [automated] Cook — healAmount (server: ok)
+  [automated] Copycat — shuffleHandThenDraw (server: ok)
+  [automated] Copycat — shuffleHandThenDraw (server: ok)
+  [guided] Cover Fossil — lookAtBottom (server: ok)
+  [guided] Crasher Wake — searchDeck (server: ok)
+  [guided] Crispin — searchDeck (server: ok)
+  [guided] Cross Switcher — switchOpponent (server: ok)
+  [guided] Crossceiver — recursion (server: ok)
+  [guided] Crushing Hammer — coinFlip (server: ok)
+  [guided] Crushing Hammer — coinFlip (server: ok)
+  [automated] Custom Catcher — switchOpponent + drawUntil (server: ok)
+  [automated] Cynthia — shuffleHandThenDraw (server: ok)
+  [automated] Cynthia & Caitlin — recursion + draw (server: ok)
+  [automated] Cynthia’s Ambition — drawUntil (server: ok)
+  [automated] Cynthia’s Feelings — shuffleHandThenDraw (server: ok)
+  [guided] Cynthia’s Guidance — lookAtTop (server: ok)
+  [guided] Cyrano — searchDeck (server: ok)
+  [guided] Cyrus’s Conspiracy — searchDeck (server: ok)
+  [guided] Damage Mover — moveDamageCounters (server: ok)
+  [guided] Damage Pump — moveDamageCounters (server: ok)
+  [automated] Dan — draw (server: ok)
+  [guided] Dana — searchDeck (server: ok)
+  [automated] Dancer — draw (server: ok)
+  [guided] Dangerous Drill — discardFromOpponent (server: ok)
+  [automated] Dangerous Laser — applyStatus (server: ok)
+  [automated] Dark Bell — applyStatus (server: ok)
+  [guided] Dark Patch — attachFromDiscard (server: ok)
+  [guided] Darkness Cube 01 — attachAttackTool (server: ok)
+  [guided] Dawn — searchDeckSequence (server: ok)
+  [guided] Deduction Kit — lookAtTop (server: ok)
+  [guided] Delinquent — discardStadium (server: ok)
+  [guided] Delivery Drone — searchDeck (server: ok)
+  [automated] Dendra — putHandOnBottom + drawUntil (server: ok)
+  [guided] Department Store Girl — searchDeck (server: ok)
+  [automated] Desert Shaman — shuffleHandThenDraw (server: ok)
+  [guided] Devolution Spray — devolve (server: ok)
+  [guided] Devolution Spray — devolve (server: ok)
+  [guided] Devolution Spray — devolve (server: ok)
+  [guided] Devolution Spray Z — devolve (server: ok)
+  [guided] Diantha — recursion (server: ok)
+  [guided] Dive Ball — searchDeck (server: ok)
+  [automated] Doctor — draw (server: ok)
+  [guided] Dome Fossil Kabuto — lookAtBottom (server: ok)
+  [guided] Double Full Heal — clearStatus (server: ok)
+  [guided] Double Gust — switchOwn + switchOpponentOut (server: ok)
+  [guided] Dowsing Machine — recursion (server: ok)
+  [automated] Dragon Elixir — healAmount (server: ok)
+  [guided] Drayton — lookAtTop (server: ok)
+  [guided] Drone Rotom — lookAtTop (server: ok)
+  [guided] Dual Ball — searchDeck (server: ok)
+  [guided] Dual Ball — searchDeck (server: ok)
+  [guided] Dual Ball — searchDeck (server: ok)
+  [guided] Dusk Ball — lookAtBottom (server: ok)
+  [guided] Dusk Ball — lookAtBottom (server: ok)
+  [guided] Earthen Vessel — discardCost + searchDeck (server: ok)
+  [guided] Eco Arm — shuffleFromDiscard (server: ok)
+  [guided] Electrocharger — shuffleFromDiscard (server: ok)
+  [guided] Electromagnetic Radar — discardCost + searchDeck (server: ok)
+  [guided] Elesa — searchDeck (server: ok)
+  [guided] Elesa’s Sparkle — searchDeck (server: ok)
+  [guided] Emcee’s Chatter — coinFlip (server: ok)
+  [automated] Emergency Jelly — healAmount (server: ok)
+  [automated] Emma — variableDraw (server: ok)
+  [guided] Energy Ark — searchDeck (server: ok)
+  [guided] Energy Coin — searchDeck (server: ok)
+  [guided] Energy Exchanger — searchDeck (server: ok)
+  [guided] Energy Flow — energyToHand (server: ok)
+  [guided] Energy Loto — lookAtTop (server: ok)
+  [guided] Energy Pickup — coinFlip (server: ok)
+  [guided] Energy Recycle System — recursion (server: ok)
+  [guided] Energy Recycle System — shuffleFromDiscard (server: ok)
+  [guided] Energy Recycler — shuffleFromDiscard (server: ok)
+  [guided] Energy Recycler — shuffleFromDiscard (server: ok)
+  [guided] Energy Recycler — shuffleFromDiscard (server: ok)
+  [guided] Energy Removal — discardEnergyFromOpponent (server: ok)
+  [guided] Energy Removal 2 — coinFlip (server: ok)
+  [guided] Energy Reset — energyToHand (server: ok)
+  [guided] Energy Restore — recursion (server: ok)
+  [guided] Energy Restore — recursion (server: ok)
+  [guided] Energy Retrieval — recursion (server: ok)
+  [guided] Energy Retrieval — recursion (server: ok)
+  [guided] Energy Retrieval — recursion (server: ok)
+  [guided] Energy Retrieval — discardCost + recursion (server: ok)
+  [guided] Energy Returner — shuffleFromDiscard (server: ok)
+  [guided] Energy Search — searchDeck (server: ok)
+  [guided] Energy Search — searchDeck (server: ok)
+  [guided] Energy Search — searchDeck (server: ok)
+  [guided] Energy Search — searchDeck (server: ok)
+  [guided] Energy Search — searchDeck (server: ok)
+  [guided] Energy Search Pro — searchDeck (server: ok)
+  [guided] Energy Spinner — searchDeck (server: ok)
+  [guided] Energy Swatter — opponentHandBottom (server: ok)
+  [guided] Energy Switch — moveEnergy (server: ok)
+  [guided] Energy Switch — moveEnergy (server: ok)
+  [guided] Energy Switch — moveEnergy (server: ok)
+  [guided] Energy Switch — moveEnergy (server: ok)
+  [automated] Engineer’s Adjustments — draw (server: ok)
+  [guided] Enhanced Hammer — discardEnergyFromOpponent (server: ok)
+  [guided] Enhanced Hammer — discardEnergyFromOpponent (server: ok)
+  [guided] Eri — revealOpponentHandDiscard (server: ok)
+  [guided] Erika — eachPlayerDraw (server: ok)
+  [guided] Erika — eachPlayerDraw (server: ok)
+  [automated] Erika’s Hospitality — variableDraw (server: ok)
+  [guided] Erika’s Kindness — healEachActive (server: ok)
+  [guided] Erika’s Perfume — opponentHandToBenchBasic (server: ok)
+  [guided] Escape Rope — switchOwn + switchOpponentOut (server: ok)
+  [guided] Escape Rope — switchOwn + switchOpponentOut (server: ok)
+  [guided] Escape Rope — switchOwn + switchOpponentOut (server: ok)
+  [guided] Ethan’s Adventure — searchDeck (server: ok)
+  [automated] Evelyn — draw (server: ok)
+  [guided] Evolution Incense — searchDeck (server: ok)
+  [guided] Exp. Share — moveEnergy (server: ok)
+  [guided] Exp. Share — moveEnergy (server: ok)
+  [guided] Expedition Uniform — lookAtBottom (server: ok)
+  [guided] Explorer’s Guidance — lookAtTop (server: ok)
+  [guided] Faba — discardFromOpponent (server: ok)
+  [automated] Fairy Drop — healAmount (server: ok)
+  [automated] Falkner — draw (server: ok)
+  [guided] Familiar Bell — searchDeck (server: ok)
+  [guided] Fan of Waves — sendEnergyToDeckBottom (server: missing)
+  [guided] Farewell Bell — searchDeck (server: ok)
+  [guided] Fast Ball — revealUntilCard (server: ok)
+  [guided] Feather Ball — searchDeck (server: ok)
+  [automated] Felicity’s Drawing — draw (server: ok)
+  [automated] Fennel — healAmount (server: ok)
+  [guided] Fervor — lookAtTop (server: ok)
+  [guided] Field Blower — discardTools (server: ok)
+  [automated] Fieldworker — draw (server: ok)
+  [guided] Fiery Flint — discardCost + searchDeck (server: ok)
+  [automated] Fiery Torch — draw (server: ok)
+  [guided] Fighting Cube 01 — attachAttackTool (server: ok)
+  [guided] Fighting Gong — searchDeck (server: ok)
+  [guided] Fire Crystal — recursion (server: ok)
+  [guided] Fire Cube 01 — attachAttackTool (server: ok)
+  [guided] Firebreather — searchDeck (server: ok)
+  [guided] Fisherman — recursion (server: ok)
+  [guided] Fisherman — recursion (server: ok)
+  [guided] Fisherman — recursion (server: ok)
+  [guided] Fisherman — recursion (server: ok)
+  [guided] Flannery — discardEnergyFromOpponent (server: ok)
+  [automated] Floral Crown — healAmount (server: ok)
+  [guided] Flower Shop Lady — shuffleFromDiscard (server: ok)
+  [guided] Fog Crystal — searchDeck (server: ok)
+  [guided] Forest Guardian — lookAtTop (server: ok)
+  [guided] Forest Seal Stone — searchDeck (server: ok)
+  [guided] Fossil Excavation Kit — recursion (server: ok)
+  [guided] Fossil Excavation Map — searchDeck (server: ok)
+  [guided] Fossil Researcher — searchDeck (server: ok)
+  [automated] Fresh Water Set — healAmount (server: ok)
+  [guided] Friend Ball — searchDeck (server: ok)
+  [guided] Friend Ball — searchDeck (server: ok)
+  [automated] Friends in Galar — draw (server: ok)
+  [automated] Friends in Hisui — draw (server: ok)
+  [automated] Friends in Paldea — draw (server: ok)
+  [automated] Friends in Sinnoh — draw (server: ok)
+  [guided] Full Heal — clearStatus (server: ok)
+  [guided] Full Heal — clearStatus (server: ok)
+  [guided] Furisode Girl — searchDeck (server: ok)
+  [automated] Gardenia — healAmount (server: ok)
+  [guided] Geeta — searchDeck (server: ok)
+  [guided] Ghetsis — opponentHandShuffleItemsDraw (server: missing)
+  [guided] Giacomo — discardEnergyFromOpponent (server: ok)
+  [guided] Giovanni’s Exile — discardOwnBenchPokemon (server: ok)
+  [automated] Giovanni’s Last Resort — heal + discardHandThenDraw (server: ok)
+  [automated] Giovanni’s Scheme — drawUntil (server: ok)
+  [guided] Glass Trumpet — attachFromDiscard (server: ok)
+  [guided] Gloria — searchDeck (server: ok)
+  [automated] Gold Potion — healAmount (server: ok)
+  [guided] Good Manners — searchDeck (server: ok)
+  [guided] Good Rod — coinFlip (server: ok)
+  [guided] Gordie — lookAtTop (server: ok)
+  [guided] Grabber — opponentHandBottom (server: ok)
+  [guided] Grass Cube 01 — attachAttackTool (server: ok)
+  [guided] Great Ball — lookAtTop (server: ok)
+  [guided] Great Ball — searchDeck (server: ok)
+  [guided] Great Ball — searchDeck (server: ok)
+  [guided] Great Catcher — switchOpponent (server: ok)
+  [guided] Great Haul Net — shuffleFromDiscard (server: ok)
+  [automated] Great Potion — healAmount (server: ok)
+  [guided] Green’s Exploration — searchDeck (server: ok)
+  [guided] Grimsley — moveDamageCounters (server: ok)
+  [guided] Grimsley’s Move — lookAtTop (server: ok)
+  [automated] Grusha — drawUntil (server: ok)
+  [guided] Gust of Wind — switchOpponent (server: ok)
+  [guided] Guzma — switchOpponent (server: ok)
+  [guided] Guzma & Hala — discardCost + searchDeck (server: ok)
+  [automated] Gym Trainer — draw (server: ok)
+  [automated] Hala — shuffleHandThenDraw (server: ok)
+  [guided] Hand Scope — lookAtOpponentHand (server: ok)
+  [guided] Hand Trimmer — eachPlayerDiscardUntil (server: ok)
+  [guided] Hapu — lookAtTop (server: ok)
+  [guided] Hassel — lookAtTop (server: ok)
+  [automated] Hau — draw (server: ok)
+  [guided] Heal Powder — coinFlip (server: ok)
+  [guided] Heavy Ball — searchDeck (server: ok)
+  [guided] Heavy Baton — moveEnergyToActive (server: ok)
+  [guided] Helix Fossil Omanyte — lookAtBottom (server: ok)
+  [guided] Hiker — lookAtTop (server: ok)
+  [guided] Hilda — searchDeck (server: ok)
+  [automated] Hole-Digging Shovel — millSelf (server: ok)
+  [automated] Holon Adventurer — draw (server: ok)
+  [guided] Holon Farmer — discardCost + shuffleFromDiscard (server: ok)
+  [guided] Holon Mentor — searchDeck (server: ok)
+  [guided] Holon Researcher — searchDeck (server: ok)
+  [automated] Holon Scientist — drawUntil (server: ok)
+  [guided] Holon Transceiver — searchDeck (server: ok)
+  [automated] Honey — variableDraw (server: ok)
+  [guided] Hooligans Jim & Cas — coinFlip (server: ok)
+  [automated] Hop — draw (server: ok)
+  [guided] Hop’s Bag — searchDeck (server: ok)
+  [guided] Hugh — eachPlayerHandToFive (server: missing)
+  [guided] Hyper Aroma — searchDeck (server: ok)
+  [guided] Hyper Devolution Spray — devolve (server: ok)
+  [automated] Hyper Potion — healAmount (server: ok)
+  [automated] Hypnotoxic Laser — applyStatus + coinFlip (server: ok)
+  [automated] Ilima — ionoShuffle + draw (server: ok)
+  [automated] Imakuni? — applyStatus (server: ok)
+  [automated] Imposter Oak’s Revenge — opponentShuffleHandDraw (server: ok)
+  [automated] Imposter Professor Oak — opponentShuffleHandDraw (server: ok)
+  [automated] Impostor Professor Oak — opponentShuffleHandDraw (server: ok)
+  [automated] Ingo & Emmet — discardHandThenDraw (server: ok)
+  [guided] Interviewer’s Questions — lookAtTop (server: ok)
+  [guided] Irida — searchDeck (server: ok)
+  [automated] Iris’s Fighting Spirit — discardCost + drawUntil (server: ok)
+  [automated] Iscan — draw (server: ok)
+  [guided] Item Finder — recursion (server: ok)
+  [automated] Jacinthe — healAmount (server: ok)
+  [guided] Jacq — searchDeck (server: ok)
+  [guided] Janine — lookAtTop (server: ok)
+  [guided] Jasmine — searchDeck (server: ok)
+  [guided] Jaw Fossil — lookAtBottom (server: ok)
+  [guided] Jessie & James — eachPlayerDiscardFromHand (server: missing)
+  [automated] Jett — variableDraw (server: ok)
+  [automated] Judge — ionoShuffle (server: ok)
+  [automated] Judge — ionoShuffle (server: ok)
+  [automated] Judge Whistle — recursion + draw (server: ok)
+  [automated] Juggler — draw (server: ok)
+  [automated] Jumbo Ice Cream — healAmount (server: ok)
+  [guided] Junk Arm — discardCost + recursion (server: ok)
+  [automated] Kabu — shuffleHandThenDraw (server: ok)
+  [automated] Kamado — draw (server: ok)
+  [guided] Karen — shuffleDiscardIntoDeck (server: ok)
+  [automated] Katy — shuffleHandThenDraw (server: ok)
+  [guided] Kiawe — searchDeck (server: ok)
+  [guided] Kindler — lookAtTop (server: ok)
+  [guided] Klara — recursion (server: ok)
+  [automated] Kofu — putHandOnBottom + draw (server: ok)
+  [automated] Koga’s Trap — applyStatus (server: ok)
+  [guided] Korrina — searchDeck (server: ok)
+  [automated] Korrina’s Focus — drawUntil (server: ok)
+  [guided] Lady — searchDeck (server: ok)
+  [guided] Lady Outing — searchDeck (server: ok)
+  [automated] Lana — healAmount (server: ok)
+  [guided] Lana’s Aid — recursion (server: ok)
+  [guided] Lana’s Fishing Rod — shuffleFromDiscard (server: ok)
+  [guided] Lance — searchDeck (server: ok)
+  [guided] Lance Prism Star — searchDeck (server: ok)
+  [guided] Lanette’s Net Search — searchDeck (server: ok)
+  [automated] Lass’s Special — variableDraw (server: ok)
+  [automated] Last Chance Potion — healAmount (server: ok)
+  [automated] League Staff — draw (server: ok)
+  [automated] Leftovers — healAmount (server: ok)
+  [guided] Letter of Encouragement — searchDeck (server: ok)
+  [guided] Level Ball — searchDeck (server: ok)
+  [guided] Level Ball — searchDeck (server: ok)
+  [guided] Life Herb — coinFlip (server: ok)
+  [guided] Life Herb — coinFlip (server: ok)
+  [guided] Life Herb — coinFlip (server: ok)
+  [automated] Lillie — drawUntil (server: ok)
+  [automated] Lillie’s Full Force — draw (server: ok)
+  [guided] Lisia — searchDeck (server: ok)
+  [guided] Lisia’s Appeal — switchOpponent (server: ok)
+  [automated] Looker — draw (server: ok)
+  [guided] Looker Whistle — searchDeck (server: ok)
+  [automated] Lost Blender — lostZoneCost + draw (server: ok)
+  [guided] Lost Remover — sendEnergyToLostZone (server: missing)
+  [guided] Lost Vacuum — lostZoneCost + toolOrStadiumToLostZone (server: ok)
+  [guided] Love Ball — searchDeck (server: ok)
+  [automated] Lucian — ionoShuffle + draw (server: ok)
+  [guided] Lucian’s Assignment — moveEnergy (server: ok)
+  [automated] Lucky Egg — drawUntil (server: ok)
+  [automated] Lucky Egg — drawUntil (server: ok)
+  [automated] Lumiose Galette — healAmount (server: ok)
+  [guided] Lure Ball — recursion (server: ok)
+  [guided] Lure Ball — recursion (server: ok)
+  [automated] Lure Module — ionoShuffle (server: ok)
+  [guided] Lusamine — recursion (server: ok)
+  [guided] Luxury Ball — searchDeck (server: ok)
+  [guided] Lysandre — switchOpponent (server: ok)
+  [guided] Lysandre Prism Star — opponentDiscardToLostZonePerPokemon (server: missing)
+  [guided] Lysandre’s Trump Card — shuffleDiscardIntoDeck (server: ok)
+  [automated] Mail from Bill — drawUntil (server: ok)
+  [guided] Maintenance — shuffleHandCardsThenDraw (server: ok)
+  [guided] Maintenance — shuffleHandCardsThenDraw (server: ok)
+  [guided] Mallow — searchDeck (server: ok)
+  [guided] Mallow — searchDeck (server: ok)
+  [guided] Marley’s Request — recursion (server: ok)
+  [automated] Marnie — ionoShuffle + draw + opponentDraw (server: ok)
+  [guided] Marnie’s Pride — attachFromDiscard (server: ok)
+  [automated] Mars — draw (server: ok)
+  [guided] Mary — shuffleHandCardsThenDraw (server: ok)
+  [automated] Mary’s Request — draw + passive (server: ok)
+  [guided] Master Ball — searchDeck (server: ok)
+  [guided] Master Ball — searchDeck (server: ok)
+  [guided] Master Ball — lookAtTop (server: ok)
+  [guided] Master Ball — lookAtTop (server: ok)
+  [guided] Master Ball — lookAtTop (server: ok)
+  [automated] Max Potion — heal (server: ok)
+  [automated] Max Potion — heal (server: ok)
+  [automated] Max Potion — heal (server: ok)
+  [guided] Max Revive — putDiscardOnTop (server: missing)
+  [guided] Max Rod — recursion (server: ok)
+  [automated] Meddling Memo — opponentCountShuffleDraw (server: ok)
+  [guided] Mega Catcher — switchOpponent (server: ok)
+  [guided] Mega Signal — searchDeck (server: ok)
+  [guided] Mega Turbo — attachFromDiscard (server: ok)
+  [automated] Megaton Blower — massDiscardAttached (server: ok)
+  [automated] Mela — attachFromDiscard + drawUntil (server: ok)
+  [automated] Melony — attachFromDiscard + draw (server: ok)
+  [guided] Metal Cube 01 — switchOpponent (server: ok)
+  [guided] Metal Saucer — attachFromDiscard (server: ok)
+  [guided] Mina — searchDeck (server: ok)
+  [guided] Miracle Headset — recursion (server: ok)
+  [guided] Mirage Gate — searchDeck (server: ok)
+  [guided] Miriam — shuffleFromDiscard (server: ok)
+  [guided] Miss Fortune Sisters — lookAtTop (server: ok)
+  [guided] Misty & Lorelei — discardCost + searchDeck (server: ok)
+  [guided] Misty’s Determination — lookAtTop (server: ok)
+  [guided] Misty’s Favor — searchDeck (server: ok)
+  [guided] Misty’s Tears — searchDeck (server: ok)
+  [guided] Misty’s Vitality — searchDeck (server: ok)
+  [guided] Misty’s Water Command — moveEnergy (server: ok)
+  [guided] Misty’s Wrath — lookAtTop (server: ok)
+  [automated] Mixed Herbs — healAmount (server: ok)
+  [guided] Molayne — shuffleFromDiscard (server: ok)
+  [automated] Mom’s Kindness — draw (server: ok)
+  [guided] Moo-Moo Milk — healPerHeads (server: ok)
+  [automated] Moomoo Cheese — healAmount (server: ok)
+  [automated] Moomoo Milk — healAmount (server: ok)
+  [guided] Moomoo Milk — healPerHeads (server: ok)
+  [guided] Morty — opponentHandShuffleDeck (server: ok)
+  [automated] Morty’s Conviction — discardCost + variableDraw (server: ok)
+  [guided] Mr. Briney’s Compassion — returnPokemonToHand (server: ok)
+  [guided] Mr. Fuji — shufflePokemonIntoDeck (server: ok)
+  [guided] Mr. Stone’s Project — searchDeck (server: ok)
+  [guided] Multi Switch — moveEnergyToActive (server: ok)
+  [guided] Multi Technical Machine 01 — attachAttackTool (server: ok)
+  [guided] Mysterious Treasure — searchDeck (server: ok)
+  [guided] N’s Plan — moveEnergyToActive (server: ok)
+  [guided] N’s PP Up — attachFromDiscard (server: ok)
+  [automated] N’s Resolve — millSelf (server: ok)
+  [guided] Nanu — swapWithDiscard (server: ok)
+  [automated] Naveen — drawUntil (server: ok)
+  [automated] Nemona — draw (server: ok)
+  [guided] Nemona’s Backpack — recursion (server: ok)
+  [guided] Nessa — recursion (server: ok)
+  [guided] Nest Ball — searchDeck (server: ok)
+  [guided] Net Ball — searchDeck (server: ok)
+  [guided] New Pokédex — rearrangeTop (server: ok)
+  [guided] Night Maintenance — shuffleFromDiscard (server: ok)
+  [guided] Night Stretcher — recursion (server: ok)
+  [guided] Nightly Garbage Run — shuffleFromDiscard (server: ok)
+  [guided] Ninja Boy — searchDeck (server: ok)
+  [guided] Nita — opponentActiveEnergyToDeck (server: ok)
+  [automated] Norman — draw (server: ok)
+  [automated] Nugget — draw (server: ok)
+  [guided] Ogre’s Mask — swapWithDiscard (server: ok)
+  [guided] Old Amber Aerodactyl — lookAtBottom (server: ok)
+  [guided] Old PC — recursion (server: ok)
+  [guided] Old Rod — recursion (server: ok)
+  [guided] Old Rod — recursion (server: ok)
+  [guided] Oleana — opponentHandBottom (server: ok)
+  [guided] Olivia — searchDeck (server: ok)
+  [guided] Opal — searchDeck (server: ok)
+  [guided] Oracle — searchToTop (server: missing)
+  [guided] Ordinary Rod — shuffleFromDiscard (server: ok)
+  [guided] Ortega — opponentHandBottom (server: ok)
+  [automated] Paint Roller — discardStadium + draw (server: ok)
+  [guided] Pal Pad — shuffleFromDiscard (server: ok)
+  [guided] Pal Pad — shuffleFromDiscard (server: ok)
+  [guided] Paldean Student — searchDeck (server: ok)
+  [guided] Palmer’s Contribution — shuffleFromDiscard (server: ok)
+  [automated] Parasol Lady — shuffleHandThenDraw (server: ok)
+  [guided] Peeking Red Card — opponentHandShuffleDeck (server: ok)
+  [guided] Penny — returnPokemonToHand (server: ok)
+  [guided] Perrin — searchDeck (server: ok)
+  [guided] Philippe — attachMultipleFromDiscard (server: ok)
+  [automated] Picnic Basket — healAmount (server: ok)
+  [guided] Picnicker — coinFlip (server: ok)
+  [guided] Piers — searchDeck (server: ok)
+  [guided] Plume Fossil — lookAtBottom (server: ok)
+  [guided] Plumeria — discardCost + discardEnergyFromOpponent (server: ok)
+  [guided] Plumeria — discardEnergyFromOpponent (server: ok)
+  [guided] Poké Blower + — coinFlip (server: ok)
+  [automated] Poké Drawer + — searchDeck + draw (server: ok)
+  [automated] Poké Healer + — healAmount (server: ok)
+  [guided] Poké Kid — searchDeck (server: ok)
+  [guided] Poké Maniac — searchDeck (server: ok)
+  [guided] Poké Pad — searchDeck (server: ok)
+  [guided] Poké Radar — lookAtTop (server: ok)
+  [automated] Poké Vital A — healAmount (server: ok)
+  [guided] Pokédex — lookAtTop (server: ok)
+  [guided] Pokédex — lookAtTop (server: ok)
+  [guided] Pokédex — rearrangeTop (server: ok)
+  [guided] PokéDex HANDY909 — lookAtTop (server: ok)
+  [guided] Pokédex HANDY910is — lookAtTop (server: ok)
+  [guided] PokéGear — lookAtTop (server: ok)
+  [guided] Pokégear 3.0 — lookAtTop (server: ok)
+  [guided] Pokégear 3.0 — lookAtTop (server: ok)
+  [automated] Pokémon Breeder — healAmount + draw (server: ok)
+  [guided] Pokémon Breeder — evolveStage2 (server: ok)
+  [guided] Pokémon Breeder — evolveStage2 (server: ok)
+  [guided] Pokémon Breeder’s Nurturing — searchDeck (server: ok)
+  [guided] Pokémon Catcher — switchOpponent (server: ok)
+  [automated] Pokémon Center Lady — healAmount (server: ok)
+  [automated] Pokémon Center Lady — healAmount (server: ok)
+  [guided] Pokémon Circulator — switchOpponentOut (server: ok)
+  [guided] Pokémon Collector — searchDeck (server: ok)
+  [guided] Pokémon Communication — searchDeck (server: ok)
+  [guided] Pokémon Communication — searchDeck (server: ok)
+  [guided] Pokémon Communication — searchDeck (server: ok)
+  [guided] Pokémon Fan Club — searchDeck (server: ok)
+  [guided] Pokémon Fan Club — searchDeck (server: ok)
+  [guided] Pokémon Fan Club — searchDeck (server: ok)
+  [guided] Pokémon Fan Club — searchDeck (server: ok)
+  [guided] Pokémon Fan Club — searchDeck (server: ok)
+  [guided] Pokémon March — searchDeck (server: ok)
+  [automated] Pokémon Nurse — heal (server: ok)
+  [automated] Pokémon Personality Test — draw (server: ok)
+  [guided] Pokémon Ranger — clearAttackEffects (server: ok)
+  [guided] Pokémon Rescue — recursion (server: ok)
+  [guided] Pokémon Retriever — shuffleFromDiscard (server: ok)
+  [guided] Pokémon Reversal — coinFlip (server: ok)
+  [guided] Pokémon Reversal — coinFlip (server: ok)
+  [guided] Pokémon Reversal — coinFlip (server: ok)
+  [guided] Pokémon Reversal — coinFlip (server: ok)
+  [guided] PokéNav — lookAtTop (server: ok)
+  [guided] PokéNav — lookAtTop (server: ok)
+  [guided] Poppy — moveEnergy (server: ok)
+  [automated] Potion — healAmount (server: ok)
+  [automated] Potion — healAmount (server: ok)
+  [automated] Potion — healAmount (server: ok)
+  [automated] Potion — healAmount (server: ok)
+  [guided] Powerglass — attachFromDiscard (server: ok)
+  [guided] Precious Trolley — searchDeck (server: ok)
+  [guided] Prime Catcher — switchOwn + switchOpponent (server: ok)
+  [automated] Prof. Oak’s Research — shuffleHandThenDraw (server: ok)
+  [automated] Professor Birch — drawUntil (server: ok)
+  [guided] Professor Burnet — searchDeck (server: ok)
+  [guided] Professor Cozmo’s Discovery — coinFlip (server: ok)
+  [automated] Professor Elm — shuffleHandThenDraw (server: ok)
+  [guided] Professor Elm’s Lecture — searchDeck (server: ok)
+  [guided] Professor Elm’s Training Method — searchDeck (server: ok)
+  [automated] Professor Juniper — discardHandThenDraw (server: ok)
+  [automated] Professor Kukui — draw + passive (server: ok)
+  [guided] Professor Laventon — recursion (server: ok)
+  [automated] Professor Oak — discardHandThenDraw (server: ok)
+  [automated] Professor Oak’s Hint — drawUntil (server: ok)
+  [automated] Professor Oak’s New Theory — shuffleHandThenDraw (server: ok)
+  [automated] Professor Oak’s Research — shuffleHandThenDraw (server: ok)
+  [guided] Professor Oak’s Setup — searchDeck (server: ok)
+  [automated] Professor Oak’s Visit — draw (server: ok)
+  [automated] Professor Rowan — draw (server: ok)
+  [automated] Professor Sada’s Vitality — attachFromDiscard + draw (server: ok)
+  [automated] Professor Sycamore — discardHandThenDraw (server: ok)
+  [guided] Professor Turo’s Scenario — returnPokemonToHand (server: ok)
+  [guided] Professor’s Letter — searchDeck (server: ok)
+  [automated] Professor’s Research — discardHandThenDraw (server: ok)
+  [guided] Psychic Cube 01 — attachAttackTool (server: ok)
+  [guided] Psychic’s Third Eye — lookAtOpponentHand + discardAnyThenDraw (server: ok)
+  [guided] Puzzle of Time — lookAtTop (server: ok)
+  [automated] Quad Stone — healAmount (server: ok)
+  [guided] Quick Ball — discardCost + searchDeck (server: ok)
+  [guided] Quick Ball — revealUntilCard (server: ok)
+  [guided] Raifort — lookAtTop (server: ok)
+  [guided] Rainbow Brush — searchDeck (server: ok)
+  [guided] Random Receiver — revealUntilCard (server: ok)
+  [guided] Rare Candy — evolveStage2 (server: ok)
+  [guided] Rare Candy — evolveStage2 (server: ok)
+  [guided] Rare Candy — evolveStage2 (server: ok)
+  [guided] Rare Candy — evolveStage2 (server: ok)
+  [guided] Rare Candy — evolveStage2 (server: ok)
+  [guided] Rare Candy — evolveStage2 (server: ok)
+  [automated] Rare Fossil — fossilItem (server: ok)
+  [guided] Reboot Pod — attachFromDiscard (server: ok)
+  [guided] Recycle — coinFlip (server: ok)
+  [guided] Recycle — coinFlip (server: ok)
+  [automated] Red Card — opponentShuffleHandDraw (server: ok)
+  [guided] Red’s Challenge — discardCost + searchDeck (server: ok)
+  [automated] Redeemable Ticket — reshufflePrizes (server: ok)
+  [guided] Relic Hunter — searchDeck (server: ok)
+  [guided] Repeat Ball — searchDeck (server: ok)
+  [guided] Repel — switchOpponentOut (server: ok)
+  [guided] Repel — switchOpponentOut (server: ok)
+  [guided] Rescue Carrier — recursion (server: ok)
+  [guided] Rescue Stretcher — recursion (server: ok)
+  [guided] Research Record — lookAtTop (server: ok)
+  [guided] Return Label — opponentDiscardToDeckBottom (server: missing)
+  [guided] Reversal Trigger — searchDeck (server: ok)
+  [guided] Revitalizer — recursion (server: ok)
+  [guided] Rika — lookAtTop (server: ok)
+  [guided] Riley — opponentChoosesFromTop (server: ok)
+  [guided] Rival — opponentChoosesFromTop (server: ok)
+  [automated] Roark — recursion + draw (server: ok)
+  [automated] Rocket’s Mission — draw (server: ok)
+  [guided] Rocket’s Poké Ball — searchDeck (server: ok)
+  [guided] Rocket’s Sneak Attack — opponentHandShuffleDeck (server: ok)
+  [automated] Roller Skater — draw (server: ok)
+  [guided] Root Fossil Lileep — lookAtBottom (server: ok)
+  [guided] Rosa — searchDeck (server: ok)
+  [guided] Roseanne’s Backup — shuffleFromDiscard (server: ok)
+  [guided] Roseanne’s Research — searchDeck (server: ok)
+  [guided] Roto-Stick — lookAtTop (server: ok)
+  [automated] Rotom Bike — drawUntil (server: ok)
+  [automated] Rotom Dex — reshufflePrizes (server: ok)
+  [guided] Rotom Dex Poké Finder Mode — lookAtTop (server: ok)
+  [guided] Rotom Phone — lookAtTop (server: ok)
+  [guided] Ruffian — discardToolAndSpecialEnergy (server: ok)
+  [guided] Ruin Wall — searchDeck (server: ok)
+  [guided] Rust Syndicate Grunt — discardEnergyFromOpponent (server: ok)
+  [guided] Ryme — switchOpponentOut (server: ok)
+  [guided] Sabrina — moveEnergy (server: ok)
+  [guided] Sabrina & Brycen — discardCost + searchDeck (server: ok)
+  [automated] Sabrina’s Gaze — ionoShuffle (server: ok)
+  [guided] Sacred Ash — shuffleFromDiscard (server: ok)
+  [guided] Sacred Ash — shuffleFromDiscard (server: ok)
+  [guided] Sage’s Training — lookAtTop (server: ok)
+  [automated] Saguaro — healAmount (server: ok)
+  [guided] Sail Fossil — lookAtBottom (server: ok)
+  [automated] Samson Oak — draw (server: ok)
+  [guided] Scoop Up — returnPokemonToHand (server: ok)
+  [guided] Scoop Up Cyclone — returnPokemonToHand (server: ok)
+  [guided] Scoop Up Cyclone — returnPokemonToHand (server: ok)
+  [guided] Scoop Up Net — returnPokemonToHand (server: ok)
+  [guided] Scott — searchDeck (server: ok)
+  [guided] Secret Box — discardCost + searchDeck (server: ok)
+  [guided] Secret Mission — lookAtOpponentHand + discardAnyThenDraw (server: ok)
+  [guided] Seeker — eachPlayerReturnBench (server: missing)
+  [guided] Seer — lookAtTop (server: ok)
+  [automated] Serena — switchOpponent + drawUntil (server: ok)
+  [guided] Shadow Triad — recursion (server: ok)
+  [automated] Shauna — shuffleHandThenDraw (server: ok)
+  [guided] Sidney — revealOpponentHandDiscard (server: ok)
+  [automated] Siebold — healAmount (server: ok)
+  [automated] Sightseer — drawUntil (server: ok)
+  [automated] Single Strike Style Mustard — searchDeck + draw (server: ok)
+  [automated] Sitrus Berry — healAmount (server: ok)
+  [guided] Skyla — searchDeck (server: ok)
+  [guided] Skyla — searchDeck (server: ok)
+  [guided] Sleep! — coinFlip (server: ok)
+  [guided] Sonia — searchDeck (server: ok)
+  [automated] Sophocles — draw (server: ok)
+  [automated] Sordward & Shielbert — draw (server: ok)
+  [guided] Special Charge — shuffleFromDiscard (server: ok)
+  [automated] Spicy Seasoned Curry — healAmount (server: ok)
+  [guided] Stadium Nav — searchDeck (server: ok)
+  [guided] Star Piece — searchDeck (server: ok)
+  [guided] Startling Megaphone — discardTools (server: ok)
+  [guided] Steven — searchDeck (server: ok)
+  [automated] Steven’s Advice — variableDraw (server: ok)
+  [automated] Steven’s Advice — variableDraw (server: ok)
+  [guided] Steven’s Resolve — searchDeck (server: ok)
+  [guided] Strange Timepiece — devolve (server: ok)
+  [guided] Super Energy Removal — discardEnergyFromOpponent (server: ok)
+  [guided] Super Energy Removal 2 — coinFlip (server: ok)
+  [guided] Super Energy Retrieval — discardCost + recursion (server: ok)
+  [automated] Super Potion — healAmount (server: ok)
+  [automated] Super Potion — healAmount (server: ok)
+  [automated] Super Potion — healAmount (server: ok)
+  [guided] Super Rod — shuffleFromDiscard (server: ok)
+  [guided] Super Rod — shuffleFromDiscard (server: ok)
+  [guided] Super Rod — shuffleFromDiscard (server: ok)
+  [guided] Super Rod — shuffleFromDiscard (server: ok)
+  [guided] Super Rod — coinFlip (server: ok)
+  [guided] Super Scoop Up — coinFlip (server: ok)
+  [guided] Super Scoop Up — coinFlip (server: ok)
+  [guided] Super Scoop Up — coinFlip (server: ok)
+  [guided] Superior Energy Retrieval — recursion (server: ok)
+  [guided] Superior Energy Retrieval — recursion (server: ok)
+  [automated] Surfer — switchOwn + drawUntil (server: ok)
+  [guided] Surprise Box — opponentDiscardToHand (server: missing)
+  [guided] Surprise! Time Machine — searchDeck (server: ok)
+  [automated] Suspicious Food Tin — healAmount (server: ok)
+  [guided] Switch — switchOwn (server: ok)
+  [guided] Switch — switchOwn (server: ok)
+  [guided] Switch — switchOwn (server: ok)
+  [guided] Switch — switchOwn (server: ok)
+  [guided] Switch — switchOwn (server: ok)
+  [automated] Switch Cart — healAmount (server: ok)
+  [automated] Switch Raft — healAmount (server: ok)
+  [guided] Switching Cups — switchHandWithTop (server: missing)
+  [guided] Swoop! Teleporter — searchDeck (server: ok)
+  [guided] Tag Call — searchDeck (server: ok)
+  [guided] Tag Switch — moveEnergy (server: ok)
+  [guided] Tarragon — recursion (server: ok)
+  [automated] Tate & Liza — shuffleHandThenDraw (server: ok)
+  [guided] Team Aqua Admin — attachFromDiscard (server: ok)
+  [guided] Team Aqua Belt — searchDeck (server: ok)
+  [guided] Team Aqua Conspirator — searchDeck (server: ok)
+  [automated] Team Aqua Grunt — draw (server: ok)
+  [automated] Team Aqua Schemer — draw (server: ok)
+  [guided] Team Aqua Technical Machine 01 — attachAttackTool (server: ok)
+  [guided] Team Aqua’s Great Ball — searchDeck (server: ok)
+  [guided] Team Flare Grunt — discardEnergyFromOpponent (server: ok)
+  [guided] Team Galactic’s Invention G-105 Poké Turn — returnPokemonToHand (server: ok)
+  [guided] Team Galactic’s Invention G-109 SP Radar — searchDeck (server: ok)
+  [automated] Team Galactic’s Mars — draw (server: ok)
+  [automated] Team Galactic’s Wager — ionoShuffle (server: ok)
+  [guided] Team Magma Admin — recursion (server: ok)
+  [guided] Team Magma Belt — searchDeck (server: ok)
+  [guided] Team Magma Conspirator — searchDeck (server: ok)
+  [automated] Team Magma Grunt — draw (server: ok)
+  [automated] Team Magma Schemer — draw (server: ok)
+  [guided] Team Magma’s Great Ball — searchDeck (server: ok)
+  [guided] Team Plasma Ball — searchDeck (server: ok)
+  [automated] Team Plasma Grunt — draw (server: ok)
+  [automated] Team Rocket’s Archer — ionoShuffle + draw + opponentDraw (server: ok)
+  [automated] Team Rocket’s Ariana — drawUntil (server: ok)
+  [guided] Team Rocket’s Bother-Bot — opponentPrizeHandSwap (server: ok)
+  [guided] Team Rocket’s Evil Deeds — opponentHandShuffleDeck (server: ok)
+  [guided] Team Rocket’s Giovanni — switchOwn + switchOpponent (server: ok)
+  [guided] Team Rocket’s Handiwork — millPerHeads (server: missing)
+  [guided] Team Rocket’s Petrel — searchDeck (server: ok)
+  [guided] Team Rocket’s Proton — searchDeck (server: ok)
+  [guided] Team Rocket’s Transceiver — searchDeck (server: ok)
+  [automated] Team Rocket’s Trickery — draw (server: ok)
+  [guided] Team Rocket’s Venture Bomb — coinFlip (server: ok)
+  [guided] Team Skull Grunt — revealOpponentHandDiscard (server: ok)
+  [guided] Team Star Grunt — opponentActiveEnergyToDeck (server: ok)
+  [guided] Team Yell Grunt — discardEnergyFromOpponent (server: ok)
+  [automated] Team Yell Towel — healAmount (server: ok)
+  [guided] Team Yell’s Cheer — shuffleFromDiscard (server: ok)
+  [guided] Teammates — searchDeck (server: ok)
+  [guided] Technical Machine: Evolution — searchDeck (server: ok)
+  [automated] Technical Machine: Fluorite — heal (server: ok)
+  [guided] Technical Machine: Turbo Energize — searchDeck (server: ok)
+  [guided] Techno Radar — discardCost + searchDeck (server: ok)
+  [guided] Tera Orb — searchDeck (server: ok)
+  [guided] The Boss’s Way — searchDeck (server: ok)
+  [guided] The Rocket’s Trap — coinFlip (server: ok)
+  [guided] Thorton — swapWithDiscard (server: ok)
+  [automated] Tierno — draw (server: ok)
+  [guided] Time-Space Distortion — recursion (server: ok)
+  [guided] Timer Ball — searchDeck (server: ok)
+  [guided] TM Machine — searchDeck (server: ok)
+  [guided] Tool Box — lookAtTop (server: ok)
+  [guided] Tool Retriever — toolsToHand (server: missing)
+  [guided] Tool Scrapper — discardTools (server: ok)
+  [guided] Tool Scrapper — discardTools (server: ok)
+  [guided] Tormenting Spray — discardRandomOpponentHandIfSupporter (server: missing)
+  [guided] Town Volunteers — shuffleFromDiscard (server: ok)
+  [guided] Toy Catcher — switchOpponent (server: ok)
+  [guided] Trainers’ Mail — lookAtTop (server: ok)
+  [guided] Transformation Tome — swapWithDiscard (server: ok)
+  [guided] Trash Exchange — shuffleDiscardThenMill (server: missing)
+  [guided] Traveling Salesman — searchDeck (server: ok)
+  [guided] Treasure Tracker — searchDeck (server: ok)
+  [automated] Trekking Shoes — lookAtTop + draw (server: ok)
+  [guided] Trevor — searchDeck (server: ok)
+  [guided] Trick Shovel — lookAtTop (server: ok)
+  [guided] Tropical Tidal Wave — coinFlip (server: ok)
+  [guided] Tropical Tidal Wave — coinFlip (server: ok)
+  [guided] Tropical Tidal Wave — coinFlip (server: ok)
+  [guided] Tropical Wind — coinFlip (server: ok)
+  [guided] Tulip — recursion (server: ok)
+  [automated] TV Reporter — draw (server: ok)
+  [automated] TV Reporter — draw (server: ok)
+  [automated] Tyme — draw (server: ok)
+  [guided] Ultra Ball — discardCost + searchDeck (server: ok)
+  [guided] Ultra Ball — discardCost + searchDeck (server: ok)
+  [guided] Ultra Ball — discardCost + searchDeck (server: ok)
+  [guided] Ultra Ball — discardCost + searchDeck (server: ok)
+  [guided] Underground Expedition — lookAtBottom (server: ok)
+  [guided] Underground Expedition — lookAtBottom (server: ok)
+  [guided] Underground Expedition — lookAtBottom (server: ok)
+  [automated] Unfair Stamp — ionoShuffle + draw + opponentDraw (server: ok)
+  [automated] Unidentified Fossil — fossilItem (server: ok)
+  [automated] Unidentified Fossil — fossilItem (server: ok)
+  [automated] Urbain — draw (server: ok)
+  [guided] Urn of Vitality — shuffleFromDiscard (server: ok)
+  [guided] Venture Bomb — coinFlip (server: ok)
+  [automated] Victory Medal — searchDeck + draw (server: ok)
+  [guided] Volkner — searchDeck (server: ok)
+  [automated] Volkner’s Philosophy — drawUntil (server: ok)
+  [guided] Volo — discardOwnBenchPokemon (server: ok)
+  [guided] VS Seeker — recursion (server: ok)
+  [guided] VS Seeker — recursion (server: ok)
+  [guided] VS Seeker — recursion (server: ok)
+  [guided] Wait and See Hammer — discardEnergyFromOpponent (server: ok)
+  [guided] Wait and See Turbo — searchDeck (server: ok)
+  [automated] Wallace — draw (server: ok)
+  [automated] Wally’s Compassion — heal (server: ok)
+  [guided] Wally’s Training — searchDeck (server: ok)
+  [guided] Warp Point — switchOpponentOut + switchOwn (server: ok)
+  [guided] Warp Point — switchOwn + switchOpponentOut (server: ok)
+  [guided] Warp Point — switchOwn + switchOpponentOut (server: ok)
+  [guided] Water Cube 01 — attachAttackTool (server: ok)
+  [guided] Welcoming Lantern — recursion (server: ok)
+  [guided] Wicke — eachPlayerShuffleHandDraw (server: missing)
+  [guided] Windstorm — discardTools (server: ok)
+  [guided] Winona — searchDeck (server: ok)
+  [guided] Wishful Baton — moveEnergyToActive (server: ok)
+  [guided] Wondrous Patch — attachFromDiscard (server: ok)
+  [automated] Worker — draw (server: ok)
+  [guided] Xerosic — discardFromOpponent (server: ok)
+  [guided] Xerosic’s Machinations — opponentDiscardUntil (server: ok)
+  [automated] Yell Horn — applyStatus (server: ok)
+  [automated] Youngster — shuffleHandThenDraw (server: ok)
+  [automated] Zinnia’s Resolve — discardCost + variableDraw (server: ok)
+  [automated] Zisu — drawUntil (server: ok)

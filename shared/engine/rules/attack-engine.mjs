@@ -11,6 +11,10 @@ import {
   getStadiumTypeDamageReduction,
 } from './stadium-effects.mjs';
 import {
+  stadiumWeaknessOverrides,
+  stadiumResistanceOverrides,
+} from './stadium-triggers.mjs';
+import {
   combinedToolAttackBonus,
   applyToolDamageReduction,
   combinedToolDamagePrevention,
@@ -34,6 +38,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     stadium = null,
     defenderIsActive = true,
     attackerTrailingPrizes = false,
+    defenderTrailingPrizes = false,
+    attackerPrizesRemaining,
+    defenderPrizesRemaining,
     defenderPoisoned = false,
     baseDamage = null,
     blockTools = false,
@@ -58,6 +65,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
   const base = baseDamage != null ? baseDamage : (parseInt(attack?.damage, 10) || 0);
+  // An attack that does no damage gets no modifiers: Tool/turn bonuses and Weakness only change
+  // damage that exists (I152 — Defiance Band must not turn a 0-damage attack into a 30 hit).
+  if (!(base > 0)) {
+    return {
+      total: 0, base: 0, attackerBonus: 0, specialEnergyBonus: 0, specialEnergyPenalty: 0, multiplier: 1,
+      flat: 0, resistance: 0, stadiumReduction: 0, specialEnergyReduction: 0, reduced: 0, prevented: false,
+    };
+  }
 
   // Step 2: Attacker tool and ability damage bonuses (e.g. Choice Belt, Maximum Belt, Defiance Band)
   // Applied BEFORE Weakness and Resistance.
@@ -66,6 +81,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderIsActive,
     defenderPoisoned,
     attackerTrailingPrizes,
+    attackerPrizesRemaining,
     stadium,
   });
 
@@ -75,7 +91,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards);
 
   // Step 2c: Trainer turn boosts (Premium Power Pro), also BEFORE Weakness/Resistance.
-  const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, { defenderIsActive });
+  const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, {
+    defenderIsActive,
+    defenderPrizesRemaining,
+  });
 
   // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.
   const markerBonus =
@@ -102,9 +121,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Stadiums nullify Weakness for a filtered set of Pokémon, force Weakness to
   // ×2, ignore Resistance, or reduce damage to a type after W/R.
   const stadiumCard = stadium?.card || stadium || null;
+  const weaknessOverride = stadiumCard
+    ? stadiumWeaknessOverrides(stadiumCard, { attacker, defender })
+    : null;
   const weaknessNullified =
-    !!stadiumCard &&
-    stadiumNullifiesWeakness(stadiumCard, defender, { defenderZoneCards });
+    !!weaknessOverride?.ignore ||
+    (!!stadiumCard &&
+      stadiumNullifiesWeakness(stadiumCard, defender, { defenderZoneCards }));
 
   let multiplier = 1;
   let flat = 0;
@@ -124,9 +147,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     }
   }
 
+  const resistanceOverride = stadiumCard
+    ? stadiumResistanceOverrides(stadiumCard, { attacker, defender })
+    : null;
   let resistance = 0;
   if (
     !ignoreResistance &&
+    !resistanceOverride?.ignore &&
     attacker?.types?.length &&
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
@@ -134,6 +161,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     if (attacker.types.includes(defender.resistance.type)) {
       resistance = Math.abs(defender.resistance.value || 0);
     }
+  }
+  if (resistanceOverride?.reduce) {
+    resistance = Math.max(0, resistance - resistanceOverride.reduce);
   }
 
   const stadiumReduction = stadiumCard
@@ -156,13 +186,22 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
   let reduced = 0;
   let damageAfterReduction = damageAfterWR;
+  const defenderFlags = {
+    trailingPrizes: defenderTrailingPrizes,
+    prizesRemaining: defenderPrizesRemaining,
+  };
   if (damageAfterWR > 0 && !ignoreDefenderEffects) {
     damageAfterReduction = applyToolDamageReduction(
       damageAfterWR,
       defender,
       defenderZoneCards,
       attacker,
-      { blockTools, stadium, inPlayCards: defenderInPlayCards }
+      {
+        blockTools,
+        stadium,
+        inPlayCards: defenderInPlayCards,
+        flags: defenderFlags,
+      }
     );
     reduced = damageAfterWR - damageAfterReduction;
   }
@@ -173,6 +212,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     : combinedToolDamagePrevention(defender, defenderZoneCards, attacker, {
         blockTools,
         stadium,
+        flags: defenderFlags,
       });
 
   let prevented = false;
