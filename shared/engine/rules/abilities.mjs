@@ -1450,18 +1450,31 @@ export function parseAbility(text = '') {
           ? 'When this Pokémon is Knocked Out: move Energy from it to your Benched Pokémon (as described).'
           : 'When 1 of your Pokémon is Knocked Out: move Energy from it to this Pokémon (as described).',
       });
-    } else if (lower.includes('to this pokémon') || lower.includes('to this pokemon')) {
+    } else if (
+      lower.includes('to this pokémon') ||
+      lower.includes('to this pokemon') ||
+      /move .* energy .* to (?:1 of )?your active/.test(lower) ||
+      /to 1 of your pokémon.*energy/.test(lower)
+    ) {
+      const toActive = /to (?:1 of )?your active/.test(lower);
+      const anyAmount = lower.includes('any amount') || lower.includes('any number');
       steps.push({
         type: 'moveEnergyAbility',
-        upTo: lower.match(/move\s+(?:up to\s+)?(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
-        unlimited: lower.includes('as often as you like') || lower.includes('any number'),
+        target: toActive ? 'active' : 'self',
+        upTo: anyAmount
+          ? null
+          : lower.match(/move\s+(?:up to\s+)?(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        unlimited: lower.includes('as often as you like') || anyAmount,
         energyType: parseEnergyTypeHint(lower),
         basic: lower.includes('basic'),
-        guidance: 'Once during your turn: move Energy from your other Pokémon to this Pokémon (as described).',
+        guidance: toActive
+          ? 'Once during your turn: move Energy from your Benched Pokémon to your Active Pokémon (as described).'
+          : 'Once during your turn: move Energy from your other Pokémon to this Pokémon (as described).',
       });
     } else if (lower.includes('to your benched')) {
       steps.push({
         type: 'moveEnergyAbility',
+        target: 'bench',
         upTo:
           lower.match(
             /move\s+up to\s+(\d+)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?energy/

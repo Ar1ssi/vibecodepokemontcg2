@@ -1272,3 +1272,48 @@ test('ability: self-bench placement is refused without a hand copy', async () =>
   assert.equal(state.players.p1.zones.bench.length, 0);
   assert.ok(events.some((e) => e.type === 'effectStepSkipped'));
 });
+
+test('ability: Bubble Gathering moves an Energy from another Pokémon to this one', () => {
+  const { state, rng } = setupGame();
+  const { holder } = holderWithAbility(
+    state,
+    'As often as you like during your turn, you may use this Ability. Move an Energy from 1 of your other Pokémon to this Pokémon.'
+  );
+  const source = createCard({ instanceId: 72, name: 'Source', hp: 100, supertype: 'Pokémon' });
+  const energy = createCard({ instanceId: 73, name: 'Water Energy', supertype: 'Energy', subtypes: ['Basic'], attachedTo: 72 });
+  state.players.p1.zones.bench.push(source, energy);
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [73]);
+  const res2 = resolveWith(res1, [73], rng);
+  assert.equal(res2.error, null);
+  const moved = [
+    ...res2.state.players.p1.zones.active,
+    ...res2.state.players.p1.zones.bench,
+  ].find((c) => c.instanceId === 73);
+  assert.equal(moved.attachedTo, 70);
+});
+
+test('ability: Wash Out moves a Benched {W} Energy to your Active', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'As often as you like during your turn, you may use this Ability. Move a {W} Energy from 1 of your Benched Pokémon to your Active Pokémon.'
+  );
+  const benchMon = createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' });
+  const water = createCard({ instanceId: 73, name: 'Water Energy', supertype: 'Energy', subtypes: ['Basic'], attachedTo: 72 });
+  const fire = createCard({ instanceId: 74, name: 'Fire Energy', supertype: 'Energy', subtypes: ['Basic'], attachedTo: 72 });
+  state.players.p1.zones.bench.push(benchMon, water, fire);
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [73], 'only the {W} Energy is offered');
+  const res2 = resolveWith(res1, [73], rng);
+  assert.equal(res2.error, null);
+  const moved = [
+    ...res2.state.players.p1.zones.active,
+    ...res2.state.players.p1.zones.bench,
+  ].find((c) => c.instanceId === 73);
+  assert.equal(moved.attachedTo, 70);
+});

@@ -1626,6 +1626,97 @@ function attachTool(ctx) {
   });
 }
 
+// ── design 034 slice 5b: generic energy-move ability ─────────────────────
+
+function moveEnergyAbility(ctx) {
+  const { player, step, sourceCard } = ctx;
+  const typeFilter = (card) => {
+    if (step.basic && !isBasicEnergy(card)) return false;
+    if (step.energyType) {
+      const want = String(step.energyType).toLowerCase();
+      const name = String(card.name || '').toLowerCase();
+      const types = (Array.isArray(card.types) ? card.types : []).map((t) =>
+        String(t).toLowerCase()
+      );
+      if (!types.includes(want) && !name.includes(want)) return false;
+    }
+    return true;
+  };
+
+  // The destination is fixed by the printing; only the source (and, for a
+  // multi-target destination, the target) is a player choice.
+  let destination = null;
+  let sourcePool = [];
+  if (step.target === 'active') {
+    destination = activeOf(player);
+    sourcePool = benchRootsOf(player);
+  } else if (step.target === 'bench') {
+    destination = null; // chosen below
+    sourcePool = sourceCard
+      ? [rootsOf(player).find((c) => c.instanceId === sourceCard.instanceId)].filter(Boolean)
+      : [];
+  } else {
+    destination = rootsOf(player).find((c) => c.instanceId === sourceCard?.instanceId);
+    sourcePool = rootsOf(player).filter((c) => c.instanceId !== sourceCard?.instanceId);
+  }
+
+  const energiesFor = (roots) =>
+    roots
+      .flatMap((root) => attachedCards(player, root.instanceId))
+      .filter((c) => isEnergy(c) && typeFilter(c));
+
+  if (ctx.memo?.phase === 'target') {
+    const chosen = pickById(energiesFor(sourcePool), ctx.memo.energyIds || []);
+    const target = rootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
+    if (!target || chosen.length === 0) return skip(ctx, 'target_not_found');
+    for (const energy of chosen) attachTo(player, energy, target, ctx.events);
+    return null;
+  }
+
+  if (ctx.selection) {
+    const chosen = pickById(energiesFor(sourcePool), ctx.selection);
+    if (chosen.length === 0) return skip(ctx, 'target_not_found');
+    if (destination) {
+      for (const energy of chosen) attachTo(player, energy, destination, ctx.events);
+      return null;
+    }
+    // "to your Benched Pokémon": the source is this Pokémon, the target is a choice.
+    const targets = benchRootsOf(player);
+    if (targets.length === 1) {
+      for (const energy of chosen) attachTo(player, energy, targets[0], ctx.events);
+      return null;
+    }
+    if (targets.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose a Benched Pokémon to move the Energy to`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: {
+        phase: 'target',
+        energyIds: chosen.map((c) => c.instanceId),
+      },
+    });
+  }
+
+  if (!destination && step.target === 'bench' && sourcePool.length === 0) {
+    return skip(ctx, 'source_not_in_play');
+  }
+  const energies = energiesFor(sourcePool);
+  if (energies.length === 0) return skip(ctx, 'no_energy_to_move');
+
+  const anyAmount = step.unlimited || step.upTo == null;
+  const cap = anyAmount
+    ? energies.length
+    : Math.min(Number(step.upTo) || 1, energies.length);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose ${anyAmount ? 'any amount of' : `up to ${cap}`} Energy to move`,
+    options: energies,
+    min: anyAmount ? 1 : cap,
+    max: cap,
+  });
+}
+
 // ── design 034 slice 5: ability-side executables ─────────────────────────
 
 /**
@@ -1900,6 +1991,7 @@ export const EXTRA_STEP_HANDLERS = {
       },
     }),
   // Design 034 slice 5 ability executables.
+  moveEnergyAbility,
   moveDamageBetweenAbility: moveDamageBetweenOwn,
   recoverStatusAbility,
   selfDamageAbility,

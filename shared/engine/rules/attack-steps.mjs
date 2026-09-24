@@ -670,7 +670,7 @@ function searchAttachStep(clause, gate, optional) {
 // follows. A preamble with its own condition ("if this Pokémon is on your Bench, …") is not
 // stripped, so the effect is not read without it.
 const ABILITY_PREAMBLE =
-  /^(?:(?:once during your turn|as often as you like during your turn|during your turn|when you play this pokémon from your hand to evolve 1 of your pokémon during your turn), (?:you may use this (?:ability|power)\. )?(?:you may )?)/;
+  /^(?:(?:once during your turn|as often as you like during your turn|during your turn|when you play this pokémon from your hand (?:to evolve 1 of your pokémon|(?:on)?to your bench) during your turn), (?:you may use this (?:ability|power)\. )?(?:you may |you must )?)/;
 
 /**
  * An activated Ability's effect read with the attack templates (I89, I95): the effect half
