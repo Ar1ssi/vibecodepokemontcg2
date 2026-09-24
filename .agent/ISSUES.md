@@ -12,6 +12,9 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I150 2026-09-24 P3 [tooling] `pnpm audit:trainers` only compares gap tags + play condition: a card that loses a parsed step (still executable) passes, and a baseline key that disappears (text edit re-hashes the key) is never reported — checkTrainerGate walks the corpus, not the baseline (refs: design 035 slice 12, D123, S288 review)
+- I149 2026-09-24 P2 [rules] "If you go first, you may use this card during your first turn" Supporters (Carmine, Beauty, Team Rocket's Proton) are blocked on turn 1: trainerPlayBlockReason's blanket turn-1 Supporter rule has no exception (pre-existing, not slice 11) (refs: design 035, S288 review)
+- I148 2026-09-24 P3 [rules] Blaine's Last Resort parses as `lastCardInHand`, so holding 2 copies blocks it; printed text allows other copies ("other than Blaine's Last Resort") (refs: design 035 slice 11, S288 review)
 - I147 2026-09-24 P3 [rules] opponentChoosesFromTop (Riley/Rival) pushes `cardsRevealed` again on the resume call (event sits before the `ctx.selection` branch), so the log shows the reveal twice (refs: design 035 slice 6, S288 review)
 - I146 2026-09-24 P3 [rules] Focus Band: a tails flip consumes RNG but emits no `coinFlipped` (reduce.mjs:4210 only inside `prevented`); the bench-damage KO path (reduce.mjs:360) passes no flipCoin, so Focus Band never saves a sniped Pokémon (refs: design 035 slice 9, S288 review)
 - I145 2026-09-24 P2 [rules] Chaos Gym coin lives only in the playTrainer apply case; a Tool attached straight from hand via `attachCard` (reduce.mjs:5215) never flips (refs: design 035 slice 10b, S288 review)
