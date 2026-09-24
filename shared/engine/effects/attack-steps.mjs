@@ -1570,19 +1570,21 @@ function atkAddMarker(ctx) {
     step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
   if (!card) return skip(ctx, 'no_marker_target');
   const turn = ctx.draft.turn?.number || 1;
-  addAttackMarker(card, {
-    ...resolveSelfName(step.marker, ctx),
-    untilTurn: markerUntilTurn(step.window, turn),
-    fromTurn: markerFromTurn(step.window, turn),
-    topId: topPokemonCard(owner, card)?.instanceId ?? card.instanceId,
-    sourceAttack: attackName(ctx),
-  });
-  ctx.events.push({
-    type: 'attackMarkerAdded',
-    kind: step.marker.kind,
-    instanceId: card.instanceId,
-    playerId: owner.playerId,
-  });
+  for (const marker of [step.marker, ...(step.alsoMarkers || [])]) {
+    addAttackMarker(card, {
+      ...resolveSelfName(marker, ctx),
+      untilTurn: markerUntilTurn(step.window, turn),
+      fromTurn: markerFromTurn(step.window, turn),
+      topId: topPokemonCard(owner, card)?.instanceId ?? card.instanceId,
+      sourceAttack: attackName(ctx),
+    });
+    ctx.events.push({
+      type: 'attackMarkerAdded',
+      kind: marker.kind,
+      instanceId: card.instanceId,
+      playerId: owner.playerId,
+    });
+  }
   return null;
 }
 

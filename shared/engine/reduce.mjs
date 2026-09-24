@@ -650,6 +650,10 @@ function cardEffectiveHp(state, card, playerId) {
   return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium);
 }
 
+function markerCount(markers, kind, field) {
+  return markers.reduce((sum, marker) => sum + (marker.kind === kind ? marker[field] || 0 : 0), 0);
+}
+
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
 function computeEffectiveRetreatCost(state, card, playerId) {
   if (!card) return 0;
@@ -695,6 +699,9 @@ function computeEffectiveRetreatCost(state, card, playerId) {
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
   cost = getStadiumRetreatCost(cost, card, playerId, stadium);
+
+  // 4. "Its Retreat Cost is {C} more" attack markers (Mawile, Grimer).
+  cost += markerCount(activeAttackMarkers(state, playerId, card), 'retreatDelta', 'amount');
 
   return Math.max(0, cost);
 }
@@ -1962,7 +1969,9 @@ function validateReferences(state, command) {
  * preview prices it (ability/Tool/Stadium discounts, then Stadium increases).
  */
 function attackCostPayable(state, playerId, active, attack) {
-  if (!(attack?.cost?.length > 0)) return true;
+  // Flapple V Sour Spit: "attacks cost {C} more" also taxes a free attack.
+  const markerIncrease = markerCount(activeAttackMarkers(state, playerId, active), 'attackCostIncrease', 'count');
+  if (!(attack?.cost?.length > 0) && markerIncrease === 0) return true;
   const player = state.players?.[playerId];
   if (!player || !active) return false;
   const activeZoneCards = player.zones?.active || [];
@@ -1996,16 +2005,12 @@ function attackCostPayable(state, playerId, active, attack) {
     );
   }
   if (stadiumCard) discount += parseStadiumCostModifier(stadiumCard);
-  let effectiveCost = attack.cost;
+  let effectiveCost = attack?.cost || [];
   if (discount > 0 && effectiveCost.length > 0) {
     effectiveCost = applyCostDiscount(effectiveCost, discount);
   }
-  const increase = getStadiumAttackCostIncreaseFor(
-    activeView,
-    playerId,
-    stadiumCard,
-    stadiumUser
-  );
+  const increase =
+    getStadiumAttackCostIncreaseFor(activeView, playerId, stadiumCard, stadiumUser) + markerIncrease;
   if (increase > 0) {
     effectiveCost = [
       ...effectiveCost,
