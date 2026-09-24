@@ -5,8 +5,8 @@
     "runs": 1811,
     "partial": 584,
     "dead": 148,
-    "consumed": 1038,
-    "unconsumed": 646,
+    "consumed": 970,
+    "unconsumed": 714,
     "unparsed": 1
   },
   "families": {
@@ -330,8 +330,8 @@
       "runs": 24,
       "partial": 6,
       "dead": 0,
-      "consumed": 80,
-      "unconsumed": 56,
+      "consumed": 78,
+      "unconsumed": 58,
       "unparsed": 1
     },
     "prize-modify": {
@@ -357,8 +357,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 1,
-      "consumed": 140,
-      "unconsumed": 31,
+      "consumed": 74,
+      "unconsumed": 97,
       "unparsed": 0
     },
     "search": {

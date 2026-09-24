@@ -3127,6 +3127,34 @@ import test from 'node:test';
       assert.equal(applyHpBonus(0, 20), 0);
     });
 
+    test('parseRetreatCostModifier: a Pokémon reads only its own Retreat Cost, behind its condition (I138)', () => {
+      const mon = (name, text) => ({ instanceId: 1, name, supertype: 'Pokémon', abilities: [{ text }] });
+      const energy = { instanceId: 2, name: 'Basic Water Energy', supertype: 'Energy', energyType: 'Water', attachedTo: 1 };
+      const magcargo = mon("Ethan's Magcargo", 'If this Pokémon has no Energy attached, it has no Retreat Cost.');
+      assert.deepEqual(parseRetreatCostModifier(magcargo, { zoneCards: [magcargo] }), { delta: -Infinity });
+      assert.deepEqual(parseRetreatCostModifier(magcargo, { zoneCards: [magcargo, energy] }), { delta: 0 }, 'Energy attached');
+      const lotad = mon('Lotad', "If Lotad has any {W} Energy attached to it, Lotad's Retreat Cost is 0.");
+      assert.deepEqual(parseRetreatCostModifier(lotad, { zoneCards: [lotad, energy] }), { delta: -Infinity });
+      assert.deepEqual(parseRetreatCostModifier(lotad, { zoneCards: [lotad] }), { delta: 0 });
+      const thwackey = mon('Thwackey', 'If you have a Stadium in play, this Pokémon has no Retreat Cost.');
+      assert.deepEqual(parseRetreatCostModifier(thwackey, {}), { delta: 0 });
+      assert.deepEqual(parseRetreatCostModifier(thwackey, { stadium: { name: 'Stadium' } }), { delta: -Infinity });
+      // Changes aimed at other Pokémon never touch the holder's own cost.
+      for (const text of [
+        "Your opponent's Active Pokémon's Retreat Cost is {C} more.",
+        "As long as this Pokémon is on your Bench, your Active Pokémon's Retreat Cost is {C}{C} less.",
+        'Any damage done to this Pokémon by an opponent\'s attack is reduced by 10 for each {C} in your opponent\'s Active Pokémon\'s Retreat Cost.',
+        "Magnemite's Retreat Cost is {C} less for each Magnemite on your Bench.",
+      ]) {
+        assert.deepEqual(parseRetreatCostModifier(mon('Holder', text), {}), { delta: 0 }, text);
+      }
+      // An unrecognised condition fails closed.
+      assert.deepEqual(
+        parseRetreatCostModifier(mon('Volbeat', "As long as Illumise is in play, Volbeat's Retreat Cost is 0."), {}),
+        { delta: 0 }
+      );
+    });
+
     test('parseRetreatCostModifier / applyRetreatCostModifier', () => {
       assert.deepEqual(
         parseRetreatCostModifier({ ability: { text: 'This Pokémon\'s Retreat Cost is 1 less.' } }),

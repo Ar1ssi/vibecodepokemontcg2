@@ -1,7 +1,7 @@
 // Retreat: switch your active Pokémon to the bench by paying its retreat
 // cost in energy. Once per turn; not allowed after attacking.
 
-import { rulesState } from './rules-state.mjs';
+import { rulesState, getStadium } from './rules-state.mjs';
 import { canPayAttackCost } from './attack-engine.mjs';
 import {
   parseRetreatCostModifier,
@@ -36,6 +36,7 @@ export function getEffectiveRetreatCost(
   cost = getStadiumRetreatCost(cost, activeCard, player);
   cost = combinedToolRetreatCost(cost, activeCard, cards, {
     blockTools: stadiumBlocksToolEffects(),
+    stadium: getStadium(),
   });
   cost += pendingRetreatCostDelta(rulesState, player);
   return Math.max(0, cost);

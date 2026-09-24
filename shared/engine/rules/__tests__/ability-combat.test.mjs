@@ -630,6 +630,37 @@ test('abilityPrizeModify: KO-condition prize reduction, trigger wordings exclude
 
 // ── retreat cost ─────────────────────────────────────────────────────────
 
+test('abilityRetreatCost: printed symbol amounts and the holder\'s position (I138)', () => {
+  const active = mon('Active');
+  const zoroark = mon('Zoroark', {
+    abilities: [ability('x', "As long as this Pokémon is on your Bench, your Active Pokémon's Retreat Cost is {C}{C} less.")],
+  });
+  assert.equal(
+    abilityRetreatCost(active, { sideCards: [active, zoroark], sideActive: [active], sideBench: [zoroark], isActive: true }),
+    -2
+  );
+  assert.equal(
+    abilityRetreatCost(zoroark, { sideCards: [zoroark], sideActive: [zoroark], sideBench: [], isActive: true }),
+    0,
+    'the Bench clause is unmet in the Active Spot'
+  );
+  const opp = mon('Opp');
+  const grapploct = mon('Grapploct', {
+    abilities: [ability('x', "As long as this Pokémon is in the Active Spot, your opponent's Active Pokémon's Retreat Cost is {C}{C} more.")],
+  });
+  const oppCtx = (holderActive) => ({
+    sideCards: [opp],
+    sideActive: [opp],
+    opponentSideCards: [grapploct],
+    opponentActive: holderActive ? [grapploct] : [],
+    opponentBench: holderActive ? [] : [grapploct],
+    isActive: true,
+    zone: 'active',
+  });
+  assert.equal(abilityRetreatCost(opp, oppCtx(true)), 2);
+  assert.equal(abilityRetreatCost(opp, oppCtx(false)), 0);
+});
+
 test('abilityRetreatCost: opponent-target increases and own-bench reductions', () => {
   const target = mon('Target', { stage: 'Stage 1', retreatCost: 2 });
   const chandelure = mon('Mega Chandelure ex', {

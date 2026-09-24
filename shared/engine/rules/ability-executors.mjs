@@ -6,7 +6,7 @@
 // the attack path; this module only extracts *what* a card does from its
 // printed ability text.
 
-import { isBasicPokemon } from '../cards.mjs';
+import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
 import { isExCard, isGxCard } from './card-classify.mjs';
 
 const lower = (v) =>
@@ -449,8 +449,111 @@ export function applyHpBonus(baseHp, bonus) {
   return Math.max(1, base + (bonus || 0));
 }
 
-// "+N more to retreat", "retreat cost is N less"
-export function parseRetreatCostModifier(card) {
+// A Pokémon's printed name read as "this pokémon": older cards say "Gligar's Retreat Cost is 0".
+function selfFolded(card) {
+  const t = textOf(card);
+  const name = lower(card?.name).trim();
+  if (!name || name.length < 3) return t;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return t.replace(new RegExp(`(?<![\\w'])${escaped}(?![\\w-])`, 'g'), 'this pokémon');
+}
+
+const SYMBOL_TYPE = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic',
+  f: 'fighting', d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon',
+};
+
+function holderEnergy(card, zoneCards = []) {
+  if (card?.instanceId == null) return [];
+  return (zoneCards || []).filter((c) => c?.attachedTo === card.instanceId && isEnergy(c));
+}
+
+function energyIsType(energy, letter) {
+  const want = SYMBOL_TYPE[letter];
+  const kinds = [energy.energyType, ...(Array.isArray(energy.types) ? energy.types : []), energy.name]
+    .map(lower)
+    .join(' ');
+  return Boolean(want) && kinds.includes(want);
+}
+
+// Leading conditions on a Pokémon's own Retreat Cost change: true / false when the board
+// answers it, undefined when the clause is not this condition.
+const SELF_RETREAT_CONDITIONS = [
+  (c, card, b) => {
+    if (!/this pok[eé]mon has no energy(?: cards?)? attached/.test(c)) return undefined;
+    return holderEnergy(card, b.zoneCards).length === 0;
+  },
+  (c, card, b) => {
+    const m = c.match(/this pok[eé]mon has any (?:\{([a-z])\} |basic )?energy(?: cards?)? attached/) ||
+      c.match(/there is an? \{([a-z])\} energy card attached to this pok[eé]mon/);
+    if (!m) return undefined;
+    const energy = holderEnergy(card, b.zoneCards);
+    return m[1] ? energy.some((e) => energyIsType(e, m[1])) : energy.length > 0;
+  },
+  (c, card, b) => {
+    const m = c.match(/this pok[eé]mon has (\d+) or fewer energy attached|this pok[eé]mon has (\d+) energy or less attached/);
+    if (!m) return undefined;
+    return holderEnergy(card, b.zoneCards).length <= Number(m[1] ?? m[2]);
+  },
+  (c, card) => {
+    if (!/this pok[eé]mon has any damage counters on it/.test(c)) return undefined;
+    return (card?.damage || 0) > 0;
+  },
+  (c, card, b) => {
+    if (!/this pok[eé]mon has a pok[eé]mon tool(?: card)? attached/.test(c)) return undefined;
+    return (b.zoneCards || []).some(
+      (x) => x?.attachedTo === card?.instanceId && /tool/.test(lower(`${x.type} ${x.trainerType} ${(x.subtypes || []).join(' ')}`))
+    );
+  },
+  (c, _card, b) => {
+    if (!/(?:you have )?(?:a|any) stadium(?: card)? (?:is )?in play|there is (?:a|any) stadium card (?:is )?in play/.test(c)) {
+      return undefined;
+    }
+    return Boolean(b.stadium);
+  },
+];
+
+/**
+ * A Pokémon's printed change to its OWN Retreat Cost (I138): "this Pokémon has no Retreat
+ * Cost", "its Retreat Cost is {C} less", "the Retreat Cost of this Pokémon is 0". Changes aimed
+ * at other Pokémon (your Active, your opponent's Active, a team) are `abilityRetreatCost` /
+ * `teamNoRetreatCostForActive`'s, "for each" scaling is not read, and a leading condition
+ * must hold on `board` (`zoneCards`, `stadium`) — an unrecognised one fails closed.
+ */
+function selfRetreatModifier(card, board = {}) {
+  const t = selfFolded(card);
+  if (!/retreat/.test(t)) return { delta: 0 };
+  for (const sentence of t.split(/(?<=\.)\s+/)) {
+    const self =
+      /(?:this pok[eé]mon|, it) has no retreat cost/.test(sentence) ||
+      /(?:this pok[eé]mon's|its|the retreat cost of this pok[eé]mon) retreat cost is|the retreat cost of this pok[eé]mon is|you pay [^.]*? to retreat this pok[eé]mon/.test(sentence);
+    if (!self || /for each/.test(sentence)) continue;
+    if (/your opponent|each player|your active|of your pok|each of your/.test(sentence)) continue;
+    const clause = sentence.match(/^(?:if|as long as|during) ([^,]+),/)?.[1];
+    if (clause) {
+      if (/^your first turn/.test(clause)) {
+        if (board.turnNumber == null || Number(board.turnNumber) > 2) return { delta: 0 };
+      } else {
+        const verdicts = SELF_RETREAT_CONDITIONS.map((check) => check(clause, card, board));
+        if (verdicts.every((v) => v === undefined) || verdicts.some((v) => v === false)) {
+          return { delta: 0 };
+        }
+      }
+    }
+    if (/no retreat cost|retreat cost is 0\b/.test(sentence)) return { delta: -Infinity };
+    const symbols = (sentence.match(/\{[a-z]\}/g) || []).length;
+    const n = Number(sentence.match(/(\d+)\s*(?:more|less)/)?.[1]) || symbols || 1;
+    if (/\bless\b|fewer/.test(sentence)) return { delta: -n };
+    if (/\bmore\b/.test(sentence)) return { delta: n };
+  }
+  return { delta: 0 };
+}
+
+// "+N more to retreat", "retreat cost is N less". A Pokémon reads only its own Retreat Cost
+// (selfRetreatModifier, I138); a Tool keeps the plain text read ("the Retreat Cost of the
+// Pokémon this card is attached to is {C}{C} less").
+export function parseRetreatCostModifier(card, board = {}) {
+  if (isPokemon(card)) return selfRetreatModifier(card, board);
   const t = textOf(card);
   if (!t || (!t.includes('retreat cost') && !/retreat/.test(t)))
     return { delta: 0 };
@@ -493,7 +596,8 @@ export function teamNoRetreatCostForActive(activeCard, benchCards) {
   const activeName = lower(activeCard?.name || '');
   const activeIsBasic = isBasicPokemon(activeCard);
   const activeIsExOrGx = isExCard(activeCard) || isGxCard(activeCard);
-  for (const card of Array.isArray(benchCards) ? benchCards : []) {
+  // The Active's own team wording ("Your Basic Pokémon in play have no Retreat Cost") counts too.
+  for (const card of [activeCard, ...(Array.isArray(benchCards) ? benchCards : [])]) {
     if (!card || card.attachedTo || card.image?.attached) continue;
     const t = textOf(card);
     if (!/no retreat cost/.test(t)) continue;

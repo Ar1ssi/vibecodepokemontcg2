@@ -373,7 +373,7 @@ export function combinedToolRetreatCost(
   { blockTools = false, stadium = null } = {}
 ) {
   let cost = baseRetreat || 0;
-  const mod = parseRetreatCostModifier(pokemon);
+  const mod = parseRetreatCostModifier(pokemon, { zoneCards, stadium });
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;
   for (const tool of attachedTools(pokemon, zoneCards)) {

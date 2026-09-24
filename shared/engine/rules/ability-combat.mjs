@@ -685,22 +685,32 @@ export function abilityPrizeModify(victim, ctx = {}) {
  */
 export function abilityRetreatCost(target, ctx = {}) {
   if (!target) return 0;
+  // "{C}{C} less" / "2 less": the number, or how many Energy symbols are printed.
+  const amount = (m) => (m[1] ? Number(m[1]) : (m[2].match(/\{c\}/g) || []).length);
   let delta = 0;
   for (const card of dedupe(sideInPlay(ctx))) {
-    const t = cardAbilityText(card);
+    const t = selfNamedText(card);
     if (isAbilitySuppressed(card, ctx)) continue;
-    const less = t.match(/active pok[eé]mon's retreat cost is (\d+) less/);
-    if (less && ctx.isActive !== false) delta -= Number(less[1] || 1);
+    if (!holderPositionMet(t, card, ctx)) continue;
+    const less =
+      t.match(/your active pok[eé]mon's retreat cost is (?:(\d+)|((?:\{c\})+)) less/) ||
+      t.match(/you pay (?:(\d+)|((?:\{c\})+)) less to retreat your active pok[eé]mon/);
+    if (!less || ctx.isActive === false) continue;
+    if (/excluding pok[eé]mon-ex/.test(t) && isExCard(target)) continue;
+    delta -= amount(less) || 1;
   }
   for (const card of dedupe(opponentInPlay(ctx))) {
-    const t = cardAbilityText(card);
+    const t = selfNamedText(card);
     if (isAbilitySuppressed(card, ctx)) continue;
-    const more = t.match(
-      /your opponent's active (?:evolution )?pok[eé]mon's retreat cost is \{c\} more/
-    );
+    if (!holderPositionMet(t, card, ctx)) continue;
+    const more =
+      t.match(/your opponent's active (?:evolution )?pok[eé]mon's retreat cost is (?:(\d+)|((?:\{c\})+)) more/) ||
+      t.match(/your opponent pays (?:(\d+)|((?:\{c\})+)) more to retreat (?:his or her|their) active pok[eé]mon/);
     if (!more || ctx.zone === 'bench') continue;
     if (/active evolution pok[eé]mon/.test(t) && !isEvolutionCard(target)) continue;
-    delta += 1;
+    // A condition other than the holder's own position is not read here.
+    if (/^(?:if|as long as) /.test(t) && !/^as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon|on your bench)/.test(t)) continue;
+    delta += amount(more) || 1;
   }
   return delta;
 }
