@@ -65,6 +65,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
   const base = baseDamage != null ? baseDamage : (parseInt(attack?.damage, 10) || 0);
+  // An attack that does no damage gets no modifiers: Tool/turn bonuses and Weakness only change
+  // damage that exists (I152 — Defiance Band must not turn a 0-damage attack into a 30 hit).
+  if (!(base > 0)) {
+    return {
+      total: 0, base: 0, attackerBonus: 0, specialEnergyBonus: 0, specialEnergyPenalty: 0, multiplier: 1,
+      flat: 0, resistance: 0, stadiumReduction: 0, specialEnergyReduction: 0, reduced: 0, prevented: false,
+    };
+  }
 
   // Step 2: Attacker tool and ability damage bonuses (e.g. Choice Belt, Maximum Belt, Defiance Band)
   // Applied BEFORE Weakness and Resistance.

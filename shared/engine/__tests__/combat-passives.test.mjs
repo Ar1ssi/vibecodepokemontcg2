@@ -706,7 +706,9 @@ test('Defiance Band applies to a chosen-target hit on the Active when trailing o
     playerId: 'p1',
   });
   assert.equal(resolved.error, null);
-  // The clause hit's own damage; the main-site 0-damage bonus is I152.
   const hit = resolved.events.find((e) => e.type === 'damageUpdated' && e.instanceId === 3);
   assert.equal(hit.dealt, 60);
+  // I152: the 0-damage attack itself gets no Defiance Band bonus, so the clause hit is all.
+  const snorlax = resolved.state.players.p2.zones.active.find((c) => c.instanceId === 3);
+  assert.equal(snorlax.damage, 60);
 });

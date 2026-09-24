@@ -27,6 +27,8 @@ export function isSupporterTrainer(card) {
  * @param {number} params.opponentPrizes Prize cards the opponent has left
  * @param {string|null} [params.stadiumName] Name of the Stadium in play, if any
  * @param {number} [params.handCount] Cards in hand, including the Trainer being played
+ * @param {string[]|null} [params.handNames] Names of every card in hand, including the Trainer
+ *   being played; null when unknown
  * @param {number} [params.benchCount] Benched Pokémon
  * @param {number|null} [params.rareCandyOptionCount] Stage 2 cards in hand with a Basic in play they
  *   can evolve (evolved-pokemon.mjs rareCandyOptions); null when unknown
@@ -47,6 +49,7 @@ export function trainerPlayBlockReason({
   stadiumName = null,
   stadiumPlayedThisTurn = false,
   handCount = Infinity,
+  handNames = null,
   benchCount = 0,
   opponentBenchCount = null,
   rareCandyOptionCount = null,
@@ -57,7 +60,9 @@ export function trainerPlayBlockReason({
   koedLastOppTurnVictims = null,
 }) {
   if (!card) return null;
-  if (isSupporterTrainer(card) && turnNumber === 1) {
+  const text = card.text || card.effect || card.cardText || '';
+  const parsed = parseTrainerEffect(Array.isArray(text) ? text.join(' ') : text);
+  if (isSupporterTrainer(card) && turnNumber === 1 && !parsed.turnOnePermission) {
     return "The player going first can't play a Supporter on turn 1.";
   }
   const kind = kindText(card);
@@ -70,8 +75,6 @@ export function trainerPlayBlockReason({
       if (same) return 'A Stadium card with the same name is already in play.';
     }
   }
-  const text = card.text || card.effect || card.cardText || '';
-  const parsed = parseTrainerEffect(Array.isArray(text) ? text.join(' ') : text);
   const condition = parsed.playCondition;
   const cost = parsed.steps?.[0]?.type === 'discardCost' ? parsed.steps[0].count || 1 : 0;
   if (cost > 0 && handCount - 1 < cost) return 'Not enough cards in hand to pay discard cost.';
@@ -117,11 +120,20 @@ export function trainerPlayBlockReason({
     opponentPrizes,
     stadiumName,
     handCount,
+    handNames,
+    cardName: card.name,
     lostZoneCount,
     opponentActive,
     koedLastOppTurn,
     koedLastOppTurnVictims,
   });
+}
+
+function normalizeName(name) {
+  return String(name || '')
+    .replace(/[\u2018\u2019]/g, "'")
+    .trim()
+    .toLowerCase();
 }
 
 const TYPE_SYMBOL_WORDS = {
@@ -210,6 +222,13 @@ function playConditionBlockReason(condition, ctx) {
   }
   if (condition === 'lastCardInHand') {
     return ctx.handCount > 1 ? 'This must be the last card in your hand.' : null;
+  }
+  if (condition === 'onlyCopiesInHand') {
+    if (!Array.isArray(ctx.handNames)) return null;
+    const own = normalizeName(ctx.cardName);
+    return ctx.handNames.some((name) => normalizeName(name) !== own)
+      ? `You can't have any cards in your hand other than ${ctx.cardName}.`
+      : null;
   }
   const handMax = condition.match(/^handCount<=(\d+)$/);
   if (handMax) {

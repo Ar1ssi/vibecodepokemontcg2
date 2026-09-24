@@ -45,6 +45,9 @@ const TEXTS = {
     'You can play this card only if you have more Prize cards left than your opponent. Each player shuffles his or her hand into his or her deck. Then, you draw 6 cards, and your opponent draws 3 cards.',
   'Call Bell':
     'You can use this card only if you go second, and only during your first turn. Search your deck for a Supporter card, reveal it, and put it into your hand. Then, shuffle your deck.',
+  Carmine:
+    'If you go first, you may use this card during your first turn. Discard your hand and draw 5 cards.',
+  Beauty: 'If you go first, you may play this card during your first turn. Draw 2 cards.',
   'Battle VIP Pass':
     'You can use this card only during your first turn. Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck.',
 };
@@ -67,7 +70,7 @@ test('parsePlayCondition: every slice 11 wording maps to one condition', () => {
     Morty: 'koedLastTurn:type=p',
     'Team Rocket’s Archer': "koedLastTurn:name=team rocket's",
     'Single Strike Style Mustard': 'lastCardInHand',
-    'Blaine’s Last Resort': 'lastCardInHand',
+    'Blaine’s Last Resort': 'onlyCopiesInHand',
     'Erika’s Hospitality': 'handCount<=5',
     'Mail from Bill': 'handCount<=4',
     Kamado: 'handCount>=2',
@@ -131,7 +134,6 @@ test("KO'd-last-turn gates, including typed and Team Rocket's victims", () => {
 test('last card and hand-size gates count the Trainer itself', () => {
   assert.equal(blocked('Single Strike Style Mustard', { handCount: 1 }), null);
   assert.match(blocked('Single Strike Style Mustard', { handCount: 2 }), /last card/);
-  assert.match(blocked('Blaine’s Last Resort', { handCount: 4 }), /last card/);
   assert.equal(blocked('Erika’s Hospitality', { handCount: 5 }), null);
   assert.match(blocked('Erika’s Hospitality', { handCount: 6 }), /too many/);
   assert.equal(blocked('Mail from Bill', { handCount: 4 }, 'Item'), null);
@@ -218,4 +220,39 @@ test("a KO on the opponent's turn records the victim for the victim's next turn"
   assert.equal(result.state.turn.player, 'p2');
   assert.equal(flags.koedLastOppTurn, true);
   assert.deepEqual(flags.koedLastOppTurnVictims, [{ name: 'Gardevoir', types: ['Psychic'] }]);
+});
+
+// Design 038 row 16 (I148): other copies of Blaine's Last Resort do not block it.
+test("Blaine's Last Resort allows its own copies, blocks any other card, skips an unknown hand", () => {
+  const name = 'Blaine’s Last Resort';
+  assert.equal(blocked(name, { handCount: 2, handNames: [name, name] }), null);
+  assert.equal(blocked(name, { handCount: 2, handNames: [name, "Blaine's Last Resort"] }), null);
+  assert.match(blocked(name, { handCount: 2, handNames: [name, 'Pikachu'] }), /other than/);
+  assert.equal(blocked(name, { handCount: 4, handNames: null }), null);
+
+  const twoCopies = game();
+  twoCopies.players.p1.zones.hand.push(card({ name, type: 'Trainer', trainerType: 'Supporter', text: TEXTS[name] }));
+  const blaine = card({ name, type: 'Trainer', trainerType: 'Supporter', text: TEXTS[name] });
+  assert.equal(play(twoCopies, blaine).error, null);
+
+  const withOther = game();
+  withOther.players.p1.zones.hand.push(card({ name: 'Pikachu', supertype: 'Pokémon', hp: 60 }));
+  const blaine2 = card({ name, type: 'Trainer', trainerType: 'Supporter', text: TEXTS[name] });
+  assert.match(play(withOther, blaine2).error || '', /other than/);
+});
+
+// Design 038 row 17 (I149): "If you go first, you may use this card during your first turn".
+test('first-turn permission Supporters are playable on turn 1; plain Supporters are not', () => {
+  assert.equal(parseTrainerEffect(TEXTS.Carmine).turnOnePermission, true);
+  assert.equal(parseTrainerEffect(TEXTS.Beauty).turnOnePermission, true);
+  assert.equal(parseTrainerEffect(TEXTS.Nita).turnOnePermission, undefined);
+  assert.equal(blocked('Carmine', { turnNumber: 1 }), null);
+  assert.equal(blocked('Carmine', { turnNumber: 2 }), null);
+  assert.equal(blocked('Beauty', { turnNumber: 1 }), null);
+  assert.match(blocked('Kamado', { turnNumber: 1 }), /turn 1/);
+
+  const first = game();
+  first.turn.number = 1;
+  const carmine = card({ name: 'Carmine', type: 'Trainer', trainerType: 'Supporter', text: TEXTS.Carmine });
+  assert.equal(play(first, carmine).error, null);
 });

@@ -6,8 +6,8 @@ Branch `claude/wizardly-brown-k61li3` (design 035 slices 1–12 + S288 reviews).
 - [x] 2 I141 + I143: faceDown choice options (engine + picker), count-only look events, Heavy/Beast Ball choice (S290; live Peonia check skipped per user)
 - [x] 3 I142 Mr. Fuji bench-only + `resetLeftPlay`; I147 single reveal; I146 Focus Band coin events + bench RNG (S291)
 - [x] 4 I144 `prizeFlags` at all damage sites; I145 shared `chaosGymBlocks` gate (S292; I152 filed)
-- [ ] 5 I148 `onlyCopiesInHand`; I149 `turnOnePermission`; I150 gate steps/removed + baseline regen; file the
-      per-viewer event-filter follow-up; close I141–I150
+- [x] 5 I148 `onlyCopiesInHand`; I149 `turnOnePermission`; I150 gate steps/removed + baseline regen; I153 filed;
+      I152 fixed too (S293). Design 038 complete — next: merge branch to main
 Verify each slice: node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"
 (known fail: card-inspector-model "retreat greys"; coin-flip-ceremony flaky) + oracle/audit:trainers per the plan.
 

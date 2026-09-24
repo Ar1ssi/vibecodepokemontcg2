@@ -808,7 +808,7 @@ function parsePlayCondition(lower) {
     return symbol ? `koedLastTurn:type=${symbol[1]}` : `koedLastTurn:name=${qualifier}`;
   }
   if (/only when it is the last card in your hand/.test(lower)) return 'lastCardInHand';
-  if (/can't play this card if you have any cards in your hand other than/.test(lower)) return 'lastCardInHand';
+  if (/can't play this card if you have any cards in your hand other than/.test(lower)) return 'onlyCopiesInHand';
   const fewerOthers = lower.match(/only if you have\s+(\d+)\s+or fewer other cards in your hand/);
   if (fewerOthers) return `handCount<=${Number(fewerOthers[1]) + 1}`;
   const tooMany = lower.match(/if you have\s+(\d+)\s+or more cards (?:\(including this one\) )?in your hand(?: \(including this one\))?, you can't play this card/)
@@ -832,6 +832,9 @@ export function parseTrainerEffect(text = '') {
   const lower = normalizeText(text);
   const playCondition = parsePlayCondition(lower);
   const result = parseTrainerSteps(lower);
+  if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
+    result.turnOnePermission = true;
+  }
   return playCondition ? { ...result, playCondition } : result;
 }
 

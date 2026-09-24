@@ -282,6 +282,7 @@ export async function enumerateOptions({
           rulesState.flags?.[user]?.stadiumPlayedThisTurn
         ),
         handCount: handCards.length,
+        handNames: handCards.map((c) => c?.name || ''),
         benchCount: benchCards.length,
         ...trainerTargetCountsOf(handCards, inPlayTargets(active, benchCards), attachedCardsOf, deckList),
       });

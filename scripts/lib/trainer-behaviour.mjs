@@ -1,7 +1,8 @@
 // Pure classification + ratchet gate over the Trainer corpus (design 035 slice 12). Each unique
 // card (name + text) gets gap tags describing what the authoritative server cannot do with it;
 // the gate fails when a card that is in the committed baseline gains a tag it did not have, or
-// loses its parsed play condition. Cards new to the corpus are reported, never failed.
+// loses its parsed play condition or a parsed step type, or when a baseline card vanishes from the
+// corpus (a text edit re-hashes its key). Cards new to the corpus are reported, never failed.
 import { parseTrainerEffect } from '../../shared/engine/rules/trainer-effects.mjs';
 import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
 
@@ -58,13 +59,11 @@ export function classifyCorpus(rows) {
 export function baselineOf(classified) {
   const cards = {};
   for (const c of classified) {
-    if (c.gaps.length === 0 && !c.playCondition) {
-      cards[c.key] = {};
-      continue;
-    }
+    const steps = [...new Set(c.steps || [])].sort();
     cards[c.key] = {
       ...(c.gaps.length ? { gaps: c.gaps } : {}),
       ...(c.playCondition ? { playCondition: c.playCondition } : {}),
+      ...(steps.length ? { steps } : {}),
     };
   }
   return { cards: Object.keys(cards).length, entries: cards };
@@ -80,7 +79,8 @@ export function gapTally(classified) {
 }
 
 /**
- * @returns {{failures: string[], improvements: string[], added: string[]}}
+ * A baseline entry without `steps` (pre-design-038 format) records no steps, so none can be lost.
+ * @returns {{failures: string[], improvements: string[], added: string[], removed: string[]}}
  */
 export function checkTrainerGate(classified, baseline) {
   const failures = [];
@@ -106,6 +106,13 @@ export function checkTrainerGate(classified, baseline) {
     } else if (!before.playCondition && c.playCondition) {
       improvements.push(`${c.key}: play condition ${c.playCondition}`);
     }
+    const nowSteps = new Set(c.steps || []);
+    for (const t of before.steps || []) {
+      if (!nowSteps.has(t)) failures.push(`${c.key}: lost step ${t}`);
+    }
   }
-  return { failures, improvements, added };
+  const corpusKeys = new Set(classified.map((c) => c.key));
+  const removed = Object.keys(entries).filter((key) => !corpusKeys.has(key));
+  for (const key of removed) failures.push(`${key}: in the baseline but not in the corpus`);
+  return { failures, improvements, added, removed };
 }

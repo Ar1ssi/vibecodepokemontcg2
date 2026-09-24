@@ -33,7 +33,7 @@ test('checkTrainerGate: new gaps and lost play conditions fail; closures and new
   const corpus = classifyCorpus([DRAW, DRAW, MIRAGE]);
   assert.equal(corpus.length, 2);
   const baseline = baselineOf(corpus);
-  assert.deepEqual(checkTrainerGate(corpus, baseline), { failures: [], improvements: [], added: [] });
+  assert.deepEqual(checkTrainerGate(corpus, baseline), { failures: [], improvements: [], added: [], removed: [] });
 
   const regressed = corpus.map((c) =>
     c.name === 'Draw Thing' ? { ...c, gaps: ['server-missing:draw'] } : { ...c, playCondition: null }
@@ -49,4 +49,23 @@ test('checkTrainerGate: new gaps and lost play conditions fail; closures and new
   const withNew = checkTrainerGate(classifyCorpus([DRAW, MIRAGE, NONSENSE]), baseline);
   assert.deepEqual(withNew.failures, []);
   assert.deepEqual(withNew.added, [trainerKey(NONSENSE)]);
+});
+
+// Design 038 row 18 (I150): lost steps and vanished baseline keys fail the gate.
+test('checkTrainerGate: a lost step or a baseline key missing from the corpus fails', () => {
+  const corpus = classifyCorpus([DRAW, MIRAGE]);
+  const baseline = baselineOf(corpus);
+  assert.deepEqual(baseline.entries[trainerKey(DRAW)].steps, ['draw']);
+
+  const lost = corpus.map((c) => (c.name === 'Draw Thing' ? { ...c, steps: [] } : c));
+  assert.deepEqual(checkTrainerGate(lost, baseline).failures, [`${trainerKey(DRAW)}: lost step draw`]);
+
+  const edited = classifyCorpus([{ ...DRAW, text: 'Draw 3 cards.' }, MIRAGE]);
+  const result = checkTrainerGate(edited, baseline);
+  assert.deepEqual(result.removed, [trainerKey(DRAW)]);
+  assert.equal(result.failures.length, 1);
+  assert.deepEqual(result.added, [trainerKey({ ...DRAW, text: 'Draw 3 cards.' })]);
+
+  const oldFormat = { entries: { [trainerKey(DRAW)]: {}, [trainerKey(MIRAGE)]: { playCondition: 'lostZone>=7' } } };
+  assert.deepEqual(checkTrainerGate(lost, oldFormat).failures, []);
 });

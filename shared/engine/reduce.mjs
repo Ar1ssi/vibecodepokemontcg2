@@ -2988,6 +2988,7 @@ export function validateLegality(state, command) {
           stadiumName: state.stadium?.name || null,
           stadiumPlayedThisTurn: Boolean(player.flags?.stadiumPlayedThisTurn),
           handCount: (player.zones?.hand || []).length,
+          handNames: (player.zones?.hand || []).map((c) => c?.name || ''),
           benchCount: (player.zones?.bench || []).filter((c) => !c.attachedTo)
             .length,
           opponentBenchCount: (opponent?.zones?.bench || []).filter(

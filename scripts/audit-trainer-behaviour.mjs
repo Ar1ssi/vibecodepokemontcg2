@@ -68,6 +68,7 @@ function main() {
   if (failures.length) {
     console.log(`\nFAILED: ${failures.length} regression(s)`);
     for (const line of failures) console.log(`  ${line}`);
+    console.log('Legit change (card text edited, step renamed)? Refresh with --update-baseline.');
     return 1;
   }
   console.log('\nPASSED');

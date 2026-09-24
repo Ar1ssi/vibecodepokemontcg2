@@ -167,9 +167,9 @@ Contract (stable surface):
 | 13 | Chaos Gym + Stadium / Energy attach | no flip | [x] covered: same test (Energy attach, no `coinFlipped`); Stadium: stadiumTrainerPlayCoin returns null (unchanged) |
 | 14 | Focus Band tails / bench snipe with and without RNG | `coinFlipped` emitted on tails; bench path flips when RNG present | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Focus Band reports its tails flip…", "…on a Benched Pokémon flips against bench spread damage", "…without a coin flipper" |
 | 15 | Replay / undo of a command with a new flip | deterministic: flips consume `activeRng` in the same order on replay | [x] covered: tool-on-ko.test.mjs "Focus Band flips replay deterministically from the same seed" (Focus Band flips only; Chaos Gym flips in slice 4) |
-| 16 | Blaine's Last Resort with 2 copies / with 1 other card / unknown hand | allowed / blocked / skipped | [ ] |
-| 17 | Carmine on turn 1 (going first) / on turn 2 | allowed / allowed; plain Supporter on turn 1 still blocked | [ ] |
-| 18 | Gate: corpus card text edited (new key) | old key reported as removed → fail until `--update-baseline` | [ ] |
+| 16 | Blaine's Last Resort with 2 copies / with 1 other card / unknown hand | allowed / blocked / skipped | [x] covered: shared/engine/rules/__tests__/trainer-play-conditions.test.mjs "Blaine's Last Resort allows its own copies…" |
+| 17 | Carmine on turn 1 (going first) / on turn 2 | allowed / allowed; plain Supporter on turn 1 still blocked | [x] covered: trainer-play-conditions.test.mjs "first-turn permission Supporters are playable on turn 1…" |
+| 18 | Gate: corpus card text edited (new key) | old key reported as removed → fail until `--update-baseline` | [x] covered: scripts/lib/trainer-behaviour.test.mjs "a lost step or a baseline key missing from the corpus fails" |
 
 ## Test plan
 - Unit: `trainer-tool-modifiers.test.mjs` (side parse for the 16-row table + Beast Bringer/Sky Seal
@@ -240,5 +240,12 @@ Slice 4 (S292):
   `zoneId === 'hand'` && the actor owns the card && `isPokemonToolCard` before calling it.
 - Test for I144 asserts the clause hit's own `dealt`: the main attack site also adds Defiance Band to the
   0-damage attack (pre-existing, filed I152), so the Active's total damage is not the clause's.
+
+Slice 5 (S293):
+- `checkTrainerGate` pushes each removed key into `failures` too (one exit path) and returns `removed`.
+- The baseline now stores every card's `steps`, so the regenerated JSON is ~8k lines of diff (format, not behaviour).
+- I152 fixed in the same commit at the user's request: `computeAttackDamage` returns an all-zero breakdown when
+  base damage is 0, so no Tool/turn/marker bonus or Weakness turns a no-damage attack into a hit.
+- Per-viewer event filtering filed as I153.
 
 ---

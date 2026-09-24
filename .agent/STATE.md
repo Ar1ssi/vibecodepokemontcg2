@@ -5,12 +5,11 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 292
-Focus: S292 feature: design 038 slice 4 (I144 + I145) shipped on claude/wizardly-brown-k61li3.
-Active: design 038 slice 4/5 done (`prizeFlags` at all attack damage sites, shared `chaosGymBlocks` gate also on
-  attachCard Tools). Next = slice 5 (I148, I149, I150 + baseline regen). Ledger: NEXTSTEPS.md top.
-Next: design 038 slice 5, then merge the trainer-behaviour branch to main. Maintenance due (S270, S280 not run).
-  I152 (0-damage attacks get Tool bonuses), I151 (reactive Tool conditions unchecked), I136 (26 server-missing Trainer steps), I137 (design 035 leftovers).
+Session: 293
+Focus: S293 feature: design 038 slice 5 (I148, I149, I150, I152) shipped on claude/wizardly-brown-k61li3.
+Active: design 038 complete (5/5). Next = merge the trainer-behaviour branch to main.
+Next: merge claude/wizardly-brown-k61li3 to main. Maintenance due (S270, S280, S290 not run).
+  I153 (per-viewer event filtering), I151 (reactive Tool conditions unchecked), I136 (26 server-missing Trainer steps), I137 (design 035 leftovers).
   User visual check of typed Tera entry/skin, Mega vortex in a real rules-mode game.
   I126/I127 (retreat-cost), I121-I125 (design 032 leftovers); I113 oracle still blind to damage amounts.
   Design numbers collide: 032 (two files) and 035 (mega orb in D118 vs trainer-behaviour design file).
@@ -30,6 +29,8 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Board FX: D103, D117-D122 (playCanvasStage WAAPI clock; holo wrappers need TCGdex, emulate with buildHoloCard).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S293 Design 038 slice 5: Blaine's Last Resort allows its own copies; Carmine-style Supporters play on turn 1;
+  audit:trainers fails on lost steps/removed keys; 0-damage attacks no longer take Tool bonuses (I152).
 - S292 Design 038 slice 4: Defiance Band/Vest see Prize counts on chosen-target and retaliation hits; Chaos Gym
   flips for a Tool attached from hand.
 - S291 Design 038 slice 3: Mr. Fuji picks only Benched Pokémon and shuffled cards lose damage/conditions/markers;
