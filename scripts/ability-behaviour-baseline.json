@@ -5,8 +5,8 @@
     "runs": 1811,
     "partial": 584,
     "dead": 148,
-    "consumed": 1166,
-    "unconsumed": 518,
+    "consumed": 1106,
+    "unconsumed": 578,
     "unparsed": 1
   },
   "families": {
@@ -42,8 +42,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 1,
-      "unconsumed": 5,
+      "consumed": 0,
+      "unconsumed": 6,
       "unparsed": 0
     },
     "attack-inheritance": {
@@ -96,8 +96,8 @@
       "runs": 7,
       "partial": 0,
       "dead": 0,
-      "consumed": 59,
-      "unconsumed": 25,
+      "consumed": 52,
+      "unconsumed": 32,
       "unparsed": 0
     },
     "damage-bonus": {
@@ -114,8 +114,8 @@
       "runs": 23,
       "partial": 13,
       "dead": 0,
-      "consumed": 184,
-      "unconsumed": 85,
+      "consumed": 179,
+      "unconsumed": 90,
       "unparsed": 0
     },
     "damage-reduce": {
@@ -168,8 +168,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 115,
-      "unconsumed": 36,
+      "consumed": 100,
+      "unconsumed": 51,
       "unparsed": 0
     },
     "end-of-turn": {
@@ -321,8 +321,8 @@
       "runs": 41,
       "partial": 86,
       "dead": 4,
-      "consumed": 67,
-      "unconsumed": 25,
+      "consumed": 59,
+      "unconsumed": 33,
       "unparsed": 0
     },
     "passive": {
@@ -339,8 +339,8 @@
       "runs": 2,
       "partial": 0,
       "dead": 0,
-      "consumed": 36,
-      "unconsumed": 14,
+      "consumed": 25,
+      "unconsumed": 25,
       "unparsed": 0
     },
     "recursion": {
@@ -402,8 +402,8 @@
       "runs": 303,
       "partial": 53,
       "dead": 24,
-      "consumed": 67,
-      "unconsumed": 60,
+      "consumed": 62,
+      "unconsumed": 65,
       "unparsed": 0
     },
     "status-recover": {
@@ -447,8 +447,8 @@
       "runs": 0,
       "partial": 4,
       "dead": 0,
-      "consumed": 254,
-      "unconsumed": 64,
+      "consumed": 246,
+      "unconsumed": 72,
       "unparsed": 0
     },
     "when-played": {

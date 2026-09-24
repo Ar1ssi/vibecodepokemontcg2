@@ -137,25 +137,35 @@ export function isActivatedAbility(card, abilityIndex = 0) {
 // --- passive -----------------------------------------------------------
 
 // How many cost symbols a passive ability removes from attacks.
-// "reduce the cost … by 1" / "attacks cost 1 less" → 1; "cost less" → 1.
+// "reduce the cost … by 1" / "attacks cost 1 less" / "attacks cost {C}{C} less" → 1 / 1 / 2;
+// "cost less" → 1.
 //
-// The text has to actually describe a REDUCTION. This previously matched on /(cost|energy)/ and
-// then returned 1 whenever no number was found, so every ability that merely mentioned Energy
-// granted a free symbol off every attack: Charmander's Agile ("If this Pokémon has no Energy
-// attached, it has no Weakness") made its Live Coal payable with zero Energy attached. A
-// false positive here silently removes a cost from combat, which is far worse than missing an
-// exotic wording, so the reduction verb is now required rather than assumed.
+// A false positive here silently removes a cost from combat, which is far worse than missing an
+// exotic wording, so one sentence has to say that an ATTACK's COST goes DOWN. Earlier versions
+// matched loose keywords across the whole card text: mentioning Energy made Charmander's Live
+// Coal free, and "takes 30 less damage from attacks" (I136) — a reduction wording, printed on
+// abilities and on attack text alike — discounted every attack by 30, i.e. made them free.
+// Retreat Cost wordings are parseRetreatCostModifier's and never mention an attack's cost.
+const ATTACK_COST_REDUCTION = [
+  /\battacks?\b[^.]*?\bcosts?\b[^.]*?\b(?:less|fewer)\b/,
+  /\bcosts? of [^.]*?\battacks?\b[^.]*?\b(?:reduced|less|fewer|lower|decreased)\b/,
+  /\breduce the (?:energy )?cost of [^.]*?\battacks?\b/,
+];
+
 export function passiveCostDiscount(card) {
   const t = textOf(card);
   if (!t) return 0;
-  if (!/(less|fewer|reduc|decrease|lower)/.test(t)) return 0;
-  // …and it has to be an ATTACK cost. "The Retreat Cost of this Pokémon is 1 less" is a retreat
-  // modifier — parseRetreatCostModifier owns that — and reading it here would discount attacks.
-  if (/retreat/.test(t) && !/attack/.test(t)) return 0;
-  if (!/(cost|energy|attack)/.test(t)) return 0;
+  const sentence = t
+    .split(/[.\n]/)
+    .find((s) => !/retreat cost/.test(s) && ATTACK_COST_REDUCTION.some((re) => re.test(s)));
+  if (!sentence) return 0;
+  const symbols = sentence.match(
+    /((?:\{[a-z]\})+)\s*(?:energy\s*)?(?:less|fewer)/
+  );
+  if (symbols) return symbols[1].match(/\{/g).length;
   const by =
-    t.match(/(?:by|less|fewer)\s*(\d+)/) ||
-    t.match(/(\d+)\s+(?:less|fewer)/);
+    sentence.match(/\bby\s*(\d+)/) ||
+    sentence.match(/(\d+)\s+(?:energy\s+)?(?:less|fewer)/);
   if (by) return parseInt(by[1], 10) || 1;
   return 1;
 }

@@ -2883,6 +2883,43 @@ import test from 'node:test';
         passiveCostDiscount({ ability: { text: 'Your attacks cost 3 fewer Energy.' } }),
         3,
       );
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'This Pokémon’s attacks cost {C}{C}{C} less.' } }),
+        3,
+      );
+    });
+
+    // I136: a damage reduction is not a cost reduction. "less" + "attack" used to read as a
+    // discount of 30, so every damage-reduction Pokémon attacked for free.
+    test('passiveCostDiscount: "takes N less damage from attacks" is not a discount', () => {
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'This Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).' },
+        }),
+        0,
+      );
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'Attacks used by your opponent’s Active Pokémon do 20 less damage.' },
+        }),
+        0,
+      );
+      // Whole-card text (no ability): an attack's "takes 50 less damage" must not discount it.
+      assert.equal(
+        passiveCostDiscount({
+          text: '{G}{C} → Leaf Guard : 140\n\nDuring your opponent’s next turn, this Pokémon takes 50 less damage from attacks.',
+        }),
+        0,
+      );
+    });
+
+    test('passiveCostDiscount: a Retreat Cost reduction on a card with attacks is not a discount', () => {
+      assert.equal(
+        passiveCostDiscount({
+          text: 'Ability ⇢ Retreat Aid\n\nAs long as this Pokémon is on your Bench, your Active Pokémon’s Retreat Cost is {C}{C} less.\n\n{C}{C} → Peck : 20\n\nThis attack does 10 damage.',
+        }),
+        0,
+      );
     });
 
     test('parseWhenPlayedEffect', () => {
