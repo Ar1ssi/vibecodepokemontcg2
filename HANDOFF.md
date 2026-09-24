@@ -8,6 +8,14 @@ for this stop, so nothing here is unrecorded.
 follow-ups recorded in the design Deviations) and slice 7 (A5 discard-scaling "or" groups) is
 committed. Next: slice 8 (A6 heal wordings) per the design work plan.
 
+**Update S287 cont. (2026-09-24):** slices 8–15 are committed, one per slice (`bf811766` heal,
+`307e15b5` and `ccf36716` next-turn markers, `baac3e90` counter spread, `e064973c` conditional
+status, `c39bd4e7` hand discard and Lost Zone, `a720f848` D executors, `bbf1b5d1` Supporter
+effect, rest-of-game effects and copy variants). Each slice passed the full suite (only the known
+card-inspector-model failure) and `pnpm audit:oracle`. The design 036 Deviations section records
+per-slice notes and residuals (I139–I141). Next: slice 16 (regression gate, close I136/I137).
+The sections below describe the S284 stop and are kept as history.
+
 ## Where you are
 
 - Branch `feature/attack-behaviour` (this branch), base `main` `7baf0c9e`. Worktree used:
