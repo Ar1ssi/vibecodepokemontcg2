@@ -130,6 +130,7 @@ client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary 
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
 client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
+client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native HTML5 card drag/drop; the dragged card is drawn as a swinging body-level avatar (design 038, D123; physics pure in drag-tilt.mjs)
 
 ## Tests & tooling
 client/src/**/__tests__/*.mjs — plain `node --test`, no jsdom; `pnpm test` (1223 tests, S85)

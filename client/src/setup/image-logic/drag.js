@@ -16,6 +16,7 @@ import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 import { zoneOf } from './drop-zone.mjs';
+import { endDragAvatar, startDragAvatar } from './drag-avatar.js';
 
 const popupContainers = [
   'lostZone',
@@ -69,6 +70,7 @@ export const dragStart = (event) => {
     mouseClick.playContainerParent = dragHost.parentElement;
     mouseClick.playContainer.style.opacity = '0';
   }
+  startDragAvatar(event);
 };
 
 export const dragOver = (event) => {
@@ -179,6 +181,7 @@ export const dragLeave = (event) => {
 };
 
 export const dragEnd = (event) => {
+  endDragAvatar(event);
   const enablePointerEvents = (containerDocument, classNames) => {
     const counters = containerDocument.getElementsByClassName(...classNames);
     for (let i = 0; i < counters.length; i++) {

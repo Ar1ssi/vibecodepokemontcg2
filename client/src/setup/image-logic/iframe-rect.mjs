@@ -29,6 +29,24 @@ export const parseTransformOrigin = (origin, fallback) => {
 };
 
 /**
+ * Project an iframe-local client point (e.g. a dragover's clientX/Y) onto the
+ * parent viewport. Same frame description as mapIframeLocalToViewport.
+ */
+export const mapIframePointToViewport = (
+  point,
+  frameRect,
+  matrix = IDENTITY_MATRIX,
+  origin = { x: frameRect.width / 2, y: frameRect.height / 2 }
+) => {
+  const px = point.x - origin.x;
+  const py = point.y - origin.y;
+  return {
+    x: frameRect.left + matrix.a * px + matrix.c * py + matrix.e + origin.x,
+    y: frameRect.top + matrix.b * px + matrix.d * py + matrix.f + origin.y,
+  };
+};
+
+/**
  * Project an iframe-local getBoundingClientRect onto the parent viewport.
  * `frameRect` is the iframe element's parent-viewport AABB.
  * `matrix` / `origin` describe the iframe's CSS transform (default: identity
@@ -40,14 +58,8 @@ export const mapIframeLocalToViewport = (
   matrix = IDENTITY_MATRIX,
   origin = { x: frameRect.width / 2, y: frameRect.height / 2 }
 ) => {
-  const map = (x, y) => {
-    const px = x - origin.x;
-    const py = y - origin.y;
-    return {
-      x: frameRect.left + matrix.a * px + matrix.c * py + matrix.e + origin.x,
-      y: frameRect.top + matrix.b * px + matrix.d * py + matrix.f + origin.y,
-    };
-  };
+  const map = (x, y) =>
+    mapIframePointToViewport({ x, y }, frameRect, matrix, origin);
   const corners = [
     map(local.left, local.top),
     map(local.left + local.width, local.top),

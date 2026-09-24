@@ -4,6 +4,7 @@ import {
   FLIP_180_MATRIX,
   IDENTITY_MATRIX,
   mapIframeLocalToViewport,
+  mapIframePointToViewport,
   parseCssMatrix,
   parseTransformOrigin,
 } from '../iframe-rect.mjs';
@@ -68,4 +69,25 @@ test('P1 and P2 decks stay on opposite sides of the center seam', () => {
   assert.ok(p2.left < 200, 'P2 deck stays on the left');
   assert.ok(p2.top < 400, 'P2 deck stays on the opp half');
   assert.ok(p2.top > 200, 'P2 deck is near the seam, not the far edge');
+});
+
+test('a drag pointer in either iframe maps onto the parent viewport', () => {
+  // Near (self) frame: plain offset.
+  assert.deepEqual(
+    mapIframePointToViewport({ x: 10, y: 20 }, selfFrame, IDENTITY_MATRIX),
+    { x: 10, y: 420 }
+  );
+  // Far (opp) frame, flipped 180° about its center: local top-left is the
+  // visual bottom-right, next to the seam.
+  assert.deepEqual(
+    mapIframePointToViewport({ x: 10, y: 20 }, oppFrame, FLIP_180_MATRIX),
+    { x: 790, y: 380 }
+  );
+  // The rect mapper agrees with the point mapper on a zero-size rect.
+  const rect = mapIframeLocalToViewport(
+    { left: 10, top: 20, width: 0, height: 0 },
+    oppFrame,
+    FLIP_180_MATRIX
+  );
+  assert.deepEqual({ x: rect.left, y: rect.top }, { x: 790, y: 380 });
 });

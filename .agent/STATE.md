@@ -5,11 +5,12 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 281
-Focus: S281 feature: Tera entry + crystal skin take the card's type colour (D122, design 037 amendment).
+Session: 282
+Focus: S282 feature: dragged card swings with the pointer like TCG Live (design 038, D123), no resize.
 Active: none.
-Next: maintenance due (S270 and S280, still not run). User visual check of typed Tera entry/skin, Mega vortex
-  in a real rules-mode game.
+Next: maintenance due (S270, S280, still not run; MAP.md is 150/120 lines, needs area-doc collapse). User visual
+  check of the drag swing on a real deck (sandbox has no card art); Firefox/Safari drag untested.
+  User visual check of typed Tera entry/skin, Mega vortex in a real rules-mode game.
   I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
   leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
   Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
@@ -26,12 +27,15 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   playmat iframes (css/mat-ambient.css); `.card` is preserve-3d, so layer order inside a holo wrapper needs translateZ,
   not z-index. Holo wrappers need TCGdex (unreachable in the sandbox): emulate with buildHoloCard + `holo-wrapper-changed`.
   To eyeball an effect: Playwright on /?e2e=1, pause `document.getAnimations()`, step `currentTime`, wait 2 rAFs, screenshot.
+- Sandbox Playwright: launch with executablePath /opt/pw-browsers/chromium; fulfill cdn.socket.io from the server's
+  /socket.io/socket.io.min.js (saved to a file); fixture deck loads flake, so retry. Real-mouse 2P drag harness: S282 journal.
 - Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…".
   ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S282 Dragged card = opaque body-level avatar that rolls into horizontal motion (≤14°, springy settle), native DnD
+  untouched; cancelled drags fly home; FX-off → native ghost.
 - S281 Tera crystal (entry prisms/floor/burst + lasting skin tint/facets/rim/glints) is the card's type colour;
   Colorless/unknown stays icy; orb, flash, jewel, rainbow universal.
 - S280 Mega vortex = 3D brush strokes behind/in front of the card; Tera entry = S/V canvas Terastallization; Tera Pokémon
   keep a crystal skin while in play.
-- S279 Mega orb is a 3D canvas shell (mega-orb.mjs): white-hot sphere → faceted cracked shell → perspective shatter.

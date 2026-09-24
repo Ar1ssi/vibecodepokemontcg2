@@ -5759,3 +5759,24 @@ body.sidebox-hidden #lostZoneRail {
     transition: none;
   }
 }
+
+/* Design 038: the dragged card (drag-avatar.js). A body-level copy so it can
+   cross both playmat iframes; above every popup because it is under the
+   pointer. Pointer-transparent, or it would swallow the dragover/drop hits. */
+img.drag-avatar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  margin: 0;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  border-radius: 4.55% / 3.5%;
+  box-shadow:
+    0 16px 28px rgba(0, 0, 0, 0.45),
+    0 4px 10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  user-select: none;
+  z-index: 100001;
+  will-change: transform;
+}
