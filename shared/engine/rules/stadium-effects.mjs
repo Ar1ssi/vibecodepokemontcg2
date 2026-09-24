@@ -6,11 +6,8 @@
 // `ability-executors.mjs`.
 
 import { rulesState, getStadium } from './rules-state.mjs';
-import {
-  attachedTools,
-  parseHpBonus,
-  applyHpBonus,
-} from './ability-executors.mjs';
+import { attachedTools, applyHpBonus } from './ability-executors.mjs';
+import { toolHpBonusFor } from './tool-conditions.mjs';
 import { pokemonNamesMatch, normalizeStage } from './evolution.mjs';
 import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
@@ -1565,8 +1562,9 @@ export function effectiveHp(
     ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)
     : stadiumBlocksToolEffects();
   if (zoneCards?.length && pokemon && !blockTools) {
+    const holder = topPokemonCard(zoneCards, pokemon) || pokemon;
     for (const tool of attachedTools(pokemon, zoneCards)) {
-      total = applyHpBonus(total, parseHpBonus(tool).bonus);
+      total = applyHpBonus(total, toolHpBonusFor(tool, { holder, zoneCards }));
     }
   }
   return Math.max(1, total);

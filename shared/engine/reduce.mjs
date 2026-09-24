@@ -22,7 +22,7 @@ import {
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { setupGame } from './setup.mjs';
-import { createRng } from './rng.mjs';
+import { createRng, shuffleInPlace } from './rng.mjs';
 import {
   computeAttackDamage,
   expandEnergyEntries,
@@ -44,11 +44,13 @@ import {
   returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
+import { parseGrantedAttacks } from './rules/tool-attacks.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
 import {
   evaluateToolKoPrevention,
   toolPrizeCountAdjust,
   attachedToolOnDamageEffects,
+  attachedToolOnKoEffects,
   combinedToolRetreatCost,
   isPokemonToolCard,
   attachedTools,
@@ -67,7 +69,23 @@ import {
   passiveCostDiscount,
   applyCostDiscount,
   teamNoRetreatCostForActive,
+  parsePrizeModify,
 } from './rules/ability-executors.mjs';
+import { parseToolCondition, toolConditionMet } from './rules/tool-conditions.mjs';
+import {
+  stadiumOnAttachTriggers,
+  stadiumOnEvolveTriggers,
+  stadiumOnBenchTriggers,
+  stadiumCheckupCoinModifiers,
+  stadiumRetreatCoin,
+  stadiumTrainerPlayCoin,
+  stadiumAttackCoinModifier,
+} from './rules/stadium-triggers.mjs';
+import {
+  applyStadiumTriggerEffect,
+  applyStadiumSwitchTriggers,
+} from './effects/stadium-trigger-apply.mjs';
+import { classifyEnergyEffect } from './rules/energy-effects.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
@@ -394,6 +412,7 @@ function damageBenchedPokemon(
       attackerPlayerId,
       victim,
       events,
+      byAttack: true,
     });
   }
 }
@@ -477,6 +496,7 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, events 
       attackerPlayerId,
       victim,
       events,
+      byAttack: true,
     });
   }
   return amount;
@@ -504,6 +524,7 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       stadium: draft.stadium,
       defenderIsActive: true,
       baseDamage: clause.amount,
+      defenderPrizesRemaining: (defenderPlayer?.zones?.prizes || []).length,
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
       ...clause.immunity,
       defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
@@ -656,6 +677,12 @@ function inPlayView(state, card) {
   return Array.isArray(zone) ? evolvedView(zone, card) : card;
 }
 
+// The bench zone of the player's first Benched Pokémon (Handheld Fan's destination).
+function firstBenchRootZone(state, playerId) {
+  const bench = state.players?.[playerId]?.zones?.bench || [];
+  return bench.some((c) => !c.attachedTo) ? bench : null;
+}
+
 // Extra attacks a Stadium makes usable by this Pokémon (Shrine of Memories /
 // Meteor Falls inheritance, Holon Lake / Rocket's Tricky Gym grants). Order is
 // shared with the client's list builders, so an attackIndex resolves alike.
@@ -672,10 +699,28 @@ function stadiumExtraAttacksFor(state, card, { isActive = true } = {}) {
   });
 }
 
+// Attacks a Pokémon Tool grants to the Pokémon it is attached to (TM/Cube Items,
+// design 035 slice 7). Read from the same zone stack the tool lives in.
+function toolGrantedAttacksFor(state, card) {
+  if (!card) return [];
+  const ref = findCard(state, card.instanceId);
+  const zone = ref?.player?.zones?.[ref.zoneId];
+  if (!Array.isArray(zone)) return [];
+  const out = [];
+  for (const attached of zone) {
+    if (attached.attachedTo !== card.instanceId) continue;
+    out.push(...parseGrantedAttacks(attached));
+  }
+  return out;
+}
+
 // `inPlayView` with Stadium extras merged into its attacks list.
 function attackViewFor(state, card, { isActive = true } = {}) {
   const view = inPlayView(state, card);
-  const extras = stadiumExtraAttacksFor(state, card, { isActive });
+  const extras = mergeAttacks(
+    stadiumExtraAttacksFor(state, card, { isActive }),
+    toolGrantedAttacksFor(state, card)
+  );
   if (extras.length === 0) return view;
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
 }
@@ -740,6 +785,145 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   return Math.max(0, cost);
 }
 
+// On-Knock-Out Tool effects (design 035 slice 9): return-to-hand, Prize denial,
+// Energy moves, opponent mill, KO search and draw-to-N. Runs before the victim's
+// discard sweep so Energy still attached can be moved.
+function applyToolOnKoEffects(
+  draft,
+  { victimPlayerId, attackerPlayerId, victim, effects, activeRng, events }
+) {
+  const victimPlayer = draft.players[victimPlayerId];
+  const attacker = draft.players[attackerPlayerId];
+  const outcome = { returnToHand: false, discardPrizes: false };
+  if (!victimPlayer || !Array.isArray(effects) || effects.length === 0) return outcome;
+
+  const firstBench = (player) =>
+    (player?.zones?.bench || []).find((c) => !c.attachedTo) || null;
+  const moveCard = (owner, card, fromZone, toZone, toLabel, newHostId = null) => {
+    const idx = fromZone.indexOf(card);
+    if (idx < 0) return;
+    fromZone.splice(idx, 1);
+    card.attachedTo = newHostId;
+    toZone.push(card);
+    events.push({
+      type: 'cardMoved',
+      instanceId: card.instanceId,
+      from: 'inPlay',
+      to: toLabel,
+      playerId: owner.playerId,
+    });
+  };
+
+  for (const eff of effects) {
+    if (eff.returnSelfToHand) outcome.returnToHand = true;
+    if (eff.discardPrizes) outcome.discardPrizes = true;
+
+    if (eff.moveEnergyOnKo) {
+      const spec = eff.moveEnergyOnKo;
+      const sourceRoot =
+        spec.from === 'attacker'
+          ? attacker?.zones?.active?.find((c) => !c.attachedTo)
+          : victim;
+      const srcRef = sourceRoot ? findCard(draft, sourceRoot.instanceId) : null;
+      const sourceZone = srcRef?.player?.zones?.[srcRef.zoneId] || [];
+      const pool = sourceZone.filter(
+        (c) =>
+          c.attachedTo === sourceRoot?.instanceId &&
+          isEnergy(c) &&
+          (!spec.basicOnly || classifyEnergyEffect(c) === 'basic')
+      );
+      const count = spec.count === 'all' ? pool.length : Math.min(spec.count, pool.length);
+      for (const energy of pool.slice(0, count)) {
+        if (spec.to === 'hand') {
+          moveCard(victimPlayer, energy, sourceZone, victimPlayer.zones.hand, 'hand');
+        } else if (spec.to === 'holder') {
+          // Exp. Share: the Tool's own Pokémon receives the Energy. A holder that is
+          // the victim itself has nothing to move to.
+          if (!eff.holder || eff.holder.instanceId === victim.instanceId) continue;
+          const holderRef = findCard(draft, eff.holder.instanceId);
+          const holderZone = holderRef?.player?.zones?.[holderRef.zoneId];
+          if (!Array.isArray(holderZone)) continue;
+          moveCard(victimPlayer, energy, sourceZone, holderZone, holderRef.zoneId, eff.holder.instanceId);
+        } else if (spec.to === 'bench') {
+          const bench = firstBench(victimPlayer);
+          if (!bench || bench.instanceId === victim.instanceId) continue;
+          const benchRef = findCard(draft, bench.instanceId);
+          moveCard(victimPlayer, energy, sourceZone, benchRef.player.zones.bench, 'bench', bench.instanceId);
+        } else if (spec.to === 'opponentHand') {
+          if (!attacker) continue;
+          moveCard(attacker, energy, sourceZone, attacker.zones.hand, 'hand');
+        } else if (spec.to === 'opponentBench') {
+          const bench = firstBench(attacker);
+          if (!bench) continue;
+          const benchRef = findCard(draft, bench.instanceId);
+          moveCard(attacker, energy, sourceZone, benchRef.player.zones.bench, 'bench', bench.instanceId);
+        }
+      }
+    }
+
+    if (eff.millOpponent && attacker) {
+      if (eff.millOpponent.deck > 0) {
+        const milled = attacker.zones.deck.splice(
+          0,
+          Math.min(eff.millOpponent.deck, attacker.zones.deck.length)
+        );
+        for (const card of milled) discardCardToPlayerZone(attacker, card);
+        if (milled.length) {
+          events.push({
+            type: 'cardsDiscarded',
+            playerId: attacker.playerId,
+            cards: milled.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+          });
+        }
+      }
+      if (eff.millOpponent.handRandom > 0 && activeRng && attacker.zones.hand.length > 0) {
+        const idx = Math.floor(activeRng.next() * attacker.zones.hand.length);
+        const [card] = attacker.zones.hand.splice(idx, 1);
+        discardCardToPlayerZone(attacker, card);
+        events.push({
+          type: 'cardsDiscarded',
+          playerId: attacker.playerId,
+          cards: [{ instanceId: card.instanceId, name: card.name }],
+        });
+      }
+    }
+
+    if (eff.searchDeckOnKo > 0) {
+      const deck = victimPlayer.zones.deck || [];
+      const taken = deck.splice(0, Math.min(eff.searchDeckOnKo, deck.length));
+      victimPlayer.zones.hand.push(...taken);
+      if (activeRng) shuffleInPlace(activeRng, deck);
+      if (taken.length) {
+        events.push({
+          type: 'cardsRevealed',
+          playerId: victimPlayerId,
+          cards: taken.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+        });
+      }
+    }
+
+    if (eff.drawUntil > 0) {
+      const hand = victimPlayer.zones.hand;
+      const need = Math.max(0, eff.drawUntil - hand.length);
+      const drawn = victimPlayer.zones.deck.splice(
+        0,
+        Math.min(need, victimPlayer.zones.deck.length)
+      );
+      hand.push(...drawn);
+      if (drawn.length) {
+        events.push({
+          type: 'cardsDrawn',
+          count: drawn.length,
+          playerId: victimPlayerId,
+          cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+        });
+      }
+    }
+  }
+
+  return outcome;
+}
+
 /**
  * Handles Knockout resolution for a Pokemon:
  * - Grants the attacker a prize entitlement, settled by collectPrizeEntitlement
@@ -751,7 +935,7 @@ function computeEffectiveRetreatCost(state, card, playerId) {
  */
 function handleKnockout(
   draft,
-  { victimPlayerId, attackerPlayerId, victim, events }
+  { victimPlayerId, attackerPlayerId, victim, events, byAttack = false, activeRng = null }
 ) {
   // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
@@ -772,6 +956,25 @@ function handleKnockout(
       ? victimBench
       : [victim];
 
+  const attacker = draft.players[attackerPlayerId];
+  const attackerActive = attacker?.zones?.active?.find((c) => !c.attachedTo);
+  // On-KO Tool effects run before the discard sweep so Energy still attached to the
+  // victim can be moved (Exp. Share, Energy Pouch, Rescue Scarf's return to hand).
+  const koToolEffects = byAttack
+    ? attachedToolOnKoEffects(victimPlayer, victim, {
+        stadium: draft.stadium,
+        isActive: wasActive,
+      })
+    : [];
+  const koToolOutcome = applyToolOnKoEffects(draft, {
+    victimPlayerId,
+    attackerPlayerId,
+    victim,
+    effects: koToolEffects,
+    activeRng,
+    events,
+  });
+
   const basePrizeCount = prizesForKO(inPlayView(draft, victim));
   // Legacy Energy: the once-per-game reduction may already be spent.
   const legacyEnergyAttached = victimZoneCards.some(
@@ -788,6 +991,13 @@ function handleKnockout(
     {
       stadium: draft.stadium,
       skipSpecialEnergy: legacyUsed,
+      holder: inPlayView(draft, victim),
+      flags: {
+        prizesRemaining: (victimPlayer?.zones?.prizes || []).length,
+        trailingPrizes:
+          (victimPlayer?.zones?.prizes || []).length >
+          (draft.players[attackerPlayerId]?.zones?.prizes || []).length,
+      },
     }
   );
   if (legacyEnergyAttached && !legacyUsed) {
@@ -795,10 +1005,28 @@ function handleKnockout(
     victimPlayer.flags.legacyPrizeReductionUsed = true;
   }
 
-  const attacker = draft.players[attackerPlayerId];
+  // Billowing Smoke: the attacker discards the Prizes instead of taking them.
+  if (koToolOutcome.discardPrizes) prizeCount = 0;
+
+  // Attacker-side on-KO Prize clause (Beast Bringer): the Tool sits on the attacker,
+  // so the victim-side scan above never sees it.
+  if (attackerActive) {
+    const attackerZone = attacker.zones.active || [];
+    const attackerCtx = {
+      holder: inPlayView(draft, attackerActive),
+      defender: inPlayView(draft, victim),
+      zoneCards: attackerZone,
+      flags: { prizesRemaining: (attacker.zones.prizes || []).length },
+    };
+    for (const tool of attachedTools(attackerActive, attackerZone)) {
+      if (!toolConditionMet(parseToolCondition(tool), attackerCtx)) continue;
+      const delta = parsePrizeModify(tool).delta;
+      if (delta) prizeCount = Math.max(0, prizeCount + delta);
+    }
+  }
+
   if (attacker?.flags?.briarActive) {
     const victimIsEx = isExCard(victim);
-    const attackerActive = attacker?.zones?.active?.find((c) => !c.attachedTo);
     if (victimIsEx && attackerActive && isTeraCard(attackerActive)) {
       prizeCount += 1;
     }
@@ -856,7 +1084,10 @@ function handleKnockout(
             victimPlayer.zones.lostZone = [];
           }
           victimPlayer.zones.lostZone.push(c);
-        } else if (koSpecial.returnToHand && c.instanceId === victim.instanceId) {
+        } else if (
+          (koSpecial.returnToHand || koToolOutcome.returnToHand) &&
+          c.instanceId === victim.instanceId
+        ) {
           victimPlayer.zones.hand.push(c);
           events.push({
             type: 'cardMoved',
@@ -1143,6 +1374,30 @@ function resolveDeferredKnockouts(draft, { events }) {
   }
 }
 
+// TM/Cube Items (design 035 slice 7): "At the end of your turn, discard <tool>."
+// The sweep runs for the player whose turn is ending, after Pokémon Checkup.
+function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
+  const player = draft.players?.[endingPlayerId];
+  if (!player) return;
+  for (const zoneId of ['active', 'bench']) {
+    const zone = player.zones?.[zoneId] || [];
+    for (const card of [...zone]) {
+      if (!card.attachedTo || !card.discardAtEndOfTurn) continue;
+      zone.splice(zone.indexOf(card), 1);
+      card.attachedTo = null;
+      delete card.discardAtEndOfTurn;
+      const to = discardCardToPlayerZone(player, card);
+      events.push({
+        type: 'cardMoved',
+        instanceId: card.instanceId,
+        from: zoneId,
+        to,
+        playerId: player.playerId,
+      });
+    }
+  }
+}
+
 function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
@@ -1177,15 +1432,25 @@ function resolveCheckup(
       });
     };
 
+    const checkupStadium = draft.stadium?.card || draft.stadium;
     if (hasCondition(active, 'Poisoned')) {
       checkupDamage('Poisoned', 10);
     }
     if (hasCondition(active, 'Burned')) {
       checkupDamage('Burned', 20);
-      if (flip() === 'heads') cleared('Burned');
+      // Wela Volcano Park: the Burned flip happens but can't remove the condition.
+      const burnedMods = stadiumCheckupCoinModifiers(checkupStadium, { condition: 'Burned' });
+      if (flip() === 'heads' && !burnedMods?.burnedPersists) cleared('Burned');
     }
     if (hasCondition(active, 'Asleep')) {
-      if (flip() === 'heads') cleared('Asleep');
+      // Slumbering Forest: 2 coins instead of 1; either tails keeps it Asleep.
+      const asleepMods = stadiumCheckupCoinModifiers(checkupStadium, { condition: 'Asleep' });
+      const asleepFlips = asleepMods?.asleepFlips ?? 1;
+      let asleepHeads = 0;
+      for (let i = 0; i < asleepFlips; i++) {
+        if (flip() === 'heads') asleepHeads++;
+      }
+      if (asleepHeads === asleepFlips) cleared('Asleep');
     }
     // Under official Pokémon TCG rules, Paralysis is only cured at the end of that player's turn.
     if (
@@ -1213,6 +1478,9 @@ function resolveCheckup(
   // End-of-turn special-energy effects (legacy Darkness Energy): "at the end of
   // every turn" applies to both players' in-play Pokémon.
   runEndOfTurnSpecialEnergies(draft, { events });
+
+  // "At the end of your turn, discard …" Tools (TM/Cube Items).
+  discardEndOfTurnTools(draft, { endingPlayerId, events });
 }
 
 /**
@@ -1504,6 +1772,18 @@ function applyRetreatSwap(
         player.zones.active.push(c);
       }
     }
+
+    // Stadium on-switch triggers (Spikemuth: damage the Pokémon moving to the
+    // Bench) run before the outgoing Pokémon's conditions are cleared.
+    applyStadiumSwitchTriggers(draft, {
+      switchedOut: active,
+      switchedIn: benchPokemon,
+      switchedOutPlayerId: playerId,
+      switchedInPlayerId: playerId,
+      viaTrainer: false,
+      duringOwnersTurn: true,
+      events,
+    });
 
     clearConditions(active);
     delete active.cannotAttackUntilTurn;
@@ -3798,6 +4078,7 @@ function resolveAttackEffectPhase(draft, ctx) {
 
       let dmgDealt = 0;
       let weaknessApplied = false;
+      let stadiumSelfDamage = 0;
       if (attacker && defender) {
         const defenderView = inPlayView(draft, defender);
         const attackerView = inPlayView(draft, attacker);
@@ -3812,6 +4093,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         const oppPrizes = (draft.players[defenderPlayerId]?.zones?.prizes || [])
           .length;
         const attackerTrailingPrizes = myPrizes > oppPrizes;
+        const defenderTrailingPrizes = oppPrizes > myPrizes;
         const defenderPoisoned = hasCondition(defender, 'Poisoned');
 
         const dmgResult = computeAttackDamage(
@@ -3825,6 +4107,9 @@ function resolveAttackEffectPhase(draft, ctx) {
             stadium: draft.stadium,
             defenderIsActive: true,
             attackerTrailingPrizes,
+            defenderTrailingPrizes,
+            attackerPrizesRemaining: myPrizes,
+            defenderPrizesRemaining: oppPrizes,
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
@@ -3835,6 +4120,24 @@ function resolveAttackEffectPhase(draft, ctx) {
         );
         dmgDealt = dmgResult.total;
         weaknessApplied = dmgResult.multiplier > 1 || dmgResult.flat > 0;
+
+        // Vermilion City Gym: Lt. Surge's Pokémon flip when attacking. Heads adds
+        // 10 damage after Weakness/Resistance when the attack does damage; tails
+        // deals 10 to the attacker in addition to the attack. The printed "may
+        // flip" is auto-flipped (no optional-coin protocol exists).
+        const vermilion = stadiumAttackCoinModifier(
+          draft.stadium?.card || draft.stadium,
+          { attacker: attackerView }
+        );
+        if (vermilion) {
+          const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+          events.push({ type: 'coinFlipped', playerId, face, source: vermilion.source });
+          if (face === 'heads') {
+            if (dmgDealt > 0) dmgDealt += vermilion.headsBonus;
+          } else {
+            stadiumSelfDamage = vermilion.tailsSelfDamage;
+          }
+        }
 
         if (dmgResult.prevented) {
           events.push({
@@ -3849,6 +4152,16 @@ function resolveAttackEffectPhase(draft, ctx) {
         const defenderMarkers = activeAttackMarkers(draft, defenderPlayerId, defender);
         const retaliations = defenderMarkers.filter((m) => m.kind === 'retaliate');
         const surviveOnHeads = defenderMarkers.some((m) => m.kind === 'surviveKnockOutCoin');
+
+        // Snapshot the reactive Tools before a Knock Out discards them: the "even if
+        // Knocked Out" wordings (Team Rocket's Hypnotizer, Handheld Fan) still resolve.
+        const reactiveToolEffects =
+          dmgDealt > 0 && !dmgResult.prevented
+            ? attachedToolOnDamageEffects(defender, defenderZoneCards, {
+                stadium: draft.stadium,
+                isActive: true,
+              })
+            : [];
 
         if (dmgDealt > 0) {
           // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
@@ -3879,6 +4192,9 @@ function resolveAttackEffectPhase(draft, ctx) {
                 baseHp: koHp,
                 stadium: draft.stadium,
                 inHp: true,
+                // Focus Band: the flip is consumed only when a coin-flip candidate is
+                // actually evaluated, so seeded RNG streams stay untouched otherwise.
+                flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails'),
               }
             );
 
@@ -3891,6 +4207,9 @@ function resolveAttackEffectPhase(draft, ctx) {
                 dealt: dmgDealt,
                 ...(weaknessApplied && { weakness: true }),
               });
+              if (koEval.coinFace) {
+                events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face: koEval.coinFace });
+              }
               events.push({
                 type: 'koPrevented',
                 instanceId: defender.instanceId,
@@ -3929,6 +4248,8 @@ function resolveAttackEffectPhase(draft, ctx) {
                 attackerPlayerId: playerId,
                 victim: defender,
                 events,
+                byAttack: true,
+                activeRng,
               });
             }
           } else {
@@ -3946,14 +4267,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         // Reactive tool effects & Thorns on damage (if damage > 0 and not prevented)
         if (dmgDealt > 0 && !dmgResult.prevented && attacker) {
           let thornsDamage = 0;
-          const toolEffects = attachedToolOnDamageEffects(
-            defender,
-            defenderZoneCards,
-            {
-              stadium: draft.stadium,
-              isActive: true,
-            }
-          );
+          const toolEffects = reactiveToolEffects;
           for (const eff of toolEffects) {
             if (eff.damageAttacker > 0) {
               thornsDamage += eff.damageAttacker * 10;
@@ -3973,6 +4287,57 @@ function resolveAttackEffectPhase(draft, ctx) {
                   playerId: defenderPlayerId,
                   count: eff.draw,
                   source: eff.tool?.name || 'Tool',
+                });
+              }
+            }
+            if (eff.drawUntil > 0) {
+              const defPlayer = draft.players[defenderPlayerId];
+              const hand = defPlayer?.zones?.hand || [];
+              const need = Math.max(0, eff.drawUntil - hand.length);
+              const drawn = (defPlayer?.zones?.deck || []).splice(
+                0,
+                Math.min(need, defPlayer?.zones?.deck?.length || 0)
+              );
+              hand.push(...drawn);
+              if (drawn.length) {
+                events.push({
+                  type: 'cardsDrawn',
+                  playerId: defenderPlayerId,
+                  count: drawn.length,
+                  source: eff.tool?.name || 'Tool',
+                });
+              }
+            }
+            // Team Rocket's Hypnotizer: the Attacking Pokémon is now Asleep.
+            if (eff.statusAttacker && attacker) {
+              addCondition(attacker, eff.statusAttacker);
+              events.push({
+                type: 'statusApplied',
+                playerId,
+                instanceId: attacker.instanceId,
+                condition: eff.statusAttacker,
+              });
+            }
+            // Handheld Fan / Rugged Helmet move an Energy off the Attacking Pokémon.
+            if (eff.moveEnergyOnKo?.from === 'attacker' && attacker) {
+              const attackerZone = draft.players[playerId]?.zones?.active || [];
+              const energy = attackerZone.find(
+                (c) => c.attachedTo === attacker.instanceId && isEnergy(c)
+              );
+              const benchZone = firstBenchRootZone(draft, playerId);
+              const benchRoot = benchZone?.find((c) => !c.attachedTo) || null;
+              const toHand = eff.moveEnergyOnKo.to === 'opponentHand';
+              const dest = toHand ? attacker.zones.hand : benchZone;
+              if (energy && dest) {
+                attackerZone.splice(attackerZone.indexOf(energy), 1);
+                energy.attachedTo = toHand ? null : benchRoot?.instanceId ?? null;
+                dest.push(energy);
+                events.push({
+                  type: 'cardMoved',
+                  instanceId: energy.instanceId,
+                  from: 'inPlay',
+                  to: toHand ? 'hand' : 'bench',
+                  playerId,
                 });
               }
             }
@@ -4006,6 +4371,8 @@ function resolveAttackEffectPhase(draft, ctx) {
                 attackerPlayerId: defenderPlayerId,
                 victim: attacker,
                 events,
+                byAttack: true,
+                activeRng,
               });
             }
           }
@@ -4023,15 +4390,17 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
       }
 
-      // Recoil: printed damage the attack deals to its own Pokémon. A recoil KO hands the
-      // prize entitlement to the DEFENDING player.
-      if (parsed.selfDamage > 0 && attacker) {
-        attacker.damage = (attacker.damage || 0) + parsed.selfDamage;
+      // Recoil: printed damage the attack deals to its own Pokémon (plus a
+      // Vermilion City Gym tails). A recoil KO hands the prize entitlement to the
+      // DEFENDING player.
+      const selfDamage = parsed.selfDamage + stadiumSelfDamage;
+      if (selfDamage > 0 && attacker) {
+        attacker.damage = (attacker.damage || 0) + selfDamage;
         events.push({
           type: 'damageUpdated',
           instanceId: attacker.instanceId,
           damage: attacker.damage,
-          dealt: parsed.selfDamage,
+          dealt: selfDamage,
         });
         const selfKoHp = cardEffectiveHp(draft, attacker, playerId);
         if (selfKoHp > 0 && attacker.damage >= selfKoHp) {
@@ -4040,6 +4409,8 @@ function resolveAttackEffectPhase(draft, ctx) {
             attackerPlayerId: oppId,
             victim: attacker,
             events,
+            byAttack: true,
+            activeRng,
           });
         }
       }
@@ -4769,6 +5140,25 @@ export function applyCommand(state, command, rng = null) {
           // Only a hand→Bench play opens a "when you play onto your Bench" trigger.
           if (payload.from === 'hand' && payload.to === 'bench') {
             card.playedToBenchTurn = draft.turn.number;
+            const benchStadium = draft.stadium?.card || draft.stadium;
+            for (const effect of stadiumOnBenchTriggers(benchStadium, { pokemon: card })) {
+              // Rocket's Minefield Gym: only tails puts the counters on.
+              if (effect.coin) {
+                const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+                events.push({
+                  type: 'coinFlipped',
+                  playerId,
+                  face,
+                  source: effect.source,
+                });
+                if (face !== effect.coin) continue;
+              }
+              applyStadiumTriggerEffect(draft, effect, {
+                host: card,
+                hostPlayerId: playerId,
+                events,
+              });
+            }
           } else {
             delete card.playedToBenchTurn;
           }
@@ -4926,6 +5316,19 @@ export function applyCommand(state, command, rng = null) {
             events,
           });
 
+          // Stadium on-evolve triggers (Po Town, Galactic HQ, Wyndon, Battle Tower).
+          const evolveStadium = draft.stadium?.card || draft.stadium;
+          for (const effect of stadiumOnEvolveTriggers(evolveStadium, {
+            evolvedCard: cardRef.card,
+            hostTop: inPlayView(draft, hostRef.card),
+          })) {
+            applyStadiumTriggerEffect(draft, effect, {
+              host: hostRef.card,
+              hostPlayerId: hostRef.playerId,
+              events,
+            });
+          }
+
           // Gen 6 Mega Evolution / Primal Reversion: the evolve ends the turn
           // immediately unless the matching Spirit Link is already attached
           // (rulebook 30c 1.4). The reducer is the authority; the client only
@@ -4988,6 +5391,22 @@ export function applyCommand(state, command, rng = null) {
             fromZone: cardRef.zoneId,
             events,
           });
+        }
+
+        // Stadium on-attach triggers (Calamitous Snowy Mountain, Frozen City,
+        // Old Cemetery, Dawn Stadium, Island Cave) — any Energy from hand.
+        if (isEnergy(cardRef.card) && cardRef.zoneId === 'hand') {
+          const attachStadium = draft.stadium?.card || draft.stadium;
+          for (const effect of stadiumOnAttachTriggers(attachStadium, {
+            hostTop: inPlayView(draft, hostRef.card),
+            fromZone: cardRef.zoneId,
+          })) {
+            applyStadiumTriggerEffect(draft, effect, {
+              host: hostRef.card,
+              hostPlayerId: hostRef.playerId,
+              events,
+            });
+          }
         }
       }
       break;
@@ -5266,6 +5685,25 @@ export function applyCommand(state, command, rng = null) {
         (c) => !c.attachedTo
       );
 
+      // Mirage Stadium: the retreat costs a coin flip. Tails leaves the Active
+      // unable to retreat this turn and no Energy is discarded.
+      const mirage = stadiumRetreatCoin(draft.stadium?.card || draft.stadium);
+      if (mirage) {
+        const activeMon = (player?.zones?.active || []).find((c) => !c.attachedTo);
+        const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        events.push({ type: 'coinFlipped', playerId, face, source: mirage.source });
+        if (face === 'tails') {
+          if (activeMon) activeMon.cannotRetreatUntilTurn = draft.turn.number;
+          events.push({
+            type: 'retreatBlocked',
+            playerId,
+            instanceId: activeMon?.instanceId ?? null,
+            source: mirage.source,
+          });
+          break;
+        }
+      }
+
       // 2+ Benched Pokémon and no explicit target: suspend and let the player
       // click the one to switch in (server mat picker, D19). Legality has
       // already guaranteed at least one valid bench target.
@@ -5404,6 +5842,43 @@ export function applyCommand(state, command, rng = null) {
     case 'playTrainer': {
       const cardRef = findCard(draft, payload.instanceId);
       if (cardRef) {
+        // Chaos Gym: every Trainer card other than a Stadium is coin-gated. Tails
+        // means it can't be played; either way the card goes to the discard pile.
+        // (The printed "opponent may use that card instead" clause is not implemented.)
+        const chaos = stadiumTrainerPlayCoin(
+          draft.stadium?.card || draft.stadium,
+          cardRef.card
+        );
+        if (chaos) {
+          const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+          events.push({ type: 'coinFlipped', playerId, face, source: chaos.source });
+          if (face === 'tails') {
+            const hand = draft.players[playerId].zones.hand;
+            const handIdx = hand.findIndex(
+              (c) => c.instanceId === cardRef.card.instanceId
+            );
+            if (handIdx >= 0) {
+              const [blocked] = hand.splice(handIdx, 1);
+              blocked.attachedTo = null;
+              discardCardToPlayerZone(draft.players[playerId], blocked);
+              events.push({
+                type: 'cardMoved',
+                instanceId: blocked.instanceId,
+                from: 'hand',
+                to: 'discard',
+                playerId,
+              });
+            }
+            events.push({
+              type: 'trainerPlayBlocked',
+              playerId,
+              instanceId: cardRef.card.instanceId,
+              name: cardRef.card.name || '',
+              source: chaos.source,
+            });
+            break;
+          }
+        }
         executeTrainer(draft, {
           card: cardRef.card,
           playerId,

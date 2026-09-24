@@ -378,6 +378,9 @@ export function applyDamageBonus(baseDamage, bonus) {
 export function parseHpBonus(card) {
   const t = textOf(card);
   if (!t || !/hp/.test(t)) return { bonus: 0 };
+  // Negative printed modifiers (Hero's Medal, Island Challenge Amulet).
+  const neg = t.match(/gets\s+-(\d+)\s+hp/);
+  if (neg) return { bonus: -(parseInt(neg[1], 10) || 0) };
   if (!/(more|increase|treated as|gets \+|\+\d+\s+hp|for each)/.test(t)) {
     return { bonus: 0 };
   }
@@ -402,23 +405,26 @@ export function parseRetreatCostModifier(card) {
   if (!t || (!t.includes('retreat cost') && !/retreat/.test(t)))
     return { delta: 0 };
   if (
+    !/remaining hp is 30 or less/i.test(t) &&
     /has no retreat cost|no retreat cost|retreat cost is 0|retreat for free/i.test(
       t
     )
   ) {
+    // Rescue Board's zero is conditional on remaining HP; the "{C} less" half
+    // must still apply, and combinedToolRetreatCost zeroes the conditional case.
     return { delta: -Infinity };
   }
   const increased = /(more|increase)/.test(t);
   const decreased = /(less|fewer|reduc|decrease)/.test(t);
-  const m =
-    t.match(/(\d+)\s*(?:more|less)/) ||
-    t.match(/(?:by|is)\s+(\d+)/) ||
-    t.match(/(\d+)/);
-  // TCGdex prints retreat modifiers with energy symbols, not numerals: Air
-  // Balloon is "{C}{C} less" (two Colorless). The digit fallback below missed
-  // that, defaulting to 1, so a 2-retreat Pokémon stayed at 1 instead of 0.
+  if (!increased && !decreased) return { delta: 0 };
+  // The modifier numeral must sit next to more/less ("2 less", "is 3 or more"
+  // is a CONDITION, not a modifier — Heavy Boots, I133/A4). TCGdex prints
+  // retreat modifiers with energy symbols, not numerals: Air Balloon is
+  // "{C}{C} less" (two Colorless), counted by symbolCount below.
+  const m = t.match(/(\d+)\s*(?:more|less|fewer)/);
   const symbolCount = (t.match(/\{[a-z]\}/g) || []).length;
-  const n = m ? parseInt(m[1], 10) || 1 : symbolCount || 1;
+  const n = m ? parseInt(m[1], 10) || 1 : symbolCount;
+  if (!n) return { delta: 0 };
   if (decreased && !increased) return { delta: -n };
   if (increased) return { delta: n };
   return { delta: 0 };
@@ -460,16 +466,18 @@ export function teamNoRetreatCostForActive(activeCard, benchCards) {
   return false;
 }
 
-// "take N fewer/more Prize cards"
+// "take N fewer/more Prize cards" (I131). Only the prize clause may supply the
+// number: the text's first number is usually HP/damage ("gets -100 HP, and if
+// it is Knocked Out … takes 1 fewer Prize card"), which made Hero's Medal take
+// 0 prizes and Luxurious Cape take 101.
 export function parsePrizeModify(card) {
   const t = textOf(card);
   if (!t || !t.includes('prize card')) return { delta: 0 };
-  if (!/(less|fewer|more|extra)/.test(t)) return { delta: 0 };
-  const m = t.match(/(\d+)/);
-  const n = m ? parseInt(m[1], 10) || 1 : 1;
-  if (/(fewer|less)/.test(t)) return { delta: -n };
-  if (/(more|extra)/.test(t)) return { delta: n };
-  return { delta: 0 };
+  const m = t.match(/\btakes?\s+(\d+)\s+(more|fewer|less)\s+prize/i);
+  if (!m) return { delta: 0 };
+  const n = parseInt(m[1], 10);
+  if (!n) return { delta: 0 };
+  return { delta: /(fewer|less)/i.test(m[2]) ? -n : n };
 }
 
 export function applyPrizeModify(basePrizes, delta) {
@@ -478,7 +486,7 @@ export function applyPrizeModify(basePrizes, delta) {
 
 // Resolute Heart pattern: full HP survive, optional remaining HP
 export function parseKoPrevention(card) {
-  const out = { fullHpOnly: false, surviveHp: null };
+  const out = { fullHpOnly: false, surviveHp: null, coinFlip: false };
   const t = textOf(card);
   if (!t) return out;
   const matches =
@@ -492,8 +500,9 @@ export function parseKoPrevention(card) {
       t.includes('not knocked out'));
   if (!matches) return out;
   out.fullHpOnly = t.includes('full hp');
+  out.coinFlip = /flip a coin/.test(t);
   const survive =
-    t.match(/remaining hp becomes\s+(\d+)/) || t.match(/hp becomes\s+(\d+)/);
+    t.match(/remaining hp becomes?\s+(\d+)/) || t.match(/hp becomes?\s+(\d+)/);
   if (survive) out.surviveHp = parseInt(survive[1], 10);
   return out;
 }
