@@ -21,8 +21,11 @@ const UNCONSUMED =
   "As long as this Pokémon is in the Active Spot, attacks used by your opponent's Active Pokémon cost {C} more.";
 // Garganacl: read by abilityStatusImmune, which addCondition consults.
 const CONSUMED = "This Pokémon can't be affected by any Special Conditions.";
-// Ninjask ROS Wing Buzz: parsed as discardOpponentDeckAbility, which has no executor.
+// A hand-discard cost that runs, then resetInPlayAbility, which has no executor.
 const UNEXECUTED =
+  'Once per game during your turn, you may discard a card from your hand. If you do, each player shuffles all cards in play into their deck.';
+// Ninjask ROS Wing Buzz: the hand cost and the opponent mill both run as attack steps (design 036 A11).
+const NINJASK =
   "Once during your turn (before your attack), if this Pokémon is your Active Pokémon, you may discard a card from your hand. If you do, discard the top card of your opponent's deck.";
 
 const row = (text, tags, extra = {}) => ({
@@ -47,9 +50,10 @@ test('abilityPlan reads the step plan useAbility runs', () => {
     activated: false,
     reason: 'unparsed',
   });
-  const plan = abilityPlan(UNEXECUTED, 'Ninjask');
+  const plan = abilityPlan(UNEXECUTED, 'Testmon');
   assert.equal(plan.activated, true);
-  assert.ok(plan.unexecutable.includes('discardOpponentDeckAbility'));
+  assert.ok(plan.unexecutable.includes('resetInPlayAbility'));
+  assert.deepEqual(abilityPlan(NINJASK, 'Ninjask'), { activated: true, unexecutable: [] });
 });
 
 test('abilityPlan: the when-played trigger is not an unexecutable step beside a real effect', () => {
@@ -187,7 +191,7 @@ test('gate warns on new and vanished families', () => {
   ]);
 });
 
-test('executed claims need half the family running or read (D128)', () => {
+test('executed claims need half the family running or read (D136)', () => {
   const counts = {
     draw: fam(10, 6, 2), // 6 runs + 2 consumed = 80%
     evolve: fam(10, 0, 0, { consumed: 0, partial: 10 }),

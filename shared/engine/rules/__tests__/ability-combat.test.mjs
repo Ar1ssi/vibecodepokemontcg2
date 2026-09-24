@@ -119,7 +119,7 @@ test('abilityDamageBonus: "this Pokémon" holder and in-play conditions', () => 
   );
 });
 
-test('abilityDamageBonus: a self-named conditional bonus needs its condition and stays on the holder (I137)', () => {
+test('abilityDamageBonus: a self-named conditional bonus needs its condition and stays on the holder (I158)', () => {
   const text =
     "As long as Scizor ex's remaining HP is 60 or less, Scizor ex does 40 more damage to the Defending Pokémon (before applying Weakness and Resistance).";
   const scizor = mon('Scizor ex', { hp: 200, abilities: [ability('Danger Perception', text)] });
@@ -132,7 +132,7 @@ test('abilityDamageBonus: a self-named conditional bonus needs its condition and
   assert.equal(abilityDamageBonus(mate, defender, { sideCards: [hurt, mate] }), 0, 'not a team bonus');
 });
 
-test('abilityDamageBonus: named attackers, defender filters and activated powers (I137)', () => {
+test('abilityDamageBonus: named attackers, defender filters and activated powers (I158)', () => {
   const defender = mon('Defender');
   const nidoking = mon('Nidoking', {
     abilities: [ability('x', "Your Nidoqueen's attacks do 20 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).")],
@@ -166,7 +166,7 @@ test('abilityDamageBonus: named attackers, defender filters and activated powers
   assert.equal(abilityDamageBonus(ludicolo, defender, { sideCards: [ludicolo] }), 0, 'activated, not passive');
 });
 
-test('abilityDamageBonus: Prize-count conditions read the counts the attack site passes (I137)', () => {
+test('abilityDamageBonus: Prize-count conditions read the counts the attack site passes (I158)', () => {
   const charizard = mon('Charizard', {
     abilities: [ability('x', "If your opponent has 3 or less Prize cards left, each of Charizard's attacks does 50 more damage to the Active Pokémon (before applying Weakness and Resistance).")],
   });
@@ -630,7 +630,7 @@ test('abilityPrizeModify: KO-condition prize reduction, trigger wordings exclude
 
 // ── retreat cost ─────────────────────────────────────────────────────────
 
-test('abilityRetreatCost: printed symbol amounts and the holder\'s position (I138)', () => {
+test('abilityRetreatCost: printed symbol amounts and the holder\'s position (I159)', () => {
   const active = mon('Active');
   const zoroark = mon('Zoroark', {
     abilities: [ability('x', "As long as this Pokémon is on your Bench, your Active Pokémon's Retreat Cost is {C}{C} less.")],

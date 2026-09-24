@@ -3,32 +3,31 @@
      History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-Session: 286
-Focus: S286 maintain: harness slimmed for token cost — DECISIONS/ISSUES compacted to one-liners (verbatim
-  originals in .agent/archive/), NEXTSTEPS holds only in-flight ledgers, MAP split into areas/, CLAUDE.md
-  rewritten (grep-only reading budget, Light/Full END), new PostToolUse hook scripts/hooks/post-edit-check.mjs.
+Session: 294
+Focus: S294 merge: PRs #182 (trainer 035 + 038 fixes), #183 (attack 036 slices 1–15), #184 (ability 034)
+  merged to main in that order; colliding branch ids renumbered (D124–D141, I154–I168; "(PR #n branch id X)").
 Active: none.
-Next: 036 slice 6 review follow-up (HANDOFF.md on `feature/attack-behaviour`, `attack-behaviour-wt`): re-review
-  `settleKnockOutWins`, close slice 6, then slices 7–16 (kit .agent/scratch/036-slices-5-16-handoff.md).
-  035 slice 11 (play conditions) then 12 in `trainer-behaviour-wt` (ledger NEXTSTEPS.md).
-  Then I128, I130, I129, I126/I127, I121. User visual check of typed Tera entry/skin + Mega vortex in a real game.
-  Pending approval: designs 028 (I85), 029 (I86), 034 (I128).
+Next: maintenance due (S290 skipped; ISSUES Open 43/40, Closed 34/30 over cap).
+  036 slice 16 (regression gate `pnpm audit:attacks`, close I136) — ledger NEXTSTEPS.md.
+  P2 engine backlog: I151 (reactive Tool conditions), I154 (26 server-missing Trainer steps), I164 (ability
+  follow-on steps), I136. Then I165–I168, I155, I161–I163, I137, I126/I127, I121.
+  User visual check of typed Tera entry/skin + Mega vortex in a real rules-mode game.
+  Pending approval: designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5)
-- Parallel programs share one harness: trainer (`trainer-behaviour-wt`) and attack (`attack-behaviour-wt`)
-  worktrees have stale .agent copies — the primary/main harness is live. Parallel sessions collided on
-  S278–S281 and D117–D120: cite D ids with scope (`D119[rules]`); take the next free id by grep.
-- Gate: `pnpm audit:oracle` (~2 min, D108) after attack/ability engine changes; legit rate changes →
-  `--update-baseline`, commit scripts/oracle-baseline.json. Known `pnpm test` failure: card-inspector-model.
+- Gates after engine changes: `pnpm audit:oracle` (~2 min), `pnpm audit:abilities` (~2 min), `pnpm audit:trainers`
+  (seconds). Legit rate changes → `--update-baseline` + commit the baseline JSON. Known `pnpm test` failure:
+  card-inspector-model "retreat greys…"; coin-flip-ceremony is flaky.
+- Parallel branches collide on D/I ids: take the next free id by grep of this checkout AND open branches.
+  The primary checkout still holds another session's uncommitted harness edits (S288 CLAUDE.md/workflows).
 - Engine: `applyCommand` clones state — read results via `findCard(res.state, id).card`; attacking ends the
-  turn → assert events; rng stub `{next, shuffle}`. Trainer contracts: `effects/stadium-trigger-apply.mjs`
-  (call before `clearConditions`); Chaos Gym coin lives in the playTrainer apply path.
-- Mat FX: canvas FX go through entry.js `playCanvasStage` (WAAPI clock); board cards live in playmat iframes;
-  `.card` is preserve-3d → layer with translateZ. Holo wrappers need TCGdex (emulate via buildHoloCard).
+  turn → assert events. computeAttackDamage returns early for 0 base damage (I152) before any bonus.
+  Coin KO-prevention needs a `flipCoin` (heads) or it never applies (Focus Band, I146).
+- Mat FX: canvas FX go through entry.js `playCanvasStage` (WAAPI clock); holo wrappers need TCGdex.
 - Bash heredoc eats `\` → write edit scripts with the Write tool. Primary working copy is CRLF (repo LF).
 
 ## Recently shipped (≤3 one-liners; older → journal)
-- S286 harness slim (this session): hook + compaction; see journal.
-- S285 trainer 035 slice 10b: coin/condition Stadiums + shared switch hook; suite 3432/3433, oracle PASSED.
-- S284 attack 036 slices 5–6: extra Prize on KO + conditional KO; review follow-up pending (HANDOFF.md).
+- S294 merge of #182/#183/#184: suite 3879/3880 (known inspector fail), oracle/abilities/trainers gates PASSED.
+- S293 trainer design 038 complete (I138–I152 fixes) on #182.
+- S287 attack 036 slices 8–15 (#183) and ability 034 slice 7 + I157–I160 fixes (#184).

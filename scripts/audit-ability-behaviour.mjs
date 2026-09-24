@@ -6,7 +6,7 @@
  * rows are split by the reader probes in scripts/lib/ability-passive-probe.mjs), and ratchets the
  * per-family class shares against scripts/ability-behaviour-baseline.json. Exits 1 when a family's
  * runs share falls or its dead / unconsumed / unparsed share rises, or when a family claimed in
- * EXECUTED_ABILITY_FAMILIES has under half its rows running or read (D128).
+ * EXECUTED_ABILITY_FAMILIES has under half its rows running or read (D136).
  *
  * Run: pnpm audit:abilities [--update-baseline] [--rows]
  *   --update-baseline  rewrite the baseline from this run (after a legit change), exit 0

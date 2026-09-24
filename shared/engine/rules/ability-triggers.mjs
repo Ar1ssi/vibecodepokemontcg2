@@ -8,7 +8,7 @@
  * are suppressed (`isAbilitySuppressed`, design 034 slice 3), so a suppressed
  * holder never contributes a trigger.
  *
- * Dependency note (D117): this module may import `ability-combat.mjs` and
+ * Dependency note (D125): this module may import `ability-combat.mjs` and
  * `tool-combat.mjs`; nothing those import may reach back here.
  *
  * Entries are `{ card, playerId, zone }` in-play roots. `ctx` is the

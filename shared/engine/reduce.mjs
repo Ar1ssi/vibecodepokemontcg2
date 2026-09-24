@@ -3054,7 +3054,7 @@ function attackCostPayable(state, playerId, active, attack) {
   // increases. Checking the raw printed cost rejected legally payable attacks.
   const activeView = inPlayView(state, active);
   const blockTools = isStadiumToolNegation(stadiumCard);
-  // The board facts a printed discount condition or "for each" count reads (I139).
+  // The board facts a printed discount condition or "for each" count reads (I160).
   const discountCtx = {
     attacker: activeView,
     ownHandCount: (player.zones?.hand || []).length,
@@ -6516,7 +6516,7 @@ export function applyCommand(state, command, rng = null) {
             });
           }
 
-          // Energy-attach Ability triggers (Blissey V, Vaporeon, Magearna, …; design 034 I141).
+          // Energy-attach Ability triggers (Blissey V, Vaporeon, Magearna, …; design 034 I162).
           if (cardRef.zoneId === 'hand' && hostRef.playerId === playerId) {
             applyEnergyAttachTriggers(draft, {
               host: hostRef.card,

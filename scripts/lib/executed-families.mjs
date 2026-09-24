@@ -64,7 +64,7 @@ export const EXECUTED_ATTACK_FAMILIES = new Set([
 /** Partial / heuristic execution — still flagged but lower priority. */
 export const PARTIAL_ATTACK_FAMILIES = new Set([]);
 
-// Claimed from `pnpm audit:abilities` evidence (D128): at least half the family's printed rows
+// Claimed from `pnpm audit:abilities` evidence (D136): at least half the family's printed rows
 // run (activated, board changes) or are read by a passive reader. The gate fails a claim that
 // drops under that share and warns on an unclaimed family that meets it.
 export const EXECUTED_ABILITY_FAMILIES = new Set([
@@ -119,7 +119,7 @@ export const ORACLE_BLIND_FAMILIES = new Map([
     'damage counters, not dealt damage: the only change is opp:active+dmg, a base tag',
   ],
   // Passive ability families: the oracle cannot see them, `pnpm audit:abilities` reads them
-  // through the passive-reader probes (D127) and holds their claim (D128).
+  // through the passive-reader probes (D135) and holds their claim (D136).
   ['ability:effect-prevent', 'passive rule modifier; useAbility rejects it'],
   ['ability:coin-control', 'passive rule modifier; read by the audit:abilities probes'],
   ['ability:copy-attack', 'passive attack borrowing; read by the audit:abilities probes'],

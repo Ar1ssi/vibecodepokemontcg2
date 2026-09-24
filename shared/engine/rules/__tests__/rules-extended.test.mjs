@@ -2889,7 +2889,7 @@ import test from 'node:test';
       );
     });
 
-    // I136: a damage reduction is not a cost reduction. "less" + "attack" used to read as a
+    // I157: a damage reduction is not a cost reduction. "less" + "attack" used to read as a
     // discount of 30, so every damage-reduction Pokémon attacked for free.
     test('passiveCostDiscount: "takes N less damage from attacks" is not a discount', () => {
       assert.equal(
@@ -2922,8 +2922,8 @@ import test from 'node:test';
       );
     });
 
-    // I139: a discount's printed condition, scope and "for each" count are read against the board.
-    test('costDiscountRead: conditions, scope, scaling and typed symbols (I139)', () => {
+    // I160: a discount's printed condition, scope and "for each" count are read against the board.
+    test('costDiscountRead: conditions, scope, scaling and typed symbols (I160)', () => {
       const card = (name, text, extra = {}) => ({ name, supertype: 'Pokémon', abilities: [{ text }], ...extra });
       const vmax = { name: 'Opp VMAX', supertype: 'Pokémon', subtypes: ['VMAX'] };
       const plain = { name: 'Opp', supertype: 'Pokémon', subtypes: ['Basic'] };
@@ -3167,7 +3167,7 @@ import test from 'node:test';
       assert.equal(applyHpBonus(0, 20), 0);
     });
 
-    test('parseRetreatCostModifier: a Pokémon reads only its own Retreat Cost, behind its condition (I138)', () => {
+    test('parseRetreatCostModifier: a Pokémon reads only its own Retreat Cost, behind its condition (I159)', () => {
       const mon = (name, text) => ({ instanceId: 1, name, supertype: 'Pokémon', abilities: [{ text }] });
       const energy = { instanceId: 2, name: 'Basic Water Energy', supertype: 'Energy', energyType: 'Water', attachedTo: 1 };
       const magcargo = mon("Ethan's Magcargo", 'If this Pokémon has no Energy attached, it has no Retreat Cost.');

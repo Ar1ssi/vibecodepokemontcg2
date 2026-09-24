@@ -143,7 +143,7 @@ export function isActivatedAbility(card, abilityIndex = 0) {
 // A false positive here silently removes a cost from combat, which is far worse than missing an
 // exotic wording, so one sentence has to say that an ATTACK's COST goes DOWN. Earlier versions
 // matched loose keywords across the whole card text: mentioning Energy made Charmander's Live
-// Coal free, and "takes 30 less damage from attacks" (I136) — a reduction wording, printed on
+// Coal free, and "takes 30 less damage from attacks" (I157) — a reduction wording, printed on
 // abilities and on attack text alike — discounted every attack by 30, i.e. made them free.
 // Retreat Cost wordings are parseRetreatCostModifier's and never mention an attack's cost.
 const ATTACK_COST_REDUCTION = [
@@ -242,7 +242,7 @@ function discountUnits(sentence, ctx) {
  * typed discount ("{Y} less") removes, null for Colorless/any. Null when nothing applies.
  * `ctx`: `{ attacker, ownHandCount, ownPrizesLeft, opponentPrizesLeft, ownSideCards,
  * opponentSideCards, opponentActive, ownDiscard }`; a condition or "for each" unit it cannot check fails closed
- * (I139). Only a sentence saying an attack's cost goes down is read (I136).
+ * (I160). Only a sentence saying an attack's cost goes down is read (I157).
  */
 export function costDiscountRead(source, ctx = {}) {
   const t = textOf(source);
@@ -647,7 +647,7 @@ const SELF_RETREAT_CONDITIONS = [
 ];
 
 /**
- * A Pokémon's printed change to its OWN Retreat Cost (I138): "this Pokémon has no Retreat
+ * A Pokémon's printed change to its OWN Retreat Cost (I159): "this Pokémon has no Retreat
  * Cost", "its Retreat Cost is {C} less", "the Retreat Cost of this Pokémon is 0". Changes aimed
  * at other Pokémon (your Active, your opponent's Active, a team) are `abilityRetreatCost` /
  * `teamNoRetreatCostForActive`'s, "for each" scaling is not read, and a leading condition
@@ -683,7 +683,7 @@ function selfRetreatModifier(card, board = {}) {
 }
 
 // "+N more to retreat", "retreat cost is N less". A Pokémon reads only its own Retreat Cost
-// (selfRetreatModifier, I138); a Tool keeps the plain text read ("the Retreat Cost of the
+// (selfRetreatModifier, I159); a Tool keeps the plain text read ("the Retreat Cost of the
 // Pokémon this card is attached to is {C}{C} less").
 export function parseRetreatCostModifier(card, board = {}) {
   if (isPokemon(card)) return selfRetreatModifier(card, board);

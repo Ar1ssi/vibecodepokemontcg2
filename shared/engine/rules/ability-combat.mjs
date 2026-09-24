@@ -315,7 +315,7 @@ function isSelfScoped(text) {
 // --- damage bonus --------------------------------------------------------
 
 // A holder's text with its own printed name read as "this pokémon": older cards say "Scizor ex
-// does 40 more damage" / "each of Ursaring's attacks" where newer ones say "this Pokémon" (I137).
+// does 40 more damage" / "each of Ursaring's attacks" where newer ones say "this Pokémon" (I158).
 export function selfNamedText(holder) {
   const t = cardAbilityText(holder);
   const name = lower(holder?.name).trim();
@@ -475,7 +475,7 @@ function defenderQualifies(text, defender) {
  * Flat damage the attacker's (and its team's) abilities add before Weakness
  * and Resistance. Scaling wordings ("for each …") are skipped: they need live
  * counts and would otherwise be added as a flat number. The holder's printed
- * attacker scope, leading condition and defender filter must all hold (I137).
+ * attacker scope, leading condition and defender filter must all hold (I158).
  */
 export function abilityDamageBonus(attacker, defender, ctx = {}) {
   if (!attacker) return 0;

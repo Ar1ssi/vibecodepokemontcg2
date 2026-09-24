@@ -206,6 +206,8 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
           incomingDamage: 1000,
           baseHp: card.hp,
           inHp: true,
+          // Coin KO-prevention only applies on heads (design 038 I146); a heads flip shows the read.
+          flipCoin: () => 'heads',
         })
       );
     }

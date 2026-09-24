@@ -162,11 +162,11 @@ export function worksShare(c) {
   return c?.n ? ((c.runs || 0) + (c.consumed || 0)) / c.n : 0;
 }
 
-/** The works share a family needs before `EXECUTED_ABILITY_FAMILIES` may claim it (D128). */
+/** The works share a family needs before `EXECUTED_ABILITY_FAMILIES` may claim it (D136). */
 export const EXECUTED_CLAIM_SHARE = 0.5;
 
 /**
- * Checks the executed-family claims against the gate's evidence (D128).
+ * Checks the executed-family claims against the gate's evidence (D136).
  * Failures: a claimed family with no rows, or whose works share is under the threshold.
  * Warnings: an unclaimed family that meets it (a claim the evidence now supports).
  */
