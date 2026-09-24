@@ -161,12 +161,12 @@ Contract (stable surface):
 | 7 | Tool text with both damage and KO clauses | phase from the governing trigger sentence; test the corpus rows that match both | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "parseToolOnDamageEffect: phase follows the governing trigger" (Time Shard, Rocky Helmet, Hypnotizer …) |
 | 8 | Blind Prize pick resumes after a disconnect | ids re-validated against live Prizes; names never in options | [x] covered: shared/engine/__tests__/trainer-steps-missing.test.mjs "prizeToHand: a resumed blind pick rejects unknown ids …" + "Peonia offers its blind Prize pick face down …" |
 | 9 | Heavy Ball: 0 / 1 / 2 matching Basics; player declines | skip + discard / choice / choice; decline → discard, Prizes unchanged | [x] covered: trainer-steps-missing.test.mjs "Heavy Ball with no matching Basic …", "… chooses between two Basics, or declines", "Hisuian Heavy Ball trades itself …" |
-| 10 | Mr. Fuji with an empty Bench | `no_pokemon` skip (Active never offered) | [ ] |
-| 11 | Card shuffled into deck, later drawn and benched | enters with 0 damage, no conditions, no markers | [ ] |
+| 10 | Mr. Fuji with an empty Bench | `no_pokemon` skip (Active never offered) | [x] covered: shared/engine/__tests__/trainer-steps-missing.test.mjs "Mr. Fuji offers only Benched Pokémon, and skips with an empty Bench" |
+| 11 | Card shuffled into deck, later drawn and benched | enters with 0 damage, no conditions, no markers | [x] covered: trainer-steps-missing.test.mjs "a stack shuffled in forgets damage, conditions and markers" (state reset in deck; drawing/benching adds nothing) |
 | 12 | Chaos Gym + Tool via attachCard, tails | Tool discarded, not attached, `trainerPlayBlocked` event | [ ] |
 | 13 | Chaos Gym + Stadium / Energy attach | no flip | [ ] |
-| 14 | Focus Band tails / bench snipe with and without RNG | `coinFlipped` emitted on tails; bench path flips when RNG present | [ ] |
-| 15 | Replay / undo of a command with a new flip | deterministic: flips consume `activeRng` in the same order on replay | [ ] |
+| 14 | Focus Band tails / bench snipe with and without RNG | `coinFlipped` emitted on tails; bench path flips when RNG present | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Focus Band reports its tails flip…", "…on a Benched Pokémon flips against bench spread damage", "…without a coin flipper" |
+| 15 | Replay / undo of a command with a new flip | deterministic: flips consume `activeRng` in the same order on replay | [x] covered: tool-on-ko.test.mjs "Focus Band flips replay deterministically from the same seed" (Focus Band flips only; Chaos Gym flips in slice 4) |
 | 16 | Blaine's Last Resort with 2 copies / with 1 other card / unknown hand | allowed / blocked / skipped | [ ] |
 | 17 | Carmine on turn 1 (going first) / on turn 2 | allowed / allowed; plain Supporter on turn 1 still blocked | [ ] |
 | 18 | Gate: corpus card text edited (new key) | old key reported as removed → fail until `--update-baseline` | [ ] |
@@ -220,6 +220,12 @@ Slice 2 (S290):
 - Stale ids are checked twice: the resolver rejects ids outside the options (`invalid_selection`), and
   the step's `pickById` against the live Prizes drops ids that left the zone.
 - Manual live Peonia check skipped at the user's request (S290).
+
+Slice 3 (S291):
+- `applyAttackTargets` also takes `activeRng` (chosen bench targets flip Focus Band too); own-bench recoil passes it.
+- `coinFlipped` is now emitted before `damageUpdated` at the Active site (was after it, heads only).
+- Row 11 is tested on the card in the deck; the draw/bench path copies no state, so nothing more to cover.
+- Oracle and audit:trainers run via `pnpm -s audit:*`; the full suite via the node --test glob (user's instruction).
 
 ---
 Self-approval checklist (only when the user is unreachable):

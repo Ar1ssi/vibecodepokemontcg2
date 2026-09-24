@@ -489,6 +489,8 @@ export function evaluateToolKoPrevention(
   const dmgCurrent = currentDamage;
   const dmgTotal = totalAfter;
 
+  // A tails flip still happened, so it is reported even when nothing prevented the KO.
+  let lastCoinFace = null;
   for (const { source, ko, isTool } of candidates) {
     if (!ko.fullHpOnly && ko.surviveHp == null) continue;
     if (ko.fullHpOnly && dmgCurrent > 0) continue;
@@ -496,6 +498,7 @@ export function evaluateToolKoPrevention(
     let coinFace = null;
     if (ko.coinFlip) {
       coinFace = typeof flipCoin === 'function' ? flipCoin() : null;
+      if (coinFace) lastCoinFace = coinFace;
       if (coinFace !== 'heads') continue;
     }
 
@@ -524,6 +527,7 @@ export function evaluateToolKoPrevention(
     prevented: false,
     totalDamage: inHp ? totalAfter : Math.ceil(totalAfter / 10),
     damageHp: totalAfter,
+    ...(lastCoinFace && { coinFace: lastCoinFace }),
   };
 }
 

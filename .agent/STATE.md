@@ -5,11 +5,11 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 290
-Focus: S290 feature: design 038 slice 2 (I141 + I143) shipped on claude/wizardly-brown-k61li3.
-Active: design 038 slice 2/5 done (face-down Prize options + card-back picker, count-only `cardsLookedAt`,
-  Heavy/Beast Ball choice). Next = slice 3 (I142 Mr. Fuji + resetLeftPlay, I147, I146). Ledger: NEXTSTEPS.md top.
-Next: design 038 slices 3-5, then merge the trainer-behaviour branch to main. Maintenance due (S270, S280 not run).
+Session: 291
+Focus: S291 feature: design 038 slice 3 (I142 + I146 + I147) shipped on claude/wizardly-brown-k61li3.
+Active: design 038 slice 3/5 done (Mr. Fuji bench-only + `resetLeftPlay`, Riley single reveal, Focus Band tails
+  `coinFlipped` + bench flips with the attack RNG). Next = slice 4 (I144 `prizeFlags`, I145 `chaosGymBlocks`). Ledger: NEXTSTEPS.md top.
+Next: design 038 slices 4-5, then merge the trainer-behaviour branch to main. Maintenance due (S270, S280 not run).
   I151 (reactive Tool conditions unchecked), I136 (26 server-missing Trainer steps), I137 (design 035 leftovers).
   User visual check of typed Tera entry/skin, Mega vortex in a real rules-mode game.
   I126/I127 (retreat-cost), I121-I125 (design 032 leftovers); I113 oracle still blind to damage amounts.
@@ -30,8 +30,7 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Board FX: D103, D117-D122 (playCanvasStage WAAPI clock; holo wrappers need TCGdex, emulate with buildHoloCard).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S291 Design 038 slice 3: Mr. Fuji picks only Benched Pokémon and shuffled cards lose damage/conditions/markers;
+  Riley reveals once; Focus Band reports tails and now works against bench damage.
 - S290 Design 038 slice 2: blind Prize picks (Peonia) show card backs, no names; Prize/deck looks broadcast
   counts only; Heavy/Beast Ball let the player choose or decline.
-- S289 Design 038 slice 1: attacker-held prize Tools no longer change the attacker's KO Prizes; Lucky Egg only on KO;
-  Handheld Fan/Rugged Helmet move one Energy once (Rugged Helmet no longer crashes); Vengeful Punch only on KO.
-- S287 Forest of Vitality (evolution-speed Stadiums) allows a {G} Basic → Stage 1 → Stage 2 in one turn, server + client.

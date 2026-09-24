@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
-import { parseToolOnDamageEffect } from '../rules/tool-combat.mjs';
+import { evaluateToolKoPrevention, parseToolOnDamageEffect } from '../rules/tool-combat.mjs';
+import { createRng } from '../rng.mjs';
 
 let nextId = 900;
 const card = (props) => createCard({ instanceId: nextId++, ...props });
@@ -484,4 +485,81 @@ test('Vengeful Punch retaliates only when its holder is Knocked Out', () => {
     40,
     '4 counters on the Attacking Pokémon'
   );
+});
+
+// ── Design 038 slice 3: Focus Band coin events and bench RNG (I146) ──
+
+const FOCUS_BAND =
+  'If the Pokémon Focus Band is attached to would be Knocked Out by your opponent’s attack, flip a coin. If heads, that Pokémon is not Knocked Out and its remaining HP become 10 instead. Then, discard Focus Band.';
+const coinEvents = (res) => res.events.filter((e) => e.type === 'coinFlipped');
+
+test('Focus Band reports its tails flip on the Active (design 038 row 14)', () => {
+  const state = game({ p1Active: attacker(), p2Active: defender() });
+  attach(state, 'p2', tool('Focus Band', FOCUS_BAND), state.players.p2.zones.active[0]);
+  const tails = attack(state, { next: () => 0.9, shuffle: (a) => [...a] });
+  assert.equal(tails.error, null);
+  assert.deepEqual(
+    coinEvents(tails).map((e) => [e.playerId, e.face]),
+    [['p2', 'tails']]
+  );
+});
+
+const spreader = () =>
+  attacker({
+    attacks: [
+      {
+        name: 'Spread',
+        cost: [],
+        damage: 10,
+        text: 'This attack also does 20 damage to each of your opponent’s Benched Pokémon.',
+      },
+    ],
+  });
+
+test('Focus Band on a Benched Pokémon flips against bench spread damage (design 038 row 14)', () => {
+  for (const [roll, face] of [
+    [0.1, 'heads'],
+    [0.9, 'tails'],
+  ]) {
+    const benched = defender({ name: 'Benched', hp: 20 });
+    const state = game({ p1Active: spreader(), p2Active: defender(), p2Bench: [benched] });
+    attachBench(state, 'p2', tool('Focus Band', FOCUS_BAND), benched);
+    const res = attack(state, { next: () => roll, shuffle: (a) => [...a] });
+    assert.equal(res.error, null);
+    assert.deepEqual(
+      coinEvents(res).map((e) => [e.playerId, e.face]),
+      [['p2', face]]
+    );
+    const survived = res.state.players.p2.zones.bench.some((c) => c.instanceId === benched.instanceId);
+    assert.equal(survived, face === 'heads', `${face}: survives only on heads`);
+    if (survived) {
+      const onBench = res.state.players.p2.zones.bench.find((c) => c.instanceId === benched.instanceId);
+      assert.equal(onBench.damage, 10, 'heads leaves 10 HP');
+    }
+  }
+});
+
+test('Focus Band flips replay deterministically from the same seed (design 038 row 15)', () => {
+  const run = () => {
+    const benched = defender({ name: 'Benched', hp: 20, instanceId: 'bench-fb' });
+    const state = game({ p1Active: spreader(), p2Active: defender(), p2Bench: [benched] });
+    attachBench(state, 'p2', tool('Focus Band', FOCUS_BAND), benched);
+    return coinEvents(attack(state, createRng(38))).map((e) => e.face);
+  };
+  const first = run();
+  assert.equal(first.length, 1);
+  assert.deepEqual(run(), first);
+});
+
+test('evaluateToolKoPrevention: Focus Band without a coin flipper neither flips nor prevents', () => {
+  const victim = defender();
+  const band = tool('Focus Band', FOCUS_BAND);
+  band.attachedTo = victim.instanceId;
+  const res = evaluateToolKoPrevention(victim, [victim, band], {
+    incomingDamage: 200,
+    baseHp: 100,
+    inHp: true,
+  });
+  assert.equal(res.prevented, false);
+  assert.equal(res.coinFace, undefined);
 });

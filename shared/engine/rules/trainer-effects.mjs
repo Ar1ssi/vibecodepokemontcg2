@@ -1517,7 +1517,10 @@ function parseTrainerSteps(lower) {
   // Mr. Fuji / Cassius — shuffle one of your Pokémon (and its attachments) into deck
   if (/shuffle 1 of your pokémon and all cards attached to it into your deck/.test(lower) ||
       /shuffle it and any cards attached to it into your deck/.test(lower)) {
-    steps.push({ type: 'shufflePokemonIntoDeck' });
+    steps.push({
+      type: 'shufflePokemonIntoDeck',
+      ...(/pokémon on your bench/.test(lower) ? { benchOnly: true } : {}),
+    });
     return { steps, recognizable: true };
   }
 

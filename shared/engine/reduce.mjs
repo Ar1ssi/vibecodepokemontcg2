@@ -304,7 +304,7 @@ function discardCardFromPlayerZone(draft, instanceId, playerId) {
  */
 function damageBenchedPokemon(
   draft,
-  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, events }
+  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, activeRng = null, events }
 ) {
   if (dealt <= 0) return;
 
@@ -364,7 +364,12 @@ function damageBenchedPokemon(
       baseHp: koHp,
       stadium: draft.stadium,
       inHp: true,
+      // Without an RNG (non-attack callers) Focus Band cannot flip, so it never prevents.
+      ...(activeRng && { flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails') }),
     });
+    if (koEval.coinFace) {
+      events.push({ type: 'coinFlipped', playerId: victimPlayerId, face: koEval.coinFace });
+    }
     if (koEval.prevented) {
       victim.damage = koEval.totalDamage;
       events.push({
@@ -639,7 +644,7 @@ function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerP
 // Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
 function applyAttackTargets(
   draft,
-  { selection, clause, defenderPlayerId, attackerPlayerId, attackName, events }
+  { selection, clause, defenderPlayerId, attackerPlayerId, attackName, activeRng = null, events }
 ) {
   let dealt = 0;
   for (const id of selection || []) {
@@ -654,6 +659,7 @@ function applyAttackTargets(
         attackName,
         dealt: clause.amount,
         auto: false,
+        activeRng,
         events,
       });
     } else if (ref.zoneId === 'active') {
@@ -4239,6 +4245,9 @@ function resolveAttackEffectPhase(draft, ctx) {
               }
             );
 
+            if (koEval.coinFace) {
+              events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face: koEval.coinFace });
+            }
             if (koEval.prevented) {
               defender.damage = koEval.totalDamage;
               events.push({
@@ -4248,9 +4257,6 @@ function resolveAttackEffectPhase(draft, ctx) {
                 dealt: dmgDealt,
                 ...(weaknessApplied && { weakness: true }),
               });
-              if (koEval.coinFace) {
-                events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face: koEval.coinFace });
-              }
               events.push({
                 type: 'koPrevented',
                 instanceId: defender.instanceId,
@@ -4565,6 +4571,7 @@ function resolveAttackEffectPhase(draft, ctx) {
               attackName: attack.name,
               dealt: spread,
               auto: false,
+              activeRng,
               events,
             });
           }
@@ -4585,6 +4592,7 @@ function resolveAttackEffectPhase(draft, ctx) {
             dealt: ownSpread,
             auto: false,
             ownAttack: true,
+            activeRng,
             events,
           });
         }
@@ -4825,6 +4833,7 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               defenderPlayerId,
               attackerPlayerId: playerId,
               attackName: attack.name,
+              activeRng,
               events,
             });
           } else if (!searchTriggered) {
@@ -4856,6 +4865,7 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               defenderPlayerId,
               attackerPlayerId: playerId,
               attackName: attack.name,
+              activeRng,
               events,
             });
           }
@@ -6345,6 +6355,7 @@ export function applyCommand(state, command, rng = null) {
             defenderPlayerId: token.oppId,
             attackerPlayerId: initiatorPlayerId,
             attackName: token.effectiveAttack?.name || '',
+            activeRng,
             events,
           });
           // "in any way you like": one counter per click until all are placed.

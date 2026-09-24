@@ -349,6 +349,55 @@ test('shufflePokemonIntoDeck: shuffling the Active in auto-promotes the only Ben
   assert.ok(zone(done, 'p1', 'deck').some((c) => c.instanceId === active.instanceId));
 });
 
+const MR_FUJI_TEXT = 'Choose a Pokémon on your Bench. Shuffle it and any cards attached to it into your deck.';
+
+test('shufflePokemonIntoDeck: Mr. Fuji offers only Benched Pokémon, and skips with an empty Bench (design 038 row 10)', () => {
+  const game = setup();
+  const bench = pokemon('P1 Bench');
+  game.p1.zones.bench.push(bench);
+  const offered = play(game, MR_FUJI_TEXT, { name: 'Mr. Fuji' }).res;
+  assert.equal(offered.error, null);
+  assert.deepEqual(
+    offered.pendingChoice.options.map((o) => o.instanceId),
+    [bench.instanceId]
+  );
+
+  const empty = setup();
+  const res = play(empty, MR_FUJI_TEXT, { name: 'Mr. Fuji' }).res;
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(zone(res, 'p1', 'active').length, 1);
+});
+
+test('shufflePokemonIntoDeck: a stack shuffled in forgets damage, conditions and markers (design 038 row 11)', () => {
+  const game = setup();
+  const bench = pokemon('P1 Bench');
+  bench.damage = 60;
+  bench.specialCondition = 'asleep';
+  bench.attackMarkers = [{ kind: 'noWeakness', untilTurn: 9 }];
+  bench.cannotAttackUntilTurn = 9;
+  bench.cannotAttackAttackName = 'Tackle';
+  bench.cannotRetreatUntilTurn = 9;
+  const tool = card({ name: 'Tool', supertype: 'Trainer', trainerType: 'Pokémon Tool' });
+  tool.attachedTo = bench.instanceId;
+  tool.discardAtEndOfTurn = true;
+  game.p1.zones.bench.push(bench, tool);
+
+  const { res } = play(game, MR_FUJI_TEXT, { name: 'Mr. Fuji' });
+  const done = resolve(game, res, [bench.instanceId]);
+  assert.equal(done.error, null);
+  const shuffled = cardIn(done, bench.instanceId);
+  assert.equal(shuffled.damage, 0);
+  assert.equal(shuffled.specialCondition, null);
+  assert.equal(shuffled.attackMarkers, undefined);
+  assert.equal(shuffled.cannotAttackUntilTurn, undefined);
+  assert.equal(shuffled.cannotAttackAttackName, undefined);
+  assert.equal(shuffled.cannotRetreatUntilTurn, undefined);
+  const shuffledTool = cardIn(done, tool.instanceId);
+  assert.equal(shuffledTool.attachedTo, null);
+  assert.equal(shuffledTool.discardAtEndOfTurn, undefined);
+});
+
 test('clearAttackEffects: Channeler clears own markers; Pokémon Ranger clears both sides', () => {
   const game = setup();
   const own = game.p1.zones.active[0];
@@ -738,6 +787,8 @@ test("opponentChoosesFromTop: Riley's opponent discards 2 of the top 5; the rest
     [top[2].instanceId, top[3].instanceId, top[4].instanceId].sort()
   );
   assert.deepEqual(ids(zone(done, 'p1', 'deck')), ids(rest));
+  const reveals = [...res.events, ...done.events].filter((e) => e.type === 'cardsRevealed');
+  assert.equal(reveals.length, 1, 'the top cards are revealed once, not again on resume (I147)');
 });
 
 test("lookAtOpponentHand: Hand Scope reveals the opponent's hand", () => {

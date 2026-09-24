@@ -1809,6 +1809,18 @@ function rearrangeTop(ctx) {
   });
 }
 
+// A card leaving play forgets everything that happened to it there.
+function resetLeftPlay(card) {
+  card.damage = 0;
+  clearConditions(card);
+  clearAttackMarkers(card);
+  delete card.cannotAttackUntilTurn;
+  delete card.cannotAttackAttackName;
+  delete card.cannotRetreatUntilTurn;
+  delete card.discardAtEndOfTurn;
+  card.attachedTo = null;
+}
+
 // Mr. Fuji / Cassius — shuffle one of your Pokémon and its attachments into the deck.
 function shufflePokemonIntoDeck(ctx) {
   const { player } = ctx;
@@ -1826,7 +1838,7 @@ function shufflePokemonIntoDeck(ctx) {
     const wasActive = zoneIdOf(player, root) === 'active';
     for (const card of [root, ...attachedCards(player, root.instanceId)]) {
       removeFromZones(player, card);
-      card.attachedTo = null;
+      resetLeftPlay(card);
       player.zones.deck.push(card);
     }
     ctx.events.push({
@@ -1853,7 +1865,8 @@ function shufflePokemonIntoDeck(ctx) {
   }
 
   // The Active may only be shuffled in when a Benched Pokémon can replace it.
-  const options = benchRootsOf(player).length > 0 ? roots : benchRootsOf(player);
+  const bench = benchRootsOf(player);
+  const options = ctx.step.benchOnly || bench.length === 0 ? bench : roots;
   if (options.length === 0) return skip(ctx, 'no_pokemon');
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your Pokémon to shuffle into your deck`,
@@ -2325,12 +2338,12 @@ function opponentChoosesFromTop(ctx) {
     return null;
   };
 
+  if (ctx.selection) return applyChoice(pickById(top, ctx.selection).slice(0, chosenCount));
   ctx.events.push({
     type: 'cardsRevealed',
     playerId: player.playerId,
     cards: top.map((c) => ({ instanceId: c.instanceId, name: c.name })),
   });
-  if (ctx.selection) return applyChoice(pickById(top, ctx.selection).slice(0, chosenCount));
   if (!opponent) return applyChoice(top.slice(0, chosenCount));
   return ctx.ask({
     player: opponent.playerId,

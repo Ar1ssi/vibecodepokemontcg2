@@ -4,7 +4,7 @@ Branch `claude/wizardly-brown-k61li3` (design 035 slices 1–12 + S288 reviews).
 `.agent/designs/038-trainer-review-fixes.md` (approved S289, option A ×5). One slice per commit, suite green between.
 - [x] 1 I138 prize-clause side + attack gate; I139/I140 Tool `phase` split (S289)
 - [x] 2 I141 + I143: faceDown choice options (engine + picker), count-only look events, Heavy/Beast Ball choice (S290; live Peonia check skipped per user)
-- [ ] 3 I142 Mr. Fuji bench-only + `resetLeftPlay`; I147 single reveal; I146 Focus Band coin events + bench RNG
+- [x] 3 I142 Mr. Fuji bench-only + `resetLeftPlay`; I147 single reveal; I146 Focus Band coin events + bench RNG (S291)
 - [ ] 4 I144 `prizeFlags` at all damage sites; I145 shared `chaosGymBlocks` gate
 - [ ] 5 I148 `onlyCopiesInHand`; I149 `turnOnePermission`; I150 gate steps/removed + baseline regen; file the
       per-viewer event-filter follow-up; close I141–I150
