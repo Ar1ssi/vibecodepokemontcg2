@@ -71,6 +71,16 @@ export function executeAbility(draft, {
   // precondition failed (no damaged Pokémon to heal, empty Bench to switch).
   // Marking up front consumed the ability with no effect and locked out a retry.
   const markUsed = () => {
+    // "As often as you like during your turn" is never spent; it is still announced.
+    if (!isRepeatableAbility(text)) spendAbility();
+    events.push({
+      type: 'abilityUsed',
+      instanceId: card.instanceId,
+      name: card.name,
+      playerId,
+    });
+  };
+  const spendAbility = () => {
     // A card the ability moved out of play (Stance Change's old Aegislash) keeps no marker;
     // advanceTurn only resets in-play cards.
     const zoneAfter = findCard(draft, card.instanceId)?.zoneId;
@@ -80,12 +90,6 @@ export function executeAbility(draft, {
     // instanceId first: two Pokémon sharing a name must not share one used-flag
     // slot, or using one blocks the other's separate ability (I48).
     player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
-    events.push({
-      type: 'abilityUsed',
-      instanceId: card.instanceId,
-      name: card.name,
-      playerId,
-    });
   };
 
   const ability = card.abilities?.[abilityIndex];
@@ -161,6 +165,13 @@ export function executeAbility(draft, {
 
   draft.pendingChoice = null;
   return { pendingChoice: null, completed: true };
+}
+
+const REPEATABLE_ABILITY = /^as often as you like\b/;
+
+/** "As often as you like during your turn, …": usable any number of times, never marked used. */
+export function isRepeatableAbility(text) {
+  return REPEATABLE_ABILITY.test(String(text || '').trim().toLowerCase());
 }
 
 /**

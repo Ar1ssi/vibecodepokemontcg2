@@ -1171,6 +1171,41 @@ test('ability: Strange Behavior moves a damage counter between own Pokémon', ()
   assert.equal(res2.state.players.p1.zones.active[0].damage, 10);
 });
 
+test('ability: an "as often as you like" ability is not spent by a use', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'As often as you like during your turn, you may move 1 damage counter from 1 of your other Pokémon to this Pokémon.'
+  );
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 72, name: 'Damaged', hp: 100, supertype: 'Pokémon', damage: 30 })
+  );
+  let current = state;
+  for (const expected of [20, 10]) {
+    const res = applyCommand(current, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+    assert.equal(res.error, null);
+    const done = resolveWith(res, [72], rng);
+    assert.equal(done.error, null);
+    assert.equal(done.state.players.p1.zones.bench[0].damage, expected);
+    current = done.state;
+  }
+});
+
+test('ability: an "as often as you like" hand attach (Emboar) attaches the matching Energy', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'As often as you like during your turn, you may attach a Basic {R} Energy card from your hand to 1 of your Pokémon.'
+  );
+  state.players.p1.zones.hand.push(energyCard(81, 'Fire'), energyCard(82, 'Water'));
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId), [81]);
+  const done = resolveWith(res, [81], rng);
+  assert.equal(done.error, null);
+  assert.deepEqual(attachedTo(done.state, 'p1', 70), [81]);
+});
+
 test('ability: Busybody Nurse cures every Special Condition on the Active', () => {
   const { state, rng } = setupGame();
   const { holder } = holderWithAbility(

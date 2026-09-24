@@ -2,9 +2,9 @@
   "corpusRows": 4228,
   "totals": {
     "n": 4228,
-    "runs": 1635,
+    "runs": 1675,
     "partial": 257,
-    "dead": 102,
+    "dead": 62,
     "consumed": 1169,
     "unconsumed": 1064,
     "unparsed": 1
@@ -12,9 +12,9 @@
   "families": {
     "attach": {
       "n": 211,
-      "runs": 132,
+      "runs": 169,
       "partial": 2,
-      "dead": 49,
+      "dead": 12,
       "consumed": 0,
       "unconsumed": 28,
       "unparsed": 0
@@ -399,9 +399,9 @@
     },
     "status": {
       "n": 507,
-      "runs": 194,
+      "runs": 197,
       "partial": 24,
-      "dead": 24,
+      "dead": 21,
       "consumed": 111,
       "unconsumed": 154,
       "unparsed": 0

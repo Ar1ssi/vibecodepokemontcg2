@@ -374,9 +374,9 @@ const ENERGY_SYMBOL_TYPES = {
 // Carnival, Golden Flame, …) → which hand Energy may go where. Null when the text is not a
 // hand attach. handTarget is the printed target phrase ("this pokémon", "1 of your pokémon").
 function parseHandAttach(lower) {
-  // "As often as you like" hand attaches are Energy accelerators on the normal attach
-  // (parseUnlimitedHandEnergyAcceleration), not a one-shot ability use.
-  if (/as often as you like/.test(lower)) return null;
+  // A repeatable attach behind a board condition the activation gate cannot check (Oricorio ex:
+  // "if you have any {R} Mega Evolution Pokémon ex in play") fails closed.
+  if (/^as often as you like[^.]*?, if you have [^.]*? in play/.test(lower)) return null;
   // The player's own attach action only: not "Whenever you attach…" / "To attach…" rules text.
   const clause = lower.match(/(?:^|\. |you may |if you do, )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
   if (!clause || /^this card\b/.test(clause[1])) return null;
