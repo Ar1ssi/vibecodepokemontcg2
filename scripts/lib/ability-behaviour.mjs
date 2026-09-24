@@ -5,19 +5,23 @@
 // working, or stops being read, fails the audit instead of drifting back in silently.
 import { resolveAbilitySteps } from '../../shared/engine/effects/ability.mjs';
 import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
+import { passiveReads } from './ability-passive-probe.mjs';
 
 /**
  * runs      activated; the board changed and every planned step has an executor
  * partial   activated; the board changed but a planned step has no executor
  * dead      activated; no state change beyond the base tags (a no-op ability button)
- * passive   every parsed step is continuous/triggered — useAbility has nothing to run
+ * consumed    passive (useAbility has nothing to run) and an engine passive reader answers
+ *             differently with the text printed than without it (ability-passive-probe.mjs)
+ * unconsumed  passive and no probed reader reads it: parsed, but nothing enforces it
  * unparsed  neither the ability parser nor the effect templates read the text
  */
 export const BEHAVIOUR_CLASSES = [
   'runs',
   'partial',
   'dead',
-  'passive',
+  'consumed',
+  'unconsumed',
   'unparsed',
 ];
 
@@ -51,12 +55,29 @@ export function abilityObserved(row) {
   return (row.tags || []).some((t) => t !== 'ability-used');
 }
 
+/** The passive readers consuming a row's text (see ability-passive-probe.mjs). */
+export function rowPassiveReads(row) {
+  return passiveReads(row.text, { name: row.card, abilityName: row.name, abilityType: row.abilityType });
+}
+
+/**
+ * One oracle ability row classed: `{ behaviour, unexecutable, reads }` — the planned steps with
+ * no executor, and for a passive row the probe labels of the readers consuming it.
+ */
+export function classifyRow(row) {
+  const plan = abilityPlan(row.text, row.card);
+  if (!plan.activated && plan.reason === 'passive') {
+    const reads = rowPassiveReads(row);
+    return { behaviour: reads.length ? 'consumed' : 'unconsumed', unexecutable: [], reads };
+  }
+  if (!plan.activated) return { behaviour: plan.reason, unexecutable: [], reads: [] };
+  const behaviour = !abilityObserved(row) ? 'dead' : plan.unexecutable.length ? 'partial' : 'runs';
+  return { behaviour, unexecutable: plan.unexecutable, reads: [] };
+}
+
 /** The behaviour class of one oracle ability row. */
 export function behaviourClass(row) {
-  const plan = abilityPlan(row.text, row.card);
-  if (!plan.activated) return plan.reason;
-  if (!abilityObserved(row)) return 'dead';
-  return plan.unexecutable.length ? 'partial' : 'runs';
+  return classifyRow(row).behaviour;
 }
 
 /** `{ <family>: { n, runs, partial, dead, passive, unparsed } }` over classed rows. */
@@ -89,17 +110,19 @@ export function totalCounts(counts) {
 const share = (c, k) => (c.n ? (c[k] || 0) / c.n : 0);
 
 // A share that may only rise (`up`) or only fall (`down`) against the baseline. partial and
-// passive move both ways legitimately (partial → runs, a mis-read now read as passive), so
-// they are reported but not gated; a drop in runs catches runs → partial.
+// consumed move both ways legitimately (partial → runs, a passive now activated), so they are
+// reported but not gated; a drop in runs catches runs → partial, and a rise in unconsumed
+// catches a passive reader that stopped reading its text.
 const RATCHETS = [
   ['runs', 'up'],
   ['dead', 'down'],
+  ['unconsumed', 'down'],
   ['unparsed', 'down'],
 ];
 
 /**
  * Compares per-family counts with the baseline (same shape).
- * Failures: a family's runs share fell, or its dead / unparsed share rose.
+ * Failures: a family's runs share fell, or its dead / unconsumed / unparsed share rose.
  * Warnings: families new since the baseline, families gone from the corpus.
  */
 export function checkBehaviourGate(counts, baseline) {

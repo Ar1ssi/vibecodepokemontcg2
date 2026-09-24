@@ -248,3 +248,8 @@ Self-approval checklist (only when the user is unreachable):
   passive/unparsed and which steps lack an executor; the oracle run decides runs vs dead. Ability
   rows count `opp:active+dmg`/KO as observed (the oracle's attack BASE_TAGS would call 146
   move-damage abilities dead). Passive-reader "behave" probes are slice 7 piece 2.
+- Slice 7b split `passive` into `consumed`/`unconsumed` by probing the wired passive readers with
+  the text printed vs stripped on four boards (D127): 1166 consumed / 518 unconsumed of 1684. The
+  probe also exposes wrong reads (a reader answering where the text says it should not): I136
+  (damage reduction read as a cost discount), I137 (conditional self bonus given to the team),
+  I138 (no-Energy free retreat applied with Energy). Those are filed, not fixed, in 7b.

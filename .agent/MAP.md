@@ -9,7 +9,7 @@ server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQL
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
 scripts/audit-oracle.mjs (`pnpm audit:oracle`, ~2 min) — execution gate: runs every corpus attack/ability through the engine (lib/oracle-harness.mjs), ratchets per-family observed rates vs scripts/oracle-baseline.json (lib/oracle-gate.mjs); family claim lists in lib/executed-families.mjs (I113)
-scripts/audit-ability-behaviour.mjs (`pnpm audit:abilities`, ~80 s) — ability gate: classes every corpus ability runs/partial/dead/passive/unparsed (lib/ability-behaviour.mjs, reads effects/ability.mjs `resolveAbilitySteps`), ratchets per-family shares vs scripts/ability-behaviour-baseline.json (D126)
+scripts/audit-ability-behaviour.mjs (`pnpm audit:abilities`, ~2 min) — ability gate: classes every corpus ability runs/partial/dead/consumed/unconsumed/unparsed (lib/ability-behaviour.mjs, reads effects/ability.mjs `resolveAbilitySteps`; passive rows via lib/ability-passive-probe.mjs reader probes, D127), ratchets per-family shares vs scripts/ability-behaviour-baseline.json (D126)
 tools/ — internal dev tools, sync log comparison, asset mappings
 client/src/css/deck-builder-live.css — deck builder's PTCG Live theme (D: S252); ALL rules scoped
   under `.db-live` (on #nativeDeckBuilderWorkspace) — that class is what overrides index.css on

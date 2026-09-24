@@ -2,9 +2,10 @@
 /**
  * Ability behaviour gate (design 034 slice 7). Runs every printed ability in
  * out/pkmn-pokemon-cards.json through useAbility (scripts/lib/oracle-harness.mjs), classes each row
- * runs / partial / dead / passive / unparsed (scripts/lib/ability-behaviour.mjs), and ratchets the
+ * runs / partial / dead / consumed / unconsumed / unparsed (scripts/lib/ability-behaviour.mjs; passive
+ * rows are split by the reader probes in scripts/lib/ability-passive-probe.mjs), and ratchets the
  * per-family class shares against scripts/ability-behaviour-baseline.json. Exits 1 when a family's
- * runs share falls or its dead / unparsed share rises.
+ * runs share falls or its dead / unconsumed / unparsed share rises.
  *
  * Run: pnpm audit:abilities [--update-baseline] [--rows]
  *   --update-baseline  rewrite the baseline from this run (after a legit change), exit 0
@@ -16,8 +17,7 @@ import { fileURLToPath } from 'url';
 import { oracleCorpus } from './lib/oracle-harness.mjs';
 import {
   BEHAVIOUR_CLASSES,
-  abilityPlan,
-  behaviourClass,
+  classifyRow,
   classCounts,
   totalCounts,
   checkBehaviourGate,
@@ -71,7 +71,7 @@ function main() {
   const started = Date.now();
   const rows = oracleCorpus(corpus, { kinds: ['ability'] }).map((row) => ({
     ...row,
-    behaviour: behaviourClass(row),
+    ...classifyRow(row),
   }));
   const counts = classCounts(rows);
   console.log(
@@ -80,14 +80,15 @@ function main() {
   printTable(counts);
   if (process.argv.includes('--rows')) {
     const out = rows.map(
-      ({ card, set, number, name, family, behaviour, text, tags, errors }) => ({
+      ({ card, set, number, name, family, behaviour, unexecutable, reads, tags, errors }) => ({
         card,
         set,
         number,
         name,
         family,
         behaviour,
-        unexecutable: abilityPlan(text, card).unexecutable || [],
+        unexecutable,
+        reads,
         tags,
         errors,
       })

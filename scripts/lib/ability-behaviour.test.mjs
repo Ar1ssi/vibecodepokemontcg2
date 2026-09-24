@@ -14,6 +14,11 @@ const SWITCH =
   'Once during your turn, you may use this Ability. Switch your Active Pokémon with 1 of your Benched Pokémon.';
 const PASSIVE =
   "As long as Scizor ex's remaining HP is 60 or less, Scizor ex does 40 more damage to the Defending Pokémon (before applying Weakness and Resistance).";
+// Espathra ex: an opponent attack-cost increase no reader applies yet.
+const UNCONSUMED =
+  "As long as this Pokémon is in the Active Spot, attacks used by your opponent's Active Pokémon cost {C} more.";
+// Garganacl: read by abilityStatusImmune, which addCondition consults.
+const CONSUMED = "This Pokémon can't be affected by any Special Conditions.";
 // Ninjask ROS Wing Buzz: parsed as discardOpponentDeckAbility, which has no executor.
 const UNEXECUTED =
   "Once during your turn (before your attack), if this Pokémon is your Active Pokémon, you may discard a card from your hand. If you do, discard the top card of your opponent's deck.";
@@ -57,7 +62,10 @@ test('behaviourClass: runs, partial and dead need an observed state change', () 
     'partial'
   );
   assert.equal(behaviourClass(row(UNEXECUTED, ['ability-used'])), 'dead');
-  assert.equal(behaviourClass(row(PASSIVE, [])), 'passive');
+  // Passive rows are classed by the probe: no reader applies Espathra's cost increase, while
+  // the Special Condition immunity is read.
+  assert.equal(behaviourClass(row(UNCONSUMED, [])), 'unconsumed');
+  assert.equal(behaviourClass(row(CONSUMED, [])), 'consumed');
   // Damage counters on the opponent's Active are an ability's own effect, not attack noise.
   assert.equal(
     behaviourClass(row(SWITCH, ['ability-used', 'opp:active+dmg'])),
@@ -70,23 +78,25 @@ test('classCounts and totalCounts tally per family', () => {
   const counts = classCounts([
     { family: 'switch', behaviour: 'runs' },
     { family: 'switch', behaviour: 'dead' },
-    { family: 'passive', behaviour: 'passive' },
+    { family: 'passive', behaviour: 'consumed' },
   ]);
   assert.deepEqual(counts.switch, {
     n: 2,
     runs: 1,
     partial: 0,
     dead: 1,
-    passive: 0,
+    consumed: 0,
+    unconsumed: 0,
     unparsed: 0,
   });
-  assert.equal(counts.passive.passive, 1);
+  assert.equal(counts.passive.consumed, 1);
   assert.deepEqual(totalCounts(counts), {
     n: 3,
     runs: 1,
     partial: 0,
     dead: 1,
-    passive: 1,
+    consumed: 1,
+    unconsumed: 0,
     unparsed: 0,
   });
 });
@@ -96,7 +106,8 @@ const fam = (n, runs, dead = 0, extra = {}) => ({
   runs,
   partial: 0,
   dead,
-  passive: n - runs - dead,
+  consumed: n - runs - dead,
+  unconsumed: 0,
   unparsed: 0,
   ...extra,
 });
@@ -124,10 +135,17 @@ test('gate fails a runs drop, a dead rise and an unparsed rise', () => {
     2
   );
   const unparsed = checkBehaviourGate(
-    { draw: fam(10, 6, 2, { unparsed: 1, passive: 1 }) },
+    { draw: fam(10, 6, 2, { unparsed: 1, consumed: 1 }) },
     base
   );
   assert.match(unparsed.failures[0], /draw: unparsed 1\/10/);
+});
+
+test('gate fails a passive reader that stopped reading its text', () => {
+  const base = { hp: fam(10, 0, 0) };
+  const { failures } = checkBehaviourGate({ hp: fam(10, 0, 0, { consumed: 9, unconsumed: 1 }) }, base);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /hp: unconsumed 1\/10 vs baseline 0\/10/);
 });
 
 test('gate compares shares, so a grown corpus with the same rates passes', () => {
