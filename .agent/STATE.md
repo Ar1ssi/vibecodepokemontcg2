@@ -8,7 +8,8 @@
 Session: 287
 Focus: S286 feature: design 035 finished — slice 11 trainer play conditions + slice 12 `pnpm audit:trainers` gate
   (branch claude/wizardly-brown-k61li3 = feature/trainer-behaviour + main merged).
-Active: none.
+Active: S288 review of feature/trainer-behaviour (design 035 slices 1-10b): verdict fix first — I138/I139 (P1 prize/KO-draw),
+  I140-I145 (P2), I146/I147 (P3). Same code on this branch (S286/S287 did not touch those paths).
 Next: maintenance due (S270 and S280, still not run). Merge the trainer-behaviour branch to main after review.
   I136 (26 server-missing Trainer step kinds, `pnpm audit:trainers`), I137 (design 035 leftovers).
   User visual check of typed Tera entry/skin, Mega vortex in a real rules-mode game.
