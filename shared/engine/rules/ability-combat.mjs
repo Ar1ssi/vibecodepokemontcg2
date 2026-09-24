@@ -316,7 +316,7 @@ function isSelfScoped(text) {
 
 // A holder's text with its own printed name read as "this pokémon": older cards say "Scizor ex
 // does 40 more damage" / "each of Ursaring's attacks" where newer ones say "this Pokémon" (I137).
-function selfNamedText(holder) {
+export function selfNamedText(holder) {
   const t = cardAbilityText(holder);
   const name = lower(holder?.name).trim();
   if (!name) return t;

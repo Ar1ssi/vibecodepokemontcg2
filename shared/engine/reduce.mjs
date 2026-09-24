@@ -98,6 +98,7 @@ import {
   parseOnOpponentEvolveAbilities,
   parseEndOfTurnAbilities,
   parseOnDamageAbilities,
+  parseOnDamageStatus,
   parseOnKoAbilities,
 } from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
@@ -4768,6 +4769,25 @@ function resolveAttackEffectPhase(draft, ctx) {
                 victim: attacker,
                 events,
               });
+            }
+          }
+
+          // "… the Attacking Pokémon is now Poisoned" (Qwilfish, Numel, …): after thorns, so
+          // an Attacker the thorns Knocked Out is no longer in the Active Spot to receive it.
+          const onDamageStatus = parseOnDamageStatus(defender, {
+            ...abilitySideContext(draft, defenderPlayerId),
+            isActive: true,
+          });
+          const atkRef = onDamageStatus ? findCard(draft, attacker.instanceId) : null;
+          if (atkRef?.zoneId === 'active') {
+            let lands = true;
+            if (onDamageStatus.coin) {
+              const face = flipCoin(activeRng);
+              events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: onDamageStatus.source });
+              lands = face === 'heads';
+            }
+            for (const cond of lands ? onDamageStatus.conditions : []) {
+              if (addCondition(atkRef.card, cond)) events.push(conditionsUpdatedEvent(atkRef.card, cond));
             }
           }
 

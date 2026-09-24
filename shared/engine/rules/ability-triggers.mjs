@@ -24,7 +24,7 @@ import {
   parseThorns,
 } from './ability-executors.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
-import { isAbilitySuppressed, abilityPlayLocks } from './ability-combat.mjs';
+import { isAbilitySuppressed, abilityPlayLocks, selfNamedText } from './ability-combat.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { hasCondition } from './special-conditions.mjs';
 import { attackerTypes, TYPE_LETTER } from './tool-combat.mjs';
@@ -204,6 +204,36 @@ export function parseOnDamageAbilities(holder, ctx = {}) {
     return { count: 0, zone: thorns.zone };
   }
   return thorns;
+}
+
+// "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon
+// (even if this Pokémon is Knocked Out), [flip a coin. If heads,] the Attacking Pokémon is now
+// Poisoned [and …]." The whole clause must match: any other condition (a Pokémon-GX attacker,
+// Energy attached) fails closed. Old printings say "the Defending Pokémon" for the attacker.
+const STATUS_WORD = '(asleep|burned|confused|paralyzed|poisoned)';
+const ON_DAMAGE_STATUS = new RegExp(
+  "(?:^|\\.\\s)if this pokémon (?:is in the active spot|is your active pokémon) and is damaged by " +
+    "(?:an attack from your opponent's pokémon|an opponent's attack) " +
+    '\\(even if (?:this pokémon|it) is knocked out\\), (flip a coin\\. if heads, )?' +
+    `(?:this |the )(?:attacking|defending) pokémon is now ${STATUS_WORD}(?: and ${STATUS_WORD})?\\.`
+);
+const capitalised = (word) => word[0].toUpperCase() + word.slice(1);
+
+/**
+ * On-damage Special Conditions for the Attacking Pokémon (Qwilfish, Numel, Venomoth, …):
+ * `{ conditions, coin }`, or null when the holder's Ability is not live or its wording is not
+ * this exact trigger. Every printing is Active-only, and the reduce hook runs for the Active.
+ */
+export function parseOnDamageStatus(holder, ctx = {}) {
+  if (!holderCanTrigger(holder, ctx)) return null;
+  const text = selfNamedText(holder).replace(/’/g, "'");
+  const m = text.match(ON_DAMAGE_STATUS);
+  if (!m) return null;
+  return {
+    conditions: [m[2], m[3]].filter(Boolean).map(capitalised),
+    coin: Boolean(m[1]),
+    source: holder.name,
+  };
 }
 
 /**

@@ -5,11 +5,13 @@ import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
-import { addCondition } from '../rules/special-conditions.mjs';
+import { addCondition, hasCondition } from '../rules/special-conditions.mjs';
+import { createRng, withForcedCoin } from '../rng.mjs';
 import {
   parseCheckupAbilities,
   parseOnOpponentEvolveAbilities,
   parseOnDamageAbilities,
+  parseOnDamageStatus,
   parseEndOfTurnAbilities,
   parseOnKoAbilities,
   parseOnPromotionAbilities,
@@ -305,6 +307,47 @@ test('parseOnDamageAbilities: zone gate and suppression', () => {
 });
 
 // ── readers pending wiring (slice 5/6 executors) ─────────────────────────
+
+const QWILFISH =
+  "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), the Attacking Pokémon is now Poisoned.";
+const DELCATTY =
+  "If Delcatty is your Active Pokémon and is damaged by an opponent's attack (even if Delcatty is Knocked Out), flip a coin. If heads, the Attacking Pokémon is now Confused.";
+
+test('parseOnDamageStatus: the exact trigger, name-folded and coin-gated; other conditions fail closed', () => {
+  const qwilfish = pokemon({ name: 'Qwilfish', abilities: [ability('Poison Point', QWILFISH)] });
+  assert.deepEqual(parseOnDamageStatus(qwilfish), { conditions: ['Poisoned'], coin: false, source: 'Qwilfish' });
+  const delcatty = pokemon({ name: 'Delcatty', abilities: [ability('Tuff Fur', DELCATTY)] });
+  assert.deepEqual(parseOnDamageStatus(delcatty), { conditions: ['Confused'], coin: true, source: 'Delcatty' });
+  const gxOnly = pokemon({
+    name: 'Sigilyph-GX',
+    abilities: [ability('X', QWILFISH.replace("opponent's Pokémon", "opponent's Pokémon-GX"))],
+  });
+  assert.equal(parseOnDamageStatus(gxOnly), null);
+});
+
+function attackIntoTrigger(text, name, rng) {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({ instanceId: 10, name: 'Attacker', hp: 200, attacks: [{ name: 'Hit', damage: 30, cost: [] }] })
+  );
+  state.players.p1.zones.deck.push(pokemon({ instanceId: 11, name: 'Deck1' }));
+  state.players.p2.zones.active.push(pokemon({ instanceId: 20, name, hp: 200, abilities: [ability('Trigger', text)] }));
+  state.players.p2.zones.deck.push(pokemon({ instanceId: 21, name: 'Deck2' }));
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  return res.state.players.p1.zones.active[0];
+}
+
+test('on-damage status hook: the Attacking Pokémon is Poisoned when it damages Qwilfish', () => {
+  assert.equal(hasCondition(attackIntoTrigger(QWILFISH, 'Qwilfish', createRng(3)), 'Poisoned'), true);
+});
+
+test('on-damage status hook: a coin-gated condition lands only on heads', () => {
+  const heads = attackIntoTrigger(DELCATTY, 'Delcatty', withForcedCoin(createRng(3), 'heads'));
+  const tails = attackIntoTrigger(DELCATTY, 'Delcatty', withForcedCoin(createRng(3), 'tails'));
+  assert.equal(hasCondition(heads, 'Confused'), true);
+  assert.equal(hasCondition(tails, 'Confused'), false);
+});
 
 test('parseOnKoAbilities: reads Miraidon Photon Cord', () => {
   const state = setupGame();

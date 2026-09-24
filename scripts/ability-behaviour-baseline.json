@@ -5,8 +5,8 @@
     "runs": 1635,
     "partial": 257,
     "dead": 102,
-    "consumed": 1090,
-    "unconsumed": 1143,
+    "consumed": 1128,
+    "unconsumed": 1105,
     "unparsed": 1
   },
   "families": {
@@ -276,8 +276,8 @@
       "runs": 10,
       "partial": 1,
       "dead": 0,
-      "consumed": 13,
-      "unconsumed": 39,
+      "consumed": 14,
+      "unconsumed": 38,
       "unparsed": 0
     },
     "look-at-top": {
@@ -402,8 +402,8 @@
       "runs": 194,
       "partial": 24,
       "dead": 24,
-      "consumed": 72,
-      "unconsumed": 193,
+      "consumed": 109,
+      "unconsumed": 156,
       "unparsed": 0
     },
     "status-recover": {

@@ -42,6 +42,7 @@ import {
   parseOnOpponentEvolveAbilities,
   parseEndOfTurnAbilities,
   parseOnDamageAbilities,
+  parseOnDamageStatus,
   parseOnKoAbilities,
 } from '../../shared/engine/rules/ability-triggers.mjs';
 import {
@@ -234,6 +235,7 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     if (!holderCard) continue;
     const ctx = at(p1, holderCard);
     ask('onDamage', () => parseOnDamageAbilities(holderCard, ctx));
+    ask('onDamageStatus', () => parseOnDamageStatus(holderCard, ctx));
     ask('ignoresDefenderEffects', () => abilityIgnoresDefenderEffects(holderCard));
     ask('setupActive', () => [abilitySetupActive(holderCard), abilitySetupActive(holderCard, { goingSecond: true })]);
     ask('prizeToBench', () => abilityPrizeToBench(holderCard));
