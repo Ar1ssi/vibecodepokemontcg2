@@ -170,6 +170,17 @@ const TEMPLATES = [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) 1 of your pokémon to another of your pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', count: 1, ...energyFilter(m[1], s) }),
   ],
+  // Rest-of-game effects (design 036 E): kept on the attacking player, read by the damage path
+  // and the attack legality gate.
+  [
+    /^for the rest of this game, your pokémon's attacks do (\d+) more damage to your opponent's active pokémon$/,
+    (m) => ({ type: 'atkRestOfGame', effect: { kind: 'damageBonus', amount: Number(m[1]) } }),
+  ],
+  [
+    /^for the rest of this game, your \{([a-z])\} pokémon take (\d+) less damage from your opponent's attacks$/,
+    (m) => ({ type: 'atkRestOfGame', effect: { kind: 'damageReduce', amount: Number(m[2]), pokemonType: m[1] } }),
+  ],
+  [/^for the rest of this game, your opponent can't use any gx attacks$/, () => ({ type: 'atkRestOfGame', effect: { kind: 'gxLock' } })],
   // Opponent Energy between their own Pokémon.
   [
     new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to (?:1 of (?:their|your opponent's) benched pokémon|another of (?:their|your opponent's) pokémon)$`),
@@ -732,6 +743,32 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // "Use the effect of that Supporter card as the effect of this attack" (design 036 E): where
+  // the Supporter comes from, and whether it is discarded on the way.
+  [
+    /(?:your opponent reveals? their hand|look at your opponent's hand)\. you may (discard a supporter card you find there and )?use the effect of (?:that card|a supporter card you find there) as the effect of this attack\./g,
+    (m) => ({ type: 'atkUseSupporter', source: 'oppHand', optional: true, ...(m[1] ? { discard: true } : {}) }),
+  ],
+  [
+    /(?:your opponent reveals? their hand\. discard a supporter card you find there\.|look at your opponent's hand, choose a supporter card you find there, and discard it\. then,) use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'oppHand', discard: true }),
+  ],
+  [
+    /discard a supporter card from your hand\. if you do, use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'hand', discard: true }),
+  ],
+  [
+    /(?:choose a supporter card from|search) (your opponent's|your) discard pile(?: for a supporter card)? and use (?:the effect of that card|it) as the effect of this attack\./g,
+    (m) => ({ type: 'atkUseSupporter', source: m[1] === 'your' ? 'discard' : 'oppDiscard' }),
+  ],
+  [
+    /discard the top card of your deck, and if that card is a supporter card, use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'deckTop', discard: true }),
+  ],
+  [
+    /search your deck for a supporter card and discard it\. shuffle your deck afterward\. then, use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'deck', discard: true }),
+  ],
   [
     /look at the top (\d+) cards of your deck(?:, and|\.) you may put any number of (basic )?pokémon you find there onto your bench\. shuffle the other cards back into your deck\./g,
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),

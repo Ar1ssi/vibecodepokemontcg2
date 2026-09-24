@@ -76,6 +76,7 @@ import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-steps.mjs';
+import { pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
 import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
@@ -461,9 +462,27 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
 function activeAttackMarkers(draft, playerId, card) {
   const active = draft.players[playerId]?.zones?.active || [];
   if (!card || !active.some((c) => c.instanceId === card.instanceId)) return [];
-  return liveAttackMarkers(card, {
-    turnNumber: draft.turn?.number || 1,
-    zoneCards: active,
+  return [
+    ...liveAttackMarkers(card, {
+      turnNumber: draft.turn?.number || 1,
+      zoneCards: active,
+    }),
+    ...restOfGameMarkers(draft, playerId, card),
+  ];
+}
+
+// "For the rest of this game, …" (design 036 E) read as the marker kinds the damage path knows:
+// a bonus on the player's Active attacker, a reduction on their typed Active defender.
+function restOfGameMarkers(draft, playerId, card) {
+  const effects = draft.players[playerId]?.restOfGame || [];
+  if (effects.length === 0) return [];
+  const view = inPlayView(draft, card);
+  return effects.flatMap((effect) => {
+    if (effect.kind === 'damageBonus') return [{ kind: 'nextTurnBonus', amount: effect.amount }];
+    if (effect.kind === 'damageReduce' && (!effect.pokemonType || pokemonHasType(view, effect.pokemonType))) {
+      return [{ kind: 'incomingReduce', amount: effect.amount, afterWR: true }];
+    }
+    return [];
   });
 }
 
@@ -2467,6 +2486,10 @@ export function validateLegality(state, command) {
       // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
       // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide. Share the
       // `useVStarGX` guard so a legacy state whose marker lives on `flags` also blocks it.
+      const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
+      if (isGxAttack(attack) && state.players[opponentId]?.restOfGame?.some((e) => e.kind === 'gxLock')) {
+        return { allowed: false, reason: "Your opponent's attack stops you using GX attacks for the rest of the game." };
+      }
       if (isGxAttack(attack) && oncePerGameUsed(player, 'gx')) {
         return {
           allowed: false,
@@ -3502,7 +3525,7 @@ function copySourceCards(draft, { copy, playerId, oppId }) {
   const opp = draft.players[oppId]?.zones || {};
   switch (copy.source) {
     case 'ownBench':
-      return rootsIn(own.bench).filter((c) => inCopyGroup(c, copy.group));
+      return rootsIn(own.bench).filter((c) => !copy.group || inCopyGroup(c, copy.group));
     case 'ownDiscard':
       return rootsIn(own.discard).filter((c) => (c.types || []).includes(copy.pokemonType));
     case 'oppActive':
@@ -3529,6 +3552,7 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker }) {
     const attacks = (inPlay ? inPlayView(draft, card) : card)?.attacks || [];
     for (const attack of attacks) {
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
+      if (copy.excludeGx && isGxAttack(attack)) continue;
       if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
       candidates.push({ sourceId: card.instanceId, sourceName: card.name, attack: { ...attack } });
     }

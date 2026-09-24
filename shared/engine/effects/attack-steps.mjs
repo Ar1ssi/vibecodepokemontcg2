@@ -13,6 +13,7 @@
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isBasicPokemon, isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import {
   addCondition,
   clearConditions,
@@ -2144,6 +2145,94 @@ function atkOppShuffleHandDraw(ctx) {
   return null;
 }
 
+// ── design 036 E ────────────────────────────────────────────────────────────
+
+const isSupporterCard = (card) => matchesSearch(card, 'supporter');
+
+// Where an atkUseSupporter step looks, and whose zone the card is in.
+function supporterSource(ctx) {
+  const { player, opponent, step } = ctx;
+  switch (step.source) {
+    case 'hand':
+      return { owner: player, zone: 'hand' };
+    case 'discard':
+      return { owner: player, zone: 'discard' };
+    case 'deck':
+    case 'deckTop':
+      return { owner: player, zone: 'deck' };
+    case 'oppHand':
+      return { owner: opponent, zone: 'hand' };
+    default:
+      return { owner: opponent, zone: 'discard' };
+  }
+}
+
+/** Runs the chosen Supporter's printed effect as this attack's next steps. */
+function useSupporterEffect(ctx, owner, card) {
+  if (ctx.step.discard && ctx.step.source !== 'discard' && ctx.step.source !== 'oppDiscard') {
+    discardCards(owner, [card], ctx.events);
+  }
+  if (ctx.step.source === 'deck') shuffleOwnDeck(owner, ctx);
+  const steps = parseTrainerEffect(card.text || card.effect || card.cardText || '')?.steps || [];
+  ctx.events.push({
+    type: 'supporterEffectUsed',
+    playerId: ctx.playerId,
+    instanceId: card.instanceId,
+    name: card.name,
+    stepCount: steps.length,
+  });
+  if (steps.length > 0) ctx.insertSteps(steps);
+  return null;
+}
+
+// "Use the effect of that Supporter card as the effect of this attack" (Mimikyu Impersonation,
+// Oranguru Primate Acting, Ninetales Supernatural Shapeshifter, Mr. Mime Look-Alike Show).
+function atkUseSupporter(ctx) {
+  const { step } = ctx;
+  const { owner, zone } = supporterSource(ctx);
+  if (!owner) return skip(ctx, 'no_opponent');
+  const cards = owner.zones[zone] || [];
+  if (step.source === 'deckTop') {
+    const top = cards[0];
+    if (!top) return skip(ctx, 'empty_deck');
+    if (!isSupporterCard(top)) {
+      discardCards(owner, [top], ctx.events);
+      return null;
+    }
+    return useSupporterEffect(ctx, owner, top);
+  }
+  const candidates = cards.filter(isSupporterCard);
+  if (ctx.selection) {
+    const chosen = candidates.find((c) => c.instanceId === ctx.selection[0]);
+    if (!chosen) {
+      if (step.source === 'deck') shuffleOwnDeck(owner, ctx);
+      return null;
+    }
+    return useSupporterEffect(ctx, owner, chosen);
+  }
+  if (step.source === 'oppHand') {
+    ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: cards.length });
+  }
+  if (candidates.length === 0) {
+    if (step.source === 'deck') shuffleOwnDeck(owner, ctx);
+    return skip(ctx, 'no_supporter');
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a Supporter card whose effect this attack uses`,
+    options: candidates,
+    min: step.optional ? 0 : 1,
+    max: 1,
+  });
+}
+
+// "For the rest of this game, …": kept on the attacking player (read by reduce).
+function atkRestOfGame(ctx) {
+  const { player, step } = ctx;
+  player.restOfGame = [...(player.restOfGame || []), step.effect];
+  ctx.events.push({ type: 'restOfGameEffect', playerId: player.playerId, effect: step.effect });
+  return null;
+}
+
 export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
@@ -2164,6 +2253,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOppActive,
   atkShuffleOwnBench,
   atkOppShuffleHandDraw,
+  atkUseSupporter,
+  atkRestOfGame,
   atkLostZoneOppDiscard,
   atkLostZoneSelf,
   atkLostZoneOppActive,

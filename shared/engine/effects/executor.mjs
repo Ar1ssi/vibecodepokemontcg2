@@ -253,6 +253,11 @@ export function executeSteps(draft, {
         events,
         selection: stepSelection,
         memo: context[memoKey],
+        // Runs `more` right after this step (a Supporter's effect used as an attack's, design
+        // 036 E). The widened list rides on later resume tokens.
+        insertSteps: (more) => {
+          steps = [...steps.slice(0, idx + 1), ...more, ...steps.slice(idx + 1)];
+        },
         ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
           context[memoKey] = memo;
           return createPendingChoice({
