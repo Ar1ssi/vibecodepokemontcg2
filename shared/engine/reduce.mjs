@@ -508,6 +508,46 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, events 
   return amount;
 }
 
+// Chaos Gym: every Trainer card other than a Stadium is coin-gated, whether played
+// or attached from hand as a Pokémon Tool. Tails means it can't be played and goes
+// to the discard pile. Returns true when the card was blocked.
+// (The printed "opponent may use that card instead" clause is not implemented.)
+function chaosGymBlocks(draft, { card, playerId, activeRng, events }) {
+  const chaos = stadiumTrainerPlayCoin(draft.stadium?.card || draft.stadium, card);
+  if (!chaos) return false;
+  const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+  events.push({ type: 'coinFlipped', playerId, face, source: chaos.source });
+  if (face === 'heads') return false;
+  const hand = draft.players[playerId].zones.hand;
+  const handIdx = hand.findIndex((c) => c.instanceId === card.instanceId);
+  if (handIdx >= 0) {
+    const [blocked] = hand.splice(handIdx, 1);
+    blocked.attachedTo = null;
+    discardCardToPlayerZone(draft.players[playerId], blocked);
+    events.push({ type: 'cardMoved', instanceId: blocked.instanceId, from: 'hand', to: 'discard', playerId });
+  }
+  events.push({
+    type: 'trainerPlayBlocked',
+    playerId,
+    instanceId: card.instanceId,
+    name: card.name || '',
+    source: chaos.source,
+  });
+  return true;
+}
+
+// Prize-count inputs computeAttackDamage reads, from the attacking player's side.
+function prizeFlags(draft, attackerPlayerId, defenderPlayerId) {
+  const attackerPrizesRemaining = (draft.players[attackerPlayerId]?.zones?.prizes || []).length;
+  const defenderPrizesRemaining = (draft.players[defenderPlayerId]?.zones?.prizes || []).length;
+  return {
+    attackerTrailingPrizes: attackerPrizesRemaining > defenderPrizesRemaining,
+    defenderTrailingPrizes: defenderPrizesRemaining > attackerPrizesRemaining,
+    attackerPrizesRemaining,
+    defenderPrizesRemaining,
+  };
+}
+
 // A chosen-target clause's damage to the opponent's Active after Weakness,
 // Resistance and the other attack modifiers computeAttackDamage applies.
 function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }) {
@@ -530,7 +570,7 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       stadium: draft.stadium,
       defenderIsActive: true,
       baseDamage: clause.amount,
-      defenderPrizesRemaining: (defenderPlayer?.zones?.prizes || []).length,
+      ...prizeFlags(draft, attackerPlayerId, ref.playerId),
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
       ...clause.immunity,
       defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
@@ -635,6 +675,7 @@ function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerP
       stadium: draft.stadium,
       defenderIsActive: true,
       baseDamage: marker.amount,
+      ...prizeFlags(draft, strikerPlayerId, attackerPlayerId),
       defenderMarkers: activeAttackMarkers(draft, attackerPlayerId, target),
     }
   );
@@ -4130,11 +4171,6 @@ function resolveAttackEffectPhase(draft, ctx) {
           ...(draft.players[defenderPlayerId]?.zones?.active || []),
           ...(draft.players[defenderPlayerId]?.zones?.bench || []),
         ];
-        const myPrizes = (draft.players[playerId]?.zones?.prizes || []).length;
-        const oppPrizes = (draft.players[defenderPlayerId]?.zones?.prizes || [])
-          .length;
-        const attackerTrailingPrizes = myPrizes > oppPrizes;
-        const defenderTrailingPrizes = oppPrizes > myPrizes;
         const defenderPoisoned = hasCondition(defender, 'Poisoned');
 
         const dmgResult = computeAttackDamage(
@@ -4147,10 +4183,7 @@ function resolveAttackEffectPhase(draft, ctx) {
             defenderInPlayCards,
             stadium: draft.stadium,
             defenderIsActive: true,
-            attackerTrailingPrizes,
-            defenderTrailingPrizes,
-            attackerPrizesRemaining: myPrizes,
-            defenderPrizesRemaining: oppPrizes,
+            ...prizeFlags(draft, playerId, defenderPlayerId),
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
@@ -5278,6 +5311,16 @@ export function applyCommand(state, command, rng = null) {
         findCard(draft, attachmentHostId(draft, payload.targetInstanceId)) ||
         targetRef;
 
+      if (
+        cardRef &&
+        targetRef &&
+        cardRef.playerId === playerId &&
+        cardRef.zoneId === 'hand' &&
+        isPokemonToolCard(cardRef.card) &&
+        chaosGymBlocks(draft, { card: cardRef.card, playerId, activeRng, events })
+      ) {
+        break;
+      }
       if (cardRef && targetRef) {
         // Splice card out of its origin zone
         const srcZone = draft.players[playerId].zones[cardRef.zoneId];
@@ -5896,43 +5939,7 @@ export function applyCommand(state, command, rng = null) {
     case 'playTrainer': {
       const cardRef = findCard(draft, payload.instanceId);
       if (cardRef) {
-        // Chaos Gym: every Trainer card other than a Stadium is coin-gated. Tails
-        // means it can't be played; either way the card goes to the discard pile.
-        // (The printed "opponent may use that card instead" clause is not implemented.)
-        const chaos = stadiumTrainerPlayCoin(
-          draft.stadium?.card || draft.stadium,
-          cardRef.card
-        );
-        if (chaos) {
-          const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
-          events.push({ type: 'coinFlipped', playerId, face, source: chaos.source });
-          if (face === 'tails') {
-            const hand = draft.players[playerId].zones.hand;
-            const handIdx = hand.findIndex(
-              (c) => c.instanceId === cardRef.card.instanceId
-            );
-            if (handIdx >= 0) {
-              const [blocked] = hand.splice(handIdx, 1);
-              blocked.attachedTo = null;
-              discardCardToPlayerZone(draft.players[playerId], blocked);
-              events.push({
-                type: 'cardMoved',
-                instanceId: blocked.instanceId,
-                from: 'hand',
-                to: 'discard',
-                playerId,
-              });
-            }
-            events.push({
-              type: 'trainerPlayBlocked',
-              playerId,
-              instanceId: cardRef.card.instanceId,
-              name: cardRef.card.name || '',
-              source: chaos.source,
-            });
-            break;
-          }
-        }
+        if (chaosGymBlocks(draft, { card: cardRef.card, playerId, activeRng, events })) break;
         executeTrainer(draft, {
           card: cardRef.card,
           playerId,

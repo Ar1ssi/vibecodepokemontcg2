@@ -163,8 +163,8 @@ Contract (stable surface):
 | 9 | Heavy Ball: 0 / 1 / 2 matching Basics; player declines | skip + discard / choice / choice; decline → discard, Prizes unchanged | [x] covered: trainer-steps-missing.test.mjs "Heavy Ball with no matching Basic …", "… chooses between two Basics, or declines", "Hisuian Heavy Ball trades itself …" |
 | 10 | Mr. Fuji with an empty Bench | `no_pokemon` skip (Active never offered) | [x] covered: shared/engine/__tests__/trainer-steps-missing.test.mjs "Mr. Fuji offers only Benched Pokémon, and skips with an empty Bench" |
 | 11 | Card shuffled into deck, later drawn and benched | enters with 0 damage, no conditions, no markers | [x] covered: trainer-steps-missing.test.mjs "a stack shuffled in forgets damage, conditions and markers" (state reset in deck; drawing/benching adds nothing) |
-| 12 | Chaos Gym + Tool via attachCard, tails | Tool discarded, not attached, `trainerPlayBlocked` event | [ ] |
-| 13 | Chaos Gym + Stadium / Energy attach | no flip | [ ] |
+| 12 | Chaos Gym + Tool via attachCard, tails | Tool discarded, not attached, `trainerPlayBlocked` event | [x] covered: shared/engine/__tests__/stadium-triggers.test.mjs "Chaos Gym: a Pokémon Tool attached from hand flips; Energy does not" |
+| 13 | Chaos Gym + Stadium / Energy attach | no flip | [x] covered: same test (Energy attach, no `coinFlipped`); Stadium: stadiumTrainerPlayCoin returns null (unchanged) |
 | 14 | Focus Band tails / bench snipe with and without RNG | `coinFlipped` emitted on tails; bench path flips when RNG present | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Focus Band reports its tails flip…", "…on a Benched Pokémon flips against bench spread damage", "…without a coin flipper" |
 | 15 | Replay / undo of a command with a new flip | deterministic: flips consume `activeRng` in the same order on replay | [x] covered: tool-on-ko.test.mjs "Focus Band flips replay deterministically from the same seed" (Focus Band flips only; Chaos Gym flips in slice 4) |
 | 16 | Blaine's Last Resort with 2 copies / with 1 other card / unknown hand | allowed / blocked / skipped | [ ] |
@@ -234,3 +234,11 @@ Self-approval checklist (only when the user is unreachable):
 - [ ] Interfaces fully named and typed — no hand-waving
 - [ ] Slices each ≤1 session and independently green
 - [ ] No section reads "TBD"
+
+Slice 4 (S292):
+- `chaosGymBlocks(draft, {card, playerId, activeRng, events})`: no `fromZone` param; attachCard gates on
+  `zoneId === 'hand'` && the actor owns the card && `isPokemonToolCard` before calling it.
+- Test for I144 asserts the clause hit's own `dealt`: the main attack site also adds Defiance Band to the
+  0-damage attack (pre-existing, filed I152), so the Active's total damage is not the clause's.
+
+---

@@ -618,3 +618,52 @@ test('Spikemuth: a Trainer switch counters the Pokémon moving to the Bench', ()
   assert.equal(res.error, null);
   assert.equal(findCard(res.state, active.instanceId).card.damage, 20);
 });
+
+test('Chaos Gym: a Pokémon Tool attached from hand flips; Energy does not', () => {
+  const chaosText =
+    "Whenever a player plays a Trainer card other than a Stadium card, he or she flips a coin. If heads, that player plays that card normally. If tails, the player can't play that card.";
+  const setup = () => {
+    const state = game();
+    state.stadium = stadium('Chaos Gym', chaosText);
+    const tool = card({
+      name: 'Test Tool',
+      type: 'Trainer',
+      trainerType: 'Tool',
+      subtypes: ['Pokémon Tool'],
+      text: 'The Pokémon this card is attached to gets +10 HP.',
+    });
+    state.players.p1.zones.hand.push(tool);
+    const host = state.players.p1.zones.active.find((c) => !c.attachedTo);
+    return { state, tool, host };
+  };
+  const attach = ({ state, tool, host }, rng) =>
+    applyCommand(
+      state,
+      { type: 'attachCard', payload: { instanceId: tool.instanceId, targetInstanceId: host.instanceId }, playerId: 'p1' },
+      rng
+    );
+
+  const tails = setup();
+  const tailsRes = attach(tails, rngOf(0.9));
+  assert.equal(tailsRes.error, null);
+  assert.ok(tailsRes.events.some((e) => e.type === 'coinFlipped' && e.face === 'tails'));
+  assert.ok(tailsRes.events.some((e) => e.type === 'trainerPlayBlocked'));
+  assert.ok(tailsRes.state.players.p1.zones.discard.some((c) => c.instanceId === tails.tool.instanceId));
+  assert.ok(!tailsRes.state.players.p1.zones.active.some((c) => c.instanceId === tails.tool.instanceId));
+
+  const heads = setup();
+  const headsRes = attach(heads, rngOf(0.1));
+  assert.equal(headsRes.error, null);
+  assert.equal(findCard(headsRes.state, heads.tool.instanceId).card.attachedTo, heads.host.instanceId);
+
+  const withEnergy = setup();
+  const fire = energy();
+  withEnergy.state.players.p1.zones.hand.push(fire);
+  const energyRes = applyCommand(
+    withEnergy.state,
+    { type: 'attachCard', payload: { instanceId: fire.instanceId, targetInstanceId: withEnergy.host.instanceId }, playerId: 'p1' },
+    rngOf(0.9)
+  );
+  assert.equal(energyRes.error, null);
+  assert.ok(!energyRes.events.some((e) => e.type === 'coinFlipped'));
+});

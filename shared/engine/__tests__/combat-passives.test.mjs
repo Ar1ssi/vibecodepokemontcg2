@@ -668,3 +668,45 @@ describe('Phase 1: Combat Passives & Modifier Pipeline', () => {
     });
   });
 });
+
+test('Defiance Band applies to a chosen-target hit on the Active when trailing on Prizes', () => {
+  const state = createTestGame();
+  const attacker = createCard({
+    instanceId: 1,
+    name: 'Sniper',
+    subtypes: ['Basic'],
+    types: ['Colorless'],
+    hp: 60,
+    attacks: [
+      { name: 'Snipe', cost: [], damage: '', text: "This attack does 30 damage to 1 of your opponent's Pokémon." },
+    ],
+  });
+  const band = createCard({
+    instanceId: 2,
+    name: 'Defiance Band',
+    type: 'Trainer',
+    trainerType: 'Tool',
+    subtypes: ['Pokémon Tool'],
+    attachedTo: 1,
+    text: "If you have more Prize cards remaining than your opponent, the attacks of the Pokémon this card is attached to do 30 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).",
+  });
+  const defender = createCard({ instanceId: 3, name: 'Snorlax', subtypes: ['Basic'], types: ['Colorless'], hp: 150 });
+  const benched = createCard({ instanceId: 4, name: 'Bench', subtypes: ['Basic'], types: ['Colorless'], hp: 150 });
+  state.players.p1.zones.active.push(attacker, band);
+  state.players.p2.zones.active.push(defender);
+  state.players.p2.zones.bench.push(benched);
+  state.players.p1.zones.prizes = [101, 102, 103, 104].map((id) => createCard({ instanceId: id, name: 'P' }));
+  state.players.p2.zones.prizes = [201, 202].map((id) => createCard({ instanceId: id, name: 'P' }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  const resolved = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [3] },
+    playerId: 'p1',
+  });
+  assert.equal(resolved.error, null);
+  // The clause hit's own damage; the main-site 0-damage bonus is I152.
+  const hit = resolved.events.find((e) => e.type === 'damageUpdated' && e.instanceId === 3);
+  assert.equal(hit.dealt, 60);
+});
