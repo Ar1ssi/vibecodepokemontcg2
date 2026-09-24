@@ -12,6 +12,9 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I137 2026-09-24 P3 [rules] Design 035 leftovers: unparsed play conditions (Lt. Surge, Kahili, Glass Trumpet, Cyrus Prism Star, Green's Exploration, Anthea & Concordia, Luxury Ball, Nugget/Dream Ball) and step/tool gaps (Gladion Prize shuffle, Peeking Red Card, Evil Deeds "up to 2", Daisy's Help draw, attachAttackTool qualifiers, "Your turn ends.", Spell Tag/Spirit Mask/Heavy Baton/Berries, Counter Gain cost gate, Chaos Gym opponent use)
+  detail: each is listed with its reason in design 035's Deviations (slices 4, 6, 7, 8, 9, 10b, 11) (refs: design 035, S286)
+- I136 2026-09-24 P2 [rules] 26 parsed Trainer step kinds (one card each: Alph Lithograph, Buddy-Buddy Rescue, Caitlin, Eneporter, Fan of Waves…) have no server executor, so the authoritative game skips them — `pnpm audit:trainers` lists every `server-missing:<step>` (refs: design 035, S286)
 - I127 2026-09-23 P3 [rules] The card inspector's retreat tile ignores bench abilities: retreatGateFor passes `zoneCards: []` and the printed cost to canRetreat, so a Latias ex Skyliner free retreat still renders as unpaid (refs: S277)
 - I126 2026-09-23 P3 [rules] Team-wide retreat-cost abilities with an energy condition (Metal Bridge, Thunderclap Zone, Aqua Tube, Dark Cloak) are not applied: teamNoRetreatCostForActive handles only unconditional "in play have no Retreat Cost" wordings (refs: S277)
 - I125 2026-09-23 P3 [rules] A period inside the attacker's name breaks sentence splitting: Lt. Surge's Raichu Mega Shock gated recoil is not parsed — node .agent/scratch/i118/gateprobe2.mjs (refs: design 032, S271)
@@ -299,3 +302,8 @@
     instead of calling initializePlayerDeck directly; `undo` implemented as commandLog-minus-tail
     replay from a fresh seeded state.
 - I48 2026-09-16 P2 [netcode] SERVER_AUTHORITATIVE hand renders every card TWICE: after setup client A's #hand held 8 legacy <img>s (no data-instance-id) plus 9 server-rendered ones (apply-view.js); legacy zone arrays (window.__ptcg.zone) still count 9, so harness waits on zone counts are unreliable — likely also behind I47. Repro: .agent/scratch/mp-preview-repro.mjs "hand imgs" dump (refs: S141, I47) — **Closed S142 2026-09-16**: legacy move/sort/shuffle/reveal paths no longer write the DOM of server-drawn zones (server-rendered-zones.mjs, rebuild-zone-dom.js); live repro 53 duplicate <img>s before, 0 after. Not the cause of I47 (test:flip still stalls after join).
+- I131 2026-09-23 P1 [rules] KO prize counts wrong for 11 Tools: parsePrizeModify read the text's first number (0 or 101 prizes) (refs: design 035, S279) → closed 2026-09-24 S286: prize-clause-only parser (slice 1)
+- I132 2026-09-23 P2 [rules] Fossil Items could never bench their own card: look-at pick hardcoded 'Darkness Pokémon (bench)' (refs: design 035, S279) → closed 2026-09-24 S286: bench pick vocabulary (slice 2)
+- I133 2026-09-23 P2 [rules] Conditional Tool modifiers (HP/retreat/damage/prevention/prize) over-applied (refs: design 035, S279) → closed 2026-09-24 S286: tool-conditions.mjs gating (slices 3-4)
+- I134 2026-09-23 P2 [rules] 28 parsed Trainer step kinds had no server executor (refs: design 035, S279) → closed 2026-09-24 S286: handlers for the audit's list (slices 5-7); remaining kinds → I136
+- I135 2026-09-23 P2 [rules] Passive Trainers did nothing: turn damage bonus wording, drawUntil targets, Tool on-damage/on-KO, triggered Stadiums, play conditions (refs: design 035, S279) → closed 2026-09-24 S286: slices 8-11; leftovers → I137

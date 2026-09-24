@@ -9,6 +9,7 @@ server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQL
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
 scripts/audit-oracle.mjs (`pnpm audit:oracle`, ~2 min) — execution gate: runs every corpus attack/ability through the engine (lib/oracle-harness.mjs), ratchets per-family observed rates vs scripts/oracle-baseline.json (lib/oracle-gate.mjs); family claim lists in lib/executed-families.mjs (I113)
+scripts/audit-trainer-behaviour.mjs (`pnpm audit:trainers`, seconds) — Trainer gate: parse + server-executor coverage + play conditions per corpus card (lib/trainer-behaviour.mjs) ratcheted vs scripts/trainer-behaviour-baseline.json (D123); scripts/audit-all-trainers.mjs writes the long-form report out/trainer-full-audit.txt
 tools/ — internal dev tools, sync log comparison, asset mappings
 client/src/css/deck-builder-live.css — deck builder's PTCG Live theme (D: S252); ALL rules scoped
   under `.db-live` (on #nativeDeckBuilderWorkspace) — that class is what overrides index.css on
@@ -95,6 +96,10 @@ shared/engine/rules/special-energy-parse.mjs — special-energy text → structu
 shared/engine/rules/special-conditions.mjs — server card conditions: rotation field + Poison/Burn marker keys (D45); every reducer/effect write goes through it
 shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
 shared/engine/rules/trainer-play-conditions.mjs — `trainerPlayBlockReason` (turn-1 Supporter, same Stadium, printed play conditions); used by reduce.mjs legality and the bot's e2e-options.mjs
+shared/engine/rules/tool-conditions.mjs — `parseToolCondition`/`toolConditionMet` gate every Tool modifier (HP, retreat, damage, prevention, prize) on holder/attacker/defender/prize conditions (design 035)
+shared/engine/rules/tool-attacks.mjs — attacks granted by TM/attack Tools (`parseGrantedAttacks`), merged by reduce.mjs `attackViewFor`
+shared/engine/rules/stadium-triggers.mjs + effects/stadium-trigger-apply.mjs — Stadium triggers on attach/evolve/bench/switch/checkup/retreat/Trainer/attack coin and W/R overrides; apply helper shared by switch sites (design 035 slice 10)
+shared/engine/rules/turn-damage-bonus.mjs — "during this turn, your … attacks do N more damage" Trainer bonuses (incl. possessive/per-Prize wording)
 shared/engine/rules/evolved-pokemon.mjs — `evolvedView` (in-play Pokémon read as its top Evolution card), Rare Candy line tracing, Trainer target counts; used by reduce.mjs, trainer-steps.mjs, the bot
 shared/engine/rules/server-energy.mjs — `serverEnergyDescriptor`: how the server prices attached Energy; the bot uses it too
 shared/engine/effects/executor.mjs — resumable step runner; core step kinds inline, the rest delegated to trainer-steps.mjs

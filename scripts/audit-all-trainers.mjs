@@ -17,6 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseTrainerEffect, describeStep } from '../shared/engine/rules/trainer-effects.mjs';
+import { classifyTrainer } from './lib/trainer-behaviour.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JSON_PATH = path.join(__dirname, '..', 'out', 'pkmn-trainer-cards.json');
@@ -60,9 +61,9 @@ const AUTO_STEP_TYPES = new Set([
 ]);
 
 // Every step type runTrainerSteps() (client/src/setup/rules/trainer-execution.js)
-// handles with a real state change or interactive picker. A parsed step outside
-// this set (other than `passive`) is silently skipped by the engine — the true
-// "announce-only" gap.
+// handles with a real state change or interactive picker — the legacy client only.
+// The authoritative server's coverage is the separate `server` column below
+// (isExecutableStepType via scripts/lib/trainer-behaviour.mjs).
 const EXECUTED_STEP_TYPES = new Set([
   'passive',
   ...AUTO_STEP_TYPES,
@@ -228,6 +229,7 @@ function classify(card) {
   return {
     parsed,
     status,
+    serverMissing: classifyTrainer(card).serverMissing,
     stepSummary: stepSummary(parsed.steps),
     descriptions: parsed.steps.map((s) => describeStep(s)),
     warnings: suspiciousWarnings(parsed, card.text),
@@ -268,6 +270,13 @@ for (const [k, v] of tally((r) => r.card.subtitle || '(none)')) log(`  ${String(
 log('\n=== By parse outcome ===');
 for (const [k, v] of tally((r) => r.status)) log(`  ${String(v).padStart(4)}  ${k}`);
 
+const serverGaps = rows.filter((r) => r.serverMissing.length > 0);
+log(`\n=== Server coverage: cards with a parsed step the server cannot execute (${serverGaps.length}) ===`);
+log('  (Legacy-client coverage is the parse outcome above; the server is authoritative.)');
+for (const r of serverGaps.sort((a, b) => a.card.name.localeCompare(b.card.name))) {
+  log(`  [${r.card.subtitle}] ${r.card.name} — server lacks: ${r.serverMissing.join(', ')}`);
+}
+
 const GAP = (r) => r.status === 'unrecognizable' || r.status === 'empty' || r.status === 'unhandled-step';
 const gaps = rows.filter(GAP).sort((a, b) => a.card.name.localeCompare(b.card.name));
 log(`\n=== Gaps: unrecognizable / empty / unhandled step (${gaps.length}) ===`);
@@ -297,7 +306,8 @@ for (const r of suspicious) {
 const wired = rows.filter((r) => !GAP(r) && r.status !== 'passive-only' && !SUS(r));
 log(`\n=== OK (${wired.length}) ===`);
 for (const r of wired.sort((a, b) => a.card.name.localeCompare(b.card.name))) {
-  log(`  [${r.status}] ${r.card.name} — ${r.stepSummary}`);
+  const server = r.serverMissing.length ? 'server: missing' : 'server: ok';
+  log(`  [${r.status}] ${r.card.name} — ${r.stepSummary} (${server})`);
 }
 
 fs.writeFileSync(REPORT_PATH, lines.join('\n'), 'utf8');

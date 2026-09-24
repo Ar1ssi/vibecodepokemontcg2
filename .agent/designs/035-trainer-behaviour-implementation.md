@@ -1,6 +1,6 @@
 # 035: Trainer behaviour implementation (I131–I135)
 
-Status: draft
+Status: done (S286; built S280–S286 on `feature/trainer-behaviour`)
 Date: 2026-09-24 · Session: S279
 
 ## Problem
@@ -183,8 +183,8 @@ only for legitimate improvements (D108 policy).
 | 8 | ✅ I135a: `TURN_BONUS_RE` "…'s attacks do" (+ styles, per-Prize) + `drawUntil` target/bonus descriptors | parser + executor tests; `pnpm test` |
 | 9 | ✅ I135b: tool on-damage/on-KO sub-effects + `attachedToolOnKoEffects` hook (incl. Beast Bringer's attacker-side clause, Focus Band F6) | KO/damage tests; oracle green |
 | 10 | ✅ I135c: `stadium-triggers.mjs` + hooks — 10a (counters/heal on attach/evolve/bench/retreat + W/R overrides, 21 stadiums); 10b (S285: Minefield coin counters, Wela/Slumbering checkup coins, Mirage retreat coin, Chaos Gym Trainer coin, Vermilion attack coin, switch hook shared via `effects/stadium-trigger-apply.mjs` at executor/special-energy/Erika sites) | 18 trigger tests; suite 3432/3433; oracle PASSED |
-| 11 | I135d: play conditions (`lostZone>=N`, stadium, basic Active, KO'd last turn, last card, hand gate, exactly-N prizes) | gate tests per condition; `pnpm test` |
-| 12 | Tooling: refresh corpus, `audit-all-trainers` server-coverage column, optional `audit-trainer-behaviour.mjs` gate, close I131–I135 | gate runs; ISSUES closed; reports annotated |
+| 11 | ✅ I135d: play conditions (`lostZone>=N`, stadium, basic Active, KO'd last turn, last card, hand gate, exactly-N prizes) | gate tests per condition; `pnpm test` |
+| 12 | ✅ Tooling: refresh corpus, `audit-all-trainers` server-coverage column, optional `audit-trainer-behaviour.mjs` gate, close I131–I135 | gate runs; ISSUES closed; reports annotated |
 
 Slices 1–4 are the recommended first cluster (wrong outcomes, no schema risk). Slices 5–7 are the
 largest and can be split further per step group if a session runs long.
@@ -389,6 +389,46 @@ largest and can be split further per step group if a session runs long.
   - Minefield count: the corpus text omits it; errata + later prints say 2 damage counters (20).
   New tests: `stadium-triggers.test.mjs` (18 cases, +9). Full suite: 3432/3433 pass, same
   pre-existing failure; `pnpm audit:oracle` PASSED (0 failures, 11 warnings).
+
+- Slice 11 (S286): play conditions done.
+  - `parsePlayCondition` still returns one condition string; vocabulary grew beyond the design's
+    list to cover every corpus wording found: `opponentPrizes==N|M` (Briar, Lusamine, Beast Ring),
+    `lostZone>=N`, `stadiumInPlay`, `opponentActiveStage=Basic|Stage 1|Stage 2` (Nita/Evelyn/Dana),
+    `opponentActivePoisoned` (Atticus), `koedLastTurn[:type=<sym>|:name=team rocket's]`
+    (Morty/Diantha/Archer), `lastCardInHand` (Mustards, Gladion's Final Battle, Blaine's Last
+    Resort…), `handCount<=N` / `handCount>=N` (hand counts include the Trainer: Erika's
+    Hospitality, Mail from Bill, Steven's Advice, Kamado/Professor Rowan "no other cards"),
+    `firstTurnOnly` (Battle VIP Pass), `secondPlayerFirstTurn` (Call Bell, Chill Teaser Toy…),
+    and "Prize cards left" for `morePrizesThanOpponent` (Ace Trainer, Twins). 66 unique corpus
+    cards now carry a condition.
+  - `trainerPlayBlockReason` params deviate from the design's names: `lostZoneCount`,
+    `opponentActive` (top card; stage from the top, Poisoned from the root), `koedLastOppTurn`,
+    `koedLastOppTurnVictims`; Stadium and hand gates reuse `stadiumName`/`handCount`. An unknown
+    input (undefined/null — the playtest bot's e2e-options) skips that gate; the server always
+    supplies it.
+  - `handleKnockout` records `koedOnOppTurnVictims` ({name, types} of the top card) beside
+    `koedOnOppTurn`; `advanceTurn` carries it to `flags.koedLastOppTurnVictims`.
+  - Slice 6's Morty step test now sets the KO flags (it was playing Morty without its condition).
+  - Not covered (ISSUES): Lt. Surge (Basic in hand), Kahili (empty deck), Glass Trumpet (Tera in
+    play), Cyrus Prism Star (Active {W}/{M}), Green's Exploration (no Ability Pokémon), Anthea &
+    Concordia, Luxury Ball, Nugget/Dream Ball (how the card reached the hand).
+  New tests: `rules/__tests__/trainer-play-conditions.test.mjs` (9). Full suite 3500/3501, same
+  pre-existing `card-inspector-model` failure.
+- Slice 12 (S286): tooling done.
+  - Corpus refresh: `scripts/scrape-pkmncards-trainers.mjs` re-run on 2026-09-24 returned the same
+    2642 printings (only reprint order changed), so the committed corpus was kept as is; the
+    design's "268 rows stale" had already been fixed on this branch.
+  - `scripts/lib/trainer-behaviour.mjs` (pure: `classifyTrainer`, `classifyCorpus`, `baselineOf`,
+    `checkTrainerGate`) + `scripts/audit-trainer-behaviour.mjs` (`pnpm audit:trainers`, seconds)
+    ratchet against `scripts/trainer-behaviour-baseline.json`: a baseline card gaining a gap tag
+    (`unrecognizable`/`empty`/`passive-only`/`server-missing:<step>`) or losing its play
+    condition fails; new corpus cards are reported only. The scratch probe/behave pair from the
+    S279 audit was not available in this checkout, so the gate is parse + server-executor
+    coverage, not a behaviour replay.
+  - `audit-all-trainers.mjs` grew the server-coverage section and a `server:` column in OK rows;
+    `out/trainer-full-audit.txt` regenerated.
+  - The gate shows 26 step kinds (one card each) that the parser emits and the server still
+    cannot execute — recorded as a new ISSUES line; I131–I135 recorded as closed.
 
 ---
 Self-approval checklist (only when the user is unreachable):
