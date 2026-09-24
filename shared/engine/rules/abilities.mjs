@@ -402,6 +402,70 @@ function parseHandAttach(lower) {
   };
 }
 
+// Legacy Pokémon Power / Poké-Power use restriction: "This power can't be used if <this
+// Pokémon> is Asleep, Confused, or Paralyzed" / "is affected by a Special Condition".
+export const POWER_CONDITION_CLAUSE =
+  /(?:this )?(?:pok[eé]mon )?power can't be used if [\s\S]*?(asleep, confused, or paralyzed|affected by a special condition)[^.]*\.?/g;
+
+// "If Lanturn becomes Asleep, Confused, or Paralyzed after you have used this power, …" ends
+// the power's effect; it inflicts nothing either.
+const POWER_ENDS_CLAUSE = /if [^.]*? becomes asleep, confused, or paralyzed[^.]*\./g;
+
+function stripPowerConditionClause(lower) {
+  return lower.replace(POWER_CONDITION_CLAUSE, '').replace(POWER_ENDS_CLAUSE, '');
+}
+
+// Stance Change / Schooling (hand, by name), V Transformation / Phantom Transformation
+// (discard pile), Transformative Start (deck) and Ditto Transform (hand Basic on top).
+// `keepState`: attached cards, counters, conditions and effects stay on the new Pokémon;
+// otherwise this Pokémon and its attached cards are discarded first.
+function parseTransformShape(lower) {
+  const onTop = /put a basic pok[eé]mon from your hand on top of this pok[eé]mon/.test(lower);
+  const source = /search your deck/.test(lower)
+    ? 'deck'
+    : /discard pile/.test(lower)
+      ? 'discard'
+      : 'hand';
+  const what =
+    lower.match(/switch this pok[eé]mon with an? ([^.,]+?) in your hand/)?.[1] ||
+    lower.match(/choose an? ([^.,]+?)(?:, except any [^,]+,)? (?:from your discard pile|you find there)/)?.[1] ||
+    (onTop ? 'basic pokémon' : null);
+  return {
+    source,
+    what: what ? what.trim() : null,
+    except: lower.match(/except any ([a-z0-9é' -]+?)[,.]/)?.[1]?.trim() || null,
+    keepState: onTop || /remain on the new pok[eé]mon/.test(lower),
+    onTop,
+    shuffle: source === 'deck',
+  };
+}
+
+const PROVIDES_SYMBOL_TYPES = {
+  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
+  f: 'Fighting', d: 'Darkness', m: 'Metal', n: 'Dragon', y: 'Fairy', c: 'Colorless',
+};
+
+// Buzzap / Buzzap Thunder / Battery: what the card provides once attached as Energy and
+// which of your Pokémon may receive it.
+function parseSelfAttachEnergyShape(lower) {
+  const every = lower.match(/provides every type of energy but provides only (\d+) energy/);
+  const typed = lower.match(/provides (\d+) \{([a-z])\} energy/);
+  const provides = every
+    ? Array(Number(every[1])).fill('Wildcard')
+    : typed && PROVIDES_SYMBOL_TYPES[typed[2]]
+      ? Array(Number(typed[1])).fill(PROVIDES_SYMBOL_TYPES[typed[2]])
+      : null;
+  const target = lower.match(
+    /attach (?:this card|it) (?:from your hand )?to (?:1|one) of your (other )?([^.]*?) as a special energy/
+  );
+  return {
+    fromHand: /attach this card from your hand/.test(lower),
+    provides,
+    targetOther: Boolean(target?.[1]),
+    targetFilter: target?.[2]?.trim() || null,
+  };
+}
+
 // Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
 function parseWinCondition(lower) {
   const lostZone = lower.match(/opponent has (\d+) or more supporter cards in the lost zone/);
@@ -415,7 +479,7 @@ function parseWinCondition(lower) {
 
 export function parseAbility(text = '') {
   const lower = normalizeText(text);
-  const steps = [];
+  let steps = [];
 
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
   if (
@@ -915,39 +979,34 @@ export function parseAbility(text = '') {
   }
 
   // ── 14. Status conditions (Confuse / Burn / Poison / Asleep) ────────────
+  // "This power can't be used if … is Asleep, Confused, or Paralyzed" is a use
+  // restriction (abilityConditionUseBlocked), not a condition the power inflicts.
+  const statusText = stripPowerConditionClause(lower);
   const namesStatus =
-    lower.includes('confused') ||
-    lower.includes('burned') ||
-    lower.includes('poisoned') ||
-    lower.includes('asleep') ||
-    lower.includes('paralyzed');
+    statusText.includes('confused') ||
+    statusText.includes('burned') ||
+    statusText.includes('poisoned') ||
+    statusText.includes('asleep') ||
+    statusText.includes('paralyzed');
   const conditionalPoisonOnSwitch =
-    isBenchActiveSwitchText(lower) &&
-    lower.includes('if you do') &&
-    lower.includes('poisoned');
-  const coinFlipStatus =
-    lower.includes('flip a coin') &&
-    (namesStatus || lower.includes('burned') || lower.includes('confused') || lower.includes('poisoned'));
+    isBenchActiveSwitchText(statusText) &&
+    statusText.includes('if you do') &&
+    statusText.includes('poisoned');
+  const coinFlipStatus = statusText.includes('flip a coin') && namesStatus;
   if (
     !conditionalPoisonOnSwitch &&
-    !statusImmunityCondition(lower) &&
+    !statusImmunityCondition(statusText) &&
     (coinFlipStatus ||
       namesStatus ||
-      (lower.includes('make') &&
-        lower.includes('opponent') &&
-        (lower.includes('asleep') ||
-          lower.includes('burned') ||
-          lower.includes('confused') ||
-          lower.includes('poisoned'))) ||
-      (lower.includes('special condition') && namesStatus && !lower.includes('recover')))
+      (statusText.includes('special condition') && namesStatus && !statusText.includes('recover')))
   ) {
-    const target = lower.includes('opponent') ? 'opponent' : 'attacker';
+    const target = statusText.includes('opponent') ? 'opponent' : 'attacker';
     let status = null;
-    if (lower.includes('asleep')) status = 'asleep';
-    else if (lower.includes('burned')) status = 'burned';
-    else if (lower.includes('poisoned') || lower.includes('now poisoned')) status = 'poisoned';
-    else if (lower.includes('confused')) status = 'confused';
-    else if (lower.includes('paralyzed')) status = 'paralyzed';
+    if (statusText.includes('asleep')) status = 'asleep';
+    else if (statusText.includes('burned')) status = 'burned';
+    else if (statusText.includes('poisoned')) status = 'poisoned';
+    else if (statusText.includes('confused')) status = 'confused';
+    else if (statusText.includes('paralyzed')) status = 'paralyzed';
     steps.push({
       type: 'statusAbility',
       target,
@@ -1551,6 +1610,7 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'transformAbility',
       fromDiscard: lower.includes('discard pile'),
+      ...parseTransformShape(lower),
       guidance:
         'Once during your turn: replace this Pokémon with the named card (attached cards, counters and conditions remain, as described).',
     });
@@ -1636,6 +1696,7 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'selfAttachEnergyAbility',
       knockOutSelf: /knock out this pok[eé]mon/.test(lower),
+      ...parseSelfAttachEnergyShape(lower),
       guidance: /knock out this pok[eé]mon/.test(lower)
         ? 'Once during your turn: Knock Out this Pokémon and attach it to one of your Pokémon as a Special Energy card (as described).'
         : 'Once during your turn: attach this card from your hand as a Special Energy card (as described).',
@@ -1871,6 +1932,14 @@ export function parseAbility(text = '') {
     const [stadiumStep] = steps.splice(stadiumIndex, 1);
     for (const step of steps) step.requiresStadiumDiscard = true;
     steps.unshift(stadiumStep);
+  }
+
+  // Transformative Start searches the deck itself; Buzzap / Battery attach the card itself.
+  if (steps.some((step) => step.type === 'transformAbility' && step.source === 'deck')) {
+    steps = steps.filter((step) => step.type !== 'searchAbility');
+  }
+  if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
+    steps = steps.filter((step) => step.type !== 'attachAbility');
   }
 
   // ── Passive fallback (only if NO other step matched) ────────────────────

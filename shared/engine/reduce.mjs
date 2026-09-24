@@ -61,6 +61,7 @@ import {
   passiveCostDiscount,
   applyCostDiscount,
   teamNoRetreatCostForActive,
+  isHandActivatedAbility,
 } from './rules/ability-executors.mjs';
 import {
   abilityDamageBonus,
@@ -2043,6 +2044,41 @@ function endTurnFromEffect(draft, { playerId, activeRng, events }) {
 }
 
 /**
+ * Ability outcomes the effect executor can't apply itself, because the KO and game-end flow
+ * lives here (design 034 slice 6), announced as events:
+ * - `abilitySelfKnockOut` (Electrode Buzzap): Knock Out the holder — the opponent takes
+ *   Prizes as usual — then attach the card to the chosen Pokémon as a Special Energy.
+ * - `abilityWinsGame` (Unown MISSING / HAND / DAMAGE).
+ */
+function settleAbilityOutcomes(draft, { events }) {
+  for (const outcome of events.filter((e) => e.type === 'abilitySelfKnockOut')) {
+    const player = draft.players[outcome.playerId];
+    const oppId = Object.keys(draft.players || {}).find((id) => id !== outcome.playerId);
+    const root = findCard(draft, outcome.rootId)?.card;
+    const target = findCard(draft, outcome.targetId);
+    if (!player || !root || !target || isGameConcluded(draft)) continue;
+    handleKnockout(draft, { victimPlayerId: outcome.playerId, attackerPlayerId: oppId, victim: root, events });
+    const ref = findCard(draft, outcome.cardId);
+    if (!ref || !['discard', 'lostZone'].includes(ref.zoneId)) continue;
+    const pile = player.zones[ref.zoneId];
+    pile.splice(pile.indexOf(ref.card), 1);
+    ref.card.asEnergy = { provides: outcome.provides };
+    ref.card.attachedTo = outcome.targetId;
+    player.zones[target.zoneId].push(ref.card);
+    events.push({
+      type: 'cardAttached',
+      instanceId: ref.card.instanceId,
+      targetInstanceId: outcome.targetId,
+      playerId: outcome.playerId,
+    });
+  }
+  const win = events.find((e) => e.type === 'abilityWinsGame');
+  if (win && !isGameConcluded(draft)) {
+    setGameEnded(draft, { winner: win.playerId, reason: win.reason, events });
+  }
+}
+
+/**
  * Marks game as ended with winner and reason, or — when both players satisfy a
  * win condition on the same Knockout — enters the sudden-death `tiebreak`
  * phase with no winner (rulebook 30c 1.3a).
@@ -2305,9 +2341,13 @@ function validateReferences(state, command) {
 
     case 'useAbility': {
       const cardRef = findCard(state, payload?.instanceId);
+      // Luxray Swelling Flash / Charjabug Battery are activated from the hand.
+      const legalZones = isHandActivatedAbility(cardRef?.card)
+        ? ['hand']
+        : ['active', 'bench'];
       if (
         !cardRef ||
-        !['active', 'bench'].includes(cardRef.zoneId) ||
+        !legalZones.includes(cardRef.zoneId) ||
         cardRef.playerId !== playerId
       ) {
         return { valid: false, error: 'stale_view' };
@@ -3220,6 +3260,12 @@ export function validateLegality(state, command) {
           enteredPlayTurn: cardRef.card.enteredPlayTurn ?? null,
           playedToBenchTurn: cardRef.card.playedToBenchTurn ?? null,
           movedToActiveTurn: cardRef.card.movedToActiveTurn ?? null,
+          // Conditions live on the root; the clicked card may be its evolution.
+          holderConditions: listConditions(
+            cardRef.card.attachedTo != null
+              ? findCard(state, cardRef.card.attachedTo)?.card
+              : cardRef.card
+          ),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
         // "Have no Abilities" Stadiums (Team Rocket's Watchtower, Space Center,
@@ -5987,13 +6033,8 @@ export function applyCommand(state, command, rng = null) {
           activeRng,
           events,
         });
-        // Unown MISSING / HAND / DAMAGE (design 034 slice 6): the executor can't reach
-        // setGameEnded, so the win arrives as an event.
-        const win = events.find((e) => e.type === 'abilityWinsGame');
-        if (win && !isGameConcluded(draft)) {
-          setGameEnded(draft, { winner: win.playerId, reason: win.reason, events });
-          break;
-        }
+        settleAbilityOutcomes(draft, { events });
+        if (isGameConcluded(draft)) break;
         // An ability that shuffles the Active Pokémon into the deck leaves the spot empty.
         if (cardRef.zoneId === 'active' && findCard(draft, payload.instanceId)?.zoneId !== 'active') {
           const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
@@ -6076,6 +6117,7 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection,
           resumeToken: token,
         });
+        settleAbilityOutcomes(draft, { events });
       } else if (token.effectType === PRIZE_CHOICE_EFFECT) {
         resolvePrizeChoice(draft, {
           playerId: initiatorPlayerId,

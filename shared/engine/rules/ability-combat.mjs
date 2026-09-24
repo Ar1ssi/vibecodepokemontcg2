@@ -39,6 +39,9 @@ import {
   isActivatedAbility,
   requiresActiveSpot,
   requiresBenchSpot,
+  powerConditionRestriction,
+  isHandActivatedAbility,
+  requiresFirstTurn,
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
@@ -810,8 +813,28 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) {
     return 'This ability can only be used from the Active Spot.';
   }
+  if (rulesEnabled && isHandActivatedAbility(card) !== (zone === 'hand')) {
+    return zone === 'hand'
+      ? 'This ability can only be used while the Pokémon is in play.'
+      : 'This ability can only be used from your hand.';
+  }
   if (rulesEnabled && zone !== 'bench' && requiresBenchSpot(card)) {
     return 'This ability can only be used from the Bench.';
+  }
+  // Turn 1 is the first player's first turn and turn 2 the second player's (reduce.mjs).
+  if (rulesEnabled && requiresFirstTurn(card) && turnNumber > 2) {
+    return 'This ability can only be used during your first turn.';
+  }
+  // Legacy powers are off while the holder has the printed Special Conditions. Callers
+  // without `holderConditions` (presence-only pickers) fail open.
+  const restriction = powerConditionRestriction(card);
+  const conditions = ctx.holderConditions || [];
+  if (
+    rulesEnabled &&
+    restriction &&
+    conditions.some((c) => restriction === 'any' || ['Asleep', 'Confused', 'Paralyzed'].includes(c))
+  ) {
+    return "This power can't be used while this Pokémon is affected by that Special Condition.";
   }
   // The window checks only fire when the caller supplies the stamps: a caller
   // without the board history (presence-only pickers) must not turn "unknown"

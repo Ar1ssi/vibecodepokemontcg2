@@ -4,6 +4,7 @@
 // damage the attack dealt. The gate (oracle-gate.mjs) decides whether that counts as executed.
 import { splitCard } from './split-card-text.mjs';
 import { parseAbility } from '../../shared/engine/rules/abilities.mjs';
+import { isHandActivatedAbility } from '../../shared/engine/rules/ability-executors.mjs';
 import { classifyAbility } from '../../shared/engine/rules/ability-effects.mjs';
 import { classifyAttackEffect } from '../../shared/engine/rules/attack-effects.mjs';
 import {
@@ -191,6 +192,8 @@ export function buildState(holder, holderZone) {
       tool('Disc Tool')
     );
     for (let i = 0; i < 6; i++) z.prizes.push(mon(`${pid}Prize${i}`));
+    // A hand-activated Ability (Luxray Swelling Flash) is used from the hand.
+    if (own && holderZone === 'hand') z.hand.unshift(holder());
   }
   return state;
 }
@@ -435,8 +438,13 @@ export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
           abilityIndex: aIdx,
         },
       });
-      const fromActive = runAll(useFrom('active'), holder, 'active', seeds);
-      const fromBench = runAll(useFrom('bench'), holder, 'bench', seeds);
+      // The ability is used from wherever it is legal: the hand for a hand-activated one,
+      // else the Active Spot and the Bench.
+      const fromHand = isHandActivatedAbility({ abilities: [abilities[aIdx]] });
+      const fromActive = runAll(useFrom(fromHand ? 'hand' : 'active'), holder, fromHand ? 'hand' : 'active', seeds);
+      const fromBench = fromHand
+        ? { tags: [], errors: [], eventTypes: [] }
+        : runAll(useFrom('bench'), holder, 'bench', seeds);
       rows.push({
         kind: 'ability',
         ...where,

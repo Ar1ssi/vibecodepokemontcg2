@@ -371,3 +371,263 @@ test('ability: Grind Up with no Stadium in play attaches nothing and is not spen
   assert.deepEqual(ids(res.state.players.p1.zones.hand), [80]);
   assert.equal(abilitySpent(res), false);
 });
+
+// ── transform ───────────────────────────────────────────────────────────
+
+const STANCE_CHANGE =
+  'Once during your turn, you may switch this Pokémon with an Aegislash in your hand. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.';
+
+test('ability: Stance Change swaps the evolved Aegislash for the hand copy, keeping the stack', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(60, 'Honedge', { damage: 40, enteredPlayTurn: 1 }));
+  const aegislash = mon(70, 'Aegislash', {
+    stage: 'Stage 2',
+    attachedTo: 60,
+    abilities: [{ name: 'Stance Change', type: 'Ability', text: STANCE_CHANGE }],
+  });
+  state.players.p1.zones.active.push(aegislash, basicEnergy(61, 'Metal', 60));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  state.players.p1.zones.hand.push(mon(80, 'Aegislash', { stage: 'Stage 2' }), mon(81, 'Honedge'));
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(ids(res1.pendingChoice.options), [80]);
+  const res2 = resolveWith(res1, [80], rng);
+  assert.equal(res2.error, null);
+  const zones = res2.state.players.p1.zones;
+  assert.equal(zones.active.find((c) => c.instanceId === 80)?.attachedTo, 60);
+  assert.equal(zones.active.find((c) => c.instanceId === 60).damage, 40);
+  assert.equal(zones.active.find((c) => c.instanceId === 61).attachedTo, 60);
+  assert.deepEqual(ids(zones.hand).sort(), [70, 81]);
+  assert.equal(zones.hand.find((c) => c.instanceId === 70).abilityUsed, false);
+});
+
+test('ability: Schooling swaps an unevolved Wishiwashi, moving counters, Energy and conditions', () => {
+  const { state, rng } = setupGame();
+  holder(
+    state,
+    'Once during your turn (before your attack), you may switch this Pokémon with a Wishiwashi-GX in your hand. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.',
+    { name: 'Wishiwashi', damage: 20, enteredPlayTurn: 1, specialCondition: 'Confused' }
+  );
+  state.players.p1.zones.active.push(basicEnergy(61, 'Water', 70));
+  state.players.p1.zones.hand.push(mon(80, 'Wishiwashi-GX', { hp: 200 }));
+
+  const res = resolveWith(use70(state, rng), [80], rng);
+  assert.equal(res.error, null);
+  const zones = res.state.players.p1.zones;
+  const gx = zones.active.find((c) => !c.attachedTo);
+  assert.equal(gx.instanceId, 80);
+  assert.equal(gx.damage, 20);
+  assert.equal(gx.enteredPlayTurn, 1);
+  assert.equal(gx.specialCondition, 'Confused');
+  assert.equal(zones.active.find((c) => c.instanceId === 61).attachedTo, 80);
+  const old = zones.hand.find((c) => c.instanceId === 70);
+  assert.equal(old.damage, 0);
+  assert.equal(old.specialCondition, null);
+});
+
+test('ability: V Transformation puts a Basic Pokémon V from discard in place; Ditto V is discarded', () => {
+  const { state, rng } = setupGame();
+  holder(
+    state,
+    'Once during your turn, you may choose a Basic Pokémon V from your discard pile and switch it with this Pokémon. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.',
+    { name: 'Ditto V', damage: 30 }
+  );
+  state.players.p1.zones.discard.push(
+    mon(80, 'Zacian V', { subtypes: ['Basic', 'V'] }),
+    mon(81, 'Pikachu', { subtypes: ['Basic'] }),
+    mon(82, 'Zacian VMAX', { stage: 'VMAX', subtypes: ['VMAX'] })
+  );
+
+  const res1 = use70(state, rng);
+  assert.deepEqual(ids(res1.pendingChoice.options), [80]);
+  const res2 = resolveWith(res1, [80], rng);
+  const zones = res2.state.players.p1.zones;
+  assert.equal(zones.active[0].instanceId, 80);
+  assert.equal(zones.active[0].damage, 30);
+  assert.ok(zones.discard.some((c) => c.instanceId === 70));
+});
+
+test('ability: Phantom Transformation discards Zoroark and its cards; the Stage 1 enters fresh', () => {
+  const { state, rng } = setupGame();
+  holder(
+    state,
+    'Once during your turn, you may choose a Stage 1 Pokémon, except any Zoroark, from your discard pile. If you do, discard this Pokémon and all attached cards, and put the chosen Pokémon in its place.',
+    { name: 'Zoroark', stage: 'Stage 1', damage: 50 }
+  );
+  state.players.p1.zones.active.push(basicEnergy(61, 'Darkness', 70));
+  state.players.p1.zones.discard.push(
+    mon(80, 'Zoroark', { stage: 'Stage 1' }),
+    mon(81, 'Kirlia', { stage: 'Stage 1' })
+  );
+
+  const res1 = use70(state, rng);
+  assert.deepEqual(ids(res1.pendingChoice.options), [81]);
+  const res2 = resolveWith(res1, [81], rng);
+  const zones = res2.state.players.p1.zones;
+  assert.deepEqual(ids(zones.active), [81]);
+  assert.equal(zones.active[0].damage || 0, 0);
+  assert.equal(zones.active[0].enteredPlayTurn, 2);
+  assert.deepEqual(ids(zones.discard).sort(), [61, 70, 80]);
+});
+
+const TRANSFORMATIVE_START =
+  'Once during your first turn, if this Pokémon is in the Active Spot, you may search your deck and choose a Basic Pokémon you find there, except any Ditto. If you do, discard this Pokémon and all attached cards, and put the chosen Pokémon in its place. Then, shuffle your deck.';
+
+test('ability: Transformative Start searches the deck for a non-Ditto Basic on the first turn', () => {
+  const { state, rng } = setupGame();
+  holder(state, TRANSFORMATIVE_START, { name: 'Ditto' });
+  state.players.p1.zones.deck.push(
+    mon(80, 'Ditto'),
+    mon(81, 'Charmander'),
+    mon(82, 'Charmeleon', { stage: 'Stage 1' }),
+    card(83)
+  );
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(ids(res1.pendingChoice.options), [81]);
+  const res2 = resolveWith(res1, [81], rng);
+  const zones = res2.state.players.p1.zones;
+  assert.deepEqual(ids(zones.active), [81]);
+  assert.deepEqual(ids(zones.hand), [], 'the searched card goes into play, not the hand');
+  assert.deepEqual(ids(zones.discard), [70]);
+  assert.ok(res2.events.some((e) => e.type === 'deckShuffled'));
+});
+
+test('ability: Transformative Start is refused after your first turn', () => {
+  const { state, rng } = setupGame();
+  state.turn.number = 3;
+  holder(state, TRANSFORMATIVE_START, { name: 'Ditto' });
+  state.players.p1.zones.deck.push(mon(81, 'Charmander'));
+  assert.ok(use70(state, rng).error);
+});
+
+test('ability: Ditto Transform puts a hand Basic on top; the new top keeps the stack state', () => {
+  const { state, rng } = setupGame();
+  holder(
+    state,
+    'During your turn (before your attack), you may put a Basic Pokémon from your hand on top of this Pokémon. (This does not count as playing that Pokémon or evolving.) This Pokémon is now that Pokémon. (Any cards attached to this Pokémon, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.)',
+    { name: 'Ditto', damage: 10 }
+  );
+  state.players.p1.zones.hand.push(mon(80, 'Mewtwo', { hp: 120 }), mon(81, 'Kadabra', { stage: 'Stage 1' }));
+
+  const res1 = use70(state, rng);
+  assert.deepEqual(ids(res1.pendingChoice.options), [80]);
+  const res2 = resolveWith(res1, [80], rng);
+  const zones = res2.state.players.p1.zones;
+  assert.equal(zones.active.find((c) => c.instanceId === 80)?.attachedTo, 70);
+  assert.equal(zones.active.find((c) => c.instanceId === 70).damage, 10);
+  assert.deepEqual(ids(zones.hand), [81]);
+});
+
+test('ability: Stance Change without a matching hand card is not spent', () => {
+  const { state, rng } = setupGame();
+  holder(state, STANCE_CHANGE, { name: 'Aegislash' });
+  state.players.p1.zones.hand.push(mon(81, 'Honedge'));
+  const res = use70(state, rng);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(abilitySpent(res), false);
+});
+
+// ── self-attach as Special Energy ───────────────────────────────────────
+
+const BUZZAP_THUNDER =
+  'Once during your turn (before your attack), you may Knock Out this Pokémon and attach it to one of your {L} Pokémon as a Special Energy card. This card provides 2 {L} Energy only while this card is attached to a Pokémon.';
+
+test('ability: Buzzap Thunder Knocks Out Electrode, gives Prizes, and attaches it as 2 {L}', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(
+    mon(72, 'Zapdos', { types: ['Lightning'], attacks: [{ name: 'Bolt', cost: ['Lightning', 'Lightning'], damage: '60' }] })
+  );
+  holder(state, BUZZAP_THUNDER, { zone: 'bench', name: 'Electrode', types: ['Lightning'] });
+  state.players.p1.zones.bench.push(
+    mon(73, 'Pikachu', { types: ['Lightning'] }),
+    mon(74, 'Bulbasaur', { types: ['Grass'] }),
+    basicEnergy(75, 'Lightning', 70)
+  );
+  for (let i = 0; i < 6; i++) state.players.p2.zones.prizes.push(card(200 + i));
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(ids(res1.pendingChoice.options).sort(), [72, 73], 'only {L} Pokémon, never itself');
+  const res2 = resolveWith(res1, [72], rng);
+  assert.equal(res2.error, null);
+  const zones = res2.state.players.p1.zones;
+  const electrode = zones.active.find((c) => c.instanceId === 70);
+  assert.equal(electrode?.attachedTo, 72);
+  assert.deepEqual(electrode.asEnergy.provides, ['Lightning', 'Lightning']);
+  assert.ok(zones.discard.some((c) => c.instanceId === 75), 'its own Energy is discarded');
+  assert.ok(res2.events.some((e) => e.type === 'pokemonKnockedOut' && e.instanceId === 70));
+  assert.equal(res2.state.players.p2.flags.prizesOwed, 1);
+});
+
+test('ability: an Electrode attached as Energy pays an attack cost and is not the top Pokémon', async () => {
+  const { topPokemonCard } = await import('../rules/evolved-pokemon.mjs');
+  const { serverEnergyDescriptor } = await import('../rules/server-energy.mjs');
+  const { expandEnergyEntries } = await import('../rules/attack-engine.mjs');
+  const root = mon(72, 'Zapdos', { types: ['Lightning'] });
+  const electrode = mon(70, 'Electrode', { stage: 'Stage 1', attachedTo: 72, asEnergy: { provides: ['Lightning', 'Lightning'] } });
+  assert.equal(topPokemonCard([root, electrode], root), root);
+  assert.deepEqual(expandEnergyEntries([serverEnergyDescriptor(electrode)]), ['Lightning', 'Lightning']);
+  electrode.attachedTo = null;
+  const { isPokemon, isEnergy } = await import('../cards.mjs');
+  assert.equal(isPokemon(electrode), true, 'off the board it is a Pokémon again');
+  assert.equal(isEnergy(electrode), false);
+});
+
+test('ability: Charjabug Battery attaches from the hand to a Vikavolt only', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(72, 'Vikavolt', { stage: 'Stage 2' }));
+  state.players.p1.zones.bench.push(mon(73, 'Pikachu'));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  state.players.p1.zones.hand.push(
+    mon(70, 'Charjabug', {
+      stage: 'Stage 1',
+      abilities: [
+        {
+          name: 'Battery',
+          type: 'Ability',
+          text: "Once during your turn (before your attack), you may attach this card from your hand to 1 of your Vikavolt or Vikavolt-GX as a Special Energy card. This card provides 2 {L} Energy only while it's attached to a Pokémon.",
+        },
+      ],
+    })
+  );
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  const charjabug = res.state.players.p1.zones.active.find((c) => c.instanceId === 70);
+  assert.equal(charjabug?.attachedTo, 72);
+  assert.deepEqual(charjabug.asEnergy.provides, ['Lightning', 'Lightning']);
+  assert.deepEqual(res.state.players.p1.zones.hand, []);
+});
+
+test('ability: an in-play Charjabug cannot use Battery', () => {
+  const { state, rng } = setupGame();
+  holder(
+    state,
+    "Once during your turn (before your attack), you may attach this card from your hand to 1 of your Vikavolt or Vikavolt-GX as a Special Energy card. This card provides 2 {L} Energy only while it's attached to a Pokémon."
+  );
+  assert.ok(use70(state, rng).error);
+});
+
+// ── legacy power restrictions ───────────────────────────────────────────
+
+const RAIN_DANCE =
+  "As often as you like during your turn, you may attach a Basic {W} Energy card from your hand to 1 of your {W} Pokémon. This Pokémon Power can't be used if this Pokémon is Asleep, Confused, or Paralyzed.";
+
+test("ability: a Pokémon Power's \"can't be used if … Asleep\" clause inflicts nothing", async () => {
+  const { parseAbility } = await import('../rules/abilities.mjs');
+  assert.equal(parseAbility(RAIN_DANCE).some((s) => s.type === 'statusAbility'), false);
+});
+
+test('ability: Rain Dance is refused while the holder is Asleep, allowed when Poisoned', () => {
+  const { state, rng } = setupGame();
+  holder(state, RAIN_DANCE, { types: ['Water'], specialCondition: 'Asleep' });
+  state.players.p1.zones.hand.push(basicEnergy(80, 'Water'));
+  assert.ok(use70(state, rng).error);
+
+  state.players.p1.zones.active[0].specialCondition = null;
+  state.players.p1.zones.active[0].poisoned = true;
+  assert.equal(use70(state, rng).error, null);
+});

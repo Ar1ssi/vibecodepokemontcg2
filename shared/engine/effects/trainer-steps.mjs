@@ -2198,6 +2198,179 @@ function stadiumManipAbility(ctx) {
   });
 }
 
+// Per-Pokémon state that "any other effects remain on the new Pokémon" carries over.
+const IN_PLAY_STATE_KEYS = [
+  'damage',
+  'enteredPlayTurn',
+  'playedToBenchTurn',
+  'lastEvolvedTurn',
+  'movedToActiveTurn',
+  'cannotAttackUntilTurn',
+  'cannotRetreatUntilTurn',
+  'cannotAttackAttackName',
+  'attackMarkers',
+];
+
+function transformCandidates(ctx, outgoing) {
+  const { player, step } = ctx;
+  const pool = player.zones[step.source] || [];
+  const except = step.except ? step.except.toLowerCase() : null;
+  const wantsV = / v$/.test(step.what || '');
+  return pool.filter((c) => {
+    if (c === outgoing || !isPokemon(c)) return false;
+    if (except && String(c.name || '').toLowerCase().includes(except)) return false;
+    if (wantsV && !/\bv$/i.test(c.name || '') && !textOf(c, 'subtypes').split(' ').includes('v')) {
+      return false;
+    }
+    return matchesSearch(c, (step.what || '').replace(/ v$/, ''));
+  });
+}
+
+// `incoming` takes `outgoing`'s place in play with everything on it (Stance Change, Schooling,
+// V Transformation). An evolution card on a stack is swapped within the stack.
+function swapInPlace(player, outgoing, incoming, events) {
+  const zone = player.zones[zoneIdOf(player, outgoing)];
+  removeFromZones(player, incoming);
+  zone.splice(zone.indexOf(outgoing), 1, incoming);
+  if (outgoing.attachedTo != null) {
+    incoming.attachedTo = outgoing.attachedTo;
+  } else {
+    incoming.attachedTo = null;
+    for (const key of IN_PLAY_STATE_KEYS) {
+      if (outgoing[key] !== undefined) incoming[key] = outgoing[key];
+      delete outgoing[key];
+    }
+    outgoing.damage = 0;
+    copyConditions(outgoing, incoming);
+    clearConditions(outgoing);
+    for (const card of attachedCards(player, outgoing.instanceId)) {
+      card.attachedTo = incoming.instanceId;
+    }
+  }
+  outgoing.attachedTo = null;
+  // The card leaving play keeps no once-per-turn marker; the incoming card is a different
+  // card, so its own Ability stays usable.
+  outgoing.abilityUsed = false;
+  events.push({
+    type: 'pokemonSwapped',
+    playerId: player.playerId,
+    instanceId: incoming.instanceId,
+    replacedInstanceId: outgoing.instanceId,
+  });
+}
+
+/**
+ * Transform Abilities (design 034 slice 6): Aegislash Stance Change / Wishiwashi Schooling
+ * (a named card from hand, the old one returns to hand), Ditto V V Transformation (discard
+ * pile, the old one is discarded), Zoroark Phantom Transformation / Ditto Transformative Start
+ * (discard this Pokémon and its cards, the chosen Pokémon enters fresh in its place), Ditto
+ * Transform (a hand Basic goes on top of this Pokémon). The chosen card is re-checked against
+ * the live zone on resume, so a stale pick does nothing.
+ */
+function transformAbility(ctx) {
+  const { draft, player, step } = ctx;
+  const outgoing = findCard(draft, ctx.sourceCard?.instanceId)?.card;
+  const root = sourceRoot(ctx);
+  if (!outgoing || !root) return skip(ctx, 'source_not_in_play');
+  const candidates = transformCandidates(ctx, outgoing);
+
+  if (ctx.selection) {
+    const incoming = candidates.find((c) => c.instanceId === ctx.selection[0]);
+    if (!incoming) return skip(ctx, 'target_not_found');
+    if (step.onTop) {
+      attachTo(player, incoming, root, ctx.events);
+    } else if (step.keepState) {
+      swapInPlace(player, outgoing, incoming, ctx.events);
+      if (step.source === 'hand') player.zones.hand.push(outgoing);
+      else discardCardToPlayerZone(player, outgoing);
+    } else {
+      const zone = player.zones[zoneIdOf(player, root)];
+      discardInPlayPokemon(player, root, ctx.events);
+      removeFromZones(player, incoming);
+      incoming.attachedTo = null;
+      incoming.enteredPlayTurn = draft.turn?.number ?? null;
+      zone.push(incoming);
+      ctx.events.push({
+        type: 'pokemonSwapped',
+        playerId: player.playerId,
+        instanceId: incoming.instanceId,
+        replacedInstanceId: root.instanceId,
+      });
+    }
+    if (step.shuffle) shuffleDeck(player, ctx);
+    return null;
+  }
+  if (candidates.length === 0) return skip(ctx, 'no_transform_target');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose the Pokémon to put in this Pokémon's place`,
+    options: candidates,
+    min: 1,
+    max: 1,
+  });
+}
+
+function selfAttachTargets(ctx, self) {
+  const { player, step } = ctx;
+  const filter = step.targetFilter || '';
+  const names = /\{[a-z]\}|^pok[eé]mon$/.test(filter) ? [] : filter.split(/\s+or\s+/);
+  return rootsOf(player).filter((root) => {
+    // A Knocked Out holder can't receive itself, whether or not the text says "other".
+    if ((step.targetOther || step.knockOutSelf) && root.instanceId === self?.instanceId) return false;
+    if (!rootMatchesTarget(player, root, filter)) return false;
+    if (names.length === 0) return true;
+    const name = String(topPokemonCard(player, root)?.name || '').toLowerCase();
+    return names.some((n) => name === n.trim());
+  });
+}
+
+/**
+ * Electrode Buzzap / Buzzap Thunder (Knock Out this Pokémon and attach it as a Special Energy)
+ * and Charjabug Battery (attach this card from your hand as a Special Energy). The attached card
+ * carries `asEnergy.provides`; the Knock Out itself — Prizes, discarding the rest of the stack,
+ * promotion — is the reducer's (`abilitySelfKnockOut`, settleAbilityOutcomes).
+ */
+function selfAttachEnergyAbility(ctx) {
+  const { draft, player, step } = ctx;
+  const card = findCard(draft, ctx.sourceCard?.instanceId)?.card;
+  if (!card || !step.provides) return skip(ctx, 'source_not_found');
+  const self = step.fromHand ? null : sourceRoot(ctx);
+  if (step.fromHand ? !player.zones.hand.includes(card) : !self) {
+    return skip(ctx, 'source_not_found');
+  }
+  const targets = selfAttachTargets(ctx, self);
+
+  const attach = (target) => {
+    if (step.knockOutSelf) {
+      ctx.events.push({
+        type: 'abilitySelfKnockOut',
+        playerId: player.playerId,
+        rootId: self.instanceId,
+        cardId: card.instanceId,
+        targetId: target.instanceId,
+        provides: [...step.provides],
+      });
+      return null;
+    }
+    card.asEnergy = { provides: [...step.provides] };
+    attachTo(player, card, target, ctx.events);
+    return null;
+  };
+
+  if (ctx.selection) {
+    const target = targets.find((c) => c.instanceId === ctx.selection[0]);
+    if (!target) return skip(ctx, 'target_not_found');
+    return attach(target);
+  }
+  if (targets.length === 0) return skip(ctx, 'no_attach_target');
+  if (targets.length === 1) return attach(targets[0]);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to attach this card to as Energy`,
+    options: targets,
+    min: 1,
+    max: 1,
+  });
+}
+
 export const EXTRA_STEP_HANDLERS = {
   attachTool,
   searchEvolve,
@@ -2257,6 +2430,8 @@ export const EXTRA_STEP_HANDLERS = {
   discardBenchAbility,
   energySwapAbility,
   stadiumManipAbility,
+  transformAbility,
+  selfAttachEnergyAbility,
   fossilItem,
   returnPokemonToHand,
   swapWithDiscard,

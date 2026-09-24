@@ -70,7 +70,10 @@ export function executeAbility(draft, {
   // precondition failed (no damaged Pokémon to heal, empty Bench to switch).
   // Marking up front consumed the ability with no effect and locked out a retry.
   const markUsed = () => {
-    card.abilityUsed = true;
+    // A card the ability moved out of play (Stance Change's old Aegislash) keeps no marker;
+    // advanceTurn only resets in-play cards.
+    const zoneAfter = findCard(draft, card.instanceId)?.zoneId;
+    if (zoneAfter === 'active' || zoneAfter === 'bench') card.abilityUsed = true;
     if (!player.flags) player.flags = {};
     if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
     // instanceId first: two Pokémon sharing a name must not share one used-flag

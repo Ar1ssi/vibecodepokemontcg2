@@ -47,7 +47,7 @@
     },
     "ability:damage-prevent": {
       "n": 305,
-      "observed": 66
+      "observed": 64
     },
     "ability:damage-reduce": {
       "n": 3,
@@ -119,7 +119,7 @@
     },
     "ability:ko-prevention": {
       "n": 63,
-      "observed": 55
+      "observed": 54
     },
     "ability:look-at-top": {
       "n": 67,
@@ -151,7 +151,7 @@
     },
     "ability:recursion": {
       "n": 119,
-      "observed": 118
+      "observed": 117
     },
     "ability:retreat-cost": {
       "n": 172,
@@ -175,7 +175,7 @@
     },
     "ability:status": {
       "n": 507,
-      "observed": 391
+      "observed": 360
     },
     "ability:status-recover": {
       "n": 38,
@@ -183,7 +183,7 @@
     },
     "ability:switch": {
       "n": 256,
-      "observed": 249
+      "observed": 248
     },
     "ability:tool-cap": {
       "n": 48,
