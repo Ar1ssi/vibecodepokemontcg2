@@ -12,6 +12,7 @@
 # Closed ≤100 (maintain.md deletes the oldest lines; git history keeps everything forever).
 
 ## Open (newest first — scan this section only)
+- I131 2026-09-24 P3 [rules] Coin-conditional trainer turn ends ("If tails, your turn ends immediately": Tickling Machine, Minion of Team Rocket) are not enforced; only the closing "Your turn ends." sentence is (`trainerEndsTurn`, S283). Client ability pickers also still list only in-play abilities, so hand-activated ones (Luxray, Charjabug) are server-legal but have no button (refs: design 034, D125)
 - I127 2026-09-23 P3 [rules] The card inspector's retreat tile ignores bench abilities: retreatGateFor passes `zoneCards: []` and the printed cost to canRetreat, so a Latias ex Skyliner free retreat still renders as unpaid (refs: S277)
 - I126 2026-09-23 P3 [rules] Team-wide retreat-cost abilities with an energy condition (Metal Bridge, Thunderclap Zone, Aqua Tube, Dark Cloak) are not applied: teamNoRetreatCostForActive handles only unconditional "in play have no Retreat Cost" wordings (refs: S277)
 - I125 2026-09-23 P3 [rules] A period inside the attacker's name breaks sentence splitting: Lt. Surge's Raichu Mega Shock gated recoil is not parsed — node .agent/scratch/i118/gateprobe2.mjs (refs: design 032, S271)

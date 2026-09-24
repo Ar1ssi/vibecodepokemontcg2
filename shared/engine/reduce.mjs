@@ -76,6 +76,9 @@ import {
   abilityExtraTypes,
   applyEnergyMultiplier,
   abilityActivationBlockReason,
+  isAbilitySuppressed,
+  abilitySupporterLimit,
+  abilityTurnNotEnd,
   abilityPlayLocks,
   abilityEvolvePermission,
   abilityEvolveLock,
@@ -97,7 +100,12 @@ import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard } from './effects/attack-steps.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
-import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
+import {
+  parseCopyAttack,
+  inCopyGroup,
+  copiedAttackFor,
+  parseAttackBorrowAbility,
+} from './rules/attack-copy.mjs';
 import {
   attackerMatchesFilter,
   clearAttackMarkers,
@@ -142,6 +150,7 @@ import {
   isBasicEnergy,
 } from './rules/card-classify.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
+import { trainerEndsTurn } from './rules/trainer-effects.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import {
   evolvedView,
@@ -790,10 +799,65 @@ function stadiumExtraAttacksFor(state, card, { isActive = true } = {}) {
   });
 }
 
-// `inPlayView` with Stadium extras merged into its attacks list.
+function borrowSourceMatches(card, borrow) {
+  if (!isPokemon(card)) return false;
+  const name = String(card.name || '').toLowerCase();
+  if (borrow.basic && (normalizeStage(card.stage) || 'Basic') !== 'Basic') return false;
+  if (borrow.noRuleBox && isRuleBoxPokemon(card)) return false;
+  if (borrow.gxOrEx && !/-(?:gx|ex)$/.test(name)) return false;
+  if (borrow.evolvesFrom && String(card.evolvesFrom || '').toLowerCase() !== borrow.evolvesFrom) {
+    return false;
+  }
+  if (borrow.names && !borrow.names.includes(name)) return false;
+  return true;
+}
+
+/**
+ * Attacks an Ability lets `card` use as its own (Mew ex Memory Helix, Ditto Sudden
+ * Transformation, Mewtwo & Mew-GX Perfection, Mew-EX Versatile, …; design 034 slice 6).
+ * In-play sources are read through their top evolution; the copier itself never counts.
+ * Each attack keeps its own cost, and its text names the copier (copiedAttackFor).
+ */
+function abilityBorrowedAttacks(state, card) {
+  const ref = findCard(state, card?.instanceId);
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  const view = inPlayView(state, card);
+  const texts = (view?.abilities || []).map((a) => (typeof a === 'string' ? a : a?.text));
+  const borrow = texts.map(parseAttackBorrowAbility).find(Boolean);
+  if (!borrow) return [];
+  if (borrow.requiresActive && ref.zoneId !== 'active') return [];
+  if (isAbilitySuppressed(view, abilitySideContext(state, ref.playerId))) return [];
+  const own = state.players?.[ref.playerId];
+  const opp = Object.values(state.players || {}).find((p) => p.playerId !== ref.playerId);
+  const inPlay = (p, zones) =>
+    zones.flatMap((z) => rootsIn(p?.zones?.[z])).map((root) => inPlayView(state, root));
+  const bySource = {
+    ownBench: () => inPlay(own, ['bench']),
+    ownInPlay: () => inPlay(own, ['active', 'bench']),
+    oppInPlay: () => inPlay(opp, ['active', 'bench']),
+    oppActive: () => inPlay(opp, ['active']),
+    ownDiscard: () => own?.zones?.discard || [],
+    ownLostZone: () => own?.zones?.lostZone || [],
+    oppLostZone: () => opp?.zones?.lostZone || [],
+  };
+  const borrowed = [];
+  for (const source of borrow.scopes.flatMap((scope) => bySource[scope]?.() || [])) {
+    if (source.instanceId === card.instanceId || !borrowSourceMatches(source, borrow)) continue;
+    for (const attack of source.attacks || []) {
+      if (!attack?.name) continue;
+      borrowed.push(copiedAttackFor(attack, { sourceName: source.name, copierName: view.name }));
+    }
+  }
+  return borrowed;
+}
+
+// `inPlayView` with Stadium extras and Ability-borrowed attacks merged into its attacks list.
 function attackViewFor(state, card, { isActive = true } = {}) {
   const view = inPlayView(state, card);
-  const extras = stadiumExtraAttacksFor(state, card, { isActive });
+  const extras = [
+    ...stadiumExtraAttacksFor(state, card, { isActive }),
+    ...abilityBorrowedAttacks(state, card),
+  ];
   if (extras.length === 0) return view;
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
 }
@@ -2029,6 +2093,20 @@ function advanceTurn(draft, { nextPlayerId, events }) {
 }
 
 /**
+ * "… Your turn ends." Trainers end the turn once their effect has fully resolved (no choice
+ * pending), unless an Ability exempts that card (Alcremie Additional Order, design 034 slice 6).
+ */
+function endTurnAfterTrainer(draft, { card, playerId, activeRng, events }) {
+  if (!card || draft.pendingChoice || !trainerEndsTurn(card)) return;
+  if (draft.turn?.player !== playerId) return;
+  if (abilityTurnNotEnd(card, abilitySideContext(draft, playerId))) {
+    events.push({ type: 'turnEndPrevented', playerId, instanceId: card.instanceId });
+    return;
+  }
+  endTurnFromEffect(draft, { playerId, activeRng, events });
+}
+
+/**
  * Ends the acting player's turn from inside a card effect (Lumiose City: "If a
  * player searches their deck in this way, their turn ends."). Mirrors the `pass`
  * path — Checkup first, then advance only while the game is still live.
@@ -3197,7 +3275,12 @@ export function validateLegality(state, command) {
           `${cardRef.card.subtypes || ''} ${cardRef.card.trainerType || ''}`.toLowerCase();
         const isSupporter =
           typeStr.includes('supporter') || subStr.includes('supporter');
-        if (isSupporter && player.flags?.supporterPlayed) {
+        const supportersPlayed =
+          player.flags?.supportersPlayedCount ?? (player.flags?.supporterPlayed ? 1 : 0);
+        if (
+          isSupporter &&
+          supportersPlayed >= abilitySupporterLimit(abilitySideContext(state, playerId))
+        ) {
           return {
             allowed: false,
             reason: 'Supporter already played this turn.',
@@ -6019,6 +6102,7 @@ export function applyCommand(state, command, rng = null) {
           events,
           targetInstanceId: payload.targetInstanceId,
         });
+        endTurnAfterTrainer(draft, { card: cardRef.card, playerId, activeRng, events });
       }
       break;
     }
@@ -6108,6 +6192,7 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection,
           resumeToken: token,
         });
+        endTurnAfterTrainer(draft, { card: resumeCard, playerId: initiatorPlayerId, activeRng, events });
       } else if (token.effectType === 'ability') {
         executeAbility(draft, {
           card: resumeCard,

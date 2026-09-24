@@ -62,6 +62,7 @@ import {
 import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
+import { topPokemonCard } from './evolved-pokemon.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -1037,6 +1038,46 @@ export function abilityCounterMoveLock(ctx = {}) {
       !isAbilitySuppressed(c, ctx) &&
       /damage counters?[^.]*can'?t be moved/.test(cardAbilityText(c))
   );
+}
+
+// --- turn-structure permissions (design 034 slice 6) ---------------------
+
+/** The top card of each of the player's in-play stacks (the card whose Ability is printed). */
+function sideTops(cards) {
+  return rootsOf(cards).filter(isPokemon).map((root) => topPokemonCard(cards, root));
+}
+
+/** Magnezone Dual Brains: "During your turn, you may play 2 Supporter cards." → 2, else 1. */
+export function abilitySupporterLimit(ctx = {}) {
+  const dualBrains = sideTops(ctx.sideCards).some(
+    (top) =>
+      !isAbilitySuppressed(top, ctx) &&
+      /you may play 2 supporter cards/.test(cardAbilityText(top))
+  );
+  return dualBrains ? 2 : 1;
+}
+
+/**
+ * Alcremie Additional Order: "As long as this Pokémon is in the Active Spot, your turn does
+ * not end when you use Café Master." True when `trainer` is the named card and the holder
+ * meets its position clause.
+ */
+export function abilityTurnNotEnd(trainer, ctx = {}) {
+  const name = lower(trainer?.name).replace(/[\u2018\u2019]/g, "'");
+  if (!name) return false;
+  const activeIds = new Set(rootsOf(ctx.sideActive).map((c) => c.instanceId));
+  return rootsOf(ctx.sideCards)
+    .filter(isPokemon)
+    .some((root) => {
+      const top = topPokemonCard(ctx.sideCards, root);
+      const text = cardAbilityText(top).replace(/[\u2018\u2019]/g, "'");
+      const named = text.match(/your turn does not end when you use ([^.]+?)\./)?.[1];
+      if (!named || named.trim() !== name) return false;
+      if (/as long as this pok[eé]mon is in the active spot/.test(text) && !activeIds.has(root.instanceId)) {
+        return false;
+      }
+      return !isAbilitySuppressed(top, ctx);
+    });
 }
 
 // --- status / evolve / summon / attack permissions -----------------------

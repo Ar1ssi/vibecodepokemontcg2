@@ -107,3 +107,46 @@ export function copiedAttackFor(attack, { sourceName, copierName }) {
     sourceName && copierName && sourceName !== copierName ? text.split(sourceName).join(copierName) : text;
   return { ...attack, text: renamed, copiedFrom: sourceName || '' };
 }
+
+/**
+ * Attack-borrowing Abilities (design 034 slice 6): "This Pokémon can use the attacks of …
+ * (You still need the necessary Energy …)". Returns where the attacks come from and which
+ * Pokémon qualify; reduce.mjs gathers them into the attacker's view. Null for other text.
+ * @returns {{ scopes: string[], basic: boolean, noRuleBox: boolean, gxOrEx: boolean,
+ *   evolvesFrom: string|null, names: string[]|null, requiresActive: boolean }|null}
+ */
+export function parseAttackBorrowAbility(text) {
+  if (!/you still need the necessary energy/i.test(String(text || ''))) return null;
+  const t = normalize(text);
+  const phrase = t.match(/can use the attacks of (.+?)(?: as its own)?\s*\./)?.[1]?.trim();
+  if (!phrase) return null;
+  let scopes;
+  if (/lost zone/.test(phrase)) scopes = ['ownLostZone', 'oppLostZone'];
+  else if (/opponent's active|^that pokemon/.test(phrase)) scopes = ['oppActive'];
+  else {
+    scopes = [];
+    if (/bench/.test(phrase)) scopes.push('ownBench');
+    if (/discard pile/.test(phrase)) scopes.push('ownDiscard');
+    if (/in play/.test(phrase)) {
+      scopes.push('ownInPlay');
+      if (!/\byour\b|you have/.test(phrase)) scopes.push('oppInPlay');
+    }
+  }
+  const named = phrase.match(/^all (.+?) you have in play/)?.[1];
+  const names =
+    named && !/pokemon/.test(named)
+      ? named
+          .split(/,\s*(?:or\s+)?|\s+or\s+/)
+          .map((n) => n.replace(/^other\s+/, '').trim())
+          .filter(Boolean)
+      : null;
+  return {
+    scopes,
+    basic: /basic pokemon/.test(phrase),
+    noRuleBox: /except for pokemon with a rule box/.test(phrase),
+    gxOrEx: /pokemon-gx or pokemon-ex/.test(phrase),
+    evolvesFrom: phrase.match(/evolve from (\w+)/)?.[1] || null,
+    names,
+    requiresActive: /if this pokemon is your active|as long as [^.]+ is your active/.test(t),
+  };
+}

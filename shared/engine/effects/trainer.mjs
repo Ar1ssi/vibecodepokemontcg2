@@ -216,6 +216,8 @@ export function executeTrainer(draft, {
   if (isSupporter) {
     if (!player.flags) player.flags = {};
     player.flags.supporterPlayed = true;
+    // Magnezone Dual Brains allows a second Supporter (abilitySupporterLimit).
+    player.flags.supportersPlayedCount = (player.flags.supportersPlayedCount || 0) + 1;
     // Server-projected so the client's Stadium `named-supporter` condition
     // ("a Supporter with X in its name") can be evaluated under authority;
     // without it the once-per-turn Stadium never lit up.

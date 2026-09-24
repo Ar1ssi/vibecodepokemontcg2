@@ -631,3 +631,174 @@ test('ability: Rain Dance is refused while the holder is Asleep, allowed when Po
   state.players.p1.zones.active[0].poisoned = true;
   assert.equal(use70(state, rng).error, null);
 });
+
+// ── extra Supporter (Magnezone Dual Brains) ─────────────────────────────
+
+const DUAL_BRAINS = 'During your turn, you may play 2 Supporter cards.';
+const drawSupporter = (instanceId) =>
+  createCard({
+    instanceId,
+    name: `Sup ${instanceId}`,
+    supertype: 'Trainer',
+    subtypes: ['Supporter'],
+    type: 'Supporter',
+    text: 'Draw a card.',
+  });
+const playTrainer = (state, instanceId, rng) =>
+  applyCommand(state, { type: 'playTrainer', payload: { instanceId }, playerId: 'p1' }, rng);
+
+test('ability: Dual Brains allows a second Supporter, not a third', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(60, 'Magnemite'));
+  state.players.p1.zones.active.push(
+    mon(70, 'Magnezone', { stage: 'Stage 2', attachedTo: 60, abilities: [{ name: 'Dual Brains', type: 'Ability', text: DUAL_BRAINS }] })
+  );
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  state.players.p1.zones.hand.push(drawSupporter(80), drawSupporter(81), drawSupporter(82));
+  for (let i = 0; i < 5; i++) state.players.p1.zones.deck.push(card(90 + i));
+
+  const r1 = playTrainer(state, 80, rng);
+  assert.equal(r1.error, null);
+  const r2 = playTrainer(r1.state, 81, rng);
+  assert.equal(r2.error, null, 'Evolved Magnezone allows the second Supporter');
+  const r3 = playTrainer(r2.state, 82, rng);
+  assert.ok(r3.error, 'a third Supporter is refused');
+});
+
+test('ability: without Dual Brains the second Supporter is refused', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.hand.push(drawSupporter(80), drawSupporter(81));
+  state.players.p1.zones.deck.push(card(90), card(91));
+  const r1 = playTrainer(state, 80, rng);
+  assert.equal(r1.error, null);
+  assert.ok(playTrainer(r1.state, 81, rng).error);
+});
+
+// ── turn-not-end (Alcremie Additional Order) and trainer "Your turn ends." ──
+
+const cafeMaster = (instanceId) =>
+  createCard({
+    instanceId,
+    name: 'Café Master',
+    supertype: 'Trainer',
+    subtypes: ['Supporter'],
+    type: 'Supporter',
+    text: 'Choose up to 3 of your Benched Pokémon. For each of those Pokémon, search your deck for a different type of basic Energy card and attach it to that Pokémon. Then, shuffle your deck. Your turn ends.',
+  });
+const katy = (instanceId) =>
+  createCard({
+    instanceId,
+    name: 'Katy',
+    supertype: 'Trainer',
+    subtypes: ['Supporter'],
+    type: 'Supporter',
+    text: 'Discard your hand and draw 8 cards. Your turn ends.',
+  });
+
+test('trainer: "Your turn ends." hands the turn to the opponent after the effect', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.hand.push(katy(80));
+  for (let i = 0; i < 10; i++) state.players.p1.zones.deck.push(card(90 + i));
+  state.players.p2.zones.deck.push(card(120), card(121));
+
+  const res = playTrainer(state, 80, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 8);
+  assert.equal(res.state.turn.player, 'p2');
+});
+
+test('ability: Additional Order keeps the turn after Café Master only from the Active Spot', () => {
+  const ADDITIONAL_ORDER =
+    'As long as this Pokémon is in the Active Spot, your turn does not end when you use Café Master.';
+  const setup = (zone) => {
+    const { state, rng } = setupGame();
+    if (zone === 'bench') state.players.p1.zones.active.push(mon(72, 'Front'));
+    holder(state, ADDITIONAL_ORDER, { zone, name: 'Alcremie' });
+    state.players.p1.zones.hand.push(cafeMaster(80));
+    for (let i = 0; i < 4; i++) state.players.p1.zones.deck.push(card(90 + i));
+    state.players.p2.zones.deck.push(card(120));
+    return { state, rng };
+  };
+
+  const active = setup('active');
+  const kept = playTrainer(active.state, 80, active.rng);
+  assert.equal(kept.error, null);
+  assert.equal(kept.state.turn.player, 'p1');
+  assert.ok(kept.events.some((e) => e.type === 'turnEndPrevented'));
+
+  const bench = setup('bench');
+  const ended = playTrainer(bench.state, 80, bench.rng);
+  assert.equal(ended.error, null);
+  assert.equal(ended.state.turn.player, 'p2');
+});
+
+// ── attack-copy Abilities ───────────────────────────────────────────────
+
+const MEMORY_HELIX =
+  'This Pokémon can use the attacks of any of your Benched Pokémon. (You still need the necessary Energy to use each attack.)';
+const attackCmd = (state, attackIndex, rng) =>
+  applyCommand(state, { type: 'attack', payload: { attackIndex }, playerId: 'p1' }, rng);
+
+test("ability: Memory Helix uses a Benched Pokémon's attack as its own", () => {
+  const { state, rng } = setupGame();
+  holder(state, MEMORY_HELIX, {
+    name: 'Mew ex',
+    attacks: [{ name: 'Own', cost: [], damage: '10', text: '' }],
+  });
+  state.players.p1.zones.bench.push(
+    mon(72, 'Benched', { attacks: [{ name: 'Big Hit', cost: [], damage: '70', text: '' }] })
+  );
+  state.players.p2.zones.active[0].hp = 300;
+  state.players.p2.zones.deck.push(card(120));
+
+  const res = attackCmd(state, 1, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 70);
+});
+
+test('ability: a borrowed attack still needs its own Energy', () => {
+  const { state, rng } = setupGame();
+  holder(state, MEMORY_HELIX, {
+    name: 'Mew ex',
+    attacks: [{ name: 'Own', cost: [], damage: '10', text: '' }],
+  });
+  state.players.p1.zones.bench.push(
+    mon(72, 'Benched', { attacks: [{ name: 'Fire Blast', cost: ['Fire', 'Fire'], damage: '120', text: '' }] })
+  );
+  state.players.p1.zones.active.push(basicEnergy(80, 'Fire', 70));
+  assert.ok(attackCmd(state, 1, rng).error, 'one Fire Energy cannot pay {R}{R}');
+});
+
+test('ability: Sudden Transformation borrows only non-Rule-Box Basics in the discard pile', async () => {
+  const { state } = setupGame();
+  holder(
+    state,
+    'This Pokémon can use the attacks of any Basic Pokémon in your discard pile, except for Pokémon with a Rule Box (Pokémon V, Pokémon-GX, etc. have Rule Boxes). (You still need the necessary Energy to use each attack.)',
+    { name: 'Ditto', attacks: [] }
+  );
+  state.players.p1.zones.discard.push(
+    mon(80, 'Pikachu', { attacks: [{ name: 'Gnaw', cost: [], damage: '10', text: '' }] }),
+    mon(81, 'Zacian V', { subtypes: ['Basic', 'V'], attacks: [{ name: 'Brave Blade', cost: [], damage: '230', text: '' }] }),
+    mon(82, 'Raichu', { stage: 'Stage 1', attacks: [{ name: 'Thunder', cost: [], damage: '120', text: '' }] })
+  );
+  const { applyCommand: apply } = await import('../reduce.mjs');
+  const rng = createRng(3);
+  const ok = apply(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, rng);
+  assert.equal(ok.error, null);
+  assert.equal(ok.state.players.p2.zones.active[0].damage, 10, 'Gnaw is the only borrowed attack');
+  assert.ok(apply(state, { type: 'attack', payload: { attackIndex: 1 }, playerId: 'p1' }, rng).error);
+});
+
+test("ability: Metamorphosis Gene borrows the opponent's Active attack", () => {
+  const GENE =
+    "If this Pokémon is your Active Pokémon, it can use the attacks of your opponent's Active Pokémon. (You still need the necessary Energy to use each attack.)";
+  const { state, rng } = setupGame();
+  holder(state, GENE, { name: 'Ditto', attacks: [] });
+  state.players.p2.zones.active[0].attacks = [{ name: 'Slam', cost: [], damage: '30', text: '' }];
+
+  const res = attackCmd(state, 0, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 30);
+});
