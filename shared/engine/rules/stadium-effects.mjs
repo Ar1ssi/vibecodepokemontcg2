@@ -1623,6 +1623,28 @@ export function parseStadiumEvolutionSpeed(card) {
   return out;
 }
 
+/**
+ * Whether the Stadium lets `pokemon` (the top card in play) evolve into `evolution` on a turn it
+ * was played or already evolved (Forest of Vitality: a {G} Basic played this turn can evolve to
+ * Stage 1 and then Stage 2). Both cards must match the Stadium's type filter when it has one.
+ * Pure: the server passes its own Stadium card (ownerId = the player who played it).
+ */
+export function stadiumAllowsSameTurnEvolution(stadiumCard, { playerId, pokemon, evolution } = {}) {
+  if (!stadiumCard) return false;
+  const parsed = parseStadiumEvolutionSpeed(stadiumCard);
+  if (!parsed.relaxTurnGate) return false;
+  if (parsed.typeFilter) {
+    const hasType = (card) => (card?.types || []).map(lower).includes(parsed.typeFilter);
+    if (!hasType(pokemon)) return false;
+    if (evolution && (evolution.types || []).length && !hasType(evolution)) return false;
+  }
+  const scope = stadiumTargetScope(stadiumCard);
+  const owner = stadiumCard.ownerId;
+  if (scope === 'opponent' && owner != null) return playerId !== owner;
+  if (scope === 'owner' && owner != null) return playerId === owner;
+  return true;
+}
+
 export function getStadiumEvolutionSpeed(targetPlayer, pokemon = null) {
   const neutral = { relaxTurnGate: false, costReduce: 0, typeFilter: null };
   if (!rulesState.enabled) return neutral;

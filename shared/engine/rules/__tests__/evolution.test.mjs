@@ -498,3 +498,28 @@ import test from 'node:test';
       assert.equal(requiresTurnEndOnEvolve(evo, base), false);
     });
     
+test('Forest of Vitality: a {G} Pokémon played and evolved this turn can evolve again', async () => {
+  startGame();
+  for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+  rulesState.enabled = true;
+  rulesState.stadium = {
+    user: 'opp',
+    card: {
+      name: 'Forest of Vitality',
+      text: "Each player's {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.",
+    },
+  };
+  try {
+    const ivysaur = { instanceId: 'iv1', stage: 'Stage 1', name: 'Ivysaur', types: ['Grass'] };
+    markEvolvedThisTurn('self', ivysaur);
+    const venusaur = { stage: 'Stage 2', name: 'Venusaur', evolvesFrom: 'Ivysaur', types: ['Grass'] };
+    assert.equal((await canEvolve('self', ivysaur, venusaur, true)).allowed, true);
+
+    const charmeleon = { instanceId: 'ch1', stage: 'Stage 1', name: 'Charmeleon', types: ['Fire'] };
+    markEvolvedThisTurn('self', charmeleon);
+    const charizard = { stage: 'Stage 2', name: 'Charizard', evolvesFrom: 'Charmeleon', types: ['Fire'] };
+    assert.equal((await canEvolve('self', charmeleon, charizard, false)).allowed, false);
+  } finally {
+    rulesState.stadium = null;
+  }
+});

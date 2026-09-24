@@ -127,6 +127,7 @@ import {
   parseStadiumCostModifier,
   getStadiumAttackCostIncreaseFor,
   stadiumAbilityBlockedFor,
+  stadiumAllowsSameTurnEvolution,
 } from './rules/stadium-effects.mjs';
 import {
   isRuleBoxPokemon,
@@ -2616,22 +2617,29 @@ export function validateLegality(state, command) {
         if ((state.turn?.number || 1) <= 2) {
           return { allowed: false, reason: "Can't evolve on the first turn." };
         }
-        if (targetRef.card.enteredPlayTurn === state.turn?.number) {
+        const targetZoneCards =
+          targetRef.player?.zones?.[targetRef.zoneId] || [];
+        const topTarget = topPokemonCard(targetZoneCards, targetRef.card);
+        // Forest of Vitality and other evolution-speed Stadiums lift both the
+        // just-played and the once-per-turn gates (Basic → Stage 1 → Stage 2).
+        const stadiumRelaxes = stadiumAllowsSameTurnEvolution(state.stadium, {
+          playerId,
+          pokemon: topTarget,
+          evolution: cardRef.card,
+        });
+        if (!stadiumRelaxes && targetRef.card.enteredPlayTurn === state.turn?.number) {
           return {
             allowed: false,
             reason:
               "That Pokémon was just played this turn — it can't evolve yet.",
           };
         }
-        if (player.flags?.evolved?.[payload.targetInstanceId]) {
+        if (!stadiumRelaxes && player.flags?.evolved?.[payload.targetInstanceId]) {
           return {
             allowed: false,
             reason: 'Already evolved that Pokémon this turn.',
           };
         }
-        const targetZoneCards =
-          targetRef.player?.zones?.[targetRef.zoneId] || [];
-        const topTarget = topPokemonCard(targetZoneCards, targetRef.card);
         const baseStage = normalizeStage(topTarget?.stage) || 'Basic';
         const evoStage = normalizeStage(cardRef.card.stage);
         if (!evoStage || evoStage === 'Basic') {

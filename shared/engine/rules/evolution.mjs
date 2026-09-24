@@ -208,7 +208,13 @@ export async function canEvolve(
   // turn" gate (still enforced above via wasPlayedThisTurn on the Basic).
   const evoSpeed = getStadiumEvolutionSpeed(player, baseCardInPlay);
   const bypassJustEvolvedGate = Boolean(options.bypassJustEvolvedGate);
-  if (wasPlayedThisTurn && !evoSpeed.relaxTurnGate && !bypassJustEvolvedGate) {
+  // Evolution-speed Stadiums (Forest of Vitality) also allow a second evolution this turn
+  // (Basic → Stage 1 → Stage 2); a type filter must hold for the evolution card too.
+  const evolutionTypes = (evolutionCardInHand.types || []).map((t) => String(t).toLowerCase());
+  const stadiumRelaxes =
+    evoSpeed.relaxTurnGate &&
+    (!evoSpeed.typeFilter || !evolutionTypes.length || evolutionTypes.includes(evoSpeed.typeFilter));
+  if (wasPlayedThisTurn && !stadiumRelaxes && !bypassJustEvolvedGate) {
     return { allowed: false, reason: "That Pokémon was just played this turn — it can't evolve yet." };
   }
 
@@ -280,7 +286,7 @@ export async function canEvolve(
 
   // once per turn per card instance — Grand Tree's chained Stage 2 step is
   // the one printed exception (see bypassJustEvolvedGate above).
-  if (!bypassJustEvolvedGate) {
+  if (!bypassJustEvolvedGate && !stadiumRelaxes) {
     const instanceId = getCardInstanceId(baseCardInPlay);
     if (instanceId && rulesState.flags[player]?.evolved?.[instanceId]) {
       return { allowed: false, reason: 'Already evolved that Pokémon this turn.' };

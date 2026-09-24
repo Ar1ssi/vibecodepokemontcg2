@@ -5,7 +5,7 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 286
+Session: 287
 Focus: S286 feature: design 035 finished — slice 11 trainer play conditions + slice 12 `pnpm audit:trainers` gate
   (branch claude/wizardly-brown-k61li3 = feature/trainer-behaviour + main merged).
 Active: none.
@@ -32,8 +32,8 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Session numbers S282–S285 were used on another machine for design 035 without journal entries (see S286 line).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S287 Forest of Vitality (evolution-speed Stadiums) allows a {G} Basic → Stage 1 → Stage 2 in one turn, server + client.
 - S286 Design 035 done: Trainer play conditions (Lost Zone, Stadium, opponent Active stage/Poisoned, typed KO'd-last-
   turn, last card/hand size, exactly-N Prizes, first-turn-only) enforced server-side; `pnpm audit:trainers` ratchet.
 - S280–S285 (other machine) design 035 slices 1–10: prize clauses, fossil bench picks, gated Tool modifiers, ~27 new
   Trainer step executors, TM attacks, Tool on-KO effects, triggered Stadiums.
-- S281 Tera crystal (entry prisms/floor/burst + lasting skin tint/facets/rim/glints) is the card's type colour.
