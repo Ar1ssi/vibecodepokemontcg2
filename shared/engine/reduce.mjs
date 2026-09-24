@@ -3295,6 +3295,7 @@ function attackResumeContext(draft, token, { activeRng, events }) {
     revealedMatches: token.revealedMatches,
     copiedAttack: token.copiedAttack || null,
     conditionChecked: token.conditionChecked === true,
+    statusConditionsMet: token.statusConditionsMet,
   };
 }
 
@@ -3610,6 +3611,25 @@ function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
   });
 }
 
+/** Per status branch: whether its printed board condition holds now (null for other branches). */
+function statusConditionResults(draft, ctx, branches) {
+  if (!branches.some((branch) => branch.when?.condition)) return [];
+  const { attacker, defender, attackerView, playerId, defenderPlayerId, coin, headsCount } = ctx;
+  const conditionCtx = buildServerAttackContext(draft, {
+    attackerPlayerId: playerId,
+    defenderPlayerId,
+    attacker,
+    defender,
+    attackerView,
+    defenderView: defender ? inPlayView(draft, defender) : null,
+    coin,
+    headsCount,
+  });
+  return branches.map((branch) =>
+    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
+  );
+}
+
 /**
  * Resolves the part of an attack that runs after its coins are flipped:
  * printed-text damage, recoil, status, bench/spread damage, searches, and the
@@ -3675,6 +3695,14 @@ function resolveAttackEffectPhase(draft, ctx) {
   // in the applyCommand tail.
   draft.__attackEffectPhase = true;
 
+  // Conditional status clauses (design 036 A10) read the board before the attack's damage
+  // ("already has any damage counters on it"); a resumed effect phase keeps that reading.
+  const statusBranches = parseAttackStatusBranches(attack?.text, {
+    selfName: attackerView?.name || attacker?.name,
+  });
+  const statusConditionsMet =
+    ctx.statusConditionsMet ?? statusConditionResults(draft, ctx, statusBranches);
+
   const resumeBase = {
     initiatorPlayerId: playerId,
     attackName: attack.name,
@@ -3682,6 +3710,7 @@ function resolveAttackEffectPhase(draft, ctx) {
     targetInstanceId: defender?.instanceId ?? null,
     coinResult: { coin, headsCount, flips },
     conditionChecked: true,
+    statusConditionsMet,
     ...(ctx.copiedAttack ? { copiedAttack: ctx.copiedAttack } : {}),
   };
 
@@ -4225,10 +4254,13 @@ function resolveAttackEffectPhase(draft, ctx) {
       // atkChooseCondition step's (design 032).
       const { defenderConditions, attackerConditions } = attackSteps.printed.has('atkChooseCondition')
         ? { defenderConditions: [], attackerConditions: [] }
-        : statusesFromBranches(
-            parseAttackStatusBranches(attack?.text, { selfName: attackerView?.name || attacker?.name }),
-            { coin, headsCount, flips }
-          );
+        : statusesFromBranches(statusBranches, {
+            coin,
+            headsCount,
+            flips,
+            conditionMet: (condition) =>
+              statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
+          });
 
       if (defenderConditions.length > 0 && defender) {
         // Only apply condition if defender survived the attack (not KO'd)

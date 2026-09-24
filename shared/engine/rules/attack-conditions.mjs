@@ -429,6 +429,17 @@ function parseClause(raw) {
   return null;
 }
 
+/**
+ * A bare "if <clause>" condition (design 036 A10: "If X, this attack does 30 more damage, and
+ * the Defending Pokémon is now Confused") as a descriptor that holds when the clause is TRUE.
+ * @param {string} clause Normalized clause text, with or without the leading "if"
+ * @returns {object|null}
+ */
+export function parseConditionClause(clause) {
+  const printed = parseClause(clause);
+  return printed ? { ...printed.desc, negated: printed.printedNegated } : null;
+}
+
 const DOES_NOTHING = /^(?:if )?(.+?),?\s*this attack does nothing\.?$/;
 // "You can use this attack only if <clause>." Unlike a "does nothing" gate the printed
 // polarity is already the state the attack proceeds in, so `negated` keeps it as parsed.

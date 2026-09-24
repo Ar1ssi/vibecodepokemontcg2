@@ -10,7 +10,8 @@
  *   statusesFromBranches(branches, { coin, headsCount, flips }) → { defenderConditions, attackerConditions }
  *
  * `when` is 'always', 'heads', 'tails', { firstFlip:'heads'|'tails' }, { headsAtLeast:n },
- * { headsExactly:n }, { tailsAtLeast:n } or { allHeads:true }. Threshold chains
+ * { headsExactly:n }, { tailsAtLeast:n }, { allHeads:true } or { condition } (a printed board
+ * condition from attack-conditions, evaluated by the caller's `conditionMet`). Threshold chains
  * ("if 1 / if 2 / if all of them are heads") are exclusive: only the highest matching
  * clause's statuses apply, so a 2-heads flip does not also apply the 1-head status.
  *
@@ -26,6 +27,7 @@
 
 import { normalizeAttackText } from './attack-steps.mjs';
 import { classifyAttackEffect } from './attack-effects.mjs';
+import { parseConditionClause } from './attack-conditions.mjs';
 
 const STATUS_WORDS = {
   asleep: 'Asleep',
@@ -56,6 +58,11 @@ const GATES = [
   [/^if at least (\d+) of them are heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
   [/^if (\d+) or more (?:of them )?(?:are|is) heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
   [/^if you get (\d+) or more heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
+  [/^if all \d+ are heads,?\s+/, () => ({ allHeads: true })],
+  [/^if you get at least (\d+) heads,?\s+/, (m) => ({ headsAtLeast: Number(m[1]) })],
+  [/^if exactly (\d+) (?:of them )?(?:is|are) heads,?\s+/, (m) => ({ headsExactly: Number(m[1]) })],
+  [/^if either (?:coin|of the coins) is heads,?\s+/, () => ({ headsAtLeast: 1 })],
+  [/^if (\d+) is heads,?\s+/, (m) => ({ headsExactly: Number(m[1]) })],
   [/^if any of them (?:is|are) heads,?\s+/, () => ({ headsAtLeast: 1 })],
   [/^if (?:either|1 or both) of them (?:is|are) heads,?\s+/, () => ({ headsAtLeast: 1 })],
   [/^if both (?:of them )?are heads,?\s+/, () => ({ headsAtLeast: 2 })],
@@ -79,6 +86,10 @@ const SUBJECT = `(?:this pokémon|your opponent's active pokémon)`;
 const STATUS_LIST = `(?:'?(?:${STATUS_RE})'?)(?:\\s*(?:,\\s*(?:and|or)?\\s*|and\\s+|or\\s+)'?(?:${STATUS_RE})'?)*`;
 const BOTH_RE = new RegExp(`both (${SUBJECT}) and (${SUBJECT}) (?:is|are) (?:now|also) (${STATUS_LIST})`);
 const NOW_RE = new RegExp(`(${SUBJECT}) (?:is|are) (?:now|also) (${STATUS_LIST})`);
+const BOTH_ACTIVE_RE = new RegExp(`both active pokémon are now (${STATUS_LIST})`);
+// "If your opponent's Active Pokémon is Confused, it is now Paralyzed": inside a conditional
+// sentence the pronoun is the Pokémon the condition names, which in print is always the defender.
+const PRONOUN_RE = new RegExp(`^(?:it|that pokémon) is now (${STATUS_LIST})`);
 const PUT_RE = new RegExp(`put (${SUBJECT}) to sleep`);
 const VERB_RE = new RegExp(`\\b(paralyze|poison|burn|confuse) (${SUBJECT})`);
 
@@ -91,13 +102,17 @@ const targetOf = (subject) => (/this pokémon/.test(subject) ? 'attacker' : 'def
  * The status application inside a sentence: `{ target, statuses }`, or null when the
  * sentence does not apply one (conditions like "is still asleep" are not applications).
  */
-function statusesIn(sentence) {
+function statusesIn(sentence, { conditional = false } = {}) {
   const text = String(sentence || '');
   const both = BOTH_RE.exec(text);
   if (both) {
     const statuses = statusList(both[3]);
     if (statuses.length > 0) return { target: 'both', statuses };
   }
+  const bothActive = BOTH_ACTIVE_RE.exec(text);
+  if (bothActive) return { target: 'both', statuses: statusList(bothActive[1]) };
+  const pronoun = conditional ? PRONOUN_RE.exec(text) : null;
+  if (pronoun) return { target: 'defender', statuses: statusList(pronoun[1]) };
   const now = NOW_RE.exec(text);
   if (now) {
     const statuses = statusList(now[2]);
@@ -125,6 +140,19 @@ function legacyBranches(normalized) {
     : [];
 }
 
+// "If <board condition>, [this attack does N more damage, and] <status clause>" (design 036
+// A10): a branch whose `when` is `{ condition }`, the attack-conditions descriptor that holds
+// when the printed clause is true. Null when the clause or the status is not read.
+function conditionBranch(sentence) {
+  const lead = /^if ([^,]+),\s*(.+)$/.exec(sentence);
+  if (!lead) return null;
+  const condition = parseConditionClause(lead[1]);
+  if (!condition) return null;
+  const application = statusesIn(lead[2], { conditional: true });
+  if (!application || application.statuses.length === 0) return null;
+  return { when: { condition }, target: application.target, statuses: application.statuses };
+}
+
 /**
  * @param {string} text Printed attack effect text
  * @param {{ selfName?: string }} [options] The attacker's printed name
@@ -140,9 +168,11 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
     if (!sentence) continue;
     const gate = sentenceGate(sentence);
     if (!gate && /^if\b/.test(sentence)) {
+      const condition = conditionBranch(sentence);
+      if (condition) branches.push(condition);
       // A conditional wording this parser cannot evaluate: apply nothing rather than
       // everything (the condition may be a damage gate, a discard chain or a prize count).
-      sawConditional = true;
+      else sawConditional = true;
       continue;
     }
     const body = gate ? sentence.slice(gate.length).trim() : sentence;
@@ -162,7 +192,8 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
 }
 
 // `firstFlip` is a one-off condition, not a rung on the heads-count ladder.
-const isThreshold = (when) => typeof when === 'object' && when !== null && when.firstFlip == null;
+const isThreshold = (when) =>
+  typeof when === 'object' && when !== null && when.firstFlip == null && when.condition == null;
 const rankOf = (when) => {
   if (when.allHeads) return Infinity;
   if (when.headsExactly != null) return when.headsExactly;
@@ -173,10 +204,15 @@ const rankOf = (when) => {
 
 /**
  * @param {Array} branches From `parseAttackStatusBranches`
- * @param {{ coin?: 'heads'|'tails'|null, headsCount?: number, flips?: string[] }} flip
+ * @param {{ coin?: 'heads'|'tails'|null, headsCount?: number, flips?: string[],
+ *   conditionMet?: (condition: object) => boolean }} flip `conditionMet` evaluates a
+ *   `{ condition }` branch; without it those branches never apply.
  * @returns {{ defenderConditions: string[], attackerConditions: string[] }}
  */
-export function statusesFromBranches(branches, { coin = null, headsCount = 0, flips = [] } = {}) {
+export function statusesFromBranches(
+  branches,
+  { coin = null, headsCount = 0, flips = [], conditionMet = () => false } = {}
+) {
   const defender = new Set();
   const attacker = new Set();
   const heads = Number(headsCount) || 0;
@@ -186,6 +222,7 @@ export function statusesFromBranches(branches, { coin = null, headsCount = 0, fl
   const applies = (when) => {
     if (when === 'heads') return coin === 'heads' || heads >= 1;
     if (when === 'tails') return coin === 'tails' || tailsCount >= 1;
+    if (when.condition) return conditionMet(when.condition) === true;
     if (when.firstFlip) return flipList[0] === when.firstFlip;
     if (when.allHeads) return flipList.length > 0 && heads === flipList.length;
     if (when.headsExactly != null) return heads === when.headsExactly;
