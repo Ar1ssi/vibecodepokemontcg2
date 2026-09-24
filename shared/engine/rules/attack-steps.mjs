@@ -241,9 +241,18 @@ const TEMPLATES = [
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
   ],
 
+  // Own-hand discards (design 036 A11). A cost the attack cannot be used without, or a discard
+  // the damage counts, moves before damage in parseAttackSteps; "If you do, …" chains on it.
+  [/^discard your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'all' })],
+  [/^discard any number of cards from your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'any' })],
+  [/^discard (an?|\d+) cards? from your hand$/, (m) => ({ type: 'atkDiscardOwnHand', count: countOf(m[1]) })],
+  [
+    new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand$`),
+    (m, s) => ({ type: 'atkDiscardHandEnergy', count: countOf(m[1]), ...energyFilter(m[2], s) }),
+  ],
+
   // Raichu LV.X Voltage Shoot: the hand discard pays for the chosen-target damage, so it
   // runs before damage and the attack is refused without the cards (handEnergyDiscardCost).
-  // "Discard … from your hand. If you do, …" (Flare Bonus) is conditional and stays unread.
   [
     new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand and choose 1 of your opponent's pokémon$`),
     (m, s) => ({ type: 'atkDiscardHandEnergy', count: countOf(m[1]), ...energyFilter(m[2], s), beforeDamage: true }),
@@ -336,6 +345,32 @@ const TEMPLATES = [
       ...(/any|as many/.test(m[1]) ? { anyNumber: true } : { count: countOf(m[1]) }),
       ...energyFilter(m[2], s),
     }),
+  ],
+  [
+    /^(?:put all energy(?: cards)? attached to this pokémon in the lost zone|remove all energy cards attached to this pokémon and put them in the lost zone)$/,
+    () => ({ type: 'atkLostZoneEnergy', from: 'self', all: true }),
+  ],
+  // Design 036 A12: Lost Zone from a hand, the discard pile, or play.
+  [
+    /^(?:put (an?|\d+) cards? from your hand in the lost zone|choose (a|1) card from your hand and put it in the lost zone)$/,
+    (m) => ({ type: 'atkLostZoneFromHand', count: countOf(m[1] || m[2]) }),
+  ],
+  [
+    /^choose (a|1) pokémon from your hand and put it in the lost zone$/,
+    () => ({ type: 'atkLostZoneFromHand', count: 1, what: 'pokemon' }),
+  ],
+  [
+    /^(?:put a random card from your opponent's hand in the lost zone|choose 1 card from your opponent's hand without looking and put it in the lost zone)$/,
+    () => ({ type: 'atkLostZoneOppHandRandom', count: 1 }),
+  ],
+  [
+    /^put (an?|\d+) cards? from your opponent's discard pile in the lost zone$/,
+    (m) => ({ type: 'atkLostZoneOppDiscard', count: countOf(m[1]) }),
+  ],
+  [/^put this pokémon and all (?:attached cards|cards attached to it) in the lost zone$/, () => ({ type: 'atkLostZoneSelf' })],
+  [
+    /^put your opponent's active pokémon and all cards attached to it in the lost zone$/,
+    () => ({ type: 'atkLostZoneOppActive' }),
   ],
   [
     /^put a special energy attached to 1 of your opponent's pokémon in the lost zone$/,
@@ -870,6 +905,7 @@ export function resolveCoinGates(steps, { coin, headsCount }) {
 }
 
 const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;
+const HAND_COST_TYPES = new Set(['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkLostZoneFromHand']);
 
 function isAttachStep(step) {
   return step?.type === 'atkAttach' || (step?.type === 'searchAbility' && step.destination === 'attach');
@@ -936,10 +972,13 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
     const chained = ATTACH_CHAIN.exec(plain);
     const previous = result.after[result.after.length - 1];
-    if (chained && !isAttachStep(previous)) continue;
+    // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
+    const handChain = Boolean(chained) && /^if you do, /.test(plain) && HAND_COST_TYPES.has(previous?.type);
+    if (chained && !handChain && !isAttachStep(previous)) continue;
     const { rest, flags } = stripGates(chained ? plain.slice(chained[0].length) : plain);
-    if (chained) flags.requiresAttach = true;
-    const templates = chained ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    if (handChain) flags.requiresHandCost = true;
+    else if (chained) flags.requiresAttach = true;
+    const templates = chained && !handChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
@@ -960,6 +999,18 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const costs = result.after.filter((step) => step.type.startsWith('atkLostZone'));
     result.after = result.after.filter((step) => !costs.includes(step));
     result.before.push(...costs.map((step) => ({ ...step, countsForDamage: true })));
+  }
+
+  // A hand cost the attack cannot be used without ("(If you can't discard a card from your hand,
+  // this attack does nothing.)") pays before damage, and the legality gate refuses the attack
+  // without the cards (D114). A discard the damage counts ("If you do, this attack does 70 more
+  // damage") also runs first, and the reducer counts it.
+  const handCost = /if you (?:can't|don't)[^.]*this attack does nothing/.test(normalizeAttackText(text, selfName));
+  const handScaled = /(?:if you do|if you discarded [^,]* in this way), this attack does/.test(normalized);
+  if (handCost || handScaled) {
+    const costs = result.after.filter((step) => HAND_COST_TYPES.has(step.type));
+    result.after = result.after.filter((step) => !costs.includes(step));
+    result.before.push(...costs.map((step) => (handScaled ? { ...step, countsForDamage: true } : step)));
   }
   return result;
 }

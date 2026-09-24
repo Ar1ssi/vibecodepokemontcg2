@@ -109,6 +109,7 @@ const isDamagedTauros = ({ card, view }) =>
  * @param {number} [args.energyDiscarded] Number of energy discarded for scaling damage
  * @param {number} [args.milledMatches] Counted cards a deck-mill attack discarded
  * @param {number} [args.lostZoned] Cards the attack's before-damage step put in the Lost Zone
+ * @param {number} [args.handDiscarded] Hand cards the attack's before-damage step discarded (036 A11)
  * @param {number} [args.revealedMatches] Counted cards a deck-reveal attack found (Mud Flood)
  * @param {boolean} [args.energyReturned] Whether an attached Energy was returned to hand
  *   (Mega Greninja ex — Ninja Spinner); drives its optional +N damage bonus.
@@ -129,6 +130,7 @@ export function buildServerAttackContext(
     milledMatches = undefined,
     energyReturned = undefined,
     lostZoned = undefined,
+    handDiscarded = undefined,
     revealedMatches = undefined,
   } = {}
 ) {
@@ -207,6 +209,9 @@ export function buildServerAttackContext(
   }
   if (lostZoned !== undefined) {
     ctx.lostZoned = lostZoned;
+  }
+  if (handDiscarded !== undefined) {
+    ctx.handDiscarded = handDiscarded;
   }
   if (revealedMatches !== undefined) {
     ctx.revealedMatches = revealedMatches;

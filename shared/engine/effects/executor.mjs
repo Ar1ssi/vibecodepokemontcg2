@@ -224,6 +224,12 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // "Discard a card from your hand. If you do, …" (design 036 A11): the hand cost was paid.
+    if (events.some((e) => e.handCost && e.playerId === playerId)) context.handCostPaid = true;
+    if (step.requiresHandCost && !context.handCostPaid) {
+      events.push({ type: 'effectStepSkipped', reason: 'hand_cost_unpaid', step: step.type });
+      continue;
+    }
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;

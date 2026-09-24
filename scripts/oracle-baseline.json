@@ -211,7 +211,7 @@
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 159
+      "observed": 171
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -291,7 +291,7 @@
     },
     "attack:lost-zone": {
       "n": 11,
-      "observed": 8
+      "observed": 9
     },
     "attack:mirror-heal": {
       "n": 11,
@@ -319,7 +319,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 456
+      "observed": 459
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -375,7 +375,7 @@
     },
     "attack:status-asleep": {
       "n": 121,
-      "observed": 120
+      "observed": 121
     },
     "attack:status-burned": {
       "n": 94,
@@ -383,7 +383,7 @@
     },
     "attack:status-confused": {
       "n": 130,
-      "observed": 122
+      "observed": 123
     },
     "attack:status-paralyzed": {
       "n": 155,

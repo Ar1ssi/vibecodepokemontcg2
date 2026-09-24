@@ -75,9 +75,9 @@ import {
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
-import { handEnergyForDiscard } from './effects/attack-steps.mjs';
+import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
-import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
+import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
 import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
 import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
 import {
@@ -777,6 +777,27 @@ function settleKnockOutWins(draft, { events }) {
   }
 }
 
+const LOST_ZONE_KNOCKOUT =
+  /knocked out by (?:damage from )?this (?:attack|damage), put (?:that pokémon|your opponent's active pokémon) and all cards attached to it in the lost zone instead of (?:discarding it|the discard pile)/;
+
+/**
+ * The attack-legality reason a printed own-hand cost cannot be paid (D114), or null.
+ * Only a required cost counts: "You may discard …" is never a reason to refuse the attack.
+ */
+function handCardsCostReason(player, beforeSteps) {
+  const discard = beforeSteps.find(
+    (step) => step.type === 'atkDiscardOwnHand' && !step.optional && typeof step.count === 'number'
+  );
+  if (discard && (player?.zones?.hand || []).length < discard.count) {
+    return `You need ${discard.count} card(s) in your hand to discard.`;
+  }
+  const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional);
+  if (lostZone && handCardsForLostZone(player, lostZone).length < (lostZone.count || 1)) {
+    return `You need ${lostZone.what === 'pokemon' ? 'a Pokémon' : 'a card'} in your hand to put in the Lost Zone.`;
+  }
+  return null;
+}
+
 /**
  * Handles Knockout resolution for a Pokemon:
  * - Grants the attacker a prize entitlement, settled by collectPrizeEntitlement
@@ -874,6 +895,7 @@ function handleKnockout(
   // Lost City: the Knocked Out Pokémon itself is put in the Lost Zone instead
   // of the discard pile — attached cards are still discarded (card text).
   const lostCity = isStadiumLostCity(draft.stadium?.card || draft.stadium);
+  const attackLostZone = draft.__attackLostZoneKnockouts === victimPlayerId;
 
   // Special-energy on-knockout triggers (Splash/Rescue return the Pokémon to
   // hand; Gift draws until 7). Attached cards still go to the discard pile.
@@ -897,7 +919,10 @@ function handleKnockout(
         clearConditions(c);
         clearAttackMarkers(c);
         c.attachedTo = null;
-        if (lostCity && c.instanceId === victim.instanceId) {
+        if (attackLostZone) {
+          if (!Array.isArray(victimPlayer.zones.lostZone)) victimPlayer.zones.lostZone = [];
+          victimPlayer.zones.lostZone.push(c);
+        } else if (lostCity && c.instanceId === victim.instanceId) {
           if (!Array.isArray(victimPlayer.zones.lostZone)) {
             victimPlayer.zones.lostZone = [];
           }
@@ -2482,15 +2507,16 @@ export function validateLegality(state, command) {
       if (!attackCostPayable(state, playerId, active, attack)) {
         return { allowed: false, reason: 'Not enough energy attached.' };
       }
-      const handCost = parseAttackSteps(attack?.text, { selfName: active.name }).before.find(
-        (step) => step.type === 'atkDiscardHandEnergy'
-      );
+      const beforeSteps = parseAttackSteps(attack?.text, { selfName: active.name }).before;
+      const handCost = beforeSteps.find((step) => step.type === 'atkDiscardHandEnergy');
       if (handCost && handEnergyForDiscard(player, handCost).length < (handCost.count || 1)) {
         return {
           allowed: false,
           reason: `You need ${handCost.count || 1} ${handCost.energyType ? `{${handCost.energyType}} ` : ''}Energy card(s) in your hand to discard.`,
         };
       }
+      const handCardsNeeded = handCardsCostReason(player, beforeSteps);
+      if (handCardsNeeded) return { allowed: false, reason: handCardsNeeded };
       return { allowed: true };
     }
 
@@ -3694,6 +3720,11 @@ function resolveAttackEffectPhase(draft, ctx) {
   // triggers (Boomerang/Burning) fire only for attack-driven discards. Cleared
   // in the applyCommand tail.
   draft.__attackEffectPhase = true;
+  // "If … would be Knocked Out by damage from this attack, put that Pokémon and all cards attached
+  // to it in the Lost Zone instead of discarding it" (design 036 A12): read by handleKnockout.
+  if (LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name))) {
+    draft.__attackLostZoneKnockouts = defenderPlayerId;
+  }
 
   // Conditional status clauses (design 036 A10) read the board before the attack's damage
   // ("already has any damage counters on it"); a resumed effect phase keeps that reading.
@@ -3933,6 +3964,13 @@ function resolveAttackEffectPhase(draft, ctx) {
   }
   // Cards a before-damage Lost Zone cost moved (Rotom V Scrap Short). The cost is those
   // attacks' only before-damage step, so it moves in the command that reaches damage.
+  const handDiscarded = attackSteps.before.some(
+    (step) => step.countsForDamage && (step.type === 'atkDiscardOwnHand' || step.type === 'atkDiscardHandEnergy')
+  )
+    ? events
+        .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
+        .reduce((total, e) => total + e.cards.length, 0)
+    : undefined;
   const lostZoned = attackSteps.before.some((step) => step.countsForDamage)
     ? events
         .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
@@ -3956,6 +3994,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           milledMatches,
           energyReturned,
           lostZoned,
+          handDiscarded,
           revealedMatches,
         })
       );
@@ -6788,6 +6827,7 @@ export function applyCommand(state, command, rng = null) {
   settlePrizeEntitlements(draft, { events });
   clearFaceDownOffBoard(draft);
   delete draft.__attackEffectPhase;
+  delete draft.__attackLostZoneKnockouts;
 
   // Advance state version and append to commandLog
   draft.stateVersion = (state.stateVersion || 0) + 1;

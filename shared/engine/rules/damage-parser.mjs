@@ -84,6 +84,14 @@ function amount(text, re) {
 // the condition depends on something not present in card data (e.g. "you
 // have an Energy attached…") — the caller keeps an honest unresolved note.
 function evalCondition(cond, defender, ctx) {
+  // Design 036 A11: the hand cards the attack's own before-damage discard took
+  // (ctx.handDiscarded, set by the reducer only for such attacks).
+  if (ctx.handDiscarded !== undefined) {
+    const clause = cond.trim();
+    if (/^you (?:do|discarded any cards in this way)$/.test(clause)) return ctx.handDiscarded > 0;
+    const atLeast = clause.match(/^you discarded (\d+) or more cards in this way$/);
+    if (atLeast) return ctx.handDiscarded >= Number(atLeast[1]);
+  }
   const hp = Number(defender?.hp) || 0;
   const hpMore = cond.match(/(\d+) hp or more/);
   if (hpMore) {
@@ -434,7 +442,7 @@ export function parseAttackDamage(
     // conditions not derivable from card data stay honest unresolved notes.
     // Coin-conditional bonuses ("if heads/if tails") are handled by the coin
     // block below and must not be misfiled here as an unresolved condition.
-    const bonus = amount(text, /does (\d+) more damage|(\d+) more damage/);
+    const bonus = amount(text, /(\d+) more damage/);
     const cond = (text.match(/if (.+?)(?:,| this attack)/) || [])[1] || '';
     const result = evalCondition(cond, defender, ctx);
     if (result === null) {

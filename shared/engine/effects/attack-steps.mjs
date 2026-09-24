@@ -122,7 +122,7 @@ function swapActive(player, active, benchRoot, events, turnNumber = 1) {
   });
 }
 
-function discardCards(player, cards, events) {
+function discardCards(player, cards, events, extra = {}) {
   if (cards.length === 0) return;
   for (const card of cards) {
     removeFromZones(player, card);
@@ -133,8 +133,13 @@ function discardCards(player, cards, events) {
     type: 'cardsDiscarded',
     playerId: player.playerId,
     cards: cards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    ...extra,
   });
 }
+
+// A hand card the attack paid: "If you do, …" steps run only after one (executor
+// requiresHandCost), and `forDamage` marks a discard the damage counts.
+const handCostTag = (step) => ({ handCost: true, ...(step.countsForDamage ? { forDamage: true } : {}) });
 
 function moveToZone(player, card, zone, from, events) {
   removeFromZones(player, card);
@@ -518,17 +523,55 @@ function atkDiscardHandEnergy(ctx) {
   if (ctx.selection) {
     const picked = pickById(candidates, ctx.selection).slice(0, count);
     if (picked.length < count) return skip(ctx, 'not_enough_energy');
-    discardCards(player, picked, ctx.events);
+    discardCards(player, picked, ctx.events, handCostTag(step));
     return null;
   }
   if (candidates.length < count) return skip(ctx, 'not_enough_energy');
   if (candidates.length === count) {
-    discardCards(player, candidates, ctx.events);
+    discardCards(player, candidates, ctx.events, handCostTag(step));
     return null;
   }
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose ${count} ${energyLabel(step)} card${count === 1 ? '' : 's'} to discard from your hand`,
     options: candidates,
+    min: count,
+    max: count,
+  });
+}
+
+// Design 036 A11: discard N cards, any number, or the whole hand.
+function atkDiscardOwnHand(ctx) {
+  const { player, step } = ctx;
+  const hand = player.zones.hand || [];
+  const tag = handCostTag(step);
+  if (ctx.selection) {
+    const picked = pickById(hand, ctx.selection);
+    if (typeof step.count === 'number' && picked.length < step.count) return skip(ctx, 'not_enough_cards');
+    discardCards(player, picked, ctx.events, tag);
+    return null;
+  }
+  if (step.count === 'all') {
+    discardCards(player, [...hand], ctx.events, tag);
+    return null;
+  }
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  if (step.count === 'any') {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose any number of cards to discard from your hand`,
+      options: hand,
+      min: 0,
+      max: hand.length,
+    });
+  }
+  const count = step.count || 1;
+  if (hand.length < count) return skip(ctx, 'not_enough_cards');
+  if (hand.length === count) {
+    discardCards(player, [...hand], ctx.events, tag);
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${count} card${count === 1 ? '' : 's'} to discard from your hand`,
+    options: hand,
     min: count,
     max: count,
   });
@@ -920,6 +963,7 @@ function moveToLostZone(ctx, owner, cards) {
     count: cards.length,
     cards: cards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
     ...(ctx.step.countsForDamage ? { forDamage: true } : {}),
+    ...(ctx.step.type === 'atkLostZoneFromHand' ? { handCost: true } : {}),
   });
 }
 
@@ -941,7 +985,7 @@ function lostZoneChoice(ctx, owner, candidates, label) {
     return null;
   }
   if (candidates.length === 0) return skip(ctx, 'nothing_to_lost_zone');
-  if (!step.anyNumber && candidates.length <= (step.count || 1)) {
+  if (step.all || (!step.anyNumber && candidates.length <= (step.count || 1))) {
     moveToLostZone(ctx, owner, candidates);
     return null;
   }
@@ -975,6 +1019,65 @@ function atkLostZoneFromDiscard(ctx) {
   const { player, step } = ctx;
   const candidates = (player.zones.discard || []).filter((c) => matchesSearch(c, step.what));
   return lostZoneChoice(ctx, player, candidates, `${step.what} cards`);
+}
+
+/** Hand cards an `atkLostZoneFromHand` step may take (Absol Vicious Claw: Pokémon only). */
+export function handCardsForLostZone(player, step) {
+  const hand = player?.zones?.hand || [];
+  return step.what === 'pokemon' ? hand.filter(isPokemon) : hand;
+}
+
+function atkLostZoneFromHand(ctx) {
+  const { player, step } = ctx;
+  return lostZoneChoice(ctx, player, handCardsForLostZone(player, step), step.what === 'pokemon' ? 'Pokémon' : 'cards');
+}
+
+function atkLostZoneOppHandRandom(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const pool = [...(opponent.zones.hand || [])];
+  if (pool.length === 0) return skip(ctx, 'empty_hand');
+  const count = Math.min(step.count || 1, pool.length);
+  const picked = [];
+  for (let i = 0; i < count; i++) {
+    const at = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * pool.length);
+    picked.push(...pool.splice(at, 1));
+  }
+  moveToLostZone(ctx, opponent, picked);
+  return null;
+}
+
+function atkLostZoneOppDiscard(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  return lostZoneChoice(ctx, opponent, [...(opponent.zones.discard || [])], 'cards');
+}
+
+/** A Pokémon and every card attached to it, off the board and into its owner's Lost Zone. */
+function lostZoneStack(ctx, owner, root) {
+  const stack = [root, ...attachedCards(owner, root.instanceId)];
+  for (const card of stack) {
+    card.damage = 0;
+    clearConditions(card);
+    clearAttackMarkers(card);
+  }
+  moveToLostZone(ctx, owner, stack);
+}
+
+function atkLostZoneSelf(ctx) {
+  const { player } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref || ref.playerId !== player.playerId) return skip(ctx, 'attacker_not_in_play');
+  lostZoneStack(ctx, player, ref.card);
+  return null;
+}
+
+function atkLostZoneOppActive(ctx) {
+  const { opponent } = ctx;
+  const active = opponent ? activeOf(opponent) : null;
+  if (!active) return skip(ctx, 'no_opponent_active');
+  lostZoneStack(ctx, opponent, active);
+  return null;
 }
 
 // ── leave play ──────────────────────────────────────────────────────────────
@@ -1813,7 +1916,15 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardOppTools: optional(atkDiscardOppTools, () => "Discard Pokémon Tools from your opponent's Pokémon"),
   atkDiscardOppHand: optional(atkDiscardOppHand, () => "Discard from your opponent's hand"),
-  atkDiscardHandEnergy,
+  atkDiscardOwnHand: optional(atkDiscardOwnHand, (step) =>
+    step.count === 'all' ? 'Discard your hand' : `Discard ${step.count === 'any' ? 'cards' : `${step.count} card(s)`} from your hand`
+  ),
+  atkLostZoneFromHand: optional(atkLostZoneFromHand, () => 'Put a card from your hand in the Lost Zone'),
+  atkLostZoneOppHandRandom,
+  atkLostZoneOppDiscard,
+  atkLostZoneSelf,
+  atkLostZoneOppActive,
+  atkDiscardHandEnergy: optional(atkDiscardHandEnergy, (step) => `Discard ${energyLabel(step)} from your hand`),
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
