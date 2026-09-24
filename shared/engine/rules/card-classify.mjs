@@ -166,14 +166,15 @@ const BASIC_ENERGY_NAME_RE =
   /^(?:basic\s+)?(?:\{\w+\}|grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|fairy|colorless|dragon)\s+energy$/i;
 
 // Basic Energy: supertype/type Energy, never Special. Prefers explicit subtype
-// then TCGdex `energyType` ("Normal" vs "Special"), then the printed name.
+// then TCGdex `energyType` ("Special"), then the printed name. TCGdex marks the
+// Mega Evolution typed specials (Telepathic Psychic Energy, …) `energyType: "Normal"`,
+// so "Normal" alone never makes a card Basic: the name has to be a basic one too.
 export function isBasicEnergy(card = {}) {
   const supertype = lower(card?.supertype || card?.type);
   if (supertype !== 'energy') return false;
   if (hasSubtype(card, 'special')) return false;
-  const energyType = lower(card?.energyType);
-  if (energyType === 'special') return false;
-  if (hasSubtype(card, 'basic') || energyType === 'normal') return true;
+  if (lower(card?.energyType) === 'special') return false;
+  if (hasSubtype(card, 'basic')) return true;
   return BASIC_ENERGY_NAME_RE.test(nameOf(card));
 }
 

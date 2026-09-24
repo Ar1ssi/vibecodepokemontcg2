@@ -1385,6 +1385,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
 
           const desc = describeSpecialEnergyEffects(energy) || describeEnergyEffect(energy);
           appendMessage('', `⚡ ${desc}`, 'announcement', false);
+          // The server runs on-attach triggers itself (reduce.mjs attachCard). Running them
+          // here too would draw/search/switch twice (audit SE17).
+          if (systemState.serverAuthoritative) return;
 
           const hostZoneId = toZone === 'active' ? 'active' : 'bench';
           const hostZone = getZone(user, hostZoneId);

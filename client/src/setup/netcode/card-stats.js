@@ -16,9 +16,14 @@ import { emitCmd } from './cmd-emitter.js';
 // Exactly the fields the server's own reducers read: hp for the KO check
 // (reduce.mjs 'attack'), attacks for damage/name, types+weakness+resistance for
 // computeAttackDamage, retreatCost for getRetreatCostCount, stage for evolution legality,
-// text/trainerType/subtypes for playTrainer, evolvesFrom for Salvatore, abilities for useAbility.
+// text/trainerType/subtypes for playTrainer and special Energy, evolvesFrom for Salvatore,
+// abilities for useAbility.
 function isTrainerCard(card) {
   return Boolean(card.trainerType) || /trainer|item|supporter|stadium|tool/i.test(card.type || '');
+}
+
+function isEnergyCard(card) {
+  return /energy/i.test(card.type || card.supertype || '');
 }
 
 function extractStats(card) {
@@ -85,10 +90,11 @@ function extractStats(card) {
     stats.abilities = [{ name: String(card.ability.name || ''), text: String(card.ability.text) }];
     hasAny = true;
   }
-  // Trainer-only: playTrainer parses this text server-side to run the card's effect. Kept
-  // off Pokémon, where the server reads card.text as an ability fallback and subtypes as a
-  // stage fallback.
-  if (!isTrainerCard(card)) return hasAny ? stats : null;
+  // Trainers and Energy only: playTrainer and the special-Energy triggers/pricing parse this
+  // text server-side (audit SE1 — without it every text-derived special Energy did nothing
+  // under SERVER_AUTHORITATIVE). Kept off Pokémon, where the server reads card.text as an
+  // ability fallback and subtypes as a stage fallback.
+  if (!isTrainerCard(card) && !isEnergyCard(card)) return hasAny ? stats : null;
   const effectText = [card.effect || card.text || []].flat().join(' ').trim();
   if (effectText) {
     stats.text = effectText;

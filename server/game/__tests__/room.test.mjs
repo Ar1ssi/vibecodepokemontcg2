@@ -373,7 +373,12 @@ test('resetGame: explicit leave frees the leaver seat and restarts the game for 
   // Printed stats arrive once from the client; the client never resends them.
   const stats = room.handleCommand('sock-b', {
     type: 'cardStats',
-    payload: { stats: [{ syncInstance: 0, hp: 60 }] },
+    payload: {
+      stats: [
+        { syncInstance: 0, hp: 60 },
+        { syncInstance: 2, text: 'This card provides {C} Energy.', subtypes: ['Special'] },
+      ],
+    },
   });
   assert.equal(stats.success, true, stats.reason);
 
@@ -400,6 +405,9 @@ test('resetGame: explicit leave frees the leaver seat and restarts the game for 
   assert.equal(room.state.players.p2.zones.deck.length, 3, 'stayer deck reloaded in full');
   const pikachu = room.state.players.p2.zones.deck.find((c) => c.syncInstance === 0);
   assert.equal(pikachu.hp, 60, 'printed stats carried across the reset');
+  const energy = room.state.players.p2.zones.deck.find((c) => c.syncInstance === 2);
+  assert.equal(energy.text, 'This card provides {C} Energy.', 'effect text carried across the reset');
+  assert.deepEqual(energy.subtypes, ['Special']);
 
   const map = room.getInstanceMap('p2');
   assert.deepEqual(Object.keys(map).map(Number).sort((x, y) => x - y), [0, 1, 2]);
