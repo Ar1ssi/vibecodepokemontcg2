@@ -5,18 +5,17 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 287
-Focus: S286 feature: design 035 finished — slice 11 trainer play conditions + slice 12 `pnpm audit:trainers` gate
-  (branch claude/wizardly-brown-k61li3 = feature/trainer-behaviour + main merged).
-Active: design 038 (I138-I150 fixes from the S288 review of design 035) drafted, awaiting user approval; 5 slices,
-  slice 1 = P1 prize-side + Tool damage/KO phase split. No code changed yet.
-Next: maintenance due (S270 and S280, still not run). Merge the trainer-behaviour branch to main after review.
-  I136 (26 server-missing Trainer step kinds, `pnpm audit:trainers`), I137 (design 035 leftovers).
+Session: 289
+Focus: S289 feature: design 038 (I138-I150 fixes for the design 035 review) approved (option A x5); slice 1 shipped
+  on claude/wizardly-brown-k61li3 (= feature/trainer-behaviour + main merged).
+Active: design 038 slice 1/5 done (0ab2dbc: prize-clause side, Tool damage/KO phase). Next = slice 2 (I141 + I143
+  faceDown choice options, count-only look events, Heavy/Beast Ball choice). Ledger: NEXTSTEPS.md top section.
+Next: design 038 slices 2-5, then merge the trainer-behaviour branch to main. Maintenance due (S270, S280 not run).
+  I151 (reactive Tool conditions unchecked), I136 (26 server-missing Trainer steps), I137 (design 035 leftovers).
   User visual check of typed Tera entry/skin, Mega vortex in a real rules-mode game.
   I126/I127 (retreat-cost), I121-I125 (design 032 leftovers); I113 oracle still blind to damage amounts.
   Design numbers collide: 032 (two files) and 035 (mega orb in D118 vs trainer-behaviour design file).
-  Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
-  ISSUES Open still over cap.
+  Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy). ISSUES Open over cap.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
@@ -25,16 +24,14 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   baseline JSON. Later-turn markers are ORACLE_BLIND_FAMILIES.
 - Editing via bash heredoc eats `\` → write edit scripts with the Write tool / String.raw.
   Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins (D110).
-- Mat FX: see D103, D117-D122. Canvas FX go through entry.js `playCanvasStage` (WAAPI clock). Board cards live in the
-  playmat iframes (css/mat-ambient.css); `.card` is preserve-3d, so layer order inside a holo wrapper needs translateZ.
-  Holo wrappers need TCGdex (unreachable in the sandbox): emulate with buildHoloCard + `holo-wrapper-changed`.
-- Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…".
+- Reactive Tools: `parsePrizeModify().side` and `parseToolOnDamageEffect().phase` decide which loop applies a clause
+  (design 038). An attack ends the turn, so the defender's hand gains the turn draw in attack tests.
+- Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…"; coin-flip-ceremony is flaky.
   ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
-- Session numbers S282–S285 were used on another machine for design 035 without journal entries (see S286 line).
+- Board FX: D103, D117-D122 (playCanvasStage WAAPI clock; holo wrappers need TCGdex, emulate with buildHoloCard).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S289 Design 038 slice 1: attacker-held prize Tools no longer change the attacker's KO Prizes; Lucky Egg only on KO;
+  Handheld Fan/Rugged Helmet move one Energy once (Rugged Helmet no longer crashes); Vengeful Punch only on KO.
 - S287 Forest of Vitality (evolution-speed Stadiums) allows a {G} Basic → Stage 1 → Stage 2 in one turn, server + client.
-- S286 Design 035 done: Trainer play conditions (Lost Zone, Stadium, opponent Active stage/Poisoned, typed KO'd-last-
-  turn, last card/hand size, exactly-N Prizes, first-turn-only) enforced server-side; `pnpm audit:trainers` ratchet.
-- S280–S285 (other machine) design 035 slices 1–10: prize clauses, fossil bench picks, gated Tool modifiers, ~27 new
-  Trainer step executors, TM attacks, Tool on-KO effects, triggered Stadiums.
+- S286 Design 035 done: Trainer play conditions enforced server-side; `pnpm audit:trainers` ratchet.
