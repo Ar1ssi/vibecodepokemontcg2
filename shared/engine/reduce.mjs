@@ -154,6 +154,7 @@ import {
   hasSpecialEnergyFreeRetreat,
   getSpecialEnergyRetreatReduction,
   hasSpecialEnergyCannotRetreat,
+  specialEnergyAttachDiscardCost,
 } from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
@@ -917,7 +918,7 @@ function firstBenchRootZone(state, playerId) {
 // shared with the client's list builders, so an attackIndex resolves alike.
 function stadiumExtraAttacksFor(state, card, { isActive = true } = {}) {
   const stadiumCard = state.stadium?.card || state.stadium;
-  if (!stadiumCard || !card) return [];
+  if (!card) return [];
   const ref = findCard(state, card.instanceId);
   const zone = ref?.player?.zones?.[ref.zoneId];
   if (!Array.isArray(zone)) return [];
@@ -3423,6 +3424,15 @@ export function validateLegality(state, command) {
           })
         ) {
           return { allowed: false, reason: `${cardRef.card.name} can't be attached to that Pokémon.` };
+        }
+        // Aurora Energy: "only if you discard another card from your hand" (audit SE9).
+        const discardCost = specialEnergyAttachDiscardCost(cardRef.card);
+        const otherHandCards = (player?.zones?.hand || []).length - 1;
+        if (discardCost > otherHandCards) {
+          return {
+            allowed: false,
+            reason: `${cardRef.card.name} needs you to discard ${discardCost} other card${discardCost === 1 ? '' : 's'} from your hand.`,
+          };
         }
       }
       if (cardRef && isEnergy(cardRef.card)) {

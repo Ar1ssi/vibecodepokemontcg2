@@ -16,6 +16,7 @@ import {
   isPrismStarCard,
   isRadiantCard,
 } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { specialEnergyDeckLimit } from '../../../../../shared/engine/rules/special-energy-parse.mjs';
 
 export const DECK_FORMATS = {
   POCKET: 'pocket',
@@ -131,10 +132,13 @@ export function validateDeck(decklist = {}, selectedFormat = DECK_FORMATS.POCKET
   }
 
   // Only Basic Energy is exempt from the copy limit (p.22); Special Energy is not.
+  // A printed cap below the format's (Miracle Energy: 1 per deck, audit SE9) wins.
   for (const entry of byOfficialName.values()) {
     if (isBasicEnergy(entry.card)) continue;
-    if (entry.count > rules.maxCopiesPerCard) {
-      errors.push(`${entry.name} has ${entry.count} copies (max ${rules.maxCopiesPerCard}).`);
+    const printedLimit = specialEnergyDeckLimit(entry.card);
+    const maxCopies = printedLimit == null ? rules.maxCopiesPerCard : Math.min(printedLimit, rules.maxCopiesPerCard);
+    if (entry.count > maxCopies) {
+      errors.push(`${entry.name} has ${entry.count} copies (max ${maxCopies}).`);
     }
   }
 

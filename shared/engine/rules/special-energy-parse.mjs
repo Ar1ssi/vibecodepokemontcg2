@@ -858,6 +858,18 @@ export function parseSpecialEnergyEffects(card) {
   };
 }
 
+/** "You can't have more than 1 Miracle Energy in your deck": the copy cap, or null. */
+export function specialEnergyDeckLimit(card) {
+  const step = parseSpecialEnergyEffects(card)?.steps.find((s) => s.type === 'deckLimit');
+  return step ? step.max : null;
+}
+
+/** Cards from hand an attach from hand costs (Aurora Energy: 1), else 0. */
+export function specialEnergyAttachDiscardCost(card) {
+  const step = parseSpecialEnergyEffects(card)?.steps.find((s) => s.type === 'attachCost');
+  return step?.discardFromHand || 0;
+}
+
 /** True when a special energy's effect is limited to once per game (Legacy). */
 export function hasOncePerGameSpecialEnergyEffect(card) {
   const parsed = parseSpecialEnergyEffects(card);
@@ -913,6 +925,12 @@ export function planSpecialEnergyTriggers(
 
   for (const step of parsed.steps) {
     switch (step.type) {
+      case 'attachCost':
+        // Aurora Energy's discard is paid as part of attaching; legality checked the hand size.
+        if (trigger === 'attach' && fromZone === 'hand' && step.discardFromHand) {
+          plans.push({ action: 'discardHand', count: step.discardFromHand });
+        }
+        break;
       case 'onAttachDraw':
         if (trigger === 'attach' && fromZone === 'hand' && ready(step)) plans.push({ action: 'draw', count: step.count });
         break;

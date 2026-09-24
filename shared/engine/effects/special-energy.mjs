@@ -292,18 +292,67 @@ function applyPlan(draft, plan, ctx, selection = null) {
       }
       break;
     }
+    case 'discardHand':
+      discardFromHand(draft, ctx, selection || []);
+      break;
     default:
       break;
   }
 }
 
+function discardFromHand(draft, ctx, instanceIds) {
+  const hand = zoneOf(draft, ctx.hostPlayerId, 'hand');
+  for (const id of instanceIds) {
+    const idx = hand.findIndex((c) => c.instanceId === id);
+    if (idx < 0) continue;
+    const [c] = hand.splice(idx, 1);
+    draft.players[ctx.hostPlayerId].zones.discard.push(c);
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: c.instanceId,
+      from: 'hand',
+      to: 'discard',
+      playerId: ctx.hostPlayerId,
+    });
+  }
+}
+
 function planIsChoice(plan) {
-  return plan.action === 'search' || plan.action === 'switch';
+  return plan.action === 'search' || plan.action === 'switch' || plan.action === 'discardHand';
 }
 
 /** Builds a PendingChoice for a choice plan, or applies it when deterministic. */
 function handleChoicePlan(draft, item, ctx, queue, index) {
   const plan = item.plan;
+  if (plan.action === 'discardHand') {
+    // Aurora Energy's attach cost (audit SE9); legality already required enough cards.
+    const hand = zoneOf(draft, ctx.hostPlayerId, 'hand');
+    const count = Math.min(plan.count, hand.length);
+    if (count === 0) return 'done';
+    if (hand.length === count) {
+      discardFromHand(draft, ctx, hand.map((c) => c.instanceId));
+      return 'done';
+    }
+    return makeChoice({
+      player: ctx.hostPlayerId,
+      prompt: `Discard ${count} card${count === 1 ? '' : 's'} from your hand`,
+      options: hand,
+      min: count,
+      max: count,
+      resumeToken: {
+        effectType: SPECIAL_ENERGY_EFFECT,
+        trigger: ctx.trigger,
+        hostInstanceId: ctx.hostInstanceId,
+        hostPlayerId: ctx.hostPlayerId,
+        hostZoneId: ctx.hostZoneId,
+        attackerInstanceId: ctx.attackerInstanceId,
+        attackerPlayerId: ctx.attackerPlayerId,
+        fromZone: ctx.fromZone,
+        queue,
+        index,
+      },
+    });
+  }
   if (plan.action === 'search') {
     const deck = zoneOf(draft, ctx.hostPlayerId, 'deck');
     const matches = deck.filter((c) => matchesSearch(c, plan.what));

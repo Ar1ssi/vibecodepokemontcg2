@@ -12,6 +12,7 @@ import { abilityHpBonus } from './ability-combat.mjs';
 import { pokemonNamesMatch, normalizeStage } from './evolution.mjs';
 import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
+import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
 import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard } from './card-classify.mjs';
 import { isDeltaSpecies } from './energy-effects.mjs';
@@ -277,9 +278,26 @@ export function stadiumExtraAttacks(
   stadiumCard,
   { zoneCards = [], root = null, isActive = false } = {}
 ) {
-  const inherited = stadiumInheritedAttacks(stadiumCard, { zoneCards, root, isActive });
+  const inherited = mergeAttacks(
+    stadiumInheritedAttacks(stadiumCard, { zoneCards, root, isActive }),
+    energyInheritedAttacks({ zoneCards, root })
+  );
   const granted = stadiumGrantedAttacks(stadiumCard, root);
   return mergeAttacks(inherited, granted);
+}
+
+// Memory Energy (LOT 194): "The Pokémon this card is attached to can use any attack from
+// its previous Evolutions" — Shrine of Memories for one Pokémon (audit SE9).
+/** Attacks an attached Memory-style Energy lets `root` use from below its top stage. */
+export function energyInheritedAttacks({ zoneCards = [], root = null } = {}) {
+  if (!root || root.instanceId == null) return [];
+  const hasMemory = getAttachedSpecialEnergies(root, zoneCards).some((energy) =>
+    parseSpecialEnergyEffects(energy)?.steps.some((s) => s.type === 'canUseEvolutionAttacks')
+  );
+  if (!hasMemory) return [];
+  return priorEvolutionCards(zoneCards, root).flatMap((src) =>
+    (src.attacks || []).map((atk) => ({ ...atk, inherited: true }))
+  );
 }
 
 /**
@@ -347,7 +365,8 @@ export function stadiumExtraAttacksFromZone(
   stadiumCard,
   { zoneCards = [], card = null, isActive = true } = {}
 ) {
-  if (!stadiumCard || !card) return [];
+  // No Stadium still leaves Memory Energy inheritance (energyInheritedAttacks).
+  if (!card) return [];
   const members = stackMembersFor(zoneCards, card);
   if (members.length <= 1) {
     return stadiumExtraAttacks(stadiumCard, { zoneCards, root: card, isActive });
