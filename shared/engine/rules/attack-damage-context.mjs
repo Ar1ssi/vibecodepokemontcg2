@@ -50,9 +50,14 @@ function attachedEnergyCards(player, pokemon) {
 
 /** Energy cards attached to one Pokémon, counted as the cost pool sees them. */
 function energyOn(player, pokemon, stadiumCard = null) {
+  const attachedCards = pokemon
+    ? [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
+        (card) => card.attachedTo === pokemon.instanceId
+      )
+    : [];
   return expandEnergyEntries(
     attachedEnergyCards(player, pokemon).map((card) =>
-      serverEnergyDescriptor(card, { stadiumCard, hostPokemon: pokemon })
+      serverEnergyDescriptor(card, { stadiumCard, hostPokemon: pokemon, attachedCards })
     )
   );
 }

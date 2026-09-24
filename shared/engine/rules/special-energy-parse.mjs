@@ -58,6 +58,7 @@
 //   { type: 'officialIllegal' }
 
 import { isEnergyCard } from './energy-effects.mjs';
+import { isExCard, isGxCard, isRuleBoxPokemon, isVCard } from './card-classify.mjs';
 
 const SYMBOL_TYPES = {
   c: 'Colorless',
@@ -1175,27 +1176,147 @@ export function blocksSpecialEnergyBenchDamage(pokemonCard, zoneId, zoneArray = 
   return false;
 }
 
-// Host conditions a cost-payment path can check from the host card alone.
-// Other conditions (prize count, rule box, …) fall through conditionMet's
-// default `true`, which would over-grant Energy, so they are not applied here.
-const HOST_PROVISION_CONDITIONS = new Set(['stage2', 'hostBasic', 'evolution']);
+// Pool tokens use the cost-symbol spelling (TCGdex writes {D} costs "Darkness").
+const POOL_TYPE = { Dark: 'Darkness' };
+const poolType = (type) => POOL_TYPE[type] ?? type;
+
+const isSpPokemon = (pokemon) =>
+  (pokemon?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
+  /\s(?:G|GL|FB|C|E4|4)$/.test(String(pokemon?.name ?? ''));
+
+const isLvXPokemon = (pokemon) =>
+  /lv\.?\s*x$/i.test(String(pokemon?.name ?? '')) ||
+  (pokemon?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s)));
+
+const isUltraBeast = (pokemon) =>
+  (pokemon?.subtypes || []).some((s) => /ultra beast/i.test(String(s)));
+
+const isVOrGx = (pokemon) => isVCard(pokemon) || isGxCard(pokemon);
+
+function basicEnergyTypesOn(attached, self) {
+  const types = new Set();
+  for (const card of attached) {
+    if (!card || card === self || card.instanceId === self?.instanceId) continue;
+    if (isSpecialEnergyCard(card)) continue;
+    const m = String(card.name ?? '').match(TYPED_BASIC_NAME);
+    if (m) types.add(poolType(SYMBOL_NAME_TYPES[m[1].toLowerCase()]));
+  }
+  return [...types];
+}
+
+const TYPED_BASIC_NAME = /^(?:basic\s+)?(grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|dragon|fairy) energy$/i;
+const SYMBOL_NAME_TYPES = {
+  grass: 'Grass',
+  fire: 'Fire',
+  water: 'Water',
+  lightning: 'Lightning',
+  psychic: 'Psychic',
+  fighting: 'Fighting',
+  darkness: 'Darkness',
+  dark: 'Darkness',
+  metal: 'Metal',
+  dragon: 'Dragon',
+  fairy: 'Fairy',
+};
 
 /**
- * Energy units a special Energy provides because of its host (Neo Upper on a
- * Stage 2 → two units of every type). Returns pool tokens for
- * expandEnergyEntries ('Wildcard' = any type), or null when no host
- * condition applies and the card's ordinary type should be used.
+ * Whether a provide step's condition holds. Every condition the parser can emit is
+ * decided explicitly; an unknown one is not met, so a missing rule never over-grants
+ * Energy (the old default-true did).
+ *
+ * @param {string|undefined} condition
+ * @param {{host?:object|null, attached?:object[], self?:object|null,
+ *          board?:{ownPrizes?:number, opponentPrizes?:number, ownStage2InPlay?:number}}} ctx
  */
-export function hostConditionalProvision(energyCard, hostPokemon) {
-  if (!energyCard || !hostPokemon) return null;
-  const provides = parseSpecialEnergyEffects(energyCard)?.provides ?? [];
-  const met = provides.filter(
-    (step) => HOST_PROVISION_CONDITIONS.has(step.condition) && conditionMet(step.condition, hostPokemon, []),
-  );
-  if (!met.length) return null;
-  const step = met[met.length - 1];
+function provisionConditionMet(condition, { host = null, attached = [], self = null, board = {} } = {}) {
+  if (!condition) return true;
+  if (!host) return false;
+  if (condition.startsWith('host:')) return hostIsType(host, condition.slice(5));
+  const trailing =
+    Number.isFinite(board.ownPrizes) &&
+    Number.isFinite(board.opponentPrizes) &&
+    board.ownPrizes > board.opponentPrizes;
+  switch (condition) {
+    case 'hostBasic':
+      return stageKey(host) === 'basic';
+    case 'stage2':
+      return stageKey(host) === 'stage2';
+    case 'evolution':
+      return stageKey(host) !== 'basic';
+    case 'threeStage2':
+      return (board.ownStage2InPlay ?? 0) >= 3;
+    case 'delta':
+      return conditionMet('delta', host, []);
+    case 'hostSP':
+      return isSpPokemon(host);
+    case 'ultraBeast':
+      return isUltraBeast(host);
+    case 'teamMagma':
+      return /^team magma'?s/i.test(String(host.name ?? '').replace(/’/g, "'"));
+    case 'teamAqua':
+      return /^team aqua'?s/i.test(String(host.name ?? '').replace(/’/g, "'"));
+    case 'isVOrGx':
+      return isVOrGx(host);
+    case 'notVOrGx':
+      return !isVOrGx(host);
+    case 'otherSpecial':
+      return attached.some(
+        (card) => card && card !== self && card.instanceId !== self?.instanceId && isSpecialEnergyCard(card)
+      );
+    case 'noBasicEnergy':
+      return basicEnergyTypesOn(attached, self).length === 0;
+    case 'trailingPrizes':
+      return trailing;
+    case 'trailingPrizesNotGxEx':
+      return trailing && !isGxCard(host) && !isExCard(host);
+    case 'trailingPrizesNotLvX':
+      return trailing && !isLvXPokemon(host);
+    case 'trailingPrizesEvolutionNoRuleBox':
+      return trailing && stageKey(host) !== 'basic' && !isRuleBoxPokemon(host);
+    default:
+      return false;
+  }
+}
+
+function provideTokens(step, ctx) {
+  const count = Math.max(1, step.count || 1);
   const types = step.energyTypes || [];
-  const token = types.includes('Any') ? 'Wildcard' : types.length === 1 ? types[0] : null;
-  if (!token) return null;
-  return new Array(Math.max(1, step.count || 1)).fill(token);
+  if (types.includes('Any')) return new Array(count).fill('Wildcard');
+  if (types.includes('CrystalBasic')) {
+    const basics = basicEnergyTypesOn(ctx.attached || [], ctx.self);
+    if (!basics.length) return null;
+    return new Array(count).fill(basics.join('|'));
+  }
+  if (!types.length) return null;
+  const token = types.map(poolType).join('|');
+  return new Array(count).fill(token);
+}
+
+/**
+ * What a special Energy provides where it is attached, as expandEnergyEntries pool
+ * tokens ('Wildcard' = any type, "A|B" = one unit of either type). The last provide
+ * step whose condition holds wins ("… provides {C}{C}{C} Energy instead"); with none
+ * holding, the Energy provides nothing (Shield Energy off a {M} Pokémon).
+ *
+ * @param {object} energyCard
+ * @param {{host?:object|null, attached?:object[],
+ *          board?:{ownPrizes?:number, opponentPrizes?:number, ownStage2InPlay?:number}}} [ctx]
+ *   `attached` is every card attached to the host (siblings of this Energy).
+ * @returns {string[]|null} null when the card's text names no provision at all, so the
+ *   caller keeps its type-based fallback.
+ */
+export function specialEnergyProvision(energyCard, { host = null, attached = [], board = {} } = {}) {
+  if (!energyCard) return null;
+  const provides = parseSpecialEnergyEffects(energyCard)?.provides ?? [];
+  if (!provides.length) return null;
+  const ctx = { host, attached: attached || [], self: energyCard, board: board || {} };
+  const met = provides.filter((step) => provisionConditionMet(step.condition, ctx));
+  if (!met.length) return [];
+  const conditional = met.filter((step) => step.condition);
+  const step = conditional.length ? conditional[conditional.length - 1] : met[met.length - 1];
+  const tokens = provideTokens(step, ctx);
+  if (tokens) return tokens;
+  // Crystal Energy with no basic Energy beside it falls back to its {C} step.
+  const fallback = met.filter((s) => s !== step);
+  return fallback.length ? provideTokens(fallback[fallback.length - 1], ctx) ?? [] : [];
 }

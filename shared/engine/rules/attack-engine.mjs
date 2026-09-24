@@ -347,8 +347,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         const type = typeof entry === 'string' ? entry : entry?.type;
         const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
         if (!type) continue;
-        if (Array.isArray(entry?.provides) && entry.provides.length) {
-          // Host-conditional provision (Neo Upper on a Stage 2, …).
+        if (Array.isArray(entry?.provides)) {
+          // Parsed special-Energy provision (energy-effects rewriteEnergyDescriptor);
+          // empty when its condition fails (Shield Energy off a {M} Pokémon).
           pool.push(...entry.provides);
         } else if (family === 'double-colorless') {
           pool.push('Colorless', 'Colorless');

@@ -858,6 +858,32 @@ function inPlayView(state, card) {
   return Array.isArray(zone) ? evolvedView(zone, card) : card;
 }
 
+// Context a special Energy's provision conditions read (energy-effects
+// rewriteEnergyDescriptor): the host as it is in play, every card attached to it, and
+// the prize / Stage 2 facts behind Reversal, Counter, Scramble and Super Boost Energy.
+function energyProvisionContext(state, playerId, host) {
+  const player = state.players?.[playerId];
+  const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
+  const ref = host ? findCard(state, host.instanceId) : null;
+  const zone = ref?.player?.zones?.[ref.zoneId] || [];
+  const roots = ['active', 'bench'].flatMap((zoneId) =>
+    (player?.zones?.[zoneId] || [])
+      .filter((c) => !c.attachedTo && isPokemon(c))
+      .map((c) => evolvedView(player.zones[zoneId], c))
+  );
+  return {
+    hostPokemon: inPlayView(state, host),
+    attachedCards: host ? zone.filter((c) => c.attachedTo === host.instanceId) : [],
+    board: {
+      ownPrizes: (player?.zones?.prizes || []).length,
+      opponentPrizes: (state.players?.[opponentId]?.zones?.prizes || []).length,
+      ownStage2InPlay: roots.filter(
+        (c) => String(c.stage ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') === 'stage2'
+      ).length,
+    },
+  };
+}
+
 // The bench zone of the player's first Benched Pokémon (Handheld Fan's destination).
 function firstBenchRootZone(state, playerId) {
   const bench = state.players?.[playerId]?.zones?.bench || [];
@@ -3033,7 +3059,7 @@ function attackCostPayable(state, playerId, active, attack) {
     null;
   const energyContext = {
     stadiumCard,
-    hostPokemon: inPlayView(state, active),
+    ...energyProvisionContext(state, playerId, active),
   };
   const sideCards = [
     ...(player.zones?.active || []),
@@ -3744,7 +3770,7 @@ export function validateLegality(state, command) {
         const costSymbols = new Array(retreatCostN).fill('Colorless');
         const energyContext = {
           stadiumCard: state.stadium?.card || state.stadium || null,
-          hostPokemon: inPlayView(state, active),
+          ...energyProvisionContext(state, playerId, active),
         };
         if (
           !canPayAttackCost(
