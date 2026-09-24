@@ -119,6 +119,64 @@ test('abilityDamageBonus: "this Pokémon" holder and in-play conditions', () => 
   );
 });
 
+test('abilityDamageBonus: a self-named conditional bonus needs its condition and stays on the holder (I137)', () => {
+  const text =
+    "As long as Scizor ex's remaining HP is 60 or less, Scizor ex does 40 more damage to the Defending Pokémon (before applying Weakness and Resistance).";
+  const scizor = mon('Scizor ex', { hp: 200, abilities: [ability('Danger Perception', text)] });
+  const mate = mon('Mate');
+  const defender = mon('Defender');
+  const ctx = { sideCards: [scizor, mate] };
+  assert.equal(abilityDamageBonus(scizor, defender, ctx), 0, 'full HP: condition unmet');
+  const hurt = { ...scizor, damage: 150 };
+  assert.equal(abilityDamageBonus(hurt, defender, { sideCards: [hurt, mate] }), 40);
+  assert.equal(abilityDamageBonus(mate, defender, { sideCards: [hurt, mate] }), 0, 'not a team bonus');
+});
+
+test('abilityDamageBonus: named attackers, defender filters and activated powers (I137)', () => {
+  const defender = mon('Defender');
+  const nidoking = mon('Nidoking', {
+    abilities: [ability('x', "Your Nidoqueen's attacks do 20 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).")],
+  });
+  const nidoqueen = mon('Nidoqueen');
+  const other = mon('Other');
+  const team = { sideCards: [nidoking, nidoqueen, other] };
+  assert.equal(abilityDamageBonus(nidoqueen, defender, team), 20);
+  assert.equal(abilityDamageBonus(other, defender, team), 0);
+
+  const carracosta = mon('Carracosta', {
+    abilities: [ability('x', "Attacks used by your Pokémon do 30 more damage to your opponent's Active Evolution Pokémon (before applying Weakness and Resistance).")],
+  });
+  const evolved = mon('Evolved', { stage: 'Stage 1', subtypes: ['Stage 1'] });
+  assert.equal(abilityDamageBonus(carracosta, defender, { sideCards: [carracosta] }), 0, 'Basic defender');
+  assert.equal(abilityDamageBonus(carracosta, evolved, { sideCards: [carracosta] }), 30);
+
+  const crown = mon('Iron Crown ex', {
+    subtypes: ['Basic', 'ex', 'Future'],
+    abilities: [ability('x', "Your Future Pokémon's attacks, except any Iron Crown ex, do 20 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).")],
+  });
+  const future = mon('Iron Hands', { subtypes: ['Basic', 'Future'] });
+  const futureTeam = { sideCards: [crown, future, other] };
+  assert.equal(abilityDamageBonus(future, defender, futureTeam), 20);
+  assert.equal(abilityDamageBonus(other, defender, futureTeam), 0, 'not a Future Pokémon');
+  assert.equal(abilityDamageBonus(crown, defender, futureTeam), 0, 'except any Iron Crown ex');
+
+  const ludicolo = mon('Ludicolo', {
+    abilities: [ability('x', 'Once during your turn (before your attack), you may use this power. If you do, your turn ends. During your next turn, each of Ludicolo\'s attacks does 60 more damage to the Defending Pokémon.')],
+  });
+  assert.equal(abilityDamageBonus(ludicolo, defender, { sideCards: [ludicolo] }), 0, 'activated, not passive');
+});
+
+test('abilityDamageBonus: Prize-count conditions read the counts the attack site passes (I137)', () => {
+  const charizard = mon('Charizard', {
+    abilities: [ability('x', "If your opponent has 3 or less Prize cards left, each of Charizard's attacks does 50 more damage to the Active Pokémon (before applying Weakness and Resistance).")],
+  });
+  const defender = mon('Defender');
+  const ctx = { sideCards: [charizard] };
+  assert.equal(abilityDamageBonus(charizard, defender, ctx), 0, 'unknown count fails closed');
+  assert.equal(abilityDamageBonus(charizard, defender, { ...ctx, opponentPrizesLeft: 4 }), 0);
+  assert.equal(abilityDamageBonus(charizard, defender, { ...ctx, opponentPrizesLeft: 3 }), 50);
+});
+
 test('abilityDamageBonus: scaling wording and non-stacking', () => {
   const kingambit = mon('Kingambit', {
     abilities: [

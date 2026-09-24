@@ -5,8 +5,8 @@
     "runs": 1811,
     "partial": 584,
     "dead": 148,
-    "consumed": 1106,
-    "unconsumed": 578,
+    "consumed": 1038,
+    "unconsumed": 646,
     "unparsed": 1
   },
   "families": {
@@ -96,8 +96,8 @@
       "runs": 7,
       "partial": 0,
       "dead": 0,
-      "consumed": 52,
-      "unconsumed": 32,
+      "consumed": 49,
+      "unconsumed": 35,
       "unparsed": 0
     },
     "damage-bonus": {
@@ -105,8 +105,8 @@
       "runs": 1,
       "partial": 0,
       "dead": 0,
-      "consumed": 4,
-      "unconsumed": 4,
+      "consumed": 0,
+      "unconsumed": 8,
       "unparsed": 0
     },
     "damage-prevent": {
@@ -258,8 +258,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 15,
-      "unconsumed": 7,
+      "consumed": 4,
+      "unconsumed": 18,
       "unparsed": 0
     },
     "joke": {
@@ -321,8 +321,8 @@
       "runs": 41,
       "partial": 86,
       "dead": 4,
-      "consumed": 59,
-      "unconsumed": 33,
+      "consumed": 55,
+      "unconsumed": 37,
       "unparsed": 0
     },
     "passive": {
@@ -330,8 +330,8 @@
       "runs": 24,
       "partial": 6,
       "dead": 0,
-      "consumed": 83,
-      "unconsumed": 53,
+      "consumed": 80,
+      "unconsumed": 56,
       "unparsed": 1
     },
     "prize-modify": {
@@ -339,8 +339,8 @@
       "runs": 2,
       "partial": 0,
       "dead": 0,
-      "consumed": 25,
-      "unconsumed": 25,
+      "consumed": 23,
+      "unconsumed": 27,
       "unparsed": 0
     },
     "recursion": {
@@ -402,8 +402,8 @@
       "runs": 303,
       "partial": 53,
       "dead": 24,
-      "consumed": 62,
-      "unconsumed": 65,
+      "consumed": 60,
+      "unconsumed": 67,
       "unparsed": 0
     },
     "status-recover": {
@@ -447,8 +447,8 @@
       "runs": 0,
       "partial": 4,
       "dead": 0,
-      "consumed": 246,
-      "unconsumed": 72,
+      "consumed": 207,
+      "unconsumed": 111,
       "unparsed": 0
     },
     "when-played": {

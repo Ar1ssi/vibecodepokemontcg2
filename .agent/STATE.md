@@ -5,12 +5,12 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 286
+Session: 287
 Focus: design 034 (ability behaviour), slice 7 (regression gate). 7a (S284) `pnpm audit:abilities`
   (D126); 7b (S285) passive probes (D127). S286 fixed I136: `passiveCostDiscount` needs one
   sentence saying an attack's cost goes down → runs/partial/dead/consumed/unconsumed/unparsed =
   1811/584/148/1106/578/1 (60 rows re-ratcheted consumed→unconsumed, bogus reads only).
-Active: I136 committed on `claude/exciting-meitner-pt47ts`. Next: I137/I138, then 7c.
+Active: I137 committed (S287). Next: I138, then 7c, then I139, then the unconsumed backlog.
 Next: I137/I138 (probe-found wrong reads), I139 (cost-discount conditions/scope ignored). 7c:
   EXECUTED_ABILITY_FAMILIES from the gate, ADD then close I128/I129/I130, annotate reports; 578
   unconsumed passives are the enforcement backlog (`--rows`, behaviour=unconsumed). Issue-number

@@ -606,6 +606,9 @@ function attackAbilityReads(
     attackerIsActive: true,
     turnNumber: draft.turn?.number,
     opponentHandCount: (defenderZones.hand || []).length,
+    ownHandCount: (attackerZones.hand || []).length,
+    ownPrizesLeft: (attackerZones.prizes || []).length,
+    opponentPrizesLeft: (defenderZones.prizes || []).length,
   };
   const defenderCtx = {
     sideCards: defenderSide,

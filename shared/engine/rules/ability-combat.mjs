@@ -17,6 +17,8 @@
 //   attackerIsEx       the attacker is a Pokémon ex (KO conditions)
 //   opponentActiveIsEx the other side's Active is a Pokémon ex (evolve permission)
 //   turnNumber         current turn number
+//   ownPrizesLeft / opponentPrizesLeft / ownHandCount / opponentHandCount
+//                      counts a damage-bonus condition reads (absent = condition unmet)
 //   abilityIndex       ability slot for `abilityActivationBlockReason`
 //   used               ability already spent this turn (activation gate)
 //   koedLastOppTurn    a Pokémon was KO'd during the opponent's last turn
@@ -58,6 +60,8 @@ import {
   isExCard,
   isGxCard,
   isMegaCard,
+  isVCard,
+  isVmaxCard,
 } from './card-classify.mjs';
 import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
@@ -170,18 +174,6 @@ function attackerTypeRequirementMet(text, attacker) {
 }
 
 /**
- * The type symbols that filter the attacker ("attacks used by your {F}
- * Pokémon do …"). Symbols elsewhere in the text (in-play conditions, costs)
- * must not be read as attacker requirements.
- */
-function attackerFilterSymbols(text) {
-  const m = text.match(
-    /(?:attacks used by|attacks of|each of your)\s+([^,.]*?pok[eé]mon)(?:'s)?[^.]*?do(?:es)? \d+ more damage/
-  );
-  return m ? typeSymbols(m[1]) : [];
-}
-
-/**
  * The printed "If you have … in play" / "If this Pokémon has … attached"
  * conditions that gate a passive reader. Unverifiable conditions fail closed.
  */
@@ -265,27 +257,17 @@ function inPlayConditionMet(text, target, ctx) {
  */
 function attackerQualifies(text, attacker, holder, ctx) {
   if (!attacker) return false;
-  const types = attackerTypes(attacker);
-
-  const excluding = text.match(/excluding ([^.,)]+)/);
-  if (excluding) {
-    const excluded = lower(excluding[1]).replace(/-ex\b/g, '').trim();
-    if (excluded && lower(attacker.name).includes(excluded)) return false;
+  const scope = bonusScope(text);
+  if (!scope) return false;
+  if (scope.kind === 'self' && !sameCard(holder, attacker)) return false;
+  if (scope.kind === 'team') {
+    const except = text.match(/\((?:excluding|except) [^)]*\)|, except any [^,]+,/)?.[0] || '';
+    if (!attackerInCategory(`${scope.category} ${except}`, attacker, holder)) return false;
   }
-
-  const symbols = attackerFilterSymbols(text);
-  if (symbols.length && !symbols.some((ty) => types.includes(lower(ty)))) return false;
-
-  if (/this pok[eé]mon/.test(text) && holder !== attacker) return false;
-
-  const named = text.match(/attacks used by your ([a-z0-9 .'’-]+?) pok[eé]mon/);
-  if (named && !lower(attacker.name).includes(named[1].trim())) return false;
-
   if (/to your opponent's active pok[eé]mon|to the active pok[eé]mon/.test(text)) {
     if (ctx.isActive === false) return false;
   }
-
-  return inPlayConditionMet(text, attacker, ctx);
+  return true;
 }
 
 /**
@@ -332,20 +314,182 @@ function isSelfScoped(text) {
 
 // --- damage bonus --------------------------------------------------------
 
+// A holder's text with its own printed name read as "this pokémon": older cards say "Scizor ex
+// does 40 more damage" / "each of Ursaring's attacks" where newer ones say "this Pokémon" (I137).
+function selfNamedText(holder) {
+  const t = cardAbilityText(holder);
+  const name = lower(holder?.name).trim();
+  if (!name) return t;
+  const short = name.replace(/ (?:lv\.x|gl|fb|g|c|gx|ex)$/, '').trim();
+  let out = t;
+  for (const printed of new Set([name, short])) {
+    if (printed.length < 3) continue;
+    const escaped = printed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`(?<![\\w'])${escaped}(?![\\w-])`, 'g'), 'this pokémon');
+  }
+  return out;
+}
+
+const sameCard = (a, b) =>
+  a === b || (a?.instanceId != null && a.instanceId === b?.instanceId);
+
+// Who a damage-bonus Ability boosts: `self` (the holder's own attacks) or `team` with the printed
+// attacker category ("your Basic {L} Pokémon's attacks", "attacks used by your Cynthia's
+// Pokémon", "your Nidoqueen's attacks"). Null when the wording names no attacker.
+function bonusScope(text) {
+  if (
+    /(?:attacks used by|attacks of|each of) this pok[eé]mon|this pok[eé]mon(?:'s)? attacks?|this pok[eé]mon does|its attacks|the attacks it uses/.test(
+      text
+    )
+  ) {
+    return { kind: 'self' };
+  }
+  const team =
+    text.match(/(?:attacks used by|the attacks of|attacks by) (?:each of )?your ([^.]*?pok[eé]mon(?:-gx|-ex| ex| v| vmax)?)/) ||
+    text.match(/(?:each of )?your ([^.]*?pok[eé]mon(?:-gx|-ex| ex| v| vmax)?)(?:'s| that)[^.]*? do(?:es)? \d+ more damage/) ||
+    text.match(/your ([a-z0-9 .’'-]+?)'s (?:and [a-z0-9 .’'-]+?'s )?attacks/);
+  if (team) return { kind: 'team', category: team[0] };
+  return null;
+}
+
+// The printed attacker category a team bonus is limited to.
+function attackerInCategory(category, attacker, holder) {
+  const c = lower(category);
+  const types = attackerTypes(attacker);
+  const symbols = typeSymbols(c);
+  if (symbols.length && !symbols.some((ty) => types.includes(lower(ty)))) return false;
+  if (/\bbasic\b/.test(c) && !isBasicPokemon(attacker)) return false;
+  if (/evolution|evolved/.test(c) && !isEvolutionCard(attacker)) return false;
+  if (/stage 2/.test(c) && lower(attacker?.stage) !== 'stage 2') return false;
+  if (/pok[eé]mon-gx|pok[eé]mon gx/.test(c) && !isGxCard(attacker)) return false;
+  if (/pok[eé]mon-ex|pok[eé]mon ex/.test(c) && !isExCard(attacker)) return false;
+  const subtypes = (attacker?.subtypes || []).map(lower);
+  for (const style of ['rapid strike', 'single strike', 'fusion strike', 'ancient', 'future']) {
+    if (c.includes(style) && !subtypes.includes(style)) return false;
+  }
+  if (/team plasma/.test(c) && !/plasma/.test(`${lower(attacker?.name)} ${subtypes.join(' ')}`)) {
+    return false;
+  }
+  if (/that evolve from ([a-z]+)/.test(c) && lower(attacker?.evolvesFrom) !== c.match(/that evolve from ([a-z]+)/)[1]) {
+    return false;
+  }
+  if (/δ|delta/.test(c)) return false;
+  // A trainer's or a named Pokémon's possessive: "your Hop's Pokémon", "your Registeel's attacks".
+  const owners = [...c.matchAll(/(?:your |and )([a-z0-9 .’'-]+?)'s\b/g)]
+    .map((m) => m[1].trim())
+    .filter((n) => !/pok[eé]mon/.test(n));
+  if (owners.length && !owners.some((n) => lower(attacker?.name).includes(n))) return false;
+  const except = c.match(/(?:excluding|except any) ([a-z0-9 .’'é-]+?)(?:\)|,|$)/)?.[1].trim();
+  // "except any Iron Crown ex" reads "except any this pokémon" once the holder's name is folded.
+  if (except === 'this pokémon' && lower(attacker?.name) === lower(holder?.name)) return false;
+  if (except && except !== 'this pokémon' && lower(attacker?.name).includes(except.replace(/-ex\b/, '').trim())) {
+    return false;
+  }
+  return true;
+}
+
+// Leading conditions a damage bonus is printed behind. Each returns true/false when it can be
+// checked from the holder and ctx, or undefined when the wording is not this condition. An
+// unrecognised condition fails closed: a bonus that should not apply is worse than a missed one.
+const BONUS_CONDITIONS = [
+  (c, holder) => {
+    const m = c.match(/this pok[eé]mon's remaining hp is (\d+) or less/);
+    if (!m) return undefined;
+    return (holder?.hp || 0) - (holder?.damage || 0) <= Number(m[1]);
+  },
+  (c, holder) => {
+    const m = c.match(/this pok[eé]mon has (?:any|(\d+) or more) damage counters? on it/);
+    if (!m) return undefined;
+    return (holder?.damage || 0) >= (m[1] ? Number(m[1]) * 10 : 10);
+  },
+  (c, holder) => {
+    if (!/this pok[eé]mon is affected by a special condition/.test(c)) return undefined;
+    return Boolean(holder?.specialCondition) || holder?.poisoned === true || holder?.burned === true;
+  },
+  (c, holder, ctx) => {
+    const m = c.match(/this pok[eé]mon is (on your bench|your active pok[eé]mon|in the active spot)/);
+    if (!m) return undefined;
+    const zone = holderZone(holder, ctx);
+    return /bench/.test(m[1]) ? zone === 'bench' : zone === 'active';
+  },
+  (c, holder) => {
+    if (!/this pok[eé]mon is an evolved pok[eé]mon/.test(c)) return undefined;
+    return isEvolutionCard(holder);
+  },
+  (c, _holder, ctx) => {
+    const m = c.match(/your opponent has (\d+) or (?:less|fewer) prize cards? (?:left|remaining)/);
+    if (!m) return undefined;
+    if (ctx.opponentPrizesLeft == null) return false;
+    return ctx.opponentPrizesLeft <= Number(m[1]);
+  },
+  (c, _holder, ctx) => {
+    if (!/you have more prize cards (?:left|remaining) than your opponent/.test(c)) return undefined;
+    if (ctx.ownPrizesLeft == null || ctx.opponentPrizesLeft == null) return false;
+    return ctx.ownPrizesLeft > ctx.opponentPrizesLeft;
+  },
+  (c, _holder, ctx) => {
+    if (!/you have the same number of cards in your hand as your opponent/.test(c)) return undefined;
+    if (ctx.ownHandCount == null || ctx.opponentHandCount == null) return false;
+    return ctx.ownHandCount === ctx.opponentHandCount;
+  },
+  // Energy / Tool / full-HP / "if you have X in play" clauses: inPlayConditionMet reads them.
+  (c) =>
+    /this pok[eé]mon has (?:any|full|\d+ or more)|(?:has|have) any \{[a-z]\} energy|you have [^,]+ in play|has (?:a )?[a-z0-9 .'’-]+ attached/.test(
+      c
+    )
+      ? true
+      : undefined,
+];
+
+function bonusConditionMet(text, holder, attacker, ctx) {
+  const clause = text.match(/^(?:if|as long as) ([^,]+),/)?.[1];
+  if (clause) {
+    const verdicts = BONUS_CONDITIONS.map((check) => check(clause, holder, ctx));
+    if (verdicts.every((v) => v === undefined)) return false;
+    if (verdicts.some((v) => v === false)) return false;
+  }
+  return inPlayConditionMet(text, attacker, ctx);
+}
+
+// The defender a bonus names ("to your opponent's Active Evolution Pokémon", "to {D} Pokémon",
+// "… Pokémon VMAX", "… that has an Ability"). Bench-only targets never apply to Active damage.
+function defenderQualifies(text, defender) {
+  const target = text.match(/more damage to ([^(.]+?)(?:\s*\(|\.|,|$)/)?.[1];
+  if (!target) return true;
+  const t = lower(target);
+  if (/benched/.test(t)) return false;
+  if (/that pok[eé]mon/.test(t)) return false;
+  if (!defender) return true;
+  const symbols = typeSymbols(t);
+  if (symbols.length && !symbols.some((ty) => attackerTypes(defender).includes(lower(ty)))) {
+    return false;
+  }
+  if (/evolution pok[eé]mon/.test(t) && !isEvolutionCard(defender)) return false;
+  if (/vmax/.test(t) && !isVmaxCard(defender)) return false;
+  if (/pok[eé]mon v\b/.test(t) && !isVCard(defender)) return false;
+  if (/that has an ability/.test(t) && !cardAbilityText(defender)) return false;
+  return true;
+}
+
 /**
  * Flat damage the attacker's (and its team's) abilities add before Weakness
  * and Resistance. Scaling wordings ("for each …") are skipped: they need live
- * counts and would otherwise be added as a flat number.
+ * counts and would otherwise be added as a flat number. The holder's printed
+ * attacker scope, leading condition and defender filter must all hold (I137).
  */
 export function abilityDamageBonus(attacker, defender, ctx = {}) {
   if (!attacker) return 0;
   let total = 0;
   for (const holder of nonStackingOnce(dedupe([attacker, ...sideInPlay(ctx)]))) {
-    const t = cardAbilityText(holder);
+    const t = selfNamedText(holder);
     if (!t || !parseDamageBonus(holder).bonus) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (/for each/.test(t)) continue;
+    // An activated power's "during your next turn … more damage" is its effect, not a passive.
+    if (/^(?:once during your turn|as often as you like)/.test(t)) continue;
     if (!attackerQualifies(t, attacker, holder, ctx)) continue;
+    if (!bonusConditionMet(t, holder, attacker, ctx)) continue;
+    if (!defenderQualifies(t, defender)) continue;
     total += parseDamageBonus(holder).bonus;
   }
   return total;
