@@ -111,6 +111,34 @@ test('parseCheckupAbilities: scope, Ability filter and holder-Active gate', () =
   assert.deepEqual(active[0].targets.map((x) => x.card.name), ['Opp Active']);
 });
 
+test('parseCheckupAbilities: "N instead of 2" adds the difference; a named holder must be Active', () => {
+  const state = setupGame();
+  const pyroar = pokemon({
+    instanceId: 1,
+    name: 'Pyroar',
+    abilities: [ability('Intimidating Mane', "During Pokémon Checkup, put 4 damage counters on your opponent's Burned Pokémon instead of 2.")],
+  });
+  const burned = pokemon({ instanceId: 2, name: 'Burned' });
+  addCondition(burned, 'Burned');
+  state.players.p1.zones.active.push(pyroar);
+  state.players.p2.zones.active.push(burned);
+  const [effect] = parseCheckupAbilities(inPlayEntries(state), ctxFor(state, 'p1'));
+  assert.equal(effect.count, 2);
+
+  const named = setupGame();
+  const pecharunt = pokemon({
+    instanceId: 3,
+    name: 'Pecharunt',
+    abilities: [ability('X', "As long as Pecharunt is your Active Pokémon, put 5 more damage counters on your opponent's Poisoned Pokémon during Pokémon Checkup.")],
+  });
+  const poisoned = pokemon({ instanceId: 4, name: 'Poisoned' });
+  addCondition(poisoned, 'Poisoned');
+  named.players.p1.zones.active.push(pokemon({ instanceId: 5, name: 'Other' }));
+  named.players.p1.zones.bench.push(pecharunt);
+  named.players.p2.zones.active.push(poisoned);
+  assert.equal(parseCheckupAbilities(inPlayEntries(named), ctxFor(named, 'p1')).length, 0);
+});
+
 test('Checkup hook: Froslass damages every in-play Ability holder except itself', () => {
   const state = setupGame();
   const froslass = pokemon({

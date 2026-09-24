@@ -77,10 +77,17 @@ const CONDITION_WORDS = [
  * and type/basic/Ability target filters, the scope (own/opponent/both) and the
  * holder-Active gate.
  */
+const HOLDER_ACTIVE_CLAUSE =
+  /(?:if|as long as) this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/;
+
 function normalizeCheckup(text) {
   const m = text.match(/put\s+(\d+)\s+(more\s+)?damage/);
-  const count = m ? Number(m[1]) : 0;
-  const more = Boolean(m && m[2]);
+  // "put 4 damage counters … instead of 2" (Pyroar) replaces the condition's own counters, which
+  // Checkup already puts: the ability adds the difference.
+  const instead = text.match(/instead of (\d+)/);
+  const printed = m ? Number(m[1]) : 0;
+  const count = instead ? Math.max(0, printed - Number(instead[1])) : printed;
+  const more = Boolean(m && m[2]) || Boolean(instead);
   let condition = null;
   for (const [word, label] of CONDITION_WORDS) {
     if (new RegExp(`\\b${word}\\b`).test(text)) {
@@ -91,9 +98,7 @@ function normalizeCheckup(text) {
   const basic = /\bbasic pok[eé]mon\b/.test(text);
   const typeMatch = text.match(/\{([a-z])\}\s*pok[eé]mon/);
   const type = typeMatch ? lower(TYPE_LETTER[typeMatch[1]]) : null;
-  const holderActive = /(?:if|as long as) this pok[eé]mon is in the active spot/.test(
-    text
-  );
+  const holderActive = HOLDER_ACTIVE_CLAUSE.test(text);
   const targetActive = /your opponent's active pok[eé]mon/.test(text);
   const both = /\(both yours and your opponent's\)/.test(text);
   const opponent = /your opponent's/.test(text);
@@ -153,6 +158,8 @@ export function parseCheckupAbilities(entries = [], ctx = {}) {
     if (!parseAbility(text).some((s) => s.type === 'checkupAbility')) continue;
     const effect = normalizeCheckup(text);
     if (!(effect.count > 0)) continue;
+    // "as long as Pecharunt is your Active Pokémon": the printed name is the holder.
+    effect.holderActive ||= HOLDER_ACTIVE_CLAUSE.test(selfNamedText(card));
     if (effect.holderActive && !holderIsActive(card, ctx)) continue;
     const targets = resolveCheckupTargets(effect, entries, playerId);
     if (targets.length === 0) continue;

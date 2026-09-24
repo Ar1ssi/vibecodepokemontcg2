@@ -6,6 +6,7 @@
 // a condition the probe board does not meet (a named Stadium, a Pokémon ex Active) reads as
 // unconsumed, never the other way round.
 import { createCard } from '../../shared/engine/cards.mjs';
+import { addCondition } from '../../shared/engine/rules/special-conditions.mjs';
 import {
   abilityDamageBonus,
   abilityDamageReduction,
@@ -269,6 +270,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       })
     );
     ask('attackInheritance', () => parseAttackInheritance(holderCard));
+    // Last on this board: condition-targeted Checkup damage needs Poisoned/Burned/Asleep targets.
+    for (const card of [...own, ...opp]) for (const c of ['Poisoned', 'Burned', 'Asleep']) addCondition(card, c);
+    ask('checkup:conditioned', () => parseCheckupAbilities(inPlayEntries(state), p1));
   }
   return answers;
 }

@@ -5,8 +5,8 @@
     "runs": 1635,
     "partial": 257,
     "dead": 102,
-    "consumed": 1163,
-    "unconsumed": 1070,
+    "consumed": 1169,
+    "unconsumed": 1064,
     "unparsed": 1
   },
   "families": {
@@ -69,8 +69,8 @@
       "runs": 2,
       "partial": 0,
       "dead": 0,
-      "consumed": 5,
-      "unconsumed": 6,
+      "consumed": 11,
+      "unconsumed": 0,
       "unparsed": 0
     },
     "coin-control": {
