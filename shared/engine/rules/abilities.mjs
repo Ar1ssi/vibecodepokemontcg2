@@ -181,6 +181,42 @@ const parseEnergyTypeHint = (t) => {
   return null;
 };
 
+/**
+ * Where a move-Energy Ability takes Energy from and puts it (design 034 slice 5b). The
+ * printing fixes the destination: `self` ("to this Pokémon"), `active` ("to your Active
+ * Pokémon"), `bench` ("to your Benched Pokémon", from this one) or `between` ("from 1 of your
+ * Pokémon to another of your Pokémon", optionally a named kind: Rapid Strike, Deoxys).
+ */
+export function parseMoveEnergyShape(lower) {
+  const anyAmount = /any (?:amount|number) of|move all\b/.test(lower);
+  const count = lower.match(/move\s+(up to\s+)?(\d+|an?)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?(?:[a-z]+\s+)?energy/);
+  const upTo = anyAmount || !count ? null : count[2].startsWith('a') ? 1 : Number(count[2]);
+  const shape = {
+    target: 'self',
+    source: 'others',
+    targetTag: null,
+    upTo,
+    anyAmount,
+    exact: !anyAmount && Boolean(count) && !count[1],
+    special: /\bspecial energy\b/.test(lower),
+  };
+  if (/to your active pok[eé]mon/.test(lower)) {
+    shape.target = 'active';
+    shape.source = 'bench';
+  } else if (/to this pok[eé]mon/.test(lower)) {
+    shape.source = /from your active pok[eé]mon to this/.test(lower) ? 'active' : 'others';
+  } else if (/to your benched pok[eé]mon/.test(lower)) {
+    shape.target = 'bench';
+    shape.source = 'self';
+  } else {
+    shape.target = 'between';
+    shape.source = 'any';
+    const tag = lower.match(/to 1 of your ([^.]+?)(?: pok[eé]mon)?\./)?.[1];
+    if (tag && !/^(?:other|benched|active)\b/.test(tag)) shape.targetTag = tag;
+  }
+  return shape;
+}
+
 /** Ability deck-search parsing — separate from trainer parseSearchDeckParams(). */
 export function parseAbilitySearchParams(lower) {
   let what = 'a card';
@@ -291,6 +327,9 @@ export function parseAbilitySearchParams(lower) {
     upTo = true;
   } else if (scope.includes('basic energy')) {
     what = 'Basic Energy';
+  } else if (/pok[eé]mon tool/.test(scope)) {
+    // Farfetch'd Impromptu Carrier: a Tool, not a Pokémon.
+    what = 'Pokémon Tool';
   } else if (scope.includes('supporter')) {
     what = 'Supporter';
   } else if (scope.includes('item')) {
@@ -570,13 +609,14 @@ export function parseAbility(text = '') {
       lower.includes('to this pokemon') ||
       lower.includes('to your benched'))
   ) {
-    const upTo = lower.match(/move\s+(?:up to\s+)?(\d+)\s+energy/)?.[1] || null;
+    const shape = parseMoveEnergyShape(lower);
+    const upTo = shape.upTo;
     const unlimited = lower.includes('as often as you like');
     const energyType = parseEnergyTypeHint(lower);
     const basic = lower.includes('basic');
     steps.push({
       type: 'moveEnergyAbility',
-      upTo: upTo ? Number(upTo) : null,
+      ...shape,
       unlimited,
       energyType,
       basic,
@@ -1453,34 +1493,22 @@ export function parseAbility(text = '') {
     } else if (
       lower.includes('to this pokémon') ||
       lower.includes('to this pokemon') ||
-      /move .* energy .* to (?:1 of )?your active/.test(lower) ||
-      /to 1 of your pokémon.*energy/.test(lower)
+      /to (?:1 of )?your active/.test(lower) ||
+      lower.includes('to your benched')
     ) {
-      const toActive = /to (?:1 of )?your active/.test(lower);
-      const anyAmount = lower.includes('any amount') || lower.includes('any number');
+      const shape = parseMoveEnergyShape(lower);
       steps.push({
         type: 'moveEnergyAbility',
-        target: toActive ? 'active' : 'self',
-        upTo: anyAmount
-          ? null
-          : lower.match(/move\s+(?:up to\s+)?(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
-        unlimited: lower.includes('as often as you like') || anyAmount,
+        ...shape,
+        unlimited: lower.includes('as often as you like'),
         energyType: parseEnergyTypeHint(lower),
         basic: lower.includes('basic'),
-        guidance: toActive
-          ? 'Once during your turn: move Energy from your Benched Pokémon to your Active Pokémon (as described).'
-          : 'Once during your turn: move Energy from your other Pokémon to this Pokémon (as described).',
-      });
-    } else if (lower.includes('to your benched')) {
-      steps.push({
-        type: 'moveEnergyAbility',
-        target: 'bench',
-        upTo:
-          lower.match(
-            /move\s+up to\s+(\d+)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?energy/
-          )?.[1] || null,
-        basic: lower.includes('basic'),
-        guidance: 'Move Energy from this Pokémon to your Benched Pokémon (as described).',
+        guidance:
+          shape.target === 'active'
+            ? 'Move Energy from your Benched Pokémon to your Active Pokémon (as described).'
+            : shape.target === 'bench'
+              ? 'Move Energy from this Pokémon to your Benched Pokémon (as described).'
+              : 'Move Energy from your other Pokémon to this Pokémon (as described).',
       });
     }
   }

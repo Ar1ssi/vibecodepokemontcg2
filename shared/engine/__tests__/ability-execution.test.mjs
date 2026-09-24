@@ -5,6 +5,7 @@ import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { addCondition, hasAnyCondition } from '../rules/special-conditions.mjs';
+import { parseAbility } from '../rules/abilities.mjs';
 
 function setupGame() {
   const rng = createRng(42);
@@ -1273,47 +1274,223 @@ test('ability: self-bench placement is refused without a hand copy', async () =>
   assert.ok(events.some((e) => e.type === 'effectStepSkipped'));
 });
 
-test('ability: Bubble Gathering moves an Energy from another Pokémon to this one', () => {
-  const { state, rng } = setupGame();
-  const { holder } = holderWithAbility(
-    state,
-    'As often as you like during your turn, you may use this Ability. Move an Energy from 1 of your other Pokémon to this Pokémon.'
-  );
-  const source = createCard({ instanceId: 72, name: 'Source', hp: 100, supertype: 'Pokémon' });
-  const energy = createCard({ instanceId: 73, name: 'Water Energy', supertype: 'Energy', subtypes: ['Basic'], attachedTo: 72 });
-  state.players.p1.zones.bench.push(source, energy);
+const energyOn = (instanceId, name, attachedTo, types = []) =>
+  createCard({ instanceId, name, supertype: 'Energy', subtypes: ['Basic'], types, attachedTo });
+const benchMon = (instanceId, name = 'Benched', extra = {}) =>
+  createCard({ instanceId, name, hp: 100, supertype: 'Pokémon', ...extra });
+const hostOf = (state, instanceId) =>
+  [...state.players.p1.zones.active, ...state.players.p1.zones.bench].find(
+    (c) => c.instanceId === instanceId
+  )?.attachedTo;
+const use70 = (state, rng) =>
+  applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
 
-  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
-  assert.equal(res1.error, null);
-  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [73]);
-  const res2 = resolveWith(res1, [73], rng);
-  assert.equal(res2.error, null);
-  const moved = [
-    ...res2.state.players.p1.zones.active,
-    ...res2.state.players.p1.zones.bench,
-  ].find((c) => c.instanceId === 73);
-  assert.equal(moved.attachedTo, 70);
+const BUBBLE_GATHERING =
+  'As often as you like during your turn, you may use this Ability. Move an Energy from 1 of your other Pokémon to this Pokémon.';
+
+test('ability: Bubble Gathering moves the only other Energy to this Pokémon without a prompt', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, BUBBLE_GATHERING);
+  state.players.p1.zones.bench.push(benchMon(72), energyOn(73, 'Water Energy', 72));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(hostOf(res.state, 73), 70);
 });
 
-test('ability: Wash Out moves a Benched {W} Energy to your Active', () => {
+test('ability: Bubble Gathering asks for exactly one Energy when several qualify', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, BUBBLE_GATHERING);
+  state.players.p1.zones.bench.push(
+    benchMon(72),
+    energyOn(73, 'Water Energy', 72),
+    energyOn(74, 'Fire Energy', 72),
+    energyOn(75, 'Grass Energy', 70)
+  );
+
+  const res1 = use70(state, rng);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [73, 74], 'not its own Energy');
+  assert.equal(res1.pendingChoice.min, 1);
+  assert.equal(res1.pendingChoice.max, 1);
+  const res2 = resolveWith(res1, [74], rng);
+  assert.equal(res2.error, null);
+  assert.equal(hostOf(res2.state, 74), 70);
+  assert.equal(hostOf(res2.state, 73), 72);
+});
+
+test('ability: Wash Out from the Bench moves a Benched {W} Energy to the Active, not to itself', () => {
+  const { state, rng } = setupGame();
+  const active = benchMon(60, 'Active');
+  const dewgong = createCard({
+    instanceId: 70,
+    name: 'Dewgong',
+    hp: 100,
+    supertype: 'Pokémon',
+    abilities: [{
+      name: 'Wash Out',
+      type: 'Ability',
+      text: 'As often as you like during your turn, you may use this Ability. Move a {W} Energy from 1 of your Benched Pokémon to your Active Pokémon.',
+    }],
+  });
+  state.players.p1.zones.active.push(active);
+  state.players.p2.zones.active.push(benchMon(71, 'Opp'));
+  state.players.p1.zones.bench.push(
+    dewgong,
+    benchMon(72),
+    energyOn(73, 'Water Energy', 72),
+    energyOn(74, 'Fire Energy', 72)
+  );
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null, 'the one {W} Energy moves without a prompt');
+  assert.equal(hostOf(res.state, 73), 60);
+  assert.equal(hostOf(res.state, 74), 72);
+});
+
+test('ability: Energy Trans moves a {G} Energy between two of your Pokémon, target chosen', () => {
   const { state, rng } = setupGame();
   holderWithAbility(
     state,
-    'As often as you like during your turn, you may use this Ability. Move a {W} Energy from 1 of your Benched Pokémon to your Active Pokémon.'
+    'As often as you like during your turn, you may move a {G} Energy from 1 of your Pokémon to another of your Pokémon.'
   );
-  const benchMon = createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' });
-  const water = createCard({ instanceId: 73, name: 'Water Energy', supertype: 'Energy', subtypes: ['Basic'], attachedTo: 72 });
-  const fire = createCard({ instanceId: 74, name: 'Fire Energy', supertype: 'Energy', subtypes: ['Basic'], attachedTo: 72 });
-  state.players.p1.zones.bench.push(benchMon, water, fire);
+  state.players.p1.zones.bench.push(
+    benchMon(72, 'A'),
+    benchMon(76, 'B'),
+    energyOn(73, 'Grass Energy', 72),
+    energyOn(74, 'Grass Energy', 70),
+    energyOn(75, 'Fire Energy', 72)
+  );
 
-  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
-  assert.equal(res1.error, null);
-  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [73], 'only the {W} Energy is offered');
+  const res1 = use70(state, rng);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId).sort(), [73, 74]);
   const res2 = resolveWith(res1, [73], rng);
+  assert.deepEqual(
+    res2.pendingChoice.options.map((o) => o.instanceId).sort(),
+    [70, 76],
+    'any of your Pokémon except the one it is on'
+  );
+  const res3 = resolveWith(res2, [76], rng);
+  assert.equal(res3.error, null);
+  assert.equal(hostOf(res3.state, 73), 76);
+});
+
+test('ability: Rapid Strike Connection only moves Energy to a Rapid Strike Pokémon', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'As often as you like during your turn, you may move an Energy from 1 of your Pokémon to 1 of your Rapid Strike Pokémon.'
+  );
+  state.players.p1.zones.bench.push(
+    benchMon(72, 'Plain'),
+    benchMon(76, 'Striker', { subtypes: ['Basic', 'Rapid Strike'] }),
+    energyOn(73, 'Water Energy', 72)
+  );
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null, 'one Energy, one legal target');
+  assert.equal(hostOf(res.state, 73), 76);
+});
+
+test('ability: move-Energy wordings parse to their printed destination', () => {
+  const shapeOf = (text) =>
+    [parseAbility(text)].flat().flatMap((r) => r.steps || [r]).find((s) => s.type === 'moveEnergyAbility');
+  const metalRoad = shapeOf(
+    'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may use this Ability. Move any amount of {M} Energy from your other Pokémon to this Pokémon.'
+  );
+  assert.equal(metalRoad.target, 'self');
+  assert.equal(metalRoad.anyAmount, true);
+  const lustrous = shapeOf(
+    'Once during your turn, when your Mega Latias ex moves from your Bench to the Active Spot, you may use this Ability. Move any amount of Energy from your Benched Pokémon to your Active Pokémon.'
+  );
+  assert.equal(lustrous.target, 'active');
+  assert.equal(lustrous.source, 'bench');
+  const plunge = shapeOf(
+    'Once during your turn (before your attack), if this Pokémon is on your Bench, you may move all Energy from your Active Pokémon to this Pokémon. If you do, switch it with your Active Pokémon.'
+  );
+  assert.equal(plunge.source, 'active');
+  assert.equal(plunge.anyAmount, true);
+  const magma = shapeOf(
+    "Once during your turn (before your attack), you may move a basic Energy from 1 of your Pokémon to 1 of your Team Magma's Pokémon."
+  );
+  assert.equal(magma.target, 'between');
+  assert.equal(magma.targetTag, "team magma's");
+  assert.equal(magma.exact, true);
+  assert.equal(magma.upTo, 1);
+});
+
+const benchPlayedHolder = (state, name, text, extra = {}) => {
+  const holder = createCard({
+    instanceId: 70,
+    name,
+    hp: 100,
+    supertype: 'Pokémon',
+    playedToBenchTurn: state.turn.number,
+    abilities: [{ name: 'When Played', type: 'Ability', text }],
+    ...extra,
+  });
+  state.players.p1.zones.active.push(benchMon(60, 'Active'));
+  state.players.p1.zones.bench.push(holder);
+  state.players.p2.zones.active.push(benchMon(71, 'Opp'));
+  return holder;
+};
+
+test("ability: Farfetch'd Impromptu Carrier searches a Pokémon Tool, not a Pokémon, and attaches it", () => {
+  const { state, rng } = setupGame();
+  benchPlayedHolder(
+    state,
+    "Farfetch'd",
+    'When you play this Pokémon from your hand onto your Bench during your turn, you may search your deck for a Pokémon Tool card and attach it to this Pokémon. Then, shuffle your deck.'
+  );
+  const tool = createCard({ instanceId: 80, name: 'Choice Belt', supertype: 'Trainer', subtypes: ['Pokémon Tool'] });
+  state.players.p1.zones.deck.push(benchMon(81, 'Pikachu'), tool);
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [80], 'only the Tool is offered');
+  const res2 = resolveWith(res1, [80], rng);
   assert.equal(res2.error, null);
-  const moved = [
-    ...res2.state.players.p1.zones.active,
-    ...res2.state.players.p1.zones.bench,
-  ].find((c) => c.instanceId === 73);
-  assert.equal(moved.attachedTo, 70);
+  assert.equal(hostOf(res2.state, 80), 70);
+});
+
+test('ability: Durant ex Sudden Shearing discards the top card of the opponent’s deck', () => {
+  const { state, rng } = setupGame();
+  benchPlayedHolder(
+    state,
+    'Durant ex',
+    "When you play this Pokémon from your hand onto your Bench during your turn, you may discard the top card of your opponent's deck."
+  );
+  state.players.p2.zones.deck.push(benchMon(90, 'Top'), benchMon(91, 'Next'));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(res.state.players.p2.zones.discard.map((c) => c.instanceId), [90]);
+  assert.deepEqual(res.state.players.p2.zones.deck.map((c) => c.instanceId), [91]);
+});
+
+test('ability: Gyarados Untamed One ("you must") discards the top 5 cards of your deck', () => {
+  const { state, rng } = setupGame();
+  const gyarados = createCard({
+    instanceId: 70,
+    name: 'Gyarados',
+    hp: 180,
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    enteredPlayTurn: state.turn.number,
+    abilities: [{
+      name: 'Untamed One',
+      type: 'Ability',
+      text: 'When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you must discard the top 5 cards of your deck.',
+    }],
+  });
+  state.players.p1.zones.active.push(gyarados);
+  state.players.p2.zones.active.push(benchMon(71, 'Opp'));
+  for (let i = 0; i < 7; i++) state.players.p1.zones.deck.push(benchMon(100 + i, `Deck${i}`));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.discard.length, 5);
+  assert.equal(res.state.players.p1.zones.deck.length, 2);
 });

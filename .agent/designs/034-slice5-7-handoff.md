@@ -25,7 +25,14 @@ Six ability step types gained `EXTRA_STEP_HANDLERS` in `effects/trainer-steps.mj
 `turnDamageBonusTotal` now scopes by it), `selfBenchPlacementAbility` (Luxray/Klinklang;
 `condition: morePrizes|opponentStage2`, plus `swapActive`), `returnSelfToHandAbility`.
 
-## Slice 5b IN PROGRESS — uncommitted working tree
+## Slice 5b-1 DONE (S282, branch `claude/exciting-meitner-pt47ts`)
+
+The WIP below was verified and corrected: parse site #6 (not #51) catches most move-Energy texts,
+so both now spread `parseMoveEnergyShape` (D123); the handler was rewritten (self/active/bench/
+between, target tags, forced single move auto-resolves). `atkMill` does have a handler. Farfetch'd
+is a Tool *search-attach*, fixed via `what: 'Pokémon Tool'`. Only the reveal-hand item remains.
+
+## (historical) Slice 5b WIP as handed off by S281
 
 Implemented but **NOT yet verified green** (run the suite + oracle before committing):
 

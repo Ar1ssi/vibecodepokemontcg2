@@ -104,6 +104,10 @@ export function matchesSearch(card, what = '') {
     const tt = String(card.trainerType || card.type || '').toLowerCase();
     return tt.includes('item') || (isTrainer && tt.includes('item'));
   }
+  if (/pok[eé]mon tool/.test(w)) {
+    const kind = `${card.trainerType || ''} ${card.type || ''} ${(card.subtypes || []).join(' ')}`;
+    return isTrainer && /tool/i.test(kind);
+  }
   if (w.includes('supporter')) {
     const tt = String(card.trainerType || card.type || '').toLowerCase();
     const st = Array.isArray(card.subtypes) ? card.subtypes.map((s) => String(s).toLowerCase()) : [];

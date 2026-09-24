@@ -656,7 +656,8 @@ function searchAttachStep(clause, gate, optional) {
   const { guidance, ...step } = search;
   return {
     ...step,
-    ...(clauseParams.what ? { what: clauseParams.what } : {}),
+    // A Tool search keeps the ability parser's filter; the attack one reads it as a Pokémon.
+    ...(clauseParams.what && step.what !== 'Pokémon Tool' ? { what: clauseParams.what } : {}),
     ...(clauseParams.count ? { count: clauseParams.count } : {}),
     ...(clauseParams.upTo ? { upTo: true } : {}),
     // "You may search": finding nothing is the way to decline.
