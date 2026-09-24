@@ -8,6 +8,8 @@ import {
   classCounts,
   totalCounts,
   checkBehaviourGate,
+  checkExecutedClaims,
+  worksShare,
 } from './ability-behaviour.mjs';
 
 const SWITCH =
@@ -166,4 +168,19 @@ test('gate warns on new and vanished families', () => {
     'draw: in baseline but no rows now',
     'heal: not in baseline',
   ]);
+});
+
+test('executed claims need half the family running or read (D128)', () => {
+  const counts = {
+    draw: fam(10, 6, 2), // 6 runs + 2 consumed = 80%
+    evolve: fam(10, 0, 0, { consumed: 0, partial: 10 }),
+    tool: fam(4, 0, 0, { consumed: 4 }),
+  };
+  assert.equal(worksShare(counts.draw), 0.8);
+  const { failures, warnings } = checkExecutedClaims(counts, new Set(['draw', 'evolve', 'ghost']));
+  assert.deepEqual(failures, [
+    'evolve: claimed executed but only 0/10 rows run or are read',
+    'ghost: claimed executed but has no ability rows',
+  ]);
+  assert.deepEqual(warnings, ['tool: 4/4 rows work — not claimed executed']);
 });

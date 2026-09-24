@@ -150,3 +150,36 @@ export function checkBehaviourGate(counts, baseline) {
     if (!baseline[family]) warnings.push(`${family}: not in baseline`);
   return { failures, warnings };
 }
+
+/** Share of a family's rows the gate sees working: activated and running, or passive and read. */
+export function worksShare(c) {
+  return c?.n ? ((c.runs || 0) + (c.consumed || 0)) / c.n : 0;
+}
+
+/** The works share a family needs before `EXECUTED_ABILITY_FAMILIES` may claim it (D128). */
+export const EXECUTED_CLAIM_SHARE = 0.5;
+
+/**
+ * Checks the executed-family claims against the gate's evidence (D128).
+ * Failures: a claimed family with no rows, or whose works share is under the threshold.
+ * Warnings: an unclaimed family that meets it (a claim the evidence now supports).
+ */
+export function checkExecutedClaims(counts, claimed, threshold = EXECUTED_CLAIM_SHARE) {
+  const failures = [];
+  const warnings = [];
+  for (const family of claimed) {
+    const c = counts[family];
+    if (!c) failures.push(`${family}: claimed executed but has no ability rows`);
+    else if (worksShare(c) < threshold) {
+      failures.push(
+        `${family}: claimed executed but only ${(c.runs || 0) + (c.consumed || 0)}/${c.n} rows run or are read`
+      );
+    }
+  }
+  for (const [family, c] of Object.entries(counts)) {
+    if (!claimed.has(family) && worksShare(c) >= threshold) {
+      warnings.push(`${family}: ${(c.runs || 0) + (c.consumed || 0)}/${c.n} rows work — not claimed executed`);
+    }
+  }
+  return { failures, warnings };
+}

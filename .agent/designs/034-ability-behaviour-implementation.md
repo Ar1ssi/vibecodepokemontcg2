@@ -1,6 +1,6 @@
 # 034: Ability behaviour implementation (I128/I129/I130)
 
-Status: approved (user instructed slice build, S279)
+Status: built — slices 1-7 complete (S287); backlog in I141
 Date: 2026-09-24 · Session: S278
 
 ## Problem
@@ -253,3 +253,9 @@ Self-approval checklist (only when the user is unreachable):
   probe also exposes wrong reads (a reader answering where the text says it should not): I136
   (damage reduction read as a cost discount), I137 (conditional self bonus given to the team),
   I138 (no-Energy free retreat applied with Energy). Those are filed, not fixed, in 7b.
+- Slice 7c made the executed-family claims evidence-based (D128): `checkExecutedClaims` in the
+  ability gate; 11 claims dropped (under 50% works share), 9 added (copy-attack, status-recover,
+  coin-control, discard-bench, energy-on-ko, extra-supporter, self-attach-energy, self-return,
+  discard-cost), 3 with no corpus rows removed (move-energy, hand-protect, thorns). The scratch
+  sweep reports this design cites were gone, so the annotation went into
+  `docs/card-parsing-and-audit-guide.md` §8. I128/I129/I130 added to ISSUES as closed.

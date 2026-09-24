@@ -5,7 +5,8 @@
  * runs / partial / dead / consumed / unconsumed / unparsed (scripts/lib/ability-behaviour.mjs; passive
  * rows are split by the reader probes in scripts/lib/ability-passive-probe.mjs), and ratchets the
  * per-family class shares against scripts/ability-behaviour-baseline.json. Exits 1 when a family's
- * runs share falls or its dead / unconsumed / unparsed share rises.
+ * runs share falls or its dead / unconsumed / unparsed share rises, or when a family claimed in
+ * EXECUTED_ABILITY_FAMILIES has under half its rows running or read (D128).
  *
  * Run: pnpm audit:abilities [--update-baseline] [--rows]
  *   --update-baseline  rewrite the baseline from this run (after a legit change), exit 0
@@ -21,7 +22,9 @@ import {
   classCounts,
   totalCounts,
   checkBehaviourGate,
+  checkExecutedClaims,
 } from './lib/ability-behaviour.mjs';
+import { EXECUTED_ABILITY_FAMILIES } from './lib/executed-families.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = path.join(ROOT, 'out/pkmn-pokemon-cards.json');
@@ -120,7 +123,10 @@ function main() {
     console.error(`\n${error} — run with --update-baseline to create it.`);
     process.exit(1);
   }
-  const { failures, warnings } = checkBehaviourGate(counts, baseline);
+  const gate = checkBehaviourGate(counts, baseline);
+  const claims = checkExecutedClaims(counts, EXECUTED_ABILITY_FAMILIES);
+  const failures = [...gate.failures, ...claims.failures];
+  const warnings = [...gate.warnings, ...claims.warnings];
   for (const w of warnings) console.log(`WARN ${w}`);
   for (const f of failures) console.log(`FAIL ${f}`);
   console.log(
