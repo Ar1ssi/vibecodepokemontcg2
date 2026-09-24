@@ -170,6 +170,73 @@ const TEMPLATES = [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) 1 of your pokémon to another of your pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', count: 1, ...energyFilter(m[1], s) }),
   ],
+  // Opponent Energy between their own Pokémon.
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to (?:1 of (?:their|your opponent's) benched pokémon|another of (?:their|your opponent's) pokémon)$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) 1 of your opponent's pokémon to another of (?:their|your opponent's) pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentAny', to: 'opponentAny', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) 1 of your opponent's benched pokémon to their active pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentBench', to: 'opponentActive', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  // Deck look / reorder (the opponent-only block form stays atkLookOppDeck).
+  [
+    /^look at the top (\d+) cards (?:of|on) (your|your opponent's|either player's) deck,? and put them back (?:on top of (?:your|their|that player's|your opponent's) deck )?in any order(?: you like)?$/,
+    (m) => ({
+      type: 'atkLookDeckReorder',
+      count: Number(m[1]),
+      side: m[2] === 'your' ? 'self' : m[2] === 'either player\'s' ? 'either' : 'opponent',
+    }),
+  ],
+  // Per-Bench attach (Mega Gardevoir ex Overflowing Wishes, Mudsdale Mud Stock).
+  [
+    new RegExp(String.raw`^for each of your benched pokémon, search your deck for an? ${ENERGY_TYPE}energy card and attach it to that pokémon$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'deck', ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to each of your benched pokémon$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^choose up to (\d+) of your benched pokémon and attach an? ${ENERGY_TYPE}energy card from your discard pile to each of them$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', max: Number(m[1]), ...energyFilter(m[2], s) }),
+  ],
+  // Druddigon Dragon's Fury: a typed attach target.
+  [
+    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to 1 of your \{([a-z])\} pokémon$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', count: 1, ...energyFilter(m[1], s), target: 'any', pokemonType: m[2] }),
+  ],
+  // Shuffle clauses.
+  [
+    new RegExp(String.raw`^shuffle (up to \d+|\d+|an?) ((?:basic )?(?:\{[a-z]\} )?(?:basic )?energy|item|trainer|pokémon)?\s?cards? from your discard pile into your deck$`),
+    (m, s) => ({
+      type: 'atkShuffleFromDiscard',
+      ...attachCount(m[1]),
+      ...(m[2] && /energy/.test(m[2]) ? { what: 'energy', ...energyFilter(/\{([a-z])\}/.exec(m[2])?.[1], s) } : {}),
+      ...(m[2] && !/energy/.test(m[2]) ? { what: recoverWhat(m[2]) } : {}),
+    }),
+  ],
+  [
+    /^(?:your opponent shuffles their active pokémon and all attached cards into their deck|shuffle your opponent's active pokémon and all cards attached to it into their deck)$/,
+    () => ({ type: 'atkShuffleOppActive' }),
+  ],
+  [
+    /^shuffle 1 of your benched pokémon and all attached cards into your deck$/,
+    () => ({ type: 'atkShuffleOwnBench' }),
+  ],
+  [
+    /^your opponent shuffles their hand into their deck and draws (\d+) cards$/,
+    (m) => ({ type: 'atkOppShuffleHandDraw', count: Number(m[1]) }),
+  ],
+  // Old switch wordings with a Bench qualifier (Vikavolt Volt Switch, Honchkrow Callous Wings).
+  [
+    /^switch this pokémon with 1 of your benched (?:\{([a-z])\} pokémon|([a-z][a-z' .-]*?))$/,
+    (m) => ({ type: 'atkSwitchSelf', ...(m[1] ? { benchType: m[1] } : { benchName: m[2] }) }),
+  ],
   [
     /^move (\d+|a) damage counters? from 1 of your ((?:[a-z'.-]+ )*?)pokémon to another of your pokémon$/,
     (m) => ({
@@ -465,6 +532,16 @@ const TEMPLATES = [
   [
     /^move all damage counters from 1 of your benched pokémon to your opponent's active pokémon$/,
     () => ({ type: 'atkMoveAllCounters' }),
+  ],
+  // Design 036 D: your damage counters onto the opponent (Xerneas-GX Sanctuary, Drifloon Transfer Pain).
+  [
+    /^move (all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's pokémon)$/,
+    (m) => ({
+      type: 'atkMoveCounterToOpponent',
+      count: m[1] === 'all' ? 'all' : countOf(m[1]),
+      from: m[2] === 'this pokémon' ? 'self' : /^each/.test(m[2]) ? 'each' : /benched/.test(m[2]) ? 'bench' : 'one',
+      to: /active/.test(m[3]) ? 'active' : 'any',
+    }),
   ],
 
   // Opponent's Active back to their hand (Fan Rotom Spin Storm, Unown Hidden Power)

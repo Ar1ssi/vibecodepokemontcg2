@@ -181,13 +181,21 @@ function optional(handler, question) {
   };
 }
 
+// "1 of your Benched {L} Pokémon" / "1 of your Benched Murkrow" (design 036 D).
+function benchQualifierMatches(player, root, step) {
+  const top = topPokemonCard(player, root) || root;
+  if (step.benchType && !pokemonHasType(top, step.benchType)) return false;
+  if (step.benchName && String(top.name || '').toLowerCase() !== step.benchName) return false;
+  return true;
+}
+
 // ── switch / gust ───────────────────────────────────────────────────────────
 
 function atkSwitchSelf(ctx) {
   const { player } = ctx;
   const ref = attackerRef(ctx);
   if (!ref || ref.zoneId !== 'active') return skip(ctx, 'attacker_not_active');
-  const bench = benchRootsOf(player);
+  const bench = benchRootsOf(player).filter((c) => benchQualifierMatches(player, c, ctx.step));
   const turn = ctx.draft?.turn?.number;
   if (ctx.selection) {
     const root = bench.find((c) => c.instanceId === ctx.selection[0]);
@@ -267,6 +275,22 @@ function moveEnergyEnds(ctx) {
         targets: benchRootsOf(opponent),
       };
     }
+    case 'opponentAny':
+      return {
+        owner: opponent,
+        energies: rootsOf(opponent).flatMap((root) => attachedCards(opponent, root.instanceId)).filter(matches),
+        targets: rootsOf(opponent),
+      };
+    case 'opponentBench': {
+      const active = activeOf(opponent);
+      return {
+        owner: opponent,
+        energies: benchRootsOf(opponent)
+          .flatMap((root) => attachedCards(opponent, root.instanceId))
+          .filter(matches),
+        targets: active ? [active] : [],
+      };
+    }
     default:
       return {
         owner: player,
@@ -282,7 +306,7 @@ function atkMoveEnergy(ctx) {
   const byId = (id) => energies.find((c) => c.instanceId === id);
 
   // "in any way you like" between all of your Pokémon: one Energy, then its new host, repeated.
-  if (step.from === 'any') {
+  if (step.from === 'any' || step.from === 'opponentAny') {
     if (ctx.memo?.energyId != null) {
       const energy = byId(ctx.memo.energyId);
       const target = targets.find((c) => c.instanceId === ctx.selection?.[0]);
@@ -600,7 +624,9 @@ function attachTargets(ctx) {
       (c) => c !== attacker && (!step.targetEx || /-EX$/.test(String(topPokemonCard(player, c)?.name || '')))
     );
   }
-  return rootsOf(player);
+  return rootsOf(player).filter(
+    (c) => !step.pokemonType || pokemonHasType(topPokemonCard(player, c) || c, step.pokemonType)
+  );
 }
 
 function attachPicked(ctx, picked, targets) {
@@ -1908,6 +1934,216 @@ function atkLookOppDeck(ctx) {
   return null;
 }
 
+// ── design 036 D executors ──────────────────────────────────────────────────
+
+// "Move all damage counters from each of your Pokémon to your opponent's Active Pokémon":
+// the source (when one is chosen) first, then the target (when more than one can take them).
+function atkMoveCounterToOpponent(ctx) {
+  const { player, opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const attacker = attackerRef(ctx)?.card;
+  const pool =
+    step.from === 'self' ? [attacker].filter(Boolean) : step.from === 'bench' ? benchRootsOf(player) : rootsOf(player);
+  const sources = pool.filter((c) => (c.damage || 0) > 0);
+  const targets = step.to === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent);
+  const chooseSource = step.from === 'one' || step.from === 'bench';
+
+  let fromIds = ctx.memo?.fromIds;
+  if (!fromIds && ctx.memo?.stage === 'from') fromIds = (ctx.selection || []).slice(0, 1);
+  if (!fromIds) {
+    if (sources.length === 0) return skip(ctx, 'no_damage_to_move');
+    if (targets.length === 0) return skip(ctx, 'no_opponent_pokemon');
+    if (chooseSource && sources.length > 1) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose a Pokémon to move damage counters from`,
+        options: sources,
+        min: 1,
+        max: 1,
+        memo: { stage: 'from' },
+      });
+    }
+    fromIds = (chooseSource ? sources.slice(0, 1) : sources).map((c) => c.instanceId);
+  }
+  let target = targets.length === 1 ? targets[0] : null;
+  if (!target && ctx.memo?.stage === 'to') target = targets.find((c) => c.instanceId === ctx.selection?.[0]);
+  if (!target) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to move the damage counters to`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { stage: 'to', fromIds },
+    });
+  }
+  let moved = 0;
+  for (const from of sources.filter((c) => fromIds.includes(c.instanceId))) {
+    const amount = step.count === 'all' ? from.damage || 0 : Math.min(from.damage || 0, (step.count || 1) * 10);
+    from.damage -= amount;
+    moved += amount;
+    ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
+  }
+  if (moved > 0) placeCounters(ctx, target, opponent.playerId, moved);
+  return null;
+}
+
+// "Look at the top N cards of your / either player's deck and put them back in any order."
+function atkLookDeckReorder(ctx) {
+  const { player, opponent, step } = ctx;
+  let side = ctx.memo?.side || (step.side === 'either' ? null : step.side);
+  let selection = ctx.selection;
+  if (!side) {
+    if (!ctx.memo?.pickingSide) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Look at the top of which deck?`,
+        options: [
+          { instanceId: ATTACK_YES, name: 'Your deck', type: 'option' },
+          { instanceId: ATTACK_NO, name: "Your opponent's deck", type: 'option' },
+        ],
+        min: 1,
+        max: 1,
+        memo: { pickingSide: true },
+      });
+    }
+    side = selection?.[0] === ATTACK_YES ? 'self' : 'opponent';
+    selection = null;
+  }
+  const owner = side === 'self' ? player : opponent;
+  const deck = owner?.zones?.deck || [];
+  const viewed = deck.slice(0, step.count || 1);
+  if (viewed.length === 0) return skip(ctx, 'empty_deck');
+  const order = [...(ctx.memo?.order || []), ...(selection || []).slice(0, 1)].filter((id) =>
+    viewed.some((c) => c.instanceId === id)
+  );
+  const remaining = viewed.filter((c) => !order.includes(c.instanceId));
+  if (order.length === 0) ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: viewed.length });
+  if (remaining.length > 1) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the card to put ${ORDINALS[order.length] || `${order.length + 1}th`} from the top of the deck`,
+      options: remaining,
+      min: 1,
+      max: 1,
+      memo: { order, side },
+    });
+  }
+  const ordered = [...order.map((id) => viewed.find((c) => c.instanceId === id)), ...remaining];
+  deck.splice(0, viewed.length, ...ordered);
+  ctx.events.push({ type: 'deckReordered', playerId: owner.playerId, count: ordered.length });
+  return null;
+}
+
+// "For each of your Benched Pokémon, search your deck for a {P} Energy card and attach it to
+// that Pokémon" / "attach a Basic {F} Energy card from your discard pile to each of your Benched
+// Pokémon". Energy of one type is interchangeable, so each Pokémon takes the next match.
+function atkAttachEachBench(ctx) {
+  const { player, step } = ctx;
+  const bench = benchRootsOf(player);
+  if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
+  let chosen = bench;
+  if (step.max && bench.length > step.max) {
+    if (!ctx.selection) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose up to ${step.max} of your Benched Pokémon`,
+        options: bench,
+        min: 0,
+        max: step.max,
+      });
+    }
+    chosen = pickById(bench, ctx.selection).slice(0, step.max);
+  }
+  const zone = step.source === 'deck' ? player.zones.deck : player.zones.discard;
+  const pool = (zone || []).filter((c) => energyMatches(c, step));
+  for (const root of chosen) {
+    const energy = pool.shift();
+    if (!energy) break;
+    attachTo(player, energy, root, ctx.events);
+  }
+  if (step.source === 'deck') shuffleOwnDeck(player, ctx);
+  return null;
+}
+
+function atkShuffleFromDiscard(ctx) {
+  const { player, step } = ctx;
+  const candidates = (player.zones.discard || []).filter((c) =>
+    step.what === 'energy' ? energyMatches(c, step) : !step.what || matchesSearch(c, step.what)
+  );
+  const toDeck = (cards) => {
+    for (const card of cards) moveToZone(player, card, 'deck', 'discard', ctx.events);
+    shuffleOwnDeck(player, ctx);
+    return null;
+  };
+  if (ctx.selection) return toDeck(pickById(candidates, ctx.selection).slice(0, step.count || 1));
+  if (candidates.length === 0) return skip(ctx, 'nothing_to_shuffle');
+  const max = Math.min(step.count || 1, candidates.length);
+  if (!step.upTo && candidates.length <= max) return toDeck(candidates);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${step.upTo ? 'up to ' : ''}${max} card(s) to shuffle into your deck`,
+    options: candidates,
+    min: step.upTo ? 0 : max,
+    max,
+  });
+}
+
+/** A Pokémon and every card attached to it, shuffled into its owner's deck. */
+function shuffleStackIntoDeck(ctx, owner, root, from) {
+  const stack = [root, ...attachedCards(owner, root.instanceId)];
+  for (const card of stack) {
+    removeFromZones(owner, card);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    clearAttackMarkers(card);
+    owner.zones.deck.push(card);
+  }
+  ctx.events.push({ type: 'cardMoved', instanceId: root.instanceId, from, to: 'deck', playerId: owner.playerId });
+  shuffleOwnDeck(owner, ctx);
+}
+
+function atkShuffleOppActive(ctx) {
+  const { opponent } = ctx;
+  const active = opponent ? activeOf(opponent) : null;
+  if (!active) return skip(ctx, 'no_opponent_active');
+  shuffleStackIntoDeck(ctx, opponent, active, 'active');
+  return null;
+}
+
+function atkShuffleOwnBench(ctx) {
+  const { player } = ctx;
+  const bench = benchRootsOf(player);
+  if (ctx.selection) {
+    const root = bench.find((c) => c.instanceId === ctx.selection[0]);
+    if (root) shuffleStackIntoDeck(ctx, player, root, 'bench');
+    return null;
+  }
+  if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
+  if (bench.length === 1) {
+    shuffleStackIntoDeck(ctx, player, bench[0], 'bench');
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a Benched Pokémon to shuffle into your deck`,
+    options: bench,
+    min: 1,
+    max: 1,
+  });
+}
+
+function atkOppShuffleHandDraw(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const hand = opponent.zones.hand;
+  opponent.zones.deck.push(...hand.splice(0, hand.length));
+  shuffleOwnDeck(opponent, ctx);
+  const drawn = opponent.zones.deck.splice(0, Math.min(step.count || 0, opponent.zones.deck.length));
+  hand.push(...drawn);
+  ctx.events.push({
+    type: 'cardsDrawn',
+    count: drawn.length,
+    playerId: opponent.playerId,
+    cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+  });
+  return null;
+}
+
 export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
@@ -1921,6 +2157,13 @@ export const ATTACK_STEP_HANDLERS = {
   ),
   atkLostZoneFromHand: optional(atkLostZoneFromHand, () => 'Put a card from your hand in the Lost Zone'),
   atkLostZoneOppHandRandom,
+  atkMoveCounterToOpponent,
+  atkLookDeckReorder,
+  atkAttachEachBench,
+  atkShuffleFromDiscard: optional(atkShuffleFromDiscard, () => 'Shuffle cards from your discard pile into your deck'),
+  atkShuffleOppActive,
+  atkShuffleOwnBench,
+  atkOppShuffleHandDraw,
   atkLostZoneOppDiscard,
   atkLostZoneSelf,
   atkLostZoneOppActive,
