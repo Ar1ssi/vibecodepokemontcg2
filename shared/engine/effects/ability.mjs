@@ -8,6 +8,7 @@ import { parseAbility } from '../rules/abilities.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
 import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { executeSteps, isExecutableStepType } from './executor.mjs';
+import { flipCoin } from '../rng.mjs';
 
 /**
  * Executes a Pokemon ability or resumes a suspended ability choice.
@@ -113,7 +114,7 @@ export function executeAbility(draft, {
     }
     let flip = { coin: null, headsCount: 0 };
     if (templateSteps.some((step) => step.gate || step.perHeads)) {
-      const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+      const face = flipCoin(activeRng);
       events.push({ type: 'coinFlipped', playerId, face });
       flip = { coin: face, headsCount: face === 'heads' ? 1 : 0 };
     }
@@ -126,7 +127,7 @@ export function executeAbility(draft, {
     }
   } else if (isHeadsGatedAbility(text, actionableSteps)) {
     // "Flip a coin. If heads, …": the flip is the ability's use; tails spends it with no effect.
-    const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+    const face = flipCoin(activeRng);
     events.push({ type: 'coinFlipped', playerId, face });
     if (face === 'tails') {
       markUsed();

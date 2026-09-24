@@ -802,3 +802,163 @@ test("ability: Metamorphosis Gene borrows the opponent's Active attack", () => {
   assert.equal(res.error, null);
   assert.equal(res.state.players.p2.zones.active[0].damage, 30);
 });
+
+// ── coin-flip control ───────────────────────────────────────────────────
+
+const CONTRARY =
+  'If this Pokémon is your Active Pokémon, whenever your opponent flips a coin during his or her turn, treat it as tails.';
+const flipAttack = (damage = '50') => ({
+  name: 'Coin Hit',
+  cost: [],
+  damage,
+  text: 'Flip a coin. If tails, this attack does nothing.',
+});
+
+test("ability: Contrary makes every coin the opponent flips on their turn tails", () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const { state } = setupGame();
+    state.turn.player = 'p2';
+    state.players.p1.zones.active.push(mon(60, 'Malamar', { abilities: [{ name: 'Contrary', type: 'Ability', text: CONTRARY }] }));
+    state.players.p2.zones.active.push(mon(61, 'Attacker', { attacks: [flipAttack()] }));
+    state.players.p1.zones.deck.push(card(120));
+    const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' }, createRng(seed));
+    assert.equal(res.error, null);
+    const flip = res.events.find((e) => e.type === 'attackCoinFlipped');
+    assert.deepEqual(flip.flips, ['tails'], `seed ${seed}`);
+    assert.equal(res.state.players.p1.zones.active[0].damage || 0, 0);
+  }
+});
+
+test('ability: Contrary from the Bench forces nothing', () => {
+  const faces = new Set();
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const { state } = setupGame();
+    state.turn.player = 'p2';
+    state.players.p1.zones.active.push(mon(62, 'Front'));
+    state.players.p1.zones.bench.push(mon(60, 'Malamar', { abilities: [{ name: 'Contrary', type: 'Ability', text: CONTRARY }] }));
+    state.players.p2.zones.active.push(mon(61, 'Attacker', { attacks: [flipAttack()] }));
+    const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' }, createRng(seed));
+    faces.add(res.events.find((e) => e.type === 'attackCoinFlipped')?.flips?.[0]);
+  }
+  assert.ok(faces.has('heads'));
+});
+
+test("ability: Pattern Distraction flips for a Basic attacker; tails, the attack does nothing", () => {
+  const PATTERN =
+    "As long as Spinda is your Active Pokémon, whenever your opponent's Basic Pokémon tries to attack, your opponent flips a coin. If tails, that attack does nothing. You can't use more than 1 Pattern Distraction Poké-Body each turn.";
+  const outcomes = new Set();
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const { state } = setupGame();
+    state.turn.player = 'p2';
+    state.players.p1.zones.active.push(mon(60, 'Spinda', { abilities: [{ name: 'Pattern Distraction', type: 'Poké-Body', text: PATTERN }] }));
+    state.players.p2.zones.active.push(mon(61, 'Attacker', { attacks: [{ name: 'Hit', cost: [], damage: '30', text: '' }] }));
+    state.players.p1.zones.deck.push(card(120));
+    const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' }, createRng(seed));
+    const coin = res.events.find((e) => e.type === 'attackFlipGateCoinFlipped')?.coin;
+    assert.ok(coin, 'the attacker flipped');
+    const dealt = res.state.players.p1.zones.active[0].damage || 0;
+    assert.equal(dealt, coin === 'heads' ? 30 : 0);
+    outcomes.add(coin);
+  }
+  assert.equal(outcomes.size, 2);
+});
+
+test('ability: Victory Star offers a re-flip of an attack\'s coins once per turn', () => {
+  const VICTORY_STAR =
+    "Once during your turn, after you flip any coins for an attack, you may ignore all results of those coin flips and begin flipping those coins again. You can't use more than 1 Victory Star Ability each turn.";
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.', { attacks: [flipAttack('40')] });
+  state.players.p1.zones.bench.push(mon(72, 'Victini', { abilities: [{ name: 'Victory Star', type: 'Ability', text: VICTORY_STAR }] }));
+  state.players.p2.zones.deck.push(card(120));
+
+  const res1 = attackCmd(state, 0, rng);
+  assert.equal(res1.error, null);
+  assert.match(res1.pendingChoice.prompt, /Victory Star/);
+  const res2 = resolveWith(res1, [2], rng);
+  assert.equal(res2.error, null);
+  assert.ok(res2.events.some((e) => e.type === 'attackCoinFlipped' && e.reflip === true));
+  assert.equal(res2.state.players.p1.flags.victoryStarUsedThisTurn, true);
+});
+
+// ── setup / Prize placement ─────────────────────────────────────────────
+
+test('ability: Explosiveness lets a Stage 2 be the opening Active, not a later play', () => {
+  const EXPLOSIVENESS =
+    'If this Pokémon is in your hand when you are setting up to play, you may put it face down in the Active Spot.';
+  const cinderace = () =>
+    mon(80, 'Cinderace', { stage: 'Stage 2', abilities: [{ name: 'Explosiveness', type: 'Ability', text: EXPLOSIVENESS }] });
+  const move = (state) =>
+    applyCommand(state, { type: 'moveCard', payload: { instanceId: 80, from: 'hand', to: 'active' }, playerId: 'p1' }, createRng(1));
+
+  const opening = setupGame().state;
+  opening.turn.number = 1;
+  opening.players.p1.zones.hand.push(cinderace());
+  opening.players.p2.zones.active.push(mon(71, 'Opp'));
+  const res = move(opening);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.active[0].instanceId, 80);
+
+  const later = setupGame().state;
+  later.turn.number = 5;
+  later.players.p1.zones.hand.push(cinderace());
+  later.players.p1.zones.bench.push(mon(72, 'Benched'));
+  assert.ok(move(later).error);
+});
+
+const WISH_UPON_A_STAR =
+  "If you took this Pokémon as a face-down Prize card during your turn and your Bench isn't full, before you put it into your hand, you may put it onto your Bench and take 1 more Prize card.";
+
+test('ability: Wish Upon a Star puts the taken Prize onto the Bench and takes 1 more', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.deck.push(card(120), card(121));
+  state.players.p1.zones.prizes.push(
+    mon(90, 'Jirachi', { abilities: [{ name: 'Wish Upon a Star', type: 'Ability', text: WISH_UPON_A_STAR }] }),
+    card(91),
+    card(92)
+  );
+  state.players.p1.flags.prizesOwed = 1;
+
+  const res1 = use70(state, rng);
+  assert.match(res1.pendingChoice.prompt, /Prize/);
+  const res2 = resolveWith(res1, [90], rng);
+  assert.match(res2.pendingChoice.prompt, /Bench/);
+  const res3 = resolveWith(res2, [1], rng);
+  assert.equal(res3.error, null);
+  assert.ok(res3.state.players.p1.zones.bench.some((c) => c.instanceId === 90));
+  assert.ok(!res3.state.players.p1.zones.hand.some((c) => c.instanceId === 90));
+  assert.match(res3.pendingChoice?.prompt || '', /Prize/, 'one more Prize to take');
+  const res4 = resolveWith(res3, [91], rng);
+  assert.deepEqual(ids(res4.state.players.p1.zones.prizes), [92]);
+});
+
+test('ability: declining Wish Upon a Star keeps the Prize in hand with no extra Prize', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.deck.push(card(120));
+  state.players.p1.zones.prizes.push(
+    mon(90, 'Jirachi', { abilities: [{ name: 'Wish Upon a Star', type: 'Ability', text: WISH_UPON_A_STAR }] }),
+    card(91)
+  );
+  state.players.p1.flags.prizesOwed = 1;
+  const res2 = resolveWith(use70(state, rng), [90], rng);
+  const res3 = resolveWith(res2, [2], rng);
+  assert.equal(res3.pendingChoice, null);
+  assert.ok(res3.state.players.p1.zones.hand.some((c) => c.instanceId === 90));
+  assert.deepEqual(ids(res3.state.players.p1.zones.prizes), [91]);
+});
+
+test("ability: Pantomime swaps one of your Prizes with your deck's top card", () => {
+  const { state, rng } = setupGame();
+  holder(
+    state,
+    'Once during your turn (before your attack), you may switch 1 of your Prizes with the top card of your deck. This power can\'t be used if Rattata is Asleep, Confused, or Paralyzed.'
+  );
+  state.players.p1.zones.prizes.push(card(90), card(91));
+  state.players.p1.zones.deck.push(card(95), card(96));
+  const res1 = use70(state, rng);
+  assert.deepEqual(ids(res1.pendingChoice.options), [90, 91]);
+  const res2 = resolveWith(res1, [91], rng);
+  assert.deepEqual(ids(res2.state.players.p1.zones.prizes), [90, 95]);
+  assert.deepEqual(ids(res2.state.players.p1.zones.deck), [91, 96]);
+});

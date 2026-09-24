@@ -11,7 +11,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { shuffleInPlace } from '../rng.mjs';
+import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
@@ -1180,7 +1180,7 @@ export function executeSteps(draft, {
         const coinKey = `${idx}:coinFlip`;
         let face = context[coinKey];
         if (!face) {
-          face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+          face = flipCoin(activeRng);
           context[coinKey] = face;
           events.push({ type: 'coinFlipped', playerId, face });
         }
@@ -1208,7 +1208,7 @@ export function executeSteps(draft, {
         // Speed Stadium: flip until tails, draw per heads.
         const perHeads = step.perHeads || 1;
         let heads = 0;
-        while (activeRng && activeRng.next() < 0.5) {
+        while (activeRng && flipCoin(activeRng) === 'heads') {
           heads++;
           if (heads > MAX_EFFECT_STEPS) break;
         }
@@ -1535,7 +1535,7 @@ export function executeSteps(draft, {
         if (abilityStatus?.coinFlip) {
           const coinKey = `${idx}:statusCoin`;
           if (!context[coinKey]) {
-            context[coinKey] = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+            context[coinKey] = flipCoin(activeRng);
             events.push({ type: 'coinFlipped', playerId, face: context[coinKey] });
           }
           if (context[coinKey] !== 'heads') break;

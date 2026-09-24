@@ -63,6 +63,7 @@ import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { topPokemonCard } from './evolved-pokemon.mjs';
+import { normalizeStage } from './evolution.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -1078,6 +1079,89 @@ export function abilityTurnNotEnd(trainer, ctx = {}) {
       }
       return !isAbilitySuppressed(top, ctx);
     });
+}
+
+/** The top card of the player's Active Pokémon, from their in-play zone cards. */
+function activeTop(ctx) {
+  const root = rootsOf(ctx.sideActive).find(isPokemon);
+  return root ? topPokemonCard(ctx.sideActive, root) : null;
+}
+
+/**
+ * Malamar Contrary / Shiftry Unlucky Wind: while the holder is its owner's Active Pokémon,
+ * "whenever your opponent flips a coin during his or her turn, treat it as tails". `ctx` is
+ * the HOLDER's side.
+ */
+export function abilityForcesOpponentTails(ctx = {}) {
+  const top = activeTop(ctx);
+  if (!top || isAbilitySuppressed(top, ctx)) return false;
+  return /whenever your opponent flips a coin during (?:his or her|their) turn, treat it as tails/.test(
+    cardAbilityText(top)
+  );
+}
+
+/**
+ * Spinda Pattern Distraction: "As long as this is your Active Pokémon, whenever your
+ * opponent's Basic Pokémon tries to attack, your opponent flips a coin. If tails, that attack
+ * does nothing." `ctx` is the DEFENDING side; `attacker` is the attacking Pokémon's top card.
+ */
+export function abilityAttackFlipGate(attacker, ctx = {}) {
+  if (!attacker || (normalizeStage(attacker.stage) || 'Basic') !== 'Basic') return false;
+  const top = activeTop(ctx);
+  if (!top || isAbilitySuppressed(top, ctx)) return false;
+  return /opponent's basic pok[eé]mon tries to attack, your opponent flips a coin\. if tails, that attack does nothing/.test(
+    cardAbilityText(top)
+  );
+}
+
+/**
+ * Victini Victory Star: "after you flip any coins for an attack, you may ignore all results of
+ * those coin flips and begin flipping those coins again." True when one of the attacker's side
+ * has it; the caller enforces "can't use more than 1 Victory Star Ability each turn".
+ */
+export function abilityVictoryStar(ctx = {}) {
+  return sideTops(ctx.sideCards).some(
+    (top) =>
+      !isAbilitySuppressed(top, ctx) &&
+      /after you flip any coins for an attack, you may ignore all (?:results|effects) of those coin flips and begin flipping those coins again/.test(
+        cardAbilityText(top)
+      )
+  );
+}
+
+// --- setup / Prize placement (design 034 slice 6) ------------------------
+
+/**
+ * Cinderace / Luxray Explosiveness, Manectric Electric Start: "If this Pokémon is in your hand
+ * when you are setting up to play, you may put it face down in the Active Spot" — a non-Basic
+ * may be the opening Active. `goingSecond` gates the "If you go second" printing.
+ */
+export function abilitySetupActive(card, { goingSecond = false } = {}) {
+  const t = cardAbilityText(card);
+  if (
+    !/if this pok[eé]mon is in your hand when you are setting up to play, you may put it face down (?:in the active spot|as your active pok[eé]mon)/.test(
+      t
+    )
+  ) {
+    return false;
+  }
+  return !/if you go second/.test(t) || goingSecond;
+}
+
+/**
+ * Jirachi Prism Star Wish Upon a Star / Chansey Lucky Bonus: "If you took this Pokémon as a
+ * face-down Prize card during your turn and your Bench isn't full, before you put it into your
+ * hand, you may put it onto your Bench" — `extraPrize` 'always' ("and take 1 more Prize card")
+ * or 'coin' ("flip a coin. If heads, take 1 more Prize card"); null when not printed.
+ */
+export function abilityPrizeToBench(card) {
+  const t = cardAbilityText(card);
+  if (!/if you took this pok[eé]mon as a face-down prize card during your turn[^.]*you may put it onto your bench/.test(t)) {
+    return null;
+  }
+  if (/flip a coin\. if heads, take 1 more prize card/.test(t)) return { extraPrize: 'coin' };
+  if (/and take 1 more prize card/.test(t)) return { extraPrize: 'always' };
+  return { extraPrize: null };
 }
 
 // --- status / evolve / summon / attack permissions -----------------------

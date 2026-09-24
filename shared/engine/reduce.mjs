@@ -22,7 +22,7 @@ import {
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { setupGame } from './setup.mjs';
-import { createRng } from './rng.mjs';
+import { createRng, flipCoin, withForcedCoin } from './rng.mjs';
 import {
   computeAttackDamage,
   expandEnergyEntries,
@@ -79,6 +79,11 @@ import {
   isAbilitySuppressed,
   abilitySupporterLimit,
   abilityTurnNotEnd,
+  abilityForcesOpponentTails,
+  abilityAttackFlipGate,
+  abilityVictoryStar,
+  abilitySetupActive,
+  abilityPrizeToBench,
   abilityPlayLocks,
   abilityEvolvePermission,
   abilityEvolveLock,
@@ -189,7 +194,7 @@ import { matchesSearch } from './rules/search-match.mjs';
  */
 function flipAttackCoins(attack, rng) {
   const text = String(attack?.text || '').toLowerCase();
-  const flip = () => ((rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails');
+  const flip = () => flipCoin(rng);
 
   const multi = text.match(/flip (\d+) coins?/);
   if (multi) {
@@ -1740,6 +1745,7 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
     count: actualCount,
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
   });
+  if (prizes.length > 0) offerPrizeToBench(draft, { playerId, taken });
 }
 
 function conditionsUpdatedEvent(card, condition) {
@@ -1905,6 +1911,60 @@ function resolvePrizeChoice(draft, { playerId, selection, events }) {
       reason: 'all prize cards taken',
       events,
     });
+    return;
+  }
+  offerPrizeToBench(draft, { playerId, taken });
+}
+
+const PRIZE_BENCH_EFFECT = 'prizeBench';
+
+/**
+ * Jirachi Prism Star / Chansey Lucky Bonus (design 034 slice 6): a Prize just taken during
+ * its owner's turn may go onto the Bench instead of the hand. Raises a yes/no choice for the
+ * first such card; `resumePrizeToBench` applies it.
+ */
+function offerPrizeToBench(draft, { playerId, taken }) {
+  if (draft.pendingChoice || draft.turn?.player !== playerId || isGameConcluded(draft)) return;
+  const player = draft.players[playerId];
+  if (rootsIn(player.zones.bench).length >= 5) return;
+  const card = taken.find(
+    (c) => player.zones.hand.includes(c) && isPokemon(c) && abilityPrizeToBench(c)
+  );
+  if (!card) return;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: card.name || 'Ability',
+    prompt: `${card.name}: put it onto your Bench instead of into your hand?`,
+    options: [
+      { instanceId: 1, name: 'Put it onto your Bench', type: 'option' },
+      { instanceId: 2, name: 'Keep it in your hand', type: 'option' },
+    ],
+    min: 1,
+    max: 1,
+    resumeToken: { effectType: PRIZE_BENCH_EFFECT, initiatorPlayerId: playerId, cardId: card.instanceId },
+  });
+}
+
+function resumePrizeToBench(draft, { token, selection, activeRng, events }) {
+  draft.pendingChoice = null;
+  if (Number((selection || [])[0]) !== 1) return;
+  const player = draft.players[token.initiatorPlayerId];
+  const card = player?.zones?.hand?.find((c) => c.instanceId === token.cardId);
+  if (!card || rootsIn(player.zones.bench).length >= 5) return;
+  player.zones.hand.splice(player.zones.hand.indexOf(card), 1);
+  card.enteredPlayTurn = draft.turn?.number ?? null;
+  player.zones.bench.push(card);
+  events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'bench', playerId: player.playerId });
+  const { extraPrize } = abilityPrizeToBench(card) || {};
+  let extra = extraPrize === 'always';
+  if (extraPrize === 'coin') {
+    const coin = flipCoin(activeRng);
+    events.push({ type: 'coinFlipped', playerId: player.playerId, face: coin });
+    extra = coin === 'heads';
+  }
+  if (extra && player.zones.prizes.length > 0) {
+    if (!player.flags) player.flags = {};
+    player.flags.prizesOwed = (player.flags.prizesOwed || 0) + 1;
   }
 }
 
@@ -2799,7 +2859,18 @@ export function validateLegality(state, command) {
               'Only Pokémon can be played to the Bench or Active Spot. Items, Supporters, and Tools are played elsewhere.',
           };
         }
-        if (cardRef && isPokemon(cardRef.card) && !isBasicPokemon(cardRef.card)) {
+        // Explosiveness (design 034 slice 6): the opening Active may be this non-Basic.
+        const openingActive =
+          payload.to === 'active' &&
+          (state.turn?.number ?? 0) <= 1 &&
+          rootsIn([...(player.zones?.active || []), ...(player.zones?.bench || [])]).length === 0;
+        const goingSecond = state.turn?.number === 1 && state.turn.player !== playerId;
+        if (
+          cardRef &&
+          isPokemon(cardRef.card) &&
+          !isBasicPokemon(cardRef.card) &&
+          !(openingActive && abilitySetupActive(cardRef.card, { goingSecond }))
+        ) {
           return {
             allowed: false,
             reason: 'Only Basic Pokémon can be played from your hand.',
@@ -4004,15 +4075,20 @@ function flipAndResolveAttack(draft, ctx) {
   // Glimwood Tangle: after any coins are flipped for an attack, the player
   // may ignore the results and re-flip. The choice is offered before any
   // effect resolves, so a re-flip never has to undo damage or a KO.
-  if (
-    flips.length > 0 &&
+  // Victini Victory Star (design 034 slice 6) offers the same keep-or-re-flip choice, at
+  // most once per turn.
+  const glimwood =
     isStadiumGlimwoodReFlip(draft.stadium?.card || draft.stadium) &&
-    !attackerPlayer?.flags?.glimwoodUsedThisTurn
-  ) {
+    !attackerPlayer?.flags?.glimwoodUsedThisTurn;
+  const victoryStar =
+    !glimwood &&
+    !attackerPlayer?.flags?.victoryStarUsedThisTurn &&
+    abilityVictoryStar(abilitySideContext(draft, playerId));
+  if (flips.length > 0 && (glimwood || victoryStar)) {
     draft.pendingChoice = createPendingChoice({
       player: playerId,
-      source: 'stadium',
-      prompt: `${attack.name}: keep the coin results or re-flip them (Glimwood Tangle)?`,
+      source: glimwood ? 'stadium' : 'ability',
+      prompt: `${attack.name}: keep the coin results or re-flip them (${glimwood ? 'Glimwood Tangle' : 'Victory Star'})?`,
       // Numeric sentinels: the choice validator only accepts integer
       // instanceIds. 1 = keep, 2 = re-flip.
       options: [
@@ -4023,6 +4099,7 @@ function flipAndResolveAttack(draft, ctx) {
       max: 1,
       resumeToken: {
         effectType: 'glimwood',
+        reflipSource: glimwood ? 'glimwood' : 'victoryStar',
         initiatorPlayerId: playerId,
         attackIndex: atkIdx,
         targetInstanceId,
@@ -5355,11 +5432,21 @@ export function applyCommand(state, command, rng = null) {
 
   // Step 5: Apply to cloned draft
   const draft = cloneGameState(state);
-  const activeRng = rng || createRng(state.seed || 0);
+  let activeRng = rng || createRng(state.seed || 0);
   if (state.rngCursor && !rng) {
     while (activeRng.cursor < state.rngCursor) {
       activeRng.next();
     }
+  }
+  // Malamar Contrary / Shiftry Unlucky Wind: the turn player's coin flips are tails. Flips by
+  // the other player (surviveKnockOutCoin) and Checkup draw raw RNG, so they are unaffected.
+  const turnOpponentId = Object.keys(state.players || {}).find((id) => id !== state.turn?.player);
+  if (
+    state.turn?.player &&
+    turnOpponentId &&
+    abilityForcesOpponentTails(abilitySideContext(state, turnOpponentId))
+  ) {
+    activeRng = withForcedCoin(activeRng, 'tails');
   }
   const events = [];
 
@@ -5857,7 +5944,7 @@ export function applyCommand(state, command, rng = null) {
 
       // Check confused condition
       if (attacker && attacker.specialCondition === 'Confused') {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        const coin = flipCoin(activeRng);
         if (coin === 'tails') {
           attacker.damage = (attacker.damage || 0) + 30;
           events.push({
@@ -5891,8 +5978,20 @@ export function applyCommand(state, command, rng = null) {
       // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle (design 032): the marked Pokémon's
       // owner flips when it tries to attack; tails, the attack doesn't happen.
       if (attacker && activeAttackMarkers(draft, playerId, attacker).some((m) => m.kind === 'attackFlipOrFail')) {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        const coin = flipCoin(activeRng);
         events.push({ type: 'attackMarkerCoinFlipped', kind: 'attackFlipOrFail', playerId, coin });
+        if (coin === 'tails') {
+          events.push({ type: 'attackPrevented', playerId, attackerId: attacker.instanceId, attackName: attack.name });
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+      }
+
+      // Spinda Pattern Distraction (design 034 slice 6): a Basic attacker flips; tails, the
+      // attack does nothing.
+      if (attacker && abilityAttackFlipGate(attackerView, abilitySideContext(draft, oppId))) {
+        const coin = flipCoin(activeRng);
+        events.push({ type: 'attackFlipGateCoinFlipped', playerId, coin });
         if (coin === 'tails') {
           events.push({ type: 'attackPrevented', playerId, attackerId: attacker.instanceId, attackName: attack.name });
           endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
@@ -5905,7 +6004,7 @@ export function applyCommand(state, command, rng = null) {
       const copy = parseCopyAttack(attack?.text);
       // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
       if (copy?.coinGate) {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        const coin = flipCoin(activeRng);
         events.push({
           type: 'attackCoinFlipped',
           playerId,
@@ -6203,6 +6302,8 @@ export function applyCommand(state, command, rng = null) {
           resumeToken: token,
         });
         settleAbilityOutcomes(draft, { events });
+      } else if (token.effectType === PRIZE_BENCH_EFFECT) {
+        resumePrizeToBench(draft, { token, selection: payload.selection, activeRng, events });
       } else if (token.effectType === PRIZE_CHOICE_EFFECT) {
         resolvePrizeChoice(draft, {
           playerId: initiatorPlayerId,
@@ -6221,9 +6322,14 @@ export function applyCommand(state, command, rng = null) {
         // deliberately skipped — it already resolved before the coins.
         const resumer = draft.players[initiatorPlayerId];
         if (!resumer.flags) resumer.flags = {};
-        resumer.flags.glimwoodUsedThisTurn = true;
         const pick = (payload.selection || [])[0];
         const wantsReflip = Number(pick) === 2;
+        // Victory Star is spent only by a re-flip ("you may"); Glimwood by the offer.
+        if (token.reflipSource === 'victoryStar') {
+          if (wantsReflip) resumer.flags.victoryStarUsedThisTurn = true;
+        } else {
+          resumer.flags.glimwoodUsedThisTurn = true;
+        }
         const attackIdx = token.attackIndex ?? 0;
         const attacker = resumer?.zones?.active?.find((c) => !c.attachedTo);
         const attackerView = attackViewFor(draft, attacker);

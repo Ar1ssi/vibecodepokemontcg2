@@ -150,6 +150,11 @@ const TEMPLATES = [
     /^switch 1 of your opponent's face-down prize cards with the top card of their deck$/,
     () => ({ type: 'atkOpponentPrizeDeckSwap' }),
   ],
+  // Mr. Mime Pantomime / Rattata Trickery: the same swap on your own Prizes.
+  [
+    /^switch 1 of your (?:face-down )?prize(?: card)?s? with the top card of your deck$/,
+    () => ({ type: 'atkOpponentPrizeDeckSwap', own: true }),
+  ],
   [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: card)? from your opponent's active pokémon to 1 of their benched pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),

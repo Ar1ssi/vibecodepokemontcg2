@@ -1177,21 +1177,22 @@ function atkHandDeckTopSwap(ctx) {
 }
 
 // Galarian Mr. Rime Shuffle Dance: a face-down Prize trades places with the deck's top card.
+// `step.own` (Mr. Mime Pantomime, Rattata Trickery) swaps the user's own Prize instead.
 function atkOpponentPrizeDeckSwap(ctx) {
-  const { opponent } = ctx;
-  const prizes = opponent?.zones?.prizes || [];
-  const deck = opponent?.zones?.deck || [];
+  const owner = ctx.step.own ? ctx.player : ctx.opponent;
+  const prizes = owner?.zones?.prizes || [];
+  const deck = owner?.zones?.deck || [];
   if (ctx.selection) {
     const at = prizes.findIndex((c) => c.instanceId === ctx.selection[0]);
     if (at < 0 || deck.length === 0) return skip(ctx, 'target_not_found');
     const [prize] = prizes.splice(at, 1, deck.shift());
     deck.unshift(prize);
-    ctx.events.push({ type: 'prizeSwapped', playerId: opponent.playerId });
+    ctx.events.push({ type: 'prizeSwapped', playerId: owner.playerId });
     return null;
   }
   if (prizes.length === 0 || deck.length === 0) return skip(ctx, 'nothing_to_swap');
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose 1 of your opponent's face-down Prize cards`,
+    prompt: `${attackName(ctx)}: Choose 1 of ${ctx.step.own ? 'your' : "your opponent's"} face-down Prize cards`,
     // Identity only: Prize cards stay face down.
     options: prizes.map((c) => ({ instanceId: c.instanceId })),
     min: 1,
