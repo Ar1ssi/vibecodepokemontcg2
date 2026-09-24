@@ -37,6 +37,7 @@ import {
   markerUntilTurn,
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
+import { eachFilterMatches } from '../rules/each-filter.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import {
   BENCH_LIMIT,
@@ -1022,7 +1023,8 @@ function placeCounters(ctx, card, victimPlayerId, amount) {
     type: 'damageCountersPlaced',
     instanceId: card.instanceId,
     victimPlayerId,
-    attackerPlayerId: ctx.playerId,
+    // Counters on the attacker's own Pokémon (Dusclops Night Roam) give the opponent the Prize.
+    attackerPlayerId: victimPlayerId === ctx.playerId ? ctx.opponent?.playerId : ctx.playerId,
     damage: card.damage,
   });
 }
@@ -1033,6 +1035,50 @@ function atkCountersEach(ctx) {
   const targets = step.scope === 'bench' ? benchRootsOf(opponent) : rootsOf(opponent);
   if (targets.length === 0) return skip(ctx, 'no_target');
   for (const card of targets) placeCounters(ctx, card, opponent.playerId, (step.count || 1) * 10);
+  return null;
+}
+
+// Design 036 A9: filtered and both-sides counter spread. Targets are picked before any
+// counter lands, so a "has damage counters" filter reads the board as the attack began.
+function atkCountersEachFiltered(ctx) {
+  const { player, opponent, step } = ctx;
+  const owners = (step.side === 'both' ? [opponent, player] : [opponent]).filter(Boolean);
+  const targets = [];
+  for (const owner of owners) {
+    const roots =
+      step.scope === 'active'
+        ? [activeOf(owner)].filter(Boolean)
+        : step.scope === 'bench'
+          ? benchRootsOf(owner)
+          : rootsOf(owner);
+    for (const root of roots) {
+      if (eachFilterMatches(owner, root, step.filter)) targets.push({ owner, root });
+    }
+  }
+  if (targets.length === 0) return skip(ctx, 'no_target');
+  for (const { owner, root } of targets) placeCounters(ctx, root, owner.playerId, (step.count || 1) * 10);
+  return null;
+}
+
+function atkDoubleCountersEach(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const damaged = rootsOf(opponent).filter((root) => (root.damage || 0) > 0);
+  if (damaged.length === 0) return skip(ctx, 'no_target');
+  for (const root of damaged) placeCounters(ctx, root, opponent.playerId, root.damage);
+  return null;
+}
+
+// Yveltal ex Soul Destroyer: every opponent's Pokémon at or below the remaining-HP line.
+function atkKnockOutAll(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const doomed = rootsOf(opponent).filter((root) => {
+    const left = remainingHp(ctx, opponent, root);
+    return left > 0 && left <= step.maxRemainingHp;
+  });
+  if (doomed.length === 0) return skip(ctx, 'condition_unmet');
+  for (const root of doomed) markKnockOut(ctx, opponent, root);
   return null;
 }
 
@@ -1790,12 +1836,15 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
   atkKnockOutChoose,
   atkCountersEach,
+  atkCountersEachFiltered,
+  atkDoubleCountersEach,
   atkHpCap,
   atkMoveAllCounters: optional(atkMoveAllCounters, () => 'Move damage counters'),
   atkMoveCounterBetween,
   atkHandDeckTopSwap,
   atkOpponentPrizeDeckSwap,
   atkKnockOut,
+  atkKnockOutAll,
   atkTakePrize,
   atkChooseCondition,
   atkDevolve,

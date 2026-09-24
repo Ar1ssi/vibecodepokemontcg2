@@ -35,6 +35,7 @@
 import { parseSearchDeckParams } from './trainer-effects.mjs';
 import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
+import { parseEachFilter } from './each-filter.mjs';
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
@@ -1083,6 +1084,27 @@ function benchSpreadClauses(attackText) {
 // clause OR the clause is unnumbered (caller announces the fizzle rather than guessing).
 export function allBenchDamage(attackText) {
   return benchSpreadClauses(attackText).find((c) => c.opponent)?.amount || 0;
+}
+
+/**
+ * Design 036 A9: "This attack does N damage to each of your opponent's Pokémon [filter]" and
+ * the old "Does N damage to each Defending Pokémon" (the Active only). A sentence-leading
+ * clause only: a coin-gated "If heads, … to each …" is not read. Pure.
+ * @returns {{ amount: number, activeOnly: boolean, filter: object }|null}
+ */
+export function eachPokemonDamage(attackText) {
+  const text = String(attackText || '')
+    .replace(/[‘’]/g, "'")
+    .toLowerCase()
+    .replace(/pokemon/g, 'pokémon');
+  const m = /(?:^|\.\s+)(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon)([^.(]*)/.exec(
+    text
+  );
+  if (!m) return null;
+  const tail = m[3].trimEnd();
+  if (m[2] === 'defending pokémon') return tail ? null : { amount: Number(m[1]), activeOnly: true, filter: {} };
+  const filter = parseEachFilter(tail);
+  return filter === undefined ? null : { amount: Number(m[1]), activeOnly: false, filter };
 }
 
 // Damage the attack also does to each of the ATTACKER's own Benched Pokémon (recoil). Pure.

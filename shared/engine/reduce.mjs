@@ -32,6 +32,7 @@ import {
   drawCount,
   parseAttackDamage,
   allBenchDamage,
+  eachPokemonDamage,
   ownBenchDamage,
   attackTargetClause,
   opponentCounterClause,
@@ -75,6 +76,7 @@ import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard } from './effects/attack-steps.mjs';
+import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates } from './rules/attack-steps.mjs';
 import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
 import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
@@ -4262,7 +4264,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       // A printed clause that lets the player choose which opponent Pokémon take
       // damage / counters. Resolved after the attack's other effects below so a
       // suspension never drops them (design 017 / D19).
-      let attackTarget = resolveAttackTargetClause(attack.text, parsed, spread);
+      // Design 036 A9: "does N damage to each of your opponent's Pokémon [that …]" hits every
+      // matching Pokémon below; the looser bench reading must not also ask for one target.
+      const eachDamage = eachPokemonDamage(attack.text);
+      let attackTarget = eachDamage ? null : resolveAttackTargetClause(attack.text, parsed, spread);
       // Wugtrio ex / Tricolor Pump: the snipe does its printed amount once per
       // Energy discarded, and nothing when none were.
       if (
@@ -4306,6 +4311,27 @@ function resolveAttackEffectPhase(draft, ctx) {
             });
           }
         }
+      }
+
+      // The Active takes the damage-each clause through Weakness and Resistance unless the
+      // text waives them; the Bench never does.
+      if (eachDamage) {
+        const victimPlayer = draft.players[defenderPlayerId];
+        const zones = victimPlayer?.zones || {};
+        const roots = eachDamage.activeOnly
+          ? rootsIn(zones.active)
+          : [...rootsIn(zones.active), ...rootsIn(zones.bench)];
+        const selection = roots
+          .filter((root) => eachFilterMatches(victimPlayer, root, eachDamage.filter))
+          .map((root) => root.instanceId);
+        benchDealt += applyAttackTargets(draft, {
+          selection,
+          clause: { amount: eachDamage.amount, activeWR: true, immunity: parseDamageImmunity(attack.text) },
+          defenderPlayerId,
+          attackerPlayerId: playerId,
+          attackName: attack.name,
+          events,
+        });
       }
 
       // Self-recoil spread ("This attack also does 30 damage to each of your Benched

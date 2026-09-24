@@ -203,7 +203,7 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 584
+      "observed": 591
     },
     "attack:coin-flip": {
       "n": 429,
@@ -307,7 +307,7 @@
     },
     "attack:multi-target": {
       "n": 165,
-      "observed": 83
+      "observed": 84
     },
     "attack:neutralize-opponent-energy": {
       "n": 1,

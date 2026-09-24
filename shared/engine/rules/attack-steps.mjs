@@ -16,6 +16,7 @@ import {
   deckMillScaling,
   parseAttackSearchClause,
 } from './damage-parser.mjs';
+import { parseEachFilter } from './each-filter.mjs';
 
 const WORD_COUNTS = { a: 1, an: 1, one: 1, two: 2, three: 3 };
 
@@ -23,6 +24,27 @@ function countOf(word) {
   const w = String(word || '').trim();
   if (/^\d+$/.test(w)) return Number(w);
   return WORD_COUNTS[w] || 1;
+}
+
+// Design 036 A9: "put N damage counters on each [of your opponent's] [benched] Pokémon
+// <filter>". "Each Defending Pokémon" is the Active. An unowned "each Pokémon" is both
+// sides: every such card prints "(both yours and your opponent's)", which the parser strips
+// as reminder text. The plain opponent-wide form stays atkCountersEach.
+function countersEachFiltered([, amount, opponentWord, bench, noun, tail]) {
+  const filter = parseEachFilter(tail);
+  if (filter === undefined) return null;
+  const count = countOf(amount);
+  if (noun === 'defending pokémon') {
+    if (opponentWord || bench) return null;
+    return { type: 'atkCountersEachFiltered', count, side: 'opponent', scope: 'active', filter };
+  }
+  return {
+    type: 'atkCountersEachFiltered',
+    count,
+    side: opponentWord ? 'opponent' : 'both',
+    scope: bench ? 'bench' : 'all',
+    filter,
+  };
 }
 
 function escapeRegExp(text) {
@@ -389,6 +411,17 @@ const TEMPLATES = [
   [
     /^put (\d+) damage counters? on each of your opponent's (benched )?pokémon$/,
     (m) => ({ type: 'atkCountersEach', count: Number(m[1]), scope: m[2] ? 'bench' : 'all' }),
+  ],
+  [
+    /^put (\d+|a|an) damage counters? (?:on )?each (of your opponent's |)(benched )?(pokémon|defending pokémon)(.*)$/,
+    countersEachFiltered,
+  ],
+  // N's Vanilluxe Snow Coating / Lunala Lunar Pain / Aegislash Painful Sword.
+  [/^double the number of damage counters on each of your opponent's pokémon$/, () => ({ type: 'atkDoubleCountersEach' })],
+  // Yveltal ex Soul Destroyer.
+  [
+    /^knock out each of your opponent's pokémon that has (\d+) hp or less remaining$/,
+    (m) => ({ type: 'atkKnockOutAll', maxRemainingHp: Number(m[1]) }),
   ],
   [
     /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
