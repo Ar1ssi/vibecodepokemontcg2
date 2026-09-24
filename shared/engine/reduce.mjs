@@ -58,7 +58,7 @@ import {
 import {
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
-  passiveCostDiscount,
+  costDiscountRead,
   applyCostDiscount,
   teamNoRetreatCostForActive,
   isHandActivatedAbility,
@@ -2612,17 +2612,27 @@ function attackCostPayable(state, playerId, active, attack) {
   // increases. Checking the raw printed cost rejected legally payable attacks.
   const activeView = inPlayView(state, active);
   const blockTools = isStadiumToolNegation(stadiumCard);
-  let discount = passiveCostDiscount(activeView);
+  // The board facts a printed discount condition or "for each" count reads (I139).
+  const discountCtx = {
+    attacker: activeView,
+    ownHandCount: (player.zones?.hand || []).length,
+    ownPrizesLeft: (player.zones?.prizes || []).length,
+    opponentPrizesLeft: (opponent?.zones?.prizes || []).length,
+    ownSideCards: sideCards,
+    opponentSideCards: [...(opponent?.zones?.active || []), ...(opponent?.zones?.bench || [])],
+    opponentActive: opponent?.zones?.active || [],
+    ownDiscard: player.zones?.discard || [],
+  };
+  const discounts = [costDiscountRead(activeView, discountCtx)];
   if (!blockTools) {
-    discount += attachedTools(active, activeZoneCards).reduce(
-      (sum, tool) => sum + passiveCostDiscount(tool),
-      0
-    );
+    for (const tool of attachedTools(active, activeZoneCards)) {
+      discounts.push(costDiscountRead(tool, discountCtx));
+    }
   }
-  if (stadiumCard) discount += parseStadiumCostModifier(stadiumCard);
+  if (stadiumCard) discounts.push({ count: parseStadiumCostModifier(stadiumCard), symbol: null });
   let effectiveCost = attack.cost;
-  if (discount > 0 && effectiveCost.length > 0) {
-    effectiveCost = applyCostDiscount(effectiveCost, discount);
+  if (effectiveCost.length > 0) {
+    effectiveCost = applyCostDiscount(effectiveCost, discounts.filter(Boolean));
   }
   const abilityCost = abilityAttackCostDiscount(activeView, {
     sideCards,

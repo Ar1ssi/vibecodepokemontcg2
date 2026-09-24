@@ -47,7 +47,7 @@ import {
 import {
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
-  passiveCostDiscount,
+  costDiscountRead,
   teamNoRetreatCostForActive,
   parseAttackInheritance,
 } from '../../shared/engine/rules/ability-executors.mjs';
@@ -130,6 +130,14 @@ function probeBoard(holder, zone, { bare, partners }) {
   partners.forEach((name, i) => {
     if (others[i]) others[i].name = name;
   });
+  // An opponent worth reacting to: a V (Rapid Strike), a VMAX and a GX on the Bench, and two
+  // Prizes taken, so "if your opponent has any Pokémon V …" / "for each …" clauses can hold.
+  const oppBench = state.players.p2.zones.bench.filter((c) => !c.attachedTo);
+  const oppKinds = [['Basic', 'V', 'Rapid Strike'], ['VMAX'], ['Basic', 'GX']];
+  oppBench.forEach((c, i) => {
+    if (oppKinds[i]) c.subtypes = oppKinds[i];
+  });
+  state.players.p2.zones.prizes.splice(0, 2);
   if (bare && holderCard) {
     holderCard.damage = 0;
     for (const zoneName of ['active', 'bench']) {
@@ -236,7 +244,18 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     ask('extraAttack', () => abilityExtraAttack(holderCard));
     ask('toolCap', () => parseToolCap(holderCard));
     ask('handEnergyAcceleration', () => parseUnlimitedHandEnergyAcceleration(holderCard));
-    ask('passiveCostDiscount', () => passiveCostDiscount(holderCard));
+    ask('passiveCostDiscount', () =>
+      costDiscountRead(holderCard, {
+        attacker: holderCard,
+        ownHandCount: state.players.p1.zones.hand.length,
+        ownPrizesLeft: state.players.p1.zones.prizes.length,
+        opponentPrizesLeft: state.players.p2.zones.prizes.length,
+        ownSideCards: p1.sideCards,
+        opponentSideCards: p2.sideCards,
+        opponentActive: p2.sideActive,
+        ownDiscard: state.players.p1.zones.discard,
+      })
+    );
     ask('attackInheritance', () => parseAttackInheritance(holderCard));
   }
   return answers;

@@ -7,7 +7,7 @@
 // printed ability text.
 
 import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
-import { isExCard, isGxCard } from './card-classify.mjs';
+import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -152,27 +152,157 @@ const ATTACK_COST_REDUCTION = [
   /\breduce the (?:energy )?cost of [^.]*?\battacks?\b/,
 ];
 
-export function passiveCostDiscount(card) {
-  const t = textOf(card);
-  if (!t) return 0;
+const COST_SYMBOL_TYPE = {
+  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
+  f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon',
+};
+
+const rootsIn = (cards = []) => (cards || []).filter((c) => c && !c.attachedTo && isPokemon(c));
+
+// Whose attacks the discount covers, checked against the attacker (for a Tool, its host).
+function discountCoversAttacker(sentence, attacker) {
+  const name = lower(attacker?.name);
+  if (/hop's pok[eé]mon/.test(sentence) && !name.startsWith("hop's")) return false;
+  if (/tera pok[eé]mon/.test(sentence) && !isTeraCard(attacker)) return false;
+  if (/pok[eé]mon-gx[^.]*evolve from eevee/.test(sentence)) {
+    if (!isGxCard(attacker) || lower(attacker?.evolvesFrom) !== 'eevee') return false;
+  }
+  const named = sentence.match(/pok[eé]mon v this card is attached to has ([^.]*?) in its name/);
+  if (named) {
+    const names = [...named[1].matchAll(/["“]([a-z]+),?["”]/g)].map((m) => m[1]);
+    if (!isVCard(attacker) || !names.some((n) => name.includes(n))) return false;
+  }
+  return true;
+}
+
+// "If …" clauses a discount is printed behind: true / false from ctx, undefined when the clause
+// is not this condition. Anything unrecognised fails closed.
+const DISCOUNT_CONDITIONS = [
+  (c, ctx) => {
+    const m = c.match(/you have exactly (\d+) cards? in your hand/);
+    if (!m) return undefined;
+    return ctx.ownHandCount != null && ctx.ownHandCount === Number(m[1]);
+  },
+  (c, ctx) => {
+    if (!/your opponent has any pok[eé]mon/.test(c)) return undefined;
+    const opp = rootsIn(ctx.opponentSideCards);
+    const wantVmax = /vmax/.test(c);
+    const wantGxEx = /pok[eé]mon-gx or pok[eé]mon-ex/.test(c);
+    if (!wantVmax && !wantGxEx) return undefined;
+    return opp.some((p) => (wantVmax && isVmaxCard(p)) || (wantGxEx && (isGxCard(p) || isExCard(p))));
+  },
+  (c, ctx) => {
+    if (!/you have more prize cards remaining than your opponent/.test(c)) return undefined;
+    if (ctx.ownPrizesLeft == null || ctx.opponentPrizesLeft == null) return false;
+    return ctx.ownPrizesLeft > ctx.opponentPrizesLeft;
+  },
+  (c, ctx) => {
+    // "If you have Regirock, Regice, and Registeel in play": each named Pokémon on your side.
+    const m = c.match(/^you have ([^,]+(?:, [^,]+)*?(?:,? and [^,]+)?) in play$/);
+    if (!m || /pok[eé]mon|\{/.test(m[1])) return undefined;
+    const names = m[1].split(/, and |, | and /).map((n) => n.trim()).filter(Boolean);
+    const own = rootsIn(ctx.ownSideCards).map((p) => lower(p.name));
+    return names.every((n) => own.some((o) => o.includes(n)));
+  },
+  // The Tool naming itself ("As long as <Tool> is attached to a Pokémon") always holds here.
+  (c) => (/is attached to a pok[eé]mon$/.test(c) ? true : undefined),
+  // A host filter, checked by discountCoversAttacker.
+  (c) => (/this card is attached to has/.test(c) ? true : undefined),
+];
+
+// "for each …" units the discount scales by, or null when the unit is not read.
+function discountUnits(sentence, ctx) {
+  const each = sentence.match(/for each ([^.]+)/)?.[1];
+  if (!each) return 1;
+  const opp = rootsIn(ctx.opponentSideCards);
+  if (/kofu card in your discard pile/.test(each)) {
+    return (ctx.ownDiscard || []).filter((c) => lower(c.name).includes('kofu')).length;
+  }
+  if (/your opponent's benched pok[eé]mon/.test(each)) {
+    return opp.filter((p) => !(ctx.opponentActive || []).includes(p)).length;
+  }
+  if (/prize card your opponent has taken/.test(each)) {
+    return ctx.opponentPrizesLeft == null ? null : Math.max(0, 6 - ctx.opponentPrizesLeft);
+  }
+  if (/your opponent's pok[eé]mon v in play/.test(each)) return opp.filter((p) => isVCard(p)).length;
+  if (/single strike, rapid strike, and fusion strike/.test(each)) {
+    return opp.filter((p) =>
+      (p.subtypes || []).some((t) => /single strike|rapid strike|fusion strike/i.test(t))
+    ).length;
+  }
+  if (/team plasma pok[eé]mon/.test(each)) {
+    return opp.filter((p) => /plasma/.test(`${lower(p.name)} ${lower((p.subtypes || []).join(' '))}`)).length;
+  }
+  return null;
+}
+
+/**
+ * What an attack-cost discount printed on `source` (the attacker's own Ability, or a Tool
+ * attached to it) takes off this attack: `{ count, symbol }` — `symbol` is the Energy type a
+ * typed discount ("{Y} less") removes, null for Colorless/any. Null when nothing applies.
+ * `ctx`: `{ attacker, ownHandCount, ownPrizesLeft, opponentPrizesLeft, ownSideCards,
+ * opponentSideCards, opponentActive, ownDiscard }`; a condition or "for each" unit it cannot check fails closed
+ * (I139). Only a sentence saying an attack's cost goes down is read (I136).
+ */
+export function costDiscountRead(source, ctx = {}) {
+  const t = textOf(source);
+  if (!t) return null;
   const sentence = t
     .split(/[.\n]/)
     .find((s) => !/retreat cost/.test(s) && ATTACK_COST_REDUCTION.some((re) => re.test(s)));
-  if (!sentence) return 0;
-  const symbols = sentence.match(
-    /((?:\{[a-z]\})+)\s*(?:energy\s*)?(?:less|fewer)/
-  );
-  if (symbols) return symbols[1].match(/\{/g).length;
-  const by =
-    sentence.match(/\bby\s*(\d+)/) ||
-    sentence.match(/(\d+)\s+(?:energy\s+)?(?:less|fewer)/);
-  if (by) return parseInt(by[1], 10) || 1;
-  return 1;
+  if (!sentence) return null;
+  const attacker = ctx.attacker || source;
+  if (!discountCoversAttacker(sentence, attacker)) return null;
+  // A list of names has its own commas: "If you have Regirock, Regice, and Registeel in play, …".
+  const lead = sentence.trim();
+  const clause = (lead.match(/^(?:if|as long as) (.+? in play),/) || lead.match(/^(?:if|as long as) (.+?),/))?.[1];
+  if (clause) {
+    const verdicts = DISCOUNT_CONDITIONS.map((check) => check(clause, ctx));
+    if (verdicts.every((v) => v === undefined) || verdicts.some((v) => v === false)) return null;
+  }
+  const units = discountUnits(sentence, ctx);
+  if (!units) return null;
+  const symbols = sentence.match(/((?:\{[a-z]\})+)\s*(?:energy\s*)?(?:less|fewer)/);
+  let per = 1;
+  let symbol = null;
+  if (symbols) {
+    const letters = symbols[1].match(/[a-z]/g);
+    per = letters.length;
+    symbol = letters[0] === 'c' ? null : COST_SYMBOL_TYPE[letters[0]] || null;
+  } else {
+    const by = sentence.match(/\bby\s*(\d+)/) || sentence.match(/(\d+)\s+(?:energy\s+)?(?:less|fewer)/);
+    if (by) per = parseInt(by[1], 10) || 1;
+  }
+  return { count: per * units, symbol };
 }
 
-// Apply a cost discount: drop `n` symbols from the front of the cost list.
+/** The discount `card` grants as a symbol count (see `costDiscountRead`); 0 when none applies. */
+export function passiveCostDiscount(card, ctx = {}) {
+  return costDiscountRead(card, ctx)?.count || 0;
+}
+
+/**
+ * Apply cost discounts: a typed one ("{Y} less") removes that many matching symbols; a
+ * Colorless one drops symbols from the end of the cost (where Colorless is printed).
+ * `discount` may be a count (Colorless) or a list of `costDiscountRead` results.
+ */
 export function applyCostDiscount(cost = [], discount = 0) {
-  return [...cost].slice(0, Math.max(0, cost.length - discount));
+  const reads = Array.isArray(discount) ? discount : [{ count: discount, symbol: null }];
+  let out = [...cost];
+  let generic = 0;
+  for (const read of reads) {
+    if (!read?.count) continue;
+    if (!read.symbol) {
+      generic += read.count;
+      continue;
+    }
+    for (let i = 0; i < read.count; i++) {
+      const at = out.lastIndexOf(read.symbol);
+      if (at < 0) break;
+      out.splice(at, 1);
+    }
+  }
+  return out.slice(0, Math.max(0, out.length - generic));
 }
 
 // --- when-played -------------------------------------------------------

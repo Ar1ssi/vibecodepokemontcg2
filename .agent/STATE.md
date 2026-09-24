@@ -10,7 +10,7 @@ Focus: design 034 (ability behaviour), slice 7 (regression gate). 7a (S284) `pnp
   (D126); 7b (S285) passive probes (D127). S286 fixed I136: `passiveCostDiscount` needs one
   sentence saying an attack's cost goes down → runs/partial/dead/consumed/unconsumed/unparsed =
   1811/584/148/1106/578/1 (60 rows re-ratcheted consumed→unconsumed, bogus reads only).
-Active: I137, I138, slice 7c committed (S287) — design 034 complete. Next: I139, then the I141 backlog.
+Active: I137, I138, 7c, I139 committed (S287) — design 034 complete. Next: the I141 backlog.
 Next: I137/I138 (probe-found wrong reads), I139 (cost-discount conditions/scope ignored). 7c:
   EXECUTED_ABILITY_FAMILIES from the gate, ADD then close I128/I129/I130, annotate reports; 578
   unconsumed passives are the enforcement backlog (`--rows`, behaviour=unconsumed). Issue-number

@@ -12,7 +12,7 @@ import test from 'node:test';
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger, cardAbilityText } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, costDiscountRead, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger, cardAbilityText } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions, statusAttackBlock } = await import('../attack-window.mjs');
     const {
       isUsableAbilityCard,
@@ -2920,6 +2920,46 @@ import test from 'node:test';
         }),
         0,
       );
+    });
+
+    // I139: a discount's printed condition, scope and "for each" count are read against the board.
+    test('costDiscountRead: conditions, scope, scaling and typed symbols (I139)', () => {
+      const card = (name, text, extra = {}) => ({ name, supertype: 'Pokémon', abilities: [{ text }], ...extra });
+      const vmax = { name: 'Opp VMAX', supertype: 'Pokémon', subtypes: ['VMAX'] };
+      const plain = { name: 'Opp', supertype: 'Pokémon', subtypes: ['Basic'] };
+
+      const mightyena = card('Mightyena', "If your opponent has any Pokémon VMAX in play, this Pokémon's attacks cost {C}{C}{C} less.");
+      assert.equal(costDiscountRead(mightyena, { opponentSideCards: [plain] }), null);
+      assert.deepEqual(costDiscountRead(mightyena, { opponentSideCards: [plain, vmax] }), { count: 3, symbol: null });
+
+      const medicham = card('Medicham', "If you have exactly 4 cards in your hand, this Pokémon's attacks cost {C}{C}{C} less.");
+      assert.equal(costDiscountRead(medicham, { ownHandCount: 3 }), null);
+      assert.equal(costDiscountRead(medicham, {}), null, 'unknown hand size fails closed');
+      assert.equal(passiveCostDiscount(medicham, { ownHandCount: 4 }), 3);
+
+      const incineroar = card('Incineroar ex', "Attacks used by this Pokémon cost {C} less for each of your opponent's Benched Pokémon.");
+      const oppActive = { ...plain, name: 'Active' };
+      const ctx = { opponentSideCards: [oppActive, plain, plain], opponentActive: [oppActive] };
+      assert.equal(passiveCostDiscount(incineroar, ctx), 2);
+      assert.equal(passiveCostDiscount(incineroar, { opponentSideCards: [oppActive], opponentActive: [oppActive] }), 0);
+
+      const charizard = card('Radiant Charizard', "This Pokémon's attacks cost {C} less for each Prize card your opponent has taken.");
+      assert.equal(passiveCostDiscount(charizard, { opponentPrizesLeft: 2 }), 4);
+      assert.equal(passiveCostDiscount(charizard, {}), 0);
+
+      const florges = card('Florges', "Each of your Pokémon's attacks costs {Y} less.");
+      assert.deepEqual(costDiscountRead(florges, {}), { count: 1, symbol: 'Fairy' });
+      assert.deepEqual(applyCostDiscount(['Fairy', 'Colorless'], [{ count: 1, symbol: 'Fairy' }]), ['Colorless']);
+      assert.deepEqual(applyCostDiscount(['Fire', 'Colorless'], [{ count: 1, symbol: 'Fairy' }]), ['Fire', 'Colorless'], 'no {Y} to remove');
+
+      const regigigas = card('Regigigas', "If you have Regirock, Regice, and Registeel in play, the attack cost of Regigigas's attacks is {C} less.");
+      const mon = (name) => ({ name, supertype: 'Pokémon' });
+      assert.equal(passiveCostDiscount(regigigas, { ownSideCards: [regigigas, mon('Regirock'), mon('Regice')] }), 0);
+      assert.equal(passiveCostDiscount(regigigas, { ownSideCards: [regigigas, mon('Regirock'), mon('Regice'), mon('Registeel')] }), 1);
+
+      const band = { name: "Hop's Choice Band", supertype: 'Trainer', text: "Attacks used by the Hop's Pokémon this card is attached to cost {C} less and do 30 more damage to your opponent's Active Pokémon." };
+      assert.equal(passiveCostDiscount(band, { attacker: { name: "Hop's Snorlax" } }), 1);
+      assert.equal(passiveCostDiscount(band, { attacker: { name: 'Snorlax' } }), 0);
     });
 
     test('parseWhenPlayedEffect', () => {

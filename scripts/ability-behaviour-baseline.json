@@ -5,8 +5,8 @@
     "runs": 1811,
     "partial": 584,
     "dead": 148,
-    "consumed": 970,
-    "unconsumed": 714,
+    "consumed": 965,
+    "unconsumed": 719,
     "unparsed": 1
   },
   "families": {
@@ -96,8 +96,8 @@
       "runs": 7,
       "partial": 0,
       "dead": 0,
-      "consumed": 49,
-      "unconsumed": 35,
+      "consumed": 43,
+      "unconsumed": 41,
       "unparsed": 0
     },
     "damage-bonus": {
@@ -168,8 +168,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 100,
-      "unconsumed": 51,
+      "consumed": 101,
+      "unconsumed": 50,
       "unparsed": 0
     },
     "end-of-turn": {
