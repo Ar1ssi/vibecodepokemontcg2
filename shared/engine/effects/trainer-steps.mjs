@@ -1626,6 +1626,236 @@ function attachTool(ctx) {
   });
 }
 
+// ── design 034 slice 5: ability-side executables ─────────────────────────
+
+/**
+ * Slowbro Strange Behavior / Team Rocket's Orbeetle Rocket Brain: "move 1 damage
+ * counter from 1 of your Pokémon to another". Both endpoints are the acting
+ * player's own Pokémon, unlike `moveOwnDamageToOpponent` (which moves to the
+ * opponent's side).
+ */
+function moveDamageBetweenOwn(ctx) {
+  const { player, step } = ctx;
+  const roots = rootsOf(player);
+  const sources = roots.filter((c) => (c.damage || 0) > 0);
+  const targetsFor = (from) => roots.filter((c) => c.instanceId !== from.instanceId);
+
+  if (ctx.selection && ctx.memo?.fromId != null) {
+    const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
+    const to = targetsFor(from || {}).find((c) => c.instanceId === ctx.selection[0]);
+    if (!from || !to) return skip(ctx, 'target_not_found');
+    return moveDamageCounters(ctx, from, to, maxMovableCounters(step, from));
+  }
+  if (ctx.selection) {
+    const from = sources.find((c) => c.instanceId === ctx.selection[0]);
+    if (!from) return skip(ctx, 'target_not_found');
+    // "to this Pokémon": the destination is fixed, so the source pick moves at once.
+    if (step.toSelf) {
+      const self = roots.find(
+        (c) => c.instanceId === ctx.sourceCard?.instanceId && c !== from
+      );
+      if (!self) return skip(ctx, 'target_not_found');
+      return moveDamageCounters(ctx, from, self, maxMovableCounters(step, from));
+    }
+    const targets = targetsFor(from);
+    if (targets.length === 0) return skip(ctx, 'no_target');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to move the damage counter to`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { fromId: from.instanceId },
+    });
+  }
+  if (sources.length === 0 || roots.length < 2) return skip(ctx, 'no_damage_to_move');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose 1 of your Pokémon to move a damage counter from`,
+    options: sources,
+    min: 1,
+    max: 1,
+  });
+}
+
+/**
+ * Blissey Busybody Nurse: "Your Active Pokémon recovers from all Special
+ * Conditions." Applies to the acting player's Active.
+ */
+function recoverStatusAbility(ctx) {
+  const { player } = ctx;
+  const active = activeOf(player);
+  if (!active) return skip(ctx, 'no_active');
+  if (!hasAnyCondition(active)) return skip(ctx, 'no_condition');
+  clearConditions(active);
+  ctx.events.push({
+    type: 'specialConditionUpdated',
+    instanceId: active.instanceId,
+    condition: null,
+    conditions: [],
+    playerId: player.playerId,
+  });
+  return null;
+}
+
+/**
+ * Dodrio Zooming Draw / Feraligatr Torrential Heart: "put N damage counters on
+ * this Pokémon" (an optional cost). `selfKnockOut` marks a self-KO for the
+ * reducer's post-command KO sweep.
+ */
+function selfDamageAbility(ctx) {
+  const { player, step, sourceCard } = ctx;
+  const ref = findCard(ctx.draft, sourceCard?.instanceId);
+  if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench') || ref.card.attachedTo) {
+    return skip(ctx, 'source_not_in_play');
+  }
+  const amount = (step.count || 1) * 10;
+  ref.card.damage = (ref.card.damage || 0) + amount;
+  ctx.events.push({ type: 'damageUpdated', instanceId: ref.card.instanceId, damage: ref.card.damage });
+  ctx.events.push({
+    type: 'damageCountersPlaced',
+    instanceId: ref.card.instanceId,
+    victimPlayerId: player.playerId,
+    attackerPlayerId: null,
+    damage: ref.card.damage,
+  });
+  return null;
+}
+
+/**
+ * Luxray Swelling Flash / Klinklang Emergency Rotation: "if this Pokémon is in
+ * your hand …, you may put this Pokémon onto your Bench." `step.condition`
+ * carries the parsed gate; an unmet condition skips without consuming a Bench
+ * slot.
+ */
+function selfBenchPlacementAbility(ctx) {
+  const { player, step, sourceCard } = ctx;
+  const card = (player.zones.hand || []).find(
+    (c) => c.instanceId === sourceCard?.instanceId
+  );
+  if (!card) return skip(ctx, 'card_not_in_hand');
+  if (benchRootsOf(player).length >= BENCH_LIMIT) return skip(ctx, 'bench_full');
+  if (step.condition === 'morePrizes' && !morePrizesThanOpponent(ctx)) {
+    return skip(ctx, 'condition_unmet');
+  }
+  if (step.condition === 'opponentStage2' && !opponentHasStage2(ctx)) {
+    return skip(ctx, 'condition_unmet');
+  }
+  removeFromZones(player, card);
+  card.attachedTo = null;
+  if (step.swapActive) {
+    const active = activeOf(player);
+    if (!active) return skip(ctx, 'no_active');
+    removeFromZones(player, active);
+    player.zones.bench.push(active);
+    player.zones.active.push(card);
+    ctx.events.push({
+      type: 'cardSwitched',
+      playerId: player.playerId,
+      activeId: active.instanceId,
+      benchId: card.instanceId,
+    });
+    return null;
+  }
+  player.zones.bench.push(card);
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: card.instanceId,
+    from: 'hand',
+    to: 'bench',
+    playerId: player.playerId,
+  });
+  return null;
+}
+
+function morePrizesThanOpponent(ctx) {
+  const mine = (ctx.player?.zones?.prizes || []).length;
+  const theirs = (ctx.opponent?.zones?.prizes || []).length;
+  return mine > theirs;
+}
+
+function opponentHasStage2(ctx) {
+  if (!ctx.opponent) return false;
+  return rootsOf(ctx.opponent).some(
+    (root) => normalizeStage(root.stage) === 'Stage 2'
+  );
+}
+
+/**
+ * Turn-scoped attack damage boost from an activated ability (Feraligatr
+ * Torrential Heart, Skeledirge ex Incendiary Song). Pushes the same shape
+ * `parseTurnDamageBonus` produces; `attackerInstanceId` scopes it to this
+ * Pokémon's attacks ("attacks used by this Pokémon").
+ */
+function turnDamageBonusAbility(ctx) {
+  const { player, step } = ctx;
+  if (!(step.amount > 0)) return skip(ctx, 'no_amount');
+  if (!player.flags) player.flags = {};
+  player.flags.turnDamageBonuses = [
+    ...(player.flags.turnDamageBonuses || []),
+    {
+      amount: step.amount,
+      type: null,
+      attackerNoRuleBox: false,
+      defenderFilter: null,
+      attackerInstanceId: ctx.sourceCard?.instanceId ?? null,
+    },
+  ];
+  ctx.events.push({
+    type: 'turnDamageBonus',
+    playerId: player.playerId,
+    instanceId: ctx.sourceCard?.instanceId,
+    amount: step.amount,
+  });
+  return null;
+}
+
+/**
+ * "Put this Pokémon into your hand" self-return (Grumpig Energized Steps reuse,
+ * ability wording). Attachments follow the root; an emptied Active auto-promotes
+ * when a lone Benched Pokémon exists, else raises the same promote choice the
+ * trainer Scoop Up path uses.
+ */
+function returnSelfToHandAbility(ctx) {
+  const { player, step, sourceCard } = ctx;
+  if (ctx.memo?.phase === 'promote') {
+    const newActive = benchRootsOf(player).find(
+      (c) => c.instanceId === ctx.selection?.[0]
+    );
+    if (newActive) promoteToActive(player, newActive, ctx.events);
+    return null;
+  }
+  const root = rootsOf(player).find((c) => c.instanceId === sourceCard?.instanceId);
+  if (!root) return skip(ctx, 'source_not_in_play');
+  const wasActive = zoneIdOf(player, root) === 'active';
+  for (const card of [root, ...attachedCards(player, root.instanceId)]) {
+    removeFromZones(player, card);
+    card.attachedTo = null;
+    const keep = step.keepAttached || isPokemon(card);
+    if (keep) player.zones.hand.push(card);
+    else discardCardToPlayerZone(player, card);
+  }
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: root.instanceId,
+    from: wasActive ? 'active' : 'bench',
+    to: 'hand',
+    playerId: player.playerId,
+  });
+  if (!wasActive) return null;
+  const bench = benchRootsOf(player);
+  if (bench.length === 1) {
+    promoteToActive(player, bench[0], ctx.events);
+    return null;
+  }
+  if (bench.length === 0) return null;
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose your new Active Pokémon`,
+    options: bench,
+    min: 1,
+    max: 1,
+    memo: { phase: 'promote' },
+  });
+}
+
 export const EXTRA_STEP_HANDLERS = {
   attachTool,
   searchEvolve,
@@ -1669,6 +1899,13 @@ export const EXTRA_STEP_HANDLERS = {
         target: ctx.step.onOpponent ? "opponent's Pokémon" : 'your Pokémon',
       },
     }),
+  // Design 034 slice 5 ability executables.
+  moveDamageBetweenAbility: moveDamageBetweenOwn,
+  recoverStatusAbility,
+  selfDamageAbility,
+  selfBenchPlacementAbility,
+  turnDamageBonusAbility,
+  returnSelfToHandAbility,
   fossilItem,
   returnPokemonToHand,
   swapWithDiscard,

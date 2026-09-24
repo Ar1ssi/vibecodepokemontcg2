@@ -681,10 +681,13 @@ export function parseAbility(text = '') {
 
     if (betweenOwn) {
       const unlimited = lower.includes('as often as you like');
+      const toSelf =
+        lower.includes('to this pokémon') || lower.includes('to this pokemon');
       steps.push({
         type: 'moveDamageBetweenAbility',
         count: count || 1,
         unlimited,
+        toSelf,
         guidance: unlimited
           ? 'As often as you like during your turn: move 1 damage counter from 1 of your Pokémon to another.'
           : 'Once during your turn: move damage counters between your Pokémon as described.',
@@ -1595,9 +1598,12 @@ export function parseAbility(text = '') {
       /play this pok[eé]mon as your new active pok[eé]mon/.test(lower)) &&
     !lower.includes('when you play')
   ) {
+    const morePrizes = /more prize cards? remaining than your opponent/.test(lower);
+    const opponentStage2 = /opponent has any stage 2/.test(lower);
     steps.push({
       type: 'selfBenchPlacementAbility',
       swapActive: /move your active pok[eé]mon to your bench/.test(lower),
+      condition: morePrizes ? 'morePrizes' : opponentStage2 ? 'opponentStage2' : null,
       guidance: /move your active pok[eé]mon to your bench/.test(lower)
         ? 'Once during your turn: move your Active Pokémon to the Bench and put this Pokémon in the Active Spot (as described).'
         : 'Once during your turn: put this Pokémon from your hand onto your Bench (as described).',

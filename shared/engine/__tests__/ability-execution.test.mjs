@@ -4,6 +4,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { addCondition, hasAnyCondition } from '../rules/special-conditions.mjs';
 
 function setupGame() {
   const rng = createRng(42);
@@ -1147,4 +1148,127 @@ test("ability: Biting Spree puts 2 counters on each of 2 chosen opponent's Poké
   const opp = res2.state.players.p2.zones;
   assert.equal(opp.active[0].damage, 20);
   assert.deepEqual(opp.bench.map((c) => c.damage || 0), [0, 20]);
+});
+
+// ── design 034 slice 5: ability executables ──────────────────────────────
+
+test('ability: Strange Behavior moves a damage counter between own Pokémon', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'As often as you like during your turn, you may move 1 damage counter from 1 of your other Pokémon to this Pokémon.'
+  );
+  const source = createCard({ instanceId: 72, name: 'Damaged', hp: 100, supertype: 'Pokémon', damage: 30 });
+  state.players.p1.zones.bench.push(source);
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId).sort(), [72]);
+  const res2 = resolveWith(res1, [72], rng);
+  assert.equal(res2.error, null);
+  assert.equal(res2.state.players.p1.zones.bench[0].damage, 20);
+  assert.equal(res2.state.players.p1.zones.active[0].damage, 10);
+});
+
+test('ability: Busybody Nurse cures every Special Condition on the Active', () => {
+  const { state, rng } = setupGame();
+  const { holder } = holderWithAbility(
+    state,
+    'Once during your turn, you may use this Ability. Your Active Pokémon recovers from all Special Conditions.'
+  );
+  addCondition(holder, 'Poisoned');
+  addCondition(holder, 'Confused');
+
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  const active = res.state.players.p1.zones.active[0];
+  assert.equal(hasAnyCondition(active), false);
+});
+
+test('ability: Torrential Heart self-damages then grants a this-Pokémon damage bonus', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'Once during your turn, you may put 5 damage counters on this Pokémon. If you do, during this turn, attacks used by this Pokémon do 120 more damage to your opponent\u2019s Active Pokémon (before applying Weakness and Resistance).'
+  );
+  state.players.p1.zones.deck.push(createCard({ instanceId: 90, name: 'Deck' }));
+
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.active[0].damage, 50);
+  const bonus = res.state.players.p1.flags.turnDamageBonuses?.[0];
+  assert.equal(bonus?.amount, 120);
+  assert.equal(bonus?.attackerInstanceId, 70);
+});
+
+test('ability: Swelling Flash puts a hand copy onto the Bench only with more Prizes', async () => {
+  const { executeSteps } = await import('../effects/executor.mjs');
+  const { state } = setupGame();
+  const luxray = createCard({
+    instanceId: 70,
+    name: 'Luxray',
+    hp: 160,
+    supertype: 'Pokémon',
+  });
+  state.players.p1.zones.hand.push(luxray);
+  state.players.p1.zones.prizes.push(createCard({ instanceId: 91 }), createCard({ instanceId: 92 }));
+  state.players.p2.zones.prizes.push(createCard({ instanceId: 93 }));
+
+  const step = {
+    type: 'selfBenchPlacementAbility',
+    swapActive: false,
+    condition: 'morePrizes',
+  };
+  const res = executeSteps(state, {
+    steps: [step],
+    playerId: 'p1',
+    effectType: 'ability',
+    sourceCard: luxray,
+    activeRng: createRng(1),
+    events: [],
+  });
+  assert.ok(res.completed);
+  assert.equal(state.players.p1.zones.bench.length, 1);
+  assert.equal(state.players.p1.zones.bench[0].instanceId, 70);
+  assert.equal(state.players.p1.zones.hand.length, 0);
+});
+
+test('ability: Buzzing Boost-style self-return to hand promotes a lone Benched Pokémon', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'Once during your turn, you may return this Pokémon and all cards attached to it to your hand.'
+  );
+  const benchMon = createCard({ instanceId: 72, name: 'Benched', hp: 100, supertype: 'Pokémon' });
+  state.players.p1.zones.bench.push(benchMon);
+
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.some((c) => c.instanceId === 70), true);
+  assert.equal(res.state.players.p1.zones.active[0].instanceId, 72);
+});
+
+test('ability: self-bench placement is refused without a hand copy', async () => {
+  const { executeSteps } = await import('../effects/executor.mjs');
+  const { state } = setupGame();
+  const holder = createCard({
+    instanceId: 70,
+    name: 'Luxray',
+    hp: 160,
+    supertype: 'Pokémon',
+  });
+  // On the Active, not in hand: the handler must skip and leave the Bench empty.
+  state.players.p1.zones.active.push(holder);
+  const events = [];
+  const res = executeSteps(state, {
+    steps: [{ type: 'selfBenchPlacementAbility', condition: 'morePrizes' }],
+    playerId: 'p1',
+    effectType: 'ability',
+    sourceCard: holder,
+    activeRng: createRng(1),
+    events,
+  });
+  assert.ok(res.completed);
+  assert.equal(state.players.p1.zones.bench.length, 0);
+  assert.ok(events.some((e) => e.type === 'effectStepSkipped'));
 });

@@ -46,6 +46,13 @@ export function turnDamageBonusTotal(
   let total = 0;
   for (const bonus of bonuses) {
     if (!bonus || !(bonus.amount > 0)) continue;
+    // "attacks used by this Pokémon": scoped to the granting card's instance.
+    if (
+      bonus.attackerInstanceId != null &&
+      bonus.attackerInstanceId !== attacker?.instanceId
+    ) {
+      continue;
+    }
     if (bonus.type && !types.includes(bonus.type)) continue;
     if (bonus.attackerNoRuleBox && isRuleBoxPokemon(attacker)) continue;
     if (!defenderMatches(bonus.defenderFilter, defender)) continue;
