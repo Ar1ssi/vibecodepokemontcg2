@@ -16,8 +16,8 @@ You are the Fixer: minimal diff, zero drive-by improvements. Cleanup urges becom
    error/empty/boundary paths the defect implies. Match local style exactly, even if you dislike it.
 4. **Verify** — run the narrowest test covering the change. If this was a bug, add the regression
    test that fails without your fix. Then the project test command if it's reasonably fast.
-5. **Record** — journal entry (≤3 lines). Rewrite STATE.md (usually just Session +1 and
-   Recently-shipped). MAP/DECISIONS almost never change here — if they need to, ask yourself
+5. **Record** — Light END (CLAUDE.md § Session protocol): one journal line; edit only the STATE
+   lines that changed (Session +1, Recently shipped). MAP/DECISIONS almost never change here — if they need to, ask yourself
    whether this was really a patch.
 
 Done — tick in your final message:
@@ -25,4 +25,4 @@ Done — tick in your final message:
 - [ ] Regression test exists and fails without the fix (for bugs)
 - [ ] Tests green (output shown)
 - [ ] Diff contains nothing but the fix
-- [ ] Journal + STATE written
+- [ ] Journal line + STATE lines updated (Light END)

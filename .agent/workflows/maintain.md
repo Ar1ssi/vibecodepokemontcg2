@@ -9,9 +9,10 @@ directive 5; just do it.)
 | STATE.md | 40 lines | rewrite: keep Active/Next/Blocked, top-5 watch-outs, last-3 shipped |
 | MAP.md | 120 lines | collapse subtrees into `.agent/areas/<x>.md`; keep one pointer line each |
 | PROJECT.md | 80 lines | tighten prose; landmines >15 → merge, retire, or push into area docs |
-| DECISIONS.md (active) | 50 lines | move superseded/expired lines to the Archive section |
-| ISSUES.md (Open) | 40 lines | merge duplicates, close the stale, demote or drop P3s; Closed >100 → delete oldest lines (git keeps them) |
-| journal/<month>.md | 200 lines | fine while current; months older than 2 → roll up into journal/ARCHIVE.md, ≤1 line per session, keep still-live `flag:` lines |
+| DECISIONS.md | 90 lines / 20 KB; each line ≤220 chars | delete superseded lines (cite the superseder); shorten long lines — detail lives in the cited design; full old wording stays in .agent/archive/ |
+| ISSUES.md | Open 40 / Closed 30 lines; each ≤300 chars | merge duplicates, close the stale (check git log), demote or drop P3s; move oldest Closed lines to .agent/archive/ISSUES-closed.md |
+| NEXTSTEPS.md | ~60 lines, in-flight ledgers only | move finished ledgers to .agent/archive/NEXTSTEPS-history.md |
+| journal/<month>.md | entries ≤4 lines, ≤200 chars each | read by `tail`/grep only; months older than 2 → roll up into journal/ARCHIVE.md, ≤1 line per session, keep still-live `flag:` lines |
 | areas/*.md | 60 lines each | split or prune; DELETE area docs describing deleted code |
 | designs/ (root) | active docs only | shipped/superseded → designs/archive/ |
 
@@ -26,7 +27,10 @@ directive 5; just do it.)
    Then scan ISSUES.md Open: close lines already fixed (check git log), merge duplicates, re-rank.
    An area touched by 3+ sessions or repeat-flagged since the last audit → add
    `audit due: <area> → workflows/audit.md` to STATE `Next:` (detection only; the audit is its own session).
-5. **Scratch** — delete `.agent/scratch/` files not referenced by STATE.
+5. **Scratch & worktrees** — delete `.agent/scratch/` files not referenced by STATE, ISSUES or an
+   active design (scratch is gitignored: deleting loses it for good, so check refs first).
+   `git worktree list`: remove trees whose branch is merged into origin/main AND are clean
+   (`git worktree remove <path>`, never `--force`); `git worktree prune` for missing dirs.
 6. **Metrics ratchet** — one line in the sweep's journal entry: `metrics: <LOC> loc · <deps> deps ·
    <public routes/exports> surface · <tests> tests`. Compare with the previous sweep's line:
    surface growing much faster than shipped features → add `audit due` to STATE `Next:`.
