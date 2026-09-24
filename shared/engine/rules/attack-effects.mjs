@@ -117,27 +117,17 @@ export const STATUS_NOUNS = [
 // Detect a dual-status application: "now Asleep and Poisoned",
 // "is now Burned and Confused", etc. Returns the two status nouns or null.
 export function dualStatus(t) {
+  // The printed nouns may be quoted ("'Paralyzed' and 'Poisoned'") or bare; both apostrophes
+  // are optional (the old pattern required a closing one, so bare printings never matched).
   const m = t.match(
-    /now\s+('?(asleep|paralyzed|poisoned|burned|confused)')?\s+and\s+('?(asleep|paralyzed|poisoned|burned|confused)')?/
+    /now\s+'?(asleep|paralyzed|poisoned|burned|confused)'?\s+and\s+'?(asleep|paralyzed|poisoned|burned|confused)'?/
   );
-  if (!m) {
-    // Try "is now X and Y" where the nouns are explicit.
-    const m2 = t.match(
-      /is\s+now\s+('?(asleep|paralyzed|poisoned|burned|confused)')?\s+and\s+('?(asleep|paralyzed|poisoned|burned|confused)')?/
-    );
-    if (!m2) return null;
-    const a = m2[2] || m2[1];
-    const b = m2[4] || m2[3];
-    return a && b ? [a, b] : null;
-  }
-  const a = m[2] || m[1];
-  const b = m[3] || m[4];
-  if (a && b && a !== b) return [a, b];
-  const m3 = t.match(
+  if (m && m[1] !== m[2]) return [m[1], m[2]];
+  // Any "X and Y" pair (the nouns are explicit even when the "now" clause is phrased oddly).
+  const m2 = t.match(
     /(asleep|paralyzed|poisoned|burned|confused)\s+and\s+(asleep|paralyzed|poisoned|burned|confused)/
   );
-  if (m3) return [m3[1], m3[2]];
-  return null;
+  return m2 && m2[1] !== m2[2] ? [m2[1], m2[2]] : null;
 }
 
 // Detect a self-status application: "This Pokémon is now Asleep."

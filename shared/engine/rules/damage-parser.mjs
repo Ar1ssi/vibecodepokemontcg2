@@ -33,6 +33,9 @@
 //     attackerDamage /* damage counters on the attacker (this Pokémon) */ }
 
 import { parseSearchDeckParams } from './trainer-effects.mjs';
+import { isBasicPokemon } from '../cards.mjs';
+import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
+import { parseEachFilter } from './each-filter.mjs';
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
@@ -81,6 +84,14 @@ function amount(text, re) {
 // the condition depends on something not present in card data (e.g. "you
 // have an Energy attached…") — the caller keeps an honest unresolved note.
 function evalCondition(cond, defender, ctx) {
+  // Design 036 A11: the hand cards the attack's own before-damage discard took
+  // (ctx.handDiscarded, set by the reducer only for such attacks).
+  if (ctx.handDiscarded !== undefined) {
+    const clause = cond.trim();
+    if (/^you (?:do|discarded any cards in this way)$/.test(clause)) return ctx.handDiscarded > 0;
+    const atLeast = clause.match(/^you discarded (\d+) or more cards in this way$/);
+    if (atLeast) return ctx.handDiscarded >= Number(atLeast[1]);
+  }
   const hp = Number(defender?.hp) || 0;
   const hpMore = cond.match(/(\d+) hp or more/);
   if (hpMore) {
@@ -431,7 +442,7 @@ export function parseAttackDamage(
     // conditions not derivable from card data stay honest unresolved notes.
     // Coin-conditional bonuses ("if heads/if tails") are handled by the coin
     // block below and must not be misfiled here as an unresolved condition.
-    const bonus = amount(text, /does (\d+) more damage|(\d+) more damage/);
+    const bonus = amount(text, /(\d+) more damage/);
     const cond = (text.match(/if (.+?)(?:,| this attack)/) || [])[1] || '';
     const result = evalCondition(cond, defender, ctx);
     if (result === null) {
@@ -535,12 +546,13 @@ export function parseAttackDamage(
     if (bench > 0) components.push('bench');
   }
   let heal = 0;
-  // Heal family (audit B): "Heal N damage from …" and "remove N damage
-  // counter(s)" both remove N damage counters. The target (attacker /
-  // defender / all) is resolved separately by healTarget().
-  const healRe = /(?:heal|remove) (?:up to )?(\d+) damage/;
-  if (text && healRe.test(text)) {
-    heal = amount(text, healRe);
+  // Heal family (audit B): "Heal N damage from …" removes N damage; "remove N damage
+  // counter(s)" removes N × 10. The target (attacker / defender / all) is resolved
+  // separately by healTarget().
+  const healRe = /(?:heal|remove) (?:up to )?(\d+) damage( counters?)?/;
+  const healMatch = text ? healRe.exec(text) : null;
+  if (healMatch) {
+    heal = amount(text, healRe) * (healMatch[2] ? 10 : 1);
     if (heal > 0) components.push('heal');
   }
 
@@ -726,6 +738,69 @@ export function conditionalKoClause(attackText) {
     return true;
   }
   return false;
+}
+
+// ── extra Prize on Knock Out (design 036 A3) ────────────────────────────────
+// "If your opponent's Pokémon is Knocked Out by damage from this attack, take N more
+// Prize card(s)." The clause's subject narrows which Knock Out pays: the generic wording,
+// Basic Pokémon, Pokémon-GX/-EX, Mega Evolution Pokémon, or the Defending Pokémon ("…by
+// this attack" — Cresselia LV.X Moon Skip). The delayed "During your next turn, if the
+// Defending Pokémon is Knocked Out…" wording is a marker (attack-markers.mjs), and the
+// damage-scaling "If you have more Prize cards remaining" wording never matches. Pure.
+const PRIZE_ON_KO_CLAUSES = [
+  [
+    /(?:1 of )?your opponent's pok[ée]mon-gx or pok[ée]mon-ex is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    'gx-ex',
+  ],
+  [
+    /your opponent's mega evolution pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    'mega',
+  ],
+  [
+    /your opponent's basic pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    'basic',
+  ],
+  [
+    /(?:1 of )?your opponent's pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    null,
+  ],
+  [
+    /the defending pok[ée]mon is knocked out (?:by damage from this attack|by this attack), take (a|\d+) more prize cards?/,
+    null,
+  ],
+];
+
+/**
+ * @param {string} attackText Printed attack effect text
+ * @returns {{count: number, filter?: {ruleBox: 'basic'|'gx-ex'|'mega'}}|null}
+ */
+export function parsePrizeOnKo(attackText) {
+  const text = lower(attackText).replace(/\s+/g, ' ');
+  if (!text) return null;
+  for (const [re, ruleBox] of PRIZE_ON_KO_CLAUSES) {
+    const m = re.exec(text);
+    if (!m) continue;
+    return {
+      count: parseInt(m[1], 10) || 1,
+      ...(ruleBox ? { filter: { ruleBox } } : {}),
+    };
+  }
+  return null;
+}
+
+/** The A3 rule-box labels a Knock Out victim can match: basic / gx-ex / mega. */
+export function prizeRuleBoxes(card) {
+  if (!card) return [];
+  const boxes = [];
+  if (isBasicPokemon(card)) boxes.push('basic');
+  if (isGxCard(card) || isExCard(card)) boxes.push('gx-ex');
+  if (isMegaCard(card)) boxes.push('mega');
+  return boxes;
+}
+
+/** Whether a `{ruleBox}` filter accepts the victim's labels (a missing filter accepts all). */
+export function prizeFilterMatches(filter, ruleBoxes) {
+  return !filter || (ruleBoxes || []).includes(filter.ruleBox);
 }
 
 /** Exact damage-counter threshold for conditional KO (e.g. exactly 6 counters). */
@@ -1019,6 +1094,27 @@ export function allBenchDamage(attackText) {
   return benchSpreadClauses(attackText).find((c) => c.opponent)?.amount || 0;
 }
 
+/**
+ * Design 036 A9: "This attack does N damage to each of your opponent's Pokémon [filter]" and
+ * the old "Does N damage to each Defending Pokémon" (the Active only). A sentence-leading
+ * clause only: a coin-gated "If heads, … to each …" is not read. Pure.
+ * @returns {{ amount: number, activeOnly: boolean, filter: object }|null}
+ */
+export function eachPokemonDamage(attackText) {
+  const text = String(attackText || '')
+    .replace(/[‘’]/g, "'")
+    .toLowerCase()
+    .replace(/pokemon/g, 'pokémon');
+  const m = /(?:^|\.\s+)(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon)([^.(]*)/.exec(
+    text
+  );
+  if (!m) return null;
+  const tail = m[3].trimEnd();
+  if (m[2] === 'defending pokémon') return tail ? null : { amount: Number(m[1]), activeOnly: true, filter: {} };
+  const filter = parseEachFilter(tail);
+  return filter === undefined ? null : { amount: Number(m[1]), activeOnly: false, filter };
+}
+
 // Damage the attack also does to each of the ATTACKER's own Benched Pokémon (recoil). Pure.
 export function ownBenchDamage(attackText) {
   return benchSpreadClauses(attackText).find((c) => c.own)?.amount || 0;
@@ -1089,12 +1185,70 @@ const discardSourceOf = (from) => {
   return 'self';
 };
 
+// One typed group of a discard clause: "all basic {R} Energy", "up to 2 basic {L} Energy",
+// "any amount of basic {R} Energy", "2 basic {W} Energy cards".
+const DISCARD_GROUP = String.raw`(?:(all)|up\s+to\s+(\d+)|(any\s+(?:amount|number)\s+of)|(\d+))\s+(basic\s+)?\{([A-Z])\}\s+Energy(?:\s+cards?)?`;
+const discardGroupOf = ([all, upTo, anyAmount, exact, basic, symbol]) => {
+  let max = 1;
+  if (all || anyAmount) max = Infinity;
+  else if (upTo || exact) max = Math.max(0, parseInt(upTo || exact, 10));
+  return {
+    energyType: energyTypeOf(symbol),
+    basicOnly: Boolean(basic),
+    max,
+    ...(all ? { all: true } : {}),
+  };
+};
+
+// Rayquaza-EX / Rayquaza ex / Rayquaza V / VMAX: "Discard [either] <group> or <group>
+// attached to / from this Pokémon" — the player discards from ONE group only; `all`
+// groups discard every matching card. Pikachu-EX Overspark / Raichu / Infernape: a lone
+// "Discard all {L} Energy attached to …" discards every match, no choice.
+// Returns the scaling shape (with `groups` for the "or" form, `all` for the lone form) or null.
+function discardEnergyGroups(text) {
+  const pair = new RegExp(
+    String.raw`discard\s+(?:either\s+)?${DISCARD_GROUP}\s+or\s+${DISCARD_GROUP}\s+(?:attached\s+to|from)\s+(this\s+Pok[ée]mon|[^.,]+?)[.,]`,
+    'i'
+  ).exec(text);
+  if (pair) {
+    const groups = [discardGroupOf(pair.slice(1, 7)), discardGroupOf(pair.slice(7, 13))];
+    return {
+      max: Math.max(...groups.map((g) => g.max)),
+      source: discardSourceOf(pair[13]),
+      energyType: null,
+      basicOnly: groups.every((g) => g.basicOnly),
+      groups,
+    };
+  }
+  const all =
+    /discard\s+all\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+attached\s+to\s+([^.,]+?)[.,]/i.exec(
+      text
+    );
+  if (!all) return null;
+  return {
+    max: Infinity,
+    source: discardSourceOf(all[3]),
+    energyType: energyTypeOf(all[2]),
+    basicOnly: Boolean(all[1]),
+    all: true,
+  };
+}
+
 export function discardEnergyScaling(attackText) {
   const text = String(attackText || '');
   // Blastoise-GX Rocket Splash shuffles the Energy into the deck instead ("for each card
   // you shuffled into your deck in this way"): destination 'deck'.
   const shuffled = /for each (?:energy )?card you shuffled into your deck/i.test(text);
-  if (!shuffled && !/for each (?:energy )?card you discard(ed)?/i.test(text)) return null;
+  // Older prints scale with "… damage times the number (amount) of Energy you discarded".
+  const discardedScaling =
+    /for each (?:energy )?card you discard(ed)?/i.test(text) ||
+    /times the (?:number|amount) of [^.]*?Energy[^.]*?discarded/i.test(text);
+  if (!shuffled && !discardedScaling) return null;
+
+  if (!shuffled) {
+    const grouped = discardEnergyGroups(text);
+    if (grouped) return grouped;
+  }
 
   const counted = new RegExp(
     String.raw`${shuffled ? 'shuffle' : 'discard'}\s+(?:up\s+to\s+(\d+)|(\d+)|(any\s+(?:amount|number)\s+of))?\s*(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon|your\s+hand)`,

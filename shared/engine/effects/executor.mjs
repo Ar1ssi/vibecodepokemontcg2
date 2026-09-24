@@ -271,6 +271,12 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // "Discard a card from your hand. If you do, …" (design 036 A11): the hand cost was paid.
+    if (events.some((e) => e.handCost && e.playerId === playerId)) context.handCostPaid = true;
+    if (step.requiresHandCost && !context.handCostPaid) {
+      events.push({ type: 'effectStepSkipped', reason: 'hand_cost_unpaid', step: step.type });
+      continue;
+    }
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;
@@ -294,6 +300,11 @@ export function executeSteps(draft, {
         events,
         selection: stepSelection,
         memo: context[memoKey],
+        // Runs `more` right after this step (a Supporter's effect used as an attack's, design
+        // 036 E). The widened list rides on later resume tokens.
+        insertSteps: (more) => {
+          steps = [...steps.slice(0, idx + 1), ...more, ...steps.slice(idx + 1)];
+        },
         ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
           context[memoKey] = memo;
           return createPendingChoice({
@@ -886,6 +897,7 @@ export function executeSteps(draft, {
           }
           const benchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
           if (benchCard) {
+            benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
             for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
               const c = opponent.zones.active[i];
               if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
@@ -962,6 +974,7 @@ export function executeSteps(draft, {
         // Perform active-bench switch preserving attachments
         const benchCard = bench.find((c) => c.instanceId === chosenBenchId);
         if (benchCard) {
+          benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
           for (let i = player.zones.active.length - 1; i >= 0; i--) {
             const c = player.zones.active[i];
             if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
@@ -1044,6 +1057,7 @@ export function executeSteps(draft, {
 
         const oppBenchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
         if (oppBenchCard) {
+          oppBenchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
           for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
             const c = opponent.zones.active[i];
             if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {

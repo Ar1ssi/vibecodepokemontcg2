@@ -203,19 +203,19 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 577
+      "observed": 591
     },
     "attack:coin-flip": {
       "n": 429,
       "observed": 415
     },
     "attack:conditional-damage": {
-      "n": 741,
-      "observed": 155
+      "n": 740,
+      "observed": 176
     },
     "attack:conditional-ko": {
       "n": 20,
-      "observed": 19
+      "observed": 20
     },
     "attack:copy-attack": {
       "n": 34,
@@ -239,7 +239,7 @@
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 411
+      "observed": 424
     },
     "attack:discard-opponent": {
       "n": 151,
@@ -252,6 +252,10 @@
     "attack:draw-until": {
       "n": 45,
       "observed": 40
+    },
+    "attack:dual-status": {
+      "n": 78,
+      "observed": 72
     },
     "attack:effect-prevention": {
       "n": 26,
@@ -267,7 +271,7 @@
     },
     "attack:heal": {
       "n": 148,
-      "observed": 138
+      "observed": 142
     },
     "attack:hp-cap-damage": {
       "n": 9,
@@ -287,7 +291,7 @@
     },
     "attack:lost-zone": {
       "n": 11,
-      "observed": 8
+      "observed": 9
     },
     "attack:mirror-heal": {
       "n": 11,
@@ -295,7 +299,7 @@
     },
     "attack:move-damage-counter": {
       "n": 1,
-      "observed": 0
+      "observed": 1
     },
     "attack:move-energy": {
       "n": 135,
@@ -303,7 +307,7 @@
     },
     "attack:multi-target": {
       "n": 165,
-      "observed": 83
+      "observed": 84
     },
     "attack:neutralize-opponent-energy": {
       "n": 1,
@@ -315,7 +319,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 439
+      "observed": 470
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -370,24 +374,24 @@
       "observed": 46
     },
     "attack:status-asleep": {
-      "n": 135,
-      "observed": 135
+      "n": 121,
+      "observed": 121
     },
     "attack:status-burned": {
-      "n": 109,
-      "observed": 109
+      "n": 94,
+      "observed": 90
     },
     "attack:status-confused": {
       "n": 130,
-      "observed": 130
+      "observed": 123
     },
     "attack:status-paralyzed": {
-      "n": 172,
-      "observed": 171
+      "n": 155,
+      "observed": 142
     },
     "attack:status-poisoned": {
-      "n": 183,
-      "observed": 183
+      "n": 152,
+      "observed": 152
     },
     "attack:supporter-effect": {
       "n": 5,

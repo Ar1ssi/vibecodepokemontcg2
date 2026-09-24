@@ -35,10 +35,28 @@ const TEMPLATES = [
     /^choose 1 of your benched (.+?) pokemon's attacks and use it as this attack\.$/,
     (m) => ({ source: 'ownBench', group: m[1] }),
   ],
+  // Liepard Assist: any Benched Pokémon, no group.
+  [/^choose 1 of your benched pokemon's attacks and use it as this attack\.$/, () => ({ source: 'ownBench' })],
   [
     /^choose 1 of your opponent's (active |benched |)pokemon's attacks and use it as this attack\.$/,
     (m) => ({ source: OPPONENT_SCOPE[m[1]] }),
   ],
+  // Marshadow Shadow Imitation.
+  [
+    /^choose 1 of your opponent's active pokemon's non-gx attacks and use it as this attack\.$/,
+    () => ({ source: 'oppActive', excludeGx: true }),
+  ],
+  // Ditto Copy Anything.
+  [
+    /^choose 1 of your opponent's pokemon's attacks and use it as this attack\. if this pokemon doesn't have the necessary energy to use that attack, this attack does nothing\.$/,
+    () => ({ source: 'oppInPlay', needsEnergy: true }),
+  ],
+  // Hypno Pendulum Influence (after its coin), Zoroark Foul Play.
+  [
+    /^choose an attack from 1 of your opponent's pokemon in play and use it as this attack\.$/,
+    () => ({ source: 'oppInPlay' }),
+  ],
+  [/^choose 1 of the defending pokemon's attacks and use it as this attack\.$/, () => ({ source: 'oppActive' })],
   [
     /^choose an attack from a \{(\w)\} pokemon in your discard pile and use it as this attack\.$/,
     (m) => (TYPE_LETTERS[m[1]] ? { source: 'ownDiscard', pokemonType: TYPE_LETTERS[m[1]] } : null),
@@ -78,11 +96,21 @@ const TEMPLATES = [
  * The copy source an attack's whole text asks for, or null when the text is not a copy
  * attack (or carries anything the templates don't cover).
  * @returns {{source: string, group?: string, pokemonType?: string, count?: number,
- *   optional?: boolean, needsEnergy?: boolean} | null}
+ *   optional?: boolean, needsEnergy?: boolean, excludeGx?: boolean, coinGate?: string} | null}
  */
 export function parseCopyAttack(text) {
   const t = normalize(text);
   if (!t) return null;
+  const whole = matchTemplates(t);
+  if (whole) return whole;
+  // "Flip a coin. If heads, <copy wording>" (Liepard Assist, Ethan's Sudowoodo, Hypno).
+  const coin = /^flip a coin\. if heads, (.+)$/.exec(t);
+  if (!coin) return null;
+  const rest = matchTemplates(coin[1]);
+  return rest ? { ...rest, coinGate: 'heads' } : null;
+}
+
+function matchTemplates(t) {
   for (const [pattern, build] of TEMPLATES) {
     const m = pattern.exec(t);
     if (m) return build(m);

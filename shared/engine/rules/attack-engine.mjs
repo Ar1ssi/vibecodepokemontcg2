@@ -27,6 +27,24 @@ import {
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
 
+/**
+ * "During your next turn, this Pokémon's X attack's base damage is N / is doubled" (design
+ * 036 A8b). Only the printed base changes: "30+" extras stay on top, a "10×" attack scales
+ * per unit, and an attack whose effect already zeroed its damage stays at 0.
+ */
+function overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower) {
+  if (rawBase <= 0 || printedBase <= 0) return rawBase;
+  const marker = attackerMarkers.findLast(
+    (m) =>
+      m.kind === 'nextTurnBaseDamage' &&
+      (m.attackName === attackNameLower || `${m.attackName} attack` === attackNameLower)
+  );
+  if (!marker) return rawBase;
+  const newBase = marker.doubled ? printedBase * 2 : marker.value;
+  if (/[×x]\s*$/i.test(String(attack?.damage || ''))) return Math.round((rawBase / printedBase) * newBase);
+  return rawBase - printedBase + newBase;
+}
+
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
 // multiplier (2) or flat bonus (20/30).
@@ -64,7 +82,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
-  const base = baseDamage != null ? baseDamage : (parseInt(attack?.damage, 10) || 0);
+  const printedBase = parseInt(attack?.damage, 10) || 0;
+  const rawBase = baseDamage != null ? baseDamage : printedBase;
+  const base = overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower);
   // An attack that does no damage gets no modifiers: Tool/turn bonuses and Weakness only change
   // damage that exists (I152 — Defiance Band must not turn a 0-damage attack into a 30 hit).
   if (!(base > 0)) {
@@ -111,10 +131,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR) +
     markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && m.afterWR && incomingApplies(m));
 
+  // "This Pokémon takes N more damage from attacks": only when the attack does damage.
+  const incomingBonusBeforeWR =
+    base > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && !m.afterWR) : 0;
+
   const damageBeforeWR = Math.max(
     0,
-    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus - specialEnergyPenalty -
-      markerReductionBeforeWR
+    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus + incomingBonusBeforeWR -
+      specialEnergyPenalty - markerReductionBeforeWR
   );
 
   // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
@@ -134,8 +158,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const weaknessApplies =
     !ignoreWeakness && !weaknessNullified && !hasMarker(defenderEffects, 'noWeakness');
   if (attacker?.types?.length && defender?.weakness && weaknessApplies) {
-    // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
-    if (attacker.types.includes(defender.weakness.type)) {
+    // Any of a dual-typed attacker's types triggers Weakness (audit A-5). A
+    // weaknessOverride marker (Oranguru) swaps the type and keeps the amount.
+    const override = defenderEffects.findLast((m) => m.kind === 'weaknessOverride')?.type;
+    const hasWeakness = override
+      ? attacker.types.some((t) => String(t).toLowerCase() === override)
+      : attacker.types.includes(defender.weakness.type);
+    if (hasWeakness) {
       const v = defender.weakness.value;
       if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
         multiplier = 2;                   // Lake Boundary: Weakness is always ×2
@@ -181,7 +210,12 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         attacker,
         afterWR: true,
       });
-  damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction - markerReductionAfterWR);
+  const incomingBonusAfterWR =
+    damageBeforeWR > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && m.afterWR) : 0;
+  damageAfterWR = Math.max(
+    0,
+    damageAfterWR + incomingBonusAfterWR - specialEnergyReduction - markerReductionAfterWR
+  );
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
   let reduced = 0;

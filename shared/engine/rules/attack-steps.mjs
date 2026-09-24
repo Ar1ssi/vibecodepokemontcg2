@@ -16,6 +16,7 @@ import {
   deckMillScaling,
   parseAttackSearchClause,
 } from './damage-parser.mjs';
+import { parseEachFilter } from './each-filter.mjs';
 
 const WORD_COUNTS = { a: 1, an: 1, one: 1, two: 2, three: 3 };
 
@@ -23,6 +24,27 @@ function countOf(word) {
   const w = String(word || '').trim();
   if (/^\d+$/.test(w)) return Number(w);
   return WORD_COUNTS[w] || 1;
+}
+
+// Design 036 A9: "put N damage counters on each [of your opponent's] [benched] Pokémon
+// <filter>". "Each Defending Pokémon" is the Active. An unowned "each Pokémon" is both
+// sides: every such card prints "(both yours and your opponent's)", which the parser strips
+// as reminder text. The plain opponent-wide form stays atkCountersEach.
+function countersEachFiltered([, amount, opponentWord, bench, noun, tail]) {
+  const filter = parseEachFilter(tail);
+  if (filter === undefined) return null;
+  const count = countOf(amount);
+  if (noun === 'defending pokémon') {
+    if (opponentWord || bench) return null;
+    return { type: 'atkCountersEachFiltered', count, side: 'opponent', scope: 'active', filter };
+  }
+  return {
+    type: 'atkCountersEachFiltered',
+    count,
+    side: opponentWord ? 'opponent' : 'both',
+    scope: bench ? 'bench' : 'all',
+    filter,
+  };
 }
 
 function escapeRegExp(text) {
@@ -85,6 +107,17 @@ function stripGates(sentence) {
 
 const ENERGY_TYPE = String.raw`(?:basic )?(?:\{([a-z])\} )?(?:basic )?`;
 
+// "heal 30 damage" / "heal all damage" / "remove 3 damage counters" / "remove a damage counter".
+const HEAL = String.raw`(?:heal (\d+|all) damage|remove (\d+|an?|all) damage counters?)`;
+
+// The two HEAL captures → a step amount in damage counters, or `all`.
+function healAmount(healWord, removeWord) {
+  const word = healWord ?? removeWord;
+  if (word === 'all') return { all: true };
+  if (healWord != null) return { count: Math.floor(Number(healWord) / 10) };
+  return { count: countOf(removeWord) };
+}
+
 // ── single-sentence templates ───────────────────────────────────────────────
 // Each entry: [regex, (match, sentence) => step | null]. The regex is anchored on the
 // sentence with its gate removed and its final period stripped.
@@ -136,6 +169,84 @@ const TEMPLATES = [
   [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) 1 of your pokémon to another of your pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  // Rest-of-game effects (design 036 E): kept on the attacking player, read by the damage path
+  // and the attack legality gate.
+  [
+    /^for the rest of this game, your pokémon's attacks do (\d+) more damage to your opponent's active pokémon$/,
+    (m) => ({ type: 'atkRestOfGame', effect: { kind: 'damageBonus', amount: Number(m[1]) } }),
+  ],
+  [
+    /^for the rest of this game, your \{([a-z])\} pokémon take (\d+) less damage from your opponent's attacks$/,
+    (m) => ({ type: 'atkRestOfGame', effect: { kind: 'damageReduce', amount: Number(m[2]), pokemonType: m[1] } }),
+  ],
+  [/^for the rest of this game, your opponent can't use any gx attacks$/, () => ({ type: 'atkRestOfGame', effect: { kind: 'gxLock' } })],
+  // Opponent Energy between their own Pokémon.
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to (?:1 of (?:their|your opponent's) benched pokémon|another of (?:their|your opponent's) pokémon)$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) 1 of your opponent's pokémon to another of (?:their|your opponent's) pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentAny', to: 'opponentAny', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) 1 of your opponent's benched pokémon to their active pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentBench', to: 'opponentActive', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  // Deck look / reorder (the opponent-only block form stays atkLookOppDeck).
+  [
+    /^look at the top (\d+) cards (?:of|on) (your|your opponent's|either player's) deck,? and put them back (?:on top of (?:your|their|that player's|your opponent's) deck )?in any order(?: you like)?$/,
+    (m) => ({
+      type: 'atkLookDeckReorder',
+      count: Number(m[1]),
+      side: m[2] === 'your' ? 'self' : m[2] === 'either player\'s' ? 'either' : 'opponent',
+    }),
+  ],
+  // Per-Bench attach (Mega Gardevoir ex Overflowing Wishes, Mudsdale Mud Stock).
+  [
+    new RegExp(String.raw`^for each of your benched pokémon, search your deck for an? ${ENERGY_TYPE}energy card and attach it to that pokémon$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'deck', ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to each of your benched pokémon$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', ...energyFilter(m[1], s) }),
+  ],
+  [
+    new RegExp(String.raw`^choose up to (\d+) of your benched pokémon and attach an? ${ENERGY_TYPE}energy card from your discard pile to each of them$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', max: Number(m[1]), ...energyFilter(m[2], s) }),
+  ],
+  // Druddigon Dragon's Fury: a typed attach target.
+  [
+    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to 1 of your \{([a-z])\} pokémon$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', count: 1, ...energyFilter(m[1], s), target: 'any', pokemonType: m[2] }),
+  ],
+  // Shuffle clauses.
+  [
+    new RegExp(String.raw`^shuffle (up to \d+|\d+|an?) ((?:basic )?(?:\{[a-z]\} )?(?:basic )?energy|item|trainer|pokémon)?\s?cards? from your discard pile into your deck$`),
+    (m, s) => ({
+      type: 'atkShuffleFromDiscard',
+      ...attachCount(m[1]),
+      ...(m[2] && /energy/.test(m[2]) ? { what: 'energy', ...energyFilter(/\{([a-z])\}/.exec(m[2])?.[1], s) } : {}),
+      ...(m[2] && !/energy/.test(m[2]) ? { what: recoverWhat(m[2]) } : {}),
+    }),
+  ],
+  [
+    /^(?:your opponent shuffles their active pokémon and all attached cards into their deck|shuffle your opponent's active pokémon and all cards attached to it into their deck)$/,
+    () => ({ type: 'atkShuffleOppActive' }),
+  ],
+  [
+    /^shuffle 1 of your benched pokémon and all attached cards into your deck$/,
+    () => ({ type: 'atkShuffleOwnBench' }),
+  ],
+  [
+    /^your opponent shuffles their hand into their deck and draws (\d+) cards$/,
+    (m) => ({ type: 'atkOppShuffleHandDraw', count: Number(m[1]) }),
+  ],
+  // Old switch wordings with a Bench qualifier (Vikavolt Volt Switch, Honchkrow Callous Wings).
+  [
+    /^switch this pokémon with 1 of your benched (?:\{([a-z])\} pokémon|([a-z][a-z' .-]*?))$/,
+    (m) => ({ type: 'atkSwitchSelf', ...(m[1] ? { benchType: m[1] } : { benchName: m[2] }) }),
   ],
   [
     /^move (\d+|a) damage counters? from 1 of your ((?:[a-z'.-]+ )*?)pokémon to another of your pokémon$/,
@@ -208,9 +319,18 @@ const TEMPLATES = [
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
   ],
 
+  // Own-hand discards (design 036 A11). A cost the attack cannot be used without, or a discard
+  // the damage counts, moves before damage in parseAttackSteps; "If you do, …" chains on it.
+  [/^discard your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'all' })],
+  [/^discard any number of cards from your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'any' })],
+  [/^discard (an?|\d+) cards? from your hand$/, (m) => ({ type: 'atkDiscardOwnHand', count: countOf(m[1]) })],
+  [
+    new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand$`),
+    (m, s) => ({ type: 'atkDiscardHandEnergy', count: countOf(m[1]), ...energyFilter(m[2], s) }),
+  ],
+
   // Raichu LV.X Voltage Shoot: the hand discard pays for the chosen-target damage, so it
   // runs before damage and the attack is refused without the cards (handEnergyDiscardCost).
-  // "Discard … from your hand. If you do, …" (Flare Bonus) is conditional and stays unread.
   [
     new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand and choose 1 of your opponent's pokémon$`),
     (m, s) => ({ type: 'atkDiscardHandEnergy', count: countOf(m[1]), ...energyFilter(m[2], s), beforeDamage: true }),
@@ -305,6 +425,32 @@ const TEMPLATES = [
     }),
   ],
   [
+    /^(?:put all energy(?: cards)? attached to this pokémon in the lost zone|remove all energy cards attached to this pokémon and put them in the lost zone)$/,
+    () => ({ type: 'atkLostZoneEnergy', from: 'self', all: true }),
+  ],
+  // Design 036 A12: Lost Zone from a hand, the discard pile, or play.
+  [
+    /^(?:put (an?|\d+) cards? from your hand in the lost zone|choose (a|1) card from your hand and put it in the lost zone)$/,
+    (m) => ({ type: 'atkLostZoneFromHand', count: countOf(m[1] || m[2]) }),
+  ],
+  [
+    /^choose (a|1) pokémon from your hand and put it in the lost zone$/,
+    () => ({ type: 'atkLostZoneFromHand', count: 1, what: 'pokemon' }),
+  ],
+  [
+    /^(?:put a random card from your opponent's hand in the lost zone|choose 1 card from your opponent's hand without looking and put it in the lost zone)$/,
+    () => ({ type: 'atkLostZoneOppHandRandom', count: 1 }),
+  ],
+  [
+    /^put (an?|\d+) cards? from your opponent's discard pile in the lost zone$/,
+    (m) => ({ type: 'atkLostZoneOppDiscard', count: countOf(m[1]) }),
+  ],
+  [/^put this pokémon and all (?:attached cards|cards attached to it) in the lost zone$/, () => ({ type: 'atkLostZoneSelf' })],
+  [
+    /^put your opponent's active pokémon and all cards attached to it in the lost zone$/,
+    () => ({ type: 'atkLostZoneOppActive' }),
+  ],
+  [
     /^put a special energy attached to 1 of your opponent's pokémon in the lost zone$/,
     () => ({ type: 'atkLostZoneEnergy', from: 'opponentAny', count: 1, special: true }),
   ],
@@ -342,6 +488,24 @@ const TEMPLATES = [
       ...(m[1] ? { exactCounters: Number(m[1]) } : { maxRemainingHp: Number(m[2]) }),
     }),
   ],
+  // A4 (design 036): least remaining HP among every Pokémon in play except the attacker
+  // (Inteleon/Greninja Bring Down, Gardevoir LV.X Bring Down), and Noivern Radiant Hunt.
+  [
+    /^choose a pokémon in play that has the least hp remaining, except for this pokémon, and it is knocked out$/,
+    () => ({ type: 'atkKnockOutChoose', leastHp: true }),
+  ],
+  [
+    /^the pokémon that has the least hp remaining, except for this pokémon, is knocked out$/,
+    () => ({ type: 'atkKnockOutChoose', leastHp: true }),
+  ],
+  [
+    /^choose 1 pokémon with the fewest remaining hp and that pokémon is now knocked out$/,
+    () => ({ type: 'atkKnockOutChoose', leastHp: true }),
+  ],
+  [
+    /^knock out 1 of your opponent's radiant pokémon$/,
+    () => ({ type: 'atkKnockOutChoose', ruleBox: 'radiant' }),
+  ],
 
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
 
@@ -362,12 +526,33 @@ const TEMPLATES = [
     (m) => ({ type: 'atkCountersEach', count: Number(m[1]), scope: m[2] ? 'bench' : 'all' }),
   ],
   [
+    /^put (\d+|a|an) damage counters? (?:on )?each (of your opponent's |)(benched )?(pokémon|defending pokémon)(.*)$/,
+    countersEachFiltered,
+  ],
+  // N's Vanilluxe Snow Coating / Lunala Lunar Pain / Aegislash Painful Sword.
+  [/^double the number of damage counters on each of your opponent's pokémon$/, () => ({ type: 'atkDoubleCountersEach' })],
+  // Yveltal ex Soul Destroyer.
+  [
+    /^knock out each of your opponent's pokémon that has (\d+) hp or less remaining$/,
+    (m) => ({ type: 'atkKnockOutAll', maxRemainingHp: Number(m[1]) }),
+  ],
+  [
     /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
     (m) => ({ type: 'atkHpCap', target: m[1].startsWith('1 of') ? 'opponentAny' : 'opponentActive', hp: Number(m[2]) }),
   ],
   [
     /^move all damage counters from 1 of your benched pokémon to your opponent's active pokémon$/,
     () => ({ type: 'atkMoveAllCounters' }),
+  ],
+  // Design 036 D: your damage counters onto the opponent (Xerneas-GX Sanctuary, Drifloon Transfer Pain).
+  [
+    /^move (all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's pokémon)$/,
+    (m) => ({
+      type: 'atkMoveCounterToOpponent',
+      count: m[1] === 'all' ? 'all' : countOf(m[1]),
+      from: m[2] === 'this pokémon' ? 'self' : /^each/.test(m[2]) ? 'each' : /benched/.test(m[2]) ? 'bench' : 'one',
+      to: /active/.test(m[3]) ? 'active' : 'any',
+    }),
   ],
 
   // Opponent's Active back to their hand (Fan Rotom Spin Storm, Unown Hidden Power)
@@ -410,6 +595,22 @@ const TEMPLATES = [
   // Prizes / Knock Out
   [/^(?:discard all energy from this pokémon, and )?take (a|\d+) prize cards?$/, (m) => ({ type: 'atkTakePrize', count: countOf(m[1]) })],
   [/^your opponent's active pokémon is knocked out$/, () => ({ type: 'atkKnockOut', condition: null })],
+  // A4 (design 036): the Active is Knocked Out when its printed condition holds
+  // (Haxorus Axe Blast, Haxorus Bring Down the Axe, Armaldo Reaping Claw), and the
+  // "Both Active Pokémon are Knocked Out" wording (Annihilape, Forretress, Beedrill).
+  [
+    /^if your opponent's active pokémon is a basic pokémon, (?:it|that pokémon) is knocked out$/,
+    () => ({ type: 'atkKnockOut', condition: 'basic' }),
+  ],
+  [
+    /^if your opponent's active pokémon has any special energy attached, (?:it|that pokémon) is knocked out$/,
+    () => ({ type: 'atkKnockOut', condition: 'specialEnergy' }),
+  ],
+  [
+    /^if your opponent's active pokémon has (\d+) hp or less remaining, (?:it|that pokémon) is knocked out$/,
+    (m) => ({ type: 'atkKnockOut', condition: 'maxRemainingHp', maxRemainingHp: Number(m[1]) }),
+  ],
+  [/^both active pokémon are knocked out$/, () => ({ type: 'atkKnockOut', scope: 'both' })],
   [
     /^if your opponent's active pokémon is affected by a special condition, (?:it|that pokémon) is knocked out$/,
     () => ({ type: 'atkKnockOut', condition: 'specialCondition' }),
@@ -423,10 +624,73 @@ const TEMPLATES = [
     (m) => ({ type: 'atkKnockOut', condition: 'exactCounters', counters: Number(m[1]) }),
   ],
 
-  // Heal your side
+  // Heal (design 036 A6). Amounts are damage counters (`count`, so "For each heads" scales
+  // them) or `all`; "heal 30 damage" is 3 counters.
   [
-    /^heal (\d+|all) damage from (?:each|all) of your (benched )?pokémon$/,
-    (m) => ({ type: 'atkHealEach', ...(m[1] === 'all' ? { all: true } : { amount: Number(m[1]) }), scope: m[2] ? 'bench' : 'all' }),
+    new RegExp(String.raw`^${HEAL} from (?:each|all) of your (benched )?(basic )?(?:\{([a-z])\} )?pokémon(?: that has any (?:\{([a-z])\} )?(energy) attached to it)?$`),
+    (m) => ({
+      type: 'atkHealEach',
+      ...healAmount(m[1], m[2]),
+      scope: m[3] ? 'bench' : 'all',
+      ...(m[4] ? { basicOnly: true } : {}),
+      ...(m[5] ? { pokemonType: m[5] } : {}),
+      ...(m[7] ? { hasEnergy: true, ...(m[6] ? { energyType: m[6].toUpperCase() } : {}) } : {}),
+    }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from each pokémon$`),
+    (m) => ({ type: 'atkHealEach', ...healAmount(m[1], m[2]), scope: 'all', side: 'both' }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from both active pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'bothActive' }),
+  ],
+  [
+    new RegExp(String.raw`^(?:discard (?:an?|\d+) (?:\{[a-z]\} )?energy(?: cards?)? (?:attached to|from) this pokémon and )?${HEAL} from this pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self' }),
+  ],
+  [
+    new RegExp(String.raw`^discard (?:an?|\d+) (?:\{[a-z]\} )?energy(?: cards?)? (?:attached to|from) this pokémon and ${HEAL} from it$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self' }),
+  ],
+  [
+    /^remove all special conditions and (\d+|an?|all) damage counters? from this pokémon$/,
+    (m) => ({ type: 'atkHealCounted', ...healAmount(undefined, m[1]), target: 'self', cure: true }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} (?:and remove all special conditions from this pokémon|from this pokémon, and it recovers from all special conditions)$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self', cure: true }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from your opponent's active pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'opponentActive' }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from (\d+) of your (benched )?(?:\{([a-z])\} )?pokémon$`),
+    (m) => ({
+      type: 'atkHealCounted',
+      ...healAmount(m[1], m[2]),
+      target: 'chosen',
+      scope: m[4] ? 'bench' : 'all',
+      ...(Number(m[3]) > 1 ? { targets: Number(m[3]) } : {}),
+      ...(m[5] ? { pokemonType: m[5] } : {}),
+    }),
+  ],
+  // "If heads, this attack does 20 more damage and heal 20 damage from this Pokémon": the
+  // damage half is the damage parser's; the heal follows the same coin.
+  [
+    new RegExp(String.raw`^this attack does \d+ (?:more )?damage(?: plus \d+ more damage)?,? and ${HEAL} from this pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self' }),
+  ],
+  // Mr. Mime E4 Magic Heal / Lopunny Healing Wish: one counter per heads.
+  [
+    /^remove a number of damage counters equal to the number of heads from (your pokémon in any way you like|1 of your pokémon)$/,
+    (m) => ({ type: 'atkHealCounted', count: 1, perHeads: true, target: /any way/.test(m[1]) ? 'distribute' : 'chosen', scope: 'all' }),
+  ],
+  // The drain wordings: as many counters as the damage this attack did.
+  [
+    /^(?:remove from this pokémon the number of damage counters equal to the damage you did to your opponent's active pokémon|remove a number of damage counters from this pokémon equal to the damage done to your opponent's active pokémon)$/,
+    () => ({ type: 'atkMirrorHeal' }),
   ],
 
   // Timed effects on later turns (design 031)
@@ -479,6 +743,32 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // "Use the effect of that Supporter card as the effect of this attack" (design 036 E): where
+  // the Supporter comes from, and whether it is discarded on the way.
+  [
+    /(?:your opponent reveals? their hand|look at your opponent's hand)\. you may (discard a supporter card you find there and )?use the effect of (?:that card|a supporter card you find there) as the effect of this attack\./g,
+    (m) => ({ type: 'atkUseSupporter', source: 'oppHand', optional: true, ...(m[1] ? { discard: true } : {}) }),
+  ],
+  [
+    /(?:your opponent reveals? their hand\. discard a supporter card you find there\.|look at your opponent's hand, choose a supporter card you find there, and discard it\. then,) use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'oppHand', discard: true }),
+  ],
+  [
+    /discard a supporter card from your hand\. if you do, use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'hand', discard: true }),
+  ],
+  [
+    /(?:choose a supporter card from|search) (your opponent's|your) discard pile(?: for a supporter card)? and use (?:the effect of that card|it) as the effect of this attack\./g,
+    (m) => ({ type: 'atkUseSupporter', source: m[1] === 'your' ? 'discard' : 'oppDiscard' }),
+  ],
+  [
+    /discard the top card of your deck, and if that card is a supporter card, use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'deckTop', discard: true }),
+  ],
+  [
+    /search your deck for a supporter card and discard it\. shuffle your deck afterward\. then, use the effect of that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'deck', discard: true }),
+  ],
   [
     /look at the top (\d+) cards of your deck(?:, and|\.) you may put any number of (basic )?pokémon you find there onto your bench\. shuffle the other cards back into your deck\./g,
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
@@ -551,6 +841,13 @@ const BLOCKS = [
   [
     /(?<=^|\. )if your opponent has a stadium in play, discard it\. if you discarded a stadium in this way, ([^.]+)\./g,
     (m) => chainedMarkerStep({ type: 'atkDiscardStadium', owner: 'opponent' }, m[1]),
+  ],
+  // Eternatus World Ender: the discard is the cost its gate names (the gate itself lives in
+  // rules/attack-conditions.mjs). The block consumes both sentences so no bare template picks
+  // up the other "Discard a Stadium in play." printings, whose damage bonus is not modelled yet.
+  [
+    /discard a stadium in play\. if you can't, this attack does nothing\./g,
+    () => ({ type: 'atkDiscardStadium', owner: 'any' }),
   ],
   // Mime Jr. Encore ("can use only") / Unown Amnesia ("can't use"): an attack lock marker on
   // the opponent's Active, read by the attack legality gate.
@@ -722,6 +1019,7 @@ export function resolveCoinGates(steps, { coin, headsCount }) {
 }
 
 const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;
+const HAND_COST_TYPES = new Set(['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkLostZoneFromHand']);
 
 function isAttachStep(step) {
   return step?.type === 'atkAttach' || (step?.type === 'searchAbility' && step.destination === 'attach');
@@ -788,10 +1086,13 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
     const chained = ATTACH_CHAIN.exec(plain);
     const previous = result.after[result.after.length - 1];
-    if (chained && !isAttachStep(previous)) continue;
+    // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
+    const handChain = Boolean(chained) && /^if you do, /.test(plain) && HAND_COST_TYPES.has(previous?.type);
+    if (chained && !handChain && !isAttachStep(previous)) continue;
     const { rest, flags } = stripGates(chained ? plain.slice(chained[0].length) : plain);
-    if (chained) flags.requiresAttach = true;
-    const templates = chained ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    if (handChain) flags.requiresHandCost = true;
+    else if (chained) flags.requiresAttach = true;
+    const templates = chained && !handChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
@@ -812,6 +1113,18 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const costs = result.after.filter((step) => step.type.startsWith('atkLostZone'));
     result.after = result.after.filter((step) => !costs.includes(step));
     result.before.push(...costs.map((step) => ({ ...step, countsForDamage: true })));
+  }
+
+  // A hand cost the attack cannot be used without ("(If you can't discard a card from your hand,
+  // this attack does nothing.)") pays before damage, and the legality gate refuses the attack
+  // without the cards (D114). A discard the damage counts ("If you do, this attack does 70 more
+  // damage") also runs first, and the reducer counts it.
+  const handCost = /if you (?:can't|don't)[^.]*this attack does nothing/.test(normalizeAttackText(text, selfName));
+  const handScaled = /(?:if you do|if you discarded [^,]* in this way), this attack does/.test(normalized);
+  if (handCost || handScaled) {
+    const costs = result.after.filter((step) => HAND_COST_TYPES.has(step.type));
+    result.after = result.after.filter((step) => !costs.includes(step));
+    result.before.push(...costs.map((step) => (handScaled ? { ...step, countsForDamage: true } : step)));
   }
   return result;
 }

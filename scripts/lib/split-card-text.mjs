@@ -14,7 +14,10 @@ export const TYPE_SYMBOLS = {
   L: 'Lightning',
   P: 'Psychic',
   F: 'Fighting',
-  D: 'Dark',
+  // The engine's energy descriptors spell the Darkness type 'Darkness' (server-energy.mjs →
+  // energy-effects.mjs); 'Dark' never matched `canPayAttackCost`, so every `{D}` attack cost
+  // in the oracle corpus was unpayable (I137).
+  D: 'Darkness',
   M: 'Metal',
   Y: 'Fairy',
   N: 'Dragon',

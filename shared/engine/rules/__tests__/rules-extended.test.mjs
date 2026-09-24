@@ -2637,7 +2637,7 @@ import test from 'node:test';
 
       const heal = parseAttackDamage({ damage: 10, text: 'Remove up to 2 damage counters from your Active Pokémon.' });
       assert.equal(heal.total, 10);
-      assert.equal(heal.heal, 2);
+      assert.equal(heal.heal, 20, '2 damage counters');
       assert.ok(heal.components.includes('heal'));
     });
 
@@ -4719,7 +4719,8 @@ import test from 'node:test';
         text: 'Remove up to 50 damage counters from this Pok\u00e9mon.',
       };
       const p = parseAttackDamage(atk, {}, {}, {});
-      assert.equal(p.heal, 50);
+      // Damage counters are 10 damage each.
+      assert.equal(p.heal, 500);
       assert.ok(p.components.includes('heal'));
     });
 
