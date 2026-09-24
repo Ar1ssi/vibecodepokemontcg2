@@ -263,6 +263,16 @@ export function diffTags(before, after, events) {
   for (const e of events) {
     if (/coin|flip/i.test(e.type)) tags.add('coin');
     if (/shuffle/i.test(e.type)) tags.add('shuffle');
+    // A hand reveal changes no zone but is the whole effect of "reveal their hand" cards.
+    // Only cards still in the opponent's hand count: a search's own reveal proves nothing.
+    if (
+      e.type === 'cardsRevealed' &&
+      e.playerId === 'p2' &&
+      (e.cards || []).length > 0 &&
+      e.cards.every((c) => after.cards.get(c.instanceId)?.zone === 'hand')
+    ) {
+      tags.add('opp:hand-revealed');
+    }
     if (/knock|KO/i.test(e.type)) tags.add('ko');
     if (e.type === 'effectStepSkipped') tags.add(`skipped:${e.reason}`);
     if (e.type === 'abilityUsed') tags.add('ability-used');

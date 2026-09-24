@@ -11,11 +11,11 @@ Focus: design 034 (ability behaviour), slices 1-5a done earlier (see journal S27
   Ability a printed destination (self/active/bench/between, target tags); `moveEnergyAbility`
   handler honours it and auto-moves a forced single Energy; widened when-played preamble now runs
   Durant ex / Gyarados "must" / Mawile via templates; Farfetch'd Tool search reads `Pokémon Tool`
-  (ability search parser, `matchesSearch`, `searchAttachStep`).
-Active: slice 5b-1 committed on `claude/exciting-meitner-pt47ts`. Next: 5b-2 opponent-disrupt
-  reveal-hand wordings (Zubat Revealing Echo, Mandibuzz, Thievul, Hawlucha — no template block),
-  then slices 6/7 (`.agent/designs/034-slice5-7-handoff.md`, ledger in NEXTSTEPS.md).
-Next: design 034 5b-2/6/7. Move-energy gaps: Plasma Energy filter unread; compound move+switch
+  (ability search parser, `matchesSearch`, `searchAttachStep`). 5b-2: reveal-hand Abilities run
+  via `abilityRevealVoice` + `atkRevealOppHand` bench/deckShuffle actions; oracle `opp:hand-revealed`.
+Active: slice 5 complete on `claude/exciting-meitner-pt47ts`. Next: slice 6 (executor batch B)
+  then 7 (`.agent/designs/034-slice5-7-handoff.md`, ledger in NEXTSTEPS.md).
+Next: design 034 slices 6/7. Oracle baseline stale-low for ~11 attack families (pre-existing). Move-energy gaps: Plasma Energy filter unread; compound move+switch
   texts (Iron Leaves, Articuno-GX, Tapu Koko-GX, Croconaw) run only the move half. Slice-5a gaps:
   hand-activated placement abilities blocked by `validateReferences`; `swapActive` untested.
   Slice-4: extra attack skips resolveCheckup — confirm live. Slice-3 gaps: Special Energy play
@@ -44,6 +44,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   (trainer-steps.mjs), which `isExecutableStepType` picks up automatically.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S282 design 034 slice 5b-1: move-Energy shape reader + handler (D123), when-played must/Bench, Tool search.
+- S282 design 034 slice 5b: move-Energy shape (D123), when-played must/Bench, Tool search, reveal-hand Abilities.
 - S281 design 034 slice 5a: six ability step executables in `EXTRA_STEP_HANDLERS` (c6392bb8).
 - S281 design 034 slice 4b: on-promotion window (D120), on-KO energy moves (D121), extra attack (D122).

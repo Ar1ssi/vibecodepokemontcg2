@@ -791,7 +791,7 @@ function atkOppHandRandomToDeck(ctx) {
 
 const revealedCard = (card) => ({ instanceId: card.instanceId, name: card.name });
 
-const REVEAL_ACTION_ZONE = { deckBottom: 'deck', prize: 'prizes' };
+const REVEAL_ACTION_ZONE = { deckBottom: 'deck', deckShuffle: 'deck', prize: 'prizes', bench: 'bench' };
 
 function applyRevealAction(ctx, cards) {
   const { opponent, step } = ctx;
@@ -802,28 +802,52 @@ function applyRevealAction(ctx, cards) {
   }
   // Deck index 0 is the top, so a push puts the card on the bottom.
   for (const card of cards) moveToZone(opponent, card, zone, 'hand', ctx.events);
+  if (step.then.action === 'deckShuffle' && cards.length > 0) shuffleOwnDeck(opponent, ctx);
+  if (step.then.action === 'bench' && step.then.counters) {
+    for (const card of cards) {
+      card.damage = (card.damage || 0) + step.then.counters * 10;
+      ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
+    }
+  }
   return null;
 }
 
+// How many revealed cards the follow-up takes: "any number" is the player's call (none
+// included), and a Bench placement is capped by the room on the opponent's Bench.
+function revealPickRange(ctx, matching) {
+  const { opponent, step } = ctx;
+  const room = step.then.action === 'bench' ? benchSpace(opponent) : Infinity;
+  if (step.then.count === 'any') return { min: 0, max: Math.min(matching.length, room) };
+  if (step.then.count === 'all') return { min: Math.min(matching.length, room), max: Math.min(matching.length, room) };
+  const n = Math.min(step.then.count, matching.length, room);
+  return { min: n, max: n };
+}
+
 // "Your opponent reveals their hand." plus an optional follow-up on the revealed cards
-// (discard / bottom of deck / face-down Prize). Damage that counts the revealed cards is
-// the damage parser's, read from the same hand.
+// (discard / bottom of deck / shuffle into deck / face-down Prize / onto their Bench). Damage
+// that counts the revealed cards is the damage parser's, read from the same hand.
 function atkRevealOppHand(ctx) {
   const { opponent, step } = ctx;
   const hand = opponent?.zones?.hand;
   if (!hand) return skip(ctx, 'no_opponent');
   const matching = step.then?.filter ? hand.filter((c) => matchesSearch(c, step.then.filter)) : [...hand];
-  if (ctx.selection && step.then) return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, step.then.count));
+  if (ctx.selection && step.then) {
+    const { max } = revealPickRange(ctx, matching);
+    return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, max));
+  }
   ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, cards: hand.map(revealedCard) });
   if (!step.then) return null;
   if (matching.length === 0) return skip(ctx, 'no_matching_card');
-  if (step.then.count === 'all' || matching.length <= step.then.count) return applyRevealAction(ctx, matching);
+  const { min, max } = revealPickRange(ctx, matching);
+  if (max === 0) return skip(ctx, 'bench_full');
+  if (min === max && max === matching.length) return applyRevealAction(ctx, matching);
   const kind = step.then.filter ? `${step.then.filter[0].toUpperCase()}${step.then.filter.slice(1)} ` : '';
+  const amount = step.then.count === 'any' ? 'any number of' : String(max);
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose ${step.then.count} ${kind}card(s) from your opponent's hand`,
+    prompt: `${attackName(ctx)}: Choose ${amount} ${kind}card(s) from your opponent's hand`,
     options: matching,
-    min: step.then.count,
-    max: step.then.count,
+    min,
+    max,
   });
 }
 

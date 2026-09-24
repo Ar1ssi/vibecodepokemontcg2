@@ -572,10 +572,24 @@ const BLOCKS = [
     /look at the top (\d+) cards of your opponent's deck and put them back in any order\./g,
     (m) => ({ type: 'atkLookOppDeck', count: Number(m[1]), reorder: true }),
   ],
+  // "…reveals their hand. Put a Basic Pokémon (with 70 HP or less) you find there onto their
+  // Bench(, and put 3 damage counters on that Pokémon)." (Mandibuzz, Mawile-GX, Dusknoir).
+  [
+    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand\. put (a|any number of) (basic pokémon(?: with \d+ hp or less)?) (?:that )?you find there onto their bench(?:, and put (\d+) damage counters on that pokémon)?\./g,
+    (m) => ({
+      type: 'atkRevealOppHand',
+      then: {
+        action: 'bench',
+        count: m[1] === 'a' ? 1 : 'any',
+        filter: m[2],
+        ...(m[3] ? { counters: Number(m[3]) } : {}),
+      },
+    }),
+  ],
   // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
   // reveals …" stays unparsed instead of losing its condition.
   [
-    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down))?)?\./g,
+    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter |energy )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down|and shuffle them into their deck))?)?\./g,
     (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
   ],
 ];
@@ -619,8 +633,9 @@ function revealHandStep(verb, countWord, kindWord, destination) {
   if (!verb) return { type: 'atkRevealOppHand' };
   let action = 'discard';
   if (verb === 'choose') {
-    if (!/bottom of their deck/.test(destination || '')) return null;
-    action = 'deckBottom';
+    if (/shuffle them into their deck/.test(destination || '')) action = 'deckShuffle';
+    else if (/bottom of their deck/.test(destination || '')) action = 'deckBottom';
+    else return null;
   } else if (verb === 'add') {
     if (!/prize cards/.test(destination || '')) return null;
     action = 'prize';
@@ -695,8 +710,19 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
     effect = effect.slice(position[0].length);
   }
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
-  const parsed = parseAttackSteps(effect);
+  const parsed = parseAttackSteps(abilityRevealVoice(effect));
   return { steps: [...parsed.before, ...parsed.after], holderZone };
+}
+
+// Abilities print a reveal in the player's voice ("have your opponent reveal their hand, and
+// then you choose …"); the attack templates read the attack voice ("your opponent reveals
+// their hand. choose …").
+function abilityRevealVoice(effect) {
+  return effect
+    .replace(/^have your opponent reveal their hand/, 'your opponent reveals their hand')
+    .replace(/^(your opponent reveals their hand),? and (?:then )?(?:you )?/, '$1. ')
+    .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
+    .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2');
 }
 
 const HOLDER_POSITION =

@@ -1494,3 +1494,134 @@ test('ability: Gyarados Untamed One ("you must") discards the top 5 cards of you
   assert.equal(res.state.players.p1.zones.discard.length, 5);
   assert.equal(res.state.players.p1.zones.deck.length, 2);
 });
+
+const oppHand = (state, ...cards) => state.players.p2.zones.hand.push(...cards);
+const basicMon = (instanceId, name, hp = 60) =>
+  createCard({ instanceId, name, hp, supertype: 'Pokémon', stage: 'Basic' });
+
+test('ability: Zubat Revealing Echo reveals the opponent’s hand from the Active Spot', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'Once during your turn, if this Pokémon is in the Active Spot, you may have your opponent reveal their hand.'
+  );
+  oppHand(state, basicMon(90, 'Pichu'), energyOn(91, 'Fire Energy', null));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  const reveal = res.events.find((e) => e.type === 'cardsRevealed');
+  assert.deepEqual(reveal.cards.map((c) => c.instanceId), [90, 91]);
+  assert.equal(res.state.players.p2.zones.hand.length, 2, 'a reveal moves nothing');
+});
+
+test('ability: Mandibuzz Look for Prey benches the one Basic with 70 HP or less', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    "Once during your turn, you may use this Ability. Your opponent reveals their hand, and you put a Basic Pokémon with 70 HP or less that you find there onto your opponent's Bench."
+  );
+  oppHand(state, basicMon(90, 'Small', 60), basicMon(91, 'Big', 120));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.deepEqual(res.state.players.p2.zones.bench.map((c) => c.instanceId), [90]);
+  assert.deepEqual(res.state.players.p2.zones.hand.map((c) => c.instanceId), [91]);
+});
+
+test('ability: Dusknoir Dark Invitation benches a Basic and puts 3 damage counters on it', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    "Once during your turn (before your attack), you may have your opponent reveal their hand. Put a Basic Pokémon you find there onto your opponent's Bench, and put 3 damage counters on that Pokémon."
+  );
+  oppHand(state, basicMon(90, 'Victim', 90));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  const benched = res.state.players.p2.zones.bench.find((c) => c.instanceId === 90);
+  assert.equal(benched.damage, 30);
+});
+
+test('ability: Mawile-GX Captivating Wink benches any number of Basics, capped by Bench room', () => {
+  const { state, rng } = setupGame();
+  benchPlayedHolder(
+    state,
+    'Mawile-GX',
+    'When you play this Pokémon from your hand onto your Bench during your turn, you may have your opponent reveal their hand and put any number of Basic Pokémon you find there onto their Bench.'
+  );
+  for (let i = 0; i < 3; i++) state.players.p2.zones.bench.push(basicMon(80 + i, `B${i}`));
+  oppHand(state, basicMon(90, 'A'), basicMon(91, 'B'), basicMon(92, 'C'), energyOn(93, 'Fire Energy', null));
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [90, 91, 92]);
+  assert.equal(res1.pendingChoice.min, 0);
+  assert.equal(res1.pendingChoice.max, 2, 'only 2 Bench spaces left');
+  const res2 = resolveWith(res1, [90, 92], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p2.zones.bench.map((c) => c.instanceId).sort(), [80, 81, 82, 90, 92]);
+});
+
+test('ability: Thievul Rob-’n’-Run shuffles 2 chosen Energy cards into the opponent’s deck', () => {
+  const { state, rng } = setupGame();
+  const thievul = createCard({
+    instanceId: 70,
+    name: 'Thievul',
+    hp: 100,
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    enteredPlayTurn: state.turn.number,
+    abilities: [{
+      name: "Rob-'n'-Run",
+      type: 'Ability',
+      text: "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may have your opponent reveal their hand, and then you choose 2 Energy cards you find there and shuffle them into your opponent's deck.",
+    }],
+  });
+  state.players.p1.zones.active.push(thievul);
+  state.players.p2.zones.active.push(benchMon(71, 'Opp'));
+  oppHand(
+    state,
+    energyOn(90, 'Fire Energy', null),
+    energyOn(91, 'Water Energy', null),
+    energyOn(92, 'Grass Energy', null),
+    basicMon(93, 'Pichu')
+  );
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId), [90, 91, 92]);
+  const res2 = resolveWith(res1, [90, 92], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p2.zones.deck.map((c) => c.instanceId).sort(), [90, 92]);
+  assert.deepEqual(res2.state.players.p2.zones.hand.map((c) => c.instanceId).sort(), [91, 93]);
+  assert.ok(res2.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p2'));
+});
+
+test('ability: Tsareena Queenly Majesty reveals the hand, then you discard a card from it', () => {
+  const { state, rng } = setupGame();
+  const tsareena = createCard({
+    instanceId: 70,
+    name: 'Tsareena',
+    hp: 150,
+    supertype: 'Pokémon',
+    stage: 'Stage 2',
+    enteredPlayTurn: state.turn.number,
+    abilities: [{
+      name: 'Queenly Majesty',
+      type: 'Ability',
+      text: 'When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may have your opponent reveal their hand. Then, discard a card from it.',
+    }],
+  });
+  state.players.p1.zones.active.push(tsareena);
+  state.players.p2.zones.active.push(benchMon(71, 'Opp'));
+  oppHand(state, basicMon(90, 'Keep'), energyOn(91, 'Fire Energy', null));
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.equal(res1.pendingChoice.player, 'p1', 'the Ability user picks');
+  const res2 = resolveWith(res1, [91], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p2.zones.discard.map((c) => c.instanceId), [91]);
+  assert.deepEqual(res2.state.players.p2.zones.hand.map((c) => c.instanceId), [90]);
+});

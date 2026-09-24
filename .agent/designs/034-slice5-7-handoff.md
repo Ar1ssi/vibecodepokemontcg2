@@ -30,7 +30,8 @@ Six ability step types gained `EXTRA_STEP_HANDLERS` in `effects/trainer-steps.mj
 The WIP below was verified and corrected: parse site #6 (not #51) catches most move-Energy texts,
 so both now spread `parseMoveEnergyShape` (D123); the handler was rewritten (self/active/bench/
 between, target tags, forced single move auto-resolves). `atkMill` does have a handler. Farfetch'd
-is a Tool *search-attach*, fixed via `what: 'Pokémon Tool'`. Only the reveal-hand item remains.
+is a Tool *search-attach*, fixed via `what: 'Pokémon Tool'`. 5b-2 (reveal-hand) also done in S282 —
+slice 5 is complete; start at slice 6.
 
 ## (historical) Slice 5b WIP as handed off by S281
 
