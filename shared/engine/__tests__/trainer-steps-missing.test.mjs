@@ -680,6 +680,12 @@ test("opponentHandShuffleDeck: Morty shuffles 2 chosen cards from the opponent's
   const game = setup();
   const opponentHand = [card({ name: 'oh1' }), card({ name: 'oh2' }), card({ name: 'oh3' })];
   game.p2.zones.hand.push(...opponentHand);
+  // Morty's play condition (slice 11): a {P} Pokémon was Knocked Out last turn.
+  game.p1.flags = {
+    ...game.p1.flags,
+    koedLastOppTurn: true,
+    koedLastOppTurnVictims: [{ name: 'Gardevoir', types: ['Psychic'] }],
+  };
 
   const { res } = play(
     game,

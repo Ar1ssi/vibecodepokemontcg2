@@ -54,8 +54,8 @@
 //   { type: 'searchEvolve', noAbilities?: true }
 //   { type: 'prizeBargain', drawCount: N }
 //   { type: 'searchAttachEach', count: N, energy: '…', target: '…', poisonActive?: true }
-// parseTrainerEffect also returns `playCondition` ('opponentPrizes<=N' | 'morePrizesThanOpponent')
-// when the card can only be played under that condition.
+// parseTrainerEffect also returns `playCondition` (see parsePlayCondition; e.g. 'opponentPrizes<=N',
+// 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
 import { WORD_POKEMON_TYPES } from './search-match.mjs';
 
@@ -437,13 +437,13 @@ export function parseSearchDeckParams(lower) {
     };
   }
   if (
-    /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-\.]+?)\s+and put them onto your bench/.test(
+    /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-.]+?)\s+and put them onto your bench/.test(
       lower,
     ) &&
     !lower.includes('basic pok')
   ) {
     const namedBenchMulti = lower.match(
-      /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-\.]+?)\s+and put them onto your bench/
+      /search your deck for up to\s+(\d+)\s+([a-z][\w\s'\-.]+?)\s+and put them onto your bench/
     );
     return {
       what: namedBenchMulti[2].trim(),
@@ -780,12 +780,50 @@ function parseCoinFlipStep(lower) {
   return null;
 }
 
+const PLAY_STAGE_WORDS = { basic: 'Basic', 'stage 1': 'Stage 1', 'stage 2': 'Stage 2' };
+
+// Card-printed "only if …" / "you can't play this card if …" restrictions, as one condition
+// string evaluated by trainer-play-conditions.mjs. Hand counts include the Trainer itself.
 function parsePlayCondition(lower) {
   const oppPrizes = lower.match(/only if your opponent has\s+(\d+)\s+or fewer prize cards remaining/);
   if (oppPrizes) return `opponentPrizes<=${oppPrizes[1]}`;
-  if (lower.includes('only if you have more prize cards remaining than your opponent')) {
+  const exactPrizes = lower.match(/only if your opponent has exactly\s+(\d+)(?:\s+or\s+(\d+))?\s+prize cards remaining/);
+  if (exactPrizes) return `opponentPrizes==${[exactPrizes[1], exactPrizes[2]].filter(Boolean).join('|')}`;
+  if (/only if you have more prize cards (?:remaining|left) than your opponent/.test(lower)) {
     return 'morePrizesThanOpponent';
   }
+  const lostZone = lower.match(/only if you have\s+(\d+)\s+or more cards in the lost zone/);
+  if (lostZone) return `lostZone>=${lostZone[1]}`;
+  if (lower.includes('only if there is any stadium card in play')) return 'stadiumInPlay';
+  const oppStage = lower.match(/only if your opponent's active pokémon is a (basic|stage 1|stage 2) pokémon/);
+  if (oppStage) return `opponentActiveStage=${PLAY_STAGE_WORDS[oppStage[1]]}`;
+  if (lower.includes("only if your opponent's active pokémon is poisoned")) return 'opponentActivePoisoned';
+  const koed = lower.match(
+    /only if (?:any of your|1 of your) (\{[a-z]\} |team rocket's )?pokémon (?:were|was) knocked out during your opponent's last turn/
+  );
+  if (koed) {
+    const qualifier = (koed[1] || '').trim();
+    if (!qualifier) return 'koedLastTurn';
+    const symbol = qualifier.match(/^\{([a-z])\}$/);
+    return symbol ? `koedLastTurn:type=${symbol[1]}` : `koedLastTurn:name=${qualifier}`;
+  }
+  if (/only when it is the last card in your hand/.test(lower)) return 'lastCardInHand';
+  if (/can't play this card if you have any cards in your hand other than/.test(lower)) return 'lastCardInHand';
+  const fewerOthers = lower.match(/only if you have\s+(\d+)\s+or fewer other cards in your hand/);
+  if (fewerOthers) return `handCount<=${Number(fewerOthers[1]) + 1}`;
+  const tooMany = lower.match(/if you have\s+(\d+)\s+or more cards (?:\(including this one\) )?in your hand(?: \(including this one\))?, you can't play this card/)
+    || lower.match(/can't play this card if you have\s+(\d+)\s+or more cards in your hand/);
+  if (tooMany) return `handCount<=${Number(tooMany[1]) - 1}`;
+  const moreThan = lower.match(/if you have more than\s+(\d+)\s+cards (?:\(including this one\) )?in your hand, you can't play this card/);
+  if (moreThan) return `handCount<=${moreThan[1]}`;
+  if (
+    /if you have no other cards in your hand, you can't (?:use|play) this card/.test(lower) ||
+    /if this is the only card in your hand, you can't play this card/.test(lower)
+  ) {
+    return 'handCount>=2';
+  }
+  if (/only if you go second, and only (?:during|on) your first turn/.test(lower)) return 'secondPlayerFirstTurn';
+  if (/can use this card only during your first turn/.test(lower)) return 'firstTurnOnly';
   if (lower.includes("can't use this card during your first turn")) return 'notFirstTurn';
   return null;
 }

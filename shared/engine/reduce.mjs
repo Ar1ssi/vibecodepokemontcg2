@@ -924,6 +924,16 @@ function applyToolOnKoEffects(
   return outcome;
 }
 
+// The opponent's Active Pokémon as play conditions see it: the top of the stack, which
+// carries the stage/types; Special Conditions live on the root card.
+function opponentActiveTop(opponent) {
+  const active = opponent?.zones?.active || [];
+  const root = active.find((c) => !c.attachedTo);
+  if (!root) return null;
+  const top = topPokemonCard(active, root) || root;
+  return top === root ? root : { ...top, specialCondition: root.specialCondition, poisoned: root.poisoned, burned: root.burned };
+}
+
 /**
  * Handles Knockout resolution for a Pokemon:
  * - Grants the attacker a prize entitlement, settled by collectPrizeEntitlement
@@ -941,10 +951,6 @@ function handleKnockout(
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
   const victimPlayer = draft.players[victimPlayerId];
-  if (victimPlayer && draft.turn?.player !== victimPlayerId) {
-    victimPlayer.flags = { ...victimPlayer.flags, koedOnOppTurn: true };
-  }
-
   const wasActive = victimActive.some(
     (c) => c.instanceId === victim.instanceId
   );
@@ -955,6 +961,18 @@ function handleKnockout(
     : wasBench
       ? victimBench
       : [victim];
+
+  if (victimPlayer && draft.turn?.player !== victimPlayerId) {
+    // Typed "only if 1 of your {P} Pokémon was Knocked Out during your opponent's last
+    // turn" Trainers (Morty, Diantha, Team Rocket's Archer) need who was Knocked Out.
+    const top = topPokemonCard(victimZoneCards, victim) || victim;
+    const koVictim = { name: top.name || '', types: [...(top.types || [])] };
+    victimPlayer.flags = {
+      ...victimPlayer.flags,
+      koedOnOppTurn: true,
+      koedOnOppTurnVictims: [...(victimPlayer.flags?.koedOnOppTurnVictims || []), koVictim],
+    };
+  }
 
   const attacker = draft.players[attackerPlayerId];
   const attackerActive = attacker?.zones?.active?.find((c) => !c.attachedTo);
@@ -1812,6 +1830,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   // prize choice raised at the end of the command can be settled.
   const prizesOwed = draft.players[nextPlayerId].flags?.prizesOwed;
   const koedLastOppTurn = !!draft.players[nextPlayerId].flags?.koedOnOppTurn;
+  const koedLastOppTurnVictims = draft.players[nextPlayerId].flags?.koedOnOppTurnVictims || [];
   // Game-scoped once-per-game markers live in `flags` too, so the wholesale
   // rebuild below must carry them across or they are silently forgotten — the
   // Legacy Energy prize reduction was spent again on a later KO.
@@ -1835,6 +1854,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     evolved: {},
     briarActive: false,
     koedLastOppTurn,
+    koedLastOppTurnVictims,
     ...(prizesOwed ? { prizesOwed } : {}),
     ...(legacyPrizeReductionUsed ? { legacyPrizeReductionUsed } : {}),
   };
@@ -2915,6 +2935,10 @@ export function validateLegality(state, command) {
           opponentBenchCount: (opponent?.zones?.bench || []).filter(
             (c) => !c.attachedTo
           ).length,
+          lostZoneCount: (player.zones?.lostZone || []).length,
+          opponentActive: opponentActiveTop(opponent),
+          koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
+          koedLastOppTurnVictims: player.flags?.koedLastOppTurnVictims || [],
           ...trainerTargetCounts(
             player,
             ownedCards(player),
