@@ -23,6 +23,24 @@ import {
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
 
+/**
+ * "During your next turn, this Pokémon's X attack's base damage is N / is doubled" (design
+ * 036 A8b). Only the printed base changes: "30+" extras stay on top, a "10×" attack scales
+ * per unit, and an attack whose effect already zeroed its damage stays at 0.
+ */
+function overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower) {
+  if (rawBase <= 0 || printedBase <= 0) return rawBase;
+  const marker = attackerMarkers.findLast(
+    (m) =>
+      m.kind === 'nextTurnBaseDamage' &&
+      (m.attackName === attackNameLower || `${m.attackName} attack` === attackNameLower)
+  );
+  if (!marker) return rawBase;
+  const newBase = marker.doubled ? printedBase * 2 : marker.value;
+  if (/[×x]\s*$/i.test(String(attack?.damage || ''))) return Math.round((rawBase / printedBase) * newBase);
+  return rawBase - printedBase + newBase;
+}
+
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
 // multiplier (2) or flat bonus (20/30).
@@ -57,7 +75,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
-  const base = baseDamage != null ? baseDamage : (parseInt(attack?.damage, 10) || 0);
+  const printedBase = parseInt(attack?.damage, 10) || 0;
+  const rawBase = baseDamage != null ? baseDamage : printedBase;
+  const base = overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower);
 
   // Step 2: Attacker tool and ability damage bonuses (e.g. Choice Belt, Maximum Belt, Defiance Band)
   // Applied BEFORE Weakness and Resistance.

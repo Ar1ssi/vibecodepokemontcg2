@@ -155,7 +155,10 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
     });
   }
   if (branches.length > 0) return branches;
-  return sawConditional ? [] : legacyBranches(normalized);
+  // "This Pokémon can't become Asleep, Confused, Paralyzed, or Poisoned" names statuses it
+  // blocks (a statusImmunity marker), not ones it applies.
+  const applied = normalized.replace(/can't (?:be|become) (?:asleep|burned|confused|paralyzed|poisoned)[^.]*/g, '');
+  return sawConditional ? [] : legacyBranches(applied);
 }
 
 // `firstFlip` is a one-off condition, not a rung on the heads-count ladder.

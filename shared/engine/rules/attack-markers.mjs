@@ -49,6 +49,16 @@ export function hasMarker(markers, kind) {
   return (markers || []).some((marker) => marker.kind === kind);
 }
 
+/** Does a statusImmunity marker stop `condition` ("Poisoned", …) landing? */
+export function markersBlockCondition(markers, condition) {
+  const wanted = String(condition || '').toLowerCase();
+  return (markers || []).some(
+    (marker) =>
+      marker.kind === 'statusImmunity' &&
+      (marker.conditions == null || marker.conditions.some((c) => c.toLowerCase() === wanted))
+  );
+}
+
 function stageOf(card) {
   const labels = [card?.stage, ...(card?.subtypes || [])].map((s) => String(s || '').toLowerCase());
   if (labels.includes('stage 2')) return 2;
@@ -173,6 +183,8 @@ const WINDOW_PHRASES = [
   ],
   [/^(.+) until the end of your next turn$/, 'throughYourNextTurn'],
   [/^until the end of your next turn, (.+)$/, 'throughYourNextTurn'],
+  // Older wording: "Your opponent can't attach Energy … during his or her next turn."
+  [/^(.+) during their next turn$/, 'opponentNextTurn'],
 ];
 
 // "{c}{c}" → 2
@@ -296,6 +308,57 @@ const MARKER_BODIES = [
     null,
     (m) => ({ kind: 'retreatDelta', amount: symbolCount(m[1]) }),
   ],
+  // Design 036 A8b. Energy attach lock on the Defending Pokémon, read by attachCard legality.
+  [
+    /^(?:your opponent can't attach (?:any )?(special )?energy(?: cards)? (?:from their hand )?to (?:your opponent's|their|the) active pokémon|energy cards can't be attached from your opponent's hand to (?:your opponent's active pokémon|that pokémon))$/,
+    'opponentActive',
+    null,
+    (m) => ({ kind: 'attachLock', ...(m[1] ? { specialOnly: true } : {}) }),
+  ],
+  // Dark Omastar Dark Tentacle: blocks evolving from the hand only.
+  [
+    /^your opponent's active pokémon can't evolve(?: except from effects of attacks or pokémon powers)?$/,
+    'opponentActive',
+    null,
+    () => ({ kind: 'evolveLock' }),
+  ],
+  // Goodra Shining Breath / Bayleef Pollen Shield. `conditions: null` blocks every one.
+  [/^this pokémon can't (?:be|become) affected by (?:any special conditions|a special condition)$/, 'self', null, () => ({ kind: 'statusImmunity', conditions: null })],
+  [
+    /^this pokémon can't become ((?:asleep|burned|confused|paralyzed|poisoned)(?:,? (?:or )?(?:asleep|burned|confused|paralyzed|poisoned))*)$/,
+    'self',
+    null,
+    (m) => ({
+      kind: 'statusImmunity',
+      conditions: m[1].match(/asleep|burned|confused|paralyzed|poisoned/g).map((c) => c[0].toUpperCase() + c.slice(1)),
+    }),
+  ],
+  // "During your next turn, this Pokémon's X attack's base damage is N": computeAttackDamage
+  // swaps the printed base for the named attack. Possessive self names stay in place.
+  [
+    /^(?:(?:this pokémon|[^,]+)'s )?([^,]+?)(?: attack)?'s base damage is (\d+)(?: instead of \d+)?$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], value: Number(m[2]) }),
+  ],
+  [
+    /^base damage of (?:this pokémon|[^,]+)'s ([^,]+?)(?: is attack)? is (\d+) instead of \d+$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], value: Number(m[2]) }),
+  ],
+  [
+    /^(?:this pokémon|[^,]+)'s ([^,]+?) attack does (\d+) damage instead of \d+$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], value: Number(m[2]) }),
+  ],
+  [
+    /^(?:this pokémon|[^,]+)'s ([^,]+?)(?: attack)?'s (?:base )?damage(?: \([^)]*\))? is doubled$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], doubled: true }),
+  ],
   // Galarian Slowking V Word of Ruin: resolveCheckup knocks the marked Pokémon out.
   [
     /^at the end of the turn, your opponent's active pokémon will be knocked out$/,
@@ -378,7 +441,7 @@ export function parseMarkerSentence(sentence, context = {}) {
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
   [
-    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|until the end of your) next turn$)/,
+    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
   ],
 ];

@@ -31,7 +31,9 @@ import { shuffleInPlace } from '../rng.mjs';
 import {
   addAttackMarker,
   clearAttackMarkers,
+  liveAttackMarkers,
   markerFromTurn,
+  markersBlockCondition,
   markerUntilTurn,
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
@@ -1312,6 +1314,11 @@ function atkChooseCondition(ctx) {
   if (ctx.selection) {
     const condition = conditions[Number(ctx.selection[0]) - 1];
     if (!condition) return skip(ctx, 'invalid_condition');
+    const markers = liveAttackMarkers(target, {
+      turnNumber: ctx.draft.turn?.number || 1,
+      zoneCards: opponent.zones?.active || [],
+    });
+    if (markersBlockCondition(markers, condition)) return skip(ctx, 'status_immune');
     addCondition(target, condition);
     ctx.events.push({
       type: 'specialConditionUpdated',

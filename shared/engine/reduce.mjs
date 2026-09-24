@@ -82,6 +82,7 @@ import {
   attackerMatchesFilter,
   clearAttackMarkers,
   liveAttackMarkers,
+  markersBlockCondition,
   parseDamageImmunity,
 } from './rules/attack-markers.mjs';
 import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
@@ -462,6 +463,21 @@ function activeAttackMarkers(draft, playerId, card) {
     turnNumber: draft.turn?.number || 1,
     zoneCards: active,
   });
+}
+
+function attachLockReason(state, card, targetInstanceId) {
+  const targetRef = findCard(state, targetInstanceId);
+  if (!targetRef?.card) return null;
+  const markers = activeAttackMarkers(state, targetRef.playerId, targetRef.card);
+  if (isEnergy(card)) {
+    const special = !isBasicEnergy(card);
+    const locked = markers.some((m) => m.kind === 'attachLock' && (!m.specialOnly || special));
+    return locked ? "An attack stops Energy being attached to that Pokémon this turn." : null;
+  }
+  if (isPokemon(card) && markers.some((m) => m.kind === 'evolveLock')) {
+    return "An attack stops that Pokémon evolving this turn.";
+  }
+  return null;
 }
 
 /** The defending player's flip for a surviveKnockOutCoin marker: true on heads. */
@@ -2218,6 +2234,12 @@ export function validateLegality(state, command) {
 
     case 'attachCard': {
       const cardRef = findCard(state, payload.instanceId);
+      // Palkia Cross Slicer / Dark Omastar Dark Tentacle (design 036 A8b): locks from an
+      // attack on the target Pokémon, for cards played from the hand.
+      if (cardRef?.zoneId === 'hand') {
+        const lockReason = attachLockReason(state, cardRef.card, payload.targetInstanceId);
+        if (lockReason) return { allowed: false, reason: lockReason };
+      }
       if (cardRef && isEnergy(cardRef.card)) {
         if (player.flags?.energyAttached) {
           // Check for unlimited energy acceleration abilities (Phase 4)
@@ -4210,7 +4232,9 @@ function resolveAttackEffectPhase(draft, ctx) {
         // Only apply condition if defender survived the attack (not KO'd)
         const defRef = findCard(draft, defender.instanceId);
         if (defRef && defRef.zoneId === 'active') {
+          const defMarkers = activeAttackMarkers(draft, defRef.playerId, defRef.card);
           for (const cond of defenderConditions) {
+            if (markersBlockCondition(defMarkers, cond)) continue;
             addCondition(defRef.card, cond);
             events.push(conditionsUpdatedEvent(defRef.card, cond));
           }
@@ -4220,7 +4244,9 @@ function resolveAttackEffectPhase(draft, ctx) {
       if (attackerConditions.length > 0 && attacker) {
         const atkRef = findCard(draft, attacker.instanceId);
         if (atkRef && atkRef.zoneId === 'active') {
+          const atkMarkers = activeAttackMarkers(draft, atkRef.playerId, atkRef.card);
           for (const cond of attackerConditions) {
+            if (markersBlockCondition(atkMarkers, cond)) continue;
             addCondition(atkRef.card, cond);
             events.push(conditionsUpdatedEvent(atkRef.card, cond));
           }
