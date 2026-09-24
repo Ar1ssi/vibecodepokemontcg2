@@ -5,45 +5,41 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 282
-Focus: design 034 (ability behaviour), slices 1-5a done earlier (see journal S279-S281). S282
-  verified + fixed the S281 slice-5b WIP: `parseMoveEnergyShape` (D123) gives every move-Energy
-  Ability a printed destination (self/active/bench/between, target tags); `moveEnergyAbility`
-  handler honours it and auto-moves a forced single Energy; widened when-played preamble now runs
-  Durant ex / Gyarados "must" / Mawile via templates; Farfetch'd Tool search reads `Pokémon Tool`
-  (ability search parser, `matchesSearch`, `searchAttachStep`). 5b-2: reveal-hand Abilities run
-  via `abilityRevealVoice` + `atkRevealOppHand` bench/deckShuffle actions; oracle `opp:hand-revealed`.
-Active: slice 5 complete on `claude/exciting-meitner-pt47ts`. Next: slice 6 (executor batch B)
-  then 7 (`.agent/designs/034-slice5-7-handoff.md`, ledger in NEXTSTEPS.md).
-Next: design 034 slices 6/7. Oracle baseline stale-low for ~11 attack families (pre-existing). Move-energy gaps: Plasma Energy filter unread; compound move+switch
-  texts (Iron Leaves, Articuno-GX, Tapu Koko-GX, Croconaw) run only the move half. Slice-5a gaps:
-  hand-activated placement abilities blocked by `validateReferences`; `swapActive` untested.
-  Slice-4: extra attack skips resolveCheckup — confirm live. Slice-3 gaps: Special Energy play
-  lock on attachCard; inspector `listAbilities` lacks suppression ctx; addCondition immunity can't
-  see suppression. Slice 2: "for each" scaling returns 0; client `listAttacks` lacks ability-cost
-  options. Maintenance due (S270, still not run). I126/I127, I121-I125, I113. Design-number
-  collision 032. Pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy.
+Session: 283
+Focus: design 034 (ability behaviour). S283 shipped slice 6 (executor batch B) in 4 commits
+  (6a-6d): all 14 one-off families from the design's slice-6 row now execute, with 49 tests in
+  `shared/engine/__tests__/ability-one-offs.test.mjs`. Along the way: trainer "Your turn ends."
+  is now enforced server-side, the legacy Pokémon Power "can't be used if Asleep…" clause is a
+  use gate instead of a misparsed status (D125), and Energy-as-Pokémon cards use `asEnergy` (D124).
+Active: slice 6 complete on `claude/exciting-meitner-pt47ts` (3c7266db). Next: slice 7, the
+  regression gate (`scripts/audit-ability-behaviour.mjs` + baseline, `pnpm audit:abilities`).
+Next: design 034 slice 7 — also ADD then close I128/I129/I130 (referenced by the design, never
+  filed in ISSUES.md). Slice-6 gaps: Manectric bench option, Unown S prize peek, Heat Metal/
+  Overheater, I131. Oracle baseline stale-low for ~11 attack families (pre-existing). Move-energy
+  gaps: Plasma Energy filter; compound move+switch texts run only the move half. Slice-4: extra
+  attack skips resolveCheckup — confirm live. Slice-3 gaps: Special Energy play lock on
+  attachCard; inspector `listAbilities` lacks suppression ctx; addCondition immunity can't see
+  suppression. Slice 2: "for each" scaling returns 0; client `listAttacks` lacks ability-cost and
+  borrowed-attack options. Maintenance due (S270, still not run). I126/I127, I121-I125, I113.
+  Design-number collision 032. Pending: designs 028 (I85), 029 (I86), #5 description (I87), I84.
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Design 034 is on remote branch `claude/exciting-meitner-pt47ts` (from `ability-behaviour-s5b-7-handoff`,
-  the pushed copy of local `feature/ability-behaviour`); merge to main then sync the primary folder. Main
-  checkout still holds the untracked copy of `.agent/designs/034-*.md` — delete it before merging
-  (the branch tracks the file) and expect main's uncommitted S278 STATE/journal to conflict.
-- `pnpm audit:oracle` (~2 min, D108) after engine attack/ability changes; legit rate changes →
-  update the baseline deliberately. `pnpm test` baseline now: 3399 pass, 1 pre-existing fail
-  (card-inspector-model "retreat greys…"); lint is prettier-warning noise only.
-- Working-copy files are CRLF (repo LF); use the Write/Edit tools for edits — bash rewrites can
-  re-encode. Editing via bash heredoc eats `\`.
-- Ability reads must go through `cardAbilityText` (plural `abilities[]`, I128); ability-combat may
-  import tool-combat, ability-triggers may import both (D119), but nothing they import may reach
-  special-conditions (addCondition imports abilityStatusImmune — keep that direction only).
-- New design-034 state lives on `draft.__koEnergyMoves` (tail-settled, not flags) and per-turn
-  `flags.attacksThisTurn`; `movedToActiveTurn` is stamped by the single post-command diff, never at
-  individual switch sites. Ability executables are registered in `EXTRA_STEP_HANDLERS`
-  (trainer-steps.mjs), which `isExecutableStepType` picks up automatically.
+- Design 034 lives on remote branch `claude/exciting-meitner-pt47ts`; merge to main then sync the
+  primary folder. Main checkout still holds an untracked copy of `.agent/designs/034-*.md` —
+  delete it before merging and expect main's uncommitted S278 STATE/journal to conflict.
+- `pnpm audit:oracle` (~2 min, D108) after engine ability changes; diff rows with `--rows` against
+  the previous commit before re-ratcheting, and edit only the affected families. `pnpm test`
+  baseline: 3464 pass, 1 pre-existing fail (card-inspector-model "retreat greys…").
+- Ability reads go through `cardAbilityText` (I128); D117 import direction: nothing
+  ability-combat imports may reach special-conditions (it now imports evolved-pokemon/evolution —
+  checked acyclic). Coin flips go through `flipCoin(rng)` so Contrary's forced tails apply.
+- Reducer-only ability outcomes (self-KO, win) are events settled by `settleAbilityOutcomes`
+  after useAbility and ability resumes; hand-activated abilities are legal only from the hand
+  (`isHandActivatedAbility`) and have no client button yet (I131).
+- New ability executables register in `EXTRA_STEP_HANDLERS` (trainer-steps.mjs).
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S282 design 034 slice 5b: move-Energy shape (D123), when-played must/Bench, Tool search, reveal-hand Abilities.
+- S283 design 034 slice 6: 14 one-off ability families (6a-6d, D124/D125, I131 filed).
+- S282 design 034 slice 5b: move-Energy shape (D123), when-played must/Bench, Tool search, reveal-hand.
 - S281 design 034 slice 5a: six ability step executables in `EXTRA_STEP_HANDLERS` (c6392bb8).
-- S281 design 034 slice 4b: on-promotion window (D120), on-KO energy moves (D121), extra attack (D122).

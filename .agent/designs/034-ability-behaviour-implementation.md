@@ -232,3 +232,13 @@ Self-approval checklist (only when the user is unreachable):
 - [ ] Interfaces fully named and typed — no hand-waving
 - [ ] Slices each ≤1 session and independently green
 - [ ] No section reads "TBD"
+- Slice 6 registers the one-off executables in `EXTRA_STEP_HANDLERS` (as slice 5), not a new
+  `effects/ability-steps.mjs`. Outcomes needing the reducer's KO/game-end flow (Buzzap self-KO,
+  win-game) arrive as events settled by `settleAbilityOutcomes` (D124).
+- Slice 6 turn-not-end needed the missing trainer "Your turn ends." rule itself
+  (`endTurnAfterTrainer`); coin-conditional endings stay open (I131).
+- Slice 6 stripped the legacy "power can't be used if … Asleep, Confused, or Paralyzed" clause
+  from status parsing and made it an activation gate (D125); the oracle baseline was re-ratcheted
+  for the 5 families those 36 misparsed rows inflated. `attackCopyAbility` reuses
+  `copiedAttackFor` via `attackViewFor` rather than the copy-attack prompt: borrowed attacks are
+  listed as the copier's own (legality, cost and execution all read the same view).
